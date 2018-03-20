@@ -11,10 +11,10 @@ open Logging.Node.Main
 
 let genesis : State.Chain.genesis = {
   time =
-    Time.of_notation_exn "2018-03-09T13:05:42Z" ;
+    Time.of_notation_exn "2018-03-18T17:36:14Z" ;
   block =
     Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesis1962feAyDRw" ;
+      "BLockGenesisGenesisGenesisGenesisGenesisd83c5erKDpS" ;
   protocol =
     Protocol_hash.of_b58check_exn
       "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
@@ -92,7 +92,7 @@ let init_logger ?verbosity (log_config : Node_config_file.log) =
 
 let init_node ?sandbox (config : Node_config_file.t) =
   let patch_context json ctxt =
-    let module Proto = (val Registred_protocol.get_exn genesis.protocol) in
+    let module Proto = (val Registered_protocol.get_exn genesis.protocol) in
     protect begin fun () ->
       Proto.configure_sandbox ctxt json
     end >|= function

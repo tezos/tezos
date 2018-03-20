@@ -32,6 +32,11 @@ type validation_result = {
       operations whose 'branch' is older than 'ttl' blocks in the
       past cannot be included in the next block. *)
 
+  last_allowed_fork_level: Int32.t ;
+  (** The level of the last block for which the node might consider an
+      alternate branch. The shell should consider as invalid any
+      branch whose fork point is older than the given level *)
+
 }
 
 type quota = {

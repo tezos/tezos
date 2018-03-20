@@ -36,9 +36,3 @@ module Index = struct
       end
     | _ -> None
 end
-
-let rec too_many_roll next =
-  if Compare.Int32.(next < 100_000l) then
-    0
-  else
-    1 + too_many_roll (Int32.div next 2l)

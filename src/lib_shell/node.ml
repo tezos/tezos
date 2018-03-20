@@ -34,7 +34,7 @@ let inject_protocol state ?force:_ proto =
         State.Protocol.store state proto >>= function
         | None ->
             failwith
-              "Previously registred protocol (%a)"
+              "Previously registered protocol (%a)"
               Protocol_hash.pp_short hash
         | Some _ -> return ()
   in
@@ -547,7 +547,7 @@ module RPC = struct
         | None -> Lwt.fail Not_found
         | Some { context = ctxt } ->
             Context.get_protocol ctxt >>= fun protocol_hash ->
-            let (module Proto) = Registred_protocol.get_exn protocol_hash in
+            let (module Proto) = Registered_protocol.get_exn protocol_hash in
             Base58.complete str >>= fun l1 ->
             Proto.complete_b58prefix ctxt str >>= fun l2 ->
             Lwt.return (l1 @ l2)
@@ -557,7 +557,7 @@ module RPC = struct
     | None -> Lwt.return None
     | Some rpc_context ->
         Context.get_protocol rpc_context.context >>= fun protocol_hash ->
-        let (module Proto) = Registred_protocol.get_exn protocol_hash in
+        let (module Proto) = Registered_protocol.get_exn protocol_hash in
         let dir = RPC_directory.map (fun () -> Lwt.return rpc_context) Proto.rpc_services in
         Lwt.return (Some (RPC_directory.map (fun _ -> ()) dir))
 

@@ -112,12 +112,16 @@ let commands () =
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
         Client_proto_contracts.get_delegate
-          cctxt cctxt#block contract >>=? fun delegate ->
-        Public_key_hash.rev_find cctxt delegate >>=? fun mn ->
-        Public_key_hash.to_source delegate >>=? fun m ->
-        cctxt#message "%s (%s)" m
-          (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
-        return ()
+          cctxt cctxt#block contract >>=? function
+        | None ->
+            cctxt#message "none" >>= fun () ->
+            return ()
+        | Some delegate ->
+            Public_key_hash.rev_find cctxt delegate >>=? fun mn ->
+            Public_key_hash.to_source delegate >>=? fun m ->
+            cctxt#message "%s (%s)" m
+              (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
+            return ()
       end ;
 
     command ~group ~desc: "Set the delegate of a contract."

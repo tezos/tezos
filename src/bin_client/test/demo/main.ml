@@ -89,7 +89,9 @@ let finalize_block ctxt =
   let message = Some (Format.asprintf "fitness <- %Ld" fitness) in
   let fitness = Fitness.from_int64 fitness in
   return { Updater.message ; context = ctxt.context ; fitness ;
-           max_operations_ttl = 0 ; max_operation_data_length = 0 }
+           max_operations_ttl = 0 ; max_operation_data_length = 0 ;
+           last_allowed_fork_level = 0l ;
+         }
 
 let rpc_services = RPC_directory.empty
 

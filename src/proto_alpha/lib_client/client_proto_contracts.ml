@@ -135,15 +135,7 @@ let get_manager cctxt block source =
   | None -> Alpha_services.Contract.manager cctxt block source
 
 let get_delegate cctxt block source =
-  match Contract.is_implicit source with
-  | Some hash -> return hash
-  | None ->
-      Alpha_services.Contract.delegate_opt cctxt
-        block source >>=? function
-      | Some delegate ->
-          return delegate
-      | None ->
-          Alpha_services.Contract.manager cctxt block source
+  Alpha_services.Contract.delegate_opt cctxt block source
 
 let may_check_key sourcePubKey sourcePubKeyHash =
   match sourcePubKey with

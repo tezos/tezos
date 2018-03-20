@@ -87,6 +87,7 @@ module Raw_level : sig
   val succ: raw_level -> raw_level
   val pred: raw_level -> raw_level option
   val to_int32: raw_level -> int32
+  val of_int32: int32 -> raw_level tzresult
 
 end
 
@@ -99,6 +100,8 @@ module Cycle : sig
   val root: cycle
   val succ: cycle -> cycle
   val pred: cycle -> cycle option
+  val add: cycle -> int -> cycle
+  val sub: cycle -> int -> cycle option
   val to_int32: cycle -> int32
 
 end
@@ -252,27 +255,31 @@ end
 module Constants : sig
 
   val proof_of_work_nonce_size: int
-  val baking_reward: Tez.t
+  val block_reward: Tez.t
   val endorsement_reward: Tez.t
   val nonce_length: int
   val seed_nonce_revelation_tip: Tez.t
   val origination_burn: Tez.t
-  val baking_bond_cost: Tez.t
-  val endorsement_bond_cost: Tez.t
+  val block_security_deposit: Tez.t
+  val endorsement_security_deposit: Tez.t
   val faucet_credit: Tez.t
+  val max_revelations_per_block: int
 
-  val cycle_length: context -> int32
-  val voting_period_length: context -> int32
-  val time_before_reward: context -> Period.t
-  val slot_durations: context -> Period.t list
+  val preserved_cycles: context -> int
+  val blocks_per_cycle: context -> int32
+  val blocks_per_commitment: context -> int32
+  val blocks_per_roll_snapshot: context -> int32
+  val blocks_per_voting_period: context -> int32
+  val time_between_blocks: context -> Period.t list
   val first_free_baking_slot: context -> int
-  val max_signing_slot: context -> int
+  val endorsers_per_block: context -> int
   val max_gas: context -> int
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Ed25519.Public_key.t
-  val max_number_of_operations: context -> int list
   val max_operation_data_length: context -> int
+  val tokens_per_roll: context -> Tez.t
   val michelson_maximum_type_size: context -> int
+
 end
 
 module Voting_period : sig
@@ -303,6 +310,7 @@ module Level : sig
     cycle_position: int32 ;
     voting_period: Voting_period.t ;
     voting_period_position: int32 ;
+    expected_commitment: bool ;
   }
   include BASIC_DATA with type t := t
   val pp_full: Format.formatter -> t -> unit
@@ -321,6 +329,8 @@ module Level : sig
 
   val last_level_in_cycle: context -> Cycle.t -> level
   val levels_in_cycle: context -> Cycle.t -> level list
+
+  val last_allowed_fork_level: context -> Raw_level.t
 
 end
 
@@ -343,20 +353,23 @@ module Nonce : sig
   type nonce = t
   val encoding: nonce Data_encoding.t
 
+  type unrevealed = {
+    nonce_hash: Nonce_hash.t ;
+    delegate: public_key_hash ;
+    deposit: Tez.t ;
+    rewards: Tez.t ;
+    fees: Tez.t ;
+  }
+
   val record_hash:
-    context -> public_key_hash -> Tez.t -> Nonce_hash.t ->
-    context tzresult Lwt.t
+    context -> unrevealed -> context tzresult Lwt.t
 
   val reveal:
     context -> Level.t -> nonce ->
-    (context * public_key_hash * Tez.t) tzresult Lwt.t
+    context tzresult Lwt.t
 
   type status =
-    | Unrevealed of {
-        nonce_hash: Nonce_hash.t ;
-        delegate_to_reward: public_key_hash ;
-        reward_amount: Tez.t ;
-      }
+    | Unrevealed of unrevealed
     | Revealed of nonce
 
   val get: context -> Level.t -> status tzresult Lwt.t
@@ -369,8 +382,13 @@ end
 
 module Seed : sig
 
-  val compute_for_cycle: context -> Cycle.t -> context tzresult Lwt.t
-  val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t
+  type error +=
+    | Unknown of { oldest : Cycle.t ;
+                   cycle : Cycle.t ;
+                   latest : Cycle.t }
+
+  val cycle_end:
+    context -> Cycle.t -> (context * Nonce.unrevealed list) tzresult Lwt.t
 
 end
 
@@ -451,7 +469,7 @@ module Contract : sig
   val check_counter_increment:
     context -> contract -> int32 -> unit tzresult Lwt.t
 
-  module Big_map_storage : sig
+  module Big_map : sig
     val set:
       context -> contract ->
       string -> Script.expr -> context tzresult Lwt.t
@@ -476,6 +494,32 @@ module Delegate : sig
     init:'a -> f:(public_key_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
   val list: context -> public_key_hash list Lwt.t
+
+  val freeze_deposit:
+    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+
+  val freeze_rewards:
+    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+
+  val freeze_fees:
+    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+
+  val cycle_end:
+    context -> Cycle.t -> Nonce.unrevealed list -> context tzresult Lwt.t
+
+  val punish:
+    context -> public_key_hash -> Cycle.t ->
+    (context * Tez.t) tzresult Lwt.t
+
+  val has_frozen_balance:
+    context -> public_key_hash -> Cycle.t ->
+    bool tzresult Lwt.t
+
+  val frozen_balance:
+    context -> public_key_hash -> Tez.t tzresult Lwt.t
+
+  val full_balance:
+    context -> public_key_hash -> Tez.t tzresult Lwt.t
 
 end
 
@@ -525,8 +569,57 @@ module Vote : sig
 
 end
 
+module Block_header : sig
+
+  type t = {
+    shell: Block_header.shell_header ;
+    protocol_data: protocol_data ;
+    signature: Ed25519.Signature.t ;
+  }
+
+  and protocol_data = {
+    priority: int ;
+    seed_nonce_hash: Nonce_hash.t option ;
+    proof_of_work_nonce: MBytes.t ;
+  }
+
+  type block_header = t
+
+  type raw = Block_header.t
+  type shell_header = Block_header.shell_header
+
+  val hash: block_header -> Block_hash.t
+  val hash_raw: raw -> Block_hash.t
+
+  val encoding: block_header Data_encoding.encoding
+  val raw_encoding: raw Data_encoding.t
+  val protocol_data_encoding: protocol_data Data_encoding.encoding
+  val shell_header_encoding: shell_header Data_encoding.encoding
+
+  val max_header_length: int
+  (** The maximum size of block headers in bytes *)
+
+  val parse: Block_header.t -> block_header tzresult
+  (** Parse the protocol-specific part of a block header. *)
+
+  val parse_unsigned_protocol_data: MBytes.t -> protocol_data tzresult
+  (** Parse the (unsigned) protocol-specific part of a block header. *)
+
+  val forge_unsigned_protocol_data: protocol_data -> MBytes.t
+  (** [forge_header proto_hdr] is the binary serialization
+      (using [protocol_data_encoding]) of the protocol-specific part
+      of a block header, without the signature. *)
+
+  val forge_unsigned:
+    Block_header.shell_header -> protocol_data -> MBytes.t
+    (** [forge_header shell_hdr proto_hdr] is the binary serialization
+        (using [unsigned_header_encoding]) of a block header,
+        comprising both the shell and the protocol part of the header,
+        without the signature. *)
+
+end
+
 type operation = {
-  hash: Operation_hash.t ;
   shell: Operation.shell_header ;
   contents: proto_operation ;
   signature: signature option ;
@@ -540,6 +633,14 @@ and anonymous_operation =
   | Seed_nonce_revelation of {
       level: Raw_level.t ;
       nonce: Nonce.t ;
+    }
+  | Double_endorsement_evidence of {
+      op1: operation ;
+      op2: operation ;
+    }
+  | Double_baking_evidence of {
+      bh1: Block_header.t ;
+      bh2: Block_header.t ;
     }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
@@ -612,10 +713,11 @@ module Operation : sig
   type t = operation
   val encoding: operation Data_encoding.t
 
+  val hash: operation -> Operation_hash.t
   val hash_raw: raw -> Operation_hash.t
 
   type error += Cannot_parse_operation (* `Branch *)
-  val parse: Operation_hash.t -> Operation.t -> operation tzresult
+  val parse: Operation.t -> operation tzresult
   val acceptable_passes: operation -> int list
 
   val parse_proto:
@@ -635,62 +737,10 @@ module Operation : sig
 
 end
 
-module Block_header : sig
-
-  type t = {
-    shell: Block_header.shell_header ;
-    protocol_data: protocol_data ;
-    signature: Ed25519.Signature.t ;
-  }
-
-  and protocol_data = {
-    priority: int ;
-    seed_nonce_hash: Nonce_hash.t ;
-    proof_of_work_nonce: MBytes.t ;
-  }
-
-  type block_header = t
-
-  type raw = Block_header.t
-  type shell_header = Block_header.shell_header
-
-  val hash: block_header -> Block_hash.t
-  val hash_raw: raw -> Block_hash.t
-
-  val encoding: block_header Data_encoding.encoding
-  val raw_encoding: raw Data_encoding.t
-  val protocol_data_encoding: protocol_data Data_encoding.encoding
-  val shell_header_encoding: shell_header Data_encoding.encoding
-
-  val max_header_length: int
-  (** The maximum size of block headers in bytes *)
-
-  val parse: Block_header.t -> block_header tzresult
-  (** Parse the protocol-specific part of a block header. *)
-
-  val parse_unsigned_protocol_data: MBytes.t -> protocol_data tzresult
-  (** Parse the (unsigned) protocol-specific part of a block header. *)
-
-  val forge_unsigned_protocol_data: protocol_data -> MBytes.t
-  (** [forge_header proto_hdr] is the binary serialization
-      (using [protocol_data_encoding]) of the protocol-specific part
-      of a block header, without the signature. *)
-
-  val forge_unsigned:
-    Block_header.shell_header -> protocol_data -> MBytes.t
-    (** [forge_header shell_hdr proto_hdr] is the binary serialization
-        (using [unsigned_header_encoding]) of a block header,
-        comprising both the shell and the protocol part of the header,
-        without the signature. *)
-
-end
-
 module Roll : sig
 
-  val value: context -> Tez.t
-
-  val freeze_rolls_for_cycle: context -> Cycle.t -> context tzresult Lwt.t
-  val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t
+  val snapshot_rolls: context -> context tzresult Lwt.t
+  val cycle_end: context -> Cycle.t -> context tzresult Lwt.t
 
   val baking_rights_owner:
     context -> Level.t -> priority:int -> public_key tzresult Lwt.t
@@ -700,21 +750,6 @@ module Roll : sig
 
   val delegate_pubkey:
     context -> public_key_hash -> public_key tzresult Lwt.t
-
-end
-
-module Reward : sig
-
-  val record:
-    context -> public_key_hash -> Cycle.t -> Tez.t -> context tzresult Lwt.t
-
-  val discard:
-    context -> public_key_hash -> Cycle.t -> Tez.t -> context tzresult Lwt.t
-
-  val set_reward_time_for_cycle:
-    context -> Cycle.t -> Time.t -> context tzresult Lwt.t
-
-  val pay_due_rewards: context -> context tzresult Lwt.t
 
 end
 
@@ -734,9 +769,3 @@ val fork_test_chain: context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
 val endorsement_already_recorded: context -> int -> bool
 val record_endorsement: context -> int -> context
-
-(**/**)
-
-(* HACK alphanet *)
-val faucet_count: context -> int
-val incr_faucet_count: context -> context

@@ -114,7 +114,7 @@ module Make (Encoding : ENCODING) = struct
 
   and 'key directory = 'key t
   and 'key static_directory = {
-    services : 'key registred_service_builder MethMap.t ;
+    services : 'key registered_service_builder MethMap.t ;
     subdirs : 'key static_subdirectories option
   }
 
@@ -122,16 +122,16 @@ module Make (Encoding : ENCODING) = struct
     | Suffixes: 'key directory StringMap.t -> 'key static_subdirectories
     | Arg: 'a Resto.Internal.arg * ('key * 'a) directory -> 'key static_subdirectories
 
-  and registred_service =
+  and registered_service =
     | Service :
         { types : ('q, 'i, 'o, 'e) types ;
           handler : ('q -> 'i -> ('o, 'e) Answer.t Lwt.t) ;
-        } -> registred_service
+        } -> registered_service
 
-  and 'key registred_service_builder = {
+  and 'key registered_service_builder = {
     meth : Resto.meth ;
     description : Encoding.schema Description.service ;
-    builder : 'key -> registred_service ;
+    builder : 'key -> registered_service ;
   }
 
   let empty = Empty
@@ -154,7 +154,7 @@ module Make (Encoding : ENCODING) = struct
     : type a b.
       (a -> b) -> b static_directory -> a static_directory
     = fun f t ->
-      { services = MethMap.map (map_registred_service f) t.services ;
+      { services = MethMap.map (map_registered_service f) t.services ;
         subdirs = map_option (map_static_subdirectories f) t.subdirs ;
       }
 
@@ -169,9 +169,9 @@ module Make (Encoding : ENCODING) = struct
           let dir = map_directory (fun (a, x) -> f a, x) dir in
           Arg (arg, dir)
 
-  and map_registred_service
+  and map_registered_service
     : type a b.
-      (a -> b) -> b registred_service_builder -> a registred_service_builder
+      (a -> b) -> b registered_service_builder -> a registered_service_builder
     = fun f rs ->
       { rs with builder = (fun p -> rs.builder (f p)) }
 
@@ -314,7 +314,7 @@ module Make (Encoding : ENCODING) = struct
 
   and describe_service
     : type a.
-      a registred_service_builder -> Encoding.schema Description.service
+      a registered_service_builder -> Encoding.schema Description.service
     = fun { description ; _ } -> description
 
   and describe_query
@@ -382,7 +382,7 @@ module Make (Encoding : ENCODING) = struct
   let lookup
     : type a.
       a directory -> a -> meth -> string list ->
-      (registred_service, lookup_error) result Lwt.t
+      (registered_service, lookup_error) result Lwt.t
     = fun dir args meth path ->
       resolve [] dir args path >>= function
       | Error _ as err -> Lwt.return err

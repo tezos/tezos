@@ -43,9 +43,7 @@ val take_int32 : sequence -> int32 -> int32 * sequence
 (** {2 Predefined seeds} *****************************************************)
 
 val empty : seed
-val initial_seed_0 : seed
-val initial_seed_1 : seed
-val initial_seed_2 : seed
+val initial_seeds : int -> seed list
 
 (** {2 Entropy} **************************************************************)
 

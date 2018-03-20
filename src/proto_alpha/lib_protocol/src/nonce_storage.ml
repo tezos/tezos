@@ -30,35 +30,32 @@ let get_unrevealed c level =
     Raw_level_repr.(level.level < cur_level.level)
     Too_early_revelation >>=? fun () ->
   Storage.Seed.Nonce.get c level >>=? function
-  | Revealed _ ->
-      fail Previously_revealed_nonce
-  | Unrevealed { nonce_hash; delegate_to_reward ; reward_amount  } ->
-      return (nonce_hash, delegate_to_reward, reward_amount)
+  | Revealed _ -> fail Previously_revealed_nonce
+  | Unrevealed status -> return status
 
-(* let get_unrevealed_hash c level = *)
-(* get_unrevealed c level >>=? fun (nonce_hash, _) -> *)
-(* return nonce_hash *)
-
-let record_hash c delegate_to_reward reward_amount nonce_hash =
+let record_hash c unrevealed =
   let level = Level_storage.current c in
-  Storage.Seed.Nonce.init c level
-    (Unrevealed { nonce_hash; delegate_to_reward ; reward_amount })
+  Storage.Seed.Nonce.init c level (Unrevealed unrevealed)
 
 let reveal c level nonce =
-  get_unrevealed c level >>=? fun (nonce_hash, delegate_to_reward, reward_amount) ->
+  get_unrevealed c level >>=? fun unrevealed ->
   fail_unless
-    (Seed_repr.check_hash nonce nonce_hash)
+    (Seed_repr.check_hash nonce unrevealed.nonce_hash)
     Unexpected_nonce >>=? fun () ->
   Storage.Seed.Nonce.set c level (Revealed nonce) >>=? fun c ->
-  return (c, delegate_to_reward, reward_amount)
+  return c
+
+type unrevealed = Storage.Seed.unrevealed_nonce = {
+  nonce_hash: Nonce_hash.t ;
+  delegate: Ed25519.Public_key_hash.t ;
+  deposit: Tez_repr.t ;
+  rewards: Tez_repr.t ;
+  fees: Tez_repr.t ;
+}
 
 type status = Storage.Seed.nonce_status =
-  | Unrevealed of {
-      nonce_hash: Nonce_hash.t ;
-      delegate_to_reward: Ed25519.Public_key_hash.t ;
-      reward_amount: Tez_repr.t ;
-    }
-  | Revealed of nonce
+  | Unrevealed of unrevealed
+  | Revealed of Seed_repr.nonce
 
 let get c level = Storage.Seed.Nonce.get c level
 

@@ -152,7 +152,6 @@ let create_base c contract
     match delegate with
     | None -> return c
     | Some delegate ->
-        Storage.Contract.Delegate.init c contract delegate >>=? fun c ->
         Delegate_storage.init c contract delegate
   end >>=? fun c ->
   Storage.Contract.Spendable.set c contract spendable >>= fun c ->
@@ -182,7 +181,6 @@ let delete c contract =
   Delegate_storage.remove c contract >>=? fun c ->
   Storage.Contract.Balance.delete c contract >>=? fun c ->
   Storage.Contract.Manager.delete c contract >>=? fun c ->
-  Storage.Contract.Delegate.remove c contract >>= fun c ->
   Storage.Contract.Spendable.del c contract >>= fun c ->
   Storage.Contract.Delegatable.del c contract >>= fun c ->
   Storage.Contract.Counter.delete c contract >>=? fun c ->
@@ -334,7 +332,7 @@ let spend_from_script c contract amount =
       else match Contract_repr.is_implicit contract with
         | None -> return c (* Never delete originated contracts *)
         | Some pkh ->
-            Storage.Contract.Delegate.get_option c contract >>=? function
+            Delegate_storage.get c contract >>=? function
             | Some pkh' ->
                 (* Don't delete "delegate" contract *)
                 assert (Ed25519.Public_key_hash.equal pkh pkh') ;
@@ -355,7 +353,20 @@ let credit c contract amount =
   | Some balance ->
       Lwt.return Tez_repr.(amount +? balance) >>=? fun balance ->
       Storage.Contract.Balance.set c contract balance >>=? fun c ->
-      Roll_storage.Contract.add_amount c contract amount
+      Roll_storage.Contract.add_amount c contract amount >>=? fun c ->
+      begin
+        match contract with
+        | Implicit delegate ->
+            Delegate_storage.registered c delegate >>= fun registered ->
+            if registered then
+              Roll_storage.Delegate.set_active c delegate >>=? fun c ->
+              return c
+            else
+              return c
+        | Originated _ ->
+            return c
+      end >>=? fun c ->
+      return c
 
 let spend c contract amount =
   is_spendable c contract >>=? fun spendable ->
@@ -367,9 +378,9 @@ let init c =
   Storage.Contract.Global_counter.init c 0l
 
 module Big_map = struct
-  let set handle key value =
-    Storage.Contract.Big_map.init_set handle key value >>= return
-  let remove = Storage.Contract.Big_map.delete
-  let mem = Storage.Contract.Big_map.mem
-  let get_opt = Storage.Contract.Big_map.get_option
+  let set ctxt contract key value =
+    Storage.Contract.Big_map.init_set (ctxt, contract) key value >>= return
+  let remove ctxt contract = Storage.Contract.Big_map.delete (ctxt, contract)
+  let mem ctxt contract = Storage.Contract.Big_map.mem (ctxt, contract)
+  let get_opt ctxt contract = Storage.Contract.Big_map.get_option (ctxt, contract)
 end

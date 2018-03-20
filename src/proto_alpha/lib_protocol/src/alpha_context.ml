@@ -56,42 +56,7 @@ type signature = Ed25519.Signature.t
 
 module Constants = struct
   include Constants_repr
-  let cycle_length c =
-    let constants = Raw_context.constants c in
-    constants.cycle_length
-  let voting_period_length c =
-    let constants = Raw_context.constants c in
-    constants.voting_period_length
-  let time_before_reward c =
-    let constants = Raw_context.constants c in
-    constants.time_before_reward
-  let slot_durations c =
-    let constants = Raw_context.constants c in
-    constants.slot_durations
-  let first_free_baking_slot c =
-    let constants = Raw_context.constants c in
-    constants.first_free_baking_slot
-  let max_signing_slot c =
-    let constants = Raw_context.constants c in
-    constants.max_signing_slot
-  let max_gas c =
-    let constants = Raw_context.constants c in
-    constants.max_gas
-  let proof_of_work_threshold c =
-    let constants = Raw_context.constants c in
-    constants.proof_of_work_threshold
-  let dictator_pubkey c =
-    let constants = Raw_context.constants c in
-    constants.dictator_pubkey
-  let max_number_of_operations c =
-    let constants = Raw_context.constants c in
-    constants.max_number_of_operations
-  let max_operation_data_length c =
-    let constants = Raw_context.constants c in
-    constants.max_operation_data_length
-  let michelson_maximum_type_size c =
-    let constants = Raw_context.constants c in
-    constants.michelson_maximum_type_size
+  include Constants_storage
 end
 
 module Voting_period = Voting_period_repr
@@ -103,14 +68,6 @@ end
 module Contract = struct
   include Contract_repr
   include Contract_storage
-
-  module Big_map_storage = struct
-    let set ctx contract = Contract_storage.Big_map.set (ctx, contract)
-    let remove ctx contract = Contract_storage.Big_map.remove (ctx, contract)
-    let mem ctx contract = Contract_storage.Big_map.mem (ctx, contract)
-    let get_opt ctx contract = Contract_storage.Big_map.get_opt (ctx, contract)
-  end
-
 end
 module Delegate = Delegate_storage
 module Roll = struct
@@ -123,7 +80,6 @@ module Seed = struct
   include Seed_storage
 end
 module Bootstrap = Bootstrap_storage
-module Reward = Reward_storage
 
 module Fitness = struct
 
@@ -142,15 +98,14 @@ let finalize ?commit_message:message c =
   let constants = Raw_context.constants c in
   { Updater.context ; fitness ; message ; max_operations_ttl = 60 ;
     max_operation_data_length = constants.max_operation_data_length ;
+    last_allowed_fork_level =
+      Raw_level.to_int32 @@ Level.last_allowed_fork_level c;
   }
 
 let configure_sandbox = Raw_context.configure_sandbox
 
 let activate = Raw_context.activate
 let fork_test_chain = Raw_context.fork_test_chain
-
-let faucet_count = Raw_context.faucet_count
-let incr_faucet_count = Raw_context.incr_faucet_count
 
 let endorsement_already_recorded = Raw_context.endorsement_already_recorded
 let record_endorsement = Raw_context.record_endorsement

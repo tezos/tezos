@@ -40,7 +40,7 @@ type result = {
   tezos_context : Alpha_context.t;
 }
 val get_op_header_res : result -> operation_header
-val get_protocol_data : int -> protocol_data
+val get_protocol_data : int -> bool -> protocol_data
 val get_op_header : Block_hash.t -> operation_header
 val make_sourced_operation :
   Operation.shell_header ->

@@ -18,8 +18,9 @@ let from_raw c ?offset l =
   let first_level = Raw_context.first_level c in
   Level_repr.from_raw
     ~first_level
-    ~cycle_length:constants.Constants_repr.cycle_length
-    ~voting_period_length:constants.Constants_repr.voting_period_length
+    ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
+    ~blocks_per_voting_period:constants.Constants_repr.blocks_per_voting_period
+    ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
     l
 
 let root c =
@@ -47,7 +48,7 @@ let first_level_in_cycle ctxt c =
        (Int32.add
           (Raw_level_repr.to_int32 first_level)
           (Int32.mul
-             constants.Constants_repr.cycle_length
+             constants.Constants_repr.blocks_per_cycle
              (Cycle_repr.to_int32 c))))
 
 let last_level_in_cycle ctxt c =
@@ -63,3 +64,24 @@ let levels_in_cycle ctxt c =
     else acc
   in
   loop first []
+
+let levels_with_commitments_in_cycle ctxt c =
+  let first = first_level_in_cycle ctxt c in
+  let rec loop n acc =
+    if Cycle_repr.(n.cycle = first.cycle)
+    then
+      if n.expected_commitment then
+        loop (succ ctxt n) (n :: acc)
+      else
+        loop (succ ctxt n) acc
+    else acc
+  in
+  loop first []
+
+
+let last_allowed_fork_level c =
+  let level = Raw_context.current_level c in
+  let preserved_cycles = Constants_storage.preserved_cycles c in
+  match Cycle_repr.sub level.cycle preserved_cycles with
+  | None -> Raw_level_repr.root
+  | Some cycle -> (first_level_in_cycle c cycle).level

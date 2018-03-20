@@ -34,7 +34,7 @@ let sed =
     "sed -i \
      -e 's/Time.of_notation_exn \"[^\\\"]*\"/Time.of_notation_exn \"%s\"/' \
      -e 's/BLockGenesisGenesisGenesisGenesisGenesis.........../%s/' \
-    ../src/bin_node/node_run_command.ml"
+     ../src/bin_node/node_run_command.ml"
     date
     genesis
 
@@ -45,7 +45,7 @@ let sed =
   Format.sprintf
     "sed -i \
      -e 's/name = \"TEZOS[^\"]*\" ;/name = \"TEZOS_%s\" ;/' \
-    ../src/lib_shell/distributed_db_message.ml"
+     ../src/lib_shell/distributed_db_message.ml"
     date
 
 let _ =

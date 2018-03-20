@@ -132,17 +132,16 @@ module I = struct
             forged_operation with
     | None -> Error_monad.fail Operation.Cannot_parse_operation
     | Some (shell, contents) ->
-        let operation = { hash ; shell ; contents ; signature } in
+        let operation = { shell ; contents ; signature } in
         let level = Alpha_context.Level.current ctxt in
         Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (baker_pk, _)) ->
         let baker_pkh = Ed25519.Public_key.hash baker_pk in
-        let baker_contract = Contract.implicit_contract baker_pkh in
         let block_prio = 0 in
         Apply.apply_operation
-          ctxt (Some baker_contract) pred_block block_prio operation
+          ctxt (Some baker_pkh) pred_block block_prio hash operation
         >>=? function
-        | (_ctxt, _, Some script_err) -> Lwt.return (Error script_err)
-        | (_ctxt, contracts, None) -> Lwt.return (Ok contracts)
+        | (_ctxt, _, Some script_err, _, _) -> Lwt.return (Error script_err)
+        | (_ctxt, contracts, None,_ , _) -> Lwt.return (Ok contracts)
 
 
   let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =
@@ -280,7 +279,7 @@ module Forge = struct
         ~input:
           (obj3
              (req "priority" uint16)
-             (req "nonce_hash" Nonce_hash.encoding)
+             (opt "nonce_hash" Nonce_hash.encoding)
              (dft "proof_of_work_nonce"
                 (Fixed.bytes
                    Alpha_context.Constants.proof_of_work_nonce_size)
@@ -425,8 +424,9 @@ module Forge = struct
 
   let protocol_data ctxt
       block
-      ~priority ~seed_nonce_hash
-      ?(proof_of_work_nonce = empty_proof_of_work_nonce) () =
+      ~priority ?seed_nonce_hash
+      ?(proof_of_work_nonce = empty_proof_of_work_nonce)
+      () =
     RPC_context.make_call0 S.protocol_data
       ctxt block () (priority, seed_nonce_hash, proof_of_work_nonce)
 
@@ -480,20 +480,20 @@ module Parse = struct
                 Roll.delegate_pubkey ctxt manager
           end >>=? fun public_key ->
           Operation.check_signature public_key
-            { signature ; shell ; contents ; hash = Operation_hash.zero }
+            { signature ; shell ; contents }
       | Sourced_operations (Consensus_operation (Endorsements { level ; slots ; _ })) ->
           let level = Level.from_raw ctxt level in
           Baking.check_endorsements_rights ctxt level slots >>=? fun public_key ->
           Operation.check_signature public_key
-            { signature ; shell ; contents ; hash = Operation_hash.zero }
+            { signature ; shell ; contents }
       | Sourced_operations (Amendment_operation { source ; _ }) ->
           Roll.delegate_pubkey ctxt source >>=? fun source ->
           Operation.check_signature source
-            { signature ; shell ; contents ; hash = Operation_hash.zero }
+            { signature ; shell ; contents }
       | Sourced_operations (Dictator_operation _) ->
           let key = Constants.dictator_pubkey ctxt in
           Operation.check_signature key
-            { signature ; shell ; contents ; hash = Operation_hash.zero }
+            { signature ; shell ; contents }
 
   end
 
@@ -501,7 +501,7 @@ module Parse = struct
     let open Services_registration in
     register0 S.operations begin fun ctxt () (operations, check) ->
       map_s begin fun raw ->
-        Lwt.return (Operation.parse (Operation.hash_raw raw) raw) >>=? fun op ->
+        Lwt.return (Operation.parse raw) >>=? fun op ->
         begin match check with
           | Some true -> I.check_signature ctxt op.signature op.shell op.contents
           | Some false | None -> return ()

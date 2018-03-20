@@ -17,15 +17,17 @@ type ('l, 'p) node =
   | Seq of 'l * ('l, 'p) node list * string option
 
 (** Encoding for expressions, as their {!canonical} encoding.
-    Locations are stored in a side table. *)
-val table_encoding :
+    Locations are stored in a side table.
+    See {!canonical_encoding} for the [variant] parameter. *)
+val table_encoding : variant:string ->
   'l Data_encoding.encoding -> 'p Data_encoding.encoding ->
   ('l, 'p) node Data_encoding.encoding
 
 (** Encoding for expressions, as their {!canonical} encoding.
     Locations are erased when serialized, and restored to a provided
-    default value when deserialized. *)
-val erased_encoding :
+    default value when deserialized.
+    See {!canonical_encoding} for the [variant] parameter. *)
+val erased_encoding : variant:string ->
   'l -> 'p Data_encoding.encoding -> ('l, 'p) node Data_encoding.encoding
 
 (** Extract the location of the node. *)
@@ -48,8 +50,11 @@ type canonical_location = int
 (** Encoding for canonical integer locations. *)
 val canonical_location_encoding : canonical_location Data_encoding.encoding
 
-(** Encoding for expressions in canonical form. *)
-val canonical_encoding : 'l Data_encoding.encoding -> 'l canonical Data_encoding.encoding
+(** Encoding for expressions in canonical form. The first parameter
+    is a name used to produce named definitions in the schemas. Make
+    sure to use different names if two expression variants with
+    different primitive encodings are used in the same schema. *)
+val canonical_encoding : variant:string -> 'l Data_encoding.encoding -> 'l canonical Data_encoding.encoding
 
 (** Compute the canonical form of an expression.
     Drops the concrete locations completely. *)

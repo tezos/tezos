@@ -62,7 +62,7 @@ let assert_valid_operations_hash shell_header operations =
 
 let inject_block cctxt
     ?force ?chain_id
-    ~shell_header ~priority ~seed_nonce_hash ~src_sk operations =
+    ~shell_header ~priority ?seed_nonce_hash ~src_sk operations =
   assert_valid_operations_hash shell_header operations >>=? fun () ->
   let block = `Hash shell_header.Tezos_base.Block_header.predecessor in
   forge_block_header cctxt block
@@ -98,8 +98,7 @@ let classify_operations (ops: Operation.raw list) =
   let t = Array.make (List.length Proto_alpha.Main.validation_passes) [] in
   List.iter
     (fun op ->
-       let h = Operation.hash_raw op in
-       match Operation.parse h op with
+       match Operation.parse op with
        | Ok o ->
            List.iter
              (fun pass -> t.(pass) <- op :: t.(pass))
@@ -113,7 +112,7 @@ let forge_block cctxt block
     ?operations ?(best_effort = operations = None) ?(sort = best_effort)
     ?timestamp
     ~priority
-    ~seed_nonce_hash ~src_sk () =
+    ?seed_nonce_hash ~src_sk () =
   let block = Block_services.last_baked_block block in
   begin
     match operations with
@@ -196,7 +195,7 @@ let forge_block cctxt block
       else List.map (fun l -> List.map snd l.Preapply_result.applied) result in
     Block_services.info cctxt block >>=? fun {chain_id} ->
     inject_block cctxt
-      ?force ~chain_id ~shell_header ~priority ~seed_nonce_hash ~src_sk
+      ?force ~chain_id ~shell_header ~priority ?seed_nonce_hash ~src_sk
       operations
   else
     let result =
@@ -467,6 +466,7 @@ let bake (cctxt : #Proto_alpha.full) state =
   filter_map_s
     (fun (timestamp, (bi, priority, delegate)) ->
        let block = `Hash bi.Client_baking_blocks.hash in
+       Alpha_services.Context.next_level cctxt block >>=? fun next_level ->
        let timestamp =
          if Block_hash.equal bi.Client_baking_blocks.hash state.genesis then
            Time.now ()
@@ -484,6 +484,11 @@ let bake (cctxt : #Proto_alpha.full) state =
          Operation_hash.Map.(fold add)
            ops (Preapply_result.operations res) in
        let request = List.length operations in
+       let seed_nonce_hash =
+         if next_level.expected_commitment then
+           Some seed_nonce_hash
+         else
+           None in
        let protocol_data =
          forge_faked_protocol_data ~priority ~seed_nonce_hash in
        let operations = classify_operations operations in
@@ -507,11 +512,11 @@ let bake (cctxt : #Proto_alpha.full) state =
            let operations =
              List.map (fun l -> List.map snd l.Preapply_result.applied) operations in
            return
-             (Some (bi, priority, shell_header, operations, delegate)))
+             (Some (bi, priority, shell_header, operations, delegate, seed_nonce_hash)))
     slots >>=? fun candidates ->
   let candidates =
     List.sort
-      (fun (_,_,h1,_,_) (_,_,h2,_,_) ->
+      (fun (_,_,h1,_,_,_) (_,_,h2,_,_,_) ->
          match
            Fitness.compare h1.Tezos_base.Block_header.fitness h2.fitness
          with
@@ -520,7 +525,7 @@ let bake (cctxt : #Proto_alpha.full) state =
          | cmp -> ~- cmp)
       candidates in
   match candidates with
-  | (bi, priority, shell_header, operations, delegate) :: _
+  | (bi, priority, shell_header, operations, delegate, seed_nonce_hash) :: _
     when Fitness.compare state.best.fitness shell_header.fitness < 0 ||
          (Fitness.compare state.best.fitness shell_header.fitness = 0 &&
           Time.compare shell_header.timestamp state.best.timestamp < 0) -> begin
@@ -532,7 +537,7 @@ let bake (cctxt : #Proto_alpha.full) state =
       Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
       inject_block cctxt
         ~force:true ~chain_id:bi.chain_id
-        ~shell_header ~priority ~seed_nonce_hash ~src_sk
+        ~shell_header ~priority ?seed_nonce_hash ~src_sk
         operations
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
       State.record_block cctxt level block_hash seed_nonce

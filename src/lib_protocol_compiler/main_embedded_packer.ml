@@ -31,7 +31,7 @@ end
 let () =
   Format.printf {|
 let () =
-  let module Ignored = Tezos_protocol_updater.Registred_protocol.Register
+  let module Ignored = Tezos_protocol_updater.Registered_protocol.Register
     (Tezos_embedded_protocol_environment_%s.Environment)
     (Tezos_embedded_raw_protocol_%s.Main)
     (Source) in

@@ -8,8 +8,9 @@
       "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU",
       "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
     ],
-    "slot_durations" : [ 1, 0 ],
-    "cycle_length" : 4,
-    "time_before_reward" : 1,
+    "time_between_blocks" : [ 1, 0 ],
+    "blocks_per_cycle" : 4,
+    "blocks_per_roll_snapshot" : 2,
+    "preserved_cycles" : 1,
     "first_free_baking_slot" : 4
 }

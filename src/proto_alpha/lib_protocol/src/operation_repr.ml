@@ -17,7 +17,6 @@ type raw = Operation.t = {
 let raw_encoding = Operation.encoding
 
 type operation = {
-  hash: Operation_hash.t ;
   shell: Operation.shell_header ;
   contents: proto_operation ;
   signature: Ed25519.Signature.t option ;
@@ -31,6 +30,14 @@ and anonymous_operation =
   | Seed_nonce_revelation of {
       level: Raw_level_repr.t ;
       nonce: Seed_repr.nonce ;
+    }
+  | Double_endorsement_evidence of {
+      op1: operation ;
+      op2: operation ;
+    }
+  | Double_baking_evidence of {
+      bh1: Block_header_repr.t ;
+      bh2: Block_header_repr.t ;
     }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
@@ -307,6 +314,34 @@ module Encoding = struct
       )
       (fun ((), level, nonce) -> Seed_nonce_revelation { level ; nonce })
 
+  let double_endorsement_evidence_encoding op_encoding =
+    (obj3
+       (req "kind" (constant "double_endorsement_evidence"))
+       (req "op1" (dynamic_size op_encoding))
+       (req "op2" (dynamic_size op_encoding)))
+
+  let double_endorsement_evidence_case tag op_encoding =
+    case tag (double_endorsement_evidence_encoding op_encoding)
+      (function
+        | Double_endorsement_evidence { op1 ; op2 } -> Some ((), op1, op2)
+        | _ -> None
+      )
+      (fun ((), op1, op2) -> Double_endorsement_evidence { op1 ; op2 })
+
+  let double_baking_evidence_encoding =
+    (obj3
+       (req "kind" (constant "double_baking_evidence"))
+       (req "op1" (dynamic_size Block_header_repr.encoding))
+       (req "op2" (dynamic_size Block_header_repr.encoding)))
+
+  let double_baking_evidence_case tag =
+    case tag double_baking_evidence_encoding
+      (function
+        | Double_baking_evidence { bh1 ; bh2 } -> Some ((), bh1, bh2)
+        | _ -> None
+      )
+      (fun ((), bh1, bh2) -> Double_baking_evidence { bh1 ; bh2 })
+
   let faucet_encoding =
     (obj3
        (req "kind" (constant "faucet"))
@@ -321,50 +356,59 @@ module Encoding = struct
       )
       (fun ((), id, nonce) -> Faucet { id ; nonce })
 
-  let unsigned_operation_case tag =
+  let unsigned_operation_case tag op_encoding =
     case tag
       (obj1
          (req "operations"
             (list
                (union [
                    seed_nonce_revelation_case (Tag 0) ;
-                   faucet_case (Tag 1) ;
+                   double_endorsement_evidence_case (Tag 1) op_encoding ;
+                   double_baking_evidence_case (Tag 2) ;
+                   faucet_case (Tag 3) ;
                  ]))))
       (function Anonymous_operations ops -> Some ops | _ -> None)
       (fun ops -> Anonymous_operations ops)
 
-  let proto_operation_encoding =
+  let mu_proto_operation_encoding op_encoding =
     union [
       signed_operations_case (Tag 0) ;
-      unsigned_operation_case (Tag 1) ;
+      unsigned_operation_case (Tag 1) op_encoding ;
     ]
+
+  let mu_signed_proto_operation_encoding op_encoding =
+    merge_objs
+      (mu_proto_operation_encoding op_encoding)
+      (obj1 (varopt "signature" Ed25519.Signature.encoding))
+
+  let operation_encoding =
+    mu "operation"
+      (fun encoding ->
+         conv
+           (fun { shell ; contents ; signature } ->
+              (shell, (contents, signature)))
+           (fun (shell, (contents, signature)) ->
+              { shell ; contents ; signature })
+           (merge_objs
+              Operation.shell_header_encoding
+              (mu_signed_proto_operation_encoding encoding)))
+
+  let proto_operation_encoding =
+    mu_proto_operation_encoding operation_encoding
+
+  let signed_proto_operation_encoding =
+    mu_signed_proto_operation_encoding operation_encoding
 
   let unsigned_operation_encoding =
     merge_objs
       Operation.shell_header_encoding
       proto_operation_encoding
 
-  let signed_proto_operation_encoding =
-    merge_objs
-      proto_operation_encoding
-      (obj1 (varopt "signature" Ed25519.Signature.encoding))
-
 end
 
 type error += Cannot_parse_operation
 
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun { hash ; shell ; contents ; signature } ->
-       (hash, (shell, (contents, signature))))
-    (fun (hash, (shell, (contents, signature))) ->
-       { hash ; shell ; contents ; signature })
-    (merge_objs
-       (obj1 (req "hash" Operation_hash.encoding))
-       (merge_objs
-          Operation.shell_header_encoding
-          Encoding.signed_proto_operation_encoding))
+let encoding = Encoding.operation_encoding
 
 let () =
   register_error_kind
@@ -379,20 +423,20 @@ let () =
     (function Cannot_parse_operation -> Some () | _ -> None)
     (fun () -> Cannot_parse_operation)
 
-let parse hash (op: Operation.t) =
+let parse (op: Operation.t) =
   match Data_encoding.Binary.of_bytes
           Encoding.signed_proto_operation_encoding
           op.proto with
   | Some (contents, signature) ->
-      ok { hash ; shell = op.shell ; contents ; signature }
+      ok { shell = op.shell ; contents ; signature }
   | None -> error Cannot_parse_operation
 
 let acceptable_passes op =
   match op.contents with
-  | Anonymous_operations _
   | Sourced_operations (Consensus_operation _) -> [0]
   | Sourced_operations (Amendment_operation _ | Dictator_operation _) -> [1]
-  | Sourced_operations (Manager_operations _) -> [2]
+  | Anonymous_operations _ -> [2]
+  | Sourced_operations (Manager_operations _) -> [3]
 
 type error += Invalid_signature (* `Permanent *)
 type error += Missing_signature (* `Permanent *)
@@ -425,7 +469,7 @@ let forge shell proto =
   Data_encoding.Binary.to_bytes
     Encoding.unsigned_operation_encoding (shell, proto)
 
-let check_signature key { shell ; contents ; signature }  =
+let check_signature key { shell ; contents ; signature } =
   match contents, signature with
   | Anonymous_operations _, _ -> return ()
   | Sourced_operations _, None ->
@@ -444,6 +488,12 @@ let parse_proto bytes =
   | Some (proto, signature) -> return (proto, signature)
   | None -> fail Cannot_parse_operation
 
-include Encoding
-
 let hash_raw = Operation.hash
+let hash o =
+  let proto =
+    Data_encoding.Binary.to_bytes
+      Encoding.signed_proto_operation_encoding
+      (o.contents, o.signature) in
+  Operation.hash { shell = o.shell ; proto }
+
+include Encoding

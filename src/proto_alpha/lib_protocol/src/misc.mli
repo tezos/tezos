@@ -13,7 +13,7 @@ type 'a lazyt = unit -> 'a
 type 'a lazy_list_t = LCons of 'a * ('a lazy_list_t tzresult Lwt.t lazyt)
 type 'a lazy_list = 'a lazy_list_t tzresult Lwt.t
 
-(** Include lower bound, exclude upper bound *)
+(** Include bounds *)
 val (-->) : int -> int -> int list
 val (--->) : Int32.t -> Int32.t -> Int32.t list
 

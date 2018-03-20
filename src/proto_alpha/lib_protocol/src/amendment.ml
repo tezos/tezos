@@ -138,7 +138,7 @@ let record_ballot ctxt delegate proposal ballot =
 
 let last_of_a_voting_period ctxt l =
   Compare.Int32.(Int32.succ l.Level.voting_period_position =
-                 Constants.voting_period_length ctxt )
+                 Constants.blocks_per_voting_period ctxt )
 
 let may_start_new_voting_cycle ctxt =
   let level = Level.current ctxt in

@@ -58,7 +58,6 @@ val set_current_fitness: context -> Int64.t -> t
 
 val constants: context -> Constants_repr.constants
 val first_level: context -> Raw_level_repr.t
-val roll_value: context -> Tez_repr.t
 
 (** {1 Generic accessors} *************************************************)
 
@@ -139,8 +138,3 @@ include T with type t := t and type context := context
 val record_endorsement: context -> int -> context
 val endorsement_already_recorded: context -> int -> bool
 
-
-(** HACK alphanet *)
-val double_roll_value: context -> int -> context tzresult Lwt.t
-val faucet_count: context -> int
-val incr_faucet_count: context -> context

@@ -20,20 +20,19 @@
 type error +=
   | Consume_roll_change
   | No_roll_for_delegate
-  | Unregistred_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
+  | Unregistered_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
 
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+val init_first_cycles : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+val cycle_end : Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+val snapshot_rolls : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
 
 val fold :
   Raw_context.t ->
   f:(Roll_repr.roll -> Ed25519.Public_key.t -> 'a -> 'a tzresult Lwt.t) ->
   'a -> 'a tzresult Lwt.t
-
-val freeze_rolls_for_cycle :
-  Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
-
-val clear_cycle :
-  Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
 val baking_rights_owner :
   Raw_context.t -> Level_repr.t -> priority:int ->
@@ -50,6 +49,10 @@ module Delegate : sig
 
   val remove_amount :
     Raw_context.t -> Ed25519.Public_key_hash.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
+  val set_inactive : Raw_context.t -> Ed25519.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+
+  val set_active : Raw_context.t -> Ed25519.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
 end
 
@@ -71,5 +74,3 @@ val delegate_pubkey:
 
 val get_contract_delegate:
   Raw_context.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option tzresult Lwt.t
-
-val value: Raw_context.t -> Tez_repr.t

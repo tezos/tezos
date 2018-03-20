@@ -195,7 +195,7 @@ module Forge : sig
   val protocol_data:
     'a #RPC_context.simple -> 'a ->
     priority: int ->
-    seed_nonce_hash: Nonce_hash.t ->
+    ?seed_nonce_hash: Nonce_hash.t ->
     ?proof_of_work_nonce: MBytes.t ->
     unit -> MBytes.t shell_tzresult Lwt.t
 

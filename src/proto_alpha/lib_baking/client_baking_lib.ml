@@ -12,6 +12,7 @@ open Alpha_context
 
 let bake_block (cctxt : #Proto_alpha.full) block
     ?force ?max_priority ?(free_baking=false) ?src_sk delegate =
+  let block = Block_services.last_baked_block block in
   begin
     match src_sk with
     | None ->
@@ -19,17 +20,26 @@ let bake_block (cctxt : #Proto_alpha.full) block
         return src_sk
     | Some sk -> return sk
   end >>=? fun src_sk ->
-  Alpha_services.Context.level cctxt block >>=? fun level ->
-  let level = Raw_level.succ level.level in
-  let seed_nonce = Client_baking_forge.generate_seed_nonce () in
-  let seed_nonce_hash = Nonce.hash seed_nonce in
+  Alpha_services.Context.next_level cctxt block >>=? fun level ->
+  let seed_nonce, seed_nonce_hash =
+    if level.expected_commitment then
+      let seed_nonce = Client_baking_forge.generate_seed_nonce () in
+      let seed_nonce_hash = Nonce.hash seed_nonce in
+      Some seed_nonce, Some seed_nonce_hash
+    else
+      None, None in
   Client_baking_forge.forge_block cctxt
     ~timestamp:(Time.now ())
     ?force
-    ~seed_nonce_hash ~src_sk block
+    ?seed_nonce_hash ~src_sk block
     ~priority:(`Auto (delegate, max_priority, free_baking)) () >>=? fun block_hash ->
-  Client_baking_forge.State.record_block cctxt level block_hash seed_nonce
-  |> trace_exn (Failure "Error while recording block") >>=? fun () ->
+  begin
+    match seed_nonce with
+    | None -> return ()
+    | Some seed_nonce ->
+        Client_baking_forge.State.record_block cctxt level.level block_hash seed_nonce
+        |> trace_exn (Failure "Error while recording block")
+  end >>=? fun () ->
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return ()
 

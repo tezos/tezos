@@ -15,8 +15,27 @@ type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Tempo
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
 type error += Duplicate_endorsement of int (* `Branch *)
 type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.expr option (* `Permanent *)
-type error += Too_many_faucet
 type error += Invalid_endorsement_level
+type error += Invalid_commitment of { expected: bool }
+
+type error += Invalid_double_endorsement_evidence (* `Permanent *)
+type error += Inconsistent_double_endorsement_evidence
+  of { delegate1: Ed25519.Public_key_hash.t ; delegate2: Ed25519.Public_key_hash.t } (* `Permanent *)
+type error += Unrequired_double_endorsement_evidence (* `Branch*)
+type error += Too_early_double_endorsement_evidence
+  of { level: Raw_level.t ; current: Raw_level.t } (* `Temporary *)
+type error += Outdated_double_endorsement_evidence
+  of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
+
+type error += Invalid_double_baking_evidence
+  of { level1: Int32.t ; level2: Int32.t } (* `Permanent *)
+type error += Inconsistent_double_baking_evidence
+  of { delegate1: Ed25519.Public_key_hash.t ; delegate2: Ed25519.Public_key_hash.t } (* `Permanent *)
+type error += Unrequired_double_baking_evidence (* `Branch*)
+type error += Too_early_double_baking_evidence
+  of { level: Raw_level.t ; current: Raw_level.t } (* `Temporary *)
+type error += Outdated_double_baking_evidence
+  of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
 
 
 let () =
@@ -74,26 +93,201 @@ let () =
     (fun k -> Duplicate_endorsement k);
   register_error_kind
     `Temporary
-    ~id:"operation.too_many_faucet"
-    ~title:"Too many faucet"
-    ~description:"Trying to include a faucet operation in a block \
-                 \ with more than 5 faucet operations."
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "Too many faucet operation.")
-    Data_encoding.unit
-    (function Too_many_faucet -> Some () | _ -> None)
-    (fun () -> Too_many_faucet) ;
-  register_error_kind
-    `Temporary
     ~id:"operation.invalid_endorsement_level"
-    ~title:"Unpexpected level in endorsement"
+    ~title:"Unexpected level in endorsement"
     ~description:"The level of an endorsement is inconsistent with the \
                  \ provided block hash."
     ~pp:(fun ppf () ->
-        Format.fprintf ppf "Unpexpected level in endorsement.")
+        Format.fprintf ppf "Unexpected level in endorsement.")
     Data_encoding.unit
     (function Invalid_endorsement_level -> Some () | _ -> None)
-    (fun () -> Invalid_endorsement_level)
+    (fun () -> Invalid_endorsement_level) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.invalid_commitment"
+    ~title:"Invalid commitment in block header"
+    ~description:"The block header has invalid commitment."
+    ~pp:(fun ppf expected ->
+        if expected then
+          Format.fprintf ppf "Missing seed's nonce commitment in block header."
+        else
+          Format.fprintf ppf "Unexpected seed's nonce commitment in block header.")
+    Data_encoding.(obj1 (req "expected "bool))
+    (function Invalid_commitment { expected } -> Some expected | _ -> None)
+    (fun expected -> Invalid_commitment { expected }) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.invalid_double_endorsement_evidence"
+    ~title:"Invalid double endorsement evidence"
+    ~description:"A double-endorsement evidence is malformed"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Malformed double-endorsement evidence")
+    Data_encoding.empty
+    (function Invalid_double_endorsement_evidence -> Some () | _ -> None)
+    (fun () -> Invalid_double_endorsement_evidence) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.inconsistent_double_endorsement_evidence"
+    ~title:"Inconsistent double endorsement evidence"
+    ~description:"A double-endorsement evidence is inconsistent \
+                 \ (two distinct delegates)"
+    ~pp:(fun ppf (delegate1, delegate2) ->
+        Format.fprintf ppf
+          "Inconsistent double-endorsement evidence \
+          \ (distinct delegate: %a and %a)"
+          Ed25519.Public_key_hash.pp_short delegate1
+          Ed25519.Public_key_hash.pp_short delegate2)
+    Data_encoding.(obj2
+                     (req "delegate1" Ed25519.Public_key_hash.encoding)
+                     (req "delegate2" Ed25519.Public_key_hash.encoding))
+    (function
+      | Inconsistent_double_endorsement_evidence { delegate1 ; delegate2 } ->
+          Some (delegate1, delegate2)
+      | _ -> None)
+    (fun (delegate1, delegate2) ->
+       Inconsistent_double_endorsement_evidence { delegate1 ; delegate2 }) ;
+  register_error_kind
+    `Branch
+    ~id:"block.unrequired_double_endorsement_evidence"
+    ~title:"Unrequired double endorsement evidence"
+    ~description:"A double-endorsement evidence is unrequired"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "A valid double-endorsement operation cannot \
+                           \ be applied: the associated delegate \
+                           \ has previously been denunciated in this cycle.")
+    Data_encoding.empty
+    (function Unrequired_double_endorsement_evidence -> Some () | _ -> None)
+    (fun () -> Unrequired_double_endorsement_evidence) ;
+  register_error_kind
+    `Temporary
+    ~id:"block.too_early_double_endorsement_evidence"
+    ~title:"Too early double endorsement evidence"
+    ~description:"A double-endorsement evidence is in the future"
+    ~pp:(fun ppf (level, current) ->
+        Format.fprintf ppf
+          "A double-endorsement evidence is in the future \
+          \ (current level: %a, endorsement level: %a)"
+          Raw_level.pp current
+          Raw_level.pp level)
+    Data_encoding.(obj2
+                     (req "level" Raw_level.encoding)
+                     (req "current" Raw_level.encoding))
+    (function
+      | Too_early_double_endorsement_evidence { level ; current } ->
+          Some (level, current)
+      | _ -> None)
+    (fun (level, current) ->
+       Too_early_double_endorsement_evidence { level ; current }) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.outdated_double_endorsement_evidence"
+    ~title:"Outdated double endorsement evidence"
+    ~description:"A double-endorsement evidence is outdated."
+    ~pp:(fun ppf (level, last) ->
+        Format.fprintf ppf
+          "A double-endorsement evidence is outdated \
+          \ (last acceptable level: %a, endorsement level: %a)"
+          Raw_level.pp last
+          Raw_level.pp level)
+    Data_encoding.(obj2
+                     (req "level" Raw_level.encoding)
+                     (req "last" Raw_level.encoding))
+    (function
+      | Outdated_double_endorsement_evidence { level ; last } ->
+          Some (level, last)
+      | _ -> None)
+    (fun (level, last) ->
+       Outdated_double_endorsement_evidence { level ; last }) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.invalid_double_baking_evidence"
+    ~title:"Invalid double baking evidence"
+    ~description:"A double-baking evidence is inconsistent \
+                 \ (two distinct level)"
+    ~pp:(fun ppf (level1, level2) ->
+        Format.fprintf ppf
+          "Inconsistent double-baking evidence (levels: %ld and %ld)"
+          level1 level2)
+    Data_encoding.(obj2
+                     (req "level1" int32)
+                     (req "level2" int32))
+    (function
+      | Invalid_double_baking_evidence { level1 ; level2 } -> Some (level1, level2)
+      | _ -> None)
+    (fun (level1, level2) -> Invalid_double_baking_evidence { level1 ; level2 }) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.inconsistent_double_baking_evidence"
+    ~title:"Inconsistent double baking evidence"
+    ~description:"A double-baking evidence is inconsistent \
+                 \ (two distinct delegates)"
+    ~pp:(fun ppf (delegate1, delegate2) ->
+        Format.fprintf ppf
+          "Inconsistent double-baking evidence \
+          \ (distinct delegate: %a and %a)"
+          Ed25519.Public_key_hash.pp_short delegate1
+          Ed25519.Public_key_hash.pp_short delegate2)
+    Data_encoding.(obj2
+                     (req "delegate1" Ed25519.Public_key_hash.encoding)
+                     (req "delegate2" Ed25519.Public_key_hash.encoding))
+    (function
+      | Inconsistent_double_baking_evidence { delegate1 ; delegate2 } ->
+          Some (delegate1, delegate2)
+      | _ -> None)
+    (fun (delegate1, delegate2) ->
+       Inconsistent_double_baking_evidence { delegate1 ; delegate2 }) ;
+  register_error_kind
+    `Branch
+    ~id:"block.unrequired_double_baking_evidence"
+    ~title:"Unrequired double baking evidence"
+    ~description:"A double-baking evidence is unrequired"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "A valid double-baking operation cannot \
+                           \ be applied: the associated delegate \
+                           \ has previously been denunciated in this cycle.")
+    Data_encoding.empty
+    (function Unrequired_double_baking_evidence -> Some () | _ -> None)
+    (fun () -> Unrequired_double_baking_evidence) ;
+  register_error_kind
+    `Temporary
+    ~id:"block.too_early_double_baking_evidence"
+    ~title:"Too early double baking evidence"
+    ~description:"A double-baking evidence is in the future"
+    ~pp:(fun ppf (level, current) ->
+        Format.fprintf ppf
+          "A double-baking evidence is in the future \
+          \ (current level: %a, baking level: %a)"
+          Raw_level.pp current
+          Raw_level.pp level)
+    Data_encoding.(obj2
+                     (req "level" Raw_level.encoding)
+                     (req "current" Raw_level.encoding))
+    (function
+      | Too_early_double_baking_evidence { level ; current } ->
+          Some (level, current)
+      | _ -> None)
+    (fun (level, current) ->
+       Too_early_double_baking_evidence { level ; current }) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.outdated_double_baking_evidence"
+    ~title:"Outdated double baking evidence"
+    ~description:"A double-baking evidence is outdated."
+    ~pp:(fun ppf (level, last) ->
+        Format.fprintf ppf
+          "A double-baking evidence is outdated \
+          \ (last acceptable level: %a, baking level: %a)"
+          Raw_level.pp last
+          Raw_level.pp level)
+    Data_encoding.(obj2
+                     (req "level" Raw_level.encoding)
+                     (req "last" Raw_level.encoding))
+    (function
+      | Outdated_double_baking_evidence { level ; last } ->
+          Some (level, last)
+      | _ -> None)
+    (fun (level, last) ->
+       Outdated_double_baking_evidence { level ; last })
 
 let apply_consensus_operation_content ctxt
     pred_block block_priority operation = function
@@ -102,7 +296,7 @@ let apply_consensus_operation_content ctxt
         match Level.pred ctxt (Level.current ctxt) with
         | None -> failwith ""
         | Some lvl -> return lvl
-      end >>=? fun ({ cycle = current_cycle ; level = current_level ;_ } as lvl) ->
+      end >>=? fun ({ level = current_level ;_ } as lvl) ->
       fail_unless
         (Block_hash.equal block pred_block)
         (Wrong_endorsement_predecessor (pred_block, block)) >>=? fun () ->
@@ -119,10 +313,10 @@ let apply_consensus_operation_content ctxt
       Operation.check_signature delegate operation >>=? fun () ->
       let delegate = Ed25519.Public_key.hash delegate in
       let ctxt = Fitness.increase ~gap:(List.length slots) ctxt in
-      Baking.pay_endorsement_bond ctxt delegate >>=? fun (ctxt, bond) ->
+      Baking.freeze_endorsement_deposit ctxt delegate >>=? fun ctxt ->
       Baking.endorsement_reward ~block_priority >>=? fun reward ->
-      Lwt.return Tez.(reward +? bond) >>=? fun full_reward ->
-      Reward.record ctxt delegate current_cycle full_reward
+      Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
+      return ctxt
 
 let apply_amendment_operation_content ctxt delegate = function
   | Proposals { period ; proposals } ->
@@ -211,9 +405,9 @@ let apply_manager_operation_content
         | Some diff ->
             fold_left_s (fun ctxt (key, value) ->
                 match value with
-                | None -> Contract.Big_map_storage.remove ctxt contract key
+                | None -> Contract.Big_map.remove ctxt contract key
                 | Some v ->
-                    Contract.Big_map_storage.set ctxt contract key v)
+                    Contract.Big_map.set ctxt contract key v)
               ctxt diff
       end >>=? fun ctxt ->
       return (ctxt, origination_nonce, None)
@@ -222,7 +416,7 @@ let apply_manager_operation_content
       return (ctxt, origination_nonce, None)
 
 let apply_sourced_operation
-    ctxt baker_contract pred_block block_prio
+    ctxt pred_block block_prio
     operation origination_nonce ops =
   match ops with
   | Manager_operations { source ; fee ; counter ; operations = contents } ->
@@ -237,10 +431,6 @@ let apply_sourced_operation
       Contract.check_counter_increment ctxt source counter >>=? fun () ->
       Contract.increment_counter ctxt source >>=? fun ctxt ->
       Contract.spend ctxt source fee >>=? fun ctxt ->
-      (match baker_contract with
-       | None -> return ctxt
-       | Some contract ->
-           Contract.credit ctxt contract fee) >>=? fun ctxt ->
       fold_left_s (fun (ctxt, origination_nonce, err) content ->
           match err with
           | Some _ -> return (ctxt, origination_nonce, err)
@@ -249,102 +439,166 @@ let apply_sourced_operation
               apply_manager_operation_content
                 ctxt origination_nonce source content)
         (ctxt, origination_nonce, None) contents
+      >>=? fun (ctxt, origination_nonce, err) ->
+      return (ctxt, origination_nonce, err, fee, Tez.zero)
   | Consensus_operation content ->
       apply_consensus_operation_content ctxt
         pred_block block_prio operation content >>=? fun ctxt ->
-      return (ctxt, origination_nonce, None)
+      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
   | Amendment_operation { source ; operation = content } ->
       Roll.delegate_pubkey ctxt source >>=? fun delegate ->
       Operation.check_signature delegate operation >>=? fun () ->
       (* TODO, see how to extract the public key hash after this operation to
          pass it to apply_delegate_operation_content *)
       apply_amendment_operation_content ctxt source content >>=? fun ctxt ->
-      return (ctxt, origination_nonce, None)
+      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
   | Dictator_operation (Activate hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       activate ctxt hash >>= fun ctxt ->
-      return (ctxt, origination_nonce, None)
+      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
   | Dictator_operation (Activate_testchain hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       let expiration = (* in two days maximum... *)
         Time.add (Timestamp.current ctxt) (Int64.mul 48L 3600L) in
       fork_test_chain ctxt hash expiration >>= fun ctxt ->
-      return (ctxt, origination_nonce, None)
+      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
 
-let apply_anonymous_operation ctxt baker_contract origination_nonce kind =
+let apply_anonymous_operation ctxt delegate origination_nonce kind =
   match kind with
   | Seed_nonce_revelation { level ; nonce } ->
       let level = Level.from_raw ctxt level in
-      Nonce.reveal ctxt level nonce
-      >>=? fun (ctxt, delegate_to_reward, reward_amount) ->
-      Reward.record ctxt
-        delegate_to_reward level.cycle reward_amount >>=? fun ctxt ->
-      begin
-        match baker_contract with
-        | None -> return (ctxt, origination_nonce)
-        | Some contract ->
-            Contract.credit
-              ctxt contract Constants.seed_nonce_revelation_tip >>=? fun ctxt ->
-            return (ctxt, origination_nonce)
-      end
+      Nonce.reveal ctxt level nonce >>=? fun ctxt ->
+      return (ctxt, origination_nonce,
+              Tez.zero, Constants.seed_nonce_revelation_tip)
+  | Double_endorsement_evidence { op1 ; op2 } -> begin
+      match op1.contents, op2.contents with
+      | Sourced_operations (Consensus_operation (Endorsements e1)),
+        Sourced_operations (Consensus_operation (Endorsements e2))
+        when Raw_level.(e1.level = e2.level) &&
+             not (Block_hash.equal e1.block e2.block) ->
+          let level = Level.from_raw ctxt e1.level in
+          let oldest_level = Level.last_allowed_fork_level ctxt in
+          fail_unless Level.(level < Level.current ctxt)
+            (Too_early_double_endorsement_evidence
+               { level = level.level ;
+                 current = (Level.current ctxt).level }) >>=? fun () ->
+          fail_unless Raw_level.(oldest_level <= level.level)
+            (Outdated_double_endorsement_evidence
+               { level = level.level ;
+                 last = oldest_level }) >>=? fun () ->
+          (* Whenever a delegate might have multiple endorsement slots for
+             given level, she should not endorse different block with different
+             slots. Hence, we don't check that [e1.slots] and [e2.slots]
+             intersect. *)
+          Baking.check_endorsements_rights ctxt level e1.slots >>=? fun delegate1 ->
+          Operation.check_signature delegate1 op1 >>=? fun () ->
+          Baking.check_endorsements_rights ctxt level e2.slots >>=? fun delegate2 ->
+          Operation.check_signature delegate2 op2 >>=? fun () ->
+          fail_unless
+            (Ed25519.Public_key.equal delegate1 delegate2)
+            (Inconsistent_double_endorsement_evidence
+               { delegate1 = Ed25519.Public_key.hash delegate1 ;
+                 delegate2 = Ed25519.Public_key.hash delegate2 }) >>=? fun () ->
+          let delegate = Ed25519.Public_key.hash delegate1 in
+          Delegate.has_frozen_balance ctxt delegate level.cycle >>=? fun valid ->
+          fail_unless valid Unrequired_double_endorsement_evidence >>=? fun () ->
+          Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, burned) ->
+          let reward =
+            match Tez.(burned /? 2L) with
+            | Ok v -> v
+            | Error _ -> Tez.zero in
+          return (ctxt, origination_nonce, Tez.zero, reward)
+      | _, _ -> fail Invalid_double_endorsement_evidence
+    end
+  | Double_baking_evidence { bh1 ; bh2 } ->
+      fail_unless Compare.Int32.(bh1.shell.level = bh2.shell.level)
+        (Invalid_double_baking_evidence
+           { level1 = bh1.shell.level ;
+             level2 = bh2.shell.level }) >>=? fun () ->
+      Lwt.return (Raw_level.of_int32 bh1.shell.level) >>=? fun raw_level ->
+      let oldest_level = Level.last_allowed_fork_level ctxt in
+      fail_unless Raw_level.(raw_level < (Level.current ctxt).level)
+        (Too_early_double_baking_evidence
+           { level = raw_level ;
+             current = (Level.current ctxt).level }) >>=? fun () ->
+      fail_unless Raw_level.(oldest_level <= raw_level)
+        (Outdated_double_baking_evidence
+           { level = raw_level ;
+             last = oldest_level }) >>=? fun () ->
+      let level = Level.from_raw ctxt raw_level in
+      Roll.baking_rights_owner
+        ctxt level ~priority:bh1.protocol_data.priority >>=? fun delegate1 ->
+      Baking.check_signature bh1 delegate1 >>=? fun () ->
+      Roll.baking_rights_owner
+        ctxt level ~priority:bh2.protocol_data.priority >>=? fun delegate2 ->
+      Baking.check_signature bh2 delegate2 >>=? fun () ->
+      fail_unless
+        (Ed25519.Public_key.equal delegate1 delegate2)
+        (Inconsistent_double_baking_evidence
+           { delegate1 = Ed25519.Public_key.hash delegate1 ;
+             delegate2 = Ed25519.Public_key.hash delegate2 }) >>=? fun () ->
+      let delegate = Ed25519.Public_key.hash delegate1 in
+      Delegate.has_frozen_balance ctxt delegate level.cycle >>=? fun valid ->
+      fail_unless valid Unrequired_double_baking_evidence >>=? fun () ->
+      Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, burned) ->
+      let reward =
+        match Tez.(burned /? 2L) with
+        | Ok v -> v
+        | Error _ -> Tez.zero in
+      return (ctxt, origination_nonce, Tez.zero, reward)
   | Faucet { id = manager ; _ } ->
-      (* Free tez for all! *)
-      begin
-        match baker_contract with
-        | None -> return None
-        | Some contract -> Delegate.get ctxt contract
-      end >>=? fun delegate ->
-      if Compare.Int.(faucet_count ctxt < 5) then
-        let ctxt = incr_faucet_count ctxt in
-        Contract.originate ctxt
-          origination_nonce
-          ~manager ~delegate ~balance:Constants.faucet_credit ?script:None
-          ~spendable:true ~delegatable:true >>=? fun (ctxt, _, origination_nonce) ->
-        return (ctxt, origination_nonce)
-      else
-        fail Too_many_faucet
+      Contract.originate ctxt
+        origination_nonce
+        ~manager ~delegate ~balance:Constants.faucet_credit ?script:None
+        ~spendable:true ~delegatable:true >>=? fun (ctxt, _, origination_nonce) ->
+      return (ctxt, origination_nonce, Tez.zero, Tez.zero)
 
 let apply_operation
-    ctxt baker_contract pred_block block_prio operation =
+    ctxt delegate pred_block block_prio hash operation =
   match operation.contents with
   | Anonymous_operations ops ->
-      let origination_nonce = Contract.initial_origination_nonce operation.hash in
+      let origination_nonce = Contract.initial_origination_nonce hash in
       fold_left_s
-        (fun (ctxt, origination_nonce) ->
-           apply_anonymous_operation ctxt baker_contract origination_nonce)
-        (ctxt, origination_nonce) ops >>=? fun (ctxt, origination_nonce) ->
-      return (ctxt, Contract.originated_contracts origination_nonce, None)
+        (fun (ctxt, origination_nonce, fees, rewards) op ->
+           apply_anonymous_operation ctxt delegate origination_nonce op
+           >>=? fun (ctxt, origination_nonce, fee, reward) ->
+           return (ctxt, origination_nonce,
+                   fees >>? Tez.(+?) fee,
+                   rewards >>? Tez.(+?) reward))
+        (ctxt, origination_nonce, Ok Tez.zero, Ok Tez.zero) ops
+      >>=? fun (ctxt, origination_nonce, fees, rewards) ->
+      return (ctxt, Contract.originated_contracts origination_nonce, None,
+              fees, rewards)
   | Sourced_operations op ->
-      let origination_nonce = Contract.initial_origination_nonce operation.hash in
+      let origination_nonce = Contract.initial_origination_nonce hash in
       apply_sourced_operation
-        ctxt baker_contract pred_block block_prio
-        operation origination_nonce op >>=? fun (ctxt, origination_nonce, err) ->
-      return (ctxt, Contract.originated_contracts origination_nonce, err)
+        ctxt pred_block block_prio
+        operation origination_nonce op >>=? fun (ctxt, origination_nonce, err,
+                                                 fees, rewards) ->
+      return (ctxt, Contract.originated_contracts origination_nonce, err,
+              Ok fees, Ok rewards)
+
+let may_snapshot_roll ctxt =
+  let level = Alpha_context.Level.current ctxt in
+  let blocks_per_roll_snapshot = Constants.blocks_per_roll_snapshot ctxt in
+  if Compare.Int32.equal
+      (Int32.rem level.cycle_position blocks_per_roll_snapshot)
+      (Int32.pred blocks_per_roll_snapshot)
+  then
+    Alpha_context.Roll.snapshot_rolls ctxt >>=? fun ctxt ->
+    return ctxt
+  else
+    return ctxt
 
 let may_start_new_cycle ctxt =
   Baking.dawn_of_a_new_cycle ctxt >>=? function
   | None -> return ctxt
   | Some last_cycle ->
-      let new_cycle = Cycle.succ last_cycle in
-      let succ_new_cycle = Cycle.succ new_cycle in
-      begin
-        (* Temporary, the seed needs to be preserve until
-           no denunciation are allowed *)
-        match Cycle.pred last_cycle with
-        | None -> return ctxt
-        | Some pred_last_cycle ->
-            Seed.clear_cycle ctxt pred_last_cycle >>=? fun ctxt ->
-            Roll.clear_cycle ctxt pred_last_cycle
-      end >>=? fun ctxt ->
-      Seed.compute_for_cycle ctxt succ_new_cycle >>=? fun ctxt ->
-      Roll.freeze_rolls_for_cycle ctxt succ_new_cycle >>=? fun ctxt ->
-      let timestamp = Timestamp.current ctxt in
-      Lwt.return (Timestamp.(timestamp +? (Constants.time_before_reward ctxt)))
-      >>=? fun reward_date ->
-      Reward.set_reward_time_for_cycle
-        ctxt last_cycle reward_date >>=? fun ctxt ->
+      Seed.cycle_end ctxt last_cycle >>=? fun (ctxt, unrevealed) ->
+      Roll.cycle_end ctxt last_cycle >>=? fun ctxt ->
+      Delegate.cycle_end ctxt last_cycle unrevealed >>=? fun ctxt ->
       return ctxt
 
 let begin_full_construction ctxt pred_timestamp protocol_data =
@@ -352,35 +606,51 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
     (Block_header.parse_unsigned_protocol_data
        protocol_data) >>=? fun protocol_data ->
   Baking.check_baking_rights
-    ctxt protocol_data pred_timestamp >>=? fun baker ->
-  Baking.pay_baking_bond ctxt protocol_data
-    (Ed25519.Public_key.hash baker) >>=? fun ctxt ->
+    ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
+  let delegate_pkh = Ed25519.Public_key.hash delegate_pk in
+  Baking.freeze_baking_deposit ctxt protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, protocol_data, baker)
+  return (ctxt, protocol_data, delegate_pk, deposit)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
   return ctxt
 
 let begin_application ctxt block_header pred_timestamp =
+  let current_level = Alpha_context.Level.current ctxt in
   Baking.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
   Baking.check_baking_rights
-    ctxt block_header.protocol_data pred_timestamp >>=? fun baker ->
-  Baking.check_signature block_header baker >>=? fun () ->
-  Baking.pay_baking_bond ctxt block_header.protocol_data
-    (Ed25519.Public_key.hash baker) >>=? fun ctxt ->
+    ctxt block_header.protocol_data pred_timestamp >>=? fun delegate_pk ->
+  Baking.check_signature block_header delegate_pk >>=? fun () ->
+  let has_commitment =
+    match block_header.protocol_data.seed_nonce_hash with
+    | None -> false
+    | Some _ -> true in
+  fail_unless
+    Compare.Bool.(has_commitment = current_level.expected_commitment)
+    (Invalid_commitment
+       { expected = current_level.expected_commitment }) >>=? fun () ->
+  let delegate_pkh = Ed25519.Public_key.hash delegate_pk in
+  Baking.freeze_baking_deposit ctxt
+    block_header.protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, baker)
+  return (ctxt, delegate_pk, deposit)
 
-let finalize_application ctxt block_protocol_data baker =
+let finalize_application ctxt protocol_data delegate deposit fees rewards =
   (* end of level (from this point nothing should fail) *)
-  let priority = block_protocol_data.Block_header.priority in
-  let reward = Baking.base_baking_reward ctxt ~priority in
-  Nonce.record_hash ctxt
-    baker reward block_protocol_data.seed_nonce_hash >>=? fun ctxt ->
-  Reward.pay_due_rewards ctxt >>=? fun ctxt ->
+  Lwt.return Tez.(rewards +? Constants.block_reward) >>=? fun rewards ->
+  Delegate.freeze_fees ctxt delegate fees >>=? fun ctxt ->
+  Delegate.freeze_rewards ctxt delegate rewards >>=? fun ctxt ->
+  begin
+    match protocol_data.Block_header.seed_nonce_hash with
+    | None -> return ctxt
+    | Some nonce_hash ->
+        Nonce.record_hash ctxt
+          { nonce_hash ; delegate ; deposit ; rewards ; fees }
+  end >>=? fun ctxt ->
   (* end of cycle *)
+  may_snapshot_roll ctxt >>=? fun ctxt ->
   may_start_new_cycle ctxt >>=? fun ctxt ->
   Amendment.may_start_new_voting_cycle ctxt >>=? fun ctxt ->
   return ctxt

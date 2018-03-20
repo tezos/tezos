@@ -665,6 +665,7 @@ module Encoding = struct
         List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
     | Empty -> true
     | Ignore -> true
+    | Mu (_,_,self) -> is_obj (self e)
     | _ -> false
 
   let rec is_tup : type a. a t -> bool = fun e ->
@@ -675,6 +676,7 @@ module Encoding = struct
     | Dynamic_size e  -> is_tup e
     | Union (_,_,cases) ->
         List.for_all (function Case { encoding = e} -> is_tup e) cases
+    | Mu (_,_,self) -> is_tup (self e)
     | _ -> false
 
   let merge_objs o1 o2 =
@@ -1175,7 +1177,7 @@ module Binary = struct
     | RangedFloat { minimum ; maximum } ->
         fun v ->
           if v < minimum || v > maximum
-          then invalid_arg (Printf.sprintf "Integer %f not in range [%f, %f]." v minimum maximum) ;
+          then invalid_arg (Printf.sprintf "Float %f not in range [%f, %f]." v minimum maximum) ;
           float v
     | Bytes (`Fixed n) -> fixed_kind_bytes n
     | String (`Fixed n) -> fixed_kind_string n

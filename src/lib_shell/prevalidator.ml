@@ -117,7 +117,21 @@ let list_pendings ?maintain_chain_db  ~from_block ~to_block old_mempool =
     (State.Block.hash ancestor)
     from_block old_mempool >>= fun mempool ->
   Lwt_list.fold_left_s push_block mempool path >>= fun new_mempool ->
-  Lwt.return new_mempool
+  Chain_traversal.live_blocks
+    to_block
+    (State.Block.max_operations_ttl to_block)
+  >>= fun (live_blocks, live_operations) ->
+  let new_mempool, outdated =
+    Operation_hash.Map.partition
+      (fun _oph op ->
+         Block_hash.Set.mem op.Operation.shell.branch live_blocks)
+      new_mempool in
+  Option.iter maintain_chain_db
+    ~f:(fun chain_db ->
+        Operation_hash.Map.iter
+          (fun oph _op -> Distributed_db.Operation.clear_or_cancel chain_db oph)
+          outdated) ;
+  Lwt.return (new_mempool, live_blocks, live_operations)
 
 let already_handled pv oph =
   Operation_hash.Map.mem oph pv.refusals
@@ -319,12 +333,9 @@ let on_flush w pv predecessor =
   list_pendings
     ~maintain_chain_db:pv.chain_db
     ~from_block:pv.predecessor ~to_block:predecessor
-    (Preapply_result.operations pv.validation_result) >>= fun pending ->
+    (Preapply_result.operations pv.validation_result)
+  >>= fun (pending, new_live_blocks, new_live_operations) ->
   let timestamp = Time.now () in
-  Chain_traversal.live_blocks
-    predecessor
-    (State.Block.max_operations_ttl predecessor)
-  >>= fun (new_live_blocks, new_live_operations) ->
   Prevalidation.start_prevalidation
     ~predecessor ~timestamp () >>= fun validation_state ->
   begin match validation_state with
@@ -472,8 +483,8 @@ let pending ?block w =
   match block with
   | Some to_block ->
       list_pendings
-        ~maintain_chain_db:pv.chain_db
-        ~from_block:pv.predecessor ~to_block ops
+        ~from_block:pv.predecessor ~to_block ops >>= fun (pending, _, _) ->
+      Lwt.return pending
   | None -> Lwt.return ops
 
 let timestamp w =

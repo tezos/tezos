@@ -164,7 +164,7 @@ let ill_typed_return_error ~msg =
     | _ -> false in
   economic_error ~msg aux
 
-let double_endorsement ~msg =
+let double_endorsement_evidence ~msg =
   let aux = function
     | Proto_alpha.Apply.Duplicate_endorsement(_) -> true
     | _ -> false

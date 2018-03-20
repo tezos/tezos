@@ -16,7 +16,7 @@ type t = {
 
 and protocol_data = {
   priority: int ;
-  seed_nonce_hash: Nonce_hash.t ;
+  seed_nonce_hash: Nonce_hash.t option ;
   proof_of_work_nonce: MBytes.t ;
 }
 

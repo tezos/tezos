@@ -7,25 +7,27 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Misc
+
 type error +=
   | Consume_roll_change
   | No_roll_for_delegate
   | No_roll_snapshot_for_cycle of Cycle_repr.t
-  | Unregistred_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
+  | Unregistered_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"contract.manager.unregistred_delegate"
-    ~title:"Unregistred delegate"
-    ~description:"A contract cannot be delegated to an unregistred delegate"
+    ~id:"contract.manager.unregistered_delegate"
+    ~title:"Unregistered delegate"
+    ~description:"A contract cannot be delegated to an unregistered delegate"
     ~pp:(fun ppf (k) ->
         Format.fprintf ppf "The provided public key (with hash %a) is \
-                           \ not registred as valid delegate key."
+                           \ not registered as valid delegate key."
           Ed25519.Public_key_hash.pp k)
     Data_encoding.(obj1 (req "hash" Ed25519.Public_key_hash.encoding))
-    (function Unregistred_delegate (k) -> Some (k) | _ -> None)
-    (fun (k) -> Unregistred_delegate (k))
+    (function Unregistered_delegate (k) -> Some (k) | _ -> None)
+    (fun (k) -> Unregistered_delegate (k))
 
 let get_contract_delegate c contract =
   Storage.Contract.Delegate.get_option c contract
@@ -34,13 +36,15 @@ let delegate_pubkey ctxt delegate =
   Storage.Contract.Manager.get_option ctxt
     (Contract_repr.implicit_contract delegate) >>=? function
   | None | Some (Manager_repr.Hash _) ->
-      fail (Unregistred_delegate delegate)
+      fail (Unregistered_delegate delegate)
   | Some (Manager_repr.Public_key pk) ->
       return pk
 
 let clear_cycle c cycle =
-  Storage.Roll.Last_for_cycle.delete c cycle >>=? fun c ->
-  Storage.Roll.Owner.delete_snapshot c cycle >>= fun c ->
+  Storage.Roll.Snapshot_for_cycle.get c cycle >>=? fun index ->
+  Storage.Roll.Snapshot_for_cycle.delete c cycle >>=? fun c ->
+  Storage.Roll.Last_for_snapshot.delete (c, cycle) index >>=? fun c ->
+  Storage.Roll.Owner.delete_snapshot c (cycle, index) >>= fun c ->
   return c
 
 let fold ctxt ~f init =
@@ -57,10 +61,34 @@ let fold ctxt ~f init =
           loop ctxt (Roll_repr.succ roll) (f roll delegate acc) in
   loop ctxt Roll_repr.first (return init)
 
-let freeze_rolls_for_cycle ctxt cycle =
-  Storage.Roll.Owner.snapshot ctxt cycle >>=? fun ctxt ->
+let snapshot_rolls_for_cycle ctxt cycle =
+  Storage.Roll.Snapshot_for_cycle.get ctxt cycle >>=? fun index ->
+  Storage.Roll.Snapshot_for_cycle.set ctxt cycle (index + 1) >>=? fun ctxt ->
+  Storage.Roll.Owner.snapshot ctxt (cycle, index) >>=? fun ctxt ->
   Storage.Roll.Next.get ctxt >>=? fun last ->
-  Storage.Roll.Last_for_cycle.init ctxt cycle last
+  Storage.Roll.Last_for_snapshot.init (ctxt, cycle) index last >>=? fun ctxt ->
+  return ctxt
+
+let freeze_rolls_for_cycle ctxt cycle =
+  Storage.Roll.Snapshot_for_cycle.get ctxt cycle >>=? fun max_index ->
+  Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+  let rd = Seed_repr.initialize_new seed [MBytes.of_string "roll_snapshot"] in
+  let seq = Seed_repr.sequence rd 0l in
+  let selected_index =
+    Seed_repr.take_int32 seq (Int32.of_int max_index) |> fst |> Int32.to_int in
+  Storage.Roll.Snapshot_for_cycle.set ctxt cycle selected_index >>=? fun ctxt ->
+  fold_left_s
+    (fun ctxt index ->
+       if Compare.Int.(index = selected_index) then
+         return ctxt
+       else
+         Storage.Roll.Owner.delete_snapshot ctxt (cycle, index) >>= fun ctxt ->
+         Storage.Roll.Last_for_snapshot.delete (ctxt, cycle) index >>=? fun ctxt ->
+         return ctxt
+    )
+    ctxt
+    Misc.(0 --> (max_index - 1)) >>=? fun ctxt ->
+  return ctxt
 
 (* Roll selection *)
 
@@ -82,15 +110,16 @@ module Random = struct
     Seed_storage.for_cycle c cycle >>=? fun random_seed ->
     let rd = level_random random_seed kind level in
     let sequence = Seed_repr.sequence rd (Int32.of_int offset) in
-    Storage.Roll.Last_for_cycle.get c cycle >>=? fun bound ->
+    Storage.Roll.Snapshot_for_cycle.get c cycle >>=? fun index ->
+    Storage.Roll.Last_for_snapshot.get (c, cycle) index >>=? fun bound ->
     let rec loop sequence =
       let roll, sequence = Roll_repr.random sequence ~bound in
-      Storage.Roll.Owner.Snapshot.get_option c (cycle, roll) >>=? function
+      Storage.Roll.Owner.Snapshot.get_option c ((cycle, index), roll) >>=? function
       | None ->
           loop sequence
       | Some delegate ->
           return delegate in
-    Storage.Roll.Owner.snapshot_exists c cycle >>= fun snapshot_exists ->
+    Storage.Roll.Owner.snapshot_exists c (cycle, index) >>= fun snapshot_exists ->
     fail_unless snapshot_exists (No_roll_snapshot_for_cycle cycle) >>=? fun () ->
     loop sequence
 
@@ -119,16 +148,16 @@ module Delegate = struct
         return (roll, c)
 
   let consume_roll_change c delegate =
-    let roll_value = Raw_context.roll_value c in
+    let tokens_per_roll = Constants_storage.tokens_per_roll c in
     Storage.Roll.Delegate_change.get c delegate >>=? fun change ->
     trace Consume_roll_change
-      (Lwt.return Tez_repr.(change -? roll_value)) >>=? fun new_change ->
+      (Lwt.return Tez_repr.(change -? tokens_per_roll)) >>=? fun new_change ->
     Storage.Roll.Delegate_change.set c delegate new_change
 
   let recover_roll_change c delegate =
-    let roll_value = Raw_context.roll_value c in
+    let tokens_per_roll = Constants_storage.tokens_per_roll c in
     Storage.Roll.Delegate_change.get c delegate >>=? fun change ->
-    Lwt.return Tez_repr.(change +? roll_value) >>=? fun new_change ->
+    Lwt.return Tez_repr.(change +? tokens_per_roll) >>=? fun new_change ->
     Storage.Roll.Delegate_change.set c delegate new_change
 
   let pop_roll_from_delegate c delegate =
@@ -188,37 +217,104 @@ module Delegate = struct
 
   let add_amount c delegate amount =
     ensure_inited c delegate >>=? fun c ->
-    let roll_value = Raw_context.roll_value c in
+    let tokens_per_roll = Constants_storage.tokens_per_roll c in
     Storage.Roll.Delegate_change.get c delegate >>=? fun change ->
     Lwt.return Tez_repr.(amount +? change) >>=? fun change ->
     Storage.Roll.Delegate_change.set c delegate change >>=? fun c ->
     delegate_pubkey c delegate >>=? fun delegate_pk ->
     let rec loop c change =
-      if Tez_repr.(change < roll_value) then
+      if Tez_repr.(change < tokens_per_roll) then
         return c
       else
-        Lwt.return Tez_repr.(change -? roll_value) >>=? fun  change ->
+        Lwt.return Tez_repr.(change -? tokens_per_roll) >>=? fun  change ->
         create_roll_in_delegate c delegate delegate_pk >>=? fun c ->
         loop c change in
-    loop c change
+    Storage.Contract.Inactive_delegate.mem c
+      (Contract_repr.implicit_contract delegate) >>= fun inactive ->
+    if inactive then return c else loop c change
 
   let remove_amount c delegate amount =
-    let roll_value = Raw_context.roll_value c in
+    let tokens_per_roll = Constants_storage.tokens_per_roll c in
     let rec loop c change =
       if Tez_repr.(amount <= change)
       then return (c, change)
       else
         pop_roll_from_delegate c delegate >>=? fun (_, c) ->
-        Lwt.return Tez_repr.(change +? roll_value) >>=? fun change ->
+        Lwt.return Tez_repr.(change +? tokens_per_roll) >>=? fun change ->
         loop c change in
     Storage.Roll.Delegate_change.get c delegate >>=? fun change ->
-    loop c change >>=? fun (c, change) ->
+    Storage.Contract.Inactive_delegate.mem c
+      (Contract_repr.implicit_contract delegate) >>= fun inactive ->
+    begin
+      if inactive then return (c, change) else loop c change
+    end >>=? fun (c, change) ->
     Lwt.return Tez_repr.(change -? amount) >>=? fun change ->
     Storage.Roll.Delegate_roll_list.mem c delegate >>= fun rolls ->
-    if Tez_repr.(change = zero) && not rolls then
+    if not inactive && Tez_repr.(change = zero) && not rolls then
       Storage.Roll.Delegate_change.delete c delegate
     else
       Storage.Roll.Delegate_change.set c delegate change
+
+  let set_inactive ctxt delegate =
+    ensure_inited ctxt delegate >>=? fun ctxt ->
+    let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
+    Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
+    Storage.Contract.Inactive_delegate.add ctxt
+      (Contract_repr.implicit_contract delegate) >>= fun ctxt ->
+    let rec loop ctxt change =
+      Storage.Roll.Delegate_roll_list.get_option ctxt delegate >>=? function
+      | None -> return (ctxt, change)
+      | Some _roll ->
+          pop_roll_from_delegate ctxt delegate >>=? fun (_, ctxt) ->
+          Lwt.return Tez_repr.(change +? tokens_per_roll) >>=? fun change ->
+          loop ctxt change in
+    loop ctxt change >>=? fun (ctxt, change) ->
+    Storage.Roll.Delegate_change.set ctxt delegate change >>=? fun ctxt ->
+    return ctxt
+
+  let set_active ctxt delegate =
+    Storage.Contract.Inactive_delegate.mem ctxt
+      (Contract_repr.implicit_contract delegate) >>= fun inactive ->
+    let current_cycle = (Raw_context.current_level ctxt).cycle in
+    let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+    (* When the delegate is new or inactive, she will become active in
+       `1+preserved_cycles`, and we allow `preserved_cycles` for the
+       delegate to start baking. When the delegate is active, we only
+       give her at least `preserved_cycles` after the current cycle
+       before to be deactivated.  *)
+    Storage.Contract.Delegate_desactivation.get_option ctxt
+      (Contract_repr.implicit_contract delegate) >>=? fun current_expiration ->
+    let expiration = match current_expiration with
+      | None ->
+          Cycle_repr.add current_cycle (1+2*preserved_cycles)
+      | Some current_expiration ->
+          let delay =
+            if inactive then (1+2*preserved_cycles) else 1+preserved_cycles in
+          let updated =
+            Cycle_repr.add current_cycle delay in
+          Cycle_repr.max current_expiration updated in
+    Storage.Contract.Delegate_desactivation.init_set ctxt
+      (Contract_repr.implicit_contract delegate)
+      expiration >>= fun ctxt ->
+    if not inactive then
+      return ctxt
+    else begin
+      ensure_inited ctxt delegate >>=? fun ctxt ->
+      let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
+      Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
+      Storage.Contract.Inactive_delegate.del ctxt
+        (Contract_repr.implicit_contract delegate) >>= fun ctxt ->
+      delegate_pubkey ctxt delegate >>=? fun delegate_pk ->
+      let rec loop ctxt change =
+        if Tez_repr.(change < tokens_per_roll) then
+          return ctxt
+        else
+          Lwt.return Tez_repr.(change -? tokens_per_roll) >>=? fun  change ->
+          create_roll_in_delegate ctxt delegate delegate_pk >>=? fun ctxt ->
+          loop ctxt change in
+      loop ctxt change >>=? fun ctxt ->
+      return ctxt
+    end
 
 end
 
@@ -238,7 +334,45 @@ module Contract = struct
 
 end
 
-let value = Raw_context.roll_value
+let init ctxt =
+  Storage.Roll.Next.init ctxt Roll_repr.first
 
-let init c =
-  Storage.Roll.Next.init c Roll_repr.first
+let init_first_cycles ctxt =
+  let preserved = Constants_storage.preserved_cycles ctxt in
+  (* Precompute rolls for cycle (0 --> preserved_cycles) *)
+  List.fold_left
+    (fun ctxt c ->
+       ctxt >>=? fun ctxt ->
+       let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
+       Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0 >>=? fun ctxt ->
+       snapshot_rolls_for_cycle ctxt cycle >>=? fun ctxt ->
+       freeze_rolls_for_cycle ctxt cycle)
+    (return ctxt) (0 --> preserved) >>=? fun ctxt ->
+  let cycle = Cycle_repr.of_int32_exn (Int32.of_int (preserved + 1)) in
+  (* Precomputed a snapshot for cycle (preserved_cycles + 1) *)
+  Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0 >>=? fun ctxt ->
+  snapshot_rolls_for_cycle ctxt cycle >>=? fun ctxt ->
+  (* Prepare storage for storing snapshots for cycle (preserved_cycles+2) *)
+  let cycle = Cycle_repr.of_int32_exn (Int32.of_int (preserved + 2)) in
+  Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0 >>=? fun ctxt ->
+  return ctxt
+
+let snapshot_rolls ctxt =
+  let current_level = Raw_context.current_level ctxt in
+  let preserved = Constants_storage.preserved_cycles ctxt in
+  let cycle = Cycle_repr.add current_level.cycle (preserved+2) in
+  snapshot_rolls_for_cycle ctxt cycle
+
+let cycle_end ctxt last_cycle =
+  let preserved = Constants_storage.preserved_cycles ctxt in
+  begin
+    match Cycle_repr.sub last_cycle preserved with
+    | None -> return ctxt
+    | Some cleared_cycle ->
+        clear_cycle ctxt cleared_cycle
+  end >>=? fun ctxt ->
+  let frozen_roll_cycle = Cycle_repr.add last_cycle (preserved+1) in
+  freeze_rolls_for_cycle ctxt frozen_roll_cycle >>=? fun ctxt ->
+  Storage.Roll.Snapshot_for_cycle.init
+    ctxt (Cycle_repr.succ (Cycle_repr.succ frozen_roll_cycle)) 0 >>=? fun ctxt ->
+  return ctxt

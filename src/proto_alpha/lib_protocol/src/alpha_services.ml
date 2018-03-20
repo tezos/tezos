@@ -20,7 +20,9 @@ module S = struct
       ~description: "All the operations of the block (fully decoded)."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (list (list (dynamic_size Operation.encoding)))
+      ~output: (list (list (merge_objs
+                              (obj1 (req "hash" Operation_hash.encoding))
+                              (dynamic_size Operation.encoding))))
       RPC_path.(custom_root / "operations")
 
   let header =
@@ -55,7 +57,9 @@ let () =
     ctxt.operation_hashes () >>= fun operation_hashes ->
     ctxt.operations () >>= fun operations ->
     map2_s
-      (map2_s (fun x y -> Lwt.return (Operation.parse x y)))
+      (map2_s (fun h op ->
+           Lwt.return (Operation.parse op) >>=? fun op ->
+           return (h, op)))
       operation_hashes operations
   end ;
   register0_fullctxt S.header begin fun { block_header ; _ } () () ->
@@ -66,7 +70,7 @@ let () =
     Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
     return block_header.protocol_data.priority
   end ;
-  register0_fullctxt S.seed_nonce_hash begin fun { block_header ; _ } () ( )->
+  opt_register0_fullctxt S.seed_nonce_hash begin fun { block_header ; _ } () ( )->
     Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
     return block_header.protocol_data.seed_nonce_hash
   end

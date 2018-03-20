@@ -17,7 +17,6 @@ type raw = Operation.t = {
 val raw_encoding: raw Data_encoding.t
 
 type operation = {
-  hash: Operation_hash.t ;
   shell: Operation.shell_header ;
   contents: proto_operation ;
   signature: Ed25519.Signature.t option ;
@@ -31,6 +30,14 @@ and anonymous_operation =
   | Seed_nonce_revelation of {
       level: Raw_level_repr.t ;
       nonce: Seed_repr.nonce ;
+    }
+  | Double_endorsement_evidence of {
+      op1: operation ;
+      op2: operation ;
+    }
+  | Double_baking_evidence of {
+      bh1: Block_header_repr.t ;
+      bh2: Block_header_repr.t ;
     }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
@@ -97,9 +104,9 @@ type error += Cannot_parse_operation (* `Branch *)
 val encoding: operation Data_encoding.t
 
 val hash_raw: raw -> Operation_hash.t
+val hash: operation -> Operation_hash.t
 
-val parse:
-  Operation_hash.t -> Operation.t -> operation tzresult
+val parse: Operation.t -> operation tzresult
 
 val acceptable_passes: operation -> int list
 

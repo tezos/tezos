@@ -34,6 +34,15 @@ let pred = function
   | 0l -> None
   | i -> Some (Int32.pred i)
 
+let add c i =
+  assert Compare.Int.(i > 0) ;
+  Int32.add c (Int32.of_int i)
+
+let sub c i =
+  assert Compare.Int.(i > 0) ;
+  let r = Int32.sub c (Int32.of_int i) in
+  if Compare.Int32.(r < 0l) then None else Some r
+
 let to_int32 i = i
 
 let of_int32_exn l =

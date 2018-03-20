@@ -47,7 +47,7 @@ let expect_big_map tc contract print_key key_type print_data data_type contents 
   iter_p
     (fun (n, exp) ->
        let key = Proto_alpha.Script_ir_translator.hash_data key_type n in
-       Proto_alpha.Alpha_context.Contract.Big_map_storage.get_opt tc contract key >>=? fun data ->
+       Proto_alpha.Alpha_context.Contract.Big_map.get_opt tc contract key >>=? fun data ->
        match data, exp with
        | None, None ->
            debug " - big_map[%a] is not defined (ok)" print_key n ;

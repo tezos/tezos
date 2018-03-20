@@ -16,8 +16,6 @@ type t = {
   level: Level_repr.t ;
   timestamp: Time.t ;
   fitness: Int64.t ;
-  roll_value: Tez_repr.t ;
-  faucet_count: int;
   endorsements_received: Int_set.t;
 }
 
@@ -28,15 +26,12 @@ let current_level ctxt = ctxt.level
 let current_timestamp ctxt = ctxt.timestamp
 let current_fitness ctxt = ctxt.fitness
 let first_level ctxt = ctxt.first_level
-let faucet_count ctxt = ctxt.faucet_count
 let constants ctxt = ctxt.constants
-let roll_value ctxt = ctxt.roll_value
 let recover ctxt = ctxt.context
 
 let record_endorsement ctxt k = { ctxt with endorsements_received = Int_set.add k ctxt.endorsements_received }
 let endorsement_already_recorded ctxt k = Int_set.mem k ctxt.endorsements_received
 
-let incr_faucet_count ctxt = { ctxt with faucet_count = ctxt.faucet_count + 1 }
 let set_current_fitness ctxt fitness = { ctxt with fitness }
 
 type storage_error =
@@ -55,7 +50,7 @@ let storage_error_encoding =
     case (Tag 1)
       (obj2
          (req "missing_key" (list string))
-         (req "function" (string_enum ["get", `Get ; "set", `Set ; "del", `Del ])))
+         (req "function" (string_enum ["get", `Get ; "set", `Set ; "del", `Del ; "copy", `Copy ])))
       (function Missing_key (key, f) -> Some (key, f) | _ -> None)
       (fun (key, f) -> Missing_key (key, f)) ;
     case (Tag 2)
@@ -140,7 +135,6 @@ let is_first_block ctxt =
 
 let version = "v1"
 let first_level_key = [ version ; "first_level" ]
-let roll_value_key = [ version ; "roll_value" ]
 let sandboxed_key = [ version ; "sandboxed" ]
 
 let get_first_level ctxt =
@@ -157,22 +151,6 @@ let set_first_level ctxt level =
   let bytes =
     Data_encoding.Binary.to_bytes Raw_level_repr.encoding level in
   Context.set ctxt first_level_key bytes >>= fun ctxt ->
-  return ctxt
-
-let get_roll_value ctxt =
-  Context.get ctxt roll_value_key >>= function
-  | None -> storage_error (Missing_key (roll_value_key, `Get))
-  | Some bytes ->
-      match
-        Data_encoding.Binary.of_bytes Tez_repr.encoding bytes
-      with
-      | None -> storage_error (Corrupted_data roll_value_key)
-      | Some level -> return level
-
-let set_roll_value ctxt level =
-  let bytes =
-    Data_encoding.Binary.to_bytes Tez_repr.encoding level in
-  Context.set ctxt roll_value_key bytes >>= fun ctxt ->
   return ctxt
 
 type error += Failed_to_parse_sandbox_parameter of MBytes.t
@@ -222,38 +200,22 @@ let prepare ~level ~timestamp ~fitness ctxt =
   may_tag_first_block ctxt level >>=? fun (ctxt, first_block, first_level) ->
   get_sandboxed ctxt >>=? fun sandbox ->
   Constants_repr.read sandbox >>=? fun constants ->
-  begin
-    if first_block then begin
-      set_roll_value ctxt constants.initial_roll_value >>=? fun ctxt ->
-      return (ctxt, constants.initial_roll_value)
-    end else begin
-      get_roll_value ctxt >>=? fun roll_value ->
-      return (ctxt, roll_value)
-    end
-  end >>=? fun (ctxt, roll_value) ->
   let level =
     Level_repr.from_raw
       ~first_level
-      ~cycle_length:constants.Constants_repr.cycle_length
-      ~voting_period_length:constants.Constants_repr.voting_period_length
+      ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
+      ~blocks_per_voting_period:constants.Constants_repr.blocks_per_voting_period
+      ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
       level in
   return ({ context = ctxt ; constants ; level ;
-            timestamp ; fitness ; first_level ; roll_value ;
-            faucet_count = 0 ; endorsements_received = Int_set.empty ;
+            timestamp ; fitness ; first_level ;
+            endorsements_received = Int_set.empty ;
           },
           first_block)
 
-let rec double_roll_value ctxt i =
-  if Compare.Int.(i <= 0) then
-    return ctxt
-  else
-    Lwt.return Tez_repr.(ctxt.roll_value +? ctxt.roll_value) >>=? fun roll_value ->
-    set_roll_value ctxt.context roll_value >>=? fun context ->
-    double_roll_value { ctxt with context ; roll_value } (i-1)
-
-let activate ({ context = c } as s) h =
+let activate ({ context = c ; _ } as s) h =
   Updater.activate c h >>= fun c -> Lwt.return { s with context = c }
-let fork_test_chain ({ context = c } as s) protocol expiration =
+let fork_test_chain ({ context = c ; _ } as s) protocol expiration =
   Updater.fork_test_chain c ~protocol ~expiration >>= fun c ->
   Lwt.return { s with context = c }
 
@@ -266,8 +228,6 @@ let register_resolvers enc resolve =
       level =  Level_repr.root Raw_level_repr.root ;
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
-      roll_value = Tez_repr.zero ;
-      faucet_count = 0 ;
       endorsements_received = Int_set.empty ;
     } in
     resolve faked_context str in

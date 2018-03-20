@@ -48,21 +48,21 @@ end
 
 module Constants = struct
 
-  let cycle_length custom_root =
+  let blocks_per_cycle custom_root =
     RPC_service.post_service
       ~description: "Cycle length"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "cycle_length" int32))
-      RPC_path.(custom_root / "constants" / "cycle_length")
+      ~output: (obj1 (req "blocks_per_cycle" int32))
+      RPC_path.(custom_root / "constants" / "blocks_per_cycle")
 
-  let voting_period_length custom_root =
+  let blocks_per_voting_period custom_root =
     RPC_service.post_service
       ~description: "Length of the voting period"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "voting_period_length" int32))
-      RPC_path.(custom_root / "constants" / "voting_period_length")
+      ~output: (obj1 (req "blocks_per_voting_period" int32))
+      RPC_path.(custom_root / "constants" / "blocks_per_voting_period")
 
   let time_before_reward custom_root =
     RPC_service.post_service
@@ -72,7 +72,7 @@ module Constants = struct
       ~output: (obj1 (req "time_before_reward" Period.encoding))
       RPC_path.(custom_root / "constants" / "time_before_reward")
 
-  let slot_durations custom_root =
+  let time_between_blocks custom_root =
     RPC_service.post_service
       ~description: "Slot durations"
       ~query: RPC_query.empty
@@ -88,13 +88,13 @@ module Constants = struct
       ~output: (obj1 (req "first_free_baking_slot" uint16))
       RPC_path.(custom_root / "constants" / "first_free_baking_slot")
 
-  let max_signing_slot custom_root =
+  let endorsers_per_block custom_root =
     RPC_service.post_service
       ~description: "Max signing slot"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "max_signing_slot" uint16))
-      RPC_path.(custom_root / "constants" / "max_signing_slot")
+      ~output: (obj1 (req "endorsers_per_block" uint16))
+      RPC_path.(custom_root / "constants" / "endorsers_per_block")
 
   let max_gas custom_root =
     RPC_service.post_service

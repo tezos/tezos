@@ -40,10 +40,14 @@ let get_op_header_res (res : result) : operation_header = {
   branch = res.hash
 }
 
-let get_protocol_data priority : protocol_data = {
+let get_protocol_data priority commit : protocol_data = {
   priority ;
   proof_of_work_nonce = Helpers_crypto.generate_proof_of_work_nonce ();
-  seed_nonce_hash = Proto_alpha.Alpha_context.Nonce.hash @@ Helpers_crypto.generate_seed_nonce ()
+  seed_nonce_hash =
+    if commit then
+      Some (Proto_alpha.Alpha_context.Nonce.hash @@ Helpers_crypto.generate_seed_nonce ())
+    else
+      None
 }
 
 let get_op_header pbh : operation_header = {
@@ -62,7 +66,7 @@ let init (pred_shell_header : shell_header) pred_block_hash
     get_op_header pred_block_hash in
   Helpers_assert.tmp_map (make_sourced_operation op_header) src_protops >>? fun src_ops_hashs ->
   let (sourced_operations, operation_hashs) = List.split src_ops_hashs in
-  let protocol_data = get_protocol_data priority in
+  let protocol_data = get_protocol_data priority true in
   let protocol_data_bytes =
     Proto_alpha.Alpha_context.Block_header.forge_unsigned_protocol_data
       protocol_data

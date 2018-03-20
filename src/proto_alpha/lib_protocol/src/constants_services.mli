@@ -9,22 +9,28 @@
 
 open Alpha_context
 
-val cycle_length:
+val preserved_cycles:
+  'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
+
+val blocks_per_cycle:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
-val voting_period_length:
+val blocks_per_voting_period:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
-val time_before_reward:
-  'a #RPC_context.simple -> 'a -> Period.t shell_tzresult Lwt.t
+val blocks_per_commitment:
+  'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
-val slot_durations:
+val blocks_per_roll_snapshot:
+  'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
+
+val time_between_blocks:
   'a #RPC_context.simple -> 'a -> Period.t list shell_tzresult Lwt.t
 
 val first_free_baking_slot:
   'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
 
-val max_signing_slot:
+val endorsers_per_block:
   'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
 
 val max_gas:

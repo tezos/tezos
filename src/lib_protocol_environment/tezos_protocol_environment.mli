@@ -30,6 +30,7 @@ module Make (Context : CONTEXT) : sig
     message: string option ;
     max_operation_data_length: int ;
     max_operations_ttl: int ;
+    last_allowed_fork_level: Int32.t ;
   }
 
   type quota = {

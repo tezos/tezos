@@ -15,7 +15,10 @@ type expr = Michelson_v1_primitives.prim Micheline.canonical
 
 type node = (location, Michelson_v1_primitives.prim) Micheline.node
 
-let expr_encoding = Micheline.canonical_encoding Michelson_v1_primitives.prim_encoding
+let expr_encoding =
+  Micheline.canonical_encoding
+    ~variant:"michelson_v1"
+    Michelson_v1_primitives.prim_encoding
 
 type t = { code : expr ; storage : expr }
 

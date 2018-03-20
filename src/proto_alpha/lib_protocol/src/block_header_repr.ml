@@ -18,7 +18,7 @@ type t = {
 
 and protocol_data = {
   priority: int ;
-  seed_nonce_hash: Nonce_hash.t ;
+  seed_nonce_hash: Nonce_hash.t option ;
   proof_of_work_nonce: MBytes.t ;
 }
 
@@ -34,14 +34,14 @@ let protocol_data_encoding =
   let open Data_encoding in
   conv
     (fun { priority ; seed_nonce_hash ; proof_of_work_nonce } ->
-       (priority, seed_nonce_hash, proof_of_work_nonce))
-    (fun (priority, seed_nonce_hash, proof_of_work_nonce) ->
+       (priority, proof_of_work_nonce, seed_nonce_hash))
+    (fun (priority, proof_of_work_nonce, seed_nonce_hash) ->
        { priority ; seed_nonce_hash ; proof_of_work_nonce })
     (obj3
        (req "priority" uint16)
-       (req "seed_nonce_hash" Nonce_hash.encoding)
        (req "proof_of_work_nonce"
-          (Fixed.bytes Constants_repr.proof_of_work_nonce_size)))
+          (Fixed.bytes Constants_repr.proof_of_work_nonce_size))
+       (opt "seed_nonce_hash" Nonce_hash.encoding))
 
 let signed_protocol_data_encoding =
   let open Data_encoding in
@@ -69,9 +69,13 @@ let encoding =
 (** Constants *)
 
 let max_header_length =
-  match Data_encoding.classify signed_protocol_data_encoding with
-  | `Fixed n -> n
-  | `Dynamic | `Variable -> assert false
+  let fake = { priority = 0 ;
+               proof_of_work_nonce =
+                 MBytes.create Constants_repr.proof_of_work_nonce_size ;
+               seed_nonce_hash = Some Nonce_hash.zero } in
+  let signature = Ed25519.Signature.zero in
+  Data_encoding.Binary.length signed_protocol_data_encoding (fake, signature)
+
 
 (** Header parsing entry point  *)
 

@@ -15,8 +15,8 @@ type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
-type error += Cannot_pay_baking_bond (* `Permanent *)
-type error += Cannot_pay_endorsement_bond (* `Permanent *)
+type error += Cannot_freeze_baking_deposit (* `Permanent *)
+type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
 
 val paying_priorities: context -> int list
@@ -24,35 +24,38 @@ val paying_priorities: context -> int list
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
     time, given the predecessor block timestamp [pred_block_time],
     after which a baker with priority [priority] is allowed to
-    bake. Fail with [Invalid_slot_durations_constant] if the minimal
+    bake. Fail with [Invalid_time_between_blocks_constant] if the minimal
     time cannot be computed. *)
 val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
 
-(** [pay_baking_bond: cxt baker] Debit the baking bond (See
-    !Constants.baking_bond_cost) from the default account of the
-    [baker]. No bond is debited if the baking priority of this block is
-    greater than the maximum number of paying baking in the network
-    (meaning that n. bakers skipped their turn).
+(** [freeze_baking_deposit: ctxt delegate priority]
+    Freeze the baking deposit (See !Constants.block_security_deposit)
+    from a delegate account. No deposit is frozen if the baking
+    priority of this block is greater than the maximum number
+    of paying baking in the network (meaning that n. bakers
+    skipped their turn).
 
-    Raise an error if the baker account does not have enough
+    Raise an error if the delegate account does not have enough
     funds to claim baking rights. *)
-val pay_baking_bond:
+val freeze_baking_deposit:
   context ->
   Block_header.protocol_data ->
   public_key_hash ->
-  context tzresult Lwt.t
+  (context * Tez.t) tzresult Lwt.t
 
-(** [pay_endorsement_bond: cxt baker] Debit the endorsement bond
-    (See !Constants.endorsement_bond_cost) from the default account
-    of the [baker]. Raise an error if the baker account does not
-    have enough funds to claim endorsement rights *)
-val pay_endorsement_bond:
-  context -> public_key_hash -> (context * Tez.t) tzresult Lwt.t
+(** [freeze_endorsement_deposit: ctxt delegate]
+    Freeze the endorsement deposit (See !Constants.endorsement_security_deposit)
+    from the delegate account.
+
+    Raise an error if the baker account does not have enough
+    funds to claim endorsement rights *)
+val freeze_endorsement_deposit:
+  context -> public_key_hash -> context tzresult Lwt.t
 
 (** [check_baking_rights ctxt block pred_timestamp] verifies that:
     * the contract that owned the roll at cycle start has the block signer as delegate.
     * the timestamp is coherent with the announced slot.
-    * the bond have been payed if the slot is below [Constants.first_free_baking_slot].
+    * the deposit have been payed if the slot is below [Constants.first_free_baking_slot].
 *)
 val check_baking_rights:
   context -> Block_header.protocol_data -> Time.t ->
@@ -64,10 +67,6 @@ val check_baking_rights:
 *)
 val check_endorsements_rights:
   context -> Level.t -> int list -> public_key tzresult Lwt.t
-
-(** If this priority should have payed the bond it is the base baking
-    reward and the bond, or just the base reward otherwise *)
-val base_baking_reward: context -> priority:int -> Tez.t
 
 (** Returns the endorsement reward calculated w.r.t a given priotiry.  *)
 val endorsement_reward: block_priority:int -> Tez.t tzresult Lwt.t

@@ -14,10 +14,10 @@ open Misc
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
+type error += Cannot_freeze_baking_deposit (* `Permanent *)
+type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Empty_endorsement
-type error += Cannot_pay_baking_bond (* `Permanent *)
-type error += Cannot_pay_endorsement_bond (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
 
 
@@ -64,6 +64,26 @@ let () =
     (fun (m, g) -> Invalid_endorsement_slot (m, g)) ;
   register_error_kind
     `Permanent
+    ~id:"baking.cannot_freeze_baking_deposit"
+    ~title:"Cannot freeze baking deposit"
+    ~description:
+      "Impossible to debit the required tokens on the baker's contract"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot freeze the baking deposit")
+    Data_encoding.unit
+    (function Cannot_freeze_baking_deposit -> Some () | _ -> None)
+    (fun () -> Cannot_freeze_baking_deposit) ;
+  register_error_kind
+    `Permanent
+    ~id:"baking.cannot_freeze_endorsement_deposit"
+    ~title:"Cannot freeze endorsement deposit"
+    ~description:
+      "Impossible to debit the required tokens on the endorser's contract"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot freeze the endorsement deposit")
+    Data_encoding.unit
+    (function Cannot_freeze_endorsement_deposit -> Some () | _ -> None)
+    (fun () -> Cannot_freeze_endorsement_deposit) ;
+  register_error_kind
+    `Permanent
     ~id:"baking.inconsisten_endorsement"
     ~title:"Multiple delegates for a single endorsement"
     ~description:"The operation tries to endorse slots with distinct delegates"
@@ -75,26 +95,6 @@ let () =
                      (req "delegates" (list Ed25519.Public_key_hash.encoding)))
     (function Inconsistent_endorsement l -> Some l | _ -> None)
     (fun l -> Inconsistent_endorsement l) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.cannot_pay_baking_bond"
-    ~title:"Cannot pay baking bond"
-    ~description:
-      "Impossible to debit the required tokens on the baker's contract"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay the baking bond")
-    Data_encoding.unit
-    (function Cannot_pay_baking_bond -> Some () | _ -> None)
-    (fun () -> Cannot_pay_baking_bond) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.cannot_pay_endorsement_bond"
-    ~title:"Cannot pay endorsement bond"
-    ~description:
-      "Impossible to debit the required tokens on the endorser's contract"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay the endorsement bond")
-    Data_encoding.unit
-    (function Cannot_pay_endorsement_bond -> Some () | _ -> None)
-    (fun () -> Cannot_pay_endorsement_bond) ;
   register_error_kind
     `Permanent
     ~id:"baking.invalid_block_signature"
@@ -111,23 +111,38 @@ let () =
     (function Invalid_block_signature (block, pkh) -> Some (block, pkh) | _ -> None)
     (fun (block, pkh) -> Invalid_block_signature (block, pkh))
 
+
 let minimal_time c priority pred_timestamp =
   let priority = Int32.of_int priority in
-  let rec cumsum_slot_durations acc durations p =
+  let rec cumsum_time_between_blocks acc durations p =
     if Compare.Int32.(<=) p 0l then
       ok acc
     else match durations with
-      | [] -> cumsum_slot_durations acc [ Period.one_minute ] p
+      | [] -> cumsum_time_between_blocks acc [ Period.one_minute ] p
       | [ last ] ->
           Period.mult p last >>? fun period ->
           Timestamp.(acc +? period)
       | first :: durations ->
           Timestamp.(acc +? first) >>? fun acc ->
           let p = Int32.pred p in
-          cumsum_slot_durations acc durations p in
+          cumsum_time_between_blocks acc durations p in
   Lwt.return
-    (cumsum_slot_durations
-       pred_timestamp (Constants.slot_durations c) (Int32.succ priority))
+    (cumsum_time_between_blocks
+       pred_timestamp (Constants.time_between_blocks c) (Int32.succ priority))
+
+let freeze_baking_deposit ctxt { Block_header.priority ; _ } delegate =
+  if Compare.Int.(priority >= Constants.first_free_baking_slot ctxt)
+  then return (ctxt, Tez.zero)
+  else
+    let deposit = Constants.block_security_deposit in
+    Delegate.freeze_deposit ctxt delegate deposit
+    |> trace Cannot_freeze_baking_deposit >>=? fun ctxt ->
+    return (ctxt, deposit)
+
+let freeze_endorsement_deposit ctxt delegate =
+  let deposit = Constants.endorsement_security_deposit in
+  Delegate.freeze_deposit ctxt delegate deposit
+  |> trace Cannot_freeze_endorsement_deposit
 
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp >>=? fun minimal_time ->
@@ -142,23 +157,10 @@ let check_baking_rights c { Block_header.priority ; _ }
   check_timestamp c priority pred_timestamp >>=? fun () ->
   return delegate
 
-let pay_baking_bond c { Block_header.priority ; _ } id =
-  if Compare.Int.(priority >= Constants.first_free_baking_slot c)
-  then return c
-  else
-    Contract.spend c (Contract.implicit_contract id) Constants.baking_bond_cost
-    |> trace Cannot_pay_baking_bond
-
-let pay_endorsement_bond c id =
-  let bond = Constants.endorsement_bond_cost in
-  Contract.spend c (Contract.implicit_contract id) bond
-  |> trace Cannot_pay_endorsement_bond >>=? fun c ->
-  return (c, bond)
-
 let check_endorsements_rights c level slots =
   map_p (fun slot ->
-      fail_unless Compare.Int.(0 <= slot && slot <= Constants.max_signing_slot c)
-        (Invalid_endorsement_slot (Constants.max_signing_slot c, slot)) >>=? fun () ->
+      fail_unless Compare.Int.(0 <= slot && slot <= Constants.endorsers_per_block c)
+        (Invalid_endorsement_slot (Constants.endorsers_per_block c, slot)) >>=? fun () ->
       Roll.endorsement_rights_owner c level ~slot)
     slots >>=? function
   | [] -> fail Empty_endorsement
@@ -169,17 +171,7 @@ let check_endorsements_rights c level slots =
       return delegate
 
 let paying_priorities c =
-  0 --> Constants.first_free_baking_slot c
-
-let bond_and_reward =
-  match Tez.(Constants.baking_bond_cost +? Constants.baking_reward) with
-  | Ok v -> v
-  | Error _ -> assert false
-
-let base_baking_reward c ~priority =
-  if Compare.Int.(priority < Constants.first_free_baking_slot c)
-  then bond_and_reward
-  else Constants.baking_reward
+  0 --> (Constants.first_free_baking_slot c - 1)
 
 type error += Incorect_priority
 
@@ -228,7 +220,7 @@ let first_baking_priorities
 
 let first_endorsement_slots
     ctxt
-    ?(max_priority = Constants.max_signing_slot ctxt)
+    ?(max_priority = Constants.endorsers_per_block ctxt)
     delegate level =
   endorsement_priorities ctxt level >>=? fun delegate_list ->
   select_delegate delegate delegate_list max_priority
@@ -263,7 +255,7 @@ let check_signature block key =
                                    Ed25519.Public_key.hash key))
 
 let max_fitness_gap ctxt =
-  let slots = Int64.of_int (Constants.max_signing_slot ctxt + 1) in
+  let slots = Int64.of_int (Constants.endorsers_per_block ctxt + 1) in
   Int64.add slots 1L
 
 let check_fitness_gap ctxt (block : Block_header.t) =
@@ -277,7 +269,7 @@ let check_fitness_gap ctxt (block : Block_header.t) =
 
 let last_of_a_cycle ctxt l =
   Compare.Int32.(Int32.succ l.Level.cycle_position =
-                 Constants.cycle_length ctxt)
+                 Constants.blocks_per_cycle ctxt)
 
 let dawn_of_a_new_cycle ctxt =
   let level = Level.current ctxt in

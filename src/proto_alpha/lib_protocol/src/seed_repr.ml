@@ -97,11 +97,14 @@ let initial_nonce_0 =
 let initial_nonce_hash_0 =
   hash initial_nonce_0
 
-let initial_seed_0 = B (State_hash.hash_bytes [])
-let initial_seed_1 =
-  nonce initial_seed_0
-    (MBytes.of_string (String.make Constants_repr.nonce_length '\000'))
-let initial_seed_2 =
-  nonce initial_seed_1
-    (MBytes.of_string (String.make Constants_repr.nonce_length '\000'))
-
+let initial_seeds n =
+  let rec loop acc elt i =
+    if Compare.Int.(i = 0) then
+      List.rev (elt :: acc)
+    else
+      loop
+        (elt :: acc)
+        (nonce elt
+           (MBytes.of_string (String.make Constants_repr.nonce_length '\000')))
+        (i-1) in
+  loop [] (B (State_hash.hash_bytes [])) n

@@ -26,7 +26,11 @@ type validation_mode =
 type validation_state =
   { mode : validation_mode ;
     ctxt : Alpha_context.t ;
-    op_count : int }
+    op_count : int ;
+    deposit : Alpha_context.Tez.t ;
+    fees : Alpha_context.Tez.t ;
+    rewards : Alpha_context.Tez.t ;
+  }
 
 include Updater.PROTOCOL with type operation = Alpha_context.Operation.t
                           and type validation_state := validation_state

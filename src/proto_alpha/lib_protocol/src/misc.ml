@@ -11,13 +11,13 @@ type 'a lazyt = unit -> 'a
 type 'a lazy_list_t = LCons of 'a * ('a lazy_list_t tzresult Lwt.t lazyt)
 type 'a lazy_list = 'a lazy_list_t tzresult Lwt.t
 
-let rec (-->) i j = (* [i; i+1; ...; j-1] *)
-  if Compare.Int.(i >= j)
+let rec (-->) i j = (* [i; i+1; ...; j] *)
+  if Compare.Int.(i > j)
   then []
   else i :: (succ i --> j)
 
-let rec (--->) i j = (* [i; i+1; ...; j-1] *)
-  if Compare.Int32.(i >= j)
+let rec (--->) i j = (* [i; i+1; ...; j] *)
+  if Compare.Int32.(i > j)
   then []
   else i :: (Int32.succ i ---> j)
 

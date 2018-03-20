@@ -57,28 +57,28 @@ let test_endorsement_payment () =
       @@ List.nth endorsers endorser_slot in
     Contract.get_balance tc (Contract.implicit_contract contract_p.hpub) >>=? fun init_balance ->
 
-    (* After one block, endorsement bond cost should be paid *)
+    (* After one block, endorsement deposit cost should be paid *)
     Block.endorsement
       root.tezos_header.shell root.hash
       root.level block_priority contract_p
       root.validation.context endorser_slot
     >>=? fun result ->
-    get_balance_res contract_p result >>=? fun bond_balance ->
+    get_balance_res contract_p result >>=? fun deposit_balance ->
     let protocol_data = Block.get_protocol_data block_priority in
     Proto_alpha.Baking.check_baking_rights
       result.tezos_context protocol_data root.tezos_header.shell.timestamp
     >>=? fun baker_pub ->
     let baker_hpub = Ed25519.Public_key.hash baker_pub in
-    let endorsement_bond_cost =
-      Constants.endorsement_bond_cost in
+    let endorsement_security_deposit =
+      Constants.endorsement_security_deposit in
     let baking = baker_hpub = contract_p.hpub && block_priority < 4 in
-    let baking_bond_cost =
+    let block_security_deposit =
       if baking
-      then Constants.baking_bond_cost
+      then Constants.block_security_deposit
       else Tez.zero in
-    let cost = Cast.tez_add endorsement_bond_cost baking_bond_cost in
+    let cost = Cast.tez_add endorsement_security_deposit block_security_deposit in
     let expected_balance = Cast.tez_sub init_balance cost in
-    Assert.equal_tez ~msg: __LOC__ expected_balance bond_balance ;
+    Assert.equal_tez ~msg: __LOC__ expected_balance deposit_balance ;
     (* After one cycle, (4 blocks in test/proto_alpha/sandbox),
        endorsement reward sould be received *)
     chain_empty_block result >>=? chain_empty_block >>=?
@@ -86,7 +86,7 @@ let test_endorsement_payment () =
     get_balance_res contract_p result >>=? fun reward_balance ->
     Proto_alpha.Baking.endorsement_reward ~block_priority >>=? fun reward ->
     let expected_balance = Cast.tez_add expected_balance reward in
-    let expected_balance = Cast.tez_add expected_balance endorsement_bond_cost in
+    let expected_balance = Cast.tez_add expected_balance endorsement_security_deposit in
     Assert.equal_tez ~msg: __LOC__ expected_balance reward_balance ;
     return ()
   in
@@ -106,7 +106,7 @@ let test_multiple_endorsement () =
   let op =
     Isolate_helpers.Operation.endorsement_full pred.hash level.level, endorser in
   Block.of_res ~res: pred ~ops: [op ;op] () >>= Assert.wrap >>= fun x ->
-  Assert.double_endorsement ~msg: __LOC__ x ;
+  Assert.double_endorsement_evidence ~msg: __LOC__ x ;
   return ()
 
 

@@ -27,7 +27,7 @@ module Roll : sig
 
   module Owner : Indexed_data_snapshotable_storage
     with type key = Roll_repr.t
-     and type snapshot = Cycle_repr.t
+     and type snapshot = (Cycle_repr.t * int)
      and type value = Ed25519.Public_key.t
      and type t := Raw_context.t
 
@@ -64,12 +64,17 @@ module Roll : sig
      and type value = Tez_repr.t
      and type t := Raw_context.t
 
-  (** Frozen rolls per cycle *)
-
-  module Last_for_cycle : Indexed_data_storage
+  (** Index of the randomly selected roll snapshot of a given cycle. *)
+  module Snapshot_for_cycle : Indexed_data_storage
     with type key = Cycle_repr.t
-     and type value = Roll_repr.t
+     and type value = int
      and type t := Raw_context.t
+
+  (** Last roll in the snapshoted roll allocation of a given cycle. *)
+  module Last_for_snapshot : Indexed_data_storage
+    with type key = int
+     and type value = Roll_repr.t
+     and type t = Raw_context.t * Cycle_repr.t
 
 end
 
@@ -96,6 +101,22 @@ module Contract : sig
      and type value = Tez_repr.t
      and type t := Raw_context.t
 
+  (** Frozen balance, see 'delegate_storage.mli' for more explanation *)
+  module Frozen_deposits : Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t
+     and type t = Raw_context.t * Contract_repr.t
+
+  module Frozen_fees : Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t
+     and type t = Raw_context.t * Contract_repr.t
+
+  module Frozen_rewards : Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t
+     and type t = Raw_context.t * Contract_repr.t
+
   (** The manager of a contract *)
   module Manager : Indexed_data_storage
     with type key = Contract_repr.t
@@ -111,6 +132,16 @@ module Contract : sig
   module Delegated : Data_set_storage
     with type elt = Contract_hash.t
      and type t = Raw_context.t * Contract_repr.t
+
+  module Inactive_delegate : Data_set_storage
+    with type elt = Contract_repr.t
+     and type t = Raw_context.t
+
+  (** The cycle where the delegate should be desactivated. *)
+  module Delegate_desactivation : Indexed_data_storage
+    with type key = Contract_repr.t
+     and type value = Cycle_repr.t
+     and type t := Raw_context.t
 
   module Spendable : Data_set_storage
     with type elt = Contract_repr.t
@@ -154,7 +185,8 @@ module Contract : sig
 
 end
 
-module Delegate : Data_set_storage
+(** Set of all registered delegates. *)
+module Delegates : Data_set_storage
   with type t := Raw_context.t
    and type elt = Ed25519.Public_key_hash.t
 
@@ -201,12 +233,16 @@ module Seed : sig
   (** Storage from this submodule must only be accessed through the
       module `Seed`. *)
 
+  type unrevealed_nonce = {
+    nonce_hash: Nonce_hash.t ;
+    delegate: Ed25519.Public_key_hash.t ;
+    deposit: Tez_repr.t ;
+    rewards: Tez_repr.t ;
+    fees: Tez_repr.t ;
+  }
+
   type nonce_status =
-    | Unrevealed of {
-        nonce_hash: Nonce_hash.t ;
-        delegate_to_reward: Ed25519.Public_key_hash.t ;
-        reward_amount: Tez_repr.t ;
-      }
+    | Unrevealed of unrevealed_nonce
     | Revealed of Seed_repr.nonce
 
   module Nonce : Non_iterable_indexed_data_storage
@@ -219,25 +255,5 @@ module Seed : sig
     val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
     val delete : Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
   end
-
-end
-
-(** Rewards *)
-
-module Rewards : sig
-
-  module Next : Single_data_storage
-    with type value = Cycle_repr.t
-     and type t := Raw_context.t
-
-  module Date : Indexed_data_storage
-    with type key = Cycle_repr.t
-     and type value = Time.t
-     and type t := Raw_context.t
-
-  module Amount : Indexed_data_storage
-    with type key = Ed25519.Public_key_hash.t
-     and type value = Tez_repr.t
-     and type t = Raw_context.t * Cycle_repr.t
 
 end

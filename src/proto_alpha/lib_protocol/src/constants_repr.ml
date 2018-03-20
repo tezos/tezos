@@ -20,21 +20,21 @@ let seed_nonce_revelation_tip =
 let origination_burn =
   Tez_repr.one
 
-(* 1000 tez *)
-let baking_bond_cost =
-  Tez_repr.(mul_exn one 1000)
+(* 512 tez *)
+let block_security_deposit =
+  Tez_repr.(mul_exn one 512)
 
-(* 1000 tez *)
-let endorsement_bond_cost =
-  Tez_repr.(mul_exn one 1000)
+(* 64 tez *)
+let endorsement_security_deposit =
+  Tez_repr.(mul_exn one 64)
 
-(* 150 tez *)
-let baking_reward =
-  Tez_repr.(mul_exn one 150)
+(* 16 tez *)
+let block_reward =
+  Tez_repr.(mul_exn one 16)
 
-(* 150 tez *)
+(* 2 tez *)
 let endorsement_reward =
-  Tez_repr.(mul_exn one 150)
+  Tez_repr.(mul_exn one 2)
 
 (* 100,000 tez *)
 let faucet_credit =
@@ -44,54 +44,55 @@ let faucet_credit =
 let bootstrap_wealth =
   Tez_repr.(mul_exn one 4_000_000)
 
+let max_revelations_per_block = 32
+
 type constants = {
-  cycle_length: int32 ;
-  voting_period_length: int32 ;
-  time_before_reward: Period_repr.t ;
-  slot_durations: Period_repr.t list ;
+  preserved_cycles: int ;
+  blocks_per_cycle: int32 ;
+  blocks_per_commitment: int32 ;
+  blocks_per_roll_snapshot: int32 ;
+  blocks_per_voting_period: int32 ;
+  time_between_blocks: Period_repr.t list ;
   first_free_baking_slot: int ;
-  max_signing_slot: int ;
+  endorsers_per_block: int ;
   max_gas: int ;
   proof_of_work_threshold: int64 ;
   bootstrap_keys: Ed25519.Public_key.t list ;
   dictator_pubkey: Ed25519.Public_key.t ;
-  max_number_of_operations: int list ;
   max_operation_data_length: int ;
-  initial_roll_value: Tez_repr.t ;
+  tokens_per_roll: Tez_repr.t ;
   michelson_maximum_type_size: int;
 }
 
-let read_public_key s = Ed25519.Public_key.of_hex_exn (`Hex s)
+let read_public_key = Ed25519.Public_key.of_b58check_exn
 
 let default = {
-  cycle_length = 128l ;
-  voting_period_length = 1024l ;
-  time_before_reward =
-    Period_repr.of_seconds_exn
-      Int64.(mul 6L 3600L) ; (* 6 hours *)
-  slot_durations =
+  preserved_cycles = 5 ;
+  blocks_per_cycle = 128l ;
+  blocks_per_commitment = 32l ;
+  blocks_per_roll_snapshot = 8l ;
+  blocks_per_voting_period = 32768l ;
+  time_between_blocks =
     List.map Period_repr.of_seconds_exn [ 60L ; 30L ; 20L ; 10L ] ;
   first_free_baking_slot = 16 ;
-  max_signing_slot = 15 ;
+  endorsers_per_block = 32 ;
   max_gas = 40_000 ;
   proof_of_work_threshold =
-    Int64.(lognot (sub (shift_left 1L 56) 1L)) ;
+    Int64.(sub (shift_left 1L 56) 1L) ;
   bootstrap_keys =
     List.map read_public_key [
-      "dd5d3536916765fd00a8cd402bddd34e87b49ae5159c43b8feecfd9f06b267d2" ;
-      "2dc874e66659ef2df0b7c6f29af7c913d32a01acecb36c4ad1a4ed74af7de33a" ;
-      "9c328bddf6249bbe550121076194d99bbe60e5b1e144da4f426561b5d3bbc6ab" ;
-      "a3db517734e07ace089ad0a2388e7276fb9b114bd79259dd5c93b0c33d57d6a2" ;
-      "30cdca1f0713916c9f1f2d3efc9fb688deb3e2f87b19ccd77f4c06676dc9baa9" ;
+      "edpkumCM1MAkah9ESaoQJnf1pXKrEYZMtFnEz46rrpq9SWkF1phM5Q" ;
+      "edpktsJoNN7G67B4rBwXD44ymRwEMMXVJDV2nURasB3gd6jqibZqWh" ;
+      "edpkth7ZUHB1X26ruiQXg4WaJPKPFfBqX5wvgja17Bf6hybMcRBCkn" ;
+      "edpkvTnasCe4gtEPRsgyBhMjvDkyf5YA7QTyEksJj836gXVCSxeQZk" ;
+      "edpkvXCagqGcEfJ7rUmzwRcPMViM6Yk2XGwwkrLre4d9yMFEqsrwuf" ;
     ] ;
   dictator_pubkey =
     read_public_key
-      "4d5373455738070434f214826d301a1c206780d7f789fcbf94c2149b2e0718cc" ;
-  max_number_of_operations =
-    [ 300 ] ;
+      "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ;
   max_operation_data_length =
     16 * 1024 ; (* 16kB *)
-  initial_roll_value =
+  tokens_per_roll =
     Tez_repr.(mul_exn one 10_000) ;
   michelson_maximum_type_size = 1000 ;
 }
@@ -109,27 +110,32 @@ let constants_encoding =
   (* let open Data_encoding in *)
   Data_encoding.conv
     (fun c ->
-       let module Compare_slot_durations = Compare.List (Period_repr) in
+       let module Compare_time_between_blocks = Compare.List (Period_repr) in
        let module Compare_keys = Compare.List (Ed25519.Public_key) in
-       let cycle_length =
+       let preserved_cycles =
+         opt Compare.Int.(=)
+           default.preserved_cycles c.preserved_cycles
+       and blocks_per_cycle =
          opt Compare.Int32.(=)
-           default.cycle_length c.cycle_length
-       and voting_period_length =
+           default.blocks_per_cycle c.blocks_per_cycle
+       and blocks_per_commitment =
          opt Compare.Int32.(=)
-           default.voting_period_length c.voting_period_length
-       and time_before_reward =
-         map_option Period_repr.to_seconds @@
-         opt Period_repr.(=)
-           default.time_before_reward c.time_before_reward
-       and slot_durations =
-         opt Compare_slot_durations.(=)
-           default.slot_durations c.slot_durations
+           default.blocks_per_commitment c.blocks_per_commitment
+       and blocks_per_roll_snapshot =
+         opt Compare.Int32.(=)
+           default.blocks_per_roll_snapshot c.blocks_per_roll_snapshot
+       and blocks_per_voting_period =
+         opt Compare.Int32.(=)
+           default.blocks_per_voting_period c.blocks_per_voting_period
+       and time_between_blocks =
+         opt Compare_time_between_blocks.(=)
+           default.time_between_blocks c.time_between_blocks
        and first_free_baking_slot =
          opt Compare.Int.(=)
            default.first_free_baking_slot c.first_free_baking_slot
-       and max_signing_slot =
+       and endorsers_per_block =
          opt Compare.Int.(=)
-           default.max_signing_slot c.max_signing_slot
+           default.endorsers_per_block c.endorsers_per_block
        and max_gas =
          opt Compare.Int.(=)
            default.max_gas c.max_gas
@@ -142,61 +148,63 @@ let constants_encoding =
        and dictator_pubkey =
          opt Ed25519.Public_key.(=)
            default.dictator_pubkey c.dictator_pubkey
-       and max_number_of_operations =
-         opt CompareListInt.(=)
-           default.max_number_of_operations c.max_number_of_operations
        and max_operation_data_length =
          opt Compare.Int.(=)
            default.max_operation_data_length c.max_operation_data_length
-       and initial_roll_value =
+       and tokens_per_roll =
          opt Tez_repr.(=)
-           default.initial_roll_value c.initial_roll_value
+           default.tokens_per_roll c.tokens_per_roll
        and michelson_maximum_type_size =
          opt Compare.Int.(=)
            default.michelson_maximum_type_size c.michelson_maximum_type_size
        in
-       ((( cycle_length,
-           voting_period_length,
-           time_before_reward,
-           slot_durations,
+       ((( preserved_cycles,
+           blocks_per_cycle,
+           blocks_per_commitment,
+           blocks_per_roll_snapshot,
+           blocks_per_voting_period,
+           time_between_blocks,
            first_free_baking_slot,
-           max_signing_slot,
-           max_gas,
-           proof_of_work_threshold,
+           endorsers_per_block,
+           max_gas),
+         ( proof_of_work_threshold,
            bootstrap_keys,
-           dictator_pubkey),
-         (max_number_of_operations,
-          max_operation_data_length,
-          initial_roll_value,
-          michelson_maximum_type_size)), ()) )
-    (fun ((( cycle_length,
-             voting_period_length,
-             time_before_reward,
-             slot_durations,
+           dictator_pubkey,
+           max_operation_data_length,
+           tokens_per_roll,
+           michelson_maximum_type_size)), ()) )
+    (fun ((( preserved_cycles,
+             blocks_per_cycle,
+             blocks_per_commitment,
+             blocks_per_roll_snapshot,
+             blocks_per_voting_period,
+             time_between_blocks,
              first_free_baking_slot,
-             max_signing_slot,
-             max_gas,
-             proof_of_work_threshold,
+             endorsers_per_block,
+             max_gas),
+           ( proof_of_work_threshold,
              bootstrap_keys,
-             dictator_pubkey),
-           (max_number_of_operations,
-            max_operation_data_length,
-            initial_roll_value,
-            michelson_maximum_type_size)), ()) ->
-      { cycle_length =
-          unopt default.cycle_length cycle_length ;
-        voting_period_length =
-          unopt default.voting_period_length voting_period_length ;
-        time_before_reward =
-          unopt default.time_before_reward @@
-          map_option Period_repr.of_seconds_exn time_before_reward ;
-        slot_durations =
-          unopt default.slot_durations @@
-          slot_durations ;
+             dictator_pubkey,
+             max_operation_data_length,
+             tokens_per_roll,
+             michelson_maximum_type_size)), ()) ->
+      { preserved_cycles =
+          unopt default.preserved_cycles preserved_cycles ;
+        blocks_per_cycle =
+          unopt default.blocks_per_cycle blocks_per_cycle ;
+        blocks_per_commitment =
+          unopt default.blocks_per_commitment blocks_per_commitment ;
+        blocks_per_roll_snapshot =
+          unopt default.blocks_per_roll_snapshot blocks_per_roll_snapshot ;
+        blocks_per_voting_period =
+          unopt default.blocks_per_voting_period blocks_per_voting_period ;
+        time_between_blocks =
+          unopt default.time_between_blocks @@
+          time_between_blocks ;
         first_free_baking_slot =
           unopt default.first_free_baking_slot first_free_baking_slot ;
-        max_signing_slot =
-          unopt default.max_signing_slot max_signing_slot ;
+        endorsers_per_block =
+          unopt default.endorsers_per_block endorsers_per_block ;
         max_gas =
           unopt default.max_gas max_gas ;
         proof_of_work_threshold =
@@ -205,33 +213,32 @@ let constants_encoding =
           unopt default.bootstrap_keys bootstrap_keys ;
         dictator_pubkey =
           unopt default.dictator_pubkey dictator_pubkey ;
-        max_number_of_operations =
-          unopt default.max_number_of_operations max_number_of_operations ;
         max_operation_data_length =
           unopt default.max_operation_data_length max_operation_data_length ;
-        initial_roll_value =
-          unopt default.initial_roll_value initial_roll_value ;
+        tokens_per_roll =
+          unopt default.tokens_per_roll tokens_per_roll ;
         michelson_maximum_type_size =
           unopt default.michelson_maximum_type_size michelson_maximum_type_size ;
       } )
     Data_encoding.(
       merge_objs
         (merge_objs
-           (obj10
-              (opt "cycle_length" int32)
-              (opt "voting_period_length" int32)
-              (opt "time_before_reward" int64)
-              (opt "slot_durations" (list Period_repr.encoding))
+           (obj9
+              (opt "preserved_cycles" uint8)
+              (opt "blocks_per_cycle" int32)
+              (opt "blocks_per_commitment" int32)
+              (opt "blocks_per_roll_snapshot" int32)
+              (opt "blocks_per_voting_period" int32)
+              (opt "time_between_blocks" (list Period_repr.encoding))
               (opt "first_free_baking_slot" uint16)
-              (opt "max_signing_slot" uint16)
-              (opt "instructions_per_transaction" int31)
+              (opt "endorsers_per_block" uint16)
+              (opt "instructions_per_transaction" int31))
+           (obj6
               (opt "proof_of_work_threshold" int64)
               (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
-              (opt "dictator_pubkey" Ed25519.Public_key.encoding))
-           (obj4
-              (opt "max_number_of_operations" (list uint16))
-              (opt "max_number_of_operations" int31)
-              (opt "initial_roll_value" Tez_repr.encoding)
+              (opt "dictator_pubkey" Ed25519.Public_key.encoding)
+              (opt "max_operation_data_length" int31)
+              (opt "tokens_per_roll" Tez_repr.encoding)
               (opt "michelson_maximum_type_size" uint16)
            ))
         unit)
@@ -244,4 +251,8 @@ let read = function
   | Some json ->
       match Data_encoding.Json.(destruct constants_encoding json) with
       | exception exn -> fail (Constant_read exn)
-      | c -> return c
+      | c ->
+          if Compare.Int32.(c.blocks_per_roll_snapshot > c.blocks_per_cycle) then
+            failwith "Invalid sandbox: 'blocks_per_roll_snapshot > blocks_per_cycle'"
+          else
+            return c

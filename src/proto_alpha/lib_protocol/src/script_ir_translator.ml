@@ -2136,7 +2136,7 @@ let hash_data typ data =
 
 let big_map_mem ctx contract key { diff ; key_type } =
   match map_get key diff with
-  | None -> Alpha_context.Contract.Big_map_storage.mem ctx contract (hash_data key_type key)
+  | None -> Alpha_context.Contract.Big_map.mem ctx contract (hash_data key_type key)
   | Some None -> Lwt.return false
   | Some (Some _) -> Lwt.return true
 
@@ -2144,7 +2144,7 @@ let big_map_get ctx contract key { diff ; key_type ; value_type } =
   match map_get key diff with
   | Some x -> return x
   | None ->
-      Alpha_context.Contract.Big_map_storage.get_opt
+      Alpha_context.Contract.Big_map.get_opt
         ctx contract
         (hash_data key_type key) >>=? begin function
         | None -> return None

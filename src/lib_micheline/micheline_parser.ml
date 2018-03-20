@@ -340,7 +340,8 @@ let tokenize source =
 
 type node = (location, string) Micheline.node
 
-let node_encoding = Micheline.table_encoding location_encoding Data_encoding.string
+let node_encoding =
+  Micheline.table_encoding ~variant:"generic" location_encoding Data_encoding.string
 
 (* Beginning of a sequence of consecutive primitives *)
 let min_point : node list -> point = function
@@ -766,7 +767,7 @@ let () =
                    or sequence."
     ~pp:(fun ppf node ->
         Format.fprintf ppf "%a, misaligned expression" print_location (location node))
-    Data_encoding.(obj1 (req "expression"  node_encoding))
+    Data_encoding.(obj1 (req "expression" node_encoding))
     (function Misaligned node -> Some node | _ -> None)
     (fun node -> Misaligned node) ;
   register_error_kind `Permanent

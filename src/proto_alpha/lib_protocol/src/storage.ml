@@ -9,9 +9,25 @@
 
 open Storage_functors
 
+module Int = struct
+  type t = int
+  let encoding = Data_encoding.uint16
+end
+
 module Int32 = struct
   type t = Int32.t
   let encoding = Data_encoding.int32
+end
+
+module Int_index = struct
+  type t = int
+  let path_length = 1
+  let to_path c l = string_of_int c :: l
+  let of_path = function
+    | [] | _ :: _ :: _ -> None
+    | [ c ] ->
+        try Some (int_of_string c)
+        with _ -> None
 end
 
 module String_index = struct
@@ -49,6 +65,28 @@ module Contract = struct
       (struct let name = ["balance"] end)
       (Make_value(Tez_repr))
 
+  module Frozen_balance_index =
+    Make_indexed_subcontext
+      (Make_subcontext
+         (Indexed_context.Raw_context)
+         (struct let name = ["frozen_balance"] end))
+      (Cycle_repr.Index)
+
+  module Frozen_deposits =
+    Frozen_balance_index.Make_map
+      (struct let name = ["deposits"] end)
+      (Make_value(Tez_repr))
+
+  module Frozen_fees =
+    Frozen_balance_index.Make_map
+      (struct let name = ["fees"] end)
+      (Make_value(Tez_repr))
+
+  module Frozen_rewards =
+    Frozen_balance_index.Make_map
+      (struct let name = ["rewards"] end)
+      (Make_value(Tez_repr))
+
   module Manager =
     Indexed_context.Make_map
       (struct let name = ["manager"] end)
@@ -66,6 +104,15 @@ module Contract = struct
     Indexed_context.Make_map
       (struct let name = ["delegate"] end)
       (Make_value(Ed25519.Public_key_hash))
+
+  module Inactive_delegate =
+    Indexed_context.Make_set
+      (struct let name = ["inactive_delegate"] end)
+
+  module Delegate_desactivation =
+    Indexed_context.Make_map
+      (struct let name = ["delegate_desactivation"] end)
+      (Make_value(Cycle_repr))
 
   module Delegated =
     Make_data_set_storage
@@ -129,7 +176,7 @@ module Contract = struct
 
 end
 
-module Delegate =
+module Delegates =
   Make_data_set_storage
     (Make_subcontext(Raw_context)(struct let name = ["delegates"] end))
     (Ed25519.Public_key_hash)
@@ -144,32 +191,46 @@ module Cycle = struct
       (Cycle_repr.Index)
 
   module Last_roll =
-    Indexed_context.Make_map
-      (struct let name = ["last_roll"] end)
+    Make_indexed_data_storage
+      (Make_subcontext
+         (Indexed_context.Raw_context)
+         (struct let name = ["last_roll"] end))
+      (Int_index)
       (Make_value(Roll_repr))
 
+  module Roll_snapshot =
+    Indexed_context.Make_map
+      (struct let name = ["roll_snapshot"] end)
+      (Make_value(Int))
+
+  type unrevealed_nonce = {
+    nonce_hash: Nonce_hash.t ;
+    delegate: Ed25519.Public_key_hash.t ;
+    deposit: Tez_repr.t ;
+    rewards: Tez_repr.t ;
+    fees: Tez_repr.t ;
+  }
+
   type nonce_status =
-    | Unrevealed of {
-        nonce_hash: Nonce_hash.t ;
-        delegate_to_reward: Ed25519.Public_key_hash.t ;
-        reward_amount: Tez_repr.t ;
-      }
+    | Unrevealed of unrevealed_nonce
     | Revealed of Seed_repr.nonce
 
   let nonce_status_encoding =
     let open Data_encoding in
     union [
       case (Tag 0)
-        (tup3
+        (tup5
            Nonce_hash.encoding
            Ed25519.Public_key_hash.encoding
+           Tez_repr.encoding
+           Tez_repr.encoding
            Tez_repr.encoding)
         (function
-          | Unrevealed { nonce_hash ; delegate_to_reward ; reward_amount } ->
-              Some (nonce_hash, delegate_to_reward, reward_amount)
+          | Unrevealed { nonce_hash ; delegate ; deposit ; rewards ; fees } ->
+              Some (nonce_hash, delegate, deposit, rewards, fees)
           | _ -> None)
-        (fun (nonce_hash, delegate_to_reward, reward_amount) ->
-           Unrevealed { nonce_hash ; delegate_to_reward ; reward_amount }) ;
+        (fun (nonce_hash, delegate, deposit, rewards, fees) ->
+           Unrevealed { nonce_hash ; delegate ; deposit ; rewards ; fees }) ;
       case (Tag 1)
         Seed_repr.nonce_encoding
         (function
@@ -196,19 +257,6 @@ module Cycle = struct
          type t = Seed_repr.seed
          let encoding = Seed_repr.seed_encoding
        end))
-
-  module Reward_date =
-    Indexed_context.Make_map
-      (struct let name = [ "reward_date" ] end)
-      (Make_value(Time_repr))
-
-  module Reward_amount =
-    Make_indexed_data_storage
-      (Make_subcontext
-         (Indexed_context.Raw_context)
-         (struct let name = [ "rewards" ] end))
-      (Ed25519.Public_key_hash)
-      (Make_value(Tez_repr))
 
 end
 
@@ -253,14 +301,32 @@ module Roll = struct
       let unwrap = Contract_repr.is_implicit
     end)
 
+  module Snapshoted_owner_index = struct
+    type t = Cycle_repr.t * int
+    let path_length = Cycle_repr.Index.path_length + 1
+    let to_path (c, n) s =
+      Cycle_repr.Index.to_path c (string_of_int n :: s)
+    let of_path l =
+      match Misc.take Cycle_repr.Index.path_length l with
+      | None | Some (_, ([] | _ :: _ :: _ ))-> None
+      | Some (l1, [l2]) ->
+          match Cycle_repr.Index.of_path l1 with
+          | None -> None
+          | Some c -> begin
+              try Some (c, int_of_string l2)
+              with _ -> None
+            end
+  end
+
   module Owner =
     Make_indexed_data_snapshotable_storage
       (Make_subcontext(Raw_context)(struct let name = ["owner"] end))
-      (Cycle_repr.Index)
+      (Snapshoted_owner_index)
       (Roll_repr.Index)
       (Make_value(Ed25519.Public_key))
 
-  module Last_for_cycle = Cycle.Last_roll
+  module Snapshot_for_cycle = Cycle.Roll_snapshot
+  module Last_for_snapshot = Cycle.Last_roll
 
   let clear = Indexed_context.clear
 
@@ -326,12 +392,16 @@ end
 
 module Seed = struct
 
+  type unrevealed_nonce = Cycle.unrevealed_nonce = {
+    nonce_hash: Nonce_hash.t ;
+    delegate: Ed25519.Public_key_hash.t ;
+    deposit: Tez_repr.t ;
+    rewards: Tez_repr.t ;
+    fees: Tez_repr.t ;
+  }
+
   type nonce_status = Cycle.nonce_status =
-    | Unrevealed of {
-        nonce_hash: Nonce_hash.t ;
-        delegate_to_reward: Ed25519.Public_key_hash.t ;
-        reward_amount: Tez_repr.t ;
-      }
+    | Unrevealed of unrevealed_nonce
     | Revealed of Seed_repr.nonce
 
   module Nonce = struct
@@ -348,21 +418,6 @@ module Seed = struct
     let remove ctxt l = Cycle.Nonce.remove (ctxt, l.cycle) l.level
   end
   module For_cycle = Cycle.Seed
-
-end
-
-(** Rewards *)
-
-module Rewards = struct
-
-  module Next =
-    Make_single_data_storage
-      (Raw_context)
-      (struct let name = ["next_cycle_to_be_rewarded"] end)
-      (Make_value(Cycle_repr))
-
-  module Date = Cycle.Reward_date
-  module Amount = Cycle.Reward_amount
 
 end
 

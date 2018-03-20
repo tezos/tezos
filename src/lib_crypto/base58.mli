@@ -32,7 +32,7 @@ end
     [Environment.Ed25519.Public_key_hash]. *)
 type data = ..
 
-(** Abstract representation of registred encodings. The type paramater
+(** Abstract representation of registered encodings. The type paramater
     is the type of the encoded data, for instance [Hash.Block_hash.t]. *)
 type 'a encoding = private {
   prefix: string ;
@@ -45,7 +45,7 @@ type 'a encoding = private {
 }
 
 (** Register a new encoding. The function might raise `Invalid_arg` if
-    the provided [prefix] overlap with a previously registred
+    the provided [prefix] overlap with a previously registered
     prefix. The [to_raw] and [of_raw] are the ad-hoc
     serialisation/deserialisation for the data. The [wrap] should wrap
     the deserialised value into the extensible sum-type [data] (see
@@ -78,13 +78,13 @@ val simple_encode: ?alphabet:Alphabet.t -> 'a encoding -> 'a -> string
 val simple_decode: ?alphabet:Alphabet.t -> 'a encoding -> string -> 'a option
 
 (** Generic decoder. It returns [None] when the decoded data does
-    not start with a registred prefix. *)
+    not start with a registered prefix. *)
 val decode: ?alphabet:Alphabet.t -> string -> data option
 
 (** {2 Completion of partial Base58Check value} *)
 
 (** Register a (global) resolver for a previsously
-    registred kind af data. *)
+    registered kind af data. *)
 val register_resolver: 'a encoding -> (string -> 'a list Lwt.t) -> unit
 
 (** Try to complete a prefix of a Base58Check encoded data, by using

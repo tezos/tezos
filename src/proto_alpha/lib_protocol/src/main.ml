@@ -11,16 +11,18 @@
 
 type operation = Alpha_context.operation
 
-let parse_operation = Alpha_context.Operation.parse
+let parse_operation _hash op = Alpha_context.Operation.parse op
 let acceptable_passes = Alpha_context.Operation.acceptable_passes
 
 let max_block_length =
   Alpha_context.Block_header.max_header_length
 
 let validation_passes =
-  Updater.[ { max_size = 32 * 1024 ; max_op = None  } ; (* 32kB FIXME *)
-            { max_size = 32 * 1024 ; max_op = None  } ; (* 32kB FIXME *)
-            { max_size = 1024 * 1024 ; max_op = None  } ] (* 1MB *)
+  Updater.[ { max_size = 32 * 1024 ; max_op = Some 32 } ; (* 32kB FIXME *)
+            { max_size = 32 * 1024 ; max_op = None } ; (* 32kB FIXME *)
+            { max_size = 32 * 1024 ; (* 32kB FIXME *)
+              max_op = Some Alpha_context.Constants.max_revelations_per_block } ;
+            { max_size = 512 * 1024 ; max_op = None } ] (* 512kB *)
 
 let rpc_services = Services_registration.get_rpc_services ()
 
@@ -41,7 +43,11 @@ type validation_mode =
 type validation_state =
   { mode : validation_mode ;
     ctxt : Alpha_context.t ;
-    op_count : int }
+    op_count : int ;
+    deposit : Alpha_context.Tez.t ;
+    fees : Alpha_context.Tez.t ;
+    rewards : Alpha_context.Tez.t ;
+  }
 
 let current_context { ctxt ; _ } =
   return (Alpha_context.finalize ctxt).context
@@ -65,9 +71,11 @@ let begin_application
   let timestamp = block_header.shell.timestamp in
   Alpha_context.init ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
-    ctxt block_header pred_timestamp >>=? fun (ctxt, baker) ->
+    ctxt block_header pred_timestamp >>=? fun (ctxt, baker, deposit) ->
   let mode = Application { block_header ; baker = Ed25519.Public_key.hash baker } in
-  return { mode ; ctxt ; op_count = 0 }
+  return { mode ; ctxt ; op_count = 0 ; deposit ;
+           fees = Alpha_context.Tez.zero ;
+           rewards = Alpha_context.Tez.zero }
 
 let begin_construction
     ~predecessor_context:ctxt
@@ -86,20 +94,22 @@ let begin_construction
     | None ->
         Apply.begin_partial_construction ctxt >>=? fun ctxt ->
         let mode = Partial_construction { predecessor } in
-        return (mode, ctxt)
+        return (mode, ctxt, Alpha_context.Tez.zero)
     | Some proto_header ->
         Apply.begin_full_construction
           ctxt pred_timestamp
-          proto_header >>=? fun (ctxt, protocol_data, baker) ->
+          proto_header >>=? fun (ctxt, protocol_data, baker, deposit) ->
         let mode =
           let baker = Ed25519.Public_key.hash baker in
           Full_construction { predecessor ; baker ; protocol_data } in
-        return (mode, ctxt)
-  end >>=? fun (mode, ctxt) ->
-  return { mode ; ctxt ; op_count = 0 }
+        return (mode, ctxt, deposit)
+  end >>=? fun (mode, ctxt, deposit) ->
+  return { mode ; ctxt ; op_count = 0 ; deposit ;
+           fees = Alpha_context.Tez.zero ;
+           rewards = Alpha_context.Tez.zero  }
 
-let apply_operation ({ mode ; ctxt ; op_count } as data) operation =
-  let pred_block, block_prio, baker_contract =
+let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
+  let pred_block, block_prio, baker =
     match mode with
     | Partial_construction { predecessor } ->
         predecessor, 0, None
@@ -109,21 +119,25 @@ let apply_operation ({ mode ; ctxt ; op_count } as data) operation =
     | Full_construction { predecessor ; protocol_data ; baker } ->
         predecessor,
         protocol_data.priority,
-        Some (Alpha_context.Contract.implicit_contract baker) in
-  Apply.apply_operation
-    ctxt baker_contract pred_block block_prio operation
-  >>=? fun (ctxt, _contracts, _ignored_script_error) ->
+        Some baker in
+  Apply.apply_operation ctxt baker pred_block block_prio
+    (Alpha_context.Operation.hash operation) operation
+  >>=? fun (ctxt, _contracts, _ignored_script_error, fees, rewards) ->
   let op_count = op_count + 1 in
-  return { data with ctxt ; op_count }
+  Lwt.return Alpha_context.Tez.(fees >>? (+?) data.fees) >>=? fun fees ->
+  Lwt.return Alpha_context.Tez.(rewards >>? (+?) data.rewards) >>=? fun rewards ->
+  return { data with ctxt ; op_count ; fees ; rewards }
 
-let finalize_block { mode ; ctxt ; op_count } = match mode with
+let finalize_block { mode ; ctxt ; op_count ; deposit ; fees ; rewards } =
+  match mode with
   | Partial_construction _ ->
       let ctxt = Alpha_context.finalize ctxt in
       return ctxt
   | Application
       { baker ;  block_header = { protocol_data ; _ } }
   | Full_construction { protocol_data ; baker ; _ } ->
-      Apply.finalize_application ctxt protocol_data baker >>=? fun ctxt ->
+      Apply.finalize_application
+        ctxt protocol_data baker deposit fees rewards >>=? fun ctxt ->
       let { level ; _ } : Alpha_context.Level.t =
         Alpha_context. Level.current ctxt in
       let priority = protocol_data.priority in

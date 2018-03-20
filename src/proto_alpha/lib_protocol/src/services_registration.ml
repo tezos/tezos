@@ -34,6 +34,12 @@ let register0_fullctxt s f =
       (fun ctxt q i ->
          rpc_init ctxt >>=? fun ctxt ->
          f ctxt q i)
+let opt_register0_fullctxt s f =
+  rpc_services :=
+    RPC_directory.opt_register !rpc_services s
+      (fun ctxt q i ->
+         rpc_init ctxt >>=? fun ctxt ->
+         f ctxt q i)
 let register0 s f =
   register0_fullctxt s (fun { context ; _ } -> f context)
 let register0_noctxt s f =

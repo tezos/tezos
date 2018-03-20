@@ -26,7 +26,8 @@ let execute_code_pred
   let op_header = Helpers_block.get_op_header_res pred in
   let apply_op = Helpers_operation.apply_of_proto
       (Some op) op_header dummy_protop in
-  let dummy_nonce = Contract.initial_origination_nonce apply_op.hash in
+  let hash = Operation.hash apply_op in
+  let dummy_nonce = Contract.initial_origination_nonce hash in
   let amount = Tez.zero in
   let gaz = Gas.of_int (Alpha_context.Constants.max_gas tc) in
   let return = Script_interpreter.execute
