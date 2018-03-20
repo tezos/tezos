@@ -64,7 +64,7 @@ type constants = {
   michelson_maximum_type_size: int;
 }
 
-let read_public_key s = Ed25519.Public_key.of_hex_exn (`Hex s)
+let read_public_key = Ed25519.Public_key.of_b58check_exn
 
 let default = {
   preserved_cycles = 5 ;
@@ -81,15 +81,15 @@ let default = {
     Int64.(sub (shift_left 1L 56) 1L) ;
   bootstrap_keys =
     List.map read_public_key [
-      "dd5d3536916765fd00a8cd402bddd34e87b49ae5159c43b8feecfd9f06b267d2" ;
-      "2dc874e66659ef2df0b7c6f29af7c913d32a01acecb36c4ad1a4ed74af7de33a" ;
-      "9c328bddf6249bbe550121076194d99bbe60e5b1e144da4f426561b5d3bbc6ab" ;
-      "a3db517734e07ace089ad0a2388e7276fb9b114bd79259dd5c93b0c33d57d6a2" ;
-      "30cdca1f0713916c9f1f2d3efc9fb688deb3e2f87b19ccd77f4c06676dc9baa9" ;
+      "edpkumCM1MAkah9ESaoQJnf1pXKrEYZMtFnEz46rrpq9SWkF1phM5Q" ;
+      "edpktsJoNN7G67B4rBwXD44ymRwEMMXVJDV2nURasB3gd6jqibZqWh" ;
+      "edpkth7ZUHB1X26ruiQXg4WaJPKPFfBqX5wvgja17Bf6hybMcRBCkn" ;
+      "edpkvTnasCe4gtEPRsgyBhMjvDkyf5YA7QTyEksJj836gXVCSxeQZk" ;
+      "edpkvXCagqGcEfJ7rUmzwRcPMViM6Yk2XGwwkrLre4d9yMFEqsrwuf" ;
     ] ;
   dictator_pubkey =
     read_public_key
-      "4d5373455738070434f214826d301a1c206780d7f789fcbf94c2149b2e0718cc" ;
+      "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ;
   max_operation_data_length =
     16 * 1024 ; (* 16kB *)
   tokens_per_roll =
