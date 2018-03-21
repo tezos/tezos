@@ -9,10 +9,12 @@
 
 (**
    This module implements four Access Control Lists:
-   - ip greylist used to automatically ban a given ip address.
-   - peer_id greylist used to automatically ban a given peer_id.
-   - ip blacklist used to manually ban a given ip addr.
-   - peers blacklist used to manually trust a given peer_id.
+   - ip greylist is a set of banned ip addresses automatically added by
+     the p2p layer.
+   - peer_id greylist is a set of banned peers ids automatically added by
+     the p2p layer.
+   - ip blacklist is a set of ip addresses manually added by the node admin.
+   - peers blacklist is a set of peers ids manually added by the node admin.
 
    IP greylists use a time based GC to periodically remove entries from
    the table, while peer_id grey lists are built using a ring structure,

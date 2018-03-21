@@ -132,11 +132,9 @@ module Points : sig
        unit * P2p_point.Id.t, unit, unit,
        bool) RPC_service.t
 
-
   end
 
 end
-
 
 module Peers : sig
 

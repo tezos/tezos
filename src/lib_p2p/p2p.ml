@@ -543,9 +543,6 @@ let build_rpc_directory net =
       match net.pool with
       | None -> failwith "The P2P layer is disabled."
       | Some pool ->
-          fail_when
-            (P2p_pool.Points.banned pool point)
-            (P2p_errors.Point_banned point) >>=? fun () ->
           P2p_pool.connect ~timeout pool point >>=? fun _conn ->
           return ()
     end in
@@ -674,9 +671,10 @@ let build_rpc_directory net =
       begin fun peer_id () () ->
         match net.pool with
         | None -> return false
+        | Some pool when (P2p_pool.Peers.get_trusted pool peer_id) ->
+            return false
         | Some pool ->
-            if P2p_pool.Peers.get_trusted pool peer_id then return false
-            else return (P2p_pool.Peers.banned pool peer_id)
+            return (P2p_pool.Peers.banned pool peer_id)
       end in
 
   (* Network : Point *)
@@ -766,12 +764,11 @@ let build_rpc_directory net =
     RPC_directory.gen_register1 dir P2p_services.Points.S.banned
       begin fun point () () ->
         match net.pool with
-        | None -> RPC_answer.return false
+        | None -> RPC_answer.not_found
+        | Some pool when (P2p_pool.Points.get_trusted pool point) ->
+            RPC_answer.return false
         | Some pool ->
-            if P2p_pool.Points.get_trusted pool point then
-              RPC_answer.return false
-            else
-              RPC_answer.return (P2p_pool.Points.banned pool point)
+            RPC_answer.return (P2p_pool.Points.banned pool point)
       end in
 
   (* Network : Greylist *)

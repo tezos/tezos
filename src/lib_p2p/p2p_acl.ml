@@ -1,6 +1,6 @@
 (**************************************************************************)
 (*                                                                        *)
-(*    Copyright (c) 2014 - 2016.                                          *)
+(*    Copyright (c) 2014 - 2018.                                          *)
 (*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
 (*                                                                        *)
 (*    All rights reserved. No warranty, explicit or implicit, provided.   *)
@@ -112,7 +112,7 @@ module IpSet = struct
       type result = Time.t
       let default = Time.now()
       let map _t _key value = value
-      let reduce _t left right = Time.(max left right)
+      let reduce _t left right = Time.(min left right)
     end
     in
     let module MR = M.Map_Reduce(MI) in
