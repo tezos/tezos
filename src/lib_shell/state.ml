@@ -60,7 +60,6 @@ and chain_data = {
   current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
-  locator: Block_locator.t Lwt.t lazy_t ;
 }
 
 and block = {
@@ -139,7 +138,7 @@ let store_predecessors (store: Store.Block.store) (b: Block_hash.t) : unit Lwt.t
    and in O(|chain|) after that.
    @raise Invalid_argument "State.predecessors: negative distance"
 *)
-let predecessor_n (store: Store.Block.store) (b: Block_hash.t) (distance: int)
+let predecessor_n (store: Store.Block.store) (block_hash: Block_hash.t) (distance: int)
   : Block_hash.t option Lwt.t =
   (* helper functions *)
   (* computes power of 2 w/o floats *)
@@ -167,9 +166,9 @@ let predecessor_n (store: Store.Block.store) (b: Block_hash.t) (distance: int)
   if distance <= 0 then
     invalid_arg ("State.predecessor: distance <= 0"^(string_of_int distance))
   else
-    let rec loop b distance =
+    let rec loop block_hash distance =
       if distance = 1
-      then Store.Block.Predecessors.read_opt (store, b) 0
+      then Store.Block.Predecessors.read_opt (store, block_hash) 0
       else
         let (power,rest) = closest_power_two_and_rest distance in
         let (power,rest) =
@@ -179,24 +178,24 @@ let predecessor_n (store: Store.Block.store) (b: Block_hash.t) (distance: int)
             let rest = distance - (power_of_2 power) in
             (power,rest)
         in
-        Store.Block.Predecessors.read_opt (store, b) power >>= function
+        Store.Block.Predecessors.read_opt (store, block_hash) power >>= function
         | None -> Lwt.return_none (* reached genesis *)
         | Some pred ->
             if rest = 0
             then Lwt.return_some pred (* landed on the requested predecessor *)
             else loop pred rest       (* need to jump further back *)
     in
-    loop b distance
+    loop block_hash distance
 
-let compute_locator_from_hash (chain : chain_state) ?(size = 200) head_hash =
+let compute_locator_from_hash (chain : chain_state) ?(size = 200) head_hash seed =
   Shared.use chain.block_store begin fun block_store ->
     Store.Block.Contents.read_exn (block_store, head_hash) >>= fun { header } ->
     Block_locator.compute ~predecessor:(predecessor_n block_store)
-      ~genesis:chain.genesis.block head_hash header size
+      ~genesis:chain.genesis.block head_hash header seed ~size
   end
 
-let compute_locator chain ?size head =
-  compute_locator_from_hash chain ?size head.hash
+let compute_locator chain ?size head seed =
+  compute_locator_from_hash chain ?size head.hash seed
 
 type t = global_state
 
@@ -259,7 +258,6 @@ module Chain = struct
         current_mempool = Mempool.empty ;
         live_blocks = Block_hash.Set.singleton genesis.block ;
         live_operations = Operation_hash.Set.empty ;
-        locator = lazy (compute_locator_from_hash chain_state current_head) ;
       } ;
       chain_data_store ;
     }
@@ -644,6 +642,33 @@ module Block = struct
   let test_chain block =
     context block >>= fun context ->
     Context.get_test_chain context
+
+  let block_validity chain_state block : Block_locator.validity Lwt.t =
+    known chain_state block >>= function
+    | false ->
+        if Block_hash.equal block (Chain.faked_genesis_hash chain_state) then
+          Lwt.return Block_locator.Known_valid
+        else
+          Lwt.return Block_locator.Unknown
+    | true ->
+        known_invalid chain_state block >>= function
+        | true ->
+            Lwt.return Block_locator.Known_invalid
+        | false ->
+            Lwt.return Block_locator.Known_valid
+
+  let known_ancestor chain_state locator =
+    Block_locator.unknown_prefix
+      ~is_known:(block_validity chain_state) locator >>= function
+    | None -> Lwt.return_none
+    | Some (tail, locator) ->
+        if Block_hash.equal tail (Chain.faked_genesis_hash chain_state) then
+          read_exn
+            chain_state (Chain.genesis chain_state).block >>= fun genesis ->
+          Lwt.return_some (genesis, locator)
+        else
+          read_exn chain_state tail >>= fun block ->
+          Lwt.return_some (block, locator)
 
 end
 

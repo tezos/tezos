@@ -216,10 +216,7 @@ let broadcast_head w ~previous block =
         nv.parameters.chain_db block ;
       Lwt.return_unit
     end else begin
-      let chain_state = Distributed_db.chain_state nv.parameters.chain_db in
-      Chain.locator chain_state >>= fun locator ->
-      Distributed_db.Advertise.current_branch
-        nv.parameters.chain_db locator
+      Distributed_db.Advertise.current_branch nv.parameters.chain_db
     end
   end
 

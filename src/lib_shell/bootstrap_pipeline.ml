@@ -31,7 +31,7 @@ type t = {
   mutable errors: Error_monad.error list ;
 }
 
-let fetch_step pipeline (step : Block_locator_iterator.step)  =
+let fetch_step pipeline (step : Block_locator.step)  =
   lwt_log_info "fetching step %a -> %a (%d%s) from peer %a."
     Block_hash.pp_short step.block
     Block_hash.pp_short step.predecessor
@@ -78,7 +78,11 @@ let fetch_step pipeline (step : Block_locator_iterator.step)  =
 
 let headers_fetch_worker_loop pipeline =
   begin
-    let steps = Block_locator_iterator.to_steps pipeline.locator in
+    let sender_id = Distributed_db.my_peer_id pipeline.chain_db in
+    (* sender and receiver are inverted here because they are from
+       the point of view of the node sending the locator *)
+    let seed = {Block_locator.sender_id=pipeline.peer_id; receiver_id=sender_id } in
+    let steps = Block_locator.to_steps seed pipeline.locator in
     iter_s (fetch_step pipeline) steps >>=? fun () ->
     return ()
   end >>= function

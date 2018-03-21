@@ -15,7 +15,7 @@ val genesis: State.Chain.t -> State.Block.t Lwt.t
 
 (** The current head of the chain. *)
 val head: State.Chain.t -> State.Block.t Lwt.t
-val locator: State.Chain.t -> Block_locator.t Lwt.t
+val locator: State.Chain.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
 (** All the available chain data. *)
 type data = {
@@ -23,12 +23,10 @@ type data = {
   current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
-  locator: Block_locator.t Lwt.t lazy_t ;
 }
 
 (** Reading atomically all the chain data. *)
 val data: State.Chain.t -> data Lwt.t
-
 
 (** The current head and all the known (valid) alternate heads. *)
 val known_heads: State.Chain.t -> State.Block.t list Lwt.t

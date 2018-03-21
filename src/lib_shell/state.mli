@@ -148,6 +148,14 @@ module Block : sig
 
   val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
+  val known_ancestor:
+    Chain.t -> Block_locator.t -> (block * Block_locator.t) option Lwt.t
+    (** [known_ancestor chain_state locator] computes the first block of
+        [locator] that is known to be a valid block. It also computes the
+        'prefix' of [locator] with end at the first valid block.  The
+        function returns [None] when no block in the locator are known or
+        if the first known block is invalid. *)
+
 end
 
 val read_block:
@@ -156,7 +164,7 @@ val read_block:
 val read_block_exn:
   global_state -> ?pred:int -> Block_hash.t -> Block.t Lwt.t
 
-val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.t Lwt.t
+val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
 val fork_testchain:
   Block.t -> Protocol_hash.t -> Time.t -> Chain.t tzresult Lwt.t
@@ -166,7 +174,6 @@ type chain_data = {
   current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
-  locator: Block_locator.t Lwt.t lazy_t ;
 }
 
 val read_chain_data:
@@ -217,4 +224,3 @@ module Current_mempool : sig
       not the provided one. *)
 
 end
-

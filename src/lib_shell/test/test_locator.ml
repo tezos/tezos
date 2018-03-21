@@ -226,6 +226,10 @@ let test_pred (base_dir:string) : unit tzresult Lwt.t =
   let repeats = 100 in
   return (repeat (fun () -> test_once (1 + Random.int range)) repeats)
 
+let seed =
+  let receiver_id = P2p_peer.Id.of_string_exn (String.make P2p_peer.Id.size 'r') in
+  let sender_id = P2p_peer.Id.of_string_exn (String.make P2p_peer.Id.size 's') in
+  {Block_locator.receiver_id=receiver_id ; sender_id }
 
 (* compute locator using the linear predecessor *)
 let compute_linear_locator (chain:State.Chain.t) ~size block =
@@ -233,16 +237,16 @@ let compute_linear_locator (chain:State.Chain.t) ~size block =
   let block_hash = State.Block.hash block in
   let header = State.Block.header block in
   Block_locator.compute ~predecessor:(linear_predecessor_n chain)
-    ~genesis:genesis.block block_hash header size
+    ~genesis:genesis.block block_hash header ~size seed
 
 
-(* given the size of a chain, returns the size required for a locator 
+(* given the size of a chain, returns the size required for a locator
    to reach genesis *)
 let compute_size_locator size_chain =
   let repeats = 10. in
   int_of_float ((log ((float size_chain) /. repeats)) /. (log 2.) -. 1.) * 10
 
-(* given the size of a locator, returns the size of the chain that it 
+(* given the size of a locator, returns the size of the chain that it
    can cover back to genesis *)
 let compute_size_chain size_locator =
   let repeats = 10. in
@@ -284,7 +288,7 @@ let test_locator base_dir =
   let check_locator size : unit tzresult Lwt.t =
     State.Block.read chain head >>=? fun block ->
     time ~runs:runs (fun () ->
-        State.compute_locator chain ~size:size block) |>
+        State.compute_locator chain ~size:size block seed) |>
     fun (l_exp,t_exp) ->
     time ~runs:runs (fun () ->
         compute_linear_locator chain ~size:size block) |>
@@ -311,7 +315,6 @@ let test_locator base_dir =
     else return ()
   in
   loop 1
-
 
 let wrap n f =
   Alcotest_lwt.test_case n `Quick begin fun _ () ->
