@@ -36,7 +36,7 @@ update_compose_file() {
     fi
 
     cat > "$docker_compose_yml" <<EOF
-version: "3"
+version: "2"
 services:
 
   node:
