@@ -12,9 +12,11 @@ let version_number = "\000"
 let proof_of_work_nonce_size = 8
 let nonce_length = 32
 
-(* 10 tez *)
+(* 1/8 tez *)
 let seed_nonce_revelation_tip =
-  Tez_repr.(mul_exn one 10)
+  match Tez_repr.(one /? 8L) with
+  | Ok c -> c
+  | Error _ -> assert false
 
 (* 1 tez *)
 let origination_burn =
