@@ -799,7 +799,7 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
   Baking.check_baking_rights
     ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
   let delegate_pkh = Signature.Public_key.hash delegate_pk in
-  Baking.freeze_baking_deposit ctxt protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
+  Baking.freeze_baking_deposit ctxt delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, protocol_data, delegate_pk, deposit)
 
@@ -823,8 +823,7 @@ let begin_application ctxt block_header pred_timestamp =
     (Invalid_commitment
        { expected = current_level.expected_commitment }) >>=? fun () ->
   let delegate_pkh = Signature.Public_key.hash delegate_pk in
-  Baking.freeze_baking_deposit ctxt
-    block_header.protocol_data.contents delegate_pkh >>=? fun (ctxt, deposit) ->
+  Baking.freeze_baking_deposit ctxt delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, delegate_pk, deposit)
 

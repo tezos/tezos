@@ -163,14 +163,11 @@ let earlier_predecessor_timestamp ctxt level =
     Lwt.return Timestamp.(current_timestamp +? delay) >>=? fun result ->
     return result
 
-let freeze_baking_deposit ctxt { Block_header.priority ; _ } delegate =
-  if Compare.Int.(priority >= Constants.first_free_baking_slot ctxt)
-  then return (ctxt, Tez.zero)
-  else
-    let deposit = Constants.block_security_deposit ctxt in
-    Delegate.freeze_deposit ctxt delegate deposit
-    |> trace Cannot_freeze_baking_deposit >>=? fun ctxt ->
-    return (ctxt, deposit)
+let freeze_baking_deposit ctxt delegate =
+  let deposit = Constants.block_security_deposit ctxt in
+  Delegate.freeze_deposit ctxt delegate deposit
+  |> trace Cannot_freeze_baking_deposit >>=? fun ctxt ->
+  return (ctxt, deposit)
 
 let freeze_endorsement_deposit ctxt delegate n =
   let deposit = Constants.endorsement_security_deposit ctxt in
@@ -203,9 +200,6 @@ let check_endorsements_rights c level slots =
         (List.for_all (fun d -> Signature.Public_key.equal d delegate) delegates)
         (Inconsistent_endorsement (List.map Signature.Public_key.hash all_delegates)) >>=? fun () ->
       return delegate
-
-let paying_priorities c =
-  0 --> (Constants.first_free_baking_slot c - 1)
 
 type error += Incorrect_priority
 
@@ -248,7 +242,7 @@ let select_delegate delegate delegate_list max_priority =
 
 let first_baking_priorities
     ctxt
-    ?(max_priority = Constants.first_free_baking_slot ctxt)
+    ?(max_priority = 32)
     delegate level =
   baking_priorities ctxt level >>=? fun delegate_list ->
   select_delegate delegate delegate_list max_priority

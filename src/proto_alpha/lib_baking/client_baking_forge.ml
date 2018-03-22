@@ -162,7 +162,7 @@ let forge_block cctxt ?(chain = `Main) block
             (List.nth_opt rights priority) in
         return (priority, time)
       end
-    | `Auto (src_pkh, max_priority, free_baking) ->
+    | `Auto (src_pkh, max_priority) ->
         Alpha_services.Helpers.current_level
           cctxt ~offset:1l (chain, block)>>=? fun { level } ->
         Alpha_services.Delegate.Baking_rights.get cctxt
@@ -171,21 +171,11 @@ let forge_block cctxt ?(chain = `Main) block
           ~delegates:[src_pkh]
           (chain, block)  >>=? fun possibilities ->
         try
-          begin
-            if free_baking then
-              Alpha_services.Constants.all cctxt
-                (chain, block) >>=? fun { parametric = {
-                  first_free_baking_slot ;
-                } } ->
-              return first_free_baking_slot
-            else
-              return 0
-          end >>=? fun min_prio ->
           let { Alpha_services.Delegate.Baking_rights.priority = prio ;
                 timestamp = time } =
             List.find
               (fun (p : Alpha_services.Delegate.Baking_rights.t) ->
-                 p.level = level && p.priority >= min_prio)
+                 p.level = level)
               possibilities in
           return (prio, time)
         with Not_found ->

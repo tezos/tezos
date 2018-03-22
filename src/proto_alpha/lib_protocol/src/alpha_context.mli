@@ -316,7 +316,6 @@ module Constants : sig
     blocks_per_roll_snapshot: int32 ;
     blocks_per_voting_period: int32 ;
     time_between_blocks: Period.t list ;
-    first_free_baking_slot: int ;
     endorsers_per_block: int ;
     hard_gas_limit_per_operation: Z.t ;
     hard_gas_limit_per_block: Z.t ;
@@ -343,7 +342,6 @@ module Constants : sig
   val blocks_per_roll_snapshot: context -> int32
   val blocks_per_voting_period: context -> int32
   val time_between_blocks: context -> Period.t list
-  val first_free_baking_slot: context -> int
   val endorsers_per_block: context -> int
   val hard_gas_limit_per_operation: context -> Z.t
   val hard_gas_limit_per_block: context -> Z.t

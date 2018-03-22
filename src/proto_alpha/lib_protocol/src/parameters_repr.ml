@@ -57,9 +57,6 @@ let constants_encoding =
        and time_between_blocks =
          opt Compare_time_between_blocks.(=)
            default.time_between_blocks c.time_between_blocks
-       and first_free_baking_slot =
-         opt Compare.Int.(=)
-           default.first_free_baking_slot c.first_free_baking_slot
        and endorsers_per_block =
          opt Compare.Int.(=)
            default.endorsers_per_block c.endorsers_per_block
@@ -118,7 +115,6 @@ let constants_encoding =
           blocks_per_roll_snapshot,
           blocks_per_voting_period,
           time_between_blocks,
-          first_free_baking_slot,
           endorsers_per_block,
           hard_gas_limit_per_operation,
           hard_gas_limit_per_block),
@@ -142,7 +138,6 @@ let constants_encoding =
             blocks_per_roll_snapshot,
             blocks_per_voting_period,
             time_between_blocks,
-            first_free_baking_slot,
             endorsers_per_block,
             hard_gas_limit_per_operation,
             hard_gas_limit_per_block),
@@ -175,8 +170,6 @@ let constants_encoding =
         time_between_blocks =
           unopt default.time_between_blocks @@
           time_between_blocks ;
-        first_free_baking_slot =
-          unopt default.first_free_baking_slot first_free_baking_slot ;
         endorsers_per_block =
           unopt default.endorsers_per_block endorsers_per_block ;
         hard_gas_limit_per_operation =
@@ -213,14 +206,13 @@ let constants_encoding =
           unopt default.hard_storage_limit_per_block hard_storage_limit_per_block ;
       } )
     (merge_objs
-       (obj10
+       (obj9
           (opt "preserved_cycles" uint8)
           (opt "blocks_per_cycle" int32)
           (opt "blocks_per_commitment" int32)
           (opt "blocks_per_roll_snapshot" int32)
           (opt "blocks_per_voting_period" int32)
           (opt "time_between_blocks" (list Period_repr.encoding))
-          (opt "first_free_baking_slot" uint16)
           (opt "endorsers_per_block" uint16)
           (opt "hard_gas_limit_per_operation" z)
           (opt "hard_gas_limit_per_block" z))

@@ -40,8 +40,7 @@ init_sandboxed_client() {
   "time_between_blocks" : [ "1", "0" ],
   "blocks_per_roll_snapshot" : 4,
   "blocks_per_cycle" : 8,
-  "preserved_cycles" : 2,
-  "first_free_baking_slot" : 4
+  "preserved_cycles" : 2
 }
 EOF
     fi

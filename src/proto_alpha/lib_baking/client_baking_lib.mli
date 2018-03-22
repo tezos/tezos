@@ -17,7 +17,6 @@ val bake_block:
   Block_services.block ->
   ?force:bool ->
   ?max_priority: int ->
-  ?free_baking: bool ->
   ?minimal_timestamp: bool ->
   ?src_sk:Client_keys.sk_uri ->
   public_key_hash ->

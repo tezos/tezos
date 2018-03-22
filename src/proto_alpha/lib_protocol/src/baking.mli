@@ -19,8 +19,6 @@ type error += Cannot_freeze_baking_deposit (* `Permanent *)
 type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
 
-val paying_priorities: context -> int list
-
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
     time, given the predecessor block timestamp [pred_block_time],
     after which a baker with priority [priority] is allowed to
@@ -39,7 +37,6 @@ val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
     funds to claim baking rights. *)
 val freeze_baking_deposit:
   context ->
-  Block_header.contents ->
   public_key_hash ->
   (context * Tez.t) tzresult Lwt.t
 
@@ -55,7 +52,6 @@ val freeze_endorsement_deposit:
 (** [check_baking_rights ctxt block pred_timestamp] verifies that:
     * the contract that owned the roll at cycle start has the block signer as delegate.
     * the timestamp is coherent with the announced slot.
-    * the deposit have been payed if the slot is below [Constants.first_free_baking_slot].
 *)
 val check_baking_rights:
   context -> Block_header.contents -> Time.t ->

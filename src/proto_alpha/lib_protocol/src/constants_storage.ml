@@ -25,9 +25,6 @@ let blocks_per_voting_period c =
 let time_between_blocks c =
   let constants = Raw_context.constants c in
   constants.time_between_blocks
-let first_free_baking_slot c =
-  let constants = Raw_context.constants c in
-  constants.first_free_baking_slot
 let endorsers_per_block c =
   let constants = Raw_context.constants c in
   constants.endorsers_per_block

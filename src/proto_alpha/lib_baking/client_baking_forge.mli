@@ -44,7 +44,7 @@ val forge_block:
   ?best_effort:bool ->
   ?sort:bool ->
   ?timestamp:Time.t ->
-  priority:[`Set of int | `Auto of (public_key_hash * int option * bool)] ->
+  priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
   ?seed_nonce_hash:Nonce_hash.t ->
   src_sk:Client_keys.sk_uri ->
   unit ->

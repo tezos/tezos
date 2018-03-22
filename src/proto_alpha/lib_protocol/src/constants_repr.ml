@@ -50,7 +50,6 @@ type parametric = {
   blocks_per_roll_snapshot: int32 ;
   blocks_per_voting_period: int32 ;
   time_between_blocks: Period_repr.t list ;
-  first_free_baking_slot: int ;
   endorsers_per_block: int ;
   hard_gas_limit_per_operation: Z.t ;
   hard_gas_limit_per_block: Z.t ;
@@ -78,7 +77,6 @@ let default = {
   blocks_per_voting_period = 32768l ;
   time_between_blocks =
     List.map Period_repr.of_seconds_exn [ 60L ] ;
-  first_free_baking_slot = 16 ;
   endorsers_per_block = 32 ;
   hard_gas_limit_per_operation = Z.of_int 400_000 ;
   hard_gas_limit_per_block = Z.of_int 4_000_000 ;
@@ -119,7 +117,6 @@ let parametric_encoding =
           c.blocks_per_roll_snapshot,
           c.blocks_per_voting_period,
           c.time_between_blocks,
-          c.first_free_baking_slot,
           c.endorsers_per_block,
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block),
@@ -143,7 +140,6 @@ let parametric_encoding =
             blocks_per_roll_snapshot,
             blocks_per_voting_period,
             time_between_blocks,
-            first_free_baking_slot,
             endorsers_per_block,
             hard_gas_limit_per_operation,
             hard_gas_limit_per_block),
@@ -167,7 +163,6 @@ let parametric_encoding =
         blocks_per_roll_snapshot ;
         blocks_per_voting_period ;
         time_between_blocks ;
-        first_free_baking_slot ;
         endorsers_per_block ;
         hard_gas_limit_per_operation ;
         hard_gas_limit_per_block ;
@@ -187,14 +182,13 @@ let parametric_encoding =
         hard_storage_limit_per_block ;
       } )
     (merge_objs
-       (obj10
+       (obj9
           (req "preserved_cycles" uint8)
           (req "blocks_per_cycle" int32)
           (req "blocks_per_commitment" int32)
           (req "blocks_per_roll_snapshot" int32)
           (req "blocks_per_voting_period" int32)
           (req "time_between_blocks" (list Period_repr.encoding))
-          (req "first_free_baking_slot" uint16)
           (req "endorsers_per_block" uint16)
           (req "hard_gas_limit_per_operation" z)
           (req "hard_gas_limit_per_block" z))

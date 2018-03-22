@@ -80,7 +80,6 @@ let protocol_parameters =
   "blocks_per_cycle" : 4,
   "blocks_per_roll_snapshot" : 2,
   "preserved_cycles" : 1,
-  "first_free_baking_slot" : 4,
   "proof_of_work_threshold": "-1"
 }
 |json} in
@@ -103,7 +102,6 @@ let vote_protocol_parameters =
   "blocks_per_cycle" : 4,
   "blocks_per_roll_snapshot" : 2,
   "preserved_cycles" : 1,
-  "first_free_baking_slot" : 4,
   "blocks_per_voting_period": 2,
   "proof_of_work_threshold": "-1"
 }
@@ -536,7 +534,7 @@ module Baking = struct
       ~force:true
       ~best_effort:false
       ~sort:false
-      ~priority:(`Auto (contract.pkh, Some 1024, false))
+      ~priority:(`Auto (contract.pkh, Some 1024))
       ?seed_nonce_hash
       ~src_sk
       ()
