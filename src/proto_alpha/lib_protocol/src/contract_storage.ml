@@ -13,10 +13,13 @@ type error +=
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
+  | Empty_implicit_contract of Signature.Public_key_hash.t (* `Temporary *)
   | Inconsistent_hash of Signature.Public_key.t * Signature.Public_key_hash.t * Signature.Public_key_hash.t (* `Permanent *)
   | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t (* `Permanent *)
   | Missing_public_key of Signature.Public_key_hash.t (* `Permanent *)
   | Failure of string (* `Permanent *)
+  | Previously_revealed_key of Contract_repr.t (* `Permanent *)
+  | Unrevealed_manager_key of Contract_repr.t (* `Permanent *)
 
 let () =
   register_error_kind
@@ -137,7 +140,44 @@ let () =
     ~pp:(fun ppf s -> Format.fprintf ppf "Contract_storage.Failure %S" s)
     Data_encoding.(obj1 (req "message" string))
     (function Failure s -> Some s | _ -> None)
-    (fun s -> Failure s)
+    (fun s -> Failure s) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.unrevealed_key"
+    ~title:"Manager operation precedes key revelation"
+    ~description:
+      "One tried to apply a manager operation \
+       without revealing the manager public key"
+    ~pp:(fun ppf s ->
+        Format.fprintf ppf "Unrevealed manager key for contract %a."
+          Contract_repr.pp s)
+    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
+    (function Unrevealed_manager_key s -> Some s | _ -> None)
+    (fun s -> Unrevealed_manager_key s) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.previously_revealed_key"
+    ~title:"Manager operation already revealed"
+    ~description:
+      "One tried to revealed twice a manager public key"
+    ~pp:(fun ppf s ->
+        Format.fprintf ppf "Previously revealed manager key for contract %a."
+          Contract_repr.pp s)
+    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
+    (function Previously_revealed_key s -> Some s | _ -> None)
+    (fun s -> Previously_revealed_key s) ;
+  register_error_kind
+    `Branch
+    ~id:"implicit.empty_implicit_contract"
+    ~title:"Empty implicit contract"
+    ~description:"No manager operations are allowed on an empty implicit contract."
+    ~pp:(fun ppf implicit ->
+        Format.fprintf ppf
+          "Empty implicit contract (%a)"
+          Signature.Public_key_hash.pp implicit)
+    Data_encoding.(obj1 (req "implicit" Signature.Public_key_hash.encoding))
+    (function Empty_implicit_contract c -> Some c | _ -> None)
+    (fun c -> Empty_implicit_contract c)
 
 let failwith msg = fail (Failure msg)
 
@@ -191,18 +231,28 @@ let delete c contract =
   Storage.Contract.Big_map.clear (c, contract) >>= fun c ->
   return c
 
+let allocated c contract =
+  Storage.Contract.Counter.get_option c contract >>=? function
+  | None -> return false
+  | Some _ -> return true
+
 let exists c contract =
   match Contract_repr.is_implicit contract with
   | Some _ -> return true
-  | None ->
-      Storage.Contract.Counter.get_option c contract >>=? function
-      | None -> return false
-      | Some _ -> return true
+  | None -> allocated c contract
 
 let must_exist c contract =
   exists c contract >>=? function
   | true -> return ()
   | false -> fail (Non_existing_contract contract)
+
+let must_be_allocated c contract =
+  allocated c contract >>=? function
+  | true -> return ()
+  | false ->
+      match Contract_repr.is_implicit contract with
+      | Some pkh -> fail (Empty_implicit_contract pkh)
+      | None -> fail (Non_existing_contract contract)
 
 let list c = Storage.Contract.list c
 
@@ -251,25 +301,22 @@ let get_manager c contract =
   | Some (Manager_repr.Hash v) -> return v
   | Some (Manager_repr.Public_key v) -> return (Signature.Public_key.hash v)
 
-let update_manager_key c contract = function
-  | Some public_key ->
-      begin Storage.Contract.Manager.get c contract >>=? function
-        | Public_key v -> (* key revealed for the second time *)
-            if Signature.Public_key.(v = public_key) then return (c,v)
-            else fail (Inconsistent_public_key (v,public_key))
-        | Hash v ->
-            let actual_hash = Signature.Public_key.hash public_key in
-            if (Signature.Public_key_hash.equal actual_hash v) then
-              let v = (Manager_repr.Public_key public_key) in
-              Storage.Contract.Manager.set c contract v >>=? fun c ->
-              return (c,public_key) (* reveal and update key *)
-            else fail (Inconsistent_hash (public_key,v,actual_hash))
-      end
-  | None ->
-      begin Storage.Contract.Manager.get c contract >>=? function
-        | Public_key v -> return (c,v) (* already revealed *)
-        | Hash v -> fail (Missing_public_key (v))
-      end
+let get_manager_key c contract =
+  Storage.Contract.Manager.get_option c contract >>=? function
+  | None -> failwith "get_manager_key"
+  | Some (Manager_repr.Hash _) -> fail (Unrevealed_manager_key contract)
+  | Some (Manager_repr.Public_key v) -> return v
+
+let reveal_manager_key c contract public_key =
+  Storage.Contract.Manager.get c contract >>=? function
+  | Public_key _ -> fail (Previously_revealed_key contract)
+  | Hash v ->
+      let actual_hash = Signature.Public_key.hash public_key in
+      if (Signature.Public_key_hash.equal actual_hash v) then
+        let v = (Manager_repr.Public_key public_key) in
+        Storage.Contract.Manager.set c contract v >>=? fun c ->
+        return c
+      else fail (Inconsistent_hash (public_key,v,actual_hash))
 
 let get_balance c contract =
   Storage.Contract.Balance.get_option c contract >>=? function

@@ -438,6 +438,9 @@ module Contract : sig
   val exists: context -> contract -> bool tzresult Lwt.t
   val must_exist: context -> contract -> unit tzresult Lwt.t
 
+  val allocated: context -> contract -> bool tzresult Lwt.t
+  val must_be_allocated: context -> contract -> unit tzresult Lwt.t
+
   val list: context -> contract list Lwt.t
 
   type origination_nonce
@@ -450,8 +453,12 @@ module Contract : sig
 
   val get_manager:
     context -> contract -> public_key_hash tzresult Lwt.t
-  val update_manager_key:
-    context -> contract -> public_key option -> (context * public_key) tzresult Lwt.t
+
+  val get_manager_key:
+    context -> contract -> public_key tzresult Lwt.t
+
+  val reveal_manager_key:
+    context -> contract -> public_key -> context tzresult Lwt.t
 
   val is_delegatable:
     context -> contract -> bool tzresult Lwt.t

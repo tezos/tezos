@@ -11,8 +11,7 @@ let init ctxt (account: Parameters_repr.bootstrap_account) =
   let public_key_hash = Signature.Public_key.hash account.public_key in
   let contract = Contract_repr.implicit_contract public_key_hash in
   Contract_storage.credit ctxt contract account.amount >>=? fun ctxt ->
-  Contract_storage.update_manager_key ctxt contract
-    (Some account.public_key) >>=? fun (ctxt, _) ->
+  Contract_storage.reveal_manager_key ctxt contract account.public_key >>=? fun ctxt ->
   Delegate_storage.set ctxt contract (Some public_key_hash) >>=? fun ctxt ->
   return ctxt
 

@@ -38,6 +38,7 @@ type error += Outdated_double_baking_evidence
   of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
 type error += Invalid_activation of { pkh : Ed25519.Public_key_hash.t }
 type error += Wrong_activation_secret
+type error += Multiple_revelation
 
 let () =
   register_error_kind
@@ -313,7 +314,18 @@ let () =
         Format.fprintf ppf "Wrong activation secret.")
     Data_encoding.unit
     (function Wrong_activation_secret -> Some () | _ -> None)
-    (fun () -> Wrong_activation_secret)
+    (fun () -> Wrong_activation_secret) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.multiple_revelation"
+    ~title:"Multiple revelations were included in a manager operation"
+    ~description:"A manager operation should not contain more than one revelation"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf
+          "Multiple revelations were included in a manager operation")
+    Data_encoding.empty
+    (function Multiple_revelation -> Some () | _ -> None)
+    (fun () -> Multiple_revelation)
 
 let apply_consensus_operation_content ctxt
     pred_block block_priority operation = function
@@ -446,15 +458,23 @@ let apply_sourced_operation
     operation origination_nonce ops =
   match ops with
   | Manager_operations { source ; fee ; counter ; operations = contents } ->
-      let public_key =
+      let revealed_public_keys =
         List.fold_left (fun acc op ->
             match op with
-            | Reveal pk -> Some pk
-            | _ -> acc) None contents in
-      Contract.must_exist ctxt source >>=? fun () ->
-      Contract.update_manager_key ctxt source public_key >>=? fun (ctxt,public_key) ->
-      Operation.check_signature public_key operation >>=? fun () ->
+            | Reveal pk -> pk :: acc
+            | _ -> acc) [] contents in
+      Contract.must_be_allocated ctxt source >>=? fun () ->
       Contract.check_counter_increment ctxt source counter >>=? fun () ->
+      begin
+        match revealed_public_keys with
+        | [] -> return ctxt
+        | [pk] ->
+            Contract.reveal_manager_key ctxt source pk
+        | _ :: _ :: _ ->
+            fail Multiple_revelation
+      end >>=? fun ctxt ->
+      Contract.get_manager_key ctxt source >>=? fun public_key ->
+      Operation.check_signature public_key operation >>=? fun () ->
       Contract.increment_counter ctxt source >>=? fun ctxt ->
       Contract.spend ctxt source fee >>=? fun ctxt ->
       add_fees ctxt fee >>=? fun ctxt ->
