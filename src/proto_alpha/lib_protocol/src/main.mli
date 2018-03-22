@@ -27,7 +27,6 @@ type validation_state =
   { mode : validation_mode ;
     ctxt : Alpha_context.t ;
     op_count : int ;
-    deposit : Alpha_context.Tez.t ;
   }
 
 type operation_data = Alpha_context.packed_protocol_data

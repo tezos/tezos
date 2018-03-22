@@ -71,9 +71,12 @@ val first_level: context -> Raw_level_repr.t
 
 val add_fees: context -> Tez_repr.t -> context tzresult Lwt.t
 val add_rewards: context -> Tez_repr.t -> context tzresult Lwt.t
+val add_deposit:
+  context -> Signature.Public_key_hash.t -> Tez_repr.t -> context tzresult Lwt.t
 
 val get_fees: context -> Tez_repr.t
 val get_rewards: context -> Tez_repr.t
+val get_deposits: context -> Tez_repr.t Signature.Public_key_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 

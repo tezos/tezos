@@ -17,6 +17,7 @@ type t = {
   timestamp: Time.t ;
   fitness: Int64.t ;
   endorsements_received: Int_set.t ;
+  deposits: Tez_repr.t Signature.Public_key_hash.Map.t ;
   fees: Tez_repr.t ;
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
@@ -78,6 +79,16 @@ let add_rewards ctxt rewards =
   Lwt.return Tez_repr.(ctxt.rewards +? rewards) >>=? fun rewards ->
   return { ctxt with rewards}
 
+let add_deposit ctxt delegate deposit =
+  let previous =
+    try Signature.Public_key_hash.Map.find delegate ctxt.deposits
+    with Not_found -> Tez_repr.zero in
+  Lwt.return Tez_repr.(previous +? deposit) >>=? fun deposit ->
+  let deposits =
+    Signature.Public_key_hash.Map.add delegate deposit ctxt.deposits in
+  return { ctxt with deposits }
+
+let get_deposits ctxt = ctxt.deposits
 let get_rewards ctxt = ctxt.rewards
 let get_fees ctxt = ctxt.fees
 
@@ -386,6 +397,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
     endorsements_received = Int_set.empty ;
     fees = Tez_repr.zero ;
     rewards = Tez_repr.zero ;
+    deposits = Signature.Public_key_hash.Map.empty ;
     operation_gas = Unaccounted ;
     block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
     operation_storage = Unaccounted ;
@@ -437,6 +449,7 @@ let register_resolvers enc resolve =
       endorsements_received = Int_set.empty ;
       fees = Tez_repr.zero ;
       rewards = Tez_repr.zero ;
+      deposits = Signature.Public_key_hash.Map.empty ;
       block_gas = Constants_repr.default.hard_gas_limit_per_block ;
       operation_gas = Unaccounted ;
       block_storage = Constants_repr.default.hard_storage_limit_per_block ;

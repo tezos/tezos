@@ -1052,8 +1052,11 @@ val internal_nonce_already_recorded: context -> int -> bool
 
 val add_fees: context -> Tez.t -> context tzresult Lwt.t
 val add_rewards: context -> Tez.t -> context tzresult Lwt.t
+val add_deposit:
+  context -> Signature.Public_key_hash.t -> Tez.t -> context tzresult Lwt.t
 
 val get_fees: context -> Tez.t
 val get_rewards: context -> Tez.t
+val get_deposits: context -> Tez.t Signature.Public_key_hash.Map.t
 
 val description: context Storage_description.t

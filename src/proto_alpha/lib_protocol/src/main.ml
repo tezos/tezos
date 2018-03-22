@@ -70,7 +70,6 @@ type validation_state =
   { mode : validation_mode ;
     ctxt : Alpha_context.t ;
     op_count : int ;
-    deposit : Alpha_context.Tez.t ;
   }
 
 let current_context { ctxt ; _ } =
@@ -93,9 +92,9 @@ let begin_application
   let timestamp = block_header.shell.timestamp in
   Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
-    ctxt block_header pred_timestamp >>=? fun (ctxt, baker, deposit) ->
+    ctxt block_header pred_timestamp >>=? fun (ctxt, baker) ->
   let mode = Application { block_header ; baker = Signature.Public_key.hash baker } in
-  return { mode ; ctxt ; op_count = 0 ; deposit }
+  return { mode ; ctxt ; op_count = 0 }
 
 let begin_construction
     ~predecessor_context:ctxt
@@ -114,17 +113,17 @@ let begin_construction
     | None ->
         Apply.begin_partial_construction ctxt >>=? fun ctxt ->
         let mode = Partial_construction { predecessor } in
-        return (mode, ctxt, Alpha_context.Tez.zero)
+        return (mode, ctxt)
     | Some proto_header ->
         Apply.begin_full_construction
           ctxt pred_timestamp
-          proto_header.contents >>=? fun (ctxt, protocol_data, baker, deposit) ->
+          proto_header.contents >>=? fun (ctxt, protocol_data, baker) ->
         let mode =
           let baker = Signature.Public_key.hash baker in
           Full_construction { predecessor ; baker ; protocol_data } in
-        return (mode, ctxt, deposit)
-  end >>=? fun (mode, ctxt, deposit) ->
-  return { mode ; ctxt ; op_count = 0 ; deposit }
+        return (mode, ctxt)
+  end >>=? fun (mode, ctxt) ->
+  return { mode ; ctxt ; op_count = 0 }
 
 let apply_operation
     ({ mode ; ctxt ; op_count ; _ } as data)
@@ -144,12 +143,18 @@ let apply_operation
   let op_count = op_count + 1 in
   return ({ data with ctxt ; op_count }, Operation_metadata result)
 
-let finalize_block { mode ; ctxt ; op_count ; deposit = _ } =
+let finalize_block { mode ; ctxt ; op_count } =
   match mode with
   | Partial_construction _ ->
       let level = Alpha_context. Level.current ctxt in
       Alpha_context.Vote.get_current_period_kind ctxt >>=? fun voting_period_kind ->
       let baker = Signature.Public_key_hash.zero in
+      Signature.Public_key_hash.Map.fold
+        (fun delegate deposit ctxt ->
+           ctxt >>=? fun ctxt ->
+           Alpha_context.Delegate.freeze_deposit ctxt delegate deposit)
+        (Alpha_context.get_deposits ctxt)
+        (return ctxt) >>=? fun ctxt ->
       let ctxt = Alpha_context.finalize ctxt in
       return (ctxt, { Alpha_context.Block_header.baker ; level ;
                       voting_period_kind })

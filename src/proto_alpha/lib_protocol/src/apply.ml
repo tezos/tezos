@@ -638,7 +638,10 @@ let apply_contents_list
       let delegate = Signature.Public_key.hash delegate in
       let gap = List.length slots in
       let ctxt = Fitness.increase ~gap ctxt in
-      Baking.freeze_endorsement_deposit ctxt delegate gap >>=? fun ctxt ->
+      Lwt.return
+        Tez.(Constants.endorsement_security_deposit ctxt *?
+             Int64.of_int gap) >>=? fun deposit ->
+      add_deposit ctxt delegate deposit >>=? fun ctxt ->
       Global.get_last_block_priority ctxt >>=? fun block_priority ->
       Baking.endorsement_reward ctxt ~block_priority gap >>=? fun reward ->
       Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
@@ -798,10 +801,8 @@ let may_start_new_cycle ctxt =
 let begin_full_construction ctxt pred_timestamp protocol_data =
   Baking.check_baking_rights
     ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
-  let delegate_pkh = Signature.Public_key.hash delegate_pk in
-  Baking.freeze_baking_deposit ctxt delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, protocol_data, delegate_pk, deposit)
+  return (ctxt, protocol_data, delegate_pk)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
@@ -822,14 +823,19 @@ let begin_application ctxt block_header pred_timestamp =
     Compare.Bool.(has_commitment = current_level.expected_commitment)
     (Invalid_commitment
        { expected = current_level.expected_commitment }) >>=? fun () ->
-  let delegate_pkh = Signature.Public_key.hash delegate_pk in
-  Baking.freeze_baking_deposit ctxt delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, delegate_pk, deposit)
+  return (ctxt, delegate_pk)
 
 let finalize_application ctxt protocol_data delegate =
-  let block_reward = Constants.block_reward ctxt in
-  add_rewards ctxt block_reward >>=? fun ctxt ->
+  let deposit = Constants.block_security_deposit ctxt in
+  add_deposit ctxt delegate deposit >>=? fun ctxt ->
+  add_rewards ctxt (Constants.block_reward ctxt) >>=? fun ctxt ->
+  Signature.Public_key_hash.Map.fold
+    (fun delegate deposit ctxt ->
+       ctxt >>=? fun ctxt ->
+       Delegate.freeze_deposit ctxt delegate deposit)
+    (get_deposits ctxt)
+    (return ctxt) >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
   let fees = Alpha_context.get_fees ctxt in
   Delegate.freeze_fees ctxt delegate fees >>=? fun ctxt ->

@@ -15,8 +15,6 @@ type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
-type error += Cannot_freeze_baking_deposit (* `Permanent *)
-type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
 
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
@@ -25,29 +23,6 @@ type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_has
     bake. Fail with [Invalid_time_between_blocks_constant] if the minimal
     time cannot be computed. *)
 val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
-
-(** [freeze_baking_deposit: ctxt delegate priority]
-    Freeze the baking deposit (See !Constants.block_security_deposit)
-    from a delegate account. No deposit is frozen if the baking
-    priority of this block is greater than the maximum number
-    of paying baking in the network (meaning that n. bakers
-    skipped their turn).
-
-    Raise an error if the delegate account does not have enough
-    funds to claim baking rights. *)
-val freeze_baking_deposit:
-  context ->
-  public_key_hash ->
-  (context * Tez.t) tzresult Lwt.t
-
-(** [freeze_endorsement_deposit: ctxt delegate]
-    Freeze the endorsement deposit (See !Constants.endorsement_security_deposit)
-    from the delegate account.
-
-    Raise an error if the baker account does not have enough
-    funds to claim endorsement rights *)
-val freeze_endorsement_deposit:
-  context -> public_key_hash -> int -> context tzresult Lwt.t
 
 (** [check_baking_rights ctxt block pred_timestamp] verifies that:
     * the contract that owned the roll at cycle start has the block signer as delegate.

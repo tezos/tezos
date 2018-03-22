@@ -14,8 +14,6 @@ open Misc
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
-type error += Cannot_freeze_baking_deposit (* `Permanent *)
-type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Empty_endorsement
 type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
@@ -63,26 +61,6 @@ let () =
                      (req "provided" int16))
     (function Invalid_endorsement_slot (m, g)   -> Some (m, g) | _ -> None)
     (fun (m, g) -> Invalid_endorsement_slot (m, g)) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.cannot_freeze_baking_deposit"
-    ~title:"Cannot freeze baking deposit"
-    ~description:
-      "Impossible to debit the required tokens on the baker's contract"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot freeze the baking deposit")
-    Data_encoding.unit
-    (function Cannot_freeze_baking_deposit -> Some () | _ -> None)
-    (fun () -> Cannot_freeze_baking_deposit) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.cannot_freeze_endorsement_deposit"
-    ~title:"Cannot freeze endorsement deposit"
-    ~description:
-      "Impossible to debit the required tokens on the endorser's contract"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot freeze the endorsement deposit")
-    Data_encoding.unit
-    (function Cannot_freeze_endorsement_deposit -> Some () | _ -> None)
-    (fun () -> Cannot_freeze_endorsement_deposit) ;
   register_error_kind
     `Permanent
     ~id:"baking.inconsisten_endorsement"
@@ -162,18 +140,6 @@ let earlier_predecessor_timestamp ctxt level =
     Lwt.return (Period.mult (Int32.pred gap) step) >>=? fun delay ->
     Lwt.return Timestamp.(current_timestamp +? delay) >>=? fun result ->
     return result
-
-let freeze_baking_deposit ctxt delegate =
-  let deposit = Constants.block_security_deposit ctxt in
-  Delegate.freeze_deposit ctxt delegate deposit
-  |> trace Cannot_freeze_baking_deposit >>=? fun ctxt ->
-  return (ctxt, deposit)
-
-let freeze_endorsement_deposit ctxt delegate n =
-  let deposit = Constants.endorsement_security_deposit ctxt in
-  Lwt.return (Tez.(deposit *? Int64.of_int n)) >>=? fun deposit ->
-  Delegate.freeze_deposit ctxt delegate deposit
-  |> trace Cannot_freeze_endorsement_deposit
 
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp >>=? fun minimal_time ->
