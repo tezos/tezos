@@ -454,6 +454,7 @@ let apply_sourced_operation
       Contract.check_counter_increment ctxt source counter >>=? fun () ->
       Contract.increment_counter ctxt source >>=? fun ctxt ->
       Contract.spend ctxt source fee >>=? fun ctxt ->
+      add_fees ctxt fee >>=? fun ctxt ->
       fold_left_s (fun (ctxt, origination_nonce, err) content ->
           match err with
           | Some _ -> return (ctxt, origination_nonce, err)
@@ -463,38 +464,38 @@ let apply_sourced_operation
                 ctxt origination_nonce source content)
         (ctxt, origination_nonce, None) contents
       >>=? fun (ctxt, origination_nonce, err) ->
-      return (ctxt, origination_nonce, err, fee, Tez.zero)
+      return (ctxt, origination_nonce, err)
   | Consensus_operation content ->
       apply_consensus_operation_content ctxt
         pred_block block_prio operation content >>=? fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
+      return (ctxt, origination_nonce, None)
   | Amendment_operation { source ; operation = content } ->
       Roll.delegate_pubkey ctxt source >>=? fun delegate ->
       Operation.check_signature delegate operation >>=? fun () ->
       (* TODO, see how to extract the public key hash after this operation to
          pass it to apply_delegate_operation_content *)
       apply_amendment_operation_content ctxt source content >>=? fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
+      return (ctxt, origination_nonce, None)
   | Dictator_operation (Activate hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       activate ctxt hash >>= fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
+      return (ctxt, origination_nonce, None)
   | Dictator_operation (Activate_testchain hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       let expiration = (* in two days maximum... *)
         Time.add (Timestamp.current ctxt) (Int64.mul 48L 3600L) in
       fork_test_chain ctxt hash expiration >>= fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
+      return (ctxt, origination_nonce, None)
 
 let apply_anonymous_operation ctxt _delegate origination_nonce kind =
   match kind with
   | Seed_nonce_revelation { level ; nonce } ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
-      return (ctxt, origination_nonce,
-              Tez.zero, Constants.seed_nonce_revelation_tip)
+      add_rewards ctxt Constants.seed_nonce_revelation_tip >>=? fun ctxt ->
+      return (ctxt, origination_nonce)
   | Double_endorsement_evidence { op1 ; op2 } -> begin
       match op1.contents, op2.contents with
       | Sourced_operations (Consensus_operation (Endorsements e1)),
@@ -532,7 +533,8 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
             match Tez.(burned /? 2L) with
             | Ok v -> v
             | Error _ -> Tez.zero in
-          return (ctxt, origination_nonce, Tez.zero, reward)
+          add_rewards ctxt reward >>=? fun ctxt ->
+          return (ctxt, origination_nonce)
       | _, _ -> fail Invalid_double_endorsement_evidence
     end
   | Double_baking_evidence { bh1 ; bh2 } ->
@@ -570,7 +572,8 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
         match Tez.(burned /? 2L) with
         | Ok v -> v
         | Error _ -> Tez.zero in
-      return (ctxt, origination_nonce, Tez.zero, reward)
+      add_rewards ctxt reward >>=? fun ctxt ->
+      return (ctxt, origination_nonce)
   | Activation { id = pkh ; secret } ->
       let h_pkh = Unclaimed_public_key_hash.of_ed25519_pkh pkh in
       Commitment.get_opt ctxt h_pkh >>=? function
@@ -582,7 +585,7 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
             Wrong_activation_secret >>=? fun () ->
           Commitment.delete ctxt h_pkh >>=? fun ctxt ->
           Contract.(credit ctxt (implicit_contract pkh) amount) >>=? fun ctxt ->
-          return (ctxt, origination_nonce,  Tez.zero, Tez.zero)
+          return (ctxt, origination_nonce)
 
 let apply_operation
     ctxt delegate pred_block block_prio hash operation =
@@ -590,24 +593,17 @@ let apply_operation
   | Anonymous_operations ops ->
       let origination_nonce = Contract.initial_origination_nonce hash in
       fold_left_s
-        (fun (ctxt, origination_nonce, fees, rewards) op ->
-           apply_anonymous_operation ctxt delegate origination_nonce op
-           >>=? fun (ctxt, origination_nonce, fee, reward) ->
-           return (ctxt, origination_nonce,
-                   fees >>? Tez.(+?) fee,
-                   rewards >>? Tez.(+?) reward))
-        (ctxt, origination_nonce, Ok Tez.zero, Ok Tez.zero) ops
-      >>=? fun (ctxt, origination_nonce, fees, rewards) ->
-      return (ctxt, Contract.originated_contracts origination_nonce, None,
-              fees, rewards)
+        (fun (ctxt, origination_nonce) op ->
+           apply_anonymous_operation ctxt delegate origination_nonce op)
+        (ctxt, origination_nonce) ops
+      >>=? fun (ctxt, origination_nonce) ->
+      return (ctxt, Contract.originated_contracts origination_nonce, None)
   | Sourced_operations op ->
       let origination_nonce = Contract.initial_origination_nonce hash in
       apply_sourced_operation
         ctxt pred_block block_prio
-        operation origination_nonce op >>=? fun (ctxt, origination_nonce, err,
-                                                 fees, rewards) ->
-      return (ctxt, Contract.originated_contracts origination_nonce, err,
-              Ok fees, Ok rewards)
+        operation origination_nonce op >>=? fun (ctxt, origination_nonce, err) ->
+      return (ctxt, Contract.originated_contracts origination_nonce, err)
 
 let may_snapshot_roll ctxt =
   let level = Alpha_context.Level.current ctxt in
@@ -666,10 +662,12 @@ let begin_application ctxt block_header pred_timestamp =
   let ctxt = Fitness.increase ctxt in
   return (ctxt, delegate_pk, deposit)
 
-let finalize_application ctxt protocol_data delegate deposit fees rewards =
+let finalize_application ctxt protocol_data delegate deposit =
+  add_rewards ctxt Constants.block_reward >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
-  Lwt.return Tez.(rewards +? Constants.block_reward) >>=? fun rewards ->
+  let fees = Alpha_context.get_fees ctxt in
   Delegate.freeze_fees ctxt delegate fees >>=? fun ctxt ->
+  let rewards = Alpha_context.get_rewards ctxt in
   Delegate.freeze_rewards ctxt delegate rewards >>=? fun ctxt ->
   begin
     match protocol_data.Block_header.seed_nonce_hash with

@@ -62,6 +62,12 @@ val set_current_fitness: context -> Int64.t -> t
 val constants: context -> Constants_repr.parametric
 val first_level: context -> Raw_level_repr.t
 
+val add_fees: context -> Tez_repr.t -> context tzresult Lwt.t
+val add_rewards: context -> Tez_repr.t -> context tzresult Lwt.t
+
+val get_fees: context -> Tez_repr.t
+val get_rewards: context -> Tez_repr.t
+
 (** {1 Generic accessors} *************************************************)
 
 type key = string list

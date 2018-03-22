@@ -20,7 +20,7 @@ let operation
     pred_block_hash
     0
     hash
-    operation >>=? fun (tc, contracts, err, _fees, _rewards) ->
+    operation >>=? fun (tc, contracts, err) ->
   return ((contracts, err), tc)
 
 

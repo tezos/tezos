@@ -17,6 +17,8 @@ type t = {
   timestamp: Time.t ;
   fitness: Int64.t ;
   endorsements_received: Int_set.t;
+  fees: Tez_repr.t ;
+  rewards: Tez_repr.t ;
 }
 
 type context = t
@@ -33,6 +35,17 @@ let record_endorsement ctxt k = { ctxt with endorsements_received = Int_set.add 
 let endorsement_already_recorded ctxt k = Int_set.mem k ctxt.endorsements_received
 
 let set_current_fitness ctxt fitness = { ctxt with fitness }
+
+let add_fees ctxt fees =
+  Lwt.return Tez_repr.(ctxt.fees +? fees) >>=? fun fees ->
+  return { ctxt with fees}
+
+let add_rewards ctxt rewards =
+  Lwt.return Tez_repr.(ctxt.rewards +? rewards) >>=? fun rewards ->
+  return { ctxt with rewards}
+
+let get_rewards ctxt = ctxt.rewards
+let get_fees ctxt = ctxt.fees
 
 type storage_error =
   | Incompatible_protocol_version of string
@@ -234,6 +247,8 @@ let prepare ~level ~timestamp ~fitness ctxt =
     context = ctxt ; constants ; level ;
     timestamp ; fitness ; first_level ;
     endorsements_received = Int_set.empty ;
+    fees = Tez_repr.zero ;
+    rewards = Tez_repr.zero ;
   }
 
 let check_first_block ctxt =
@@ -278,6 +293,8 @@ let register_resolvers enc resolve =
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
       endorsements_received = Int_set.empty ;
+      fees = Tez_repr.zero ;
+      rewards = Tez_repr.zero ;
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve

@@ -140,8 +140,8 @@ module I = struct
         Apply.apply_operation
           ctxt (Some baker_pkh) pred_block block_prio hash operation
         >>=? function
-        | (_ctxt, _, Some script_err, _, _) -> Lwt.return (Error script_err)
-        | (_ctxt, contracts, None,_ , _) -> Lwt.return (Ok contracts)
+        | (_ctxt, _, Some script_err) -> Lwt.return (Error script_err)
+        | (_ctxt, contracts, None) -> Lwt.return (Ok contracts)
 
 
   let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =

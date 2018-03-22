@@ -78,7 +78,7 @@ let test_simple_activation () =
     starting_block.tezos_context
     None
     starting_block.hash
-    activation_operation >>=? fun (ctxt, _, _, _) ->
+    activation_operation >>=? fun (ctxt, _) ->
 
   let contract = Contract.implicit_contract pkh in
 
