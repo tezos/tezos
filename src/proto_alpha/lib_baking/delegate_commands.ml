@@ -11,7 +11,7 @@ open Client_proto_args
 open Client_baking_lib
 
 let group =
-  { Clic.name = "delegate" ;
+  { Cli_entries.name = "delegate" ;
     title = "Commands related to delegate operations." }
 
 let commands () =
@@ -21,14 +21,31 @@ let commands () =
       (args5 max_priority_arg endorsement_delay_arg
          Daemon.baking_switch Daemon.endorsement_switch Daemon.denunciation_switch)
       (prefixes [ "launch" ; "daemon" ]
-       @@ seq_of_param Client_keys.Public_key_hash.source_param)
-      (fun (max_priority, endorsement_delay, baking, endorsement, denunciation) delegates cctxt ->
-         let (endorsement, baking, denunciation) =
-           if (not endorsement) && (not baking) && (not denunciation)
-           then (true, true, true)
-           else (endorsement, baking, denunciation) in
-         iter_s (fun d -> Client_keys.get_key cctxt d >>|? fun _ -> ()) delegates >>=? fun () ->
-         run_daemon cctxt ?max_priority ~endorsement_delay ~endorsement ~baking ~denunciation delegates) ;
+       @@ seq_of_param Client_keys.Public_key_hash.alias_param)
+      (fun max_priority delegates cctxt ->
+         Client_daemon.Baker.run cctxt
+           ?max_priority
+           ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
+           (List.map snd delegates)
+      ) ;
+
+    command ~group ~desc: "Launch the accuser daemon"
+      no_options
+      (prefixes [ "launch" ; "accuser" ]
+       @@ stop)
+      (fun () cctxt -> Client_daemon.Accuser.run cctxt) ;
+
+    command ~group ~desc: "Launch the endorser daemon"
+      (args1 endorsement_delay_arg )
+      (prefixes [ "launch" ; "endorser" ]
+       @@ seq_of_param Client_keys.Public_key_hash.alias_param)
+      (fun endorsement_delay delegates cctxt ->
+         Client_daemon.Endorser.run cctxt
+           ~delay:endorsement_delay
+           ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
+           (List.map snd delegates)
+      ) ;
+
     command ~group ~desc: "Forge and inject an endorsement operation."
       no_options
       (prefixes [ "endorse"; "for" ]

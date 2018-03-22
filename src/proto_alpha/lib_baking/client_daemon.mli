@@ -10,11 +10,23 @@
 open Proto_alpha
 open Alpha_context
 
-val run:
-  #Proto_alpha.full ->
-  ?max_priority: int ->
-  delay: int ->
-  public_key_hash list ->
-  endorsement:bool ->
-  denunciation:bool ->
-  baking:bool -> unit tzresult Lwt.t
+module Endorser : sig
+  val run:
+    #Proto_alpha.full ->
+    delay: int ->
+    ?min_date: Time.t ->
+    public_key_hash list -> unit tzresult Lwt.t
+end
+
+module Baker : sig
+  val run:
+    #Proto_alpha.full ->
+    ?max_priority: int ->
+    ?min_date: Time.t ->
+    public_key_hash list -> unit tzresult Lwt.t
+end
+
+module Accuser : sig
+  val run:
+    #Proto_alpha.full -> unit tzresult Lwt.t
+end

@@ -11,6 +11,6 @@ let select_commands _ _ =
   return
     (List.map
        (Clic.map_command (new Proto_alpha.wrap_full))
-       (Client_baking_commands.commands ()))
+       (Delegate_commands.commands ()))
 
 let () = Client_main_run.run select_commands

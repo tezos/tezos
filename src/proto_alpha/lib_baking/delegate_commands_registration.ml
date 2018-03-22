@@ -10,4 +10,4 @@
 let () =
   Client_commands.register Proto_alpha.hash @@
   List.map (Clic.map_command (new Proto_alpha.wrap_full)) @@
-  Client_baking_commands.commands ()
+  Delegate_commands.commands ()
