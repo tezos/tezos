@@ -266,7 +266,7 @@ module Forge = struct
           (obj1
              (req "operation" @@
               describe ~title: "hex encoded operation" bytes))
-        RPC_path.(custom_root / "forge" / "operations" )
+        RPC_path.(custom_root / "operations" )
 
     let empty_proof_of_work_nonce =
       MBytes.of_string
@@ -285,7 +285,7 @@ module Forge = struct
                    Alpha_context.Constants.proof_of_work_nonce_size)
                 empty_proof_of_work_nonce))
         ~output: (obj1 (req "protocol_data" bytes))
-        RPC_path.(custom_root / "forge" / "protocol_data")
+        RPC_path.(custom_root / "protocol_data")
 
   end
 
@@ -449,7 +449,7 @@ module Parse = struct
              (req "operations" (list (dynamic_size Operation.raw_encoding)))
              (opt "check_signature" bool))
         ~output: (list (dynamic_size Operation.encoding))
-        RPC_path.(custom_root / "parse" / "operations" )
+        RPC_path.(custom_root / "operations" )
 
     let block =
       RPC_service.post_service
@@ -457,7 +457,7 @@ module Parse = struct
         ~query: RPC_query.empty
         ~input: Block_header.raw_encoding
         ~output: Block_header.protocol_data_encoding
-        RPC_path.(custom_root / "parse" / "block" )
+        RPC_path.(custom_root / "block" )
 
   end
 
