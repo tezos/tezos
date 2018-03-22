@@ -540,8 +540,13 @@ let bake (cctxt : #Proto_alpha.full) state =
         ~shell_header ~priority ?seed_nonce_hash ~src_sk
         operations
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
-      State.record_block cctxt level block_hash seed_nonce
-      |> trace_exn (Failure "Error while recording block") >>=? fun () ->
+      begin
+        if seed_nonce_hash <> None then
+          State.record_block cctxt level block_hash seed_nonce
+          |> trace_exn (Failure "Error while recording block")
+        else
+          return ()
+      end >>=? fun () ->
       Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
       cctxt#message
         "Injected block %a for %s after %a \
