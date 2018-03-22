@@ -31,7 +31,7 @@ update_compose_file() {
 
     if [ "$#" -ge 2 ] && [ "$1" = "--rpc-port" ] ; then
         export_rpc="
-      - \"$1:8732\""
+      - \"$2:8732\""
         shift 2
     fi
 
