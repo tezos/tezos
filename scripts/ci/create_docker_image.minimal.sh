@@ -55,7 +55,7 @@ COPY keys /etc/apk/keys/
 COPY leveldb-$leveldb_version-r0.apk .
 
 RUN apk --no-cache add \
-      libssl1.0 libsodium libev gmp \
+      libssl1.0 libsodium libev gmp vim \
       leveldb-1.18-r0.apk && \
     rm leveldb-$leveldb_version-r0.apk
 
@@ -68,6 +68,8 @@ RUN adduser -S tezos && \
     chown -R tezos /var/run/tezos
 
 USER tezos
+
+ENV EDITOR=/usr/bin/vi
 
 VOLUME /var/run/tezos/node
 VOLUME /var/run/tezos/client
