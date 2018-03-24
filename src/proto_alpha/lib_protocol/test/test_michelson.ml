@@ -48,7 +48,7 @@ let quote s = "\"" ^ s ^ "\""
 let parse_execute sb ?tc code_str param_str storage_str =
   let param = parse_param param_str in
   let script = parse_script code_str storage_str in
-  Script.execute_code_pred ?tc sb script param >>=?? fun (ret, st, _, tc, nonce, bgm) ->
+  Script.execute_code_pred ?tc sb script param >>=?? fun (ret, st, tc, nonce, bgm) ->
   let contracts = Contract.originated_contracts nonce in
   return (ret, st, tc, contracts, bgm)
 
@@ -85,8 +85,8 @@ let test_print ctxt fn s i =
   return ()
 
 
-let test_output ctxt ?location (file_name: string) (storage: string) (input: string) (expected_output: string) =
-  test ctxt file_name storage input >>=? fun (_storage_prim, output_prim, _tc, _contracts, _bgm) ->
+let test_output ctxt ?tc ?location (file_name: string) (storage: string) (input: string) (expected_output: string) =
+  test ?tc ctxt file_name storage input >>=? fun (_storage_prim, output_prim, _tc, _contracts, _bgm) ->
   let output = string_of_canon output_prim in
   let msg = Option.unopt ~default:"strings aren't equal" location in
   Assert.equal_string ~msg expected_output output ;
@@ -287,7 +287,7 @@ let test_example () =
   test_output ~location: __LOC__ "exec_concat" "Unit" "\"test\"" "\"test_abc\"" >>=? fun _ ->
 
   (*  Get current steps to quota *)
-  test_output ~location: __LOC__ "steps_to_quota" "Unit" "Unit" "39973" >>=? fun _ ->
+  test_output ~location: __LOC__ "steps_to_quota" "Unit" "Unit" "39968" >>=? fun _ ->
 
   let bootstrap_0 = List.nth Account.bootstrap_accounts 0 in
   get_balance_res bootstrap_0 sb >>=?? fun _balance ->
@@ -436,7 +436,7 @@ let test_example () =
   let contract = List.hd cs in
   Proto_alpha.Alpha_context.Contract.get_script tc contract >>=?? fun res ->
   let script = Option.unopt_exn (Failure "get_script") res in
-  Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun (_, ret, _, _, _, _) ->
+  Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun (_, ret, _, _, _) ->
   Assert.equal_string ~msg: __LOC__ "\"abc\"" @@ string_of_canon ret ;
 
   (* Test DEFAULT_ACCOUNT *)

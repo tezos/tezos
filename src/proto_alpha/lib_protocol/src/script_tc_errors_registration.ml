@@ -29,10 +29,12 @@ let type_map_enc =
 let ex_ty_enc =
   Data_encoding.conv
     (fun (Ex_ty ty) -> strip_locations (unparse_ty None ty))
-    (fun expr ->
-       match parse_ty (Gas.of_int 10000000000) true (root expr) with
-       | Ok ((Ex_ty ty, _), _) -> Ex_ty ty
-       | _ -> Ex_ty Unit_t (* FIXME: ? *))
+    (fun _expr ->
+       (* (* code temporarily deactivated *)
+          match parse_ty (Gas.of_int 10000000000) true (root expr) with
+          | Ok ((Ex_ty ty, _), _) -> Ex_ty ty
+          | _ -> *)
+       Ex_ty Unit_t (* FIXME: ? *))
     Script.expr_encoding
 
 (* main registration *)

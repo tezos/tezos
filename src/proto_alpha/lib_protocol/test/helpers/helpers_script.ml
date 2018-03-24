@@ -29,10 +29,11 @@ let execute_code_pred
   let hash = Operation.hash apply_op in
   let dummy_nonce = Contract.initial_origination_nonce hash in
   let amount = Tez.zero in
-  let gaz = Gas.of_int (Alpha_context.Constants.max_gas tc) in
+  let gas = Proto_alpha.Alpha_context.Constants.max_gas tc in
+  let tc = Proto_alpha.Alpha_context.Gas.set_limit tc gas in
   let return = Script_interpreter.execute
       dummy_nonce op.contract dst
-      tc script amount argument gaz in
+      tc script amount argument in
   return
 
 

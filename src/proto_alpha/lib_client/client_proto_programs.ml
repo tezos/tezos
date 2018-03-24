@@ -134,7 +134,7 @@ let typecheck_program ?gas (program : Michelson_v1_parser.parsed) block cctxt =
   Alpha_services.Helpers.typecheck_code cctxt block (program.expanded, gas)
 
 let print_typecheck_result
-    ~emacs ~show_types ~print_source_on_error ~original_gas
+    ~emacs ~show_types ~print_source_on_error
     program res (cctxt : #Client_context.printer) =
   if emacs then
     let type_map, errs, _gas = match res with
@@ -154,8 +154,7 @@ let print_typecheck_result
     match res with
     | Ok (type_map, gas) ->
         let program = Michelson_v1_printer.inject_types type_map program in
-        cctxt#message "@[<v 0>Well typed@,Gas used: %a@,Gas remaining: %a@]"
-          Gas.pp (Gas.used ~original:original_gas ~current:gas)
+        cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]"
           Gas.pp gas >>= fun () ->
         if show_types then
           cctxt#message "%a" Micheline_printer.print_expr program >>= fun () ->

@@ -42,11 +42,11 @@ let code = {|
 
 let storage = {| Pair { Elt "A" 1 ; Elt "B" 2 } Unit |}
 
-let expect_big_map tc contract print_key ?(gas=Proto_alpha.Gas.max_gas) key_type print_data data_type contents =
+let expect_big_map tc contract print_key key_type print_data data_type contents =
   let open Proto_alpha.Error_monad in
   iter_p
     (fun (n, exp) ->
-       Lwt.return @@ Proto_alpha.Script_ir_translator.hash_data gas key_type n >>=? fun (key, gas) ->
+       Lwt.return @@ Proto_alpha.Script_ir_translator.hash_data tc key_type n >>=? fun (key, _tc) ->
        Proto_alpha.Alpha_context.Contract.Big_map.get_opt tc contract key >>=? fun data ->
        match data, exp with
        | None, None ->
@@ -56,11 +56,11 @@ let expect_big_map tc contract print_key ?(gas=Proto_alpha.Gas.max_gas) key_type
            debug " - big_map[%a] is not defined (error)" print_key n ;
            Helpers_assert.fail_msg "Wrong big map contents"
        | Some data, None ->
-           Proto_alpha.Script_ir_translator.parse_data tc gas data_type (Micheline.root data) >>=? fun (data, _gas) ->
+           Proto_alpha.Script_ir_translator.parse_data tc data_type (Micheline.root data) >>=? fun (data, _tc) ->
            debug " - big_map[%a] = %a (error)" print_key n print_data data ;
            Helpers_assert.fail_msg "Wrong big map contents"
        | Some data, Some exp ->
-           Proto_alpha.Script_ir_translator.parse_data tc gas data_type (Micheline.root data) >>=? fun (data, _gas) ->
+           Proto_alpha.Script_ir_translator.parse_data tc data_type (Micheline.root data) >>=? fun (data, _tc) ->
            debug " - big_map[%a] = %a (expected %a)" print_key n print_data data print_data exp ;
            Helpers_assert.equal data exp ;
            return ())

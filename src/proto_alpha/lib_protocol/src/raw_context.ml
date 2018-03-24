@@ -19,6 +19,7 @@ type t = {
   endorsements_received: Int_set.t;
   fees: Tez_repr.t ;
   rewards: Tez_repr.t ;
+  gas: Gas_repr.t;
 }
 
 type context = t
@@ -46,6 +47,14 @@ let add_rewards ctxt rewards =
 
 let get_rewards ctxt = ctxt.rewards
 let get_fees ctxt = ctxt.fees
+
+let set_gas_limit ctxt remaining = { ctxt with gas = Limited { remaining } }
+let set_gas_unlimited ctxt = { ctxt with gas = Unaccounted }
+let consume_gas ctxt cost =
+  Gas_repr.consume ctxt.gas cost >>? fun gas ->
+  ok { ctxt with gas }
+let gas_level ctxt = ctxt.gas
+
 
 type storage_error =
   | Incompatible_protocol_version of string
@@ -263,6 +272,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
     endorsements_received = Int_set.empty ;
     fees = Tez_repr.zero ;
     rewards = Tez_repr.zero ;
+    gas = Unaccounted ;
   }
 
 let check_first_block ctxt =
@@ -307,6 +317,7 @@ let register_resolvers enc resolve =
       endorsements_received = Int_set.empty ;
       fees = Tez_repr.zero ;
       rewards = Tez_repr.zero ;
+      gas = Unaccounted ;
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve

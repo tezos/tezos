@@ -61,6 +61,13 @@ end
 
 module Voting_period = Voting_period_repr
 
+module Gas = struct
+  include Gas_repr
+  let set_limit = Raw_context.set_gas_limit
+  let set_unlimited = Raw_context.set_gas_unlimited
+  let consume = Raw_context.consume_gas
+  let level = Raw_context.gas_level
+end
 module Level = struct
   include Level_repr
   include Level_storage

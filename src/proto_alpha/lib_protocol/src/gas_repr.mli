@@ -7,12 +7,27 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_alpha
-open Alpha_context
+type t =
+  | Unaccounted
+  | Limited of { remaining : int }
 
-val init_amount : int
-val execute_code_pred :
-  ?tc:Alpha_context.t -> Helpers_block.result -> Script.t -> Script.expr ->
-  (Script.expr * Script.expr * context * Contract.origination_nonce * Script_typed_ir.ex_big_map option)
-    proto_tzresult Lwt.t
+val encoding : t Data_encoding.encoding
+val pp : Format.formatter -> t -> unit
 
+type cost
+
+val cost_encoding : cost Data_encoding.encoding
+val pp_cost : Format.formatter -> cost -> unit
+
+type error += Quota_exceeded
+
+val consume : t -> cost -> t tzresult
+
+val free : cost
+val step_cost : int -> cost
+val alloc_cost : int -> cost
+val alloc_bytes_cost : int -> cost
+val alloc_bits_cost : int -> cost
+
+val ( *@ ) : int -> cost -> cost
+val ( +@ ) : cost -> cost -> cost

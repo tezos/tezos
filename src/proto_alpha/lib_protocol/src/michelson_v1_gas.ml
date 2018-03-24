@@ -181,7 +181,6 @@ module Cost_of = struct
   (* TODO: This needs to be a function of the data being hashed *)
   let hash _data = step_cost 3
   let steps_to_quota = step_cost 1
-  let get_steps_to_quota gas = Script_int.abs (Script_int.of_int (remaining gas))
   let source = step_cost 3
   let self = step_cost 3
   let amount = step_cost 1

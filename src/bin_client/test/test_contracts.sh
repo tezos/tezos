@@ -208,7 +208,7 @@ assert_output $contract_dir/exec_concat.tz Unit '""' '"_abc"'
 assert_output $contract_dir/exec_concat.tz Unit '"test"' '"test_abc"'
 
 # Get current steps to quota
-assert_output $contract_dir/steps_to_quota.tz Unit Unit 39973
+assert_output $contract_dir/steps_to_quota.tz Unit Unit 39968
 
 # Get the current balance of the contract
 assert_output $contract_dir/balance.tz Unit Unit '"4,000,000"'

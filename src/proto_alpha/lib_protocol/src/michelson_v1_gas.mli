@@ -74,7 +74,6 @@ module Cost_of : sig
   val check_signature : Gas.cost
   val hash_key : Gas.cost
   val hash : 'a -> Gas.cost
-  val get_steps_to_quota : Gas.t -> Script_int.n Script_int.num
   val steps_to_quota : Gas.cost
   val source : Gas.cost
   val self : Gas.cost

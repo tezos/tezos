@@ -79,7 +79,7 @@ module S = struct
       ~query: RPC_query.empty
       ~input: (obj2
                  (req "program" Script.expr_encoding)
-                 (opt "gas" Gas.encoding))
+                 (opt "gas" int31))
       ~output: (obj2
                   (req "type_map" Script_tc_errors_registration.type_map_enc)
                   (req "gas" Gas.encoding))
@@ -93,7 +93,7 @@ module S = struct
       ~input: (obj3
                  (req "data" Script.expr_encoding)
                  (req "type" Script.expr_encoding)
-                 (opt "gas" Gas.encoding))
+                 (opt "gas" int31))
       ~output: (obj1 (req "gas" Gas.encoding))
       RPC_path.(custom_root / "typecheck_data")
 
@@ -105,7 +105,7 @@ module S = struct
       ~input: (obj3
                  (req "data" Script.expr_encoding)
                  (req "type" Script.expr_encoding)
-                 (opt "gas" Gas.encoding))
+                 (opt "gas" int31))
       ~output: (obj2
                   (req "hash" string)
                   (req "gas" Gas.encoding))
@@ -178,53 +178,53 @@ let () =
   register0 S.run_code begin fun ctxt () parameters ->
     let (code, storage, input, amount, contract, gas, origination_nonce) =
       I.run_parameters ctxt parameters in
+    let ctxt = if Compare.Int.(gas > 0) then Gas.set_limit ctxt gas else Gas.set_unlimited ctxt in
     Script_interpreter.execute
       origination_nonce
       contract (* transaction initiator *)
       contract (* script owner *)
-      ctxt { storage ; code } amount input
-      (Gas.of_int gas) >>=? fun (sto, ret, _gas, _ctxt, _, maybe_big_map_diff) ->
+      ctxt { storage ; code } amount input >>=? fun (sto, ret, _ctxt, _, maybe_big_map_diff) ->
     return (sto, ret,
             Option.map maybe_big_map_diff
-              ~f:Script_ir_translator.to_printable_big_map)
+              ~f:(Script_ir_translator.to_printable_big_map ctxt))
   end ;
   register0 S.trace_code begin fun ctxt () parameters ->
     let (code, storage, input, amount, contract, gas, origination_nonce) =
       I.run_parameters ctxt parameters in
+    let ctxt = if Compare.Int.(gas > 0) then Gas.set_limit ctxt gas else Gas.set_unlimited ctxt in
     Script_interpreter.trace
       origination_nonce
       contract (* transaction initiator *)
       contract (* script owner *)
       ctxt { storage ; code } amount input
-      (Gas.of_int gas) >>=? fun ((sto, ret, _gas, _ctxt, _, maybe_big_map_diff), trace) ->
+    >>=? fun ((sto, ret, _ctxt, _, maybe_big_map_diff), trace) ->
     return (sto, ret, trace,
             Option.map maybe_big_map_diff
-              ~f:Script_ir_translator.to_printable_big_map)
+              ~f:(Script_ir_translator.to_printable_big_map ctxt))
   end ;
   register0 S.typecheck_code begin fun ctxt () (expr, maybe_gas) ->
-    Script_ir_translator.typecheck_code ctxt
-      (match maybe_gas with
-       | None -> Gas.of_int (Constants.max_gas ctxt)
-       | Some gas -> gas)
-      expr
+    let ctxt = match maybe_gas with
+      | None -> Gas.set_unlimited ctxt
+      | Some gas -> Gas.set_limit ctxt gas in
+    Script_ir_translator.typecheck_code ctxt expr >>=? fun (res, ctxt) ->
+    return (res, Gas.level ctxt)
   end ;
   register0 S.typecheck_data begin fun ctxt () (data, ty, maybe_gas) ->
-    Script_ir_translator.typecheck_data ctxt
-      (match maybe_gas with
-       | None -> Gas.of_int (Constants.max_gas ctxt)
-       | Some gas -> gas)
-      (data, ty)
+    let ctxt = match maybe_gas with
+      | None -> Gas.set_unlimited ctxt
+      | Some gas -> Gas.set_limit ctxt gas in
+    Script_ir_translator.typecheck_data ctxt (data, ty) >>=? fun ctxt ->
+    return (Gas.level ctxt)
   end ;
   register0 S.hash_data begin fun ctxt () (expr, typ, maybe_gas) ->
     let open Script_ir_translator in
-    Lwt.return @@
-    parse_ty
-      (match maybe_gas with
-       | None -> Gas.of_int (Constants.max_gas ctxt)
-       | Some gas -> gas)
-      false (Micheline.root typ) >>=? fun ((Ex_ty typ, _), gas) ->
-    parse_data ctxt gas typ (Micheline.root expr) >>=? fun (data, gas) ->
-    Lwt.return @@ Script_ir_translator.hash_data gas typ data
+    let ctxt = match maybe_gas with
+      | None -> Gas.set_unlimited ctxt
+      | Some gas -> Gas.set_limit ctxt gas in
+    Lwt.return (parse_ty ctxt false (Micheline.root typ)) >>=? fun ((Ex_ty typ, _), ctxt) ->
+    parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
+    Lwt.return (Script_ir_translator.hash_data ctxt typ data) >>=? fun (hash, ctxt) ->
+    return (hash, Gas.level ctxt)
   end ;
   register1 S.level begin fun ctxt raw () offset ->
     return (Level.from_raw ctxt ?offset raw)

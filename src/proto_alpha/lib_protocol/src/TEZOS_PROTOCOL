@@ -20,6 +20,7 @@
         "Cycle_repr",
         "Level_repr",
         "Seed_repr",
+        "Gas_repr",
         "Script_int_repr",
         "Script_timestamp_repr",
         "Michelson_v1_primitives",
@@ -55,7 +56,6 @@
 
         "Script_typed_ir",
         "Fees",
-        "Gas",
         "Script_tc_errors",
         "Michelson_v1_gas",
         "Script_ir_translator",

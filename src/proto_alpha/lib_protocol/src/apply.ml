@@ -371,67 +371,67 @@ let apply_amendment_operation_content ctxt delegate = function
 let apply_manager_operation_content
     ctxt origination_nonce source = function
   | Reveal _ -> return (ctxt, origination_nonce, None)
-  | Transaction { amount ; parameters ; destination } -> begin
-      Contract.spend ctxt source amount >>=? fun ctxt ->
-      Contract.credit ctxt destination amount >>=? fun ctxt ->
-      Contract.get_script ctxt destination >>=? function
-      | None -> begin
-          match parameters with
-          | None ->
-              return (ctxt, origination_nonce, None)
-          | Some arg ->
-              match Micheline.root arg with
-              | Prim (_, D_Unit, [], _) ->
-                  return (ctxt, origination_nonce, None)
-              | _ -> fail (Bad_contract_parameter (destination, None, parameters))
-        end
-      | Some script ->
-          let gas = Gas.of_int (Constants.max_gas ctxt) in
-          let call_contract argument gas =
-            Script_interpreter.execute
-              origination_nonce
-              source destination ctxt script amount argument
-              gas
-            >>= function
-            | Ok (storage_res, _res, gas, ctxt, origination_nonce, maybe_big_map_diff) ->
-                begin match maybe_big_map_diff with
-                  | None -> return (None, gas)
-                  | Some map ->
-                      Script_ir_translator.to_serializable_big_map gas map >>=? fun (diff, gas) ->
-                      return (Some diff, gas) end >>=? fun (diff, _gas) ->
-                Contract.update_script_storage
-                  ctxt destination
-                  storage_res diff >>=? fun ctxt ->
-                Fees.update_script_storage ctxt ~source
-                  destination Script_interpreter.dummy_storage_fee >>=? fun ctxt ->
+  | Transaction { amount ; parameters ; destination } ->
+      let ctxt = Gas.set_limit ctxt (Constants.max_gas ctxt) in
+      begin
+        Contract.spend ctxt source amount >>=? fun ctxt ->
+        Contract.credit ctxt destination amount >>=? fun ctxt ->
+        Contract.get_script ctxt destination >>=? function
+        | None -> begin
+            match parameters with
+            | None ->
                 return (ctxt, origination_nonce, None)
-            | Error err ->
-                return (ctxt, origination_nonce, Some err) in
-          Lwt.return @@ Script_ir_translator.parse_toplevel gas script.code >>=? fun ((arg_type, _, _, _), gas) ->
-          let arg_type = Micheline.strip_locations arg_type in
-          match parameters, Micheline.root arg_type with
-          | None, Prim (_, T_unit, _, _) ->
-              call_contract (Micheline.strip_locations (Prim (0, Script.D_Unit, [], None))) gas
-          | Some parameters, _ -> begin
-              Script_ir_translator.typecheck_data ctxt gas (parameters, arg_type) >>= function
-              | Ok gas -> call_contract parameters gas
-              | Error errs ->
-                  let err = Bad_contract_parameter (destination, Some arg_type, Some parameters) in
-                  return (ctxt, origination_nonce, Some ((err :: errs)))
-            end
-          | None, _ -> fail (Bad_contract_parameter (destination, Some arg_type, None))
-    end
+            | Some arg ->
+                match Micheline.root arg with
+                | Prim (_, D_Unit, [], _) ->
+                    return (ctxt, origination_nonce, None)
+                | _ -> fail (Bad_contract_parameter (destination, None, parameters))
+          end
+        | Some script ->
+            let call_contract ctxt argument =
+              Script_interpreter.execute
+                origination_nonce
+                source destination ctxt script amount argument
+              >>= function
+              | Ok (storage_res, _res, ctxt, origination_nonce, maybe_big_map_diff) ->
+                  begin match maybe_big_map_diff with
+                    | None -> return (None, ctxt)
+                    | Some map ->
+                        Script_ir_translator.to_serializable_big_map ctxt map >>=? fun (diff, ctxt) ->
+                        return (Some diff, ctxt) end >>=? fun (diff, ctxt) ->
+                  Contract.update_script_storage
+                    ctxt destination
+                    storage_res diff >>=? fun ctxt ->
+                  Fees.update_script_storage ctxt ~source
+                    destination Script_interpreter.dummy_storage_fee >>=? fun ctxt ->
+                  return (ctxt, origination_nonce, None)
+              | Error err ->
+                  return (ctxt, origination_nonce, Some err) in
+            Lwt.return @@ Script_ir_translator.parse_toplevel ctxt script.code >>=? fun ((arg_type, _, _, _), ctxt) ->
+            let arg_type = Micheline.strip_locations arg_type in
+            match parameters, Micheline.root arg_type with
+            | None, Prim (_, T_unit, _, _) ->
+                call_contract ctxt (Micheline.strip_locations (Prim (0, Script.D_Unit, [], None)))
+            | Some parameters, _ -> begin
+                Script_ir_translator.typecheck_data ctxt (parameters, arg_type) >>= function
+                | Ok ctxt -> call_contract ctxt parameters
+                | Error errs ->
+                    let err = Bad_contract_parameter (destination, Some arg_type, Some parameters) in
+                    return (ctxt, origination_nonce, Some ((err :: errs)))
+              end
+            | None, _ -> fail (Bad_contract_parameter (destination, Some arg_type, None))
+      end
   | Origination { manager ; delegate ; script ;
                   spendable ; delegatable ; credit } ->
-      let gas = Gas.of_int (Constants.max_gas ctxt) in
+      let ctxt = Gas.set_limit ctxt (Constants.max_gas ctxt) in
       begin match script with
-        | None -> return (None, None, gas)
+        | None -> return (None, None, ctxt)
         | Some script ->
-            Script_ir_translator.parse_script ctxt gas script >>=? fun (_, gas) ->
-            Script_ir_translator.erase_big_map_initialization ctxt gas script >>=? fun (script, big_map_diff, gas) ->
+            Script_ir_translator.parse_script ctxt script >>=? fun (_, ctxt) ->
+            Script_ir_translator.erase_big_map_initialization ctxt script >>=? fun (script, big_map_diff, ctxt) ->
             return (Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)),
-                    big_map_diff, gas)
-      end >>=? fun (script, big_map, _gas) ->
+                    big_map_diff, ctxt)
+      end >>=? fun (script, big_map, ctxt) ->
       Contract.spend ctxt source credit >>=? fun ctxt ->
       Contract.originate ctxt
         origination_nonce
@@ -488,6 +488,7 @@ let apply_sourced_operation
                 ctxt origination_nonce source content)
         (ctxt, origination_nonce, None) contents
       >>=? fun (ctxt, origination_nonce, err) ->
+      let ctxt = Gas.set_unlimited ctxt in
       return (ctxt, origination_nonce, err)
   | Consensus_operation content ->
       apply_consensus_operation_content ctxt
@@ -615,6 +616,7 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
 
 let apply_operation
     ctxt delegate pred_block block_prio hash operation =
+  let ctxt = Gas.set_unlimited ctxt in
   match operation.contents with
   | Anonymous_operations ops ->
       let origination_nonce = Contract.initial_origination_nonce hash in

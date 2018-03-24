@@ -50,12 +50,12 @@ let commands () =
       (parameter
          (fun _ctx str ->
             try
-              return @@ Proto_alpha.Gas.of_int @@ int_of_string str
+              return (int_of_string str)
             with _ ->
               failwith "Invalid gas literal: '%s'" str)) in
   let resolve_max_gas ctxt block = function
     | None -> Alpha_services.Constants.max_gas ctxt block >>=? fun gas ->
-        return @@ Proto_alpha.Gas.of_int gas
+        return gas
     | Some gas -> return gas in
   let data_parameter =
     Clic.parameter (fun _ data ->
@@ -129,7 +129,6 @@ let commands () =
              resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
              typecheck_program ~gas:original_gas program cctxt#block cctxt >>= fun res ->
              print_typecheck_result
-               ~original_gas
                ~emacs:emacs_mode
                ~show_types
                ~print_source_on_error:(not no_print_source)
@@ -164,9 +163,8 @@ let commands () =
          resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
          Client_proto_programs.typecheck_data ~gas:original_gas ~data ~ty cctxt#block cctxt >>= function
          | Ok gas ->
-             cctxt#message "@[<v 0>Well typed@,Gas used: %a@,Gas remaining: %a@]"
-               Proto_alpha.Gas.pp (Proto_alpha.Gas.used ~original:original_gas ~current:gas)
-               Proto_alpha.Gas.pp gas >>= fun () ->
+             cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]"
+               Proto_alpha.Alpha_context.Gas.pp gas >>= fun () ->
              return ()
          | Error errs ->
              cctxt#warning "%a"
@@ -193,8 +191,8 @@ let commands () =
          Alpha_services.Helpers.hash_data cctxt
            cctxt#block (data.expanded, typ.expanded, Some original_gas) >>= function
          | Ok (hash, remaining_gas) ->
-             cctxt#message "%S@,Gas used: %a" hash
-               Proto_alpha.Gas.pp (Proto_alpha.Gas.used ~original:original_gas ~current:remaining_gas) >>= fun () ->
+             cctxt#message "%S@,Gas remaining: %a" hash
+               Proto_alpha.Alpha_context.Gas.pp remaining_gas >>= fun () ->
              return ()
          | Error errs ->
              cctxt#warning "%a"
@@ -225,10 +223,9 @@ let commands () =
          resolve_max_gas cctxt cctxt#block gas >>=? fun gas ->
          Client_proto_programs.hash_and_sign ~gas data typ sk cctxt#block cctxt >>= begin function
            | Ok (hash, signature, current_gas) ->
-               cctxt#message "@[<v 0>Hash: %S@,Signature: %S@,Gas used: %a@,Remaining gas: %a@]"
+               cctxt#message "@[<v 0>Hash: %S@,Signature: %S@,Remaining gas: %a@]"
                  hash signature
-                 Proto_alpha.Gas.pp (Proto_alpha.Gas.used ~original:gas ~current:current_gas)
-                 Proto_alpha.Gas.pp current_gas
+                 Proto_alpha.Alpha_context.Gas.pp current_gas
            | Error errs ->
                cctxt#warning "%a"
                  (Michelson_v1_error_reporter.report_errors
