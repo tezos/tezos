@@ -191,7 +191,7 @@ let signed_range_to_size min max : [> signed_integer ] =
   then `Int8
   else if min >= ~-32_768 && max <= 32_767
   then `Int16
-  else if min >= ~-2_147_483_648 && max <= 2_147_483_647
+  else if min >= ~-1_073_741_824 && max <= 1_073_741_823
   then `Int32
   else `Int64
 
@@ -201,7 +201,7 @@ let unsigned_range_to_size max : [> unsigned_integer ] =
   then `Uint8
   else if max <= 65535
   then `Uint16
-  else if max <= 2_147_483_647 (* Unsigned int32 and int64 are not supported *)
+  else if max <= 1_073_741_823 (* Unsigned int32 and int64 are not supported *)
   then `Int32
   else `Int64
 
