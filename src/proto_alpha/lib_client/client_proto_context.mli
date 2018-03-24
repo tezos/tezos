@@ -91,6 +91,7 @@ val operation_submitted_message :
 
 val originate_contract:
   fee:Tez.t ->
+  ?gas_limit:Z.t ->
   delegate:public_key_hash option ->
   ?delegatable:bool ->
   ?spendable:bool ->
@@ -115,6 +116,7 @@ val transfer :
   ?arg:string ->
   amount:Tez.t ->
   fee:Tez.t ->
+  ?gas_limit:Z.t ->
   unit ->
   (Operation_hash.t * Contract.t list) tzresult Lwt.t
 

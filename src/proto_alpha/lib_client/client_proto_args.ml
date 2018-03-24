@@ -149,6 +149,20 @@ let fee_arg =
     ~parameter:"fee"
     ~doc:"fee in \xEA\x9C\xA9 to pay to the baker"
 
+let gas_limit_arg =
+  arg
+    ~long:"gas-limit"
+    ~short:'G'
+    ~placeholder:"amount"
+    ~doc:"Set the gas limit of the transaction instead \
+          of letting the client decide based on a simulation"
+    (parameter (fun _ s ->
+         try
+           let v = Z.of_string s in
+           assert Compare.Z.(v >= Z.zero) ;
+           return v
+         with _ -> failwith "invalid gas limit (must be a positive number)"))
+
 let max_priority_arg =
   arg
     ~long:"max-priority"

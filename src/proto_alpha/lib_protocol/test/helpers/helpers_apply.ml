@@ -20,7 +20,7 @@ let operation
     pred_block_hash
     0
     hash
-    operation >>=? fun (tc, contracts, err) ->
+    operation >>=? fun (tc, _, contracts, err) ->
   return ((contracts, err), tc)
 
 
@@ -31,6 +31,7 @@ let transaction ~tc ?(fee = 0) ?baker
     src dst.contract
     (Helpers_cast.cents_of_int amount)
     ~fee: (Helpers_cast.cents_of_int fee)
+    (Proto_alpha.Alpha_context.Constants.hard_gas_limit_per_operation tc)
   @@ Helpers_cast.ctxt_of_tc tc
   >>=? fun protop ->
   operation ~tc ?baker ~src pbh opsh protop
@@ -45,7 +46,9 @@ let transaction_pred ?tc ~(pred: Helpers_block.result) ?baker (src, dst, amount,
 let script_origination
     ~tc pbh opsh script src amount =
   Helpers_operation.script_origination_full
-    script src (Helpers_cast.cents_of_int amount) @@ Helpers_cast.ctxt_of_tc tc
+    script src (Helpers_cast.cents_of_int amount)
+    (Proto_alpha.Alpha_context.Constants.hard_gas_limit_per_operation tc)
+  @@ Helpers_cast.ctxt_of_tc tc
   >>=? fun protop -> operation ~tc ?baker: None ~src pbh opsh protop
 
 
@@ -55,6 +58,7 @@ let origination
   Helpers_operation.origination_full
     src ~spendable ~delegatable
     (Helpers_cast.cents_of_int amount) ~fee:(Helpers_cast.tez_of_int fee)
+    (Proto_alpha.Alpha_context.Constants.hard_gas_limit_per_operation tc)
   @@ Helpers_cast.ctxt_of_tc tc
   >>=? fun protop ->
   operation ~tc ?baker ~src pbh opsh protop

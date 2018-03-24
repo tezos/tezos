@@ -9,7 +9,7 @@
 
 type t =
   | Unaccounted
-  | Limited of { remaining : int }
+  | Limited of { remaining : Z.t }
 
 val encoding : t Data_encoding.encoding
 val pp : Format.formatter -> t -> unit
@@ -19,9 +19,10 @@ type cost
 val cost_encoding : cost Data_encoding.encoding
 val pp_cost : Format.formatter -> cost -> unit
 
-type error += Quota_exceeded
+type error += Block_quota_exceeded (* `Temporary *)
+type error += Operation_quota_exceeded (* `Temporary *)
 
-val consume : t -> cost -> t tzresult
+val consume : Z.t -> t -> cost -> (Z.t * t) tzresult
 
 val free : cost
 val step_cost : int -> cost

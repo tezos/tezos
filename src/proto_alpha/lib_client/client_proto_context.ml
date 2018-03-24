@@ -36,9 +36,9 @@ let parse_expression arg =
     (Micheline_parser.no_parsing_error
        (Michelson_v1_parser.parse_expression arg))
 
-let transfer cctxt
+let transfer (cctxt : #Proto_alpha.full)
     block ?branch
-    ~source ~src_pk ~src_sk ~destination ?arg ~amount ~fee () =
+    ~source ~src_pk ~src_sk ~destination ?arg ~amount ~fee ?gas_limit () =
   get_branch cctxt block branch >>=? fun (chain_id, branch) ->
   begin match arg with
     | Some arg ->
@@ -49,17 +49,43 @@ let transfer cctxt
   Alpha_services.Contract.counter
     cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
+  Block_services.predecessor cctxt block >>=? fun predecessor ->
+  begin match gas_limit with
+    | Some gas_limit -> return gas_limit
+    | None ->
+        Alpha_services.Constants.hard_gas_limits cctxt block >>=? fun (_, max_gas) ->
+        Alpha_services.Forge.Manager.transaction
+          cctxt block
+          ~branch ~source ~sourcePubKey:src_pk ~counter ~amount
+          ~destination ?parameters ~fee ~gas_limit:max_gas () >>=? fun bytes ->
+        Client_keys.sign
+          src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
+        let signed_bytes = Signature.concat bytes signature in
+        let oph = Operation_hash.hash_bytes [ signed_bytes ] in
+        Alpha_services.Helpers.apply_operation cctxt block
+          predecessor oph bytes (Some signature) >>=? fun (_, gas) ->
+        match gas with
+        | Limited { remaining } ->
+            let gas = Z.sub max_gas remaining in
+            if Z.equal gas Z.zero then
+              cctxt#message "Estimated gas: none" >>= fun () ->
+              return Z.zero
+            else
+              let gas = Z.sub max_gas remaining in
+              cctxt#message "Estimated gas: %s units (will add 100 for safety)" (Z.to_string gas) >>= fun () ->
+              return (Z.add gas (Z.of_int 100))
+        | Unaccounted -> assert false
+  end >>=? fun gas_limit ->
   Alpha_services.Forge.Manager.transaction
     cctxt block
     ~branch ~source ~sourcePubKey:src_pk ~counter ~amount
-    ~destination ?parameters ~fee () >>=? fun bytes ->
-  Block_services.predecessor cctxt block >>=? fun predecessor ->
+    ~destination ?parameters ~fee ~gas_limit () >>=? fun bytes ->
   Client_keys.sign
     src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   let signed_bytes = Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Alpha_services.Helpers.apply_operation cctxt block
-    predecessor oph bytes (Some signature) >>=? fun contracts ->
+    predecessor oph bytes (Some signature) >>=? fun (contracts, _gas) ->
   Shell_services.inject_operation
     cctxt ~chain_id signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
@@ -91,12 +117,12 @@ let originate rpc_config ?chain_id ~block ?signature bytes =
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Alpha_services.Helpers.apply_operation rpc_config block
     predecessor oph bytes signature >>=? function
-  | [ contract ] ->
+  | [ contract ], _ ->
       Shell_services.inject_operation
         rpc_config ?chain_id signed_bytes >>=? fun injected_oph ->
       assert (Operation_hash.equal oph injected_oph) ;
       return (oph, contract)
-  | contracts ->
+  | contracts, _ ->
       failwith
         "The origination introduced %d contracts instead of one."
         (List.length contracts)
@@ -121,7 +147,7 @@ let originate_account ?branch
   Alpha_services.Forge.Manager.origination cctxt block
     ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ~spendable:true
-    ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
+    ?delegatable ?delegatePubKey:delegate ~fee ~gas_limit:Z.zero () >>=? fun bytes ->
   Client_keys.sign
     src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   originate cctxt ~block ~chain_id ~signature bytes
@@ -216,6 +242,7 @@ let save_contract ~force cctxt alias_name contract =
 
 let originate_contract
     ~fee
+    ?gas_limit
     ~delegate
     ?(delegatable=true)
     ?(spendable=false)
@@ -235,11 +262,38 @@ let originate_contract
     cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   get_branch cctxt block None >>=? fun (_chain_id, branch) ->
+  begin match gas_limit with
+    | Some gas_limit -> return gas_limit
+    | None ->
+        Alpha_services.Constants.hard_gas_limits cctxt block >>=? fun (_, max_gas) ->
+        Alpha_services.Forge.Manager.origination cctxt block
+          ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager
+          ~counter ~balance ~spendable:spendable
+          ~delegatable ?delegatePubKey:delegate
+          ~script:{ code ; storage } ~fee  ~gas_limit:max_gas () >>=? fun bytes ->
+        Client_keys.sign
+          ~watermark:Generic_operation src_sk bytes >>=? fun signature ->
+        let signed_bytes = Signature.concat bytes signature in
+        let oph = Operation_hash.hash_bytes [ signed_bytes ] in
+        Block_services.predecessor cctxt block >>=? fun predecessor ->
+        Alpha_services.Helpers.apply_operation cctxt block
+          predecessor oph bytes (Some signature) >>=? fun (_, gas) ->
+        match gas with
+        | Limited { remaining } ->
+            let gas = Z.sub max_gas remaining in
+            if Z.equal gas Z.zero then
+              cctxt#message "Estimated gas: none" >>= fun () ->
+              return Z.zero
+            else
+              cctxt#message "Estimated gas: %s units (will add 100 for safety)" (Z.to_string gas) >>= fun () ->
+              return (Z.add gas (Z.of_int 100))
+        | Unaccounted -> assert false
+  end >>=? fun gas_limit ->
   Alpha_services.Forge.Manager.origination cctxt block
     ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager
     ~counter ~balance ~spendable:spendable
     ~delegatable ?delegatePubKey:delegate
-    ~script:{ code ; storage } ~fee () >>=? fun bytes ->
+    ~script:{ code ; storage } ~fee ~gas_limit () >>=? fun bytes ->
   Client_keys.sign
     src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   originate cctxt ~block ~signature bytes

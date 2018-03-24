@@ -47,14 +47,15 @@ let commands () =
       ~short:'G'
       ~doc:"Initial quantity of gas for typechecking and execution"
       ~placeholder:"gas"
-      (parameter
-         (fun _ctx str ->
-            try
-              return (int_of_string str)
-            with _ ->
-              failwith "Invalid gas literal: '%s'" str)) in
-  let resolve_max_gas ctxt block = function
-    | None -> Alpha_services.Constants.max_gas ctxt block >>=? fun gas ->
+      (parameter (fun _ctx str ->
+           try
+             let v = Z.of_string str in
+             assert Compare.Z.(v >= Z.zero) ;
+             return v
+           with _ -> failwith "invalid gas limit (must be a positive number)")) in
+  let resolve_max_gas cctxt block = function
+    | None ->
+        Alpha_services.Constants.hard_gas_limits cctxt block >>=? fun (_, gas) ->
         return gas
     | Some gas -> return gas in
   let data_parameter =

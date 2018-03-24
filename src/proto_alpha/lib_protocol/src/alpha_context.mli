@@ -109,7 +109,7 @@ end
 module Gas : sig
   type t = private
     | Unaccounted
-    | Limited of { remaining : int }
+    | Limited of { remaining : Z.t }
 
   val encoding : t Data_encoding.encoding
   val pp : Format.formatter -> t -> unit
@@ -119,7 +119,8 @@ module Gas : sig
   val cost_encoding : cost Data_encoding.encoding
   val pp_cost : Format.formatter -> cost -> unit
 
-  type error += Quota_exceeded
+  type error += Block_quota_exceeded (* `Temporary *)
+  type error += Operation_quota_exceeded (* `Temporary *)
 
   val free : cost
   val step_cost : int -> cost
@@ -130,10 +131,11 @@ module Gas : sig
   val ( *@ ) : int -> cost -> cost
   val ( +@ ) : cost -> cost -> cost
 
-  val set_limit: context -> int -> context
+  val set_limit: context -> Z.t -> context tzresult
   val set_unlimited: context -> context
   val consume: context -> cost -> context tzresult
   val level: context -> t
+  val block_level: context -> Z.t
 end
 
 module Script_int : module type of Script_int_repr
@@ -299,7 +301,8 @@ module Constants : sig
     time_between_blocks: Period.t list ;
     first_free_baking_slot: int ;
     endorsers_per_block: int ;
-    max_gas: int ;
+    hard_gas_limit_per_operation: Z.t ;
+    hard_gas_limit_per_block: Z.t ;
     proof_of_work_threshold: int64 ;
     dictator_pubkey: Signature.Public_key.t ;
     max_operation_data_length: int ;
@@ -323,7 +326,8 @@ module Constants : sig
   val time_between_blocks: context -> Period.t list
   val first_free_baking_slot: context -> int
   val endorsers_per_block: context -> int
-  val max_gas: context -> int
+  val hard_gas_limit_per_operation: context -> Z.t
+  val hard_gas_limit_per_block: context -> Z.t
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Signature.Public_key.t
   val max_operation_data_length: context -> int
@@ -764,6 +768,7 @@ and manager_operation =
       amount: Tez.t ;
       parameters: Script.expr option ;
       destination: Contract.contract ;
+      gas_limit: Z.t;
     }
   | Origination of {
       manager: public_key_hash ;
@@ -772,6 +777,7 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez.t ;
+      gas_limit: Z.t;
     }
   | Delegation of public_key_hash option
 

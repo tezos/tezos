@@ -94,9 +94,10 @@ let main () =
   debug "initial big map is ok" ;
   let call tc input result =
     Lwt.return (parse_expr input) >>=? fun parameters ->
+    let gas = Proto_alpha.Alpha_context.Constants.hard_gas_limit_per_operation tc in
     Helpers.Operation.transaction_full
       src contract (Helpers_cast.cents_of_int 100_00)
-      (Helpers_cast.ctxt_of_tc tc)
+      gas (Helpers_cast.ctxt_of_tc tc)
       ~parameters >>=?? fun op ->
     Helpers.Apply.operation ~tc
       ~src pred.Helpers_block.hash

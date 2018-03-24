@@ -82,6 +82,7 @@ and manager_operation =
       amount: Tez_repr.tez ;
       parameters: Script_repr.expr option ;
       destination: Contract_repr.contract ;
+      gas_limit: Z.t ;
     }
   | Origination of {
       manager: Signature.Public_key_hash.t ;
@@ -90,6 +91,7 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
+      gas_limit: Z.t ;
     }
   | Delegation of Signature.Public_key_hash.t option
 

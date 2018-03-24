@@ -21,7 +21,8 @@ let execute_code_pred
   >>=? fun ((dst, _), tc) ->
   let dst = List.hd dst in
   let ctxt = Helpers_cast.ctxt_of_tc tc in
-  Helpers_operation.transaction_full op dst Tez.zero ctxt
+  let gas = Proto_alpha.Alpha_context.Constants.hard_gas_limit_per_operation tc in
+  Helpers_operation.transaction_full op dst Tez.zero gas ctxt
   >>=? fun dummy_protop ->
   let op_header = Helpers_block.get_op_header_res pred in
   let apply_op = Helpers_operation.apply_of_proto
@@ -29,8 +30,7 @@ let execute_code_pred
   let hash = Operation.hash apply_op in
   let dummy_nonce = Contract.initial_origination_nonce hash in
   let amount = Tez.zero in
-  let gas = Proto_alpha.Alpha_context.Constants.max_gas tc in
-  let tc = Proto_alpha.Alpha_context.Gas.set_limit tc gas in
+  Lwt.return (Proto_alpha.Alpha_context.Gas.set_limit tc gas) >>=? fun tc ->
   let return = Script_interpreter.execute
       dummy_nonce op.contract dst
       tc script amount argument in

@@ -73,10 +73,13 @@ val add_rewards: context -> Tez_repr.t -> context tzresult Lwt.t
 val get_fees: context -> Tez_repr.t
 val get_rewards: context -> Tez_repr.t
 
-val set_gas_limit: t -> int -> t
+type error += Gas_limit_too_high (* `Permanent *)
+
+val set_gas_limit: t -> Z.t -> t tzresult
 val set_gas_unlimited: t -> t
 val consume_gas: t -> Gas_repr.cost -> t tzresult
 val gas_level: t -> Gas_repr.t
+val block_gas_level: t -> Z.t
 
 (** {1 Generic accessors} *************************************************)
 

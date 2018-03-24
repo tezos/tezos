@@ -287,7 +287,7 @@ let test_example () =
   test_output ~location: __LOC__ "exec_concat" "Unit" "\"test\"" "\"test_abc\"" >>=? fun _ ->
 
   (*  Get current steps to quota *)
-  test_output ~location: __LOC__ "steps_to_quota" "Unit" "Unit" "39968" >>=? fun _ ->
+  test_output ~location: __LOC__ "steps_to_quota" "Unit" "Unit" "39989" >>=? fun _ ->
 
   let bootstrap_0 = List.nth Account.bootstrap_accounts 0 in
   get_balance_res bootstrap_0 sb >>=?? fun _balance ->

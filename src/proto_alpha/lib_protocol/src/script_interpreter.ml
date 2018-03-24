@@ -791,8 +791,8 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.steps_to_quota) >>=? fun ctxt ->
             let steps = match Gas.level ctxt with
               | Limited { remaining } -> remaining
-              | Unaccounted -> max_int in
-            logged_return (Item (Script_int.(abs (of_int steps)), rest), ctxt)
+              | Unaccounted -> Z.of_string "99999999" in
+            logged_return (Item (Script_int.(abs (of_zint steps)), rest), ctxt)
         | Source (ta, tb), rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.source) >>=? fun ctxt ->
             logged_return (Item ((ta, tb, orig), rest), ctxt)

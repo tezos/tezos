@@ -27,6 +27,7 @@ let bootstrap_account_encoding =
     (fun (public_key, amount) -> { public_key ; amount })
     (tup2 Signature.Public_key.encoding Tez_repr.encoding)
 
+
 (* This encoding is used to read configuration files (e.g. sandbox.json)
    where some fields can be missing, in that case they are replaced by
    the default. *)
@@ -62,9 +63,12 @@ let constants_encoding =
        and endorsers_per_block =
          opt Compare.Int.(=)
            default.endorsers_per_block c.endorsers_per_block
-       and max_gas =
-         opt Compare.Int.(=)
-           default.max_gas c.max_gas
+       and hard_gas_limit_per_operation =
+         opt Compare.Z.(=)
+           default.hard_gas_limit_per_operation c.hard_gas_limit_per_operation
+       and hard_gas_limit_per_block =
+         opt Compare.Z.(=)
+           default.hard_gas_limit_per_block c.hard_gas_limit_per_block
        and proof_of_work_threshold =
          opt Compare.Int64.(=)
            default.proof_of_work_threshold c.proof_of_work_threshold
@@ -107,9 +111,10 @@ let constants_encoding =
           time_between_blocks,
           first_free_baking_slot,
           endorsers_per_block,
-          max_gas,
-          proof_of_work_threshold),
-        ( dictator_pubkey,
+          hard_gas_limit_per_operation,
+          hard_gas_limit_per_block),
+        ((proof_of_work_threshold,
+          dictator_pubkey,
           max_operation_data_length,
           tokens_per_roll,
           michelson_maximum_type_size,
@@ -117,8 +122,8 @@ let constants_encoding =
           origination_burn,
           block_security_deposit,
           endorsement_security_deposit,
-          block_reward,
-          endorsement_reward)))
+          block_reward),
+         (endorsement_reward))))
     (fun (( preserved_cycles,
             blocks_per_cycle,
             blocks_per_commitment,
@@ -127,9 +132,10 @@ let constants_encoding =
             time_between_blocks,
             first_free_baking_slot,
             endorsers_per_block,
-            max_gas,
-            proof_of_work_threshold),
-          ( dictator_pubkey,
+            hard_gas_limit_per_operation,
+            hard_gas_limit_per_block),
+          ((proof_of_work_threshold,
+            dictator_pubkey,
             max_operation_data_length,
             tokens_per_roll,
             michelson_maximum_type_size,
@@ -137,8 +143,8 @@ let constants_encoding =
             origination_burn,
             block_security_deposit,
             endorsement_security_deposit,
-            block_reward,
-            endorsement_reward)) ->
+            block_reward),
+           (endorsement_reward))) ->
       let unopt def = function None -> def | Some v -> v in
       let default = Constants_repr.default in
       { Constants_repr.preserved_cycles =
@@ -158,8 +164,10 @@ let constants_encoding =
           unopt default.first_free_baking_slot first_free_baking_slot ;
         endorsers_per_block =
           unopt default.endorsers_per_block endorsers_per_block ;
-        max_gas =
-          unopt default.max_gas max_gas ;
+        hard_gas_limit_per_operation =
+          unopt default.hard_gas_limit_per_operation hard_gas_limit_per_operation ;
+        hard_gas_limit_per_block =
+          unopt default.hard_gas_limit_per_block hard_gas_limit_per_block ;
         proof_of_work_threshold =
           unopt default.proof_of_work_threshold proof_of_work_threshold ;
         dictator_pubkey =
@@ -193,19 +201,22 @@ let constants_encoding =
           (opt "time_between_blocks" (list Period_repr.encoding))
           (opt "first_free_baking_slot" uint16)
           (opt "endorsers_per_block" uint16)
-          (opt "instructions_per_transaction" int31)
-          (opt "proof_of_work_threshold" int64))
-       (obj10
-          (opt "dictator_pubkey" Signature.Public_key.encoding)
-          (opt "max_operation_data_length" int31)
-          (opt "tokens_per_roll" Tez_repr.encoding)
-          (opt "michelson_maximum_type_size" uint16)
-          (opt "seed_nonce_revelation_tip" Tez_repr.encoding)
-          (opt "origination_burn" Tez_repr.encoding)
-          (opt "block_security_deposit" Tez_repr.encoding)
-          (opt "endorsement_security_deposit" Tez_repr.encoding)
-          (opt "block_reward" Tez_repr.encoding)
-          (opt "endorsement_reward" Tez_repr.encoding)))
+          (opt "hard_gas_limit_per_operation" z)
+          (opt "hard_gas_limit_per_block" z))
+       (merge_objs
+          (obj10
+             (opt "proof_of_work_threshold" int64)
+             (opt "dictator_pubkey" Signature.Public_key.encoding)
+             (opt "max_operation_data_length" int31)
+             (opt "tokens_per_roll" Tez_repr.encoding)
+             (opt "michelson_maximum_type_size" uint16)
+             (opt "seed_nonce_revelation_tip" Tez_repr.encoding)
+             (opt "origination_burn" Tez_repr.encoding)
+             (opt "block_security_deposit" Tez_repr.encoding)
+             (opt "endorsement_security_deposit" Tez_repr.encoding)
+             (opt "block_reward" Tez_repr.encoding))
+          (obj1
+             (opt "endorsement_reward" Tez_repr.encoding))))
 
 let encoding =
   let open Data_encoding in

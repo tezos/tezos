@@ -23,12 +23,12 @@ val manager_full :
   Alpha_environment.Context.t -> proto_operation proto_tzresult Lwt.t
 
 val transaction :
-  ?parameters:Script.expr -> Tez.t -> Contract.contract ->
+  ?parameters:Script.expr -> Tez.t -> Contract.contract -> Z.t ->
   manager_operation
 
 val origination :
   ?delegatable:bool -> ?script:Script.t option -> ?spendable:bool ->
-  ?delegate:public_key_hash option -> Helpers_account.t -> Tez.t -> manager_operation
+  ?delegate:public_key_hash option -> Helpers_account.t -> Tez.t -> Z.t -> manager_operation
 
 val delegation : public_key_hash -> manager_operation
 
@@ -37,16 +37,16 @@ val delegation_full :
   proto_operation proto_tzresult Lwt.t
 
 val script_origination_full :
-  Script.t option -> Helpers_account.t -> Tez.t -> Alpha_environment.Context.t ->
+  Script.t option -> Helpers_account.t -> Tez.t -> Z.t -> Alpha_environment.Context.t ->
   proto_operation proto_tzresult  Lwt.t
 
 val origination_full :
   ?spendable:bool -> ?delegatable:bool -> ?fee:Tez.tez ->
-  Helpers_account.t -> Tez.t -> Alpha_environment.Context.t ->
+  Helpers_account.t -> Tez.t -> Z.t -> Alpha_environment.Context.t ->
   proto_operation proto_tzresult Lwt.t
 
 val transaction_full :
-  ?fee:Tez.tez -> ?parameters:Proto_alpha.Alpha_context.Script.expr -> Helpers_account.t -> Contract.contract -> Tez.t ->
+  ?fee:Tez.tez -> ?parameters:Proto_alpha.Alpha_context.Script.expr -> Helpers_account.t -> Contract.contract -> Tez.t -> Z.t ->
   Alpha_environment.Context.t -> proto_operation proto_tzresult Lwt.t
 
 val amendment_operation :

@@ -31,9 +31,12 @@ let first_free_baking_slot c =
 let endorsers_per_block c =
   let constants = Raw_context.constants c in
   constants.endorsers_per_block
-let max_gas c =
+let hard_gas_limit_per_operation c =
   let constants = Raw_context.constants c in
-  constants.max_gas
+  constants.hard_gas_limit_per_operation
+let hard_gas_limit_per_block c =
+  let constants = Raw_context.constants c in
+  constants.hard_gas_limit_per_block
 let proof_of_work_threshold c =
   let constants = Raw_context.constants c in
   constants.proof_of_work_threshold

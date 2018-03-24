@@ -19,7 +19,8 @@ type t = {
   endorsements_received: Int_set.t;
   fees: Tez_repr.t ;
   rewards: Tez_repr.t ;
-  gas: Gas_repr.t;
+  block_gas: Z.t ;
+  operation_gas: Gas_repr.t ;
 }
 
 type context = t
@@ -48,12 +49,32 @@ let add_rewards ctxt rewards =
 let get_rewards ctxt = ctxt.rewards
 let get_fees ctxt = ctxt.fees
 
-let set_gas_limit ctxt remaining = { ctxt with gas = Limited { remaining } }
-let set_gas_unlimited ctxt = { ctxt with gas = Unaccounted }
+type error += Gas_limit_too_high (* `Permanent *)
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"gas_limit_too_high"
+    ~title: "Gas limit higher than the hard limit"
+    ~description:
+      "A transaction tried to exceed the hard limit on gas"
+    empty
+    (function Gas_limit_too_high -> Some () | _ -> None)
+    (fun () -> Gas_limit_too_high)
+
+let set_gas_limit ctxt remaining =
+  if Compare.Z.(remaining > ctxt.constants.hard_gas_limit_per_operation) then
+    error Gas_limit_too_high
+  else
+    ok { ctxt with operation_gas = Limited { remaining } }
+let set_gas_unlimited ctxt =
+  { ctxt with operation_gas = Unaccounted }
 let consume_gas ctxt cost =
-  Gas_repr.consume ctxt.gas cost >>? fun gas ->
-  ok { ctxt with gas }
-let gas_level ctxt = ctxt.gas
+  Gas_repr.consume ctxt.block_gas ctxt.operation_gas cost >>? fun (block_gas, operation_gas) ->
+  ok { ctxt with block_gas ; operation_gas }
+let gas_level ctxt = ctxt.operation_gas
+let block_gas_level ctxt = ctxt.block_gas
 
 
 type storage_error =
@@ -272,7 +293,8 @@ let prepare ~level ~timestamp ~fitness ctxt =
     endorsements_received = Int_set.empty ;
     fees = Tez_repr.zero ;
     rewards = Tez_repr.zero ;
-    gas = Unaccounted ;
+    operation_gas = Unaccounted ;
+    block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
   }
 
 let check_first_block ctxt =
@@ -317,7 +339,8 @@ let register_resolvers enc resolve =
       endorsements_received = Int_set.empty ;
       fees = Tez_repr.zero ;
       rewards = Tez_repr.zero ;
-      gas = Unaccounted ;
+      block_gas = Constants_repr.default.hard_gas_limit_per_block ;
+      operation_gas = Unaccounted ;
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve

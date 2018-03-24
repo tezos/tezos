@@ -52,9 +52,10 @@ module S = struct
                  (req "operation_hash" Operation_hash.encoding)
                  (req "forged_operation" bytes)
                  (opt "signature" Signature.encoding))
-      ~output: (obj1 (req "contracts" (list Contract.encoding)))
+      ~output: (obj2
+                  (req "contracts" (list Contract.encoding))
+                  (req "remaining_gas" Gas.encoding))
       RPC_path.(custom_root / "apply_operation")
-
 
   let trace_code =
     RPC_service.post_service
@@ -79,7 +80,7 @@ module S = struct
       ~query: RPC_query.empty
       ~input: (obj2
                  (req "program" Script.expr_encoding)
-                 (opt "gas" int31))
+                 (opt "gas" z))
       ~output: (obj2
                   (req "type_map" Script_tc_errors_registration.type_map_enc)
                   (req "gas" Gas.encoding))
@@ -93,7 +94,7 @@ module S = struct
       ~input: (obj3
                  (req "data" Script.expr_encoding)
                  (req "type" Script.expr_encoding)
-                 (opt "gas" int31))
+                 (opt "gas" z))
       ~output: (obj1 (req "gas" Gas.encoding))
       RPC_path.(custom_root / "typecheck_data")
 
@@ -105,7 +106,7 @@ module S = struct
       ~input: (obj3
                  (req "data" Script.expr_encoding)
                  (req "type" Script.expr_encoding)
-                 (opt "gas" int31))
+                 (opt "gas" z))
       ~output: (obj2
                   (req "hash" string)
                   (req "gas" Gas.encoding))
@@ -150,13 +151,13 @@ module I = struct
         Apply.apply_operation
           ctxt (Some baker_pkh) pred_block block_prio hash operation
         >>=? function
-        | (_ctxt, _, Some script_err) -> Lwt.return (Error script_err)
-        | (_ctxt, contracts, None) -> Lwt.return (Ok contracts)
+        | (_ctxt, _, _, Some script_err) -> Lwt.return (Error script_err)
+        | (_ctxt, gas, contracts, None) -> Lwt.return (Ok (contracts, gas))
 
 
   let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =
     let max_gas =
-      Constants.max_gas ctxt in
+      Constants.hard_gas_limit_per_operation ctxt in
     let origination_nonce =
       match origination_nonce with
       | Some origination_nonce -> origination_nonce
@@ -178,7 +179,10 @@ let () =
   register0 S.run_code begin fun ctxt () parameters ->
     let (code, storage, input, amount, contract, gas, origination_nonce) =
       I.run_parameters ctxt parameters in
-    let ctxt = if Compare.Int.(gas > 0) then Gas.set_limit ctxt gas else Gas.set_unlimited ctxt in
+    begin if Compare.Z.(gas > Z.zero) then
+        Lwt.return (Gas.set_limit ctxt gas)
+      else
+        return (Gas.set_unlimited ctxt) end >>=? fun ctxt ->
     Script_interpreter.execute
       origination_nonce
       contract (* transaction initiator *)
@@ -191,7 +195,10 @@ let () =
   register0 S.trace_code begin fun ctxt () parameters ->
     let (code, storage, input, amount, contract, gas, origination_nonce) =
       I.run_parameters ctxt parameters in
-    let ctxt = if Compare.Int.(gas > 0) then Gas.set_limit ctxt gas else Gas.set_unlimited ctxt in
+    begin if Compare.Z.(gas > Z.zero) then
+        Lwt.return (Gas.set_limit ctxt gas)
+      else
+        return (Gas.set_unlimited ctxt) end >>=? fun ctxt ->
     Script_interpreter.trace
       origination_nonce
       contract (* transaction initiator *)
@@ -203,24 +210,24 @@ let () =
               ~f:(Script_ir_translator.to_printable_big_map ctxt))
   end ;
   register0 S.typecheck_code begin fun ctxt () (expr, maybe_gas) ->
-    let ctxt = match maybe_gas with
-      | None -> Gas.set_unlimited ctxt
-      | Some gas -> Gas.set_limit ctxt gas in
+    begin match maybe_gas with
+      | None -> return (Gas.set_unlimited ctxt)
+      | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
     Script_ir_translator.typecheck_code ctxt expr >>=? fun (res, ctxt) ->
     return (res, Gas.level ctxt)
   end ;
   register0 S.typecheck_data begin fun ctxt () (data, ty, maybe_gas) ->
-    let ctxt = match maybe_gas with
-      | None -> Gas.set_unlimited ctxt
-      | Some gas -> Gas.set_limit ctxt gas in
+    begin match maybe_gas with
+      | None -> return (Gas.set_unlimited ctxt)
+      | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
     Script_ir_translator.typecheck_data ctxt (data, ty) >>=? fun ctxt ->
     return (Gas.level ctxt)
   end ;
   register0 S.hash_data begin fun ctxt () (expr, typ, maybe_gas) ->
     let open Script_ir_translator in
-    let ctxt = match maybe_gas with
-      | None -> Gas.set_unlimited ctxt
-      | Some gas -> Gas.set_limit ctxt gas in
+    begin match maybe_gas with
+      | None -> return (Gas.set_unlimited ctxt)
+      | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
     Lwt.return (parse_ty false (Micheline.root typ)) >>=? fun (Ex_ty typ, _) ->
     parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
     Lwt.return (Script_ir_translator.hash_data ctxt typ data) >>=? fun (hash, ctxt) ->
@@ -343,9 +350,9 @@ module Forge = struct
 
     let transaction ctxt
         block ~branch ~source ?sourcePubKey ~counter
-        ~amount ~destination ?parameters ~fee ()=
+        ~amount ~destination ?parameters ~gas_limit ~fee ()=
       operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
-        Alpha_context.[Transaction { amount ; parameters ; destination }]
+        Alpha_context.[Transaction { amount ; parameters ; destination ; gas_limit }]
 
     let origination ctxt
         block ~branch
@@ -353,7 +360,8 @@ module Forge = struct
         ~managerPubKey ~balance
         ?(spendable = true)
         ?(delegatable = true)
-        ?delegatePubKey ?script ~fee () =
+        ?delegatePubKey ?script
+        ~gas_limit ~fee () =
       operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
         Alpha_context.[
           Origination { manager = managerPubKey ;
@@ -361,7 +369,8 @@ module Forge = struct
                         script ;
                         spendable ;
                         delegatable ;
-                        credit = balance }
+                        credit = balance ;
+                        gas_limit }
         ]
 
     let delegation ctxt

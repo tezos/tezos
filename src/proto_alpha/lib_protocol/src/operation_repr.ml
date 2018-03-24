@@ -82,6 +82,7 @@ and manager_operation =
       amount: Tez_repr.tez ;
       parameters: Script_repr.expr option ;
       destination: Contract_repr.contract ;
+      gas_limit: Z.t;
     }
   | Origination of {
       manager: Signature.Public_key_hash.t ;
@@ -90,6 +91,7 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
+      gas_limit: Z.t;
     }
   | Delegation of Signature.Public_key_hash.t option
 
@@ -118,47 +120,49 @@ module Encoding = struct
 
   let transaction_encoding =
     describe ~title:"Transaction operation" @@
-    obj4
+    obj5
       (req "kind" (constant "transaction"))
       (req "amount" Tez_repr.encoding)
       (req "destination" Contract_repr.encoding)
       (opt "parameters" Script_repr.expr_encoding)
+      (req "gas_limit" z)
 
   let transaction_case tag =
     case tag ~name:"Transaction" transaction_encoding
       (function
-        | Transaction { amount ; destination ; parameters } ->
-            Some ((), amount, destination, parameters)
+        | Transaction { amount ; destination ; parameters ; gas_limit } ->
+            Some ((), amount, destination, parameters, gas_limit)
         | _ -> None)
-      (fun ((), amount, destination, parameters) ->
-         Transaction { amount ; destination ; parameters })
+      (fun ((), amount, destination, parameters, gas_limit) ->
+         Transaction { amount ; destination ; parameters ; gas_limit })
 
   let origination_encoding =
     describe ~title:"Origination operation" @@
-    (obj7
+    (obj8
        (req "kind" (constant "origination"))
        (req "managerPubkey" Signature.Public_key_hash.encoding)
        (req "balance" Tez_repr.encoding)
        (opt "spendable" bool)
        (opt "delegatable" bool)
        (opt "delegate" Signature.Public_key_hash.encoding)
-       (opt "script" Script_repr.encoding))
+       (opt "script" Script_repr.encoding)
+       (req "gas_limit" z))
 
   let origination_case tag =
     case tag ~name:"Origination" origination_encoding
       (function
         | Origination { manager ; credit ; spendable ;
-                        delegatable ; delegate ; script } ->
+                        delegatable ; delegate ; script ; gas_limit } ->
             Some ((), manager, credit, Some spendable,
-                  Some delegatable, delegate, script)
+                  Some delegatable, delegate, script, gas_limit)
         | _ -> None)
-      (fun ((), manager, credit, spendable, delegatable, delegate, script) ->
+      (fun ((), manager, credit, spendable, delegatable, delegate, script, gas_limit) ->
          let delegatable =
            match delegatable with None -> true | Some b -> b in
          let spendable =
            match spendable with None -> true | Some b -> b in
          Origination
-           {manager ; credit ; spendable ; delegatable ; delegate ; script })
+           {manager ; credit ; spendable ; delegatable ; delegate ; script ; gas_limit })
 
   let delegation_encoding =
     describe ~title:"Delegation operation" @@

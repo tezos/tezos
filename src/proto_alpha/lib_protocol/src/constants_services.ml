@@ -80,13 +80,14 @@ module S = struct
       ~output: (obj1 (req "endorsers_per_block" uint16))
       RPC_path.(custom_root / "endorsers_per_block")
 
-  let max_gas =
+  let hard_gas_limits =
     RPC_service.post_service
-      ~description: "Instructions per transaction"
+      ~description: "Hard maximum amount of gas per operation and per block"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "instructions_per_transaction" int31))
-      RPC_path.(custom_root / "max_gas")
+      ~output: (obj2 (req "per_block" z) (req "per_operation" z))
+      RPC_path.(custom_root / "hard_gas_limits")
+
 
   let proof_of_work_threshold =
     RPC_service.post_service
@@ -189,8 +190,9 @@ let () =
   register0 S.endorsers_per_block begin fun ctxt () () ->
     return (Constants.endorsers_per_block ctxt)
   end ;
-  register0 S.max_gas begin fun ctxt () () ->
-    return (Constants.max_gas ctxt)
+  register0 S.hard_gas_limits begin fun ctxt () () ->
+    return (Constants.hard_gas_limit_per_block ctxt,
+            Constants.hard_gas_limit_per_operation ctxt)
   end ;
   register0 S.proof_of_work_threshold begin fun ctxt () () ->
     return (Constants.proof_of_work_threshold ctxt)
@@ -238,8 +240,8 @@ let first_free_baking_slot ctxt block =
   RPC_context.make_call0 S.first_free_baking_slot ctxt block () ()
 let endorsers_per_block ctxt block =
   RPC_context.make_call0 S.endorsers_per_block ctxt block () ()
-let max_gas ctxt block =
-  RPC_context.make_call0 S.max_gas ctxt block () ()
+let hard_gas_limits ctxt block =
+  RPC_context.make_call0 S.hard_gas_limits ctxt block () ()
 let proof_of_work_threshold ctxt block =
   RPC_context.make_call0 S.proof_of_work_threshold ctxt block () ()
 let seed_nonce_revelation_tip ctxt block =

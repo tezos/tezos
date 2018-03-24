@@ -371,8 +371,8 @@ let apply_amendment_operation_content ctxt delegate = function
 let apply_manager_operation_content
     ctxt origination_nonce source = function
   | Reveal _ -> return (ctxt, origination_nonce, None)
-  | Transaction { amount ; parameters ; destination } ->
-      let ctxt = Gas.set_limit ctxt (Constants.max_gas ctxt) in
+  | Transaction { amount ; parameters ; destination ; gas_limit } ->
+      Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
       begin
         Contract.spend ctxt source amount >>=? fun ctxt ->
         Contract.credit ctxt destination amount >>=? fun ctxt ->
@@ -422,8 +422,8 @@ let apply_manager_operation_content
             | None, _ -> fail (Bad_contract_parameter (destination, Some arg_type, None))
       end
   | Origination { manager ; delegate ; script ;
-                  spendable ; delegatable ; credit } ->
-      let ctxt = Gas.set_limit ctxt (Constants.max_gas ctxt) in
+                  spendable ; delegatable ; credit ; gas_limit } ->
+      Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
       begin match script with
         | None -> return (None, None, ctxt)
         | Some script ->
@@ -488,7 +488,6 @@ let apply_sourced_operation
                 ctxt origination_nonce source content)
         (ctxt, origination_nonce, None) contents
       >>=? fun (ctxt, origination_nonce, err) ->
-      let ctxt = Gas.set_unlimited ctxt in
       return (ctxt, origination_nonce, err)
   | Consensus_operation content ->
       apply_consensus_operation_content ctxt
@@ -616,22 +615,25 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
 
 let apply_operation
     ctxt delegate pred_block block_prio hash operation =
+  begin match operation.contents with
+    | Anonymous_operations ops ->
+        let origination_nonce = Contract.initial_origination_nonce hash in
+        fold_left_s
+          (fun (ctxt, origination_nonce) op ->
+             apply_anonymous_operation ctxt delegate origination_nonce op)
+          (ctxt, origination_nonce) ops
+        >>=? fun (ctxt, origination_nonce) ->
+        return (ctxt, Contract.originated_contracts origination_nonce, None)
+    | Sourced_operations op ->
+        let origination_nonce = Contract.initial_origination_nonce hash in
+        apply_sourced_operation
+          ctxt pred_block block_prio
+          operation origination_nonce op >>=? fun (ctxt, origination_nonce, err) ->
+        return (ctxt, Contract.originated_contracts origination_nonce, err)
+  end >>=? fun (ctxt, contracts, err) ->
+  let gas = Gas.level ctxt in
   let ctxt = Gas.set_unlimited ctxt in
-  match operation.contents with
-  | Anonymous_operations ops ->
-      let origination_nonce = Contract.initial_origination_nonce hash in
-      fold_left_s
-        (fun (ctxt, origination_nonce) op ->
-           apply_anonymous_operation ctxt delegate origination_nonce op)
-        (ctxt, origination_nonce) ops
-      >>=? fun (ctxt, origination_nonce) ->
-      return (ctxt, Contract.originated_contracts origination_nonce, None)
-  | Sourced_operations op ->
-      let origination_nonce = Contract.initial_origination_nonce hash in
-      apply_sourced_operation
-        ctxt pred_block block_prio
-        operation origination_nonce op >>=? fun (ctxt, origination_nonce, err) ->
-      return (ctxt, Contract.originated_contracts origination_nonce, err)
+  return (ctxt, gas, contracts, err)
 
 let may_snapshot_roll ctxt =
   let level = Alpha_context.Level.current ctxt in

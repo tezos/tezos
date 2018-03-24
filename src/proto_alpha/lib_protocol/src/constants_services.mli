@@ -33,8 +33,8 @@ val first_free_baking_slot:
 val endorsers_per_block:
   'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
 
-val max_gas:
-  'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
+val hard_gas_limits:
+  'a #RPC_context.simple -> 'a -> (Z.t * Z.t) shell_tzresult Lwt.t
 
 val proof_of_work_threshold:
   'a #RPC_context.simple -> 'a -> Int64.t shell_tzresult Lwt.t

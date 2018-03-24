@@ -51,7 +51,7 @@ val print_trace_result :
     tzresult -> unit tzresult Lwt.t
 
 val hash_and_sign :
-  ?gas:int ->
+  ?gas:Z.t ->
   Michelson_v1_parser.parsed ->
   Michelson_v1_parser.parsed ->
   Client_keys.sk_uri ->
@@ -60,7 +60,7 @@ val hash_and_sign :
   (string * string * Gas.t) tzresult Lwt.t
 
 val typecheck_data :
-  ?gas:int ->
+  ?gas:Z.t ->
   data:Michelson_v1_parser.parsed ->
   ty:Michelson_v1_parser.parsed ->
   'a ->
@@ -68,7 +68,7 @@ val typecheck_data :
   Gas.t tzresult Lwt.t
 
 val typecheck_program :
-  ?gas:int ->
+  ?gas:Z.t ->
   Michelson_v1_parser.parsed ->
   Block_services.block ->
   #Proto_alpha.rpc_context ->

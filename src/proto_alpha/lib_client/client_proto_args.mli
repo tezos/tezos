@@ -14,6 +14,7 @@ val tez_sym: string
 
 val init_arg: (string, Proto_alpha.full) Clic.arg
 val fee_arg: (Tez.t, Proto_alpha.full) Clic.arg
+val gas_limit_arg: (Z.t option, Proto_alpha.full) Clic.arg
 val arg_arg: (string, Proto_alpha.full) Clic.arg
 val source_arg: (string option, Proto_alpha.full) Clic.arg
 
