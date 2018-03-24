@@ -221,7 +221,7 @@ let () =
     let ctxt = match maybe_gas with
       | None -> Gas.set_unlimited ctxt
       | Some gas -> Gas.set_limit ctxt gas in
-    Lwt.return (parse_ty ctxt false (Micheline.root typ)) >>=? fun ((Ex_ty typ, _), ctxt) ->
+    Lwt.return (parse_ty false (Micheline.root typ)) >>=? fun (Ex_ty typ, _) ->
     parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
     Lwt.return (Script_ir_translator.hash_data ctxt typ data) >>=? fun (hash, ctxt) ->
     return (hash, Gas.level ctxt)

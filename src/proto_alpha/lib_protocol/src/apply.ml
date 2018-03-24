@@ -407,7 +407,7 @@ let apply_manager_operation_content
                   return (ctxt, origination_nonce, None)
               | Error err ->
                   return (ctxt, origination_nonce, Some err) in
-            Lwt.return @@ Script_ir_translator.parse_toplevel ctxt script.code >>=? fun ((arg_type, _, _, _), ctxt) ->
+            Lwt.return @@ Script_ir_translator.parse_toplevel script.code >>=? fun (arg_type, _, _, _) ->
             let arg_type = Micheline.strip_locations arg_type in
             match parameters, Micheline.root arg_type with
             | None, Prim (_, T_unit, _, _) ->

@@ -62,13 +62,13 @@ val unparse_data :
   context -> 'a Script_typed_ir.ty -> 'a -> (Script.node * context) tzresult
 
 val parse_ty :
-  context -> bool -> Script.node ->
-  ((ex_ty * Script_typed_ir.annot) * context) tzresult
+  bool -> Script.node ->
+  (ex_ty * Script_typed_ir.annot) tzresult
 val unparse_ty :
   string option -> 'a Script_typed_ir.ty -> Script.node
 
 val parse_toplevel
-  : context -> Script.expr -> ((Script.node * Script.node * Script.node * Script.node) * context) tzresult
+  : Script.expr -> (Script.node * Script.node * Script.node * Script.node) tzresult
 
 val typecheck_code :
   context -> Script.expr -> (type_map * context) tzresult Lwt.t
