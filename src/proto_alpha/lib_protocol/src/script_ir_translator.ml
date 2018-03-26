@@ -435,7 +435,7 @@ let empty_map
 let map_get
   : type key value. key -> (key, value) map -> value option
   = fun k (module Box) ->
-    try Some (Box.OPS.find k (fst Box.boxed)) with Not_found -> None
+    Box.OPS.find_opt k (fst Box.boxed)
 
 let map_update
   : type a b. a -> b option -> (a, b) map -> (a, b) map

@@ -105,18 +105,12 @@ module type SET = sig
   val partition: (elt -> bool) -> t -> t * t
   val cardinal: t -> int
   val elements: t -> elt list
-  val min_elt: t -> elt
   val min_elt_opt: t -> elt option
-  val max_elt: t -> elt
   val max_elt_opt: t -> elt option
-  val choose: t -> elt
   val choose_opt: t -> elt option
   val split: elt -> t -> t * bool * t
-  val find: elt -> t -> elt
   val find_opt: elt -> t -> elt option
-  val find_first: (elt -> bool) -> t -> elt
   val find_first_opt: (elt -> bool) -> t -> elt option
-  val find_last: (elt -> bool) -> t -> elt
   val find_last_opt: (elt -> bool) -> t -> elt option
   val of_list: elt list -> t
 end
@@ -144,18 +138,12 @@ module type MAP = sig
   val partition: (key -> 'a -> bool) -> 'a t -> 'a t * 'a t
   val cardinal: 'a t -> int
   val bindings: 'a t -> (key * 'a) list
-  val min_binding: 'a t -> (key * 'a)
   val min_binding_opt: 'a t -> (key * 'a) option
-  val max_binding: 'a t -> (key * 'a)
   val max_binding_opt: 'a t -> (key * 'a) option
-  val choose: 'a t -> (key * 'a)
   val choose_opt: 'a t -> (key * 'a) option
   val split: key -> 'a t -> 'a t * 'a option * 'a t
-  val find: key -> 'a t -> 'a
   val find_opt: key -> 'a t -> 'a option
-  val find_first: (key -> bool) -> 'a t -> key * 'a
   val find_first_opt: (key -> bool) -> 'a t -> (key * 'a) option
-  val find_last: (key -> bool) -> 'a t -> key * 'a
   val find_last_opt: (key -> bool) -> 'a t -> (key * 'a) option
   val map: ('a -> 'b) -> 'a t -> 'b t
   val mapi: (key -> 'a -> 'b) -> 'a t -> 'b t
