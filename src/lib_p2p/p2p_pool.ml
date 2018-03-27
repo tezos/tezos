@@ -39,32 +39,43 @@ module Message = struct
     let open Data_encoding in
     dynamic_size @@
     union ~tag_size:`Uint16
-      ([ case (Tag 0x01) ~name:"Disconnect" null
+      ([ case (Tag 0x01) ~name:"Disconnect"
+           (obj1 (req "kind" (constant "Disconnect")))
            (function Disconnect -> Some () | _ -> None)
            (fun () -> Disconnect);
-         case (Tag 0x02) ~name:"Bootstrap" null
+         case (Tag 0x02) ~name:"Bootstrap"
+           (obj1 (req "kind" (constant "Bootstrap")))
            (function Bootstrap -> Some () | _ -> None)
            (fun () -> Bootstrap);
-         case (Tag 0x03) ~name:"Advertise" (Variable.list P2p_point.Id.encoding)
-           (function Advertise points -> Some points | _ -> None)
-           (fun points -> Advertise points);
+         case (Tag 0x03) ~name:"Advertise"
+           (obj2
+              (req "id" (Variable.list P2p_point.Id.encoding))
+              (req "kind" (constant "Advertise")))
+           (function Advertise points -> Some (points, ()) | _ -> None)
+           (fun (points, ()) -> Advertise points);
          case (Tag 0x04) ~name:"Swap_request"
-           (tup2 P2p_point.Id.encoding P2p_peer.Id.encoding)
+           (obj3
+              (req "point" P2p_point.Id.encoding)
+              (req "peer_id" P2p_peer.Id.encoding)
+              (req "kind" (constant "Swap_request")))
            (function
-             | Swap_request (point, peer_id) -> Some (point, peer_id)
+             | Swap_request (point, peer_id) -> Some (point, peer_id, ())
              | _ -> None)
-           (fun (point, peer_id) -> Swap_request (point, peer_id)) ;
+           (fun (point, peer_id, ()) -> Swap_request (point, peer_id)) ;
          case (Tag 0x05)
            ~name:"Swap_ack"
-           (tup2 P2p_point.Id.encoding P2p_peer.Id.encoding)
+           (obj3
+              (req "point" P2p_point.Id.encoding)
+              (req "peer_id" P2p_peer.Id.encoding)
+              (req "kind" (constant "Swap_ack")))
            (function
-             | Swap_ack (point, peer_id) -> Some (point, peer_id)
+             | Swap_ack (point, peer_id) -> Some (point, peer_id, ())
              | _ -> None)
-           (fun (point, peer_id) -> Swap_ack (point, peer_id)) ;
+           (fun (point, peer_id, ()) -> Swap_ack (point, peer_id)) ;
        ] @
        ListLabels.map msg_encoding
          ~f:(function Encoding { tag ; encoding ; wrap ; unwrap } ->
-             case (Tag tag) encoding
+             Data_encoding.case (Tag tag) encoding
                (function Message msg -> unwrap msg | _ -> None)
                (fun msg -> Message (wrap msg))))
 
