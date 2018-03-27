@@ -104,26 +104,28 @@ module Encoding = struct
   open Data_encoding
 
   let reveal_encoding =
+    describe ~title:"Reveal operation" @@
     (obj2
        (req "kind" (constant "reveal"))
        (req "public_key" Signature.Public_key.encoding))
 
   let reveal_case tag =
-    case tag reveal_encoding
+    case tag ~name:"Reveal" reveal_encoding
       (function
         | Reveal pkh -> Some ((), pkh)
         | _ -> None)
       (fun ((), pkh) -> Reveal pkh)
 
   let transaction_encoding =
-    (obj4
-       (req "kind" (constant "transaction"))
-       (req "amount" Tez_repr.encoding)
-       (req "destination" Contract_repr.encoding)
-       (opt "parameters" Script_repr.expr_encoding))
+    describe ~title:"Transaction operation" @@
+    obj4
+      (req "kind" (constant "transaction"))
+      (req "amount" Tez_repr.encoding)
+      (req "destination" Contract_repr.encoding)
+      (opt "parameters" Script_repr.expr_encoding)
 
   let transaction_case tag =
-    case tag transaction_encoding
+    case tag ~name:"Transaction" transaction_encoding
       (function
         | Transaction { amount ; destination ; parameters } ->
             Some ((), amount, destination, parameters)
@@ -132,6 +134,7 @@ module Encoding = struct
          Transaction { amount ; destination ; parameters })
 
   let origination_encoding =
+    describe ~title:"Origination operation" @@
     (obj7
        (req "kind" (constant "origination"))
        (req "managerPubkey" Signature.Public_key_hash.encoding)
@@ -142,7 +145,7 @@ module Encoding = struct
        (opt "script" Script_repr.encoding))
 
   let origination_case tag =
-    case tag origination_encoding
+    case tag ~name:"Origination" origination_encoding
       (function
         | Origination { manager ; credit ; spendable ;
                         delegatable ; delegate ; script } ->
@@ -158,31 +161,33 @@ module Encoding = struct
            {manager ; credit ; spendable ; delegatable ; delegate ; script })
 
   let delegation_encoding =
+    describe ~title:"Delegation operation" @@
     (obj2
        (req "kind" (constant "delegation"))
        (opt "delegate" Signature.Public_key_hash.encoding))
 
+
   let delegation_case tag =
-    case tag delegation_encoding
+    case tag ~name:"Delegation" delegation_encoding
       (function Delegation key -> Some ((), key) | _ -> None)
       (fun ((), key) -> Delegation key)
 
   let manager_kind_encoding =
-    (obj5
-       (req "kind" (constant "manager"))
-       (req "source" Contract_repr.encoding)
-       (req "fee" Tez_repr.encoding)
-       (req "counter" int32)
-       (req "operations"
-          (list (union ~tag_size:`Uint8 [
-               reveal_case (Tag 0) ;
-               transaction_case (Tag 1) ;
-               origination_case (Tag 2) ;
-               delegation_case (Tag 3) ;
-             ]))))
+    obj5
+      (req "kind" (constant "manager"))
+      (req "source" Contract_repr.encoding)
+      (req "fee" Tez_repr.encoding)
+      (req "counter" int32)
+      (req "operations"
+         (list (union ~tag_size:`Uint8 [
+              reveal_case (Tag 0) ;
+              transaction_case (Tag 1) ;
+              origination_case (Tag 2) ;
+              delegation_case (Tag 3) ;
+            ])))
 
   let manager_kind_case tag =
-    case tag manager_kind_encoding
+    case tag ~name:"Manager operations" manager_kind_encoding
       (function
         | Manager_operations { source; fee ; counter ;operations } ->
             Some ((), source, fee, counter, operations)
@@ -191,11 +196,12 @@ module Encoding = struct
          Manager_operations { source; fee ; counter ; operations })
 
   let endorsement_encoding =
-    (obj4
-       (req "kind" (constant "endorsement"))
-       (req "block" Block_hash.encoding)
-       (req "level" Raw_level_repr.encoding)
-       (req "slots" (list int31)))
+    (* describe ~title:"Endorsement operation" @@ *)
+    obj4
+      (req "kind" (constant "endorsement"))
+      (req "block" Block_hash.encoding)
+      (req "level" Raw_level_repr.encoding)
+      (req "slots" (list int31))
 
   let consensus_kind_encoding =
     conv
@@ -397,9 +403,11 @@ module Encoding = struct
     mu_proto_operation_encoding operation_encoding
 
   let signed_proto_operation_encoding =
+    describe ~title:"Signed alpha operation" @@
     mu_signed_proto_operation_encoding operation_encoding
 
   let unsigned_operation_encoding =
+    describe ~title:"Unsigned Alpha operation" @@
     merge_objs
       Operation.shell_header_encoding
       proto_operation_encoding

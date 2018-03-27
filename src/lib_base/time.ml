@@ -93,6 +93,7 @@ module T = struct
 
   let encoding =
     let open Data_encoding in
+    describe ~title:"timestamp" @@
     splitted
       ~binary: int64
       ~json:

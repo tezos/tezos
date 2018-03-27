@@ -15,13 +15,13 @@ module Request = struct
   let encoding =
     let open Data_encoding in
     union
-      [ case (Tag 0)
+      [ case (Tag 0) ~name:"New_head"
           (obj2
              (req "request" (constant "new_head"))
              (req "block" Block_hash.encoding))
           (function New_head h -> Some ((), h) | _ -> None)
           (fun ((), h) -> New_head h) ;
-        case (Tag 1)
+        case (Tag 1) ~name:"New_branch"
           (obj3
              (req "request" (constant "new_branch"))
              (req "block" Block_hash.encoding)

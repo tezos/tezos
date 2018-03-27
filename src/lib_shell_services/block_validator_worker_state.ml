@@ -48,18 +48,19 @@ module Event = struct
 
   let encoding =
     let open Data_encoding in
+    describe ~title:"Event state" @@
     union
-      [ case (Tag 0)
+      [ case (Tag 0) ~name:"Debug"
           (obj1 (req "message" string))
           (function Debug msg -> Some msg | _ -> None)
           (fun msg -> Debug msg) ;
-        case (Tag 1)
+        case (Tag 1) ~name:"Validation_success"
           (obj2
              (req "successful_validation" Request.encoding)
              (req "status" Worker_types.request_status_encoding))
           (function Validation_success (r, s) -> Some (r, s) | _ -> None)
           (fun (r, s) -> Validation_success (r, s)) ;
-        case (Tag 2)
+        case (Tag 2) ~name:"Validation_failure"
           (obj3
              (req "failed_validation" Request.encoding)
              (req "status" Worker_types.request_status_encoding)

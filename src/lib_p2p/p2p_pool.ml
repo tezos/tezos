@@ -39,21 +39,24 @@ module Message = struct
     let open Data_encoding in
     dynamic_size @@
     union ~tag_size:`Uint16
-      ([ case (Tag 0x01) null
+      ([ case (Tag 0x01) ~name:"Disconnect" null
            (function Disconnect -> Some () | _ -> None)
            (fun () -> Disconnect);
-         case (Tag 0x02) null
+         case (Tag 0x02) ~name:"Bootstrap" null
            (function Bootstrap -> Some () | _ -> None)
            (fun () -> Bootstrap);
-         case (Tag 0x03) (Variable.list P2p_point.Id.encoding)
+         case (Tag 0x03) ~name:"Advertise" (Variable.list P2p_point.Id.encoding)
            (function Advertise points -> Some points | _ -> None)
            (fun points -> Advertise points);
-         case (Tag 0x04) (tup2 P2p_point.Id.encoding P2p_peer.Id.encoding)
+         case (Tag 0x04) ~name:"Swap_request"
+           (tup2 P2p_point.Id.encoding P2p_peer.Id.encoding)
            (function
              | Swap_request (point, peer_id) -> Some (point, peer_id)
              | _ -> None)
            (fun (point, peer_id) -> Swap_request (point, peer_id)) ;
-         case (Tag 0x05) (tup2 P2p_point.Id.encoding P2p_peer.Id.encoding)
+         case (Tag 0x05)
+           ~name:"Swap_ack"
+           (tup2 P2p_point.Id.encoding P2p_peer.Id.encoding)
            (function
              | Swap_ack (point, peer_id) -> Some (point, peer_id)
              | _ -> None)

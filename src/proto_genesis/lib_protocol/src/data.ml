@@ -36,6 +36,7 @@ module Command = struct
     let open Data_encoding in
     union ~tag_size:`Uint8 [
       case (Tag 0)
+        ~name:"activate"
         (mk_case "activate"
            (obj3
               (req "hash" Protocol_hash.encoding)
@@ -49,6 +50,7 @@ module Command = struct
         (fun (protocol, fitness, protocol_parameters) ->
            Activate { protocol ; fitness ; protocol_parameters }) ;
       case (Tag 1)
+        ~name:"activate_testchain"
         (mk_case "activate_testchain"
            (obj2
               (req "hash" Protocol_hash.encoding)

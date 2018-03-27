@@ -142,18 +142,26 @@ module State = struct
         (merge_objs
            (obj1 (req "event_kind" (constant name))) obj) in
     union ~tag_size:`Uint8 [
-      case (Tag 0) (branch_encoding "requested" empty)
+      case (Tag 0)
+        ~name:"requested"
+        (branch_encoding "requested" empty)
         (function Requested -> Some () | _ -> None)
         (fun () -> Requested) ;
-      case (Tag 1) (branch_encoding "accepted"
-                      (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
+      case (Tag 1)
+        ~name:"accepted"
+        (branch_encoding "accepted"
+           (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
         (function Accepted p2p_peer_id -> Some p2p_peer_id | _ -> None)
         (fun p2p_peer_id -> Accepted p2p_peer_id) ;
-      case (Tag 2) (branch_encoding "running"
-                      (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
+      case (Tag 2)
+        ~name:"running"
+        (branch_encoding "running"
+           (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
         (function Running p2p_peer_id -> Some p2p_peer_id | _ -> None)
         (fun p2p_peer_id -> Running p2p_peer_id) ;
-      case (Tag 3) (branch_encoding "disconnected" empty)
+      case (Tag 3)
+        ~name:"disconnected"
+        (branch_encoding "disconnected" empty)
         (function Disconnected -> Some () | _ -> None)
         (fun () -> Disconnected) ;
     ]
