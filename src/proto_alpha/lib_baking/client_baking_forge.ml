@@ -105,7 +105,14 @@ let classify_operations (ops: Operation.raw list) =
              (Proto_alpha.Main.acceptable_passes o)
        | Error _ -> ())
     ops ;
-  Array.fold_right (fun ops acc -> List.rev ops :: acc) t []
+  let ops = Array.fold_right (fun ops acc -> List.rev ops :: acc) t [] in
+  (* Quick and dirty fix for quota. *)
+  List.map2
+    (fun ops q ->
+       match q.Tezos_protocol_environment_faked.max_op with
+       | None -> ops
+       | Some n -> List.take_n n ops)
+    ops Proto_alpha.Main.validation_passes
 
 let forge_block cctxt block
     ?force
