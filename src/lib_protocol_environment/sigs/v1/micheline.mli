@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 type ('l, 'p) node =
-  | Int of 'l * string
+  | Int of 'l * Z.t
   | String of 'l * string
   | Prim of 'l * 'p * ('l, 'p) node list * string option
   | Seq of 'l * ('l, 'p) node list * string option

@@ -16,7 +16,7 @@ let print_expr ppf expr =
     | None -> ()
     | Some annot -> Format.fprintf ppf " %s" annot in
   let rec print_expr ppf = function
-    | Int (_, value) -> Format.fprintf ppf "%s" value
+    | Int (_, value) -> Format.fprintf ppf "%s" (Z.to_string value)
     | String (_, value) -> Micheline_printer.print_string ppf value
     | Seq (_, items, annot) ->
         Format.fprintf ppf "(seq%a %a)"

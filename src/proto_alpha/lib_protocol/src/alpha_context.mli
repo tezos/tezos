@@ -153,6 +153,7 @@ module Script_timestamp : sig
   val sub_delta: t -> z num -> t
   val now: context -> t
   val to_zint: t -> Z.t
+  val of_zint: Z.t -> t
 end
 
 module Script : sig

@@ -47,7 +47,7 @@ let preformat root =
   let rec preformat_expr = function
     | Int (loc, value) ->
         let cml, csz = preformat_loc loc in
-        Int ((cml, String.length value + csz, loc), value)
+        Int ((cml, String.length (Z.to_string value) + csz, loc), value)
     | String (loc, value) ->
         let cml, csz = preformat_loc loc in
         String ((cml, String.length value + csz, loc), value)
@@ -105,8 +105,8 @@ let rec print_expr_unwrapped ppf = function
       end
   | Int ((_, _, { comment }), value) ->
       begin match comment with
-        | None -> Format.fprintf ppf "%s" value
-        | Some comment -> Format.fprintf ppf "%s@ %a" value print_comment comment
+        | None -> Format.fprintf ppf "%s" (Z.to_string value)
+        | Some comment -> Format.fprintf ppf "%s@ %a" (Z.to_string value) print_comment comment
       end
   | String ((_, _, { comment }), value) ->
       begin match comment with

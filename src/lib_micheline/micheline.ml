@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 type ('l, 'p) node =
-  | Int of 'l * string
+  | Int of 'l * Z.t
   | String of 'l * string
   | Prim of 'l * 'p * ('l, 'p) node list * string option
   | Seq of 'l * ('l, 'p) node list * string option
@@ -116,7 +116,7 @@ let rec map_node fl fp = function
 let canonical_encoding ~variant prim_encoding =
   let open Data_encoding in
   let int_encoding =
-    obj1 (req "int" string) in
+    obj1 (req "int" z) in
   let string_encoding =
     obj1 (req "string" string) in
   let int_encoding tag =

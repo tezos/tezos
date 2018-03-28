@@ -129,6 +129,7 @@ module Make (Context : CONTEXT) : sig
        and type Signature.t = Signature.t
        and type Signature.watermark = Signature.watermark
        and type 'a Micheline.canonical = 'a Micheline.canonical
+       and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t

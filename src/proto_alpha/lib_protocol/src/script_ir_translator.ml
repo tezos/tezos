@@ -562,10 +562,10 @@ let rec unparse_data
         (Prim (-1, D_Unit, [], None), gas)
     | Int_t, v ->
         Gas.consume ctxt (Unparse_costs.int v) >|? fun gas ->
-        (Int (-1, Script_int.to_string v), gas)
+        (Int (-1, Script_int.to_zint v), gas)
     | Nat_t, v ->
         Gas.consume ctxt (Unparse_costs.int v) >|? fun gas ->
-        (Int (-1, Script_int.to_string v), gas)
+        (Int (-1, Script_int.to_zint v), gas)
     | String_t, s ->
         Gas.consume ctxt (Unparse_costs.string s) >|? fun gas ->
         (String (-1, s), gas)
@@ -579,7 +579,7 @@ let rec unparse_data
         Gas.consume ctxt (Unparse_costs.timestamp t) >>? fun gas ->
         begin
           match Script_timestamp.to_notation t with
-          | None -> ok @@ (Int (-1, Script_timestamp.to_num_str t), gas)
+          | None -> ok @@ (Int (-1, Script_timestamp.to_zint t), gas)
           | Some s -> ok @@ (String (-1, s), gas)
         end
     | Contract_t _, (_, _, c)  ->
@@ -1083,20 +1083,12 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Integers *)
     | Int_t, Int (_, v) ->
-        Lwt.return (Gas.consume ctxt (Typecheck_costs.int_of_string v)) >>=? fun ctxt ->
-        begin match Script_int.of_string v with
-          | None -> fail (error ())
-          | Some v -> return (v, ctxt)
-        end
+        return (Script_int.of_zint v, ctxt)
     | Nat_t, Int (_, v) ->
-        Lwt.return (Gas.consume ctxt (Typecheck_costs.int_of_string v)) >>=? fun ctxt ->
-        begin match Script_int.of_string v with
-          | None -> fail (error ())
-          | Some v ->
-              if Compare.Int.(Script_int.compare v Script_int.zero >= 0) then
-                return (Script_int.abs v, ctxt)
-              else fail (error ())
-        end
+        let v = Script_int.of_zint v in
+        if Compare.Int.(Script_int.compare v Script_int.zero >= 0) then
+          return (Script_int.abs v, ctxt)
+        else fail (error ())
     | Int_t, expr ->
         traced (fail (Invalid_kind (location expr, [ Int_kind ], kind expr)))
     | Nat_t, expr ->
@@ -1115,12 +1107,7 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Timestamps *)
     | Timestamp_t, (Int (_, v)) ->
-        Lwt.return (Gas.consume ctxt (Typecheck_costs.int_of_string v)) >>=? fun ctxt ->
-        begin
-          match Script_timestamp.of_string v with
-          | Some v -> return (v, ctxt)
-          | None -> fail (error ())
-        end
+        return (Script_timestamp.of_zint v, ctxt)
     | Timestamp_t, String (_, s) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.string_timestamp) >>=? fun ctxt ->
         begin try

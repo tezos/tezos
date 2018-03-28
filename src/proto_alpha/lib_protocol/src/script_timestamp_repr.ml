@@ -45,3 +45,4 @@ let add_delta t delta =
   Z.add t (Script_int_repr.to_zint delta)
 
 let to_zint x = x
+let of_zint x = x

@@ -330,7 +330,7 @@ let test_parsing () =
 
   assert_parses "PUSH int 100"
     [ (Prim ((), "PUSH", [ Prim ((), "int", [], None) ;
-                           Int ((), "100") ], None)) ] >>? fun () ->
+                           Int ((), Z.of_int 100) ], None)) ] >>? fun () ->
 
   assert_parses "DROP" [ (Prim ((), "DROP", [], None)) ] >>? fun () ->
   assert_parses "DIP{DROP}"
@@ -360,9 +360,9 @@ let test_parsing () =
     [ Prim ((), "PUSH", [ Prim ((), "list",
                                 [ Prim ((), "nat", [], None) ], None) ;
                           Prim ((), "List",
-                                [ Int((), "1");
-                                  Int ((), "2");
-                                  Int ((), "3")],
+                                [ Int((), Z.of_int 1);
+                                  Int ((), Z.of_int 2);
+                                  Int ((), Z.of_int 3)],
                                 None) ], None) ] >>? fun () ->
   assert_parses "PUSH (lambda nat nat) {}"
     [ Prim ((), "PUSH", [ Prim ((), "lambda",
@@ -380,7 +380,7 @@ let test_parsing () =
                                   Prim((), "bool", [], None)], None) ;
                           Prim ((), "Map",
                                 [Prim ((), "Item",
-                                       [Int ((), "100");
+                                       [Int ((), Z.of_int 100);
                                         Prim ((), "False", [], None)], None)], None) ],
             None) ] >>? fun () ->
   assert_parses
@@ -402,7 +402,7 @@ let test_parsing () =
       Prim ((), "return", [ Prim((), "int", [], None) ], None);
       Prim ((), "code", [ Seq((), [ Prim ((), "CAR", [], None) ;
                                     Prim ((), "PUSH", [ Prim((), "int", [], None) ;
-                                                        Int ((), "1")], None) ;
+                                                        Int ((), Z.of_int 1)], None) ;
                                     Prim ((), "ADD", [], None) ;
                                     Prim ((), "UNIT", [], None) ;
                                     Prim ((), "SWAP", [], None) ;

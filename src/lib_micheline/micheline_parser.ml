@@ -526,7 +526,7 @@ let rec parse ?(check = true) errors tokens stack =
     { token = Int value ; loc } :: rest
   | (Expression None | Sequence _ | Toplevel _) :: _,
     { token = Int value ; loc } :: ([] | { token = Semi | Close_brace} :: _ as rest) ->
-      let expr : node = Int (loc, value) in
+      let expr : node = Int (loc, Z.of_string value) in
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr stack)
   | (Unwrapped _ | Wrapped _) :: _,
