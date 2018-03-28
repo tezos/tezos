@@ -28,6 +28,7 @@ module Tez : sig
   type tez = t
 
   val zero: tez
+  val one_mutez: tez
   val one_cent: tez
   val fifty_cents: tez
   val one: tez
