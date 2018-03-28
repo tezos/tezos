@@ -115,3 +115,5 @@ module Uint64 = MakeUnsigned (Int64) (struct let zero = 0L end)
 
 module Float = Make (struct type t = float let compare = Pervasives.compare end)
 module String = Make (String)
+
+module Z = Make (Z)
