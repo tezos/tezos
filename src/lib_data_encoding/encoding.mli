@@ -34,6 +34,7 @@ type 'a desc =
   | Int31 : int desc
   | Int32 : Int32.t desc
   | Int64 : Int64.t desc
+  | Z : Z.t desc
   | RangedInt : { minimum : int ; maximum : int } -> int desc
   | RangedFloat : { minimum : float ; maximum : float } -> float desc
   | Float : float desc
@@ -109,6 +110,7 @@ val uint16 : int encoding
 val int31 : int encoding
 val int32 : int32 encoding
 val int64 : int64 encoding
+val z : Z.t encoding
 val ranged_int : int -> int -> int encoding
 val ranged_float : float -> float -> float encoding
 val bool : bool encoding

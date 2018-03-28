@@ -39,6 +39,7 @@ let rec length : type x. x Encoding.t -> x -> int = fun e ->
   | Int31 -> fun _ -> Size.int31
   | Int32 -> fun _ -> Size.int32
   | Int64 -> fun _ -> Size.int64
+  | Z -> fun z -> (Z.numbits z + 1 + 6) / 7
   | RangedInt { minimum ; maximum } ->
       fun _ -> Size.(integer_to_size @@ range_to_size ~minimum ~maximum)
   | Float -> fun _ -> Size.float
@@ -188,6 +189,38 @@ module Writer = struct
     MBytes.set_int64 buf ofs v;
     ofs + Size.int64
 
+  let z v res ofs =
+    let sign = Z.sign v < 0 in
+    let bits = Z.numbits v in
+    if Z.equal v Z.zero then begin
+      MBytes.set_int8 res ofs 0x00 ;
+      ofs + 1
+    end else
+      let raw = Z.to_bits v in
+      let get_chunk pos len (* < 8 *) =
+        let byte = pos / 8 in
+        let bit = pos mod 8 in
+        if bit + len <= 8 then
+          let mask = 0xFF lsr (8 - len) in
+          (Char.code (String.get raw byte) lsr bit) land mask
+        else
+          let mask = 0xFF lsr (16 - len - bit) in
+          (Char.code (String.get raw byte) lsr bit)
+          lor ((Char.code (String.get raw (byte + 1))) land mask) lsl (8 - bit) in
+      let length = (bits + 1 + 6) / 7 in
+      MBytes.set_int8 res ofs
+        ((if sign then 0x40 else 0x00)
+         lor (if bits > 6 then 0x80 else 0x00)
+         lor (get_chunk 0 6)) ;
+      for i = 1 to length - 1 do
+        let pos = 6 + (i - 1) * 7 in
+        let chunk_len = if i = length - 1 then bits - pos else 7 in
+        MBytes.set_int8 res (ofs + i)
+          ((if i = bits / 7 then 0x00 else 0x80)
+           lor (get_chunk pos chunk_len))
+      done ;
+      ofs + length
+
   (** write a float64 (double) **)
   let float v buf ofs =
     (*Here, float means float64, which is written using MBytes.set_double !!*)
@@ -289,6 +322,13 @@ module BufferedWriter = struct
   let int64 v buf =
     MBytes_buffer.write_int64 buf v
 
+  let z v buf =
+    let bits = Z.numbits v in
+    let length = (bits + 1 + 6) / 7 in
+    let res = MBytes.create length in
+    ignore (Writer.z v res 0) ;
+    MBytes_buffer.write_mbytes buf res 0 length
+
   (** write a float64 (double) **)
   let float v buf =
     MBytes_buffer.write_double buf v
@@ -343,6 +383,7 @@ let rec write_rec
   | Int31 -> int31
   | Int32 -> int32
   | Int64 -> int64
+  | Z -> z
   | RangedInt { minimum ; maximum } ->
       fun v ->
         begin
@@ -422,6 +463,7 @@ let rec write_rec_buffer
     | Int31 -> int31 value buffer
     | Int32 -> int32 value buffer
     | Int64 -> int64 value buffer
+    | Z -> z value buffer
     | Float -> float value buffer
     | Bytes (`Fixed n) -> fixed_kind_bytes n value buffer
     | String (`Fixed n) -> fixed_kind_string n value buffer
@@ -572,6 +614,34 @@ module Reader = struct
   let int64 buf ofs _len =
     ofs + Size.int64, MBytes.get_int64 buf ofs
 
+  let z buf ofs _len =
+    let res = Buffer.create 100 in
+    let rec read prev i value bit =
+      if prev land 0x80 = 0x00 then begin
+        if bit > 0 then Buffer.add_char res (Char.unsafe_chr value) ;
+        if prev = 0x00 then failwith "trailing zeroes in Z encoding" ;
+        i
+      end else
+        let byte = MBytes.get_uint8 buf (ofs + i) in
+        let value = value lor ((byte land 0x7F) lsl bit) in
+        let bit = bit + 7 in
+        let bit, value = if bit >= 8 then begin
+            Buffer.add_char res (Char.unsafe_chr (value land 0xFF)) ;
+            bit - 8, value lsr 8
+          end else bit, value in
+        read byte (i + 1) value bit in
+    let first = MBytes.get_uint8 buf ofs in
+    if first = 0 then
+      ofs + 1, Z.zero
+    else
+      let value = first land 0x3F in
+      let sign = (first land 0x40) <> 0 in
+      let length = read first 1 value 6 in
+      let bits = Buffer.contents res in
+      let res = Z.of_bits bits in
+      let res = if sign then Z.neg res else res in
+      ofs + length, res
+
   (** read a float64 (double) **)
   let float buf ofs _len =
     (*Here, float means float64, which is read using MBytes.get_double !!*)
@@ -671,6 +741,7 @@ let rec read_rec : type a. a Encoding.t-> MBytes.t -> int -> int -> int * a = fu
   | Int31 -> int31
   | Int32 -> int32
   | Int64 -> int64
+  | Z -> z
   | RangedInt { minimum ; maximum } ->
       (fun buf ofs alpha ->
          let ofs, value =

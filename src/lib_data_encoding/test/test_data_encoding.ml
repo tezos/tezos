@@ -15,16 +15,34 @@ let is_invalid_arg = function
   | _ -> false
 
 let test_simple_json ?msg ?(equal=Assert.equal) encoding value =
-  let json = Json.construct encoding value in
-  let result = Json.destruct encoding json in
+  let result = try
+      let json = Json.construct encoding value in
+      Json.destruct encoding json
+    with exn ->
+      let trace = Printexc.get_backtrace () in
+      Assert.fail_msg "%s %s\n%s"
+        (match msg with Some msg -> msg | None -> "no message")
+        (Printexc.to_string exn)
+        trace in
   equal ?msg value result
 
 let test_simple_bin ?msg ?(equal=Assert.equal) encoding value =
-  let bin = Binary.to_bytes encoding value in
-  let opt = Binary.of_bytes encoding bin in
+  let opt = try
+      let bin = Binary.to_bytes encoding value in
+      Binary.of_bytes encoding bin
+    with exn ->
+      let trace = Printexc.get_backtrace () in
+      Assert.fail_msg "%s %s\n%s"
+        (match msg with Some msg -> msg | None -> "no message")
+        (Printexc.to_string exn)
+        trace in
   Assert.is_some ?msg opt;
   let result = match opt with None -> assert false | Some v -> v in
   equal ?msg value result
+
+let test_simple_of_bin ?msg ?(equal=Assert.equal) encoding value bin =
+  let opt = Binary.of_bytes encoding bin in
+  equal ?msg value opt
 
 let test_json_exn ?msg encoding value fail =
   let get_result () =
@@ -113,6 +131,31 @@ let test_simple_values _ =
 (* Should fail *)
 (* test_bin_exn ~msg:__LOC__ (string_enum ["a", 1; "a", 2]) 2 (...duplicatate...); *)
 (* test_json_exn ~msg:__LOC__ (string_enum ["a", 1; "a", 2]) 1 (... duplicate...); *)
+
+let test_zarith _ =
+  let test i = test_simple ~msg:("failed on Z number " ^ Z.to_string i) z i in
+  let test_of_bin bin exp name = test_simple_of_bin ~msg:("failed on " ^ name) z exp (MBytes.of_string bin) in
+  for i = -1_00_000 to 1_00_000 do test (Z.of_int i) done ;
+  for i = 100_000_000 to 100_100_000 do test (Z.of_int i) done ;
+  for i = -100_000_000 downto -100_100_000 do test (Z.of_int i) done ;
+  let rec fact n l =
+    if n > 1 then
+      let l = Z.mul l (Z.of_int n) in
+      test l ;
+      fact (n - 1) l in
+  fact 35 Z.one ;
+  test (Z.of_string "123574503164821730218493275982143254986574985328") ;
+  test (Z.of_string "8493275982143254986574985328") ;
+  test (Z.of_string "123574503164821730218474985328") ;
+  test (Z.of_string "10000000000100000000001000003050000000060600000000000777000008") ;
+  test (Z.of_string "-123574503164821730218493275982143254986574985328") ;
+  test (Z.of_string "-8493275982143254986574985328") ;
+  test (Z.of_string "-123574503164821730218474985328") ;
+  test (Z.of_string "-10000000000100000000001000003050000000060600000000000777000008") ;
+  test_of_bin "\x03" (Some (Z.of_int 3)) "3 (size OK)" ;
+  test_of_bin "\x83" None "3 (size + 1, truncated)" ;
+  test_of_bin "\x83\x00"  None "3 (size + 1)" ;
+  test_of_bin "\x83\x80\x00" None "3 (size + 2)" ;
 
 type t = A of int | B of string | C of int | D of string | E
 
@@ -319,6 +362,7 @@ let test_randomized_variant_list _ =
          (make_int_list [] 100 ()))
 
 let tests = [
+  "zarith", `Quick, test_zarith ;
   "simple", `Quick, test_simple_values ;
   "union", `Quick, test_union ;
   "splitted", `Quick, test_splitted ;

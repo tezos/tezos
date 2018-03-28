@@ -44,6 +44,14 @@ let int64_encoding =
       Int64.of_string
   ]
 
+let z_encoding =
+  let open Json_encoding in
+  def "bignum" @@
+  describe
+    ~title: "Big number"
+    ~description: "Decimal representation of a big number" @@
+  conv Z.to_string Z.of_string string
+
 let bytes_jsont =
   let open Json_encoding in
   let schema =
@@ -147,6 +155,7 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Int31 -> int
   | Int32 -> int32
   | Int64 -> int64_encoding
+  | Z -> z_encoding
   | Bool -> bool
   | Float -> float
   | RangedFloat { minimum; maximum } -> ranged_float ~minimum ~maximum "rangedFloat"

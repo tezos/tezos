@@ -122,6 +122,17 @@ module Encoding: sig
   *)
   val ranged_int : int -> int -> int encoding
 
+  (** Big number
+      In JSON, data is encoded as a decimal string.
+      In binary, data is encoded as a variable length sequence of
+      bytes, with a running unary size bit: the most significant bit of
+      each byte tells is this is the last byte in the sequence (0) or if
+      there is more to read (1). The second most significant bit of the
+      first byte is reserved for the sign (positive if zero). Size and
+      sign bits ignored, data is then the binary representation of the
+      absolute value of the number in little endian order. *)
+  val z : Z.t encoding
+
   (** Encoding of floating point number
       (encoded as a floating point number in JSON and a double in binary). *)
   val float : float encoding

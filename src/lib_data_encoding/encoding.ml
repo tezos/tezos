@@ -87,6 +87,7 @@ type 'a desc =
   | Int31 : int desc
   | Int32 : Int32.t desc
   | Int64 : Int64.t desc
+  | Z : Z.t desc
   | RangedInt : { minimum : int ; maximum : int } -> int desc
   | RangedFloat : { minimum : float ; maximum : float } -> float desc
   | Float : float desc
@@ -152,6 +153,7 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Int31 -> `Fixed Size.int31
   | Int32 -> `Fixed Size.int32
   | Int64 -> `Fixed Size.int64
+  | Z -> `Dynamic
   | RangedInt { minimum ; maximum } ->
       `Fixed Size.(integer_to_size @@ range_to_size ~minimum ~maximum)
   | Float -> `Fixed Size.float
@@ -234,6 +236,7 @@ let ranged_float minimum maximum =
   and maximum = max minimum maximum in
   make @@ RangedFloat { minimum ; maximum }
 let int64 = make @@ Int64
+let z = make @@ Z
 let float = make @@ Float
 
 let string = dynamic_size Variable.string

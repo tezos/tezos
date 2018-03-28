@@ -42,6 +42,7 @@ val uint16 : int encoding
 val int31 : int encoding
 val int32 : int32 encoding
 val int64 : int64 encoding
+val z : Z.t encoding
 val bool : bool encoding
 val string : string encoding
 val bytes : MBytes.t encoding

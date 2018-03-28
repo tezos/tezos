@@ -32,7 +32,7 @@ type mbytes_stream = {
 
 (* exception raised when additional mbytes are needed to continue
    decoding *)
-exception Need_more_data
+exception Need_more_data of mbytes_stream
 
 (* read a data that is stored in may Mbytes *)
 let read_from_many_blocks reader buf ofs d_ofs =
@@ -63,7 +63,7 @@ let read_from_many_blocks reader buf ofs d_ofs =
 let generic_read_data delta_ofs reader buf =
   let absolute_ofs  = buf.ofs in
   if buf.unread < delta_ofs then (*not enough data*)
-    raise Need_more_data ;
+    raise (Need_more_data buf) ;
   if delta_ofs = 0 then (*we'll read nothing*)
     buf, reader (MBytes.create 0) 0 0
   else
@@ -176,6 +176,17 @@ let rec data_checker
       | Int31  -> next_path path (fst (int31  buf))
       | Int32  -> next_path path (fst (int32  buf))
       | Int64  -> next_path path (fst (int64  buf))
+      | Z ->
+          let rec while_not_terminator i buf =
+            let buf, byte = uint8 buf in
+            if (byte land 0x80) = 0x00 then
+              if byte = 0x00 && i <> 0 then
+                failwith "trailing zeroes in Z encoding"
+              else
+                next_path path buf
+            else
+              while_not_terminator (i + 1) buf in
+          while_not_terminator 0 buf
       | RangedInt { minimum ; maximum }  ->
           let (stream, ranged) =
             match Size.range_to_size ~minimum ~maximum with
@@ -296,7 +307,7 @@ let rec data_checker
 
       | Delayed f -> data_checker path (f ()) buf len
 
-    with Need_more_data ->
+    with Need_more_data buf ->
       P_await { path ; encoding = e ; data_len = len }, buf
 
 and next_path : path -> mbytes_stream -> path * mbytes_stream =
