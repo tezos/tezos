@@ -73,7 +73,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
     (fun hash ->
        Lwt.catch
          (fun () ->
-            Client_baking_blocks.info cctxt (`Hash hash) >>= function
+            Client_baking_blocks.info cctxt (`Hash (hash, 0)) >>= function
             | Ok bi -> Lwt.return (Some bi)
             | Error _ ->
                 Lwt.fail Not_found)

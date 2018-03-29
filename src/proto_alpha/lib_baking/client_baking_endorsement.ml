@@ -192,7 +192,7 @@ let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
     Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
     lwt_log_info "May endorse block %a for %s"
       Block_hash.pp_short block.hash name >>= fun () ->
-    let b = `Hash block.hash in
+    let b = `Hash (block.hash, 0) in
     let level = block.level.level in
     get_signing_slots cctxt b delegate level >>=? fun slots ->
     lwt_debug "Found slots for %a/%s (%d)"
@@ -281,7 +281,7 @@ let endorse cctxt state =
   iter_p
     (fun { delegate ; block ; slot } ->
        let hash = block.hash in
-       let b = `Hash hash in
+       let b = `Hash (hash, 0) in
        let level = block.level.level in
        previously_endorsed_slot cctxt level slot >>=? function
        | true -> return ()

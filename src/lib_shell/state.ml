@@ -463,17 +463,33 @@ module Block = struct
         Store.Block.Invalid_block.known store hash
     end
 
-  let read chain_state hash =
+  let read chain_state ?(pred = 0) hash =
     Shared.use chain_state.block_store begin fun store ->
+      begin
+        if pred = 0 then
+          return hash
+        else
+          predecessor_n store hash pred >>= function
+          | None -> return chain_state.genesis.block
+          | Some hash -> return hash
+      end >>=? fun hash ->
       Store.Block.Contents.read (store, hash) >>=? fun contents ->
       return { chain_state ; hash ; contents }
     end
-  let read_opt chain_state hash =
-    read chain_state hash >>= function
+  let read_opt chain_state ?pred hash =
+    read chain_state ?pred hash >>= function
     | Error _ -> Lwt.return None
     | Ok v -> Lwt.return (Some v)
-  let read_exn chain_state hash =
+  let read_exn chain_state ?(pred = 0) hash =
     Shared.use chain_state.block_store begin fun store ->
+      begin
+        if pred = 0 then
+          Lwt.return hash
+        else
+          predecessor_n store hash pred >>= function
+          | None -> Lwt.return chain_state.genesis.block
+          | Some hash -> Lwt.return hash
+      end >>= fun hash ->
       Store.Block.Contents.read_exn (store, hash) >>= fun contents ->
       Lwt.return { chain_state ; hash ; contents }
     end
@@ -497,9 +513,10 @@ module Block = struct
       read_exn chain_state header.shell.predecessor >>= fun block ->
       Lwt.return (Some block)
 
-  let predecessor_n (chain: Chain.t) (b: Block_hash.t) (distance: int) : Block_hash.t option Lwt.t =
-    Shared.use chain.block_store (fun store ->
-        predecessor_n store b distance)
+  let predecessor_n b n =
+    Shared.use b.chain_state.block_store begin fun block_store ->
+      predecessor_n block_store b.hash n
+    end
 
   let store
       ?(dont_enforce_context_hash = false)
@@ -630,22 +647,22 @@ module Block = struct
 
 end
 
-let read_block { global_data } hash =
+let read_block { global_data } ?pred hash =
   Shared.use global_data begin fun { chains } ->
     Chain_id.Table.fold
       (fun _chain_id chain_state acc ->
          acc >>= function
          | Some _ -> acc
          | None ->
-             Block.read_opt chain_state hash >>= function
+             Block.read_opt chain_state ?pred hash >>= function
              | None -> acc
              | Some block -> Lwt.return (Some block))
       chains
       Lwt.return_none
   end
 
-let read_block_exn t hash =
-  read_block t hash >>= function
+let read_block_exn t ?pred hash =
+  read_block t ?pred hash >>= function
   | None -> Lwt.fail Not_found
   | Some b -> Lwt.return b
 

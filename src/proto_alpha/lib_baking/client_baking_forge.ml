@@ -64,7 +64,7 @@ let inject_block cctxt
     ?force ?chain_id
     ~shell_header ~priority ?seed_nonce_hash ~src_sk operations =
   assert_valid_operations_hash shell_header operations >>=? fun () ->
-  let block = `Hash shell_header.Tezos_base.Block_header.predecessor in
+  let block = `Hash (shell_header.Tezos_base.Block_header.predecessor, 0) in
   forge_block_header cctxt block
     src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
   Shell_services.inject_block cctxt
@@ -298,7 +298,7 @@ end
 
 let get_baking_slot cctxt
     ?max_priority (bi: Client_baking_blocks.block_info) delegates =
-  let block = `Hash bi.hash in
+  let block = `Hash (bi.hash, 0) in
   let level = Raw_level.succ bi.level.level in
   Lwt_list.filter_map_p
     (fun delegate ->
@@ -379,7 +379,7 @@ let get_unrevealed_nonces (cctxt : #Proto_alpha.full) ?(force = false) block =
           | None -> return None
           | Some nonce ->
               Alpha_services.Context.level
-                cctxt (`Hash hash) >>=? fun level ->
+                cctxt (`Hash (hash, 0)) >>=? fun level ->
               if force then
                 return (Some (hash, (level.level, nonce)))
               else
@@ -416,9 +416,9 @@ let get_delegates cctxt state =
 let insert_block
     (cctxt : #Proto_alpha.full) ?max_priority state (bi: Client_baking_blocks.block_info) =
   begin
-    safe_get_unrevealed_nonces cctxt (`Hash bi.hash) >>= fun nonces ->
+    safe_get_unrevealed_nonces cctxt (`Hash (bi.hash, 0)) >>= fun nonces ->
     Client_baking_revelation.forge_seed_nonce_revelation
-      cctxt (`Hash bi.hash) (List.map snd nonces)
+      cctxt (`Hash (bi.hash, 0)) (List.map snd nonces)
   end >>= fun _ignore_error ->
   if Fitness.compare state.best.fitness bi.fitness < 0 then begin
     state.best <- bi ;
@@ -464,7 +464,7 @@ let bake (cctxt : #Proto_alpha.full) state =
   let seed_nonce_hash = Nonce.hash seed_nonce in
   filter_map_s
     (fun (timestamp, (bi, priority, delegate)) ->
-       let block = `Hash bi.Client_baking_blocks.hash in
+       let block = `Hash (bi.Client_baking_blocks.hash, 0) in
        Alpha_services.Context.next_level cctxt block >>=? fun next_level ->
        let timestamp =
          if Block_hash.equal bi.Client_baking_blocks.hash state.genesis then

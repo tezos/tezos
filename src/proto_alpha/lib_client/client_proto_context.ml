@@ -19,20 +19,13 @@ let get_balance (rpc : #Proto_alpha.rpc_context) block contract =
 let get_storage (rpc : #Proto_alpha.rpc_context) block contract =
   Alpha_services.Contract.storage_opt rpc block contract
 
-let rec find_predecessor rpc_config h n =
-  if n <= 0 then
-    return (`Hash h)
-  else
-    Block_services.predecessor rpc_config (`Hash h) >>=? fun h ->
-    find_predecessor rpc_config h (n-1)
-
 let get_branch rpc_config block branch =
   let branch = Option.unopt ~default:0 branch in (* TODO export parameter *)
   begin
     match block with
     | `Head n -> return (`Head (n+branch))
     | `Test_head n -> return (`Test_head (n+branch))
-    | `Hash h -> find_predecessor rpc_config h branch
+    | `Hash (h,n) -> return (`Hash (h,n+branch))
     | `Genesis -> return `Genesis
   end >>=? fun block ->
   Block_services.info rpc_config block >>=? fun { chain_id ; hash } ->

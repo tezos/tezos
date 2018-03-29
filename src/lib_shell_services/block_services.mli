@@ -11,9 +11,8 @@ type block = [
   | `Genesis
   | `Head of int
   | `Test_head of int
-  | `Hash of Block_hash.t
+  | `Hash of Block_hash.t * int
 ]
-
 val parse_block: string -> (block, string) result
 val to_string: block -> string
 

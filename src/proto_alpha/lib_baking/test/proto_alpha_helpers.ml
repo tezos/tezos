@@ -464,7 +464,7 @@ module Endorse = struct
       src_sk
       slot =
     Block_services.info !rpc_ctxt block >>=? fun { hash ; _ } ->
-    Alpha_services.Context.level !rpc_ctxt (`Hash hash) >>=? fun level ->
+    Alpha_services.Context.level !rpc_ctxt (`Hash (hash, 0)) >>=? fun level ->
     Alpha_services.Forge.Consensus.endorsement !rpc_ctxt
       block
       ~branch:hash

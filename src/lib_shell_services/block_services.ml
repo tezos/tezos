@@ -13,7 +13,7 @@ type block = [
   | `Genesis
   | `Head of int
   | `Test_head of int
-  | `Hash of Block_hash.t
+  | `Hash of Block_hash.t * int
 ]
 
 let parse_block s =
@@ -24,7 +24,8 @@ let parse_block s =
     | ["test_head"] -> Ok (`Test_head 0)
     | ["head"; n] -> Ok (`Head (int_of_string n))
     | ["test_head"; n] -> Ok (`Test_head (int_of_string n))
-    | [h] -> Ok (`Hash (Block_hash.of_b58check_exn h))
+    | [h] -> Ok (`Hash (Block_hash.of_b58check_exn h, 0))
+    | [h ; n] -> Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
     | _ -> raise Exit
   with _ -> Error "Cannot parse block identifier."
 
@@ -34,7 +35,8 @@ let to_string = function
   | `Head n -> Printf.sprintf "head~%d" n
   | `Test_head 0 -> "test_head"
   | `Test_head n -> Printf.sprintf "test_head~%d" n
-  | `Hash h -> Block_hash.to_b58check h
+  | `Hash (h, 0) -> Block_hash.to_b58check h
+  | `Hash (h, n) -> Printf.sprintf "%s~%d" (Block_hash.to_b58check h) n
 
 type block_info = {
   hash: Block_hash.t ;

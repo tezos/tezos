@@ -78,7 +78,7 @@ let rpc_port = try int_of_string Sys.argv.(3) with _ -> 18200
 
 let main () =
   Helpers.init ~exe ~sandbox ~rpc_port () >>=? fun (_node_pid, genesis) ->
-  run (`Hash genesis) Helpers.Account.bootstrap_accounts >>=? fun _blkh ->
+  run (`Hash (genesis, 0)) Helpers.Account.bootstrap_accounts >>=? fun _blkh ->
   return ()
 
 let tests = [

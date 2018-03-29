@@ -95,9 +95,9 @@ module Block : sig
   val list_invalid: Chain.t -> (Block_hash.t * int32 * error list) list Lwt.t
   val unmark_invalid: Chain.t -> Block_hash.t -> unit tzresult Lwt.t
 
-  val read: Chain.t -> Block_hash.t -> block tzresult Lwt.t
-  val read_opt: Chain.t -> Block_hash.t -> block option Lwt.t
-  val read_exn: Chain.t -> Block_hash.t -> block Lwt.t
+  val read: Chain.t -> ?pred:int -> Block_hash.t -> block tzresult Lwt.t
+  val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block option Lwt.t
+  val read_exn: Chain.t -> ?pred:int -> Block_hash.t -> block Lwt.t
 
   val store:
     ?dont_enforce_context_hash:bool ->
@@ -131,7 +131,7 @@ module Block : sig
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t
-  val predecessor_n: Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
+  val predecessor_n: t -> int -> Block_hash.t option Lwt.t
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
@@ -151,10 +151,10 @@ module Block : sig
 end
 
 val read_block:
-  global_state -> Block_hash.t -> Block.t option Lwt.t
+  global_state -> ?pred:int -> Block_hash.t -> Block.t option Lwt.t
 
 val read_block_exn:
-  global_state -> Block_hash.t -> Block.t Lwt.t
+  global_state -> ?pred:int -> Block_hash.t -> Block.t Lwt.t
 
 val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.t Lwt.t
 

@@ -57,7 +57,7 @@ let rpc_port = try int_of_string Sys.argv.(3) with _ -> 18500
 
 let main () =
   Helpers.init ~exe ~sandbox ~rpc_port () >>=? fun (_node_pid, genesis) ->
-  run (`Hash genesis)
+  run (`Hash (genesis, 0))
 
 let tests = [
   "main", (fun _ -> main ()) ;

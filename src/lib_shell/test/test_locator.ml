@@ -203,7 +203,8 @@ let test_pred (base_dir:string) : unit tzresult Lwt.t =
 
   let test_once distance =
     linear_predecessor_n chain head distance >>= fun lin_res ->
-    State.Block.predecessor_n chain head distance >>= fun exp_res ->
+    State.Block.read_exn chain head >>= fun head_block ->
+    State.Block.predecessor_n head_block distance >>= fun exp_res ->
     match lin_res,exp_res with
     | None, None ->
         Lwt.return_unit

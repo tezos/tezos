@@ -24,22 +24,22 @@ let test_double_endorsement_evidence contract block =
   Helpers.Baking.bake block contract [] >>=? fun b1 ->
 
   (* branch root *)
-  Helpers.Baking.bake (`Hash b1) contract [] >>=? fun b2 ->
+  Helpers.Baking.bake (`Hash (b1, 0)) contract [] >>=? fun b2 ->
   (* changing branch *)
-  Helpers.Baking.bake (`Hash b1) contract [] >>=? fun b2' ->
+  Helpers.Baking.bake (`Hash (b1, 0)) contract [] >>=? fun b2' ->
 
   (* branch root *)
-  Helpers.Endorse.endorse contract (`Hash b2) >>=? fun op ->
-  Helpers.Baking.bake (`Hash b2) contract [ op ] >>=? fun _b3 ->
+  Helpers.Endorse.endorse contract (`Hash (b2, 0)) >>=? fun op ->
+  Helpers.Baking.bake (`Hash (b2, 0)) contract [ op ] >>=? fun _b3 ->
 
-  Helpers.Endorse.endorse contract (`Hash b2') >>=? fun op ->
-  Helpers.Baking.bake (`Hash b2') contract [ op ] >>=? fun b3' ->
+  Helpers.Endorse.endorse contract (`Hash (b2', 0)) >>=? fun op ->
+  Helpers.Baking.bake (`Hash (b2', 0)) contract [ op ] >>=? fun b3' ->
 
-  Helpers.Endorse.endorse contract (`Hash b3') >>=? fun op ->
-  Helpers.Baking.bake (`Hash b3') contract [ op ] >>=? fun b4' ->
+  Helpers.Endorse.endorse contract (`Hash (b3', 0)) >>=? fun op ->
+  Helpers.Baking.bake (`Hash (b3', 0)) contract [ op ] >>=? fun b4' ->
 
   (* TODO: Inject double endorsement op ! *)
-  Helpers.Baking.bake (`Hash b4') contract []
+  Helpers.Baking.bake (`Hash (b4', 0)) contract []
 
 (* FIXME: Baking.Invalid_signature is unclassified *)
 let test_invalid_signature block =
@@ -116,70 +116,70 @@ let test_endorsement_rewards block0 =
   Helpers.Account.balance ~block:block0 account0 >>=? fun balance0 ->
   Helpers.Endorse.endorse ~slot:slot0 account0 block0 >>=? fun op ->
   Helpers.Baking.bake block0 b1 [ op ] >>=? fun hash1 ->
-  Helpers.display_level (`Hash hash1) >>=? fun () ->
-  Assert.balance_equal ~block:(`Hash hash1) ~msg:__LOC__ account0
+  Helpers.display_level (`Hash (hash1, 0)) >>=? fun () ->
+  Assert.balance_equal ~block:(`Hash (hash1, 0)) ~msg:__LOC__ account0
     (Int64.sub (Tez.to_mutez balance0) deposit) >>=? fun () ->
 
   (* #2 endorse & inject in a block  *)
-  let block1 = `Hash hash1 in
+  let block1 = `Hash (hash1, 0) in
   Helpers.Endorse.endorsers_list block1 >>=? fun accounts ->
   get_endorser_except [ b1 ; account0 ] accounts >>=? fun (account1, slot1) ->
   Helpers.Account.balance ~block:block1 account1 >>=? fun balance1 ->
   Helpers.Endorse.endorse ~slot:slot1 account1 block1 >>=? fun op ->
   Helpers.Baking.bake block1 b1 [ op ] >>=? fun hash2 ->
-  Helpers.display_level (`Hash hash2) >>=? fun () ->
-  Assert.balance_equal ~block:(`Hash hash2) ~msg:__LOC__ account1
+  Helpers.display_level (`Hash (hash2, 0)) >>=? fun () ->
+  Assert.balance_equal ~block:(`Hash (hash2, 0)) ~msg:__LOC__ account1
     (Int64.sub (Tez.to_mutez balance1) deposit) >>=? fun () ->
 
   (*
   (* Check rewards after one cycle for account0 *)
-  Helpers.Baking.bake (`Hash hash2) b1 [] >>=? fun hash3 ->
-  Helpers.display_level (`Hash hash3) >>=? fun () ->
-  Helpers.Baking.bake (`Hash hash3) b1 [] >>=? fun hash4 ->
-  Helpers.display_level (`Hash hash4) >>=? fun () ->
-  Helpers.Baking.bake (`Hash hash4) b1 [] >>=? fun hash5 ->
-  Helpers.display_level (`Hash hash5) >>=? fun () ->
+  Helpers.Baking.bake (`Hash (hash2, 0)) b1 [] >>=? fun hash3 ->
+  Helpers.display_level (`Hash (hash3, 0)) >>=? fun () ->
+  Helpers.Baking.bake (`Hash (hash3, 0)) b1 [] >>=? fun hash4 ->
+  Helpers.display_level (`Hash (hash4, 0)) >>=? fun () ->
+  Helpers.Baking.bake (`Hash (hash4, 0)) b1 [] >>=? fun hash5 ->
+  Helpers.display_level (`Hash (hash5, 0)) >>=? fun () ->
   Helpers.Baking.endorsement_reward block1 >>=? fun rw0 ->
-  Assert.balance_equal ~block:(`Hash hash5) ~msg:__LOC__ account0
+  Assert.balance_equal ~block:(`Hash (hash5, 0)) ~msg:__LOC__ account0
     (Int64.add (Tez.to_mutez balance0) rw0) >>=? fun () ->
 
   (* Check rewards after one cycle for account1 *)
-  Helpers.Baking.endorsement_reward (`Hash hash2) >>=? fun rw1 ->
-  Assert.balance_equal ~block:(`Hash hash5) ~msg:__LOC__ account1
+  Helpers.Baking.endorsement_reward (`Hash (hash2, 0)) >>=? fun rw1 ->
+  Assert.balance_equal ~block:(`Hash (hash5, 0)) ~msg:__LOC__ account1
     (Int64.add (Tez.to_mutez balance1) rw1) >>=? fun () ->
 
   (* #2 endorse and check reward only on the good chain  *)
-  Helpers.Baking.bake (`Hash hash5) b1 []>>=? fun hash6a ->
-  Helpers.display_level (`Hash hash6a) >>=? fun () ->
-  Helpers.Baking.bake (`Hash hash5) b1 [] >>=? fun hash6b ->
-  Helpers.display_level (`Hash hash6b) >>=? fun () ->
+  Helpers.Baking.bake (`Hash (hash5, 0)) b1 []>>=? fun hash6a ->
+  Helpers.display_level (`Hash (hash6a, 0)) >>=? fun () ->
+  Helpers.Baking.bake (`Hash (hash5, 0)) b1 [] >>=? fun hash6b ->
+  Helpers.display_level (`Hash (hash6b, 0)) >>=? fun () ->
 
   (* working on head *)
-  Helpers.Endorse.endorsers_list (`Hash hash6a) >>=? fun accounts ->
+  Helpers.Endorse.endorsers_list (`Hash (hash6a, 0)) >>=? fun accounts ->
   get_endorser_except [ b1 ] accounts >>=? fun (account3, slot3) ->
-  Helpers.Account.balance ~block:(`Hash hash6a) account3 >>=? fun balance3 ->
+  Helpers.Account.balance ~block:(`Hash (hash6a, 0)) account3 >>=? fun balance3 ->
   Helpers.Endorse.endorse
-    ~slot:slot3 account3 (`Hash hash6a) >>=? fun ops ->
-  Helpers.Baking.bake (`Hash hash6a) b1 [ ops ] >>=? fun hash7a ->
-  Helpers.display_level (`Hash hash7a) >>=? fun () ->
+    ~slot:slot3 account3 (`Hash (hash6a, 0)) >>=? fun ops ->
+  Helpers.Baking.bake (`Hash (hash6a, 0)) b1 [ ops ] >>=? fun hash7a ->
+  Helpers.display_level (`Hash (hash7a, 0)) >>=? fun () ->
 
   (* working on fork *)
-  Helpers.Endorse.endorsers_list (`Hash hash6b) >>=? fun accounts ->
+  Helpers.Endorse.endorsers_list (`Hash (hash6b, 0)) >>=? fun accounts ->
   get_endorser_except [ b1 ] accounts >>=? fun (account4, slot4) ->
-  Helpers.Account.balance ~block:(`Hash hash7a) account4 >>=? fun _balance4 ->
-  Helpers.Endorse.endorse ~slot:slot4 account4 (`Hash hash6b) >>=? fun ops ->
-  Helpers.Baking.bake (`Hash hash6b) b1 [ ops ] >>=? fun _new_fork ->
-  Helpers.display_level (`Hash _new_fork) >>=? fun () ->
-  Helpers.Account.balance ~block:(`Hash hash7a) account4 >>=? fun balance4 ->
+  Helpers.Account.balance ~block:(`Hash (hash7a, 0)) account4 >>=? fun _balance4 ->
+  Helpers.Endorse.endorse ~slot:slot4 account4 (`Hash (hash6b, 0)) >>=? fun ops ->
+  Helpers.Baking.bake (`Hash (hash6b, 0)) b1 [ ops ] >>=? fun _new_fork ->
+  Helpers.display_level (`Hash (_new_fork, 0)) >>=? fun () ->
+  Helpers.Account.balance ~block:(`Hash (hash7a, 0)) account4 >>=? fun balance4 ->
 
-  Helpers.Baking.bake (`Hash hash7a) b1 [] >>=? fun hash8a ->
-  Helpers.display_level (`Hash hash8a) >>=? fun () ->
-  Helpers.Baking.bake (`Hash hash8a) b1 [] >>=? fun hash9a ->
-  Helpers.display_level (`Hash hash9a) >>=? fun () ->
+  Helpers.Baking.bake (`Hash (hash7a, 0)) b1 [] >>=? fun hash8a ->
+  Helpers.display_level (`Hash (hash8a, 0)) >>=? fun () ->
+  Helpers.Baking.bake (`Hash (hash8a, 0)) b1 [] >>=? fun hash9a ->
+  Helpers.display_level (`Hash (hash9a, 0)) >>=? fun () ->
 
   (* Check rewards after one cycle *)
-  Helpers.Baking.endorsement_reward (`Hash hash7a) >>=? fun reward ->
-  Assert.balance_equal ~block:(`Hash hash9a) ~msg:__LOC__ account3
+  Helpers.Baking.endorsement_reward (`Hash (hash7a, 0)) >>=? fun reward ->
+  Assert.balance_equal ~block:(`Hash (hash9a, 0)) ~msg:__LOC__ account3
     (Int64.add (Tez.to_mutez balance3) reward) >>=? fun () ->
 
   (* Check no reward for the fork *)
@@ -187,7 +187,7 @@ let test_endorsement_rewards block0 =
     if account3 = account4 then return ()
     (* if account4 is different from account3, we need to check that there
        is no reward for him since the endorsement was in the fork branch *)
-    else Assert.balance_equal ~block:(`Hash hash9a) ~msg:__LOC__ account4 (Tez.to_mutez balance4)
+    else Assert.balance_equal ~block:(`Hash (hash9a, 0)) ~msg:__LOC__ account4 (Tez.to_mutez balance4)
   end >>=? fun () ->
 
 *)
@@ -201,7 +201,7 @@ let run genesis =
 
   Helpers.Baking.bake genesis b1 [] >>=? fun blk ->
 
-  let block = `Hash blk in
+  let block = `Hash (blk, 0) in
   test_endorsement_rights
     default_account block >>=? fun has_right_to_endorse ->
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse false ;
@@ -249,7 +249,7 @@ let rpc_port = try int_of_string Sys.argv.(3) with _ -> 18100
 
 let main () =
   Helpers.init ~exe ~sandbox ~rpc_port () >>=? fun (_node_pid, genesis) ->
-  run (`Hash genesis)
+  run (`Hash (genesis, 0))
 
 
 let tests = [
