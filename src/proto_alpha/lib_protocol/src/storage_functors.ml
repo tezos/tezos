@@ -215,24 +215,17 @@ module Make_indexed_data_storage
   let clear s =
     C.remove_rec s [] >>= fun t ->
     Lwt.return (C.project t)
-  let fold s ~init ~f =
+
+  let fold_keys s ~init ~f =
     let rec dig i path acc =
       if Compare.Int.(i <= 1) then
         C.fold s path ~init:acc ~f:begin fun k acc ->
           match k with
           | `Dir _ -> Lwt.return acc
           | `Key file ->
-              C.get_option s file >>= function
-              | None -> Lwt.return acc
-              | Some b ->
-                  match V.of_bytes b with
-                  | Error _ ->
-                      (* Silently ignore unparsable data *)
-                      Lwt.return acc
-                  | Ok v ->
-                      match I.of_path file with
-                      | None -> assert false
-                      | Some path -> f path v acc
+              match I.of_path file with
+              | None -> assert false
+              | Some path -> f path acc
         end
       else
         C.fold s path ~init:acc ~f:begin fun k acc ->
@@ -242,17 +235,17 @@ module Make_indexed_data_storage
         end in
     dig I.path_length [] init
 
+  let fold s ~init ~f =
+    let f path acc =
+      get s path >>= function
+      | Error _ ->
+          (* FIXME: silently ignore unparsable data *)
+          Lwt.return acc
+      | Ok v ->
+          f path v acc in
+    fold_keys s ~init ~f
   let bindings s =
     fold s ~init:[] ~f:(fun p v acc -> Lwt.return ((p,v) :: acc))
-  let fold_keys s ~init ~f =
-    C.fold s [] ~init
-      ~f:(fun p acc ->
-          match p with
-          | `Dir _ -> Lwt.return acc
-          | `Key p ->
-              match I.of_path p with
-              | None -> assert false
-              | Some path -> f path acc)
   let keys s =
     fold_keys s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 
