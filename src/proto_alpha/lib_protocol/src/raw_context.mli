@@ -153,6 +153,8 @@ module type T = sig
 
   val project: context -> root_context
 
+  val consume_gas: context -> Gas_repr.cost -> context tzresult
+
 end
 
 include T with type t := t and type context := context

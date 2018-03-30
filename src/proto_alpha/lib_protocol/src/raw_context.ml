@@ -380,6 +380,9 @@ module type T = sig
     context -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
   val project: context -> root_context
+
+  val consume_gas: context -> Gas_repr.cost -> context tzresult
+
 end
 
 let mem ctxt k = Context.mem ctxt.context k
