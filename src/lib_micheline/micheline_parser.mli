@@ -56,6 +56,8 @@ val min_point : node list -> point
 (** End of a sequence of consecutive primitives *)
 val max_point : node list -> point
 
+val max_annot_length : int
+
 val node_encoding : node Data_encoding.encoding
 
 type error += Invalid_utf8_sequence of point * string
@@ -70,6 +72,7 @@ type error += Unexpected of token
 type error += Extra of token
 type error += Misaligned of node
 type error += Empty
+type error += Annotation_length of location
 
 val parse_toplevel : ?check:bool -> token list -> node list parsing_result
 

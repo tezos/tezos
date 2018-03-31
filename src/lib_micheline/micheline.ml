@@ -131,11 +131,12 @@ let canonical_encoding ~variant prim_encoding =
     case tag (list expr_encoding)
       (function Seq (_, v, _annot) -> Some v | _ -> None)
       (fun args -> Seq (0, args, None)) in
+  let byte_string = Bounded.string 255 in
   let application_encoding tag expr_encoding =
     case tag
       (obj3 (req "prim" prim_encoding)
          (req "args" (list expr_encoding))
-         (opt "annot" string))
+         (opt "annot" byte_string))
       (function Prim (_, prim, args, annot) -> Some (prim, args, annot)
               | _ -> None)
       (fun (prim, args, annot) -> Prim (0, prim, args, annot)) in
@@ -161,7 +162,7 @@ let canonical_encoding ~variant prim_encoding =
                      (* No args, with annot *)
                      case (Tag 4)
                        (obj2 (req "prim" prim_encoding)
-                          (req "annot" string))
+                          (req "annot" byte_string))
                        (function
                          | Prim (_, v, [], Some annot) -> Some (v, annot)
                          | _ -> None)
@@ -178,7 +179,7 @@ let canonical_encoding ~variant prim_encoding =
                      case (Tag 6)
                        (obj3 (req "prim" prim_encoding)
                           (req "arg" expr_encoding)
-                          (req "annot" string))
+                          (req "annot" byte_string))
                        (function
                          | Prim (_, prim, [ arg ], Some annot) -> Some (prim, arg, annot)
                          | _ -> None)
@@ -197,7 +198,7 @@ let canonical_encoding ~variant prim_encoding =
                        (obj4 (req "prim" prim_encoding)
                           (req "arg1" expr_encoding)
                           (req "arg2" expr_encoding)
-                          (req "annot" string))
+                          (req "annot" byte_string))
                        (function
                          | Prim (_, prim, [ arg1 ; arg2 ], Some annot) -> Some (prim, arg1, arg2, annot)
                          | _ -> None)

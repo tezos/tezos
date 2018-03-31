@@ -438,6 +438,10 @@ bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 True)
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 False)'
 bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 False)'
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 True)'
+assert_fails $client typecheck data '3' against type \
+             '(int @aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'
+$client typecheck data '3' against type \
+        '(int @aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'
 
 init_with_transfer $contract_dir/big_map_get_add.tz $key1\
                    '(Pair { Elt 0 1 ; Elt 1 2 ; Elt 2 3 } Unit)' \

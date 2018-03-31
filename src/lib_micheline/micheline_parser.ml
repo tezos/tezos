@@ -95,6 +95,8 @@ type token =
   { token : token_value ;
     loc : location }
 
+let max_annot_length = 255
+
 type error += Invalid_utf8_sequence of point * string
 type error += Unexpected_character of point * string
 type error += Undefined_escape_sequence of point * string
@@ -102,6 +104,7 @@ type error += Missing_break_after_number of point
 type error += Unterminated_string of location
 type error += Unterminated_integer of location
 type error += Unterminated_comment of location
+type error += Annotation_length of location
 
 let tokenize source =
   let decoder = Uutf.decoder ~encoding:`UTF_8 (`String source) in
@@ -139,8 +142,13 @@ let tokenize source =
     | `End, _ -> List.rev acc
     | `Uchar c, start ->
         begin match uchar_to_char c with
-          | Some ('a'..'z' | 'A'..'Z') -> ident acc start (fun s -> Ident s)
-          | Some '@' -> ident acc start (fun s -> Annot s)
+          | Some ('a'..'z' | 'A'..'Z') -> ident acc start (fun s _ -> Ident s)
+          | Some '@' ->
+              ident acc start
+                (fun str stop ->
+                   if String.length str > max_annot_length
+                   then errors := (Annotation_length { start ; stop }) :: !errors ;
+                   Annot str)
           | Some '-' ->
               begin match next () with
                 | `End, stop ->
@@ -273,11 +281,11 @@ let tokenize source =
             let byte = Uutf.decoder_byte_count decoder in
             let s = String.sub source stop.byte (byte - stop.byte) in
             string acc (s :: sacc) start
-  and ident acc start ret =
+  and ident acc start (ret : string -> point -> token_value) =
     let tok stop =
       let name =
         String.sub source start.byte (stop.byte - start.byte) in
-      tok start stop (ret name) in
+      tok start stop (ret name stop) in
     match next () with
     | (`Uchar c, stop) as charloc ->
         begin match uchar_to_char c with
@@ -722,6 +730,18 @@ let () =
     Data_encoding.(obj1 (req "location" location_encoding))
     (function Unterminated_comment loc -> Some loc | _ -> None)
     (fun loc -> Unterminated_comment loc) ;
+  register_error_kind `Permanent
+    ~id: "micheline.parse_error.annotation_exceeds_max_length"
+    ~title: "Micheline parser error: annotation exceeds max length"
+    ~description: (Format.sprintf
+                     "While parsing a piece of Micheline source, \
+                      an annotation exceeded the maximum length (%d)." max_annot_length)
+    ~pp:(fun ppf loc -> Format.fprintf ppf "%a, annotation exceeded maximum length (%d chars)"
+            print_location
+            loc max_annot_length)
+    Data_encoding.(obj1 (req "location" location_encoding))
+    (function Annotation_length loc -> Some loc | _ -> None)
+    (fun loc -> Annotation_length loc) ;
   register_error_kind `Permanent
     ~id: "micheline.parse_error.unclosed_token"
     ~title: "Micheline parser error: unclosed token"
