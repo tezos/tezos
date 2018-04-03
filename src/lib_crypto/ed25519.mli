@@ -9,6 +9,8 @@
 
 (** Tezos - Ed25519 cryptography *)
 
+open Error_monad
+
 (** {2 Hashed public keys for user ID} ***************************************)
 
 module Public_key_hash : S.HASH
@@ -27,6 +29,7 @@ module Public_key : sig
 
   val of_b58check_exn: string -> t
   val of_b58check_opt: string -> t option
+  val of_b58check: string -> t tzresult
   val to_b58check: t -> string
 
   val to_hex: t -> Hex.t
@@ -38,6 +41,13 @@ module Public_key : sig
   val to_bytes: t -> MBytes.t
 
   val size: int
+
+  val encoding: t Data_encoding.t
+  val param:
+    ?name:string ->
+    ?desc:string ->
+    ('a, 'b) Clic.params ->
+    (t -> 'a, 'b) Clic.params
 
 end
 
@@ -53,6 +63,7 @@ module Secret_key : sig
 
   val of_b58check_exn: string -> t
   val of_b58check_opt: string -> t option
+  val of_b58check: string -> t tzresult
   val to_b58check: t -> string
 
   val of_bytes_exn: MBytes.t -> t
@@ -60,6 +71,13 @@ module Secret_key : sig
   val to_bytes: t -> MBytes.t
 
   val size: int
+
+  val encoding: t Data_encoding.t
+  val param:
+    ?name:string ->
+    ?desc:string ->
+    ('a, 'b) Clic.params ->
+    (t -> 'a, 'b) Clic.params
 
 end
 
@@ -73,11 +91,19 @@ module Signature : sig
 
   val of_b58check_exn: string -> t
   val of_b58check_opt: string -> t option
+  val of_b58check: string -> t tzresult
   val to_b58check: t -> string
 
   val of_bytes_exn: MBytes.t -> t
   val of_bytes_opt: MBytes.t -> t option
   val to_bytes: t -> MBytes.t
+
+  val encoding: t Data_encoding.t
+  val param:
+    ?name:string ->
+    ?desc:string ->
+    ('a, 'b) Clic.params ->
+    (t -> 'a, 'b) Clic.params
 
   val size: int
 

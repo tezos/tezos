@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include S.INTERNAL_HASH
+include S.MERKLE_TREE with type elt = Operation_list_hash.t

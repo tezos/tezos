@@ -78,6 +78,37 @@ module Public_key = struct
     Public_key_hash.hash_bytes
       [ Cstruct.to_bigarray (Sign.to_cstruct v) ]
 
+  let encoding =
+    let open Data_encoding in
+    splitted
+      ~json:
+        (describe
+           ~title: "An Ed25519 public key (Tezos_crypto.Base58Check encoded)" @@
+         conv
+           (fun s -> to_b58check s)
+           (fun s ->
+              match of_b58check_opt s with
+              | Some x -> x
+              | None -> Data_encoding.Json.cannot_destruct
+                          "Ed25519 public key: unexpected prefix.")
+           string)
+      ~binary:
+        (conv
+           to_bytes
+           of_bytes_exn
+           (Fixed.bytes size))
+  let of_b58check s =
+    match of_b58check_opt s with
+    | Some x -> Ok x
+    | None ->
+        Error_monad.generic_error
+          "Failed to read a base58-encoded Ed25519 public key"
+  let param
+      ?(name="ed25519-public")
+      ?(desc="Ed25519 public key (b58check-encoded)") t =
+    Clic.(param ~name ~desc
+            (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
+
 end
 
 module Secret_key = struct
@@ -142,6 +173,37 @@ module Secret_key = struct
     Base58.check_encoded_prefix seed_encoding "edsk" 54 ;
     Base58.check_encoded_prefix secret_key_encoding "edsk" 98
 
+  let encoding =
+    let open Data_encoding in
+    splitted
+      ~json:
+        (describe
+           ~title: "An Ed25519 secret key (Tezos_crypto.Base58Check encoded)" @@
+         conv
+           (fun s -> to_b58check s)
+           (fun s ->
+              match of_b58check_opt s with
+              | Some x -> x
+              | None -> Data_encoding.Json.cannot_destruct
+                          "Ed25519 secret key: unexpected prefix.")
+           string)
+      ~binary:
+        (conv
+           to_bytes
+           of_bytes_exn
+           (Fixed.bytes size))
+  let of_b58check s =
+    match of_b58check_opt s with
+    | Some x -> Ok x
+    | None ->
+        Error_monad.generic_error
+          "Failed to read a base58-encoded Ed25519 secret key"
+  let param
+      ?(name="ed25519-secret")
+      ?(desc="Ed25519 secret key (b58check-encoded)") t =
+    Clic.(param ~name ~desc
+            (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
+
 end
 
 let sign key msg =
@@ -198,6 +260,36 @@ module Signature = struct
   let concat msg signature =
     MBytes.concat msg signature
 
+  let encoding =
+    let open Data_encoding in
+    splitted
+      ~json:
+        (describe
+           ~title: "An Ed25519 signature (Base58Check encoded)" @@
+         conv
+           (fun s -> to_b58check s)
+           (fun s ->
+              match of_b58check_opt s with
+              | Some x -> x
+              | None -> Data_encoding.Json.cannot_destruct
+                          "Ed25519 signature: unexpected prefix.")
+           string)
+      ~binary:
+        (conv
+           to_bytes
+           of_bytes_exn
+           (Fixed.bytes size))
+  let of_b58check s =
+    match of_b58check_opt s with
+    | Some x -> Ok x
+    | None ->
+        Error_monad.generic_error
+          "Failed to read a base58-encoded Ed25519 signature"
+  let param
+      ?(name="ed25519-signature")
+      ?(desc="Ed25519 signature (b58check-encoded)") t =
+    Clic.(param ~name ~desc
+            (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
 end
 
 module Seed = struct

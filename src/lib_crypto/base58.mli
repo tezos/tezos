@@ -131,3 +131,4 @@ val raw_decode: ?alphabet:Alphabet.t -> string -> string option
 
 val partial_decode: ?alphabet:Alphabet.t -> string -> int -> string option
 val make_encoded_prefix: string -> int -> string * int
+val prefix: 'a encoding -> string

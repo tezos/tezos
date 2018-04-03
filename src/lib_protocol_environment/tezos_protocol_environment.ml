@@ -188,7 +188,94 @@ module Make (Context : CONTEXT) = struct
     module Data_encoding = Data_encoding
     module Time = Time
     module Ed25519 = Ed25519
-    module S = Tezos_base.S
+    module S = struct
+      module type T = Tezos_base.S.T
+      module type HASHABLE = Tezos_base.S.HASHABLE
+      module type MINIMAL_HASH = sig
+
+        type t
+
+        val name: string
+        val title: string
+
+        val hash_bytes: ?key:MBytes.t -> MBytes.t list -> t
+        val hash_string: ?key:string -> string list -> t
+        val size: int (* in bytes *)
+        val compare: t -> t -> int
+        val equal: t -> t -> bool
+
+        val to_hex: t -> string
+        val of_hex: string -> t option
+        val of_hex_exn: string -> t
+
+        val to_string: t -> string
+        val of_string: string -> t option
+        val of_string_exn: string -> t
+
+        val to_bytes: t -> MBytes.t
+        val of_bytes_opt: MBytes.t -> t option
+        val of_bytes_exn: MBytes.t -> t
+
+        val read: MBytes.t -> int -> t
+        val write: MBytes.t -> int -> t -> unit
+
+        val to_path: t -> string list -> string list
+        val of_path: string list -> t option
+        val of_path_exn: string list -> t
+
+        val prefix_path: string -> string list
+        val path_length: int
+
+        val zero: t
+
+      end
+      module type SET = Tezos_base.S.SET
+      module type MAP = Tezos_base.S.MAP
+      module type HASH = sig
+
+        include MINIMAL_HASH
+
+        val encoding: t Data_encoding.t
+
+        val to_b58check: t -> string
+        val to_short_b58check: t -> string
+        type Base58.data += Hash of t
+        val b58check_encoding: t Base58.encoding
+
+        val of_b58check_exn: string -> t
+        val of_b58check_opt: string -> t option
+
+        val pp: Format.formatter -> t -> unit
+        val pp_short: Format.formatter -> t -> unit
+
+        val rpc_arg: t RPC_arg.t
+
+        module Set : sig
+          include SET with type elt = t
+          val encoding: t Data_encoding.t
+        end
+
+        module Map : sig
+          include MAP with type key = t
+          val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
+        end
+
+      end
+
+      module type MERKLE_TREE = sig
+        type elt
+        include HASH
+        val compute: elt list -> t
+        val empty: t
+        type path =
+          | Left of path * t
+          | Right of t * path
+          | Op
+        val compute_path: elt list -> int -> path
+        val check_path: path -> elt -> t * int
+        val path_encoding: path Data_encoding.t
+      end
+    end
     module Error_monad = struct
       type 'a shell_tzresult = 'a Error_monad.tzresult
       type shell_error = Error_monad.error = ..
@@ -225,7 +312,7 @@ module Make (Context : CONTEXT) = struct
     module Operation_list_list_hash = Operation_list_list_hash
     module Context_hash = Context_hash
     module Protocol_hash = Protocol_hash
-    module Blake2B = Tezos_base.Blake2B
+    module Blake2B = Blake2B
     module Fitness = Fitness
     module Operation = Operation
     module Block_header = Block_header

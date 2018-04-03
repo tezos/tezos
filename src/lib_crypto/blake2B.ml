@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
+
 (*-- Type specific Hash builder ---------------------------------------------*)
 
 module type Name = sig
@@ -68,6 +70,11 @@ module Make_minimal (K : Name) = struct
             K.name (MBytes.length b) in
         raise (Invalid_argument msg)
     | Some h -> h
+  let of_bytes s =
+    match of_bytes_opt s with
+    | Some x -> Ok x
+    | None ->
+        generic_error "Failed to deserialize a hash (%s)" K.name
   let to_bytes (Blake2b.Hash h) = Cstruct.to_bigarray h
 
   let read src off = of_bytes_exn @@ MBytes.sub src off size
@@ -106,7 +113,7 @@ module Make_minimal (K : Name) = struct
     and p3 = if len >= 6 then String.sub p 4 2 else ""
     and p4 = if len >= 8 then String.sub p 6 2 else ""
     and p5 = if len >= 10 then String.sub p 8 2 else ""
-    and p6 = if len > 10 then String.sub p 10 (len - 10) else "" in
+    and p6 = if len > 10 then String.sub p 10 (min (len - 10) (size * 2 - 10)) else "" in
     [ p1 ; p2 ; p3 ; p4 ; p5 ; p6 ]
 
   let zero =
@@ -130,31 +137,43 @@ module Make (R : sig
 
   (* Serializers *)
 
+  let raw_encoding =
+    let open Data_encoding in
+    conv to_bytes of_bytes_exn (Fixed.bytes size)
+
+  let hash =
+    if size >= 8 then
+      fun h -> Int64.to_int (MBytes.get_int64 (to_bytes h) 0)
+    else if size >= 4 then
+      fun h -> Int32.to_int (MBytes.get_int32 (to_bytes h) 0)
+    else
+      fun h ->
+        let r = ref 0 in
+        let h = to_bytes h in
+        for i = 0 to size - 1 do
+          r := MBytes.get_uint8 h i + 8 * !r
+        done ;
+        !r
+
   type Base58.data += Hash of t
 
   let b58check_encoding =
     R.register_encoding
       ~prefix: K.b58check_prefix
-      ~length:size
+      ~length: size
       ~wrap: (fun s -> Hash s)
-      ~of_raw:(fun h -> of_string h) ~to_raw:to_string
+      ~of_raw: (fun h -> of_string h) ~to_raw:to_string
 
-  let of_b58check_opt s =
-    Base58.simple_decode b58check_encoding s
-  let of_b58check_exn s =
-    match Base58.simple_decode b58check_encoding s with
-    | Some x -> x
-    | None -> Format.kasprintf Pervasives.failwith "Unexpected hash (%s)" K.name
-  let to_b58check s = Base58.simple_encode b58check_encoding s
-
-  let to_short_b58check s =
-    String.sub (to_b58check s) 0 (10 + 2 * String.length K.b58check_prefix)
-
-  let pp ppf t =
-    Format.pp_print_string ppf (to_b58check t)
-
-  let pp_short ppf t =
-    Format.pp_print_string ppf (to_short_b58check t)
+  include Hash.Make(struct
+      type nonrec t = t
+      let title = title
+      let name = name
+      let b58check_encoding = b58check_encoding
+      let raw_encoding = raw_encoding
+      let compare = compare
+      let equal = equal
+      let hash = hash
+    end)
 
 end
 
@@ -274,6 +293,29 @@ module Make_merkle_tree
       let leaf x = hash_bytes [Contents.to_bytes x]
       let node x y = hash_bytes [to_bytes x; to_bytes y]
     end)
+
+  let path_encoding =
+    let open Data_encoding in
+    mu "path"
+      (fun path_encoding ->
+         union [
+           case (Tag 240)
+             (obj2
+                (req "path" path_encoding)
+                (req "right" encoding))
+             (function Left (p, r) -> Some (p, r) | _ -> None)
+             (fun (p, r) -> Left (p, r)) ;
+           case (Tag 15)
+             (obj2
+                (req "left" encoding)
+                (req "path" path_encoding))
+             (function Right (r, p) -> Some (r, p) | _ -> None)
+             (fun (r, p) -> Right (r, p)) ;
+           case (Tag 0)
+             unit
+             (function Op -> Some () | _ -> None)
+             (fun () -> Op)
+         ])
 
 end
 

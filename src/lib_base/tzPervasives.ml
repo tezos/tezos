@@ -12,12 +12,8 @@ include Tezos_data_encoding
 include Tezos_error_monad
 include Tezos_rpc
 include Tezos_clic
+include Tezos_crypto
 include Tezos_micheline
-
-module Ed25519 = Ed25519
-module Crypto_box = Crypto_box
-module Base58 = Tezos_crypto.Base58
-module Rand = Tezos_crypto.Rand
 
 module List = struct
   include List
@@ -33,14 +29,6 @@ module Fitness = Fitness
 module Block_header = Block_header
 module Operation = Operation
 module Protocol = Protocol
-
-module Chain_id = Chain_id
-module Block_hash = Block_hash
-module Operation_hash = Operation_hash
-module Operation_list_hash = Operation_list_hash
-module Operation_list_list_hash = Operation_list_list_hash
-module Context_hash = Context_hash
-module Protocol_hash = Protocol_hash
 
 module Test_chain_status = Test_chain_status
 module Preapply_result = Preapply_result

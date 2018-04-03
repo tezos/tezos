@@ -7,6 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include S.INTERNAL_HASH
+include Blake2B.Make (Base58) (struct
+    let name = "Operation_hash"
+    let title = "A Tezos operation ID"
+    let b58check_prefix = Base58.Prefix.operation_hash
+    let size = None
+  end)
 
-val of_block_hash: Block_hash.t -> t
+let () =
+  Base58.check_encoded_prefix b58check_encoding "o" 51
+

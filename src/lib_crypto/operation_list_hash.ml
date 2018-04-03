@@ -7,13 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Blake2B.Make (Tezos_crypto.Base58) (struct
-    let name = "Protocol_hash"
-    let title = "A Tezos protocol ID"
-    let b58check_prefix = Tezos_crypto.Base58.Prefix.protocol_hash
+include Blake2B.Make_merkle_tree (Base58) (struct
+    let name = "Operation_list_hash"
+    let title = "A list of operations"
+    let b58check_prefix = Base58.Prefix.operation_list_hash
     let size = None
-  end)
+  end) (Operation_hash)
 
 let () =
-  Tezos_crypto.Base58.check_encoded_prefix b58check_encoding "P" 51
-
+  Base58.check_encoded_prefix b58check_encoding "Lo" 52

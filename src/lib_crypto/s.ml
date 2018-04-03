@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
 
 (** {2 Hash Types} ************************************************************)
 
@@ -59,9 +60,11 @@ module type HASH = sig
 
   include MINIMAL_HASH
 
+  val of_bytes: Cstruct.buffer -> t tzresult
   val to_b58check: t -> string
   val to_short_b58check: t -> string
 
+  val of_b58check: string -> t tzresult
   val of_b58check_exn: string -> t
   val of_b58check_opt: string -> t option
 
@@ -70,6 +73,31 @@ module type HASH = sig
 
   val pp: Format.formatter -> t -> unit
   val pp_short: Format.formatter -> t -> unit
+
+  val encoding: t Data_encoding.t
+  val rpc_arg: t RPC_arg.t
+
+  val param:
+    ?name:string ->
+    ?desc:string ->
+    ('a, 'arg) Clic.params ->
+    (t -> 'a, 'arg) Clic.params
+
+  module Set : sig
+    include Set.S with type elt = t
+    val random_elt: t -> elt
+    val encoding: t Data_encoding.t
+  end
+
+  module Map : sig
+    include Map.S with type key = t
+    val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
+  end
+
+  module Table : sig
+    include Hashtbl.S with type key = t
+    val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
+  end
 
 end
 
@@ -87,6 +115,8 @@ module type MERKLE_TREE = sig
     | Left of path * t
     | Right of t * path
     | Op
+
+  val path_encoding: path Data_encoding.t
 
   val compute_path: elt list -> int -> path
   val check_path: path -> elt -> t * int

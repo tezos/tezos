@@ -144,6 +144,8 @@ type 'a encoding = {
   wrap: 'a -> data ;
 }
 
+let prefix { prefix ; _ } = prefix
+
 let simple_decode ?alphabet { prefix ; of_raw ; _ } s =
   safe_decode ?alphabet s |>
   Option.apply ~f:(TzString.remove_prefix ~prefix) |>

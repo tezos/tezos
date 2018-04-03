@@ -7,8 +7,5 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include (module type of Tezos_crypto.Crypto_box)
+include S.MERKLE_TREE with type elt = Operation_hash.t
 
-val public_key_encoding : public_key Data_encoding.t
-val secret_key_encoding : secret_key Data_encoding.t
-val nonce_encoding : nonce Data_encoding.t
