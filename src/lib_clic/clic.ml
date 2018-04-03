@@ -260,7 +260,7 @@ let group_commands commands =
                let ({ title ; _ }, r) =
                  List.find (fun ({ name ; _ }, _) -> group.name = name) grouped in
                if title <> group.title then
-                 invalid_arg "Cli_entries.usage: duplicate group name" ;
+                 invalid_arg "Clic.usage: duplicate group name" ;
                r := command :: !r ;
                (grouped, ungrouped)
              with Not_found ->
@@ -315,7 +315,7 @@ let setup_formatter ppf format verbosity =
     let pop_level () =
       match !levels with
       | _ :: level :: rest -> levels := level :: rest ; setup_level level
-      | [ _ ] | [] -> Pervasives.failwith "Cli_entries: unclosed verbosity tag" in
+      | [ _ ] | [] -> Pervasives.failwith "Clic: unclosed verbosity tag" in
     push_level (Terse, (<=)) ;
     let push_level_tag tag =
       let push op = function
@@ -323,7 +323,7 @@ let setup_formatter ppf format verbosity =
         | "details" -> push_level (Details, op)
         | "short" -> push_level (Short, op)
         | "terse" -> push_level (Terse, op)
-        | tag -> Pervasives.failwith ("Cli_entries: invalid semantic tag <" ^ tag ^ ">") in
+        | tag -> Pervasives.failwith ("Clic: invalid semantic tag <" ^ tag ^ ">") in
       if String.length tag > 0 && String.get tag 0 = '=' then
         push (=) (String.sub tag 1 (String.length tag - 1))
       else if String.length tag > 0 && String.get tag 0 = '-' then
@@ -333,7 +333,7 @@ let setup_formatter ppf format verbosity =
       | "full" | "details" | "short" | "terse"
       | "-full" | "-details" | "-short" | "-terse"
       | "=full" | "=details" | "=short" | "=terse" -> pop_level ()
-      | tag -> Pervasives.failwith ("Cli_entries: invalid semantic tag <" ^ tag ^ ">") in
+      | tag -> Pervasives.failwith ("Clic: invalid semantic tag <" ^ tag ^ ">") in
     match format with
     | Ansi ->
         let color_num = function
@@ -373,7 +373,7 @@ let setup_formatter ppf format verbosity =
           | _ :: format :: rest ->
               ansi_stack := format :: rest ;
               Format.fprintf ppf "@<0>%a" ansi_format format
-          | [ _ ] | [] -> Pervasives.failwith "Cli_entries: unclosed ansi format" in
+          | [ _ ] | [] -> Pervasives.failwith "Clic: unclosed ansi format" in
         Format.pp_set_formatter_tag_functions ppf
           { mark_open_tag = (fun _ -> "") ;
             mark_close_tag = (fun _ -> "") ;
@@ -728,7 +728,7 @@ let param ~name ~desc kind next = Param (name, desc, kind, next)
 let seq_of_param param =
   match param Stop with
   | Param (n, desc, parameter, Stop) -> Seq (n, desc, parameter)
-  | _ -> invalid_arg "Cli_entries.seq_of_param"
+  | _ -> invalid_arg "Clic.seq_of_param"
 
 let prefix keyword next = Prefix (keyword, next)
 let rec fixed =
@@ -876,7 +876,7 @@ let insert_in_dispatch_tree :
             TParam { l with stop = Some command }
         | _, _ ->
             Pervasives.failwith
-              "Cli_entries.Command_tree.insert: conflicting commands" in
+              "Clic.Command_tree.insert: conflicting commands" in
     insert_tree conv root params
 
 

@@ -64,7 +64,7 @@ module Tags (Entity : Entity) = struct
     let desc =
       desc ^ "\n"
       ^ "can be one or multiple tags separated by commas" in
-    Cli_entries.(
+    Clic.(
       param ~name ~desc
         (parameter (fun _ s -> of_source s))
         next)

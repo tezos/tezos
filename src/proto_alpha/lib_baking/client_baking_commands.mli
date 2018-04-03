@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val commands: unit -> Proto_alpha.full Cli_entries.command list
+val commands: unit -> Proto_alpha.full Clic.command list

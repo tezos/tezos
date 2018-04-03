@@ -9,7 +9,7 @@
 
 open Proto_alpha
 open Alpha_context
-open Cli_entries
+open Clic
 
 module RawContractAlias :
   Client_aliases.Alias with type t = Contract.t

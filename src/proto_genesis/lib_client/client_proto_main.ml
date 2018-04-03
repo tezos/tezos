@@ -25,17 +25,17 @@ let bake cctxt ?(timestamp = Time.now ()) block command sk =
   Shell_services.inject_block cctxt signed_blk []
 
 let int64_parameter =
-  (Cli_entries.parameter (fun _ p ->
+  (Clic.parameter (fun _ p ->
        try return (Int64.of_string p)
        with _ -> failwith "Cannot read int64"))
 
 let int_parameter =
-  (Cli_entries.parameter (fun _ p ->
+  (Clic.parameter (fun _ p ->
        try return (int_of_string p)
        with _ -> failwith "Cannot read int"))
 
 let commands () =
-  let open Cli_entries in
+  let open Clic in
   let args =
     args1
       (arg

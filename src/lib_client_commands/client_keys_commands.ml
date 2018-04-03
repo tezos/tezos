@@ -10,11 +10,11 @@
 open Client_keys
 
 let group =
-  { Cli_entries.name = "keys" ;
+  { Clic.name = "keys" ;
     title = "Commands for managing the wallet of cryptographic keys" }
 
 let commands () =
-  let open Cli_entries in
+  let open Clic in
   let show_private_switch =
     switch
       ~long:"show-secret"
@@ -195,7 +195,7 @@ let commands () =
                  else return ()) ;
 
     command ~group ~desc: "Forget the entire wallet of keys."
-      (args1 (Cli_entries.switch
+      (args1 (Clic.switch
                 ~long:"force" ~short:'f'
                 ~doc:"you got to use the force for that" ()))
       (fixed [ "forget" ; "all" ; "keys" ])

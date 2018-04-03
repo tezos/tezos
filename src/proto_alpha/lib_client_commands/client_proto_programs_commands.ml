@@ -10,7 +10,7 @@
 open Proto_alpha
 
 let group =
-  { Cli_entries.name = "programs" ;
+  { Clic.name = "programs" ;
     title = "Commands for managing the library of known programs" }
 
 open Tezos_micheline
@@ -18,7 +18,7 @@ open Client_proto_programs
 open Client_proto_args
 
 let commands () =
-  let open Cli_entries in
+  let open Clic in
   let show_types_switch =
     switch
       ~long:"details"
@@ -42,7 +42,7 @@ let commands () =
       ~doc:"amount of the transfer in \xEA\x9C\xA9"
       ~default:"0.05" in
   let data_parameter =
-    Cli_entries.parameter (fun _ data ->
+    Clic.parameter (fun _ data ->
         Lwt.return (Micheline_parser.no_parsing_error
                     @@ Michelson_v1_parser.parse_expression data)) in
   [
@@ -87,10 +87,10 @@ let commands () =
       (prefixes [ "run" ; "program" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
-       @@ Cli_entries.param ~name:"storage" ~desc:"the storage data"
+       @@ Clic.param ~name:"storage" ~desc:"the storage data"
          data_parameter
        @@ prefixes [ "and" ; "input" ]
-       @@ Cli_entries.param ~name:"storage" ~desc:"the input data"
+       @@ Clic.param ~name:"storage" ~desc:"the input data"
          data_parameter
        @@ stop)
       (fun (trace_exec, amount, no_print_source) program storage input cctxt ->
@@ -137,10 +137,10 @@ let commands () =
     command ~group ~desc: "Ask the node to typecheck a data expression."
       (args1 no_print_source_flag)
       (prefixes [ "typecheck" ; "data" ]
-       @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck"
+       @@ Clic.param ~name:"data" ~desc:"the data to typecheck"
          data_parameter
        @@ prefixes [ "against" ; "type" ]
-       @@ Cli_entries.param ~name:"type" ~desc:"the expected type"
+       @@ Clic.param ~name:"type" ~desc:"the expected type"
          data_parameter
        @@ stop)
       (fun no_print_source data ty cctxt ->
@@ -162,10 +162,10 @@ let commands () =
               instruction `H` would have produced."
       no_options
       (prefixes [ "hash" ; "data" ]
-       @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
+       @@ Clic.param ~name:"data" ~desc:"the data to hash"
          data_parameter
        @@ prefixes [ "of" ; "type" ]
-       @@ Cli_entries.param ~name:"type" ~desc:"type of the data"
+       @@ Clic.param ~name:"type" ~desc:"type of the data"
          data_parameter
        @@ stop)
       (fun () data typ cctxt ->
@@ -186,10 +186,10 @@ let commands () =
               instruction `CHECK_SIGNATURE`."
       no_options
       (prefixes [ "hash" ; "and" ; "sign" ; "data" ]
-       @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
+       @@ Clic.param ~name:"data" ~desc:"the data to hash"
          data_parameter
        @@ prefixes [ "of" ; "type" ]
-       @@ Cli_entries.param ~name:"type" ~desc:"type of the data"
+       @@ Clic.param ~name:"type" ~desc:"type of the data"
          data_parameter
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.alias_param

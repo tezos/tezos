@@ -51,9 +51,9 @@ module Extend(H : Tezos_crypto.S.HASH) = struct
       ()
 
   let param ?(name=H.name) ?(desc=H.title) t =
-    Cli_entries.param
+    Clic.param
       ~name
-      ~desc (Cli_entries.parameter (fun _ str -> Lwt.return (of_b58check str))) t
+      ~desc (Clic.parameter (fun _ str -> Lwt.return (of_b58check str))) t
 
   module Set = struct
     include Set.Make(struct type nonrec t = t let compare = compare end)

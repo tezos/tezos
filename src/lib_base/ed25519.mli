@@ -10,8 +10,8 @@ module Public_key : sig
   val param:
     ?name:string ->
     ?desc:string ->
-    ('a, 'b) Cli_entries.params ->
-    (t -> 'a, 'b) Cli_entries.params
+    ('a, 'b) Clic.params ->
+    (t -> 'a, 'b) Clic.params
   val of_b58check: string -> t tzresult
 end
 
@@ -21,8 +21,8 @@ module Secret_key : sig
   val param:
     ?name:string ->
     ?desc:string ->
-    ('a, 'b) Cli_entries.params ->
-    (t -> 'a, 'b) Cli_entries.params
+    ('a, 'b) Clic.params ->
+    (t -> 'a, 'b) Clic.params
   val of_b58check: string -> t tzresult
 end
 
@@ -32,8 +32,8 @@ module Signature : sig
   val param:
     ?name:string ->
     ?desc:string ->
-    ('a, 'b) Cli_entries.params ->
-    (t -> 'a, 'b) Cli_entries.params
+    ('a, 'b) Clic.params ->
+    (t -> 'a, 'b) Clic.params
   val of_b58check: string -> t tzresult
 end
 

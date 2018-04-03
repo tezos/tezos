@@ -66,7 +66,7 @@ let handle_error cctxt = function
       cctxt.Client_commands.error "%s" "cannot continue"
 
 let commands () =
-  let open Cli_entries in
+  let open Clic in
   let group = {name = "demo" ; title = "Some demo command" } in
   [
     command ~group ~desc: "A demo command"

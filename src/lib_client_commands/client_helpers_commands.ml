@@ -8,13 +8,13 @@
 (**************************************************************************)
 
 let unique_switch =
-  Cli_entries.switch
+  Clic.switch
     ~long:"unique"
     ~short:'u'
     ~doc:"Fail when there is more than one possible completion."
     ()
 
-let commands () = Cli_entries.[
+let commands () = Clic.[
     command
       ~desc: "Autocomplete a prefix of Base58Check-encoded hash.\n\
               This actually works only for blocks, operations, public \

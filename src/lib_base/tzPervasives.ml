@@ -11,6 +11,7 @@ include Tezos_stdlib
 include Tezos_data_encoding
 include Tezos_error_monad
 include Tezos_rpc
+include Tezos_clic
 include Tezos_micheline
 
 module Ed25519 = Ed25519
@@ -55,7 +56,6 @@ module P2p_connection = P2p_connection
 module P2p_stat = P2p_stat
 module P2p_version = P2p_version
 
-module Cli_entries = Cli_entries
 module Lwt_exit = Lwt_exit
 
 include Utils.Infix

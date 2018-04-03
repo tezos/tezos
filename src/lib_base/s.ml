@@ -146,8 +146,8 @@ module type INTERNAL_HASH = sig
   val param:
     ?name:string ->
     ?desc:string ->
-    ('a, 'arg) Cli_entries.params ->
-    (t -> 'a, 'arg) Cli_entries.params
+    ('a, 'arg) Clic.params ->
+    (t -> 'a, 'arg) Clic.params
 
   module Set : sig
     include Set.S with type elt = t
@@ -196,8 +196,8 @@ module type INTERNAL_MERKLE_TREE = sig
   val param:
     ?name:string ->
     ?desc:string ->
-    ('a, 'arg) Cli_entries.params ->
-    (t -> 'a, 'arg) Cli_entries.params
+    ('a, 'arg) Clic.params ->
+    (t -> 'a, 'arg) Clic.params
 
   module Set : sig
     include Set.S with type elt = t

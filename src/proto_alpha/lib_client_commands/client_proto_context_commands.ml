@@ -81,15 +81,15 @@ let wait_for_operation_inclusion
   return ()
 
 let group =
-  { Cli_entries.name = "context" ;
+  { Clic.name = "context" ;
     title = "Block contextual commands (see option -block)" }
 
 let alphanet =
-  { Cli_entries.name = "alphanet" ;
+  { Clic.name = "alphanet" ;
     title = "Alphanet only commands" }
 
 let commands () =
-  let open Cli_entries in
+  let open Clic in
   [
     command ~group ~desc: "Access the timestamp of the block."
       no_options

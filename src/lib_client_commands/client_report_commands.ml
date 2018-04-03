@@ -41,7 +41,7 @@ let print_rejected ppf = function
         invalid
 
 let commands () =
-  let open Cli_entries in
+  let open Clic in
   let group = { name = "report" ;
                 title = "Commands to report the node's status" } in
   let output_arg =
@@ -55,7 +55,7 @@ let commands () =
            | "-" -> return Format.std_formatter
            | file ->
                let ppf = Format.formatter_of_out_channel (open_out file) in
-               ignore Cli_entries.(setup_formatter ppf Plain Full) ;
+               ignore Clic.(setup_formatter ppf Plain Full) ;
                return ppf)) in
   [
     command ~group

@@ -31,7 +31,7 @@ module Public_key = struct
   let param
       ?(name="ed25519-public")
       ?(desc="Ed25519 public key (b58check-encoded)") t =
-    Cli_entries.(param ~name ~desc
+    Clic.(param ~name ~desc
                    (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
 
 end
@@ -66,7 +66,7 @@ module Secret_key = struct
   let param
       ?(name="ed25519-secret")
       ?(desc="Ed25519 secret key (b58check-encoded)") t =
-    Cli_entries.(param ~name ~desc
+    Clic.(param ~name ~desc
                    (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
 end
 
@@ -100,7 +100,7 @@ module Signature = struct
   let param
       ?(name="ed25519-signature")
       ?(desc="Ed25519 signature (b58check-encoded)") t =
-    Cli_entries.(param ~name ~desc
+    Clic.(param ~name ~desc
                    (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
 end
 

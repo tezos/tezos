@@ -122,7 +122,7 @@ let default_cli_args = {
 }
 
 
-open Cli_entries
+open Clic
 
 let string_parameter () : (string, #Client_context.full) parameter =
   parameter (fun _ x -> return x)
@@ -230,8 +230,8 @@ let read_config_file config_file =
 let default_config_file_name = "config"
 
 let commands config_file cfg =
-  let open Cli_entries in
-  let group = { Cli_entries.name = "config" ;
+  let open Clic in
+  let group = { Clic.name = "config" ;
                 title = "Commands for editing and viewing the client's config file" } in
   [ command ~group ~desc:"Show the config file."
       no_options

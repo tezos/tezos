@@ -11,6 +11,7 @@ include (module type of (struct include Tezos_stdlib end))
 include (module type of (struct include Tezos_data_encoding end))
 include (module type of (struct include Tezos_error_monad end))
 include (module type of (struct include Tezos_rpc end))
+include (module type of (struct include Tezos_clic end))
 
 module Ed25519 = Ed25519
 module Crypto_box = Crypto_box
@@ -52,7 +53,6 @@ module P2p_connection = P2p_connection
 module P2p_stat = P2p_stat
 module P2p_version = P2p_version
 
-module Cli_entries = Cli_entries
 module Lwt_exit = Lwt_exit
 
 include (module type of (struct include Utils.Infix end))
