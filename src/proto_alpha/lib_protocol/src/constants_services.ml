@@ -104,6 +104,14 @@ module S = struct
       ~output: json_schema
       RPC_path.(custom_root / "errors")
 
+  let all =
+    RPC_service.post_service
+      ~description: "All constants"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: Alpha_context.Constants.encoding
+      custom_root
+
 end
 
 
@@ -141,6 +149,11 @@ let () =
   end ;
   register0_noctxt S.errors begin fun () () ->
     return (Data_encoding.Json.(schema error_encoding))
+  end ;
+  register0 S.all begin fun ctxt () () ->
+    let open Constants in
+    return { fixed = fixed ;
+             parametric = parametric ctxt }
   end
 
 let blocks_per_cycle ctxt block =
@@ -165,3 +178,5 @@ let proof_of_work_threshold ctxt block =
   RPC_context.make_call0 S.proof_of_work_threshold ctxt block () ()
 let errors ctxt block =
   RPC_context.make_call0 S.errors ctxt block () ()
+let all ctxt block =
+  RPC_context.make_call0 S.all ctxt block () ()

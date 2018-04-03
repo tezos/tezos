@@ -59,7 +59,7 @@ val current_timestamp: context -> Time.t
 val current_fitness: context -> Int64.t
 val set_current_fitness: context -> Int64.t -> t
 
-val constants: context -> Constants_repr.constants
+val constants: context -> Constants_repr.parametric
 val first_level: context -> Raw_level_repr.t
 
 (** {1 Generic accessors} *************************************************)

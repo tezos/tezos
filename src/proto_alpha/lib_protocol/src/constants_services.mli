@@ -15,13 +15,13 @@ val preserved_cycles:
 val blocks_per_cycle:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
-val blocks_per_voting_period:
-  'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
-
 val blocks_per_commitment:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
 val blocks_per_roll_snapshot:
+  'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
+
+val blocks_per_voting_period:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
 val time_between_blocks:
@@ -41,3 +41,6 @@ val proof_of_work_threshold:
 
 val errors:
   'a #RPC_context.simple -> 'a -> Data_encoding.json_schema shell_tzresult Lwt.t
+
+val all:
+  'a #RPC_context.simple -> 'a -> Constants.t shell_tzresult Lwt.t

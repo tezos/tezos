@@ -245,6 +245,21 @@ end
 
 module Constants : sig
 
+  (** Fixed constants *)
+  type fixed = {
+    proof_of_work_nonce_size : int ;
+    nonce_length : int ;
+    max_revelations_per_block : int ;
+    seed_nonce_revelation_tip : Tez_repr.t ;
+    origination_burn : Tez_repr.t ;
+    block_security_deposit : Tez_repr.t ;
+    endorsement_security_deposit : Tez_repr.t ;
+    block_reward : Tez_repr.t ;
+    endorsement_reward : Tez_repr.t ;
+  }
+  val fixed_encoding: fixed Data_encoding.t
+  val fixed: fixed
+
   val proof_of_work_nonce_size: int
   val block_reward: Tez.t
   val endorsement_reward: Tez.t
@@ -254,6 +269,27 @@ module Constants : sig
   val block_security_deposit: Tez.t
   val endorsement_security_deposit: Tez.t
   val max_revelations_per_block: int
+
+
+  (** Constants parameterized by context *)
+  type parametric = {
+    preserved_cycles: int ;
+    blocks_per_cycle: int32 ;
+    blocks_per_commitment: int32 ;
+    blocks_per_roll_snapshot: int32 ;
+    blocks_per_voting_period: int32 ;
+    time_between_blocks: Period_repr.t list ;
+    first_free_baking_slot: int ;
+    endorsers_per_block: int ;
+    max_gas: int ;
+    proof_of_work_threshold: int64 ;
+    dictator_pubkey: Ed25519.Public_key.t ;
+    max_operation_data_length: int ;
+    tokens_per_roll: Tez_repr.t ;
+    michelson_maximum_type_size: int;
+  }
+  val parametric_encoding: parametric Data_encoding.t
+  val parametric: context -> parametric
 
   val preserved_cycles: context -> int
   val blocks_per_cycle: context -> int32
@@ -270,6 +306,11 @@ module Constants : sig
   val tokens_per_roll: context -> Tez.t
   val michelson_maximum_type_size: context -> int
 
+  type t = {
+    fixed : fixed ;
+    parametric : parametric ;
+  }
+  val encoding: t Data_encoding.t
 end
 
 module Voting_period : sig

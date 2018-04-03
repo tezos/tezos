@@ -11,7 +11,7 @@ module Int_set = Set.Make (Compare.Int)
 
 type t = {
   context: Context.t ;
-  constants: Constants_repr.constants ;
+  constants: Constants_repr.parametric ;
   first_level: Raw_level_repr.t ;
   level: Level_repr.t ;
   timestamp: Time.t ;
@@ -191,7 +191,7 @@ let get_proto_param ctxt =
 let set_constants ctxt constants =
   let bytes =
     Data_encoding.Binary.to_bytes
-      Constants_repr.constants_encoding constants in
+      Constants_repr.parametric_encoding constants in
   Context.set ctxt constants_key bytes
 
 let get_constants ctxt =
@@ -200,7 +200,7 @@ let get_constants ctxt =
       failwith "Internal error: cannot read constants in context."
   | Some bytes ->
       match
-        Data_encoding.Binary.of_bytes Constants_repr.constants_encoding bytes
+        Data_encoding.Binary.of_bytes Constants_repr.parametric_encoding bytes
       with
       | None ->
           failwith "Internal error: cannot parse constants in context."
@@ -253,7 +253,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
   Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
   get_proto_param ctxt >>=? fun (param, ctxt) ->
   get_sandbox_param ctxt >>=? fun sandbox_param ->
-  Constants_repr.read sandbox_param >>=? fun constants ->
+  Constants_repr.read_sandbox sandbox_param >>=? fun constants ->
   Context.set ctxt version_key
     (MBytes.of_string version_value) >>= fun ctxt ->
   set_first_level ctxt first_level >>=? fun ctxt ->

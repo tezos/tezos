@@ -49,3 +49,5 @@ let tokens_per_roll c =
 let michelson_maximum_type_size c =
   let constants = Raw_context.constants c in
   constants.michelson_maximum_type_size
+let parametric c =
+  Raw_context.constants c
