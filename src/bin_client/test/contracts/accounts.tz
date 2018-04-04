@@ -1,7 +1,7 @@
 # This is a very simple accounts system.
 # (Left key) initializes or deposits into an account
 # (Right key (pair tez (signed tez))) withdraws tez amount to a
-# DEFAULT_ACCOUNT created from the key if the balance is available
+# IMPLICIT_ACCOUNT created from the key if the balance is available
 # and the key is correctly signed
 parameter (or key_hash (pair key (pair tez signature)));
 # Maps the key to the balance they have stored
@@ -38,5 +38,5 @@ code { DUP; CAR;
                                 SWAP; CAR; HASH_KEY; UPDATE;
                                 SWAP; DUP; CDAR;
                                 # Execute the transfer
-                                DIP{ CAR; HASH_KEY; DEFAULT_ACCOUNT }; UNIT; TRANSFER_TOKENS;
+                                DIP{ CAR; HASH_KEY; IMPLICIT_ACCOUNT }; UNIT; TRANSFER_TOKENS;
                                 PAIR }}}}

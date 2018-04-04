@@ -5,5 +5,5 @@ code { DUP; CDAR; DUP; NOW; CMPGT; IF {FAIL} {}; SWAP; # Check if auction has en
        DUP; CAR; DIP{CDDR}; AMOUNT; PAIR; SWAP; DIP{SWAP; PAIR}; # Setup replacement storage
        DUP; CAR; AMOUNT; CMPLE; IF {FAIL} {};  # Check to make sure that the new amount is greater
        DUP; CAR;                               # Get amount of refund
-       DIP{CDR; DEFAULT_ACCOUNT}; UNIT; TRANSFER_TOKENS; # Make refund
+       DIP{CDR; IMPLICIT_ACCOUNT}; UNIT; TRANSFER_TOKENS; # Make refund
        PAIR}                                             # Calling convention

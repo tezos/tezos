@@ -193,7 +193,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Manager -> 0
   | Transfer_tokens _ -> 1
   | Create_account -> 0
-  | Default_account -> 0
+  | Implicit_account -> 0
   | Create_contract _ -> 1
   | Create_contract_literal _ -> 1
   | Now -> 0
@@ -248,7 +248,7 @@ let namespace = function
   | I_CONS
   | I_CREATE_ACCOUNT
   | I_CREATE_CONTRACT
-  | I_DEFAULT_ACCOUNT
+  | I_IMPLICIT_ACCOUNT
   | I_DIP
   | I_DROP
   | I_DUP
@@ -1963,9 +1963,9 @@ and parse_instr
                  (Tez_t, rest, _), _), _), _) ->
         typed ctxt loc Create_account
           (Item_t (Contract_t (Unit_t, Unit_t), rest, instr_annot))
-    | Prim (loc, I_DEFAULT_ACCOUNT, [], instr_annot),
+    | Prim (loc, I_IMPLICIT_ACCOUNT, [], instr_annot),
       Item_t (Key_hash_t, rest, _) ->
-        typed ctxt loc Default_account
+        typed ctxt loc Implicit_account
           (Item_t (Contract_t (Unit_t, Unit_t), rest, instr_annot))
     | Prim (loc, I_CREATE_CONTRACT, [], instr_annot),
       Item_t
@@ -2071,7 +2071,7 @@ and parse_instr
                  | I_LT | I_GT | I_LE | I_GE
                  | I_MANAGER | I_TRANSFER_TOKENS | I_CREATE_ACCOUNT
                  | I_CREATE_CONTRACT | I_NOW
-                 | I_DEFAULT_ACCOUNT | I_AMOUNT | I_BALANCE
+                 | I_IMPLICIT_ACCOUNT | I_AMOUNT | I_BALANCE
                  | I_CHECK_SIGNATURE | I_HASH_KEY
                  | I_H | I_STEPS_TO_QUOTA
                  as name), (_ :: _ as l), _), _ ->
@@ -2114,7 +2114,7 @@ and parse_instr
         fail (Bad_stack (loc, I_TRANSFER_TOKENS, 3, stack))
     | Prim (loc, (I_DROP | I_DUP | I_CAR | I_CDR | I_SOME | I_H | I_DIP
                  | I_IF_NONE | I_LEFT | I_RIGHT | I_IF_LEFT | I_IF
-                 | I_LOOP | I_IF_CONS | I_MANAGER | I_DEFAULT_ACCOUNT
+                 | I_LOOP | I_IF_CONS | I_MANAGER | I_IMPLICIT_ACCOUNT
                  | I_NEG | I_ABS | I_INT | I_NOT
                  | I_EQ | I_NEQ | I_LT | I_GT | I_LE | I_GE as name), _, _),
       stack ->
@@ -2141,7 +2141,7 @@ and parse_instr
             I_LT ; I_GT ; I_LE ; I_GE ;
             I_MANAGER ; I_TRANSFER_TOKENS ; I_CREATE_ACCOUNT ;
             I_CREATE_CONTRACT ; I_NOW ; I_AMOUNT ; I_BALANCE ;
-            I_DEFAULT_ACCOUNT ; I_CHECK_SIGNATURE ; I_H ; I_HASH_KEY ;
+            I_IMPLICIT_ACCOUNT ; I_CHECK_SIGNATURE ; I_H ; I_HASH_KEY ;
             I_STEPS_TO_QUOTA ;
             I_PUSH ; I_NONE ; I_LEFT ; I_RIGHT ; I_NIL ;
             I_EMPTY_SET ; I_DIP ; I_LOOP ;

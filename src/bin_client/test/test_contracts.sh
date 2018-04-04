@@ -393,7 +393,7 @@ init_with_transfer $contract_dir/create_contract.tz $key2 \
 bake_after $client transfer 0 from bootstrap1 to create_contract -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
 assert_storage_contains create_contract '"abcdefg"'
 
-# Test DEFAULT_ACCOUNT
+# Test IMPLICIT_ACCOUNT
 init_with_transfer $contract_dir/default_account.tz $key1 \
 				   Unit 1,000 bootstrap1
 bake_after $client transfer 0 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\""

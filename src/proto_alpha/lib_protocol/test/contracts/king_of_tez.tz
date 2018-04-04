@@ -13,6 +13,6 @@ code { DUP; CDAR;
                  # New storage
                  DIP{ AMOUNT; PAIR; NOW; PUSH int 604800; ADD; PAIR };
                  # Pay funds to old king
-                 DEFAULT_ACCOUNT; AMOUNT; UNIT; TRANSFER_TOKENS; DROP }};
+                 IMPLICIT_ACCOUNT; AMOUNT; UNIT; TRANSFER_TOKENS; DROP }};
        # Cleanup
        UNIT; PAIR };

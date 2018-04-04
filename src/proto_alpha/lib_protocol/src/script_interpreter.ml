@@ -744,7 +744,7 @@ let rec interp
               ?script:None ~spendable:true ~delegatable >>=? fun (ctxt, contract, origination) ->
             Fees.origination_burn ctxt ~source contract >>=? fun ctxt ->
             logged_return ~origination (Item ((Unit_t, Unit_t, contract), rest), ctxt)
-        | Default_account, Item (key, rest) ->
+        | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
             let contract = Contract.implicit_contract key in
             logged_return (Item ((Unit_t, Unit_t, contract), rest), ctxt)

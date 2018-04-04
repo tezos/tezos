@@ -439,7 +439,7 @@ let test_example () =
   Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun (_, ret, _, _, _) ->
   Assert.equal_string ~msg: __LOC__ "\"abc\"" @@ string_of_canon ret ;
 
-  (* Test DEFAULT_ACCOUNT *)
+  (* Test IMPLICIT_ACCOUNT *)
   let account = Account.new_account () in
   let b_str = quote @@ Signature.Public_key_hash.to_b58check account.hpub in
   test_contract ~tc "default_account" "Unit" b_str >>=? fun (_cs, tc) ->

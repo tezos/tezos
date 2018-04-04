@@ -1468,7 +1468,7 @@ recursive call (the contract just fails if the boolean is true).
 
     :: 'S   ->   tez : 'S
 
--  ``DEFAULT_ACCOUNT``: Return a default contract with the given
+-  ``IMPLICIT_ACCOUNT``: Return a default contract with the given
    public/private key pair. Any funds deposited in this contract can
    immediately be spent by the holder of the private key. This contract
    cannot execute Michelson code and will always exist on the
@@ -2452,7 +2452,7 @@ XII - Full grammar
       | TRANSFER_TOKENS
       | CREATE_ACCOUNT
       | CREATE_CONTRACT
-      | DEFAULT_ACCOUNT
+      | IMPLICIT_ACCOUNT
       | NOW
       | AMOUNT
       | BALANCE

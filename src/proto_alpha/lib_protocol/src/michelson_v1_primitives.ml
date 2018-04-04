@@ -41,7 +41,7 @@ type prim =
   | I_CONS
   | I_CREATE_ACCOUNT
   | I_CREATE_CONTRACT
-  | I_DEFAULT_ACCOUNT
+  | I_IMPLICIT_ACCOUNT
   | I_DIP
   | I_DROP
   | I_DUP
@@ -162,7 +162,7 @@ let string_of_prim = function
   | I_CONS -> "CONS"
   | I_CREATE_ACCOUNT -> "CREATE_ACCOUNT"
   | I_CREATE_CONTRACT -> "CREATE_CONTRACT"
-  | I_DEFAULT_ACCOUNT -> "DEFAULT_ACCOUNT"
+  | I_IMPLICIT_ACCOUNT -> "IMPLICIT_ACCOUNT"
   | I_DIP -> "DIP"
   | I_DROP -> "DROP"
   | I_DUP -> "DUP"
@@ -264,7 +264,7 @@ let prim_of_string = function
   | "CONS" -> ok I_CONS
   | "CREATE_ACCOUNT" -> ok I_CREATE_ACCOUNT
   | "CREATE_CONTRACT" -> ok I_CREATE_CONTRACT
-  | "DEFAULT_ACCOUNT" -> ok I_DEFAULT_ACCOUNT
+  | "IMPLICIT_ACCOUNT" -> ok I_IMPLICIT_ACCOUNT
   | "DIP" -> ok I_DIP
   | "DROP" -> ok I_DROP
   | "DUP" -> ok I_DUP
@@ -410,7 +410,7 @@ let prim_encoding =
     ("CONS", I_CONS) ;
     ("CREATE_ACCOUNT", I_CREATE_ACCOUNT) ;
     ("CREATE_CONTRACT", I_CREATE_CONTRACT) ;
-    ("DEFAULT_ACCOUNT", I_DEFAULT_ACCOUNT) ;
+    ("IMPLICIT_ACCOUNT", I_IMPLICIT_ACCOUNT) ;
     ("DIP", I_DIP) ;
     ("DROP", I_DROP) ;
     ("DUP", I_DUP) ;
