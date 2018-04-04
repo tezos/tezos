@@ -469,6 +469,10 @@ opam:46:tezos-node:
   variables:
     package: tezos-node
 
+opam:46:secp256k1-internal:
+  <<: *opam_definition
+  variables:
+    package: secp256k1-internal
 
 ##END_OPAM##
 

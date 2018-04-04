@@ -1,0 +1,19 @@
+opam-version: "1.2"
+name: "secp256k1-internal"
+version: "0.1"
+authors: "Vincent Bernardoff <vb@luminar.eu.org>"
+maintainer: "Vincent Bernardoff <vb@luminar.eu.org>"
+homepage: "https://github.com/vbmithr/ocaml-secp256k1-internal"
+bug-reports: "https://github.com/vbmithr/ocaml-secp256k1-internal/issues"
+dev-repo: "git://github.com/vbmithr/ocaml-secp256k1-internal"
+
+available: [
+  ocaml-version >= "4.03.0"
+]
+
+build: [ "jbuilder" "build" "-j" jobs "-p" name "@install" ]
+depends: [
+  "conf-gmp" {build}
+  "jbuilder" {build & >= "1.0+beta19.1"}
+  "cstruct" {>= "3.2.1"}
+]
