@@ -77,16 +77,20 @@ let precheck_block
   Lwt.return (parse_block raw_block) >>=? fun _ ->
   return ()
 
+(* temporary hardcoded key to be removed... *)
+let protocol_parameters_key = [ "protocol_parameters" ]
 let prepare_application ctxt command level timestamp fitness =
   match command with
-  | Data.Command.Activate { protocol = hash ; fitness } ->
+  | Data.Command.Activate { protocol = hash ; fitness ; protocol_parameters } ->
       let message =
         Some (Format.asprintf "activate %a" Protocol_hash.pp_short hash) in
+      Context.set ctxt protocol_parameters_key protocol_parameters >>= fun ctxt ->
       Updater.activate ctxt hash >>= fun ctxt ->
       return { Updater.message ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
                max_operation_data_length = 0 ;
-               last_allowed_fork_level = level }
+               last_allowed_fork_level = level ;
+             }
   | Activate_testchain { protocol = hash ; delay } ->
       let message =
         Some (Format.asprintf "activate testchain %a" Protocol_hash.pp_short hash) in
@@ -97,7 +101,6 @@ let prepare_application ctxt command level timestamp fitness =
                max_operation_data_length = 0 ;
                last_allowed_fork_level = Int32.succ level ;
              }
-
 
 let begin_application
     ~predecessor_context:ctxt
@@ -168,4 +171,3 @@ let init ctxt block_header =
            max_operation_data_length = 0 ;
            last_allowed_fork_level = block_header.level ;
          }
-

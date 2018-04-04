@@ -14,6 +14,7 @@ module Command = struct
     | Activate of {
         protocol: Protocol_hash.t ;
         fitness: Fitness.t ;
+        protocol_parameters : MBytes.t ;
       }
 
     (* Activate a protocol as a testchain *)
@@ -36,16 +37,17 @@ module Command = struct
     union ~tag_size:`Uint8 [
       case (Tag 0)
         (mk_case "activate"
-           (obj2
+           (obj3
               (req "hash" Protocol_hash.encoding)
               (req "fitness" Fitness.encoding)
+              (req "protocol_parameters" Variable.bytes)
            ))
         (function
-          | Activate { protocol ; fitness} ->
-              Some (protocol, fitness)
+          | Activate { protocol ; fitness ; protocol_parameters} ->
+              Some (protocol, fitness, protocol_parameters)
           | _ -> None)
-        (fun (protocol, fitness) ->
-           Activate { protocol ; fitness }) ;
+        (fun (protocol, fitness, protocol_parameters) ->
+           Activate { protocol ; fitness ; protocol_parameters }) ;
       case (Tag 1)
         (mk_case "activate_testchain"
            (obj2

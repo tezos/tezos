@@ -90,7 +90,8 @@ let finalize_block ctxt =
   let fitness = Fitness.from_int64 fitness in
   return { Updater.message ; context = ctxt.context ; fitness ;
            max_operations_ttl = 0 ; max_operation_data_length = 0 ;
-           last_allowed_fork_level = 0l }
+           last_allowed_fork_level = 0l ;
+         }
 
 let rpc_services = Services.rpc_services
 

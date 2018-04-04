@@ -24,13 +24,13 @@ val apply_operation:
 val run_code:
   'a #RPC_context.simple ->
   'a -> Script.expr ->
-  (Script.expr * Script.expr * Tez.t) ->
+  (Script.expr * Script.expr * Tez.t * Contract.t) ->
   (Script.expr * Script.expr * (Script.expr * Script.expr option) list option) shell_tzresult Lwt.t
 
 val trace_code:
   'a #RPC_context.simple ->
   'a -> Script.expr ->
-  (Script.expr * Script.expr * Tez.t) ->
+  (Script.expr * Script.expr * Tez.t * Contract.t) ->
   (Script.expr * Script.expr *
    (Script.location * Gas.t * Script.expr list) list *
    (Script.expr * Script.expr option) list option) shell_tzresult Lwt.t

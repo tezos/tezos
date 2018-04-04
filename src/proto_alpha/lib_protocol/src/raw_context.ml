@@ -126,6 +126,7 @@ let constants_key = [ version ; "constants" ]
 
 (* temporary hardcoded key to be removed... *)
 let sandbox_param_key = [ "sandbox_parameter" ]
+let protocol_param_key = [ "protocol_parameters" ]
 
 let get_first_level ctxt =
   Context.get ctxt first_level_key >>= function
@@ -151,7 +152,7 @@ let () =
     ~id:"context.failed_to_parse_sandbox_parameter"
     ~title: "Failed to parse sandbox parameter"
     ~description:
-      "The sandbox paramater is not a valid JSON string."
+      "The sandbox parameter is not a valid JSON string."
     ~pp:begin fun ppf bytes ->
       Format.fprintf ppf
         "@[<v 2>Cannot parse the sandbox parameter:@ %s@]"
@@ -168,6 +169,24 @@ let get_sandbox_param c =
       match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
       | None -> fail (Failed_to_parse_sandbox_parameter bytes)
       | Some json -> return (Some json)
+
+let get_proto_param ctxt =
+  Context.get ctxt protocol_param_key >>= function
+  | None ->
+      failwith "Missing protocol parameters."
+  | Some bytes ->
+      match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
+      | None -> failwith "Invalid json"
+      | Some json -> begin
+          Context.del ctxt protocol_param_key >>= fun ctxt ->
+          match Data_encoding.Json.destruct Parameters_repr.encoding json with
+          | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
+              Format.kasprintf
+                failwith "Invalid protocol_parameters: %a %a"
+                (fun ppf -> Data_encoding.Json.print_error ppf) exn
+                Data_encoding.Json.pp json
+          | param -> return (param, ctxt)
+        end
 
 let set_constants ctxt constants =
   let bytes =
@@ -232,16 +251,19 @@ let check_first_block ctxt =
 let prepare_first_block ~level ~timestamp ~fitness ctxt =
   check_first_block ctxt >>=? fun () ->
   Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
+  get_proto_param ctxt >>=? fun (param, ctxt) ->
   get_sandbox_param ctxt >>=? fun sandbox_param ->
   Constants_repr.read sandbox_param >>=? fun constants ->
   Context.set ctxt version_key
     (MBytes.of_string version_value) >>= fun ctxt ->
   set_first_level ctxt first_level >>=? fun ctxt ->
   set_constants ctxt constants >>= fun ctxt ->
-  prepare ctxt ~level ~timestamp ~fitness
+  prepare ctxt ~level ~timestamp ~fitness >>=? fun ctxt ->
+  return (param, ctxt)
 
 let activate ({ context = c ; _ } as s) h =
   Updater.activate c h >>= fun c -> Lwt.return { s with context = c }
+
 let fork_test_chain ({ context = c ; _ } as s) protocol expiration =
   Updater.fork_test_chain c ~protocol ~expiration >>= fun c ->
   Lwt.return { s with context = c }

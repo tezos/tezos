@@ -5,6 +5,7 @@ src_dir="$(dirname "$test_dir")"
 cd "$test_dir"
 
 sandbox_file="$test_dir/sandbox.json"
+parameters_file="$test_dir/protocol_parameters.json"
 
 tezos_sandboxed_node="${1:-$test_dir/../../bin_node/tezos-sandboxed-node.sh}"
 local_node="${2:-$test_dir/../../../_build/default/src/bin_node/main.exe}"

@@ -86,25 +86,36 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
 
+let get_contract cctxt block contract =
+  match contract with
+  | Some contract -> return contract
+  | None ->
+      (* TODO use local contract by default *)
+      Alpha_services.Contract.list cctxt block >>|? List.hd
+
 let run
+    ?contract
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
     block
     (cctxt : #RPC_context.simple) =
+  get_contract cctxt block contract >>=? fun contract ->
   Alpha_services.Helpers.run_code cctxt
-    block program.expanded (storage.expanded, input.expanded, amount)
+    block program.expanded (storage.expanded, input.expanded, amount, contract)
 
 let trace
+    ?contract
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
     block
     (cctxt : #RPC_context.simple) =
+  get_contract cctxt block contract >>=? fun contract ->
   Alpha_services.Helpers.trace_code cctxt
-    block program.expanded (storage.expanded, input.expanded, amount)
+    block program.expanded (storage.expanded, input.expanded, amount, contract)
 
 let hash_and_sign (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser.parsed) sk block cctxt =
   Alpha_services.Helpers.hash_data cctxt block (data.expanded, typ.expanded) >>=? fun hash ->

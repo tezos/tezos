@@ -7,18 +7,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = {
-  blinded_public_key_hash : Blinded_public_key_hash.t ;
-  amount : Tez_repr.t
+type bootstrap_account = {
+  public_key : Ed25519.Public_key.t ;
+  amount : Tez_repr.t ;
 }
 
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun { blinded_public_key_hash ; amount } ->
-       ( blinded_public_key_hash, amount ))
-    (fun ( blinded_public_key_hash, amount) ->
-       { blinded_public_key_hash ; amount })
-    (tup2
-       Blinded_public_key_hash.encoding
-       Tez_repr.encoding)
+type t = {
+  bootstrap_accounts : bootstrap_account list ;
+  commitments : (Unclaimed_public_key_hash.t * Commitment_repr.t) list
+}
+
+val encoding: t Data_encoding.t

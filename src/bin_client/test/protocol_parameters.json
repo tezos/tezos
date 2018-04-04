@@ -1,0 +1,22 @@
+{ "bootstrap_accounts":
+  [
+      [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
+      [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
+      [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
+      [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
+      [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
+  ],
+  "commitments":
+  [
+    [ "tz1fkmDXEQdua3u71JBVh4eGUGqK4t1G8xhZ", "btz1T77Ly5U1bWNBR5KzDSgNFST5Bh5F1eB6g", "1868898542104130027" ],
+    [ "tz1doNkK6RKaRswsuKJV4erT6HauYSm9fuHi", "btz1QxTPgszARgWioEor3eMehxW3osfhw3KoJ", "517697389496079974" ],
+    [ "tz1g6zFsci4YR8p1MJrkyc6wAKizR6mqJmyQ", "btz1NUYc1tV5VBksMNuQG4AuZF9Xudh1sDJni", "962290491831710023" ],
+    [ "tz1MpbcwGFWVBBWoxwm6iQH5Hzh9mCXbnETJ", "btz1Wwifd8vbQqnbuzSbQLvJEjQ9FUoxVJm68", "1233665184704419921" ],
+    [ "tz1U4t2PmX5cZVUui4BNaiRVokLa6AxB5G9Z", "btz1RrFkp9GmnypoNGRSyURkBQNUs4PPYG8SR", "131959324067470008" ],
+    [ "tz1RUxPjviua4XJM78XjSKGUCAS9R3y8Bdof", "btz1hozabzP9HdRakJddzyea7DgPHzJ5PB37N", "112378240876120002" ],
+    [ "tz1fJPeueQKJrTj2SFV2PmyCinLYJKXCEMf4", "btz1j1k4nrZB4r8RpTYiy8zbi3Fappopkb8ZF", "1060667014046690017" ],
+    [ "tz1iDPZLxcGf5CqCNpTuuMdtu3zKpJ6HvvFR", "btz1TaSfoSNhFoqwqbPC9iC19rN24KJtB7skD", "71300478465380003" ],
+    [ "tz1i2kbtVu65dP739qLGRpJNujRM8pdpkH3p", "btz1USqQRuvASPXwseXkGTWeWv4dn3VwMVPEk", "283380756728119992" ],
+    [ "tz1LKGCg6ESJLDviHkT8Jc7tUwjw4h3d9MaF", "btz1YwCKMbBLRL1qkBjAHGCwjbWDqiTAEFpbw", "1357762577679880028" ]
+  ]
+}

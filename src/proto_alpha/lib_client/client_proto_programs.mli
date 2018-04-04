@@ -15,6 +15,7 @@ module Program : Client_aliases.Alias
   with type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 
 val run :
+  ?contract:Contract.t ->
   ?amount:Tez.t ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
@@ -24,6 +25,7 @@ val run :
   (Script.expr * Script.expr * (Script.expr * Script.expr option) list option) tzresult Lwt.t
 
 val trace :
+  ?contract:Contract.t ->
   ?amount:Tez.t ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->

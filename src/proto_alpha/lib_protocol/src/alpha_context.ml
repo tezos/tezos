@@ -78,7 +78,6 @@ module Seed = struct
   include Seed_repr
   include Seed_storage
 end
-module Bootstrap = Bootstrap_storage
 
 module Fitness = struct
 

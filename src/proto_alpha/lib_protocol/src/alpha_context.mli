@@ -243,15 +243,6 @@ module Script : sig
   val encoding: t Data_encoding.t
 end
 
-module Bootstrap : sig
-  type account = {
-    public_key_hash: public_key_hash ;
-    public_key: public_key ;
-  }
-  val accounts: context -> account list
-  val account_encoding: account Data_encoding.t
-end
-
 module Constants : sig
 
   val proof_of_work_nonce_size: int

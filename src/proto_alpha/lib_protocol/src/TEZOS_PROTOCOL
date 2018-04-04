@@ -31,6 +31,7 @@
         "Operation_repr",
         "Manager_repr",
 	"Commitment_repr",
+	"Parameters_repr",
 
         "Raw_context",
         "Storage_sigs",

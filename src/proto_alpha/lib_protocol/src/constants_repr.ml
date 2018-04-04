@@ -38,10 +38,6 @@ let block_reward =
 let endorsement_reward =
   Tez_repr.(mul_exn one 2)
 
-(* 4,000,000 tez *)
-let bootstrap_wealth =
-  Tez_repr.(mul_exn one 4_000_000)
-
 let max_revelations_per_block = 32
 
 type constants = {
@@ -55,7 +51,6 @@ type constants = {
   endorsers_per_block: int ;
   max_gas: int ;
   proof_of_work_threshold: int64 ;
-  bootstrap_keys: Ed25519.Public_key.t list ;
   dictator_pubkey: Ed25519.Public_key.t ;
   max_operation_data_length: int ;
   tokens_per_roll: Tez_repr.t ;
@@ -77,14 +72,6 @@ let default = {
   max_gas = 40_000 ;
   proof_of_work_threshold =
     Int64.(sub (shift_left 1L 56) 1L) ;
-  bootstrap_keys =
-    List.map read_public_key [
-      "edpkumCM1MAkah9ESaoQJnf1pXKrEYZMtFnEz46rrpq9SWkF1phM5Q" ;
-      "edpktsJoNN7G67B4rBwXD44ymRwEMMXVJDV2nURasB3gd6jqibZqWh" ;
-      "edpkth7ZUHB1X26ruiQXg4WaJPKPFfBqX5wvgja17Bf6hybMcRBCkn" ;
-      "edpkvTnasCe4gtEPRsgyBhMjvDkyf5YA7QTyEksJj836gXVCSxeQZk" ;
-      "edpkvXCagqGcEfJ7rUmzwRcPMViM6Yk2XGwwkrLre4d9yMFEqsrwuf" ;
-    ] ;
   dictator_pubkey =
     read_public_key
       "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ;
@@ -140,9 +127,6 @@ let constants_encoding =
        and proof_of_work_threshold =
          opt Compare.Int64.(=)
            default.proof_of_work_threshold c.proof_of_work_threshold
-       and bootstrap_keys =
-         opt Compare_keys.(=)
-           default.bootstrap_keys c.bootstrap_keys
        and dictator_pubkey =
          opt Ed25519.Public_key.(=)
            default.dictator_pubkey c.dictator_pubkey
@@ -166,7 +150,6 @@ let constants_encoding =
            endorsers_per_block,
            max_gas),
          ( proof_of_work_threshold,
-           bootstrap_keys,
            dictator_pubkey,
            max_operation_data_length,
            tokens_per_roll,
@@ -181,7 +164,6 @@ let constants_encoding =
              endorsers_per_block,
              max_gas),
            ( proof_of_work_threshold,
-             bootstrap_keys,
              dictator_pubkey,
              max_operation_data_length,
              tokens_per_roll,
@@ -207,8 +189,6 @@ let constants_encoding =
           unopt default.max_gas max_gas ;
         proof_of_work_threshold =
           unopt default.proof_of_work_threshold proof_of_work_threshold ;
-        bootstrap_keys =
-          unopt default.bootstrap_keys bootstrap_keys ;
         dictator_pubkey =
           unopt default.dictator_pubkey dictator_pubkey ;
         max_operation_data_length =
@@ -231,9 +211,8 @@ let constants_encoding =
               (opt "first_free_baking_slot" uint16)
               (opt "endorsers_per_block" uint16)
               (opt "instructions_per_transaction" int31))
-           (obj6
+           (obj5
               (opt "proof_of_work_threshold" int64)
-              (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
               (opt "dictator_pubkey" Ed25519.Public_key.encoding)
               (opt "max_operation_data_length" int31)
               (opt "tokens_per_roll" Tez_repr.encoding)

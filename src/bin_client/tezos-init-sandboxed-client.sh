@@ -15,6 +15,23 @@ init_sandboxed_client() {
     client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
     admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
     alpha_baker="$local_alpha_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+    parameters_file="${parameters_file:-$client_dir/protocol_parameters.json}"
+
+    if ! [ -f "$parameters_file" ]; then
+        cat > "$parameters_file" <<EOF
+{ "bootstrap_accounts":
+  [
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
+    [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
+    [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
+    [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
+    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
+  ],
+  "commitments": [
+  ]
+}
+EOF
+    fi
 
 }
 
@@ -198,8 +215,8 @@ activate_alpha() {
         -block genesis \
         activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
         with fitness 1 \
-        and key dictator
-
+        and key dictator \
+	and parameters "${parameters_file}"
 }
 
 usage() {
@@ -216,6 +233,7 @@ main () {
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
         local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
         local_alpha_baker="${local_alpha_baker:-$bin_dir/../../_build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe}"
+        parameters_file="${parameters_file:-$bin_dir/../../scripts/protocol_parameters.json}"
     else
 	# we assume a clean install with tezos-(admin-)client in the path
         local_client="${local_client:-$(which tezos-client)}"
@@ -249,7 +267,7 @@ main () {
     cat <<EOF
 if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias tezos-activate-alpha="$client -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key dictator" ;
+alias tezos-activate-alpha="$client -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key dictator and parameters $parameters_file" ;
 alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha tezos-client-reset" ;
 alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 trap tezos-client-reset EXIT ;

@@ -10,14 +10,14 @@
 (* This is the genesis protocol: initialise the state *)
 let prepare_first_block ctxt ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block
-    ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
+    ~level ~timestamp ~fitness ctxt >>=? fun (param, ctxt) ->
+  Commitment_storage.init ctxt param.commitments >>=? fun ctxt ->
   Roll_storage.init ctxt >>=? fun ctxt ->
   Seed_storage.init ctxt >>=? fun ctxt ->
   Contract_storage.init ctxt >>=? fun ctxt ->
-  Bootstrap_storage.init ctxt >>=? fun ctxt ->
+  Bootstrap_storage.init ctxt param.bootstrap_accounts >>=? fun ctxt ->
   Roll_storage.init_first_cycles ctxt >>=? fun ctxt ->
   Vote_storage.init ctxt >>=? fun ctxt ->
-  Commitment_storage.init ctxt >>=? fun ctxt ->
   return ctxt
 
 let prepare ctxt ~level ~timestamp ~fitness =

@@ -29,7 +29,7 @@ module S = struct
        (req "storage" Script.expr_encoding)
        (req "input" Script.expr_encoding)
        (req "amount" Tez.encoding)
-       (opt "contract" Contract.encoding)
+       (req "contract" Contract.encoding)
        (opt "origination_nonce" Contract.origination_nonce_encoding))
 
   let run_code =
@@ -145,12 +145,6 @@ module I = struct
 
 
   let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =
-    let contract =
-      match contract with
-      | Some contract -> contract
-      | None ->
-          Contract.implicit_contract
-            (List.hd (Bootstrap.accounts ctxt)).Bootstrap.public_key_hash in
     let max_gas =
       Constants.max_gas ctxt in
     let origination_nonce =
@@ -222,17 +216,17 @@ let () =
 let minimal_time ctxt ?priority block =
   RPC_context.make_call0 S.minimal_timestamp ctxt block () priority
 
-let run_code ctxt block code (storage, input, amount) =
+let run_code ctxt block code (storage, input, amount, contract) =
   RPC_context.make_call0 S.run_code ctxt
-    block () (code, storage, input, amount, None, None)
+    block () (code, storage, input, amount, contract, None)
 
 let apply_operation ctxt block pred_block hash forged_operation signature =
   RPC_context.make_call0 S.apply_operation ctxt
     block () (pred_block, hash, forged_operation, signature)
 
-let trace_code ctxt block code (storage, input, amount) =
+let trace_code ctxt block code (storage, input, amount, contract) =
   RPC_context.make_call0 S.trace_code ctxt
-    block () (code, storage, input, amount, None, None)
+    block () (code, storage, input, amount, contract, None)
 
 let typecheck_code ctxt block =
   RPC_context.make_call0 S.typecheck_code ctxt block ()

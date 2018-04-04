@@ -41,7 +41,7 @@ val prepare_first_block:
   level:int32 ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
-  Context.t -> context tzresult Lwt.t
+  Context.t -> (Parameters_repr.t * context) tzresult Lwt.t
 
 val activate: context -> Protocol_hash.t -> t Lwt.t
 val fork_test_chain: context -> Protocol_hash.t -> Time.t -> t Lwt.t
