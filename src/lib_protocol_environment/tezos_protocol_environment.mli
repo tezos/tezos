@@ -121,6 +121,12 @@ module Make (Context : CONTEXT) : sig
        and type Ed25519.Public_key_hash.t = Ed25519.Public_key_hash.t
        and type Ed25519.Public_key.t = Ed25519.Public_key.t
        and type Ed25519.t = Ed25519.t
+       and type Secp256k1.Public_key_hash.t = Secp256k1.Public_key_hash.t
+       and type Secp256k1.Public_key.t = Secp256k1.Public_key.t
+       and type Secp256k1.t = Secp256k1.t
+       and type Signature.public_key_hash = Signature.public_key_hash
+       and type Signature.public_key = Signature.public_key
+       and type Signature.t = Signature.t
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema

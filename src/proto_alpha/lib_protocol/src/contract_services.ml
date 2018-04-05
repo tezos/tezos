@@ -30,12 +30,12 @@ let info_encoding =
     (fun (manager, balance, spendable, delegate, script, storage, counter) ->
        {manager ; balance ; spendable ; delegate ; script ; storage ; counter}) @@
   obj7
-    (req "manager" Ed25519.Public_key_hash.encoding)
+    (req "manager" Signature.Public_key_hash.encoding)
     (req "balance" Tez.encoding)
     (req "spendable" bool)
     (req "delegate" @@ obj2
        (req "setable" bool)
-       (opt "value" Ed25519.Public_key_hash.encoding))
+       (opt "value" Signature.Public_key_hash.encoding))
     (opt "script" Script.encoding)
     (opt "storage" Script.expr_encoding)
     (req "counter" int32)
@@ -57,7 +57,7 @@ module S = struct
       ~description: "Access the manager of a contract."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "manager" Ed25519.Public_key_hash.encoding))
+      ~output: (obj1 (req "manager" Signature.Public_key_hash.encoding))
       RPC_path.(custom_root /: Contract.arg / "manager")
 
   let delegate =
@@ -65,7 +65,7 @@ module S = struct
       ~description: "Access the delegate of a contract, if any."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "delegate" Ed25519.Public_key_hash.encoding))
+      ~output: (obj1 (req "delegate" Signature.Public_key_hash.encoding))
       RPC_path.(custom_root /: Contract.arg / "delegate")
 
   let counter =

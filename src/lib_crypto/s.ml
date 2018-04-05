@@ -172,7 +172,6 @@ module type SIGNATURE = sig
 
     val pp: Format.formatter -> t -> unit
     include Compare.S with type t := t
-    include RAW_DATA with type t := t
     include B58_DATA with type t := t
     include ENCODER with type t := t
 
@@ -186,7 +185,6 @@ module type SIGNATURE = sig
 
     val pp: Format.formatter -> t -> unit
     include Compare.S with type t := t
-    include RAW_DATA with type t := t
     include B58_DATA with type t := t
     include ENCODER with type t := t
 

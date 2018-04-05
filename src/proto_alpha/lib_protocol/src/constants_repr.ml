@@ -54,7 +54,7 @@ type parametric = {
   endorsers_per_block: int ;
   max_gas: int ;
   proof_of_work_threshold: int64 ;
-  dictator_pubkey: Ed25519.Public_key.t ;
+  dictator_pubkey: Signature.Public_key.t ;
   max_operation_data_length: int ;
   tokens_per_roll: Tez_repr.t ;
   michelson_maximum_type_size: int;
@@ -80,7 +80,7 @@ let default = {
   proof_of_work_threshold =
     Int64.(sub (shift_left 1L 56) 1L) ;
   dictator_pubkey =
-    Ed25519.Public_key.of_b58check_exn
+    Signature.Public_key.of_b58check_exn
       "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ;
   max_operation_data_length =
     16 * 1024 ; (* 16kB *)
@@ -179,7 +179,7 @@ let parametric_encoding =
           (req "instructions_per_transaction" int31)
           (req "proof_of_work_threshold" int64))
        (obj10
-          (req "dictator_pubkey" Ed25519.Public_key.encoding)
+          (req "dictator_pubkey" Signature.Public_key.encoding)
           (req "max_operation_data_length" int31)
           (req "tokens_per_roll" Tez_repr.encoding)
           (req "michelson_maximum_type_size" uint16)

@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 type bootstrap_account = {
-  public_key : Ed25519.Public_key.t ;
+  public_key : Signature.Public_key.t ;
   amount : Tez_repr.t ;
 }
 
@@ -23,7 +23,7 @@ let bootstrap_account_encoding =
   conv
     (fun { public_key ; amount } -> (public_key, amount))
     (fun (public_key, amount) -> { public_key ; amount })
-    (tup2 Ed25519.Public_key.encoding Tez_repr.encoding)
+    (tup2 Signature.Public_key.encoding Tez_repr.encoding)
 
 (* This encoding is used to read configuration files (e.g. sandbox.json)
    where some fields can be missing, in that case they are replaced by
@@ -67,7 +67,7 @@ let constants_encoding =
          opt Compare.Int64.(=)
            default.proof_of_work_threshold c.proof_of_work_threshold
        and dictator_pubkey =
-         opt Ed25519.Public_key.(=)
+         opt Signature.Public_key.(=)
            default.dictator_pubkey c.dictator_pubkey
        and max_operation_data_length =
          opt Compare.Int.(=)
@@ -194,7 +194,7 @@ let constants_encoding =
           (opt "instructions_per_transaction" int31)
           (opt "proof_of_work_threshold" int64))
        (obj10
-          (opt "dictator_pubkey" Ed25519.Public_key.encoding)
+          (opt "dictator_pubkey" Signature.Public_key.encoding)
           (opt "max_operation_data_length" int31)
           (opt "tokens_per_roll" Tez_repr.encoding)
           (opt "michelson_maximum_type_size" uint16)

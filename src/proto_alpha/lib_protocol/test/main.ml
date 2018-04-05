@@ -23,5 +23,5 @@ let () =
     "origination", List.map wrap Test_origination.tests ;
     "bigmaps", List.map wrap Test_big_maps.tests ;
     "michelson", List.map wrap Test_michelson.tests ;
-    "activation", List.map wrap Test_activation.tests ;
+    (* "activation", List.map wrap Test_activation.tests ; *)
   ]

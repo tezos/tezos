@@ -12,9 +12,9 @@ open Proto_alpha.Error_monad
 open Proto_alpha.Alpha_context
 
 type account = {
-  hpub : Ed25519.Public_key_hash.t ;
-  pub :  Ed25519.Public_key.t ;
-  ppk :  Ed25519.Secret_key.t ;
+  hpub : Signature.Public_key_hash.t ;
+  pub :  Signature.Public_key.t ;
+  ppk :  Signature.Secret_key.t ;
   contract : Contract.contract
 }
 type t = account
@@ -39,11 +39,11 @@ let bootstrap_accounts =
     "edskS7rLN2Df3nbS1EYvwJbWo4umD7yPM1SUeX7gp1WhCVpMFXjcC\
      yM58xs6xsnTsVqHQmJQ2RxoAjJGedWfvFmjQy6etA3dgZ";
   ] in
-  let pubs = List.map Ed25519.Public_key.of_b58check_exn pubs in
-  let ppks = List.map Ed25519.Secret_key.of_b58check_exn ppks in
+  let pubs = List.map Signature.Public_key.of_b58check_exn pubs in
+  let ppks = List.map Signature.Secret_key.of_b58check_exn ppks in
   let keys = List.combine pubs ppks in
   let aux (pub, ppk) : account =
-    let hpub = Ed25519.Public_key.hash pub in {
+    let hpub = Signature.Public_key.hash pub in {
       pub ;
       ppk ;
       hpub ;
@@ -52,7 +52,7 @@ let bootstrap_accounts =
   in List.map aux keys
 
 let new_account () : account =
-  let (hpub, pub, ppk) = Ed25519.generate_key () in
+  let (hpub, pub, ppk) = Signature.generate_key () in
   let contract = Contract.implicit_contract hpub in
   {hpub ; pub ; ppk ; contract}
 
@@ -96,11 +96,10 @@ let display_account ~tc account =
   | Ok balance -> (
       Helpers_logger.lwt_debug
         "Account %a : (%a tz)"
-        Ed25519.Public_key_hash.pp account.hpub
+        Signature.Public_key_hash.pp account.hpub
         Tez.pp balance
     )| Error _ -> Helpers_logger.lwt_debug "Error in balance"
 
 let display_accounts ~tc accounts =
   Helpers_logger.lwt_debug "Got accounts" >>= fun () ->
   Lwt_list.iter_s (display_account ~tc) accounts
-

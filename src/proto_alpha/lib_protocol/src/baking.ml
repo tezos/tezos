@@ -18,7 +18,7 @@ type error += Cannot_freeze_baking_deposit (* `Permanent *)
 type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Empty_endorsement
-type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
+type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
 type error += Invalid_signature  (* `Permanent *)
 type error += Invalid_stamp  (* `Permanent *)
 
@@ -91,9 +91,9 @@ let () =
     ~pp:(fun ppf l ->
         Format.fprintf ppf
           "@[<v 2>The endorsement is inconsistent. Delegates:@ %a@]"
-          (Format.pp_print_list Ed25519.Public_key_hash.pp) l)
+          (Format.pp_print_list Signature.Public_key_hash.pp) l)
     Data_encoding.(obj1
-                     (req "delegates" (list Ed25519.Public_key_hash.encoding)))
+                     (req "delegates" (list Signature.Public_key_hash.encoding)))
     (function Inconsistent_endorsement l -> Some l | _ -> None)
     (fun l -> Inconsistent_endorsement l) ;
   register_error_kind
@@ -105,10 +105,10 @@ let () =
     ~pp:(fun ppf (block, pkh) ->
         Format.fprintf ppf "Invalid signature for block %a. Expected: %a."
           Block_hash.pp_short block
-          Ed25519.Public_key_hash.pp_short pkh)
+          Signature.Public_key_hash.pp_short pkh)
     Data_encoding.(obj2
                      (req "block" Block_hash.encoding)
-                     (req "expected" Ed25519.Public_key_hash.encoding))
+                     (req "expected" Signature.Public_key_hash.encoding))
     (function Invalid_block_signature (block, pkh) -> Some (block, pkh) | _ -> None)
     (fun (block, pkh) -> Invalid_block_signature (block, pkh));
   register_error_kind
@@ -187,8 +187,8 @@ let check_endorsements_rights c level slots =
   | [] -> fail Empty_endorsement
   | delegate :: delegates as all_delegates ->
       fail_unless
-        (List.for_all (fun d -> Ed25519.Public_key.equal d delegate) delegates)
-        (Inconsistent_endorsement (List.map Ed25519.Public_key.hash all_delegates)) >>=? fun () ->
+        (List.for_all (fun d -> Signature.Public_key.equal d delegate) delegates)
+        (Inconsistent_endorsement (List.map Signature.Public_key.hash all_delegates)) >>=? fun () ->
       return delegate
 
 let paying_priorities c =
@@ -224,7 +224,7 @@ let select_delegate delegate delegate_list max_priority =
     else
       let LCons (pk, t) = l in
       let acc =
-        if Ed25519.Public_key_hash.equal delegate (Ed25519.Public_key.hash pk)
+        if Signature.Public_key_hash.equal delegate (Signature.Public_key.hash pk)
         then n :: acc
         else acc in
       t () >>=? fun t ->
@@ -265,12 +265,12 @@ let check_proof_of_work_stamp ctxt block =
 let check_signature block key =
   let check_signature key { Block_header.protocol_data ; shell ; signature } =
     let unsigned_header = Block_header.forge_unsigned shell protocol_data in
-    Ed25519.check key signature unsigned_header in
+    Signature.check key signature unsigned_header in
   if check_signature key block then
     return ()
   else
     fail (Invalid_block_signature (Block_header.hash block,
-                                   Ed25519.Public_key.hash key))
+                                   Signature.Public_key.hash key))
 
 let max_fitness_gap ctxt =
   let slots = Int64.of_int (Constants.endorsers_per_block ctxt + 1) in

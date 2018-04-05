@@ -13,6 +13,15 @@ let group =
   { Clic.name = "keys" ;
     title = "Commands for managing the wallet of cryptographic keys" }
 
+let sig_algo_arg =
+  Clic.default_arg
+    ~doc:"use custom signature algorithm"
+    ~long:"sig"
+    ~short:'s'
+    ~placeholder:"ed25519|secp256k1"
+    ~default: "ed25519"
+    (Signature.algo_param ())
+
 let commands () =
   let open Clic in
   let show_private_switch =
@@ -46,13 +55,13 @@ let commands () =
            signers >>= return) ;
 
     command ~group ~desc: "Generate a pair of (unencrypted) keys."
-      (args1 (Secret_key.force_switch ()))
+      (args2 (Secret_key.force_switch ()) sig_algo_arg)
       (prefixes [ "gen" ; "keys" ]
        @@ Secret_key.fresh_alias_param
        @@ stop)
-      (fun force name (cctxt : #Client_context.full) ->
+      (fun (force, algo) name (cctxt : #Client_context.full) ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
-         gen_keys ~force cctxt name) ;
+         gen_keys ~force ~algo cctxt name) ;
 
     command ~group ~desc: "Generate (unencrypted) keys including the given string."
       (args2
@@ -176,7 +185,7 @@ let commands () =
          | None -> ok_lwt @@ cctxt#message "No keys found for identity"
          | Some (pkh, pk, skloc) ->
              ok_lwt @@ cctxt#message "Hash: %a"
-               Ed25519.Public_key_hash.pp pkh >>=? fun () ->
+               Signature.Public_key_hash.pp pkh >>=? fun () ->
              match pk with
              | None -> return ()
              | Some (Pk_locator { scheme } as pkloc) ->
@@ -185,7 +194,7 @@ let commands () =
                  Signer.pk_of_locator pkloc >>=? fun pk ->
                  Signer.public_key pk >>= fun pk ->
                  ok_lwt @@ cctxt#message "Public Key: %a"
-                   Ed25519.Public_key.pp pk >>=? fun () ->
+                   Signature.Public_key.pp pk >>=? fun () ->
                  if show_private then
                    match skloc with
                    | None -> return ()

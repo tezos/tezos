@@ -103,7 +103,7 @@ module Contract = struct
   module Delegate =
     Indexed_context.Make_map
       (struct let name = ["delegate"] end)
-      (Make_value(Ed25519.Public_key_hash))
+      (Make_value(Signature.Public_key_hash))
 
   module Inactive_delegate =
     Indexed_context.Make_set
@@ -180,7 +180,7 @@ end
 module Delegates =
   Make_data_set_storage
     (Make_subcontext(Raw_context)(struct let name = ["delegates"] end))
-    (Ed25519.Public_key_hash)
+    (Signature.Public_key_hash)
 
 (** Rolls *)
 
@@ -206,7 +206,7 @@ module Cycle = struct
 
   type unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
-    delegate: Ed25519.Public_key_hash.t ;
+    delegate: Signature.Public_key_hash.t ;
     deposit: Tez_repr.t ;
     rewards: Tez_repr.t ;
     fees: Tez_repr.t ;
@@ -222,7 +222,7 @@ module Cycle = struct
       case (Tag 0)
         (tup5
            Nonce_hash.encoding
-           Ed25519.Public_key_hash.encoding
+           Signature.Public_key_hash.encoding
            Tez_repr.encoding
            Tez_repr.encoding
            Tez_repr.encoding)
@@ -285,7 +285,7 @@ module Roll = struct
 
   module Delegate_roll_list =
     Wrap_indexed_data_storage(Contract.Roll_list)(struct
-      type t = Ed25519.Public_key_hash.t
+      type t = Signature.Public_key_hash.t
       let wrap = Contract_repr.implicit_contract
       let unwrap = Contract_repr.is_implicit
     end)
@@ -297,7 +297,7 @@ module Roll = struct
 
   module Delegate_change =
     Wrap_indexed_data_storage(Contract.Change)(struct
-      type t = Ed25519.Public_key_hash.t
+      type t = Signature.Public_key_hash.t
       let wrap = Contract_repr.implicit_contract
       let unwrap = Contract_repr.is_implicit
     end)
@@ -324,7 +324,7 @@ module Roll = struct
       (Make_subcontext(Raw_context)(struct let name = ["owner"] end))
       (Snapshoted_owner_index)
       (Roll_repr.Index)
-      (Make_value(Ed25519.Public_key))
+      (Make_value(Signature.Public_key))
 
   module Snapshot_for_cycle = Cycle.Roll_snapshot
   module Last_for_snapshot = Cycle.Last_roll
@@ -370,18 +370,18 @@ module Vote = struct
   module Listings =
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["listings"] end))
-      (Ed25519.Public_key_hash)
+      (Signature.Public_key_hash)
       (Make_value(Int32))
 
   module Proposals =
     Make_data_set_storage
       (Make_subcontext(Raw_context)(struct let name = ["proposals"] end))
-      (Pair(Protocol_hash)(Ed25519.Public_key_hash))
+      (Pair(Protocol_hash)(Signature.Public_key_hash))
 
   module Ballots =
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["ballots"] end))
-      (Ed25519.Public_key_hash)
+      (Signature.Public_key_hash)
       (Make_value(struct
          type t = Vote_repr.ballot
          let encoding = Vote_repr.ballot_encoding
@@ -395,7 +395,7 @@ module Seed = struct
 
   type unrevealed_nonce = Cycle.unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
-    delegate: Ed25519.Public_key_hash.t ;
+    delegate: Signature.Public_key_hash.t ;
     deposit: Tez_repr.t ;
     rewards: Tez_repr.t ;
     fees: Tez_repr.t ;
@@ -446,10 +446,22 @@ let () =
   Raw_context.register_resolvers
     Ed25519.Public_key_hash.b58check_encoding
     (fun ctxt p ->
-       let p = Contract_repr.Index.pkh_prefix p in
+       let p = Contract_repr.Index.pkh_prefix_ed25519 p in
        Contract.Indexed_context.resolve ctxt p >|= fun l ->
        List.map
          (function
-           | Contract_repr.Implicit s -> s
+           | Contract_repr.Implicit (Ed25519 pkh) -> pkh
+           | Contract_repr.Implicit _ -> assert false
+           | Contract_repr.Originated _ -> assert false)
+         l) ;
+  Raw_context.register_resolvers
+    Secp256k1.Public_key_hash.b58check_encoding
+    (fun ctxt p ->
+       let p = Contract_repr.Index.pkh_prefix_secp256k1 p in
+       Contract.Indexed_context.resolve ctxt p >|= fun l ->
+       List.map
+         (function
+           | Contract_repr.Implicit (Secp256k1 pkh) -> pkh
+           | Contract_repr.Implicit _ -> assert false
            | Contract_repr.Originated _ -> assert false)
          l)

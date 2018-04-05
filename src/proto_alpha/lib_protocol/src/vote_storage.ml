@@ -51,7 +51,7 @@ let freeze_listings ctxt =
   Roll_storage.fold ctxt (ctxt, 0l)
     ~f:(fun _roll delegate (ctxt, total) ->
         (* TODO use snapshots *)
-        let delegate = Ed25519.Public_key.hash delegate in
+        let delegate = Signature.Public_key.hash delegate in
         begin
           Storage.Vote.Listings.get_option ctxt delegate >>=? function
           | None -> return 0l

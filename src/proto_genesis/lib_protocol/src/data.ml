@@ -65,7 +65,7 @@ module Command = struct
     let open Data_encoding in
     obj2
       (req "content" encoding)
-      (req "signature" Ed25519.encoding)
+      (req "signature" Signature.encoding)
 
   let forge shell command =
     Data_encoding.Binary.to_bytes
@@ -79,25 +79,25 @@ module Pubkey = struct
   let pubkey_key = ["genesis_key"]
 
   let default =
-    Ed25519.Public_key.of_b58check_exn
+    Signature.Public_key.of_b58check_exn
       "edpkuEH8DSby4w167NpxYbMagBapWvM8jsqKJpiW3JpVD7Af8oGmEo"
 
   let get_pubkey ctxt =
     Context.get ctxt pubkey_key >>= function
     | None -> Lwt.return default
     | Some b ->
-        match Data_encoding.Binary.of_bytes Ed25519.Public_key.encoding b with
+        match Data_encoding.Binary.of_bytes Signature.Public_key.encoding b with
         | None -> Lwt.return default
         | Some pk -> Lwt.return pk
 
   let set_pubkey ctxt v =
     Context.set ctxt pubkey_key @@
-    Data_encoding.Binary.to_bytes Ed25519.Public_key.encoding v
+    Data_encoding.Binary.to_bytes Signature.Public_key.encoding v
 
   let sandbox_encoding =
     let open Data_encoding in
     merge_objs
-      (obj1 (req "genesis_pubkey" Ed25519.Public_key.encoding))
+      (obj1 (req "genesis_pubkey" Signature.Public_key.encoding))
       Data_encoding.unit
 
   let may_change_default ctxt json =

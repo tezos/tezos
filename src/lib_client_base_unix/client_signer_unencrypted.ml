@@ -23,8 +23,8 @@ module Unencrypted_signer : SIGNER = struct
      The format for importing public keys is the raw Base58-encoded \
      key (starting with 'edpk')."
 
-  type secret_key = Ed25519.Secret_key.t
-  type public_key = Ed25519.Public_key.t
+  type secret_key = Signature.Secret_key.t
+  type public_key = Signature.Public_key.t
 
   let init _wallet = return ()
 
@@ -41,25 +41,25 @@ module Unencrypted_signer : SIGNER = struct
     | pk :: _ -> return (Public_key_locator.create ~scheme ~location:pk)
 
   let sk_of_locator (Sk_locator { location }) =
-    Lwt.return (Ed25519.Secret_key.of_b58check location)
+    Lwt.return (Signature.Secret_key.of_b58check location)
 
   let pk_of_locator (Pk_locator { location }) =
-    Lwt.return (Ed25519.Public_key.of_b58check location)
+    Lwt.return (Signature.Public_key.of_b58check location)
 
   let sk_to_locator sk =
     Secret_key_locator.create
-      ~scheme ~location:(Ed25519.Secret_key.to_b58check sk) |>
+      ~scheme ~location:(Signature.Secret_key.to_b58check sk) |>
     Lwt.return
 
   let pk_to_locator pk =
     Public_key_locator.create
-      ~scheme ~location:(Ed25519.Public_key.to_b58check pk) |>
+      ~scheme ~location:(Signature.Public_key.to_b58check pk) |>
     Lwt.return
 
-  let neuterize x = Lwt.return (Ed25519.Secret_key.to_public_key x)
+  let neuterize x = Lwt.return (Signature.Secret_key.to_public_key x)
   let public_key x = Lwt.return x
-  let public_key_hash x = Lwt.return (Ed25519.Public_key.hash x)
-  let sign t buf = return (Ed25519.sign t buf)
+  let public_key_hash x = Lwt.return (Signature.Public_key.hash x)
+  let sign t buf = return (Signature.sign t buf)
 end
 
 let () =

@@ -35,7 +35,7 @@ let filter_valid_endorsement cctxt ({ hash ; content } : operation) =
   | Some { shell = {chain_id} ;
            contents =
              Sourced_operations (Delegate_operations { source ; operations }) } ->
-      let source = Ed25519.Public_key.hash source in
+      let source = Signature.Public_key.hash source in
       let endorsements =
         Utils.unopt_list @@ List.map
           (function
@@ -102,4 +102,3 @@ let monitor_endorsement cctxt =
 let monitor_endorsement _ =
   let stream, _push = Lwt_stream.create () in
   return stream
-

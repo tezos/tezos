@@ -24,8 +24,8 @@ module Encrypted_signer : SIGNER = struct
      The format for importing public keys is the raw Base58-encoded \
      key (starting with 'edpk')."
 
-  type secret_key = Ed25519.Secret_key.t
-  type public_key = Ed25519.Public_key.t
+  type secret_key = Signature.Secret_key.t
+  type public_key = Signature.Public_key.t
 
   (* https://tools.ietf.org/html/rfc2898#section-4.1 *)
   let salt_len = 8
@@ -33,7 +33,7 @@ module Encrypted_signer : SIGNER = struct
   (* Fixed zero nonce *)
   let nonce = Crypto_box.zero_nonce
 
-  (* skloc -> Ed25519.Secret_key.t *)
+  (* skloc -> Signature.Secret_key.t *)
   let decrypted_sks = Hashtbl.create 13
 
   let pbkdf ~salt ~password =
@@ -67,7 +67,9 @@ module Encrypted_signer : SIGNER = struct
     match Crypto_box.Secretbox.box_open key skenc nonce with
     | None -> passwd_ask_loop cctxt ~name ~salt ~skenc
     | Some decrypted_sk ->
-        Lwt.return (password, (Ed25519.Secret_key.of_bytes_exn decrypted_sk))
+        Lwt.return (password, (Data_encoding.Binary.of_bytes_exn
+                                 Signature.Secret_key.encoding
+                                 decrypted_sk))
 
   let ask_all_passwords (cctxt : #Client_context.io_wallet) sks =
     Lwt_list.fold_left_s begin fun a (name, skloc) ->
@@ -82,7 +84,7 @@ module Encrypted_signer : SIGNER = struct
             match decrypt_sk skenc salt a with
             | Some sk ->
                 Hashtbl.replace decrypted_sks location
-                  (Ed25519.Secret_key.of_bytes_exn sk) ;
+                  (Data_encoding.Binary.of_bytes_exn Signature.Secret_key.encoding sk) ;
                 Lwt.return a
             | None ->
                 passwd_ask_loop
@@ -110,7 +112,7 @@ module Encrypted_signer : SIGNER = struct
     let password = MBytes.of_string password in
     let salt = Rand.generate salt_len in
     let key = Crypto_box.Secretbox.of_bytes_exn (pbkdf ~password ~salt) in
-    let msg = Ed25519.Secret_key.to_bytes sk in
+    let msg = Data_encoding.Binary.to_bytes Signature.Secret_key.encoding sk in
     let encrypted_passwd = Crypto_box.Secretbox.box key msg nonce in
     let payload = MBytes.(to_string (concat salt encrypted_passwd)) in
     let location = Base58.safe_encode payload in
@@ -143,25 +145,25 @@ module Encrypted_signer : SIGNER = struct
           "Enter the password used for the paper wallet: " >>= fun password ->
         let sk = Bip39.to_seed ~passphrase:(password ^ email) t in
         let sk = Cstruct.(to_bigarray (sub sk 0 32)) in
-        let sk = Ed25519.Secret_key.of_bytes_exn sk in
-        let pk = Ed25519.Secret_key.to_public_key sk in
-        let pkh = Ed25519.Public_key.hash pk in
+        let sk = Data_encoding.Binary.of_bytes_exn Signature.Secret_key.encoding sk in
+        let pk = Signature.Secret_key.to_public_key sk in
+        let pkh = Signature.Public_key.hash pk in
         let msg = Format.asprintf
             "Your public Tezos address is %a is that correct?"
-            Ed25519.Public_key_hash.pp pkh in
+            Signature.Public_key_hash.pp pkh in
         get_boolean_answer cctxt ~msg ~default:true >>=? function
         | true -> return sk
         | false -> sk_of_mnemonic cctxt
 
   let sk_locator_of_human_input cctxt = function
     | sk :: _ ->
-        Lwt.return (Ed25519.Secret_key.of_b58check sk) >>=? fun sk ->
+        Lwt.return (Signature.Secret_key.of_b58check sk) >>=? fun sk ->
         encrypt_sk cctxt sk
     | [] -> begin
         get_boolean_answer
           cctxt ~msg:"Generate a new key" ~default:true >>=? function
         | true ->
-            let _, _, sk = Ed25519.generate_key () in
+            let _, _, sk = Signature.generate_key () in
             encrypt_sk cctxt sk
         | false ->
             get_boolean_answer cctxt
@@ -182,22 +184,22 @@ module Encrypted_signer : SIGNER = struct
     | sk -> return sk
 
   let pk_of_locator (Pk_locator { location }) =
-    Lwt.return (Ed25519.Public_key.of_b58check location)
+    Lwt.return (Signature.Public_key.of_b58check location)
 
   let sk_to_locator sk =
     Secret_key_locator.create
-      ~scheme ~location:(Ed25519.Secret_key.to_b58check sk) |>
+      ~scheme ~location:(Signature.Secret_key.to_b58check sk) |>
     Lwt.return
 
   let pk_to_locator pk =
     Public_key_locator.create
-      ~scheme ~location:(Ed25519.Public_key.to_b58check pk) |>
+      ~scheme ~location:(Signature.Public_key.to_b58check pk) |>
     Lwt.return
 
-  let neuterize x = Lwt.return (Ed25519.Secret_key.to_public_key x)
+  let neuterize x = Lwt.return (Signature.Secret_key.to_public_key x)
   let public_key x = Lwt.return x
-  let public_key_hash x = Lwt.return (Ed25519.Public_key.hash x)
-  let sign t buf = return (Ed25519.sign t buf)
+  let public_key_hash x = Lwt.return (Signature.Public_key.hash x)
+  let sign t buf = return (Signature.sign t buf)
 end
 
 let () =

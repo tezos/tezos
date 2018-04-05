@@ -128,7 +128,7 @@ let check_endorsement cctxt level slot =
 let forge_endorsement (cctxt : #Proto_alpha.full)
     block
     ~src_sk ?slots ?max_priority src_pk =
-  let src_pkh = Ed25519.Public_key.hash src_pk in
+  let src_pkh = Signature.Public_key.hash src_pk in
   Alpha_services.Context.level cctxt block >>=? fun { level } ->
   begin
     match slots with

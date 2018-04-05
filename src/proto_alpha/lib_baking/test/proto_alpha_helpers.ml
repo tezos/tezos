@@ -154,9 +154,9 @@ module Account = struct
 
   type t = {
     alias : string ;
-    sk : Ed25519.Secret_key.t ;
-    pk : public_key ;
-    pkh : public_key_hash ;
+    sk : Signature.secret_key ;
+    pk : Signature.public_key ;
+    pkh : Signature.public_key_hash ;
     contract : Contract.t ;
   }
 
@@ -170,9 +170,9 @@ module Account = struct
          { alias ; sk ; pk ; pkh ; contract })
       (obj5
          (req "alias" string)
-         (req "sk" Ed25519.Secret_key.encoding)
-         (req "pk" Ed25519.Public_key.encoding)
-         (req "pkh" Ed25519.Public_key_hash.encoding)
+         (req "sk" Signature.Secret_key.encoding)
+         (req "pk" Signature.Public_key.encoding)
+         (req "pkh" Signature.Public_key_hash.encoding)
          (req "contract" Contract.encoding))
 
   let pp_account ppf account =
@@ -182,8 +182,8 @@ module Account = struct
   let create ?keys alias =
     let sk, pk = match keys with
       | Some keys -> keys
-      | None -> let _, pk, sk = Ed25519.generate_key () in sk, pk in
-    let pkh = Ed25519.Public_key.hash pk in
+      | None -> let _, pk, sk = Signature.generate_key () in sk, pk in
+    let pkh = Signature.Public_key.hash pk in
     let contract = Contract.implicit_contract pkh in
     { alias ; contract ; pkh ; pk ; sk }
 
@@ -203,8 +203,8 @@ module Account = struct
          { alias ; pk ; pkh ; contract })
       (obj4
          (req "alias" string)
-         (req "pk" Ed25519.Public_key.encoding)
-         (req "pkh" Ed25519.Public_key_hash.encoding)
+         (req "pk" Signature.Public_key.encoding)
+         (req "pkh" Signature.Public_key_hash.encoding)
          (req "contract" Contract.encoding))
 
   let pp_destination ppf destination =
@@ -212,7 +212,7 @@ module Account = struct
     Format.fprintf ppf "%s" (Data_encoding.Json.to_string json)
 
   let create_destination ~alias ~contract ~pk =
-    let pkh = Ed25519.Public_key.hash pk in
+    let pkh = Signature.Public_key.hash pk in
     { alias ; contract ; pk ; pkh }
 
   type bootstrap_accounts = { b1 : t ; b2 : t ; b3 : t ; b4 : t ;  b5 : t  ; }
@@ -231,10 +231,10 @@ module Account = struct
     let cpt = ref 0 in
     match List.map begin fun sk ->
         incr cpt ;
-        let sk = Ed25519.Secret_key.of_b58check_exn sk in
+        let sk = Signature.Secret_key.of_b58check_exn sk in
         let alias = Printf.sprintf "bootstrap%d" !cpt in
-        let pk = Ed25519.Secret_key.to_public_key sk in
-        let pkh = Ed25519.Public_key.hash pk in
+        let pk = Signature.Secret_key.to_public_key sk in
+        let pkh = Signature.Public_key.hash pk in
         { alias ; contract = Contract.implicit_contract pkh; pkh ; pk ; sk }
       end [ bootstrap1_sk; bootstrap2_sk; bootstrap3_sk;
             bootstrap4_sk; bootstrap5_sk; ]
@@ -250,7 +250,7 @@ module Account = struct
       ~amount () =
     let src_sk = Client_keys.Secret_key_locator.create
         ~scheme:"unencrypted"
-        ~location:(Ed25519.Secret_key.to_b58check account.sk) in
+        ~location:(Signature.Secret_key.to_b58check account.sk) in
     Client_proto_context.transfer
       (new wrap_full (no_write_context !rpc_config ~block))
       block
@@ -274,7 +274,7 @@ module Account = struct
       | Some delegate -> true, Some delegate in
     let src_sk = Client_keys.Secret_key_locator.create
         ~scheme:"unencrypted"
-        ~location:(Ed25519.Secret_key.to_b58check src.sk) in
+        ~location:(Signature.Secret_key.to_b58check src.sk) in
     Client_proto_context.originate_account
       ~source:src.contract
       ~src_pk:src.pk
@@ -330,7 +330,7 @@ module Protocol = struct
       ~period:next_level.voting_period
       ~proposals
       () >>=? fun bytes ->
-    let signed_bytes = Ed25519.append sk bytes in
+    let signed_bytes = Signature.append sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
@@ -343,7 +343,7 @@ module Protocol = struct
       ~proposal
       ~ballot
       () >>=? fun bytes ->
-    let signed_bytes = Ed25519.append sk bytes in
+    let signed_bytes = Signature.append sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
 end
@@ -368,11 +368,11 @@ module Assert = struct
       match pkh1, pkh2 with
       | None, None -> true
       | Some pkh1, Some pkh2 ->
-          Ed25519.Public_key_hash.equal pkh1 pkh2
+          Signature.Public_key_hash.equal pkh1 pkh2
       | _ -> false in
     let prn = function
       | None -> "none"
-      | Some pkh -> Ed25519.Public_key_hash.to_b58check pkh in
+      | Some pkh -> Signature.Public_key_hash.to_b58check pkh in
     equal ?msg ~prn ~eq pkh1 pkh2
 
   let equal_tez ?msg tz1 tz2 =
@@ -508,7 +508,7 @@ module Baking = struct
         None in
     let src_sk = Client_keys.Secret_key_locator.create
         ~scheme:"unencrypted"
-        ~location:(Ed25519.Secret_key.to_b58check contract.sk) in
+        ~location:(Signature.Secret_key.to_b58check contract.sk) in
     Client_baking_forge.forge_block
       ctxt
       block
@@ -538,7 +538,7 @@ module Endorse = struct
       ~level:level.level
       ~slots:[slot]
       () >>=? fun bytes ->
-    let signed_bytes = Ed25519.append src_sk bytes in
+    let signed_bytes = Signature.append src_sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let signing_slots

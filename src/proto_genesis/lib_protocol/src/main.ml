@@ -41,7 +41,7 @@ let validation_passes = []
 type block = {
   shell: Block_header.shell_header ;
   command: Data.Command.t ;
-  signature: Ed25519.t ;
+  signature: Signature.t ;
 }
 
 let max_block_length =
@@ -49,7 +49,7 @@ let max_block_length =
     Data.Command.encoding
     (Activate_testchain { protocol = Protocol_hash.zero ;
                           delay = 0L })
-  + Ed25519.size
+  + Signature.size
 
 let parse_block { Block_header.shell ; protocol_data } : block tzresult =
   match
@@ -62,7 +62,7 @@ let check_signature ctxt { shell ; command ; signature } =
   let bytes = Data.Command.forge shell command in
   Data.Pubkey.get_pubkey ctxt >>= fun public_key ->
   fail_unless
-    (Ed25519.check public_key signature bytes)
+    (Signature.check public_key signature bytes)
     Invalid_signature
 
 type validation_state = Updater.validation_result

@@ -22,10 +22,10 @@ let () =
     (fun s -> Unregistered_key_scheme s)
 
 module Public_key_hash = Client_aliases.Alias (struct
-    type t = Ed25519.Public_key_hash.t
-    let encoding = Ed25519.Public_key_hash.encoding
-    let of_source s = Lwt.return (Ed25519.Public_key_hash.of_b58check s)
-    let to_source p = return (Ed25519.Public_key_hash.to_b58check p)
+    type t =  Signature.Public_key_hash.t
+    let encoding = Signature.Public_key_hash.encoding
+    let of_source s = Lwt.return (Signature.Public_key_hash.of_b58check s)
+    let to_source p = return (Signature.Public_key_hash.to_b58check p)
     let name = "public key hash"
   end)
 
@@ -106,9 +106,9 @@ module Locator (K : KEY) (L : LOCATOR) = struct
   let encoding = Data_encoding.(conv to_string of_string string)
 end
 
-module Secret_key_locator = Locator(Ed25519.Secret_key)(Sk_locator)
+module Secret_key_locator = Locator(Signature.Secret_key)(Sk_locator)
 module Secret_key = Client_aliases.Alias (Secret_key_locator)
-module Public_key_locator = Locator(Ed25519.Public_key)(Pk_locator)
+module Public_key_locator = Locator(Signature.Public_key)(Pk_locator)
 module Public_key = Client_aliases.Alias (Public_key_locator)
 
 module type SIGNER = sig
@@ -125,9 +125,9 @@ module type SIGNER = sig
   val sk_to_locator : secret_key -> sk_locator Lwt.t
   val pk_to_locator : public_key -> pk_locator Lwt.t
   val neuterize : secret_key -> public_key Lwt.t
-  val public_key : public_key -> Ed25519.Public_key.t Lwt.t
-  val public_key_hash : public_key -> Ed25519.Public_key_hash.t Lwt.t
-  val sign : secret_key -> MBytes.t -> Ed25519.t tzresult Lwt.t
+  val public_key : public_key -> Signature.Public_key.t Lwt.t
+  val public_key_hash : public_key -> Signature.Public_key_hash.t Lwt.t
+  val sign : secret_key -> MBytes.t -> Signature.t tzresult Lwt.t
 end
 
 let signers_table : (string, (module SIGNER) * bool) Hashtbl.t = Hashtbl.create 13
@@ -157,21 +157,19 @@ let sign cctxt ((Sk_locator { scheme }) as skloc) buf =
 
 let append cctxt loc buf =
   sign cctxt loc buf >>|? fun signature ->
-  MBytes.concat buf (Ed25519.to_bytes signature)
+  Signature.concat buf signature
 
-let gen_keys ?(force=false) ?seed (cctxt : #Client_context.io_wallet) name =
-  let seed =
-    match seed with
-    | None -> Ed25519.Seed.generate ()
-    | Some s -> s in
-  let _, public_key, secret_key = Ed25519.generate_seeded_key seed in
+let gen_keys ?(force=false) ?algo ?seed (cctxt : #Client_context.io_wallet) name =
+  let public_key_hash, public_key, secret_key =
+    Signature.generate_key ?algo ?seed () in
   Secret_key.add ~force cctxt name
     (Secret_key_locator.of_unencrypted secret_key) >>=? fun () ->
   Public_key.add ~force cctxt name
     (Public_key_locator.of_unencrypted public_key) >>=? fun () ->
   Public_key_hash.add ~force
-    cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
+    cctxt name public_key_hash >>=? fun () ->
   return ()
+
 
 let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : #Client_context.full) =
   let unrepresentable =
@@ -208,15 +206,17 @@ let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt 
                 with Not_found -> false) in
           let rec loop attempts =
             let seed = Ed25519.Seed.generate () in
-            let _, public_key, secret_key = Ed25519.generate_seeded_key seed in
-            let hash = Ed25519.Public_key_hash.to_b58check @@ Ed25519.Public_key.hash public_key in
+            let public_key_hash, public_key, secret_key =
+              Signature.generate_key ~seed () in
+            let hash = Signature.Public_key_hash.to_b58check @@
+              Signature.Public_key.hash public_key in
             if matches hash
             then
               Secret_key.add ~force cctxt name
                 (Secret_key_locator.of_unencrypted secret_key) >>=? fun () ->
               Public_key.add ~force cctxt name
                 (Public_key_locator.of_unencrypted public_key) >>=? fun () ->
-              Public_key_hash.add ~force cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
+              Public_key_hash.add ~force cctxt name public_key_hash >>=? fun () ->
               return hash
             else begin if attempts mod 25_000 = 0
               then cctxt#message "Tried %d keys without finding a match" attempts

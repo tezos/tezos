@@ -99,12 +99,12 @@ let sign src oph protop =
   let signature_content = Operation.forge oph protop in
   let signature = match src with
     | None -> None
-    | Some(src: Helpers_account.t) -> Some (Ed25519.sign src.ppk signature_content) in
+    | Some(src: Helpers_account.t) -> Some (Signature.sign src.ppk signature_content) in
   let open Data_encoding in
   let signed_proto_operation_encoding =
     Data_encoding.merge_objs
       Operation.proto_operation_encoding
-      (obj1 @@ varopt "signature" Ed25519.encoding) in
+      (obj1 @@ varopt "signature" Signature.encoding) in
   let proto_bytes =
     Data_encoding.Binary.to_bytes
       signed_proto_operation_encoding
@@ -129,4 +129,3 @@ let apply_of_proto
     contents = protocol_operation ;
     signature
   }
-

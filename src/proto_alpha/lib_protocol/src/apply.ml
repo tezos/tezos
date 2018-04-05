@@ -20,7 +20,7 @@ type error += Invalid_commitment of { expected: bool }
 
 type error += Invalid_double_endorsement_evidence (* `Permanent *)
 type error += Inconsistent_double_endorsement_evidence
-  of { delegate1: Ed25519.Public_key_hash.t ; delegate2: Ed25519.Public_key_hash.t } (* `Permanent *)
+  of { delegate1: Signature.Public_key_hash.t ; delegate2: Signature.Public_key_hash.t } (* `Permanent *)
 type error += Unrequired_double_endorsement_evidence (* `Branch*)
 type error += Too_early_double_endorsement_evidence
   of { level: Raw_level.t ; current: Raw_level.t } (* `Temporary *)
@@ -30,7 +30,7 @@ type error += Outdated_double_endorsement_evidence
 type error += Invalid_double_baking_evidence
   of { level1: Int32.t ; level2: Int32.t } (* `Permanent *)
 type error += Inconsistent_double_baking_evidence
-  of { delegate1: Ed25519.Public_key_hash.t ; delegate2: Ed25519.Public_key_hash.t } (* `Permanent *)
+  of { delegate1: Signature.Public_key_hash.t ; delegate2: Signature.Public_key_hash.t } (* `Permanent *)
 type error += Unrequired_double_baking_evidence (* `Branch*)
 type error += Too_early_double_baking_evidence
   of { level: Raw_level.t ; current: Raw_level.t } (* `Temporary *)
@@ -136,11 +136,11 @@ let () =
         Format.fprintf ppf
           "Inconsistent double-endorsement evidence \
           \ (distinct delegate: %a and %a)"
-          Ed25519.Public_key_hash.pp_short delegate1
-          Ed25519.Public_key_hash.pp_short delegate2)
+          Signature.Public_key_hash.pp_short delegate1
+          Signature.Public_key_hash.pp_short delegate2)
     Data_encoding.(obj2
-                     (req "delegate1" Ed25519.Public_key_hash.encoding)
-                     (req "delegate2" Ed25519.Public_key_hash.encoding))
+                     (req "delegate1" Signature.Public_key_hash.encoding)
+                     (req "delegate2" Signature.Public_key_hash.encoding))
     (function
       | Inconsistent_double_endorsement_evidence { delegate1 ; delegate2 } ->
           Some (delegate1, delegate2)
@@ -226,11 +226,11 @@ let () =
         Format.fprintf ppf
           "Inconsistent double-baking evidence \
           \ (distinct delegate: %a and %a)"
-          Ed25519.Public_key_hash.pp_short delegate1
-          Ed25519.Public_key_hash.pp_short delegate2)
+          Signature.Public_key_hash.pp_short delegate1
+          Signature.Public_key_hash.pp_short delegate2)
     Data_encoding.(obj2
-                     (req "delegate1" Ed25519.Public_key_hash.encoding)
-                     (req "delegate2" Ed25519.Public_key_hash.encoding))
+                     (req "delegate1" Signature.Public_key_hash.encoding)
+                     (req "delegate2" Signature.Public_key_hash.encoding))
     (function
       | Inconsistent_double_baking_evidence { delegate1 ; delegate2 } ->
           Some (delegate1, delegate2)
@@ -334,7 +334,7 @@ let apply_consensus_operation_content ctxt
         ctxt slots >>=? fun ctxt ->
       Baking.check_endorsements_rights ctxt lvl slots >>=? fun delegate ->
       Operation.check_signature delegate operation >>=? fun () ->
-      let delegate = Ed25519.Public_key.hash delegate in
+      let delegate = Signature.Public_key.hash delegate in
       let ctxt = Fitness.increase ~gap:(List.length slots) ctxt in
       Baking.freeze_endorsement_deposit ctxt delegate >>=? fun ctxt ->
       Baking.endorsement_reward ctxt ~block_priority >>=? fun reward ->
@@ -523,11 +523,11 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
           Baking.check_endorsements_rights ctxt level e2.slots >>=? fun delegate2 ->
           Operation.check_signature delegate2 op2 >>=? fun () ->
           fail_unless
-            (Ed25519.Public_key.equal delegate1 delegate2)
+            (Signature.Public_key.equal delegate1 delegate2)
             (Inconsistent_double_endorsement_evidence
-               { delegate1 = Ed25519.Public_key.hash delegate1 ;
-                 delegate2 = Ed25519.Public_key.hash delegate2 }) >>=? fun () ->
-          let delegate = Ed25519.Public_key.hash delegate1 in
+               { delegate1 = Signature.Public_key.hash delegate1 ;
+                 delegate2 = Signature.Public_key.hash delegate2 }) >>=? fun () ->
+          let delegate = Signature.Public_key.hash delegate1 in
           Delegate.has_frozen_balance ctxt delegate level.cycle >>=? fun valid ->
           fail_unless valid Unrequired_double_endorsement_evidence >>=? fun () ->
           Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, burned) ->
@@ -562,11 +562,11 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
         ctxt level ~priority:bh2.protocol_data.priority >>=? fun delegate2 ->
       Baking.check_signature bh2 delegate2 >>=? fun () ->
       fail_unless
-        (Ed25519.Public_key.equal delegate1 delegate2)
+        (Signature.Public_key.equal delegate1 delegate2)
         (Inconsistent_double_baking_evidence
-           { delegate1 = Ed25519.Public_key.hash delegate1 ;
-             delegate2 = Ed25519.Public_key.hash delegate2 }) >>=? fun () ->
-      let delegate = Ed25519.Public_key.hash delegate1 in
+           { delegate1 = Signature.Public_key.hash delegate1 ;
+             delegate2 = Signature.Public_key.hash delegate2 }) >>=? fun () ->
+      let delegate = Signature.Public_key.hash delegate1 in
       Delegate.has_frozen_balance ctxt delegate level.cycle >>=? fun valid ->
       fail_unless valid Unrequired_double_baking_evidence >>=? fun () ->
       Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, burned) ->
@@ -586,7 +586,7 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
             Blinded_public_key_hash.(blinded_pkh = submitted_bpkh)
             Wrong_activation_secret >>=? fun () ->
           Commitment.delete ctxt h_pkh >>=? fun ctxt ->
-          Contract.(credit ctxt (implicit_contract pkh) amount) >>=? fun ctxt ->
+          Contract.(credit ctxt (implicit_contract (Signature.Ed25519 pkh)) amount) >>=? fun ctxt ->
           return (ctxt, origination_nonce)
 
 let apply_operation
@@ -634,7 +634,7 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
        protocol_data) >>=? fun protocol_data ->
   Baking.check_baking_rights
     ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
-  let delegate_pkh = Ed25519.Public_key.hash delegate_pk in
+  let delegate_pkh = Signature.Public_key.hash delegate_pk in
   Baking.freeze_baking_deposit ctxt protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, protocol_data, delegate_pk, deposit)
@@ -658,7 +658,7 @@ let begin_application ctxt block_header pred_timestamp =
     Compare.Bool.(has_commitment = current_level.expected_commitment)
     (Invalid_commitment
        { expected = current_level.expected_commitment }) >>=? fun () ->
-  let delegate_pkh = Ed25519.Public_key.hash delegate_pk in
+  let delegate_pkh = Signature.Public_key.hash delegate_pk in
   Baking.freeze_baking_deposit ctxt
     block_header.protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in

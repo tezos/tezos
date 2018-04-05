@@ -13,9 +13,9 @@ type error +=
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
-  | Inconsistent_hash of Ed25519.Public_key.t * Ed25519.Public_key_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
-  | Inconsistent_public_key of Ed25519.Public_key.t * Ed25519.Public_key.t (* `Permanent *)
-  | Missing_public_key of Ed25519.Public_key_hash.t (* `Permanent *)
+  | Inconsistent_hash of Signature.Public_key.t * Signature.Public_key_hash.t * Signature.Public_key_hash.t (* `Permanent *)
+  | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t (* `Permanent *)
+  | Missing_public_key of Signature.Public_key_hash.t (* `Permanent *)
   | Failure of string (* `Permanent *)
 
 let () =
@@ -95,13 +95,13 @@ let () =
     ~description:"A revealed manager public key is inconsistent with the announced hash"
     ~pp:(fun ppf (k, eh, ph) ->
         Format.fprintf ppf "The hash of the manager public key %s is not %a as announced but %a"
-          (Ed25519.Public_key.to_b58check k)
-          Ed25519.Public_key_hash.pp ph
-          Ed25519.Public_key_hash.pp eh)
+          (Signature.Public_key.to_b58check k)
+          Signature.Public_key_hash.pp ph
+          Signature.Public_key_hash.pp eh)
     Data_encoding.(obj3
-                     (req "public_key" Ed25519.Public_key.encoding)
-                     (req "expected_hash" Ed25519.Public_key_hash.encoding)
-                     (req "provided_hash" Ed25519.Public_key_hash.encoding))
+                     (req "public_key" Signature.Public_key.encoding)
+                     (req "expected_hash" Signature.Public_key_hash.encoding)
+                     (req "provided_hash" Signature.Public_key_hash.encoding))
     (function Inconsistent_hash (k, eh, ph) -> Some (k, eh, ph) | _ -> None)
     (fun (k, eh, ph) -> Inconsistent_hash (k, eh, ph)) ;
   register_error_kind
@@ -111,11 +111,11 @@ let () =
     ~description:"A provided manager public key is different with the public key stored in the contract"
     ~pp:(fun ppf (eh, ph) ->
         Format.fprintf ppf "Expected manager public key %s but %s was provided"
-          (Ed25519.Public_key.to_b58check ph)
-          (Ed25519.Public_key.to_b58check eh))
+          (Signature.Public_key.to_b58check ph)
+          (Signature.Public_key.to_b58check eh))
     Data_encoding.(obj2
-                     (req "public_key" Ed25519.Public_key.encoding)
-                     (req "expected_public_key" Ed25519.Public_key.encoding))
+                     (req "public_key" Signature.Public_key.encoding)
+                     (req "expected_public_key" Signature.Public_key.encoding))
     (function Inconsistent_public_key (eh, ph) -> Some (eh, ph) | _ -> None)
     (fun (eh, ph) -> Inconsistent_public_key (eh, ph)) ;
   register_error_kind
@@ -125,8 +125,8 @@ let () =
     ~description:"The manager public key must be provided to execute the current operation"
     ~pp:(fun ppf k ->
         Format.fprintf ppf "The manager public key ( with hash %a ) is missing"
-          Ed25519.Public_key_hash.pp k)
-    Data_encoding.(obj1 (req "hash" Ed25519.Public_key_hash.encoding))
+          Signature.Public_key_hash.pp k)
+    Data_encoding.(obj1 (req "hash" Signature.Public_key_hash.encoding))
     (function Missing_public_key k -> Some k | _ -> None)
     (fun k -> Missing_public_key k) ;
   register_error_kind
@@ -249,17 +249,17 @@ let get_manager c contract =
       | None -> failwith "get_manager"
     end
   | Some (Manager_repr.Hash v) -> return v
-  | Some (Manager_repr.Public_key v) -> return (Ed25519.Public_key.hash v)
+  | Some (Manager_repr.Public_key v) -> return (Signature.Public_key.hash v)
 
 let update_manager_key c contract = function
   | Some public_key ->
       begin Storage.Contract.Manager.get c contract >>=? function
         | Public_key v -> (* key revealed for the second time *)
-            if Ed25519.Public_key.(v = public_key) then return (c,v)
+            if Signature.Public_key.(v = public_key) then return (c,v)
             else fail (Inconsistent_public_key (v,public_key))
         | Hash v ->
-            let actual_hash = Ed25519.Public_key.hash public_key in
-            if (Ed25519.Public_key_hash.equal actual_hash v) then
+            let actual_hash = Signature.Public_key.hash public_key in
+            if (Signature.Public_key_hash.equal actual_hash v) then
               let v = (Manager_repr.Public_key public_key) in
               Storage.Contract.Manager.set c contract v >>=? fun c ->
               return (c,public_key) (* reveal and update key *)
@@ -335,7 +335,7 @@ let spend_from_script c contract amount =
             Delegate_storage.get c contract >>=? function
             | Some pkh' ->
                 (* Don't delete "delegate" contract *)
-                assert (Ed25519.Public_key_hash.equal pkh pkh') ;
+                assert (Signature.Public_key_hash.equal pkh pkh') ;
                 return c
             | None ->
                 (* Delete empty implicit contract *)

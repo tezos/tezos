@@ -307,7 +307,7 @@ let commands () =
        @@ Protocol_hash.param ~name:"version"
          ~desc:"protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
-       @@ Ed25519.Secret_key.param
+       @@ Signature.Secret_key.param
          ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
@@ -360,7 +360,7 @@ let commands () =
        @@ Protocol_hash.param ~name:"version"
          ~desc:"protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
-       @@ Ed25519.Secret_key.param
+       @@ Signature.Secret_key.param
          ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->

@@ -140,13 +140,13 @@ let main select_commands =
         Lwt.return 1
   end begin function
     | Client_commands.Version_not_found ->
-        Format.eprintf "@{<error>@{<title>Fatal error@}@} unknown protocol version." ;
+        Format.eprintf "@{<error>@{<title>Fatal error@}@} unknown protocol version.@." ;
         Lwt.return 1
     | Failure message ->
-        Format.eprintf "@{<error>@{<title>Fatal error@}@} %s." message ;
+        Format.eprintf "@{<error>@{<title>Fatal error@}@} %s.@." message ;
         Lwt.return 1
     | exn ->
-        Format.printf "@{<error>@{<title>Fatal error@}@} %s." (Printexc.to_string exn) ;
+        Format.printf "@{<error>@{<title>Fatal error@}@} %s.@." (Printexc.to_string exn) ;
         Lwt.return 1
   end >>= fun retcode ->
   Format.pp_print_flush Format.err_formatter () ;

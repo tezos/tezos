@@ -43,7 +43,7 @@ module Baker = struct
                     (req "baking_rights"
                        (list
                           (obj2
-                             (req "delegate" Ed25519.Public_key_hash.encoding)
+                             (req "delegate" Signature.Public_key_hash.encoding)
                              (req "timestamp" Timestamp.encoding)))))
         custom_root
 
@@ -57,7 +57,7 @@ module Baker = struct
         ~output: (obj2
                     (req "level" Raw_level.encoding)
                     (req "delegates"
-                       (list Ed25519.Public_key_hash.encoding)))
+                       (list Signature.Public_key_hash.encoding)))
         RPC_path.(custom_root / "level" /: Raw_level.arg)
 
     (* let levels = *)
@@ -75,7 +75,8 @@ module Baker = struct
         ~query: RPC_query.empty
         ~input: slots_range_encoding
         ~output: (Data_encoding.list slot_encoding)
-        RPC_path.(custom_root / "delegate" /: Ed25519.Public_key_hash.rpc_arg)
+        RPC_path.(custom_root / "delegate" /: Signature.Public_key_hash.rpc_arg)
+
 
     (* let delegates = *)
     (* RPC_service.post_service *)
@@ -84,7 +85,7 @@ module Baker = struct
     (* ~query: RPC_query.empty *)
     (* ~input: empty *)
     (* ~output: (obj1 (req "delegates" *)
-    (* (list Ed25519.Public_key_hash.encoding))) *)
+    (* (list Signature.Public_key_hash.encoding))) *)
     (* RPC_path.(custom_root / "delegate") *)
 
   end
@@ -107,7 +108,7 @@ module Baker = struct
             let Misc.LCons (h, t) = l in
             t () >>=? fun t ->
             loop t (pred n) >>=? fun t ->
-            return (Ed25519.Public_key.hash h :: t)
+            return (Signature.Public_key.hash h :: t)
       in
       loop contract_list max >>=? fun prio ->
       return (level.level, prio)
@@ -204,7 +205,7 @@ module Endorser = struct
         ~output: (obj2
                     (req "level" Raw_level.encoding)
                     (req "delegates"
-                       (list Ed25519.Public_key_hash.encoding)))
+                       (list Signature.Public_key_hash.encoding)))
         custom_root
 
     let rights_for_level =
@@ -216,7 +217,7 @@ module Endorser = struct
         ~output: (obj2
                     (req "level" Raw_level.encoding)
                     (req "delegates"
-                       (list Ed25519.Public_key_hash.encoding)))
+                       (list Signature.Public_key_hash.encoding)))
         RPC_path.(custom_root / "level" /: Raw_level.arg)
 
     (* let levels = *)
@@ -234,7 +235,7 @@ module Endorser = struct
         ~query: RPC_query.empty
         ~input: slots_range_encoding
         ~output: (Data_encoding.list slot_encoding)
-        RPC_path.(custom_root / "delegate" /: Ed25519.Public_key_hash.rpc_arg)
+        RPC_path.(custom_root / "delegate" /: Signature.Public_key_hash.rpc_arg)
 
     (* let delegates = *)
     (* RPC_service.post_service *)
@@ -243,7 +244,7 @@ module Endorser = struct
     (* ~query: RPC_query.empty *)
     (* ~input: empty *)
     (* ~output: (obj1 (req "delegates" *)
-    (* (list Ed25519.Public_key_hash.encoding))) *)
+    (* (list Signature.Public_key_hash.encoding))) *)
     (* RPC_path.(custom_root / "delegate") *)
 
   end
@@ -266,7 +267,7 @@ module Endorser = struct
             let Misc.LCons (h, t) = l in
             t () >>=? fun t ->
             loop t (pred n) >>=? fun t ->
-            return (Ed25519.Public_key.hash h :: t)
+            return (Signature.Public_key.hash h :: t)
       in
       loop contract_list max >>=? fun prio ->
       return (level.level, prio)

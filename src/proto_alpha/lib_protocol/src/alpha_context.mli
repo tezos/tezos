@@ -17,9 +17,9 @@ end
 type t
 type context = t
 
-type public_key = Ed25519.Public_key.t
-type public_key_hash = Ed25519.Public_key_hash.t
-type signature = Ed25519.t
+type public_key = Signature.Public_key.t
+type public_key_hash = Signature.Public_key_hash.t
+type signature = Signature.t
 
 module Tez : sig
 
@@ -271,7 +271,7 @@ module Constants : sig
     endorsers_per_block: int ;
     max_gas: int ;
     proof_of_work_threshold: int64 ;
-    dictator_pubkey: Ed25519.Public_key.t ;
+    dictator_pubkey: Signature.Public_key.t ;
     max_operation_data_length: int ;
     tokens_per_roll: Tez.t ;
     michelson_maximum_type_size: int;
@@ -295,7 +295,7 @@ module Constants : sig
   val endorsers_per_block: context -> int
   val max_gas: context -> int
   val proof_of_work_threshold: context -> int64
-  val dictator_pubkey: context -> Ed25519.Public_key.t
+  val dictator_pubkey: context -> Signature.Public_key.t
   val max_operation_data_length: context -> int
   val tokens_per_roll: context -> Tez.t
   val michelson_maximum_type_size: context -> int
@@ -606,7 +606,7 @@ module Block_header : sig
   type t = {
     shell: Block_header.shell_header ;
     protocol_data: protocol_data ;
-    signature: Ed25519.t ;
+    signature: Signature.t ;
   }
 
   and protocol_data = {
@@ -682,7 +682,7 @@ and anonymous_operation =
 and sourced_operations =
   | Consensus_operation of consensus_operation
   | Amendment_operation of {
-      source: Ed25519.Public_key_hash.t ;
+      source: Signature.Public_key_hash.t ;
       operation: amendment_operation ;
     }
   | Manager_operations of {
@@ -712,7 +712,7 @@ and amendment_operation =
     }
 
 and manager_operation =
-  | Reveal of Ed25519.Public_key.t
+  | Reveal of Signature.Public_key.t
   | Transaction of {
       amount: Tez.t ;
       parameters: Script.expr option ;

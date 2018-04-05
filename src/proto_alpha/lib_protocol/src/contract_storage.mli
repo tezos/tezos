@@ -13,9 +13,9 @@ type error +=
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
-  | Inconsistent_hash of Ed25519.Public_key.t * Ed25519.Public_key_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
-  | Inconsistent_public_key of Ed25519.Public_key.t * Ed25519.Public_key.t (* `Permanent *)
-  | Missing_public_key of Ed25519.Public_key_hash.t (* `Permanent *)
+  | Inconsistent_hash of Signature.Public_key.t * Signature.Public_key_hash.t * Signature.Public_key_hash.t (* `Permanent *)
+  | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t (* `Permanent *)
+  | Missing_public_key of Signature.Public_key_hash.t (* `Permanent *)
   | Failure of string (* `Permanent *)
 
 val exists: Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
@@ -35,11 +35,11 @@ val is_delegatable:
 val is_spendable: Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 
 val get_manager:
-  Raw_context.t -> Contract_repr.t -> Ed25519.Public_key_hash.t tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Signature.Public_key_hash.t tzresult Lwt.t
 
 val update_manager_key:
-  Raw_context.t -> Contract_repr.t -> Ed25519.Public_key.t option ->
-  (Raw_context.t * Ed25519.Public_key.t) tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Signature.Public_key.t option ->
+  (Raw_context.t * Signature.Public_key.t) tzresult Lwt.t
 
 val get_balance: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 val get_counter: Raw_context.t -> Contract_repr.t -> int32 tzresult Lwt.t
@@ -80,9 +80,9 @@ val originate:
   Raw_context.t ->
   Contract_repr.origination_nonce ->
   balance:Tez_repr.t ->
-  manager:Ed25519.Public_key_hash.t ->
+  manager:Signature.Public_key_hash.t ->
   ?script:(Script_repr.t * (Tez_repr.t * Tez_repr.t)) ->
-  delegate:Ed25519.Public_key_hash.t option ->
+  delegate:Signature.Public_key_hash.t option ->
   spendable:bool ->
   delegatable:bool ->
   (Raw_context.t * Contract_repr.t * Contract_repr.origination_nonce) tzresult Lwt.t

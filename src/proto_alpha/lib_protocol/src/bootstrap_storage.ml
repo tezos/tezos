@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 let init ctxt (account: Parameters_repr.bootstrap_account) =
-  let public_key_hash = Ed25519.Public_key.hash account.public_key in
+  let public_key_hash = Signature.Public_key.hash account.public_key in
   let contract = Contract_repr.implicit_contract public_key_hash in
   Contract_storage.credit ctxt contract account.amount >>=? fun ctxt ->
   Contract_storage.update_manager_key ctxt contract

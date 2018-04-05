@@ -44,10 +44,10 @@ let test_double_endorsement_evidence contract block =
 (* FIXME: Baking.Invalid_signature is unclassified *)
 let test_invalid_signature block =
   let public_key =
-    Ed25519.Public_key.of_b58check_exn
+    Signature.Public_key.of_b58check_exn
       "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" in
   let secret_key =
-    Ed25519.Secret_key.of_b58check_exn
+    Signature.Secret_key.of_b58check_exn
       "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh" in
   let account =
     Helpers.Account.create ~keys:(secret_key, public_key) "WRONG SIGNATURE" in

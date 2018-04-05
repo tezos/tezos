@@ -309,16 +309,24 @@ module Prefix = struct
   (* 20 *)
   let ed25519_public_key_hash = "\006\161\159" (* tz1(36) *)
 
+  (* 20 *)
+  let secp256k1_public_key_hash = "\006\161\161" (* tz2(36) *)
+
   (* 16 *)
   let cryptobox_public_key_hash = "\153\103" (* id(30) *)
 
   (* 32 *)
   let ed25519_seed = "\013\015\058\007" (* edsk(54) *)
   let ed25519_public_key = "\013\015\037\217" (* edpk(54) *)
+  let secp256k1_secret_key = "\017\162\224\201" (* spsk(54) *)
+
+  (* 33 *)
+  let secp256k1_public_key = "\003\254\226\086" (* sppk(55) *)
 
   (* 64 *)
   let ed25519_secret_key = "\043\246\078\007" (* edsk(98) *)
   let ed25519_signature = "\009\245\205\134\018" (* edsig(99) *)
+  let secp256k1_signature =  "\013\115\101\019\063" (* spsig1(99) *)
 
   (* 4 *)
   let chain_id = "\087\082\000" (* Net(15) *)

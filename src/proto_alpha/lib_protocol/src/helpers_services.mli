@@ -18,7 +18,7 @@ val minimal_time:
 
 val apply_operation:
   'a #RPC_context.simple ->
-  'a -> Block_hash.t -> Operation_hash.t -> MBytes.t -> Ed25519.t option ->
+  'a -> Block_hash.t -> Operation_hash.t -> MBytes.t -> Signature.t option ->
   (Contract.t list) shell_tzresult Lwt.t
 
 val run_code:

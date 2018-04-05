@@ -49,9 +49,10 @@ module Script = struct
   include Michelson_v1_primitives
   include Script_repr
 end
-type public_key = Ed25519.Public_key.t
-type public_key_hash = Ed25519.Public_key_hash.t
-type signature = Ed25519.t
+
+type public_key = Signature.Public_key.t
+type public_key_hash = Signature.Public_key_hash.t
+type signature  = Signature.t
 
 module Constants = struct
   include Constants_repr

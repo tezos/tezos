@@ -18,6 +18,7 @@
               nocrypto
               blake2
               tweetnacl
+              secp256k1-internal
               zarith))))
 
 (alias

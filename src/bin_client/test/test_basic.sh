@@ -14,8 +14,8 @@ sleep 2
 $client rpc call '/blocks/head/raw_context/version' | assert '{ "content": "616c706861" }'
 $client rpc call '/blocks/head/raw_context/non-existent' | assert 'No service found at this URL'
 $client rpc call '/blocks/head/raw_context/delegates/?depth=2' | assert '{ "content":
-    { "02": { "29": null }, "a9": { "ce": null }, "c5": { "5c": null },
-      "da": { "c9": null }, "e7": { "67": null } } }'
+    { "ed25519":
+        { "02": null, "a9": null, "c5": null, "da": null, "e7": null } } }'
 $client rpc call '/blocks/head/raw_context/non-existent?depth=-1' | assert 'No service found at this URL'
 $client rpc call '/blocks/head/raw_context/non-existent?depth=0' | assert 'No service found at this URL'
 
@@ -25,24 +25,30 @@ sleep 1
 
 key1=foo
 key2=bar
+key3=boo
 
 $client gen keys $key1
-$client gen keys $key2
+$client gen keys $key2 --sig secp256k1
+$client gen keys $key3 --sig ed25519
 
 $client list known identities
 $client get balance for bootstrap1
 
 bake_after $client transfer 1,000 from bootstrap1 to $key1
 bake_after $client transfer 2,000 from bootstrap1 to $key2
+bake_after $client transfer 3,000 from bootstrap1 to $key3
 
 $client get balance for $key1 | assert "1,000 ꜩ"
 $client get balance for $key2 | assert "2,000 ꜩ"
+$client get balance for $key3 | assert "3,000 ꜩ"
 
-
-
-bake_after $client transfer 1,000 from $key2 to $key1
+bake_after $client transfer 1,000 from $key2 to $key1 -fee 0
 $client get balance for $key1 | assert "2,000 ꜩ"
-$client get balance for $key2 | assert "999.95 ꜩ"
+$client get balance for $key2 | assert "1,000 ꜩ"
+
+bake_after $client transfer 1,000 from $key1 to $key2
+$client get balance for $key1 | assert "999.95 ꜩ"
+$client get balance for $key2 | assert "2,000 ꜩ"
 
 # Should fail
 # $client transfer 999.95 from $key2 to $key1

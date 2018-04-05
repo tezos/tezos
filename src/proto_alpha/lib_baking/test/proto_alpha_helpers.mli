@@ -29,15 +29,15 @@ module Account : sig
 
   type t = {
     alias : string ;
-    sk : Ed25519.Secret_key.t ;
-    pk : Ed25519.Public_key.t ;
-    pkh : Ed25519.Public_key_hash.t ;
+    sk : Signature.Secret_key.t ;
+    pk : Signature.Public_key.t ;
+    pkh : Signature.Public_key_hash.t ;
     contract : Contract.t ;
   }
 
   val encoding : t Data_encoding.t
   val pp_account : Format.formatter -> t -> unit
-  val create : ?keys:(Ed25519.Secret_key.t * public_key) -> string -> t
+  val create : ?keys:(Signature.secret_key * public_key) -> string -> t
   (** [create ?keys alias] is an account with alias [alias]. If
       [?keys] is [None], a pair of keys will be minted. *)
 

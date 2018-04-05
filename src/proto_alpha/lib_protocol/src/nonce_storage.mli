@@ -19,7 +19,7 @@ val encoding: nonce Data_encoding.t
 
 type unrevealed = Storage.Seed.unrevealed_nonce = {
   nonce_hash: Nonce_hash.t ;
-  delegate: Ed25519.Public_key_hash.t ;
+  delegate: Signature.Public_key_hash.t ;
   deposit: Tez_repr.t ;
   rewards: Tez_repr.t ;
   fees: Tez_repr.t ;

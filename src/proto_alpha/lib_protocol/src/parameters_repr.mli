@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 type bootstrap_account = {
-  public_key : Ed25519.Public_key.t ;
+  public_key : Signature.Public_key.t ;
   amount : Tez_repr.t ;
 }
 

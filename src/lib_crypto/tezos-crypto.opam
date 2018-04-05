@@ -19,6 +19,7 @@ depends: [
   "blake2"
   "tweetnacl"
   "zarith"
+  "secp256k1-internal"
   "alcotest" { test }
 ]
 build: [

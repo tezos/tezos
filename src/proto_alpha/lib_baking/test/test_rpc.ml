@@ -35,16 +35,16 @@ let run blkid =
                         ("e7", Dir [("67", Cut)]);
                        ] in
 
-  let tests = [(("version",1), is_equal version);
-               (("",0), is_equal dir_depth0);
-               (("delegates",2), is_equal dir_depth2);
-               (("",-1), is_not_found);
-               (("not-existent",1), is_not_found);
-               (("not-existent",0), is_not_found);
-               (("not-existent",-1), is_not_found);
+  let tests = [((["version"],1), is_equal version);
+               (([""],0), is_equal dir_depth0);
+               ((["delegates";"ed25519"],2), is_equal dir_depth2);
+               (([""],-1), is_not_found);
+               ((["not-existent"],1), is_not_found);
+               ((["not-existent"],0), is_not_found);
+               ((["not-existent"],-1), is_not_found);
               ] in
   iter_s (fun ((path,depth),predicate) ->
-      Helpers.rpc_raw_context blkid [path] depth >>= fun result ->
+      Helpers.rpc_raw_context blkid path depth >>= fun result ->
       return (assert (predicate result))
     ) tests
 

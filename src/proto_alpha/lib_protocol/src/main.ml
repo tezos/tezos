@@ -70,7 +70,7 @@ let begin_application
   Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
     ctxt block_header pred_timestamp >>=? fun (ctxt, baker, deposit) ->
-  let mode = Application { block_header ; baker = Ed25519.Public_key.hash baker } in
+  let mode = Application { block_header ; baker = Signature.Public_key.hash baker } in
   return { mode ; ctxt ; op_count = 0 ; deposit }
 
 let begin_construction
@@ -96,7 +96,7 @@ let begin_construction
           ctxt pred_timestamp
           proto_header >>=? fun (ctxt, protocol_data, baker, deposit) ->
         let mode =
-          let baker = Ed25519.Public_key.hash baker in
+          let baker = Signature.Public_key.hash baker in
           Full_construction { predecessor ; baker ; protocol_data } in
         return (mode, ctxt, deposit)
   end >>=? fun (mode, ctxt, deposit) ->
