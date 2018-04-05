@@ -12,6 +12,7 @@
 (** {2 Predefined Hashes } ****************************************************)
 
 include S.MINIMAL_HASH
+include S.RAW_DATA with type t := t
 
 (** {2 Building Hashes} *******************************************************)
 

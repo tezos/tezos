@@ -82,7 +82,7 @@ module Account = struct
 
   type t = {
     alias : string ;
-    sk : secret_key ;
+    sk : Ed25519.Secret_key.t ;
     pk : public_key ;
     pkh : public_key_hash ;
     contract : Contract.t ;
@@ -258,7 +258,7 @@ module Protocol = struct
       ~period:next_level.voting_period
       ~proposals
       () >>=? fun bytes ->
-    let signed_bytes = Ed25519.Signature.append sk bytes in
+    let signed_bytes = Ed25519.append sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
@@ -271,7 +271,7 @@ module Protocol = struct
       ~proposal
       ~ballot
       () >>=? fun bytes ->
-    let signed_bytes = Ed25519.Signature.append sk bytes in
+    let signed_bytes = Ed25519.append sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
 end
@@ -300,7 +300,7 @@ module Assert = struct
       | _ -> false in
     let prn = function
       | None -> "none"
-      | Some pkh -> Ed25519.Public_key_hash.to_hex pkh in
+      | Some pkh -> Ed25519.Public_key_hash.to_b58check pkh in
     equal ?msg ~prn ~eq pkh1 pkh2
 
   let equal_tez ?msg tz1 tz2 =
@@ -472,7 +472,7 @@ module Endorse = struct
       ~level:level.level
       ~slots:[slot]
       () >>=? fun bytes ->
-    let signed_bytes = Ed25519.Signature.append src_sk bytes in
+    let signed_bytes = Ed25519.append src_sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let signing_slots

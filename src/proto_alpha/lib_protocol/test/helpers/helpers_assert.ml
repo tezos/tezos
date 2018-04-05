@@ -95,7 +95,7 @@ let equal_pkh ?msg pkh1 pkh2 =
     | _ -> false in
   let prn = function
     | None -> "none"
-    | Some pkh -> Ed25519.Public_key_hash.to_hex pkh in
+    | Some pkh -> Ed25519.Public_key_hash.to_b58check pkh in
   Assert.equal ?msg ~prn ~eq pkh1 pkh2
 
 let equal_int64 ?msg =

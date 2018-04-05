@@ -127,7 +127,7 @@ module type SIGNER = sig
   val neuterize : secret_key -> public_key Lwt.t
   val public_key : public_key -> Ed25519.Public_key.t Lwt.t
   val public_key_hash : public_key -> Ed25519.Public_key_hash.t Lwt.t
-  val sign : secret_key -> MBytes.t -> Ed25519.Signature.t tzresult Lwt.t
+  val sign : secret_key -> MBytes.t -> Ed25519.t tzresult Lwt.t
 end
 
 let signers_table : (string, (module SIGNER) * bool) Hashtbl.t = Hashtbl.create 13
@@ -156,7 +156,7 @@ let sign cctxt ((Sk_locator { scheme }) as skloc) buf =
 
 let append cctxt loc buf =
   sign cctxt loc buf >>|? fun signature ->
-  MBytes.concat buf (Ed25519.Signature.to_bytes signature)
+  MBytes.concat buf (Ed25519.to_bytes signature)
 
 let gen_keys ?(force=false) ?seed (cctxt : #Client_context.io_wallet) name =
   let seed =

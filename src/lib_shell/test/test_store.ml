@@ -111,12 +111,14 @@ let check_block s h b =
   Store.Block.Contents.read (s, h) >>= function
   | Ok b' when equal b b' -> Lwt.return_unit
   | Ok _ ->
-      Printf.eprintf "Error while reading block %s\n%!" (Block_hash.to_hex h);
+      Format.eprintf
+        "Error while reading block %a\n%!"
+        Block_hash.pp_short h ;
       exit 1
   | Error err ->
-      Format.eprintf "@[Error while reading block %s:@ %a\n@]"
-        (Block_hash.to_hex h)
-        pp_print_error err;
+      Format.eprintf "@[Error while reading block %a:@ %a\n@]"
+        Block_hash.pp_short h
+        pp_print_error err ;
       exit 1
 
 let test_block s =

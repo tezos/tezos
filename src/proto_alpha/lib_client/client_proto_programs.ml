@@ -109,11 +109,8 @@ let trace
 let hash_and_sign (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser.parsed) sk block cctxt =
   Alpha_services.Helpers.hash_data cctxt block (data.expanded, typ.expanded) >>=? fun hash ->
   Client_keys.sign cctxt sk (MBytes.of_string hash) >>=? fun signature ->
-  return (hash,
-          signature |>
-          Data_encoding.Binary.to_bytes Ed25519.Signature.encoding |>
-          MBytes.to_hex |>
-          (fun (`Hex s) -> s))
+  let `Hex signature = Ed25519.to_hex signature in
+  return (hash, signature)
 
 let typecheck_data
     ~(data : Michelson_v1_parser.parsed)

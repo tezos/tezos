@@ -49,36 +49,45 @@ module type MINIMAL_HASH = sig
   val name: string
   val title: string
 
+  val pp: Format.formatter -> t -> unit
+  val pp_short: Format.formatter -> t -> unit
+
+  include Compare.S with type t := t
+
   val hash_bytes: ?key:MBytes.t -> MBytes.t list -> t
   val hash_string: ?key:string -> string list -> t
-  val size: int (* in bytes *)
-  val compare: t -> t -> int
-  val equal: t -> t -> bool
-
-  val to_hex: t -> string
-  val of_hex: string -> t option
-  val of_hex_exn: string -> t
-
-  val to_string: t -> string
-  val of_string: string -> t option
-  val of_string_exn: string -> t
-
-  val to_bytes: t -> MBytes.t
-  val of_bytes_opt: MBytes.t -> t option
-  val of_bytes_exn: MBytes.t -> t
-
-  val read: MBytes.t -> int -> t
-  val write: MBytes.t -> int -> t -> unit
-
-  val to_path: t -> string list -> string list
-  val of_path: string list -> t option
-  val of_path_exn: string list -> t
-
-  val prefix_path: string -> string list
-  val path_length: int
 
   val zero: t
 
+end
+
+module type RAW_DATA = sig
+  type t
+  val size: int (* in bytes *)
+  val to_bytes: t -> MBytes.t
+  val of_bytes_opt: MBytes.t -> t option
+  val of_bytes_exn: MBytes.t -> t
+end
+
+module type B58_DATA = sig
+
+  type t
+
+  val to_b58check: t -> string
+  val to_short_b58check: t -> string
+
+  val of_b58check_exn: string -> t
+  val of_b58check_opt: string -> t option
+
+  type Base58.data += Data of t
+  val b58check_encoding: t Base58.encoding
+
+end
+
+module type ENCODER = sig
+  type t
+  val encoding: t Data_encoding.t
+  val rpc_arg: t RPC_arg.t
 end
 
 module type SET = sig
@@ -149,35 +158,35 @@ module type MAP = sig
   val mapi: (key -> 'a -> 'b) -> 'a t -> 'b t
 end
 
-module type HASH = sig
+module type INDEXES = sig
 
-  include MINIMAL_HASH
+  type t
 
-  val encoding: t Data_encoding.t
+  val to_path: t -> string list -> string list
+  val of_path: string list -> t option
+  val of_path_exn: string list -> t
 
-  val to_b58check: t -> string
-  val to_short_b58check: t -> string
-  type Base58.data += Hash of t
-  val b58check_encoding: t Base58.encoding
-
-  val of_b58check_exn: string -> t
-  val of_b58check_opt: string -> t option
-
-  val pp: Format.formatter -> t -> unit
-  val pp_short: Format.formatter -> t -> unit
-
-  val rpc_arg: t RPC_arg.t
+  val prefix_path: string -> string list
+  val path_length: int
 
   module Set : sig
-    include SET with type elt = t
+    include Set.S with type elt = t
     val encoding: t Data_encoding.t
   end
 
   module Map : sig
-    include MAP with type key = t
+    include Map.S with type key = t
     val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
   end
 
+end
+
+module type HASH = sig
+  include MINIMAL_HASH
+  include RAW_DATA with type t := t
+  include B58_DATA with type t := t
+  include ENCODER with type t := t
+  include INDEXES with type t := t
 end
 
 module type MERKLE_TREE = sig
@@ -193,3 +202,53 @@ module type MERKLE_TREE = sig
   val check_path: path -> elt -> t * int
   val path_encoding: path Data_encoding.t
 end
+
+module type SIGNATURE = sig
+
+  module Public_key_hash : sig
+
+    type t
+
+    val hash_bytes: ?key:MBytes.t -> MBytes.t list -> t
+    val hash_string: ?key:string -> string list -> t
+
+    val pp: Format.formatter -> t -> unit
+    val pp_short: Format.formatter -> t -> unit
+    include Compare.S with type t := t
+    include RAW_DATA with type t := t
+    include B58_DATA with type t := t
+    include ENCODER with type t := t
+    include INDEXES with type t := t
+
+  end
+
+  module Public_key : sig
+
+    type t
+
+    val pp: Format.formatter -> t -> unit
+    include Compare.S with type t := t
+    include B58_DATA with type t := t
+    include ENCODER with type t := t
+
+    val hash: t -> Public_key_hash.t
+
+  end
+
+  type t
+
+  val pp: Format.formatter -> t -> unit
+  include RAW_DATA with type t := t
+  include Compare.S with type t := t
+  include B58_DATA with type t := t
+  include ENCODER with type t := t
+
+  val zero: t
+
+  (** Check a signature *)
+  val check: Public_key.t -> t -> MBytes.t -> bool
+
+  val concat: MBytes.t -> t -> MBytes.t
+
+end
+

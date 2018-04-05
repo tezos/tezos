@@ -19,8 +19,7 @@ type context = t
 
 type public_key = Ed25519.Public_key.t
 type public_key_hash = Ed25519.Public_key_hash.t
-type secret_key = Ed25519.Secret_key.t
-type signature = Ed25519.Signature.t
+type signature = Ed25519.t
 
 module Tez : sig
 
@@ -574,7 +573,7 @@ module Block_header : sig
   type t = {
     shell: Block_header.shell_header ;
     protocol_data: protocol_data ;
-    signature: Ed25519.Signature.t ;
+    signature: Ed25519.t ;
   }
 
   and protocol_data = {

@@ -60,7 +60,7 @@ val endorsement_full :
 
 val sign :
   Helpers_account.t option -> Tezos_base.Operation.shell_header ->
-  proto_operation -> MBytes.t * Ed25519.Signature.t option
+  proto_operation -> MBytes.t * Ed25519.t option
 
 val main_of_proto :
   Helpers_account.t -> Tezos_base.Operation.shell_header ->

@@ -766,7 +766,7 @@ let rec interp
             let gas = Gas.consume gas Gas.Cost_of.check_signature in
             Gas.check gas >>=? fun () ->
             let message = MBytes.of_string message in
-            let res = Ed25519.Signature.check key signature message in
+            let res = Ed25519.check key signature message in
             logged_return (Item (res, rest), gas, ctxt)
         | Hash_key, Item (key, rest) ->
             logged_return (Item (Ed25519.Public_key.hash key, rest), Gas.consume gas Gas.Cost_of.hash_key, ctxt)

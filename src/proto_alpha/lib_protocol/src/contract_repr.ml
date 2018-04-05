@@ -33,8 +33,8 @@ let to_b58check = function
 
 let of_b58check s =
   match Base58.decode s with
-  | Some (Ed25519.Public_key_hash.Hash h) -> ok (Implicit h)
-  | Some (Contract_hash.Hash h) -> ok (Originated h)
+  | Some (Ed25519.Public_key_hash.Data h) -> ok (Implicit h)
+  | Some (Contract_hash.Data h) -> ok (Originated h)
   | _ -> error (Invalid_contract_notation s)
 
 let pp ppf = function

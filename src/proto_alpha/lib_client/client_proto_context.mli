@@ -132,5 +132,5 @@ val dictate :
   #Proto_alpha.rpc_context ->
   Block_services.block ->
   dictator_operation ->
-  secret_key ->
+  Ed25519.Secret_key.t ->
   Operation_hash.t tzresult Lwt.t

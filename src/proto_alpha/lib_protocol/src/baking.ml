@@ -247,8 +247,8 @@ let first_endorsement_slots
   select_delegate delegate delegate_list max_priority
 
 let check_hash hash stamp_threshold =
-  let bytes = Block_hash.to_string hash in
-  let word = String.get_int64 bytes 0 in
+  let bytes = Block_hash.to_bytes hash in
+  let word = MBytes.get_int64 bytes 0 in
   Compare.Uint64.(word < stamp_threshold)
 
 let check_header_hash header stamp_threshold =
@@ -265,7 +265,7 @@ let check_proof_of_work_stamp ctxt block =
 let check_signature block key =
   let check_signature key { Block_header.protocol_data ; shell ; signature } =
     let unsigned_header = Block_header.forge_unsigned shell protocol_data in
-    Ed25519.Signature.check key signature unsigned_header in
+    Ed25519.check key signature unsigned_header in
   if check_signature key block then
     return ()
   else

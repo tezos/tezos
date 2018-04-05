@@ -19,7 +19,7 @@ let raw_encoding = Operation.encoding
 type operation = {
   shell: Operation.shell_header ;
   contents: proto_operation ;
-  signature: Ed25519.Signature.t option ;
+  signature: Ed25519.t option ;
 }
 
 and proto_operation =
@@ -379,7 +379,7 @@ module Encoding = struct
   let mu_signed_proto_operation_encoding op_encoding =
     merge_objs
       (mu_proto_operation_encoding op_encoding)
-      (obj1 (varopt "signature" Ed25519.Signature.encoding))
+      (obj1 (varopt "signature" Ed25519.encoding))
 
   let operation_encoding =
     mu "operation"
@@ -476,7 +476,7 @@ let check_signature key { shell ; contents ; signature } =
       fail Missing_signature
   | Sourced_operations _, Some signature ->
       let unsigned_operation = forge shell contents in
-      if Ed25519.Signature.check key signature unsigned_operation then
+      if Ed25519.check key signature unsigned_operation then
         return ()
       else
         fail Invalid_signature

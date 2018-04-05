@@ -37,7 +37,7 @@ module Account : sig
 
   val encoding : t Data_encoding.t
   val pp_account : Format.formatter -> t -> unit
-  val create : ?keys:(secret_key * public_key) -> string -> t
+  val create : ?keys:(Ed25519.Secret_key.t * public_key) -> string -> t
   (** [create ?keys alias] is an account with alias [alias]. If
       [?keys] is [None], a pair of keys will be minted. *)
 

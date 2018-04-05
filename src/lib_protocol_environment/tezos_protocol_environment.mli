@@ -120,8 +120,7 @@ module Make (Context : CONTEXT) : sig
        and type 'a RPC_directory.t = 'a RPC_directory.t
        and type Ed25519.Public_key_hash.t = Ed25519.Public_key_hash.t
        and type Ed25519.Public_key.t = Ed25519.Public_key.t
-       and type Ed25519.Secret_key.t = Ed25519.Secret_key.t
-       and type Ed25519.Signature.t = Ed25519.Signature.t
+       and type Ed25519.t = Ed25519.t
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema

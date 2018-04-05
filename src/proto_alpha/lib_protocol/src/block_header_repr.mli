@@ -11,7 +11,7 @@
 type t = {
   shell: Block_header.shell_header ;
   protocol_data: protocol_data ;
-  signature: Ed25519.Signature.t ;
+  signature: Ed25519.t ;
 }
 
 and protocol_data = {

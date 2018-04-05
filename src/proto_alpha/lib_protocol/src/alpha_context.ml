@@ -51,8 +51,7 @@ module Script = struct
 end
 type public_key = Ed25519.Public_key.t
 type public_key_hash = Ed25519.Public_key_hash.t
-type secret_key = Ed25519.Secret_key.t
-type signature = Ed25519.Signature.t
+type signature = Ed25519.t
 
 module Constants = struct
   include Constants_repr

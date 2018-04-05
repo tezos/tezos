@@ -19,7 +19,7 @@ val raw_encoding: raw Data_encoding.t
 type operation = {
   shell: Operation.shell_header ;
   contents: proto_operation ;
-  signature: Ed25519.Signature.t option ;
+  signature: Ed25519.t option ;
 }
 
 and proto_operation =
@@ -112,7 +112,7 @@ val acceptable_passes: operation -> int list
 
 val parse_proto:
   MBytes.t ->
-  (proto_operation * Ed25519.Signature.t option) tzresult Lwt.t
+  (proto_operation * Ed25519.t option) tzresult Lwt.t
 
 type error += Missing_signature (* `Permanent *)
 type error += Invalid_signature (* `Permanent *)

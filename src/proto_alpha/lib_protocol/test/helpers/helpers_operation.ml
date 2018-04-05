@@ -104,7 +104,7 @@ let sign src oph protop =
   let signed_proto_operation_encoding =
     Data_encoding.merge_objs
       Operation.proto_operation_encoding
-      (obj1 @@ varopt "signature" Ed25519.Signature.encoding) in
+      (obj1 @@ varopt "signature" Ed25519.encoding) in
   let proto_bytes =
     Data_encoding.Binary.to_bytes
       signed_proto_operation_encoding

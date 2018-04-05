@@ -55,8 +55,7 @@ let transfer cctxt
     ~destination ?parameters ~fee () >>=? fun bytes ->
   Block_services.predecessor cctxt block >>=? fun predecessor ->
   Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
-  let signed_bytes =
-    MBytes.concat bytes (Ed25519.Signature.to_bytes signature) in
+  let signed_bytes = Ed25519.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Alpha_services.Helpers.apply_operation cctxt block
     predecessor oph bytes (Some signature) >>=? fun contracts ->
@@ -74,8 +73,7 @@ let reveal cctxt
     cctxt block
     ~branch ~source ~sourcePubKey:src_pk ~counter ~fee () >>=? fun bytes ->
   Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
-  let signed_bytes =
-    MBytes.concat bytes (Ed25519.Signature.to_bytes signature) in
+  let signed_bytes = Ed25519.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Shell_services.inject_operation
     cctxt ~chain_id signed_bytes >>=? fun injected_oph ->
@@ -86,7 +84,7 @@ let originate rpc_config ?chain_id ~block ?signature bytes =
   let signed_bytes =
     match signature with
     | None -> bytes
-    | Some signature -> Ed25519.Signature.concat bytes signature in
+    | Some signature -> Ed25519.concat bytes signature in
   Block_services.predecessor rpc_config block >>=? fun predecessor ->
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Alpha_services.Helpers.apply_operation rpc_config block
@@ -137,7 +135,7 @@ let delegate_contract cctxt
     ~branch ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
   >>=? fun bytes ->
   Client_keys.sign cctxt manager_sk bytes >>=? fun signature ->
-  let signed_bytes = Ed25519.Signature.concat bytes signature in
+  let signed_bytes = Ed25519.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Shell_services.inject_operation
     cctxt ~chain_id signed_bytes >>=? fun injected_oph ->
@@ -185,7 +183,7 @@ let dictate rpc_config block command seckey =
   Alpha_services.Forge.Dictator.operation
     rpc_config block ~branch command >>=? fun bytes ->
   let signature = Ed25519.sign seckey bytes in
-  let signed_bytes = Ed25519.Signature.concat bytes signature in
+  let signed_bytes = Ed25519.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Shell_services.inject_operation
     rpc_config ~chain_id signed_bytes >>=? fun injected_oph ->

@@ -63,7 +63,7 @@ module Command = struct
     let open Data_encoding in
     obj2
       (req "content" encoding)
-      (req "signature" Ed25519.Signature.encoding)
+      (req "signature" Ed25519.encoding)
 
   let forge shell command =
     Data_encoding.Binary.to_bytes
@@ -77,9 +77,8 @@ module Pubkey = struct
   let pubkey_key = ["genesis_key"]
 
   let default =
-    let pubkey =
-      "4d5373455738070434f214826d301a1c206780d7f789fcbf94c2149b2e0718cc" in
-    Ed25519.Public_key.of_hex_exn (`Hex pubkey)
+    Ed25519.Public_key.of_b58check_exn
+      "edpkuEH8DSby4w167NpxYbMagBapWvM8jsqKJpiW3JpVD7Af8oGmEo"
 
   let get_pubkey ctxt =
     Context.get ctxt pubkey_key >>= function

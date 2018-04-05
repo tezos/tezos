@@ -51,7 +51,7 @@ module S = struct
                  (req "pred_block" Block_hash.encoding)
                  (req "operation_hash" Operation_hash.encoding)
                  (req "forged_operation" bytes)
-                 (opt "signature" Ed25519.Signature.encoding))
+                 (opt "signature" Ed25519.encoding))
       ~output: (obj1 (req "contracts" (list Contract.encoding)))
       RPC_path.(custom_root / "apply_operation")
 
