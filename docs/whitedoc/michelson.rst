@@ -461,7 +461,7 @@ Control structures
     :: (or 'a 'b) : 'A   ->   'A
        iff   body :: [ 'a : 'A -> (or 'a 'b) : 'A ]
 
-    > LOOP_LEFT body / (Left a)  : S  =>  body ; LOOP_LEFT body / (or 'a 'b) : S
+    > LOOP_LEFT body / (Left a) : S  =>  body ; LOOP_LEFT body / a : S
     > LOOP_LEFT body / (Right b) : S  =>  b : S
 
 -  ``DIP code``: Runs code protecting the top of the stack.
