@@ -56,6 +56,9 @@ val operation_submitted_message :
   Operation_hash.t ->
   unit tzresult Lwt.t
 
+val pp_internal_operation:
+  Format.formatter -> internal_operation -> unit
+
 val source_to_keys:
   #Proto_alpha.full ->
   Block_services.block ->

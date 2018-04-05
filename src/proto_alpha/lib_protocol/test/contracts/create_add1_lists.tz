@@ -1,15 +1,13 @@
 parameter unit;
-return (contract (list int) (list int));
-storage unit;
-code { CAR;                      # Get the UNIT value (starting storage for contract)
-       LAMBDA (pair (list int) unit) # Start of stack for contract (see above)
-              (pair (list int) unit) # End of stack for contract (see above)
+storage (contract (list int));
+code { DROP; NIL int; # starting storage for contract
+       LAMBDA (pair (list int) (list int)) # Start of stack for contract (see above)
+              (pair (list operation) (list int)) # End of stack for contract (see above)
               # See the contract above. I copied and pasted
               { CAR;
                 LAMBDA int int {PUSH int 1; ADD};
                 MAP;
-                UNIT;
-                SWAP;
+                NIL operation;
                 PAIR };
        AMOUNT;                   # Push the starting balance
        PUSH bool False;          # Not spendable
@@ -17,6 +15,4 @@ code { CAR;                      # Get the UNIT value (starting storage for cont
        NONE key_hash;                 # No delegate
        PUSH key_hash "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5";
        CREATE_CONTRACT;          # Create the contract
-       UNIT;                     # Ending calling convention stuff
-       SWAP;
-       PAIR}
+       NIL operation; PAIR}      # Ending calling convention stuff

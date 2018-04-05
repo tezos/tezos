@@ -1,6 +1,5 @@
 parameter (pair (set string) (set string));
-return bool;
-storage unit;
+storage bool;
 code { CAR; DUP; CDR; DIP{CAR}; # Unpack lists
        PUSH bool True;
        PAIR; SWAP;              # Setup accumulator
@@ -15,4 +14,4 @@ code { CAR; DUP; CDR; DIP{CAR}; # Unpack lists
                 PAIR};
        REDUCE;                  # Reduce
        CAR;                     # Get the accumulator value
-       UNIT; SWAP; PAIR}        # Calling convention
+       NIL operation; PAIR}     # Calling convention

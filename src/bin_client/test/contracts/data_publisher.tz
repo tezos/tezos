@@ -1,15 +1,8 @@
-
-# NONE if user wants to get the value
-# SOME (signed hash of the string, string)
-parameter (option (pair signature (pair string nat)));
-return string;
+parameter (pair signature (pair string nat));
 storage (pair (pair key nat) string);
 code { DUP; CAR; DIP{CDR; DUP};
-       IF_NONE { AMOUNT; PUSH tez "1.00"; # The fee I'm charging for queries
-                 CMPLE; IF {} {FAIL};
-                 CDR; PAIR}
-               { SWAP; DIP{DUP}; CAAR; DIP{DUP; CAR; DIP{CDR; H}; PAIR};
-                 CHECK_SIGNATURE;
-                 IF { CDR; DUP; DIP{CAR; DIP{CAAR}}; CDR; PUSH nat 1; ADD;
-                      DIP{SWAP}; SWAP; PAIR; PAIR; PUSH string ""; PAIR}
-                    {FAIL}}}
+       SWAP; DIP{DUP}; CAAR; DIP{DUP; CAR; DIP{CDR; H}; PAIR};
+       CHECK_SIGNATURE;
+       IF { CDR; DUP; DIP{CAR; DIP{CAAR}}; CDR; PUSH nat 1; ADD;
+            DIP{SWAP}; SWAP; PAIR; PAIR; NIL operation; PAIR}
+          {FAIL}}

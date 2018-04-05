@@ -1,6 +1,4 @@
-
 parameter nat;
-return (pair nat bool);
-storage unit;
+storage (pair nat bool);
 code { CAR; PUSH bool True; SWAP;
-       PAIR; UNIT; SWAP; PAIR}
+       PAIR; NIL operation; PAIR}

@@ -81,8 +81,6 @@ let first_error_location errs =
       | Bad_return (loc, _, _)
       | Bad_stack (loc, _, _, _)
       | Unmatched_branches (loc, _, _)
-      | Transfer_in_lambda loc
-      | Transfer_in_dip loc
       | Invalid_constant (loc, _, _)
       | Invalid_contract (loc, _)
       | Comparable_type_expected (loc, _)

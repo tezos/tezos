@@ -1,6 +1,5 @@
 parameter (list string);
-return string;
-storage unit;
+storage string;
 code { CAR; PUSH string ""; SWAP;
        ITER { CONCAT };
-       UNIT; SWAP; PAIR}
+       NIL operation; PAIR}

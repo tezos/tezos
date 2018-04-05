@@ -16,19 +16,19 @@ val sourced : sourced_operations -> proto_operation
 
 val manager :
   Helpers_account.t -> ?fee:Tez.tez -> manager_operation list ->
-  Alpha_environment.Context.t -> sourced_operations proto_tzresult Lwt.t
+  Alpha_environment.Context.t -> Z.t -> sourced_operations proto_tzresult Lwt.t
 
 val manager_full :
   Helpers_account.t -> ?fee:Tez.tez -> manager_operation list ->
-  Alpha_environment.Context.t -> proto_operation proto_tzresult Lwt.t
+  Alpha_environment.Context.t -> Z.t -> proto_operation proto_tzresult Lwt.t
 
 val transaction :
-  ?parameters:Script.expr -> Tez.t -> Contract.contract -> Z.t ->
+  ?parameters:Script.expr -> Tez.t -> Contract.contract ->
   manager_operation
 
 val origination :
   ?delegatable:bool -> ?script:Script.t option -> ?spendable:bool ->
-  ?delegate:public_key_hash option -> Helpers_account.t -> Tez.t -> Z.t -> manager_operation
+  ?delegate:public_key_hash option -> Helpers_account.t -> Tez.t -> manager_operation
 
 val delegation : public_key_hash -> manager_operation
 

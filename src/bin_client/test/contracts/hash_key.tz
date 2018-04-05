@@ -1,4 +1,3 @@
 parameter key;
-return key_hash;
-storage unit;
-code {CAR; HASH_KEY; DIP{UNIT}; PAIR}
+storage (option key_hash);
+code {CAR; HASH_KEY; SOME ;NIL operation; PAIR}

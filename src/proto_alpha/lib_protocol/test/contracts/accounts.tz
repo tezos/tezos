@@ -6,15 +6,14 @@
 parameter (or key_hash (pair key (pair tez signature)));
 # Maps the key to the balance they have stored
 storage (map key_hash tez);
-return unit;
 code { DUP; CAR;
        # Deposit into account
        IF_LEFT { DUP; DIIP{ CDR; DUP };
                  DIP{ SWAP }; GET;
                  # Create the account
-                 IF_NONE { DIP{ AMOUNT; SOME }; UPDATE; UNIT; PAIR }
+                 IF_NONE { DIP{ AMOUNT; SOME }; UPDATE; NIL operation; PAIR }
                          # Add to an existing account
-                         { AMOUNT; ADD; SOME; SWAP; UPDATE; UNIT; PAIR }}
+                         { AMOUNT; ADD; SOME; SWAP; UPDATE; NIL operation; PAIR }}
                # Withdrawl
                { DUP; DUP; DUP; DUP;
                  # Check signature on data
@@ -38,5 +37,7 @@ code { DUP; CAR;
                                 SWAP; CAR; HASH_KEY; UPDATE;
                                 SWAP; DUP; CDAR;
                                 # Execute the transfer
-                                DIP{ CAR; HASH_KEY; IMPLICIT_ACCOUNT }; UNIT; TRANSFER_TOKENS;
+                                DIP{ CAR; HASH_KEY; IMPLICIT_ACCOUNT }; UNIT;
+                                TRANSFER_TOKENS;
+                                NIL operation; SWAP; CONS;
                                 PAIR }}}}

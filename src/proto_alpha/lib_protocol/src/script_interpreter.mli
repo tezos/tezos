@@ -18,11 +18,13 @@ type execution_result =
     origination_nonce : Contract.origination_nonce ;
     storage : Script.expr ;
     big_map_diff : Contract.big_map_diff option ;
-    return_value : Script.expr }
+    operations : internal_operation list }
 
 val execute:
   Alpha_context.t -> Contract.origination_nonce ->
+  check_operations: bool ->
   source: Contract.t ->
+  payer: Contract.t ->
   self: (Contract.t * Script.t) ->
   parameter: Script.expr ->
   amount: Tez.t ->
@@ -33,7 +35,9 @@ type execution_trace =
 
 val trace:
   Alpha_context.t -> Contract.origination_nonce ->
+  check_operations: bool ->
   source: Contract.t ->
+  payer: Contract.t ->
   self: (Contract.t * Script.t) ->
   parameter: Script.expr ->
   amount: Tez.t ->

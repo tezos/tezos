@@ -15,7 +15,7 @@ type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 type ex_comparable_ty = Ex_comparable_ty : 'a Script_typed_ir.comparable_ty -> ex_comparable_ty
 type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 type ex_stack_ty = Ex_stack_ty : 'a Script_typed_ir.stack_ty -> ex_stack_ty
-type ex_script = Ex_script : ('a, 'b, 'c) Script_typed_ir.script -> ex_script
+type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
 
 (* ---- Sets and Maps -------------------------------------------------------*)
 
@@ -57,29 +57,30 @@ val ty_eq :
 
 val parse_data :
   ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
-  context -> 'a Script_typed_ir.ty -> Script.node -> ('a * context) tzresult Lwt.t
+  context -> check_operations: bool ->
+  'a Script_typed_ir.ty -> Script.node -> ('a * context) tzresult Lwt.t
 val unparse_data :
   context -> 'a Script_typed_ir.ty -> 'a -> (Script.node * context) tzresult
 
 val parse_ty :
-  bool -> Script.node ->
+  allow_big_map: bool -> Script.node ->
   (ex_ty * Script_typed_ir.annot) tzresult
 val unparse_ty :
   string option -> 'a Script_typed_ir.ty -> Script.node
 
 val parse_toplevel
-  : Script.expr -> (Script.node * Script.node * Script.node * Script.node) tzresult
+  : Script.expr -> (Script.node * Script.node * Script.node) tzresult
 
 val typecheck_code :
   context -> Script.expr -> (type_map * context) tzresult Lwt.t
 
 val typecheck_data :
   ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
-  context -> Script.expr * Script.expr -> context tzresult Lwt.t
+  context -> check_operations:bool ->Script.expr * Script.expr -> context tzresult Lwt.t
 
 val parse_script :
   ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
-  context -> Script.t -> (ex_script * context) tzresult Lwt.t
+  context -> check_operations: bool -> Script.t -> (ex_script * context) tzresult Lwt.t
 
 val hash_data : context -> 'a Script_typed_ir.ty -> 'a -> (string * context) tzresult
 

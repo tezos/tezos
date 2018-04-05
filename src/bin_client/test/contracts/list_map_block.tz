@@ -1,6 +1,5 @@
 parameter (list int);
-return (list int);
-storage unit;
+storage (list int);
 code { CAR; PUSH int 0; SWAP;
        MAP { DIP{DUP}; ADD; DIP{PUSH int 1; ADD}};
-       UNIT; SWAP; PAIR; DIP{DROP}}
+       NIL operation; PAIR; DIP{DROP}}

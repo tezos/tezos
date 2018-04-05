@@ -15,7 +15,6 @@ type error += Invalid_primitive_name of string Micheline.canonical * Micheline.c
 
 type prim =
   | K_parameter
-  | K_return
   | K_storage
   | K_code
   | D_False
@@ -114,6 +113,7 @@ type prim =
   | T_tez
   | T_timestamp
   | T_unit
+  | T_operation
 
 let valid_case name =
   let is_lower = function  '_' | 'a'..'z' -> true | _ -> false in
@@ -136,7 +136,6 @@ let valid_case name =
 
 let string_of_prim = function
   | K_parameter -> "parameter"
-  | K_return -> "return"
   | K_storage -> "storage"
   | K_code -> "code"
   | D_False -> "False"
@@ -235,10 +234,10 @@ let string_of_prim = function
   | T_tez -> "tez"
   | T_timestamp -> "timestamp"
   | T_unit -> "unit"
+  | T_operation -> "operation"
 
 let prim_of_string = function
   | "parameter" -> ok K_parameter
-  | "return" -> ok K_return
   | "storage" -> ok K_storage
   | "code" -> ok K_code
   | "False" -> ok D_False
@@ -337,6 +336,7 @@ let prim_of_string = function
   | "tez" -> ok T_tez
   | "timestamp" -> ok T_timestamp
   | "unit" -> ok T_unit
+  | "operation" -> ok T_operation
   | n ->
       if valid_case n then
         error (Unknown_primitive_name n)
@@ -384,7 +384,6 @@ let prim_encoding =
   let open Data_encoding in
   string_enum [
     ("parameter", K_parameter) ;
-    ("return", K_return) ;
     ("storage", K_storage) ;
     ("code", K_code) ;
     ("False", D_False) ;
@@ -482,7 +481,8 @@ let prim_encoding =
     ("string", T_string) ;
     ("tez", T_tez) ;
     ("timestamp", T_timestamp) ;
-    ("unit", T_unit) ]
+    ("unit", T_unit) ;
+    ("operation", T_operation) ]
 
 let () =
   register_error_kind

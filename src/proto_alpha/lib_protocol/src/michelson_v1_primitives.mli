@@ -13,7 +13,6 @@ type error += Invalid_primitive_name of string Micheline.canonical * Micheline.c
 
 type prim =
   | K_parameter
-  | K_return
   | K_storage
   | K_code
   | D_False
@@ -112,6 +111,7 @@ type prim =
   | T_tez
   | T_timestamp
   | T_unit
+  | T_operation
 
 val prim_encoding : prim Data_encoding.encoding
 

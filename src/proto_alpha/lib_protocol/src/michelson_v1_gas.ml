@@ -220,6 +220,10 @@ module Cost_of = struct
     let primitive_type = alloc_cost 1
     let one_arg_type = alloc_cost 2
     let two_arg_type = alloc_cost 3
+    let operation s =
+      (* TODO: proper handling of (de)serialization costs *)
+      let len = String.length s in
+      alloc_cost len +@ step_cost (len * 10)
   end
 
   module Unparse = struct
@@ -237,6 +241,7 @@ module Cost_of = struct
       prim_cost +@ (alloc_bytes_cost decimal_digits)
     let tez = string_cost 19 (* max length of 64 bit int *)
     let timestamp x = Script_timestamp.to_zint x |> Script_int.of_zint |> int
+    let operation bytes = string_cost (MBytes.length bytes * 2)
     let key = string_cost 54
     let key_hash = string_cost 36
     let signature = string_cost 128

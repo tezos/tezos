@@ -43,10 +43,9 @@ type ('key, 'value) map = (module Boxed_map with type key = 'key and type value 
 
 type annot = string option
 
-type ('arg, 'ret, 'storage) script =
-  { code : (('arg, 'storage) pair, ('ret, 'storage) pair) lambda ;
+type ('arg, 'storage) script =
+  { code : (('arg, 'storage) pair, (internal_operation list, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
-    ret_type : 'ret ty ;
     storage : 'storage ;
     storage_type : 'storage ty }
 
@@ -59,8 +58,8 @@ and end_of_stack = unit
 and ('arg, 'ret) lambda =
     Lam of ('arg * end_of_stack, 'ret * end_of_stack) descr * Script.expr
 
-and ('arg, 'ret) typed_contract =
-  'arg ty * 'ret ty * Contract.t
+and 'arg typed_contract =
+  'arg ty * Contract.t
 
 and 'ty ty =
   | Unit_t : unit ty
@@ -81,7 +80,8 @@ and 'ty ty =
   | Set_t : 'v comparable_ty -> 'v set ty
   | Map_t : 'k comparable_ty * 'v ty -> ('k, 'v) map ty
   | Big_map_t : 'k comparable_ty * 'v ty -> ('k, 'v) big_map ty
-  | Contract_t : 'arg ty * 'ret ty -> ('arg, 'ret) typed_contract ty
+  | Contract_t : 'arg ty -> 'arg typed_contract ty
+  | Operation_t : internal_operation ty
 
 and 'ty stack_ty =
   | Item_t : 'ty ty * 'rest stack_ty * annot -> ('ty * 'rest) stack_ty
@@ -316,21 +316,22 @@ and ('bef, 'aft) instr =
 
   (* protocol *)
   | Manager :
-      (('arg, 'ret) typed_contract * 'rest, public_key_hash * 'rest) instr
-  | Transfer_tokens : 'sto ty ->
-    ('arg * (Tez.t * (('arg, 'ret) typed_contract * ('sto * end_of_stack))), 'ret * ('sto * end_of_stack)) instr
+      ('arg typed_contract * 'rest, public_key_hash * 'rest) instr
+  | Transfer_tokens :
+      ('arg * (Tez.t * ('arg typed_contract * 'rest)), internal_operation * 'rest) instr
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
-       (unit, unit) typed_contract * 'rest) instr
+       unit typed_contract * 'rest) instr
   | Implicit_account :
-      (public_key_hash * 'rest, (unit, unit) typed_contract * 'rest) instr
-  | Create_contract : 'g ty * 'p ty * 'r ty ->
+      (public_key_hash * 'rest, unit typed_contract * 'rest) instr
+  | Create_contract : 'g ty * 'p ty ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t *
-                                                                  (('p * 'g, 'r * 'g) lambda * ('g * 'rest)))))),
-     ('p, 'r) typed_contract * 'rest) instr
-  | Create_contract_literal : 'g ty * 'p ty * 'r ty * ('p * 'g, 'r * 'g) lambda  ->
+                                                                  (('p * 'g, internal_operation list * 'g) lambda
+                                                                   * ('g * 'rest)))))),
+     'p typed_contract * 'rest) instr
+  | Create_contract_literal : 'g ty * 'p ty * ('p * 'g, internal_operation list * 'g) lambda  ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
-     ('p, 'r) typed_contract * 'rest) instr
+     'p typed_contract * 'rest) instr
   | Now :
       ('rest, Script_timestamp.t * 'rest) instr
   | Balance :
@@ -343,10 +344,10 @@ and ('bef, 'aft) instr =
     ('a * 'rest, string * 'rest) instr
   | Steps_to_quota : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr
-  | Source : 'p ty * 'r ty ->
-    ('rest, ('p, 'r) typed_contract * 'rest) instr
-  | Self : 'p ty * 'r ty ->
-    ('rest, ('p, 'r) typed_contract * 'rest) instr
+  | Source : 'p ty ->
+    ('rest, 'p typed_contract * 'rest) instr
+  | Self : 'p ty ->
+    ('rest, 'p typed_contract * 'rest) instr
   | Amount :
       ('rest, Tez.t * 'rest) instr
 

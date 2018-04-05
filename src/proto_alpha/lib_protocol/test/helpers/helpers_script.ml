@@ -31,11 +31,14 @@ let execute_code_pred
   let dummy_nonce = Contract.initial_origination_nonce hash in
   let amount = Tez.zero in
   Lwt.return (Proto_alpha.Alpha_context.Gas.set_limit tc gas) >>=? fun tc ->
-  let return = Script_interpreter.execute
-      tc dummy_nonce
-      ~source: op.contract
-      ~self: (dst, script)
-      ~amount ~parameter in
-  return
+  Script_interpreter.execute
+    tc dummy_nonce
+    ~check_operations: true
+    ~source: op.contract
+    ~payer: op.contract
+    ~self: (dst, script)
+    ~amount ~parameter >>=? fun ({ ctxt ; storage ; big_map_diff } as res) ->
+  Proto_alpha.Alpha_context.Contract.update_script_storage ctxt dst storage big_map_diff >>=? fun ctxt ->
+  return (dst, { res with ctxt })
 
 

@@ -1,4 +1,3 @@
 parameter (pair int int);
 storage unit;
-return unit;
-code {CAR; DUP; CAR; DIP{CDR}; COMPARE; ASSERT_LE; UNIT; DUP; PAIR}
+code {CAR; DUP; CAR; DIP{CDR}; COMPARE; ASSERT_LE; UNIT; NIL operation; PAIR}

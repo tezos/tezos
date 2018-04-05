@@ -1,4 +1,3 @@
 parameter string;
-return string;
-storage unit;
-code {CAR; H; UNIT; SWAP; PAIR};
+storage string;
+code {CAR; H; NIL operation; PAIR};

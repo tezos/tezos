@@ -85,24 +85,6 @@ run_contract_file () {
     $client run program "$contract" on storage "$storage" and input "$input" $amount_flag
 }
 
-assert_output () {
-    local contract=$1;
-    local input=$2;
-    local storage=$3;
-    local expected=$4;
-    local amount=$5;
-    echo "Testing [$contract]"
-    local output=$(run_contract_file "$contract" "$input" "$storage" "$amount" | sed '1,/output/d' |
-                       sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' ||
-                       { printf '\nTest failed with error at line %s\n' "$(caller)" 1>&2;
-                         exit 1; });
-    if [ "$expected" != "$output" ]; then
-        echo "Test at " `caller` failed 1>&2 ;
-        printf "Expected %s but got %s" "$expected" "$output" 1>&2 ;
-        exit 1;
-    fi
-}
-
 assert_storage () {
     local contract=$1;
     local input=$2;
@@ -203,6 +185,17 @@ assert() {
         echo "Unexpected result: \"${result}\""
         echo "Expected: \"${expected}\""
         exit 2
+    fi
+}
+
+assert_success() {
+    printf "[Asserting success]\n"
+    if "$@" 2> /dev/null; then
+        return 0
+    else
+        printf "Expected command line to success, but failed:\n"
+        echo "$@"
+        exit 1
     fi
 }
 

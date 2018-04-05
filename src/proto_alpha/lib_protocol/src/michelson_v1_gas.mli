@@ -123,6 +123,8 @@ module Cost_of : sig
     val primitive_type : Gas.cost
     val one_arg_type : Gas.cost
     val two_arg_type : Gas.cost
+
+    val operation : string -> Gas.cost
   end
 
   module Unparse : sig
@@ -136,6 +138,7 @@ module Cost_of : sig
     val key : Gas.cost
     val key_hash : Gas.cost
     val signature : Gas.cost
+    val operation : MBytes.t -> Gas.cost
 
     val contract : Gas.cost
 

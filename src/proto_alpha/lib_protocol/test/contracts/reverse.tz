@@ -1,8 +1,7 @@
 parameter (list string);
-storage unit;
-return (list string);
+storage (list string);
 code { CAR; NIL string; SWAP;
        LAMBDA (pair string (list string))
               (list string)
               {DUP; CAR; DIP{CDR}; CONS};
-       REDUCE; UNIT; SWAP; PAIR};
+       REDUCE; NIL operation; PAIR};

@@ -1,4 +1,3 @@
 parameter bool;
 storage (pair bool nat);
-return unit;
-code { DUP; CAR; DIP{CDR}; SWAP; MAP_CAR { AND } ; UNIT; PAIR };
+code { DUP; CAR; DIP{CDR}; SWAP; MAP_CAR { AND }; NIL operation; PAIR };

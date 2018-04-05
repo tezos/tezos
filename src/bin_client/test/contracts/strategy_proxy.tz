@@ -1,9 +1,0 @@
-parameter nat;
-storage (pair (option nat) (contract (or nat (pair signature nat)) bool));
-return (pair nat bool);
-code { DUP; CAR; DIP{CDDR; DUP}; DUP; DIP{SOME; PAIR; SWAP}; # Store the nat in strorage
-       # Query our stored contract
-       LEFT (pair signature nat); DIP{PUSH tez "0.00"}; TRANSFER_TOKENS;
-       # Cleanup and finish
-       DIP{DUP; CAR}; DIP{IF_NONE {FAIL} {}}; SWAP;
-       PAIR; DIP{CDR; NONE nat; PAIR}; PAIR}

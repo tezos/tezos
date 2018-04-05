@@ -1,4 +1,3 @@
 parameter (set int);
-storage unit;
-return nat;
-code {CAR; SIZE; UNIT; SWAP; PAIR}
+storage nat;
+code {CAR; SIZE; NIL operation; PAIR}

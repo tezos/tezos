@@ -22,7 +22,9 @@ val run :
   input:Michelson_v1_parser.parsed ->
   Block_services.block ->
   #Proto_alpha.rpc_context ->
-  (Script.expr * Script.expr * Contract.big_map_diff option) tzresult Lwt.t
+  (Script.expr *
+   internal_operation list *
+   Contract.big_map_diff option) tzresult Lwt.t
 
 val trace :
   ?contract:Contract.t ->
@@ -32,7 +34,8 @@ val trace :
   input:Michelson_v1_parser.parsed ->
   Block_services.block ->
   #Proto_alpha.rpc_context ->
-  (Script.expr * Script.expr *
+  (Script.expr *
+   internal_operation list *
    Script_interpreter.execution_trace *
    Contract.big_map_diff option) tzresult Lwt.t
 
@@ -40,14 +43,16 @@ val print_run_result :
   #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  (Script_repr.expr * Script_repr.expr *
+  (Script_repr.expr *
+   internal_operation list *
    Contract.big_map_diff option) tzresult -> unit tzresult Lwt.t
 
 val print_trace_result :
   #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  (Script_repr.expr * Script_repr.expr *
+  (Script_repr.expr *
+   internal_operation list *
    Script_interpreter.execution_trace *
    Contract.big_map_diff option)
     tzresult -> unit tzresult Lwt.t

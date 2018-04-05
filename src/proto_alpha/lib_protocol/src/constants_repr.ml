@@ -78,7 +78,7 @@ let default = {
     List.map Period_repr.of_seconds_exn [ 60L ] ;
   first_free_baking_slot = 16 ;
   endorsers_per_block = 32 ;
-  hard_gas_limit_per_operation = Z.of_int 40_000 ;
+  hard_gas_limit_per_operation = Z.of_int 400_000 ;
   hard_gas_limit_per_block = Z.of_int 4_000_000 ;
   proof_of_work_threshold =
     Int64.(sub (shift_left 1L 56) 1L) ;

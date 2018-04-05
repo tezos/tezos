@@ -55,6 +55,7 @@ and sourced_operations =
       fee: Tez_repr.tez ;
       counter: counter ;
       operations: manager_operation list ;
+      gas_limit: Z.t ;
     }
   | Dictator_operation of dictator_operation
 
@@ -82,7 +83,6 @@ and manager_operation =
       amount: Tez_repr.tez ;
       parameters: Script_repr.expr option ;
       destination: Contract_repr.contract ;
-      gas_limit: Z.t ;
     }
   | Origination of {
       manager: Signature.Public_key_hash.t ;
@@ -91,7 +91,6 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
-      gas_limit: Z.t ;
     }
   | Delegation of Signature.Public_key_hash.t option
 
@@ -130,3 +129,12 @@ val proto_operation_encoding:
 
 val unsigned_operation_encoding:
   (Operation.shell_header * proto_operation) Data_encoding.t
+
+type internal_operation = {
+  source: Contract_repr.contract ;
+  operation: manager_operation ;
+  signature: Signature.t option
+}
+
+val internal_operation_encoding:
+  internal_operation Data_encoding.t

@@ -1,4 +1,3 @@
 parameter (pair timestamp timestamp);
-return int;
-storage unit;
-code { CAR; DUP; CAR; DIP{CDR}; SUB; UNIT; SWAP; PAIR }
+storage int;
+code { CAR; DUP; CAR; DIP{CDR}; SUB; NIL operation; PAIR }

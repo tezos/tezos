@@ -1,5 +1,6 @@
 # Fail if the amount transferred is less than 10
 parameter unit;
 storage unit;
-return unit;
-code {AMOUNT; PUSH tez "10"; CMPGT; IF {FAIL} {}}
+code { DROP;
+       AMOUNT; PUSH tez "10"; CMPGT; IF {FAIL} {};
+       UNIT; NIL operation; PAIR}

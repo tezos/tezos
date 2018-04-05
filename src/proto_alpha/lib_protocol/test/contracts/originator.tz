@@ -1,9 +1,8 @@
-storage unit ;
 parameter nat ;
-return (list (contract unit unit)) ;
+storage (list (contract unit)) ;
 code
   { CAR ; DUP ; PUSH nat 0 ; CMPNEQ ;
-    DIIP { NIL (contract unit unit) } ;
+    DIIP { NIL (contract unit) } ;
     LOOP
       { PUSH tez "5.00" ;
         PUSH bool True ; # delegatable
@@ -14,4 +13,4 @@ code
         PUSH nat 1 ; SWAP ; SUB ; ABS ;
         DUP ; PUSH nat 0 ; CMPNEQ } ;
     DROP ;
-    UNIT ; SWAP ; PAIR }
+    NIL operation ; PAIR }

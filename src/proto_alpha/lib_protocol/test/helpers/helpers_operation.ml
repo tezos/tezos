@@ -13,7 +13,7 @@ open Alpha_context
 
 let sourced ops = Sourced_operations ops
 
-let manager (src : Helpers_account.t) ?(fee = Tez.zero) operations context =
+let manager (src : Helpers_account.t) ?(fee = Tez.zero) operations context gas_limit =
   Alpha_context.prepare
     ~level:0l ~timestamp:(Time.now ()) ~fitness:[] context >>=? fun context ->
   Contract.get_counter context src.contract >>=? fun counter ->
@@ -25,26 +25,26 @@ let manager (src : Helpers_account.t) ?(fee = Tez.zero) operations context =
     fee ;
     counter ;
     operations = (if revealed then operations else Reveal src.pub :: operations) ;
+    gas_limit ;
   }
 
 
-let manager_full src ?(fee = Tez.zero) ops context =
-  manager src ~fee ops context >>=? fun ops -> return @@ sourced ops
+let manager_full src ?(fee = Tez.zero) ops context gas_limit =
+  manager src ~fee ops context gas_limit >>=? fun ops -> return @@ sourced ops
 
 
-let transaction ?parameters amount destination gas_limit =
+let transaction ?parameters amount destination =
   Transaction {
     amount ;
     parameters ;
     destination ;
-    gas_limit
   }
 
 
 let origination
     ?(delegatable = true) ?(script = None)
     ?(spendable = true) ?(delegate = None)
-    (manager: Helpers_account.t) credit gas_limit
+    (manager: Helpers_account.t) credit
   =
   Origination {
     manager = manager.hpub ;
@@ -52,8 +52,7 @@ let origination
     spendable ;
     delegatable ;
     script ;
-    credit ;
-    gas_limit
+    credit
   }
 
 
@@ -62,19 +61,19 @@ let delegation delegate =
 
 
 let delegation_full ?(fee = Tez.zero) src delegate context =
-  manager_full src ~fee [delegation delegate] context
+  manager_full src ~fee [delegation delegate] context Z.zero
 
 
 let script_origination_full script src credit gas_limit context =
-  manager_full src ~fee: Tez.zero [origination ~script src credit gas_limit] context
+  manager_full src ~fee: Tez.zero [origination ~script src credit] context gas_limit
 
 
 let origination_full ?(spendable = true) ?(delegatable = true) ?(fee = Tez.zero) src credit gas_limit context =
-  manager_full src ~fee [origination ~spendable ~delegatable src credit gas_limit] context
+  manager_full src ~fee [origination ~spendable ~delegatable src credit] context gas_limit
 
 
 let transaction_full ?(fee = Tez.zero) ?parameters src dst amount gas_limit context =
-  manager src ~fee [transaction ?parameters amount dst gas_limit] context
+  manager src ~fee [transaction ?parameters amount dst] context gas_limit
   >>=? fun manager_op ->
   return @@ sourced manager_op
 

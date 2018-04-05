@@ -55,10 +55,10 @@ let print_big_map_diff ppf = function
         diff
 
 let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed = function
-  | Ok (storage, output, maybe_diff) ->
-      cctxt#message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[%a@]@]@."
+  | Ok (storage, operations, maybe_diff) ->
+      cctxt#message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>emitted operations@,%a@]@,@[%a@]@]@."
         print_expr storage
-        print_expr output
+        (Format.pp_print_list Client_proto_context.pp_internal_operation) operations
         print_big_map_diff maybe_diff >>= fun () ->
       return ()
   | Error errs ->
@@ -66,12 +66,12 @@ let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed = fu
 
 let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   function
-  | Ok (storage, output, trace, maybe_big_map_diff) ->
+  | Ok (storage, operations, trace, maybe_big_map_diff) ->
       cctxt#message
         "@[<v 0>@[<v 2>storage@,%a@]@,\
-         @[<v 2>output@,%a@]@,%a@[<v 2>@[<v 2>trace@,%a@]@]@."
+         @[<v 2>emitted operations@,%a@]@,%a@[<v 2>@[<v 2>trace@,%a@]@]@."
         print_expr storage
-        print_expr output
+        (Format.pp_print_list Client_proto_context.pp_internal_operation) operations
         print_big_map_diff maybe_big_map_diff
         (Format.pp_print_list
            (fun ppf (loc, gas, stack) ->

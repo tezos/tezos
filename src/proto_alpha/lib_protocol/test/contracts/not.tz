@@ -1,4 +1,3 @@
 parameter bool;
-return bool;
-storage unit;
-code {CAR; NOT; UNIT; SWAP; PAIR};
+storage (option bool);
+code {CAR; NOT; SOME; NIL operation; PAIR};

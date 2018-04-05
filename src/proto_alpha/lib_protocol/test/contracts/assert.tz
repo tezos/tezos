@@ -1,4 +1,3 @@
 parameter bool;
 storage unit;
-return unit;
-code {CAR; ASSERT; UNIT; UNIT; PAIR}
+code {CAR; ASSERT; UNIT; NIL operation; PAIR}

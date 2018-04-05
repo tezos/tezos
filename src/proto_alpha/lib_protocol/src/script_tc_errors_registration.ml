@@ -376,32 +376,6 @@ let () =
       | _ -> None)
     (fun n ->
        Bad_stack_item n) ;
-  (* TRANSFER_TOKENS in lambda *)
-  register_error_kind
-    `Permanent
-    ~id:"TransferInLambdaTypeError"
-    ~title: "Transfer in lambda (typechecking error)"
-    ~description:
-      "A TRANSFER_TOKENS instruction was encountered in a lambda expression."
-    (located empty)
-    (function
-      | Transfer_in_lambda loc -> Some (loc, ())
-      | _ -> None)
-    (fun (loc, ()) ->
-       Transfer_in_lambda loc) ;
-  (* TRANSFER_TOKENS in DIP *)
-  register_error_kind
-    `Permanent
-    ~id:"TransferInDipTypeError"
-    ~title: "Transfer in DIP (typechecking error)"
-    ~description:
-      "A TRANSFER_TOKENS instruction was encountered in a DIP instruction."
-    (located empty)
-    (function
-      | Transfer_in_dip loc -> Some (loc, ())
-      | _ -> None)
-    (fun (loc, ()) ->
-       Transfer_in_dip loc) ;
   (* SELF in lambda *)
   register_error_kind
     `Permanent

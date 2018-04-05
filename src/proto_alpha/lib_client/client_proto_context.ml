@@ -36,6 +36,73 @@ let parse_expression arg =
     (Micheline_parser.no_parsing_error
        (Michelson_v1_parser.parse_expression arg))
 
+let pp_internal_operation ppf { source ; operation } =
+  Format.fprintf ppf "@[<v 0>" ;
+  begin match operation with
+    | Alpha_context.Transaction { destination ; amount ; parameters } ->
+        Format.fprintf ppf
+          "@[<v 2>Transaction:@,\
+           Of: %a@,\
+           From: %a@,\
+           To: %a"
+          Tez.pp amount
+          Contract.pp source
+          Contract.pp destination ;
+        begin match parameters with
+          | None -> ()
+          | Some expr ->
+              Format.fprintf ppf
+                "@,Parameter: @[<v 0>%a@]"
+                Michelson_v1_printer.print_expr expr
+        end ;
+        Format.fprintf ppf "@]" ;
+    | Origination { manager ; delegate ; credit ; spendable ; delegatable ; script } ->
+        Format.fprintf ppf "@[<v 2>Origination:@,\
+                            From: %a@,\
+                            For: %a@,\
+                            Credit: %a"
+          Contract.pp source
+          Signature.Public_key_hash.pp manager
+          Tez.pp credit ;
+        begin match script with
+          | None -> Format.fprintf ppf "@,No script (accepts all transactions)"
+          | Some { code ; storage } ->
+              Format.fprintf ppf
+                "@,@[<v 2>Script:@,%a\
+                 @,@[<v 2>Initial storage:@,%a@]"
+                Michelson_v1_printer.print_expr code
+                Michelson_v1_printer.print_expr storage
+        end ;
+        begin match delegate with
+          | None -> Format.fprintf ppf "@,Delegate is the manager"
+          | Some delegate -> Format.fprintf ppf "@,Delegate: %a" Signature.Public_key_hash.pp delegate
+        end ;
+        if spendable then Format.fprintf ppf "@,Spendable by its manager" ;
+        if delegatable then Format.fprintf ppf "@,Delegate can be changed later" ;
+        Format.fprintf ppf "@]" ;
+    | Reveal key ->
+        Format.fprintf ppf
+          "@[<v 2>Revelation of manager public key:@,\
+           Contract: %a@,\
+           Key: %a@]"
+          Contract.pp source
+          Signature.Public_key.pp key
+    | Delegation None ->
+        Format.fprintf ppf
+          "@[<v 2>Delegation:@,\
+           Contract: %a@,\
+           To: nobody@]"
+          Contract.pp source
+    | Delegation (Some delegate) ->
+        Format.fprintf ppf
+          "@[<v 2>Delegation:@,\
+           Contract: %a@,\
+           To: %a@]"
+          Contract.pp source
+          Signature.Public_key_hash.pp delegate
+  end ;
+  Format.fprintf ppf "@]"
+
 let transfer (cctxt : #Proto_alpha.full)
     block ?branch
     ~source ~src_pk ~src_sk ~destination ?arg ~amount ~fee ?gas_limit () =
@@ -63,7 +130,7 @@ let transfer (cctxt : #Proto_alpha.full)
         let signed_bytes = Signature.concat bytes signature in
         let oph = Operation_hash.hash_bytes [ signed_bytes ] in
         Alpha_services.Helpers.apply_operation cctxt block
-          predecessor oph bytes (Some signature) >>=? fun (_, gas) ->
+          predecessor oph bytes (Some signature) >>=? fun (_, _, gas) ->
         match gas with
         | Limited { remaining } ->
             let gas = Z.sub max_gas remaining in
@@ -85,7 +152,9 @@ let transfer (cctxt : #Proto_alpha.full)
   let signed_bytes = Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Alpha_services.Helpers.apply_operation cctxt block
-    predecessor oph bytes (Some signature) >>=? fun (contracts, _gas) ->
+    predecessor oph bytes (Some signature) >>=? fun (contracts, operations, _) ->
+  cctxt#message "@[<v 2>This sequence of operations was run (including internal ones):@,%a@]"
+    (Format.pp_print_list pp_internal_operation) operations >>= fun () ->
   Shell_services.inject_operation
     cctxt ~chain_id signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
@@ -108,21 +177,24 @@ let reveal cctxt
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
 
-let originate rpc_config ?chain_id ~block ?signature bytes =
+let originate (cctxt : #Client_context.full) ?chain_id ~block ?signature bytes =
   let signed_bytes =
     match signature with
     | None -> bytes
     | Some signature -> Signature.concat bytes signature in
-  Block_services.predecessor rpc_config block >>=? fun predecessor ->
+  Block_services.predecessor cctxt block >>=? fun predecessor ->
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Alpha_services.Helpers.apply_operation rpc_config block
+  Alpha_services.Helpers.apply_operation cctxt block
     predecessor oph bytes signature >>=? function
-  | [ contract ], _ ->
+  | [ contract ], operations, _ ->
+      cctxt#message
+        "@[<v 2>This sequence of operations was run (including internal ones):@,%a@]"
+        (Format.pp_print_list pp_internal_operation) operations >>= fun () ->
       Shell_services.inject_operation
-        rpc_config ?chain_id signed_bytes >>=? fun injected_oph ->
+        cctxt ?chain_id signed_bytes >>=? fun injected_oph ->
       assert (Operation_hash.equal oph injected_oph) ;
       return (oph, contract)
-  | contracts, _ ->
+  | contracts, _, _ ->
       failwith
         "The origination introduced %d contracts instead of one."
         (List.length contracts)
@@ -262,6 +334,7 @@ let originate_contract
     cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   get_branch cctxt block None >>=? fun (_chain_id, branch) ->
+  Block_services.predecessor cctxt block >>=? fun predecessor ->
   begin match gas_limit with
     | Some gas_limit -> return gas_limit
     | None ->
@@ -275,9 +348,8 @@ let originate_contract
           ~watermark:Generic_operation src_sk bytes >>=? fun signature ->
         let signed_bytes = Signature.concat bytes signature in
         let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-        Block_services.predecessor cctxt block >>=? fun predecessor ->
         Alpha_services.Helpers.apply_operation cctxt block
-          predecessor oph bytes (Some signature) >>=? fun (_, gas) ->
+          predecessor oph bytes (Some signature) >>=? fun (_, _, gas) ->
         match gas with
         | Limited { remaining } ->
             let gas = Z.sub max_gas remaining in

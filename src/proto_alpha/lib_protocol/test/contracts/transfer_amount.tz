@@ -1,4 +1,3 @@
 parameter unit;
 storage tez;
-return unit;
-code { DROP; AMOUNT; UNIT; PAIR };
+code { DROP; AMOUNT; NIL operation; PAIR };

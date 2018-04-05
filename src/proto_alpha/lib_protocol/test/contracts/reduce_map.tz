@@ -1,7 +1,6 @@
 
 parameter (pair (lambda int int) (list int));
-return (list int);
-storage unit;
+storage (list int);
 code { DIP{NIL int};
        CAR;
        DUP;
@@ -19,4 +18,4 @@ code { DIP{NIL int};
               (list int)
               {DUP; CAR; DIP{CDR}; CONS};
        REDUCE;                  # Correct list order
-       UNIT; SWAP; PAIR}        # Calling convention
+       NIL operation; PAIR}     # Calling convention

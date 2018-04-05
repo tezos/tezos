@@ -1,4 +1,3 @@
 parameter unit;
 storage unit;
-return unit;
-code { DROP; PUSH bool True; LOOP {PUSH bool True}; UNIT; UNIT; PAIR }
+code { DROP; PUSH bool True; LOOP {PUSH bool True}; UNIT; NIL operation; PAIR }

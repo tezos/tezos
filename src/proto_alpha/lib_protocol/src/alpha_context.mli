@@ -160,7 +160,6 @@ module Script : sig
 
   type prim = Michelson_v1_primitives.prim =
     | K_parameter
-    | K_return
     | K_storage
     | K_code
     | D_False
@@ -259,6 +258,7 @@ module Script : sig
     | T_tez
     | T_timestamp
     | T_unit
+    | T_operation
 
   type location = Micheline.canonical_location
 
@@ -742,6 +742,7 @@ and sourced_operations =
       fee: Tez.t ;
       counter: counter ;
       operations: manager_operation list ;
+      gas_limit: Z.t ;
     }
   | Dictator_operation of dictator_operation
 
@@ -769,7 +770,6 @@ and manager_operation =
       amount: Tez.t ;
       parameters: Script.expr option ;
       destination: Contract.contract ;
-      gas_limit: Z.t;
     }
   | Origination of {
       manager: public_key_hash ;
@@ -778,7 +778,6 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez.t ;
-      gas_limit: Z.t;
     }
   | Delegation of public_key_hash option
 
@@ -787,6 +786,12 @@ and dictator_operation =
   | Activate_testchain of Protocol_hash.t
 
 and counter = Int32.t
+
+type internal_operation = {
+  source: Contract.contract ;
+  operation: manager_operation ;
+  signature: Signature.t option
+}
 
 module Operation : sig
 
@@ -820,6 +825,8 @@ module Operation : sig
 
   val unsigned_operation_encoding:
     (Operation.shell_header * proto_operation) Data_encoding.t
+
+  val internal_operation_encoding: internal_operation Data_encoding.t
 
 end
 

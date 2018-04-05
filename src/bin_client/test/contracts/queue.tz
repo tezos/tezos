@@ -1,9 +1,8 @@
 parameter (option string);
-storage (pair (pair nat nat) (map nat string));
-return (option string);
+storage (pair (option string) (pair (pair nat nat) (map nat string)));
 code { DUP; CAR;
        # Retrieving an element
-       IF_NONE { CDR; DUP; CAR; DIP{CDR; DUP}; DUP;
+       IF_NONE { CDDR; DUP; CAR; DIP{CDR; DUP}; DUP;
                  CAR; SWAP; DIP{GET}; # Check if an element is available
                  SWAP;
                  # Put NONE on stack and finish
@@ -15,10 +14,11 @@ code { DUP; CAR;
                                 DUP; CAR; PUSH nat 1; ADD; DIP{ CDR }; PAIR; PAIR};
                            PAIR }}
                # Arrange the stack
-               { DIP{DUP; CDAR; DIP{CDDR}; DUP}; SWAP; CAR;
+               { DIP{DUP; CDDAR; DIP{CDDDR}; DUP}; SWAP; CAR;
                  # Add the element to the map
                  DIP{ SOME; SWAP; CDR; DUP; DIP{UPDATE};
                       # Increment the second number
                       PUSH nat 1; ADD};
                  # Cleanup and finish
-                 PAIR; PAIR; NONE string; PAIR }}
+                 PAIR; PAIR; NONE string; PAIR };
+       NIL operation; PAIR}

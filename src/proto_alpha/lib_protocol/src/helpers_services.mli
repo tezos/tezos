@@ -19,19 +19,22 @@ val minimal_time:
 val apply_operation:
   'a #RPC_context.simple ->
   'a -> Block_hash.t -> Operation_hash.t -> MBytes.t -> Signature.t option ->
-  (Contract.t list * Gas.t) shell_tzresult Lwt.t
+  (Contract.t list * internal_operation list * Gas.t) shell_tzresult Lwt.t
 
 val run_code:
   'a #RPC_context.simple ->
   'a -> Script.expr ->
   (Script.expr * Script.expr * Tez.t * Contract.t) ->
-  (Script.expr * Script.expr * Contract.big_map_diff option) shell_tzresult Lwt.t
+  (Script.expr *
+   internal_operation list *
+   Contract.big_map_diff option) shell_tzresult Lwt.t
 
 val trace_code:
   'a #RPC_context.simple ->
   'a -> Script.expr ->
   (Script.expr * Script.expr * Tez.t * Contract.t) ->
-  (Script.expr * Script.expr *
+  (Script.expr *
+   internal_operation list *
    Script_interpreter.execution_trace *
    Contract.big_map_diff option) shell_tzresult Lwt.t
 
@@ -68,6 +71,7 @@ module Forge : sig
       ?sourcePubKey:public_key ->
       counter:int32 ->
       fee:Tez.t ->
+      gas_limit:Z.t ->
       manager_operation list -> MBytes.t shell_tzresult Lwt.t
 
     val reveal:

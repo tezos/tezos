@@ -1,6 +1,5 @@
 parameter unit;
-storage (pair timestamp (pair tez (contract unit unit)));
-return unit;
+storage (pair timestamp (pair tez (contract unit)));
 code { CDR;                      # Ignore the parameter
        DUP;                      # Duplicate the storage
        CAR;                      # Get the timestamp
@@ -14,5 +13,6 @@ code { CDR;                      # Ignore the parameter
        CAR;                      # Get the amount of the transfer on top of the stack
        DIP{CDR};                 # Put the contract underneath it
        UNIT;                     # Put the contract's argument type on top of the stack
-       TRANSFER_TOKENS;          # Make the transfer
+       TRANSFER_TOKENS;          # Emit the transfer
+       NIL operation; SWAP; CONS;# Make a singleton list of internal operations
        PAIR}                     # Pair up to meet the calling convention

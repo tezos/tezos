@@ -1,4 +1,3 @@
 parameter (option string);
-return string;
-storage unit;
-code { CAR; IF_SOME {} {PUSH string ""}; UNIT; SWAP; PAIR}
+storage string;
+code { CAR; IF_SOME {} {PUSH string ""}; NIL operation; PAIR}

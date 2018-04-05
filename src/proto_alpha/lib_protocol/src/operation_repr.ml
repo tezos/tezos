@@ -55,6 +55,7 @@ and sourced_operations =
       fee: Tez_repr.tez ;
       counter: counter ;
       operations: manager_operation list ;
+      gas_limit: Z.t;
     }
   | Dictator_operation of dictator_operation
 
@@ -82,7 +83,6 @@ and manager_operation =
       amount: Tez_repr.tez ;
       parameters: Script_repr.expr option ;
       destination: Contract_repr.contract ;
-      gas_limit: Z.t;
     }
   | Origination of {
       manager: Signature.Public_key_hash.t ;
@@ -91,7 +91,6 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
-      gas_limit: Z.t;
     }
   | Delegation of Signature.Public_key_hash.t option
 
@@ -100,6 +99,12 @@ and dictator_operation =
   | Activate_testchain of Protocol_hash.t
 
 and counter = Int32.t
+
+type internal_operation = {
+  source: Contract_repr.contract ;
+  operation: manager_operation ;
+  signature: Signature.t option
+}
 
 module Encoding = struct
 
@@ -120,49 +125,47 @@ module Encoding = struct
 
   let transaction_encoding =
     describe ~title:"Transaction operation" @@
-    obj5
+    obj4
       (req "kind" (constant "transaction"))
       (req "amount" Tez_repr.encoding)
       (req "destination" Contract_repr.encoding)
       (opt "parameters" Script_repr.expr_encoding)
-      (req "gas_limit" z)
 
   let transaction_case tag =
     case tag ~name:"Transaction" transaction_encoding
       (function
-        | Transaction { amount ; destination ; parameters ; gas_limit } ->
-            Some ((), amount, destination, parameters, gas_limit)
+        | Transaction { amount ; destination ; parameters } ->
+            Some ((), amount, destination, parameters)
         | _ -> None)
-      (fun ((), amount, destination, parameters, gas_limit) ->
-         Transaction { amount ; destination ; parameters ; gas_limit })
+      (fun ((), amount, destination, parameters) ->
+         Transaction { amount ; destination ; parameters })
 
   let origination_encoding =
     describe ~title:"Origination operation" @@
-    (obj8
+    (obj7
        (req "kind" (constant "origination"))
        (req "managerPubkey" Signature.Public_key_hash.encoding)
        (req "balance" Tez_repr.encoding)
        (opt "spendable" bool)
        (opt "delegatable" bool)
        (opt "delegate" Signature.Public_key_hash.encoding)
-       (opt "script" Script_repr.encoding)
-       (req "gas_limit" z))
+       (opt "script" Script_repr.encoding))
 
   let origination_case tag =
     case tag ~name:"Origination" origination_encoding
       (function
         | Origination { manager ; credit ; spendable ;
-                        delegatable ; delegate ; script ; gas_limit } ->
+                        delegatable ; delegate ; script } ->
             Some ((), manager, credit, Some spendable,
-                  Some delegatable, delegate, script, gas_limit)
+                  Some delegatable, delegate, script)
         | _ -> None)
-      (fun ((), manager, credit, spendable, delegatable, delegate, script, gas_limit) ->
+      (fun ((), manager, credit, spendable, delegatable, delegate, script) ->
          let delegatable =
            match delegatable with None -> true | Some b -> b in
          let spendable =
            match spendable with None -> true | Some b -> b in
          Origination
-           {manager ; credit ; spendable ; delegatable ; delegate ; script ; gas_limit })
+           {manager ; credit ; spendable ; delegatable ; delegate ; script })
 
   let delegation_encoding =
     describe ~title:"Delegation operation" @@
@@ -177,7 +180,7 @@ module Encoding = struct
       (fun ((), key) -> Delegation key)
 
   let manager_kind_encoding =
-    obj5
+    obj6
       (req "kind" (constant "manager"))
       (req "source" Contract_repr.encoding)
       (req "fee" Tez_repr.encoding)
@@ -189,15 +192,16 @@ module Encoding = struct
               origination_case (Tag 2) ;
               delegation_case (Tag 3) ;
             ])))
+      (req "gas_limit" z)
 
   let manager_kind_case tag =
     case tag ~name:"Manager operations" manager_kind_encoding
       (function
-        | Manager_operations { source; fee ; counter ;operations } ->
-            Some ((), source, fee, counter, operations)
+        | Manager_operations { source; fee ; counter ; operations ; gas_limit } ->
+            Some ((), source, fee, counter, operations, gas_limit)
         | _ -> None)
-      (fun ((), source, fee, counter, operations) ->
-         Manager_operations { source; fee ; counter ; operations })
+      (fun ((), source, fee, counter, operations, gas_limit) ->
+         Manager_operations { source; fee ; counter ; operations ; gas_limit })
 
   let endorsement_encoding =
     (* describe ~title:"Endorsement operation" @@ *)
@@ -416,6 +420,20 @@ module Encoding = struct
       Operation.shell_header_encoding
       proto_operation_encoding
 
+  let internal_operation_encoding =
+    conv
+      (fun { source ; operation ; signature } -> ((source, signature), operation))
+      (fun ((source, signature), operation) -> { source ; operation ; signature })
+      (merge_objs
+         (obj2
+            (req "source" Contract_repr.encoding)
+            (opt "signature" Signature.encoding))
+         (union ~tag_size:`Uint8 [
+             reveal_case (Tag 0) ;
+             transaction_case (Tag 1) ;
+             origination_case (Tag 2) ;
+             delegation_case (Tag 3) ;
+           ]))
 end
 
 type error += Cannot_parse_operation

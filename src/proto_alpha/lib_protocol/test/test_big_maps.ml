@@ -31,13 +31,12 @@ let parse_script code_str storage_str : Proto_alpha.Alpha_context.Script.t tzres
 let code = {|
 { parameter (list (pair string int)) ;
   storage (pair (big_map string int) unit) ;
-  return unit ;
   code { UNPAAIAIR ;
          ITER { UNPAIR ; DUUUP ; DUUP; GET ;
                 IF_NONE { PUSH int 0 } {} ;
                 SWAP ; DIP { ADD ; SOME } ;
                 UPDATE } ;
-         PAIR ; UNIT ; PAIR } }
+         PAIR ; NIL operation ; PAIR } }
 |}
 
 let storage = {| Pair { Elt "A" 1 ; Elt "B" 2 } Unit |}
@@ -56,11 +55,13 @@ let expect_big_map tc contract print_key key_type print_data data_type contents 
            debug " - big_map[%a] is not defined (error)" print_key n ;
            Helpers_assert.fail_msg "Wrong big map contents"
        | Some data, None ->
-           Proto_alpha.Script_ir_translator.parse_data tc data_type (Micheline.root data) >>=? fun (data, _tc) ->
+           Proto_alpha.Script_ir_translator.parse_data tc ~check_operations: false
+             data_type (Micheline.root data) >>=? fun (data, _tc) ->
            debug " - big_map[%a] = %a (error)" print_key n print_data data ;
            Helpers_assert.fail_msg "Wrong big map contents"
        | Some data, Some exp ->
-           Proto_alpha.Script_ir_translator.parse_data tc data_type (Micheline.root data) >>=? fun (data, _tc) ->
+           Proto_alpha.Script_ir_translator.parse_data tc ~check_operations: false
+             data_type (Micheline.root data) >>=? fun (data, _tc) ->
            debug " - big_map[%a] = %a (expected %a)" print_key n print_data data print_data exp ;
            Helpers_assert.equal data exp ;
            return ())

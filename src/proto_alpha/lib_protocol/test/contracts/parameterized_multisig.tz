@@ -1,7 +1,6 @@
-storage (pair (map nat (pair bool bool)) (pair key key));
-return bool;
+storage (pair bool (pair (map nat (pair bool bool)) (pair key key)));
 parameter (or nat (pair signature nat));
-code { DUP; CAR; DIP{CDR};       # Stack rangling
+code { DUP; CAR; DIP{CDDR};       # Stack rangling
        IF_LEFT { DIP{DUP; CAR}; GET; # Get the value stored for that index
                  IF_NONE { PUSH bool False} # If not referenced, reject
                          { DUP; CAR; DIP{CDR}; AND};
@@ -21,4 +20,5 @@ code { DUP; CAR; DIP{CDR};       # Stack rangling
                            CAR; PUSH bool True; SWAP; PAIR; SOME; SWAP}
                          {FAIL}};
                  # Update the stored value and finish off
-                 UPDATE; PAIR; PUSH bool False; PAIR}}
+                 UPDATE; PAIR; PUSH bool False; PAIR};
+       NIL operation; PAIR }

@@ -1,4 +1,3 @@
 parameter (pair bool bool);
-return (pair bool bool);
-storage unit;
-code {}
+storage (option (pair bool bool));
+code {CAR; SOME; NIL operation; PAIR}

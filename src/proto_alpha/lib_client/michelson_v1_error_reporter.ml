@@ -77,9 +77,7 @@ let collect_error_locations errs =
         | Bad_return (loc, _, _)
         | Bad_stack (loc, _, _, _)
         | Unmatched_branches (loc, _, _)
-        | Transfer_in_lambda loc
         | Self_in_lambda loc
-        | Transfer_in_dip loc
         | Invalid_constant (loc, _, _)
         | Invalid_contract (loc, _)
         | Comparable_type_expected (loc, _)
@@ -357,14 +355,6 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 "@[<v 2>%atype size (%d) exceeded maximum type size (%d)."
                 print_loc loc
                 size maximum_size
-          | Transfer_in_lambda loc ->
-              Format.fprintf ppf
-                "%aThe TRANSFER_TOKENS instruction cannot appear in a lambda."
-                print_loc loc
-          | Transfer_in_dip loc ->
-              Format.fprintf ppf
-                "%aThe TRANSFER_TOKENS instruction cannot appear within a DIP."
-                print_loc loc
           | Self_in_lambda loc ->
               Format.fprintf ppf
                 "%aThe SELF instruction cannot appear in a lambda."

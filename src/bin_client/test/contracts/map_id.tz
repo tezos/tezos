@@ -1,4 +1,3 @@
 parameter (map nat nat);
-return (map nat nat);
-storage unit;
-code {}
+storage (map nat nat);
+code { CAR ; NIL operation ; PAIR }

@@ -1,6 +1,7 @@
 parameter unit;
-storage (pair (contract unit unit) (contract unit unit));
-return unit;
+storage (pair (contract unit) (contract unit));
 code { CDR; DUP; CAR; PUSH tez "5.00"; UNIT;
-       TRANSFER_TOKENS; DROP; DUP; CDR;
-       PUSH tez "5.00"; UNIT; TRANSFER_TOKENS; PAIR };
+       TRANSFER_TOKENS;
+       DIP {DUP; CDR;
+            PUSH tez "5.00"; UNIT; TRANSFER_TOKENS};
+       DIIP{NIL operation};DIP{CONS};CONS;PAIR};
