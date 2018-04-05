@@ -156,9 +156,6 @@ module type SIGNATURE = sig
 
     type t
 
-    val hash_bytes: ?key:MBytes.t -> MBytes.t list -> t
-    val hash_string: ?key:string -> string list -> t
-
     val pp: Format.formatter -> t -> unit
     val pp_short: Format.formatter -> t -> unit
     include Compare.S with type t := t

@@ -46,8 +46,8 @@ let given_secret =
     "c5422e3864b9e6c5260e2aac76ea0f3d28d4fff7"
 
 let expected_blinded_pkh =
-  Blinded_public_key_hash.of_hex
-    "4a6af2f5c466bf0a7a1001a1e9468cbfca82cef6"
+  Blinded_public_key_hash.of_b58check_exn
+    "btz1T77Ly5U1bWNBR5KzDSgNFST5Bh5F1eB6g"
 
 let expected_amount =
   match Tez.of_mutez 1868898542104130027L with

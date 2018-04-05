@@ -12,7 +12,9 @@ type t
 val encoding : t Data_encoding.t
 
 val of_ed25519_pkh : Ed25519.Public_key_hash.t -> t
-val of_hex : string -> t
+
+val to_b58check : t -> string
+val of_b58check_exn : string -> t
 
 module Index : sig
   type nonrec t = t

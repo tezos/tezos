@@ -14,12 +14,29 @@ let size = Ed25519.Public_key_hash.size / 2
 let of_ed25519_pkh pkh =
   MBytes.sub (Ed25519.Public_key_hash.to_bytes pkh) 0 size
 
-let encoding = Data_encoding.Fixed.bytes size
+let zero = MBytes.of_string (String.make size '\000')
 
-let of_hex h =
-  if Compare.Int.(String.length h <> size * 2) then
-    invalid_arg "Blinded_public_key_hash.of_hex" ;
-  MBytes.of_hex (`Hex h)
+let to_b58check s =
+  Ed25519.Public_key_hash.to_b58check
+    (Ed25519.Public_key_hash.of_bytes_exn
+       (MBytes.concat s zero))
+
+let of_b58check_exn s =
+  let pkh = Ed25519.Public_key_hash.of_b58check_exn s in
+  let padding = MBytes.sub (Ed25519.Public_key_hash.to_bytes pkh) size size in
+  if MBytes.(<>) zero padding then
+    failwith "invalid Base58Check-encoded unclaimed public-key hash" ;
+  of_ed25519_pkh pkh
+
+let encoding =
+  let open Data_encoding in
+  splitted
+    ~binary:(Fixed.bytes size)
+    ~json:
+      (conv
+         to_b58check
+         of_b58check_exn
+         string)
 
 module Index = struct
 
