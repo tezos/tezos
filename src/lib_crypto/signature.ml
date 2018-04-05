@@ -486,18 +486,12 @@ let algo_param () =
     end
 
 let generate_key ?(algo = Ed25519) ?seed () =
-  match algo, seed with
-  | Secp256k1, Some _ ->
-      invalid_arg "Signature.generate_key"
-  | Secp256k1, None ->
-      let (pkh, pk, sk) = Secp256k1.generate_key () in
+  match algo with
+  | Secp256k1 ->
+      let pkh, pk, sk = Secp256k1.generate_key ?seed () in
       (Public_key_hash.Secp256k1 pkh,
        Public_key.Secp256k1 pk, Secret_key.Secp256k1 sk)
-  | Ed25519, seed ->
-      let seed =
-        match seed with
-        | None -> Ed25519.Seed.generate ()
-        | Some seed -> seed in
-      let (pkh, pk, sk) = Ed25519.generate_seeded_key seed in
+  | Ed25519 ->
+      let pkh, pk, sk = Ed25519.generate_key ?seed () in
       (Public_key_hash.Ed25519 pkh,
        Public_key.Ed25519 pk, Secret_key.Ed25519 sk)

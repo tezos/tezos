@@ -113,7 +113,7 @@ val append :
 val gen_keys :
   ?force:bool ->
   ?algo:Signature.algo ->
-  ?seed:Ed25519.Seed.t ->
+  ?seed:MBytes.t ->
   #Client_context.io_wallet -> string -> unit tzresult Lwt.t
 
 val register_key :

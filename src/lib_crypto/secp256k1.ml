@@ -245,9 +245,9 @@ let sign sk msg =
 let check public_key signature msg =
   Sign.verify_exn context ~pk:public_key ~msg ~signature
 
-let generate_key () =
-  let sk = Key.read_sk_exn context (Rand.generate 32) in
+let generate_key ?(seed=Rand.generate 32) () =
+  let sk = Key.read_sk_exn context seed in
   let pk = Key.neuterize_exn context sk in
   let pkh = Public_key.hash pk in
-  (pkh, pk, sk)
+  pkh, pk, sk
 

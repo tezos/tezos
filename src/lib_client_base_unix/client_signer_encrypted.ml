@@ -46,7 +46,7 @@ module Encrypted_signer : SIGNER = struct
   let rec decrypt_sk sk salt = function
     | [] -> None
     | password :: pws ->
-        let key = Crypto_box.Secretbox.of_bytes_exn (pbkdf ~password ~salt) in
+        let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~password ~salt) in
         match Crypto_box.Secretbox.box_open key sk nonce with
         | None -> decrypt_sk sk salt pws
         | Some sk -> Some sk
@@ -63,7 +63,7 @@ module Encrypted_signer : SIGNER = struct
     cctxt#prompt_password "Enter password for encrypted key %s: " name >>= fun password ->
     let password = MBytes.of_string password in
     let key = pbkdf ~salt ~password in
-    let key = Crypto_box.Secretbox.of_bytes_exn key in
+    let key = Crypto_box.Secretbox.unsafe_of_bytes key in
     match Crypto_box.Secretbox.box_open key skenc nonce with
     | None -> passwd_ask_loop cctxt ~name ~salt ~skenc
     | Some decrypted_sk ->
@@ -111,7 +111,7 @@ module Encrypted_signer : SIGNER = struct
     input_new_passphrase cctxt >>=? fun password ->
     let password = MBytes.of_string password in
     let salt = Rand.generate salt_len in
-    let key = Crypto_box.Secretbox.of_bytes_exn (pbkdf ~password ~salt) in
+    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~password ~salt) in
     let msg = Data_encoding.Binary.to_bytes Signature.Secret_key.encoding sk in
     let encrypted_passwd = Crypto_box.Secretbox.box key msg nonce in
     let payload = MBytes.(to_string (concat "" [salt; encrypted_passwd])) in

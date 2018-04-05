@@ -207,9 +207,8 @@ let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt 
               (fun key -> try ignore (Re.Str.search_forward re key 0); true
                 with Not_found -> false) in
           let rec loop attempts =
-            let seed = Ed25519.Seed.generate () in
             let public_key_hash, public_key, secret_key =
-              Signature.generate_key ~seed () in
+              Signature.generate_key () in
             let hash = Signature.Public_key_hash.to_b58check @@
               Signature.Public_key.hash public_key in
             if matches hash

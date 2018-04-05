@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let generate = Tweetnacl.Rand.gen
+let generate = Hacl.Rand.gen
 
 let generate_into ?(pos=0) ?len buf =
   let buflen = MBytes.length buf in
@@ -18,4 +18,4 @@ let generate_into ?(pos=0) ?len buf =
     invalid_arg (Printf.sprintf "Rand.generate_into: \
                                  invalid slice (pos=%d len=%d)" pos len) ;
   let buf = MBytes.sub buf pos len in
-  Tweetnacl.Rand.write buf
+  Hacl.Rand.write buf

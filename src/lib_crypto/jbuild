@@ -17,7 +17,7 @@
               lwt
               nocrypto
               blake2
-              tweetnacl
+              hacl
               secp256k1
               zarith))))
 

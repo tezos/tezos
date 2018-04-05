@@ -17,7 +17,7 @@ depends: [
   "lwt"
   "nocrypto"
   "blake2"
-  "tweetnacl"
+  "hacl"
   "zarith"
   "secp256k1"
   "alcotest" { test & >= "0.8.3" }

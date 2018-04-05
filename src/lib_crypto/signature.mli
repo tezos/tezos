@@ -41,5 +41,5 @@ val algo_param: unit -> (algo, 'a) Clic.parameter
 
 val generate_key:
   ?algo:algo ->
-  ?seed:Ed25519.Seed.t ->
+  ?seed:MBytes.t ->
   unit -> public_key_hash * public_key * secret_key
