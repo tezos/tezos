@@ -14,5 +14,6 @@
     "blocks_per_cycle" : 128,
     "blocks_per_roll_snapshot" : 32,
     "preserved_cycles" : 1,
-    "first_free_baking_slot" : 4
+    "first_free_baking_slot" : 4,
+    "proof_of_work_threshold": -1
 }

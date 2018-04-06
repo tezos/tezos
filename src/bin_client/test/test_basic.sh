@@ -21,6 +21,7 @@ $client rpc call '/blocks/head/raw_context/non-existent?depth=0' | assert 'No se
 
 
 $client bake for bootstrap1 -max-priority 512
+sleep 1
 
 key1=foo
 key2=bar

@@ -13,5 +13,6 @@
     "blocks_per_roll_snapshot" : 2,
     "preserved_cycles" : 1,
     "first_free_baking_slot" : 4,
-    "blocks_per_voting_period": 2
+    "blocks_per_voting_period": 2,
+    "proof_of_work_threshold": -1
 }

@@ -249,7 +249,7 @@ let first_endorsement_slots
 let check_hash hash stamp_threshold =
   let bytes = Block_hash.to_bytes hash in
   let word = MBytes.get_int64 bytes 0 in
-  Compare.Uint64.(word < stamp_threshold)
+  Compare.Uint64.(word <= stamp_threshold)
 
 let check_header_hash header stamp_threshold =
   let hash = Block_header.hash header in
