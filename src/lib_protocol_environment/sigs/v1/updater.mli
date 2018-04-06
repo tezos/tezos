@@ -155,11 +155,12 @@ module type PROTOCOL = sig
   (** The list of remote procedures exported by this implementation *)
   val rpc_services: rpc_context Lwt.t RPC_directory.t
 
-  (** An ad-hoc context patcher. It used only for debugging protocol
-      while running in the "sandbox" mode. This function is never used
-      in production. *)
-  val configure_sandbox:
-    Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
+  (** Initialize the context (or upgrade the context after a protocol
+      amendment). This function receives the context resulting of the
+      application of a block that triggered the amendment. It also
+      receives the header of the block that triggered the amendment. *)
+  val init:
+    Context.t -> Block_header.shell_header -> validation_result tzresult Lwt.t
 
 end
 

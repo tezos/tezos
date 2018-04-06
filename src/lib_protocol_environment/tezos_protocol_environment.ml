@@ -93,8 +93,8 @@ module Make (Context : CONTEXT) = struct
     val finalize_block:
       validation_state -> validation_result tzresult Lwt.t
     val rpc_services: rpc_context Lwt.t RPC_directory.t
-    val configure_sandbox:
-      context -> Data_encoding.json option -> context tzresult Lwt.t
+    val init:
+      context -> Block_header.shell_header -> validation_result tzresult Lwt.t
   end
 
   module type PROTOCOL =
@@ -581,8 +581,7 @@ module Make (Context : CONTEXT) = struct
         apply_operation c o >|= wrap_error
       let finalize_block c = finalize_block c >|= wrap_error
       let parse_operation h b = parse_operation h b |> wrap_error
-      let configure_sandbox c j =
-        configure_sandbox c j >|= wrap_error
+      let init c bh = init c bh >|= wrap_error
     end
 
     class ['block] proto_rpc_context

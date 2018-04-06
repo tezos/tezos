@@ -14,7 +14,8 @@ open Alpha_context
 let sourced ops = Sourced_operations ops
 
 let manager (src : Helpers_account.t) ?(fee = Tez.zero) operations context =
-  Alpha_context.init ~level:0l ~timestamp:(Time.now ()) ~fitness:[] context >>=? fun context ->
+  Alpha_context.prepare
+    ~level:0l ~timestamp:(Time.now ()) ~fitness:[] context >>=? fun context ->
   Contract.get_counter context src.contract >>=? fun counter ->
   let counter = Int32.succ counter in
   return @@

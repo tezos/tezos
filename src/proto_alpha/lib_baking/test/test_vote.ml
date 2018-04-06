@@ -78,7 +78,6 @@ let run_change_to_demo_proto block
   (* Mine blocks to switch to end the vote cycle (back to Proposal) *)
   Format.eprintf "Switching to `demo` protocol@.";
   Baking.bake (`Hash (head, 0)) b4 operations >>=? fun head ->
-  Baking.bake (`Hash (head, 0)) b5 [] >>=? fun head ->
 
   Assert.check_protocol
     ~msg:__LOC__ ~block:(`Hash (head, 0)) demo_protocol >>=? fun () ->

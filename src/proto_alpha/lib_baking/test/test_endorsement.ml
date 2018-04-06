@@ -199,7 +199,7 @@ let test_endorsement_rights contract block =
 
 let run genesis =
 
-  Helpers.Baking.bake genesis b1 [] >>=? fun blk ->
+  Helpers.Baking.bake genesis b2 [] >>=? fun blk ->
 
   let block = `Hash (blk, 0) in
   test_endorsement_rights
@@ -211,9 +211,9 @@ let run genesis =
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse true ;
 
   Assert.balance_equal
-    ~block:block ~msg:__LOC__ b1 3_999_488_000_000L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b1 4_000_000_000_000L >>=? fun () ->
   Assert.balance_equal
-    ~block:block ~msg:__LOC__ b2 4_000_000_000_000L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b2 3_999_488_000_000L >>=? fun () ->
   Assert.balance_equal
     ~block:block ~msg:__LOC__ b3 4_000_000_000_000L >>=? fun () ->
   Assert.balance_equal

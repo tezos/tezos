@@ -26,21 +26,18 @@ let run blkid =
   in
 
   (* files and directories that are in context *)
-  let version = Key (MBytes.of_hex (`Hex "67656e65736973")) in
-  let genesis_key = Key (MBytes.of_hex (`Hex "68b4bf512517497dbd944de6825ab0a0fed7ff51bdd6b77596a19cc9175ddd55")) in
+  let version = Key (MBytes.of_hex (`Hex "616c706861")) in
   let dir_depth0 = Cut in
-  let dir_depth1 = Dir [("genesis_key", Cut);
-                        ("v1", Cut);
-                        ("version", Cut)] in
-  let dir_depth2 = Dir [("genesis_key", genesis_key);
-                        ("v1", Dir [("sandboxed",Cut)]);
-                        ("version", version)] in
+  let dir_depth2 = Dir [("02", Dir [("29", Cut)]);
+                        ("a9", Dir [("ce", Cut)]);
+                        ("c5", Dir [("5c", Cut)]);
+                        ("da", Dir [("c9", Cut)]);
+                        ("e7", Dir [("67", Cut)]);
+                       ] in
 
   let tests = [(("version",1), is_equal version);
                (("",0), is_equal dir_depth0);
-               (("",1), is_equal dir_depth1);
-               (("",2), is_equal dir_depth2);
-               (("",2), is_equal dir_depth2);
+               (("delegates",2), is_equal dir_depth2);
                (("",-1), is_not_found);
                (("not-existent",1), is_not_found);
                (("not-existent",0), is_not_found);

@@ -241,14 +241,18 @@ let constants_encoding =
            ))
         unit)
 
-type error += Constant_read of exn
+type error += Constant_read of string
 
 let read = function
   | None ->
       return default
   | Some json ->
       match Data_encoding.Json.(destruct constants_encoding json) with
-      | exception exn -> fail (Constant_read exn)
+      | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
+          Format.kasprintf
+            failwith "Invalid sandbox: %a %a"
+            (fun ppf -> Data_encoding.Json.print_error ppf) exn
+            Data_encoding.Json.pp json
       | c ->
           if Compare.Int32.(c.blocks_per_roll_snapshot > c.blocks_per_cycle) then
             failwith "Invalid sandbox: 'blocks_per_roll_snapshot > blocks_per_cycle'"

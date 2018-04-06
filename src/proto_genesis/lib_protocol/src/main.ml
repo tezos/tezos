@@ -109,7 +109,7 @@ let begin_application
     ~predecessor_timestamp:_
     ~predecessor_fitness:_
     raw_block =
-  Data.Init.may_initialize ctxt >>=? fun ctxt ->
+  Data.Init.check_inited ctxt >>=? fun () ->
   Lwt.return (parse_block raw_block) >>=? fun block ->
   check_signature ctxt block >>=? fun () ->
   prepare_application ctxt block.command
@@ -136,7 +136,7 @@ let begin_construction
       match Data_encoding.Binary.of_bytes Data.Command.encoding command with
       | None -> failwith "Failed to parse proto header"
       | Some command ->
-          Data.Init.may_initialize ctxt >>=? fun ctxt ->
+          Data.Init.check_inited ctxt >>=? fun () ->
           prepare_application ctxt command level timestamp fitness
 
 let apply_operation _vctxt _ =
@@ -146,4 +146,31 @@ let finalize_block state = return state
 
 let rpc_services = Services.rpc_services
 
-let configure_sandbox = Data.Init.configure_sandbox
+(* temporary hardcoded key to be removed... *)
+let sandbox_param_key = [ "sandbox_parameter" ]
+let get_sandbox_param ctxt =
+  Context.get ctxt sandbox_param_key >>= function
+  | None -> return None
+  | Some bytes ->
+      match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
+      | None ->
+          failwith "Internal error: failed to parse the sandbox parameter."
+      | Some json -> return (Some json)
+
+let init ctxt block_header =
+  Data.Init.tag_first_block ctxt >>=? fun ctxt ->
+  get_sandbox_param ctxt >>=? fun sandbox_param ->
+  begin
+    match sandbox_param with
+    | None -> return ctxt
+    | Some json ->
+        Data.Pubkey.may_change_default ctxt json >>= fun ctxt ->
+        return ctxt
+  end >>=? fun ctxt ->
+  return { Updater.message = None ; context = ctxt ;
+           fitness = block_header.Block_header.fitness ;
+           max_operations_ttl = 0 ;
+           max_operation_data_length = 0 ;
+           last_allowed_fork_level = block_header.level ;
+         }
+

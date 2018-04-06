@@ -11,12 +11,11 @@ activate_alpha
 sleep 2
 
 #tests for the rpc service raw_context
-$client rpc call '/blocks/head/raw_context/version' | assert '{ "content": "67656e65736973" }'
+$client rpc call '/blocks/head/raw_context/version' | assert '{ "content": "616c706861" }'
 $client rpc call '/blocks/head/raw_context/non-existent' | assert 'No service found at this URL'
-$client rpc call '/blocks/head/raw_context?depth=2' | assert '{ "content":
-    { "genesis_key":
-        "68b4bf512517497dbd944de6825ab0a0fed7ff51bdd6b77596a19cc9175ddd55",
-      "v1": { "sandboxed": null }, "version": "67656e65736973" } }'
+$client rpc call '/blocks/head/raw_context/delegates/?depth=2' | assert '{ "content":
+    { "02": { "29": null }, "a9": { "ce": null }, "c5": { "5c": null },
+      "da": { "c9": null }, "e7": { "67": null } } }'
 $client rpc call '/blocks/head/raw_context/non-existent?depth=-1' | assert 'No service found at this URL'
 $client rpc call '/blocks/head/raw_context/non-existent?depth=0' | assert 'No service found at this URL'
 

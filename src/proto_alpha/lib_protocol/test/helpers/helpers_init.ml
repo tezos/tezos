@@ -21,7 +21,9 @@ let get_sandbox () =
 let main () =
   let context = Tezos_protocol_environment_memory.Context.empty in
   get_sandbox () >>= fun json ->
-  Main.configure_sandbox context @@ Some json >>=? fun context ->
+  Tezos_protocol_environment_memory.Context.set context
+    ["sandbox_parameter"]
+    (Data_encoding.Binary.to_bytes Data_encoding.json json) >>= fun context ->
   let genesis_hash =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU" in
@@ -40,18 +42,9 @@ let main () =
       Alpha_context.Block_header.protocol_data_encoding
       (Helpers_block.get_protocol_data 0 true) in
   let tezos_header = { Block_header.shell = header ; protocol_data } in
-  Proto_alpha.Main.begin_construction
-    ~predecessor_context: context
-    ~predecessor_fitness:[]
-    ~predecessor_timestamp:Time.epoch
-    ~predecessor_level: 0l
-    ~predecessor: genesis_hash
-    ~timestamp: header.timestamp
-    ~protocol_data
-    () >>=? fun vstate ->
+  Proto_alpha.init context header >>=? fun validation ->
   let hash = Block_header.hash tezos_header in
-  Proto_alpha.Main.finalize_block vstate >>=? fun validation ->
-  Alpha_context.init
+  Alpha_context.prepare
     ~level: (Int32.succ header.level)
     ~timestamp: header.timestamp
     ~fitness: header.fitness

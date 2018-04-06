@@ -35,16 +35,19 @@ val prepare:
   level: Int32.t ->
   timestamp: Time.t ->
   fitness: Fitness.t ->
-  Context.t -> (context * bool) tzresult Lwt.t
+  Context.t -> context tzresult Lwt.t
+
+val prepare_first_block:
+  level:int32 ->
+  timestamp:Time.t ->
+  fitness:Fitness.t ->
+  Context.t -> context tzresult Lwt.t
 
 val activate: context -> Protocol_hash.t -> t Lwt.t
 val fork_test_chain: context -> Protocol_hash.t -> Time.t -> t Lwt.t
 
 val register_resolvers:
   'a Base58.encoding -> (context -> string -> 'a list Lwt.t) -> unit
-
-val configure_sandbox:
-  Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 
 (** Returns the state of the database resulting of operations on its
     abstract view *)

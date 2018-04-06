@@ -113,7 +113,7 @@ module Baker = struct
       return (level.level, prio)
 
     let baking_rights ctxt () max =
-      let level = Level.current ctxt in
+      let level = Level.succ ctxt (Level.current ctxt) in
       baking_rights_for_level ctxt level max >>=? fun (raw_level, slots) ->
       begin
         Lwt_list.filter_map_p (fun x -> x) @@
@@ -130,7 +130,7 @@ module Baker = struct
     let baking_rights_for_delegate
         ctxt contract () (max_priority, min_level, max_level) =
       let max_priority = default_max_baking_priority ctxt max_priority in
-      let current_level = Level.current ctxt in
+      let current_level = Level.succ ctxt (Level.current ctxt) in
       let min_level = match min_level with
         | None -> current_level
         | Some l -> Level.from_raw ctxt l in
@@ -276,7 +276,7 @@ module Endorser = struct
       let current_level = Level.current ctxt in
       let max_priority = default_max_endorsement_priority ctxt max_priority in
       let min_level = match min_level with
-        | None -> Level.succ ctxt current_level
+        | None -> current_level
         | Some l -> Level.from_raw ctxt l in
       let max_level =
         match max_level with

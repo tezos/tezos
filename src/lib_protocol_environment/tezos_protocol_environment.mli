@@ -86,8 +86,8 @@ module Make (Context : CONTEXT) : sig
     val finalize_block:
       validation_state -> validation_result tzresult Lwt.t
     val rpc_services: rpc_context Lwt.t RPC_directory.t
-    val configure_sandbox:
-      context -> Data_encoding.json option -> context tzresult Lwt.t
+    val init:
+      context -> Block_header.shell_header -> validation_result tzresult Lwt.t
   end
 
   module type PROTOCOL =

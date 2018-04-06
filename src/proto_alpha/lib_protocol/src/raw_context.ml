@@ -120,22 +120,12 @@ let storage_error err = fail (Storage_error err)
 let version_key = ["version"]
 let version_value = "alpha"
 
-let is_first_block ctxt =
-  Context.get ctxt version_key >>= function
-  | None ->
-      return true
-  | Some bytes ->
-      let s = MBytes.to_string bytes in
-      if Compare.String.(s = version_value) then
-        return false
-      else if Compare.String.(s = "genesis") then
-        return true
-      else
-        storage_error (Incompatible_protocol_version s)
-
 let version = "v1"
 let first_level_key = [ version ; "first_level" ]
-let sandboxed_key = [ version ; "sandboxed" ]
+let constants_key = [ version ; "constants" ]
+
+(* temporary hardcoded key to be removed... *)
+let sandbox_param_key = [ "sandbox_parameter" ]
 
 let get_first_level ctxt =
   Context.get ctxt first_level_key >>= function
@@ -171,35 +161,49 @@ let () =
     (function Failed_to_parse_sandbox_parameter data -> Some data | _ -> None)
     (fun data -> Failed_to_parse_sandbox_parameter data)
 
-let get_sandboxed c =
-  Context.get c sandboxed_key >>= function
+let get_sandbox_param c =
+  Context.get c sandbox_param_key >>= function
   | None -> return None
   | Some bytes ->
       match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
       | None -> fail (Failed_to_parse_sandbox_parameter bytes)
       | Some json -> return (Some json)
 
-let set_sandboxed c json =
-  Context.set c sandboxed_key
-    (Data_encoding.Binary.to_bytes Data_encoding.json json)
+let set_constants ctxt constants =
+  let bytes =
+    Data_encoding.Binary.to_bytes
+      Constants_repr.constants_encoding constants in
+  Context.set ctxt constants_key bytes
 
-let may_tag_first_block ctxt level =
-  is_first_block ctxt >>=? function
-  | false ->
-      get_first_level ctxt >>=? fun level ->
-      return (ctxt, false, level)
-  | true ->
-      Context.set ctxt version_key
-        (MBytes.of_string version_value) >>= fun ctxt ->
-      set_first_level ctxt level >>=? fun ctxt ->
-      return (ctxt, true, level)
+let get_constants ctxt =
+  Context.get ctxt constants_key >>= function
+  | None ->
+      failwith "Internal error: cannot read constants in context."
+  | Some bytes ->
+      match
+        Data_encoding.Binary.of_bytes Constants_repr.constants_encoding bytes
+      with
+      | None ->
+          failwith "Internal error: cannot parse constants in context."
+      | Some constants -> return constants
+
+let check_inited ctxt =
+  Context.get ctxt version_key >>= function
+  | None ->
+      failwith "Internal error: un-initialized context."
+  | Some bytes ->
+      let s = MBytes.to_string bytes in
+      if Compare.String.(s = version_value) then
+        return ()
+      else
+        storage_error (Incompatible_protocol_version s)
 
 let prepare ~level ~timestamp ~fitness ctxt =
-  Lwt.return (Raw_level_repr.of_int32 level ) >>=? fun level ->
+  Lwt.return (Raw_level_repr.of_int32 level) >>=? fun level ->
   Lwt.return (Fitness_repr.to_int64 fitness) >>=? fun fitness ->
-  may_tag_first_block ctxt level >>=? fun (ctxt, first_block, first_level) ->
-  get_sandboxed ctxt >>=? fun sandbox ->
-  Constants_repr.read sandbox >>=? fun constants ->
+  check_inited ctxt >>=? fun () ->
+  get_constants ctxt >>=? fun constants ->
+  get_first_level ctxt >>=? fun first_level ->
   let level =
     Level_repr.from_raw
       ~first_level
@@ -207,11 +211,34 @@ let prepare ~level ~timestamp ~fitness ctxt =
       ~blocks_per_voting_period:constants.Constants_repr.blocks_per_voting_period
       ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
       level in
-  return ({ context = ctxt ; constants ; level ;
-            timestamp ; fitness ; first_level ;
-            endorsements_received = Int_set.empty ;
-          },
-          first_block)
+  return {
+    context = ctxt ; constants ; level ;
+    timestamp ; fitness ; first_level ;
+    endorsements_received = Int_set.empty ;
+  }
+
+let check_first_block ctxt =
+  Context.get ctxt version_key >>= function
+  | None -> return ()
+  | Some bytes ->
+      let s = MBytes.to_string bytes in
+      if Compare.String.(s = version_value) then
+        failwith "Internal error: previously initialized context."
+      else if Compare.String.(s = "genesis") then
+        return ()
+      else
+        storage_error (Incompatible_protocol_version s)
+
+let prepare_first_block ~level ~timestamp ~fitness ctxt =
+  check_first_block ctxt >>=? fun () ->
+  Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
+  get_sandbox_param ctxt >>=? fun sandbox_param ->
+  Constants_repr.read sandbox_param >>=? fun constants ->
+  Context.set ctxt version_key
+    (MBytes.of_string version_value) >>= fun ctxt ->
+  set_first_level ctxt first_level >>=? fun ctxt ->
+  set_constants ctxt constants >>= fun ctxt ->
+  prepare ctxt ~level ~timestamp ~fitness
 
 let activate ({ context = c ; _ } as s) h =
   Updater.activate c h >>= fun c -> Lwt.return { s with context = c }
@@ -232,45 +259,6 @@ let register_resolvers enc resolve =
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve
-
-type error += Unimplemented_sandbox_migration
-
-let configure_sandbox ctxt json =
-  let rec json_equals x y = match x, y with
-    | `Float x, `Float y -> Compare.Float.(x = y)
-    | `Bool x, `Bool y -> Compare.Bool.(x = y)
-    | `String x, `String y -> Compare.String.(x = y)
-    | `Null, `Null -> true
-    | `O x, `O y ->
-        let sort =
-          List.sort (fun (a, _) (b, _) -> Compare.String.compare a b) in
-        Compare.Int.(=) (List.length x) (List.length y) &&
-        List.for_all2
-          (fun (nx, vx) (ny, vy) ->
-             Compare.String.(nx = ny) && json_equals vx vy)
-          (sort x) (sort y)
-    | `A x, `A y ->
-        Compare.Int.(=) (List.length x) (List.length y) &&
-        List.for_all2 json_equals x y
-    | _, _ -> false
-  in
-  let json =
-    match json with
-    | None -> `O []
-    | Some json -> json in
-  is_first_block ctxt >>=? function
-  | true ->
-      set_sandboxed ctxt json >>= fun ctxt ->
-      return ctxt
-  | false ->
-      get_sandboxed ctxt >>=? function
-      | None ->
-          fail Unimplemented_sandbox_migration
-      | Some existing ->
-          if json_equals existing json then
-            return ctxt
-          else
-            failwith "Changing sandbox parameter is not yet implemented"
 
 (* Generic context ********************************************************)
 

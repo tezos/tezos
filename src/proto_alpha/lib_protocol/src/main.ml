@@ -69,7 +69,7 @@ let begin_application
   let level = block_header.shell.level in
   let fitness = pred_fitness in
   let timestamp = block_header.shell.timestamp in
-  Alpha_context.init ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
+  Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
     ctxt block_header pred_timestamp >>=? fun (ctxt, baker, deposit) ->
   let mode = Application { block_header ; baker = Ed25519.Public_key.hash baker } in
@@ -88,7 +88,7 @@ let begin_construction
     () =
   let level = Int32.succ pred_level in
   let fitness = pred_fitness in
-  Alpha_context.init ~timestamp ~level ~fitness ctxt >>=? fun ctxt ->
+  Alpha_context.prepare ~timestamp ~level ~fitness ctxt >>=? fun ctxt ->
   begin
     match protocol_data with
     | None ->
@@ -153,4 +153,10 @@ let finalize_block { mode ; ctxt ; op_count ; deposit ; fees ; rewards } =
 let compare_operations op1 op2 =
   Apply.compare_operations op1 op2
 
-let configure_sandbox = Alpha_context.configure_sandbox
+let init ctxt block_header =
+  let level = block_header.Block_header.level in
+  let fitness = block_header.fitness in
+  let timestamp = block_header.timestamp in
+  Alpha_context.prepare_first_block
+    ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
+  return (Alpha_context.finalize ctxt)

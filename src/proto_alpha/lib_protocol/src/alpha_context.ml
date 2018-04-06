@@ -95,7 +95,8 @@ module Commitment = struct
   include Commitment_storage
 end
 
-let init = Init_storage.may_initialize
+let prepare_first_block = Init_storage.prepare_first_block
+let prepare = Init_storage.prepare
 
 let finalize ?commit_message:message c =
   let fitness = Fitness.from_int64 (Fitness.current c) in
@@ -106,8 +107,6 @@ let finalize ?commit_message:message c =
     last_allowed_fork_level =
       Raw_level.to_int32 @@ Level.last_allowed_fork_level c;
   }
-
-let configure_sandbox = Raw_context.configure_sandbox
 
 let activate = Raw_context.activate
 let fork_test_chain = Raw_context.fork_test_chain

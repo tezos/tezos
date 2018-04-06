@@ -335,7 +335,6 @@ module RPC = struct
         pred_shell_header.proto_level
       else
         ((pred_shell_header.proto_level + 1) mod 256) in
-    Context.commit ?message ~time:timestamp context >>= fun context ->
     let shell_header : Block_header.shell_header = {
       level = Int32.succ pred_shell_header.level ;
       proto_level ;
@@ -344,9 +343,22 @@ module RPC = struct
       validation_passes = List.length rs ;
       operations_hash ;
       fitness ;
-      context ;
+      context = Context_hash.zero ; (* place holder *)
     } in
-    return (shell_header, rs)
+    begin
+      if Protocol_hash.equal protocol pred_protocol then
+        return (context, message)
+      else
+        match Registered_protocol.get protocol with
+        | None ->
+            fail (Block_validator_errors.Unavailable_protocol
+                    { block = State.Block.hash predecessor ; protocol })
+        | Some (module NewProto) ->
+            NewProto.init context shell_header >>=? fun { context ; message ; _ } ->
+            return (context, message)
+    end >>=? fun (context, message) ->
+    Context.commit ?message ~time:timestamp context >>= fun context ->
+    return ({ shell_header with context }, rs)
 
   let complete node ?block str =
     match block with

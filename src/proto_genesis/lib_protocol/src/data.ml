@@ -119,49 +119,21 @@ module Init = struct
      protocol.  It's absence meaning that the context is empty. *)
   let version_value = "genesis"
 
-  let may_initialize ctxt =
+  let check_inited ctxt =
+    Context.get ctxt version_key >>= function
+    | None -> failwith "Internal error: uninitialized context."
+    | Some version ->
+        if Compare.String.(version_value <> MBytes.to_string version) then
+          failwith "Internal error: incompatible protocol version" ;
+        return ()
+
+  let tag_first_block ctxt =
     Context.get ctxt version_key >>= function
     | None ->
         Context.set
           ctxt version_key (MBytes.of_string version_value) >>= fun ctxt ->
         return ctxt
-    | Some bytes ->
-        let s = MBytes.to_string bytes in
-        fail_unless Compare.String.(s = version_value)
-          Incompatible_protocol_version >>=? fun () ->
-        return ctxt
-
-  let sandboxed_key = [ "v1" ; "sandboxed" ]
-
-  let set_sandboxed ctxt json =
-    Context.set ctxt sandboxed_key
-      (Data_encoding.Binary.to_bytes Data_encoding.json json)
-  let get_sandboxed ctxt =
-    Context.get ctxt sandboxed_key >>= fun b ->
-    match b with
-    | None -> return None
-    | Some b ->
-        return (Data_encoding.Binary.of_bytes Data_encoding.json b)
-
-  type error += Unimplemented_sandbox_migration
-
-  let configure_sandbox ctxt json =
-    let json =
-      match json with
-      | None -> `O []
-      | Some json -> json in
-    Context.get ctxt version_key >>= function
-    | None ->
-        set_sandboxed ctxt json >>= fun ctxt ->
-        Pubkey.may_change_default ctxt json >>= fun ctxt ->
-        return ctxt
-    | Some _ ->
-        get_sandboxed ctxt >>=? function
-        | None ->
-            fail Unimplemented_sandbox_migration
-        | Some _ ->
-            (* FIXME GRGR fail if parameter changed! *)
-            (* failwith "Changing sandbox parameter is not yet implemented" *)
-            return ctxt
+    | Some _version ->
+        failwith "Internal error: previously initialized context." ;
 
 end

@@ -8,7 +8,9 @@
 (**************************************************************************)
 
 (* This is the genesis protocol: initialise the state *)
-let initialize ctxt =
+let prepare_first_block ctxt ~level ~timestamp ~fitness =
+  Raw_context.prepare_first_block
+    ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Roll_storage.init ctxt >>=? fun ctxt ->
   Seed_storage.init ctxt >>=? fun ctxt ->
   Contract_storage.init ctxt >>=? fun ctxt ->
@@ -18,10 +20,5 @@ let initialize ctxt =
   Commitment_storage.init ctxt >>=? fun ctxt ->
   return ctxt
 
-let may_initialize ctxt ~level ~timestamp ~fitness =
-  Raw_context.prepare
-    ~level ~timestamp ~fitness ctxt >>=? fun (ctxt, first_block) ->
-  if first_block then
-    initialize ctxt
-  else
-    return ctxt
+let prepare ctxt ~level ~timestamp ~fitness =
+  Raw_context.prepare ~level ~timestamp ~fitness ctxt

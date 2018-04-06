@@ -133,7 +133,7 @@ module I = struct
     | None -> Error_monad.fail Operation.Cannot_parse_operation
     | Some (shell, contents) ->
         let operation = { shell ; contents ; signature } in
-        let level = Alpha_context.Level.current ctxt in
+        let level = Level.succ ctxt (Level.current ctxt) in
         Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (baker_pk, _)) ->
         let baker_pkh = Ed25519.Public_key.hash baker_pk in
         let block_prio = 0 in

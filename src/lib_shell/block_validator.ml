@@ -167,8 +167,8 @@ let apply_block
       Proto.apply_operation state op >>=? fun state ->
       return state))
     state parsed_operations >>=? fun state ->
-  Proto.finalize_block state >>=? fun new_context ->
-  Context.get_protocol new_context.context >>= fun new_protocol ->
+  Proto.finalize_block state >>=? fun validation_result ->
+  Context.get_protocol validation_result.context >>= fun new_protocol ->
   let expected_proto_level =
     if Protocol_hash.equal new_protocol Proto.hash then
       pred_header.shell.proto_level
@@ -180,19 +180,30 @@ let apply_block
         expected = expected_proto_level ;
       }) >>=? fun () ->
   fail_when
-    Fitness.(new_context.fitness <> header.shell.fitness)
+    Fitness.(validation_result.fitness <> header.shell.fitness)
     (invalid_block hash @@ Invalid_fitness {
         expected = header.shell.fitness ;
-        found = new_context.fitness ;
+        found = validation_result.fitness ;
       }) >>=? fun () ->
+  begin
+    if Protocol_hash.equal new_protocol Proto.hash then
+      return validation_result
+    else
+      match Registered_protocol.get new_protocol with
+      | None ->
+          fail (Unavailable_protocol { block = hash ;
+                                       protocol = new_protocol })
+      | Some (module NewProto) ->
+          NewProto.init validation_result.context header.shell
+  end >>=? fun validation_result ->
   let max_operations_ttl =
     max 0
       (min
          ((State.Block.max_operations_ttl pred)+1)
-         new_context.max_operations_ttl) in
-  let new_context =
-    { new_context with max_operations_ttl } in
-  return new_context
+         validation_result.max_operations_ttl) in
+  let validation_result =
+    { validation_result with max_operations_ttl } in
+  return validation_result
 
 let check_chain_liveness chain_db hash (header: Block_header.t) =
   let chain_state = Distributed_db.chain_state chain_db in
