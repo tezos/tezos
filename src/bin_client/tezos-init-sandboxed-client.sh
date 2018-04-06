@@ -211,12 +211,6 @@ usage() {
 
 main () {
 
-    if [ "$is_tezos_sandboxed_init" = "1" ]; then
-        echo 'The client has already been initialized in this session.' >&2
-        echo 'Start a new shell session if you wish to reinitialize a client.' >&2
-        exit
-    fi
-
     local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
     if [ $(basename "$bin_dir") = "bin_client" ]; then
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
@@ -258,7 +252,6 @@ PATH="$client_dir/bin:\$PATH" ; export PATH ;
 alias tezos-activate-alpha="$client -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key dictator" ;
 alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha tezos-client-reset" ;
 alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
-is_tezos_sandboxed_init=1 ; export is_tezos_sandboxed_init;
 trap tezos-client-reset EXIT ;
 
 EOF
