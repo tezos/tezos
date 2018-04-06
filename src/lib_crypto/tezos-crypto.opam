@@ -10,6 +10,10 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build & = "1.0+beta19" }
   "tezos-stdlib"
+  "tezos-data-encoding"
+  "tezos-error-monad"
+  "tezos-rpc"
+  "tezos-clic"
   "lwt"
   "nocrypto"
   "blake2"
