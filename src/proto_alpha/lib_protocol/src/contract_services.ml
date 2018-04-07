@@ -170,8 +170,10 @@ let () =
   register_field S.counter Contract.get_counter ;
   register_field S.spendable Contract.is_spendable ;
   register_field S.delegatable Contract.is_delegatable ;
-  register_opt_field S.script Contract.get_script ;
-  register_opt_field S.storage Contract.get_storage ;
+  register_opt_field S.script
+    (fun c v -> Contract.get_script c v >>=? fun (_, v) -> return v) ;
+  register_opt_field S.storage
+    (fun c v -> Contract.get_storage c v >>=? fun (_, v) -> return v) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Contract.get_manager ctxt contract >>=? fun manager ->
@@ -179,8 +181,8 @@ let () =
       Contract.get_counter ctxt contract >>=? fun counter ->
       Contract.is_delegatable ctxt contract >>=? fun delegatable ->
       Contract.is_spendable ctxt contract >>=? fun spendable ->
-      Contract.get_script ctxt contract >>=? fun script ->
-      Contract.get_storage ctxt contract >>=? fun storage ->
+      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+      Contract.get_storage ctxt contract >>=? fun (_ctxt, storage) ->
       return { manager ; balance ;
                spendable ; delegate = (delegatable, delegate) ;
                script ; counter ; storage})

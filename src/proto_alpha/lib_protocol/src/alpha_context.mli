@@ -502,9 +502,9 @@ module Contract : sig
   val is_spendable:
     context -> contract -> bool tzresult Lwt.t
   val get_script:
-    context -> contract -> (Script.t option) tzresult Lwt.t
+    context -> contract -> (context * Script.t option) tzresult Lwt.t
   val get_storage:
-    context -> contract -> (Script.expr option) tzresult Lwt.t
+    context -> contract -> (context * Script.expr option) tzresult Lwt.t
 
   val get_counter: context -> contract -> int32 tzresult Lwt.t
   val get_balance:
@@ -546,13 +546,13 @@ module Contract : sig
 
   module Big_map : sig
     val set:
-      context -> contract ->
-      string -> Script.expr -> context tzresult Lwt.t
+      context -> contract -> string -> Script.expr -> context tzresult Lwt.t
     val remove:
       context -> contract -> string -> context tzresult Lwt.t
-    val mem: context -> contract -> string -> bool Lwt.t
+    val mem:
+      context -> contract -> string -> (context * bool) tzresult Lwt.t
     val get_opt:
-      context -> contract -> string -> Script_repr.expr option tzresult Lwt.t
+      context -> contract -> string -> (context * Script_repr.expr option) tzresult Lwt.t
   end
 
 end

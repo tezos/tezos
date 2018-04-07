@@ -77,7 +77,6 @@ type error += Gas_limit_too_high (* `Permanent *)
 
 val set_gas_limit: t -> Z.t -> t tzresult
 val set_gas_unlimited: t -> t
-val consume_gas: t -> Gas_repr.cost -> t tzresult
 val gas_level: t -> Gas_repr.t
 val block_gas_level: t -> Z.t
 

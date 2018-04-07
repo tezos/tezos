@@ -434,7 +434,7 @@ let test_example () =
   test_contract ~tc "create_contract" account_str account_str >>=? fun (cs, tc) ->
   Assert.equal_int 1 @@ List.length cs ;
   let contract = List.hd cs in
-  Proto_alpha.Alpha_context.Contract.get_script tc contract >>=?? fun res ->
+  Proto_alpha.Alpha_context.Contract.get_script tc contract >>=?? fun (_, res) ->
   let script = Option.unopt_exn (Failure "get_script") res in
   Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun (_, ret, _, _, _) ->
   Assert.equal_string ~msg: __LOC__ "\"abc\"" @@ string_of_canon ret ;

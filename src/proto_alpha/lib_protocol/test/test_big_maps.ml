@@ -46,8 +46,8 @@ let expect_big_map tc contract print_key key_type print_data data_type contents 
   let open Proto_alpha.Error_monad in
   iter_p
     (fun (n, exp) ->
-       Lwt.return @@ Proto_alpha.Script_ir_translator.hash_data tc key_type n >>=? fun (key, _tc) ->
-       Proto_alpha.Alpha_context.Contract.Big_map.get_opt tc contract key >>=? fun data ->
+       Lwt.return @@ Proto_alpha.Script_ir_translator.hash_data tc key_type n >>=? fun (key, tc) ->
+       Proto_alpha.Alpha_context.Contract.Big_map.get_opt tc contract key >>=? fun (_tc, data) ->
        match data, exp with
        | None, None ->
            debug " - big_map[%a] is not defined (ok)" print_key n ;

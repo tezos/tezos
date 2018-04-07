@@ -648,7 +648,7 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.transfer) >>=? fun ctxt ->
             Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
             Contract.credit ctxt destination amount >>=? fun ctxt ->
-            Contract.get_script ctxt destination >>=? fun destination_script ->
+            Contract.get_script ctxt destination >>=? fun (ctxt, destination_script) ->
             Lwt.return (unparse_data ctxt storage_type storage) >>=? fun (sto, ctxt) ->
             let sto = Micheline.strip_locations sto in
             begin match Script_ir_translator.extract_big_map storage_type storage with
@@ -685,7 +685,7 @@ let rec interp
                     destination dummy_storage_fee >>=? fun ctxt ->
                   return (ctxt, origination)
             end >>=? fun (ctxt, origination) ->
-            Contract.get_script ctxt source >>=? (function
+            Contract.get_script ctxt source >>=? (fun (ctxt, script) -> match script with
                 | None -> assert false
                 | Some { storage; _ } ->
                     parse_data ctxt storage_type (Micheline.root storage) >>=? fun (sto, ctxt) ->
@@ -696,7 +696,7 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.transfer) >>=? fun ctxt ->
             Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
             Contract.credit ctxt destination amount >>=? fun ctxt ->
-            Contract.get_script ctxt destination >>=? function
+            Contract.get_script ctxt destination >>=? fun (ctxt, script) -> match script with
             | None -> fail (Invalid_contract (loc, destination))
             | Some script ->
                 begin match extract_big_map storage_type sto with
@@ -727,7 +727,7 @@ let rec interp
                 trace
                   (Invalid_contract (loc, destination))
                   (parse_data ctxt tr ret) >>=? fun (v, ctxt) ->
-                Contract.get_script ctxt source >>=? (function
+                Contract.get_script ctxt source >>=? (fun (ctxt, script) -> match script with
                     | None -> assert false
                     | Some { storage ; _ } ->
                         parse_data ctxt storage_type (Micheline.root storage) >>=? fun (sto, ctxt) ->

@@ -127,17 +127,17 @@ module Contract = struct
       (Make_value(Int32))
 
   module Code =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
       (struct let name = ["code"] end)
-      (Make_value(struct
+      (Make_carbonated_value(struct
          type t = Script_repr.expr
          let encoding = Script_repr.expr_encoding
        end))
 
   module Storage =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
       (struct let name = ["storage"] end)
-      (Make_value(struct
+      (Make_carbonated_value(struct
          type t = Script_repr.expr
          let encoding = Script_repr.expr_encoding
        end))
@@ -145,12 +145,12 @@ module Contract = struct
   type bigmap_key = Raw_context.t * Contract_repr.t
 
   module Big_map =
-    Storage_functors.Make_indexed_data_storage
+    Storage_functors.Make_indexed_carbonated_data_storage
       (Make_subcontext
          (Indexed_context.Raw_context)
          (struct let name = ["big_map"] end))
       (String_index)
-      (Make_value (struct
+      (Make_carbonated_value (struct
          type t = Script_repr.expr
          let encoding = Script_repr.expr_encoding
        end))

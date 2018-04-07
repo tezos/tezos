@@ -376,7 +376,7 @@ let apply_manager_operation_content
       begin
         Contract.spend ctxt source amount >>=? fun ctxt ->
         Contract.credit ctxt destination amount >>=? fun ctxt ->
-        Contract.get_script ctxt destination >>=? function
+        Contract.get_script ctxt destination >>=? fun (ctxt, script) -> match script with
         | None -> begin
             match parameters with
             | None ->

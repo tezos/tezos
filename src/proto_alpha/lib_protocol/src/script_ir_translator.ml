@@ -2159,7 +2159,7 @@ and parse_contract
         Lwt.return (Gas.consume ctxt Typecheck_costs.get_script) >>=? fun ctxt ->
         trace
           (Invalid_contract (loc, contract)) @@
-        Contract.get_script ctxt contract >>=? function
+        Contract.get_script ctxt contract >>=? fun (ctxt, script) -> match script with
         | None ->
             Lwt.return
               (ty_eq arg Unit_t >>? fun Eq ->
@@ -2303,7 +2303,7 @@ let hash_data ctxt typ data =
 let big_map_mem ctxt contract key { diff ; key_type ; _ } =
   match map_get key diff with
   | None -> Lwt.return @@ hash_data ctxt key_type key >>=? fun (hash, ctxt) ->
-      Alpha_context.Contract.Big_map.mem ctxt contract hash >>= fun res ->
+      Alpha_context.Contract.Big_map.mem ctxt contract hash >>=? fun (ctxt, res) ->
       return (res, ctxt)
   | Some None -> return (false, ctxt)
   | Some (Some _) -> return (true, ctxt)
@@ -2315,10 +2315,10 @@ let big_map_get ctxt contract key { diff ; key_type ; value_type } =
       Lwt.return @@ hash_data ctxt key_type key >>=? fun (hash, ctxt) ->
       Alpha_context.Contract.Big_map.get_opt
         ctxt contract hash >>=? begin function
-        | None -> return (None, ctxt)
-        | Some value ->
-            parse_data ctxt value_type (Micheline.root value) >>|? fun (x, ctxt) ->
-            (Some x, ctxt)
+        | (ctxt, None) -> return (None, ctxt)
+        | (ctxt, Some value) ->
+            parse_data ctxt value_type (Micheline.root value) >>=? fun (x, ctxt) ->
+            return (Some x, ctxt)
       end
 
 let big_map_update key value ({ diff ; _ } as map) =

@@ -56,9 +56,9 @@ val get_balance: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 val get_counter: Raw_context.t -> Contract_repr.t -> int32 tzresult Lwt.t
 
 val get_script:
-  Raw_context.t -> Contract_repr.t -> Script_repr.t option tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.t option) tzresult Lwt.t
 val get_storage:
-  Raw_context.t -> Contract_repr.t -> Script_repr.expr option tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 
 type big_map_diff = (string * Script_repr.expr option) list
 
@@ -103,11 +103,11 @@ val init:
 
 module Big_map : sig
   val set :
-    Raw_context.t -> Contract_repr.t ->
-    string -> Script_repr.expr -> Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Contract_repr.t -> string -> Script_repr.expr -> Raw_context.t tzresult Lwt.t
   val remove :
     Raw_context.t -> Contract_repr.t -> string -> Raw_context.t tzresult Lwt.t
-  val mem : Raw_context.t -> Contract_repr.t -> string -> bool Lwt.t
+  val mem :
+    Raw_context.t -> Contract_repr.t -> string -> (Raw_context.t * bool) tzresult Lwt.t
   val get_opt :
-    Raw_context.t -> Contract_repr.t -> string -> Script_repr.expr option tzresult Lwt.t
+    Raw_context.t -> Contract_repr.t -> string -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 end

@@ -48,7 +48,7 @@ let rec len_name = function
 
 let encode_len_value bytes =
   let length = MBytes.length bytes in
-  Data_encoding.(Binary.to_bytes int31) length
+  Data_encoding.(Binary.to_bytes_exn int31) length
 
 let decode_len_value key len =
   match Data_encoding.(Binary.of_bytes int31) len with

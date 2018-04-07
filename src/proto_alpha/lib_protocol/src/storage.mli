@@ -156,12 +156,12 @@ module Contract : sig
      and type value = int32
      and type t := Raw_context.t
 
-  module Code : Indexed_data_storage
+  module Code : Indexed_carbonated_data_storage
     with type key = Contract_repr.t
      and type value = Script_repr.expr
      and type t := Raw_context.t
 
-  module Storage : Indexed_data_storage
+  module Storage : Indexed_carbonated_data_storage
     with type key = Contract_repr.t
      and type value = Script_repr.expr
      and type t := Raw_context.t
@@ -178,7 +178,7 @@ module Contract : sig
 
   type bigmap_key = Raw_context.t * Contract_repr.t
 
-  module Big_map : Indexed_data_storage
+  module Big_map : Indexed_carbonated_data_storage
     with type key = string
      and type value = Script_repr.expr
      and type t := bigmap_key

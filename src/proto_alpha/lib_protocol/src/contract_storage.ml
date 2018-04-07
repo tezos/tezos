@@ -200,8 +200,8 @@ let create_base c contract
   Storage.Contract.Counter.init c contract counter >>=? fun c ->
   (match script with
    | Some ({ Script_repr.code ; storage }, (code_fees, storage_fees)) ->
-       Storage.Contract.Code.init c contract code >>=? fun c ->
-       Storage.Contract.Storage.init c contract storage >>=? fun c ->
+       Storage.Contract.Code.init c contract code >>=? fun (c, _) ->
+       Storage.Contract.Storage.init c contract storage >>=? fun (c, _) ->
        Storage.Contract.Code_fees.init c contract code_fees >>=? fun c ->
        Storage.Contract.Storage_fees.init c contract storage_fees
    | None ->
@@ -225,11 +225,11 @@ let delete c contract =
   Storage.Contract.Spendable.del c contract >>= fun c ->
   Storage.Contract.Delegatable.del c contract >>= fun c ->
   Storage.Contract.Counter.delete c contract >>=? fun c ->
-  Storage.Contract.Code.remove c contract >>= fun c ->
-  Storage.Contract.Storage.remove c contract >>= fun c ->
+  Storage.Contract.Code.remove c contract >>=? fun (c, _) ->
+  Storage.Contract.Storage.remove c contract >>=? fun (c, _) ->
   Storage.Contract.Code_fees.remove c contract >>= fun c ->
   Storage.Contract.Storage_fees.remove c contract >>= fun c ->
-  Storage.Contract.Big_map.clear (c, contract) >>= fun c ->
+  Storage.Contract.Big_map.clear (c, contract) >>=? fun c ->
   return c
 
 let allocated c contract =
@@ -274,11 +274,11 @@ let increment_counter c contract =
   Storage.Contract.Counter.set c contract (Int32.succ contract_counter)
 
 let get_script c contract =
-  Storage.Contract.Code.get_option c contract >>=? fun code ->
-  Storage.Contract.Storage.get_option c contract >>=? fun storage ->
+  Storage.Contract.Code.get_option c contract >>=? fun (c, code) ->
+  Storage.Contract.Storage.get_option c contract >>=? fun (c, storage) ->
   match code, storage with
-  | None, None -> return None
-  | Some code, Some storage -> return (Some { Script_repr.code ; storage })
+  | None, None -> return (c, None)
+  | Some code, Some storage -> return (c, Some { Script_repr.code ; storage })
   | None, Some _ | Some _, None -> failwith "get_script"
 
 let get_storage = Storage.Contract.Storage.get_option
@@ -364,14 +364,15 @@ let update_script_storage c contract storage big_map  =
         fold_left_s (fun c (key, value) ->
             match value with
             | None ->
-                Storage.Contract.Big_map.remove (c, contract) key >>=
-                return
+                Storage.Contract.Big_map.remove (c, contract) key >>=? fun (c, _) ->
+                return c
             | Some v ->
-                Storage.Contract.Big_map.init_set (c, contract) key v >>=
-                return)
+                Storage.Contract.Big_map.init_set (c, contract) key v >>=? fun (c, _) ->
+                return c)
           c diff
   end >>=? fun c ->
-  Storage.Contract.Storage.set c contract storage
+  Storage.Contract.Storage.set c contract storage >>=? fun (c, _) ->
+  return c
 
 let spend_from_script c contract amount =
   Storage.Contract.Balance.get c contract >>=? fun balance ->
@@ -393,16 +394,18 @@ let spend_from_script c contract amount =
                 return c
             | None ->
                 (* Delete empty implicit contract *)
-                delete c contract
+                delete c contract >>=? fun (c, _) ->
+                return c
 
 let credit c contract amount =
   begin
     if Tez_repr.(amount <> Tez_repr.zero) then
-      return ()
+      return c
     else
-      Storage.Contract.Code.mem c contract >>= fun target_has_code ->
-      fail_unless target_has_code (Empty_transaction contract)
-  end >>=? fun () ->
+      Storage.Contract.Code.mem c contract >>=? fun (c, target_has_code) ->
+      fail_unless target_has_code (Empty_transaction contract) >>=? fun () ->
+      return c
+  end >>=? fun c ->
   Storage.Contract.Balance.get_option c contract >>=? function
   | None -> begin
       match Contract_repr.is_implicit contract with
@@ -440,8 +443,13 @@ let init c =
 
 module Big_map = struct
   let set ctxt contract key value =
-    Storage.Contract.Big_map.init_set (ctxt, contract) key value >>= return
-  let remove ctxt contract = Storage.Contract.Big_map.delete (ctxt, contract)
-  let mem ctxt contract = Storage.Contract.Big_map.mem (ctxt, contract)
-  let get_opt ctxt contract = Storage.Contract.Big_map.get_option (ctxt, contract)
+    Storage.Contract.Big_map.init_set (ctxt, contract) key value >>=? fun (c, _) ->
+    return c
+  let remove ctxt contract key =
+    Storage.Contract.Big_map.delete (ctxt, contract) key >>=? fun (c, _) ->
+    return c
+  let mem ctxt contract key =
+    Storage.Contract.Big_map.mem (ctxt, contract) key
+  let get_opt ctxt contract key =
+    Storage.Contract.Big_map.get_option (ctxt, contract) key
 end
