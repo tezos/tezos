@@ -182,6 +182,14 @@ let () =
 
 let failwith msg = fail (Failure msg)
 
+let add_fees_for_bytes c base added =
+  let open Tez_repr in
+  let cost_per_byte = (Raw_context.constants c).cost_per_byte in
+  Lwt.return begin
+    cost_per_byte *? Int64.of_int added >>? fun added ->
+    base +? added
+  end
+
 let create_base c contract
     ~balance ~manager ~delegate ?script ~spendable ~delegatable =
   (match Contract_repr.is_implicit contract with
@@ -199,11 +207,14 @@ let create_base c contract
   Storage.Contract.Delegatable.set c contract delegatable >>= fun c ->
   Storage.Contract.Counter.init c contract counter >>=? fun c ->
   (match script with
-   | Some ({ Script_repr.code ; storage }, (code_fees, storage_fees)) ->
-       Storage.Contract.Code.init c contract code >>=? fun (c, _) ->
-       Storage.Contract.Storage.init c contract storage >>=? fun (c, _) ->
-       Storage.Contract.Code_fees.init c contract code_fees >>=? fun c ->
-       Storage.Contract.Storage_fees.init c contract storage_fees
+   | Some { Script_repr.code ; storage } ->
+       let fees = Tez_repr.zero in
+       Storage.Contract.Code.init c contract code >>=? fun (c, code_size) ->
+       add_fees_for_bytes c fees code_size >>=? fun fees ->
+       Storage.Contract.Storage.init c contract storage >>=? fun (c, storage_size) ->
+       add_fees_for_bytes c fees storage_size >>=? fun fees ->
+       Storage.Contract.Fees.init c contract fees >>=? fun c ->
+       Storage.Contract.Paid_fees.init c contract Tez_repr.zero
    | None ->
        return c) >>=? fun c ->
   return (c, contract)
@@ -227,9 +238,9 @@ let delete c contract =
   Storage.Contract.Counter.delete c contract >>=? fun c ->
   Storage.Contract.Code.remove c contract >>=? fun (c, _) ->
   Storage.Contract.Storage.remove c contract >>=? fun (c, _) ->
-  Storage.Contract.Code_fees.remove c contract >>= fun c ->
-  Storage.Contract.Storage_fees.remove c contract >>= fun c ->
-  Storage.Contract.Big_map.clear (c, contract) >>=? fun c ->
+  Storage.Contract.Paid_fees.remove c contract >>= fun c ->
+  Storage.Contract.Fees.remove c contract >>= fun c ->
+  Storage.Contract.Big_map.clear (c, contract) >>=? fun (c, _) ->
   return c
 
 let allocated c contract =
@@ -341,37 +352,40 @@ let is_spendable c contract =
   | None ->
       Storage.Contract.Spendable.mem c contract >>= return
 
-let code_and_storage_fee c contract =
-  Storage.Contract.Code_fees.get_option c contract >>=? fun code_fees ->
-  Storage.Contract.Storage_fees.get_option c contract >>=? fun storage_fees ->
-  match code_fees, storage_fees with
-  | (None, Some _) | (Some _, None) ->
-      failwith "contract_fee" (* Internal error *)
-  | None, None ->
-      return Tez_repr.zero
-  | Some code_fees, Some storage_fees ->
-      Lwt.return Tez_repr.(code_fees +? storage_fees)
-
-let update_storage_fee c contract storage_fees =
-  Storage.Contract.Storage_fees.set c contract storage_fees
-
 type big_map_diff = (string * Script_repr.expr option) list
 
-let update_script_storage c contract storage big_map  =
+let update_script_storage c contract storage big_map =
   begin match big_map with
-    | None -> return c
+    | None -> return (c, Tez_repr.zero, Tez_repr.zero)
     | Some diff ->
-        fold_left_s (fun c (key, value) ->
+        fold_left_s (fun (c, total_added, total_freed) (key, value) ->
             match value with
             | None ->
-                Storage.Contract.Big_map.remove (c, contract) key >>=? fun (c, _) ->
-                return c
+                Storage.Contract.Big_map.remove (c, contract) key >>=? fun (c, freed) ->
+                add_fees_for_bytes c total_freed freed >>=? fun total_freed ->
+                return (c, total_added, total_freed)
             | Some v ->
-                Storage.Contract.Big_map.init_set (c, contract) key v >>=? fun (c, _) ->
-                return c)
-          c diff
-  end >>=? fun c ->
-  Storage.Contract.Storage.set c contract storage >>=? fun (c, _) ->
+                Storage.Contract.Big_map.init_set (c, contract) key v >>=? fun (c, diff) ->
+                if Compare.Int.(diff > 0) then
+                  add_fees_for_bytes c total_added diff >>=? fun total_added ->
+                  return (c, total_added, total_freed)
+                else
+                  add_fees_for_bytes c total_freed (-diff) >>=? fun total_freed ->
+                  return (c, total_added, total_freed))
+          (c, Tez_repr.zero, Tez_repr.zero) diff
+  end >>=? fun (c, total_added, total_freed) ->
+  Storage.Contract.Storage.set c contract storage >>=? fun (c, diff) ->
+  begin if Compare.Int.(diff > 0) then
+      add_fees_for_bytes c total_added diff >>=? fun total_added ->
+      return (c, total_added, total_freed)
+    else
+      add_fees_for_bytes c total_freed (-diff) >>=? fun total_freed ->
+      return (c, total_added, total_freed)
+  end >>=? fun (c, total_added, total_freed) ->
+  Storage.Contract.Fees.get c contract >>=? fun fees ->
+  Lwt.return (Tez_repr.(fees +? total_added)) >>=? fun fees ->
+  Lwt.return (Tez_repr.(fees -? total_freed)) >>=? fun fees ->
+  Storage.Contract.Fees.set c contract fees >>=? fun c ->
   return c
 
 let spend_from_script c contract amount =
@@ -394,8 +408,7 @@ let spend_from_script c contract amount =
                 return c
             | None ->
                 (* Delete empty implicit contract *)
-                delete c contract >>=? fun (c, _) ->
-                return c
+                delete c contract
 
 let credit c contract amount =
   begin
@@ -441,13 +454,31 @@ let spend c contract amount =
 let init c =
   Storage.Contract.Global_counter.init c 0l
 
+let fees c contract =
+  Storage.Contract.Fees.get_option c contract >>=? function
+  | None -> return Tez_repr.zero
+  | Some fees -> return fees
+
+let paid_fees c contract =
+  Storage.Contract.Paid_fees.get_option c contract >>=? function
+  | None -> return Tez_repr.zero
+  | Some paid_fees -> return paid_fees
+
+let add_to_paid_fees c contract fees =
+  if Tez_repr.equal fees Tez_repr.zero then
+    return c
+  else
+    Storage.Contract.Paid_fees.get c contract >>=? fun paid_fees ->
+    Lwt.return (Tez_repr.(paid_fees +? fees)) >>=? fun paid_fees ->
+    Storage.Contract.Paid_fees.set c contract paid_fees
+
 module Big_map = struct
   let set ctxt contract key value =
     Storage.Contract.Big_map.init_set (ctxt, contract) key value >>=? fun (c, _) ->
-    return c
+    return c (* ignore the fees*)
   let remove ctxt contract key =
     Storage.Contract.Big_map.delete (ctxt, contract) key >>=? fun (c, _) ->
-    return c
+    return c (* ignore the fees*)
   let mem ctxt contract key =
     Storage.Contract.Big_map.mem (ctxt, contract) key
   let get_opt ctxt contract key =

@@ -65,6 +65,7 @@ type parametric = {
   endorsement_security_deposit: Tez_repr.t ;
   block_reward: Tez_repr.t ;
   endorsement_reward: Tez_repr.t ;
+  cost_per_byte: Tez_repr.t ;
 }
 
 let default = {
@@ -99,6 +100,7 @@ let default = {
   endorsement_security_deposit = Tez_repr.(mul_exn one 64) ;
   block_reward = Tez_repr.(mul_exn one 16) ;
   endorsement_reward = Tez_repr.(mul_exn one 2) ;
+  cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
 }
 
 module CompareListInt = Compare.List (Compare.Int)
@@ -127,7 +129,8 @@ let parametric_encoding =
           c.block_security_deposit,
           c.endorsement_security_deposit,
           c.block_reward),
-         (c.endorsement_reward))) )
+         (c.endorsement_reward,
+          c.cost_per_byte))) )
     (fun (( preserved_cycles,
             blocks_per_cycle,
             blocks_per_commitment,
@@ -148,7 +151,8 @@ let parametric_encoding =
             block_security_deposit,
             endorsement_security_deposit,
             block_reward),
-           (endorsement_reward))) ->
+           (endorsement_reward,
+            cost_per_byte))) ->
       { preserved_cycles ;
         blocks_per_cycle ;
         blocks_per_commitment ;
@@ -170,6 +174,7 @@ let parametric_encoding =
         endorsement_security_deposit ;
         block_reward ;
         endorsement_reward ;
+        cost_per_byte ;
       } )
     (merge_objs
        (obj10
@@ -195,8 +200,9 @@ let parametric_encoding =
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
              (req "block_reward" Tez_repr.encoding))
-          (obj1
-             (req "endorsement_reward" Tez_repr.encoding))))
+          (obj2
+             (req "endorsement_reward" Tez_repr.encoding)
+             (req "cost_per_byte" Tez_repr.encoding))))
 
 type t = {
   fixed : fixed ;

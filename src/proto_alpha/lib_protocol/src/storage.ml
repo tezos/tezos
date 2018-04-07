@@ -155,14 +155,14 @@ module Contract = struct
          let encoding = Script_repr.expr_encoding
        end))
 
-  module Code_fees =
+  module Paid_fees =
     Indexed_context.Make_map
-      (struct let name = ["code_fees"] end)
+      (struct let name = ["paid_fees"] end)
       (Make_value(Tez_repr))
 
-  module Storage_fees =
+  module Fees =
     Indexed_context.Make_map
-      (struct let name = ["storage_fees"] end)
+      (struct let name = ["fees"] end)
       (Make_value(Tez_repr))
 
   module Roll_list =

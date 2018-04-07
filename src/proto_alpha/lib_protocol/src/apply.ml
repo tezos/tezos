@@ -402,8 +402,7 @@ let apply_manager_operation_content
                   Contract.update_script_storage
                     ctxt destination
                     storage_res diff >>=? fun ctxt ->
-                  Fees.update_script_storage ctxt ~source
-                    destination Script_interpreter.dummy_storage_fee >>=? fun ctxt ->
+                  Fees.update_script_storage ctxt ~source destination >>=? fun ctxt ->
                   return (ctxt, origination_nonce, None)
               | Error err ->
                   return (ctxt, origination_nonce, Some err) in
@@ -429,8 +428,7 @@ let apply_manager_operation_content
         | Some script ->
             Script_ir_translator.parse_script ctxt script >>=? fun (_, ctxt) ->
             Script_ir_translator.erase_big_map_initialization ctxt script >>=? fun (script, big_map_diff, ctxt) ->
-            return (Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)),
-                    big_map_diff, ctxt)
+            return (Some script, big_map_diff, ctxt)
       end >>=? fun (script, big_map, ctxt) ->
       Contract.spend ctxt source credit >>=? fun ctxt ->
       Contract.originate ctxt

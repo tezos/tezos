@@ -315,6 +315,7 @@ module Constants : sig
     endorsement_security_deposit: Tez.t ;
     block_reward: Tez.t ;
     endorsement_reward: Tez.t ;
+    cost_per_byte: Tez.t ;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -515,7 +516,7 @@ module Contract : sig
     origination_nonce ->
     balance: Tez.t ->
     manager: public_key_hash ->
-    ?script: (Script.t * (Tez.t * Tez.t)) ->
+    ?script: Script.t ->
     delegate: public_key_hash option ->
     spendable: bool ->
     delegatable: bool -> (context * contract * origination_nonce) tzresult Lwt.t
@@ -535,8 +536,9 @@ module Contract : sig
     Script.expr -> (string * Script.expr option) list option ->
     context tzresult Lwt.t
 
-  val code_and_storage_fee: context -> contract -> Tez.t tzresult Lwt.t
-  val update_storage_fee: context -> contract -> Tez.t -> context tzresult Lwt.t
+  val fees: context -> t -> Tez.t tzresult Lwt.t
+  val paid_fees: context -> t -> Tez.t tzresult Lwt.t
+  val add_to_paid_fees: context -> t -> Tez.t -> context tzresult Lwt.t
 
   val increment_counter:
     context -> contract -> context tzresult Lwt.t

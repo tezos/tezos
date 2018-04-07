@@ -13,9 +13,6 @@ type error += Overflow of Script.location
 type error += Reject of Script.location
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
 
-val dummy_code_fee : Tez.t
-val dummy_storage_fee : Tez.t
-
 val execute:
   Contract.origination_nonce ->
   Contract.t -> Contract.t -> Alpha_context.t ->

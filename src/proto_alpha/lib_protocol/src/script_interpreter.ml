@@ -13,9 +13,6 @@ open Script_typed_ir
 open Script_tc_errors
 open Script_ir_translator
 
-let dummy_code_fee = Tez.fifty_cents
-let dummy_storage_fee = Tez.fifty_cents
-
 (* ---- Run-time errors -----------------------------------------------------*)
 
 type error += Reject of Script.location
@@ -172,7 +169,7 @@ let rec interp
             Contract.originate ctxt
               origination
               ~manager ~delegate ~balance:credit
-              ~script:({ code ; storage }, (dummy_code_fee, dummy_storage_fee))
+              ~script:{ code ; storage }
               ~spendable ~delegatable
             >>=? fun (ctxt, contract, origination) ->
             Fees.origination_burn ctxt ~source:orig contract >>=? fun ctxt ->
@@ -659,7 +656,7 @@ let rec interp
                   return (Some diff, ctxt)
             end >>=? fun (diff, ctxt) ->
             Contract.update_script_storage ctxt source sto diff >>=? fun ctxt ->
-            Fees.update_script_storage ctxt ~source:orig source dummy_storage_fee >>=? fun ctxt ->
+            Fees.update_script_storage ctxt ~source:orig source >>=? fun ctxt ->
             begin match destination_script with
               | None ->
                   (* we see non scripted contracts as (unit, unit) contract *)
@@ -681,8 +678,7 @@ let rec interp
                   trace
                     (Invalid_contract (loc, destination))
                     (parse_data ctxt Unit_t ret) >>=? fun ((), ctxt) ->
-                  Fees.update_script_storage ctxt ~source:orig
-                    destination dummy_storage_fee >>=? fun ctxt ->
+                  Fees.update_script_storage ctxt ~source:orig destination >>=? fun ctxt ->
                   return (ctxt, origination)
             end >>=? fun (ctxt, origination) ->
             Contract.get_script ctxt source >>=? (fun (ctxt, script) -> match script with
@@ -709,8 +705,7 @@ let rec interp
                 Lwt.return (unparse_data ctxt storage_type sto) >>=? fun (sto, ctxt) ->
                 let sto = Micheline.strip_locations sto in
                 Contract.update_script_storage ctxt source sto maybe_diff >>=? fun ctxt ->
-                Fees.update_script_storage ctxt ~source:orig
-                  source dummy_storage_fee >>=? fun ctxt ->
+                Fees.update_script_storage ctxt ~source:orig source >>=? fun ctxt ->
                 Lwt.return (unparse_data ctxt tp p) >>=? fun (p, ctxt) ->
                 execute origination source destination ctxt script amount p
                 >>=? fun (sto, ret, ctxt, origination, maybe_diff) ->
@@ -722,8 +717,7 @@ let rec interp
                       return (Some diff, ctxt)
                 end >>=? fun (diff, ctxt) ->
                 Contract.update_script_storage ctxt destination sto diff >>=? fun ctxt ->
-                Fees.update_script_storage ctxt ~source:orig
-                  destination dummy_storage_fee >>=? fun ctxt ->
+                Fees.update_script_storage ctxt ~source:orig destination >>=? fun ctxt ->
                 trace
                   (Invalid_contract (loc, destination))
                   (parse_data ctxt tr ret) >>=? fun (v, ctxt) ->
