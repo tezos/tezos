@@ -37,9 +37,10 @@ let update_script_storage c ~source contract =
   match Tez.(fees -? paid_fees) with
   | Error _ ->
       (* Previously paid fees are greater than required fees. *)
-      return c
+      return (c, Tez.zero)
   | Ok to_be_paid ->
       (* Burning the fees... *)
       trace Cannot_pay_storage_fee
         (Contract.spend_from_script c source to_be_paid >>=? fun c ->
-         Contract.add_to_paid_fees c contract to_be_paid)
+         Contract.add_to_paid_fees c contract to_be_paid) >>=? fun c ->
+      return (c, to_be_paid)

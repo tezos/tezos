@@ -17,5 +17,5 @@ val origination_burn:
 
 val update_script_storage:
   Alpha_context.t -> source:Contract.t ->
-  Contract.t -> Alpha_context.t tzresult Lwt.t
+  Contract.t -> (Alpha_context.t * Tez.t) tzresult Lwt.t
 

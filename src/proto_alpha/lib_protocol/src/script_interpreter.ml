@@ -656,7 +656,7 @@ let rec interp
                   return (Some diff, ctxt)
             end >>=? fun (diff, ctxt) ->
             Contract.update_script_storage ctxt source sto diff >>=? fun ctxt ->
-            Fees.update_script_storage ctxt ~source:orig source >>=? fun ctxt ->
+            Fees.update_script_storage ctxt ~source:orig source >>=? fun (ctxt, _) ->
             begin match destination_script with
               | None ->
                   (* we see non scripted contracts as (unit, unit) contract *)
@@ -678,7 +678,7 @@ let rec interp
                   trace
                     (Invalid_contract (loc, destination))
                     (parse_data ctxt Unit_t ret) >>=? fun ((), ctxt) ->
-                  Fees.update_script_storage ctxt ~source:orig destination >>=? fun ctxt ->
+                  Fees.update_script_storage ctxt ~source:orig destination >>=? fun (ctxt, _) ->
                   return (ctxt, origination)
             end >>=? fun (ctxt, origination) ->
             Contract.get_script ctxt source >>=? (fun (ctxt, script) -> match script with
@@ -705,7 +705,7 @@ let rec interp
                 Lwt.return (unparse_data ctxt storage_type sto) >>=? fun (sto, ctxt) ->
                 let sto = Micheline.strip_locations sto in
                 Contract.update_script_storage ctxt source sto maybe_diff >>=? fun ctxt ->
-                Fees.update_script_storage ctxt ~source:orig source >>=? fun ctxt ->
+                Fees.update_script_storage ctxt ~source:orig source >>=? fun (ctxt, _) ->
                 Lwt.return (unparse_data ctxt tp p) >>=? fun (p, ctxt) ->
                 execute origination source destination ctxt script amount p
                 >>=? fun (sto, ret, ctxt, origination, maybe_diff) ->
@@ -717,7 +717,7 @@ let rec interp
                       return (Some diff, ctxt)
                 end >>=? fun (diff, ctxt) ->
                 Contract.update_script_storage ctxt destination sto diff >>=? fun ctxt ->
-                Fees.update_script_storage ctxt ~source:orig destination >>=? fun ctxt ->
+                Fees.update_script_storage ctxt ~source:orig destination >>=? fun (ctxt, _) ->
                 trace
                   (Invalid_contract (loc, destination))
                   (parse_data ctxt tr ret) >>=? fun (v, ctxt) ->

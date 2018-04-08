@@ -20,8 +20,9 @@ let operation
     pred_block_hash
     0
     hash
-    operation >>=? fun (tc, _, contracts, err) ->
-  return ((contracts, err), tc)
+    operation >>=? fun { ctxt = tc ; origination_nonce ; ignored_error } ->
+  let contracts = Proto_alpha.Alpha_context.Contract.originated_contracts origination_nonce in
+  return ((contracts, ignored_error), tc)
 
 
 let transaction ~tc ?(fee = 0) ?baker
