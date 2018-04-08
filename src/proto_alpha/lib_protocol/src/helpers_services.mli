@@ -25,15 +25,15 @@ val run_code:
   'a #RPC_context.simple ->
   'a -> Script.expr ->
   (Script.expr * Script.expr * Tez.t * Contract.t) ->
-  (Script.expr * Script.expr * (Script.expr * Script.expr option) list option) shell_tzresult Lwt.t
+  (Script.expr * Script.expr * Contract.big_map_diff option) shell_tzresult Lwt.t
 
 val trace_code:
   'a #RPC_context.simple ->
   'a -> Script.expr ->
   (Script.expr * Script.expr * Tez.t * Contract.t) ->
   (Script.expr * Script.expr *
-   (Script.location * Gas.t * Script.expr list) list *
-   (Script.expr * Script.expr option) list option) shell_tzresult Lwt.t
+   Script_interpreter.execution_trace *
+   Contract.big_map_diff option) shell_tzresult Lwt.t
 
 val typecheck_code:
   'a #RPC_context.simple ->

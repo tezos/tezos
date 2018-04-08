@@ -40,7 +40,7 @@ module S = struct
       ~output: (obj3
                   (req "storage" Script.expr_encoding)
                   (req "output" Script.expr_encoding)
-                  (opt "big_map_diff" (list (tup2 Script.expr_encoding (option Script.expr_encoding)))))
+                  (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
       RPC_path.(custom_root / "run_code")
 
   let apply_operation =
@@ -71,7 +71,7 @@ module S = struct
                         (req "location" Script.location_encoding)
                         (req "gas" Gas.encoding)
                         (req "stack" (list (Script.expr_encoding)))))
-                  (opt "big_map_diff" (list (tup2 Script.expr_encoding (option Script.expr_encoding)))))
+                  (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
       RPC_path.(custom_root / "trace_code")
 
   let typecheck_code =
@@ -179,37 +179,34 @@ let () =
   end ;
   register0 S.apply_operation I.apply_operation ;
   register0 S.run_code begin fun ctxt () parameters ->
-    let (code, storage, input, amount, contract, gas, origination_nonce) =
+    let (code, storage, parameter, amount, contract, gas, origination_nonce) =
       I.run_parameters ctxt parameters in
     begin if Compare.Z.(gas > Z.zero) then
         Lwt.return (Gas.set_limit ctxt gas)
       else
         return (Gas.set_unlimited ctxt) end >>=? fun ctxt ->
     Script_interpreter.execute
-      origination_nonce
-      contract (* transaction initiator *)
-      contract (* script owner *)
-      ctxt { storage ; code } amount input >>=? fun (sto, ret, _ctxt, _, maybe_big_map_diff) ->
-    return (sto, ret,
-            Option.map maybe_big_map_diff
-              ~f:(Script_ir_translator.to_printable_big_map ctxt))
+      ctxt origination_nonce
+      ~source:contract (* transaction initiator *)
+      ~self:(contract, { storage ; code }) (* script owner *)
+      ~amount ~parameter
+    >>=? fun { Script_interpreter.storage ; return_value ; big_map_diff ; _ } ->
+    return (storage, return_value, big_map_diff)
   end ;
   register0 S.trace_code begin fun ctxt () parameters ->
-    let (code, storage, input, amount, contract, gas, origination_nonce) =
+    let (code, storage, parameter, amount, contract, gas, origination_nonce) =
       I.run_parameters ctxt parameters in
     begin if Compare.Z.(gas > Z.zero) then
         Lwt.return (Gas.set_limit ctxt gas)
       else
         return (Gas.set_unlimited ctxt) end >>=? fun ctxt ->
     Script_interpreter.trace
-      origination_nonce
-      contract (* transaction initiator *)
-      contract (* script owner *)
-      ctxt { storage ; code } amount input
-    >>=? fun ((sto, ret, _ctxt, _, maybe_big_map_diff), trace) ->
-    return (sto, ret, trace,
-            Option.map maybe_big_map_diff
-              ~f:(Script_ir_translator.to_printable_big_map ctxt))
+      ctxt origination_nonce
+      ~source:contract (* transaction initiator *)
+      ~self:(contract, { storage ; code }) (* script owner *)
+      ~amount ~parameter
+    >>=? fun ({ Script_interpreter.storage ; return_value ; big_map_diff ; _ }, trace) ->
+    return (storage, return_value, trace, big_map_diff)
   end ;
   register0 S.typecheck_code begin fun ctxt () (expr, maybe_gas) ->
     begin match maybe_gas with

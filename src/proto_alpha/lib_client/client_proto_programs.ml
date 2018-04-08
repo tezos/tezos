@@ -43,11 +43,11 @@ let print_big_map_diff ppf = function
         (Format.pp_print_list
            ~pp_sep:Format.pp_print_space
            (fun ppf (key, value) ->
-              Format.fprintf ppf "%s %a%a"
+              Format.fprintf ppf "%s %s%a"
                 (match value with
                  | None -> "-"
                  | Some _ -> "+")
-                print_expr key
+                key
                 (fun ppf -> function
                    | None -> ()
                    | Some x -> Format.fprintf ppf "-> %a" print_expr x)

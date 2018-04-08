@@ -388,21 +388,16 @@ let apply_manager_operation_content
                 | _ -> fail (Bad_contract_parameter (destination, None, parameters))
           end
         | Some script ->
-            let call_contract ctxt argument =
+            let call_contract ctxt parameter =
               Script_interpreter.execute
-                origination_nonce
-                source destination ctxt script amount argument
+                ctxt origination_nonce
+                ~source ~self:(destination, script) ~amount ~parameter
               >>= function
-              | Ok (storage_res, _res, ctxt, origination_nonce, maybe_big_map_diff) ->
-                  begin match maybe_big_map_diff with
-                    | None -> return (None, ctxt)
-                    | Some map ->
-                        Script_ir_translator.to_serializable_big_map ctxt map >>=? fun (diff, ctxt) ->
-                        return (Some diff, ctxt) end >>=? fun (diff, ctxt) ->
+              | Ok { ctxt ; origination_nonce ; storage ; big_map_diff ; return_value = _ } ->
                   Contract.update_script_storage
-                    ctxt destination
-                    storage_res diff >>=? fun ctxt ->
-                  Fees.update_script_storage ctxt ~source destination >>=? fun (ctxt, fees) ->
+                    ctxt destination storage big_map_diff >>=? fun ctxt ->
+                  Fees.update_script_storage
+                    ctxt ~source destination >>=? fun (ctxt, fees) ->
                   return (ctxt, origination_nonce, None, fees)
               | Error err ->
                   return (ctxt, origination_nonce, Some err, Tez.zero) in

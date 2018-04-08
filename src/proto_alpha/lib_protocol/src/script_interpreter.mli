@@ -13,18 +13,28 @@ type error += Overflow of Script.location
 type error += Reject of Script.location
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
 
+type execution_result =
+  { ctxt : context ;
+    origination_nonce : Contract.origination_nonce ;
+    storage : Script.expr ;
+    big_map_diff : Contract.big_map_diff option ;
+    return_value : Script.expr }
+
 val execute:
-  Contract.origination_nonce ->
-  Contract.t -> Contract.t -> Alpha_context.t ->
-  Script.t -> Tez.t ->
-  Script.expr ->
-  (Script.expr * Script.expr * context * Contract.origination_nonce *
-   Script_typed_ir.ex_big_map option) tzresult Lwt.t
+  Alpha_context.t -> Contract.origination_nonce ->
+  source: Contract.t ->
+  self: (Contract.t * Script.t) ->
+  parameter: Script.expr ->
+  amount: Tez.t ->
+  execution_result tzresult Lwt.t
+
+type execution_trace =
+  (Script.location * Gas.t * Script.expr list) list
 
 val trace:
-  Contract.origination_nonce ->
-  Contract.t -> Contract.t -> Alpha_context.t ->
-  Script.t -> Tez.t ->
-  Script.expr ->
-  ((Script.expr * Script.expr * context * Contract.origination_nonce * Script_typed_ir.ex_big_map option) *
-   (Script.location * Gas.t * Script.expr list) list) tzresult Lwt.t
+  Alpha_context.t -> Contract.origination_nonce ->
+  source: Contract.t ->
+  self: (Contract.t * Script.t) ->
+  parameter: Script.expr ->
+  amount: Tez.t ->
+  (execution_result * execution_trace) tzresult Lwt.t

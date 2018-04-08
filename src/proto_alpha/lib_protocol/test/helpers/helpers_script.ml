@@ -14,7 +14,7 @@ open Alpha_context
 let init_amount = 20000
 
 let execute_code_pred
-    ?tc (pred : Helpers_block.result) (script : Script.t) (argument : Script.expr) =
+    ?tc (pred : Helpers_block.result) (script : Script.t) (parameter : Script.expr) =
   let op = List.nth Helpers_account.bootstrap_accounts 0 in
   let tc = Option.unopt ~default:pred.tezos_context tc in
   Helpers_apply.script_origination_pred ~tc ~pred (script, op, init_amount)
@@ -32,8 +32,10 @@ let execute_code_pred
   let amount = Tez.zero in
   Lwt.return (Proto_alpha.Alpha_context.Gas.set_limit tc gas) >>=? fun tc ->
   let return = Script_interpreter.execute
-      dummy_nonce op.contract dst
-      tc script amount argument in
+      tc dummy_nonce
+      ~source: op.contract
+      ~self: (dst, script)
+      ~amount ~parameter in
   return
 
 

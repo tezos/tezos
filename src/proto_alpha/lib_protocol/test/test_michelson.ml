@@ -48,9 +48,11 @@ let quote s = "\"" ^ s ^ "\""
 let parse_execute sb ?tc code_str param_str storage_str =
   let param = parse_param param_str in
   let script = parse_script code_str storage_str in
-  Script.execute_code_pred ?tc sb script param >>=?? fun (ret, st, tc, nonce, bgm) ->
+  Script.execute_code_pred ?tc sb script param
+  >>=?? fun { return_value = ret ; storage = st ; ctxt = tc ;
+              origination_nonce = nonce ; big_map_diff = bgm } ->
   let contracts = Contract.originated_contracts nonce in
-  return (ret, st, tc, contracts, bgm)
+  return (st, ret, tc, contracts, bgm)
 
 let test ctxt ?tc (file_name: string) (storage: string) (input: string) =
   let full_path = contract_path // file_name ^ ".tz" in
@@ -436,7 +438,7 @@ let test_example () =
   let contract = List.hd cs in
   Proto_alpha.Alpha_context.Contract.get_script tc contract >>=?? fun (_, res) ->
   let script = Option.unopt_exn (Failure "get_script") res in
-  Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun (_, ret, _, _, _) ->
+  Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun { return_value = ret } ->
   Assert.equal_string ~msg: __LOC__ "\"abc\"" @@ string_of_canon ret ;
 
   (* Test IMPLICIT_ACCOUNT *)
