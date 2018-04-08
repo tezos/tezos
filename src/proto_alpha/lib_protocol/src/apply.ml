@@ -424,12 +424,12 @@ let apply_manager_operation_content
                   spendable ; delegatable ; credit ; gas_limit } ->
       Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
       begin match script with
-        | None -> return (None, None, ctxt)
+        | None -> return (None, ctxt)
         | Some script ->
             Script_ir_translator.parse_script ctxt script >>=? fun (_, ctxt) ->
             Script_ir_translator.erase_big_map_initialization ctxt script >>=? fun (script, big_map_diff, ctxt) ->
-            return (Some script, big_map_diff, ctxt)
-      end >>=? fun (script, big_map, ctxt) ->
+            return (Some (script, big_map_diff), ctxt)
+      end >>=? fun (script, ctxt) ->
       Contract.spend ctxt source credit >>=? fun ctxt ->
       Contract.originate ctxt
         origination_nonce
@@ -437,16 +437,6 @@ let apply_manager_operation_content
         ?script
         ~spendable ~delegatable >>=? fun (ctxt, contract, origination_nonce) ->
       Fees.origination_burn ctxt ~source contract >>=? fun ctxt ->
-      begin match big_map with
-        | None -> return ctxt
-        | Some diff ->
-            fold_left_s (fun ctxt (key, value) ->
-                match value with
-                | None -> Contract.Big_map.remove ctxt contract key
-                | Some v ->
-                    Contract.Big_map.set ctxt contract key v)
-              ctxt diff
-      end >>=? fun ctxt ->
       return (ctxt, origination_nonce, None, Tez.zero)
   | Delegation delegate ->
       Delegate.set ctxt source delegate >>=? fun ctxt ->

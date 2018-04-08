@@ -87,7 +87,7 @@ val extract_big_map : 'a Script_typed_ir.ty -> 'a -> Script_typed_ir.ex_big_map 
 
 val to_serializable_big_map :
   context -> Script_typed_ir.ex_big_map ->
-  (Contract_storage.big_map_diff * context) tzresult Lwt.t
+  (Contract.big_map_diff * context) tzresult Lwt.t
 
 val to_printable_big_map :
   context -> Script_typed_ir.ex_big_map ->
@@ -95,4 +95,4 @@ val to_printable_big_map :
 
 val erase_big_map_initialization :
   context -> Script.t ->
-  (Script.t * Contract_storage.big_map_diff option * context) tzresult Lwt.t
+  (Script.t * Contract.big_map_diff option * context) tzresult Lwt.t

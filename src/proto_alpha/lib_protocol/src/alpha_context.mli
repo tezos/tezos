@@ -511,12 +511,14 @@ module Contract : sig
   val get_balance:
     context -> contract -> Tez.t tzresult Lwt.t
 
+  type big_map_diff = (string * Script.expr option) list
+
   val originate:
     context ->
     origination_nonce ->
     balance: Tez.t ->
     manager: public_key_hash ->
-    ?script: Script.t ->
+    ?script: (Script.t * big_map_diff option) ->
     delegate: public_key_hash option ->
     spendable: bool ->
     delegatable: bool -> (context * contract * origination_nonce) tzresult Lwt.t
@@ -533,7 +535,7 @@ module Contract : sig
 
   val update_script_storage:
     context -> contract ->
-    Script.expr -> (string * Script.expr option) list option ->
+    Script.expr -> big_map_diff option ->
     context tzresult Lwt.t
 
   val fees: context -> t -> Tez.t tzresult Lwt.t
@@ -547,10 +549,6 @@ module Contract : sig
     context -> contract -> int32 -> unit tzresult Lwt.t
 
   module Big_map : sig
-    val set:
-      context -> contract -> string -> Script.expr -> context tzresult Lwt.t
-    val remove:
-      context -> contract -> string -> context tzresult Lwt.t
     val mem:
       context -> contract -> string -> (context * bool) tzresult Lwt.t
     val get_opt:

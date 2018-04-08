@@ -169,7 +169,7 @@ let rec interp
             Contract.originate ctxt
               origination
               ~manager ~delegate ~balance:credit
-              ~script:{ code ; storage }
+              ~script:({ code ; storage }, None (* TODO: initialize a big map from a map *))
               ~spendable ~delegatable
             >>=? fun (ctxt, contract, origination) ->
             Fees.origination_burn ctxt ~source:orig contract >>=? fun ctxt ->

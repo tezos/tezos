@@ -86,7 +86,7 @@ val originate:
   Contract_repr.origination_nonce ->
   balance:Tez_repr.t ->
   manager:Signature.Public_key_hash.t ->
-  ?script:Script_repr.t ->
+  ?script:(Script_repr.t * big_map_diff option) ->
   delegate:Signature.Public_key_hash.t option ->
   spendable:bool ->
   delegatable:bool ->
@@ -101,10 +101,6 @@ val paid_fees: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 val add_to_paid_fees: Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
 module Big_map : sig
-  val set :
-    Raw_context.t -> Contract_repr.t -> string -> Script_repr.expr -> Raw_context.t tzresult Lwt.t
-  val remove :
-    Raw_context.t -> Contract_repr.t -> string -> Raw_context.t tzresult Lwt.t
   val mem :
     Raw_context.t -> Contract_repr.t -> string -> (Raw_context.t * bool) tzresult Lwt.t
   val get_opt :
