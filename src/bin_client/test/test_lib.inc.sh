@@ -34,7 +34,7 @@ register_log() {
     log_files+=("$1")
 }
 
-show_logs=yes
+show_logs="${show_logs:-yes}"
 
 display_logs() {
     if [ "$show_logs" = "yes" ]; then
@@ -121,6 +121,7 @@ assert_balance () {
     local KEY="$1"
     local EXPECTED_BALANCE="$2"
     local RESULT=$($client get balance for ${KEY})
+    echo "[Asserting balance for '$KEY']"
     if [ "${RESULT}" != "${EXPECTED_BALANCE}" ]; then
         printf "Balance assertion failed for ${KEY} on line '%s'. Expected %s but got %s.\n" \
                "$(caller)" "${EXPECTED_BALANCE}" "${RESULT}"
@@ -155,8 +156,7 @@ init_with_transfer () {
 
 
 bake_after () {
-    local ARGS="$@"
-    ${ARGS}
+    "$@"
     $client bake for bootstrap1 -max-priority 512
     sleep 1
 }
