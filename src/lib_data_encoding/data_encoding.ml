@@ -52,6 +52,7 @@ module Size = struct
   let char = 1
   let int16 = 2
   let uint16 = 2
+  let uint30 = 4
   let uint32 = 4
   let uint64 = 8
   let int31 = 4
@@ -183,8 +184,8 @@ and 'a t = {
   mutable json_encoding: 'a Json_encoding.encoding option ;
 }
 
-type signed_integer = [ `Int64 | `Int32 | `Int16 | `Int8 ]
-type unsigned_integer = [ `Int64 | `Int32 | `Uint16 | `Uint8 ]
+type signed_integer = [ `Int31 | `Int16 | `Int8 ]
+type unsigned_integer = [ `Uint30 | `Uint16 | `Uint8 ]
 type integer = [ signed_integer | unsigned_integer ]
 
 let signed_range_to_size min max : [> signed_integer ] =
@@ -192,9 +193,7 @@ let signed_range_to_size min max : [> signed_integer ] =
   then `Int8
   else if min >= ~-32_768 && max <= 32_767
   then `Int16
-  else if min >= ~-2_147_483_648 && max <= 2_147_483_647
-  then `Int32
-  else `Int64
+  else `Int31
 
 (* max should be centered at zero *)
 let unsigned_range_to_size max : [> unsigned_integer ] =
@@ -202,17 +201,13 @@ let unsigned_range_to_size max : [> unsigned_integer ] =
   then `Uint8
   else if max <= 65535
   then `Uint16
-  else if max <= 2_147_483_647 (* Unsigned int32 and int64 are not supported *)
-  then `Int32
-  else `Int64
+  else `Uint30
 
 let integer_to_size = function
-  | `Int64 -> Size.int64
-  | `Int32 -> Size.int32
+  | `Int31 -> Size.int31
   | `Int16 -> Size.int16
   | `Int8 -> Size.int8
-  | `Uint64 -> Size.uint64
-  | `Uint32 -> Size.uint32
+  | `Uint30 -> Size.uint30
   | `Uint16 -> Size.uint16
   | `Uint8 -> Size.uint8
 
@@ -550,11 +545,16 @@ module Encoding = struct
   let uint16 = make @@ Uint16
   let int31 = make @@ Int31
   let int32 = make @@ Int32
-  let ranged_int minimum maximum = make @@ RangedInt { minimum = min minimum maximum ;
-                                                       maximum = max minimum maximum }
-
-  let ranged_float minimum maximum = make @@ RangedFloat { minimum = min minimum maximum ;
-                                                           maximum = max minimum maximum }
+  let ranged_int minimum maximum =
+    let minimum = min minimum maximum
+    and maximum = max minimum maximum in
+    if minimum < ~-1_073_741_824 || 1_073_741_823 < maximum then
+      invalid_arg "Data_encoding.ranged_int" ;
+    make @@ RangedInt { minimum ; maximum  }
+  let ranged_float minimum maximum =
+    let minimum = min minimum maximum
+    and maximum = max minimum maximum in
+    make @@ RangedFloat { minimum ; maximum }
   let int64 = make @@ Int64
   let float = make @@ Float
 
@@ -1015,7 +1015,15 @@ module Binary = struct
       MBytes.set_int16 buf ofs v;
       ofs + Size.uint16
 
+    let uint30 v buf ofs =
+      if v < 0 || (Sys.int_size > 31 && v >= 1 lsl 30) then
+        invalid_arg "Data_encoding.Binary.Writer.uint30" ;
+      MBytes.set_int32 buf ofs (Int32.of_int v);
+      ofs + Size.uint30
+
     let int31 v buf ofs =
+      if Sys.int_size > 31 && (v < ~- (1 lsl 30) || v >= 1 lsl 30) then
+        invalid_arg "Data_encoding.Binary.Writer.int31" ;
       MBytes.set_int32 buf ofs (Int32.of_int v);
       ofs + Size.int31
 
@@ -1111,7 +1119,14 @@ module Binary = struct
         invalid_arg "Data_encoding.Binary.Writer.uint16" ;
       MBytes_buffer.write_int16 buf v
 
+    let uint30 v buf =
+      if v < 0 || (Sys.int_size > 31 && v >= 1 lsl 30) then
+        invalid_arg "Data_encoding.Binary.Writer.uint30" ;
+      MBytes_buffer.write_int32 buf (Int32.of_int v)
+
     let int31 v buf =
+      if Sys.int_size > 31 && (v < ~- (1 lsl 30) || v >= 1 lsl 30) then
+        invalid_arg "Data_encoding.Binary.Writer.int31" ;
       MBytes_buffer.write_int32 buf (Int32.of_int v)
 
     let int32 v buf =
@@ -1180,12 +1195,12 @@ module Binary = struct
             then invalid_arg (Printf.sprintf "Integer %d not in range [%d, %d]." v minimum maximum) ;
             let v = if minimum >= 0 then v - minimum else v in
             match range_to_size ~minimum ~maximum with
-            | `Uint16 -> uint16 v
             | `Uint8 -> uint8 v
+            | `Uint16 -> uint16 v
+            | `Uint30 -> uint30 v
             | `Int8 -> int8 v
-            | `Int64 -> int64 (Int64.of_int v)
             | `Int16 -> int16 v
-            | `Int32 -> int32 (Int32.of_int v)
+            | `Int31 -> int31 v
           end
     | Float -> float
     | RangedFloat { minimum ; maximum } ->
@@ -1203,10 +1218,9 @@ module Binary = struct
         (fun v ->
            let value = get_string_enum_case tbl v in
            match enum_size arr with
-           | `Int64 -> int64 (Int64.of_int value)
+           | `Uint30 -> uint30 value
            | `Uint16 -> uint16 value
-           | `Uint8 -> uint8 value
-           | `Int32 -> int32 (Int32.of_int value))
+           | `Uint8 -> uint8 value)
     | Obj (Req (_, e)) -> write_rec e
     | Obj (Opt (`Dynamic, _, e)) ->
         let write = write_rec e in
@@ -1266,12 +1280,12 @@ module Binary = struct
           let value = if minimum >= 0 then value - minimum else value in
           begin
             match range_to_size ~minimum ~maximum with
+            | `Uint30 -> uint30 value buffer
             | `Uint16 -> uint16 value buffer
             | `Uint8 -> uint8 value buffer
             | `Int8 -> int8 value buffer
-            | `Int64 -> int64 (Int64.of_int value) buffer
             | `Int16 -> int16 value buffer
-            | `Int32 -> int32 (Int32.of_int value) buffer
+            | `Int31 -> int31 value buffer
           end
       | RangedFloat { minimum ; maximum } ->
           if value < minimum || value > maximum
@@ -1280,10 +1294,9 @@ module Binary = struct
           float value buffer
       | String_enum (tbl, arr) ->
           (match enum_size arr with
+           | `Uint30 -> BufferedWriter.uint30
            | `Uint16 -> BufferedWriter.uint16
-           | `Uint8 -> BufferedWriter.uint8
-           | `Int64 -> (fun x -> BufferedWriter.int64 (Int64.of_int x))
-           | `Int32 -> (fun x -> BufferedWriter.int32 (Int32.of_int x)))
+           | `Uint8 -> BufferedWriter.uint8)
             (get_string_enum_case tbl value)
             buffer
       | Obj (Req (_, e)) -> write_rec_buffer e value buffer
@@ -1387,6 +1400,12 @@ module Binary = struct
 
     let uint16 buf ofs _len =
       ofs + Size.uint16, MBytes.get_uint16 buf ofs
+
+    let uint30 buf ofs _len =
+      let v = Int32.to_int (MBytes.get_int32 buf ofs) in
+      if v < 0 then
+        failwith "Data_encoding.Binary.Reader.uint30: invalid data." ;
+      ofs + Size.uint30, v
 
     let int31 buf ofs _len =
       ofs + Size.int31, Int32.to_int (MBytes.get_int32 buf ofs)
@@ -1499,11 +1518,11 @@ module Binary = struct
            let ofs, value =
              match range_to_size ~minimum ~maximum with
              | `Int8 -> int8 buf ofs alpha
-             | `Int64 -> let ofs, int64 = int64 buf ofs alpha in (ofs, Int64.to_int int64)
-             | `Uint16 -> uint16 buf ofs alpha
              | `Int16 -> int16 buf ofs alpha
+             | `Int31 -> int31 buf ofs alpha
              | `Uint8 -> uint8 buf ofs alpha
-             | `Int32 -> let ofs, int32 = int32 buf ofs alpha in (ofs, Int32.to_int int32) in
+             | `Uint16 -> uint16 buf ofs alpha
+             | `Uint30 -> uint30 buf ofs alpha in
            let value = if minimum > 0 then value + minimum else value in
            if value < minimum || value > maximum
            then raise (Int_out_of_range (value, minimum, maximum)) ;
@@ -1525,8 +1544,7 @@ module Binary = struct
             match enum_size arr with
             | `Uint8 -> uint8 buf ofs a
             | `Uint16 -> uint16 buf ofs a
-            | `Int64 -> let ofs, i64 = int64 buf ofs a in (ofs, Int64.to_int i64)
-            | `Int32 -> let ofs, i64 = int32 buf ofs a in (ofs, Int32.to_int i64) in
+            | `Uint30 -> uint30 buf ofs a in
           if ind >= Array.length arr
           then raise No_case_matched
           else (ofs, arr.(ind))
@@ -1715,6 +1733,14 @@ module Binary = struct
     let uint16 buf =
       generic_read_data Size.uint16 (fun x y _ -> MBytes.get_uint16 x y) buf
 
+    let uint30 buf =
+      generic_read_data Size.uint30
+        (fun x y _ ->
+           let v = Int32.to_int (MBytes.get_int32 x y) in
+           if v < 0 then
+             failwith "Data_encoding.Binary.Reader.uint30: invalid data." ;
+           v) buf
+
     let int31 buf =
       generic_read_data Size.int31
         (fun x y _ -> Int32.to_int (MBytes.get_int32 x y)) buf
@@ -1773,13 +1799,13 @@ module Binary = struct
           | Int64  -> next_path path (fst (int64  buf))
           | RangedInt { minimum ; maximum }  ->
               let (stream, ranged) =
-                (match range_to_size ~minimum ~maximum with
-                 | `Int8 -> int8 buf
-                 | `Int64 -> let stream, int = int64 buf in (stream, Int64.to_int int)
-                 | `Uint16 -> uint16 buf
-                 | `Int16 -> int16 buf
-                 | `Uint8 -> uint8 buf
-                 | `Int32 -> let stream, int = int32 buf in (stream, Int32.to_int int)) in
+                match range_to_size ~minimum ~maximum with
+                | `Int8 -> int8 buf
+                | `Int16 -> int16 buf
+                | `Int31 -> int31 buf
+                | `Uint8 -> uint8 buf
+                | `Uint16 -> uint16 buf
+                | `Uint30 -> uint30 buf in
               let ranged = if minimum > 0 then ranged + minimum else ranged in
               assert (minimum < ranged && ranged < maximum) ;
               next_path path stream
@@ -1803,10 +1829,10 @@ module Binary = struct
           | String_enum (_, arr) ->
               next_path path
                 (match enum_size arr with
-                 | `Int64 -> fst @@ int64 buf
-                 | `Uint16 -> fst @@ uint16 buf
                  | `Uint8 -> fst @@ uint8 buf
-                 | `Int32 -> fst @@ int32 buf)
+                 | `Uint16 -> fst @@ uint16 buf
+                 | `Uint30 -> fst @@ uint30 buf)
+
           | Array e ->
               let p = P_list { path ; encoding = e ; base_ofs = buf.ofs ;
                                data_len = len ; nb_elts_read = 0 } in
