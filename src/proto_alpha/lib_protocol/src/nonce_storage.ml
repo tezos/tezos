@@ -33,17 +33,17 @@ let get_unrevealed c level =
   | Revealed _ -> fail Previously_revealed_nonce
   | Unrevealed status -> return status
 
-let record_hash c unrevealed =
-  let level = Level_storage.current c in
-  Storage.Seed.Nonce.init c level (Unrevealed unrevealed)
+let record_hash ctxt unrevealed =
+  let level = Level_storage.current ctxt in
+  Storage.Seed.Nonce.init ctxt level (Unrevealed unrevealed)
 
-let reveal c level nonce =
-  get_unrevealed c level >>=? fun unrevealed ->
+let reveal ctxt level nonce =
+  get_unrevealed ctxt level >>=? fun unrevealed ->
   fail_unless
     (Seed_repr.check_hash nonce unrevealed.nonce_hash)
     Unexpected_nonce >>=? fun () ->
-  Storage.Seed.Nonce.set c level (Revealed nonce) >>=? fun c ->
-  return c
+  Storage.Seed.Nonce.set ctxt level (Revealed nonce) >>=? fun ctxt ->
+  return ctxt
 
 type unrevealed = Storage.Seed.unrevealed_nonce = {
   nonce_hash: Nonce_hash.t ;
@@ -57,7 +57,7 @@ type status = Storage.Seed.nonce_status =
   | Unrevealed of unrevealed
   | Revealed of Seed_repr.nonce
 
-let get c level = Storage.Seed.Nonce.get c level
+let get = Storage.Seed.Nonce.get
 
 let of_bytes = Seed_repr.make_nonce
 let hash = Seed_repr.hash
