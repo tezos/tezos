@@ -206,3 +206,12 @@ let double_baking ctxt bh1 bh2 =
         signature = None ;
       } ;
   }
+
+let seed_nonce_revelation ctxt level nonce =
+  return
+    { shell = { branch = Context.branch ctxt } ;
+      protocol_data = Operation_data {
+          contents = Single (Seed_nonce_revelation { level ; nonce }) ;
+          signature = None ;
+        } ;
+    }

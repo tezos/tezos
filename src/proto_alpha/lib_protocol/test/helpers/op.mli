@@ -74,3 +74,7 @@ val activation:
   Context.t ->
   Signature.Public_key_hash.t -> Blinded_public_key_hash.activation_code ->
   Operation.packed tzresult Lwt.t
+
+(** Reveals a seed_nonce that was previously committed at a certain level *)
+val seed_nonce_revelation:
+  Context.t -> Raw_level.t -> Nonce.t -> Operation.packed tzresult Lwt.t
