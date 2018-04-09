@@ -92,14 +92,9 @@ type validation_state = Updater.validation_result
 let current_context ({ context ; _ } : validation_state) =
   return context
 
-let precheck_block
-    ~ancestor_context:_
-    ~ancestor_timestamp:_
-    _block_header =
-  return ()
-
 (* temporary hardcoded key to be removed... *)
 let protocol_parameters_key = [ "protocol_parameters" ]
+
 let prepare_application ctxt command level timestamp fitness =
   match command with
   | Data.Command.Activate { protocol = hash ; fitness ; protocol_parameters } ->
@@ -130,6 +125,17 @@ let begin_application
   check_signature ctxt block_header >>=? fun () ->
   prepare_application ctxt block_header.protocol_data.command
     block_header.shell.level block_header.shell.timestamp block_header.shell.fitness
+
+let begin_partial_application
+    ~ancestor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    block_header =
+  begin_application
+    ~predecessor_context:ancestor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    block_header
 
 let begin_construction
     ~predecessor_context:ctxt

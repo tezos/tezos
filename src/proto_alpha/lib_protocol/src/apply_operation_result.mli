@@ -39,6 +39,7 @@ type 'kind operation_metadata = {
 
 and packed_operation_metadata =
   | Operation_metadata : 'kind operation_metadata -> packed_operation_metadata
+  | No_operation_metadata : packed_operation_metadata
 
 (** Result of applying a {!Operation.contents_list}. Follows the same structure. *)
 and 'kind contents_result_list =

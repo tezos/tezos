@@ -897,6 +897,7 @@ module Operation : sig
     proto: MBytes.t ;
   }
   val raw_encoding: raw Data_encoding.t
+  val contents_list_encoding: packed_contents_list Data_encoding.t
 
   type 'kind t = 'kind operation = {
     shell: Operation.shell_header ;

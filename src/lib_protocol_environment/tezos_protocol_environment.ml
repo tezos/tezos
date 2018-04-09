@@ -81,11 +81,12 @@ module Make (Context : CONTEXT) = struct
     val compare_operations: operation -> operation -> int
     type validation_state
     val current_context: validation_state -> context tzresult Lwt.t
-    val precheck_block:
+    val begin_partial_application:
       ancestor_context: context ->
-      ancestor_timestamp: Time.t ->
+      predecessor_timestamp: Time.t ->
+      predecessor_fitness: Fitness.t ->
       block_header ->
-      unit tzresult Lwt.t
+      validation_state tzresult Lwt.t
     val begin_application:
       predecessor_context: context ->
       predecessor_timestamp: Time.t ->
@@ -631,11 +632,11 @@ module Make (Context : CONTEXT) = struct
 
     module Lift(P : Updater.PROTOCOL) = struct
       include P
-      let precheck_block
-          ~ancestor_context ~ancestor_timestamp
+      let begin_partial_application
+          ~ancestor_context ~predecessor_timestamp ~predecessor_fitness
           raw_block =
-        precheck_block
-          ~ancestor_context ~ancestor_timestamp
+        begin_partial_application
+          ~ancestor_context ~predecessor_timestamp ~predecessor_fitness
           raw_block >|= wrap_error
       let begin_application
           ~predecessor_context ~predecessor_timestamp

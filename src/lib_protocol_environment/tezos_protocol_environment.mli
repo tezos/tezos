@@ -74,11 +74,12 @@ module Make (Context : CONTEXT) : sig
     val compare_operations: operation -> operation -> int
     type validation_state
     val current_context: validation_state -> context tzresult Lwt.t
-    val precheck_block:
+    val begin_partial_application:
       ancestor_context: context ->
-      ancestor_timestamp: Time.t ->
+      predecessor_timestamp: Time.t ->
+      predecessor_fitness: Fitness.t ->
       block_header ->
-      unit tzresult Lwt.t
+      validation_state tzresult Lwt.t
     val begin_application:
       predecessor_context: context ->
       predecessor_timestamp: Time.t ->

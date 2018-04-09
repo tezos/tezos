@@ -592,6 +592,7 @@ end
 
 let encoding = Encoding.operation_encoding
 let contents_encoding = Encoding.contents_encoding
+let contents_list_encoding = Encoding.contents_list_encoding
 let protocol_data_encoding = Encoding.protocol_data_encoding
 let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
 let internal_operation_encoding = Encoding.internal_operation_encoding

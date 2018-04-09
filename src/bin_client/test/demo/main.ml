@@ -93,6 +93,17 @@ let begin_application
   Fitness.to_int64 raw_block.shell.fitness >>=? fun fitness ->
   return { context ; fitness }
 
+let begin_partial_application
+    ~ancestor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    raw_block =
+  begin_application
+    ~predecessor_context:ancestor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    raw_block
+
 let begin_construction
     ~predecessor_context:context
     ~predecessor_timestamp:_

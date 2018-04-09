@@ -80,13 +80,6 @@ module Fitness = struct
 
 end
 
-let precheck_block
-    ~ancestor_context:_
-    ~ancestor_timestamp:_
-    (raw_block: block_header) =
-  Fitness.to_int64 raw_block.shell.fitness >>=? fun _ ->
-  return ()
-
 let begin_application
     ~predecessor_context:context
     ~predecessor_timestamp:_
@@ -94,6 +87,17 @@ let begin_application
     (raw_block: block_header) =
   Fitness.to_int64 raw_block.shell.fitness >>=? fun fitness ->
   return { context ; fitness }
+
+let begin_partial_application
+    ~ancestor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    block_header =
+  begin_application
+    ~predecessor_context:ancestor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    block_header
 
 let begin_construction
     ~predecessor_context:context

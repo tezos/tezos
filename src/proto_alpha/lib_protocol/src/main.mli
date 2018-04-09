@@ -14,6 +14,10 @@ type validation_mode =
       block_header : Alpha_context.Block_header.t ;
       baker : Alpha_context.public_key_hash ;
     }
+  | Partial_application of {
+      block_header : Alpha_context.Block_header.t ;
+      baker : Alpha_context.public_key_hash ;
+    }
   | Partial_construction of {
       predecessor : Block_hash.t ;
     }

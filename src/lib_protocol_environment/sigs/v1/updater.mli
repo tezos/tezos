@@ -138,12 +138,17 @@ module type PROTOCOL = sig
       function should run quickly, as its main use is to reject bad
       blocks from the chain as early as possible. The input context
       is the one resulting of an ancestor block of same protocol
-      version, not necessarily the one of its predecessor. *)
-  val precheck_block:
+      version. This ancestor of the current head is guaranteed to be
+      more recent than `last_allowed_fork_level`.
+
+      The resulting `validation_state` will be used for multi-pass
+      validation. *)
+  val begin_partial_application:
     ancestor_context: Context.t ->
-    ancestor_timestamp: Time.t ->
+    predecessor_timestamp: Time.t ->
+    predecessor_fitness: Fitness.t ->
     block_header ->
-    unit tzresult Lwt.t
+    validation_state tzresult Lwt.t
 
   (** The first step in a block validation sequence. Initializes a
       validation context for validating a block. Takes as argument the

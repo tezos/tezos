@@ -324,12 +324,15 @@ let inject_operation
           ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
         Alpha_block_services.Operation.operation
           cctxt ~block:(`Hash (h, 0)) i j >>=? fun op' ->
-        let Operation_metadata receipt = op'.receipt in
-        match Apply_operation_result.kind_equal_list contents receipt.contents
-        with
-        | Some Apply_operation_result.Eq ->
-            return (receipt : kind operation_metadata)
-        | None -> failwith "Internal error: unexpected receipt."
+        match op'.receipt with
+        | No_operation_metadata ->
+            failwith "Internal error: unexpected receipt."
+        | Operation_metadata receipt ->
+            match Apply_operation_result.kind_equal_list contents receipt.contents
+            with
+            | Some Apply_operation_result.Eq ->
+                return (receipt : kind operation_metadata)
+            | None -> failwith "Internal error: unexpected receipt."
   end >>=? fun result ->
   cctxt#message
     "@[<v 2>This sequence of operations was run:@,%a@]"
