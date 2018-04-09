@@ -62,6 +62,15 @@ let commands () =
     Clic.parameter (fun _ data ->
         Lwt.return (Micheline_parser.no_parsing_error
                     @@ Michelson_v1_parser.parse_expression data)) in
+  let hash_parameter =
+    Clic.parameter
+      (fun _cctxt hash -> return @@ MBytes.of_string hash) in
+  let signature_parameter =
+    Clic.parameter
+      (fun _cctxt s ->
+         match Signature.of_b58check_opt s with
+         | Some s -> return s
+         | None -> failwith "Not given a valid signature") in
   [
 
     command ~group ~desc: "Lists all programs in the library."
@@ -236,5 +245,32 @@ let commands () =
                  errs >>= fun () ->
                cctxt#error "ill-formed data"
          end >>= return) ;
+
+    command ~group
+      ~desc: "Ask the node to check the signature of a hashed expression."
+      (args1 (switch ~doc:"Use only exit codes" ~short:'q' ~long:"quiet" ()))
+      (prefixes [ "check" ; "that" ]
+       @@ Clic.param ~name:"hash" ~desc:"the hashed data"
+         hash_parameter
+       @@ prefixes [ "was" ; "signed" ; "by" ]
+       @@ Client_keys.Public_key.alias_param
+         ~name:"key"
+       @@ prefixes [ "to" ; "produce" ]
+       @@ Clic.param ~name:"signature" ~desc:"the signature to check"
+         signature_parameter
+       @@ stop)
+      (fun quiet hashed (_, key_locator) signature (cctxt : #Proto_alpha.full) ->
+         Client_keys.check key_locator signature hashed >>=? fun res ->
+         begin
+           if quiet
+           then if res
+             then return ()
+             else failwith "Not signed"
+           else begin if res
+             then cctxt#message "Signed with key"
+             else cctxt#message "Not signed with key"
+           end >>= return
+         end
+      ) ;
 
   ]

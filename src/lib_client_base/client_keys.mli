@@ -48,6 +48,7 @@ module type SIGNER = sig
     sk_uri -> MBytes.t -> Signature.t tzresult Lwt.t
     (** [sign ?watermark sk data] is signature obtained by signing [data] with
         [sk]. *)
+
 end
 
 val register_signer : (module SIGNER) -> unit
@@ -69,6 +70,10 @@ val sign :
 val append :
   ?watermark:Signature.watermark ->
   sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+
+val check :
+  ?watermark:Signature.watermark ->
+  pk_uri -> Signature.t -> MBytes.t -> bool tzresult Lwt.t
 
 val register_key :
   #Client_context.wallet ->

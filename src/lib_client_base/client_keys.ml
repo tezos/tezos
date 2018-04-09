@@ -134,6 +134,10 @@ let append ?watermark loc buf =
   sign ?watermark loc buf >>|? fun signature ->
   Signature.concat buf signature
 
+let check ?watermark pk_uri signature buf =
+  public_key pk_uri >>=? fun pk ->
+  return (Signature.check ?watermark pk signature buf)
+
 let register_key cctxt ?(force=false) (public_key_hash, pk_uri, sk_uri) name =
   Public_key.add ~force cctxt name pk_uri >>=? fun () ->
   Secret_key.add ~force cctxt name sk_uri >>=? fun () ->
