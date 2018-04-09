@@ -59,18 +59,20 @@ let () =
     (function Unexpected_nonce -> Some () | _ -> None)
     (fun () -> Unexpected_nonce)
 
+let get_unrevealed ctxt level =
+  let revealed_cycle =
+    let cur_level = Level_storage.current ctxt in
     match Cycle_repr.pred cur_level.cycle with
     | None -> Cycle_repr.root
     | Some min_cycle -> min_cycle in
-  fail_unless
-    Cycle_repr.(min_cycle <= level.Level_repr.cycle)
-    Too_late_revelation >>=? fun () ->
-  fail_unless
-    Raw_level_repr.(level.level < cur_level.level)
-    Too_early_revelation >>=? fun () ->
-  Storage.Seed.Nonce.get c level >>=? function
-  | Revealed _ -> fail Previously_revealed_nonce
-  | Unrevealed status -> return status
+  if Cycle_repr.(revealed_cycle < level.Level_repr.cycle) then
+    fail Too_early_revelation
+  else if Cycle_repr.(level.Level_repr.cycle < revealed_cycle) then
+    fail Too_late_revelation
+  else
+    Storage.Seed.Nonce.get ctxt level >>=? function
+    | Revealed _ -> fail Previously_revealed_nonce
+    | Unrevealed status -> return status
 
 let record_hash ctxt unrevealed =
   let level = Level_storage.current ctxt in
