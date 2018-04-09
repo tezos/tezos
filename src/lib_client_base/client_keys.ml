@@ -142,6 +142,7 @@ let find_signer_for_key cctxt ~scheme =
   | signer, false ->
       let module Signer = (val signer : SIGNER) in
       Signer.init cctxt >>=? fun () ->
+      Hashtbl.replace signers_table scheme (signer, true) ;
       return signer
   | signer, true -> return signer
 
