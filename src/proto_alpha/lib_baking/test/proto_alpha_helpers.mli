@@ -106,9 +106,6 @@ module Baking : sig
     Operation.raw list ->
     Block_hash.t tzresult Lwt.t
 
-  val endorsement_reward:
-    Block_services.block -> int64 tzresult Lwt.t
-
 end
 
 module Endorse : sig
@@ -210,3 +207,5 @@ module Assert : sig
 end
 
 val display_level: Block_services.block -> unit tzresult Lwt.t
+
+val endorsement_security_deposit: Block_services.block -> Tez.t tzresult Lwt.t

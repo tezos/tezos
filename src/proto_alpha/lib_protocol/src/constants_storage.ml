@@ -49,5 +49,23 @@ let tokens_per_roll c =
 let michelson_maximum_type_size c =
   let constants = Raw_context.constants c in
   constants.michelson_maximum_type_size
+let seed_nonce_revelation_tip c =
+  let constants = Raw_context.constants c in
+  constants.seed_nonce_revelation_tip
+let origination_burn c =
+  let constants = Raw_context.constants c in
+  constants.origination_burn
+let block_security_deposit c =
+  let constants = Raw_context.constants c in
+  constants.block_security_deposit
+let endorsement_security_deposit c =
+  let constants = Raw_context.constants c in
+  constants.endorsement_security_deposit
+let block_reward c =
+  let constants = Raw_context.constants c in
+  constants.block_reward
+let endorsement_reward c =
+  let constants = Raw_context.constants c in
+  constants.endorsement_reward
 let parametric c =
   Raw_context.constants c

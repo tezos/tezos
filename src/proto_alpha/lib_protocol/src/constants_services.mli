@@ -39,6 +39,24 @@ val max_gas:
 val proof_of_work_threshold:
   'a #RPC_context.simple -> 'a -> Int64.t shell_tzresult Lwt.t
 
+val seed_nonce_revelation_tip:
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
+
+val origination_burn:
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
+
+val block_security_deposit:
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
+
+val endorsement_security_deposit:
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
+
+val block_reward:
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
+
+val endorsement_reward:
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
+
 val errors:
   'a #RPC_context.simple -> 'a -> Data_encoding.json_schema shell_tzresult Lwt.t
 

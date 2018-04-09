@@ -12,42 +12,10 @@ let proof_of_work_nonce_size = 8
 let nonce_length = 32
 let max_revelations_per_block = 32
 
-(* 1/8 tez *)
-let seed_nonce_revelation_tip =
-  match Tez_repr.(one /? 8L) with
-  | Ok c -> c
-  | Error _ -> assert false
-
-(* 1 tez *)
-let origination_burn =
-  Tez_repr.one
-
-(* 512 tez *)
-let block_security_deposit =
-  Tez_repr.(mul_exn one 512)
-
-(* 64 tez *)
-let endorsement_security_deposit =
-  Tez_repr.(mul_exn one 64)
-
-(* 16 tez *)
-let block_reward =
-  Tez_repr.(mul_exn one 16)
-
-(* 2 tez *)
-let endorsement_reward =
-  Tez_repr.(mul_exn one 2)
-
 type fixed = {
   proof_of_work_nonce_size : int ;
   nonce_length : int ;
   max_revelations_per_block : int ;
-  seed_nonce_revelation_tip : Tez_repr.t ;
-  origination_burn : Tez_repr.t ;
-  block_security_deposit : Tez_repr.t ;
-  endorsement_security_deposit : Tez_repr.t ;
-  block_reward : Tez_repr.t ;
-  endorsement_reward : Tez_repr.t ;
 }
 
 let fixed_encoding =
@@ -56,53 +24,23 @@ let fixed_encoding =
     (fun c ->
        ( c.proof_of_work_nonce_size,
          c.nonce_length,
-         c.max_revelations_per_block,
-         c.seed_nonce_revelation_tip,
-         c.origination_burn,
-         c.block_security_deposit,
-         c.endorsement_security_deposit,
-         c.block_reward,
-         c.endorsement_reward ))
+         c.max_revelations_per_block ))
     (fun ( proof_of_work_nonce_size,
            nonce_length,
-           max_revelations_per_block,
-           seed_nonce_revelation_tip,
-           origination_burn,
-           block_security_deposit,
-           endorsement_security_deposit,
-           block_reward,
-           endorsement_reward) ->
+           max_revelations_per_block ) ->
       { proof_of_work_nonce_size ;
         nonce_length ;
         max_revelations_per_block ;
-        seed_nonce_revelation_tip ;
-        origination_burn ;
-        block_security_deposit ;
-        endorsement_security_deposit ;
-        block_reward ;
-        endorsement_reward ;
       } )
-    (obj9
+    (obj3
        (req "proof_of_work_nonce_size" uint8)
        (req "nonce_length" uint8)
-       (req "max_revelations_per_block" uint8)
-       (req "seed_nonce_revelation_tip" Tez_repr.encoding)
-       (req "origination_burn" Tez_repr.encoding)
-       (req "block_security_deposit" Tez_repr.encoding)
-       (req "endorsement_security_deposit" Tez_repr.encoding)
-       (req "block_reward" Tez_repr.encoding)
-       (req "endorsement_reward" Tez_repr.encoding))
+       (req "max_revelations_per_block" uint8))
 
 let fixed = {
   proof_of_work_nonce_size ;
   nonce_length ;
   max_revelations_per_block ;
-  seed_nonce_revelation_tip ;
-  origination_burn ;
-  block_security_deposit ;
-  endorsement_security_deposit ;
-  block_reward ;
-  endorsement_reward ;
 }
 
 type parametric = {
@@ -120,6 +58,12 @@ type parametric = {
   max_operation_data_length: int ;
   tokens_per_roll: Tez_repr.t ;
   michelson_maximum_type_size: int;
+  seed_nonce_revelation_tip: Tez_repr.t ;
+  origination_burn: Tez_repr.t ;
+  block_security_deposit: Tez_repr.t ;
+  endorsement_security_deposit: Tez_repr.t ;
+  block_reward: Tez_repr.t ;
+  endorsement_reward: Tez_repr.t ;
 }
 
 let default = {
@@ -143,11 +87,17 @@ let default = {
   tokens_per_roll =
     Tez_repr.(mul_exn one 10_000) ;
   michelson_maximum_type_size = 1000 ;
+  seed_nonce_revelation_tip = begin
+    match Tez_repr.(one /? 8L) with
+    | Ok c -> c
+    | Error _ -> assert false
+  end ;
+  origination_burn = Tez_repr.one ;
+  block_security_deposit = Tez_repr.(mul_exn one 512) ;
+  endorsement_security_deposit = Tez_repr.(mul_exn one 64) ;
+  block_reward = Tez_repr.(mul_exn one 16) ;
+  endorsement_reward = Tez_repr.(mul_exn one 2) ;
 }
-
-let map_option f = function
-  | None -> None
-  | Some x -> Some (f x)
 
 module CompareListInt = Compare.List (Compare.Int)
 
@@ -203,6 +153,24 @@ let sandbox_encoding =
        and michelson_maximum_type_size =
          opt Compare.Int.(=)
            default.michelson_maximum_type_size c.michelson_maximum_type_size
+       and seed_nonce_revelation_tip =
+         opt Tez_repr.(=)
+           default.seed_nonce_revelation_tip c.seed_nonce_revelation_tip
+       and origination_burn =
+         opt Tez_repr.(=)
+           default.origination_burn c.origination_burn
+       and block_security_deposit =
+         opt Tez_repr.(=)
+           default.block_security_deposit c.block_security_deposit
+       and endorsement_security_deposit =
+         opt Tez_repr.(=)
+           default.endorsement_security_deposit c.endorsement_security_deposit
+       and block_reward =
+         opt Tez_repr.(=)
+           default.block_reward c.block_reward
+       and endorsement_reward =
+         opt Tez_repr.(=)
+           default.endorsement_reward c.endorsement_reward
        in
        ((( preserved_cycles,
            blocks_per_cycle,
@@ -212,12 +180,18 @@ let sandbox_encoding =
            time_between_blocks,
            first_free_baking_slot,
            endorsers_per_block,
-           max_gas),
-         ( proof_of_work_threshold,
-           dictator_pubkey,
+           max_gas,
+           proof_of_work_threshold),
+         ( dictator_pubkey,
            max_operation_data_length,
            tokens_per_roll,
-           michelson_maximum_type_size)), ()) )
+           michelson_maximum_type_size,
+           seed_nonce_revelation_tip,
+           origination_burn,
+           block_security_deposit,
+           endorsement_security_deposit,
+           block_reward,
+           endorsement_reward)), ()) )
     (fun ((( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -226,12 +200,18 @@ let sandbox_encoding =
              time_between_blocks,
              first_free_baking_slot,
              endorsers_per_block,
-             max_gas),
-           ( proof_of_work_threshold,
-             dictator_pubkey,
+             max_gas,
+             proof_of_work_threshold),
+           ( dictator_pubkey,
              max_operation_data_length,
              tokens_per_roll,
-             michelson_maximum_type_size)), ()) ->
+             michelson_maximum_type_size,
+             seed_nonce_revelation_tip,
+             origination_burn,
+             block_security_deposit,
+             endorsement_security_deposit,
+             block_reward,
+             endorsement_reward)), ()) ->
       let unopt def = function None -> def | Some v -> v in
       { preserved_cycles =
           unopt default.preserved_cycles preserved_cycles ;
@@ -262,10 +242,22 @@ let sandbox_encoding =
           unopt default.tokens_per_roll tokens_per_roll ;
         michelson_maximum_type_size =
           unopt default.michelson_maximum_type_size michelson_maximum_type_size ;
+        seed_nonce_revelation_tip =
+          unopt default.seed_nonce_revelation_tip seed_nonce_revelation_tip ;
+        origination_burn =
+          unopt default.origination_burn origination_burn ;
+        block_security_deposit =
+          unopt default.block_security_deposit block_security_deposit ;
+        endorsement_security_deposit =
+          unopt default.endorsement_security_deposit endorsement_security_deposit ;
+        block_reward =
+          unopt default.block_reward block_reward ;
+        endorsement_reward =
+          unopt default.endorsement_reward endorsement_reward ;
       } )
     (merge_objs
        (merge_objs
-          (obj9
+          (obj10
              (opt "preserved_cycles" uint8)
              (opt "blocks_per_cycle" int32)
              (opt "blocks_per_commitment" int32)
@@ -274,14 +266,19 @@ let sandbox_encoding =
              (opt "time_between_blocks" (list Period_repr.encoding))
              (opt "first_free_baking_slot" uint16)
              (opt "endorsers_per_block" uint16)
-             (opt "instructions_per_transaction" int31))
-          (obj5
-             (opt "proof_of_work_threshold" int64)
+             (opt "instructions_per_transaction" int31)
+             (opt "proof_of_work_threshold" int64))
+          (obj10
              (opt "dictator_pubkey" Ed25519.Public_key.encoding)
              (opt "max_operation_data_length" int31)
              (opt "tokens_per_roll" Tez_repr.encoding)
              (opt "michelson_maximum_type_size" uint16)
-          ))
+             (opt "seed_nonce_revelation_tip" Tez_repr.encoding)
+             (opt "origination_burn" Tez_repr.encoding)
+             (opt "block_security_deposit" Tez_repr.encoding)
+             (opt "endorsement_security_deposit" Tez_repr.encoding)
+             (opt "block_reward" Tez_repr.encoding)
+             (opt "endorsement_reward" Tez_repr.encoding)))
        unit)
 
 let parametric_encoding =
@@ -296,12 +293,18 @@ let parametric_encoding =
           c.time_between_blocks,
           c.first_free_baking_slot,
           c.endorsers_per_block,
-          c.max_gas),
-        ( c.proof_of_work_threshold,
-          c.dictator_pubkey,
+          c.max_gas,
+          c.proof_of_work_threshold ),
+        ( c.dictator_pubkey,
           c.max_operation_data_length,
           c.tokens_per_roll,
-          c.michelson_maximum_type_size)) )
+          c.michelson_maximum_type_size,
+          c.seed_nonce_revelation_tip,
+          c.origination_burn,
+          c.block_security_deposit,
+          c.endorsement_security_deposit,
+          c.block_reward,
+          c.endorsement_reward)) )
     (fun (( preserved_cycles,
             blocks_per_cycle,
             blocks_per_commitment,
@@ -310,12 +313,18 @@ let parametric_encoding =
             time_between_blocks,
             first_free_baking_slot,
             endorsers_per_block,
-            max_gas),
-          ( proof_of_work_threshold,
-            dictator_pubkey,
+            max_gas,
+            proof_of_work_threshold ),
+          ( dictator_pubkey,
             max_operation_data_length,
             tokens_per_roll,
-            michelson_maximum_type_size)) ->
+            michelson_maximum_type_size,
+            seed_nonce_revelation_tip,
+            origination_burn,
+            block_security_deposit,
+            endorsement_security_deposit,
+            block_reward,
+            endorsement_reward )) ->
       { preserved_cycles ;
         blocks_per_cycle ;
         blocks_per_commitment ;
@@ -330,9 +339,15 @@ let parametric_encoding =
         max_operation_data_length ;
         tokens_per_roll ;
         michelson_maximum_type_size ;
+        seed_nonce_revelation_tip ;
+        origination_burn ;
+        block_security_deposit ;
+        endorsement_security_deposit ;
+        block_reward ;
+        endorsement_reward ;
       } )
     (merge_objs
-       (obj9
+       (obj10
           (req "preserved_cycles" uint8)
           (req "blocks_per_cycle" int32)
           (req "blocks_per_commitment" int32)
@@ -341,13 +356,19 @@ let parametric_encoding =
           (req "time_between_blocks" (list Period_repr.encoding))
           (req "first_free_baking_slot" uint16)
           (req "endorsers_per_block" uint16)
-          (req "instructions_per_transaction" int31))
-       (obj5
-          (req "proof_of_work_threshold" int64)
+          (req "instructions_per_transaction" int31)
+          (req "proof_of_work_threshold" int64))
+       (obj10
           (req "dictator_pubkey" Ed25519.Public_key.encoding)
           (req "max_operation_data_length" int31)
           (req "tokens_per_roll" Tez_repr.encoding)
-          (req "michelson_maximum_type_size" uint16)))
+          (req "michelson_maximum_type_size" uint16)
+          (req "seed_nonce_revelation_tip" Tez_repr.encoding)
+          (req "origination_burn" Tez_repr.encoding)
+          (req "block_security_deposit" Tez_repr.encoding)
+          (req "endorsement_security_deposit" Tez_repr.encoding)
+          (req "block_reward" Tez_repr.encoding)
+          (req "endorsement_reward" Tez_repr.encoding)))
 
 type t = {
   fixed : fixed ;

@@ -250,24 +250,12 @@ module Constants : sig
     proof_of_work_nonce_size : int ;
     nonce_length : int ;
     max_revelations_per_block : int ;
-    seed_nonce_revelation_tip : Tez.t ;
-    origination_burn : Tez.t ;
-    block_security_deposit : Tez.t ;
-    endorsement_security_deposit : Tez.t ;
-    block_reward : Tez.t ;
-    endorsement_reward : Tez.t ;
   }
   val fixed_encoding: fixed Data_encoding.t
   val fixed: fixed
 
   val proof_of_work_nonce_size: int
-  val block_reward: Tez.t
-  val endorsement_reward: Tez.t
   val nonce_length: int
-  val seed_nonce_revelation_tip: Tez.t
-  val origination_burn: Tez.t
-  val block_security_deposit: Tez.t
-  val endorsement_security_deposit: Tez.t
   val max_revelations_per_block: int
 
 
@@ -287,6 +275,12 @@ module Constants : sig
     max_operation_data_length: int ;
     tokens_per_roll: Tez.t ;
     michelson_maximum_type_size: int;
+    seed_nonce_revelation_tip: Tez.t ;
+    origination_burn: Tez.t ;
+    block_security_deposit: Tez.t ;
+    endorsement_security_deposit: Tez.t ;
+    block_reward: Tez.t ;
+    endorsement_reward: Tez.t ;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -305,12 +299,19 @@ module Constants : sig
   val max_operation_data_length: context -> int
   val tokens_per_roll: context -> Tez.t
   val michelson_maximum_type_size: context -> int
+  val block_reward: context -> Tez.t
+  val endorsement_reward: context -> Tez.t
+  val seed_nonce_revelation_tip: context -> Tez.t
+  val origination_burn: context -> Tez.t
+  val block_security_deposit: context -> Tez.t
+  val endorsement_security_deposit: context -> Tez.t
 
   type t = {
     fixed : fixed ;
     parametric : parametric ;
   }
   val encoding: t Data_encoding.t
+
 end
 
 module Voting_period : sig

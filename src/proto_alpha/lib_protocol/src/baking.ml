@@ -155,13 +155,13 @@ let freeze_baking_deposit ctxt { Block_header.priority ; _ } delegate =
   if Compare.Int.(priority >= Constants.first_free_baking_slot ctxt)
   then return (ctxt, Tez.zero)
   else
-    let deposit = Constants.block_security_deposit in
+    let deposit = Constants.block_security_deposit ctxt in
     Delegate.freeze_deposit ctxt delegate deposit
     |> trace Cannot_freeze_baking_deposit >>=? fun ctxt ->
     return (ctxt, deposit)
 
 let freeze_endorsement_deposit ctxt delegate =
-  let deposit = Constants.endorsement_security_deposit in
+  let deposit = Constants.endorsement_security_deposit ctxt in
   Delegate.freeze_deposit ctxt delegate deposit
   |> trace Cannot_freeze_endorsement_deposit
 
@@ -196,11 +196,11 @@ let paying_priorities c =
 
 type error += Incorect_priority
 
-let endorsement_reward ~block_priority:prio =
+let endorsement_reward ctxt ~block_priority:prio =
   if Compare.Int.(prio >= 0)
   then
     Lwt.return
-      Tez.(Constants.endorsement_reward /? (Int64.(succ (of_int prio))))
+      Tez.(Constants.endorsement_reward ctxt /? (Int64.(succ (of_int prio))))
   else fail Incorect_priority
 
 let baking_priorities c level =

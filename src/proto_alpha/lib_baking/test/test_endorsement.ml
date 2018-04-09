@@ -107,7 +107,8 @@ let test_endorsement_rewards block0 =
     done ;
     return (!account, !cpt) in
 
-  let deposit = Tez.to_mutez Constants.endorsement_security_deposit in
+  Proto_alpha_helpers.endorsement_security_deposit block0 >>=? fun deposit ->
+  let deposit = Tez.to_mutez deposit in
 
   (* Endorsement Rights *)
   (* #1 endorse & inject in a block *)

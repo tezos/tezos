@@ -721,7 +721,7 @@ let rec interp
             let gas = Gas.consume gas Gas.Cost_of.create_account in
             Gas.check gas >>=? fun () ->
             Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
-            Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
+            Lwt.return Tez.(credit -? Constants.origination_burn ctxt) >>=? fun balance ->
             Contract.originate ctxt
               origination
               ~manager ~delegate ~balance

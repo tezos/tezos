@@ -337,7 +337,7 @@ let apply_consensus_operation_content ctxt
       let delegate = Ed25519.Public_key.hash delegate in
       let ctxt = Fitness.increase ~gap:(List.length slots) ctxt in
       Baking.freeze_endorsement_deposit ctxt delegate >>=? fun ctxt ->
-      Baking.endorsement_reward ~block_priority >>=? fun reward ->
+      Baking.endorsement_reward ctxt ~block_priority >>=? fun reward ->
       Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
       return ctxt
 
@@ -494,7 +494,9 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
   | Seed_nonce_revelation { level ; nonce } ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
-      add_rewards ctxt Constants.seed_nonce_revelation_tip >>=? fun ctxt ->
+      let seed_nonce_revelation_tip =
+        Constants.seed_nonce_revelation_tip ctxt in
+      add_rewards ctxt seed_nonce_revelation_tip >>=? fun ctxt ->
       return (ctxt, origination_nonce)
   | Double_endorsement_evidence { op1 ; op2 } -> begin
       match op1.contents, op2.contents with
@@ -663,7 +665,8 @@ let begin_application ctxt block_header pred_timestamp =
   return (ctxt, delegate_pk, deposit)
 
 let finalize_application ctxt protocol_data delegate deposit =
-  add_rewards ctxt Constants.block_reward >>=? fun ctxt ->
+  let block_reward = Constants.block_reward ctxt in
+  add_rewards ctxt block_reward >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
   let fees = Alpha_context.get_fees ctxt in
   Delegate.freeze_fees ctxt delegate fees >>=? fun ctxt ->

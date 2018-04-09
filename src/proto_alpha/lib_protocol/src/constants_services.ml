@@ -96,6 +96,54 @@ module S = struct
       ~output: (obj1 (req "proof_of_work_threshold" int64))
       RPC_path.(custom_root / "proof_of_work_threshold")
 
+  let seed_nonce_revelation_tip =
+    RPC_service.post_service
+      ~description: "seed_nonce_revelation_tip"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req "seed_nonce_revelation_tip" Tez.encoding))
+      RPC_path.(custom_root / "seed_nonce_revelation_tip")
+
+  let origination_burn =
+    RPC_service.post_service
+      ~description: "origination_burn"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req "origination_burn" Tez.encoding))
+      RPC_path.(custom_root / "origination_burn")
+
+  let block_security_deposit =
+    RPC_service.post_service
+      ~description: "block_security_deposit"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req "block_security_deposit" Tez.encoding))
+      RPC_path.(custom_root / "block_security_deposit")
+
+  let endorsement_security_deposit =
+    RPC_service.post_service
+      ~description: "endorsement_security_deposit"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req "endorsement_security_deposit" Tez.encoding))
+      RPC_path.(custom_root / "endorsement_security_deposit")
+
+  let block_reward =
+    RPC_service.post_service
+      ~description: "    block_reward"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req "    block_reward" Tez.encoding))
+      RPC_path.(custom_root / "    block_reward")
+
+  let endorsement_reward =
+    RPC_service.post_service
+      ~description: " endorsement_reward"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req " endorsement_reward" Tez.encoding))
+      RPC_path.(custom_root / " endorsement_reward")
+
   let errors =
     RPC_service.post_service
       ~description: "Schema for all the RPC errors from this protocol version"
@@ -147,6 +195,24 @@ let () =
   register0 S.proof_of_work_threshold begin fun ctxt () () ->
     return (Constants.proof_of_work_threshold ctxt)
   end ;
+  register0 S.seed_nonce_revelation_tip begin fun ctxt () () ->
+    return (Constants.seed_nonce_revelation_tip ctxt)
+  end ;
+  register0 S.origination_burn begin fun ctxt () () ->
+    return (Constants.origination_burn ctxt)
+  end ;
+  register0 S.block_security_deposit begin fun ctxt () () ->
+    return (Constants.block_security_deposit ctxt)
+  end ;
+  register0 S.endorsement_security_deposit begin fun ctxt () () ->
+    return (Constants.endorsement_security_deposit ctxt)
+  end ;
+  register0 S.block_reward begin fun ctxt () () ->
+    return (Constants.block_reward ctxt)
+  end ;
+  register0 S.endorsement_reward begin fun ctxt () () ->
+    return (Constants.endorsement_reward ctxt)
+  end ;
   register0_noctxt S.errors begin fun () () ->
     return (Data_encoding.Json.(schema error_encoding))
   end ;
@@ -176,6 +242,18 @@ let max_gas ctxt block =
   RPC_context.make_call0 S.max_gas ctxt block () ()
 let proof_of_work_threshold ctxt block =
   RPC_context.make_call0 S.proof_of_work_threshold ctxt block () ()
+let seed_nonce_revelation_tip ctxt block =
+  RPC_context.make_call0 S.seed_nonce_revelation_tip ctxt block () ()
+let origination_burn ctxt block =
+  RPC_context.make_call0 S.origination_burn ctxt block () ()
+let block_security_deposit ctxt block =
+  RPC_context.make_call0 S.block_security_deposit ctxt block () ()
+let endorsement_security_deposit ctxt block =
+  RPC_context.make_call0 S.endorsement_security_deposit ctxt block () ()
+let block_reward ctxt block =
+  RPC_context.make_call0 S.block_reward ctxt block () ()
+let endorsement_reward ctxt block =
+  RPC_context.make_call0 S.endorsement_reward ctxt block () ()
 let errors ctxt block =
   RPC_context.make_call0 S.errors ctxt block () ()
 let all ctxt block =

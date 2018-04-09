@@ -480,12 +480,6 @@ module Baking = struct
       ~src_sk
       ()
 
-  let endorsement_reward block =
-    Alpha_services.priority !rpc_ctxt block >>=? fun prio ->
-    Baking.endorsement_reward ~block_priority:prio >|=
-    Alpha_environment.wrap_error >>|?
-    Tez.to_mutez
-
 end
 
 module Endorse = struct
@@ -578,3 +572,6 @@ let display_level block =
   Alpha_services.Context.level !rpc_ctxt block >>=? fun lvl ->
   Format.eprintf "Level: %a@." Level.pp_full lvl ;
   return ()
+
+let endorsement_security_deposit block =
+  Constants_services.endorsement_security_deposit !rpc_ctxt block
