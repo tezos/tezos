@@ -27,8 +27,13 @@ init_sandboxed_client() {
     [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
     [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
   ],
-  "commitments": [
-  ]
+  "dictator_pubkey":
+    "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
+  "time_between_blocks" : [ 1, 0 ],
+  "blocks_per_roll_snapshot" : 4,
+  "blocks_per_cycle" : 8,
+  "preserved_cycles" : 2,
+  "first_free_baking_slot" : 4
 }
 EOF
     fi

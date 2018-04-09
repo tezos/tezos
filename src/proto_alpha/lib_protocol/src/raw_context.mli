@@ -17,7 +17,8 @@ type storage_error =
   | Corrupted_data of string list
 
 type error += Storage_error of storage_error
-type error += Failed_to_parse_sandbox_parameter of MBytes.t
+type error += Failed_to_parse_parameter of MBytes.t
+type error += Failed_to_decode_parameter of Data_encoding.json * string
 
 val storage_error: storage_error -> 'a tzresult Lwt.t
 

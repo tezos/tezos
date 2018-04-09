@@ -16,5 +16,12 @@
     [ "tz1iDPZLxcGf5CqCNpTuuMdtu3zKpJ6HvvFR", "btz1TaSfoSNhFoqwqbPC9iC19rN24KJtB7skD", "71300478465380003" ],
     [ "tz1i2kbtVu65dP739qLGRpJNujRM8pdpkH3p", "btz1USqQRuvASPXwseXkGTWeWv4dn3VwMVPEk", "283380756728119992" ],
     [ "tz1LKGCg6ESJLDviHkT8Jc7tUwjw4h3d9MaF", "btz1YwCKMbBLRL1qkBjAHGCwjbWDqiTAEFpbw", "1357762577679880028" ]
-  ]
+  ],
+  "dictator_pubkey":
+    "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
+  "time_between_blocks" : [ 1, 0 ],
+  "blocks_per_roll_snapshot" : 4,
+  "blocks_per_cycle" : 8,
+  "preserved_cycles" : 2,
+  "first_free_baking_slot" : 4
 }

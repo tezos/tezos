@@ -44,6 +44,15 @@ let no_write_context ?(block = `Head 0) config : #Client_context.full = object
     Format.kasprintf (fun _ -> Lwt.return "")
 end
 
+let sandbox_parameters =
+  let json_result =
+    Data_encoding.Json.from_string {json|
+{ "genesis_pubkey": "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2" }
+|json} in
+  match json_result with
+  | Error err -> raise (Failure err)
+  | Ok json -> json
+
 let protocol_parameters =
   let json_result =
     Data_encoding.Json.from_string {json|
@@ -65,7 +74,13 @@ let protocol_parameters =
     [ "tz1iDPZLxcGf5CqCNpTuuMdtu3zKpJ6HvvFR", "btz1TaSfoSNhFoqwqbPC9iC19rN24KJtB7skD", "71300478465380003" ],
     [ "tz1i2kbtVu65dP739qLGRpJNujRM8pdpkH3p", "btz1USqQRuvASPXwseXkGTWeWv4dn3VwMVPEk", "283380756728119992" ],
     [ "tz1LKGCg6ESJLDviHkT8Jc7tUwjw4h3d9MaF", "btz1YwCKMbBLRL1qkBjAHGCwjbWDqiTAEFpbw", "1357762577679880028" ]
-  ]
+  ],
+  "time_between_blocks" : [ 1, 0 ],
+  "blocks_per_cycle" : 4,
+  "blocks_per_roll_snapshot" : 2,
+  "preserved_cycles" : 1,
+  "first_free_baking_slot" : 4,
+  "proof_of_work_threshold": -1
 }
 |json} in
   match json_result with
@@ -73,11 +88,37 @@ let protocol_parameters =
   | Ok json ->
       Data_encoding.Binary.to_bytes Data_encoding.json json
 
-let activate_alpha () =
+let vote_protocol_parameters =
+  let json_result =
+    Data_encoding.Json.from_string {json|
+{ "bootstrap_accounts": [
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
+    [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
+    [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
+    [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
+    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
+  ],
+  "time_between_blocks" : [ 1, 0 ],
+  "blocks_per_cycle" : 4,
+  "blocks_per_roll_snapshot" : 2,
+  "preserved_cycles" : 1,
+  "first_free_baking_slot" : 4,
+  "blocks_per_voting_period": 2,
+  "proof_of_work_threshold": -1
+}
+|json} in
+  match json_result with
+  | Error err -> raise (Failure err)
+  | Ok json ->
+      Data_encoding.Binary.to_bytes Data_encoding.json json
+
+let activate_alpha ?(vote = false) () =
   let fitness = Fitness_repr.from_int64 0L in
   let dictator_sk = Client_keys.Secret_key_locator.create
       ~scheme:"unencrypted"
       ~location:"edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6" in
+  let protocol_parameters =
+    if vote then vote_protocol_parameters else protocol_parameters in
   Tezos_client_genesis.Client_proto_main.bake
     (no_write_context ~block:(`Head 0) !rpc_config) (`Head 0)
     (Activate  { protocol = Proto_alpha.hash ;
@@ -86,7 +127,7 @@ let activate_alpha () =
                })
     dictator_sk
 
-let init ?exe ?(sandbox = "sandbox.json") ?rpc_port () =
+let init ?exe ?vote ?rpc_port () =
   begin
     match rpc_port with
     | None -> ()
@@ -98,9 +139,9 @@ let init ?exe ?(sandbox = "sandbox.json") ?rpc_port () =
     Node_helpers.fork_node
       ?exe
       ~port:!rpc_config.port
-      ~sandbox
+      ~sandbox:sandbox_parameters
       () in
-  activate_alpha () >>=? fun hash ->
+  activate_alpha ?vote () >>=? fun hash ->
   return (pid, hash)
 
 let level block =

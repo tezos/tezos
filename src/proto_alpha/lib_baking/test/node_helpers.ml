@@ -34,6 +34,16 @@ let fork_node ?exe ?(timeout = 4) ?(port = 18732) ?sandbox () =
       (Random.int 0xFF_FF_FF) in
   let log_file_name, log_file =
     Filename.open_temp_file "tezos_node_" ".log" in
+  let sandbox =
+    match sandbox with
+    | None -> None
+    | Some json ->
+        let file_name, ch =
+          Filename.open_temp_file "tezos_node_" ".log" in
+        Printf.fprintf ch "%s%!"
+          (Data_encoding.Json.to_string json) ;
+        close_out ch ;
+        Some file_name in
   let log_fd = Unix.descr_of_out_channel log_file in
   let null_fd = Unix.(openfile "/dev/null" [O_RDONLY] 0o644) in
   let exe =
@@ -48,7 +58,6 @@ let fork_node ?exe ?(timeout = 4) ?(port = 18732) ?sandbox () =
           else
             path
         with _ -> Sys.getcwd () // ".." // "bin_node" // "main.exe" in
-  Format.eprintf "EXE %s@." exe ;
   let pid =
     Unix.create_process exe
       [| "tezos-node" ;
@@ -73,7 +82,10 @@ let fork_node ?exe ?(timeout = 4) ?(port = 18732) ?sandbox () =
           | res ->
               handle_error res log_file_name
         end ;
-        ignore (Sys.command (Printf.sprintf "rm -fr \"%s\"" data_dir))
+        ignore (Sys.command (Printf.sprintf "rm -fr \"%s\"" data_dir)) ;
+        match sandbox with
+        | None -> ()
+        | Some file -> ignore (Sys.command (Printf.sprintf "rm -f \"%s\"" file))
       end ;
       pid
   | res ->

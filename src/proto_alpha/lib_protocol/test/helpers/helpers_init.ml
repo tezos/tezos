@@ -14,12 +14,7 @@ let sandbox_parameters =
   match Data_encoding.Json.from_string {json|
 {
     "genesis_pubkey":
-      "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
-    "slot_durations" : [ 1, 0 ],
-    "cycle_length" : 4,
-    "block_per_roll_snapshot" : 2,
-    "time_before_reward" : 1,
-    "first_free_baking_slot" : 4
+      "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2"
 }
 |json} with
   | Error err -> raise (Failure err)
@@ -47,7 +42,11 @@ let protocol_parameters =
     [ "tz1iDPZLxcGf5CqCNpTuuMdtu3zKpJ6HvvFR", "btz1TaSfoSNhFoqwqbPC9iC19rN24KJtB7skD", "71300478465380003" ],
     [ "tz1i2kbtVu65dP739qLGRpJNujRM8pdpkH3p", "btz1USqQRuvASPXwseXkGTWeWv4dn3VwMVPEk", "283380756728119992" ],
     [ "tz1LKGCg6ESJLDviHkT8Jc7tUwjw4h3d9MaF", "btz1YwCKMbBLRL1qkBjAHGCwjbWDqiTAEFpbw", "1357762577679880028" ]
-  ]
+  ],
+  "time_between_blocks" : [ 1, 0 ],
+  "blocks_per_cycle" : 4,
+  "blocks_per_roll_snapshot" : 2,
+  "first_free_baking_slot" : 4
 }
 |json} in
   match json_result with

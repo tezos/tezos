@@ -136,9 +136,6 @@ let version_value = "alpha"
 let version = "v1"
 let first_level_key = [ version ; "first_level" ]
 let constants_key = [ version ; "constants" ]
-
-(* temporary hardcoded key to be removed... *)
-let sandbox_param_key = [ "sandbox_parameter" ]
 let protocol_param_key = [ "protocol_parameters" ]
 
 let get_first_level ctxt =
@@ -157,31 +154,43 @@ let set_first_level ctxt level =
   Context.set ctxt first_level_key bytes >>= fun ctxt ->
   return ctxt
 
-type error += Failed_to_parse_sandbox_parameter of MBytes.t
+type error += Failed_to_parse_parameter of MBytes.t
+type error += Failed_to_decode_parameter of Data_encoding.json * string
 
 let () =
   register_error_kind
     `Temporary
-    ~id:"context.failed_to_parse_sandbox_parameter"
-    ~title: "Failed to parse sandbox parameter"
+    ~id:"context.failed_to_parse_parameter"
+    ~title: "Failed to parse parameter"
     ~description:
-      "The sandbox parameter is not a valid JSON string."
+      "The protocol parameters are not valid JSON."
     ~pp:begin fun ppf bytes ->
       Format.fprintf ppf
-        "@[<v 2>Cannot parse the sandbox parameter:@ %s@]"
+        "@[<v 2>Cannot parse the protocol parameter:@ %s@]"
         (MBytes.to_string bytes)
     end
     Data_encoding.(obj1 (req "contents" bytes))
-    (function Failed_to_parse_sandbox_parameter data -> Some data | _ -> None)
-    (fun data -> Failed_to_parse_sandbox_parameter data)
-
-let get_sandbox_param c =
-  Context.get c sandbox_param_key >>= function
-  | None -> return None
-  | Some bytes ->
-      match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
-      | None -> fail (Failed_to_parse_sandbox_parameter bytes)
-      | Some json -> return (Some json)
+    (function Failed_to_parse_parameter data -> Some data | _ -> None)
+    (fun data -> Failed_to_parse_parameter data) ;
+  register_error_kind
+    `Temporary
+    ~id:"context.failed_to_decode_parameter"
+    ~title: "Failed to decode parameter"
+    ~description:
+      "Unexpected JSON object."
+    ~pp:begin fun ppf (json, msg) ->
+      Format.fprintf ppf
+        "@[<v 2>Cannot decode the protocol parameter:@ %s@ %a@]"
+        msg
+        Data_encoding.Json.pp json
+    end
+    Data_encoding.(obj2
+                     (req "contents" json)
+                     (req "error" string))
+    (function
+      | Failed_to_decode_parameter (json, msg) -> Some (json, msg)
+      | _ -> None)
+    (fun (json, msg) -> Failed_to_decode_parameter (json, msg))
 
 let get_proto_param ctxt =
   Context.get ctxt protocol_param_key >>= function
@@ -189,7 +198,7 @@ let get_proto_param ctxt =
       failwith "Missing protocol parameters."
   | Some bytes ->
       match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
-      | None -> failwith "Invalid json"
+      | None -> fail (Failed_to_parse_parameter bytes)
       | Some json -> begin
           Context.del ctxt protocol_param_key >>= fun ctxt ->
           match Data_encoding.Json.destruct Parameters_repr.encoding json with
@@ -204,7 +213,7 @@ let get_proto_param ctxt =
 let set_constants ctxt constants =
   let bytes =
     Data_encoding.Binary.to_bytes
-      Constants_repr.parametric_encoding constants in
+      Parameters_repr.constants_encoding constants in
   Context.set ctxt constants_key bytes
 
 let get_constants ctxt =
@@ -213,7 +222,7 @@ let get_constants ctxt =
       failwith "Internal error: cannot read constants in context."
   | Some bytes ->
       match
-        Data_encoding.Binary.of_bytes Constants_repr.parametric_encoding bytes
+        Data_encoding.Binary.of_bytes Parameters_repr.constants_encoding bytes
       with
       | None ->
           failwith "Internal error: cannot parse constants in context."
@@ -267,12 +276,10 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
   check_first_block ctxt >>=? fun () ->
   Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
   get_proto_param ctxt >>=? fun (param, ctxt) ->
-  get_sandbox_param ctxt >>=? fun sandbox_param ->
-  Constants_repr.read_sandbox sandbox_param >>=? fun constants ->
   Context.set ctxt version_key
     (MBytes.of_string version_value) >>= fun ctxt ->
   set_first_level ctxt first_level >>=? fun ctxt ->
-  set_constants ctxt constants >>= fun ctxt ->
+  set_constants ctxt param.constants >>= fun ctxt ->
   prepare ctxt ~level ~timestamp ~fitness >>=? fun ctxt ->
   return (param, ctxt)
 

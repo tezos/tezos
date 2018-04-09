@@ -49,11 +49,10 @@ let run blkid =
     ) tests
 
 let exe = try Sys.argv.(1) with _ -> "tezos-node"
-let sandbox = try Sys.argv.(2) with _ -> "sandbox.json"
-let rpc_port = try int_of_string Sys.argv.(3) with _ -> 18500
+let rpc_port = try int_of_string Sys.argv.(2) with _ -> 18500
 
 let main () =
-  Helpers.init ~exe ~sandbox ~rpc_port () >>=? fun (_node_pid, genesis) ->
+  Helpers.init ~exe ~rpc_port () >>=? fun (_node_pid, genesis) ->
   run (`Hash (genesis, 0))
 
 let tests = [
