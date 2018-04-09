@@ -74,19 +74,20 @@ module Encrypted_signer : SIGNER = struct
       if Secret_key_locator.scheme skloc <> scheme then
         Lwt.return a
       else
-        match Base58.safe_decode (Secret_key_locator.location skloc) with
+        let location = Secret_key_locator.location skloc in
+        match Base58.safe_decode location with
         | None -> Lwt.fail Exit
-        | Some loc ->
-            let salt, skenc = salt_skenc_of_skloc loc in
+        | Some payload ->
+            let salt, skenc = salt_skenc_of_skloc payload in
             match decrypt_sk skenc salt a with
             | Some sk ->
-                Hashtbl.replace decrypted_sks loc
+                Hashtbl.replace decrypted_sks location
                   (Ed25519.Secret_key.of_bytes_exn sk) ;
                 Lwt.return a
             | None ->
                 passwd_ask_loop
                   cctxt ~name ~salt ~skenc >>= fun (passwd, decrypted_sk) ->
-                Hashtbl.replace decrypted_sks loc decrypted_sk ;
+                Hashtbl.replace decrypted_sks location decrypted_sk ;
                 Lwt.return (passwd :: a)
     end [] sks
 
