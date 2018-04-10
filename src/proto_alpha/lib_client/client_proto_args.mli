@@ -17,7 +17,7 @@ val fee_arg: (Tez.t, Proto_alpha.full) Cli_entries.arg
 val arg_arg: (string, Proto_alpha.full) Cli_entries.arg
 val source_arg: (string option, Proto_alpha.full) Cli_entries.arg
 
-val delegate_arg: (string option, Proto_alpha.full) Cli_entries.arg
+val delegate_arg: (Ed25519.Public_key_hash.t option, Proto_alpha.full) Cli_entries.arg
 val delegatable_switch: (bool, Proto_alpha.full) Cli_entries.arg
 val spendable_switch: (bool, Proto_alpha.full) Cli_entries.arg
 val max_priority_arg: (int option, Proto_alpha.full) Cli_entries.arg

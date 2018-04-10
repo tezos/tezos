@@ -16,10 +16,6 @@ open Client_proto_programs
 open Client_keys
 open Client_proto_args
 
-let get_pkh cctxt = function
-  | None -> return None
-  | Some x -> Public_key_hash.find_opt cctxt x
-
 let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_context.printer) = function
   | Error errs ->
       cctxt#warning "%a"
@@ -157,7 +153,6 @@ let commands () =
         new_contract (_, manager_pkh) balance (_, source) (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
-        get_pkh cctxt delegate >>=? fun delegate ->
         originate_account
           ~fee
           ?delegate
@@ -200,7 +195,6 @@ let commands () =
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
-        get_pkh cctxt delegate >>=? fun delegate ->
         originate_contract ~fee ~delegate ~delegatable ~spendable ~initial_storage
           ~manager ~balance ~source ~src_pk ~src_sk ~code cctxt >>= fun errors ->
         report_michelson_errors ~no_print_source ~msg:"origination simulation failed" cctxt errors >>= function
