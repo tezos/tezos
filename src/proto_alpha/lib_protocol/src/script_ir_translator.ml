@@ -46,6 +46,7 @@ let comparable_type_size : type t. t comparable_ty -> int = function
   | Bool_key -> 1
   | Key_hash_key -> 1
   | Timestamp_key -> 1
+  | Address_key -> 1
 
 let rec type_size : type t. t ty -> int = function
   | Unit_t -> 1
@@ -57,6 +58,7 @@ let rec type_size : type t. t ty -> int = function
   | Key_hash_t -> 1
   | Key_t -> 1
   | Timestamp_t -> 1
+  | Address_t -> 1
   | Bool_t -> 1
   | Operation_t -> 1
   | Pair_t ((l, _), (r, _)) ->
@@ -189,7 +191,10 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Gt -> 0
   | Le -> 0
   | Ge -> 0
+  | Address -> 0
+  | Contract _ -> 1
   | Manager -> 0
+  | Address_manager -> 0
   | Transfer_tokens -> 1
   | Create_account -> 0
   | Implicit_account -> 0
@@ -299,7 +304,9 @@ let namespace = function
   | I_UPDATE
   | I_XOR
   | I_ITER
-  | I_LOOP_LEFT -> Instr_namespace
+  | I_LOOP_LEFT
+  | I_ADDRESS
+  | I_CONTRACT -> Instr_namespace
   | T_bool
   | T_contract
   | T_int
@@ -319,7 +326,8 @@ let namespace = function
   | T_tez
   | T_timestamp
   | T_unit
-  | T_operation -> Type_namespace
+  | T_operation
+  | T_address -> Type_namespace
 
 
 let unexpected expr exp_kinds exp_ns exp_prims =
@@ -365,6 +373,7 @@ let compare_comparable
         else if Compare.Int.(res > 0) then 1
         else -1
     | Timestamp_key -> Script_timestamp.compare x y
+    | Address_key -> Contract.compare x y
 
 let empty_set
   : type a. a comparable_ty -> a set
@@ -491,6 +500,7 @@ let ty_of_comparable_ty
   | Bool_key -> Bool_t
   | Key_hash_key -> Key_hash_t
   | Timestamp_key -> Timestamp_t
+  | Address_key -> Address_t
 
 let unparse_comparable_ty
   : type a. a comparable_ty -> Script.node = function
@@ -501,6 +511,7 @@ let unparse_comparable_ty
   | Bool_key -> Prim (-1, T_bool, [], None)
   | Key_hash_key -> Prim (-1, T_key_hash, [], None)
   | Timestamp_key -> Prim (-1, T_timestamp, [], None)
+  | Address_key -> Prim (-1, T_address, [], None)
 
 let rec unparse_ty
   : type a. annot -> a ty -> Script.node = fun annot ->
@@ -514,6 +525,7 @@ let rec unparse_ty
   | Key_hash_t -> Prim (-1, T_key_hash, [], annot)
   | Key_t -> Prim (-1, T_key, [], annot)
   | Timestamp_t -> Prim (-1, T_timestamp, [], annot)
+  | Address_t -> Prim (-1, T_address, [], annot)
   | Signature_t -> Prim (-1, T_signature, [], annot)
   | Operation_t -> Prim (-1, T_operation, [], annot)
   | Contract_t ut ->
@@ -581,6 +593,9 @@ let rec unparse_data
           | None -> ok @@ (Int (-1, Script_timestamp.to_zint t), gas)
           | Some s -> ok @@ (String (-1, s), gas)
         end
+    | Address_t, c  ->
+        Gas.consume ctxt Unparse_costs.contract >|? fun gas ->
+        (String (-1, Contract.to_b58check c), gas)
     | Contract_t _, (_, c)  ->
         Gas.consume ctxt Unparse_costs.contract >|? fun gas ->
         (String (-1, Contract.to_b58check c), gas)
@@ -676,6 +691,7 @@ let comparable_ty_eq
     | Bool_key, Bool_key -> Ok Eq
     | Key_hash_key, Key_hash_key -> Ok Eq
     | Timestamp_key, Timestamp_key -> Ok Eq
+    | Address_key, Address_key -> Ok Eq
     | _, _ -> error (Inconsistent_types (ty_of_comparable_ty ta, ty_of_comparable_ty tb))
 
 let rec ty_eq
@@ -691,6 +707,7 @@ let rec ty_eq
     | Signature_t, Signature_t -> Ok Eq
     | Tez_t, Tez_t -> Ok Eq
     | Timestamp_t, Timestamp_t -> Ok Eq
+    | Address_t, Address_t -> Ok Eq
     | Bool_t, Bool_t -> Ok Eq
     | Operation_t, Operation_t -> Ok Eq
     | Map_t (tal, tar), Map_t (tbl, tbr) ->
@@ -771,7 +788,8 @@ let merge_comparable_types
     | Bool_key, Bool_key -> ta
     | Key_hash_key, Key_hash_key -> ta
     | Timestamp_key, Timestamp_key -> ta
-    | _, _ -> assert false
+    | Address_key, Address_key -> ta
+    | _, _ -> assert false (* FIXME: fix injectivity of some types *)
 
 let error_unexpected_annot loc annot =
   match annot with
@@ -801,6 +819,7 @@ let merge_types :
       | Signature_t, Signature_t -> ok Signature_t
       | Tez_t, Tez_t -> ok Tez_t
       | Timestamp_t, Timestamp_t -> ok Timestamp_t
+      | Address_t, Address_t -> ok Address_t
       | Bool_t, Bool_t -> ok Bool_t
       | Operation_t, Operation_t -> ok Operation_t
       | Map_t (tal, tar), Map_t (tbl, tbr) ->
@@ -907,9 +926,10 @@ let rec parse_comparable_ty
     | Prim (_, T_bool, [], _) -> ok (Ex_comparable_ty Bool_key)
     | Prim (_, T_key_hash, [], _) -> ok (Ex_comparable_ty Key_hash_key)
     | Prim (_, T_timestamp, [], _) -> ok (Ex_comparable_ty Timestamp_key)
+    | Prim (_, T_address, [], _) -> ok (Ex_comparable_ty Address_key)
     | Prim (loc, (T_int | T_nat
                  | T_string | T_tez | T_bool
-                 | T_key | T_timestamp as prim), l, _) ->
+                 | T_key | T_address | T_timestamp as prim), l, _) ->
         error (Invalid_arity (loc, prim, 0, List.length l))
     | Prim (loc, (T_pair | T_or | T_set | T_map
                  | T_list | T_option  | T_lambda
@@ -959,6 +979,8 @@ and parse_ty
         ok (Ex_ty Key_hash_t, annot)
     | Prim (_, T_timestamp, [], annot) ->
         ok (Ex_ty Timestamp_t, annot)
+    | Prim (_, T_address, [], annot) ->
+        ok (Ex_ty Address_t, annot)
     | Prim (_, T_signature, [], annot) ->
         ok (Ex_ty Signature_t, annot)
     | Prim (_, T_operation, [], annot) ->
@@ -999,7 +1021,8 @@ and parse_ty
     | Prim (loc, (T_unit | T_signature
                  | T_int | T_nat
                  | T_string | T_tez | T_bool
-                 | T_key | T_key_hash | T_timestamp as prim), l, _) ->
+                 | T_key | T_key_hash
+                 | T_timestamp | T_address as prim), l, _) ->
         error (Invalid_arity (loc, prim, 0, List.length l))
     | Prim (loc, (T_set | T_list | T_option as prim), l, _) ->
         error (Invalid_arity (loc, prim, 1, List.length l))
@@ -1179,6 +1202,14 @@ let rec parse_data
           fail (error ())
       end
     | Operation_t, expr ->
+        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+    (* Addresses *)
+    | Address_t, String (_, s) ->
+        Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
+        traced @@
+        (Lwt.return (Contract.of_b58check s)) >>=? fun c ->
+        return (c, ctxt)
+    | Address_t, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Contracts *)
     | Contract_t ty1, String (loc, s) ->
@@ -1955,6 +1986,10 @@ and parse_instr
       Item_t (Timestamp_t, Item_t (Timestamp_t, rest, _), _) ->
         typed ctxt loc (Compare Timestamp_key)
           (Item_t (Int_t, rest, instr_annot))
+    | Prim (loc, I_COMPARE, [], instr_annot),
+      Item_t (Address_t, Item_t (Address_t, rest, _), _) ->
+        typed ctxt loc (Compare Address_key)
+          (Item_t (Int_t, rest, instr_annot))
     (* comparators *)
     | Prim (loc, I_EQ, [], instr_annot),
       Item_t (Int_t, rest, _) ->
@@ -1981,10 +2016,24 @@ and parse_instr
         typed ctxt loc Ge
           (Item_t (Bool_t, rest, instr_annot))
     (* protocol *)
+    | Prim (loc, I_ADDRESS, [], _),
+      Item_t (Contract_t _, rest, instr_annot) ->
+        typed ctxt loc Address
+          (Item_t (Address_t, rest, instr_annot))
+    | Prim (loc, I_CONTRACT, [ ty ], _),
+      Item_t (Address_t, rest, instr_annot) ->
+        Lwt.return (parse_ty ~allow_big_map:false ty) >>=? fun (Ex_ty t, annot) ->
+        fail_unexpected_annot loc annot >>=? fun () ->
+        typed ctxt loc (Contract t)
+          (Item_t (Option_t (Contract_t t), rest, instr_annot))
     | Prim (loc, I_MANAGER, [], instr_annot),
       Item_t (Contract_t _, rest, _) ->
         typed ctxt loc Manager
           (Item_t (Key_hash_t, rest, instr_annot))
+    | Prim (loc, I_MANAGER, [], instr_annot),
+      Item_t (Address_t, rest, _) ->
+        typed ctxt loc Address_manager
+          (Item_t (Option_t Key_hash_t, rest, instr_annot))
     | Prim (loc, I_TRANSFER_TOKENS, [], instr_annot),
       Item_t (p, Item_t
                 (Tez_t, Item_t
@@ -2105,11 +2154,11 @@ and parse_instr
                  | I_CREATE_CONTRACT | I_NOW
                  | I_IMPLICIT_ACCOUNT | I_AMOUNT | I_BALANCE
                  | I_CHECK_SIGNATURE | I_HASH_KEY
-                 | I_H | I_STEPS_TO_QUOTA
+                 | I_H | I_STEPS_TO_QUOTA | I_ADDRESS
                  as name), (_ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
     | Prim (loc, (I_NONE | I_LEFT | I_RIGHT | I_NIL | I_MAP | I_ITER
-                 | I_EMPTY_SET | I_DIP | I_LOOP | I_LOOP_LEFT
+                 | I_EMPTY_SET | I_DIP | I_LOOP | I_LOOP_LEFT | I_CONTRACT
                  as name), ([]
                            | _ :: _ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 1, List.length l))
@@ -2268,6 +2317,23 @@ let parse_script
       (parse_returning (Toplevel { storage_type ; param_type = arg_type })
          ctxt ?type_logger ~check_operations (arg_type_full, None) ret_type_full code_field) >>=? fun (code, ctxt) ->
     return (Ex_script { code ; arg_type ; storage ; storage_type }, ctxt)
+
+let parse_contract :
+  type t. context -> Script.location -> t Script_typed_ir.ty -> Contract.t ->
+  (context * t Script_typed_ir.typed_contract) tzresult Lwt.t
+  = fun ctxt loc ty contract ->
+    Contract.get_script ctxt contract >>=? fun (ctxt, script) -> match script with
+    | None ->
+        begin match ty with
+          | Unit_t -> return (ctxt, (ty, contract))
+          | _ -> fail (Invalid_contract (loc, contract))
+        end
+    | Some script ->
+        Lwt.return @@ parse_toplevel script.code >>=? fun (arg_type, _, _) ->
+        let arg_type = Micheline.strip_locations arg_type in
+        Lwt.return (parse_ty ~allow_big_map:false (Micheline.root arg_type)) >>=? fun (Ex_ty arg_type, _) ->
+        Lwt.return (ty_eq ty arg_type) >>=? fun Eq ->
+        return (ctxt, (ty, contract))
 
 let typecheck_code
   : context -> Script.expr -> (type_map * context) tzresult Lwt.t

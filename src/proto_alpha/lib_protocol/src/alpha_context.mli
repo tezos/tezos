@@ -127,6 +127,8 @@ module Gas : sig
   val alloc_cost : int -> cost
   val alloc_bytes_cost : int -> cost
   val alloc_bits_cost : int -> cost
+  val read_bytes_cost : Z.t -> cost
+  val write_bytes_cost : Z.t -> cost
 
   val ( *@ ) : int -> cost -> cost
   val ( +@ ) : cost -> cost -> cost
@@ -239,6 +241,8 @@ module Script : sig
     | I_XOR
     | I_ITER
     | I_LOOP_LEFT
+    | I_ADDRESS
+    | I_CONTRACT
     | T_bool
     | T_contract
     | T_int
@@ -259,6 +263,7 @@ module Script : sig
     | T_timestamp
     | T_unit
     | T_operation
+    | T_address
 
   type location = Micheline.canonical_location
 

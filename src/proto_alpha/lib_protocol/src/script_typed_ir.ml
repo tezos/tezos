@@ -21,6 +21,7 @@ type 'ty comparable_ty =
   | Bool_key : bool comparable_ty
   | Key_hash_key : public_key_hash comparable_ty
   | Timestamp_key : Script_timestamp.t comparable_ty
+  | Address_key : Contract.t comparable_ty
 
 module type Boxed_set = sig
   type elt
@@ -71,6 +72,7 @@ and 'ty ty =
   | Key_hash_t : public_key_hash ty
   | Key_t : public_key ty
   | Timestamp_t : Script_timestamp.t ty
+  | Address_t : Contract.t ty
   | Bool_t : bool ty
   | Pair_t : ('a ty * annot) * ('b ty * annot) -> ('a, 'b) pair ty
   | Union_t : ('a ty * annot) * ('b ty * annot) -> ('a, 'b) union ty
@@ -315,8 +317,14 @@ and ('bef, 'aft) instr =
       (z num * 'rest, bool * 'rest) instr
 
   (* protocol *)
+  | Address :
+      (_ typed_contract * 'rest, Contract.t * 'rest) instr
+  | Contract : 'p ty ->
+    (Contract.t * 'rest, 'p typed_contract option * 'rest) instr
   | Manager :
       ('arg typed_contract * 'rest, public_key_hash * 'rest) instr
+  | Address_manager :
+      (Contract.t * 'rest, public_key_hash option * 'rest) instr
   | Transfer_tokens :
       ('arg * (Tez.t * ('arg typed_contract * 'rest)), internal_operation * 'rest) instr
   | Create_account :

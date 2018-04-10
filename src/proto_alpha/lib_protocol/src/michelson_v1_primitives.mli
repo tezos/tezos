@@ -92,6 +92,8 @@ type prim =
   | I_XOR
   | I_ITER
   | I_LOOP_LEFT
+  | I_ADDRESS
+  | I_CONTRACT
   | T_bool
   | T_contract
   | T_int
@@ -112,6 +114,7 @@ type prim =
   | T_timestamp
   | T_unit
   | T_operation
+  | T_address
 
 val prim_encoding : prim Data_encoding.encoding
 

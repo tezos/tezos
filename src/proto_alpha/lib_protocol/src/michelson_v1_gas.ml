@@ -169,6 +169,8 @@ module Cost_of = struct
   let compare_res = step_cost 1
 
   (* TODO: protocol operations *)
+  let address = step_cost 3
+  let contract = Gas.read_bytes_cost Z.zero +@ step_cost 3
   let manager = step_cost 3
   let transfer = step_cost 50
   let create_account = step_cost 20
@@ -193,6 +195,7 @@ module Cost_of = struct
   let compare_nat = compare_int
   let compare_key_hash _ _ = alloc_bytes_cost 36
   let compare_timestamp t1 t2 = compare_zint (Script_timestamp.to_zint t1) (Script_timestamp.to_zint t2)
+  let compare_address _ _ = step_cost 20
 
   module Typechecking = struct
     let cycle = step_cost 1

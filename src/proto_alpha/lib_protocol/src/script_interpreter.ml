@@ -605,6 +605,8 @@ let rec interp
               Interp_costs.compare_key_hash a b rest
         | Compare Timestamp_key, Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Script_timestamp.compare Interp_costs.compare_timestamp a b rest
+        | Compare Address_key, Item (a, Item (b, rest)) ->
+            consume_gaz_comparison descr Contract.compare Interp_costs.compare_address a b rest
         (* comparators *)
         | Eq, Item (cmpres, rest) ->
             let cmpres = Script_int.compare cmpres Script_int.zero in
@@ -637,10 +639,29 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.compare_res) >>=? fun ctxt ->
             logged_return (Item (cmpres, rest), ctxt)
         (* protocol *)
+        | Address, Item ((_, contract), rest) ->
+            Lwt.return (Gas.consume ctxt Interp_costs.address) >>=? fun ctxt ->
+            logged_return (Item (contract, rest), ctxt)
+        | Contract t, Item (contract, rest) ->
+            Lwt.return (Gas.consume ctxt Interp_costs.contract) >>=? fun ctxt ->
+            Contract.exists ctxt contract >>=? fun exists ->
+            if exists then
+              Script_ir_translator.parse_contract ctxt loc t contract >>=? fun (ctxt, contract) ->
+              logged_return (Item (Some contract, rest), ctxt)
+            else
+              logged_return (Item (None, rest), ctxt)
         | Manager, Item ((_, contract), rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.manager) >>=? fun ctxt ->
             Contract.get_manager ctxt contract >>=? fun manager ->
             logged_return (Item (manager, rest), ctxt)
+        | Address_manager, Item (contract, rest) ->
+            Lwt.return (Gas.consume ctxt Interp_costs.manager) >>=? fun ctxt ->
+            Contract.exists ctxt contract >>=? fun exists ->
+            if exists then
+              Contract.get_manager ctxt contract >>=? fun manager ->
+              logged_return (Item (Some manager, rest), ctxt)
+            else
+              logged_return (Item (None, rest), ctxt)
         | Transfer_tokens,
           Item (p, Item (amount, Item ((tp, destination), rest))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.transfer) >>=? fun ctxt ->

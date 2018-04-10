@@ -64,6 +64,8 @@ module Cost_of : sig
   val exec : Gas.cost
   val push : Gas.cost
   val compare_res : Gas.cost
+  val address : Gas.cost
+  val contract : Gas.cost
   val manager : Gas.cost
   val transfer : Gas.cost
   val create_account : Gas.cost
@@ -86,6 +88,7 @@ module Cost_of : sig
   val compare_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
   val compare_key_hash : 'a -> 'b -> Gas.cost
   val compare_timestamp : Script_timestamp.t -> Script_timestamp.t -> Gas.cost
+  val compare_address : Contract.t -> Contract.t -> Gas.cost
 
   module Typechecking : sig
     val cycle : Gas.cost

@@ -1378,6 +1378,7 @@ Operations on contracts
 
 ::
 
+    :: address : 'S   ->   key_hash : 'S
     :: contract 'p : 'S   ->   key_hash : 'S
 
 -  ``CREATE_CONTRACT``: Forge a new contract.

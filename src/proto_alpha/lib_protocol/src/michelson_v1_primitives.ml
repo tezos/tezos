@@ -94,6 +94,8 @@ type prim =
   | I_XOR
   | I_ITER
   | I_LOOP_LEFT
+  | I_ADDRESS
+  | I_CONTRACT
   | T_bool
   | T_contract
   | T_int
@@ -114,6 +116,7 @@ type prim =
   | T_timestamp
   | T_unit
   | T_operation
+  | T_address
 
 let valid_case name =
   let is_lower = function  '_' | 'a'..'z' -> true | _ -> false in
@@ -215,6 +218,8 @@ let string_of_prim = function
   | I_XOR -> "XOR"
   | I_ITER -> "ITER"
   | I_LOOP_LEFT -> "LOOP_LEFT"
+  | I_ADDRESS -> "ADDRESS"
+  | I_CONTRACT -> "CONTRACT"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -235,6 +240,7 @@ let string_of_prim = function
   | T_timestamp -> "timestamp"
   | T_unit -> "unit"
   | T_operation -> "operation"
+  | T_address -> "address"
 
 let prim_of_string = function
   | "parameter" -> ok K_parameter
@@ -317,6 +323,8 @@ let prim_of_string = function
   | "XOR" -> ok I_XOR
   | "ITER" -> ok I_ITER
   | "LOOP_LEFT" -> ok I_LOOP_LEFT
+  | "ADDRESS" -> ok I_ADDRESS
+  | "CONTRACT" -> ok I_CONTRACT
   | "bool" -> ok T_bool
   | "contract" -> ok T_contract
   | "int" -> ok T_int
@@ -337,6 +345,7 @@ let prim_of_string = function
   | "timestamp" -> ok T_timestamp
   | "unit" -> ok T_unit
   | "operation" -> ok T_operation
+  | "address" -> ok T_address
   | n ->
       if valid_case n then
         error (Unknown_primitive_name n)
@@ -463,6 +472,8 @@ let prim_encoding =
     ("XOR", I_XOR) ;
     ("ITER", I_ITER) ;
     ("LOOP_LEFT", I_LOOP_LEFT) ;
+    ("ADDRESS", I_ADDRESS) ;
+    ("CONTRACT", I_CONTRACT) ;
     ("bool", T_bool) ;
     ("contract", T_contract) ;
     ("int", T_int) ;
@@ -482,7 +493,8 @@ let prim_encoding =
     ("tez", T_tez) ;
     ("timestamp", T_timestamp) ;
     ("unit", T_unit) ;
-    ("operation", T_operation) ]
+    ("operation", T_operation) ;
+    ("address", T_address) ]
 
 let () =
   register_error_kind
