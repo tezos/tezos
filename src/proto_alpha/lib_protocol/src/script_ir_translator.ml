@@ -206,7 +206,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Hash_key -> 0
   | H _ -> 0
   | Steps_to_quota -> 0
-  | Source _ -> 1
+  | Source -> 0
   | Self _ -> 1
   | Amount -> 0
 
@@ -2125,11 +2125,10 @@ and parse_instr
       stack ->
         typed ctxt loc Steps_to_quota
           (Item_t (Nat_t, stack, instr_annot))
-    | Prim (loc, I_SOURCE, [ ta ], instr_annot),
+    | Prim (loc, I_SOURCE, [], instr_annot),
       stack ->
-        (Lwt.return (parse_ty false ta)) >>=? fun (Ex_ty ta, _) ->
-        typed ctxt loc (Source ta)
-          (Item_t (Contract_t ta, stack, instr_annot))
+        typed ctxt loc Source
+          (Item_t (Address_t, stack, instr_annot))
     | Prim (loc, I_SELF, [], instr_annot),
       stack ->
         let rec get_toplevel_type : tc_context -> (bef judgement * context) tzresult Lwt.t = function
@@ -2153,7 +2152,7 @@ and parse_instr
                  | I_MANAGER | I_TRANSFER_TOKENS | I_CREATE_ACCOUNT
                  | I_CREATE_CONTRACT | I_NOW
                  | I_IMPLICIT_ACCOUNT | I_AMOUNT | I_BALANCE
-                 | I_CHECK_SIGNATURE | I_HASH_KEY
+                 | I_CHECK_SIGNATURE | I_HASH_KEY | I_SOURCE
                  | I_H | I_STEPS_TO_QUOTA | I_ADDRESS
                  as name), (_ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
@@ -2163,7 +2162,7 @@ and parse_instr
                            | _ :: _ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 1, List.length l))
     | Prim (loc, (I_PUSH | I_IF_NONE | I_IF_LEFT | I_IF_CONS
-                 | I_EMPTY_MAP | I_IF | I_SOURCE
+                 | I_EMPTY_MAP | I_IF
                  as name), ([] | [ _ ]
                            | _ :: _ :: _ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 2, List.length l))

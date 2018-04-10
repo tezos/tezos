@@ -352,8 +352,8 @@ and ('bef, 'aft) instr =
     ('a * 'rest, string * 'rest) instr
   | Steps_to_quota : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr
-  | Source : 'p ty ->
-    ('rest, 'p typed_contract * 'rest) instr
+  | Source :
+      ('rest, Contract.t * 'rest) instr
   | Self : 'p ty ->
     ('rest, 'p typed_contract * 'rest) instr
   | Amount :

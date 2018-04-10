@@ -731,9 +731,9 @@ let rec interp
               | Limited { remaining } -> remaining
               | Unaccounted -> Z.of_string "99999999" in
             logged_return (Item (Script_int.(abs (of_zint steps)), rest), ctxt)
-        | Source t, rest ->
+        | Source, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.source) >>=? fun ctxt ->
-            logged_return (Item ((t, source), rest), ctxt)
+            logged_return (Item (source, rest), ctxt)
         | Self t, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.self) >>=? fun ctxt ->
             logged_return (Item ((t,self), rest), ctxt)
