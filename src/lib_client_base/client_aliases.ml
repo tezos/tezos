@@ -79,6 +79,11 @@ module type Alias = sig
     ?desc:string ->
     ('a, (#Client_context.wallet as 'obj)) Clic.params ->
     (t -> 'a, 'obj) Clic.params
+  val source_arg :
+    ?long:string ->
+    ?placeholder:string ->
+    ?doc:string ->
+    unit -> (t option, (#Client_context.wallet as 'obj)) Clic.arg
   val autocomplete:
     #Client_context.wallet -> string list tzresult Lwt.t
 end
@@ -218,6 +223,40 @@ module Alias = functor (Entity : Entity) -> struct
       (parameter (fun (_ : < .. >) s -> return @@ Fresh s))
       next
 
+  let parse_source_string cctxt s =
+    let read path =
+      Lwt.catch
+        (fun () ->
+           Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
+           return content)
+        (fun exn ->
+           failwith
+             "cannot read file (%s)" (Printexc.to_string exn))
+      >>=? fun content ->
+      of_source content in
+    begin
+      match String.split ~limit:1 ':' s with
+      | [ "alias" ; alias ]->
+          find cctxt alias
+      | [ "text" ; text ] ->
+          of_source text
+      | [ "file" ; path ] ->
+          read path
+      | _ ->
+          find cctxt s >>= function
+          | Ok v -> return v
+          | Error a_errs ->
+              read s >>= function
+              | Ok v -> return v
+              | Error r_errs ->
+                  of_source s >>= function
+                  | Ok v -> return v
+                  | Error s_errs ->
+                      let all_errs =
+                        List.flatten [ a_errs ; r_errs ; s_errs ] in
+                      Lwt.return (Error all_errs)
+    end
+
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
     let desc =
       Format.asprintf
@@ -230,40 +269,28 @@ module Alias = functor (Entity : Entity) -> struct
          autodetect."
         desc Entity.name Entity.name Entity.name Entity.name Entity.name in
     param ~name ~desc
-      (parameter (fun cctxt s ->
-           let read path =
-             Lwt.catch
-               (fun () ->
-                  Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
-                  return content)
-               (fun exn ->
-                  failwith
-                    "cannot read file (%s)" (Printexc.to_string exn))
-             >>=? fun content ->
-             of_source content in
-           begin
-             match String.split ~limit:1 ':' s with
-             | [ "alias" ; alias ]->
-                 find cctxt alias
-             | [ "text" ; text ] ->
-                 of_source text
-             | [ "file" ; path ] ->
-                 read path
-             | _ ->
-                 find cctxt s >>= function
-                 | Ok v -> return v
-                 | Error a_errs ->
-                     read s >>= function
-                     | Ok v -> return v
-                     | Error r_errs ->
-                         of_source s >>= function
-                         | Ok v -> return v
-                         | Error s_errs ->
-                             let all_errs =
-                               List.flatten [ a_errs ; r_errs ; s_errs ] in
-                             Lwt.return (Error all_errs)
-           end))
+      (parameter parse_source_string)
       next
+
+  let source_arg
+      ?(long = "source " ^ Entity.name)
+      ?(placeholder = "src")
+      ?(doc = "") () =
+    let doc =
+      Format.asprintf
+        "%s\n\
+         Can be a %s name, a file or a raw %s literal. If the \
+         parameter is not the name of an existing %s, the client will \
+         look for a file containing a %s, and if it does not exist, \
+         the argument will be read as a raw %s.\n\
+         Use 'alias:name', 'file:path' or 'text:literal' to disable \
+         autodetect."
+        doc Entity.name Entity.name Entity.name Entity.name Entity.name in
+    arg
+      ~long
+      ~placeholder
+      ~doc
+      (parameter parse_source_string)
 
   let force_switch () =
     Clic.switch

@@ -75,12 +75,12 @@ let arg_arg =
     string_parameter
 
 let delegate_arg =
-  arg
+  Client_keys.Public_key_hash.source_arg
     ~long:"delegate"
     ~placeholder:"identity"
     ~doc:"delegate of the contract\n\
           Must be a known identity."
-    string_parameter
+    ()
 
 let source_arg =
   arg

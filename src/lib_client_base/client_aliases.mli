@@ -75,6 +75,11 @@ module type Alias = sig
     ?desc:string ->
     ('a, (#Client_context.wallet as 'obj)) Clic.params ->
     (t -> 'a, 'obj) Clic.params
+  val source_arg :
+    ?long:string ->
+    ?placeholder:string ->
+    ?doc:string ->
+    unit -> (t option, (#Client_context.wallet as 'obj)) Clic.arg
   val autocomplete:
     #Client_context.wallet -> string list tzresult Lwt.t
 end

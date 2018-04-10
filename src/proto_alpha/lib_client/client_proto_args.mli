@@ -17,7 +17,7 @@ val fee_arg: (Tez.t, Proto_alpha.full) Clic.arg
 val arg_arg: (string, Proto_alpha.full) Clic.arg
 val source_arg: (string option, Proto_alpha.full) Clic.arg
 
-val delegate_arg: (string option, Proto_alpha.full) Clic.arg
+val delegate_arg: (Ed25519.Public_key_hash.t option, Proto_alpha.full) Clic.arg
 val delegatable_switch: (bool, Proto_alpha.full) Clic.arg
 val spendable_switch: (bool, Proto_alpha.full) Clic.arg
 val max_priority_arg: (int option, Proto_alpha.full) Clic.arg
