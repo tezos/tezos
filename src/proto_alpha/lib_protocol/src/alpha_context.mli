@@ -250,12 +250,12 @@ module Constants : sig
     proof_of_work_nonce_size : int ;
     nonce_length : int ;
     max_revelations_per_block : int ;
-    seed_nonce_revelation_tip : Tez_repr.t ;
-    origination_burn : Tez_repr.t ;
-    block_security_deposit : Tez_repr.t ;
-    endorsement_security_deposit : Tez_repr.t ;
-    block_reward : Tez_repr.t ;
-    endorsement_reward : Tez_repr.t ;
+    seed_nonce_revelation_tip : Tez.t ;
+    origination_burn : Tez.t ;
+    block_security_deposit : Tez.t ;
+    endorsement_security_deposit : Tez.t ;
+    block_reward : Tez.t ;
+    endorsement_reward : Tez.t ;
   }
   val fixed_encoding: fixed Data_encoding.t
   val fixed: fixed
@@ -278,14 +278,14 @@ module Constants : sig
     blocks_per_commitment: int32 ;
     blocks_per_roll_snapshot: int32 ;
     blocks_per_voting_period: int32 ;
-    time_between_blocks: Period_repr.t list ;
+    time_between_blocks: Period.t list ;
     first_free_baking_slot: int ;
     endorsers_per_block: int ;
     max_gas: int ;
     proof_of_work_threshold: int64 ;
     dictator_pubkey: Ed25519.Public_key.t ;
     max_operation_data_length: int ;
-    tokens_per_roll: Tez_repr.t ;
+    tokens_per_roll: Tez.t ;
     michelson_maximum_type_size: int;
   }
   val parametric_encoding: parametric Data_encoding.t
