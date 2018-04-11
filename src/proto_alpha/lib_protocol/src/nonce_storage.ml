@@ -32,7 +32,7 @@ let () =
     `Temporary
     ~id:"nonce.too_early_revelation"
     ~title:"Too early nonce revelation"
-    ~description:"None revelation happens before cycle end"
+    ~description:"Nonce revelation happens before cycle end"
     ~pp: (fun ppf () ->
         Format.fprintf ppf "This nonce should not yet be revealed")
     Data_encoding.unit
