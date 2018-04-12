@@ -232,6 +232,8 @@ and ('bef, 'aft) instr =
   | Not :
       (bool * 'rest, bool * 'rest) instr
   (* integer operations *)
+  | Is_nat :
+      (z num * 'rest, n num option * 'rest) instr
   | Neg_nat :
       (n num * 'rest, z num * 'rest) instr
   | Neg_int :

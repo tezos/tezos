@@ -451,6 +451,8 @@ let rec interp
         | Not, Item (x, rest) ->
             consume_gas_unop descr (not, x) Interp_costs.bool_unop rest ctxt
         (* integer operations *)
+        | Is_nat, Item (x, rest) ->
+            consume_gas_unop descr (Script_int.is_nat, x) Interp_costs.abs rest ctxt
         | Abs_int, Item (x, rest) ->
             consume_gas_unop descr (Script_int.abs, x) Interp_costs.abs rest ctxt
         | Int_nat, Item (x, rest) ->

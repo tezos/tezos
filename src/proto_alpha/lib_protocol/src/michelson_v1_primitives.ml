@@ -96,6 +96,7 @@ type prim =
   | I_LOOP_LEFT
   | I_ADDRESS
   | I_CONTRACT
+  | I_ISNAT
   | T_bool
   | T_contract
   | T_int
@@ -220,6 +221,7 @@ let string_of_prim = function
   | I_LOOP_LEFT -> "LOOP_LEFT"
   | I_ADDRESS -> "ADDRESS"
   | I_CONTRACT -> "CONTRACT"
+  | I_ISNAT -> "ISNAT"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -325,6 +327,7 @@ let prim_of_string = function
   | "LOOP_LEFT" -> ok I_LOOP_LEFT
   | "ADDRESS" -> ok I_ADDRESS
   | "CONTRACT" -> ok I_CONTRACT
+  | "ISNAT" -> ok I_ISNAT
   | "bool" -> ok T_bool
   | "contract" -> ok T_contract
   | "int" -> ok T_int
@@ -474,6 +477,7 @@ let prim_encoding =
     ("LOOP_LEFT", I_LOOP_LEFT) ;
     ("ADDRESS", I_ADDRESS) ;
     ("CONTRACT", I_CONTRACT) ;
+    ("ISNAT", I_ISNAT) ;
     ("bool", T_bool) ;
     ("contract", T_contract) ;
     ("int", T_int) ;

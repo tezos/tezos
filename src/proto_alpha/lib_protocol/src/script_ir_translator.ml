@@ -151,6 +151,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | And -> 0
   | Xor -> 0
   | Not -> 0
+  | Is_nat -> 0
   | Neg_nat -> 0
   | Neg_int -> 0
   | Abs_int -> 0
@@ -306,7 +307,8 @@ let namespace = function
   | I_ITER
   | I_LOOP_LEFT
   | I_ADDRESS
-  | I_CONTRACT -> Instr_namespace
+  | I_CONTRACT
+  | I_ISNAT -> Instr_namespace
   | T_bool
   | T_contract
   | T_int
@@ -1845,6 +1847,14 @@ and parse_instr
       Item_t (Int_t, rest, _) ->
         typed ctxt loc Abs_int
           (Item_t (Nat_t, rest, instr_annot))
+    | Prim (loc, I_ISNAT, [], Some instr_annot),
+      Item_t (Int_t, rest, None) ->
+        typed ctxt loc Is_nat
+          (Item_t (Option_t Nat_t, rest, Some instr_annot))
+    | Prim (loc, I_ISNAT, [], None),
+      Item_t (Int_t, rest, annot) ->
+        typed ctxt loc Is_nat
+          (Item_t (Option_t Nat_t, rest, annot))
     | Prim (loc, I_INT, [], instr_annot),
       Item_t (Nat_t, rest, _) ->
         typed ctxt loc Int_nat

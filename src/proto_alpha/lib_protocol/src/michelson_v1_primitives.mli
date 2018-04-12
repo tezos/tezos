@@ -94,6 +94,7 @@ type prim =
   | I_LOOP_LEFT
   | I_ADDRESS
   | I_CONTRACT
+  | I_ISNAT
   | T_bool
   | T_contract
   | T_int

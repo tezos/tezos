@@ -43,6 +43,8 @@ let mul_n = mul
 let ediv_n = ediv
 
 let abs x = Z.abs x
+let is_nat x =
+  if Compare.Z.(x < Z.zero) then None else Some x
 let neg x = Z.neg x
 let int x = x
 

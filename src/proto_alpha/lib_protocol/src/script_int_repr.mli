@@ -88,6 +88,9 @@ val ediv:  _ num -> _ num -> (z num * n num) option
 (** Compute the absolute value of a relative, turning it into a natural. *)
 val abs : z num -> n num
 
+(** Partial identity over [N]. *)
+val is_nat : z num -> n num option
+
 (** Negates a number. *)
 val neg : _ num -> z num
 
