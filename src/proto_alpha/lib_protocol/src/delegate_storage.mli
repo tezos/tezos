@@ -90,6 +90,17 @@ val frozen_balance:
   Raw_context.t -> Signature.Public_key_hash.t ->
   Tez_repr.t tzresult Lwt.t
 
+type frozen_balances = {
+  deposit : Tez_repr.t ;
+  fees : Tez_repr.t ;
+  rewards : Tez_repr.t ;
+}
+
+(** Returns the amount of frozen deposit, fees and rewards associated to a given key. *)
+val frozen_balances:
+  Raw_context.t -> Signature.Public_key_hash.t ->
+  frozen_balances tzresult Lwt.t
+
 (** Returns the full 'balance' of the implicit contract associated to
     a given key, i.e. the sum of the spendable balance and of the
     frozen balance. *)
