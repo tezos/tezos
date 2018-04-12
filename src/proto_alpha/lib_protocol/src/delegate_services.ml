@@ -322,5 +322,37 @@ module Endorser = struct
 
 end
 
+module S = struct
+  let frozen_balances_encoding =
+    let open Delegate in
+    Data_encoding.(
+      conv
+        (fun { deposit ; fees ; rewards } ->
+           (deposit, fees, rewards))
+        (fun (deposit, fees, rewards) ->
+           { deposit ; fees ; rewards }
+        )
+        (obj3
+           (req "deposit" Tez.encoding)
+           (req "fees" Tez.encoding)
+           (req "rewards" Tez.encoding)))
+
+  let frozen_balances =
+    RPC_service.post_service
+      ~description: "Returns the amount of frozen tokens associated to a given key."
+      ~query: RPC_query.empty
+      ~input: Data_encoding.empty
+      ~output: frozen_balances_encoding
+      RPC_path.(open_root / "delegate" /: Signature.Public_key_hash.rpc_arg / "frozen_balances")
+end
+let () =
+  let open Services_registration in
+  register1 S.frozen_balances begin fun ctxt pkh () () ->
+    Delegate.frozen_balances ctxt pkh
+  end
+
+let frozen_balances ctxt block pkh =
+  RPC_context.make_call1 S.frozen_balances ctxt block pkh () ()
+
 let baking_rights = Baker.I.baking_rights
 let endorsement_rights = Endorser.I.endorsement_rights
