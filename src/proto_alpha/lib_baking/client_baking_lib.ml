@@ -105,4 +105,4 @@ let run_daemon cctxt ?max_priority ~endorsement_delay delegates ~endorsement ~ba
     ~delay:endorsement_delay
     ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
     ~endorsement ~baking ~denunciation
-    (List.map snd delegates)
+    delegates

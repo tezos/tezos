@@ -187,17 +187,17 @@ let commands () =
        @@ RawContractAlias.fresh_alias_param
          ~name: "new" ~desc: "name of the new contract"
        @@ prefix "for"
-       @@ Public_key_hash.alias_param
+       @@ Public_key_hash.source_param
          ~name: "mgr" ~desc: "manager of the new contract"
        @@ prefix "transferring"
        @@ tez_param
          ~name: "qty" ~desc: "amount taken from source"
        @@ prefix "from"
-       @@ ContractAlias.alias_param
+       @@ ContractAlias.destination_param
          ~name:"src" ~desc: "name of the source contract"
        @@ stop)
       begin fun (fee, delegate, delegatable, force)
-        new_contract (_, manager_pkh) balance (_, source) (cctxt : Proto_alpha.full) ->
+        new_contract manager_pkh balance (_, source) (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
         originate_account
@@ -224,13 +224,13 @@ let commands () =
        @@ RawContractAlias.fresh_alias_param
          ~name: "new" ~desc: "name of the new contract"
        @@ prefix "for"
-       @@ Public_key_hash.alias_param
+       @@ Public_key_hash.source_param
          ~name: "mgr" ~desc: "manager of the new contract"
        @@ prefix "transferring"
        @@ tez_param
          ~name: "qty" ~desc: "amount taken from source"
        @@ prefix "from"
-       @@ ContractAlias.alias_param
+       @@ ContractAlias.destination_param
          ~name:"src" ~desc: "name of the source contract"
        @@ prefix "running"
        @@ Program.source_param
@@ -238,7 +238,7 @@ let commands () =
                              Combine with -init if the storage type is not unit."
        @@ stop)
       begin fun (fee, delegate, force, delegatable, spendable, initial_storage, no_print_source)
-        alias_name (_, manager) balance (_, source) program (cctxt : Proto_alpha.full) ->
+        alias_name manager balance (_, source) program (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
@@ -290,11 +290,11 @@ let commands () =
     command ~group ~desc: "Register the public key hash as a delegate."
       (args1 fee_arg)
       (prefixes [ "register" ; "key" ]
-       @@ Public_key_hash.alias_param
+       @@ Public_key_hash.source_param
          ~name: "mgr" ~desc: "the delegate key"
        @@ prefixes [ "as" ; "delegate" ]
        @@ stop)
-      begin fun fee (_, src_pkh) cctxt ->
+      begin fun fee src_pkh cctxt ->
         Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
         register_as_delegate cctxt
           ~fee cctxt#block ~manager_sk:src_sk src_pk >>=? fun oph ->

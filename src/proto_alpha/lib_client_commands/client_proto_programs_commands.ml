@@ -192,9 +192,9 @@ let commands () =
        @@ Clic.param ~name:"type" ~desc:"type of the data"
          data_parameter
        @@ prefixes [ "for" ]
-       @@ Client_keys.Secret_key.alias_param
+       @@ Client_keys.Secret_key.source_param
        @@ stop)
-      (fun () data typ (_, sk) cctxt ->
+      (fun () data typ sk cctxt ->
          Client_proto_programs.hash_and_sign data typ sk cctxt#block cctxt >>= begin function
            | Ok (hash, signature) ->
                cctxt#message "@[<v 0>Hash: %S@,Signature: %S@]" hash signature
