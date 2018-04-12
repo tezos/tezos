@@ -422,6 +422,9 @@ let test_example () =
   test_output ~location: __LOC__ "diff_timestamps" "111" "(Pair 1 0)" "1" >>=? fun _ ->
   test_output ~location: __LOC__ "diff_timestamps" "111" "(Pair \"1970-01-01T00:03:20Z\" \"1970-01-01T00:00:00Z\")" "200" >>=? fun _ ->
 
+  (* Test internal operations *)
+  test_output ~location: __LOC__ "cps_fact" "0" "4" "24" >>=? fun _ ->
+
   (* Test NOW *)
   let now = sb.tezos_header.shell.timestamp in
   let now_str = quote @@ Tezos_base.Time.to_notation now in
