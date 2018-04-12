@@ -64,16 +64,16 @@ let protocol_parameters =
     [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
   ],
   "commitments": [
-    [ "tz1fkmDXEQdua3u71JBVh4eGUGqK4t1G8xhZ", "btz1T77Ly5U1bWNBR5KzDSgNFST5Bh5F1eB6g", "1868898542104130027" ],
-    [ "tz1doNkK6RKaRswsuKJV4erT6HauYSm9fuHi", "btz1QxTPgszARgWioEor3eMehxW3osfhw3KoJ", "517697389496079974" ],
-    [ "tz1g6zFsci4YR8p1MJrkyc6wAKizR6mqJmyQ", "btz1NUYc1tV5VBksMNuQG4AuZF9Xudh1sDJni", "962290491831710023" ],
-    [ "tz1MpbcwGFWVBBWoxwm6iQH5Hzh9mCXbnETJ", "btz1Wwifd8vbQqnbuzSbQLvJEjQ9FUoxVJm68", "1233665184704419921" ],
-    [ "tz1U4t2PmX5cZVUui4BNaiRVokLa6AxB5G9Z", "btz1RrFkp9GmnypoNGRSyURkBQNUs4PPYG8SR", "131959324067470008" ],
-    [ "tz1RUxPjviua4XJM78XjSKGUCAS9R3y8Bdof", "btz1hozabzP9HdRakJddzyea7DgPHzJ5PB37N", "112378240876120002" ],
-    [ "tz1fJPeueQKJrTj2SFV2PmyCinLYJKXCEMf4", "btz1j1k4nrZB4r8RpTYiy8zbi3Fappopkb8ZF", "1060667014046690017" ],
-    [ "tz1iDPZLxcGf5CqCNpTuuMdtu3zKpJ6HvvFR", "btz1TaSfoSNhFoqwqbPC9iC19rN24KJtB7skD", "71300478465380003" ],
-    [ "tz1i2kbtVu65dP739qLGRpJNujRM8pdpkH3p", "btz1USqQRuvASPXwseXkGTWeWv4dn3VwMVPEk", "283380756728119992" ],
-    [ "tz1LKGCg6ESJLDviHkT8Jc7tUwjw4h3d9MaF", "btz1YwCKMbBLRL1qkBjAHGCwjbWDqiTAEFpbw", "1357762577679880028" ]
+    [ "tz1MawerETND6bqJqUe4cVBcDZn6Tiahrr2V", "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ],
+    [ "tz1X4maqF9tC1Yn4hzg1w5PLdeKm62qHS64V", "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ],
+    [ "tz1SWBY7rWMutEuWRziDhC72gTGdo29KZaRj", "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428348" ],
+    [ "tz1amUjiZaevaxQy5w26LSf64bs77eNTJ8uY", "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ],
+    [ "tz1Zaee3QBtD4ErY1CpjigTYtX3VxWB6Ft9a", "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ],
+    [ "tz1geDUUhfXK1EMj7LZdP9wfcoAxR3q2QExR", "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ],
+    [ "tz1h3nY7jcZciJgAvgNvzgTnjuejEyiEqFGQ", "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ],
+    [ "tz1VzL4Xrb3fL3ckuPqw8u4H7feMAkF4cesJ", "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ],
+    [ "tz1RUHg536oRKhPLFHi9hit3MKbve91jWjPC", "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ],
+    [ "tz1M1LFbgctcPWxstKs21wgvSYBLUpaRwdx8", "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ]
   ],
   "time_between_blocks" : [ 1, 0 ],
   "blocks_per_cycle" : 4,

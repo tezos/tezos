@@ -17,25 +17,9 @@ exception No_error
 
 open Isolate_helpers
 
-
-(* Generated commitment with secret included in commitment storage :
-
-   (blind = "abc")
-
-   pk = edpktiPG79C8CRTMxua67NEaVKH7AydAMWRiC5KHQv78Ckx4UrZYBy
-   pkh = tz1fkmDXEQdua3u71vstaKwR4h8KY7oT1PDF
-   amount = 1868898542104.130027
-
-   secret = 0xc5422e3864b9e6c5260e2aac76ea0f3d28d4fff7
-
-   half_pkh = 0xdca88243fece75e9c22e
-   blinded_pkh : 0x4a6af2f5c466bf0a7a1001a1e9468cbfca82cef6
-
-*)
-
 let pk =
   Ed25519.Public_key.of_b58check_exn
-    "edpktiPG79C8CRTMxua67NEaVKH7AydAMWRiC5KHQv78Ckx4UrZYBy"
+    "edpkuSR6ywqsk17myFVRcw2eXhVib2MeLc9D1QkEQb98ctWUBwSJpF"
 let pkh = Ed25519.Public_key.hash pk
 let half_pkh =
   let len = Ed25519.Public_key_hash.size / 2 in
@@ -43,14 +27,14 @@ let half_pkh =
 
 let given_secret =
   Blinded_public_key_hash.secret_of_hex
-    "c5422e3864b9e6c5260e2aac76ea0f3d28d4fff7"
+    "0f39ed0b656509c2ecec4771712d9cddefe2afac"
 
 let expected_blinded_pkh =
   Blinded_public_key_hash.of_b58check_exn
-    "btz1T77Ly5U1bWNBR5KzDSgNFST5Bh5F1eB6g"
+    "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa"
 
 let expected_amount =
-  match Tez.of_mutez 1868898542104130027L with
+  match Tez.of_mutez 23932454669343L with
   | Some s -> s
   | _ -> assert false
 
