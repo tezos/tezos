@@ -550,6 +550,15 @@ module Delegate : sig
   val frozen_balance:
     context -> public_key_hash -> Tez.t tzresult Lwt.t
 
+  type frozen_balances = {
+    deposit : Tez.t ;
+    fees : Tez.t ;
+    rewards : Tez.t ;
+  }
+
+  val frozen_balances:
+    context -> public_key_hash -> frozen_balances tzresult Lwt.t
+
   val full_balance:
     context -> public_key_hash -> Tez.t tzresult Lwt.t
 

@@ -359,25 +359,38 @@ let has_frozen_balance ctxt delegate cycle =
       get_frozen_rewards ctxt contract cycle >>=? fun rewards ->
       return Tez_repr.(rewards <> zero)
 
-let frozen_balance ctxt delegate =
+type frozen_balances = {
+  deposit : Tez_repr.t ;
+  fees : Tez_repr.t ;
+  rewards : Tez_repr.t ;
+}
+
+let frozen_balances ctxt delegate =
   let contract = Contract_repr.implicit_contract delegate in
   let balance = Ok Tez_repr.zero in
   Storage.Contract.Frozen_deposits.fold
     (ctxt, contract) ~init:balance
     ~f:(fun _cycle amount acc ->
         Lwt.return acc >>=? fun acc ->
-        Lwt.return (Tez_repr.(acc +? amount))) >>= fun  balance ->
+        Lwt.return (Tez_repr.(acc +? amount))) >>=? fun deposit ->
   Storage.Contract.Frozen_fees.fold
     (ctxt, contract) ~init:balance
     ~f:(fun _cycle amount acc ->
         Lwt.return acc >>=? fun acc ->
-        Lwt.return (Tez_repr.(acc +? amount))) >>= fun  balance ->
+        Lwt.return (Tez_repr.(acc +? amount))) >>=? fun fees ->
   Storage.Contract.Frozen_rewards.fold
     (ctxt, contract) ~init:balance
     ~f:(fun _cycle amount acc ->
         Lwt.return acc >>=? fun acc ->
-        Lwt.return (Tez_repr.(acc +? amount))) >>= fun  balance ->
-  Lwt.return balance
+        Lwt.return (Tez_repr.(acc +? amount))) >>=? fun rewards ->
+  return { deposit ; fees ; rewards }
+
+let frozen_balance ctxt delegate =
+  frozen_balances ctxt delegate >>=? fun { deposit ; fees ; rewards } ->
+  Error_monad.fold_left_s (fun amount sum -> Lwt.return Tez_repr.(amount +? sum))
+    Tez_repr.zero
+    [deposit; fees; rewards] >>=
+  Lwt.return
 
 let full_balance ctxt delegate =
   let contract = Contract_repr.implicit_contract delegate in
