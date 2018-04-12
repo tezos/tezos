@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 type error += Unregistered_key_scheme of string
+
 let () =
   register_error_kind `Permanent
     ~id: "cli.unregistered_key_scheme"
@@ -29,19 +30,21 @@ module Public_key_hash = Client_aliases.Alias (struct
     let name = "public key hash"
   end)
 
+type location = string list
+
 module type LOCATOR = sig
   val name : string
   type t
 
-  val create : scheme:string -> location:string -> t
+  val create : scheme:string -> location:location -> t
   val scheme : t -> string
-  val location : t -> string
+  val location : t -> location
   val to_string : t -> string
   val pp : Format.formatter -> t -> unit
 end
 
-type sk_locator = Sk_locator of { scheme : string ; location : string }
-type pk_locator = Pk_locator of { scheme : string ; location : string }
+type sk_locator = Sk_locator of { scheme : string ; location : location }
+type pk_locator = Pk_locator of { scheme : string ; location : location }
 
 module Sk_locator = struct
   let name = "secret key"
@@ -54,10 +57,10 @@ module Sk_locator = struct
   let location (Sk_locator { location }) = location
 
   let to_string (Sk_locator { scheme ; location }) =
-    scheme ^ ":" ^  location
+    String.concat "/" ((scheme ^ ":") :: List.map Uri.pct_encode location)
 
-  let pp ppf (Sk_locator { scheme ; location }) =
-    Format.pp_print_string ppf (scheme ^ ":" ^ location)
+  let pp ppf loc =
+    Format.pp_print_string ppf (to_string loc)
 end
 
 module Pk_locator = struct
@@ -71,10 +74,10 @@ module Pk_locator = struct
   let location (Pk_locator { location }) = location
 
   let to_string (Pk_locator { scheme ; location }) =
-    scheme ^ ":" ^  location
+    String.concat "/" ((scheme ^ ":") :: List.map Uri.pct_encode location)
 
-  let pp ppf (Pk_locator { scheme ; location }) =
-    Format.pp_print_string ppf (scheme ^ ":" ^ location)
+  let pp ppf loc =
+    Format.pp_print_string ppf (to_string loc)
 end
 
 module type KEY = sig
@@ -88,7 +91,7 @@ module Locator (K : KEY) (L : LOCATOR) = struct
 
   let of_unencrypted k =
     L.create ~scheme:"unencrypted"
-      ~location:(K.to_b58check k)
+      ~location:[K.to_b58check k]
 
   let of_string s =
     match String.index s ':' with
@@ -96,9 +99,13 @@ module Locator (K : KEY) (L : LOCATOR) = struct
         of_unencrypted (K.of_b58check_exn s)
     | i ->
         let len = String.length s in
-        create
-          ~scheme:(String.sub s 0 i)
-          ~location:(String.sub s (i+1) (len-i-1))
+        let scheme = String.sub s 0 i in
+        let location =
+          String.sub s (i+1) (len-i-1) |>
+          String.split '/' |>
+          List.map Uri.pct_decode |>
+          List.filter ((<>) "") in
+        create ~scheme ~location
 
   let of_source s =  return (of_string s)
   let to_source t = return (to_string t)
@@ -125,8 +132,8 @@ module type SIGNER = sig
   val sk_to_locator : secret_key -> sk_locator Lwt.t
   val pk_to_locator : public_key -> pk_locator Lwt.t
   val neuterize : secret_key -> public_key Lwt.t
-  val public_key : public_key -> Signature.Public_key.t Lwt.t
-  val public_key_hash : public_key -> Signature.Public_key_hash.t Lwt.t
+  val public_key : public_key -> Signature.Public_key.t tzresult Lwt.t
+  val public_key_hash : public_key -> Signature.Public_key_hash.t tzresult Lwt.t
   val sign :
     ?watermark: Signature.watermark ->
     secret_key -> MBytes.t -> Signature.t tzresult Lwt.t
@@ -140,7 +147,8 @@ let register_signer signer =
 
 let find_signer_for_key cctxt ~scheme =
   match Hashtbl.find signers_table scheme with
-  | exception Not_found -> fail (Unregistered_key_scheme scheme)
+  | exception Not_found ->
+      fail (Unregistered_key_scheme scheme)
   | signer, false ->
       let module Signer = (val signer : SIGNER) in
       Signer.init cctxt >>=? fun () ->
@@ -151,11 +159,33 @@ let find_signer_for_key cctxt ~scheme =
 let registered_signers () : (string * (module SIGNER)) list =
   Hashtbl.fold (fun k (v, _) acc -> (k, v) :: acc) signers_table []
 
+type error += Signature_mismatch of Secret_key_locator.t
+
+let () =
+  register_error_kind `Permanent
+    ~id: "cli.signature_mismatch"
+    ~title: "Signature mismatch"
+    ~description: "The signer produced an invalid signature"
+    ~pp:
+      (fun ppf sk ->
+         Format.fprintf ppf
+           "The signer for %a produced an invalid signature"
+           Secret_key_locator.pp sk)
+    Data_encoding.(obj1 (req "locator" Secret_key_locator.encoding))
+    (function Signature_mismatch sk -> Some sk | _ -> None)
+    (fun sk -> Signature_mismatch sk)
+
 let sign ?watermark cctxt ((Sk_locator { scheme }) as skloc) buf =
   find_signer_for_key cctxt ~scheme >>=? fun signer ->
   let module Signer = (val signer : SIGNER) in
   Signer.sk_of_locator skloc >>=? fun t ->
-  Signer.sign ?watermark t buf
+  Signer.sign ?watermark t buf >>=? fun signature ->
+  Signer.neuterize t >>= fun pk ->
+  Signer.public_key pk >>=? fun pubkey ->
+  fail_unless
+    (Signature.check pubkey signature buf)
+    (Signature_mismatch skloc) >>=? fun () ->
+  return signature
 
 let append ?watermark cctxt loc buf =
   sign ?watermark cctxt loc buf >>|? fun signature ->
@@ -241,7 +271,7 @@ let get_key (cctxt : #Client_context.wallet) pkh =
       find_signer_for_key cctxt ~scheme >>=? fun signer ->
       let module Signer = (val signer : SIGNER) in
       Signer.pk_of_locator pk >>=? fun pk ->
-      Signer.public_key pk >>= fun pk ->
+      Signer.public_key pk >>=? fun pk ->
       return (n, pk, sk)
 
 let get_keys (wallet : #Client_context.io_wallet) =
@@ -254,7 +284,7 @@ let get_keys (wallet : #Client_context.io_wallet) =
       find_signer_for_key wallet ~scheme >>=? fun signer ->
       let module Signer = (val signer : SIGNER) in
       Signer.pk_of_locator pk >>=? fun pk ->
-      Signer.public_key pk >>= fun pk ->
+      Signer.public_key pk >>=? fun pk ->
       return (name, pkh, pk, sk)
     end >>= function
     | Ok r -> Lwt.return (Some r)
@@ -277,10 +307,11 @@ let alias_keys cctxt name =
     | [] -> return None
     | (key_name, pkh) :: tl ->
         if key_name = name
-        then
+        then begin
           Public_key.find_opt cctxt name >>=? fun pkm ->
           Secret_key.find_opt cctxt name >>=? fun pks ->
           return (Some (pkh, pkm, pks))
+        end
         else find_key tl
   in find_key l
 

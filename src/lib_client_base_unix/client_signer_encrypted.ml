@@ -76,21 +76,24 @@ module Encrypted_signer : SIGNER = struct
       if Secret_key_locator.scheme skloc <> scheme then
         Lwt.return a
       else
-        let location = Secret_key_locator.location skloc in
-        match Base58.safe_decode location with
-        | None -> Lwt.fail Exit
-        | Some payload ->
-            let salt, skenc = salt_skenc_of_skloc payload in
-            match decrypt_sk skenc salt a with
-            | Some sk ->
-                Hashtbl.replace decrypted_sks location
-                  (Data_encoding.Binary.of_bytes_exn Signature.Secret_key.encoding sk) ;
-                Lwt.return a
-            | None ->
-                passwd_ask_loop
-                  cctxt ~name ~salt ~skenc >>= fun (passwd, decrypted_sk) ->
-                Hashtbl.replace decrypted_sks location decrypted_sk ;
-                Lwt.return (passwd :: a)
+        match Secret_key_locator.location skloc with
+        |location :: _ -> begin
+            match Base58.safe_decode location with
+            | None -> Lwt.fail Exit
+            | Some payload ->
+                let salt, skenc = salt_skenc_of_skloc payload in
+                match decrypt_sk skenc salt a with
+                | Some sk ->
+                    Hashtbl.replace decrypted_sks location
+                      (Data_encoding.Binary.of_bytes_exn Signature.Secret_key.encoding sk);
+                    Lwt.return a
+                | None ->
+                    passwd_ask_loop
+                      cctxt ~name ~salt ~skenc >>= fun (passwd, decrypted_sk) ->
+                    Hashtbl.replace decrypted_sks location decrypted_sk ;
+                    Lwt.return (passwd :: a)
+          end
+        |_ -> Lwt.fail Exit
     end [] sks
 
   let init cctxt =
@@ -117,7 +120,7 @@ module Encrypted_signer : SIGNER = struct
     let payload = MBytes.(to_string (concat "" [salt; encrypted_passwd])) in
     let location = Base58.safe_encode payload in
     Hashtbl.replace decrypted_sks location sk ;
-    return (Secret_key_locator.create ~scheme ~location)
+    return (Secret_key_locator.create ~scheme ~location:[location])
 
   let rec get_boolean_answer (cctxt : #Client_context.io_wallet) ~default ~msg =
     let prompt = if default then "(Y/n/q)" else "(y/N/q)" in
@@ -179,29 +182,36 @@ module Encrypted_signer : SIGNER = struct
 
   let pk_locator_of_human_input _cctxt = function
     | [] -> failwith "Missing public key argument."
-    | pk :: _ -> return (Public_key_locator.create ~scheme ~location:pk)
+    | pk :: _ -> return (Public_key_locator.create ~scheme ~location:[pk])
 
-  let sk_of_locator (Sk_locator { location }) =
-    match Hashtbl.find decrypted_sks location with
-    | exception Not_found -> failwith "Unknown secret key location."
-    | sk -> return sk
+  let sk_of_locator = function
+    | (Sk_locator { location = [location] }) -> begin
+        match Hashtbl.find decrypted_sks location with
+        | exception Not_found -> failwith "Unknown secret key location."
+        | sk -> return sk
+      end
+    | (Sk_locator { location = _ }) ->
+        failwith "Wrong location type."
 
-  let pk_of_locator (Pk_locator { location }) =
-    Lwt.return (Signature.Public_key.of_b58check location)
+  let pk_of_locator = function
+    |(Pk_locator { location = [location] }) ->
+        Lwt.return (Signature.Public_key.of_b58check location)
+    |(Pk_locator { location = _ }) ->
+        failwith "Wrong location type."
 
   let sk_to_locator sk =
     Secret_key_locator.create
-      ~scheme ~location:(Signature.Secret_key.to_b58check sk) |>
+      ~scheme ~location:[Signature.Secret_key.to_b58check sk] |>
     Lwt.return
 
   let pk_to_locator pk =
     Public_key_locator.create
-      ~scheme ~location:(Signature.Public_key.to_b58check pk) |>
+      ~scheme ~location:[Signature.Public_key.to_b58check pk] |>
     Lwt.return
 
   let neuterize x = Lwt.return (Signature.Secret_key.to_public_key x)
-  let public_key x = Lwt.return x
-  let public_key_hash x = Lwt.return (Signature.Public_key.hash x)
+  let public_key x = return x
+  let public_key_hash x = return (Signature.Public_key.hash x)
   let sign ?watermark t buf = return (Signature.sign ?watermark t buf)
 end
 

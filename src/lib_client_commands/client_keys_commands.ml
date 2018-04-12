@@ -107,7 +107,7 @@ let commands () =
          Signer.pk_to_locator pk >>= fun pkloc ->
          Public_key.find_opt cctxt name >>=? function
          | None ->
-             Signer.public_key_hash pk >>= fun pkh ->
+             Signer.public_key_hash pk >>=? fun pkh ->
              Secret_key.add ~force cctxt name skloc >>=? fun () ->
              Public_key_hash.add ~force cctxt name pkh >>=? fun () ->
              Public_key.add ~force cctxt name pkloc
@@ -142,7 +142,7 @@ let commands () =
          Signer.pk_locator_of_human_input
            (cctxt :> Client_context.io_wallet) location >>=? fun pkloc ->
          Signer.pk_of_locator pkloc >>=? fun pk ->
-         Signer.public_key_hash pk >>= fun pkh ->
+         Signer.public_key_hash pk >>=? fun pkh ->
          Public_key_hash.add ~force cctxt name pkh >>=? fun () ->
          Public_key.add ~force cctxt name pkloc) ;
 
@@ -192,7 +192,7 @@ let commands () =
                  find_signer_for_key ~scheme cctxt >>=? fun signer ->
                  let module Signer = (val signer : SIGNER) in
                  Signer.pk_of_locator pkloc >>=? fun pk ->
-                 Signer.public_key pk >>= fun pk ->
+                 Signer.public_key pk >>=? fun pk ->
                  ok_lwt @@ cctxt#message "Public Key: %a"
                    Signature.Public_key.pp pk >>=? fun () ->
                  if show_private then

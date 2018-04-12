@@ -9,16 +9,17 @@
 
 (** {2 Location of keys using schemes} *)
 
-type sk_locator = Sk_locator of { scheme : string ; location : string }
-type pk_locator = Pk_locator of { scheme : string ; location : string }
+type location = string list
+type sk_locator = Sk_locator of { scheme : string ; location : location }
+type pk_locator = Pk_locator of { scheme : string ; location : location }
 
 module type LOCATOR = sig
   val name : string
   type t
 
-  val create : scheme:string -> location:string -> t
+  val create : scheme:string -> location:location -> t
   val scheme : t -> string
-  val location : t -> string
+  val location : t -> location
   val to_string : t -> string
   val pp : Format.formatter -> t -> unit
 end
@@ -84,10 +85,10 @@ module type SIGNER = sig
   val neuterize : secret_key -> public_key Lwt.t
   (** [neuterize sk] is the corresponding [pk]. *)
 
-  val public_key : public_key -> Signature.Public_key.t Lwt.t
-  (** [public_key pk] is the full version of [pk]. *)
+  val public_key : public_key -> Signature.Public_key.t tzresult Lwt.t
+  (** [public_key pk] is the Ed25519 version of [pk]. *)
 
-  val public_key_hash : public_key -> Signature.Public_key_hash.t Lwt.t
+  val public_key_hash : public_key -> Signature.Public_key_hash.t tzresult Lwt.t
   (** [public_key_hash pk] is the hash of [pk]. *)
 
   val sign :

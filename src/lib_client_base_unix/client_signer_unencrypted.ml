@@ -30,35 +30,42 @@ module Unencrypted_signer : SIGNER = struct
 
   let sk_locator_of_human_input _cctxt = function
     | sk :: _ ->
-        return (Secret_key_locator.create ~scheme ~location:sk)
+        return (Secret_key_locator.create ~scheme ~location:[sk])
     | [] ->
         let _, _, sk = Ed25519.generate_key () in
         return (Secret_key_locator.create ~scheme
-                  ~location:(Ed25519.Secret_key.to_b58check sk))
+                  ~location:[Ed25519.Secret_key.to_b58check sk])
 
   let pk_locator_of_human_input _cctxt = function
     | [] -> failwith "Missing public key argument"
-    | pk :: _ -> return (Public_key_locator.create ~scheme ~location:pk)
+    | pk :: _ -> return (Public_key_locator.create ~scheme ~location:[pk])
 
-  let sk_of_locator (Sk_locator { location }) =
-    Lwt.return (Signature.Secret_key.of_b58check location)
+  let sk_of_locator = function
+    |(Sk_locator { location = ( location :: _ ) }) ->
+        Lwt.return (Signature.Secret_key.of_b58check location)
+    |(Sk_locator { location = _ }) ->
+        failwith "Wrong type of location"
 
-  let pk_of_locator (Pk_locator { location }) =
-    Lwt.return (Signature.Public_key.of_b58check location)
+
+  let pk_of_locator = function
+    |(Pk_locator { location = ( location :: _ ) }) ->
+        Lwt.return (Signature.Public_key.of_b58check location)
+    |(Pk_locator { location = _ }) ->
+        failwith "Wrong type of location"
 
   let sk_to_locator sk =
     Secret_key_locator.create
-      ~scheme ~location:(Signature.Secret_key.to_b58check sk) |>
+      ~scheme ~location:[Signature.Secret_key.to_b58check sk] |>
     Lwt.return
 
   let pk_to_locator pk =
     Public_key_locator.create
-      ~scheme ~location:(Signature.Public_key.to_b58check pk) |>
+      ~scheme ~location:[Signature.Public_key.to_b58check pk] |>
     Lwt.return
 
   let neuterize x = Lwt.return (Signature.Secret_key.to_public_key x)
-  let public_key x = Lwt.return x
-  let public_key_hash x = Lwt.return (Signature.Public_key.hash x)
+  let public_key x = return x
+  let public_key_hash x = return (Signature.Public_key.hash x)
   let sign ?watermark t buf = return (Signature.sign ?watermark t buf)
 end
 
