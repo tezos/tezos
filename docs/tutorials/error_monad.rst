@@ -153,7 +153,7 @@ module is another decently complicated part of the codebase that should
 probably the subject of a future post. Since you can declare arbitrary
 new errors, we’ll have a way of adding a printer for each error.
 
-When we add a new error handler, we’ll use the ``register_handler``
+When we add a new error handler, we’ll use the ``register_error``
 function. This function will take a function that takes an error and
 returns a ``string option``. These functions will look something like
 this:
@@ -169,7 +169,7 @@ this:
         | _ -> None)
 
 I’m also renaming the ``error`` function to ``fail``. This is the
-convention used by the actual Errormonad module. I’m also exposing the
+convention used by the actual ``Error_monad`` module. I’m also exposing the
 ``'a t`` type so that you can dispatch on it if you need to. This is
 used several times in the Tezos codebase.
 
