@@ -112,7 +112,7 @@ code
                              IF { # Between T + 24 and T + 48
                                   # We accept only delivery notifications, from W
                                   DUP ; CDDDDDR ; MANAGER ; # W
-                                  SOURCE unit ; MANAGER ;
+                                  SOURCE ; MANAGER ; IF_NONE { FAIL } {} ;
                                   COMPARE ; NEQ ;
                                   IF { FAIL } {} ; # fail if not the warehouse
                                   DUP ; CAR ; # we must receive (Right amount)

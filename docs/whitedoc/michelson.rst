@@ -1252,6 +1252,8 @@ VI - Domain specific data types
 
 -  ``contract 'param``: A contract, with the type of its code.
 
+-  ``address``: An untyped contract address.
+
 -  ``operation``: An internal operation emitted by a contract.
 
 -  ``key``: A public cryptography key.
@@ -1439,12 +1441,31 @@ contract, unit for an account.
 
     :: 'S   ->   tez : 'S
 
--  ``SOURCE 'p``: Push the source contract of the current
+-  ``ADDRESS``: Push the untyped version of a contract.
+
+::
+
+    :: contract _ : 'S   ->   address : 'S
+
+-  ``CONTRACT 'p``: Push the untyped version of a contract.
+
+::
+
+    :: address : 'S   ->   contract 'p : 'S
+
+    > CONTRACT / addr : S  =>  Some addr : S
+        iff addr exists and is a contract of parameter type 'p
+    > CONTRACT / addr : S  =>  Some addr : S
+        iff 'p = unit and addr is an implicit contract
+    > CONTRACT / addr : S  =>  None : S
+        otherwise
+
+-  ``SOURCE``: Push the source contract of the current
    transaction.
 
 ::
 
-    :: 'S   ->   contract 'p : 'S
+    :: 'S   ->   address : 'S
 
 -  ``SELF``: Push the current contract.
 
@@ -2327,7 +2348,7 @@ The complete source ``forward.tz`` is:
                                  IF { # Between T + 24 and T + 48
                                       # We accept only delivery notifications, from W
                                       DUP ; CDDDDDR ; MANAGER ; # W
-                                      SOURCE unit ; MANAGER ;
+                                      SOURCE ; MANAGER ;
                                       COMPARE ; NEQ ;
                                       IF { FAIL } {} ; # fail if not the warehouse
                                       DUP ; CAR ; # we must receive (Right amount)
