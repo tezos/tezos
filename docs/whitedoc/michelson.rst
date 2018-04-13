@@ -1250,7 +1250,9 @@ VI - Domain specific data types
 
 -  ``tez``: A specific type for manipulating tokens.
 
--  ``contract 'param 'result``: A contract, with the type of its code.
+-  ``contract 'param``: A contract, with the type of its code.
+
+-  ``operation``: An internal operation emitted by a contract.
 
 -  ``key``: A public cryptography key.
 
@@ -1376,33 +1378,33 @@ Operations on contracts
 
 ::
 
-    :: contract 'p 'r : 'S   ->   key_hash : 'S
+    :: contract 'p : 'S   ->   key_hash : 'S
 
 -  ``CREATE_CONTRACT``: Forge a new contract.
 
 ::
 
-    :: key_hash : option key_hash : bool : bool : tez : lambda (pair 'p 'g) (pair 'r 'g) : 'g : 'S
-       -> contract 'p 'r : 'S
+    :: key_hash : option key_hash : bool : bool : tez : lambda (pair 'p 'g) (pair (list operation) 'g) : 'g : 'S
+       -> contract 'p : 'S
 
 As with non code-emitted originations the contract code takes as
 argument the transferred amount plus an ad-hoc argument and returns an
 ad-hoc value. The code also takes the global data and returns it to be
 stored and retrieved on the next transaction. These data are initialized
 by another parameter. The calling convention for the code is as follows:
-``(Pair arg globals)) -> (Pair ret globals)``, as extrapolated from
+``(Pair arg globals)) -> (Pair operations globals)``, as extrapolated from
 the instruction type. The first parameters are the manager, optional
 delegate, then spendable and delegatable flags and finally the initial
 amount taken from the currently executed contract. The contract is
 returned as a first class value to be called immediately or stored.
 
--  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; return 'r ; code ... }``:
+-  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
    Forge a new contract from a literal.
 
 ::
 
     :: key_hash : option key_hash : bool : bool : tez : 'g : 'S
-       -> contract 'p 'r : 'S
+       -> contract 'p : 'S
 
 Originate a contract based on a literal. This is currently the only way
 to include transfers inside of an originated contract. The first
@@ -1415,32 +1417,20 @@ value to be called immediately or stored.
 
 ::
 
-    :: key_hash : option key_hash : bool : tez : 'S   ->   contract unit unit : 'S
+    :: key_hash : option key_hash : bool : tez : 'S   ->   contract unit : 'S
 
 Take as argument the manager, optional delegate, the delegatable flag
 and finally the initial amount taken from the currently executed
 contract.
 
--  ``TRANSFER_TOKENS``: Forge and evaluate a transaction.
+-  ``TRANSFER_TOKENS``: Forge a transaction.
 
 ::
 
-    :: 'p : tez : contract 'p 'r : 'g : []   ->   'r : 'g : []
+    :: 'p : tez : contract 'p : 'S   ->   operation : S
 
-The parameter and return value must be consistent with the ones expected
-by the contract, unit for an account. To preserve the global consistency
-of the system, the current contract’s storage must be updated before
-passing the control to another script. For this, the script must put the
-partially updated storage on the stack (’g is the type of the contract’s
-storage). If a recursive call to the current contract happened, the
-updated storage is put on the stack next to the return value. Nothing
-else can remain on the stack during a nested call. If some local values
-have to be kept for after the nested call, they have to be stored
-explicitly in a transient part of the storage. A trivial example of that
-is to reserve a boolean in the storage, initialized to false, reset to
-false at the end of each contract execution, and set to true during a
-nested call. This thus gives an easy way for a contract to prevent
-recursive call (the contract just fails if the boolean is true).
+The parameter must be consistent with the one expected by the
+contract, unit for an account.
 
 -  ``BALANCE``: Push the current amount of tez of the current contract.
 
@@ -1448,19 +1438,19 @@ recursive call (the contract just fails if the boolean is true).
 
     :: 'S   ->   tez : 'S
 
--  ``SOURCE 'p 'r``: Push the source contract of the current
+-  ``SOURCE 'p``: Push the source contract of the current
    transaction.
 
 ::
 
-    :: 'S   ->   contract 'p 'r : 'S
+    :: 'S   ->   contract 'p : 'S
 
 -  ``SELF``: Push the current contract.
 
 ::
 
-    :: 'S   ->   contract 'p 'r : 'S
-       where   contract 'p 'r is the type of the current contract
+    :: 'S   ->   contract 'p : 'S
+       where   contract 'p is the type of the current contract
 
 -  ``AMOUNT``: Push the amount of the current transaction.
 
@@ -1476,7 +1466,7 @@ recursive call (the contract just fails if the boolean is true).
 
 ::
 
-    :: key_hash : 'S   ->   contract unit unit : 'S
+    :: key_hash : 'S   ->   contract unit : 'S
 
 Special operations
 ~~~~~~~~~~~~~~~~~~
@@ -1922,25 +1912,25 @@ storage. The type of the global data of the storage is fixed for each
 contract at origination time. This is ensured statically by checking on
 origination that the code preserves the type of the global data. For
 this, the code of the contract is checked to be of  type
-``lambda (pair ’arg ’global) -> (pair ’ret ’global)`` where ``’global`` is the
-type of the original global store given on origination. The contract
-also takes a parameter and returns a value, hence the complete calling
-convention above.
+``lambda (pair ’arg ’global) -> (pair (list operation) ’global)`` where
+``’global`` is the type of the original global store given on origination.
+The contract also takes a parameter and returns a list of internal operations,
+hence the complete calling convention above. The internal operations are
+queued for execution when the contract returns.
 
 Empty contract
 ~~~~~~~~~~~~~~
 
-Any contract with the same ``parameter`` and ``return`` types may be
-written with an empty sequence in its ``code`` section. The simplest
-contract is the contract for which the ``parameter``, ``storage``, and
-``return`` are all of type ``unit``. This contract is as follows:
+The simplest contract is the contract for which the ``parameter`` and
+``storage`` are all of type ``unit``. This contract is as follows:
 
 ::
 
-    code {};
+    code { CDR ;           # keep the storage
+           NIl operation ; # return no internal operation
+           PAIR };         # respect the calling convention
     storage unit;
     parameter unit;
-    return unit;
 
 Reservoir contract
 ~~~~~~~~~~~~~~~~~~
@@ -1962,7 +1952,7 @@ Hence, the global data of the contract has the following type
     'g =
       pair
         (pair timestamp tez)
-        (pair (contract unit unit) (contract unit unit))
+        (pair (contract unit) (contract unit))
 
 Following the contract calling convention, the code is a lambda of type
 
@@ -1970,7 +1960,7 @@ Following the contract calling convention, the code is a lambda of type
 
     lambda
       (pair unit 'g)
-      (pair unit 'g)
+      (pair (list operation) 'g)
 
 written as
 
@@ -1981,48 +1971,46 @@ written as
          unit
          (pair
            (pair timestamp tez)
-           (pair (contract unit unit) (contract unit unit))))
+           (pair (contract unit) (contract unit))))
       (pair
-         unit
+         (list operation)
          (pair
             (pair timestamp tez)
-            (pair (contract unit unit) (contract unit unit))))
+            (pair (contract unit) (contract unit))))
 
 The complete source ``reservoir.tz`` is:
 
 ::
 
-    parameter timestamp ;
+    parameter unit ;
     storage
       (pair
-         (pair timestamp tez) # T N
-         (pair (contract unit unit) (contract unit unit))) ; # A B
-    return unit ;
+         (pair (timestamp @T) (tez @N)) # T N
+         (pair (contract @A unit) (contract @B  unit))) ; # A B
     code
-      { DUP ; CDAAR ; # T
-        NOW ;
-        COMPARE ; LE ;
-        IF { DUP ; CDADR ; # N
+      { CDR ; DUP ; CAAR ; # T
+        NOW ; COMPARE ; LE ;
+        IF { DUP ; CADR ; # N
              BALANCE ;
              COMPARE ; LE ;
-             IF { CDR ; UNIT ; PAIR }
-                { DUP ; CDDDR ; # B
+             IF { NIL operation ; PAIR }
+                { DUP ; CDDR ; # B
                   BALANCE ; UNIT ;
-                  DIIIP { CDR } ;
                   TRANSFER_TOKENS ;
+                  NIL operation ; SWAP ; CONS ;
                   PAIR } }
-           { DUP ; CDDAR ; # A
+           { DUP ; CDAR ; # A
              BALANCE ;
              UNIT ;
-             DIIIP { CDR } ;
              TRANSFER_TOKENS ;
+             NIL operation ; SWAP ; CONS ;
              PAIR } }
 
 Reservoir contract (variant with broker and status)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We basically want the same contract as the previous one, but instead of
-destroying it, we want to keep it alive, storing a flag ``S`` so that we
+leaving it empty, we want to keep it alive, storing a flag ``S`` so that we
 can tell afterwards if the tokens have been transferred to ``A`` or
 ``B``. We also want a broker ``X`` to get some fee ``P`` in any case.
 
@@ -2053,20 +2041,19 @@ The complete source ``scrutable_reservoir.tz`` is:
 
 ::
 
-    parameter timestamp ;
+    parameter unit ;
     storage
       (pair
          string # S
          (pair
             timestamp # T
             (pair
-               (pair tez tez) ; # P N
+               (pair tez tez) # P N
                (pair
-                  (contract unit unit) # X
-                  (pair (contract unit unit) (contract unit unit)))))) ; # A B
-    return unit ;
+                  (contract unit) # X
+                  (pair (contract unit) (contract unit)))))) ; # A B
     code
-      { DUP ; CDAR # S
+      { DUP ; CDAR ; # S
         PUSH string "open" ;
         COMPARE ; NEQ ;
         IF { FAIL } # on "success", "timeout" or a bad init value
@@ -2083,18 +2070,20 @@ The complete source ``scrutable_reservoir.tz`` is:
                   COMPARE; LT ;
                   IF { # Not enough cash, we just accept the transaction
                        # and leave the global untouched
-                       CDR }
+                       CDR ; NIL operation ; PAIR }
                      { # Enough cash, successful ending
                        # We update the global
                        CDDR ; PUSH string "success" ; PAIR ;
                        # We transfer the fee to the broker
                        DUP ; CDDAAR ; # P
-                       DIP { DUP ; CDDDAR } # X
-                       UNIT ; TRANSFER_TOKENS ; DROP ;
+                       DIP { DUP ; CDDDAR } ; # X
+                       UNIT ; TRANSFER_TOKENS ;
                        # We transfer the rest to A
-                       DUP ; CDDADR ; # N
-                       DIP { DUP ; CDDDDAR } # A
-                       UNIT ; TRANSFER_TOKENS ; DROP } }
+                       DIP { DUP ; CDDADR ; # N
+                             DIP { DUP ; CDDDDAR } ; # A
+                             UNIT ; TRANSFER_TOKENS } ;
+                       NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
+                       PAIR } }
                 { # After timeout, we refund
                   # We update the global
                   CDDR ; PUSH string "timeout" ; PAIR ;
@@ -2103,17 +2092,17 @@ The complete source ``scrutable_reservoir.tz`` is:
                   DIP { DUP ; CDDAAR } ; # P
                   COMPARE ; LT ; # available < P
                   IF { PUSH tez "1.00" ; BALANCE ; SUB ; # available
-                       DIP { DUP ; CDDDAR } # X
-                       UNIT ; TRANSFER_TOKENS ; DROP }
+                       DIP { DUP ; CDDDAR } ; # X
+                       UNIT ; TRANSFER_TOKENS }
                      { DUP ; CDDAAR ; # P
-                       DIP { DUP ; CDDDAR } # X
-                       UNIT ; TRANSFER_TOKENS ; DROP }
+                       DIP { DUP ; CDDDAR } ; # X
+                       UNIT ; TRANSFER_TOKENS } ;
                   # We transfer the rest to B
-                  PUSH tez "1.00" ; BALANCE ; SUB ; # available
-                  DIP { DUP ; CDDDDDR } # B
-                  UNIT ; TRANSFER_TOKENS ; DROP } }
-        # return Unit
-        UNIT ; PAIR }
+                  DIP { PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                        DIP { DUP ; CDDDDDR } ; # B
+                        UNIT ; TRANSFER_TOKENS } ;
+                  NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
+                  PAIR } } }
 
 Forward contract
 ~~~~~~~~~~~~~~~~
@@ -2162,8 +2151,8 @@ send all the tokens to the seller.
 
 Otherwise, the seller must deliver at least ``Q`` tons of dried peas to
 the warehouse, in the next 24 hours. When the amount is equal to or
-exceeds ``Q``, all the tokens are transferred to the seller and the
-contract is destroyed. For storing the quantity of peas already
+exceeds ``Q``, all the tokens are transferred to the seller.
+For storing the quantity of peas already
 delivered, we add a counter of type ``nat`` in the global storage. For
 knowing this quantity, we accept messages from W with a partial amount
 of delivered peas as argument.
@@ -2223,8 +2212,8 @@ The complete source ``forward.tz`` is:
 
 ::
 
-    parameter (or string nat) ;
-    return unit ;
+    parameter
+      (or string nat) ;
     storage
       (pair
          (pair nat (pair tez tez)) # counter from_buyer from_seller
@@ -2233,11 +2222,11 @@ The complete source ``forward.tz`` is:
             (pair
                (pair tez tez) # K C
                (pair
-                  (pair (contract unit unit) (contract unit unit)) # B S
-                  (contract unit unit))))) ; # W
+                  (pair (contract unit) (contract unit)) # B S
+                  (contract unit))))) ; # W
     code
       { DUP ; CDDADDR ; # Z
-        PUSH nat 86400 ; SWAP ; ADD ; # one day in second
+        PUSH int 86400 ; SWAP ; ADD ; # one day in second
         NOW ; COMPARE ; LT ;
         IF { # Before Z + 24
              DUP ; CAR ; # we must receive (Left "buyer") or (Left "seller")
@@ -2251,7 +2240,7 @@ The complete source ``forward.tz`` is:
                       PUSH nat 0 ; PAIR ; # delivery counter at 0
                       DIP { CDDR } ; PAIR ; # parameters
                       # and return Unit
-                      UNIT ; PAIR }
+                      NIL operation ; PAIR }
                     { PUSH string "seller" ; COMPARE ; EQ ;
                       IF { DUP ; CDADDR ; # amount already versed by the seller
                            DIP { AMOUNT } ; ADD ; # transaction
@@ -2260,10 +2249,12 @@ The complete source ``forward.tz`` is:
                            PUSH nat 0 ; PAIR ; # delivery counter at 0
                            DIP { CDDR } ; PAIR ; # parameters
                            # and return Unit
-                           UNIT ; PAIR }
+                           NIL operation ; PAIR }
                          { FAIL } } } # (Left _)
                { FAIL } } # (Right _)
            { # After Z + 24
+             # if balance is emptied, just fail
+             BALANCE ; PUSH tez "0" ; IFCMPEQ { FAIL } {} ;
              # test if the required amount is reached
              DUP ; CDDAAR ; # Q
              DIP { DUP ; CDDDADR } ; MUL ; # C
@@ -2272,25 +2263,28 @@ The complete source ``forward.tz`` is:
              BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C) + 1
              IF { # refund the parties
                   CDR ; DUP ; CADAR ; # amount versed by the buyer
-                  DIP { DUP ; CDDDAAR } # B
-                  UNIT ; TRANSFER_TOKENS ; DROP
+                  DIP { DUP ; CDDDAAR } ; # B
+                  UNIT ; TRANSFER_TOKENS ;
+                  NIL operation ; SWAP ; CONS ; SWAP ;
                   DUP ; CADDR ; # amount versed by the seller
-                  DIP { DUP ; CDDDADR } # S
-                  UNIT ; TRANSFER_TOKENS ; DROP
-                  BALANCE ; # bonus to the warehouse to destroy the account
-                  DIP { DUP ; CDDDDR } # W
-                  UNIT ; TRANSFER_TOKENS ; DROP
-                  # return unit, don't change the global
-                  # since the contract will be destroyed
-                  UNIT ; PAIR }
+                  DIP { DUP ; CDDDADR } ; # S
+                  UNIT ; TRANSFER_TOKENS ; SWAP ;
+                  DIP { CONS } ;
+                  DUP ; CADAR ; DIP { DUP ; CADDR } ; ADD ;
+                  BALANCE ; SUB ; # bonus to the warehouse
+                  DIP { DUP ; CDDDDR } ; # W
+                  UNIT ; TRANSFER_TOKENS ;
+                  DIP { SWAP } ; CONS ;
+                  # leave the storage as-is, as the balance is now 0
+                  PAIR }
                 { # otherwise continue
-                  DUP ; CDDADAR # T
-                  NOW ; COMPARE ; LT
+                  DUP ; CDDADAR ; # T
+                  NOW ; COMPARE ; LT ;
                   IF { FAIL } # Between Z + 24 and T
                      { # after T
-                       DUP ; CDDADAR # T
-                       PUSH nat 86400 ; ADD # one day in second
-                       NOW ; COMPARE ; LT
+                       DUP ; CDDADAR ; # T
+                       PUSH int 86400 ; ADD ; # one day in second
+                       NOW ; COMPARE ; LT ;
                        IF { # Between T and T + 24
                             # we only accept transactions from the buyer
                             DUP ; CAR ; # we must receive (Left "buyer")
@@ -2309,7 +2303,7 @@ The complete source ``forward.tz`` is:
                                      PUSH nat 0 ; PAIR ; # delivery counter at 0
                                      DIP { CDDR } ; PAIR ; # parameters
                                      # and return Unit
-                                     UNIT ; PAIR }
+                                     NIL operation ; PAIR }
                                    { FAIL } } # (Left _)
                               { FAIL } } # (Right _)
                           { # After T + 24
@@ -2318,24 +2312,23 @@ The complete source ``forward.tz`` is:
                             DIP { DUP ; CDDDAAR } ; MUL ; # K
                             DIP { DUP ; CDADAR } ; # amount already versed by the buyer
                             COMPARE ; NEQ ;
-                            IF { # not reached, pay the seller and destroy the contract
+                            IF { # not reached, pay the seller
                                  BALANCE ;
-                                 DIP { DUP ; CDDDDADR } # S
+                                 DIP { DUP ; CDDDDADR } ; # S
                                  DIIP { CDR } ;
-                                 UNIT ; TRANSFER_TOKENS ; DROP ;
-                                 # and return Unit
-                                 UNIT ; PAIR }
+                                 UNIT ; TRANSFER_TOKENS ;
+                                 NIL operation ; SWAP ; CONS ; PAIR }
                                { # otherwise continue
-                                 DUP ; CDDADAR # T
-                                 PUSH nat 86400 ; ADD ;
-                                 PUSH nat 86400 ; ADD ; # two days in second
-                                 NOW ; COMPARE ; LT
+                                 DUP ; CDDADAR ; # T
+                                 PUSH int 86400 ; ADD ;
+                                 PUSH int 86400 ; ADD ; # two days in second
+                                 NOW ; COMPARE ; LT ;
                                  IF { # Between T + 24 and T + 48
                                       # We accept only delivery notifications, from W
                                       DUP ; CDDDDDR ; MANAGER ; # W
-                                      SOURCE unit unit ; MANAGER ;
+                                      SOURCE unit ; MANAGER ;
                                       COMPARE ; NEQ ;
-                                      IF { FAIL } {} # fail if not the warehouse
+                                      IF { FAIL } {} ; # fail if not the warehouse
                                       DUP ; CAR ; # we must receive (Right amount)
                                       IF_LEFT
                                         { FAIL } # (Left _)
@@ -2349,20 +2342,21 @@ The complete source ``forward.tz`` is:
                                           DUP ; CDAAR ;
                                           DIP { DUP ; CDDAAR } ;
                                           COMPARE ; LT ; # counter < Q
-                                          IF { CDR } # wait for more
+                                          IF { CDR ; NIL operation } # wait for more
                                              { # Transfer all the money to the seller
-                                               BALANCE ; # and destroy the contract
-                                               DIP { DUP ; CDDDDADR } # S
+                                               BALANCE ;
+                                               DIP { DUP ; CDDDDADR } ; # S
                                                DIIP { CDR } ;
-                                               UNIT ; TRANSFER_TOKENS ; DROP } } ;
-                                      UNIT ; PAIR }
+                                               UNIT ; TRANSFER_TOKENS ;
+                                               NIL operation ; SWAP ; CONS } } ;
+                                      PAIR }
                                     { # after T + 48, transfer everything to the buyer
-                                      BALANCE ; # and destroy the contract
-                                      DIP { DUP ; CDDDDAAR } # B
+                                      BALANCE ;
+                                      DIP { DUP ; CDDDDAAR } ; # B
                                       DIIP { CDR } ;
-                                      UNIT ; TRANSFER_TOKENS ; DROP ;
-                                      # and return unit
-                                      UNIT ; PAIR } } } } } } }
+                                      UNIT ; TRANSFER_TOKENS ;
+                                      NIL operation ; SWAP ; CONS ;
+                                      PAIR} } } } } } }
 
 XII - Full grammar
 ------------------
@@ -2469,7 +2463,8 @@ XII - Full grammar
       | option <type>
       | list <type>
       | set <comparable type>
-      | contract <type> <type>
+      | operation
+      | contract <type>
       | pair <type> <type>
       | or <type> <type>
       | lambda <type> <type>
