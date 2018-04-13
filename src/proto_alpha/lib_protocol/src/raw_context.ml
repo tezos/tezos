@@ -381,6 +381,8 @@ module type T = sig
 
   val project: context -> root_context
 
+  val absolute_key: context -> key -> key
+
   val consume_gas: context -> Gas_repr.cost -> context tzresult
 
 end
@@ -454,3 +456,5 @@ let fold_keys ctxt k ~init ~f =
   Context.fold_keys ctxt.context k ~init ~f
 
 let project x = x
+
+let absolute_key _ k = k

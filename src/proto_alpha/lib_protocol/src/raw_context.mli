@@ -24,7 +24,9 @@ val storage_error: storage_error -> 'a tzresult Lwt.t
 
 (** {1 Abstract Context} **************************************************)
 
-(** Abstract view of the context *)
+(** Abstract view of the context.
+    Includes a handle to the functional key-value database
+    ({!Context.t}) along with some in-memory values (gas, etc.). *)
 type t
 type context = t
 type root_context = t
@@ -86,6 +88,9 @@ type key = string list
 
 type value = MBytes.t
 
+(** All context manipulation functions. This signature is included
+    as-is for direct context accesses, and used in {!Storage_functors}
+    to provide restricted views to the context. *)
 module type T = sig
 
   type t
@@ -150,8 +155,15 @@ module type T = sig
   val fold_keys:
     context -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
+  (** Internally used in {!Storage_functors} to escape from a view. *)
   val project: context -> root_context
 
+  (** Internally used in {!Storage_functors} to retrieve a full key
+      from partial key relative a view. *)
+  val absolute_key: context -> key -> key
+
+  (** Internally used in {!Storage_functors} to consume gas from
+      within a view. *)
   val consume_gas: context -> Gas_repr.cost -> context tzresult
 
 end
