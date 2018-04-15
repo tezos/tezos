@@ -127,14 +127,13 @@ let create { genesis ; store_root ; context_root ;
     chain_validator_limits =
   init_p2p p2p_params >>=? fun p2p ->
   State.read
-    ~store_root ~context_root ?patch_context () >>=? fun state ->
+    ~store_root ~context_root ?patch_context genesis >>=? fun (state, mainchain_state) ->
   let distributed_db = Distributed_db.create state p2p in
   Validator.create state distributed_db
     peer_validator_limits
     block_validator_limits
     prevalidator_limits
     chain_validator_limits >>= fun validator ->
-  may_create_chain state genesis >>= fun mainchain_state ->
   Validator.activate validator
     ?max_child_ttl mainchain_state >>= fun mainchain_validator ->
   let shutdown () =

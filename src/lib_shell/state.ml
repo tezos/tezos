@@ -23,6 +23,7 @@ end
 type global_state = {
   global_data: global_data Shared.t ;
   protocol_store: Store.Protocol.store Shared.t ;
+  main_chain: Chain_id.t ;
 }
 
 and global_data = {
@@ -60,6 +61,7 @@ and chain_data = {
   current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
+  test_chain: Chain_id.t option ;
 }
 
 and block = {
@@ -242,6 +244,12 @@ module Chain = struct
   type t = chain_state
   type chain_state = t
 
+  let main { main_chain } = main_chain
+  let test chain_state =
+    read_chain_data chain_state begin fun _ chain_data ->
+      Lwt.return chain_data.test_chain
+    end
+
   let allocate
       ~genesis ~faked_genesis_hash ~expiration ~allow_forked_chain
       ~current_head
@@ -258,6 +266,7 @@ module Chain = struct
         current_mempool = Mempool.empty ;
         live_blocks = Block_hash.Set.singleton genesis.block ;
         live_operations = Operation_hash.Set.empty ;
+        test_chain = None ;
       } ;
       chain_data_store ;
     }
@@ -367,11 +376,17 @@ module Chain = struct
       locked_read_all state data
     end
 
-  let get state id =
+  let get_exn state id =
     Shared.use state.global_data begin fun data ->
-      try return (Chain_id.Table.find data.chains id)
-      with Not_found -> fail (Unknown_chain id)
+      Lwt.return (Chain_id.Table.find data.chains id)
     end
+
+  let get state id =
+    Lwt.catch
+      (fun () -> get_exn state id >>= return)
+      (function
+        | Not_found -> fail (Unknown_chain id)
+        | exn -> Lwt.fail exn)
 
   let all state =
     Shared.use state.global_data begin fun { chains } ->
@@ -706,6 +721,9 @@ let fork_testchain block protocol expiration =
     } in
     Chain.locked_create block.chain_state.global_state data
       chain_id ~expiration genesis commit >>= fun chain ->
+    update_chain_data block.chain_state begin fun _ chain_data ->
+      Lwt.return (Some { chain_data with test_chain = Some chain.chain_id }, ())
+    end >>= fun () ->
     return chain
   end
 
@@ -793,11 +811,16 @@ module Current_mempool = struct
 
 end
 
+let may_create_chain state chain genesis =
+  Chain.get state chain >>= function
+  | Ok chain -> Lwt.return chain
+  | Error _ -> Chain.create state genesis
+
 let read
     ?patch_context
     ~store_root
     ~context_root
-    () =
+    genesis =
   Store.init store_root >>=? fun global_store ->
   Context.init ?patch_context ~root:context_root >>= fun context_index ->
   let global_data = {
@@ -805,12 +828,15 @@ let read
     global_store ;
     context_index ;
   } in
+  let main_chain = Chain_id.of_block_hash genesis.Chain.block in
   let state = {
     global_data = Shared.create global_data ;
     protocol_store = Shared.create @@ Store.Protocol.get global_store ;
+    main_chain ;
   } in
   Chain.read_all state >>=? fun () ->
-  return state
+  may_create_chain state main_chain genesis >>= fun main_chain_state ->
+  return (state, main_chain_state)
 
 let close { global_data } =
   Shared.use global_data begin fun { global_store } ->

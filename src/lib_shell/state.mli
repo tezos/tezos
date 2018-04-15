@@ -19,18 +19,6 @@
 type t
 type global_state = t
 
-(** Read the internal state of the node and initialize
-    the databases. *)
-val read:
-  ?patch_context:(Context.t -> Context.t Lwt.t) ->
-  store_root:string ->
-  context_root:string ->
-  unit ->
-  global_state tzresult Lwt.t
-
-val close:
-  global_state -> unit Lwt.t
-
 (** {2 Network} ************************************************************)
 
 (** Data specific to a given chain (e.g the main chain or the current
@@ -58,6 +46,10 @@ module Chain : sig
 
   (** Look up for a chain by the hash of its genesis block. *)
   val get: global_state -> Chain_id.t -> chain_state tzresult Lwt.t
+  val get_exn: global_state -> Chain_id.t -> chain_state Lwt.t
+
+  val main: global_state -> Chain_id.t
+  val test: chain_state -> Chain_id.t option Lwt.t
 
   (** Returns all the known chains. *)
   val all: global_state -> chain_state list Lwt.t
@@ -174,6 +166,7 @@ type chain_data = {
   current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
+  test_chain: Chain_id.t option ;
 }
 
 val read_chain_data:
@@ -224,3 +217,15 @@ module Current_mempool : sig
       not the provided one. *)
 
 end
+
+(** Read the internal state of the node and initialize
+    the databases. *)
+val read:
+  ?patch_context:(Context.t -> Context.t Lwt.t) ->
+  store_root:string ->
+  context_root:string ->
+  Chain.genesis ->
+  (global_state * Chain.t) tzresult Lwt.t
+
+val close:
+  global_state -> unit Lwt.t
