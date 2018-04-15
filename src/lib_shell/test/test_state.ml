@@ -83,6 +83,8 @@ let parsed_block ({ shell ; protocol_data } : Block_header.t) =
       protocol_data in
   ({ shell ; protocol_data } : Proto.block_header)
 
+let zero = MBytes.create 0
+
 let build_valid_chain state vtbl pred names =
   Lwt_list.fold_left_s
     (fun pred name ->
@@ -102,7 +104,8 @@ let build_valid_chain state vtbl pred names =
              (* no operations *)
              Proto.finalize_block vstate
            end >>=? fun (ctxt, _metadata) ->
-           State.Block.store state block [[op]] ctxt >>=? fun _vblock ->
+           State.Block.store state
+             block zero [[op]] [[zero]] ctxt >>=? fun _vblock ->
            State.Block.read state hash >>=? fun vblock ->
            Hashtbl.add vtbl name vblock ;
            return vblock

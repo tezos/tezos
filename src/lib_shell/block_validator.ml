@@ -179,11 +179,17 @@ let apply_block
     ~predecessor_timestamp:pred_header.shell.timestamp
     ~predecessor_fitness:pred_header.shell.fitness
     header >>=? fun state ->
-  fold_left_s (fold_left_s (fun state op ->
-      Proto.apply_operation state op >>=? fun (state, _metadata) ->
-      return state))
-    state parsed_operations >>=? fun state ->
-  Proto.finalize_block state >>=? fun (validation_result, _metadata) ->
+  fold_left_s
+    (fun (state, acc) ops ->
+       fold_left_s
+         (fun (state, acc) op ->
+            Proto.apply_operation state op >>=? fun (state, op_metadata) ->
+            return (state, op_metadata :: acc))
+         (state, []) ops >>=? fun (state, ops_metadata) ->
+       return (state, List.rev ops_metadata :: acc))
+    (state, []) parsed_operations >>=? fun (state, ops_metadata) ->
+  let ops_metadata = List.rev ops_metadata in
+  Proto.finalize_block state >>=? fun (validation_result, block_data) ->
   Context.get_protocol validation_result.context >>= fun new_protocol ->
   let expected_proto_level =
     if Protocol_hash.equal new_protocol Proto.hash then
@@ -219,7 +225,14 @@ let apply_block
          validation_result.max_operations_ttl) in
   let validation_result =
     { validation_result with max_operations_ttl } in
-  return validation_result
+  let block_data =
+    Data_encoding.Binary.to_bytes_exn Proto.block_header_metadata_encoding block_data in
+  let ops_metadata =
+    List.map
+      (List.map
+         (Data_encoding.Binary.to_bytes_exn Proto.operation_metadata_encoding))
+      ops_metadata in
+  return (validation_result, block_data, ops_metadata)
 
 let check_chain_liveness chain_db hash (header: Block_header.t) =
   let chain_state = Distributed_db.chain_state chain_db in
@@ -271,9 +284,12 @@ let on_request
               protect ?canceler begin fun () ->
                 apply_block
                   (Distributed_db.chain_state chain_db)
-                  pred proto hash header operations >>=? fun result ->
+                  pred proto hash
+                  header operations >>=? fun (result, header_data, operations_data) ->
                 Distributed_db.commit_block
-                  chain_db hash header operations result >>=? function
+                  chain_db hash
+                  header header_data operations operations_data
+                  result >>=? function
                 | None -> assert false (* should not happen *)
                 | Some block -> return block
               end

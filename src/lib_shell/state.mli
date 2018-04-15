@@ -94,8 +94,8 @@ module Block : sig
   val store:
     ?dont_enforce_context_hash:bool ->
     Chain.t ->
-    Block_header.t ->
-    Operation.t list list ->
+    Block_header.t -> MBytes.t ->
+    Operation.t list list -> MBytes.t list list ->
     Tezos_protocol_environment_shell.validation_result ->
     block option tzresult Lwt.t
 
@@ -120,6 +120,7 @@ module Block : sig
   val message: t -> string option
   val max_operations_ttl: t -> int
   val max_operation_data_length: t -> int
+  val metadata: t -> MBytes.t
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t
@@ -137,6 +138,10 @@ module Block : sig
   val operations:
     t -> int -> (Operation.t list * Operation_list_list_hash.path) Lwt.t
   val all_operations: t -> Operation.t list list Lwt.t
+
+  val operations_metadata:
+    t -> int -> MBytes.t list Lwt.t
+  val all_operations_metadata: t -> MBytes.t list list Lwt.t
 
   val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 

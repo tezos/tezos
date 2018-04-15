@@ -82,6 +82,8 @@ let block_header
     Block_header.protocol_data = MBytes.of_string "" ;
   }
 
+let zero = MBytes.create 0
+
 (* adds n blocks on top of an initialized chain *)
 let make_empty_chain (chain:State.Chain.t) n : Block_hash.t Lwt.t =
   State.Block.read_exn chain genesis_hash >>= fun genesis ->
@@ -106,7 +108,7 @@ let make_empty_chain (chain:State.Chain.t) n : Block_hash.t Lwt.t =
         { header with
           shell = { header.shell with predecessor = pred ;
                                       level = Int32.of_int lvl } } in
-      State.Block.store chain header [] empty_result >>=? fun _ ->
+      State.Block.store chain header zero [] [] empty_result >>=? fun _ ->
       loop (lvl+1) (Block_header.hash header)
   in
   loop 1 genesis_hash >>= function

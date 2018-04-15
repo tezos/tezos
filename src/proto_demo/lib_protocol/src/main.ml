@@ -28,6 +28,7 @@ type operation = {
 let operation_data_encoding = Data_encoding.unit
 type operation_metadata = unit
 let operation_metadata_encoding = Data_encoding.unit
+
 let max_operation_data_length = 42
 
 let max_block_length = 42
