@@ -15,13 +15,12 @@ type error += Runtime_contract_error : Contract.t * Script.expr -> error
 
 type execution_result =
   { ctxt : context ;
-    origination_nonce : Contract.origination_nonce ;
     storage : Script.expr ;
     big_map_diff : Contract.big_map_diff option ;
     operations : internal_operation list }
 
 val execute:
-  Alpha_context.t -> Contract.origination_nonce ->
+  Alpha_context.t ->
   check_operations: bool ->
   source: Contract.t ->
   payer: Contract.t ->
@@ -34,7 +33,7 @@ type execution_trace =
   (Script.location * Gas.t * Script.expr list) list
 
 val trace:
-  Alpha_context.t -> Contract.origination_nonce ->
+  Alpha_context.t ->
   check_operations: bool ->
   source: Contract.t ->
   payer: Contract.t ->

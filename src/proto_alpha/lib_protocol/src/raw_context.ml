@@ -21,6 +21,7 @@ type t = {
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
   operation_gas: Gas_repr.t ;
+  origination_nonce: Contract_repr.origination_nonce option ;
 }
 
 type context = t
@@ -48,6 +49,41 @@ let add_rewards ctxt rewards =
 
 let get_rewards ctxt = ctxt.rewards
 let get_fees ctxt = ctxt.fees
+
+type error += Undefined_operation_nonce (* `Permanent *)
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"undefined_operation_nonce"
+    ~title: "Ill timed access to the origination nonce"
+    ~description:
+      "An origination was attemped out of the scope of a manager operation"
+    empty
+    (function Undefined_operation_nonce -> Some () | _ -> None)
+    (fun () -> Undefined_operation_nonce)
+
+let init_origination_nonce ctxt operation_hash =
+  let origination_nonce =
+    Some (Contract_repr.initial_origination_nonce operation_hash) in
+  { ctxt with origination_nonce }
+
+let origination_nonce ctxt =
+  match ctxt.origination_nonce with
+  | None -> error Undefined_operation_nonce
+  | Some origination_nonce -> ok origination_nonce
+
+let increment_origination_nonce ctxt =
+  match ctxt.origination_nonce with
+  | None -> error Undefined_operation_nonce
+  | Some cur_origination_nonce ->
+      let origination_nonce =
+        Some (Contract_repr.incr_origination_nonce cur_origination_nonce) in
+      ok ({ ctxt with origination_nonce }, cur_origination_nonce)
+
+let unset_origination_nonce ctxt =
+  { ctxt with origination_nonce = None }
 
 type error += Gas_limit_too_high (* `Permanent *)
 
@@ -295,6 +331,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
     rewards = Tez_repr.zero ;
     operation_gas = Unaccounted ;
     block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
+    origination_nonce = None ;
   }
 
 let check_first_block ctxt =
@@ -341,6 +378,7 @@ let register_resolvers enc resolve =
       rewards = Tez_repr.zero ;
       block_gas = Constants_repr.default.hard_gas_limit_per_block ;
       operation_gas = Unaccounted ;
+      origination_nonce = None ;
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve

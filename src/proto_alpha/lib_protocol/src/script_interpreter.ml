@@ -81,60 +81,56 @@ type execution_trace =
 let rec interp
   : type p r.
     (?log: execution_trace ref ->
-     context -> Contract.origination_nonce ->
+     context ->
      source: Contract.t -> payer:Contract.t -> self: Contract.t -> Tez.t ->
      (p, r) lambda -> p ->
-     (r * context * Contract.origination_nonce) tzresult Lwt.t)
-  = fun ?log ctxt origination ~source ~payer ~self amount (Lam (code, _)) arg ->
+     (r * context) tzresult Lwt.t)
+  = fun ?log ctxt ~source ~payer ~self amount (Lam (code, _)) arg ->
     let rec step
       : type b a.
-        Contract.origination_nonce -> context -> (b, a) descr -> b stack ->
-        (a stack * context * Contract.origination_nonce) tzresult Lwt.t =
-      fun origination ctxt ({ instr ; loc ; _ } as descr) stack ->
+        context -> (b, a) descr -> b stack ->
+        (a stack * context) tzresult Lwt.t =
+      fun ctxt ({ instr ; loc ; _ } as descr) stack ->
         Lwt.return (Gas.consume ctxt Interp_costs.cycle) >>=? fun ctxt ->
         let logged_return : type a b.
           (b, a) descr ->
-          ?origination:Contract.origination_nonce ->
           a stack * context ->
-          (a stack * context * Contract.origination_nonce) tzresult Lwt.t =
-          fun descr ?(origination = origination) (ret, ctxt) ->
+          (a stack * context) tzresult Lwt.t =
+          fun descr (ret, ctxt) ->
             match log with
-            | None -> return (ret, ctxt, origination)
+            | None -> return (ret, ctxt)
             | Some log ->
                 log := (descr.loc, Gas.level ctxt, unparse_stack ctxt (ret, descr.aft)) :: !log ;
-                return (ret, ctxt, origination) in
+                return (ret, ctxt) in
         let consume_gas_terop : type ret arg1 arg2 arg3 rest.
-          ?origination:Contract.origination_nonce ->
           (_ * (_ * (_ * rest)), ret * rest) descr ->
           ((arg1 -> arg2 -> arg3 -> ret) * arg1 * arg2 * arg3) ->
           (arg1 -> arg2 -> arg3 -> Gas.cost) ->
           rest stack ->
-          ((ret * rest) stack * context * Contract.origination_nonce) tzresult Lwt.t =
-          fun ?(origination = origination) descr (op, x1, x2, x3) cost_func rest ->
+          ((ret * rest) stack * context) tzresult Lwt.t =
+          fun descr (op, x1, x2, x3) cost_func rest ->
             Lwt.return (Gas.consume ctxt (cost_func x1 x2 x3)) >>=? fun ctxt ->
-            logged_return descr ~origination (Item (op x1 x2 x3, rest), ctxt) in
+            logged_return descr (Item (op x1 x2 x3, rest), ctxt) in
         let consume_gas_binop : type ret arg1 arg2 rest.
-          ?origination:Contract.origination_nonce ->
           (_ * (_ * rest), ret * rest) descr ->
           ((arg1 -> arg2 -> ret) * arg1 * arg2) ->
           (arg1 -> arg2 -> Gas.cost) ->
           rest stack ->
           context ->
-          ((ret * rest) stack * context * Contract.origination_nonce) tzresult Lwt.t =
-          fun ?(origination = origination) descr (op, x1, x2) cost_func rest ctxt ->
+          ((ret * rest) stack * context) tzresult Lwt.t =
+          fun descr (op, x1, x2) cost_func rest ctxt ->
             Lwt.return (Gas.consume ctxt (cost_func x1 x2)) >>=? fun ctxt ->
-            logged_return descr ~origination (Item (op x1 x2, rest), ctxt) in
+            logged_return descr (Item (op x1 x2, rest), ctxt) in
         let consume_gas_unop : type ret arg rest.
-          ?origination:Contract.origination_nonce ->
           (_ * rest, ret * rest) descr ->
           ((arg -> ret) * arg) ->
           (arg -> Gas.cost) ->
           rest stack ->
           context ->
-          ((ret * rest) stack * context * Contract.origination_nonce) tzresult Lwt.t =
-          fun ?(origination = origination) descr (op, arg) cost_func rest ctxt ->
+          ((ret * rest) stack * context) tzresult Lwt.t =
+          fun descr (op, arg) cost_func rest ctxt ->
             Lwt.return (Gas.consume ctxt (cost_func arg)) >>=? fun ctxt ->
-            logged_return descr ~origination (Item (op arg, rest), ctxt) in
+            logged_return descr (Item (op arg, rest), ctxt) in
         let consume_gaz_comparison :
           type t rest.
           (t * (t * rest), Script_int.z Script_int.num * rest) descr ->
@@ -142,9 +138,7 @@ let rec interp
           (t -> t -> Gas.cost) ->
           t -> t ->
           rest stack ->
-          ((Script_int.z Script_int.num * rest) stack
-           * context
-           * Contract.origination_nonce) tzresult Lwt.t =
+          ((Script_int.z Script_int.num * rest) stack * context) tzresult Lwt.t =
           fun descr op cost x1 x2 rest ->
             Lwt.return (Gas.consume ctxt (cost x1 x2)) >>=? fun ctxt ->
             logged_return descr (Item (Script_int.of_int @@ op x1 x2, rest), ctxt) in
@@ -155,7 +149,7 @@ let rec interp
           delegatable:bool -> credit:Tez.t -> code:prim Micheline.canonical ->
           init:storage -> param_type:param ty -> storage_type:storage ty ->
           rest:rest stack ->
-          ((param typed_contract * rest) stack * context * Contract.origination_nonce) tzresult Lwt.t =
+          ((param typed_contract * rest) stack * context) tzresult Lwt.t =
           fun descr ~manager ~delegate ~spendable ~delegatable
             ~credit ~code ~init ~param_type ~storage_type ~rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_contract) >>=? fun ctxt ->
@@ -168,16 +162,15 @@ let rec interp
             let storage = Micheline.strip_locations storage in
             Contract.spend_from_script ctxt self credit >>=? fun ctxt ->
             Contract.originate ctxt
-              origination
               ~manager ~delegate ~balance:credit
               ~script:({ code ; storage }, None (* TODO: initialize a big map from a map *))
               ~spendable ~delegatable
-            >>=? fun (ctxt, contract, origination) ->
+            >>=? fun (ctxt, contract) ->
             Fees.origination_burn ctxt ~payer contract >>=? fun ctxt ->
-            logged_return descr ~origination (Item ((param_type, contract), rest), ctxt) in
-        let logged_return : ?origination:Contract.origination_nonce ->
+            logged_return descr (Item ((param_type, contract), rest), ctxt) in
+        let logged_return :
           a stack * context ->
-          (a stack * context * Contract.origination_nonce) tzresult Lwt.t =
+          (a stack * context) tzresult Lwt.t =
           logged_return descr in
         match instr, stack with
         (* stack ops *)
@@ -202,10 +195,10 @@ let rec interp
             logged_return (Item (None, rest), ctxt)
         | If_none (bt, _), Item (None, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.branch) >>=? fun ctxt ->
-            step origination ctxt bt rest
+            step ctxt bt rest
         | If_none (_, bf), Item (Some v, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.branch) >>=? fun ctxt ->
-            step origination ctxt bf (Item (v, rest))
+            step ctxt bf (Item (v, rest))
         (* pairs *)
         | Cons_pair, Item (a, Item (b, rest)) ->
             Lwt.return (Gas.consume ctxt Interp_costs.pair) >>=? fun ctxt ->
@@ -225,10 +218,10 @@ let rec interp
             logged_return (Item (R v, rest), ctxt)
         | If_left (bt, _), Item (L v, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.branch) >>=? fun ctxt ->
-            step origination ctxt bt (Item (v, rest))
+            step ctxt bt (Item (v, rest))
         | If_left (_, bf), Item (R v, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.branch) >>=? fun ctxt ->
-            step origination ctxt bf (Item (v, rest))
+            step ctxt bf (Item (v, rest))
         (* lists *)
         | Cons_list, Item (hd, Item (tl, rest)) ->
             Lwt.return (Gas.consume ctxt Interp_costs.cons) >>=? fun ctxt ->
@@ -238,43 +231,43 @@ let rec interp
             logged_return (Item ([], rest), ctxt)
         | If_cons (_, bf), Item ([], rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.branch) >>=? fun ctxt ->
-            step origination  ctxt bf rest
+            step ctxt bf rest
         | If_cons (bt, _), Item (hd :: tl, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.branch) >>=? fun ctxt ->
-            step origination ctxt bt (Item (hd, Item (tl, rest)))
+            step ctxt bt (Item (hd, Item (tl, rest)))
         | List_map, Item (lam, Item (l, rest)) ->
-            let rec loop rest ctxt origination l acc =
+            let rec loop rest ctxt l acc =
               Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
               match l with
-              | [] -> return (List.rev acc, ctxt, origination)
+              | [] -> return (List.rev acc, ctxt)
               | hd :: tl ->
-                  interp ?log ctxt origination ~source ~payer ~self amount lam hd
-                  >>=? fun (hd, ctxt, origination) ->
-                  loop rest ctxt origination tl (hd :: acc)
-            in loop rest ctxt origination l [] >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (Item (res, rest), ctxt)
+                  interp ?log ctxt ~source ~payer ~self amount lam hd
+                  >>=? fun (hd, ctxt) ->
+                  loop rest ctxt tl (hd :: acc)
+            in loop rest ctxt l [] >>=? fun (res, ctxt) ->
+            logged_return (Item (res, rest), ctxt)
         | List_map_body body, Item (l, rest) ->
-            let rec loop rest ctxt origination l acc =
+            let rec loop rest ctxt l acc =
               Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
               match l with
-              | [] -> return (Item (List.rev acc, rest), ctxt, origination)
+              | [] -> return (Item (List.rev acc, rest), ctxt)
               | hd :: tl ->
-                  step origination ctxt body (Item (hd, rest))
-                  >>=? fun (Item (hd, rest), ctxt, origination) ->
-                  loop rest ctxt origination tl (hd :: acc)
-            in loop rest ctxt origination l [] >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (res, ctxt)
+                  step ctxt body (Item (hd, rest))
+                  >>=? fun (Item (hd, rest), ctxt) ->
+                  loop rest ctxt tl (hd :: acc)
+            in loop rest ctxt l [] >>=? fun (res, ctxt) ->
+            logged_return (res, ctxt)
         | List_reduce, Item (lam, Item (l, Item (init, rest))) ->
-            let rec loop rest ctxt origination l acc =
+            let rec loop rest ctxt l acc =
               Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
               match l with
-              | [] -> return (acc, ctxt, origination)
+              | [] -> return (acc, ctxt)
               | hd :: tl ->
-                  interp ?log ctxt origination ~source ~payer ~self amount lam (hd, acc)
-                  >>=? fun (acc, ctxt, origination) ->
-                  loop rest ctxt origination tl acc
-            in loop rest ctxt origination l init >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (Item (res, rest), ctxt)
+                  interp ?log ctxt ~source ~payer ~self amount lam (hd, acc)
+                  >>=? fun (acc, ctxt) ->
+                  loop rest ctxt tl acc
+            in loop rest ctxt l init >>=? fun (res, ctxt) ->
+            logged_return (Item (res, rest), ctxt)
         | List_size, Item (list, rest) ->
             Lwt.return
               (List.fold_left
@@ -285,16 +278,16 @@ let rec interp
                  (ok (0, ctxt)) list) >>=? fun (len, ctxt) ->
             logged_return (Item (Script_int.(abs (of_int len)), rest), ctxt)
         | List_iter body, Item (l, init) ->
-            let rec loop ctxt origination l stack =
+            let rec loop ctxt l stack =
               Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
               match l with
-              | [] -> return (stack, ctxt, origination)
+              | [] -> return (stack, ctxt)
               | hd :: tl ->
-                  step origination ctxt body (Item (hd, stack))
-                  >>=? fun (stack, ctxt, origination) ->
-                  loop ctxt origination tl stack
-            in loop ctxt origination l init >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (res, ctxt)
+                  step ctxt body (Item (hd, stack))
+                  >>=? fun (stack, ctxt) ->
+                  loop ctxt tl stack
+            in loop ctxt l init >>=? fun (res, ctxt) ->
+            logged_return (res, ctxt)
         (* sets *)
         | Empty_set t, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.empty_set) >>=? fun ctxt ->
@@ -302,29 +295,29 @@ let rec interp
         | Set_reduce, Item (lam, Item (set, Item (init, rest))) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.set_to_list set)) >>=? fun ctxt ->
             let l = List.rev (set_fold (fun e acc -> e :: acc) set []) in
-            let rec loop rest ctxt origination l acc =
+            let rec loop rest ctxt l acc =
               Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
               match l with
-              | [] -> return (acc, ctxt, origination)
+              | [] -> return (acc, ctxt)
               | hd :: tl ->
-                  interp ?log ctxt origination ~source ~payer ~self amount lam (hd, acc)
-                  >>=? fun (acc, ctxt, origination) ->
-                  loop rest ctxt origination tl acc
-            in loop rest ctxt origination l init >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (Item (res, rest), ctxt)
+                  interp ?log ctxt ~source ~payer ~self amount lam (hd, acc)
+                  >>=? fun (acc, ctxt) ->
+                  loop rest ctxt tl acc
+            in loop rest ctxt l init >>=? fun (res, ctxt) ->
+            logged_return (Item (res, rest), ctxt)
         | Set_iter body, Item (set, init) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.set_to_list set)) >>=? fun ctxt ->
             let l = List.rev (set_fold (fun e acc -> e :: acc) set []) in
-            let rec loop ctxt origination l stack =
+            let rec loop ctxt l stack =
               Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
               match l with
-              | [] -> return (stack, ctxt, origination)
+              | [] -> return (stack, ctxt)
               | hd :: tl ->
-                  step origination ctxt body (Item (hd, stack))
-                  >>=? fun (stack, ctxt, origination) ->
-                  loop ctxt origination tl stack
-            in loop ctxt origination l init >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (res, ctxt)
+                  step ctxt body (Item (hd, stack))
+                  >>=? fun (stack, ctxt) ->
+                  loop ctxt tl stack
+            in loop ctxt l init >>=? fun (res, ctxt) ->
+            logged_return (res, ctxt)
         | Set_mem, Item (v, Item (set, rest)) ->
             consume_gas_binop descr (set_mem, v, set) Interp_costs.set_mem rest ctxt
         | Set_update, Item (v, Item (presence, Item (set, rest))) ->
@@ -338,42 +331,42 @@ let rec interp
         | Map_map, Item (lam, Item (map, rest)) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.map_to_list map)) >>=? fun ctxt ->
             let l = List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
-            let rec loop rest ctxt origination l acc =
+            let rec loop rest ctxt l acc =
               Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
               match l with
-              | [] -> return (acc, ctxt, origination)
+              | [] -> return (acc, ctxt)
               | (k, _) as hd :: tl ->
-                  interp ?log ctxt origination ~source ~payer ~self amount lam hd
-                  >>=? fun (hd, ctxt, origination) ->
-                  loop rest ctxt origination tl (map_update k (Some hd) acc)
-            in loop rest ctxt origination l (empty_map (map_key_ty map)) >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (Item (res, rest), ctxt)
+                  interp ?log ctxt ~source ~payer ~self amount lam hd
+                  >>=? fun (hd, ctxt) ->
+                  loop rest ctxt tl (map_update k (Some hd) acc)
+            in loop rest ctxt l (empty_map (map_key_ty map)) >>=? fun (res, ctxt) ->
+            logged_return (Item (res, rest), ctxt)
         | Map_reduce, Item (lam, Item (map, Item (init, rest))) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.map_to_list map)) >>=? fun ctxt ->
             let l = List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
-            let rec loop rest ctxt origination l acc =
+            let rec loop rest ctxt l acc =
               Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
               match l with
-              | [] -> return (acc, ctxt, origination)
+              | [] -> return (acc, ctxt)
               | hd :: tl ->
-                  interp ?log ctxt origination ~source ~payer ~self amount lam (hd, acc)
-                  >>=? fun (acc, ctxt, origination) ->
-                  loop rest ctxt origination tl acc
-            in loop rest ctxt origination l init >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (Item (res, rest), ctxt)
+                  interp ?log ctxt ~source ~payer ~self amount lam (hd, acc)
+                  >>=? fun (acc, ctxt) ->
+                  loop rest ctxt tl acc
+            in loop rest ctxt l init >>=? fun (res, ctxt) ->
+            logged_return (Item (res, rest), ctxt)
         | Map_iter body, Item (map, init) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.map_to_list map)) >>=? fun ctxt ->
             let l = List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
-            let rec loop ctxt origination l stack =
+            let rec loop ctxt l stack =
               Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
               match l with
-              | [] -> return (stack, ctxt, origination)
+              | [] -> return (stack, ctxt)
               | hd :: tl ->
-                  step origination ctxt body (Item (hd, stack))
-                  >>=? fun (stack, ctxt, origination) ->
-                  loop ctxt origination tl stack
-            in loop ctxt origination l init >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (res, ctxt)
+                  step ctxt body (Item (hd, stack))
+                  >>=? fun (stack, ctxt) ->
+                  loop ctxt tl stack
+            in loop ctxt l init >>=? fun (res, ctxt) ->
+            logged_return (res, ctxt)
         | Map_mem, Item (v, Item (map, rest)) ->
             consume_gas_binop descr (map_mem, v, map) Interp_costs.map_mem rest ctxt
         | Map_get, Item (v, Item (map, rest)) ->
@@ -557,38 +550,38 @@ let rec interp
             consume_gas_unop descr (Script_int.lognot, x) Interp_costs.lognot rest ctxt
         (* control *)
         | Seq (hd, tl), stack ->
-            step origination ctxt hd stack >>=? fun (trans, ctxt, origination) ->
-            step origination ctxt tl trans
+            step ctxt hd stack >>=? fun (trans, ctxt) ->
+            step ctxt tl trans
         | If (bt, _), Item (true, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.branch) >>=? fun ctxt ->
-            step origination ctxt bt rest
+            step ctxt bt rest
         | If (_, bf), Item (false, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.branch) >>=? fun ctxt ->
-            step origination ctxt bf rest
+            step ctxt bf rest
         | Loop body, Item (true, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
-            step origination ctxt body rest >>=? fun (trans, ctxt, origination) ->
-            step origination ctxt descr trans
+            step ctxt body rest >>=? fun (trans, ctxt) ->
+            step ctxt descr trans
         | Loop _, Item (false, rest) ->
             logged_return (rest, ctxt)
         | Loop_left body, Item (L v, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
-            step origination ctxt body (Item (v, rest)) >>=? fun (trans, ctxt, origination) ->
-            step origination ctxt descr trans
+            step ctxt body (Item (v, rest)) >>=? fun (trans, ctxt) ->
+            step ctxt descr trans
         | Loop_left _, Item (R v, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
             logged_return (Item (v, rest), ctxt)
         | Dip b, Item (ign, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.stack_op) >>=? fun ctxt ->
-            step origination ctxt b rest >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (Item (ign, res), ctxt)
+            step ctxt b rest >>=? fun (res, ctxt) ->
+            logged_return (Item (ign, res), ctxt)
         | Exec, Item (arg, Item (lam, rest)) ->
             Lwt.return (Gas.consume ctxt Interp_costs.exec) >>=? fun ctxt ->
-            interp ?log ctxt origination ~source ~payer ~self amount lam arg >>=? fun (res, ctxt, origination) ->
-            logged_return ~origination (Item (res, rest), ctxt)
+            interp ?log ctxt ~source ~payer ~self amount lam arg >>=? fun (res, ctxt) ->
+            logged_return (Item (res, rest), ctxt)
         | Lambda lam, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.push) >>=? fun ctxt ->
-            logged_return ~origination (Item (lam, rest), ctxt)
+            logged_return (Item (lam, rest), ctxt)
         | Fail, _ ->
             fail (Reject loc)
         | Nop, stack ->
@@ -681,11 +674,10 @@ let rec interp
             Contract.spend_from_script ctxt self credit >>=? fun ctxt ->
             Lwt.return Tez.(credit -? Constants.origination_burn ctxt) >>=? fun balance ->
             Contract.originate ctxt
-              origination
               ~manager ~delegate ~balance
-              ?script:None ~spendable:true ~delegatable >>=? fun (ctxt, contract, origination) ->
+              ?script:None ~spendable:true ~delegatable >>=? fun (ctxt, contract) ->
             Fees.origination_burn ctxt ~payer contract >>=? fun ctxt ->
-            logged_return ~origination (Item ((Unit_t, contract), rest), ctxt)
+            logged_return (Item ((Unit_t, contract), rest), ctxt)
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
             let contract = Contract.implicit_contract key in
@@ -750,36 +742,35 @@ let rec interp
       | Some log ->
           log := (code.loc, Gas.level ctxt, unparse_stack ctxt (stack, code.bef)) :: !log
     end ;
-    step origination ctxt code stack >>=? fun (Item (ret, Empty), ctxt, origination) ->
-    return (ret, ctxt, origination)
+    step ctxt code stack >>=? fun (Item (ret, Empty), ctxt) ->
+    return (ret, ctxt)
 
 (* ---- contract handling ---------------------------------------------------*)
 
-and execute ?log ctxt ~check_operations origination_nonce ~source ~payer ~self script amount arg :
-  (Script.expr * internal_operation list * context * Contract.origination_nonce *
+and execute ?log ctxt ~check_operations ~source ~payer ~self script amount arg :
+  (Script.expr * internal_operation list * context *
    Script_typed_ir.ex_big_map option) tzresult Lwt.t =
   parse_script ctxt ~check_operations script
   >>=? fun ((Ex_script { code ; arg_type ; storage ; storage_type }), ctxt) ->
   parse_data ctxt ~check_operations arg_type arg >>=? fun (arg, ctxt) ->
   trace
     (Runtime_contract_error (self, script.code))
-    (interp ?log ctxt origination_nonce ~source ~payer ~self amount code (arg, storage))
-  >>=? fun ((ops, sto), ctxt, origination) ->
+    (interp ?log ctxt ~source ~payer ~self amount code (arg, storage))
+  >>=? fun ((ops, sto), ctxt) ->
   Lwt.return @@ unparse_data ctxt storage_type sto >>=? fun (storage, ctxt) ->
-  return (Micheline.strip_locations storage, ops, ctxt, origination,
+  return (Micheline.strip_locations storage, ops, ctxt,
           Script_ir_translator.extract_big_map storage_type sto)
 
 type execution_result =
   { ctxt : context ;
-    origination_nonce : Contract.origination_nonce ;
     storage : Script.expr ;
     big_map_diff : Contract.big_map_diff option ;
     operations : internal_operation list }
 
-let trace ctxt origination_nonce ~check_operations ~source ~payer ~self:(self, script) ~parameter ~amount =
+let trace ctxt ~check_operations ~source ~payer ~self:(self, script) ~parameter ~amount =
   let log = ref [] in
-  execute ~log ctxt ~check_operations origination_nonce ~source ~payer ~self script amount (Micheline.root parameter)
-  >>=? fun (storage, operations, ctxt, origination_nonce, big_map_diff) ->
+  execute ~log ctxt ~check_operations ~source ~payer ~self script amount (Micheline.root parameter)
+  >>=? fun (storage, operations, ctxt, big_map_diff) ->
   begin match big_map_diff with
     | None -> return (None, ctxt)
     | Some big_map_diff ->
@@ -787,15 +778,15 @@ let trace ctxt origination_nonce ~check_operations ~source ~payer ~self:(self, s
         return (Some big_map_diff, ctxt)
   end >>=? fun (big_map_diff, ctxt) ->
   let trace = List.rev !log in
-  return ({ ctxt ; origination_nonce ; storage ; big_map_diff ; operations }, trace)
+  return ({ ctxt ; storage ; big_map_diff ; operations }, trace)
 
-let execute ctxt origination_nonce ~check_operations ~source ~payer ~self:(self, script) ~parameter ~amount =
-  execute ctxt origination_nonce ~check_operations ~source ~payer ~self script amount (Micheline.root parameter)
-  >>=? fun (storage, operations, ctxt, origination_nonce, big_map_diff) ->
+let execute ctxt ~check_operations ~source ~payer ~self:(self, script) ~parameter ~amount =
+  execute ctxt ~check_operations ~source ~payer ~self script amount (Micheline.root parameter)
+  >>=? fun (storage, operations, ctxt, big_map_diff) ->
   begin match big_map_diff with
     | None -> return (None, ctxt)
     | Some big_map_diff ->
         Script_ir_translator.to_serializable_big_map ctxt big_map_diff >>=? fun (big_map_diff, ctxt) ->
         return (Some big_map_diff, ctxt)
   end >>=? fun (big_map_diff, ctxt) ->
-  return { ctxt ; origination_nonce ; storage ; big_map_diff ; operations }
+  return { ctxt ; storage ; big_map_diff ; operations }

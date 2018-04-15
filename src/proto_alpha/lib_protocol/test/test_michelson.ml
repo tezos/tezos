@@ -48,12 +48,11 @@ let parse_execute sb ?tc code_str param_str storage_str =
   let param = parse_param param_str in
   let script = parse_script code_str storage_str in
   Script.execute_code_pred ?tc sb script param
-  >>=?? fun (dst, { ctxt = tc ; operations = ops ;
-                    origination_nonce = nonce ; big_map_diff = bgm }) ->
+  >>=?? fun (dst, { ctxt = tc ; operations = ops ; big_map_diff = bgm }) ->
   let payer =
     (List.hd Account.bootstrap_accounts).contract in
-  Proto_alpha.Apply.apply_internal_manager_operations tc ~payer nonce ops >>=?? fun (tc, nonce, err, _, ops) ->
-  let contracts = Contract.originated_contracts nonce in
+  Proto_alpha.Apply.apply_internal_manager_operations tc ~payer ops >>=?? fun (tc, err, _, ops) ->
+  Contract.originated_from_current_nonce tc >>=?? fun contracts ->
   match err with
   | None ->
       let tc = Proto_alpha.Alpha_context.Gas.set_unlimited tc in

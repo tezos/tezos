@@ -82,6 +82,13 @@ val set_gas_unlimited: t -> t
 val gas_level: t -> Gas_repr.t
 val block_gas_level: t -> Z.t
 
+type error += Undefined_operation_nonce (* `Permanent *)
+
+val init_origination_nonce: t -> Operation_hash.t -> t
+val origination_nonce: t -> Contract_repr.origination_nonce tzresult
+val increment_origination_nonce: t -> (t * Contract_repr.origination_nonce) tzresult
+val unset_origination_nonce: t -> t
+
 (** {1 Generic accessors} *************************************************)
 
 type key = string list

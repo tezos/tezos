@@ -369,8 +369,8 @@ let apply_amendment_operation_content ctxt delegate = function
       Amendment.record_ballot ctxt delegate proposal ballot
 
 let apply_manager_operation_content
-    ctxt origination_nonce ~payer ~source ~internal = function
-  | Reveal _ -> return (ctxt, origination_nonce, None, Tez.zero, [])
+    ctxt ~payer ~source ~internal = function
+  | Reveal _ -> return (ctxt, None, Tez.zero, [])
   | Transaction { amount ; parameters ; destination } ->
       begin
         begin
@@ -384,28 +384,28 @@ let apply_manager_operation_content
         | None -> begin
             match parameters with
             | None ->
-                return (ctxt, origination_nonce, None, Tez.zero, [])
+                return (ctxt, None, Tez.zero, [])
             | Some arg ->
                 match Micheline.root arg with
                 | Prim (_, D_Unit, [], _) ->
-                    return (ctxt, origination_nonce, None, Tez.zero, [])
+                    return (ctxt, None, Tez.zero, [])
                 | _ -> fail (Bad_contract_parameter (destination, None, parameters))
           end
         | Some script ->
             let call_contract ctxt parameter =
               Script_interpreter.execute
-                ctxt origination_nonce
+                ctxt
                 ~check_operations:(not internal)
                 ~source ~payer ~self:(destination, script) ~amount ~parameter
               >>= function
-              | Ok { ctxt ; origination_nonce ; storage ; big_map_diff ; operations } ->
+              | Ok { ctxt ; storage ; big_map_diff ; operations } ->
                   Contract.update_script_storage
                     ctxt destination storage big_map_diff >>=? fun ctxt ->
                   Fees.update_script_storage
                     ctxt ~payer destination >>=? fun (ctxt, fees) ->
-                  return (ctxt, origination_nonce, None, fees, operations)
+                  return (ctxt, None, fees, operations)
               | Error err ->
-                  return (ctxt, origination_nonce, Some err, Tez.zero, []) in
+                  return (ctxt, Some err, Tez.zero, []) in
             Lwt.return @@ Script_ir_translator.parse_toplevel script.code >>=? fun (arg_type, _, _) ->
             let arg_type = Micheline.strip_locations arg_type in
             match parameters, Micheline.root arg_type with
@@ -416,7 +416,7 @@ let apply_manager_operation_content
                 | Ok ctxt -> call_contract ctxt parameters
                 | Error errs ->
                     let err = Bad_contract_parameter (destination, Some arg_type, Some parameters) in
-                    return (ctxt, origination_nonce, Some ((err :: errs)), Tez.zero, [])
+                    return (ctxt, Some ((err :: errs)), Tez.zero, [])
               end
             | None, _ -> fail (Bad_contract_parameter (destination, Some arg_type, None))
       end
@@ -431,59 +431,58 @@ let apply_manager_operation_content
       end >>=? fun (script, ctxt) ->
       Contract.spend ctxt source credit >>=? fun ctxt ->
       Contract.originate ctxt
-        origination_nonce
         ~manager ~delegate ~balance:credit
         ?script
-        ~spendable ~delegatable >>=? fun (ctxt, contract, origination_nonce) ->
+        ~spendable ~delegatable >>=? fun (ctxt, contract) ->
       Fees.origination_burn ctxt ~payer contract >>=? fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, [])
+      return (ctxt, None, Tez.zero, [])
   | Delegation delegate ->
       Delegate.set ctxt source delegate >>=? fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, [])
+      return (ctxt, None, Tez.zero, [])
 
-let apply_internal_manager_operations ctxt origination_nonce ~payer ops =
-  let rec apply ctxt origination_nonce storage_fees applied worklist =
+let apply_internal_manager_operations ctxt ~payer ops =
+  let rec apply ctxt storage_fees applied worklist =
     match worklist with
-    | [] -> return (ctxt, origination_nonce, None, storage_fees, List.rev applied)
+    | [] -> return (ctxt, None, storage_fees, List.rev applied)
     | { source ; operation ;
         signature = _ (* at this point the signature must have been
                          checked if the operation has been
                          deserialized from the outside world *) } as op :: rest ->
-        apply_manager_operation_content ctxt origination_nonce ~source ~payer ~internal:true operation
-        >>=? fun (ctxt, origination_nonce, ignored_error, operation_storage_fees, emitted) ->
+        apply_manager_operation_content ctxt ~source ~payer ~internal:true operation
+        >>=? fun (ctxt, ignored_error, operation_storage_fees, emitted) ->
         Lwt.return Tez.(storage_fees +? operation_storage_fees) >>=? fun storage_fees ->
         match ignored_error with
         | Some err ->
-            return (ctxt, origination_nonce, Some err, storage_fees, List.rev (op :: applied))
+            return (ctxt, Some err, storage_fees, List.rev (op :: applied))
         | None ->
-            apply ctxt origination_nonce storage_fees (op :: applied) (rest @ emitted) in
-  apply ctxt origination_nonce Tez.zero [] ops
+            apply ctxt storage_fees (op :: applied) (rest @ emitted) in
+  apply ctxt Tez.zero [] ops
 
-let apply_manager_operations ctxt origination_nonce source ops =
-  let rec apply ctxt origination_nonce storage_fees applied ops =
+let apply_manager_operations ctxt source ops =
+  let rec apply ctxt storage_fees applied ops =
     match ops with
-    | [] -> return (ctxt, origination_nonce, None, storage_fees, List.rev applied)
+    | [] -> return (ctxt, None, storage_fees, List.rev applied)
     | operation :: rest ->
         Contract.must_exist ctxt source >>=? fun () ->
-        apply_manager_operation_content ctxt origination_nonce ~source ~payer:source ~internal:false operation
-        >>=? fun (ctxt, origination_nonce, ignored_error, operation_storage_fees, emitted) ->
+        apply_manager_operation_content ctxt ~source ~payer:source ~internal:false operation
+        >>=? fun (ctxt, ignored_error, operation_storage_fees, emitted) ->
         Lwt.return Tez.(storage_fees +? operation_storage_fees) >>=? fun storage_fees ->
         let op = { source ; operation ; signature = None } in
         match ignored_error with
-        | Some _ -> return (ctxt, origination_nonce, ignored_error, storage_fees, List.rev (op :: applied))
+        | Some _ -> return (ctxt, ignored_error, storage_fees, List.rev (op :: applied))
         | None ->
-            apply_internal_manager_operations ctxt origination_nonce ~payer:source emitted
-            >>=? fun (ctxt, origination_nonce, ignored_error, internal_storage_fees, internal_applied) ->
+            apply_internal_manager_operations ctxt ~payer:source emitted
+            >>=? fun (ctxt, ignored_error, internal_storage_fees, internal_applied) ->
             let applied = List.rev internal_applied @ (op :: applied) in
             Lwt.return Tez.(storage_fees +? internal_storage_fees) >>=? fun storage_fees ->
             match ignored_error with
-            | Some _ -> return (ctxt, origination_nonce, ignored_error, storage_fees, List.rev applied)
-            | None -> apply ctxt origination_nonce storage_fees applied rest in
-  apply ctxt origination_nonce Tez.zero [] ops
+            | Some _ -> return (ctxt, ignored_error, storage_fees, List.rev applied)
+            | None -> apply ctxt storage_fees applied rest in
+  apply ctxt Tez.zero [] ops
 
 let apply_sourced_operation
     ctxt pred_block block_prio
-    operation origination_nonce ops =
+    operation ops =
   match ops with
   | Manager_operations { source ; fee ; counter ; operations ; gas_limit } ->
       let revealed_public_keys =
@@ -507,34 +506,34 @@ let apply_sourced_operation
       Contract.spend ctxt source fee >>=? fun ctxt ->
       add_fees ctxt fee >>=? fun ctxt ->
       Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
-      apply_manager_operations ctxt origination_nonce source operations
-      >>=? fun (ctxt, origination_nonce, ignored_error, storage_fees, applied) ->
-      return (ctxt, origination_nonce, ignored_error, storage_fees, applied)
+      apply_manager_operations ctxt source operations
+      >>=? fun (ctxt, ignored_error, storage_fees, applied) ->
+      return (ctxt, ignored_error, storage_fees, applied)
   | Consensus_operation content ->
       apply_consensus_operation_content ctxt
         pred_block block_prio operation content >>=? fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, [])
+      return (ctxt, None, Tez.zero, [])
   | Amendment_operation { source ; operation = content } ->
       Roll.delegate_pubkey ctxt source >>=? fun delegate ->
       Operation.check_signature delegate operation >>=? fun () ->
       (* TODO, see how to extract the public key hash after this operation to
          pass it to apply_delegate_operation_content *)
       apply_amendment_operation_content ctxt source content >>=? fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, [])
+      return (ctxt, None, Tez.zero, [])
   | Dictator_operation (Activate hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       activate ctxt hash >>= fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, [])
+      return (ctxt, None, Tez.zero, [])
   | Dictator_operation (Activate_testchain hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       let expiration = (* in two days maximum... *)
         Time.add (Timestamp.current ctxt) (Int64.mul 48L 3600L) in
       fork_test_chain ctxt hash expiration >>= fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, [])
+      return (ctxt, None, Tez.zero, [])
 
-let apply_anonymous_operation ctxt _delegate origination_nonce kind =
+let apply_anonymous_operation ctxt _delegate kind =
   match kind with
   | Seed_nonce_revelation { level ; nonce } ->
       let level = Level.from_raw ctxt level in
@@ -542,7 +541,7 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
       let seed_nonce_revelation_tip =
         Constants.seed_nonce_revelation_tip ctxt in
       add_rewards ctxt seed_nonce_revelation_tip >>=? fun ctxt ->
-      return (ctxt, origination_nonce)
+      return ctxt
   | Double_endorsement_evidence { op1 ; op2 } -> begin
       match op1.contents, op2.contents with
       | Sourced_operations (Consensus_operation (Endorsements e1)),
@@ -581,7 +580,7 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
             | Ok v -> v
             | Error _ -> Tez.zero in
           add_rewards ctxt reward >>=? fun ctxt ->
-          return (ctxt, origination_nonce)
+          return ctxt
       | _, _ -> fail Invalid_double_endorsement_evidence
     end
   | Double_baking_evidence { bh1 ; bh2 } ->
@@ -620,7 +619,7 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
         | Ok v -> v
         | Error _ -> Tez.zero in
       add_rewards ctxt reward >>=? fun ctxt ->
-      return (ctxt, origination_nonce)
+      return ctxt
   | Activation { id = pkh ; secret } ->
       let h_pkh = Unclaimed_public_key_hash.of_ed25519_pkh pkh in
       Commitment.get_opt ctxt h_pkh >>=? function
@@ -632,12 +631,12 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
             Wrong_activation_secret >>=? fun () ->
           Commitment.delete ctxt h_pkh >>=? fun ctxt ->
           Contract.(credit ctxt (implicit_contract (Signature.Ed25519 pkh)) amount) >>=? fun ctxt ->
-          return (ctxt, origination_nonce)
+          return ctxt
 
 type operation_result =
   { ctxt : context ;
     gas : Gas.t ;
-    origination_nonce : Contract.origination_nonce ;
+    contracts : Contract.t list ;
     ignored_error : error list option ;
     internal_operations : internal_operation list ;
     fees : Tez.t ;
@@ -646,25 +645,26 @@ type operation_result =
 
 let apply_operation
     ctxt delegate pred_block block_prio hash operation =
+  let ctxt = Contract.init_origination_nonce ctxt hash  in
   begin match operation.contents with
     | Anonymous_operations ops ->
-        let origination_nonce = Contract.initial_origination_nonce hash in
         fold_left_s
-          (fun (ctxt, origination_nonce) op ->
-             apply_anonymous_operation ctxt delegate origination_nonce op)
-          (ctxt, origination_nonce) ops
-        >>=? fun (ctxt, origination_nonce) ->
-        return (ctxt, origination_nonce, None, Tez.zero, [])
+          (fun ctxt op ->
+             apply_anonymous_operation ctxt delegate op)
+          ctxt ops
+        >>=? fun ctxt ->
+        return (ctxt, None, Tez.zero, [])
     | Sourced_operations op ->
-        let origination_nonce = Contract.initial_origination_nonce hash in
         apply_sourced_operation
           ctxt pred_block block_prio
-          operation origination_nonce op
-  end >>=? fun (ctxt, origination_nonce, ignored_error, storage_fees, internal_operations) ->
+          operation op
+  end >>=? fun (ctxt, ignored_error, storage_fees, internal_operations) ->
   let gas = Gas.level ctxt in
   let ctxt = Gas.set_unlimited ctxt in
-  return { ctxt ; gas ; origination_nonce ; ignored_error ; storage_fees ;
-           internal_operations ;
+  Contract.originated_from_current_nonce ctxt >>=? fun contracts ->
+  let ctxt = Contract.unset_origination_nonce ctxt in
+  return { ctxt ; gas ; ignored_error ; storage_fees ;
+           internal_operations ; contracts ;
            fees = Alpha_context.get_fees ctxt ;
            rewards = Alpha_context.get_rewards ctxt }
 

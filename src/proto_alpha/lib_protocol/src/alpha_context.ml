@@ -76,6 +76,8 @@ end
 module Contract = struct
   include Contract_repr
   include Contract_storage
+  let init_origination_nonce = Raw_context.init_origination_nonce
+  let unset_origination_nonce = Raw_context.unset_origination_nonce
 end
 module Delegate = Delegate_storage
 module Roll = struct

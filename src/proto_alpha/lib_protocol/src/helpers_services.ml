@@ -24,13 +24,12 @@ module S = struct
       RPC_path.(custom_root / "minimal_timestamp")
 
   let run_code_input_encoding =
-    (obj6
+    (obj5
        (req "script" Script.expr_encoding)
        (req "storage" Script.expr_encoding)
        (req "input" Script.expr_encoding)
        (req "amount" Tez.encoding)
-       (req "contract" Contract.encoding)
-       (opt "origination_nonce" Contract.origination_nonce_encoding))
+       (req "contract" Contract.encoding))
 
   let run_code =
     RPC_service.post_service
@@ -153,21 +152,8 @@ module I = struct
           ctxt (Some baker_pkh) pred_block block_prio hash operation
         >>=? function
         | { ignored_error = Some script_err ; _ } -> Lwt.return (Error script_err)
-        | { gas ; origination_nonce ; internal_operations ; _ } ->
-            let contracts = Contract.originated_contracts origination_nonce in
+        | { gas ; contracts ; internal_operations ; _ } ->
             Lwt.return (Ok (contracts, internal_operations, gas))
-
-
-  let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =
-    let max_gas =
-      Constants.hard_gas_limit_per_operation ctxt in
-    let origination_nonce =
-      match origination_nonce with
-      | Some origination_nonce -> origination_nonce
-      | None ->
-          Contract.initial_origination_nonce
-            (Operation_hash.hash_string [ "FAKE " ; "FAKE" ; "FAKE" ]) in
-    (script, storage, input, amount, contract, max_gas, origination_nonce)
 
 end
 
@@ -179,15 +165,12 @@ let () =
     Baking.minimal_time ctxt slot timestamp
   end ;
   register0 S.apply_operation I.apply_operation ;
-  register0 S.run_code begin fun ctxt () parameters ->
-    let (code, storage, parameter, amount, contract, gas, origination_nonce) =
-      I.run_parameters ctxt parameters in
-    begin if Compare.Z.(gas > Z.zero) then
-        Lwt.return (Gas.set_limit ctxt gas)
-      else
-        return (Gas.set_unlimited ctxt) end >>=? fun ctxt ->
+  register0 S.run_code begin fun ctxt ()
+    (code, storage, parameter, amount, contract) ->
+    Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
+    let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
     Script_interpreter.execute
-      ctxt origination_nonce
+      ctxt
       ~check_operations:true
       ~source:contract (* transaction initiator *)
       ~payer:contract (* storage fees payer *)
@@ -196,15 +179,12 @@ let () =
     >>=? fun { Script_interpreter.storage ; operations ; big_map_diff ; _ } ->
     return (storage, operations, big_map_diff)
   end ;
-  register0 S.trace_code begin fun ctxt () parameters ->
-    let (code, storage, parameter, amount, contract, gas, origination_nonce) =
-      I.run_parameters ctxt parameters in
-    begin if Compare.Z.(gas > Z.zero) then
-        Lwt.return (Gas.set_limit ctxt gas)
-      else
-        return (Gas.set_unlimited ctxt) end >>=? fun ctxt ->
+  register0 S.trace_code begin fun ctxt ()
+    (code, storage, parameter, amount, contract) ->
+    Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
+    let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
     Script_interpreter.trace
-      ctxt origination_nonce
+      ctxt
       ~check_operations:true
       ~source:contract (* transaction initiator *)
       ~payer:contract (* storage fees payer *)
@@ -252,7 +232,7 @@ let minimal_time ctxt ?priority block =
 
 let run_code ctxt block code (storage, input, amount, contract) =
   RPC_context.make_call0 S.run_code ctxt
-    block () (code, storage, input, amount, contract, None)
+    block () (code, storage, input, amount, contract)
 
 let apply_operation ctxt block pred_block hash forged_operation signature =
   RPC_context.make_call0 S.apply_operation ctxt
@@ -260,7 +240,7 @@ let apply_operation ctxt block pred_block hash forged_operation signature =
 
 let trace_code ctxt block code (storage, input, amount, contract) =
   RPC_context.make_call0 S.trace_code ctxt
-    block () (code, storage, input, amount, contract, None)
+    block () (code, storage, input, amount, contract)
 
 let typecheck_code ctxt block =
   RPC_context.make_call0 S.typecheck_code ctxt block ()

@@ -28,11 +28,11 @@ let execute_code_pred
   let apply_op = Helpers_operation.apply_of_proto
       (Some op) op_header dummy_protop in
   let hash = Operation.hash apply_op in
-  let dummy_nonce = Contract.initial_origination_nonce hash in
   let amount = Tez.zero in
   Lwt.return (Proto_alpha.Alpha_context.Gas.set_limit tc gas) >>=? fun tc ->
+  let tc = Contract.init_origination_nonce tc hash in
   Script_interpreter.execute
-    tc dummy_nonce
+    tc
     ~check_operations: true
     ~source: op.contract
     ~payer: op.contract
