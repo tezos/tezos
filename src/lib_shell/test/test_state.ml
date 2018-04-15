@@ -101,7 +101,7 @@ let build_valid_chain state vtbl pred names =
                (parsed_block block) >>=? fun vstate ->
              (* no operations *)
              Proto.finalize_block vstate
-           end >>=? fun ctxt ->
+           end >>=? fun (ctxt, _metadata) ->
            State.Block.store state block [[op]] ctxt >>=? fun _vblock ->
            State.Block.read state hash >>=? fun vblock ->
            Hashtbl.add vtbl name vblock ;

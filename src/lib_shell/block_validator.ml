@@ -180,10 +180,10 @@ let apply_block
     ~predecessor_fitness:pred_header.shell.fitness
     header >>=? fun state ->
   fold_left_s (fold_left_s (fun state op ->
-      Proto.apply_operation state op >>=? fun state ->
+      Proto.apply_operation state op >>=? fun (state, _metadata) ->
       return state))
     state parsed_operations >>=? fun state ->
-  Proto.finalize_block state >>=? fun validation_result ->
+  Proto.finalize_block state >>=? fun (validation_result, _metadata) ->
   Context.get_protocol validation_result.context >>= fun new_protocol ->
   let expected_proto_level =
     if Protocol_hash.equal new_protocol Proto.hash then

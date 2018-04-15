@@ -13,8 +13,12 @@ type block_header = {
   shell : Block_header.shell_header ;
   protocol_data : block_header_data ;
 }
+
 let block_header_data_encoding =
   Data_encoding.(obj1 (req "random_data" Variable.bytes))
+
+type block_header_metadata = unit
+let block_header_metadata_encoding = Data_encoding.unit
 
 type operation_data = unit
 type operation = {
@@ -22,6 +26,8 @@ type operation = {
   protocol_data : operation_data ;
 }
 let operation_data_encoding = Data_encoding.unit
+type operation_metadata = unit
+let operation_metadata_encoding = Data_encoding.unit
 let max_operation_data_length = 42
 
 let max_block_length = 42
@@ -94,16 +100,16 @@ let begin_construction
   return { context ; fitness }
 
 let apply_operation ctxt _ =
-  return ctxt
+  return (ctxt, ())
 
 let finalize_block ctxt =
   let fitness = Fitness.get ctxt in
   let message = Some (Format.asprintf "fitness <- %Ld" fitness) in
   let fitness = Fitness.from_int64 fitness in
-  return { Updater.message ; context = ctxt.context ; fitness ;
-           max_operations_ttl = 0 ; max_operation_data_length = 0 ;
-           last_allowed_fork_level = 0l ;
-         }
+  return ({ Updater.message ; context = ctxt.context ; fitness ;
+            max_operations_ttl = 0 ; max_operation_data_length = 0 ;
+            last_allowed_fork_level = 0l ;
+          }, ())
 
 let rpc_services = Services.rpc_services
 

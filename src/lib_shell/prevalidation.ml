@@ -14,7 +14,7 @@ let rec apply_operations apply_operation state r max_ops ~sort ops =
   Lwt_list.fold_left_s
     (fun (state, max_ops, r) (hash, op, parsed_op) ->
        apply_operation state max_ops op parsed_op >>= function
-       | Ok state ->
+       | Ok (state, _metadata) ->
            let applied = (hash, op) :: r.applied in
            Lwt.return (state, max_ops - 1, { r with applied })
        | Error errors ->
@@ -164,4 +164,5 @@ let prevalidate
               r)
 
 let end_prevalidation (State { proto = (module Proto) ; state }) =
-  Proto.finalize_block state
+  Proto.finalize_block state >>=? fun (result, _metadata) ->
+  return result

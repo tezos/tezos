@@ -60,12 +60,16 @@ module Make (Context : CONTEXT) : sig
       shell: Block_header.shell_header ;
       protocol_data: block_header_data ;
     }
+    type block_header_metadata
+    val block_header_metadata_encoding: block_header_metadata Data_encoding.t
     type operation_data
     val operation_data_encoding: operation_data Data_encoding.t
     type operation = {
       shell: Operation.shell_header ;
       protocol_data: operation_data ;
     }
+    type operation_metadata
+    val operation_metadata_encoding: operation_metadata Data_encoding.t
     val acceptable_passes: operation -> int list
     val compare_operations: operation -> operation -> int
     type validation_state
@@ -91,9 +95,11 @@ module Make (Context : CONTEXT) : sig
       ?protocol_data: block_header_data ->
       unit -> validation_state tzresult Lwt.t
     val apply_operation:
-      validation_state -> operation -> validation_state tzresult Lwt.t
+      validation_state -> operation ->
+      (validation_state * operation_metadata) tzresult Lwt.t
     val finalize_block:
-      validation_state -> validation_result tzresult Lwt.t
+      validation_state ->
+      (validation_result * block_header_metadata) tzresult Lwt.t
     val rpc_services: rpc_context Lwt.t RPC_directory.t
     val init:
       context -> Block_header.shell_header -> validation_result tzresult Lwt.t

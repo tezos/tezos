@@ -167,10 +167,12 @@ let make init_block =
   let (operations,_) = List.split init_block.sourced_operations in
   begin_construction_pre init_block >>=? fun vs ->
   Proto_alpha.Error_monad.fold_left_s
-    Main.apply_operation
+    (fun ctxt op -> Main.apply_operation ctxt op >>=? fun (ctxt, _) -> return ctxt)
     vs
     operations
-  >>=? Main.finalize_block >>=? get_header_hash init_block
+  >>=? fun ctxt ->
+  Main.finalize_block ctxt >>=? fun (ctxt, _) ->
+  get_header_hash init_block ctxt
 
 
 let make_init psh pbh lvl prio ops ctxt =

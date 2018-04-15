@@ -64,7 +64,6 @@ val protocol:
 val test_chain:
   #simple -> block -> Test_chain_status.t tzresult Lwt.t
 
-
 val info:
   #simple ->
   ?include_ops:bool -> block -> block_info tzresult Lwt.t

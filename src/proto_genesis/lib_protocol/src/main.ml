@@ -37,7 +37,11 @@ type operation = {
   shell: Operation.shell_header ;
   protocol_data: operation_data ;
 }
+
 let operation_data_encoding = Data_encoding.unit
+
+type operation_metadata = unit
+let operation_metadata_encoding = Data_encoding.unit
 
 let acceptable_passes _op = []
 let compare_operations _ _ = 0
@@ -57,6 +61,9 @@ let block_header_data_encoding =
     (fun { command ; signature } -> (command, signature))
     (fun (command, signature) ->  { command ; signature })
     Data.Command.signed_encoding
+
+type block_header_metadata = unit
+let block_header_metadata_encoding = Data_encoding.unit
 
 let max_block_length =
   Data_encoding.Binary.length
@@ -142,7 +149,7 @@ let begin_construction
 let apply_operation _vctxt _ =
   Lwt.return (Error []) (* absurd *)
 
-let finalize_block state = return state
+let finalize_block state = return (state, ())
 
 let rpc_services = Services.rpc_services
 

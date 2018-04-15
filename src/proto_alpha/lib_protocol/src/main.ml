@@ -17,6 +17,9 @@ type block_header = Alpha_context.Block_header.t = {
 
 let block_header_data_encoding = Alpha_context.Block_header.protocol_data_encoding
 
+type block_header_metadata = unit
+let block_header_metadata_encoding = Data_encoding.unit
+
 type operation_data = Alpha_context.Operation.protocol_data
 type operation = Alpha_context.Operation.t = {
   shell: Operation.shell_header ;
@@ -24,6 +27,9 @@ type operation = Alpha_context.Operation.t = {
 }
 
 let operation_data_encoding = Alpha_context.Operation.protocol_data_encoding
+
+type operation_metadata = unit
+let operation_metadata_encoding = Data_encoding.unit
 
 let acceptable_passes = Alpha_context.Operation.acceptable_passes
 
@@ -124,13 +130,13 @@ let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
   Apply.apply_operation ctxt Optimized predecessor
     (Alpha_context.Operation.hash operation) operation >>=? fun (ctxt, _) ->
   let op_count = op_count + 1 in
-  return { data with ctxt ; op_count }
+  return ({ data with ctxt ; op_count }, ())
 
 let finalize_block { mode ; ctxt ; op_count ; deposit = _ } =
   match mode with
   | Partial_construction _ ->
       let ctxt = Alpha_context.finalize ctxt in
-      return ctxt
+      return (ctxt, ())
   | Application
       { baker ;  block_header = { protocol_data = { contents = protocol_data ; _ } ; _ } }
   | Full_construction { protocol_data ; baker ; _ } ->
@@ -145,7 +151,7 @@ let finalize_block { mode ; ctxt ; op_count ; deposit = _ } =
           "lvl %ld, fit %Ld, prio %d, %d ops"
           level fitness priority op_count in
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
-      return ctxt
+      return (ctxt, ())
 
 let compare_operations op1 op2 =
   Apply.compare_operations op1 op2

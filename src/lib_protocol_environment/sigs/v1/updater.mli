@@ -79,6 +79,12 @@ module type PROTOCOL = sig
     protocol_data: block_header_data ;
   }
 
+  (** ... *)
+  type block_header_metadata
+
+  (** ...  *)
+  val block_header_metadata_encoding: block_header_metadata Data_encoding.t
+
   (** The version specific type of operations. *)
   type operation_data
 
@@ -90,6 +96,12 @@ module type PROTOCOL = sig
     shell: Operation.shell_header ;
     protocol_data: operation_data ;
   }
+
+  (** ... *)
+  type operation_metadata
+
+  (** ...  *)
+  val operation_metadata_encoding: operation_metadata Data_encoding.t
 
   (** The Validation passes in which an operation can appear.
       For instance [[0]] if it only belongs to the first pass.
@@ -160,13 +172,16 @@ module type PROTOCOL = sig
   (** Called after {!begin_application} (or {!begin_construction}) and
       before {!finalize_block}, with each operation in the block. *)
   val apply_operation:
-    validation_state -> operation -> validation_state tzresult Lwt.t
+    validation_state ->
+    operation ->
+    (validation_state * operation_metadata) tzresult Lwt.t
 
   (** The last step in a block validation sequence. It produces the
       context that will be used as input for the validation of its
       successor block candidates. *)
   val finalize_block:
-    validation_state -> validation_result tzresult Lwt.t
+    validation_state ->
+    (validation_result * block_header_metadata) tzresult Lwt.t
 
   (** The list of remote procedures exported by this implementation *)
   val rpc_services: rpc_context Lwt.t RPC_directory.t
