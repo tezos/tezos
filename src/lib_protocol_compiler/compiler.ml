@@ -171,7 +171,7 @@ let main { compile_ml ; pack_objects ; link_shared } =
   (* Generate the 'functor' *)
   let functor_file = build_dir // "functor.ml" in
   let oc = open_out functor_file in
-  Packer.dump oc
+  Packer.dump oc hash
     (Array.map
        begin fun { Protocol.name }  ->
          let name_lowercase = String.uncapitalize_ascii name in

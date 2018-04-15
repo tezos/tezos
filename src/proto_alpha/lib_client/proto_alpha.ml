@@ -11,10 +11,6 @@ module Name = struct let name = "alpha" end
 module Alpha_environment = Tezos_protocol_environment_faked.MakeV1(Name)()
 include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
 
-let hash =
-  Protocol_hash.of_b58check_exn
-    "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-
 class type rpc_context = object
   inherit RPC_context.json
   inherit [Block_services.block] Alpha_environment.RPC_context.simple
