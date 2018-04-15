@@ -75,6 +75,15 @@ module Path : sig
   val prefix:
     ('prefix, 'a) path -> ('a, 'params) path -> ('prefix, 'params) path
 
+  val subst0:
+    ('p, 'p) path -> ('p2, 'p2) path
+  val subst1:
+    ('p, 'p * 'a) path -> ('p2, 'p2 * 'a) path
+  val subst2:
+    ('p, ('p * 'a) * 'b) path -> ('p2, ('p2 * 'a) * 'b) path
+  val subst3:
+    ('p, (('p * 'a) * 'b) * 'c) path -> ('p2, (('p2 * 'a) * 'b) * 'c) path
+
 end
 
 (** Service directory description *)
