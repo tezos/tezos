@@ -275,7 +275,7 @@ Check out the Alphanet *constants* for this:
 
 ::
 
-    ./alphanet.sh client rpc call /blocks/head/proto/constants
+    ./alphanet.sh client rpc get /blocks/head/proto/constants
 
 Check for the ``endorsement_security_deposit`` and
 ``block_security_deposit`` keys of the JSON record. The value is in
@@ -318,7 +318,10 @@ the appropriate value:
 
     $ ./alphanet.sh client list known identities
     my_identity: tz1iFY8aDskx9QGbgBy68SNAGgkc7AE2iG9H (public key known) (secret key known)
-    $ ./alphanet.sh client rpc call /blocks/head/proto/helpers/rights/baking/delegate/tz1iFY8aDskx9QGbgBy68SNAGgkc7AE2iG9H with '{}'
-    [ { "level": 1400.000000, "priority": 2.000000,"timestamp": "2017-05-19T03:21:52Z" }, ...  ]
+    $ ./alphanet.sh client rpc post /blocks/head/proto/helpers/rights/baking/delegate/tz1iFY8aDskx9QGbgBy68SNAGgkc7AE2iG9H with '{}'
+    { "ok":
+        [ { "level": 1400.000000, "priority": 2.000000,
+            "timestamp": "2017-05-19T03:21:52Z" },
+          ...  ] }
 
 .. include:: alphanet_changes.rst

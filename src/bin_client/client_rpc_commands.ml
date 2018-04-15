@@ -290,12 +290,12 @@ let list url (cctxt : #Client_context.full) =
   end else return ()
 
 
-let schema url (cctxt : #Client_context.full) =
+let schema meth url (cctxt : #Client_context.full) =
   let args = String.split '/' url in
   let open RPC_description in
   RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
-      match RPC_service.MethMap.find `POST services with
+      match RPC_service.MethMap.find meth services with
       | exception Not_found ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
@@ -315,12 +315,12 @@ let schema url (cctxt : #Client_context.full) =
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
       return ()
 
-let format url (cctxt : #Client_context.io_rpcs) =
+let format meth url (cctxt : #Client_context.io_rpcs) =
   let args = String.split '/' url in
   let open RPC_description in
   RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
-      match RPC_service.MethMap.find `POST services with
+      match RPC_service.MethMap.find meth services with
       | exception Not_found ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
@@ -366,18 +366,19 @@ let display_answer (cctxt : #Client_context.full) = function
       cctxt#message "Unexpected server answer\n%!" >>= fun () ->
       return ()
 
-let call raw_url (cctxt : #Client_context.full) =
+let call meth raw_url (cctxt : #Client_context.full) =
   let uri = Uri.of_string raw_url in
   let args = String.split_path (Uri.path uri) in
   RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
-      match RPC_service.MethMap.find `POST services with
+      match RPC_service.MethMap.find meth services with
       | exception Not_found ->
           cctxt#message
-            "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
+            "No service found at this URL with this method \
+             (but this is a valid prefix)\n%!" >>= fun () ->
           return ()
       | { input = None } ->
-          cctxt#generic_json_call `POST uri >>=?
+          cctxt#generic_json_call meth uri >>=?
           display_answer cctxt
       | { input = Some input } ->
           fill_in ~show_optionals:false input >>= function
@@ -385,14 +386,14 @@ let call raw_url (cctxt : #Client_context.full) =
               cctxt#error "%s" msg >>= fun () ->
               return ()
           | Ok json ->
-              cctxt#generic_json_call `POST ~body:json uri >>=?
+              cctxt#generic_json_call meth ~body:json uri >>=?
               display_answer cctxt
     end
   | _ ->
       cctxt#message "No service found at this URL\n%!" >>= fun () ->
       return ()
 
-let call_with_json raw_url json (cctxt: #Client_context.full) =
+let call_with_json meth raw_url json (cctxt: #Client_context.full) =
   let uri = Uri.of_string raw_url in
   match Data_encoding.Json.from_string json with
   | exception Assert_failure _ ->
@@ -404,10 +405,10 @@ let call_with_json raw_url json (cctxt: #Client_context.full) =
         "Failed to parse the provided json: %s\n%!"
         err
   | Ok body ->
-      cctxt#generic_json_call `POST ~body uri >>=?
+      cctxt#generic_json_call meth ~body uri >>=?
       display_answer cctxt
 
-let call_with_file_or_json url maybe_file (cctxt: #Client_context.full) =
+let call_with_file_or_json meth url maybe_file (cctxt: #Client_context.full) =
   begin
     match TzString.split ':' ~limit:1 maybe_file with
     | [ "file" ; filename] ->
@@ -421,7 +422,20 @@ let call_with_file_or_json url maybe_file (cctxt: #Client_context.full) =
                "cannot read file (%s)" (Printexc.to_string exn))
     | _ -> return maybe_file
   end >>=? fun json ->
-  call_with_json url json cctxt
+  call_with_json meth url json cctxt
+
+let meth_params ?(name = "HTTP method") ?(desc = "") params =
+  param ~name ~desc
+    (parameter ~autocomplete:(fun _ ->
+         return @@
+         List.map String.lowercase_ascii @@
+         List.map Resto.string_of_meth @@
+         [ `GET ; `POST ; `DELETE ; `PUT ; `PATCH ])
+        (fun _ name ->
+           match Resto.meth_of_string (String.uppercase_ascii name) with
+           | None -> failwith "Unknown HTTP method: %s" name
+           | Some meth -> return meth))
+    params
 
 let group =
   { Clic.name = "rpc" ;
@@ -448,32 +462,45 @@ let commands = [
   command ~group
     ~desc: "Get the input and output JSON schemas of an RPC."
     no_options
-    (prefixes [ "rpc" ; "schema" ] @@ string ~name: "url" ~desc: "the RPC url" @@ stop)
+    (prefixes [ "rpc" ; "schema" ] @@
+     meth_params @@
+     string ~name: "url" ~desc: "the RPC url" @@
+     stop)
     (fun () -> schema) ;
 
   command ~group
     ~desc: "Get the humanoid readable input and output formats of an RPC."
     no_options
-    (prefixes [ "rpc" ; "format" ] @@ string ~name: "url" ~desc: "the RPC URL" @@ stop)
+    (prefixes [ "rpc" ; "format"] @@
+     meth_params @@
+     string ~name: "url" ~desc: "the RPC URL" @@
+     stop)
     (fun () -> format) ;
 
   command ~group
-    ~desc: "Call an RPC.\n\
-            If input data is needed, a text editor will be popped up."
+    ~desc: "Call an RPC with the GET method."
     no_options
-    (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC URL" @@ stop)
-    (fun () -> call) ;
+    (prefixes [ "rpc" ; "get" ] @@ string ~name: "url" ~desc: "the RPC URL" @@ stop)
+    (fun () -> call `GET) ;
 
   command ~group
-    ~desc: "Call an RPC providing input data via the command line."
+    ~desc: "Call an RPC with the POST method.\n\
+            If input data is needed, a text editor will be popped up."
     no_options
-    (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC URL"
+    (prefixes [ "rpc" ; "post" ] @@ string ~name: "url" ~desc: "the RPC URL" @@ stop)
+    (fun () -> call `POST) ;
+
+  command ~group
+    ~desc: "Call an RPC with the POST method, \
+           \ providing input data via the command line."
+    no_options
+    (prefixes [ "rpc" ; "post" ] @@ string ~name: "url" ~desc: "the RPC URL"
      @@ prefix "with"
      @@ string ~name:"input"
        ~desc:"the raw JSON input to the RPC\n\
               For instance, use `{}` to send the empty document.\n\
               Alternatively, use `file:path` to read the JSON data from a file."
      @@ stop)
-    (fun () -> call_with_file_or_json)
+    (fun () -> call_with_file_or_json `POST)
 
 ]

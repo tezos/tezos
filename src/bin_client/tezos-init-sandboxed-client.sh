@@ -57,10 +57,10 @@ cleanup_clients() {
 
 wait_for_the_node_to_be_ready() {
     local count=0
-    if $client rpc call blocks/head/hash >/dev/null 2>&1; then return; fi
+    if $client rpc post blocks/head/hash >/dev/null 2>&1; then return; fi
     printf "Waiting for the node to initialize..."
     sleep 1
-    while ! $client rpc call blocks/head/hash >/dev/null 2>&1
+    while ! $client rpc post blocks/head/hash >/dev/null 2>&1
     do
         count=$((count+1))
         if [ "$count" -ge 30 ]; then
@@ -301,7 +301,7 @@ The client is now properly initialized. In the rest of this shell
 session, you might now run \`tezos-client\` to communicate with a
 tezos node launched with \`launch-sandboxed-node $1\`. For instance:
 
-  tezos-client rpc call blocks/head/protocol
+  tezos-client rpc post blocks/head/protocol
 
 Note: if the current protocol version, as reported by the previous
 command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you

@@ -160,7 +160,7 @@ module S : sig
       block <id>. The optional parameter <depth> controls the size of the
       tree, default is 1.
       Example:
-      tezos-client rpc call /blocks/head/raw_context/v1?depth=2
+      tezos-client rpc post /blocks/head/raw_context/v1?depth=2
   *)
   val raw_context:
     ([ `POST ], unit,
