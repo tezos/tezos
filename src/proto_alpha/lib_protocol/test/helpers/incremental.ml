@@ -24,19 +24,10 @@ let predecessor { predecessor ; _ } = predecessor
 let level st = st.header.shell.level
 
 let rpc_context st =
-  let operations = lazy (List.rev st.rev_operations) in
-  let operations_hashes =
-    lazy (List.map Operation.hash (Lazy.force operations)) in
   let result = Alpha_context.finalize st.state.ctxt in
   Lwt.return {
     Alpha_environment.Updater.block_hash = Block_hash.zero ;
-    block_header =
-      Block_header.raw
-        { st.header with
-          shell = { st.header.shell with fitness = result.fitness }} ;
-    operation_hashes = (fun () -> Lwt.return [Lazy.force operations_hashes]) ;
-    operations = (fun () ->
-        Lwt.return [List.map Operation.raw (Lazy.force operations)]) ;
+    block_header = { st.header.shell with fitness = result.fitness } ;
     context = result.context ;
   }
 

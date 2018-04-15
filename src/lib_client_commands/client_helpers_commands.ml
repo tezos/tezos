@@ -26,7 +26,7 @@ let commands () = Clic.[
          ~desc: "the prefix of the hash to complete" @@
        stop)
       (fun unique prefix (cctxt : #Client_context.full) ->
-         Shell_services.complete
+         Block_services.Empty.Helpers.complete
            cctxt ~block:cctxt#block prefix >>=? fun completions ->
          match completions with
          | [] -> Pervasives.exit 3

@@ -147,11 +147,14 @@ module Block : sig
 
   val known_ancestor:
     Chain.t -> Block_locator.t -> (block * Block_locator.t) option Lwt.t
-    (** [known_ancestor chain_state locator] computes the first block of
-        [locator] that is known to be a valid block. It also computes the
-        'prefix' of [locator] with end at the first valid block.  The
-        function returns [None] when no block in the locator are known or
-        if the first known block is invalid. *)
+  (** [known_ancestor chain_state locator] computes the first block of
+      [locator] that is known to be a valid block. It also computes the
+      'prefix' of [locator] with end at the first valid block.  The
+      function returns [None] when no block in the locator are known or
+      if the first known block is invalid. *)
+
+  val get_rpc_directory: block -> block RPC_directory.t option Lwt.t
+  val set_rpc_directory: block -> block RPC_directory.t -> unit Lwt.t
 
 end
 

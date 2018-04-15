@@ -8,8 +8,13 @@
 (**************************************************************************)
 
 module type T = sig
-  val hash: Protocol_hash.t
-  include Tezos_protocol_environment_shell.PROTOCOL
+  module P : sig
+    val hash: Protocol_hash.t
+    include Tezos_protocol_environment_shell.PROTOCOL
+  end
+  include (module type of (struct include P end))
+  module Block_services :
+    (module type of (struct include Block_services.Make(P)(P) end))
   val complete_b58prefix : Context.t -> string -> string list Lwt.t
 end
 

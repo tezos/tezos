@@ -11,20 +11,17 @@ open Alpha_context
 
 type rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: Block_header.raw ;
-  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-  operations: unit -> Operation.raw list list Lwt.t ;
+  block_header: Block_header.shell_header ;
   context: Alpha_context.t ;
 }
 
 let rpc_init (rpc_context : Updater.rpc_context Lwt.t) =
-  rpc_context >>= fun { block_hash ; block_header ;
-                        operation_hashes ; operations ; context } ->
-  let level = block_header.shell.level in
-  let timestamp = block_header.shell.timestamp in
-  let fitness = block_header.shell.fitness in
+  rpc_context >>= fun { block_hash ; block_header ; context } ->
+  let level = block_header.level in
+  let timestamp = block_header.timestamp in
+  let fitness = block_header.fitness in
   Alpha_context.prepare ~level ~timestamp ~fitness context >>=? fun context ->
-  return { block_hash ; block_header ; operation_hashes ; operations ; context }
+  return { block_hash ; block_header ; context }
 
 let rpc_services = ref (RPC_directory.empty : Updater.rpc_context Lwt.t RPC_directory.t)
 

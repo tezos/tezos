@@ -7,16 +7,5 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
-module S : sig
-  val pending_operations:
-    ([ `POST ], unit,
-     unit , unit, unit,
-     error Preapply_result.t * Operation.t Operation_hash.Map.t) RPC_service.t
-end
-
-open RPC_context
-
-val pending_operations:
-  #simple ->
-  (error Preapply_result.t * Operation.t Operation_hash.Map.t) tzresult Lwt.t
+val build_rpc_directory:
+  State.t -> Validator.t -> Chain_validator.t -> unit RPC_directory.t

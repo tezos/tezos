@@ -19,10 +19,10 @@ protocol_version="PtamL2BUfeNFM2A8Thq2Wde8vNaVD9DhoARDVB41QsHFj89kQpT"
 $admin_client inject protocol "$test_dir/demo"
 $admin_client list protocols
 $client activate protocol $protocol_version with fitness 1 and key dictator and parameters $parameters_file
-answ=$($client -p ProtoALphaALph rpc post /blocks/head/protocol with {} 2>/dev/null)
+answ=$($client -p ProtoALphaALph rpc get /chains/main/blocks/head/metadata/next_protocol_hash 2>/dev/null)
 
 if ! grep "$protocol_version" <<< $answ ; then
-  exit 1
+    exit 1
 fi
 
 echo

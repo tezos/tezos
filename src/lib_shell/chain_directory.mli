@@ -7,4 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val build_rpc_directory: Node.t -> unit RPC_directory.t
+val get_chain_id: State.t -> Chain_services.chain -> Chain_id.t Lwt.t
+val get_chain: State.t -> Chain_services.chain -> State.Chain.t Lwt.t
+
+val rpc_directory: State.Chain.t Lwt.t RPC_directory.t
+
+val build_rpc_directory: State.t -> Validator.t -> unit RPC_directory.t

@@ -207,7 +207,7 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
           failwith "Cannot resolve listening address: %S" addr
       | (addr, port) :: _ ->
           let host = Ipaddr.V6.to_string addr in
-          let dir = Node_rpc.build_rpc_directory node in
+          let dir = Node.build_rpc_directory node in
           let mode =
             match rpc_config.tls with
             | None -> `TCP (`Port port)

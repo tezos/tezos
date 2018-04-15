@@ -23,3 +23,12 @@ val prevalidate :
 val end_prevalidation :
   prevalidation_state ->
   Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
+
+val preapply :
+  predecessor:State.Block.t ->
+  timestamp:Time.t ->
+  protocol_data:MBytes.t ->
+  sort_operations:bool ->
+  Operation.t list list ->
+  (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
+

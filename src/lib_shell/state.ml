@@ -44,6 +44,8 @@ and chain_state = {
   context_index: Context.index Shared.t ;
   block_watcher: block Lwt_watcher.input ;
   chain_data: chain_data_state Shared.t ;
+  block_rpc_directories:
+    block RPC_directory.t Protocol_hash.Map.t Protocol_hash.Table.t  ;
 }
 
 and genesis = {
@@ -282,6 +284,7 @@ module Chain = struct
       block_store = Shared.create block_store ;
       context_index = Shared.create context_index ;
       block_watcher = Lwt_watcher.create_input () ;
+      block_rpc_directories = Protocol_hash.Table.create 7 ;
     } in
     Lwt.return chain_state
 
@@ -721,6 +724,33 @@ module Block = struct
         else
           read_exn chain_state tail >>= fun block ->
           Lwt.return_some (block, locator)
+
+  let get_rpc_directory ({ chain_state ; _ } as block) =
+    read_opt chain_state block.contents.header.shell.predecessor >>= function
+    | None -> Lwt.return_none (* genesis *)
+    | Some pred ->
+        protocol_hash pred >>= fun protocol ->
+        match
+          Protocol_hash.Table.find_opt
+            chain_state.block_rpc_directories protocol
+        with
+        | None -> Lwt.return_none
+        | Some map ->
+            protocol_hash block >>= fun next_protocol ->
+            Lwt.return (Protocol_hash.Map.find_opt next_protocol map)
+
+  let set_rpc_directory ({ chain_state ; _ } as block) dir =
+    read_exn chain_state block.contents.header.shell.predecessor >>= fun pred ->
+    protocol_hash block >>= fun next_protocol ->
+    protocol_hash pred >>= fun protocol ->
+    let map =
+      Option.unopt ~default:Protocol_hash.Map.empty
+        (Protocol_hash.Table.find_opt chain_state.block_rpc_directories protocol)
+    in
+    Protocol_hash.Table.replace
+      chain_state.block_rpc_directories protocol
+      (Protocol_hash.Map.add next_protocol dir map) ;
+    Lwt.return_unit
 
 end
 

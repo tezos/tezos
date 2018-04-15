@@ -21,13 +21,9 @@ type t = {
 type block = t
 
 let rpc_context block =
-  let operations_hashes =
-    lazy [ List.map Operation.hash block.operations ] in
   Lwt.return {
     Alpha_environment.Updater.block_hash = block.hash ;
-    block_header = (Block_header.raw block.header) ;
-    operation_hashes = (fun () -> Lwt.return (Lazy.force operations_hashes)) ;
-    operations = (fun () -> Lwt.return [ List.map Operation.raw block.operations ]) ;
+    block_header = block.header.shell ;
     context = block.context ;
   }
 

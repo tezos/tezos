@@ -381,8 +381,8 @@ run_shell() {
 
 display_head() {
     assert_node_uptodate
-    exec_docker tezos-client rpc post /blocks/head with '{}'
-    exec_docker tezos-client rpc post /blocks/head/proto/context/level with '{}'
+    exec_docker tezos-client rpc get /chains/main/blocks/head
+    exec_docker tezos-client rpc post /chains/main/blocks/head/context/level with {}
 }
 
 ## Main ####################################################################

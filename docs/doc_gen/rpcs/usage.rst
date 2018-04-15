@@ -5,7 +5,7 @@ Usage
 *****
 
 In order to interact with a Tezos node, you may use RPC calls through the
-client using this command ``tezos-admin-client rpc post <url>``.
+client using this command ``tezos-admin-client rpc (get|post) <url>``.
 
 For instance, if you wish to request the current balance of a given
 block and contract, you can call the associated RPC via the command :

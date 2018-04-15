@@ -17,25 +17,32 @@ type block_info = {
   fitness: MBytes.t list ;
   timestamp: Time.t ;
   protocol: Protocol_hash.t ;
+  next_protocol: Protocol_hash.t ;
   level: Level.t ;
 }
 
 val info:
   #Proto_alpha.rpc_context ->
-  ?include_ops:bool -> Block_services.block -> block_info tzresult Lwt.t
+  ?chain:Chain_services.chain ->
+  Block_services.block ->
+  block_info tzresult Lwt.t
 
-val compare:
-  block_info -> block_info -> int
-
-val monitor:
+val monitor_valid_blocks:
   #Proto_alpha.rpc_context ->
-  ?include_ops:bool -> ?length:int -> ?heads:Block_hash.t list ->
-  ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
-  ?compare:(block_info -> block_info -> int) ->
-  unit -> block_info list tzresult Lwt_stream.t tzresult Lwt.t
+  ?chains:Chain_services.chain list ->
+  ?protocols:Protocol_hash.t list ->
+  ?next_protocols:Protocol_hash.t list ->
+  unit -> block_info tzresult Lwt_stream.t tzresult Lwt.t
+
+val monitor_heads:
+  #Proto_alpha.rpc_context ->
+  ?next_protocols:Protocol_hash.t list ->
+  Chain_services.chain ->
+  block_info tzresult Lwt_stream.t tzresult Lwt.t
 
 val blocks_from_cycle:
   #Proto_alpha.rpc_context ->
+  ?chain:Chain_services.chain ->
   Block_services.block ->
   Cycle.t ->
   Block_hash.t list tzresult Lwt.t

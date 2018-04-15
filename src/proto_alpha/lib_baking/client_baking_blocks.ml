@@ -17,68 +17,48 @@ type block_info = {
   fitness: MBytes.t list ;
   timestamp: Time.t ;
   protocol: Protocol_hash.t ;
+  next_protocol: Protocol_hash.t ;
   level: Level.t ;
 }
 
-let convert_block_info cctxt
-    ( { hash ; chain_id ; predecessor ; fitness ; timestamp ; protocol }
-      : Block_services.block_info ) =
-  Alpha_services.Context.level cctxt (`Hash (hash, 0)) >>= function
-  | Ok level ->
-      Lwt.return
-        (Some { hash ; chain_id ; predecessor ;
-                fitness ; timestamp ; protocol ; level })
-  | Error _ ->
-      (* TODO log error *)
-      Lwt.return_none
+let info cctxt ?(chain = `Main) block =
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  Block_services.hash cctxt ~chain ~block () >>=? fun hash ->
+  Block_services.Header.shell_header cctxt ~chain ~block () >>=? fun header ->
+  Block_services.Metadata.next_protocol_hash
+    cctxt ~chain ~block () >>=? fun next_protocol ->
+  Block_services.Metadata.protocol_hash
+    cctxt ~chain ~block () >>=? fun protocol ->
+  Alpha_services.Context.level cctxt (chain, block) >>=? fun level ->
+  let { Tezos_base.Block_header.predecessor ; fitness ; timestamp ; _ } = header in
+  return { hash ; chain_id ; predecessor ; fitness ;
+           timestamp ; protocol ; next_protocol ; level }
 
-let convert_block_info_err cctxt
-    ( { hash ; chain_id ; predecessor ; fitness ; timestamp ; protocol }
-      : Block_services.block_info ) =
-  Alpha_services.Context.level cctxt (`Hash (hash, 0)) >>=? fun level ->
-  return { hash ; chain_id ; predecessor ; fitness ; timestamp ; protocol ; level }
+let monitor_valid_blocks cctxt ?chains ?protocols ?next_protocols () =
+  Shell_services.Monitor.valid_blocks cctxt
+    ?chains ?protocols ?next_protocols () >>=? fun (block_stream, _stop) ->
+  return (Lwt_stream.map_s
+            (fun (chain, block) ->
+               info cctxt ~chain:(`Hash chain) (`Hash (block, 0))) block_stream)
 
-let info cctxt ?include_ops block =
-  Block_services.info cctxt ?include_ops block >>=? fun block ->
-  convert_block_info_err cctxt block
+let monitor_heads cctxt ?next_protocols chain =
+  Shell_services.Monitor.heads
+    cctxt ?next_protocols chain >>=? fun (block_stream, _stop) ->
+  return (Lwt_stream.map_s
+            (fun block -> info cctxt ~chain (`Hash (block, 0)))
+            block_stream)
 
-let compare (bi1 : block_info) (bi2 : block_info) =
-  match Fitness.compare bi1.fitness bi2.fitness with
-  | 0 -> begin
-      match compare bi1.level bi2.level with
-      | 0 -> begin
-          match Time.compare bi1.timestamp bi2.timestamp with
-          | 0 -> Block_hash.compare bi1.predecessor bi2.predecessor
-          | x -> - x
-        end
-      | x -> - x
-    end
-  | x -> x
-
-let sort_blocks cctxt ?(compare = compare) blocks =
-  Lwt_list.filter_map_p (convert_block_info cctxt) blocks >|= fun blocks ->
-  List.sort compare blocks
-
-let monitor cctxt
-    ?include_ops ?length ?heads ?delay
-    ?min_date ?min_heads ?compare () =
-  Block_services.monitor
-    ?include_ops ?length ?heads ?delay ?min_date ?min_heads
-    cctxt >>=? fun (block_stream, _stop) ->
-  let convert blocks =
-    sort_blocks cctxt ?compare (List.flatten blocks) >>= return in
-  return (Lwt_stream.map_s convert block_stream)
-
-let blocks_from_cycle cctxt block cycle =
-  Alpha_services.Context.level cctxt block >>=? fun level ->
-  Alpha_services.Helpers.levels cctxt block cycle >>=? fun (first, last) ->
+let blocks_from_cycle cctxt ?(chain = `Main) block cycle =
+  Block_services.hash cctxt ~chain ~block () >>=? fun hash ->
+  Alpha_services.Context.level cctxt (chain, block) >>=? fun level ->
+  Alpha_services.Helpers.levels cctxt (chain, block) cycle >>=? fun (first, last) ->
   let length = Int32.to_int (Raw_level.diff level.level first) in
-  Block_services.predecessors cctxt block length >>=? fun blocks ->
+  Chain_services.Blocks.list cctxt ~heads:[hash] ~length () >>=? fun blocks ->
   let blocks =
     List.remove
-      (length - (1 + Int32.to_int (Raw_level.diff last first))) blocks in
+      (length - (Int32.to_int (Raw_level.diff last first)))
+      (List.hd blocks) in
   if Raw_level.(level.level = last) then
-    Block_services.hash cctxt block >>=? fun last ->
-    return (last :: blocks)
+    return (hash :: blocks)
   else
     return blocks

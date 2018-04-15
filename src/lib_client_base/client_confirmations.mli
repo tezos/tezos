@@ -9,6 +9,7 @@
 
 val wait_for_operation_inclusion:
   #Client_context.full ->
+  chain:Chain_services.chain ->
   ?predecessors:int ->
   ?confirmations:int ->
   Operation_hash.t ->

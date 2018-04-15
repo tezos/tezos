@@ -40,7 +40,7 @@ assert_propagation_level() {
     level=$1
     printf "\n\nAsserting all nodes have reached level %s\n" "$level"
     for client in "${client_instances[@]}"; do
-        ( $client rpc post /blocks/head/proto/context/level \
+        ( $client rpc post /chains/main/blocks/head/context/level with {} \
               | assert_in_output "\"level\": $level" ) \
             || exit 2
     done
@@ -51,7 +51,7 @@ assert_protocol() {
     proto=$1
     printf "\n\nAsserting protocol propagation\n"
     for client in "${client_instances[@]}"; do
-        ( $client rpc post /blocks/head/protocol | assert_in_output "$proto" ) \
+        ( $client rpc get /chains/main/blocks/head/metadata/next_protocol_hash | assert_in_output "$proto" ) \
               || exit 2
     done
 }
@@ -102,7 +102,7 @@ assert_contains_operation() {
     hash="$1"
     printf "Asserting operations list contains '$hash'\n"
     for client in "${client_instances[@]}"; do
-        ( $client rpc post /blocks/head/operations with {} \
+        ( $client rpc get /chains/main/blocks/head/operation_hashes \
               | assert_in_output $hash ) \
             || exit 2
     done

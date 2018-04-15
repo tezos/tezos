@@ -10,7 +10,8 @@
 open Proto_alpha
 open Alpha_context
 
-let bake_block (cctxt : #Proto_alpha.full) block
+let bake_block (cctxt : #Proto_alpha.full)
+    ?(chain = `Main) block
     ?force ?max_priority ?(free_baking=false) ?(minimal_timestamp=false)
     ?src_sk delegate =
   begin
@@ -20,7 +21,7 @@ let bake_block (cctxt : #Proto_alpha.full) block
         return src_sk
     | Some sk -> return sk
   end >>=? fun src_sk ->
-  Alpha_services.Context.next_level cctxt block >>=? fun level ->
+  Alpha_services.Context.next_level cctxt (chain, block) >>=? fun level ->
   let seed_nonce, seed_nonce_hash =
     if level.expected_commitment then
       let seed_nonce = Client_baking_forge.generate_seed_nonce () in
@@ -104,6 +105,5 @@ let run_daemon cctxt ?max_priority ~endorsement_delay delegates ~endorsement ~ba
   Client_baking_daemon.run cctxt
     ?max_priority
     ~delay:endorsement_delay
-    ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
     ~endorsement ~baking ~denunciation
     delegates

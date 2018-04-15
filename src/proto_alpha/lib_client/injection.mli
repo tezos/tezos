@@ -15,7 +15,8 @@ type result = Operation_hash.t * operation * operation_result
 
 val preapply:
   #Proto_alpha.full ->
-  Block_services.block ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
   Operation.contents ->
@@ -23,7 +24,8 @@ val preapply:
 
 val inject_operation:
   #Proto_alpha.full ->
-  Block_services.block ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
   ?confirmations:int ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->

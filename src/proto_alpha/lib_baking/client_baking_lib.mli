@@ -13,6 +13,7 @@ open Alpha_context
 (** Mine a block *)
 val bake_block:
   #Proto_alpha.full ->
+  ?chain:Chain_services.chain ->
   Block_services.block ->
   ?force:bool ->
   ?max_priority: int ->

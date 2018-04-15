@@ -6,6 +6,7 @@
   (libraries (tezos-base
               tezos-stdlib-unix
               tezos-micheline
+              tezos-shell-services
               tezos-protocol-environment-shell
               tezos-protocol-compiler.registerer
               tezos-protocol-compiler.native
@@ -16,6 +17,7 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_stdlib_unix
                     -open Tezos_micheline
+                    -open Tezos_shell_services
                     -open Tezos_storage))))
 
 (alias

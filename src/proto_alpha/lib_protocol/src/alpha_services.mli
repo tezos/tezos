@@ -9,15 +9,6 @@
 
 open Alpha_context
 
-val operations:
-  'a #RPC_context.simple -> 'a -> (Operation_hash.t * Operation.t) list list shell_tzresult Lwt.t
-val header:
-  'a #RPC_context.simple -> 'a -> Block_header.t shell_tzresult Lwt.t
-val priority:
-  'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
-val seed_nonce_hash:
-  'a #RPC_context.simple -> 'a -> Nonce_hash.t shell_tzresult Lwt.t
-
 module Context : sig
 
   val level:

@@ -13,12 +13,6 @@ module Prevalidators = struct
 
   module S = struct
 
-    let (chain_id_arg : Chain_id.t RPC_arg.t) =
-      RPC_arg.like
-        Chain_id.rpc_arg
-        ~descr:"The chain identifier of whom the prevalidator is responsible."
-        "chain_id"
-
     let list =
       RPC_service.post_service
         ~description:"Lists the Prevalidator workers and their status."

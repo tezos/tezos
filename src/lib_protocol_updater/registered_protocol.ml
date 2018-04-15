@@ -8,8 +8,13 @@
 (**************************************************************************)
 
 module type T = sig
-  val hash: Protocol_hash.t
-  include Tezos_protocol_environment_shell.PROTOCOL
+  module P : sig
+    val hash: Protocol_hash.t
+    include Tezos_protocol_environment_shell.PROTOCOL
+  end
+  include (module type of (struct include P end))
+  module Block_services :
+    (module type of (struct include Block_services.Make(P)(P) end))
   val complete_b58prefix : Context.t -> string -> string list Lwt.t
 end
 
@@ -22,9 +27,13 @@ let build_v1 hash =
   end in
   let module Env = Tezos_protocol_environment_shell.MakeV1(Name)() in
   (module struct
-    let hash = hash
-    module P = F(Env)
-    include Env.Lift(P)
+    module Raw = F(Env)
+    module P = struct
+      let hash = hash
+      include Env.Lift(Raw)
+    end
+    include P
+    module Block_services = Block_services.Make(P)(P)
     let complete_b58prefix = Env.Context.complete
   end : T)
 
@@ -68,8 +77,12 @@ module Register
     VersionTable.add
       versions hash
       (module struct
-        let hash = hash
-        include Env.Lift(Proto)
+        module P = struct
+          let hash = hash
+          include Env.Lift(Proto)
+        end
+        include P
+        module Block_services = Block_services.Make(P)(P)
         let complete_b58prefix = Env.Context.complete
       end : T)
 

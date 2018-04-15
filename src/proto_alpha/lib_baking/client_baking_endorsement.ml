@@ -82,33 +82,35 @@ end = struct
 
 end
 
-let get_signing_slots cctxt ?max_priority block delegate level =
+let get_signing_slots cctxt ?max_priority ?(chain = `Main) block delegate level =
   Alpha_services.Delegate.Endorser.rights_for_delegate cctxt
     ?max_priority ~first_level:level ~last_level:level
-    block delegate >>=? fun possibilities ->
+    (chain, block) delegate >>=? fun possibilities ->
   let slots =
     List.map (fun (_,slot) -> slot)
     @@ List.filter (fun (l, _) -> l = level) possibilities in
   return slots
 
-let inject_endorsement (cctxt : #Proto_alpha.full)
-    block level ?async
+let inject_endorsement
+    (cctxt : #Proto_alpha.full)
+    ?(chain = `Main) block level ?async
     src_sk slots =
-  Block_services.info cctxt block >>=? fun bi ->
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  Block_services.hash cctxt ~chain ~block () >>=? fun hash ->
   Alpha_services.Forge.Consensus.endorsement cctxt
-    block
-    ~branch:bi.hash
-    ~block:bi.hash
+    (chain, block)
+    ~branch:hash
+    ~block:hash
     ~level:level
     ~slots
     () >>=? fun bytes ->
   Client_keys.append
     src_sk ~watermark:Endorsement bytes >>=? fun signed_bytes ->
   Shell_services.inject_operation
-    cctxt ?async ~chain_id:bi.chain_id signed_bytes >>=? fun oph ->
+    cctxt ?async ~chain_id signed_bytes >>=? fun oph ->
   iter_s
     (fun slot ->
-       State.record_endorsement cctxt level bi.hash slot oph)
+       State.record_endorsement cctxt level hash slot oph)
     slots >>=? fun () ->
   return oph
 
@@ -127,22 +129,22 @@ let check_endorsement cctxt level slot =
 
 
 let forge_endorsement (cctxt : #Proto_alpha.full)
-    block
+    ?(chain = `Main) block
     ~src_sk ?slots ?max_priority src_pk =
   let src_pkh = Signature.Public_key.hash src_pk in
-  Alpha_services.Context.level cctxt block >>=? fun { level } ->
+  Alpha_services.Context.level cctxt (chain, block) >>=? fun { level } ->
   begin
     match slots with
     | Some slots -> return slots
     | None ->
         get_signing_slots
-          cctxt ?max_priority block src_pkh level >>=? function
+          cctxt ?max_priority ~chain block src_pkh level >>=? function
         | [] -> cctxt#error "No slot found at level %a" Raw_level.pp level
         | slots -> return slots
   end >>=? fun slots ->
   iter_s (check_endorsement cctxt level) slots >>=? fun () ->
   inject_endorsement cctxt
-    block level
+    ~chain block level
     src_sk slots
 
 
@@ -188,7 +190,7 @@ let drop_old_endorsement ~before state =
       (fun { block } -> Fitness.compare before block.fitness <= 0)
       state.to_endorse
 
-let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
+let schedule_endorsements (cctxt : #Proto_alpha.full) state bi =
   let may_endorse (block: Client_baking_blocks.block_info) delegate time =
     Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
     lwt_log_info "May endorse block %a for %s"
@@ -253,9 +255,7 @@ let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
   get_delegates cctxt state >>=? fun delegates ->
   iter_p
     (fun delegate ->
-       iter_p
-         (fun bi -> may_endorse bi delegate time)
-         bis)
+       may_endorse bi delegate time)
     delegates
 
 let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
@@ -316,9 +316,9 @@ let compute_timeout state =
 let create (cctxt : #Proto_alpha.full) ~delay contracts block_stream =
   lwt_log_info "Starting endorsement daemon" >>= fun () ->
   Lwt_stream.get block_stream >>= function
-  | None | Some (Ok []) | Some (Error _) ->
+  | None | Some (Error _) ->
       cctxt#error "Can't fetch the current block head."
-  | Some (Ok (bi :: _ as initial_heads)) ->
+  | Some (Ok head) ->
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with
@@ -327,17 +327,17 @@ let create (cctxt : #Proto_alpha.full) ~delay contracts block_stream =
             last_get_block := Some t ;
             t
         | Some t -> t in
-      let state = create_state contracts bi (Int64.of_int delay) in
+      let state = create_state contracts head (Int64.of_int delay) in
       let rec worker_loop () =
         let timeout = compute_timeout state in
         Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
                      (get_block () >|= fun b -> `Hash b) ] >>= function
         | `Hash (None | Some (Error _)) ->
             Lwt.return_unit
-        | `Hash (Some (Ok bis)) ->
+        | `Hash (Some (Ok bi)) ->
             Lwt.cancel timeout ;
             last_get_block := None ;
-            schedule_endorsements cctxt state bis >>= fun () ->
+            schedule_endorsements cctxt state bi >>= fun () ->
             worker_loop ()
         | `Timeout ->
             begin
@@ -350,5 +350,5 @@ let create (cctxt : #Proto_alpha.full) ~delay contracts block_stream =
                   Lwt.return_unit
             end >>= fun () ->
             worker_loop () in
-      schedule_endorsements cctxt state initial_heads >>= fun () ->
+      schedule_endorsements cctxt state head >>= fun () ->
       worker_loop ()

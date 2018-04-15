@@ -54,7 +54,7 @@ type prevalidation_state =
     -> prevalidation_state
 
 and 'a proto =
-  (module Registered_protocol.T with type validation_state = 'a)
+  (module Registered_protocol.T with type P.validation_state = 'a)
 
 let start_prevalidation
     ?protocol_data
@@ -166,3 +166,54 @@ let prevalidate
 let end_prevalidation (State { proto = (module Proto) ; state }) =
   Proto.finalize_block state >>=? fun (result, _metadata) ->
   return result
+
+let preapply ~predecessor ~timestamp ~protocol_data ~sort_operations:sort ops =
+  start_prevalidation
+    ~protocol_data ~predecessor ~timestamp () >>=? fun validation_state ->
+  let ops = List.map (List.map (fun x -> Operation.hash x, x)) ops in
+  Lwt_list.fold_left_s
+    (fun (validation_state, rs) ops ->
+       prevalidate
+         validation_state ~sort ops >>= fun (validation_state, r) ->
+       Lwt.return (validation_state, rs @ [r]))
+    (validation_state, []) ops >>= fun (validation_state, rs) ->
+  let operations_hash =
+    Operation_list_list_hash.compute
+      (List.map
+         (fun r ->
+            Operation_list_hash.compute
+              (List.map fst r.Preapply_result.applied))
+         rs) in
+  end_prevalidation validation_state >>=? fun { fitness ; context ; message } ->
+  let pred_shell_header = State.Block.shell_header predecessor in
+  State.Block.protocol_hash predecessor >>= fun pred_protocol ->
+  Context.get_protocol context >>= fun protocol ->
+  let proto_level =
+    if Protocol_hash.equal protocol pred_protocol then
+      pred_shell_header.proto_level
+    else
+      ((pred_shell_header.proto_level + 1) mod 256) in
+  let shell_header : Block_header.shell_header = {
+    level = Int32.succ pred_shell_header.level ;
+    proto_level ;
+    predecessor = State.Block.hash predecessor ;
+    timestamp ;
+    validation_passes = List.length rs ;
+    operations_hash ;
+    fitness ;
+    context = Context_hash.zero ; (* place holder *)
+  } in
+  begin
+    if Protocol_hash.equal protocol pred_protocol then
+      return (context, message)
+    else
+      match Registered_protocol.get protocol with
+      | None ->
+          fail (Block_validator_errors.Unavailable_protocol
+                  { block = State.Block.hash predecessor ; protocol })
+      | Some (module NewProto) ->
+          NewProto.init context shell_header >>=? fun { context ; message ; _ } ->
+          return (context, message)
+  end >>=? fun (context, message) ->
+  Context.commit ?message ~time:timestamp context >>= fun context ->
+  return ({ shell_header with context }, rs)

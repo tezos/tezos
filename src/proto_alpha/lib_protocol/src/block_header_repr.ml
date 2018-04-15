@@ -99,13 +99,30 @@ let metadata_encoding =
 (** Constants *)
 
 let max_header_length =
-  let fake = { priority = 0 ;
-               proof_of_work_nonce =
-                 MBytes.create Constants_repr.proof_of_work_nonce_size ;
-               seed_nonce_hash = Some Nonce_hash.zero } in
+  let fake_shell = {
+    Block_header.level = 0l ;
+    proto_level = 0 ;
+    predecessor = Block_hash.zero ;
+    timestamp = Time.of_seconds 0L ;
+    validation_passes = 0 ;
+    operations_hash = Operation_list_list_hash.zero ;
+    fitness = Fitness_repr.from_int64 0L ;
+    context = Context_hash.zero ;
+  }
+  and fake_contents =
+    { priority = 0 ;
+      proof_of_work_nonce =
+        MBytes.create Constants_repr.proof_of_work_nonce_size ;
+      seed_nonce_hash = Some Nonce_hash.zero
+    } in
   Data_encoding.Binary.length
-    protocol_data_encoding
-    { contents = fake ; signature = Signature.zero}
+    encoding
+    { shell = fake_shell ;
+      protocol_data = {
+        contents = fake_contents ;
+        signature = Signature.zero ;
+      }
+    }
 
 (** Header parsing entry point  *)
 

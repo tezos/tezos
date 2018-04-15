@@ -56,8 +56,8 @@ let commands () =
          (switch ~doc:"output time in seconds" ~short:'s' ~long:"seconds" ()))
       (fixed [ "get" ; "timestamp" ])
       begin fun seconds (cctxt : Proto_alpha.full) ->
-        Block_services.timestamp
-          cctxt cctxt#block >>=? fun v ->
+        Block_services.Header.Shell.timestamp
+          cctxt ~block:cctxt#block () >>=? fun v ->
         begin
           if seconds
           then cctxt#message "%Ld" (Time.to_seconds v)
@@ -70,7 +70,8 @@ let commands () =
       no_options
       (fixed [ "list" ; "contracts" ])
       begin fun () (cctxt : Proto_alpha.full) ->
-        list_contract_labels cctxt cctxt#block >>=? fun contracts ->
+        list_contract_labels cctxt
+          ~chain:`Main ~block:cctxt#block >>=? fun contracts ->
         Lwt_list.iter_s
           (fun (alias, hash, kind) -> cctxt#message "%s%s%s" hash kind alias)
           contracts >>= fun () ->
@@ -83,7 +84,9 @@ let commands () =
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
-        get_balance cctxt cctxt#block contract >>=? fun amount ->
+        get_balance cctxt
+          ~chain:`Main ~block:cctxt#block
+          contract >>=? fun amount ->
         cctxt#answer "%a %s" Tez.pp amount Client_proto_args.tez_sym >>= fun () ->
         return ()
       end ;
@@ -94,7 +97,9 @@ let commands () =
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
-        get_storage cctxt cctxt#block contract >>=? function
+        get_storage cctxt
+          ~chain:`Main ~block:cctxt#block
+          contract >>=? function
         | None ->
             cctxt#error "This is not a smart contract."
         | Some storage ->
@@ -108,8 +113,9 @@ let commands () =
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
-        Client_proto_contracts.get_manager
-          cctxt cctxt#block contract >>=? fun manager ->
+        Client_proto_contracts.get_manager cctxt
+          ~chain:`Main ~block:cctxt#block
+          contract >>=? fun manager ->
         Public_key_hash.rev_find cctxt manager >>=? fun mn ->
         Public_key_hash.to_source manager >>=? fun m ->
         cctxt#message "%s (%s)" m
@@ -123,8 +129,9 @@ let commands () =
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
-        Client_proto_contracts.get_delegate
-          cctxt cctxt#block contract >>=? function
+        Client_proto_contracts.get_delegate cctxt
+          ~chain:`Main ~block:cctxt#block
+          contract >>=? function
         | None ->
             cctxt#message "none" >>= fun () ->
             return ()
@@ -145,9 +152,11 @@ let commands () =
          ~name: "mgr" ~desc: "new delegate of the contract"
        @@ stop)
       begin fun fee (_, contract) (_, delegate) (cctxt : Proto_alpha.full) ->
-        source_to_keys cctxt cctxt#block contract >>=? fun (src_pk, manager_sk) ->
-        set_delegate
-          cctxt cctxt#block ?confirmations:cctxt#confirmations
+        source_to_keys cctxt
+          ~chain:`Main ~block:cctxt#block
+          contract >>=? fun (src_pk, manager_sk) ->
+        set_delegate cctxt
+          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           contract (Some delegate) ~fee ~src_pk ~manager_sk >>=? fun _ ->
         return ()
       end ;
@@ -158,9 +167,11 @@ let commands () =
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       begin fun fee (_, contract) (cctxt : Proto_alpha.full) ->
-        source_to_keys cctxt cctxt#block contract >>=? fun (src_pk, manager_sk) ->
-        set_delegate
-          cctxt cctxt#block ?confirmations:cctxt#confirmations
+        source_to_keys cctxt
+          ~chain:`Main ~block:cctxt#block
+          contract >>=? fun (src_pk, manager_sk) ->
+        set_delegate cctxt
+          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           contract None ~fee ~src_pk ~manager_sk >>=? fun _ ->
         return ()
       end ;
@@ -183,20 +194,13 @@ let commands () =
       begin fun (fee, delegate, delegatable, force)
         new_contract manager_pkh balance (_, source) (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
-        source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
-        originate_account
-          cctxt
-          cctxt#block
-          ?confirmations:cctxt#confirmations
-          ~fee
-          ?delegate
-          ~delegatable
-          ~manager_pkh
-          ~balance
-          ~source
-          ~src_pk
-          ~src_sk
-          () >>=? fun (_res, contract) ->
+        source_to_keys cctxt
+          ~chain:`Main ~block:cctxt#block
+          source >>=? fun (src_pk, src_sk) ->
+        originate_account cctxt
+          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+          ~fee ?delegate ~delegatable ~manager_pkh ~balance
+          ~source ~src_pk ~src_sk () >>=? fun (_res, contract) ->
         save_contract ~force cctxt alias_name contract >>=? fun () ->
         return ()
       end ;
@@ -226,8 +230,11 @@ let commands () =
         alias_name manager balance (_, source) program (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
-        source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
-        originate_contract cctxt cctxt#block ?confirmations:cctxt#confirmations
+        source_to_keys cctxt
+          ~chain:`Main ~block:cctxt#block
+          source >>=? fun (src_pk, src_sk) ->
+        originate_contract cctxt
+          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~fee ?gas_limit ?storage_limit ~delegate ~delegatable ~spendable ~initial_storage
           ~manager ~balance ~source ~src_pk ~src_sk ~code () >>= fun errors ->
         report_michelson_errors ~no_print_source ~msg:"origination simulation failed" cctxt errors >>= function
@@ -250,8 +257,11 @@ let commands () =
          ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
       begin fun (fee, gas_limit, storage_limit, arg, no_print_source) amount (_, source) (_, destination) cctxt ->
-        source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
-        transfer cctxt cctxt#block ?confirmations:cctxt#confirmations
+        source_to_keys cctxt
+          ~chain:`Main ~block:cctxt#block
+          source >>=? fun (src_pk, src_sk) ->
+        transfer cctxt
+          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~source ~fee ~src_pk ~src_sk ~destination ~arg ~amount ?gas_limit ?storage_limit () >>=
         report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
         | None -> return ()
@@ -266,8 +276,11 @@ let commands () =
          ~name: "src" ~desc: "name of the source contract"
        @@ stop)
       begin fun fee (_, source) cctxt ->
-        source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
-        reveal cctxt cctxt#block ?confirmations:cctxt#confirmations
+        source_to_keys cctxt
+          ~chain:`Main ~block:cctxt#block
+          source >>=? fun (src_pk, src_sk) ->
+        reveal cctxt
+          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~source ~fee ~src_pk ~src_sk () >>=? fun _res ->
         return ()
       end;
@@ -281,8 +294,9 @@ let commands () =
        @@ stop)
       begin fun fee src_pkh cctxt ->
         Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
-        register_as_delegate cctxt ?confirmations:cctxt#confirmations
-          ~fee cctxt#block ~manager_sk:src_sk src_pk >>=? fun _res ->
+        register_as_delegate cctxt
+          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+          ~fee ~manager_sk:src_sk src_pk >>=? fun _res ->
         return ()
       end;
 
@@ -309,8 +323,8 @@ let commands () =
                (fun ppf -> Data_encoding.Json.print_error ppf) exn
                Data_encoding.Json.pp json
          | key ->
-             claim_commitment
-               cctxt cctxt#block ?confirmations:cctxt#confirmations
+             claim_commitment cctxt
+               ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
                ~encrypted ~force key name >>=? fun _res ->
              return ()
       );
@@ -325,7 +339,8 @@ let commands () =
          ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
-        dictate cctxt cctxt#block
+        dictate cctxt
+          ~chain:`Main ~block:cctxt#block
           (Activate hash) seckey >>=? fun _ ->
         return ()
       end ;
@@ -366,7 +381,7 @@ let commands () =
         fail_when (predecessors < 0)
           (failure "check-previous cannot be negative") >>=? fun () ->
         Client_confirmations.wait_for_operation_inclusion ctxt
-          ~confirmations ~predecessors operation_hash >>=? fun _ ->
+          ~chain:`Main ~confirmations ~predecessors operation_hash >>=? fun _ ->
         return ()
       end ;
 
@@ -380,7 +395,8 @@ let commands () =
          ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
-        dictate cctxt cctxt#block
+        dictate cctxt
+          ~chain:`Main ~block:cctxt#block
           (Activate_testchain hash) seckey >>=? fun _res ->
         return ()
       end ;

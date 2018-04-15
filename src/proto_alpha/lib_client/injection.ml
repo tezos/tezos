@@ -11,24 +11,24 @@ open Proto_alpha
 open Alpha_context
 open Apply_operation_result
 
-let get_branch rpc_config (block : Block_services.block) branch =
+let get_branch (rpc_config: #Proto_alpha.full)
+    ~chain ~(block : Block_services.block) branch =
   let branch = Option.unopt ~default:0 branch in (* TODO export parameter *)
   begin
     match block with
     | `Head n -> return (`Head (n+branch))
-    | `Test_head n -> return (`Test_head (n+branch))
     | `Hash (h,n) -> return (`Hash (h,n+branch))
     | `Genesis -> return `Genesis
   end >>=? fun block ->
-  Block_services.hash rpc_config block >>=? fun hash ->
+  Block_services.hash rpc_config ~chain ~block () >>=? fun hash ->
   return hash
 
 type result = Operation_hash.t * operation * operation_result
 
 let preapply
-    cctxt block
+    (cctxt: #Proto_alpha.full) ~chain ~block
     ?branch ?src_sk contents =
-  get_branch cctxt block branch >>=? fun branch ->
+  get_branch cctxt ~chain ~block branch >>=? fun branch ->
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Operation.unsigned_encoding
@@ -51,9 +51,9 @@ let preapply
     { shell = { branch } ;
       protocol_data = { contents ; signature } } in
   let oph = Operation.hash op in
-  Block_services.hash cctxt block >>=? fun bh ->
+  Block_services.hash cctxt ~chain ~block () >>=? fun bh ->
   Alpha_services.Helpers.apply_operation cctxt
-    block bh oph bytes signature >>=? fun result ->
+    (chain, block) bh oph bytes signature >>=? fun result ->
   return (oph, op, result)
 
 let estimated_gas = function
@@ -117,17 +117,18 @@ let detect_script_failure = function
   | _ -> Ok ()
 
 let may_patch_limits
-    (cctxt : #Proto_alpha.full) block ?branch
+    (cctxt : #Proto_alpha.full) ~chain ~block ?branch
     ?src_sk contents =
-  Alpha_services.Constants.hard_gas_limits cctxt block >>=? fun (_, gas_limit) ->
-  Alpha_services.Constants.hard_storage_limits cctxt block >>=? fun (_, storage_limit) ->
+  Alpha_services.Constants.hard_gas_limits cctxt (chain, block) >>=? fun (_, gas_limit) ->
+  Alpha_services.Constants.hard_storage_limits cctxt (chain, block) >>=? fun (_, storage_limit) ->
+
   match contents with
   | Sourced_operation (Manager_operations c)
     when c.gas_limit < Z.zero || gas_limit < c.gas_limit
          || c.storage_limit < 0L || storage_limit < c.storage_limit ->
       let contents =
         Sourced_operation (Manager_operations { c with gas_limit ; storage_limit }) in
-      preapply cctxt block ?branch ?src_sk contents >>=? fun (_, _, result) ->
+      preapply cctxt ~chain ~block ?branch ?src_sk contents >>=? fun (_, _, result) ->
       begin if c.gas_limit < Z.zero || gas_limit < c.gas_limit then
           Lwt.return (estimated_gas result) >>=? fun gas ->
           begin
@@ -160,11 +161,11 @@ let may_patch_limits
   | op -> return op
 
 let inject_operation
-    cctxt block
+    cctxt ~chain ~block
     ?confirmations ?branch ?src_sk contents =
   may_patch_limits
-    cctxt block ?branch ?src_sk contents >>=? fun contents ->
-  preapply cctxt block
+    cctxt ~chain ~block ?branch ?src_sk contents >>=? fun contents ->
+  preapply cctxt ~chain ~block
     ?branch ?src_sk contents >>=? fun (_oph, op, result) ->
   begin match detect_script_failure result with
     | Ok () -> return ()
@@ -175,7 +176,7 @@ let inject_operation
         Lwt.return res
   end >>=? fun () ->
   let bytes = Data_encoding.Binary.to_bytes_exn Operation.encoding op in
-  Block_services.chain_id cctxt block >>=? fun chain_id ->
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Shell_services.inject_operation cctxt ~chain_id bytes >>=? fun oph ->
   cctxt#message "Operation successfully injected in the node." >>= fun () ->
   cctxt#message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
@@ -185,7 +186,7 @@ let inject_operation
     | Some confirmations ->
         cctxt#message "Waiting for the operation to be included..." >>= fun () ->
         Client_confirmations.wait_for_operation_inclusion
-          ~confirmations cctxt oph >>=? fun () ->
+          ~confirmations cctxt ~chain oph >>=? fun () ->
         return ()
   end >>=? fun () ->
   cctxt#message

@@ -37,7 +37,7 @@ $admin_client list protocols
 #these commands cannot be used in this case because the client does not
 #know about the new protocol
 #$client --protocol $protocol_short bake for bootstrap1 -max-priority 512
-#$client --protocol $protocol_version rpc post /blocks/head with {}
+#$client --protocol $protocol_version rpc get /chains/main/blocks/head
 
 echo
 echo End of test

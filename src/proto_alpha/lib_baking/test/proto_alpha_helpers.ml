@@ -150,7 +150,7 @@ let level block =
   Alpha_services.Context.level !rpc_ctxt block
 
 let rpc_raw_context block path depth =
-  Block_services.raw_context !rpc_ctxt block path depth
+  Block_services.Context.Raw.read !rpc_ctxt ~block ~depth path
 
 module Account = struct
 
@@ -254,7 +254,8 @@ module Account = struct
       Tezos_signer_backends.Unencrypted.make_sk account.sk in
     Client_proto_context.transfer
       (new wrap_full (no_write_context !rpc_config ~block))
-      block
+      ~chain:`Main
+      ~block
       ~source:account.contract
       ~src_pk:account.pk
       ~src_sk
@@ -278,7 +279,8 @@ module Account = struct
       Tezos_signer_backends.Unencrypted.make_sk src.sk in
     Client_proto_context.originate_account
       (new wrap_full (no_write_context !rpc_config))
-      block
+      ~chain:`Main
+      ~block
       ~source:src.contract
       ~src_pk:src.pk
       ~src_sk
@@ -299,7 +301,8 @@ module Account = struct
       delegate_opt =
     Client_proto_context.set_delegate
       (new wrap_full (no_write_context ~block !rpc_config))
-      block
+      ~chain:`Main
+      ~block
       ~fee
       contract
       ~src_pk
@@ -309,45 +312,55 @@ module Account = struct
 
   let balance ?(block = `Head 0) (account : t) =
     Alpha_services.Contract.balance !rpc_ctxt
-      block account.contract
+      (`Main, block) account.contract
 
   (* TODO: gather contract related functions in a Contract module? *)
   let delegate ?(block = `Head 0) (contract : Contract.t) =
-    Alpha_services.Contract.delegate_opt !rpc_ctxt block contract
+    Alpha_services.Contract.delegate_opt !rpc_ctxt (`Main, block) contract
 
 end
+
+let sign ?watermark src_sk shell contents =
+  let contents = Sourced_operation contents in
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Operation.unsigned_encoding
+      (shell, contents) in
+  let signature = Some (Signature.sign ?watermark src_sk bytes) in
+  let protocol_data = { contents ; signature } in
+  return { shell ; protocol_data }
 
 module Protocol = struct
 
   open Account
 
   let voting_period_kind ?(block = `Head 0) () =
-    Alpha_services.Context.voting_period_kind !rpc_ctxt block
+    Alpha_services.Context.voting_period_kind !rpc_ctxt (`Main, block)
 
   let proposals ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) proposals =
-    Block_services.info !rpc_ctxt block >>=? fun block_info ->
-    Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
-    Alpha_services.Forge.Amendment.proposals !rpc_ctxt block
-      ~branch:block_info.hash
-      ~source:pkh
-      ~period:next_level.voting_period
-      ~proposals
-      () >>=? fun bytes ->
-    let signed_bytes = Signature.append ~watermark:Generic_operation sk bytes in
-    return (Tezos_base.Operation.of_bytes_exn signed_bytes)
+    Block_services.hash !rpc_ctxt ~block () >>=? fun hash ->
+    Alpha_services.Context.next_level
+      !rpc_ctxt (`Main, block) >>=? fun next_level ->
+    let shell = { Tezos_base.Operation.branch = hash } in
+    let contents =
+      Amendment_operation
+        { source = pkh ;
+          operation = Proposals { period = next_level.voting_period ;
+                                  proposals } } in
+    sign ~watermark:Generic_operation sk shell contents
 
   let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
-    Block_services.info !rpc_ctxt block >>=? fun block_info ->
-    Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
-    Alpha_services.Forge.Amendment.ballot !rpc_ctxt block
-      ~branch:block_info.hash
-      ~source:pkh
-      ~period:next_level.voting_period
-      ~proposal
-      ~ballot
-      () >>=? fun bytes ->
-    let signed_bytes = Signature.append ~watermark:Generic_operation sk bytes in
-    return (Tezos_base.Operation.of_bytes_exn signed_bytes)
+    Block_services.hash !rpc_ctxt ~block () >>=? fun hash ->
+    Alpha_services.Context.next_level
+      !rpc_ctxt (`Main, block) >>=? fun next_level ->
+    let shell = { Tezos_base.Operation.branch = hash } in
+    let contents =
+      Amendment_operation
+        { source = pkh ;
+          operation = Ballot { period = next_level.voting_period ;
+                               proposal ;
+                               ballot } } in
+    sign ~watermark:Generic_operation sk shell contents
 
 end
 
@@ -415,7 +428,7 @@ module Assert = struct
             match op with
             | None -> true
             | Some op ->
-                let h = hash op and h' = hash op' in
+                let h = Operation.hash op and h' = hash op' in
                 Operation_hash.equal h h'
           end && List.exists (ecoproto_error f) err
       | _ -> false
@@ -473,7 +486,8 @@ module Assert = struct
     end
 
   let check_protocol ?msg ~block h =
-    Block_services.protocol !rpc_ctxt block >>=? fun block_proto ->
+    Block_services.Metadata.next_protocol_hash
+      !rpc_ctxt ~block () >>=? fun block_proto ->
     return @@ equal
       ?msg
       ~prn:Protocol_hash.to_b58check
@@ -481,7 +495,7 @@ module Assert = struct
       block_proto h
 
   let check_voting_period_kind ?msg ~block kind =
-    Alpha_services.Context.voting_period_kind !rpc_ctxt block
+    Alpha_services.Context.voting_period_kind !rpc_ctxt (`Main, block)
     >>=? fun current_kind ->
     return @@ equal
       ?msg
@@ -498,7 +512,7 @@ module Baking = struct
 
   let bake block (contract: Account.t) operations =
     let ctxt = (new wrap_full (no_write_context ~block !rpc_config)) in
-    Alpha_services.Context.next_level ctxt block >>=? fun level ->
+    Alpha_services.Context.next_level ctxt (`Main, block) >>=? fun level ->
     let seed_nonce_hash =
       if level.Level.expected_commitment then
         let seed_nonce =
@@ -531,17 +545,13 @@ module Endorse = struct
       block
       src_sk
       slot =
-    Block_services.info !rpc_ctxt block >>=? fun { hash ; _ } ->
-    Alpha_services.Context.level !rpc_ctxt (`Hash (hash, 0)) >>=? fun level ->
-    Alpha_services.Forge.Consensus.endorsement !rpc_ctxt
-      block
-      ~branch:hash
-      ~block:hash
-      ~level:level.level
-      ~slots:[slot]
-      () >>=? fun bytes ->
-    let signed_bytes = Signature.append ~watermark:Endorsement src_sk bytes in
-    return (Tezos_base.Operation.of_bytes_exn signed_bytes)
+    Block_services.hash !rpc_ctxt ~block () >>=? fun hash ->
+    Alpha_services.Context.level !rpc_ctxt (`Main, block) >>=? fun { level } ->
+    let shell = { Tezos_base.Operation.branch = hash } in
+    let contents =
+      Consensus_operation
+        (Endorsements { block = hash ; level ; slots = [ slot ]}) in
+    sign ~watermark:Endorsement src_sk shell contents
 
   let signing_slots
       ?(max_priority = 1024)
@@ -550,7 +560,7 @@ module Endorse = struct
       level =
     Alpha_services.Delegate.Endorser.rights_for_delegate
       !rpc_ctxt ~max_priority ~first_level:level ~last_level:level
-      block delegate >>=? fun possibilities ->
+      (`Main, block) delegate >>=? fun possibilities ->
     let slots =
       List.map (fun (_,slot) -> slot)
       @@ List.filter (fun (l, _) -> l = level) possibilities in
@@ -560,7 +570,7 @@ module Endorse = struct
       ?slot
       (contract : Account.t)
       block =
-    Alpha_services.Context.level !rpc_ctxt block >>=? fun { level } ->
+    Alpha_services.Context.level !rpc_ctxt (`Main, block) >>=? fun { level } ->
     begin
       match slot with
       | Some slot -> return slot
@@ -579,7 +589,7 @@ module Endorse = struct
   let endorsers_list block =
     let get_endorser_list result (account : Account.t) level block =
       Alpha_services.Delegate.Endorser.rights_for_delegate
-        !rpc_ctxt block account.pkh
+        !rpc_ctxt (`Main, block) account.pkh
         ~max_priority:16
         ~first_level:level
         ~last_level:level >>|? fun slots ->
@@ -587,7 +597,7 @@ module Endorse = struct
     in
     let { Account.b1 ; b2 ; b3 ; b4 ; b5 } = Account.bootstrap_accounts in
     let result = Array.make 16 b1 in
-    Alpha_services.Context.level !rpc_ctxt block >>=? fun level ->
+    Alpha_services.Context.level !rpc_ctxt (`Main, block) >>=? fun level ->
     let level = level.level in
     get_endorser_list result b1 level block >>=? fun () ->
     get_endorser_list result b2 level block >>=? fun () ->
@@ -599,7 +609,7 @@ module Endorse = struct
   let endorsement_rights
       ?(max_priority = 1024)
       (contract : Account.t) block =
-    Alpha_services.Context.level !rpc_ctxt block >>=? fun level ->
+    Alpha_services.Context.level !rpc_ctxt (`Main, block) >>=? fun level ->
     let delegate = contract.pkh in
     let level = level.level in
     Alpha_services.Delegate.Endorser.rights_for_delegate
@@ -607,17 +617,17 @@ module Endorse = struct
       ~max_priority
       ~first_level:level
       ~last_level:level
-      block delegate
+      (`Main, block) delegate
 
 end
 
 let display_level block =
-  Alpha_services.Context.level !rpc_ctxt block >>=? fun lvl ->
+  Alpha_services.Context.level !rpc_ctxt (`Main, block) >>=? fun lvl ->
   Format.eprintf "Level: %a@." Level.pp_full lvl ;
   return ()
 
 let endorsement_security_deposit block =
-  Constants_services.endorsement_security_deposit !rpc_ctxt block
+  Constants_services.endorsement_security_deposit !rpc_ctxt (`Main, block)
 
 let () =
   Client_keys.register_signer

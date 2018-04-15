@@ -16,7 +16,7 @@ let demo_protocol =
     "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
 let print_level head =
-  level (`Hash (head, 0)) >>=? fun lvl ->
+  level (`Main, `Hash (head, 0)) >>=? fun lvl ->
   return @@ Format.eprintf "voting_period = %a.%ld@."
     Voting_period.pp lvl.voting_period lvl.voting_period_position
 

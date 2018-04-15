@@ -277,7 +277,7 @@ preconfigured for communicating the same-numbered node. For instance:
 
 ::
 
-    $ tezos-client rpc post blocks/head/hash
+    $ tezos-client rpc get /chains/main/blocks/head/hash
     { "hash": "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z" }
 
 When you bootstrap a new network, the network is initialized with a
@@ -288,11 +288,11 @@ activating the whole network. For instance:
 
 ::
 
-    $ tezos-client rpc post blocks/head/protocol
+    $ tezos-client rpc get /chains/main/blocks/head/metadata/next_protocol_hash
     { "protocol": "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" }
     $ tezos-activate-alpha
     Injected BMBcK869jaHQDc
-    $ tezos-client rpc post blocks/head/protocol
+    $ tezos-client rpc get /chains/main/blocks/head/metadata/next_protocol_hash
     { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" }
 
 Tune protocol alpha parameters

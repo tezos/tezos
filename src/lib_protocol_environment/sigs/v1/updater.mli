@@ -50,9 +50,7 @@ type quota = {
 
 type rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: Block_header.t ;
-  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-  operations: unit -> Operation.t list list Lwt.t ;
+  block_header: Block_header.shell_header ;
   context: Context.t ;
 }
 

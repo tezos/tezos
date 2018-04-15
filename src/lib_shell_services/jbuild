@@ -4,7 +4,7 @@
  ((name tezos_shell_services)
   (public_name tezos-shell-services)
   (libraries (tezos-base))
-  (flags (:standard -w -9+27-30-32-40@8
+  (flags (:standard -w +27@8
                     -safe-string
                     -open Tezos_base__TzPervasives))))
 
