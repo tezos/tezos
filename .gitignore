@@ -24,7 +24,8 @@ __pycache__
 /docs/introduction/readme.rst
 /docs/api/errors.rst
 /docs/api/rpc.rst
-/docs/_extensions/*.pyc
+
+/src/bin_client/test/LOG.*
 
 *.install
 .merlin
