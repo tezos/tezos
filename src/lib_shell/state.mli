@@ -156,6 +156,8 @@ val read_block:
 val read_block_exn:
   global_state -> ?pred:int -> Block_hash.t -> Block.t Lwt.t
 
+val watcher: t -> Block.t Lwt_stream.t * Lwt_watcher.stopper
+
 val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
 val fork_testchain:

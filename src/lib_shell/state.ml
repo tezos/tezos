@@ -24,6 +24,7 @@ type global_state = {
   global_data: global_data Shared.t ;
   protocol_store: Store.Protocol.store Shared.t ;
   main_chain: Chain_id.t ;
+  block_watcher: block Lwt_watcher.input ;
 }
 
 and global_data = {
@@ -588,6 +589,7 @@ module Block = struct
         end >>= fun () ->
         let block = { chain_state ; hash ; contents } in
         Lwt_watcher.notify chain_state.block_watcher block ;
+        Lwt_watcher.notify chain_state.global_state.block_watcher block ;
         return (Some block)
       end
     end
@@ -607,8 +609,8 @@ module Block = struct
         return true
     end
 
-  let watcher chain_state =
-    Lwt_watcher.create_stream chain_state.block_watcher
+  let watcher (state : chain_state) =
+    Lwt_watcher.create_stream state.block_watcher
 
   let operation_hashes { chain_state ; hash ; contents } i =
     if i < 0 || contents.header.shell.validation_passes <= i then
@@ -686,6 +688,9 @@ module Block = struct
           Lwt.return_some (block, locator)
 
 end
+
+let watcher (state : global_state) =
+  Lwt_watcher.create_stream state.block_watcher
 
 let read_block { global_data } ?pred hash =
   Shared.use global_data begin fun { chains } ->
@@ -833,6 +838,7 @@ let read
     global_data = Shared.create global_data ;
     protocol_store = Shared.create @@ Store.Protocol.get global_store ;
     main_chain ;
+    block_watcher = Lwt_watcher.create_input () ;
   } in
   Chain.read_all state >>=? fun () ->
   may_create_chain state main_chain genesis >>= fun main_chain_state ->
