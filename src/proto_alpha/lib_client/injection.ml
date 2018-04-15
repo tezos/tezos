@@ -35,7 +35,7 @@ let preapply
       ({ branch }, contents) in
   let watermark =
     match contents with
-    | Sourced_operations (Consensus_operation (Endorsements _)) ->
+    | Sourced_operation (Consensus_operation (Endorsements _)) ->
         Signature.Endorsement
     | _ ->
         Signature.Generic_operation in
@@ -92,10 +92,10 @@ let may_patch_gas_limit
     ?src_sk contents =
   Alpha_services.Constants.hard_gas_limits cctxt block >>=? fun (_, gas_limit) ->
   match contents with
-  | Sourced_operations (Manager_operations c)
+  | Sourced_operation (Manager_operations c)
     when c.gas_limit < Z.zero || gas_limit < c.gas_limit ->
       let contents =
-        Sourced_operations (Manager_operations { c with gas_limit }) in
+        Sourced_operation (Manager_operations { c with gas_limit }) in
       preapply cctxt block ?branch ?src_sk contents >>=? fun (_, _, result) ->
       Lwt.return (estimated_gas result) >>=? fun gas ->
       begin
@@ -108,7 +108,7 @@ let may_patch_gas_limit
             (Z.to_string gas) >>= fun () ->
           return (Z.add gas (Z.of_int 100))
       end >>=? fun gas_limit ->
-      return (Sourced_operations (Manager_operations { c with gas_limit }))
+      return (Sourced_operation (Manager_operations { c with gas_limit }))
   | op -> return op
 
 let inject_operation

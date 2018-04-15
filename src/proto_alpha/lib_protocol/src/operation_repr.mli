@@ -24,7 +24,7 @@ type operation = {
 
 and proto_operation =
   | Anonymous_operations of anonymous_operation list
-  | Sourced_operations of sourced_operations
+  | Sourced_operation of sourced_operation
 
 and anonymous_operation =
   | Seed_nonce_revelation of {
@@ -44,7 +44,7 @@ and anonymous_operation =
       secret: Blinded_public_key_hash.secret ;
     }
 
-and sourced_operations =
+and sourced_operation =
   | Consensus_operation of consensus_operation
   | Amendment_operation of {
       source: Signature.Public_key_hash.t ;

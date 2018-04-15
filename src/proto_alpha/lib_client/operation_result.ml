@@ -173,7 +173,7 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
           | _, _ -> invalid_arg "Apply_operation_result.pp"
         in
         Format.pp_print_list pp_anonymous_operation_result ppf ops_rs
-    | Sourced_operations
+    | Sourced_operation
         (Consensus_operation
            (Endorsements { block ; level ; slots })),
       Sourced_operation_result
@@ -192,7 +192,7 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
              ~pp_sep:Format.pp_print_space
              Format.pp_print_int)
           slots
-    | Sourced_operations
+    | Sourced_operation
         (Amendment_operation { source ; operation = Proposals { period ; proposals } }),
       Sourced_operation_result Amendment_operation_result ->
         Format.fprintf ppf
@@ -204,7 +204,7 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
           Signature.Public_key_hash.pp source
           Voting_period.pp period
           (Format.pp_print_list Protocol_hash.pp) proposals
-    | Sourced_operations
+    | Sourced_operation
         (Amendment_operation { source ; operation = Ballot { period ; proposal ; ballot } }),
       Sourced_operation_result Amendment_operation_result ->
         Format.fprintf ppf
@@ -217,19 +217,19 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
           Voting_period.pp period
           Protocol_hash.pp proposal
           (match ballot with Yay -> "YAY" | Pass -> "PASS" | Nay -> "NAY")
-    | Sourced_operations (Dictator_operation (Activate protocol)),
+    | Sourced_operation (Dictator_operation (Activate protocol)),
       Sourced_operation_result Dictator_operation_result ->
         Format.fprintf ppf
           "@[<v 2>Dictator protocol activation:@,\
            Protocol: %a@]"
           Protocol_hash.pp protocol
-    | Sourced_operations (Dictator_operation (Activate_testchain protocol)),
+    | Sourced_operation (Dictator_operation (Activate_testchain protocol)),
       Sourced_operation_result Dictator_operation_result ->
         Format.fprintf ppf
           "@[<v 2>Dictator test protocol activation:@,\
            Protocol: %a@]"
           Protocol_hash.pp protocol
-    | Sourced_operations (Manager_operations { source ; fee ; counter ; operations ; gas_limit }),
+    | Sourced_operation (Manager_operations { source ; fee ; counter ; operations ; gas_limit }),
       Sourced_operation_result (Manager_operations_result { balance_updates ; operation_results }) ->
         let pp_result ppf result =
           Format.fprintf ppf "@," ;

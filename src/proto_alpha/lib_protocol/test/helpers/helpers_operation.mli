@@ -12,11 +12,11 @@ open Alpha_context
 
 (** Functions building operations *)
 
-val sourced : sourced_operations -> proto_operation
+val sourced : sourced_operation -> proto_operation
 
 val manager :
   Helpers_account.t -> ?fee:Tez.tez -> manager_operation list ->
-  Alpha_environment.Context.t -> Z.t -> sourced_operations proto_tzresult Lwt.t
+  Alpha_environment.Context.t -> Z.t -> sourced_operation proto_tzresult Lwt.t
 
 val manager_full :
   Helpers_account.t -> ?fee:Tez.tez -> manager_operation list ->
@@ -50,7 +50,7 @@ val transaction_full :
   Alpha_environment.Context.t -> proto_operation proto_tzresult Lwt.t
 
 val amendment_operation :
-  Helpers_account.t -> amendment_operation -> sourced_operations
+  Helpers_account.t -> amendment_operation -> sourced_operation
 
 val endorsements :
   ?slot:int -> Block_hash.t -> Raw_level.t -> consensus_operation

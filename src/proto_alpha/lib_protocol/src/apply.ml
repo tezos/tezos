@@ -608,8 +608,8 @@ let apply_anonymous_operation ctxt _delegate kind =
       return (ctxt, Seed_nonce_revelation_result [(* FIXME *)])
   | Double_endorsement_evidence { op1 ; op2 } -> begin
       match op1.contents, op2.contents with
-      | Sourced_operations (Consensus_operation (Endorsements e1)),
-        Sourced_operations (Consensus_operation (Endorsements e2))
+      | Sourced_operation (Consensus_operation (Endorsements e1)),
+        Sourced_operation (Consensus_operation (Endorsements e2))
         when Raw_level.(e1.level = e2.level) &&
              not (Block_hash.equal e1.block e2.block) ->
           let level = Level.from_raw ctxt e1.level in
@@ -709,7 +709,7 @@ let apply_operation
           (ctxt, []) ops
         >>=? fun (ctxt, results) ->
         return (ctxt, Anonymous_operations_result (List.rev results))
-    | Sourced_operations ops ->
+    | Sourced_operation ops ->
         apply_sourced_operation ctxt pred_block block_prio operation ops
         >>=? fun (ctxt, result) ->
         return (ctxt, Sourced_operation_result result)
@@ -800,9 +800,9 @@ let finalize_application ctxt protocol_data delegate =
 let compare_operations op1 op2 =
   match op1.contents, op2.contents with
   | Anonymous_operations _, Anonymous_operations _ -> 0
-  | Anonymous_operations _, Sourced_operations _ -> -1
-  | Sourced_operations _, Anonymous_operations _ -> 1
-  | Sourced_operations op1, Sourced_operations op2 ->
+  | Anonymous_operations _, Sourced_operation _ -> -1
+  | Sourced_operation _, Anonymous_operations _ -> 1
+  | Sourced_operation op1, Sourced_operation op2 ->
       match op1, op2 with
       | Consensus_operation _, (Amendment_operation _ | Manager_operations _ | Dictator_operation _) -> -1
       | (Amendment_operation _ | Manager_operations _ | Dictator_operation _), Consensus_operation _ -> 1

@@ -24,7 +24,7 @@ type operation = {
 
 and proto_operation =
   | Anonymous_operations of anonymous_operation list
-  | Sourced_operations of sourced_operations
+  | Sourced_operation of sourced_operation
 
 and anonymous_operation =
   | Seed_nonce_revelation of {
@@ -44,7 +44,7 @@ and anonymous_operation =
       secret: Blinded_public_key_hash.secret ;
     }
 
-and sourced_operations =
+and sourced_operation =
   | Consensus_operation of consensus_operation
   | Amendment_operation of {
       source: Signature.Public_key_hash.t ;
@@ -317,8 +317,8 @@ module Encoding = struct
           manager_kind_case (Tag 2) ;
           dictator_kind_case (Tag 3) ;
         ])
-      (function Sourced_operations ops -> Some ops | _ -> None)
-      (fun ops -> Sourced_operations ops)
+      (function Sourced_operation op -> Some op | _ -> None)
+      (fun op -> Sourced_operation op)
 
   let seed_nonce_revelation_encoding =
     (obj3
@@ -469,10 +469,10 @@ let parse (op: Operation.t) =
 
 let acceptable_passes op =
   match op.contents with
-  | Sourced_operations (Consensus_operation _) -> [0]
-  | Sourced_operations (Amendment_operation _ | Dictator_operation _) -> [1]
+  | Sourced_operation (Consensus_operation _) -> [0]
+  | Sourced_operation (Amendment_operation _ | Dictator_operation _) -> [1]
   | Anonymous_operations _ -> [2]
-  | Sourced_operations (Manager_operations _) -> [3]
+  | Sourced_operation (Manager_operations _) -> [3]
 
 type error += Invalid_signature (* `Permanent *)
 type error += Missing_signature (* `Permanent *)
@@ -508,9 +508,9 @@ let forge shell proto =
 let check_signature key { shell ; contents ; signature } =
   match contents, signature with
   | Anonymous_operations _, _ -> return ()
-  | Sourced_operations _, None ->
+  | Sourced_operation _, None ->
       fail Missing_signature
-  | Sourced_operations (Consensus_operation _), Some signature ->
+  | Sourced_operation (Consensus_operation _), Some signature ->
       (* Safe for baking *)
       let unsigned_operation = forge shell contents in
       if Signature.check
@@ -519,7 +519,7 @@ let check_signature key { shell ; contents ; signature } =
         return ()
       else
         fail Invalid_signature
-  | Sourced_operations _, Some signature ->
+  | Sourced_operation _, Some signature ->
       (* Unsafe for baking *)
       let unsigned_operation = forge shell contents in
       if Signature.check

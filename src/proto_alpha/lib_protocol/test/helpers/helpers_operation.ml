@@ -11,7 +11,7 @@ open Proto_alpha
 open Error_monad
 open Alpha_context
 
-let sourced ops = Sourced_operations ops
+let sourced ops = Sourced_operation ops
 
 let manager (src : Helpers_account.t) ?(fee = Tez.zero) operations context gas_limit =
   Alpha_context.prepare
@@ -101,7 +101,7 @@ let sign src oph protop =
   let watermark =
     match protop with
     | Proto_alpha.Alpha_context.Anonymous_operations _ -> None
-    | Proto_alpha.Alpha_context.Sourced_operations
+    | Proto_alpha.Alpha_context.Sourced_operation
         (Proto_alpha.Alpha_context.Consensus_operation (Endorsements _)) ->
         Some Signature.Endorsement
     | _ ->

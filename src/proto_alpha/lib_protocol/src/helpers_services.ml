@@ -320,7 +320,7 @@ module Forge = struct
             Manager_operations { source ;
                                  counter ; operations ; fee ; gas_limit } in
           (RPC_context.make_call0 S.operations ctxt block
-             () ({ branch }, Sourced_operations ops))
+             () ({ branch }, Sourced_operation ops))
 
     let reveal ctxt
         block ~branch ~source ~sourcePubKey ~counter ~fee ()=
@@ -364,7 +364,7 @@ module Forge = struct
         block ~branch operation =
       let ops = Consensus_operation operation in
       (RPC_context.make_call0 S.operations ctxt block
-         () ({ branch }, Sourced_operations ops))
+         () ({ branch }, Sourced_operation ops))
 
     let endorsement ctxt
         b ~branch ~block ~level ~slots () =
@@ -380,7 +380,7 @@ module Forge = struct
         block ~branch ~source operation =
       let ops = Amendment_operation { source ; operation } in
       (RPC_context.make_call0 S.operations ctxt block
-         () ({ branch }, Sourced_operations ops))
+         () ({ branch }, Sourced_operation ops))
 
     let proposals ctxt
         b ~branch ~source ~period ~proposals () =
@@ -400,7 +400,7 @@ module Forge = struct
         block ~branch operation =
       let op = Dictator_operation operation in
       (RPC_context.make_call0 S.operations ctxt block
-         () ({ branch }, Sourced_operations op))
+         () ({ branch }, Sourced_operation op))
 
     let activate ctxt
         b ~branch hash =
@@ -472,7 +472,7 @@ module Parse = struct
     let check_signature ctxt signature shell contents =
       match contents with
       | Anonymous_operations _ -> return ()
-      | Sourced_operations (Manager_operations op) ->
+      | Sourced_operation (Manager_operations op) ->
           let public_key =
             List.fold_left (fun acc op ->
                 match op with
@@ -487,16 +487,16 @@ module Parse = struct
           end >>=? fun public_key ->
           Operation.check_signature public_key
             { signature ; shell ; contents }
-      | Sourced_operations (Consensus_operation (Endorsements { level ; slots ; _ })) ->
+      | Sourced_operation (Consensus_operation (Endorsements { level ; slots ; _ })) ->
           let level = Level.from_raw ctxt level in
           Baking.check_endorsements_rights ctxt level slots >>=? fun public_key ->
           Operation.check_signature public_key
             { signature ; shell ; contents }
-      | Sourced_operations (Amendment_operation { source ; _ }) ->
+      | Sourced_operation (Amendment_operation { source ; _ }) ->
           Roll.delegate_pubkey ctxt source >>=? fun source ->
           Operation.check_signature source
             { signature ; shell ; contents }
-      | Sourced_operations (Dictator_operation _) ->
+      | Sourced_operation (Dictator_operation _) ->
           let key = Constants.dictator_pubkey ctxt in
           Operation.check_signature key
             { signature ; shell ; contents }

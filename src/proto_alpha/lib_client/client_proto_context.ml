@@ -52,7 +52,7 @@ let transfer (cctxt : #Proto_alpha.full)
   let operations = [Transaction { amount ; parameters ; destination }] in
   append_reveal cctxt block ~source ~src_pk operations >>=? fun operations ->
   let contents =
-    Sourced_operations
+    Sourced_operation
       (Manager_operations { source ; fee ; counter ;
                             gas_limit ; operations }) in
   Injection.inject_operation cctxt block ?confirmations
@@ -72,7 +72,7 @@ let reveal cctxt
   | _ :: _ ->
       let gas_limit = Z.zero in
       let contents =
-        Sourced_operations
+        Sourced_operation
           (Manager_operations { source ; fee ; counter ;
                                 gas_limit ; operations }) in
       Injection.inject_operation cctxt block ?confirmations
@@ -88,7 +88,7 @@ let originate
   append_reveal
     cctxt block ~source ~src_pk operations >>=? fun operations ->
   let contents =
-    Sourced_operations
+    Sourced_operation
       (Manager_operations { source ; fee ; counter ;
                             gas_limit ; operations }) in
   Injection.inject_operation cctxt block ?confirmations
@@ -127,7 +127,7 @@ let delegate_contract cctxt
   append_reveal
     cctxt block ~source ~src_pk operations >>=? fun operations ->
   let contents =
-    Sourced_operations
+    Sourced_operation
       (Manager_operations { source ; fee ; counter ;
                             gas_limit = Z.zero ; operations }) in
   Injection.inject_operation cctxt block ?confirmations
@@ -173,7 +173,7 @@ let get_manager
   return (src_name, src_pkh, src_pk, src_sk)
 
 let dictate rpc_config block ?confirmations command src_sk =
-  let contents = Sourced_operations (Dictator_operation command) in
+  let contents = Sourced_operation (Dictator_operation command) in
   Injection.inject_operation
     rpc_config block ?confirmations
     ~src_sk contents >>=? fun res ->
