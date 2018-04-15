@@ -274,13 +274,16 @@ let to_root = function
   | `Null -> `O []
   | oth -> `A [ oth ]
 
-let to_string ?minify j = Ezjsonm.to_string ?minify (to_root j)
+let to_string ?minify j =
+  Format.asprintf "%a" Json_repr.(pp ?compact:minify (module Ezjsonm)) j
 
 let pp = Json_repr.(pp (module Ezjsonm))
 
 let from_string s =
-  try Ok (Ezjsonm.from_string s :> json)
-  with Ezjsonm.Parse_error (_, msg) -> Error msg
+  match Ezjsonm.from_string ("[" ^ s ^ "]") with
+  | exception Ezjsonm.Parse_error (_, msg) -> Error msg
+  | `A [ json ] -> Ok json
+  | _ -> Error "Malformed value"
 
 let from_stream (stream: string Lwt_stream.t) =
   let buffer = ref "" in
