@@ -61,6 +61,10 @@ val current_fitness: context -> Int64.t
 val set_current_fitness: context -> Int64.t -> t
 
 val constants: context -> Constants_repr.parametric
+val patch_constants:
+  context ->
+  (Constants_repr.parametric -> Constants_repr.parametric) ->
+  context Lwt.t
 val first_level: context -> Raw_level_repr.t
 
 val add_fees: context -> Tez_repr.t -> context tzresult Lwt.t

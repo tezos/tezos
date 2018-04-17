@@ -263,3 +263,15 @@ module Commitments : Indexed_data_storage
   with type key = Unclaimed_public_key_hash.t
    and type value = Commitment_repr.t
    and type t := Raw_context.t
+
+(** Ramp up security deposits... *)
+
+module Ramp_up : sig
+
+  module Security_deposits :
+    Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t * Tez_repr.t (* baking * endorsement *)
+     and type t := Raw_context.t
+
+end

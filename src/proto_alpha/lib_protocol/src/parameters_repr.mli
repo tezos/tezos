@@ -16,6 +16,7 @@ type t = {
   bootstrap_accounts : bootstrap_account list ;
   commitments : (Unclaimed_public_key_hash.t * Commitment_repr.t) list ;
   constants : Constants_repr.parametric ;
+  security_deposit_ramp_up_cycles : int option ;
 }
 
 val encoding: t Data_encoding.t

@@ -649,6 +649,7 @@ let may_start_new_cycle ctxt =
       Seed.cycle_end ctxt last_cycle >>=? fun (ctxt, unrevealed) ->
       Roll.cycle_end ctxt last_cycle >>=? fun ctxt ->
       Delegate.cycle_end ctxt last_cycle unrevealed >>=? fun ctxt ->
+      Bootstrap.cycle_end ctxt last_cycle >>=? fun ctxt ->
       return ctxt
 
 let begin_full_construction ctxt pred_timestamp protocol_data =

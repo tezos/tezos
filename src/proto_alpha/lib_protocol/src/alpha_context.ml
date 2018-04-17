@@ -89,6 +89,8 @@ module Fitness = struct
 
 end
 
+module Bootstrap = Bootstrap_storage
+
 module Commitment = struct
   include Commitment_repr
   include Commitment_storage

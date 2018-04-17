@@ -228,6 +228,11 @@ let get_constants ctxt =
           failwith "Internal error: cannot parse constants in context."
       | Some constants -> return constants
 
+let patch_constants ctxt f =
+  let constants = f ctxt.constants in
+  set_constants ctxt.context constants >>= fun context ->
+  Lwt.return { ctxt with context ; constants }
+
 let check_inited ctxt =
   Context.get ctxt version_key >>= function
   | None ->

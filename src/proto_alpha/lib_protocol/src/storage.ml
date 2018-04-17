@@ -427,6 +427,21 @@ module Commitments =
     (Unclaimed_public_key_hash.Index)
     (Make_value(Commitment_repr))
 
+(** Ramp up security deposits... *)
+
+module Ramp_up = struct
+
+  module Security_deposits =
+    Make_indexed_data_storage
+      (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "deposits"] end))
+      (Cycle_repr.Index)
+      (Make_value(struct
+         type t = Tez_repr.t * Tez_repr.t
+         let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
+       end))
+
+end
+
 (** Resolver *)
 
 let () =

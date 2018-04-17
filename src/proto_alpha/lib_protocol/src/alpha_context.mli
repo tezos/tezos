@@ -815,6 +815,13 @@ module Commitment : sig
 
 end
 
+module Bootstrap : sig
+
+  val cycle_end:
+    context -> Cycle.t -> context tzresult Lwt.t
+
+end
+
 val prepare_first_block:
   Context.t ->
   level:Int32.t ->
