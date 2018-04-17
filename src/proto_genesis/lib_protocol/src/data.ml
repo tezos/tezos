@@ -80,7 +80,7 @@ module Pubkey = struct
 
   let default =
     Signature.Public_key.of_b58check_exn
-      "edpkuEH8DSby4w167NpxYbMagBapWvM8jsqKJpiW3JpVD7Af8oGmEo"
+      "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu"
 
   let get_pubkey ctxt =
     Context.get ctxt pubkey_key >>= function
