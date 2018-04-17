@@ -28,54 +28,6 @@ let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_conte
   | Ok data ->
       Lwt.return (Some data)
 
-let wait_for_operation_inclusion
-    (ctxt : Proto_alpha.full)
-    ?(predecessors = 10)
-    ?(confirmations = 1)
-    operation_hash =
-  let confirmed_blocks = Hashtbl.create confirmations in
-  Block_services.monitor ctxt
-    ~include_ops:true
-    ~length:predecessors >>=? fun (stream, stop) ->
-  let stream = Lwt_stream.flatten @@ Lwt_stream.flatten @@ stream in
-  Lwt_stream.find_s begin fun bi ->
-    match Hashtbl.find_opt confirmed_blocks bi.Block_services.predecessor with
-    | Some n ->
-        ctxt#answer
-          "Operation received %d confirmations as of block: %a"
-          (n+1) Block_hash.pp bi.hash >>= fun () ->
-        if n < confirmations then begin
-          Hashtbl.add confirmed_blocks bi.hash (n+1) ;
-          Lwt.return_false
-        end else
-          Lwt.return_true
-    | None ->
-        let in_block =
-          match bi.operations with
-          | None -> false
-          | Some operations ->
-              List.exists
-                (List.exists
-                   (fun (hash, _) ->
-                      Operation_hash.equal operation_hash hash))
-                operations in
-        if not in_block then
-          Lwt.return_false
-        else begin
-          ctxt#answer
-            "Operation found in block: %a"
-            Block_hash.pp bi.hash >>= fun () ->
-          if confirmations <= 0 then
-            Lwt.return_true
-          else begin
-            Hashtbl.add confirmed_blocks bi.hash 0 ;
-            Lwt.return_false
-          end
-        end
-  end stream >>= fun _ ->
-  stop () ;
-  return ()
-
 let group =
   { Clic.name = "context" ;
     title = "Block contextual commands (see option -block)" }

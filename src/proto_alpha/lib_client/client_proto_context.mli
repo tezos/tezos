@@ -134,3 +134,10 @@ val dictate :
   dictator_operation ->
   Signature.secret_key ->
   Operation_hash.t tzresult Lwt.t
+
+val wait_for_operation_inclusion:
+  #Proto_alpha.full ->
+  ?predecessors:int ->
+  ?confirmations:int ->
+  Operation_hash.t ->
+  unit tzresult Lwt.t
