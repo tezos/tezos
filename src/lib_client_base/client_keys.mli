@@ -116,6 +116,13 @@ val gen_keys :
   ?seed:Ed25519.Seed.t ->
   #Client_context.io_wallet -> string -> unit tzresult Lwt.t
 
+val register_key :
+  #Client_context.wallet ->
+  ?force:bool ->
+  (Signature.Public_key_hash.t *
+   Signature.Public_key.t *
+   Signature.Secret_key.t) -> string -> unit tzresult Lwt.t
+
 val gen_keys_containing :
   ?prefix:bool ->
   ?force:bool ->

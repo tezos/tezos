@@ -180,6 +180,12 @@ let no_print_source_flag =
           This option disables this behaviour."
     ()
 
+let no_confirmation =
+  switch
+    ~long:"no-confirmation"
+    ~doc:"don't print wait for the operation to be confirmed."
+    ()
+
 module Daemon = struct
   let baking_switch =
     switch

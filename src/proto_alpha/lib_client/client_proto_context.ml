@@ -285,3 +285,77 @@ let wait_for_operation_inclusion
   end stream >>= fun _ ->
   stop () ;
   return ()
+
+type activation_key =
+  { pkh : Ed25519.Public_key_hash.t ;
+    amount : Tez.t ;
+    secret : Blinded_public_key_hash.secret ;
+    mnemonic : string list ;
+    password : string ;
+    email : string ;
+  }
+
+let activation_key_encoding =
+  let open Data_encoding in
+  conv
+    (fun { pkh ; amount ; secret ; mnemonic ; password ; email } ->
+       ( pkh, amount, secret, mnemonic, password, email ))
+    (fun ( pkh, amount, secret, mnemonic, password, email ) ->
+       { pkh ; amount ; secret ; mnemonic ; password ; email })
+    (obj6
+       (req "pkh" Ed25519.Public_key_hash.encoding)
+       (req "amount" Tez.encoding)
+       (req "secret" Blinded_public_key_hash.secret_encoding)
+       (req "mnemonic" (list string))
+       (req "password" string)
+       (req "email" string))
+
+let read_key key =
+  match Bip39.of_words key.mnemonic with
+  | None ->
+      failwith ""
+  | Some t ->
+      (* TODO: unicode normalization (NFKD)... *)
+      let sk = Bip39.to_seed ~passphrase:(key.email ^ key.password) t in
+      let sk = Cstruct.(to_bigarray (sub sk 0 32)) in
+      let sk : Signature.Secret_key.t =
+        Ed25519 (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk) in
+      let pk = Signature.Secret_key.to_public_key sk in
+      let pkh = Signature.Public_key.hash pk in
+      return (pkh, pk, sk)
+
+let claim_commitment (cctxt : #Proto_alpha.full)
+    ?confirmations ?force block key name =
+  read_key key >>=? fun (pkh, pk, sk) ->
+  fail_unless (Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
+    (failure "@[<v 2>Inconsistent activation key:@ \
+              Computed pkh: %a@ \
+              Embedded pkh: %a @]"
+       Signature.Public_key_hash.pp pkh
+       Ed25519.Public_key_hash.pp key.pkh) >>=? fun () ->
+  let op = [ Activation { id = key.pkh ; secret = key.secret } ] in
+  Block_services.info cctxt block >>=? fun bi ->
+  Alpha_services.Forge.Anonymous.operations
+    cctxt block ~branch:bi.hash op >>=? fun bytes ->
+  Shell_services.inject_operation
+    cctxt ~chain_id:bi.chain_id bytes >>=? fun oph ->
+  operation_submitted_message cctxt oph >>=? fun () ->
+  begin
+    match confirmations with
+    | None ->
+        Client_keys.register_key cctxt ?force (pkh, pk, sk) name >>=? fun () ->
+        return ()
+    | Some confirmations ->
+        cctxt#message "Waiting for the operation to be included..." >>= fun () ->
+        wait_for_operation_inclusion ~confirmations cctxt oph >>=? fun () ->
+        Client_keys.register_key cctxt ?force (pkh, pk, sk) name >>=? fun () ->
+        Alpha_services.Contract.balance
+          cctxt (`Head 0) (Contract.implicit_contract pkh) >>=? fun balance ->
+        cctxt#message "Account %s (%a) created with %s%a."
+          name
+          Signature.Public_key_hash.pp pkh
+          Client_proto_args.tez_sym
+          Tez.pp balance >>= fun () ->
+        return ()
+  end
+

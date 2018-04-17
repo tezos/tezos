@@ -141,3 +141,24 @@ val wait_for_operation_inclusion:
   ?confirmations:int ->
   Operation_hash.t ->
   unit tzresult Lwt.t
+
+type activation_key =
+  { pkh : Ed25519.Public_key_hash.t ;
+    amount : Tez.t ;
+    secret : Blinded_public_key_hash.secret ;
+    mnemonic : string list ;
+    password : string ;
+    email : string ;
+  }
+
+val activation_key_encoding: activation_key Data_encoding.t
+
+val claim_commitment:
+  #Proto_alpha.full ->
+  ?confirmations:int ->
+  ?force:bool ->
+  Block_services.block ->
+  activation_key ->
+  string ->
+  unit tzresult Lwt.t
+

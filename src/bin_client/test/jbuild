@@ -4,6 +4,8 @@
  ((name runtest_basic.sh)
   (deps (sandbox.json
          protocol_parameters.json
+         king_commitment.json
+         queen_commitment.json
          test_lib.inc.sh
          (glob_files contracts/*)
          ))

@@ -26,6 +26,8 @@ sleep 1
 key1=foo
 key2=bar
 key3=boo
+key4=king
+key5=queen
 
 $client gen keys $key1
 $client gen keys $key2 --sig secp256k1
@@ -106,6 +108,20 @@ $client transfer 400,000 from bootstrap1 to bootstrap5 -fee 0
 sleep 1
 $client bake for bootstrap1 -max-priority 512
 $client get balance for bootstrap5 | assert "4,000,000 ꜩ"
+sleep 1
+
+
+$client activate account $key4 with king_commitment.json --no-confirmation
+$client activate account $key5 with queen_commitment.json --no-confirmation
+$client bake for bootstrap1 -max-priority 512
+sleep 1
+
+$client get balance for $key4 | assert "23,932,454.669,343 ꜩ"
+$client get balance for $key5 | assert "72,954,577.464,032 ꜩ"
+
+$client transfer 10 from $key4 to $key5
+
+
 
 echo
 echo End of test

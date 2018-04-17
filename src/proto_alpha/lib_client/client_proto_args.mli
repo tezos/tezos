@@ -25,7 +25,8 @@ val free_baking_switch: (bool, Proto_alpha.full) Clic.arg
 val force_switch: (bool, Proto_alpha.full) Clic.arg
 val endorsement_delay_arg: (int, Proto_alpha.full) Clic.arg
 
-val no_print_source_flag : (bool, Proto_alpha.full) Clic.arg
+val no_print_source_flag: (bool, Proto_alpha.full) Clic.arg
+val no_confirmation: (bool, Proto_alpha.full) Clic.arg
 
 val tez_arg :
   default:string ->

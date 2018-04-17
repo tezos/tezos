@@ -159,9 +159,8 @@ let append cctxt loc buf =
   sign cctxt loc buf >>|? fun signature ->
   Signature.concat buf signature
 
-let gen_keys ?(force=false) ?algo ?seed (cctxt : #Client_context.io_wallet) name =
-  let public_key_hash, public_key, secret_key =
-    Signature.generate_key ?algo ?seed () in
+let register_key cctxt ?(force=false)
+    (public_key_hash, public_key, secret_key) name =
   Secret_key.add ~force cctxt name
     (Secret_key_locator.of_unencrypted secret_key) >>=? fun () ->
   Public_key.add ~force cctxt name
@@ -170,6 +169,9 @@ let gen_keys ?(force=false) ?algo ?seed (cctxt : #Client_context.io_wallet) name
     cctxt name public_key_hash >>=? fun () ->
   return ()
 
+let gen_keys ?(force=false) ?algo ?seed (cctxt : #Client_context.io_wallet) name =
+  let key = Signature.generate_key ?algo ?seed () in
+  register_key cctxt ~force key name
 
 let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : #Client_context.full) =
   let unrepresentable =

@@ -36,7 +36,7 @@ type error += Too_early_double_baking_evidence
   of { level: Raw_level.t ; current: Raw_level.t } (* `Temporary *)
 type error += Outdated_double_baking_evidence
   of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
-type error += Invalid_activation
+type error += Invalid_activation of { pkh : Ed25519.Public_key_hash.t }
 type error += Wrong_activation_secret
 
 let () =
@@ -295,11 +295,14 @@ let () =
     ~title:"Invalid activation"
     ~description:"The given key has already been activated or the given \
                   key does not correspond to any preallocated contract"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "Invalid activation.")
-    Data_encoding.unit
-    (function Invalid_activation -> Some () | _ -> None)
-    (fun () -> Invalid_activation) ;
+    ~pp:(fun ppf pkh ->
+        Format.fprintf ppf "Invalid activation. The public key %a does \
+                            not match any commitment."
+          Ed25519.Public_key_hash.pp pkh
+      )
+    Data_encoding.(obj1 (req "pkh" Ed25519.Public_key_hash.encoding))
+    (function Invalid_activation { pkh } -> Some pkh | _ -> None)
+    (fun pkh -> Invalid_activation { pkh } ) ;
   register_error_kind
     `Permanent
     ~id:"operation.wrong_activation_secret"
@@ -579,9 +582,9 @@ let apply_anonymous_operation ctxt _delegate origination_nonce kind =
   | Activation { id = pkh ; secret } ->
       let h_pkh = Unclaimed_public_key_hash.of_ed25519_pkh pkh in
       Commitment.get_opt ctxt h_pkh >>=? function
-      | None -> fail Invalid_activation
-      | Some { blinded_public_key_hash = submitted_bpkh ; amount } ->
-          let blinded_pkh = Blinded_public_key_hash.of_ed25519_pkh secret pkh in
+      | None -> fail (Invalid_activation { pkh })
+      | Some { blinded_public_key_hash = blinded_pkh ; amount } ->
+          let submitted_bpkh = Blinded_public_key_hash.of_ed25519_pkh secret pkh in
           fail_unless
             Blinded_public_key_hash.(blinded_pkh = submitted_bpkh)
             Wrong_activation_secret >>=? fun () ->
