@@ -98,7 +98,7 @@ type frozen_balances = {
 
 (** Returns the amount of frozen deposit, fees and rewards associated to a given key. *)
 val frozen_balances:
-  Raw_context.t -> Ed25519.Public_key_hash.t ->
+  Raw_context.t -> Signature.Public_key_hash.t ->
   frozen_balances tzresult Lwt.t
 
 (** Returns the full 'balance' of the implicit contract associated to

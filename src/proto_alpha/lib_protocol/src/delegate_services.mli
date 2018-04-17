@@ -9,7 +9,9 @@
 
 open Alpha_context
 
-val frozen_balances : 'a #RPC_context.simple -> 'a -> Ed25519.Public_key_hash.t ->
+val frozen_balances:
+  'a #RPC_context.simple -> 'a ->
+  Signature.Public_key_hash.t ->
   Delegate.frozen_balances shell_tzresult Lwt.t
 
 module Baker : sig

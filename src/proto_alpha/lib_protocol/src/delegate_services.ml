@@ -343,7 +343,7 @@ module S = struct
       ~query: RPC_query.empty
       ~input: Data_encoding.empty
       ~output: frozen_balances_encoding
-      RPC_path.(open_root / "delegate" /: Ed25519.Public_key_hash.rpc_arg / "frozen_balances")
+      RPC_path.(open_root / "delegate" /: Signature.Public_key_hash.rpc_arg / "frozen_balances")
 end
 let () =
   let open Services_registration in
