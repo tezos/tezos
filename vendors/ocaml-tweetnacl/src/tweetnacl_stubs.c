@@ -1033,12 +1033,14 @@ CAMLprim value ml_crypto_sign_extended(value sm, value d) {
     return Val_unit;
 }
 
-CAMLprim value ml_crypto_sign_open(value m, value mlen, value sm, value pk) {
-    return Val_int(crypto_sign_open(Caml_ba_data_val(m),
-                                    Caml_ba_data_val(mlen),
-                                    Caml_ba_data_val(sm),
-                                    Caml_ba_array_val(sm)->dim[0],
-                                    Caml_ba_data_val(pk)));
+CAMLprim value ml_crypto_sign_open(value m, value sm, value pk) {
+    i64 mlen;
+    int ret = crypto_sign_open(Caml_ba_data_val(m),
+                               &mlen,
+                               Caml_ba_data_val(sm),
+                               Caml_ba_array_val(sm)->dim[0],
+                               Caml_ba_data_val(pk));
+    return (ret == -1 ? Val_long(-1) : Val_long(mlen));
 }
 
 CAMLprim value ml_crypto_sign_keypair(value pk, value sk) {

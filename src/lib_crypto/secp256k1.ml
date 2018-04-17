@@ -264,7 +264,7 @@ let append key msg =
   concat msg signature
 
 let generate_key () =
-  let sk = Key.read_sk_exn context (Cstruct.to_bigarray (Tweetnacl.Rand.gen 32)) in
+  let sk = Key.read_sk_exn context (Tweetnacl.Rand.gen 32) in
   let pk = Key.neuterize_exn context sk in
   let pkh = Public_key.hash pk in
   (pkh, pk, sk)

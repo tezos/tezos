@@ -4,12 +4,12 @@
   ---------------------------------------------------------------------------*)
 
 module Rand : sig
-  val gen : int -> Cstruct.t
-  val write : Cstruct.t -> unit
+  val gen : int -> Bigstring.t
+  val write : Bigstring.t -> unit
 end
 
 module Hash : sig
-  val sha512 : Cstruct.t -> Cstruct.t
+  val sha512 : Bigstring.t -> Bigstring.t
 end
 
 module Nonce : sig
@@ -17,9 +17,9 @@ module Nonce : sig
   val bytes : int
   val gen : unit -> t
   val increment : ?step:int -> t -> t
-  val of_cstruct : Cstruct.t -> t option
-  val of_cstruct_exn : Cstruct.t -> t
-  val to_cstruct : t -> Cstruct.t
+  val of_bytes : Bigstring.t -> t option
+  val of_bytes_exn : Bigstring.t -> t
+  val to_bytes : t -> Bigstring.t
 end
 
 module Secretbox : sig
@@ -30,14 +30,14 @@ module Secretbox : sig
   val boxzerobytes : int
 
   val genkey : unit -> key
-  val of_cstruct : Cstruct.t -> key option
-  val of_cstruct_exn : Cstruct.t -> key
+  val of_bytes : Bigstring.t -> key option
+  val of_bytes_exn : Bigstring.t -> key
 
-  val box : key:key -> nonce:Nonce.t -> msg:Cstruct.t -> Cstruct.t
-  val box_open : key:key -> nonce:Nonce.t -> cmsg:Cstruct.t -> Cstruct.t option
+  val box : key:key -> nonce:Nonce.t -> msg:Bigstring.t -> Bigstring.t
+  val box_open : key:key -> nonce:Nonce.t -> cmsg:Bigstring.t -> Bigstring.t option
 
-  val box_noalloc : key:key -> nonce:Nonce.t -> msg:Cstruct.t -> unit
-  val box_open_noalloc : key:key -> nonce:Nonce.t -> cmsg:Cstruct.t -> bool
+  val box_noalloc : key:key -> nonce:Nonce.t -> msg:Bigstring.t -> unit
+  val box_open_noalloc : key:key -> nonce:Nonce.t -> cmsg:Bigstring.t -> bool
 end
 
 module Box : sig
@@ -53,46 +53,44 @@ module Box : sig
   val zerobytes : int
   val boxzerobytes : int
 
-  val pp : Format.formatter -> _ key -> unit
-  val show : _ key -> string
   val equal : 'a key -> 'a key -> bool
-  val to_cstruct : _ key -> Cstruct.t
-  val blit_to_cstruct : _ key -> ?pos:int -> Cstruct.t -> unit
+  val to_bytes : _ key -> Bigstring.t
+  val blit_to_bytes : _ key -> ?pos:int -> Bigstring.t -> unit
 
-  val sk_of_cstruct : Cstruct.t -> secret key option
-  val pk_of_cstruct : Cstruct.t -> public key option
-  val ck_of_cstruct : Cstruct.t -> combined key option
+  val sk_of_bytes : Bigstring.t -> secret key option
+  val pk_of_bytes : Bigstring.t -> public key option
+  val ck_of_bytes : Bigstring.t -> combined key option
 
-  val sk_of_cstruct_exn : Cstruct.t -> secret key
-  val pk_of_cstruct_exn : Cstruct.t -> public key
-  val ck_of_cstruct_exn : Cstruct.t -> combined key
+  val sk_of_bytes_exn : Bigstring.t -> secret key
+  val pk_of_bytes_exn : Bigstring.t -> public key
+  val ck_of_bytes_exn : Bigstring.t -> combined key
 
   val keypair : unit -> public key * secret key
 
   val box :
     pk:public key -> sk:secret key ->
-    nonce:Nonce.t -> msg:Cstruct.t -> Cstruct.t
+    nonce:Nonce.t -> msg:Bigstring.t -> Bigstring.t
   val box_open :
     pk:public key -> sk:secret key ->
-    nonce:Nonce.t -> cmsg:Cstruct.t -> Cstruct.t option
+    nonce:Nonce.t -> cmsg:Bigstring.t -> Bigstring.t option
 
   val box_noalloc :
     pk:public key -> sk:secret key ->
-    nonce:Nonce.t -> msg:Cstruct.t -> unit
+    nonce:Nonce.t -> msg:Bigstring.t -> unit
   val box_open_noalloc :
     pk:public key -> sk:secret key ->
-    nonce:Nonce.t -> cmsg:Cstruct.t -> bool
+    nonce:Nonce.t -> cmsg:Bigstring.t -> bool
 
   val combine : public key -> secret key -> combined key
   val box_combined :
-    k:combined key -> nonce:Nonce.t -> msg:Cstruct.t -> Cstruct.t
+    k:combined key -> nonce:Nonce.t -> msg:Bigstring.t -> Bigstring.t
   val box_open_combined :
-    k:combined key -> nonce:Nonce.t -> cmsg:Cstruct.t -> Cstruct.t option
+    k:combined key -> nonce:Nonce.t -> cmsg:Bigstring.t -> Bigstring.t option
 
   val box_combined_noalloc :
-    k:combined key -> nonce:Nonce.t -> msg:Cstruct.t -> unit
+    k:combined key -> nonce:Nonce.t -> msg:Bigstring.t -> unit
   val box_open_combined_noalloc :
-    k:combined key -> nonce:Nonce.t -> cmsg:Cstruct.t -> bool
+    k:combined key -> nonce:Nonce.t -> cmsg:Bigstring.t -> bool
 end
 
 module Sign : sig
@@ -107,34 +105,32 @@ module Sign : sig
   val ekbytes : int
   val seedbytes : int
 
-  val pp : Format.formatter -> _ key -> unit
-  val show : _ key -> string
-  val to_cstruct : _ key -> Cstruct.t
-  val blit_to_cstruct : _ key -> ?pos:int -> Cstruct.t -> unit
+  val to_bytes : _ key -> Bigstring.t
+  val blit_to_bytes : _ key -> ?pos:int -> Bigstring.t -> unit
 
-  val sk_of_cstruct : Cstruct.t -> secret key option
-  val ek_of_cstruct : Cstruct.t -> extended key option
-  val pk_of_cstruct : Cstruct.t -> public key option
+  val sk_of_bytes : Bigstring.t -> secret key option
+  val ek_of_bytes : Bigstring.t -> extended key option
+  val pk_of_bytes : Bigstring.t -> public key option
 
-  val sk_of_cstruct_exn : Cstruct.t -> secret key
-  val ek_of_cstruct_exn : Cstruct.t -> extended key
-  val pk_of_cstruct_exn : Cstruct.t -> public key
+  val sk_of_bytes_exn : Bigstring.t -> secret key
+  val ek_of_bytes_exn : Bigstring.t -> extended key
+  val pk_of_bytes_exn : Bigstring.t -> public key
 
-  val keypair : ?seed:Cstruct.t -> unit -> public key * secret key
+  val keypair : ?seed:Bigstring.t -> unit -> public key * secret key
   val equal : 'a key -> 'a key -> bool
 
   val extended : secret key -> extended key
-  val seed : secret key -> Cstruct.t
+  val seed : secret key -> Bigstring.t
   val public : _ key -> public key
 
-  val sign : key:secret key -> Cstruct.t -> Cstruct.t
-  val sign_extended : key:extended key -> Cstruct.t -> Cstruct.t
+  val sign : key:secret key -> Bigstring.t -> Bigstring.t
+  val sign_extended : key:extended key -> Bigstring.t -> Bigstring.t
 
-  val detached : key:secret key -> Cstruct.t -> Cstruct.t
-  val detached_extended : key:extended key -> Cstruct.t -> Cstruct.t
+  val detached : key:secret key -> Bigstring.t -> Bigstring.t
+  val detached_extended : key:extended key -> Bigstring.t -> Bigstring.t
 
-  val verify : key:public key -> Cstruct.t -> Cstruct.t option
-  val verify_detached : key:public key -> signature:Cstruct.t -> Cstruct.t -> bool
+  val verify : key:public key -> Bigstring.t -> Bigstring.t option
+  val verify_detached : key:public key -> signature:Bigstring.t -> Bigstring.t -> bool
 
   val add : public key -> public key -> public key
   val mult : public key -> Z.t -> public key

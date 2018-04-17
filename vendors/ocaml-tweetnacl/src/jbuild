@@ -3,5 +3,6 @@
 (library
  ((name            tweetnacl)
   (public_name     tweetnacl)
-  (libraries       (hex cstruct zarith))
-  (c_names         (tweetnacl_stubs))))
+  (libraries       (bigstring ocplib-endian.bigstring zarith))
+  (c_names         (tweetnacl_stubs))
+  (c_flags         (-O3))))
