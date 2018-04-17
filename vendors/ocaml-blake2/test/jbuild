@@ -2,7 +2,7 @@
 
 (executable
  ((name test)
-  (libraries (blake2 alcotest))))
+  (libraries (blake2 hex alcotest))))
 
 (alias
  ((name    runtest-blake2)

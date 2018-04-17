@@ -29,7 +29,7 @@ module type MINIMAL_HASH = sig
 
   include Compare.S with type t := t
 
-  val hash_bytes: ?key:Cstruct.buffer -> Cstruct.buffer list -> t
+  val hash_bytes: ?key:MBytes.t -> MBytes.t list -> t
   val hash_string: ?key:string -> string list -> t
 
   val zero: t
