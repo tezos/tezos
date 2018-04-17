@@ -19,7 +19,7 @@ val raw_encoding: raw Data_encoding.t
 type operation = {
   shell: Operation.shell_header ;
   contents: proto_operation ;
-  signature: Ed25519.Signature.t option ;
+  signature: Signature.t option ;
 }
 
 and proto_operation =
@@ -39,15 +39,15 @@ and anonymous_operation =
       bh1: Block_header_repr.t ;
       bh2: Block_header_repr.t ;
     }
-  | Faucet of {
+  | Activation of {
       id: Ed25519.Public_key_hash.t ;
-      nonce: MBytes.t ;
+      secret: Blinded_public_key_hash.secret ;
     }
 
 and sourced_operations =
   | Consensus_operation of consensus_operation
   | Amendment_operation of {
-      source: Ed25519.Public_key_hash.t ;
+      source: Signature.Public_key_hash.t ;
       operation: amendment_operation ;
     }
   | Manager_operations of {
@@ -77,21 +77,21 @@ and amendment_operation =
     }
 
 and manager_operation =
-  | Reveal of Ed25519.Public_key.t
+  | Reveal of Signature.Public_key.t
   | Transaction of {
       amount: Tez_repr.tez ;
       parameters: Script_repr.expr option ;
       destination: Contract_repr.contract ;
     }
   | Origination of {
-      manager: Ed25519.Public_key_hash.t ;
-      delegate: Ed25519.Public_key_hash.t option ;
+      manager: Signature.Public_key_hash.t ;
+      delegate: Signature.Public_key_hash.t option ;
       script: Script_repr.t option ;
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
     }
-  | Delegation of Ed25519.Public_key_hash.t option
+  | Delegation of Signature.Public_key_hash.t option
 
 and dictator_operation =
   | Activate of Protocol_hash.t
@@ -112,13 +112,14 @@ val acceptable_passes: operation -> int list
 
 val parse_proto:
   MBytes.t ->
-  (proto_operation * Ed25519.Signature.t option) tzresult Lwt.t
+  (proto_operation * Signature.t option) tzresult Lwt.t
 
 type error += Missing_signature (* `Permanent *)
 type error += Invalid_signature (* `Permanent *)
 
+
 val check_signature:
-  Ed25519.Public_key.t -> operation -> unit tzresult Lwt.t
+  Signature.Public_key.t -> operation -> unit tzresult Lwt.t
 
 val forge: Operation.shell_header -> proto_operation -> MBytes.t
 

@@ -4,6 +4,7 @@
  ((name tezos_client_alpha_commands)
   (public_name tezos-client-alpha-commands)
   (libraries (tezos-base
+              tezos-stdlib-unix
               tezos-protocol-alpha
               tezos-protocol-environment
               tezos-shell-services
@@ -16,6 +17,7 @@
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
+                    -open Tezos_stdlib_unix
                     -open Tezos_shell_services
                     -open Tezos_client_base
                     -open Tezos_client_alpha

@@ -15,9 +15,9 @@ open Alpha_context
 
 (** Explicit account type *)
 type account = {
-  hpub : Ed25519.Public_key_hash.t;
-  pub : Ed25519.Public_key.t;
-  ppk : Ed25519.Secret_key.t;
+  hpub : Signature.Public_key_hash.t;
+  pub : Signature.Public_key.t;
+  ppk : Signature.Secret_key.t;
   contract :
     Contract.contract;
 }

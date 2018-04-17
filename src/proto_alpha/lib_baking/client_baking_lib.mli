@@ -51,7 +51,7 @@ val run_daemon:
   #Proto_alpha.full ->
   ?max_priority:int ->
   endorsement_delay:int ->
-  ('a * public_key_hash) list ->
+  public_key_hash list ->
   endorsement:bool ->
   baking:bool ->
   denunciation:bool ->

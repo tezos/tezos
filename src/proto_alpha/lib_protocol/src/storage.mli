@@ -28,7 +28,7 @@ module Roll : sig
   module Owner : Indexed_data_snapshotable_storage
     with type key = Roll_repr.t
      and type snapshot = (Cycle_repr.t * int)
-     and type value = Ed25519.Public_key.t
+     and type value = Signature.Public_key.t
      and type t := Raw_context.t
 
   val clear: Raw_context.t -> Raw_context.t Lwt.t
@@ -48,7 +48,7 @@ module Roll : sig
 
   (** Rolls associated to contracts, a linked list per contract *)
   module Delegate_roll_list : Indexed_data_storage
-    with type key = Ed25519.Public_key_hash.t
+    with type key = Signature.Public_key_hash.t
      and type value = Roll_repr.t
      and type t := Raw_context.t
 
@@ -60,7 +60,7 @@ module Roll : sig
 
   (** The tez of a contract that are not assigned to rolls *)
   module Delegate_change : Indexed_data_storage
-    with type key = Ed25519.Public_key_hash.t
+    with type key = Signature.Public_key_hash.t
      and type value = Tez_repr.t
      and type t := Raw_context.t
 
@@ -126,7 +126,7 @@ module Contract : sig
   (** The delegate of a contract, if any. *)
   module Delegate : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Ed25519.Public_key_hash.t
+     and type value = Signature.Public_key_hash.t
      and type t := Raw_context.t
 
   module Delegated : Data_set_storage
@@ -188,7 +188,7 @@ end
 (** Set of all registered delegates. *)
 module Delegates : Data_set_storage
   with type t := Raw_context.t
-   and type elt = Ed25519.Public_key_hash.t
+   and type elt = Signature.Public_key_hash.t
 
 (** Votes *)
 
@@ -211,16 +211,16 @@ module Vote : sig
      and type t := Raw_context.t
 
   module Listings : Indexed_data_storage
-    with type key = Ed25519.Public_key_hash.t
+    with type key = Signature.Public_key_hash.t
      and type value = int32 (* number of rolls for the key. *)
      and type t := Raw_context.t
 
   module Proposals : Data_set_storage
-    with type elt = Protocol_hash.t * Ed25519.Public_key_hash.t
+    with type elt = Protocol_hash.t * Signature.Public_key_hash.t
      and type t := Raw_context.t
 
   module Ballots : Indexed_data_storage
-    with type key = Ed25519.Public_key_hash.t
+    with type key = Signature.Public_key_hash.t
      and type value = Vote_repr.ballot
      and type t := Raw_context.t
 
@@ -235,7 +235,7 @@ module Seed : sig
 
   type unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
-    delegate: Ed25519.Public_key_hash.t ;
+    delegate: Signature.Public_key_hash.t ;
     deposit: Tez_repr.t ;
     rewards: Tez_repr.t ;
     fees: Tez_repr.t ;
@@ -257,3 +257,10 @@ module Seed : sig
   end
 
 end
+
+(** Commitments *)
+
+module Commitments : Indexed_data_storage
+  with type key = Unclaimed_public_key_hash.t
+   and type value = Commitment_repr.t
+   and type t := Raw_context.t

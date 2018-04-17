@@ -612,7 +612,7 @@ let rec interp
         | Compare Nat_key, Item (a, Item (b, rest)) ->
             gas_compare descr Script_int.compare Gas.Cost_of.compare_nat a b rest
         | Compare Key_hash_key, Item (a, Item (b, rest)) ->
-            gas_compare descr Ed25519.Public_key_hash.compare
+            gas_compare descr Signature.Public_key_hash.compare
               Gas.Cost_of.compare_key_hash a b rest
         | Compare Timestamp_key, Item (a, Item (b, rest)) ->
             gas_compare descr Script_timestamp.compare Gas.Cost_of.compare_timestamp a b rest
@@ -721,7 +721,7 @@ let rec interp
             let gas = Gas.consume gas Gas.Cost_of.create_account in
             Gas.check gas >>=? fun () ->
             Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
-            Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
+            Lwt.return Tez.(credit -? Constants.origination_burn ctxt) >>=? fun balance ->
             Contract.originate ctxt
               origination
               ~manager ~delegate ~balance
@@ -766,10 +766,10 @@ let rec interp
             let gas = Gas.consume gas Gas.Cost_of.check_signature in
             Gas.check gas >>=? fun () ->
             let message = MBytes.of_string message in
-            let res = Ed25519.Signature.check key signature message in
+            let res = Signature.check key signature message in
             logged_return (Item (res, rest), gas, ctxt)
         | Hash_key, Item (key, rest) ->
-            logged_return (Item (Ed25519.Public_key.hash key, rest), Gas.consume gas Gas.Cost_of.hash_key, ctxt)
+            logged_return (Item (Signature.Public_key.hash key, rest), Gas.consume gas Gas.Cost_of.hash_key, ctxt)
         | H ty, Item (v, rest) ->
             let gas = Gas.consume gas (Gas.Cost_of.hash v) in
             Gas.check gas >>=? fun () ->

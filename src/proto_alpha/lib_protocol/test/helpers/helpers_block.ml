@@ -131,7 +131,7 @@ let get_header_hash
     shell = shell_header ;
     protocol_data = init_block.protocol_data_bytes
   } in
-  Proto_alpha.Alpha_context.init
+  Proto_alpha.Alpha_context.prepare
     validation_result.context
     ~level
     ~timestamp

@@ -8,7 +8,8 @@
 (**************************************************************************)
 
 val fork_node:
-  ?exe:string -> ?timeout:int -> ?port:int -> ?sandbox:string ->
+  ?exe:string -> ?timeout:int -> ?port:int ->
+  ?sandbox:Data_encoding.json ->
   unit -> int
 (** [fork_node ()] forks a node in sandbox mode listening to rpc on
     `localhost:port` (where the default port is 18732) and returns the

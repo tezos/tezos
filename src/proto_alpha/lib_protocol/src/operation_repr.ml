@@ -19,7 +19,7 @@ let raw_encoding = Operation.encoding
 type operation = {
   shell: Operation.shell_header ;
   contents: proto_operation ;
-  signature: Ed25519.Signature.t option ;
+  signature: Signature.t option ;
 }
 
 and proto_operation =
@@ -39,15 +39,15 @@ and anonymous_operation =
       bh1: Block_header_repr.t ;
       bh2: Block_header_repr.t ;
     }
-  | Faucet of {
+  | Activation of {
       id: Ed25519.Public_key_hash.t ;
-      nonce: MBytes.t ;
+      secret: Blinded_public_key_hash.secret ;
     }
 
 and sourced_operations =
   | Consensus_operation of consensus_operation
   | Amendment_operation of {
-      source: Ed25519.Public_key_hash.t ;
+      source: Signature.Public_key_hash.t ;
       operation: amendment_operation ;
     }
   | Manager_operations of {
@@ -77,21 +77,21 @@ and amendment_operation =
     }
 
 and manager_operation =
-  | Reveal of Ed25519.Public_key.t
+  | Reveal of Signature.Public_key.t
   | Transaction of {
       amount: Tez_repr.tez ;
       parameters: Script_repr.expr option ;
       destination: Contract_repr.contract ;
     }
   | Origination of {
-      manager: Ed25519.Public_key_hash.t ;
-      delegate: Ed25519.Public_key_hash.t option ;
+      manager: Signature.Public_key_hash.t ;
+      delegate: Signature.Public_key_hash.t option ;
       script: Script_repr.t option ;
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
     }
-  | Delegation of Ed25519.Public_key_hash.t option
+  | Delegation of Signature.Public_key_hash.t option
 
 and dictator_operation =
   | Activate of Protocol_hash.t
@@ -106,7 +106,7 @@ module Encoding = struct
   let reveal_encoding =
     (obj2
        (req "kind" (constant "reveal"))
-       (req "public_key" Ed25519.Public_key.encoding))
+       (req "public_key" Signature.Public_key.encoding))
 
   let reveal_case tag =
     case tag reveal_encoding
@@ -134,11 +134,11 @@ module Encoding = struct
   let origination_encoding =
     (obj7
        (req "kind" (constant "origination"))
-       (req "managerPubkey" Ed25519.Public_key_hash.encoding)
+       (req "managerPubkey" Signature.Public_key_hash.encoding)
        (req "balance" Tez_repr.encoding)
        (opt "spendable" bool)
        (opt "delegatable" bool)
-       (opt "delegate" Ed25519.Public_key_hash.encoding)
+       (opt "delegate" Signature.Public_key_hash.encoding)
        (opt "script" Script_repr.encoding))
 
   let origination_case tag =
@@ -160,7 +160,7 @@ module Encoding = struct
   let delegation_encoding =
     (obj2
        (req "kind" (constant "delegation"))
-       (opt "delegate" Ed25519.Public_key_hash.encoding))
+       (opt "delegate" Signature.Public_key_hash.encoding))
 
   let delegation_case tag =
     case tag delegation_encoding
@@ -247,7 +247,7 @@ module Encoding = struct
 
   let amendment_kind_encoding =
     merge_objs
-      (obj1 (req "source" Ed25519.Public_key_hash.encoding))
+      (obj1 (req "source" Signature.Public_key_hash.encoding))
       (union [
           proposal_case (Tag 0) ;
           ballot_case (Tag 1) ;
@@ -342,19 +342,19 @@ module Encoding = struct
       )
       (fun ((), bh1, bh2) -> Double_baking_evidence { bh1 ; bh2 })
 
-  let faucet_encoding =
+  let activation_encoding =
     (obj3
-       (req "kind" (constant "faucet"))
-       (req "id" Ed25519.Public_key_hash.encoding)
-       (req "nonce" (Fixed.bytes 16)))
+       (req "kind" (constant "activation"))
+       (req "pkh" Ed25519.Public_key_hash.encoding)
+       (req "secret" Blinded_public_key_hash.secret_encoding))
 
-  let faucet_case tag =
-    case tag faucet_encoding
+  let activation_case tag =
+    case tag activation_encoding
       (function
-        | Faucet { id ; nonce } -> Some ((), id, nonce)
+        | Activation { id ; secret } -> Some ((), id, secret)
         | _ -> None
       )
-      (fun ((), id, nonce) -> Faucet { id ; nonce })
+      (fun ((), id, secret) -> Activation { id ; secret })
 
   let unsigned_operation_case tag op_encoding =
     case tag
@@ -365,7 +365,7 @@ module Encoding = struct
                    seed_nonce_revelation_case (Tag 0) ;
                    double_endorsement_evidence_case (Tag 1) op_encoding ;
                    double_baking_evidence_case (Tag 2) ;
-                   faucet_case (Tag 3) ;
+                   activation_case (Tag 3) ;
                  ]))))
       (function Anonymous_operations ops -> Some ops | _ -> None)
       (fun ops -> Anonymous_operations ops)
@@ -379,7 +379,7 @@ module Encoding = struct
   let mu_signed_proto_operation_encoding op_encoding =
     merge_objs
       (mu_proto_operation_encoding op_encoding)
-      (obj1 (varopt "signature" Ed25519.Signature.encoding))
+      (obj1 (varopt "signature" Signature.encoding))
 
   let operation_encoding =
     mu "operation"
@@ -476,7 +476,7 @@ let check_signature key { shell ; contents ; signature } =
       fail Missing_signature
   | Sourced_operations _, Some signature ->
       let unsigned_operation = forge shell contents in
-      if Ed25519.Signature.check key signature unsigned_operation then
+      if Signature.check key signature unsigned_operation then
         return ()
       else
         fail Invalid_signature

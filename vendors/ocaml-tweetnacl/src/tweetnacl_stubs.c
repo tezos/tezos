@@ -7,41 +7,7 @@ typedef unsigned long u32;
 typedef unsigned long long u64;
 typedef long long i64;
 typedef i64 gf[16];
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-
-/* it's really stupid that there isn't a syscall for this */
-
-static int fd = -1;
-
-void randombytes(u8 *x,u64 xlen)
-{
-  int i;
-
-  if (fd == -1) {
-    for (;;) {
-      fd = open("/dev/urandom",O_RDONLY);
-      if (fd != -1) break;
-      sleep(1);
-    }
-  }
-
-  while (xlen > 0) {
-    if (xlen < 1048576) i = xlen; else i = 1048576;
-
-    i = read(fd,x,i);
-    if (i < 1) {
-      sleep(1);
-      continue;
-    }
-
-    x += i;
-    xlen -= i;
-  }
-}
+extern void randombytes(u8 *,u64);
 
 static const u8
   _0[16],
@@ -706,24 +672,6 @@ int crypto_sign_keypair(u8 *pk, u8 *sk)
   return 0;
 }
 
-int crypto_sign_keypair_seed(u8 *pk, u8 *sk)
-{
-  u8 d[64];
-  gf p[4];
-  int i;
-
-  crypto_hash(d, sk, 32);
-  d[0] &= 248;
-  d[31] &= 127;
-  d[31] |= 64;
-
-  scalarbase(p,d);
-  pack(pk,p);
-
-  FOR(i,32) sk[32 + i] = pk[i];
-  return 0;
-}
-
 static const u64 L[32] = {0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10};
 
 sv modL(u8 *r,i64 x[64])
@@ -792,36 +740,6 @@ int crypto_sign(u8 *sm,u64 *smlen,const u8 *m,u64 n,const u8 *sk)
   return 0;
 }
 
-int crypto_sign_extended(u8 *sm,u64 *smlen,const u8 *m,u64 n,const u8 *d)
-{
-  u8 pk[32],h[64],r[64];
-  i64 i,j,x[64];
-  gf p[4];
-
-  scalarbase(p,d);
-  pack(pk,p);
-
-  *smlen = n+64;
-  FOR(i,n) sm[64 + i] = m[i];
-  FOR(i,32) sm[32 + i] = d[32 + i];
-
-  crypto_hash(r, sm+32, n+32);
-  reduce(r);
-  scalarbase(p,r);
-  pack(sm,p);
-
-  FOR(i,32) sm[i+32] = pk[i];
-  crypto_hash(h,sm,n + 64);
-  reduce(h);
-
-  FOR(i,64) x[i] = 0;
-  FOR(i,32) x[i] = (u64) r[i];
-  FOR(i,32) FOR(j,32) x[i+j] += h[i] * (u64) d[j];
-  modL(sm + 32,x);
-
-  return 0;
-}
-
 static int unpackneg(gf r[4],const u8 p[32])
 {
   gf t, chk, num, den, den2, den4, den6;
@@ -855,6 +773,125 @@ static int unpackneg(gf r[4],const u8 p[32])
   if (par25519(r[0]) == (p[31]>>7)) Z(r[0],gf0,r[0]);
 
   M(r[3],r[0],r[1]);
+  return 0;
+}
+
+int crypto_sign_open(u8 *m,u64 *mlen,const u8 *sm,u64 n,const u8 *pk)
+{
+  int i;
+  u8 t[32],h[64];
+  gf p[4],q[4];
+
+  *mlen = -1;
+  if (n < 64) return -1;
+
+  if (unpackneg(q,pk)) return -1;
+
+  FOR(i,n) m[i] = sm[i];
+  FOR(i,32) m[i+32] = pk[i];
+  crypto_hash(h,m,n);
+  reduce(h);
+  scalarmult(p,q,h);
+
+  scalarbase(q,sm + 32);
+  add(p,q);
+  pack(t,p);
+
+  n -= 64;
+  if (crypto_verify_32(sm, t)) {
+    FOR(i,n) m[i] = 0;
+    return -1;
+  }
+
+  FOR(i,n) m[i] = sm[i + 64];
+  *mlen = n;
+  return 0;
+}
+
+/*********************************************************************
+ * START OF CUSTOM C CODE
+ ********************************************************************/
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+/* it's really stupid that there isn't a syscall for this */
+
+static int fd = -1;
+
+void randombytes(u8 *x,u64 xlen)
+{
+  int i;
+
+  if (fd == -1) {
+    for (;;) {
+      fd = open("/dev/urandom",O_RDONLY);
+      if (fd != -1) break;
+      sleep(1);
+    }
+  }
+
+  while (xlen > 0) {
+    if (xlen < 1048576) i = xlen; else i = 1048576;
+
+    i = read(fd,x,i);
+    if (i < 1) {
+      sleep(1);
+      continue;
+    }
+
+    x += i;
+    xlen -= i;
+  }
+}
+
+int crypto_sign_keypair_seed(u8 *pk, u8 *sk)
+{
+  u8 d[64];
+  gf p[4];
+  int i;
+
+  crypto_hash(d, sk, 32);
+  d[0] &= 248;
+  d[31] &= 127;
+  d[31] |= 64;
+
+  scalarbase(p,d);
+  pack(pk,p);
+
+  FOR(i,32) sk[32 + i] = pk[i];
+  return 0;
+}
+
+int crypto_sign_extended(u8 *sm,u64 *smlen,const u8 *m,u64 n,const u8 *d)
+{
+  u8 pk[32],h[64],r[64];
+  i64 i,j,x[64];
+  gf p[4];
+
+  scalarbase(p,d);
+  pack(pk,p);
+
+  *smlen = n+64;
+  FOR(i,n) sm[64 + i] = m[i];
+  FOR(i,32) sm[32 + i] = d[32 + i];
+
+  crypto_hash(r, sm+32, n+32);
+  reduce(r);
+  scalarbase(p,r);
+  pack(sm,p);
+
+  FOR(i,32) sm[i+32] = pk[i];
+  crypto_hash(h,sm,n + 64);
+  reduce(h);
+
+  FOR(i,64) x[i] = 0;
+  FOR(i,32) x[i] = (u64) r[i];
+  FOR(i,32) FOR(j,32) x[i+j] += h[i] * (u64) d[j];
+  modL(sm + 32,x);
+
   return 0;
 }
 
@@ -894,37 +931,9 @@ static int unpack(gf r[4],const u8 p[32])
   return 0;
 }
 
-int crypto_sign_open(u8 *m,u64 *mlen,const u8 *sm,u64 n,const u8 *pk)
-{
-  int i;
-  u8 t[32],h[64];
-  gf p[4],q[4];
-
-  *mlen = -1;
-  if (n < 64) return -1;
-
-  if (unpackneg(q,pk)) return -1;
-
-  FOR(i,n) m[i] = sm[i];
-  FOR(i,32) m[i+32] = pk[i];
-  crypto_hash(h,m,n);
-  reduce(h);
-  scalarmult(p,q,h);
-
-  scalarbase(q,sm + 32);
-  add(p,q);
-  pack(t,p);
-
-  n -= 64;
-  if (crypto_verify_32(sm, t)) {
-    FOR(i,n) m[i] = 0;
-    return -1;
-  }
-
-  FOR(i,n) m[i] = sm[i + 64];
-  *mlen = n;
-  return 0;
-}
+/*********************************************************************
+ * START OF OCAML BINDINGS
+ ********************************************************************/
 
 #include <caml/mlvalues.h>
 #include <caml/bigarray.h>

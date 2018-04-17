@@ -219,8 +219,8 @@ module RPC = struct
       "BLockPrevaLidationPrevaLidationPrevaLidationPrZ4mr6"
 
   let get_validator node = function
-    | `Genesis | `Head _ | `Prevalidation -> node.mainchain_validator
-    | `Test_head _ | `Test_prevalidation ->
+    | `Genesis | `Head _ -> node.mainchain_validator
+    | `Test_head _ ->
         match Chain_validator.child node.mainchain_validator with
         | None -> raise Not_found
         | Some v -> v
@@ -239,76 +239,31 @@ module RPC = struct
             Lwt.return_none
       | _ -> Lwt.return_none
 
-  let read_valid_block node h =
-    State.read_block node.state h
+  let read_valid_block node h n =
+    State.read_block node.state ~pred:n h
 
-  let read_valid_block_exn node h =
-    State.read_block_exn node.state h
+  let read_valid_block_exn node h n =
+    State.read_block_exn node.state ~pred:n h
 
-  let rec predecessor chain_db n v =
-    if n <= 0 then
-      Lwt.return v
-    else
-      State.Block.predecessor v >>= function
-      | None -> Lwt.return v
-      | Some v -> predecessor chain_db (n-1) v
-
-  let block_info node (block: block) =
-    match block with
+  let get_block node = function
     | `Genesis ->
         let chain_state = Chain_validator.chain_state node.mainchain_validator in
-        Chain.genesis chain_state >>= convert
+        Chain.genesis chain_state
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
-        let chain_db = Chain_validator.chain_db validator in
         let chain_state = Chain_validator.chain_state validator in
         Chain.head chain_state >>= fun head ->
-        predecessor chain_db n head >>= convert
-    | `Hash h ->
-        read_valid_block_exn node h >>= convert
-    | ( `Prevalidation | `Test_prevalidation ) as block ->
-        let validator = get_validator node block in
-        let pv = Chain_validator.prevalidator validator in
-        let chain_state = Chain_validator.chain_state validator in
-        Chain.head chain_state >>= fun head ->
-        let head_header = State.Block.header head in
-        let head_hash = State.Block.hash head in
-        let head_chain_id = State.Block.chain_id head in
-        State.Block.context head >>= fun head_context ->
-        Context.get_protocol head_context >>= fun head_protocol ->
-        Prevalidator.context pv >>= function
-        | Error _ -> Lwt.fail Not_found
-        | Ok { context ; fitness } ->
-            Context.get_protocol context >>= fun protocol ->
-            Context.get_test_chain context >>= fun test_chain ->
-            let proto_level =
-              if Protocol_hash.equal protocol head_protocol then
-                head_header.shell.proto_level
-              else
-                ((head_header.shell.proto_level + 1) mod 256) in
-            let operations =
-              let pv_result, _ = Prevalidator.operations pv in
-              [ pv_result.applied ] in
-            Lwt.return
-              { hash = prevalidation_hash ;
-                level = Int32.succ head_header.shell.level ;
-                proto_level ;
-                predecessor = head_hash ;
-                fitness ;
-                timestamp = Prevalidator.timestamp pv ;
-                protocol ;
-                validation_passes = List.length operations ;
-                operations_hash =
-                  Operation_list_list_hash.compute
-                    (List.map
-                       (fun ops -> Operation_list_hash.compute (List.map fst ops))
-                       operations) ;
-                operations = Some operations ;
-                context = Context_hash.zero ;
-                protocol_data = MBytes.of_string "" ;
-                chain_id = head_chain_id ;
-                test_chain ;
-              }
+        if n = 0 then
+          Lwt.return head
+        else
+          read_valid_block_exn node (State.Block.hash head) n
+    | `Hash (hash, n) ->
+        read_valid_block node hash n >>= function
+        | None -> Lwt.fail Not_found
+        | Some b -> Lwt.return b
+
+  let block_info node (block: block) =
+    get_block node block >>= convert
 
   let rpc_context block : Tezos_protocol_environment_shell.rpc_context Lwt.t =
     let block_hash = State.Block.hash block in
@@ -322,150 +277,26 @@ module RPC = struct
     }
 
   let get_rpc_context node block =
-    match block with
-    | `Genesis ->
-        let chain_state = Chain_validator.chain_state node.mainchain_validator in
-        Chain.genesis chain_state >>= fun block ->
-        rpc_context block >>= fun ctxt ->
-        Lwt.return (Some ctxt)
-    | ( `Head n | `Test_head n ) as block ->
-        let validator = get_validator node block in
-        let chain_state = Chain_validator.chain_state validator in
-        let chain_db = Chain_validator.chain_db validator in
-        Chain.head chain_state >>= fun head ->
-        predecessor chain_db n head >>= fun block ->
-        rpc_context block >>= fun ctxt ->
-        Lwt.return (Some ctxt)
-    | `Hash hash-> begin
-        read_valid_block node hash >>= function
-        | None ->
-            Lwt.return_none
-        | Some block ->
-            rpc_context block >>= fun ctxt ->
-            Lwt.return (Some ctxt)
-      end
-    | ( `Prevalidation | `Test_prevalidation ) as block ->
-        let validator = get_validator node block in
-        let pv = Chain_validator.prevalidator validator in
-        let chain_state = Chain_validator.chain_state validator in
-        Chain.head chain_state >>= fun head ->
-        let head_header = State.Block.header head in
-        let head_hash = State.Block.hash head in
-        State.Block.context head >>= fun head_context ->
-        Context.get_protocol head_context >>= fun head_protocol ->
-        Prevalidator.context pv >>= function
-        | Error _ -> Lwt.fail Not_found
-        | Ok { context ; fitness } ->
-            Context.get_protocol context >>= fun protocol ->
-            let proto_level =
-              if Protocol_hash.equal protocol head_protocol then
-                head_header.shell.proto_level
-              else
-                ((head_header.shell.proto_level + 1) mod 256) in
-            let operation_hashes, operations =
-              let pv_result, _ = Prevalidator.operations pv in
-              [ List.map fst pv_result.applied ],
-              [ List.map snd pv_result.applied ] in
-            let operations_hash =
-              Operation_list_list_hash.compute
-                (List.map Operation_list_hash.compute operation_hashes) in
-            Lwt.return (Some {
-                Tezos_protocol_environment_shell.
-                block_hash = prevalidation_hash ;
-                block_header = {
-                  shell = {
-                    level = Int32.succ head_header.shell.level ;
-                    proto_level ;
-                    predecessor = head_hash ;
-                    timestamp = Prevalidator.timestamp pv ;
-                    validation_passes = List.length operation_hashes ;
-                    operations_hash ;
-                    fitness ;
-                    context = Context_hash.zero ;
-                  } ;
-                  protocol_data = MBytes.create 0 ;
-                } ;
-                operation_hashes = (fun () -> Lwt.return operation_hashes) ;
-                operations = (fun () -> Lwt.return operations) ;
-                context ;
-              })
+    Lwt.catch begin fun () ->
+      get_block node block >>= fun block ->
+      rpc_context block >>= fun ctxt ->
+      Lwt.return (Some ctxt)
+    end begin
+      fun _ -> Lwt.return None
+    end
 
   let operation_hashes node block =
-    match block with
-    | `Genesis -> Lwt.return []
-    | ( `Head n | `Test_head n ) as block ->
-        let validator = get_validator node block in
-        let chain_state = Chain_validator.chain_state validator in
-        let chain_db = Chain_validator.chain_db validator in
-        Chain.head chain_state >>= fun head ->
-        predecessor chain_db n head >>= fun block ->
-        State.Block.all_operation_hashes block
-    | (`Prevalidation | `Test_prevalidation) as block ->
-        let validator = get_validator node block in
-        let pv = Chain_validator.prevalidator validator in
-        let { Preapply_result.applied }, _ = Prevalidator.operations pv in
-        Lwt.return [List.map fst applied]
-    | `Hash hash ->
-        read_valid_block node hash >>= function
-        | None -> Lwt.return_nil
-        | Some block ->
-            State.Block.all_operation_hashes block
+    get_block node block >>= fun block ->
+    State.Block.all_operation_hashes block
 
   let operations node block =
-    match block with
-    | `Genesis -> Lwt.return []
-    | ( `Head n | `Test_head n ) as block ->
-        let validator = get_validator node block in
-        let chain_state = Chain_validator.chain_state validator in
-        let chain_db = Chain_validator.chain_db validator in
-        Chain.head chain_state >>= fun head ->
-        predecessor chain_db n head >>= fun block ->
-        State.Block.all_operations block
-    | (`Prevalidation | `Test_prevalidation) as block ->
-        let validator = get_validator node block in
-        let pv = Chain_validator.prevalidator validator in
-        let { Preapply_result.applied }, _ = Prevalidator.operations pv in
-        Lwt.return [List.map snd applied]
-    | `Hash hash ->
-        read_valid_block node hash >>= function
-        | None -> Lwt.return_nil
-        | Some block ->
-            State.Block.all_operations block
+    get_block node block >>= fun block ->
+    State.Block.all_operations block
 
-  let pending_operations node (block: block) =
-    match block with
-    | ( `Head 0 | `Prevalidation
-      | `Test_head 0 | `Test_prevalidation ) as block ->
-        let validator = get_validator node block in
-        let pv = Chain_validator.prevalidator validator in
-        Lwt.return (Prevalidator.operations pv)
-    | ( `Head n | `Test_head n ) as block ->
-        let validator = get_validator node block in
-        let prevalidator = Chain_validator.prevalidator validator in
-        let chain_state = Chain_validator.chain_state validator in
-        let chain_db = Chain_validator.chain_db validator in
-        Chain.head chain_state >>= fun head ->
-        predecessor chain_db n head >>= fun b ->
-        Prevalidator.pending ~block:b prevalidator >|= fun ops ->
-        Preapply_result.empty, ops
-    | `Genesis ->
-        let chain_state = Chain_validator.chain_state node.mainchain_validator in
-        let prevalidator =
-          Chain_validator.prevalidator node.mainchain_validator in
-        Chain.genesis chain_state >>= fun b ->
-        Prevalidator.pending ~block:b prevalidator >|= fun ops ->
-        Preapply_result.empty, ops
-    | `Hash h -> begin
-        get_validator_per_hash node h >>= function
-        | None ->
-            Lwt.return (Preapply_result.empty, Operation_hash.Map.empty)
-        | Some validator ->
-            let chain_state = Chain_validator.chain_state validator in
-            let prevalidator = Chain_validator.prevalidator validator in
-            State.Block.read_exn chain_state h >>= fun block ->
-            Prevalidator.pending ~block prevalidator >|= fun ops ->
-            Preapply_result.empty, ops
-      end
+  let pending_operations node =
+    let validator = get_validator node (`Head 0) in
+    let pv = Chain_validator.prevalidator validator in
+    Lwt.return (Prevalidator.operations pv)
 
   let protocols { state } =
     State.Protocol.list state >>= fun set ->
@@ -477,28 +308,7 @@ module RPC = struct
   let preapply
       node block
       ~timestamp ~protocol_data ~sort_operations:sort ops =
-    begin
-      match block with
-      | `Genesis ->
-          let chain_state = Chain_validator.chain_state node.mainchain_validator in
-          Chain.genesis chain_state >>= return
-      | ( `Head 0 | `Prevalidation
-        | `Test_head 0 | `Test_prevalidation ) as block ->
-          let validator = get_validator node block in
-          let chain_state = Chain_validator.chain_state validator in
-          Chain.head chain_state >>= return
-      | `Head n | `Test_head n as block -> begin
-          let validator = get_validator node block in
-          let chain_state = Chain_validator.chain_state validator in
-          let chain_db = Chain_validator.chain_db validator in
-          Chain.head chain_state >>= fun head ->
-          predecessor chain_db n head >>= return
-        end
-      | `Hash hash ->
-          read_valid_block node hash >>= function
-          | None -> Lwt.return (error_exn Not_found)
-          | Some data -> return data
-    end >>=? fun predecessor ->
+    get_block node block >>= fun predecessor ->
     Prevalidation.start_prevalidation
       ~protocol_data ~predecessor ~timestamp () >>=? fun validation_state ->
     let ops = List.map (List.map (fun x -> Operation.hash x, x)) ops in
@@ -525,7 +335,6 @@ module RPC = struct
         pred_shell_header.proto_level
       else
         ((pred_shell_header.proto_level + 1) mod 256) in
-    Context.commit ?message ~time:timestamp context >>= fun context ->
     let shell_header : Block_header.shell_header = {
       level = Int32.succ pred_shell_header.level ;
       proto_level ;
@@ -534,9 +343,22 @@ module RPC = struct
       validation_passes = List.length rs ;
       operations_hash ;
       fitness ;
-      context ;
+      context = Context_hash.zero ; (* place holder *)
     } in
-    return (shell_header, rs)
+    begin
+      if Protocol_hash.equal protocol pred_protocol then
+        return (context, message)
+      else
+        match Registered_protocol.get protocol with
+        | None ->
+            fail (Block_validator_errors.Unavailable_protocol
+                    { block = State.Block.hash predecessor ; protocol })
+        | Some (module NewProto) ->
+            NewProto.init context shell_header >>=? fun { context ; message ; _ } ->
+            return (context, message)
+    end >>=? fun (context, message) ->
+    Context.commit ?message ~time:timestamp context >>= fun context ->
+    return ({ shell_header with context }, rs)
 
   let complete node ?block str =
     match block with

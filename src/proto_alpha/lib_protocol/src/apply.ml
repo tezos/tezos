@@ -20,7 +20,7 @@ type error += Invalid_commitment of { expected: bool }
 
 type error += Invalid_double_endorsement_evidence (* `Permanent *)
 type error += Inconsistent_double_endorsement_evidence
-  of { delegate1: Ed25519.Public_key_hash.t ; delegate2: Ed25519.Public_key_hash.t } (* `Permanent *)
+  of { delegate1: Signature.Public_key_hash.t ; delegate2: Signature.Public_key_hash.t } (* `Permanent *)
 type error += Unrequired_double_endorsement_evidence (* `Branch*)
 type error += Too_early_double_endorsement_evidence
   of { level: Raw_level.t ; current: Raw_level.t } (* `Temporary *)
@@ -30,13 +30,14 @@ type error += Outdated_double_endorsement_evidence
 type error += Invalid_double_baking_evidence
   of { level1: Int32.t ; level2: Int32.t } (* `Permanent *)
 type error += Inconsistent_double_baking_evidence
-  of { delegate1: Ed25519.Public_key_hash.t ; delegate2: Ed25519.Public_key_hash.t } (* `Permanent *)
+  of { delegate1: Signature.Public_key_hash.t ; delegate2: Signature.Public_key_hash.t } (* `Permanent *)
 type error += Unrequired_double_baking_evidence (* `Branch*)
 type error += Too_early_double_baking_evidence
   of { level: Raw_level.t ; current: Raw_level.t } (* `Temporary *)
 type error += Outdated_double_baking_evidence
   of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
-
+type error += Invalid_activation of { pkh : Ed25519.Public_key_hash.t }
+type error += Wrong_activation_secret
 
 let () =
   register_error_kind
@@ -135,11 +136,11 @@ let () =
         Format.fprintf ppf
           "Inconsistent double-endorsement evidence \
           \ (distinct delegate: %a and %a)"
-          Ed25519.Public_key_hash.pp_short delegate1
-          Ed25519.Public_key_hash.pp_short delegate2)
+          Signature.Public_key_hash.pp_short delegate1
+          Signature.Public_key_hash.pp_short delegate2)
     Data_encoding.(obj2
-                     (req "delegate1" Ed25519.Public_key_hash.encoding)
-                     (req "delegate2" Ed25519.Public_key_hash.encoding))
+                     (req "delegate1" Signature.Public_key_hash.encoding)
+                     (req "delegate2" Signature.Public_key_hash.encoding))
     (function
       | Inconsistent_double_endorsement_evidence { delegate1 ; delegate2 } ->
           Some (delegate1, delegate2)
@@ -225,11 +226,11 @@ let () =
         Format.fprintf ppf
           "Inconsistent double-baking evidence \
           \ (distinct delegate: %a and %a)"
-          Ed25519.Public_key_hash.pp_short delegate1
-          Ed25519.Public_key_hash.pp_short delegate2)
+          Signature.Public_key_hash.pp_short delegate1
+          Signature.Public_key_hash.pp_short delegate2)
     Data_encoding.(obj2
-                     (req "delegate1" Ed25519.Public_key_hash.encoding)
-                     (req "delegate2" Ed25519.Public_key_hash.encoding))
+                     (req "delegate1" Signature.Public_key_hash.encoding)
+                     (req "delegate2" Signature.Public_key_hash.encoding))
     (function
       | Inconsistent_double_baking_evidence { delegate1 ; delegate2 } ->
           Some (delegate1, delegate2)
@@ -287,7 +288,32 @@ let () =
           Some (level, last)
       | _ -> None)
     (fun (level, last) ->
-       Outdated_double_baking_evidence { level ; last })
+       Outdated_double_baking_evidence { level ; last }) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.invalid_activation"
+    ~title:"Invalid activation"
+    ~description:"The given key has already been activated or the given \
+                  key does not correspond to any preallocated contract"
+    ~pp:(fun ppf pkh ->
+        Format.fprintf ppf "Invalid activation. The public key %a does \
+                            not match any commitment."
+          Ed25519.Public_key_hash.pp pkh
+      )
+    Data_encoding.(obj1 (req "pkh" Ed25519.Public_key_hash.encoding))
+    (function Invalid_activation { pkh } -> Some pkh | _ -> None)
+    (fun pkh -> Invalid_activation { pkh } ) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.wrong_activation_secret"
+    ~title:"Wrong activation secret"
+    ~description:"The submitted activation key does not match the \
+                  registered key."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Wrong activation secret.")
+    Data_encoding.unit
+    (function Wrong_activation_secret -> Some () | _ -> None)
+    (fun () -> Wrong_activation_secret)
 
 let apply_consensus_operation_content ctxt
     pred_block block_priority operation = function
@@ -311,10 +337,10 @@ let apply_consensus_operation_content ctxt
         ctxt slots >>=? fun ctxt ->
       Baking.check_endorsements_rights ctxt lvl slots >>=? fun delegate ->
       Operation.check_signature delegate operation >>=? fun () ->
-      let delegate = Ed25519.Public_key.hash delegate in
+      let delegate = Signature.Public_key.hash delegate in
       let ctxt = Fitness.increase ~gap:(List.length slots) ctxt in
       Baking.freeze_endorsement_deposit ctxt delegate >>=? fun ctxt ->
-      Baking.endorsement_reward ~block_priority >>=? fun reward ->
+      Baking.endorsement_reward ctxt ~block_priority >>=? fun reward ->
       Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
       return ctxt
 
@@ -431,6 +457,7 @@ let apply_sourced_operation
       Contract.check_counter_increment ctxt source counter >>=? fun () ->
       Contract.increment_counter ctxt source >>=? fun ctxt ->
       Contract.spend ctxt source fee >>=? fun ctxt ->
+      add_fees ctxt fee >>=? fun ctxt ->
       fold_left_s (fun (ctxt, origination_nonce, err) content ->
           match err with
           | Some _ -> return (ctxt, origination_nonce, err)
@@ -440,38 +467,40 @@ let apply_sourced_operation
                 ctxt origination_nonce source content)
         (ctxt, origination_nonce, None) contents
       >>=? fun (ctxt, origination_nonce, err) ->
-      return (ctxt, origination_nonce, err, fee, Tez.zero)
+      return (ctxt, origination_nonce, err)
   | Consensus_operation content ->
       apply_consensus_operation_content ctxt
         pred_block block_prio operation content >>=? fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
+      return (ctxt, origination_nonce, None)
   | Amendment_operation { source ; operation = content } ->
       Roll.delegate_pubkey ctxt source >>=? fun delegate ->
       Operation.check_signature delegate operation >>=? fun () ->
       (* TODO, see how to extract the public key hash after this operation to
          pass it to apply_delegate_operation_content *)
       apply_amendment_operation_content ctxt source content >>=? fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
+      return (ctxt, origination_nonce, None)
   | Dictator_operation (Activate hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       activate ctxt hash >>= fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
+      return (ctxt, origination_nonce, None)
   | Dictator_operation (Activate_testchain hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       let expiration = (* in two days maximum... *)
         Time.add (Timestamp.current ctxt) (Int64.mul 48L 3600L) in
       fork_test_chain ctxt hash expiration >>= fun ctxt ->
-      return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
+      return (ctxt, origination_nonce, None)
 
-let apply_anonymous_operation ctxt delegate origination_nonce kind =
+let apply_anonymous_operation ctxt _delegate origination_nonce kind =
   match kind with
   | Seed_nonce_revelation { level ; nonce } ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
-      return (ctxt, origination_nonce,
-              Tez.zero, Constants.seed_nonce_revelation_tip)
+      let seed_nonce_revelation_tip =
+        Constants.seed_nonce_revelation_tip ctxt in
+      add_rewards ctxt seed_nonce_revelation_tip >>=? fun ctxt ->
+      return (ctxt, origination_nonce)
   | Double_endorsement_evidence { op1 ; op2 } -> begin
       match op1.contents, op2.contents with
       | Sourced_operations (Consensus_operation (Endorsements e1)),
@@ -497,11 +526,11 @@ let apply_anonymous_operation ctxt delegate origination_nonce kind =
           Baking.check_endorsements_rights ctxt level e2.slots >>=? fun delegate2 ->
           Operation.check_signature delegate2 op2 >>=? fun () ->
           fail_unless
-            (Ed25519.Public_key.equal delegate1 delegate2)
+            (Signature.Public_key.equal delegate1 delegate2)
             (Inconsistent_double_endorsement_evidence
-               { delegate1 = Ed25519.Public_key.hash delegate1 ;
-                 delegate2 = Ed25519.Public_key.hash delegate2 }) >>=? fun () ->
-          let delegate = Ed25519.Public_key.hash delegate1 in
+               { delegate1 = Signature.Public_key.hash delegate1 ;
+                 delegate2 = Signature.Public_key.hash delegate2 }) >>=? fun () ->
+          let delegate = Signature.Public_key.hash delegate1 in
           Delegate.has_frozen_balance ctxt delegate level.cycle >>=? fun valid ->
           fail_unless valid Unrequired_double_endorsement_evidence >>=? fun () ->
           Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, burned) ->
@@ -509,7 +538,8 @@ let apply_anonymous_operation ctxt delegate origination_nonce kind =
             match Tez.(burned /? 2L) with
             | Ok v -> v
             | Error _ -> Tez.zero in
-          return (ctxt, origination_nonce, Tez.zero, reward)
+          add_rewards ctxt reward >>=? fun ctxt ->
+          return (ctxt, origination_nonce)
       | _, _ -> fail Invalid_double_endorsement_evidence
     end
   | Double_baking_evidence { bh1 ; bh2 } ->
@@ -535,11 +565,11 @@ let apply_anonymous_operation ctxt delegate origination_nonce kind =
         ctxt level ~priority:bh2.protocol_data.priority >>=? fun delegate2 ->
       Baking.check_signature bh2 delegate2 >>=? fun () ->
       fail_unless
-        (Ed25519.Public_key.equal delegate1 delegate2)
+        (Signature.Public_key.equal delegate1 delegate2)
         (Inconsistent_double_baking_evidence
-           { delegate1 = Ed25519.Public_key.hash delegate1 ;
-             delegate2 = Ed25519.Public_key.hash delegate2 }) >>=? fun () ->
-      let delegate = Ed25519.Public_key.hash delegate1 in
+           { delegate1 = Signature.Public_key.hash delegate1 ;
+             delegate2 = Signature.Public_key.hash delegate2 }) >>=? fun () ->
+      let delegate = Signature.Public_key.hash delegate1 in
       Delegate.has_frozen_balance ctxt delegate level.cycle >>=? fun valid ->
       fail_unless valid Unrequired_double_baking_evidence >>=? fun () ->
       Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, burned) ->
@@ -547,13 +577,20 @@ let apply_anonymous_operation ctxt delegate origination_nonce kind =
         match Tez.(burned /? 2L) with
         | Ok v -> v
         | Error _ -> Tez.zero in
-      return (ctxt, origination_nonce, Tez.zero, reward)
-  | Faucet { id = manager ; _ } ->
-      Contract.originate ctxt
-        origination_nonce
-        ~manager ~delegate ~balance:Constants.faucet_credit ?script:None
-        ~spendable:true ~delegatable:true >>=? fun (ctxt, _, origination_nonce) ->
-      return (ctxt, origination_nonce, Tez.zero, Tez.zero)
+      add_rewards ctxt reward >>=? fun ctxt ->
+      return (ctxt, origination_nonce)
+  | Activation { id = pkh ; secret } ->
+      let h_pkh = Unclaimed_public_key_hash.of_ed25519_pkh pkh in
+      Commitment.get_opt ctxt h_pkh >>=? function
+      | None -> fail (Invalid_activation { pkh })
+      | Some { blinded_public_key_hash = blinded_pkh ; amount } ->
+          let submitted_bpkh = Blinded_public_key_hash.of_ed25519_pkh secret pkh in
+          fail_unless
+            Blinded_public_key_hash.(blinded_pkh = submitted_bpkh)
+            Wrong_activation_secret >>=? fun () ->
+          Commitment.delete ctxt h_pkh >>=? fun ctxt ->
+          Contract.(credit ctxt (implicit_contract (Signature.Ed25519 pkh)) amount) >>=? fun ctxt ->
+          return (ctxt, origination_nonce)
 
 let apply_operation
     ctxt delegate pred_block block_prio hash operation =
@@ -561,24 +598,17 @@ let apply_operation
   | Anonymous_operations ops ->
       let origination_nonce = Contract.initial_origination_nonce hash in
       fold_left_s
-        (fun (ctxt, origination_nonce, fees, rewards) op ->
-           apply_anonymous_operation ctxt delegate origination_nonce op
-           >>=? fun (ctxt, origination_nonce, fee, reward) ->
-           return (ctxt, origination_nonce,
-                   fees >>? Tez.(+?) fee,
-                   rewards >>? Tez.(+?) reward))
-        (ctxt, origination_nonce, Ok Tez.zero, Ok Tez.zero) ops
-      >>=? fun (ctxt, origination_nonce, fees, rewards) ->
-      return (ctxt, Contract.originated_contracts origination_nonce, None,
-              fees, rewards)
+        (fun (ctxt, origination_nonce) op ->
+           apply_anonymous_operation ctxt delegate origination_nonce op)
+        (ctxt, origination_nonce) ops
+      >>=? fun (ctxt, origination_nonce) ->
+      return (ctxt, Contract.originated_contracts origination_nonce, None)
   | Sourced_operations op ->
       let origination_nonce = Contract.initial_origination_nonce hash in
       apply_sourced_operation
         ctxt pred_block block_prio
-        operation origination_nonce op >>=? fun (ctxt, origination_nonce, err,
-                                                 fees, rewards) ->
-      return (ctxt, Contract.originated_contracts origination_nonce, err,
-              Ok fees, Ok rewards)
+        operation origination_nonce op >>=? fun (ctxt, origination_nonce, err) ->
+      return (ctxt, Contract.originated_contracts origination_nonce, err)
 
 let may_snapshot_roll ctxt =
   let level = Alpha_context.Level.current ctxt in
@@ -607,7 +637,7 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
        protocol_data) >>=? fun protocol_data ->
   Baking.check_baking_rights
     ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
-  let delegate_pkh = Ed25519.Public_key.hash delegate_pk in
+  let delegate_pkh = Signature.Public_key.hash delegate_pk in
   Baking.freeze_baking_deposit ctxt protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, protocol_data, delegate_pk, deposit)
@@ -631,16 +661,19 @@ let begin_application ctxt block_header pred_timestamp =
     Compare.Bool.(has_commitment = current_level.expected_commitment)
     (Invalid_commitment
        { expected = current_level.expected_commitment }) >>=? fun () ->
-  let delegate_pkh = Ed25519.Public_key.hash delegate_pk in
+  let delegate_pkh = Signature.Public_key.hash delegate_pk in
   Baking.freeze_baking_deposit ctxt
     block_header.protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, delegate_pk, deposit)
 
-let finalize_application ctxt protocol_data delegate deposit fees rewards =
+let finalize_application ctxt protocol_data delegate deposit =
+  let block_reward = Constants.block_reward ctxt in
+  add_rewards ctxt block_reward >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
-  Lwt.return Tez.(rewards +? Constants.block_reward) >>=? fun rewards ->
+  let fees = Alpha_context.get_fees ctxt in
   Delegate.freeze_fees ctxt delegate fees >>=? fun ctxt ->
+  let rewards = Alpha_context.get_rewards ctxt in
   Delegate.freeze_rewards ctxt delegate rewards >>=? fun ctxt ->
   begin
     match protocol_data.Block_header.seed_nonce_hash with

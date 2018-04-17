@@ -14,7 +14,7 @@ let home =
   with Not_found -> "/root"
 
 let default_data_dir = home // ".tezos-node"
-let default_p2p_port = 19732
+let default_p2p_port = 9732
 let default_rpc_port = 8732
 
 type t = {
@@ -85,7 +85,7 @@ let default_p2p_limits : P2p.limits = {
 
 let default_p2p = {
   expected_pow = 24. ;
-  bootstrap_peers  = [ "52.47.156.43" ; "35.182.249.228" ; "13.231.173.142" ] ;
+  bootstrap_peers  = [ "bootstrap.tezos.net" ] ;
   listen_addr  = Some ("[::]:" ^ string_of_int default_p2p_port) ;
   closed  = false ;
   limits = default_p2p_limits ;

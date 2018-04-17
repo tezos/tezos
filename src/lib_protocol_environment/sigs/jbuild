@@ -9,8 +9,6 @@
     v1/array.mli
     v1/list.mli
     v1/string.mli
-    v1/set.mli
-    v1/map.mli
     v1/int32.mli
     v1/int64.mli
     v1/format.mli
@@ -38,8 +36,12 @@
 
     v1/base58.mli
     v1/s.mli
+    v1/set.mli
+    v1/map.mli
     v1/blake2B.mli
     v1/ed25519.mli
+    v1/secp256k1.mli
+    v1/signature.mli
     v1/block_hash.mli
     v1/operation_hash.mli
     v1/operation_list_hash.mli

@@ -23,28 +23,8 @@ type parsed =
 let expand_all source ast errors =
   let unexpanded, loc_table =
     extract_locations ast in
-  let rec error_map (expanded, errors) f = function
-    | [] -> (List.rev expanded, List.rev errors)
-    | hd :: tl ->
-        let (new_expanded, new_errors) = f hd in
-        error_map
-          (new_expanded :: expanded, List.rev_append new_errors errors)
-          f tl in
-  let error_map = error_map ([], []) in
-  let rec expand expr =
-    match Michelson_v1_macros.expand expr with
-    | Ok expanded ->
-        begin
-          match expanded with
-          | Seq (loc, items, annot) ->
-              let items, errors = error_map expand items in
-              (Seq (loc, items, annot), errors)
-          | Prim (loc, name, args, annot) ->
-              let args, errors = error_map expand args in
-              (Prim (loc, name, args, annot), errors)
-          | Int _ | String _ as atom -> (atom, []) end
-    | Error errors -> (expr, errors) in
-  let expanded, expansion_errors = expand (root unexpanded) in
+  let expanded, expansion_errors =
+    Michelson_v1_macros.expand_rec (root unexpanded) in
   let expanded, unexpansion_table =
     extract_locations expanded in
   let expansion_table =
@@ -76,7 +56,7 @@ let expand_all source ast errors =
       { source ; unexpanded ;
         expanded = Micheline.strip_locations (Seq ((), [], None)) ;
         expansion_table ; unexpansion_table },
-      errs @ errors @ expansion_errors
+      errors @ expansion_errors @ errs
 
 let parse_toplevel ?check source =
   let tokens, lexing_errors = Micheline_parser.tokenize source in

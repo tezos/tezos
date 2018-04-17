@@ -5,6 +5,7 @@ src_dir="$(dirname "$test_dir")"
 cd "$test_dir"
 
 sandbox_file="$test_dir/sandbox.json"
+parameters_file="$test_dir/protocol_parameters.json"
 
 tezos_sandboxed_node="${1:-$test_dir/../../bin_node/tezos-sandboxed-node.sh}"
 local_node="${2:-$test_dir/../../../_build/default/src/bin_node/main.exe}"
@@ -34,7 +35,7 @@ register_log() {
     log_files+=("$1")
 }
 
-show_logs=yes
+show_logs="${show_logs:-yes}"
 
 display_logs() {
     if [ "$show_logs" = "yes" ]; then
@@ -121,6 +122,7 @@ assert_balance () {
     local KEY="$1"
     local EXPECTED_BALANCE="$2"
     local RESULT=$($client get balance for ${KEY})
+    echo "[Asserting balance for '$KEY']"
     if [ "${RESULT}" != "${EXPECTED_BALANCE}" ]; then
         printf "Balance assertion failed for ${KEY} on line '%s'. Expected %s but got %s.\n" \
                "$(caller)" "${EXPECTED_BALANCE}" "${RESULT}"
@@ -149,6 +151,15 @@ init_with_transfer () {
     $client originate contract ${NAME} \
             for ${KEY} transferring "${TRANSFER_AMT}" \
             from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}"
+    $client bake for bootstrap1 -max-priority 512
+    sleep 1
+}
+
+
+bake_after () {
+    "$@"
+    $client bake for bootstrap1 -max-priority 512
+    sleep 1
 }
 
 # Takes a grep regexp and fails with an error message if command does not include

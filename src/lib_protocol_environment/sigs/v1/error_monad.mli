@@ -29,6 +29,19 @@ val error_encoding : error Data_encoding.t
 val json_of_error : error -> Data_encoding.json
 val error_of_json : Data_encoding.json -> error
 
+(** Error information *)
+type error_info =
+  { category : error_category ;
+    id: string ;
+    title : string ;
+    description : string ;
+    schema : Data_encoding.json_schema }
+
+val pp_info: Format.formatter -> error_info -> unit
+
+(** Retrieves information of registered errors *)
+val get_registered_errors : unit -> error_info list
+
 (** For other modules to register specialized error serializers *)
 val register_error_kind :
   error_category ->

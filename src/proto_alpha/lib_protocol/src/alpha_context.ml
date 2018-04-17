@@ -49,10 +49,10 @@ module Script = struct
   include Michelson_v1_primitives
   include Script_repr
 end
-type public_key = Ed25519.Public_key.t
-type public_key_hash = Ed25519.Public_key_hash.t
-type secret_key = Ed25519.Secret_key.t
-type signature = Ed25519.Signature.t
+
+type public_key = Signature.Public_key.t
+type public_key_hash = Signature.Public_key_hash.t
+type signature  = Signature.t
 
 module Constants = struct
   include Constants_repr
@@ -79,7 +79,6 @@ module Seed = struct
   include Seed_repr
   include Seed_storage
 end
-module Bootstrap = Bootstrap_storage
 
 module Fitness = struct
 
@@ -90,7 +89,13 @@ module Fitness = struct
 
 end
 
-let init = Init_storage.may_initialize
+module Commitment = struct
+  include Commitment_repr
+  include Commitment_storage
+end
+
+let prepare_first_block = Init_storage.prepare_first_block
+let prepare = Init_storage.prepare
 
 let finalize ?commit_message:message c =
   let fitness = Fitness.from_int64 (Fitness.current c) in
@@ -102,10 +107,14 @@ let finalize ?commit_message:message c =
       Raw_level.to_int32 @@ Level.last_allowed_fork_level c;
   }
 
-let configure_sandbox = Raw_context.configure_sandbox
-
 let activate = Raw_context.activate
 let fork_test_chain = Raw_context.fork_test_chain
 
 let endorsement_already_recorded = Raw_context.endorsement_already_recorded
 let record_endorsement = Raw_context.record_endorsement
+
+let add_fees = Raw_context.add_fees
+let add_rewards = Raw_context.add_rewards
+
+let get_fees = Raw_context.get_fees
+let get_rewards = Raw_context.get_rewards

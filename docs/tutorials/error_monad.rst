@@ -217,7 +217,7 @@ used several times in the Tezos codebase.
 Putting ``Lwt.t`` in the mix
 ----------------------------
 
-Tezos uses the `Lwt library <http://ocsigen.org/lwt/>`__ for threading.
+Tezos uses the `Lwt library <https://ocsigen.org/lwt/3.2.1/manual/manual>`__ for threading.
 The Lwt monad is mixed in with the error monad module. This requires us
 to add some extra combinators and reexport some functions from Lwt.
 

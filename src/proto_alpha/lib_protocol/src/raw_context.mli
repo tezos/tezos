@@ -17,7 +17,8 @@ type storage_error =
   | Corrupted_data of string list
 
 type error += Storage_error of storage_error
-type error += Failed_to_parse_sandbox_parameter of MBytes.t
+type error += Failed_to_parse_parameter of MBytes.t
+type error += Failed_to_decode_parameter of Data_encoding.json * string
 
 val storage_error: storage_error -> 'a tzresult Lwt.t
 
@@ -35,16 +36,19 @@ val prepare:
   level: Int32.t ->
   timestamp: Time.t ->
   fitness: Fitness.t ->
-  Context.t -> (context * bool) tzresult Lwt.t
+  Context.t -> context tzresult Lwt.t
+
+val prepare_first_block:
+  level:int32 ->
+  timestamp:Time.t ->
+  fitness:Fitness.t ->
+  Context.t -> (Parameters_repr.t * context) tzresult Lwt.t
 
 val activate: context -> Protocol_hash.t -> t Lwt.t
 val fork_test_chain: context -> Protocol_hash.t -> Time.t -> t Lwt.t
 
 val register_resolvers:
   'a Base58.encoding -> (context -> string -> 'a list Lwt.t) -> unit
-
-val configure_sandbox:
-  Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 
 (** Returns the state of the database resulting of operations on its
     abstract view *)
@@ -56,8 +60,14 @@ val current_timestamp: context -> Time.t
 val current_fitness: context -> Int64.t
 val set_current_fitness: context -> Int64.t -> t
 
-val constants: context -> Constants_repr.constants
+val constants: context -> Constants_repr.parametric
 val first_level: context -> Raw_level_repr.t
+
+val add_fees: context -> Tez_repr.t -> context tzresult Lwt.t
+val add_rewards: context -> Tez_repr.t -> context tzresult Lwt.t
+
+val get_fees: context -> Tez_repr.t
+val get_rewards: context -> Tez_repr.t
 
 (** {1 Generic accessors} *************************************************)
 
@@ -137,4 +147,3 @@ include T with type t := t and type context := context
 
 val record_endorsement: context -> int -> context
 val endorsement_already_recorded: context -> int -> bool
-

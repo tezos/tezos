@@ -8,11 +8,11 @@
 (**************************************************************************)
 
 let group =
-  { Cli_entries.name = "p2p" ;
+  { Clic.name = "p2p" ;
     title = "Commands for monitoring and controlling p2p-layer state" }
 
 let commands () = [
-  let open Cli_entries in
+  let open Clic in
   command ~group ~desc: "show global network status"
     no_options
     (prefixes ["p2p" ; "stat"] stop) begin fun () (cctxt : #Client_context.full) ->

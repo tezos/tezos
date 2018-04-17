@@ -92,32 +92,44 @@ let init_logger ?verbosity (log_config : Node_config_file.log) =
 
 let init_node ?sandbox (config : Node_config_file.t) =
   let patch_context json ctxt =
+    begin
+      match json with
+      | None -> Lwt.return ctxt
+      | Some json ->
+          Tezos_storage.Context.set ctxt
+            ["sandbox_parameter"]
+            (Data_encoding.Binary.to_bytes Data_encoding.json json)
+    end >>= fun ctxt ->
     let module Proto = (val Registered_protocol.get_exn genesis.protocol) in
-    protect begin fun () ->
-      Proto.configure_sandbox ctxt json
-    end >|= function
-    | Error err ->
-        warn
-          "@[Error while configuring ecoproto for the sandboxed mode:@ %a@]"
-          pp_print_error err ;
-        ctxt
-    | Ok ctxt -> ctxt in
+    Proto.init ctxt {
+      level = 0l ;
+      proto_level = 0 ;
+      predecessor = genesis.block ;
+      timestamp = genesis.time ;
+      validation_passes = 0 ;
+      operations_hash = Operation_list_list_hash.empty ;
+      fitness = [] ;
+      context = Context_hash.zero ;
+    } >>= function
+    | Error _ -> assert false (* FIXME error *)
+    | Ok { context = ctxt ; _ } ->
+        Lwt.return ctxt in
   begin
     match sandbox with
     | None -> Lwt.return_none
     | Some sandbox_param ->
         match sandbox_param with
-        | None -> Lwt.return (Some (patch_context None))
+        | None -> Lwt.return None
         | Some file ->
             Lwt_utils_unix.Json.read_file file >>= function
             | Error err ->
                 lwt_warn
                   "Can't parse sandbox parameters: %s" file >>= fun () ->
                 lwt_debug "%a" pp_print_error err >>= fun () ->
-                Lwt.return (Some (patch_context None))
+                Lwt.return None
             | Ok json ->
-                Lwt.return (Some (patch_context (Some json)))
-  end >>= fun patch_context ->
+                Lwt.return (Some json)
+  end >>= fun sandbox_param ->
   (* TODO "WARN" when pow is below our expectation. *)
   begin
     match config.p2p.listen_addr with
@@ -163,7 +175,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
   end >>=? fun p2p_config ->
   let node_config : Node.config = {
     genesis ;
-    patch_context ;
+    patch_context = Some (patch_context sandbox_param) ;
     store_root = store_dir config.data_dir ;
     context_root = context_dir config.data_dir ;
     p2p = p2p_config ;

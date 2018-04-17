@@ -227,6 +227,8 @@ module Json : sig
   val cannot_destruct : ('a, Format.formatter, unit, 'b) format4 -> 'a
   val wrap_error : ('a -> 'b) -> 'a -> 'b
 
+  val pp : Format.formatter -> json -> unit
+
 end
 
 module Binary : sig

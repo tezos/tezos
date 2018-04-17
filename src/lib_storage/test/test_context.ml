@@ -34,7 +34,7 @@ let commit = commit ~time:Time.epoch ~message:""
 
 let block2 =
   Block_hash.of_hex_exn
-    "2222222222222222222222222222222222222222222222222222222222222222"
+    (`Hex "2222222222222222222222222222222222222222222222222222222222222222")
 
 let create_block2 idx genesis_commit =
   checkout idx genesis_commit >>= function
@@ -48,7 +48,7 @@ let create_block2 idx genesis_commit =
 
 let block3a =
   Block_hash.of_hex_exn
-    "3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a"
+    (`Hex "3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a")
 
 let create_block3a idx block2_commit =
   checkout idx block2_commit >>= function
@@ -61,11 +61,11 @@ let create_block3a idx block2_commit =
 
 let block3b =
   Block_hash.of_hex_exn
-    "3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b"
+    (`Hex "3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b")
 
 let block3c =
   Block_hash.of_hex_exn
-    "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c"
+    (`Hex "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c")
 
 let create_block3b idx block2_commit =
   checkout idx block2_commit >>= function

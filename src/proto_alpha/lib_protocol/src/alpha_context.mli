@@ -17,10 +17,9 @@ end
 type t
 type context = t
 
-type public_key = Ed25519.Public_key.t
-type public_key_hash = Ed25519.Public_key_hash.t
-type secret_key = Ed25519.Secret_key.t
-type signature = Ed25519.Signature.t
+type public_key = Signature.Public_key.t
+type public_key_hash = Signature.Public_key_hash.t
+type signature = Signature.t
 
 module Tez : sig
 
@@ -28,6 +27,7 @@ module Tez : sig
   type tez = t
 
   val zero: tez
+  val one_mutez: tez
   val one_cent: tez
   val fifty_cents: tez
   val one: tez
@@ -243,27 +243,47 @@ module Script : sig
   val encoding: t Data_encoding.t
 end
 
-module Bootstrap : sig
-  type account = {
-    public_key_hash: public_key_hash ;
-    public_key: public_key ;
-  }
-  val accounts: context -> account list
-  val account_encoding: account Data_encoding.t
-end
-
 module Constants : sig
 
+  (** Fixed constants *)
+  type fixed = {
+    proof_of_work_nonce_size : int ;
+    nonce_length : int ;
+    max_revelations_per_block : int ;
+  }
+  val fixed_encoding: fixed Data_encoding.t
+  val fixed: fixed
+
   val proof_of_work_nonce_size: int
-  val block_reward: Tez.t
-  val endorsement_reward: Tez.t
   val nonce_length: int
-  val seed_nonce_revelation_tip: Tez.t
-  val origination_burn: Tez.t
-  val block_security_deposit: Tez.t
-  val endorsement_security_deposit: Tez.t
-  val faucet_credit: Tez.t
   val max_revelations_per_block: int
+
+
+  (** Constants parameterized by context *)
+  type parametric = {
+    preserved_cycles: int ;
+    blocks_per_cycle: int32 ;
+    blocks_per_commitment: int32 ;
+    blocks_per_roll_snapshot: int32 ;
+    blocks_per_voting_period: int32 ;
+    time_between_blocks: Period.t list ;
+    first_free_baking_slot: int ;
+    endorsers_per_block: int ;
+    max_gas: int ;
+    proof_of_work_threshold: int64 ;
+    dictator_pubkey: Signature.Public_key.t ;
+    max_operation_data_length: int ;
+    tokens_per_roll: Tez.t ;
+    michelson_maximum_type_size: int;
+    seed_nonce_revelation_tip: Tez.t ;
+    origination_burn: Tez.t ;
+    block_security_deposit: Tez.t ;
+    endorsement_security_deposit: Tez.t ;
+    block_reward: Tez.t ;
+    endorsement_reward: Tez.t ;
+  }
+  val parametric_encoding: parametric Data_encoding.t
+  val parametric: context -> parametric
 
   val preserved_cycles: context -> int
   val blocks_per_cycle: context -> int32
@@ -275,10 +295,22 @@ module Constants : sig
   val endorsers_per_block: context -> int
   val max_gas: context -> int
   val proof_of_work_threshold: context -> int64
-  val dictator_pubkey: context -> Ed25519.Public_key.t
+  val dictator_pubkey: context -> Signature.Public_key.t
   val max_operation_data_length: context -> int
   val tokens_per_roll: context -> Tez.t
   val michelson_maximum_type_size: context -> int
+  val block_reward: context -> Tez.t
+  val endorsement_reward: context -> Tez.t
+  val seed_nonce_revelation_tip: context -> Tez.t
+  val origination_burn: context -> Tez.t
+  val block_security_deposit: context -> Tez.t
+  val endorsement_security_deposit: context -> Tez.t
+
+  type t = {
+    fixed : fixed ;
+    parametric : parametric ;
+  }
+  val encoding: t Data_encoding.t
 
 end
 
@@ -574,7 +606,7 @@ module Block_header : sig
   type t = {
     shell: Block_header.shell_header ;
     protocol_data: protocol_data ;
-    signature: Ed25519.Signature.t ;
+    signature: Signature.t ;
   }
 
   and protocol_data = {
@@ -642,15 +674,15 @@ and anonymous_operation =
       bh1: Block_header.t ;
       bh2: Block_header.t ;
     }
-  | Faucet of {
+  | Activation of {
       id: Ed25519.Public_key_hash.t ;
-      nonce: MBytes.t ;
+      secret: Blinded_public_key_hash.secret ;
     }
 
 and sourced_operations =
   | Consensus_operation of consensus_operation
   | Amendment_operation of {
-      source: Ed25519.Public_key_hash.t ;
+      source: Signature.Public_key_hash.t ;
       operation: amendment_operation ;
     }
   | Manager_operations of {
@@ -680,7 +712,7 @@ and amendment_operation =
     }
 
 and manager_operation =
-  | Reveal of Ed25519.Public_key.t
+  | Reveal of Signature.Public_key.t
   | Transaction of {
       amount: Tez.t ;
       parameters: Script.expr option ;
@@ -753,19 +785,43 @@ module Roll : sig
 
 end
 
-val init:
+module Commitment : sig
+
+  type t =
+    { blinded_public_key_hash : Blinded_public_key_hash.t ;
+      amount : Tez.tez }
+
+  val get_opt:
+    context ->  Unclaimed_public_key_hash.t -> t option tzresult Lwt.t
+  val delete:
+    context ->  Unclaimed_public_key_hash.t -> context tzresult Lwt.t
+
+end
+
+val prepare_first_block:
   Context.t ->
   level:Int32.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
   context tzresult Lwt.t
-val finalize: ?commit_message:string -> context -> Updater.validation_result
 
-val configure_sandbox:
-  Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
+val prepare:
+  Context.t ->
+  level:Int32.t ->
+  timestamp:Time.t ->
+  fitness:Fitness.t ->
+  context tzresult Lwt.t
+
+val finalize: ?commit_message:string -> context -> Updater.validation_result
 
 val activate: context -> Protocol_hash.t -> context Lwt.t
 val fork_test_chain: context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
 val endorsement_already_recorded: context -> int -> bool
 val record_endorsement: context -> int -> context
+
+val add_fees: context -> Tez.t -> context tzresult Lwt.t
+val add_rewards: context -> Tez.t -> context tzresult Lwt.t
+
+val get_fees: context -> Tez.t
+val get_rewards: context -> Tez.t

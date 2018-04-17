@@ -10,7 +10,7 @@
 (* Tezos Command line interface - Generic JSON RPC interface *)
 
 open Lwt.Infix
-open Cli_entries
+open Clic
 open Json_schema
 
 (*-- Assisted, schema directed input fill in --------------------------------*)
@@ -424,7 +424,7 @@ let call_with_file_or_json url maybe_file (cctxt: #Client_context.full) =
   call_with_json url json cctxt
 
 let group =
-  { Cli_entries.name = "rpc" ;
+  { Clic.name = "rpc" ;
     title = "Commands for the low level RPC layer" }
 
 let commands = [

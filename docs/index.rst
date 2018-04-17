@@ -83,6 +83,8 @@ license when the main network lunches.
    README
    api/api-inline
    api/cli-commands
+   api/rpc
+   api/errors
 
 Indices and tables
 ==================

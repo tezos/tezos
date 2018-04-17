@@ -68,7 +68,7 @@ let test_endorsement_payment () =
     Proto_alpha.Baking.check_baking_rights
       result.tezos_context protocol_data root.tezos_header.shell.timestamp
     >>=? fun baker_pub ->
-    let baker_hpub = Ed25519.Public_key.hash baker_pub in
+    let baker_hpub = Signature.Public_key.hash baker_pub in
     let endorsement_security_deposit =
       Constants.endorsement_security_deposit in
     let baking = baker_hpub = contract_p.hpub && block_priority < 4 in

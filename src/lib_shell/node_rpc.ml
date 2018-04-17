@@ -13,29 +13,6 @@ let filter_bi operations (bi: Block_services.block_info)  =
   let bi = if operations then bi else { bi with operations = None } in
   bi
 
-let monitor_operations node contents =
-  let stream, stopper = Node.RPC.operation_watcher node in
-  let shutdown () = Lwt_watcher.shutdown stopper in
-  let first_request = ref true in
-  let next () =
-    if not !first_request then
-      Lwt_stream.get stream >>= function
-      | None -> Lwt.return_none
-      | Some (h, op) when contents -> Lwt.return (Some [[h, Some op]])
-      | Some (h, _) -> Lwt.return (Some [[h, None]])
-    else begin
-      first_request := false ;
-      Node.RPC.operation_hashes node `Prevalidation >>= fun hashes ->
-      if contents then
-        Node.RPC.operations node `Prevalidation >>= fun ops ->
-        Lwt.return_some @@
-        List.map2 (List.map2 (fun h op -> h, Some op)) hashes ops
-      else
-        Lwt.return_some @@
-        List.map (List.map (fun h -> h, None)) hashes
-    end in
-  RPC_answer.return_stream { next ; shutdown }
-
 let register_bi_dir node dir =
   let dir =
     let implementation b () include_ops =
@@ -100,29 +77,19 @@ let register_bi_dir node dir =
     RPC_directory.register1 dir
       Block_services.S.test_chain implementation in
   let dir =
-    let implementation b () { Block_services.S.contents ; monitor } =
-      match b with
-      | `Prevalidation when monitor ->
-          monitor_operations node contents
-      | _ ->
-          Node.RPC.operation_hashes node b >>= fun hashes ->
-          if contents then
-            Node.RPC.operations node b >>= fun ops ->
-            RPC_answer.return @@
-            List.map2 (List.map2 (fun h op -> h, Some op)) hashes ops
-          else
-            RPC_answer.return @@
-            List.map (List.map (fun h -> h, None)) hashes
+    let implementation b () { Block_services.S.contents } =
+      Node.RPC.operation_hashes node b >>= fun hashes ->
+      if contents then
+        Node.RPC.operations node b >>= fun ops ->
+        RPC_answer.return @@
+        List.map2 (List.map2 (fun h op -> h, Some op)) hashes ops
+      else
+        RPC_answer.return @@
+        List.map (List.map (fun h -> h, None)) hashes
     in
     RPC_directory.gen_register1 dir
       Block_services.S.operations implementation in
-  let dir =
-    let implementation b () () =
-      Node.RPC.pending_operations node b >>= fun res ->
-      return res in
-    RPC_directory.register1 dir
-      Block_services.S.pending_operations
-      implementation in
+
   let dir =
     let implementation
         b ()
@@ -498,7 +465,6 @@ let build_rpc_directory node =
              current_request = Peer_validator.current_request w }) in
 
   (* Workers : Net validators *)
-
   let dir  =
     RPC_directory.register0 dir Worker_services.Chain_validators.S.list
       (fun () () ->
@@ -519,8 +485,19 @@ let build_rpc_directory node =
   (* Network  *)
   let dir = RPC_directory.merge dir (Node.RPC.build_p2p_rpc_directory node) in
 
+  (* Mempool *)
+  let dir =
+    let implementation () () () =
+      Node.RPC.pending_operations node  >>= fun res ->
+      return res in
+    RPC_directory.register dir
+      Mempool_services.S.pending_operations
+      implementation in
+
   let dir =
     RPC_directory.register_describe_directory_service
       dir RPC_service.description_service in
 
+
   dir
+

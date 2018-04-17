@@ -34,7 +34,6 @@ let demo cctxt =
   return ()
 
 let bake cctxt =
-  let block = Block_services.last_baked_block cctxt.Client_commands.config.block in
   Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
   let fitness =
     match bi.fitness with
@@ -67,7 +66,7 @@ let handle_error cctxt = function
       cctxt.Client_commands.error "%s" "cannot continue"
 
 let commands () =
-  let open Cli_entries in
+  let open Clic in
   let group = {name = "demo" ; title = "Some demo command" } in
   [
     command ~group ~desc: "A demo command"

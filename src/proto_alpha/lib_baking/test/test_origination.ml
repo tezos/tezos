@@ -52,7 +52,7 @@ let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
   (* Change delegate of a non-delegatable contract *)
   let manager_sk = Client_keys.Secret_key_locator.create
       ~scheme:"unencrypted"
-      ~location:(Ed25519.Secret_key.to_b58check b1.sk) in
+      ~location:(Signature.Secret_key.to_b58check b1.sk) in
 
   Helpers.Account.set_delegate
     ~fee:(cents 5L)
@@ -78,7 +78,7 @@ let rpc_port = try int_of_string Sys.argv.(3) with _ -> 18200
 
 let main () =
   Helpers.init ~exe ~sandbox ~rpc_port () >>=? fun (_node_pid, genesis) ->
-  run (`Hash genesis) Helpers.Account.bootstrap_accounts >>=? fun _blkh ->
+  run (`Hash (genesis, 0)) Helpers.Account.bootstrap_accounts >>=? fun _blkh ->
   return ()
 
 let tests = [

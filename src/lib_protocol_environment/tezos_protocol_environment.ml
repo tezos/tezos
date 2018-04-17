@@ -93,8 +93,8 @@ module Make (Context : CONTEXT) = struct
     val finalize_block:
       validation_state -> validation_result tzresult Lwt.t
     val rpc_services: rpc_context Lwt.t RPC_directory.t
-    val configure_sandbox:
-      context -> Data_encoding.json option -> context tzresult Lwt.t
+    val init:
+      context -> Block_header.shell_header -> validation_result tzresult Lwt.t
   end
 
   module type PROTOCOL =
@@ -127,8 +127,13 @@ module Make (Context : CONTEXT) = struct
        and type 'a RPC_directory.t = 'a RPC_directory.t
        and type Ed25519.Public_key_hash.t = Ed25519.Public_key_hash.t
        and type Ed25519.Public_key.t = Ed25519.Public_key.t
-       and type Ed25519.Secret_key.t = Ed25519.Secret_key.t
-       and type Ed25519.Signature.t = Ed25519.Signature.t
+       and type Ed25519.t = Ed25519.t
+       and type Secp256k1.Public_key_hash.t = Secp256k1.Public_key_hash.t
+       and type Secp256k1.Public_key.t = Secp256k1.Public_key.t
+       and type Secp256k1.t = Secp256k1.t
+       and type Signature.public_key_hash = Signature.public_key_hash
+       and type Signature.public_key = Signature.public_key
+       and type Signature.t = Signature.t
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
@@ -137,7 +142,7 @@ module Make (Context : CONTEXT) = struct
        and type (+'m,'pr,'p,'q,'i,'o) RPC_service.t = ('m,'pr,'p,'q,'i,'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
 
-    type error += Ecoproto_error of Error_monad.error list
+    type error += Ecoproto_error of Error_monad.error
     val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
 
     module Lift (P : Updater.PROTOCOL) : PROTOCOL
@@ -188,35 +193,160 @@ module Make (Context : CONTEXT) = struct
     module Data_encoding = Data_encoding
     module Time = Time
     module Ed25519 = Ed25519
-    module S = Tezos_base.S
+    module Secp256k1 = Secp256k1
+    module Signature = Signature
+    module S = struct
+      module type T = Tezos_base.S.T
+      module type HASHABLE = Tezos_base.S.HASHABLE
+      module type MINIMAL_HASH = S.MINIMAL_HASH
+      module type B58_DATA = sig
+
+        type t
+
+        val to_b58check: t -> string
+        val to_short_b58check: t -> string
+
+        val of_b58check_exn: string -> t
+        val of_b58check_opt: string -> t option
+
+        type Base58.data += Data of t
+        val b58check_encoding: t Base58.encoding
+
+      end
+      module type RAW_DATA = sig
+        type t
+        val size: int (* in bytes *)
+        val to_bytes: t -> MBytes.t
+        val of_bytes_opt: MBytes.t -> t option
+        val of_bytes_exn: MBytes.t -> t
+      end
+      module type ENCODER = sig
+        type t
+        val encoding: t Data_encoding.t
+        val rpc_arg: t RPC_arg.t
+      end
+      module type SET = Tezos_base.S.SET
+      module type MAP = Tezos_base.S.MAP
+      module type INDEXES = sig
+
+        type t
+
+        val to_path: t -> string list -> string list
+        val of_path: string list -> t option
+        val of_path_exn: string list -> t
+
+        val prefix_path: string -> string list
+        val path_length: int
+
+        module Set : sig
+          include Set.S with type elt = t
+          val encoding: t Data_encoding.t
+        end
+
+        module Map : sig
+          include Map.S with type key = t
+          val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
+        end
+
+      end
+      module type HASH = sig
+        include MINIMAL_HASH
+        include RAW_DATA with type t := t
+        include B58_DATA with type t := t
+        include ENCODER with type t := t
+        include INDEXES with type t := t
+      end
+
+      module type MERKLE_TREE = sig
+        type elt
+        include HASH
+        val compute: elt list -> t
+        val empty: t
+        type path =
+          | Left of path * t
+          | Right of t * path
+          | Op
+        val compute_path: elt list -> int -> path
+        val check_path: path -> elt -> t * int
+        val path_encoding: path Data_encoding.t
+      end
+
+      module type SIGNATURE = sig
+
+        module Public_key_hash : sig
+
+          type t
+
+          val pp: Format.formatter -> t -> unit
+          val pp_short: Format.formatter -> t -> unit
+          include Compare.S with type t := t
+          include RAW_DATA with type t := t
+          include B58_DATA with type t := t
+          include ENCODER with type t := t
+          include INDEXES with type t := t
+
+        end
+
+        module Public_key : sig
+
+          type t
+
+          val pp: Format.formatter -> t -> unit
+          include Compare.S with type t := t
+          include B58_DATA with type t := t
+          include ENCODER with type t := t
+
+          val hash: t -> Public_key_hash.t
+
+        end
+
+        type t
+
+        val pp: Format.formatter -> t -> unit
+        include RAW_DATA with type t := t
+        include Compare.S with type t := t
+        include B58_DATA with type t := t
+        include ENCODER with type t := t
+
+        val zero: t
+
+        (** Check a signature *)
+        val check: Public_key.t -> t -> MBytes.t -> bool
+
+        val concat: MBytes.t -> t -> MBytes.t
+
+      end
+
+    end
     module Error_monad = struct
       type 'a shell_tzresult = 'a Error_monad.tzresult
       type shell_error = Error_monad.error = ..
       type error_category = [ `Branch | `Temporary | `Permanent ]
-      include Error_monad.Make()
+      include Error_monad.Make(struct let id = Format.asprintf "proto.%s." Param.name end)
     end
 
-    type error += Ecoproto_error of Error_monad.error list
+    type error += Ecoproto_error of Error_monad.error
+
+    module Wrapped_error_monad = struct
+      type unwrapped = Error_monad.error = ..
+      include (Error_monad : Error_monad_sig.S with type error := unwrapped)
+      let unwrap = function
+        | Ecoproto_error ecoerror -> Some ecoerror
+        | _ -> None
+      let wrap ecoerror =
+        Ecoproto_error ecoerror
+    end
 
     let () =
-      let id = Format.asprintf "Ecoproto.%s" Param.name in
+      let id = Format.asprintf "proto.%s.wrapper" Param.name in
       register_wrapped_error_kind
-        (fun ecoerrors -> Error_monad.classify_errors ecoerrors)
-        ~id ~title:"Error returned by the protocol"
-        ~description:"Wrapped error for the economic protocol."
-        ~pp:(fun ppf ->
-            Format.fprintf ppf
-              "@[<v 2>Economic error:@ %a@]"
-              (Format.pp_print_list Error_monad.pp))
-        Data_encoding.(obj1 (req "ecoproto"
-                               (list Error_monad.error_encoding)))
-        (function Ecoproto_error ecoerrors -> Some ecoerrors
-                | _ -> None )
-        (function ecoerrors -> Ecoproto_error ecoerrors)
+        (module Wrapped_error_monad)
+        ~id ~title: ("Error returned by protocol " ^ Param.name)
+        ~description: ("Wrapped error for economic protocol " ^ Param.name ^ ".")
 
     let wrap_error = function
       | Ok _ as ok -> ok
-      | Error errors -> Error [Ecoproto_error errors]
+      | Error errors -> Error (List.map (fun error -> Ecoproto_error error) errors)
 
     module Block_hash = Block_hash
     module Operation_hash = Operation_hash
@@ -224,7 +354,7 @@ module Make (Context : CONTEXT) = struct
     module Operation_list_list_hash = Operation_list_list_hash
     module Context_hash = Context_hash
     module Protocol_hash = Protocol_hash
-    module Blake2B = Tezos_base.Blake2B
+    module Blake2B = Blake2B
     module Fitness = Fitness
     module Operation = Operation
     module Block_header = Block_header
@@ -269,19 +399,19 @@ module Make (Context : CONTEXT) = struct
              | `Created s -> Lwt.return (`Created s)
              | `No_content -> Lwt.return (`No_content)
              | `Unauthorized e ->
-                 let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+                 let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
                  Lwt.return (`Unauthorized e)
              | `Forbidden e ->
-                 let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+                 let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
                  Lwt.return (`Forbidden e)
              | `Not_found e ->
-                 let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+                 let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
                  Lwt.return (`Not_found e)
              | `Conflict e ->
-                 let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+                 let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
                  Lwt.return (`Conflict e)
              | `Error e ->
-                 let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+                 let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
                  Lwt.return (`Error e))
 
       let register dir service handler =
@@ -493,8 +623,7 @@ module Make (Context : CONTEXT) = struct
         apply_operation c o >|= wrap_error
       let finalize_block c = finalize_block c >|= wrap_error
       let parse_operation h b = parse_operation h b |> wrap_error
-      let configure_sandbox c j =
-        configure_sandbox c j >|= wrap_error
+      let init c bh = init c bh >|= wrap_error
     end
 
     class ['block] proto_rpc_context

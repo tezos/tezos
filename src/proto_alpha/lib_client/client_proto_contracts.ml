@@ -66,7 +66,7 @@ module ContractAlias = struct
       desc ^ "\n"
       ^ "Can be a contract alias or a key alias (autodetected in order).\n\
          Use 'key:name' to force the later." in
-    Cli_entries.(
+    Clic.(
       param ~name ~desc
         (parameter ~autocomplete:autocomplete
            (fun cctxt p -> get_contract cctxt p))
@@ -77,7 +77,7 @@ module ContractAlias = struct
       desc ^ "\n"
       ^ "Can be an alias, a key, or a literal (autodetected in order).\n\
          Use 'text:literal', 'alias:name', 'key:name' to force." in
-    Cli_entries.(
+    Clic.(
       param ~name ~desc
         (parameter
            ~autocomplete:(fun cctxt ->

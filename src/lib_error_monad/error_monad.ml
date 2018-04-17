@@ -13,10 +13,7 @@
 
 type error_category = [ `Branch | `Temporary | `Permanent ]
 
-type 'err full_error_category =
-  [ error_category | `Wrapped of 'err -> error_category ]
-
-(* HACK: forward reference from [Data_encoding_ezjsonm] *)
+(* hack: forward reference from [Data_encoding_ezjsonm] *)
 let json_to_string = ref (fun _ -> "")
 
 let json_pp id encoding ppf x =
@@ -26,77 +23,202 @@ let json_pp id encoding ppf x =
     Data_encoding.(merge_objs (obj1 (req "id" string)) encoding) in
   Data_encoding.Json.construct encoding (id, x)
 
-module Make() = struct
+let set_error_encoding_cache_dirty = ref (fun () -> ())
+
+module Make(Prefix : sig val id : string end) = struct
 
   type error = ..
+
+  module type Wrapped_error_monad = sig
+    type unwrapped = ..
+    include Error_monad_sig.S with type error := unwrapped
+    val unwrap : error -> unwrapped option
+    val wrap : unwrapped -> error
+  end
+
+  type full_error_category =
+    | Main of error_category
+    | Wrapped of (module Wrapped_error_monad)
 
   (* the toplevel store for error kinds *)
   type error_kind =
       Error_kind :
         { id: string ;
+          title: string ;
+          description: string ;
           from_error: error -> 'err option ;
-          category: 'err full_error_category ;
+          category: full_error_category ;
           encoding_case: error Data_encoding.case ;
           pp: Format.formatter -> 'err -> unit ; } ->
       error_kind
+
+  type error_info =
+    { category : error_category ;
+      id: string ;
+      title : string ;
+      description : string ;
+      schema : Data_encoding.json_schema }
 
   let error_kinds
     : error_kind list ref
     = ref []
 
+  let get_registered_errors () : error_info list =
+    List.flatten
+      (List.map
+         (function
+           | Error_kind { id = "" ; _ } -> []
+           | Error_kind { id ; title ; description ; category = Main category ; encoding_case ; _ } ->
+               [ { id ; title ; description ; category ;
+                   schema = Data_encoding.Json.schema (Data_encoding.union [ encoding_case ]) } ]
+           | Error_kind { category = Wrapped (module WEM) ; _ } ->
+               List.map
+                 (fun { WEM.id ; title ; description ; category ; schema } ->
+                    { id ; title ; description ; category ; schema })
+                 (WEM.get_registered_errors ()))
+         !error_kinds)
+
   let error_encoding_cache = ref None
+  let () =
+    let cont = !set_error_encoding_cache_dirty in
+    set_error_encoding_cache_dirty := fun () ->
+      cont () ;
+      error_encoding_cache := None
 
   let string_of_category = function
     | `Permanent -> "permanent"
     | `Temporary -> "temporary"
     | `Branch -> "branch"
-    | `Wrapped _ -> "wrapped"
+
+  let pp_info
+      ppf
+      { category; id; title; description; schema } =
+    Format.fprintf
+      ppf
+      "@[<v 2>category : %s\nid : %s\ntitle : %s\ndescription : %s\nschema : %a@]"
+      (string_of_category category)
+      id title description
+      (Json_repr.pp (module Json_repr.Ezjsonm))
+      (Json_schema.to_json schema)
+
+  (* Catch all error when 'serializing' an error. *)
+  type error += Unclassified of string
+
+  let () =
+    let id = "" in
+    let category = Main `Temporary in
+    let to_error msg = Unclassified msg in
+    let from_error = function
+      | Unclassified msg -> Some msg
+      | error ->
+          let msg = Obj.(extension_name @@ extension_constructor error) in
+          Some ("Unclassified error: " ^ msg ^ ". Was the error registered?") in
+    let title = "Generic error" in
+    let description =  "An unclassified error" in
+    let encoding_case =
+      let open Data_encoding in
+      case Json_only
+        (describe ~title ~description @@
+         conv (fun x -> ((), x)) (fun ((), x) -> x) @@
+         (obj2
+            (req "kind" (constant "generic"))
+            (req "error" string)))
+        from_error to_error in
+    let pp = Format.pp_print_string in
+    error_kinds :=
+      Error_kind { id ; title ; description ;
+                   from_error ; category ; encoding_case ; pp } :: !error_kinds
+
+  (* Catch all error when 'deserializing' an error. *)
+  type error += Unregistred_error of Data_encoding.json
+
+  let () =
+    let id = "" in
+    let category = Main `Temporary in
+    let to_error msg = Unregistred_error msg in
+    let from_error = function
+      | Unregistred_error json -> Some json
+      | _ -> None in
+    let encoding_case =
+      let open Data_encoding in
+      case Json_only json from_error to_error in
+    let pp ppf json =
+      Format.fprintf ppf "@[<v 2>Unregistred error:@ %a@]"
+        Data_encoding.Json.pp json in
+    error_kinds :=
+      Error_kind { id ; title = "" ; description = "" ;
+                   from_error ; category ; encoding_case ; pp } :: !error_kinds
+
   let raw_register_error_kind
       category ~id:name ~title ~description ?pp
       encoding from_error to_error =
+    let name = Prefix.id ^ name in
     if List.exists
         (fun (Error_kind { id ; _ }) -> name = id)
         !error_kinds then
       invalid_arg
         (Printf.sprintf
            "register_error_kind: duplicate error name: %s" name) ;
-    if not (Data_encoding.is_obj encoding)
-    then invalid_arg
-        (Printf.sprintf
-           "Specified encoding for \"%s\" is not an object, but error encodings must be objects."
-           name) ;
     let encoding_case =
       let open Data_encoding in
-      case Json_only
-        (describe ~title ~description @@
-         conv (fun x -> (((), ()), x)) (fun (((),()), x) -> x) @@
-         merge_objs
-           (obj2
-              (req "kind" (constant (string_of_category category)))
-              (req "id" (constant name)))
-           encoding)
-        from_error to_error in
-    error_encoding_cache := None ;
+      match category with
+      | Wrapped (module WEM) ->
+          let unwrap err =
+            match WEM.unwrap err with
+            | Some (WEM.Unclassified _) -> None
+            | Some (WEM.Unregistred_error _) ->
+                Format.eprintf "What %s@." name ;
+                None
+            | res -> res in
+          let wrap err =
+            match err with
+            | WEM.Unclassified _ ->
+                failwith "ignore wrapped error when serializing"
+            | WEM.Unregistred_error _ ->
+                failwith "ignore wrapped error when deserializing"
+            | res -> WEM.wrap res in
+          case Json_only WEM.error_encoding unwrap wrap
+      | Main category ->
+          let with_id_and_kind_encoding =
+            merge_objs
+              (obj2
+                 (req "kind" (constant (string_of_category category)))
+                 (req "id" (constant name)))
+              encoding in
+          case Json_only
+            (describe ~title ~description
+               (conv (fun x -> (((), ()), x)) (fun (((),()), x) -> x)
+                  with_id_and_kind_encoding))
+            from_error to_error in
+    !set_error_encoding_cache_dirty () ;
     error_kinds :=
-      Error_kind { id = name ;
-                   category ;
-                   from_error ;
-                   encoding_case ;
-                   pp = Option.unopt ~default:(json_pp name encoding) pp } :: !error_kinds
+      Error_kind
+        { id = name ;
+          category ;
+          title ;
+          description ;
+          from_error ;
+          encoding_case ;
+          pp = Option.unopt ~default:(json_pp name encoding) pp }
+      :: !error_kinds
 
   let register_wrapped_error_kind
-      category ~id ~title ~description ?pp
-      encoding from_error to_error =
+      (module WEM : Wrapped_error_monad) ~id ~title ~description =
     raw_register_error_kind
-      (`Wrapped category)
-      ~id ~title ~description ?pp
-      encoding from_error to_error
+      (Wrapped (module WEM))
+      ~id ~title ~description
+      ~pp:WEM.pp WEM.error_encoding WEM.unwrap WEM.wrap
 
   let register_error_kind
       category ~id ~title ~description ?pp
       encoding from_error to_error =
+    if not (Data_encoding.is_obj encoding)
+    then invalid_arg
+        (Printf.sprintf
+           "Specified encoding for \"%s%s\" is not an object, but error encodings must be objects."
+           Prefix.id id) ;
     raw_register_error_kind
-      (category :> _ full_error_category)
+      (Main category)
       ~id ~title ~description ?pp
       encoding from_error to_error
 
@@ -105,7 +227,7 @@ module Make() = struct
     | None ->
         let cases =
           List.map
-            (fun (Error_kind { encoding_case ; _ }) -> encoding_case )
+            (fun (Error_kind { encoding_case ; _ }) -> encoding_case)
             !error_kinds in
         let json_encoding = Data_encoding.union cases in
         let encoding =
@@ -134,10 +256,13 @@ module Make() = struct
       (* assert false (\* See "Generic error" *\) *)
       | Error_kind { from_error ; category ; _ } :: rest ->
           match from_error e with
-          | Some x -> begin
+          | Some _ -> begin
               match category with
-              | `Wrapped f -> f x
-              | #error_category as x -> x
+              | Main error_category -> error_category
+              | Wrapped (module WEM) ->
+                  match WEM.unwrap e with
+                  | Some e -> WEM.classify_errors [ e ]
+                  | None -> find e rest
             end
           | None -> find e rest in
     find error !error_kinds
@@ -413,58 +538,11 @@ module Make() = struct
           (Format.pp_print_list pp)
           (List.rev errors)
 
-
-  (** Catch all error when 'serializing' an error. *)
-  type error += Unclassified of string
-
-  let () =
-    let id = "" in
-    let category = `Temporary in
-    let to_error msg = Unclassified msg in
-    let from_error = function
-      | Unclassified msg -> Some msg
-      | error ->
-          let msg = Obj.(extension_name @@ extension_constructor error) in
-          Some ("Unclassified error: " ^ msg ^ ". Was the error registered?") in
-    let title = "Generic error" in
-    let description =  "An unclassified error" in
-    let encoding_case =
-      let open Data_encoding in
-      case Json_only
-        (describe ~title ~description @@
-         conv (fun x -> ((), x)) (fun ((), x) -> x) @@
-         (obj2
-            (req "kind" (constant "generic"))
-            (req "error" string)))
-        from_error to_error in
-    let pp = Format.pp_print_string in
-    error_kinds :=
-      Error_kind { id ; from_error ; category ; encoding_case ; pp } :: !error_kinds
-
-  (** Catch all error when 'deserializing' an error. *)
-  type error += Unregistered_error of Data_encoding.json
-
-  let () =
-    let id = "" in
-    let category = `Temporary in
-    let to_error msg = Unregistered_error msg in
-    let from_error = function
-      | Unregistered_error json -> Some json
-      | _ -> None in
-    let encoding_case =
-      let open Data_encoding in
-      case Json_only json from_error to_error in
-    let pp ppf json =
-      Format.fprintf ppf "@[<v 2>Unregistered error:@ %a@]"
-        Data_encoding.Json.pp json in
-    error_kinds :=
-      Error_kind { id ; from_error ; category ; encoding_case ; pp } :: !error_kinds
-
   type error += Assert_error of string * string
 
   let () =
     let id = "" in
-    let category = `Permanent in
+    let category = Main `Permanent in
     let to_error (loc, msg) = Assert_error (loc, msg) in
     let from_error = function
       | Assert_error (loc, msg) -> Some (loc, msg)
@@ -487,7 +565,8 @@ module Make() = struct
         loc
         (if msg = "" then "." else ": " ^ msg) in
     error_kinds :=
-      Error_kind { id; from_error ; category; encoding_case ; pp } :: !error_kinds
+      Error_kind { id ; title ; description ;
+                   from_error ; category ; encoding_case ; pp } :: !error_kinds
 
   let _assert b loc fmt =
     if b then
@@ -497,7 +576,7 @@ module Make() = struct
 
 end
 
-include Make()
+include Make(struct let id = "" end)
 
 let generic_error fmt =
   Format.kasprintf (fun s -> error (Unclassified s)) fmt

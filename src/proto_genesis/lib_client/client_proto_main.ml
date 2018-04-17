@@ -14,7 +14,6 @@ let protocol =
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
 let bake cctxt ?(timestamp = Time.now ()) block command sk =
-  let block = Block_services.last_baked_block block in
   let protocol_data = Data_encoding.Binary.to_bytes Data.Command.encoding command in
   Block_services.preapply
     cctxt block ~timestamp ~protocol_data
@@ -26,17 +25,24 @@ let bake cctxt ?(timestamp = Time.now ()) block command sk =
   Shell_services.inject_block cctxt signed_blk []
 
 let int64_parameter =
-  (Cli_entries.parameter (fun _ p ->
+  (Clic.parameter (fun _ p ->
        try return (Int64.of_string p)
        with _ -> failwith "Cannot read int64"))
 
 let int_parameter =
-  (Cli_entries.parameter (fun _ p ->
+  (Clic.parameter (fun _ p ->
        try return (int_of_string p)
        with _ -> failwith "Cannot read int"))
 
+let file_parameter =
+  Clic.parameter (fun _ p ->
+      if not (Sys.file_exists p) then
+        failwith "File doesn't exist: '%s'" p
+      else
+        return p)
+
 let commands () =
-  let open Cli_entries in
+  let open Clic in
   let args =
     args1
       (arg
@@ -60,11 +66,17 @@ let commands () =
        @@ prefixes [ "and" ; "key" ]
        @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"Dictator's key"
+       @@ prefixes [ "and" ; "parameters" ]
+       @@ param ~name:"parameters"
+         ~desc:"Protocol parameters (as JSON file)"
+         file_parameter
        @@ stop)
-      begin fun timestamp hash fitness sk (cctxt : Client_context.full) ->
+      begin fun timestamp hash fitness sk param_json_file (cctxt : Client_context.full) ->
         let fitness = Proto_alpha.Fitness_repr.from_int64 fitness in
+        Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file >>=? fun json ->
+        let protocol_parameters = Data_encoding.Binary.to_bytes Data_encoding.json json in
         bake cctxt ?timestamp cctxt#block
-          (Activate { protocol = hash ; fitness })
+          (Activate { protocol = hash ; fitness ; protocol_parameters })
           sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return ()

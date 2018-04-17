@@ -68,69 +68,97 @@ let print_type_map ppf (parsed, type_map) =
 let first_error_location errs =
   let rec find = function
     | [] -> 0
-    | Inconsistent_type_annotations (loc, _, _) :: _
-    | Unexpected_annotation loc :: _
-    | Ill_formed_type (_, _, loc) :: _
-    | Invalid_arity (loc, _, _, _) :: _
-    | Invalid_namespace (loc, _, _, _) :: _
-    | Invalid_primitive (loc, _, _) :: _
-    | Invalid_kind (loc, _, _) :: _
-    | Fail_not_in_tail_position loc :: _
-    | Undefined_binop (loc, _, _, _) :: _
-    | Undefined_unop (loc, _, _) :: _
-    | Bad_return (loc, _, _) :: _
-    | Bad_stack (loc, _, _, _) :: _
-    | Unmatched_branches (loc, _, _) :: _
-    | Transfer_in_lambda loc :: _
-    | Transfer_in_dip loc :: _
-    | Invalid_constant (loc, _, _) :: _
-    | Invalid_contract (loc, _) :: _
-    | Comparable_type_expected (loc, _) :: _
-    | Michelson_v1_primitives.Invalid_primitive_name loc :: _ -> loc
+    | (Inconsistent_type_annotations (loc, _, _)
+      | Unexpected_annotation loc
+      | Ill_formed_type (_, _, loc)
+      | Invalid_arity (loc, _, _, _)
+      | Invalid_namespace (loc, _, _, _)
+      | Invalid_primitive (loc, _, _)
+      | Invalid_kind (loc, _, _)
+      | Fail_not_in_tail_position loc
+      | Undefined_binop (loc, _, _, _)
+      | Undefined_unop (loc, _, _)
+      | Bad_return (loc, _, _)
+      | Bad_stack (loc, _, _, _)
+      | Unmatched_branches (loc, _, _)
+      | Transfer_in_lambda loc
+      | Transfer_in_dip loc
+      | Invalid_constant (loc, _, _)
+      | Invalid_contract (loc, _)
+      | Comparable_type_expected (loc, _)
+      | Michelson_v1_primitives.Invalid_primitive_name (_, loc)) :: _ -> loc
     | _ :: rest -> find rest in
   find errs
 
 let report_errors ppf (parsed, errs) =
-  Format.fprintf ppf "(@[<v 0>%a@])"
+  let eco, out =
+    List.fold_left
+      (fun (eco, out) -> function
+         | Alpha_environment.Ecoproto_error err -> (err :: eco, out)
+         | err -> (eco, err :: out))
+      ([], []) errs in
+  let eco, out = List.rev eco, List.rev out in
+  Format.fprintf ppf "(@[<v 0>%a@,%a@])"
+    (fun ppf errs ->
+       let find_location loc =
+         let oloc = List.assoc loc parsed.Michelson_v1_parser.unexpansion_table in
+         fst (List.assoc oloc parsed.expansion_table) in
+       match errs with
+       | top :: errs ->
+           let errs, loc =
+             List.map
+               (fun e -> Alpha_environment.Ecoproto_error e)
+               (top :: errs),
+             match top with
+             | Ill_typed_contract (expr, _)
+             | Ill_typed_data (_, expr, _) ->
+                 if expr = parsed.expanded then
+                   find_location
+                     (first_error_location
+                        (top :: errs))
+                 else find_location 0
+             | Michelson_v1_primitives.Invalid_primitive_name (expr, loc) ->
+                 if Micheline.strip_locations (Michelson_v1_macros.unexpand_rec (Micheline.root expr)) =
+                    parsed.Michelson_v1_parser.unexpanded then
+                   find_location loc
+                 else
+                   find_location 0
+             | _ -> find_location 0
+           in
+           let message =
+             Format.asprintf "%a"
+               (Michelson_v1_error_reporter.report_errors
+                  ~details:false ~show_source:false ~parsed)
+               errs in
+           let { start = { point = s } ; stop = { point = e } } = loc in
+           Format.fprintf ppf "(%d %d %S)" (s + 1) (e + 1) message
+       | [] -> ())
+    eco
     (Format.pp_print_list
        (fun ppf err ->
           let find_location loc =
             let oloc = List.assoc loc parsed.Michelson_v1_parser.unexpansion_table in
             fst (List.assoc oloc parsed.expansion_table) in
-          let errs, loc =
+          let loc =
             match err with
-            | Alpha_environment.Ecoproto_error (top :: errs) ->
-                [ Alpha_environment.Ecoproto_error (top :: errs) ],
-                begin match top with
-                  | Ill_typed_contract (expr, _)
-                  | Ill_typed_data (_, expr, _) ->
-                      if expr = parsed.expanded then
-                        find_location (first_error_location (top :: errs))
-                      else find_location 0
-                  | Michelson_v1_primitives.Invalid_primitive_name loc ->
-                      find_location loc
-                  | _ -> find_location 0
-                end
             | Invalid_utf8_sequence (point, _)
             | Unexpected_character (point, _)
             | Undefined_escape_sequence (point, _)
-            | Missing_break_after_number point as err ->
-                [ err ], { start = point ; stop = point }
+            | Missing_break_after_number point ->
+                { start = point ; stop = point }
             | Unterminated_string loc
             | Unterminated_integer loc
             | Unterminated_comment loc
             | Unclosed { loc }
             | Unexpected { loc }
-            | Extra { loc } as err ->
-                [ err ], loc
-            | Misaligned node as err ->
-                [ err ], location node
-            | err -> [ err ], find_location 0 in
+            | Extra { loc } -> loc
+            | Misaligned node -> location node
+            | _ -> find_location 0 in
           let message =
             Format.asprintf "%a"
               (Michelson_v1_error_reporter.report_errors
                  ~details:false ~show_source:false ~parsed)
-              errs in
+              [ err ] in
           let { start = { point = s } ; stop = { point = e } } = loc in
           Format.fprintf ppf "(%d %d %S)" (s + 1) (e + 1) message))
-    errs
+    out

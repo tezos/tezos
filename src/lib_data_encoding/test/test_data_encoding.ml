@@ -83,8 +83,8 @@ let test_simple_values _ =
   test_simple ~msg:__LOC__ (ranged_int 19000 19254) 19000;
   test_simple ~msg:__LOC__ (ranged_int 19000 19254) 19254;
   test_simple ~msg:__LOC__ (ranged_int ~-100 300) 200;
-  test_simple ~msg:__LOC__ (ranged_int ~-3_000_000_000 3_000_000_000) 200;
-  test_simple ~msg:__LOC__ (ranged_int ~-3_000_000_000 3_000_000_000) 2_000_000_000;
+  test_simple ~msg:__LOC__ (ranged_int ~-300_000_000 300_000_000) 200;
+  test_simple ~msg:__LOC__ (ranged_int ~-300_000_000 300_000_000) 200_000_000;
   test_simple ~msg:__LOC__ (ranged_float 100. 200.) 150.;
   test_simple ~msg:__LOC__ (ranged_float ~-.100. 200.) ~-.75.;
   test_simple ~msg:__LOC__ bool true;

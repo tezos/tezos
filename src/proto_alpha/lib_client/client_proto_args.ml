@@ -9,7 +9,7 @@
 
 open Proto_alpha
 open Alpha_context
-open Cli_entries
+open Clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 type error += Bad_max_priority of string
@@ -130,7 +130,7 @@ let tez_arg ~default ~parameter ~doc =
     (tez_parameter ("--" ^ parameter))
 
 let tez_param ~name ~desc next =
-  Cli_entries.param
+  Clic.param
     ~name
     ~desc:(desc ^ " in \xEA\x9C\xA9\n" ^ tez_format)
     (tez_parameter name)
@@ -178,6 +178,12 @@ let no_print_source_flag =
           If an error is encountered, the client will print the \
           contract's source code by default.\n\
           This option disables this behaviour."
+    ()
+
+let no_confirmation =
+  switch
+    ~long:"no-confirmation"
+    ~doc:"don't print wait for the operation to be confirmed."
     ()
 
 module Daemon = struct

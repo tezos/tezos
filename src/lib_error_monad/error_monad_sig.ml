@@ -18,6 +18,11 @@ module type S = sig
 
   type error = ..
 
+  (** Catch all error when 'serializing' an error. *)
+  type error += private Unclassified of string
+  (** Catch all error when 'deserializing' an error. *)
+  type error += private Unregistred_error of Data_encoding.json
+
   val pp: Format.formatter -> error -> unit
   val pp_print_error: Format.formatter -> error list -> unit
 
@@ -26,19 +31,26 @@ module type S = sig
   val json_of_error : error -> Data_encoding.json
   val error_of_json : Data_encoding.json -> error
 
+  (** {2 Error documentation} ************************************************)
+
+  (** Error information *)
+  type error_info =
+    { category : error_category ;
+      id : string ;
+      title : string ;
+      description : string ;
+      schema : Data_encoding.json_schema }
+
+  val pp_info: Format.formatter -> error_info -> unit
+
+  (** Retrieves information of registered errors *)
+  val get_registered_errors : unit -> error_info list
+
   (** {2 Error classification} ***********************************************)
 
   (** For other modules to register specialized error serializers *)
   val register_error_kind :
     error_category ->
-    id:string -> title:string -> description:string ->
-    ?pp:(Format.formatter -> 'err -> unit) ->
-    'err Data_encoding.t ->
-    (error -> 'err option) -> ('err -> error) ->
-    unit
-
-  val register_wrapped_error_kind :
-    ('err -> error_category) ->
     id:string -> title:string -> description:string ->
     ?pp:(Format.formatter -> 'err -> unit) ->
     'err Data_encoding.t ->

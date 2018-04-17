@@ -28,7 +28,7 @@ let build_rpc_context config =
 let rpc_ctxt = ref (build_rpc_context !rpc_config)
 
 (* Context that does not write to alias files *)
-let no_write_context ?(block = `Prevalidation) config : #Client_context.full = object
+let no_write_context ?(block = `Head 0) config : #Client_context.full = object
   inherit RPC_client.http_ctxt config Media_type.all_media_types
   inherit Client_context.simple_printer (fun _ _ -> Lwt.return_unit)
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a Error_monad.tzresult Lwt.t =
@@ -44,18 +44,90 @@ let no_write_context ?(block = `Prevalidation) config : #Client_context.full = o
     Format.kasprintf (fun _ -> Lwt.return "")
 end
 
-let activate_alpha () =
+let sandbox_parameters =
+  let json_result =
+    Data_encoding.Json.from_string {json|
+{ "genesis_pubkey": "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2" }
+|json} in
+  match json_result with
+  | Error err -> raise (Failure err)
+  | Ok json -> json
+
+let protocol_parameters =
+  let json_result =
+    Data_encoding.Json.from_string {json|
+{ "bootstrap_accounts": [
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
+    [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
+    [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
+    [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
+    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
+  ],
+  "commitments": [
+    [ "tz1MawerETND6bqJqUe4cVBcDZn6Tiahrr2V", "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ],
+    [ "tz1X4maqF9tC1Yn4hzg1w5PLdeKm62qHS64V", "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ],
+    [ "tz1SWBY7rWMutEuWRziDhC72gTGdo29KZaRj", "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428348" ],
+    [ "tz1amUjiZaevaxQy5w26LSf64bs77eNTJ8uY", "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ],
+    [ "tz1Zaee3QBtD4ErY1CpjigTYtX3VxWB6Ft9a", "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ],
+    [ "tz1geDUUhfXK1EMj7LZdP9wfcoAxR3q2QExR", "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ],
+    [ "tz1h3nY7jcZciJgAvgNvzgTnjuejEyiEqFGQ", "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ],
+    [ "tz1VzL4Xrb3fL3ckuPqw8u4H7feMAkF4cesJ", "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ],
+    [ "tz1RUHg536oRKhPLFHi9hit3MKbve91jWjPC", "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ],
+    [ "tz1M1LFbgctcPWxstKs21wgvSYBLUpaRwdx8", "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ]
+  ],
+  "time_between_blocks" : [ 1, 0 ],
+  "blocks_per_cycle" : 4,
+  "blocks_per_roll_snapshot" : 2,
+  "preserved_cycles" : 1,
+  "first_free_baking_slot" : 4,
+  "proof_of_work_threshold": -1
+}
+|json} in
+  match json_result with
+  | Error err -> raise (Failure err)
+  | Ok json ->
+      Data_encoding.Binary.to_bytes Data_encoding.json json
+
+let vote_protocol_parameters =
+  let json_result =
+    Data_encoding.Json.from_string {json|
+{ "bootstrap_accounts": [
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
+    [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
+    [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
+    [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
+    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
+  ],
+  "time_between_blocks" : [ 1, 0 ],
+  "blocks_per_cycle" : 4,
+  "blocks_per_roll_snapshot" : 2,
+  "preserved_cycles" : 1,
+  "first_free_baking_slot" : 4,
+  "blocks_per_voting_period": 2,
+  "proof_of_work_threshold": -1
+}
+|json} in
+  match json_result with
+  | Error err -> raise (Failure err)
+  | Ok json ->
+      Data_encoding.Binary.to_bytes Data_encoding.json json
+
+let activate_alpha ?(vote = false) () =
   let fitness = Fitness_repr.from_int64 0L in
   let dictator_sk = Client_keys.Secret_key_locator.create
       ~scheme:"unencrypted"
       ~location:"edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6" in
+  let protocol_parameters =
+    if vote then vote_protocol_parameters else protocol_parameters in
   Tezos_client_genesis.Client_proto_main.bake
     (no_write_context ~block:(`Head 0) !rpc_config) (`Head 0)
     (Activate  { protocol = Proto_alpha.hash ;
-                 fitness })
+                 fitness ;
+                 protocol_parameters ;
+               })
     dictator_sk
 
-let init ?exe ?(sandbox = "sandbox.json") ?rpc_port () =
+let init ?exe ?vote ?rpc_port () =
   begin
     match rpc_port with
     | None -> ()
@@ -67,9 +139,9 @@ let init ?exe ?(sandbox = "sandbox.json") ?rpc_port () =
     Node_helpers.fork_node
       ?exe
       ~port:!rpc_config.port
-      ~sandbox
+      ~sandbox:sandbox_parameters
       () in
-  activate_alpha () >>=? fun hash ->
+  activate_alpha ?vote () >>=? fun hash ->
   return (pid, hash)
 
 let level block =
@@ -82,9 +154,9 @@ module Account = struct
 
   type t = {
     alias : string ;
-    sk : secret_key ;
-    pk : public_key ;
-    pkh : public_key_hash ;
+    sk : Signature.secret_key ;
+    pk : Signature.public_key ;
+    pkh : Signature.public_key_hash ;
     contract : Contract.t ;
   }
 
@@ -98,9 +170,9 @@ module Account = struct
          { alias ; sk ; pk ; pkh ; contract })
       (obj5
          (req "alias" string)
-         (req "sk" Ed25519.Secret_key.encoding)
-         (req "pk" Ed25519.Public_key.encoding)
-         (req "pkh" Ed25519.Public_key_hash.encoding)
+         (req "sk" Signature.Secret_key.encoding)
+         (req "pk" Signature.Public_key.encoding)
+         (req "pkh" Signature.Public_key_hash.encoding)
          (req "contract" Contract.encoding))
 
   let pp_account ppf account =
@@ -110,8 +182,8 @@ module Account = struct
   let create ?keys alias =
     let sk, pk = match keys with
       | Some keys -> keys
-      | None -> let _, pk, sk = Ed25519.generate_key () in sk, pk in
-    let pkh = Ed25519.Public_key.hash pk in
+      | None -> let _, pk, sk = Signature.generate_key () in sk, pk in
+    let pkh = Signature.Public_key.hash pk in
     let contract = Contract.implicit_contract pkh in
     { alias ; contract ; pkh ; pk ; sk }
 
@@ -131,8 +203,8 @@ module Account = struct
          { alias ; pk ; pkh ; contract })
       (obj4
          (req "alias" string)
-         (req "pk" Ed25519.Public_key.encoding)
-         (req "pkh" Ed25519.Public_key_hash.encoding)
+         (req "pk" Signature.Public_key.encoding)
+         (req "pkh" Signature.Public_key_hash.encoding)
          (req "contract" Contract.encoding))
 
   let pp_destination ppf destination =
@@ -140,7 +212,7 @@ module Account = struct
     Format.fprintf ppf "%s" (Data_encoding.Json.to_string json)
 
   let create_destination ~alias ~contract ~pk =
-    let pkh = Ed25519.Public_key.hash pk in
+    let pkh = Signature.Public_key.hash pk in
     { alias ; contract ; pk ; pkh }
 
   type bootstrap_accounts = { b1 : t ; b2 : t ; b3 : t ; b4 : t ;  b5 : t  ; }
@@ -159,10 +231,10 @@ module Account = struct
     let cpt = ref 0 in
     match List.map begin fun sk ->
         incr cpt ;
-        let sk = Ed25519.Secret_key.of_b58check_exn sk in
+        let sk = Signature.Secret_key.of_b58check_exn sk in
         let alias = Printf.sprintf "bootstrap%d" !cpt in
-        let pk = Ed25519.Secret_key.to_public_key sk in
-        let pkh = Ed25519.Public_key.hash pk in
+        let pk = Signature.Secret_key.to_public_key sk in
+        let pkh = Signature.Public_key.hash pk in
         { alias ; contract = Contract.implicit_contract pkh; pkh ; pk ; sk }
       end [ bootstrap1_sk; bootstrap2_sk; bootstrap3_sk;
             bootstrap4_sk; bootstrap5_sk; ]
@@ -171,14 +243,14 @@ module Account = struct
     | _ -> assert false
 
   let transfer
-      ?(block = `Prevalidation)
+      ?(block = `Head 0)
       ?(fee = Tez.fifty_cents)
       ~(account:t)
       ~destination
       ~amount () =
     let src_sk = Client_keys.Secret_key_locator.create
         ~scheme:"unencrypted"
-        ~location:(Ed25519.Secret_key.to_b58check account.sk) in
+        ~location:(Signature.Secret_key.to_b58check account.sk) in
     Client_proto_context.transfer
       (new wrap_full (no_write_context !rpc_config ~block))
       block
@@ -190,7 +262,7 @@ module Account = struct
       ~fee ()
 
   let originate
-      ?(block = `Prevalidation)
+      ?(block = `Head 0)
       ?delegate
       ?(fee = Tez.fifty_cents)
       ~(src:t)
@@ -202,7 +274,7 @@ module Account = struct
       | Some delegate -> true, Some delegate in
     let src_sk = Client_keys.Secret_key_locator.create
         ~scheme:"unencrypted"
-        ~location:(Ed25519.Secret_key.to_b58check src.sk) in
+        ~location:(Signature.Secret_key.to_b58check src.sk) in
     Client_proto_context.originate_account
       ~source:src.contract
       ~src_pk:src.pk
@@ -217,7 +289,7 @@ module Account = struct
       ()
 
   let set_delegate
-      ?(block = `Prevalidation)
+      ?(block = `Head 0)
       ?(fee = Tez.fifty_cents)
       ~contract
       ~manager_sk
@@ -232,12 +304,12 @@ module Account = struct
       ~manager_sk
       delegate_opt
 
-  let balance ?(block = `Prevalidation) (account : t) =
+  let balance ?(block = `Head 0) (account : t) =
     Alpha_services.Contract.balance !rpc_ctxt
       block account.contract
 
   (* TODO: gather contract related functions in a Contract module? *)
-  let delegate ?(block = `Prevalidation) (contract : Contract.t) =
+  let delegate ?(block = `Head 0) (contract : Contract.t) =
     Alpha_services.Contract.delegate_opt !rpc_ctxt block contract
 
 end
@@ -246,10 +318,10 @@ module Protocol = struct
 
   open Account
 
-  let voting_period_kind ?(block = `Prevalidation) () =
+  let voting_period_kind ?(block = `Head 0) () =
     Alpha_services.Context.voting_period_kind !rpc_ctxt block
 
-  let proposals ?(block = `Prevalidation) ~src:({ pkh; sk } : Account.t) proposals =
+  let proposals ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) proposals =
     Block_services.info !rpc_ctxt block >>=? fun block_info ->
     Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
     Alpha_services.Forge.Amendment.proposals !rpc_ctxt block
@@ -258,10 +330,10 @@ module Protocol = struct
       ~period:next_level.voting_period
       ~proposals
       () >>=? fun bytes ->
-    let signed_bytes = Ed25519.Signature.append sk bytes in
+    let signed_bytes = Signature.append sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
-  let ballot ?(block = `Prevalidation) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
+  let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
     Block_services.info !rpc_ctxt block >>=? fun block_info ->
     Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
     Alpha_services.Forge.Amendment.ballot !rpc_ctxt block
@@ -271,7 +343,7 @@ module Protocol = struct
       ~proposal
       ~ballot
       () >>=? fun bytes ->
-    let signed_bytes = Ed25519.Signature.append sk bytes in
+    let signed_bytes = Signature.append sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
 end
@@ -296,11 +368,11 @@ module Assert = struct
       match pkh1, pkh2 with
       | None, None -> true
       | Some pkh1, Some pkh2 ->
-          Ed25519.Public_key_hash.equal pkh1 pkh2
+          Signature.Public_key_hash.equal pkh1 pkh2
       | _ -> false in
     let prn = function
       | None -> "none"
-      | Some pkh -> Ed25519.Public_key_hash.to_hex pkh in
+      | Some pkh -> Signature.Public_key_hash.to_b58check pkh in
     equal ?msg ~prn ~eq pkh1 pkh2
 
   let equal_tez ?msg tz1 tz2 =
@@ -321,8 +393,7 @@ module Assert = struct
     equal_pkh ~msg expected_delegate actual_delegate
 
   let ecoproto_error f = function
-    | Alpha_environment.Ecoproto_error errors ->
-        List.exists f errors
+    | Alpha_environment.Ecoproto_error error -> f error
     | _ -> false
 
   let hash op = Tezos_base.Operation.hash op
@@ -437,7 +508,7 @@ module Baking = struct
         None in
     let src_sk = Client_keys.Secret_key_locator.create
         ~scheme:"unencrypted"
-        ~location:(Ed25519.Secret_key.to_b58check contract.sk) in
+        ~location:(Signature.Secret_key.to_b58check contract.sk) in
     Client_baking_forge.forge_block
       ctxt
       block
@@ -450,12 +521,6 @@ module Baking = struct
       ~src_sk
       ()
 
-  let endorsement_reward block =
-    Alpha_services.priority !rpc_ctxt block >>=? fun prio ->
-    Baking.endorsement_reward ~block_priority:prio >|=
-    Alpha_environment.wrap_error >>|?
-    Tez.to_mutez
-
 end
 
 module Endorse = struct
@@ -464,9 +529,8 @@ module Endorse = struct
       block
       src_sk
       slot =
-    let block = Block_services.last_baked_block block in
     Block_services.info !rpc_ctxt block >>=? fun { hash ; _ } ->
-    Alpha_services.Context.level !rpc_ctxt (`Hash hash) >>=? fun level ->
+    Alpha_services.Context.level !rpc_ctxt (`Hash (hash, 0)) >>=? fun level ->
     Alpha_services.Forge.Consensus.endorsement !rpc_ctxt
       block
       ~branch:hash
@@ -474,7 +538,7 @@ module Endorse = struct
       ~level:level.level
       ~slots:[slot]
       () >>=? fun bytes ->
-    let signed_bytes = Ed25519.Signature.append src_sk bytes in
+    let signed_bytes = Signature.append src_sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let signing_slots
@@ -549,3 +613,6 @@ let display_level block =
   Alpha_services.Context.level !rpc_ctxt block >>=? fun lvl ->
   Format.eprintf "Level: %a@." Level.pp_full lvl ;
   return ()
+
+let endorsement_security_deposit block =
+  Constants_services.endorsement_security_deposit !rpc_ctxt block
