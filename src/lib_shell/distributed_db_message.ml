@@ -170,7 +170,7 @@ let encoding =
 
 let versions =
   let open P2p_version in
-  [ { name = "TEZOS_2018-03-18T17:36:14Z" ;
+  [ { name = "TEZOS_2018-04-17T11:46:23Z" ;
       major = 0 ;
       minor = 0 ;
     }
