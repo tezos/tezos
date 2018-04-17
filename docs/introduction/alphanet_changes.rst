@@ -73,7 +73,7 @@ Reset 2017-11-20
 - Refactor the economic protocol amendment code. Protocols are
    now compiled to functors, taking the type signature of their
    runtime environment as parameter. This simplifies the
-   dependencies, and will allow third party developpers to
+   dependencies, and will allow third party developers to
    instanciate economic protocols in other contexts than the node.
 
 - Switch from Makefiles to jbuilder, yay!

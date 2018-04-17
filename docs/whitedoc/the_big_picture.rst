@@ -8,7 +8,7 @@ readable by anyone, describes the main elements of Tezos from a
 distance. It abstracts from all plumbing and both internal and system
 dependencies to give a simple view of the main components, their
 responsibilities and interactions. The second part is written for
-developpers, and is at the level of OPAM packages.
+developers, and is at the level of OPAM packages.
 
 The Big Picture
 ---------------
