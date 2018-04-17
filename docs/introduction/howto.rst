@@ -67,6 +67,18 @@ you have a recent version of libsodium and libsodium-dev, or download
 and install them from, eg, https://pkgs.org/download/libsodium18 and
 https://pkgs.org/download/libsodium-dev
 
+If after a ``git pull``, the build fails (either at ``make
+build-deps`` or ``make``), you might try to clean up a little bit the
+opam internal state with the following commands:
+
+::
+
+    opam update
+    opam pin list -s | xargs opam pin remove
+    make build-deps
+    make
+
+
 Running the node
 ----------------
 
