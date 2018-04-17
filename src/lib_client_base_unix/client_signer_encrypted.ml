@@ -143,9 +143,12 @@ module Encrypted_signer : SIGNER = struct
     | Some t ->
         cctxt#prompt_password
           "Enter the password used for the paper wallet: " >>= fun password ->
-        let sk = Bip39.to_seed ~passphrase:(password ^ email) t in
+        (* TODO: unicode normalization (NFKD)... *)
+        let sk = Bip39.to_seed ~passphrase:(email ^ password) t in
         let sk = Cstruct.(to_bigarray (sub sk 0 32)) in
-        let sk = Data_encoding.Binary.of_bytes_exn Signature.Secret_key.encoding sk in
+        let sk : Signature.Secret_key.t =
+          Ed25519
+            (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk) in
         let pk = Signature.Secret_key.to_public_key sk in
         let pkh = Signature.Public_key.hash pk in
         let msg = Format.asprintf
