@@ -11,37 +11,46 @@ activate_alpha
 sleep 2
 
 #tests for the rpc service raw_context
-$client rpc call '/blocks/head/raw_context/version' | assert '{ "content": "67656e65736973" }'
+$client rpc call '/blocks/head/raw_context/version' | assert '{ "content": "616c706861" }'
 $client rpc call '/blocks/head/raw_context/non-existent' | assert 'No service found at this URL'
-$client rpc call '/blocks/head/raw_context?depth=2' | assert '{ "content":
-    { "genesis_key":
-        "68b4bf512517497dbd944de6825ab0a0fed7ff51bdd6b77596a19cc9175ddd55",
-      "v1": { "sandboxed": null }, "version": "67656e65736973" } }'
+$client rpc call '/blocks/head/raw_context/delegates/?depth=2' | assert '{ "content":
+    { "ed25519":
+        { "02": null, "a9": null, "c5": null, "da": null, "e7": null } } }'
 $client rpc call '/blocks/head/raw_context/non-existent?depth=-1' | assert 'No service found at this URL'
 $client rpc call '/blocks/head/raw_context/non-existent?depth=0' | assert 'No service found at this URL'
 
 
 $client bake for bootstrap1 -max-priority 512
+sleep 1
 
 key1=foo
 key2=bar
+key3=boo
+key4=king
+key5=queen
 
 $client gen keys $key1
-$client gen keys $key2
+$client gen keys $key2 --sig secp256k1
+$client gen keys $key3 --sig ed25519
 
 $client list known identities
 $client get balance for bootstrap1
 
-$client transfer 1,000 from bootstrap1 to $key1
-$client transfer 2,000 from bootstrap1 to $key2
+bake_after $client transfer 1,000 from bootstrap1 to $key1
+bake_after $client transfer 2,000 from bootstrap1 to $key2
+bake_after $client transfer 3,000 from bootstrap1 to $key3
 
 $client get balance for $key1 | assert "1,000 ꜩ"
 $client get balance for $key2 | assert "2,000 ꜩ"
+$client get balance for $key3 | assert "3,000 ꜩ"
 
-$client transfer 1,000 from $key2 to $key1
-
+bake_after $client transfer 1,000 from $key2 to $key1 -fee 0
 $client get balance for $key1 | assert "2,000 ꜩ"
-$client get balance for $key2 | assert "999.95 ꜩ"
+$client get balance for $key2 | assert "1,000 ꜩ"
+
+bake_after $client transfer 1,000 from $key1 to $key2
+$client get balance for $key1 | assert "999.95 ꜩ"
+$client get balance for $key2 | assert "2,000 ꜩ"
 
 # Should fail
 # $client transfer 999.95 from $key2 to $key1
@@ -56,25 +65,63 @@ $client typecheck program noop
 $client originate contract noop \
         for $key1 transferring 1,000 from bootstrap1 \
         running noop
+sleep 1
+$client bake for bootstrap1 -max-priority 512
 $client transfer 10 from bootstrap1 to noop -arg "Unit"
+sleep 1
+$client bake for bootstrap1 -max-priority 512
+
 
 $client originate contract hardlimit \
         for $key1 transferring 1,000 from bootstrap1 \
         running file:contracts/hardlimit.tz -init "3"
+sleep 1
+$client bake for bootstrap1 -max-priority 512
 $client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
+sleep 1
+$client bake for bootstrap1 -max-priority 512
 $client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
 # $client transfer 10 from bootstrap1 to hardlimit -arg "unit" # should fail
+sleep 1
+$client bake for bootstrap1 -max-priority 512
 
-$client originate free account free_account for $key1
+$client originate account free_account for $key1 \
+        transferring 1,000 from bootstrap1 -delegatable
+sleep 1
+$client bake for bootstrap1 -max-priority 512
 $client get delegate for free_account
+sleep 1
+$client bake for bootstrap1 -max-priority 512
 $client register key $key2 as delegate
+sleep 1
+$client bake for bootstrap1 -max-priority 512
 $client set delegate for free_account to $key2
+sleep 1
+$client bake for bootstrap1 -max-priority 512
 $client get delegate for free_account
 
 $client get balance for bootstrap5 | assert "4,000,000 ꜩ"
 $client transfer 400,000 from bootstrap5 to bootstrap1 -fee 0
+sleep 1
+$client bake for bootstrap1 -max-priority 512
 $client transfer 400,000 from bootstrap1 to bootstrap5 -fee 0
+sleep 1
+$client bake for bootstrap1 -max-priority 512
 $client get balance for bootstrap5 | assert "4,000,000 ꜩ"
+sleep 1
+
+
+$client activate account $key4 with king_commitment.json --no-confirmation
+$client activate account $key5 with queen_commitment.json --no-confirmation
+$client bake for bootstrap1 -max-priority 512
+sleep 1
+
+$client get balance for $key4 | assert "23,932,454.669,343 ꜩ"
+$client get balance for $key5 | assert "72,954,577.464,032 ꜩ"
+
+$client transfer 10 from $key4 to $key5
+
+
 
 echo
 echo End of test

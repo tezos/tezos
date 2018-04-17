@@ -29,3 +29,8 @@ val inject_types :
     contracts extracted from the blockchain and not local files. *)
 val unparse_toplevel : ?type_map: Script_tc_errors.type_map -> Script.expr -> Michelson_v1_parser.parsed
 val unparse_expression : Script.expr -> Michelson_v1_parser.parsed
+
+(** Unexpand the macros and produce the result of parsing an
+    intermediate pretty printed source. Works on generic trees,for
+    programs that fail to be converted to a specific script version. *)
+val unparse_invalid : string Micheline.canonical -> Michelson_v1_parser.parsed

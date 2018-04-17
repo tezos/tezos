@@ -11,12 +11,14 @@ module Int_set = Set.Make (Compare.Int)
 
 type t = {
   context: Context.t ;
-  constants: Constants_repr.constants ;
+  constants: Constants_repr.parametric ;
   first_level: Raw_level_repr.t ;
   level: Level_repr.t ;
   timestamp: Time.t ;
   fitness: Int64.t ;
   endorsements_received: Int_set.t;
+  fees: Tez_repr.t ;
+  rewards: Tez_repr.t ;
 }
 
 type context = t
@@ -33,6 +35,17 @@ let record_endorsement ctxt k = { ctxt with endorsements_received = Int_set.add 
 let endorsement_already_recorded ctxt k = Int_set.mem k ctxt.endorsements_received
 
 let set_current_fitness ctxt fitness = { ctxt with fitness }
+
+let add_fees ctxt fees =
+  Lwt.return Tez_repr.(ctxt.fees +? fees) >>=? fun fees ->
+  return { ctxt with fees}
+
+let add_rewards ctxt rewards =
+  Lwt.return Tez_repr.(ctxt.rewards +? rewards) >>=? fun rewards ->
+  return { ctxt with rewards}
+
+let get_rewards ctxt = ctxt.rewards
+let get_fees ctxt = ctxt.fees
 
 type storage_error =
   | Incompatible_protocol_version of string
@@ -120,22 +133,10 @@ let storage_error err = fail (Storage_error err)
 let version_key = ["version"]
 let version_value = "alpha"
 
-let is_first_block ctxt =
-  Context.get ctxt version_key >>= function
-  | None ->
-      return true
-  | Some bytes ->
-      let s = MBytes.to_string bytes in
-      if Compare.String.(s = version_value) then
-        return false
-      else if Compare.String.(s = "genesis") then
-        return true
-      else
-        storage_error (Incompatible_protocol_version s)
-
 let version = "v1"
 let first_level_key = [ version ; "first_level" ]
-let sandboxed_key = [ version ; "sandboxed" ]
+let constants_key = [ version ; "constants" ]
+let protocol_param_key = [ "protocol_parameters" ]
 
 let get_first_level ctxt =
   Context.get ctxt first_level_key >>= function
@@ -153,53 +154,97 @@ let set_first_level ctxt level =
   Context.set ctxt first_level_key bytes >>= fun ctxt ->
   return ctxt
 
-type error += Failed_to_parse_sandbox_parameter of MBytes.t
+type error += Failed_to_parse_parameter of MBytes.t
+type error += Failed_to_decode_parameter of Data_encoding.json * string
 
 let () =
   register_error_kind
     `Temporary
-    ~id:"context.failed_to_parse_sandbox_parameter"
-    ~title: "Failed to parse sandbox parameter"
+    ~id:"context.failed_to_parse_parameter"
+    ~title: "Failed to parse parameter"
     ~description:
-      "The sandbox paramater is not a valid JSON string."
+      "The protocol parameters are not valid JSON."
     ~pp:begin fun ppf bytes ->
       Format.fprintf ppf
-        "@[<v 2>Cannot parse the sandbox parameter:@ %s@]"
+        "@[<v 2>Cannot parse the protocol parameter:@ %s@]"
         (MBytes.to_string bytes)
     end
     Data_encoding.(obj1 (req "contents" bytes))
-    (function Failed_to_parse_sandbox_parameter data -> Some data | _ -> None)
-    (fun data -> Failed_to_parse_sandbox_parameter data)
+    (function Failed_to_parse_parameter data -> Some data | _ -> None)
+    (fun data -> Failed_to_parse_parameter data) ;
+  register_error_kind
+    `Temporary
+    ~id:"context.failed_to_decode_parameter"
+    ~title: "Failed to decode parameter"
+    ~description:
+      "Unexpected JSON object."
+    ~pp:begin fun ppf (json, msg) ->
+      Format.fprintf ppf
+        "@[<v 2>Cannot decode the protocol parameter:@ %s@ %a@]"
+        msg
+        Data_encoding.Json.pp json
+    end
+    Data_encoding.(obj2
+                     (req "contents" json)
+                     (req "error" string))
+    (function
+      | Failed_to_decode_parameter (json, msg) -> Some (json, msg)
+      | _ -> None)
+    (fun (json, msg) -> Failed_to_decode_parameter (json, msg))
 
-let get_sandboxed c =
-  Context.get c sandboxed_key >>= function
-  | None -> return None
+let get_proto_param ctxt =
+  Context.get ctxt protocol_param_key >>= function
+  | None ->
+      failwith "Missing protocol parameters."
   | Some bytes ->
       match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
-      | None -> fail (Failed_to_parse_sandbox_parameter bytes)
-      | Some json -> return (Some json)
+      | None -> fail (Failed_to_parse_parameter bytes)
+      | Some json -> begin
+          Context.del ctxt protocol_param_key >>= fun ctxt ->
+          match Data_encoding.Json.destruct Parameters_repr.encoding json with
+          | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
+              Format.kasprintf
+                failwith "Invalid protocol_parameters: %a %a"
+                (fun ppf -> Data_encoding.Json.print_error ppf) exn
+                Data_encoding.Json.pp json
+          | param -> return (param, ctxt)
+        end
 
-let set_sandboxed c json =
-  Context.set c sandboxed_key
-    (Data_encoding.Binary.to_bytes Data_encoding.json json)
+let set_constants ctxt constants =
+  let bytes =
+    Data_encoding.Binary.to_bytes
+      Parameters_repr.constants_encoding constants in
+  Context.set ctxt constants_key bytes
 
-let may_tag_first_block ctxt level =
-  is_first_block ctxt >>=? function
-  | false ->
-      get_first_level ctxt >>=? fun level ->
-      return (ctxt, false, level)
-  | true ->
-      Context.set ctxt version_key
-        (MBytes.of_string version_value) >>= fun ctxt ->
-      set_first_level ctxt level >>=? fun ctxt ->
-      return (ctxt, true, level)
+let get_constants ctxt =
+  Context.get ctxt constants_key >>= function
+  | None ->
+      failwith "Internal error: cannot read constants in context."
+  | Some bytes ->
+      match
+        Data_encoding.Binary.of_bytes Parameters_repr.constants_encoding bytes
+      with
+      | None ->
+          failwith "Internal error: cannot parse constants in context."
+      | Some constants -> return constants
+
+let check_inited ctxt =
+  Context.get ctxt version_key >>= function
+  | None ->
+      failwith "Internal error: un-initialized context."
+  | Some bytes ->
+      let s = MBytes.to_string bytes in
+      if Compare.String.(s = version_value) then
+        return ()
+      else
+        storage_error (Incompatible_protocol_version s)
 
 let prepare ~level ~timestamp ~fitness ctxt =
-  Lwt.return (Raw_level_repr.of_int32 level ) >>=? fun level ->
+  Lwt.return (Raw_level_repr.of_int32 level) >>=? fun level ->
   Lwt.return (Fitness_repr.to_int64 fitness) >>=? fun fitness ->
-  may_tag_first_block ctxt level >>=? fun (ctxt, first_block, first_level) ->
-  get_sandboxed ctxt >>=? fun sandbox ->
-  Constants_repr.read sandbox >>=? fun constants ->
+  check_inited ctxt >>=? fun () ->
+  get_constants ctxt >>=? fun constants ->
+  get_first_level ctxt >>=? fun first_level ->
   let level =
     Level_repr.from_raw
       ~first_level
@@ -207,14 +252,40 @@ let prepare ~level ~timestamp ~fitness ctxt =
       ~blocks_per_voting_period:constants.Constants_repr.blocks_per_voting_period
       ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
       level in
-  return ({ context = ctxt ; constants ; level ;
-            timestamp ; fitness ; first_level ;
-            endorsements_received = Int_set.empty ;
-          },
-          first_block)
+  return {
+    context = ctxt ; constants ; level ;
+    timestamp ; fitness ; first_level ;
+    endorsements_received = Int_set.empty ;
+    fees = Tez_repr.zero ;
+    rewards = Tez_repr.zero ;
+  }
+
+let check_first_block ctxt =
+  Context.get ctxt version_key >>= function
+  | None -> return ()
+  | Some bytes ->
+      let s = MBytes.to_string bytes in
+      if Compare.String.(s = version_value) then
+        failwith "Internal error: previously initialized context."
+      else if Compare.String.(s = "genesis") then
+        return ()
+      else
+        storage_error (Incompatible_protocol_version s)
+
+let prepare_first_block ~level ~timestamp ~fitness ctxt =
+  check_first_block ctxt >>=? fun () ->
+  Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
+  get_proto_param ctxt >>=? fun (param, ctxt) ->
+  Context.set ctxt version_key
+    (MBytes.of_string version_value) >>= fun ctxt ->
+  set_first_level ctxt first_level >>=? fun ctxt ->
+  set_constants ctxt param.constants >>= fun ctxt ->
+  prepare ctxt ~level ~timestamp ~fitness >>=? fun ctxt ->
+  return (param, ctxt)
 
 let activate ({ context = c ; _ } as s) h =
   Updater.activate c h >>= fun c -> Lwt.return { s with context = c }
+
 let fork_test_chain ({ context = c ; _ } as s) protocol expiration =
   Updater.fork_test_chain c ~protocol ~expiration >>= fun c ->
   Lwt.return { s with context = c }
@@ -229,48 +300,11 @@ let register_resolvers enc resolve =
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
       endorsements_received = Int_set.empty ;
+      fees = Tez_repr.zero ;
+      rewards = Tez_repr.zero ;
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve
-
-type error += Unimplemented_sandbox_migration
-
-let configure_sandbox ctxt json =
-  let rec json_equals x y = match x, y with
-    | `Float x, `Float y -> Compare.Float.(x = y)
-    | `Bool x, `Bool y -> Compare.Bool.(x = y)
-    | `String x, `String y -> Compare.String.(x = y)
-    | `Null, `Null -> true
-    | `O x, `O y ->
-        let sort =
-          List.sort (fun (a, _) (b, _) -> Compare.String.compare a b) in
-        Compare.Int.(=) (List.length x) (List.length y) &&
-        List.for_all2
-          (fun (nx, vx) (ny, vy) ->
-             Compare.String.(nx = ny) && json_equals vx vy)
-          (sort x) (sort y)
-    | `A x, `A y ->
-        Compare.Int.(=) (List.length x) (List.length y) &&
-        List.for_all2 json_equals x y
-    | _, _ -> false
-  in
-  let json =
-    match json with
-    | None -> `O []
-    | Some json -> json in
-  is_first_block ctxt >>=? function
-  | true ->
-      set_sandboxed ctxt json >>= fun ctxt ->
-      return ctxt
-  | false ->
-      get_sandboxed ctxt >>=? function
-      | None ->
-          fail Unimplemented_sandbox_migration
-      | Some existing ->
-          if json_equals existing json then
-            return ctxt
-          else
-            failwith "Changing sandbox parameter is not yet implemented"
 
 (* Generic context ********************************************************)
 

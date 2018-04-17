@@ -18,8 +18,9 @@ type error += Cannot_freeze_baking_deposit (* `Permanent *)
 type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Empty_endorsement
-type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
-
+type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
+type error += Invalid_signature  (* `Permanent *)
+type error += Invalid_stamp  (* `Permanent *)
 
 let () =
   register_error_kind
@@ -90,9 +91,9 @@ let () =
     ~pp:(fun ppf l ->
         Format.fprintf ppf
           "@[<v 2>The endorsement is inconsistent. Delegates:@ %a@]"
-          (Format.pp_print_list Ed25519.Public_key_hash.pp) l)
+          (Format.pp_print_list Signature.Public_key_hash.pp) l)
     Data_encoding.(obj1
-                     (req "delegates" (list Ed25519.Public_key_hash.encoding)))
+                     (req "delegates" (list Signature.Public_key_hash.encoding)))
     (function Inconsistent_endorsement l -> Some l | _ -> None)
     (fun l -> Inconsistent_endorsement l) ;
   register_error_kind
@@ -104,12 +105,32 @@ let () =
     ~pp:(fun ppf (block, pkh) ->
         Format.fprintf ppf "Invalid signature for block %a. Expected: %a."
           Block_hash.pp_short block
-          Ed25519.Public_key_hash.pp_short pkh)
+          Signature.Public_key_hash.pp_short pkh)
     Data_encoding.(obj2
                      (req "block" Block_hash.encoding)
-                     (req "expected" Ed25519.Public_key_hash.encoding))
+                     (req "expected" Signature.Public_key_hash.encoding))
     (function Invalid_block_signature (block, pkh) -> Some (block, pkh) | _ -> None)
-    (fun (block, pkh) -> Invalid_block_signature (block, pkh))
+    (fun (block, pkh) -> Invalid_block_signature (block, pkh));
+  register_error_kind
+    `Permanent
+    ~id:"baking.invalid_signature"
+    ~title:"Invalid block signature"
+    ~description:"The block's signature is invalid"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Invalid block signature")
+    Data_encoding.empty
+    (function Invalid_signature -> Some () | _ -> None)
+    (fun () -> Invalid_signature) ;
+  register_error_kind
+    `Permanent
+    ~id:"baking.insufficient_proof_of_work"
+    ~title:"Insufficient block proof-of-work stamp"
+    ~description:"The block's proof-of-work stamp is insufficient"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Insufficient proof-of-work stamp")
+    Data_encoding.empty
+    (function Invalid_stamp -> Some () | _ -> None)
+    (fun () -> Invalid_stamp)
 
 
 let minimal_time c priority pred_timestamp =
@@ -134,13 +155,13 @@ let freeze_baking_deposit ctxt { Block_header.priority ; _ } delegate =
   if Compare.Int.(priority >= Constants.first_free_baking_slot ctxt)
   then return (ctxt, Tez.zero)
   else
-    let deposit = Constants.block_security_deposit in
+    let deposit = Constants.block_security_deposit ctxt in
     Delegate.freeze_deposit ctxt delegate deposit
     |> trace Cannot_freeze_baking_deposit >>=? fun ctxt ->
     return (ctxt, deposit)
 
 let freeze_endorsement_deposit ctxt delegate =
-  let deposit = Constants.endorsement_security_deposit in
+  let deposit = Constants.endorsement_security_deposit ctxt in
   Delegate.freeze_deposit ctxt delegate deposit
   |> trace Cannot_freeze_endorsement_deposit
 
@@ -166,8 +187,8 @@ let check_endorsements_rights c level slots =
   | [] -> fail Empty_endorsement
   | delegate :: delegates as all_delegates ->
       fail_unless
-        (List.for_all (fun d -> Ed25519.Public_key.equal d delegate) delegates)
-        (Inconsistent_endorsement (List.map Ed25519.Public_key.hash all_delegates)) >>=? fun () ->
+        (List.for_all (fun d -> Signature.Public_key.equal d delegate) delegates)
+        (Inconsistent_endorsement (List.map Signature.Public_key.hash all_delegates)) >>=? fun () ->
       return delegate
 
 let paying_priorities c =
@@ -175,11 +196,11 @@ let paying_priorities c =
 
 type error += Incorect_priority
 
-let endorsement_reward ~block_priority:prio =
+let endorsement_reward ctxt ~block_priority:prio =
   if Compare.Int.(prio >= 0)
   then
     Lwt.return
-      Tez.(Constants.endorsement_reward /? (Int64.(succ (of_int prio))))
+      Tez.(Constants.endorsement_reward ctxt /? (Int64.(succ (of_int prio))))
   else fail Incorect_priority
 
 let baking_priorities c level =
@@ -203,7 +224,7 @@ let select_delegate delegate delegate_list max_priority =
     else
       let LCons (pk, t) = l in
       let acc =
-        if Ed25519.Public_key_hash.equal delegate (Ed25519.Public_key.hash pk)
+        if Signature.Public_key_hash.equal delegate (Signature.Public_key.hash pk)
         then n :: acc
         else acc in
       t () >>=? fun t ->
@@ -226,16 +247,13 @@ let first_endorsement_slots
   select_delegate delegate delegate_list max_priority
 
 let check_hash hash stamp_threshold =
-  let bytes = Block_hash.to_string hash in
-  let word = String.get_int64 bytes 0 in
-  Compare.Uint64.(word < stamp_threshold)
+  let bytes = Block_hash.to_bytes hash in
+  let word = MBytes.get_int64 bytes 0 in
+  Compare.Uint64.(word <= stamp_threshold)
 
 let check_header_hash header stamp_threshold =
   let hash = Block_header.hash header in
   check_hash hash stamp_threshold
-
-type error +=
-  | Invalid_stamp
 
 let check_proof_of_work_stamp ctxt block =
   let proof_of_work_threshold = Constants.proof_of_work_threshold ctxt in
@@ -247,12 +265,12 @@ let check_proof_of_work_stamp ctxt block =
 let check_signature block key =
   let check_signature key { Block_header.protocol_data ; shell ; signature } =
     let unsigned_header = Block_header.forge_unsigned shell protocol_data in
-    Ed25519.Signature.check key signature unsigned_header in
+    Signature.check key signature unsigned_header in
   if check_signature key block then
     return ()
   else
     fail (Invalid_block_signature (Block_header.hash block,
-                                   Ed25519.Public_key.hash key))
+                                   Signature.Public_key.hash key))
 
 let max_fitness_gap ctxt =
   let slots = Int64.of_int (Constants.endorsers_per_block ctxt + 1) in
@@ -277,4 +295,3 @@ let dawn_of_a_new_cycle ctxt =
     return (Some level.cycle)
   else
     return None
-

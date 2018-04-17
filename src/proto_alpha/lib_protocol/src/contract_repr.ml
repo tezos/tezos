@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 type t =
-  | Implicit of Ed25519.Public_key_hash.t
+  | Implicit of Signature.Public_key_hash.t
   | Originated of Contract_hash.t
 
 include Compare.Make(struct
@@ -16,7 +16,7 @@ include Compare.Make(struct
     let compare l1 l2 =
       match l1, l2 with
       | Implicit pkh1, Implicit pkh2 ->
-          Ed25519.Public_key_hash.compare pkh1 pkh2
+          Signature.Public_key_hash.compare pkh1 pkh2
       | Originated h1, Originated h2 ->
           Contract_hash.compare h1 h2
       | Implicit _, Originated _ -> -1
@@ -28,21 +28,22 @@ type contract = t
 type error += Invalid_contract_notation of string (* `Permanent *)
 
 let to_b58check = function
-  | Implicit pbk -> Ed25519.Public_key_hash.to_b58check pbk
+  | Implicit pbk -> Signature.Public_key_hash.to_b58check pbk
   | Originated h -> Contract_hash.to_b58check h
 
 let of_b58check s =
   match Base58.decode s with
-  | Some (Ed25519.Public_key_hash.Hash h) -> ok (Implicit h)
-  | Some (Contract_hash.Hash h) -> ok (Originated h)
+  | Some (Ed25519.Public_key_hash.Data h) -> ok (Implicit (Signature.Ed25519 h))
+  | Some (Secp256k1.Public_key_hash.Data h) -> ok (Implicit (Signature.Secp256k1 h))
+  | Some (Contract_hash.Data h) -> ok (Originated h)
   | _ -> error (Invalid_contract_notation s)
 
 let pp ppf = function
-  | Implicit pbk -> Ed25519.Public_key_hash.pp ppf pbk
+  | Implicit pbk -> Signature.Public_key_hash.pp ppf pbk
   | Originated h -> Contract_hash.pp ppf h
 
 let pp_short ppf = function
-  | Implicit pbk -> Ed25519.Public_key_hash.pp_short ppf pbk
+  | Implicit pbk -> Signature.Public_key_hash.pp_short ppf pbk
   | Originated h -> Contract_hash.pp_short ppf h
 
 let encoding =
@@ -57,7 +58,7 @@ let encoding =
   splitted
     ~binary:
       (union ~tag_size:`Uint8 [
-          case (Tag 0) Ed25519.Public_key_hash.encoding
+          case (Tag 0) Signature.Public_key_hash.encoding
             (function Implicit k -> Some k | _ -> None)
             (fun k -> Implicit k) ;
           case (Tag 1) Contract_hash.encoding
@@ -150,29 +151,31 @@ let arg =
 module Index = struct
   type t = contract
   let path_length =
-    assert Compare.Int.(Ed25519.Public_key_hash.path_length =
-                        Contract_hash.path_length) ;
-    Ed25519.Public_key_hash.path_length + 1
+
+    assert Compare.Int.(Signature.Public_key_hash.path_length =
+                        1 + Contract_hash.path_length) ;
+    Signature.Public_key_hash.path_length
   let to_path c l =
     match c with
     | Implicit k ->
-        "implicit" :: Ed25519.Public_key_hash.to_path k l
+        Signature.Public_key_hash.to_path k l
     | Originated h ->
         "originated" :: Contract_hash.to_path h l
   let of_path = function
-    | "implicit" :: key -> begin
-        match Ed25519.Public_key_hash.of_path key with
-        | None -> None
-        | Some h -> Some (Implicit h)
-      end
     | "originated" :: key -> begin
         match Contract_hash.of_path key with
         | None -> None
         | Some h -> Some (Originated h)
       end
-    | _ -> None
+    | key -> begin
+        match Signature.Public_key_hash.of_path key with
+        | None -> None
+        | Some h -> Some (Implicit h)
+      end
   let contract_prefix s =
     "originated" :: Contract_hash.prefix_path s
-  let pkh_prefix s =
-    "pubkey" :: Ed25519.Public_key_hash.prefix_path s
+  let pkh_prefix_ed25519 s =
+    Ed25519.Public_key_hash.prefix_path s
+  let pkh_prefix_secp256k1 s =
+    Secp256k1.Public_key_hash.prefix_path s
 end

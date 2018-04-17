@@ -61,20 +61,13 @@ let inject_types type_map parsed =
   inject_expr (root parsed.unexpanded)
 
 let unparse ?type_map parse expanded =
-  let rec unexpand expr =
-    match Michelson_v1_macros.unexpand expr with
-    | Seq (loc, items, annot) ->
-        Seq (loc, List.map unexpand items, annot)
-    | Prim (loc, name, args, annot) ->
-        Prim (loc, name, List.map unexpand args, annot)
-    | Int _ | String _ as atom -> atom in
   let source =
     match type_map with
     | Some type_map ->
         let unexpanded, unexpansion_table =
           expanded
           |> Michelson_v1_primitives.strings_of_prims
-          |> root |> unexpand |> Micheline.extract_locations in
+          |> root |> Michelson_v1_macros.unexpand_rec |> Micheline.extract_locations in
         let rec inject_expr = function
           | Seq (loc, items, annot) ->
               Seq (inject_loc `before loc, List.map inject_expr items, annot)
@@ -97,12 +90,20 @@ let unparse ?type_map parse expanded =
         |> Format.asprintf "%a" Micheline_printer.print_expr
     | None ->
         expanded |> Michelson_v1_primitives.strings_of_prims
-        |> root |> unexpand |> Micheline.strip_locations
+        |> root |> Michelson_v1_macros.unexpand_rec |> Micheline.strip_locations
         |> Micheline_printer.printable (fun n -> n)
         |> Format.asprintf "%a" Micheline_printer.print_expr in
   match parse source with
   | res, [] -> res
-  | _, _ :: _ -> Pervasives.failwith "Michelson_v1_printer.unexpand"
+  | _, _ :: _ -> Pervasives.failwith "Michelson_v1_printer.unparse"
 
 let unparse_toplevel ?type_map = unparse ?type_map Michelson_v1_parser.parse_toplevel
 let unparse_expression = unparse Michelson_v1_parser.parse_expression
+
+let unparse_invalid expanded =
+  let source =
+    expanded
+    |> root |> Michelson_v1_macros.unexpand_rec |> Micheline.strip_locations
+    |> Micheline_printer.printable (fun n -> n)
+    |> Format.asprintf "%a" Micheline_printer.print_expr_unwrapped in
+  fst (Michelson_v1_parser.parse_toplevel source)

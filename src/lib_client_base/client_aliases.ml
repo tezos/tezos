@@ -10,7 +10,7 @@
 (* Tezos Command line interface - Local Storage for Configuration *)
 
 open Lwt.Infix
-open Cli_entries
+open Clic
 
 module type Entity = sig
   type t
@@ -60,13 +60,13 @@ module type Alias = sig
   val alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_context.wallet as 'b)) Cli_entries.params ->
-    (string * t -> 'a, 'b) Cli_entries.params
+    ('a, (#Client_context.wallet as 'b)) Clic.params ->
+    (string * t -> 'a, 'b) Clic.params
   val fresh_alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (< .. > as 'obj)) Cli_entries.params ->
-    (fresh_param -> 'a, 'obj) Cli_entries.params
+    ('a, (< .. > as 'obj)) Clic.params ->
+    (fresh_param -> 'a, 'obj) Clic.params
   val force_switch :
     unit -> (bool, #Client_context.full) arg
   val of_fresh :
@@ -77,13 +77,13 @@ module type Alias = sig
   val source_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_context.wallet as 'obj)) Cli_entries.params ->
-    (t -> 'a, 'obj) Cli_entries.params
+    ('a, (#Client_context.wallet as 'obj)) Clic.params ->
+    (t -> 'a, 'obj) Clic.params
   val source_arg :
     ?long:string ->
     ?placeholder:string ->
     ?doc:string ->
-    unit -> (t option, (#Client_context.wallet as 'obj)) Cli_entries.arg
+    unit -> (t option, (#Client_context.wallet as 'obj)) Clic.arg
   val autocomplete:
     #Client_context.wallet -> string list tzresult Lwt.t
 end
@@ -293,7 +293,7 @@ module Alias = functor (Entity : Entity) -> struct
       (parameter parse_source_string)
 
   let force_switch () =
-    Cli_entries.switch
+    Clic.switch
       ~long:"force" ~short:'f'
       ~doc:("overwrite existing " ^ Entity.name) ()
 

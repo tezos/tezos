@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 let commands () =
-  let open Cli_entries in
+  let open Clic in
   let group = { name = "admin" ;
                 title = "Commands to perform privileged operations on the node" } in
   [

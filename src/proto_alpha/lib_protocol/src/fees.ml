@@ -24,7 +24,8 @@ let () =
 
 
 let origination_burn c ~source contract =
-  Contract.spend_from_script c source Constants.origination_burn >>=? fun c ->
+  let origination_burn = Constants.origination_burn c in
+  Contract.spend_from_script c source origination_burn >>=? fun c ->
   Contract.code_and_storage_fee c contract >>=? fun storage_fee ->
   Contract.spend_from_script c source storage_fee
   |> trace Cannot_pay_storage_fee

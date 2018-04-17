@@ -45,8 +45,6 @@ type validation_state =
     ctxt : Alpha_context.t ;
     op_count : int ;
     deposit : Alpha_context.Tez.t ;
-    fees : Alpha_context.Tez.t ;
-    rewards : Alpha_context.Tez.t ;
   }
 
 let current_context { ctxt ; _ } =
@@ -69,13 +67,11 @@ let begin_application
   let level = block_header.shell.level in
   let fitness = pred_fitness in
   let timestamp = block_header.shell.timestamp in
-  Alpha_context.init ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
+  Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
     ctxt block_header pred_timestamp >>=? fun (ctxt, baker, deposit) ->
-  let mode = Application { block_header ; baker = Ed25519.Public_key.hash baker } in
-  return { mode ; ctxt ; op_count = 0 ; deposit ;
-           fees = Alpha_context.Tez.zero ;
-           rewards = Alpha_context.Tez.zero }
+  let mode = Application { block_header ; baker = Signature.Public_key.hash baker } in
+  return { mode ; ctxt ; op_count = 0 ; deposit }
 
 let begin_construction
     ~predecessor_context:ctxt
@@ -88,7 +84,7 @@ let begin_construction
     () =
   let level = Int32.succ pred_level in
   let fitness = pred_fitness in
-  Alpha_context.init ~timestamp ~level ~fitness ctxt >>=? fun ctxt ->
+  Alpha_context.prepare ~timestamp ~level ~fitness ctxt >>=? fun ctxt ->
   begin
     match protocol_data with
     | None ->
@@ -100,13 +96,11 @@ let begin_construction
           ctxt pred_timestamp
           proto_header >>=? fun (ctxt, protocol_data, baker, deposit) ->
         let mode =
-          let baker = Ed25519.Public_key.hash baker in
+          let baker = Signature.Public_key.hash baker in
           Full_construction { predecessor ; baker ; protocol_data } in
         return (mode, ctxt, deposit)
   end >>=? fun (mode, ctxt, deposit) ->
-  return { mode ; ctxt ; op_count = 0 ; deposit ;
-           fees = Alpha_context.Tez.zero ;
-           rewards = Alpha_context.Tez.zero  }
+  return { mode ; ctxt ; op_count = 0 ; deposit }
 
 let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
   let pred_block, block_prio, baker =
@@ -122,13 +116,11 @@ let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
         Some baker in
   Apply.apply_operation ctxt baker pred_block block_prio
     (Alpha_context.Operation.hash operation) operation
-  >>=? fun (ctxt, _contracts, _ignored_script_error, fees, rewards) ->
+  >>=? fun (ctxt, _contracts, _ignored_script_error) ->
   let op_count = op_count + 1 in
-  Lwt.return Alpha_context.Tez.(fees >>? (+?) data.fees) >>=? fun fees ->
-  Lwt.return Alpha_context.Tez.(rewards >>? (+?) data.rewards) >>=? fun rewards ->
-  return { data with ctxt ; op_count ; fees ; rewards }
+  return { data with ctxt ; op_count }
 
-let finalize_block { mode ; ctxt ; op_count ; deposit ; fees ; rewards } =
+let finalize_block { mode ; ctxt ; op_count ; deposit } =
   match mode with
   | Partial_construction _ ->
       let ctxt = Alpha_context.finalize ctxt in
@@ -137,7 +129,7 @@ let finalize_block { mode ; ctxt ; op_count ; deposit ; fees ; rewards } =
       { baker ;  block_header = { protocol_data ; _ } }
   | Full_construction { protocol_data ; baker ; _ } ->
       Apply.finalize_application
-        ctxt protocol_data baker deposit fees rewards >>=? fun ctxt ->
+        ctxt protocol_data baker deposit  >>=? fun ctxt ->
       let { level ; _ } : Alpha_context.Level.t =
         Alpha_context. Level.current ctxt in
       let priority = protocol_data.priority in
@@ -153,4 +145,10 @@ let finalize_block { mode ; ctxt ; op_count ; deposit ; fees ; rewards } =
 let compare_operations op1 op2 =
   Apply.compare_operations op1 op2
 
-let configure_sandbox = Alpha_context.configure_sandbox
+let init ctxt block_header =
+  let level = block_header.Block_header.level in
+  let fitness = block_header.fitness in
+  let timestamp = block_header.timestamp in
+  Alpha_context.prepare_first_block
+    ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
+  return (Alpha_context.finalize ctxt)

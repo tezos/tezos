@@ -75,3 +75,7 @@ val secret_key_size : int
 val nonce_to_bigarray : nonce -> Cstruct.buffer
 val nonce_of_bigarray : Cstruct.buffer -> nonce
 val nonce_size : int
+
+val public_key_encoding : public_key Data_encoding.t
+val secret_key_encoding : secret_key Data_encoding.t
+val nonce_encoding : nonce Data_encoding.t

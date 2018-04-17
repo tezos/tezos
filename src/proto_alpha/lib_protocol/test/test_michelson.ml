@@ -388,7 +388,6 @@ let test_example () =
 
   (*  Did the given key sign the string? (key is bootstrap1) *)
   test_output ~location: __LOC__ "check_signature" "(Pair \"26981d372a7b3866621bf79713d249197fe6d518ef702fa65738e1715bde9da54df04fefbcc84287ecaa9f74ad9296462731aa24bbcece63c6bf73a8f5752309\" \"hello\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "True" >>=? fun _ ->
-
   test_output ~location: __LOC__ "check_signature" "(Pair \"26981d372a7b3866621bf79713d249197fe6d518ef702fa65738e1715bde9da54df04fefbcc84287ecaa9f74ad9296462731aa24bbcece63c6bf73a8f5752309\" \"abcd\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "False" >>=? fun _ ->
 
   (*  Convert a public key to a public key hash *)
@@ -420,14 +419,14 @@ let test_example () =
 
   (* Test TRANSFER_TO *)
   Account.make_account ~tc: sb.tezos_context >>=?? fun (account, tc) ->
-  let account_str = quote @@ Ed25519.Public_key_hash.to_b58check account.hpub in
+  let account_str = quote @@ Signature.Public_key_hash.to_b58check account.hpub in
   test_tc ~tc "transfer_to" "Unit" account_str >>=? fun tc ->
   let amount = Account.init_amount + 100 in
   Assert.equal_cents_balance ~tc (account.contract, amount * 100) >>=?? fun _ ->
 
   (* Test CREATE_ACCOUNT *)
   Account.make_account ~tc: sb.tezos_context >>=?? fun (account, tc) ->
-  let account_str = quote @@ Ed25519.Public_key_hash.to_b58check account.hpub in
+  let account_str = quote @@ Signature.Public_key_hash.to_b58check account.hpub in
   test_contract ~tc "create_account" account_str account_str >>=? fun (cs, tc) ->
   Assert.equal_int 1 @@ List.length cs ;
 
@@ -442,7 +441,7 @@ let test_example () =
 
   (* Test DEFAULT_ACCOUNT *)
   let account = Account.new_account () in
-  let b_str = quote @@ Ed25519.Public_key_hash.to_b58check account.hpub in
+  let b_str = quote @@ Signature.Public_key_hash.to_b58check account.hpub in
   test_contract ~tc "default_account" "Unit" b_str >>=? fun (_cs, tc) ->
   Assert.equal_cents_balance ~tc (account.contract, 100 * 100) >>=?? fun _ ->
   return ()

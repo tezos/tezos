@@ -28,8 +28,6 @@ type validation_state =
     ctxt : Alpha_context.t ;
     op_count : int ;
     deposit : Alpha_context.Tez.t ;
-    fees : Alpha_context.Tez.t ;
-    rewards : Alpha_context.Tez.t ;
   }
 
 include Updater.PROTOCOL with type operation = Alpha_context.Operation.t

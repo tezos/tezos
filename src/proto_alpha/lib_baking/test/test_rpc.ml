@@ -26,38 +26,34 @@ let run blkid =
   in
 
   (* files and directories that are in context *)
-  let version = Key (MBytes.of_hex (`Hex "67656e65736973")) in
-  let genesis_key = Key (MBytes.of_hex (`Hex "68b4bf512517497dbd944de6825ab0a0fed7ff51bdd6b77596a19cc9175ddd55")) in
+  let version = Key (MBytes.of_hex (`Hex "616c706861")) in
   let dir_depth0 = Cut in
-  let dir_depth1 = Dir [("genesis_key", Cut);
-                        ("v1", Cut);
-                        ("version", Cut)] in
-  let dir_depth2 = Dir [("genesis_key", genesis_key);
-                        ("v1", Dir [("sandboxed",Cut)]);
-                        ("version", version)] in
+  let dir_depth2 = Dir [("02", Dir [("29", Cut)]);
+                        ("a9", Dir [("ce", Cut)]);
+                        ("c5", Dir [("5c", Cut)]);
+                        ("da", Dir [("c9", Cut)]);
+                        ("e7", Dir [("67", Cut)]);
+                       ] in
 
-  let tests = [(("version",1), is_equal version);
-               (("",0), is_equal dir_depth0);
-               (("",1), is_equal dir_depth1);
-               (("",2), is_equal dir_depth2);
-               (("",2), is_equal dir_depth2);
-               (("",-1), is_not_found);
-               (("not-existent",1), is_not_found);
-               (("not-existent",0), is_not_found);
-               (("not-existent",-1), is_not_found);
+  let tests = [((["version"],1), is_equal version);
+               (([""],0), is_equal dir_depth0);
+               ((["delegates";"ed25519"],2), is_equal dir_depth2);
+               (([""],-1), is_not_found);
+               ((["not-existent"],1), is_not_found);
+               ((["not-existent"],0), is_not_found);
+               ((["not-existent"],-1), is_not_found);
               ] in
   iter_s (fun ((path,depth),predicate) ->
-      Helpers.rpc_raw_context blkid [path] depth >>= fun result ->
+      Helpers.rpc_raw_context blkid path depth >>= fun result ->
       return (assert (predicate result))
     ) tests
 
 let exe = try Sys.argv.(1) with _ -> "tezos-node"
-let sandbox = try Sys.argv.(2) with _ -> "sandbox.json"
-let rpc_port = try int_of_string Sys.argv.(3) with _ -> 18500
+let rpc_port = try int_of_string Sys.argv.(2) with _ -> 18500
 
 let main () =
-  Helpers.init ~exe ~sandbox ~rpc_port () >>=? fun (_node_pid, genesis) ->
-  run (`Hash genesis)
+  Helpers.init ~exe ~rpc_port () >>=? fun (_node_pid, genesis) ->
+  run (`Hash (genesis, 0))
 
 let tests = [
   "main", (fun _ -> main ()) ;

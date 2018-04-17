@@ -86,8 +86,8 @@ module Make (Context : CONTEXT) : sig
     val finalize_block:
       validation_state -> validation_result tzresult Lwt.t
     val rpc_services: rpc_context Lwt.t RPC_directory.t
-    val configure_sandbox:
-      context -> Data_encoding.json option -> context tzresult Lwt.t
+    val init:
+      context -> Block_header.shell_header -> validation_result tzresult Lwt.t
   end
 
   module type PROTOCOL =
@@ -120,8 +120,13 @@ module Make (Context : CONTEXT) : sig
        and type 'a RPC_directory.t = 'a RPC_directory.t
        and type Ed25519.Public_key_hash.t = Ed25519.Public_key_hash.t
        and type Ed25519.Public_key.t = Ed25519.Public_key.t
-       and type Ed25519.Secret_key.t = Ed25519.Secret_key.t
-       and type Ed25519.Signature.t = Ed25519.Signature.t
+       and type Ed25519.t = Ed25519.t
+       and type Secp256k1.Public_key_hash.t = Secp256k1.Public_key_hash.t
+       and type Secp256k1.Public_key.t = Secp256k1.Public_key.t
+       and type Secp256k1.t = Secp256k1.t
+       and type Signature.public_key_hash = Signature.public_key_hash
+       and type Signature.public_key = Signature.public_key
+       and type Signature.t = Signature.t
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
@@ -130,7 +135,7 @@ module Make (Context : CONTEXT) : sig
        and type (+'m,'pr,'p,'q,'i,'o) RPC_service.t = ('m,'pr,'p,'q,'i,'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
 
-    type error += Ecoproto_error of Error_monad.error list
+    type error += Ecoproto_error of Error_monad.error
     val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
 
     module Lift (P : Updater.PROTOCOL) : PROTOCOL

@@ -13,16 +13,16 @@ module Baker : sig
 
   val rights:
     'a #RPC_context.simple -> ?max_priority:int -> 'a ->
-    (Raw_level.t * (Ed25519.Public_key_hash.t * Time.t) list) shell_tzresult Lwt.t
+    (Raw_level.t * (Signature.Public_key_hash.t * Time.t) list) shell_tzresult Lwt.t
 
   val rights_for_level:
     'a #RPC_context.simple -> ?max_priority:int -> 'a -> Raw_level.t ->
-    (Raw_level.t * Ed25519.Public_key_hash.t list) shell_tzresult Lwt.t
+    (Raw_level.t * Signature.Public_key_hash.t list) shell_tzresult Lwt.t
 
   val rights_for_delegate:
     'a #RPC_context.simple ->
     ?max_priority:int -> ?first_level:Raw_level.t -> ?last_level:Raw_level.t ->
-    'a -> Ed25519.Public_key_hash.t ->
+    'a -> Signature.Public_key_hash.t ->
     (Raw_level.t * int * Time.t) list shell_tzresult Lwt.t
 
 end
@@ -31,16 +31,16 @@ module Endorser : sig
 
   val rights:
     'a #RPC_context.simple -> ?max_priority:int -> 'a ->
-    (Raw_level.t * Ed25519.Public_key_hash.t list) shell_tzresult Lwt.t
+    (Raw_level.t * Signature.Public_key_hash.t list) shell_tzresult Lwt.t
 
   val rights_for_level:
     'a #RPC_context.simple -> ?max_priority:int -> 'a -> Raw_level.t ->
-    (Raw_level.t * Ed25519.Public_key_hash.t list) shell_tzresult Lwt.t
+    (Raw_level.t * Signature.Public_key_hash.t list) shell_tzresult Lwt.t
 
   val rights_for_delegate:
     'a #RPC_context.simple ->
     ?max_priority:int -> ?first_level:Raw_level.t -> ?last_level:Raw_level.t ->
-    'a -> Ed25519.Public_key_hash.t ->
+    'a -> Signature.Public_key_hash.t ->
     (Raw_level.t * int) list shell_tzresult Lwt.t
 
 end

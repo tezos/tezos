@@ -18,19 +18,19 @@ val minimal_time:
 
 val apply_operation:
   'a #RPC_context.simple ->
-  'a -> Block_hash.t -> Operation_hash.t -> MBytes.t -> Ed25519.Signature.t option ->
+  'a -> Block_hash.t -> Operation_hash.t -> MBytes.t -> Signature.t option ->
   (Contract.t list) shell_tzresult Lwt.t
 
 val run_code:
   'a #RPC_context.simple ->
   'a -> Script.expr ->
-  (Script.expr * Script.expr * Tez.t) ->
+  (Script.expr * Script.expr * Tez.t * Contract.t) ->
   (Script.expr * Script.expr * (Script.expr * Script.expr option) list option) shell_tzresult Lwt.t
 
 val trace_code:
   'a #RPC_context.simple ->
   'a -> Script.expr ->
-  (Script.expr * Script.expr * Tez.t) ->
+  (Script.expr * Script.expr * Tez.t * Contract.t) ->
   (Script.expr * Script.expr *
    (Script.location * Gas.t * Script.expr list) list *
    (Script.expr * Script.expr option) list option) shell_tzresult Lwt.t
@@ -181,13 +181,6 @@ module Forge : sig
       branch:Block_hash.t ->
       level:Raw_level.t ->
       nonce:Nonce.t ->
-      unit -> MBytes.t shell_tzresult Lwt.t
-
-    val faucet:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      id:public_key_hash ->
-      nonce:MBytes.t ->
       unit -> MBytes.t shell_tzresult Lwt.t
 
   end

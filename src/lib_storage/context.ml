@@ -102,7 +102,6 @@ let checkout index key =
   | Some commit ->
       GitStore.Commit.tree commit >>= fun tree ->
       let ctxt = { index ; tree ; parents = [commit] } in
-      index.patch_context ctxt >>= fun ctxt ->
       Lwt.return (Some ctxt)
 
 let checkout_exn index key =

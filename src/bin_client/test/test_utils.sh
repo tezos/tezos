@@ -81,6 +81,7 @@ activate_alpha() {
                 protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
                 with fitness 1 \
                 and key edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6 \
+		and parameters protocol_parameters.json
                 > /dev/stderr
 }
 
@@ -230,4 +231,3 @@ alias tezos-sandbox-stop="kill -9 ${node_pid}; sleep 1; rm -rf ${CLEANUP_DIRS[@]
 
 EOF
 }
-

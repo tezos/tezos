@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 type t = private
-  | Implicit of Ed25519.Public_key_hash.t
+  | Implicit of Signature.Public_key_hash.t
   | Originated of Contract_hash.t
 type contract = t
 
@@ -16,9 +16,9 @@ include Compare.S with type t := contract
 
 (** {2 Implicit contracts} *****************************************************)
 
-val implicit_contract : Ed25519.Public_key_hash.t -> contract
+val implicit_contract : Signature.Public_key_hash.t -> contract
 
-val is_implicit : contract -> Ed25519.Public_key_hash.t option
+val is_implicit : contract -> Signature.Public_key_hash.t option
 
 (** {2 Originated contracts} **************************************************)
 
@@ -66,5 +66,6 @@ module Index : sig
   val to_path: t -> string list -> string list
   val of_path: string list -> t option
   val contract_prefix: string -> string list
-  val pkh_prefix: string -> string list
+  val pkh_prefix_ed25519: string -> string list
+  val pkh_prefix_secp256k1: string -> string list
 end

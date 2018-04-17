@@ -353,7 +353,7 @@ let compare_comparable
     | String_key -> Compare.String.compare x y
     | Bool_key -> Compare.Bool.compare x y
     | Tez_key -> Tez.compare x y
-    | Key_hash_key -> Ed25519.Public_key_hash.compare x y
+    | Key_hash_key -> Signature.Public_key_hash.compare x y
     | Int_key ->
         let res = (Script_int.compare x y) in
         if Compare.Int.(res = 0) then 0
@@ -435,7 +435,7 @@ let empty_map
 let map_get
   : type key value. key -> (key, value) map -> value option
   = fun k (module Box) ->
-    try Some (Box.OPS.find k (fst Box.boxed)) with Not_found -> None
+    Box.OPS.find_opt k (fst Box.boxed)
 
 let map_update
   : type a b. a -> b option -> (a, b) map -> (a, b) map
@@ -576,14 +576,14 @@ let rec unparse_data
     | Signature_t, s ->
         let `Hex text =
           MBytes.to_hex
-            (Data_encoding.Binary.to_bytes Ed25519.Signature.encoding s) in
+            (Data_encoding.Binary.to_bytes Signature.encoding s) in
         String (-1, text)
     | Tez_t, v ->
         String (-1, Tez.to_string v)
     | Key_t, k ->
-        String (-1, Ed25519.Public_key.to_b58check k)
+        String (-1, Signature.Public_key.to_b58check k)
     | Key_hash_t, k ->
-        String (-1, Ed25519.Public_key_hash.to_b58check k)
+        String (-1, Signature.Public_key_hash.to_b58check k)
     | Pair_t ((tl, _), (tr, _)), (l, r) ->
         let l = unparse_data tl l in
         let r = unparse_data tr r in
@@ -1067,7 +1067,7 @@ let rec parse_data
     | Key_t, String (_, s) ->
         begin
           try
-            return (Ed25519.Public_key.of_b58check_exn s)
+            return (Signature.Public_key.of_b58check_exn s)
           with _ -> fail (error ())
         end
     | Key_t, expr ->
@@ -1075,14 +1075,14 @@ let rec parse_data
     | Key_hash_t, String (_, s) ->
         begin
           try
-            return (Ed25519.Public_key_hash.of_b58check_exn s)
+            return (Signature.Public_key_hash.of_b58check_exn s)
           with _ -> fail (error ()) end
     | Key_hash_t, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Signatures *)
     | Signature_t, String (_, s) -> begin try
           match Data_encoding.Binary.of_bytes
-                  Ed25519.Signature.encoding
+                  Signature.encoding
                   (MBytes.of_hex (`Hex s)) with
           | Some s -> return s
           | None -> raise Not_found

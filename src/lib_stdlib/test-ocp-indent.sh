@@ -1,5 +1,11 @@
 #!/bin/bash
 
+type ocp-indent > /dev/null 2>&-
+if [ $? -ne 0 ]; then
+  echo "I require ocp-indent but it's not installed (opam install ocp-indent). Aborting."
+  exit 1
+fi
+
 tmp_dir="$(mktemp -d -t tezos_build.XXXXXXXXXX)"
 failed=no
 if [ "$1" = "fix" ]; then

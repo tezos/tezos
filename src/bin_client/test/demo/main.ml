@@ -95,4 +95,10 @@ let finalize_block ctxt =
 
 let rpc_services = RPC_directory.empty
 
-let configure_sandbox ctxt _ = Lwt.return (Ok ctxt)
+let init ctxt block_header =
+  let fitness = block_header.Block_header.fitness in
+  let message = None in
+  return { Updater.message ; context = ctxt ; fitness ;
+           max_operations_ttl = 0 ; max_operation_data_length = 0 ;
+           last_allowed_fork_level = 0l ;
+         }

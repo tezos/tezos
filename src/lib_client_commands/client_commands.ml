@@ -9,7 +9,7 @@
 
 open Client_context
 
-type command = full Cli_entries.command
+type command = full Clic.command
 
 exception Version_not_found
 

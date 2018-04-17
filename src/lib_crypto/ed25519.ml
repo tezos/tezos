@@ -7,9 +7,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
+
 module Public_key_hash = Blake2B.Make(Base58)(struct
     let name = "Ed25519.Public_key_hash"
-    let title = "An Ed25519 public key ID"
+    let title = "An Ed25519 public key hash"
     let b58check_prefix = Base58.Prefix.ed25519_public_key_hash
     let size = Some 20
   end)
@@ -23,53 +25,27 @@ module Public_key = struct
 
   type t = Sign.public Sign.key
 
-  include Compare.Make(struct
-      type nonrec t = t
-      let compare a b =
-        Cstruct.compare (Sign.to_cstruct a) (Sign.to_cstruct b)
-    end)
-
-  type Base58.data +=
-    | Public_key of t
+  let name = "Ed25519.Public_key"
+  let title = "Ed25519 public key"
 
   let to_string s = Cstruct.to_string (Sign.to_cstruct s)
-  let of_string s = Sign.pk_of_cstruct (Cstruct.of_string s)
+  let of_string_opt s = Sign.pk_of_cstruct (Cstruct.of_string s)
+
+  let to_bytes pk = Cstruct.to_bigarray (Sign.to_cstruct pk)
+  let of_bytes_opt s = Sign.pk_of_cstruct (Cstruct.of_bigarray s)
+
+  let size = Sign.pkbytes
+
+  type Base58.data +=
+    | Data of t
 
   let b58check_encoding =
     Base58.register_encoding
       ~prefix: Base58.Prefix.ed25519_public_key
-      ~length:Sign.pkbytes
-      ~to_raw:to_string
-      ~of_raw:of_string
-      ~wrap:(fun x -> Public_key x)
-
-  let of_b58check_opt s = Base58.simple_decode b58check_encoding s
-  let of_b58check_exn s =
-    match Base58.simple_decode b58check_encoding s with
-    | Some x -> x
-    | None -> Pervasives.failwith
-                (Printf.sprintf "%s is not an ed25519 public key" s)
-  let to_b58check s = Base58.simple_encode b58check_encoding s
-  let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
-
-  let of_hex s = of_string (Hex.to_string s)
-  let of_hex_exn s =
-    match of_string (Hex.to_string s) with
-    | Some x -> x
-    | None -> invalid_arg "Public_key.of_hex_exn"
-  let to_hex s = Hex.of_string (to_string s)
-
-  let of_bytes_opt s =
-    Sign.pk_of_cstruct (Cstruct.of_bigarray s)
-
-  let of_bytes_exn s =
-    match of_bytes_opt s with
-    | None ->
-        Pervasives.invalid_arg "Ed25519.Public_key.of_bytes_exn: argument is not a serialized public key"
-    | Some pk -> pk
-  let size = Sign.pkbytes
-
-  let to_bytes pk = Cstruct.to_bigarray (Sign.to_cstruct pk)
+      ~length: size
+      ~to_raw: to_string
+      ~of_raw: of_string_opt
+      ~wrap: (fun x -> Data x)
 
   let () =
     Base58.check_encoded_prefix b58check_encoding "edpk" 54
@@ -78,50 +54,55 @@ module Public_key = struct
     Public_key_hash.hash_bytes
       [ Cstruct.to_bigarray (Sign.to_cstruct v) ]
 
+  include Compare.Make(struct
+      type nonrec t = t
+      let compare a b =
+        Cstruct.compare (Sign.to_cstruct a) (Sign.to_cstruct b)
+    end)
+
+  include Helpers.MakeRaw(struct
+      type nonrec t = t
+      let name = name
+      let of_bytes_opt = of_bytes_opt
+      let of_string_opt = of_string_opt
+      let to_string = to_string
+    end)
+
+  include Helpers.MakeB58(struct
+      type nonrec t = t
+      let title = title
+      let name = name
+      let b58check_encoding = b58check_encoding
+    end)
+
+  include Helpers.MakeEncoder(struct
+      type nonrec t = t
+      let name = name
+      let title = title
+      let raw_encoding =
+        let open Data_encoding in
+        conv to_bytes of_bytes_exn (Fixed.bytes size)
+      let of_b58check = of_b58check
+      let of_b58check_opt = of_b58check_opt
+      let of_b58check_exn = of_b58check_exn
+      let to_b58check = to_b58check
+      let to_short_b58check = to_short_b58check
+    end)
+
+  let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
+
 end
 
 module Secret_key = struct
 
   type t = Sign.secret Sign.key
 
-  let to_public_key = Sign.public
+  let name = "Ed25519.Secret_key"
+  let title = "An Ed25519 secret key"
 
-  type Base58.data +=
-    | Secret_key of t
+  let size = Sign.seedbytes
 
-  let seed_encoding =
-    Base58.register_encoding
-      ~prefix: Base58.Prefix.ed25519_seed
-      ~length:Sign.seedbytes
-      ~to_raw:(fun sk -> Cstruct.to_string (Sign.seed sk))
-      ~of_raw:(fun buf ->
-          let seed = Cstruct.of_string buf in
-          match Sign.keypair ~seed () with
-          | exception _ -> None
-          | _pk, sk -> Some sk)
-      ~wrap:(fun sk -> Secret_key sk)
-
-  let secret_key_encoding =
-    Base58.register_encoding
-      ~prefix: Base58.Prefix.ed25519_secret_key
-      ~length:Sign.skbytes
-      ~to_raw:(fun sk -> Cstruct.to_string (Sign.to_cstruct sk))
-      ~of_raw:(fun buf -> Sign.sk_of_cstruct (Cstruct.of_string buf))
-      ~wrap:(fun x -> Secret_key x)
-
-  let of_b58check_opt s =
-    match Base58.simple_decode seed_encoding s with
-    | Some x -> Some x
-    | None -> Base58.simple_decode secret_key_encoding s
-
-  let of_b58check_exn s =
-    match of_b58check_opt s with
-    | Some x -> x
-    | None -> Pervasives.failwith
-                (Printf.sprintf "%s is not an ed25519 secret key" s)
-  let to_b58check s = Base58.simple_encode seed_encoding s
-  let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
-
+  let to_bytes x = Cstruct.to_bigarray (Sign.seed x)
   let of_bytes_opt s =
     let s = Cstruct.of_bigarray s in
     match Cstruct.len s with
@@ -129,76 +110,171 @@ module Secret_key = struct
     | 64 -> Sign.sk_of_cstruct s
     | _ -> None
 
-  let of_bytes_exn s =
-    match of_bytes_opt s with
-    | None ->
-        Pervasives.invalid_arg "Ed25519.Secret_key.of_bytes_exn: argument is not a serialized seed"
-    | Some sk -> sk
+  let to_string s = MBytes.to_string (to_bytes s)
+  let of_string_opt s = of_bytes_opt (MBytes.of_string s)
 
-  let to_bytes x = Cstruct.to_bigarray (Sign.seed x)
-  let size = Sign.seedbytes
+  let to_public_key = Sign.public
+
+  type Base58.data +=
+    | Data of t
+
+  let b58check_encoding =
+    Base58.register_encoding
+      ~prefix: Base58.Prefix.ed25519_seed
+      ~length: size
+      ~to_raw: (fun sk -> Cstruct.to_string (Sign.seed sk))
+      ~of_raw: (fun buf ->
+          let seed = Cstruct.of_string buf in
+          match Sign.keypair ~seed () with
+          | exception _ -> None
+          | _pk, sk -> Some sk)
+      ~wrap: (fun sk -> Data sk)
+
+  let secret_key_encoding =
+    Base58.register_encoding
+      ~prefix: Base58.Prefix.ed25519_secret_key
+      ~length: Sign.skbytes
+      ~to_raw: (fun sk -> Cstruct.to_string (Sign.to_cstruct sk))
+      ~of_raw: (fun buf -> Sign.sk_of_cstruct (Cstruct.of_string buf))
+      ~wrap: (fun x -> Data x)
+
+  let of_b58check_opt s =
+    match Base58.simple_decode b58check_encoding s with
+    | Some x -> Some x
+    | None -> Base58.simple_decode secret_key_encoding s
+  let of_b58check_exn s =
+    match of_b58check_opt s with
+    | Some x -> x
+    | None -> Format.kasprintf Pervasives.failwith "Unexpected data (%s)" name
+  let of_b58check s =
+    match of_b58check_opt s with
+    | Some x -> Ok x
+    | None ->
+        generic_error
+          "Failed to read a b58check_encoding data (%s): %S"
+          name s
+
+  let to_b58check s = Base58.simple_encode b58check_encoding s
+  let to_short_b58check s =
+    String.sub
+      (to_b58check s) 0
+      (10 + String.length (Base58.prefix b58check_encoding))
 
   let () =
-    Base58.check_encoded_prefix seed_encoding "edsk" 54 ;
+    Base58.check_encoded_prefix b58check_encoding "edsk" 54 ;
     Base58.check_encoded_prefix secret_key_encoding "edsk" 98
 
+  include Compare.Make(struct
+      type nonrec t = t
+      let compare a b =
+        Cstruct.compare (Sign.to_cstruct a) (Sign.to_cstruct b)
+    end)
+
+  include Helpers.MakeRaw(struct
+      type nonrec t = t
+      let name = name
+      let of_bytes_opt = of_bytes_opt
+      let of_string_opt = of_string_opt
+      let to_string = to_string
+    end)
+
+  include Helpers.MakeEncoder(struct
+      type nonrec t = t
+      let name = name
+      let title = title
+      let raw_encoding =
+        let open Data_encoding in
+        conv to_bytes of_bytes_exn (Fixed.bytes size)
+      let of_b58check = of_b58check
+      let of_b58check_opt = of_b58check_opt
+      let of_b58check_exn = of_b58check_exn
+      let to_b58check = to_b58check
+      let to_short_b58check = to_short_b58check
+    end)
+
+  let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
+
 end
+
+type t = MBytes.t
+
+let name = "Ed25519"
+let title = "An Ed25519 signature"
+
+let size = Sign.bytes
+
+let of_bytes_opt s =
+  if MBytes.length s = size then Some s else None
+let to_bytes x = x
+
+let to_string s = MBytes.to_string (to_bytes s)
+let of_string_opt s = of_bytes_opt (MBytes.of_string s)
+
+type Base58.data +=
+  | Data of t
+
+let b58check_encoding =
+  Base58.register_encoding
+    ~prefix: Base58.Prefix.ed25519_signature
+    ~length: size
+    ~to_raw: MBytes.to_string
+    ~of_raw: (fun s -> Some (MBytes.of_string s))
+    ~wrap: (fun x -> Data x)
+
+let () =
+  Base58.check_encoded_prefix b58check_encoding "edsig" 99
+
+include Compare.Make(struct
+    type nonrec t = t
+    let compare = MBytes.compare
+  end)
+
+include Helpers.MakeRaw(struct
+    type nonrec t = t
+    let name = name
+    let of_bytes_opt = of_bytes_opt
+    let of_string_opt = of_string_opt
+    let to_string = to_string
+  end)
+
+include Helpers.MakeB58(struct
+    type nonrec t = t
+    let title = title
+    let name = name
+    let b58check_encoding = b58check_encoding
+  end)
+
+include Helpers.MakeEncoder(struct
+    type nonrec t = t
+    let name = name
+    let title = title
+    let raw_encoding =
+      let open Data_encoding in
+      conv to_bytes of_bytes_exn (Fixed.bytes size)
+    let of_b58check = of_b58check
+    let of_b58check_opt = of_b58check_opt
+    let of_b58check_exn = of_b58check_exn
+    let to_b58check = to_b58check
+    let to_short_b58check = to_short_b58check
+  end)
+
+let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
+
+let zero = MBytes.init size '\000'
 
 let sign key msg =
   Cstruct.(to_bigarray (Sign.detached ~key (of_bigarray msg)))
 
-module Signature = struct
+let check public_key signature msg =
+  Sign.verify_detached ~key:public_key
+    ~signature:(Cstruct.of_bigarray signature)
+    (Cstruct.of_bigarray msg)
 
-  type t = MBytes.t
+let append key msg =
+  MBytes.concat msg (sign key msg)
 
-  type Base58.data +=
-    | Signature of t
-
-  let b58check_encoding =
-    Base58.register_encoding
-      ~prefix: Base58.Prefix.ed25519_signature
-      ~length:Sign.bytes
-      ~to_raw:MBytes.to_string
-      ~of_raw:(fun s -> Some (MBytes.of_string s))
-      ~wrap:(fun x -> Signature x)
-
-  let of_b58check_opt s = Base58.simple_decode b58check_encoding s
-  let of_b58check_exn s =
-    match Base58.simple_decode b58check_encoding s with
-    | Some x -> x
-    | None -> Pervasives.failwith
-                (Printf.sprintf "%s is not an ed25519 signature" s)
-  let to_b58check s = Base58.simple_encode b58check_encoding s
-  let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
-
-  let of_bytes_opt s =
-    if MBytes.length s = Sign.bytes then Some s else None
-
-  let of_bytes_exn s =
-    match of_bytes_opt s with
-    | None ->
-        Pervasives.invalid_arg "Ed25519.Signature.of_bytes_exn: argument is not a serialized signature"
-    | Some signature -> signature
-
-  let to_bytes x = x
-  let size = Sign.bytes
-  let zero = MBytes.init size '\000'
-
-  let () =
-    Base58.check_encoded_prefix b58check_encoding "edsig" 99
-
-  let check public_key signature msg =
-    Sign.verify_detached ~key:public_key
-      ~signature:(Cstruct.of_bigarray signature)
-      (Cstruct.of_bigarray msg)
-
-  let append key msg =
-    MBytes.concat msg (sign key msg)
-
-  let concat msg signature =
-    MBytes.concat msg signature
-
-end
+let concat msg signature =
+  MBytes.concat msg signature
 
 module Seed = struct
 
@@ -206,12 +282,19 @@ module Seed = struct
 
   let generate () = Rand.gen 32
   let extract = Sign.seed
-end
 
-let generate_key () =
-  let pk, sk = Sign.keypair () in
-  (Public_key.hash pk, pk, sk)
+end
 
 let generate_seeded_key seed =
   let pk, sk = Sign.keypair ~seed () in
   (Public_key.hash pk, pk, sk)
+
+let generate_key () =
+  let seed = Seed.generate () in
+  generate_seeded_key seed
+
+include Compare.Make(struct
+    type nonrec t = t
+    let compare = MBytes.compare
+  end)
+

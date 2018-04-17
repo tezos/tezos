@@ -24,14 +24,14 @@ module Script = Helpers_script
 module Shorthands = struct
 
   let to_tc_full ctxt level fitness =
-    Alpha_context.init
+    Alpha_context.prepare
       ctxt
       ~level
       ~fitness
       ~timestamp:(Time.now())
 
   let get_tc_full (res:Block.result) =
-    Alpha_context.init
+    Alpha_context.prepare
       res.validation.context
       ~level:res.level
       ~timestamp:res.tezos_header.shell.timestamp

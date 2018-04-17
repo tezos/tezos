@@ -15,11 +15,6 @@ type operation = {
   content: Operation.t option ;
 }
 
-val monitor:
-  #Proto_alpha.rpc_context ->
-  ?contents:bool -> ?check:bool -> unit ->
-  operation list tzresult Lwt_stream.t tzresult Lwt.t
-
 type valid_endorsement = {
   hash: Operation_hash.t ;
   source: public_key_hash ;

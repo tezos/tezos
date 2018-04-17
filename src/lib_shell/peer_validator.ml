@@ -26,13 +26,15 @@ module Request = struct
 
   type _ t =
     | New_head : Block_hash.t * Block_header.t -> unit t
-    | New_branch : Block_hash.t * Block_locator.t -> unit t
+    | New_branch : Block_hash.t * Block_locator.t * Block_locator.seed -> unit t
 
   let view (type a) (req : a t) : view = match req with
     | New_head (hash, _) ->
         New_head hash
-    | New_branch (hash, locator) ->
-        New_branch (hash, Block_locator_iterator.estimated_length locator)
+    | New_branch (hash, locator, seed) ->
+        (* the seed is associated to each locator
+           w.r.t. the peer_id of the sender *)
+        New_branch (hash, Block_locator.estimated_length seed locator)
 end
 
 type limits = {
@@ -89,7 +91,11 @@ let set_bootstrapped pv =
 
 let bootstrap_new_branch w _ancestor _head unknown_prefix =
   let pv = Worker.state w in
-  let len = Block_locator_iterator.estimated_length unknown_prefix in
+  let sender_id = Distributed_db.my_peer_id pv.parameters.chain_db in
+  (* sender and receiver are inverted here because they are from
+     the point of view of the node sending the locator *)
+  let seed = {Block_locator.sender_id=pv.peer_id; receiver_id = sender_id } in
+  let len = Block_locator.estimated_length seed unknown_prefix in
   debug w
     "validating new branch from peer %a (approx. %d blocks)"
     P2p_peer.Id.pp_short pv.peer_id len ;
@@ -201,7 +207,7 @@ let may_validate_new_branch w distant_hash locator =
   let distant_header, _ = (locator : Block_locator.t :> Block_header.t * _) in
   only_if_fitness_increases w distant_header @@ fun () ->
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  Block_locator_iterator.known_ancestor chain_state locator >>= function
+  State.Block.known_ancestor chain_state locator >>= function
   | None ->
       debug w
         "ignoring branch %a without common ancestor from peer: %a."
@@ -228,7 +234,7 @@ let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
         Block_hash.pp_short hash
         P2p_peer.Id.pp_short pv.peer_id ;
       may_validate_new_head w hash header
-  | Request.New_branch (hash, locator) ->
+  | Request.New_branch (hash, locator, _seed) ->
       (* TODO penalize empty locator... ?? *)
       debug w "processing new branch %a from peer %a."
         Block_hash.pp_short hash
@@ -300,7 +306,7 @@ let table =
   let merge w (Worker.Any_request neu) old =
     let pv = Worker.state w in
     match neu with
-    | Request.New_branch (_, locator) ->
+    | Request.New_branch (_, locator, _) ->
         let header, _ = (locator : Block_locator.t :> _ * _) in
         pv.last_advertised_head <- header ;
         Some (Worker.Any_request neu)
@@ -346,7 +352,12 @@ let create
 let notify_branch w locator =
   let header, _ = (locator : Block_locator.t :> _ * _) in
   let hash = Block_header.hash header in
-  Worker.drop_request w (New_branch (hash, locator))
+  let pv = Worker.state w in
+  let sender_id = Distributed_db.my_peer_id pv.parameters.chain_db in
+  (* sender and receiver are inverted here because they are from
+     the point of view of the node sending the locator *)
+  let seed = {Block_locator.sender_id=pv.peer_id; receiver_id=sender_id } in
+  Worker.drop_request w (New_branch (hash, locator, seed))
 
 let notify_head w header =
   let hash = Block_header.hash header in

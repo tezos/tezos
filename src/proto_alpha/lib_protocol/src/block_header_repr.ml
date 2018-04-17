@@ -13,7 +13,7 @@
 type t = {
   shell: Block_header.shell_header ;
   protocol_data: protocol_data ;
-  signature: Ed25519.Signature.t ;
+  signature: Signature.t ;
 }
 
 and protocol_data = {
@@ -47,7 +47,7 @@ let signed_protocol_data_encoding =
   let open Data_encoding in
   merge_objs
     protocol_data_encoding
-    (obj1 (req "signature" Ed25519.Signature.encoding))
+    (obj1 (req "signature" Signature.encoding))
 
 let unsigned_header_encoding =
   let open Data_encoding in
@@ -73,8 +73,9 @@ let max_header_length =
                proof_of_work_nonce =
                  MBytes.create Constants_repr.proof_of_work_nonce_size ;
                seed_nonce_hash = Some Nonce_hash.zero } in
-  let signature = Ed25519.Signature.zero in
-  Data_encoding.Binary.length signed_protocol_data_encoding (fake, signature)
+  Data_encoding.Binary.length
+    signed_protocol_data_encoding
+    (fake, Signature.zero)
 
 
 (** Header parsing entry point  *)

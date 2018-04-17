@@ -9,6 +9,7 @@
                     -open Tezos_data_encoding
                     -open Tezos_error_monad
                     -open Tezos_rpc
+                    -open Tezos_clic
                     -open Tezos_micheline
                     -safe-string))
   (libraries (tezos-stdlib
@@ -16,6 +17,7 @@
               tezos-data-encoding
               tezos-error-monad
               tezos-rpc
+              tezos-clic
               tezos-micheline
               re.str
               calendar

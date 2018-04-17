@@ -36,4 +36,3 @@ module Make
          'a Base58.encoding
      end)
     (Name : PrefixedName) : S.HASH
-

@@ -157,3 +157,25 @@ let secret_key_size = Box.skbytes
 let nonce_to_bigarray x = Cstruct.to_bigarray (Nonce.to_cstruct x)
 let nonce_of_bigarray x = Nonce.of_cstruct_exn (Cstruct.of_bigarray x)
 let nonce_size = Nonce.bytes
+
+let public_key_encoding =
+  let open Data_encoding in
+  conv
+    public_key_to_bigarray
+    public_key_of_bigarray
+    (Fixed.bytes public_key_size)
+
+let secret_key_encoding =
+  let open Data_encoding in
+  conv
+    secret_key_to_bigarray
+    secret_key_of_bigarray
+    (Fixed.bytes secret_key_size)
+
+let nonce_encoding =
+  let open Data_encoding in
+  conv
+    nonce_to_bigarray
+    nonce_of_bigarray
+    (Fixed.bytes nonce_size)
+

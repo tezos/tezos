@@ -340,6 +340,8 @@ let state { disk } = disk
 let chain_state { chain_state } = chain_state
 let db { global_db } = global_db
 
+let my_peer_id chain_db = P2p.peer_id chain_db.global_db.p2p
+
 let read_block_header { disk } h =
   State.read_block disk h >>= function
   | Some b ->
@@ -466,7 +468,10 @@ module P2p_reader = struct
           ignore
           @@ P2p.try_send global_db.p2p state.conn
           @@ Get_current_branch chain_id ;
-        Chain.locator chain_db.chain_state >>= fun locator ->
+        let seed = {
+          Block_locator.receiver_id=state.gid;
+          sender_id=(my_peer_id chain_db) } in
+        (Chain.locator chain_db.chain_state seed) >>= fun locator ->
         ignore
         @@ P2p.try_send global_db.p2p state.conn
         @@ Current_branch (chain_id, locator) ;
@@ -680,6 +685,7 @@ let raw_try_send p2p peer_id msg =
   match P2p.find_connection p2p peer_id with
   | None -> ()
   | Some conn -> ignore (P2p.try_send p2p conn msg : bool)
+
 
 let create disk p2p =
   let global_request =
@@ -924,10 +930,28 @@ module Advertise = struct
     send chain_db ?peer @@
     Current_head (chain_id, State.Block.header head, mempool)
 
-  let current_branch chain_db ?peer locator =
+  let current_branch ?peer chain_db =
     let chain_id = State.Chain.id chain_db.chain_state in
-    send chain_db ?peer @@ Current_branch (chain_id, locator) ;
-    Lwt.return_unit
+    let chain_state = chain_state chain_db in
+    let sender_id = my_peer_id chain_db in
+    match peer with
+    | Some receiver_id ->
+        let seed = {
+          Block_locator.receiver_id=receiver_id; sender_id } in
+        (Chain.locator chain_state seed) >>= fun locator ->
+        let msg = Message.Current_branch (chain_id, locator) in
+        try_send chain_db receiver_id msg;
+        Lwt.return_unit
+    | None ->
+        Lwt_list.iter_p
+          (fun (receiver_id,state) ->
+             let seed = {
+               Block_locator.receiver_id=receiver_id; sender_id } in
+             (Chain.locator chain_state seed) >>= fun locator ->
+             let msg = Message.Current_branch (chain_id, locator) in
+             ignore (P2p.try_send chain_db.global_db.p2p state.conn msg);
+             Lwt.return_unit
+          ) (P2p_peer.Table.fold (fun k v acc -> (k,v)::acc) chain_db.active_connections [])
 
 end
 

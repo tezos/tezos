@@ -16,7 +16,7 @@ let no_ops_hash =
 
 let find_account accounts hpub =
   let hpub_pred (x : Helpers_account.t) =
-    Ed25519.Public_key_hash.equal x.hpub hpub in
+    Signature.Public_key_hash.equal x.hpub hpub in
   List.find hpub_pred accounts
 
 let read_file path =

@@ -52,7 +52,7 @@ let default_base_dir =
   let home = try Sys.getenv "HOME" with Not_found -> "/root" in
   Filename.concat home ".tezos-client"
 
-let default_block = `Prevalidation
+let default_block = `Head 0
 
 let (//) = Filename.concat
 
@@ -122,14 +122,15 @@ let default_cli_args = {
 }
 
 
-open Cli_entries
+open Clic
 
 let string_parameter () : (string, #Client_context.full) parameter =
   parameter (fun _ x -> return x)
 
 let block_parameter () =
   parameter
-    (fun _ block -> match Block_services.parse_block block with
+    (fun _ block ->
+       match Block_services.parse_block block with
        | Error _ -> fail (Invalid_block_argument block)
        | Ok block -> return block)
 
@@ -139,8 +140,9 @@ let protocol_parameter () =
        try
          let (hash,_commands) =
            List.find (fun (hash,_commands) ->
-               (Protocol_hash.to_short_b58check hash) = arg
-             ) (Client_commands.get_versions ())
+               String.has_prefix ~prefix:arg
+                 (Protocol_hash.to_b58check hash))
+             (Client_commands.get_versions ())
          in
          return (Some hash)
        with Not_found -> fail (Invalid_protocol_argument arg)
@@ -228,8 +230,8 @@ let read_config_file config_file =
 let default_config_file_name = "config"
 
 let commands config_file cfg =
-  let open Cli_entries in
-  let group = { Cli_entries.name = "config" ;
+  let open Clic in
+  let group = { Clic.name = "config" ;
                 title = "Commands for editing and viewing the client's config file" } in
   [ command ~group ~desc:"Show the config file."
       no_options

@@ -18,6 +18,18 @@ type error_category =
 
 include Error_monad_sig.S
 
+module type Wrapped_error_monad = sig
+  type unwrapped = ..
+  include Error_monad_sig.S with type error := unwrapped
+  val unwrap : error -> unwrapped option
+  val wrap : unwrapped -> error
+end
+
+val register_wrapped_error_kind :
+  (module Wrapped_error_monad) ->
+  id:string -> title:string -> description:string ->
+  unit
+
 (** Erroneous result (shortcut for generic errors) *)
 val generic_error :
   ('a, Format.formatter, unit, 'b tzresult) format4 ->
@@ -38,8 +50,8 @@ val pp_exn : Format.formatter -> exn -> unit
 
 val failure : ('a, Format.formatter, unit, error) format4 -> 'a
 
+(** Wrapped OCaml/Lwt exception *)
 type error += Exn of exn
-type error += Unclassified of string
 
 type error += Canceled
 
@@ -53,7 +65,7 @@ val with_timeout:
   ?canceler:Lwt_canceler.t ->
   unit Lwt.t -> (Lwt_canceler.t -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
-module Make() : Error_monad_sig.S
+module Make(Prefix : sig val id : string end) : Error_monad_sig.S
 
 (**/**)
 val json_to_string : (Data_encoding.json -> string) ref

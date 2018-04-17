@@ -12,11 +12,11 @@ open Alpha_context
 open Client_proto_contracts
 
 let group =
-  { Cli_entries.name = "contracts" ;
+  { Clic.name = "contracts" ;
     title = "Commands for managing the record of known contracts" }
 
 let commands  () =
-  let open Cli_entries in
+  let open Clic in
   [
 
     command ~group ~desc: "Add a contract to the wallet."

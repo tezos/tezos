@@ -29,7 +29,7 @@ module S = struct
        (req "storage" Script.expr_encoding)
        (req "input" Script.expr_encoding)
        (req "amount" Tez.encoding)
-       (opt "contract" Contract.encoding)
+       (req "contract" Contract.encoding)
        (opt "origination_nonce" Contract.origination_nonce_encoding))
 
   let run_code =
@@ -51,7 +51,7 @@ module S = struct
                  (req "pred_block" Block_hash.encoding)
                  (req "operation_hash" Operation_hash.encoding)
                  (req "forged_operation" bytes)
-                 (opt "signature" Ed25519.Signature.encoding))
+                 (opt "signature" Signature.encoding))
       ~output: (obj1 (req "contracts" (list Contract.encoding)))
       RPC_path.(custom_root / "apply_operation")
 
@@ -133,24 +133,18 @@ module I = struct
     | None -> Error_monad.fail Operation.Cannot_parse_operation
     | Some (shell, contents) ->
         let operation = { shell ; contents ; signature } in
-        let level = Alpha_context.Level.current ctxt in
+        let level = Level.succ ctxt (Level.current ctxt) in
         Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (baker_pk, _)) ->
-        let baker_pkh = Ed25519.Public_key.hash baker_pk in
+        let baker_pkh = Signature.Public_key.hash baker_pk in
         let block_prio = 0 in
         Apply.apply_operation
           ctxt (Some baker_pkh) pred_block block_prio hash operation
         >>=? function
-        | (_ctxt, _, Some script_err, _, _) -> Lwt.return (Error script_err)
-        | (_ctxt, contracts, None,_ , _) -> Lwt.return (Ok contracts)
+        | (_ctxt, _, Some script_err) -> Lwt.return (Error script_err)
+        | (_ctxt, contracts, None) -> Lwt.return (Ok contracts)
 
 
   let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =
-    let contract =
-      match contract with
-      | Some contract -> contract
-      | None ->
-          Contract.implicit_contract
-            (List.hd (Bootstrap.accounts ctxt)).Bootstrap.public_key_hash in
     let max_gas =
       Constants.max_gas ctxt in
     let origination_nonce =
@@ -222,17 +216,17 @@ let () =
 let minimal_time ctxt ?priority block =
   RPC_context.make_call0 S.minimal_timestamp ctxt block () priority
 
-let run_code ctxt block code (storage, input, amount) =
+let run_code ctxt block code (storage, input, amount, contract) =
   RPC_context.make_call0 S.run_code ctxt
-    block () (code, storage, input, amount, None, None)
+    block () (code, storage, input, amount, contract, None)
 
 let apply_operation ctxt block pred_block hash forged_operation signature =
   RPC_context.make_call0 S.apply_operation ctxt
     block () (pred_block, hash, forged_operation, signature)
 
-let trace_code ctxt block code (storage, input, amount) =
+let trace_code ctxt block code (storage, input, amount, contract) =
   RPC_context.make_call0 S.trace_code ctxt
-    block () (code, storage, input, amount, None, None)
+    block () (code, storage, input, amount, contract, None)
 
 let typecheck_code ctxt block =
   RPC_context.make_call0 S.typecheck_code ctxt block ()
@@ -412,10 +406,6 @@ module Forge = struct
         block ~branch ~level ~nonce () =
       operations ctxt block ~branch [Seed_nonce_revelation { level ; nonce }]
 
-    let faucet ctxt
-        block ~branch ~id ~nonce () =
-      operations ctxt block ~branch [Faucet { id ; nonce }]
-
   end
 
   let empty_proof_of_work_nonce =
@@ -521,4 +511,3 @@ module Parse = struct
       S.block ctxt block () ({ shell ; protocol_data } : Block_header.raw)
 
 end
-

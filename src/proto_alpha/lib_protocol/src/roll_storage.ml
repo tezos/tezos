@@ -13,7 +13,7 @@ type error +=
   | Consume_roll_change
   | No_roll_for_delegate
   | No_roll_snapshot_for_cycle of Cycle_repr.t
-  | Unregistered_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
+  | Unregistered_delegate of Signature.Public_key_hash.t (* `Permanent *)
 
 let () =
   register_error_kind
@@ -24,8 +24,8 @@ let () =
     ~pp:(fun ppf (k) ->
         Format.fprintf ppf "The provided public key (with hash %a) is \
                            \ not registered as valid delegate key."
-          Ed25519.Public_key_hash.pp k)
-    Data_encoding.(obj1 (req "hash" Ed25519.Public_key_hash.encoding))
+          Signature.Public_key_hash.pp k)
+    Data_encoding.(obj1 (req "hash" Signature.Public_key_hash.encoding))
     (function Unregistered_delegate (k) -> Some (k) | _ -> None)
     (fun (k) -> Unregistered_delegate (k))
 

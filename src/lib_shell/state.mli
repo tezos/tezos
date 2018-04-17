@@ -95,9 +95,9 @@ module Block : sig
   val list_invalid: Chain.t -> (Block_hash.t * int32 * error list) list Lwt.t
   val unmark_invalid: Chain.t -> Block_hash.t -> unit tzresult Lwt.t
 
-  val read: Chain.t -> Block_hash.t -> block tzresult Lwt.t
-  val read_opt: Chain.t -> Block_hash.t -> block option Lwt.t
-  val read_exn: Chain.t -> Block_hash.t -> block Lwt.t
+  val read: Chain.t -> ?pred:int -> Block_hash.t -> block tzresult Lwt.t
+  val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block option Lwt.t
+  val read_exn: Chain.t -> ?pred:int -> Block_hash.t -> block Lwt.t
 
   val store:
     ?dont_enforce_context_hash:bool ->
@@ -131,7 +131,7 @@ module Block : sig
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t
-  val predecessor_n: Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
+  val predecessor_n: t -> int -> Block_hash.t option Lwt.t
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
@@ -148,15 +148,23 @@ module Block : sig
 
   val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
+  val known_ancestor:
+    Chain.t -> Block_locator.t -> (block * Block_locator.t) option Lwt.t
+    (** [known_ancestor chain_state locator] computes the first block of
+        [locator] that is known to be a valid block. It also computes the
+        'prefix' of [locator] with end at the first valid block.  The
+        function returns [None] when no block in the locator are known or
+        if the first known block is invalid. *)
+
 end
 
 val read_block:
-  global_state -> Block_hash.t -> Block.t option Lwt.t
+  global_state -> ?pred:int -> Block_hash.t -> Block.t option Lwt.t
 
 val read_block_exn:
-  global_state -> Block_hash.t -> Block.t Lwt.t
+  global_state -> ?pred:int -> Block_hash.t -> Block.t Lwt.t
 
-val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.t Lwt.t
+val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
 val fork_testchain:
   Block.t -> Protocol_hash.t -> Time.t -> Chain.t tzresult Lwt.t
@@ -166,7 +174,6 @@ type chain_data = {
   current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
-  locator: Block_locator.t Lwt.t lazy_t ;
 }
 
 val read_chain_data:
@@ -217,4 +224,3 @@ module Current_mempool : sig
       not the provided one. *)
 
 end
-

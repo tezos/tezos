@@ -12,7 +12,7 @@ open Alpha_context
 
 val init :
   ?exe:string ->
-  ?sandbox:string ->
+  ?vote:bool ->
   ?rpc_port:int ->
   unit -> (int * Block_hash.t) tzresult Lwt.t
 (** [init ()] sets up the test environment, and return the PID of
@@ -29,15 +29,15 @@ module Account : sig
 
   type t = {
     alias : string ;
-    sk : Ed25519.Secret_key.t ;
-    pk : Ed25519.Public_key.t ;
-    pkh : Ed25519.Public_key_hash.t ;
+    sk : Signature.Secret_key.t ;
+    pk : Signature.Public_key.t ;
+    pkh : Signature.Public_key_hash.t ;
     contract : Contract.t ;
   }
 
   val encoding : t Data_encoding.t
   val pp_account : Format.formatter -> t -> unit
-  val create : ?keys:(secret_key * public_key) -> string -> t
+  val create : ?keys:(Signature.secret_key * public_key) -> string -> t
   (** [create ?keys alias] is an account with alias [alias]. If
       [?keys] is [None], a pair of keys will be minted. *)
 
@@ -105,9 +105,6 @@ module Baking : sig
     Account.t ->
     Operation.raw list ->
     Block_hash.t tzresult Lwt.t
-
-  val endorsement_reward:
-    Block_services.block -> int64 tzresult Lwt.t
 
 end
 
@@ -210,3 +207,5 @@ module Assert : sig
 end
 
 val display_level: Block_services.block -> unit tzresult Lwt.t
+
+val endorsement_security_deposit: Block_services.block -> Tez.t tzresult Lwt.t

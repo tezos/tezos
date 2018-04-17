@@ -12,7 +12,6 @@ open Alpha_context
 
 let bake_block (cctxt : #Proto_alpha.full) block
     ?force ?max_priority ?(free_baking=false) ?src_sk delegate =
-  let block = Block_services.last_baked_block block in
   begin
     match src_sk with
     | None ->
@@ -74,7 +73,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
     (fun hash ->
        Lwt.catch
          (fun () ->
-            Client_baking_blocks.info cctxt (`Hash hash) >>= function
+            Client_baking_blocks.info cctxt (`Hash (hash, 0)) >>= function
             | Ok bi -> Lwt.return (Some bi)
             | Error _ ->
                 Lwt.fail Not_found)
@@ -96,9 +95,8 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
   do_reveal cctxt cctxt#block blocks
 
 let reveal_nonces cctxt () =
-  let block = Block_services.last_baked_block cctxt#block in
   Client_baking_forge.get_unrevealed_nonces
-    cctxt block >>=? fun nonces ->
+    cctxt cctxt#block >>=? fun nonces ->
   do_reveal cctxt cctxt#block nonces
 
 let run_daemon cctxt ?max_priority ~endorsement_delay delegates ~endorsement ~baking ~denunciation =
@@ -107,4 +105,4 @@ let run_daemon cctxt ?max_priority ~endorsement_delay delegates ~endorsement ~ba
     ~delay:endorsement_delay
     ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
     ~endorsement ~baking ~denunciation
-    (List.map snd delegates)
+    delegates

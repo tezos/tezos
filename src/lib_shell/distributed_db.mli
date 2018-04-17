@@ -58,6 +58,9 @@ val disconnect: chain_db -> P2p_peer.Id.t -> unit Lwt.t
 val chain_state: chain_db -> State.Chain.t
 val db: chain_db -> db
 
+(** Return the peer id of the node *)
+val my_peer_id: chain_db -> P2p_peer.Id.t
+
 (** {1 Sending messages} *)
 
 module Request : sig
@@ -85,8 +88,7 @@ module Advertise : sig
   (** Notify a given peer, or all known active peers for the
       chain, of a new head and its sparse history. *)
   val current_branch:
-    chain_db -> ?peer:P2p_peer.Id.t ->
-    Block_locator.t -> unit Lwt.t
+    ?peer:P2p_peer.Id.t -> chain_db -> unit Lwt.t
 
 end
 

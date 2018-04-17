@@ -29,7 +29,7 @@ module Public_key_locator : LOCATOR with type t = pk_locator
 (** {2 Cryptographic keys tables } *)
 
 module Public_key_hash :
-  Client_aliases.Alias with type t = Ed25519.Public_key_hash.t
+  Client_aliases.Alias with type t = Signature.Public_key_hash.t
 module Public_key :
   Client_aliases.Alias with type t = pk_locator
 module Secret_key :
@@ -84,13 +84,13 @@ module type SIGNER = sig
   val neuterize : secret_key -> public_key Lwt.t
   (** [neuterize sk] is the corresponding [pk]. *)
 
-  val public_key : public_key -> Ed25519.Public_key.t Lwt.t
-  (** [public_key pk] is the Ed25519 version of [pk]. *)
+  val public_key : public_key -> Signature.Public_key.t Lwt.t
+  (** [public_key pk] is the full version of [pk]. *)
 
-  val public_key_hash : public_key -> Ed25519.Public_key_hash.t Lwt.t
+  val public_key_hash : public_key -> Signature.Public_key_hash.t Lwt.t
   (** [public_key_hash pk] is the hash of [pk]. *)
 
-  val sign : secret_key -> MBytes.t -> Ed25519.Signature.t tzresult Lwt.t
+  val sign : secret_key -> MBytes.t -> Signature.t tzresult Lwt.t
   (** [sign sk data] is signature obtained by signing [data] with
       [sk]. *)
 end
@@ -105,15 +105,23 @@ val find_signer_for_key :
   #Client_context.io_wallet -> scheme:string -> (module SIGNER) tzresult Lwt.t
 val sign :
   #Client_context.io_wallet ->
-  sk_locator -> MBytes.t -> Ed25519.Signature.t tzresult Lwt.t
+  sk_locator -> MBytes.t -> Signature.t tzresult Lwt.t
 val append :
   #Client_context.io_wallet ->
   sk_locator -> MBytes.t -> MBytes.t tzresult Lwt.t
 
 val gen_keys :
   ?force:bool ->
+  ?algo:Signature.algo ->
   ?seed:Ed25519.Seed.t ->
   #Client_context.io_wallet -> string -> unit tzresult Lwt.t
+
+val register_key :
+  #Client_context.wallet ->
+  ?force:bool ->
+  (Signature.Public_key_hash.t *
+   Signature.Public_key.t *
+   Signature.Secret_key.t) -> string -> unit tzresult Lwt.t
 
 val gen_keys_containing :
   ?prefix:bool ->
@@ -133,10 +141,10 @@ val alias_keys :
 val get_key:
   #Client_context.io_wallet ->
   Public_key_hash.t ->
-  (string * Ed25519.Public_key.t * sk_locator) tzresult Lwt.t
+  (string * Signature.Public_key.t * sk_locator) tzresult Lwt.t
 
 val get_keys:
   #Client_context.io_wallet ->
-  (string * Public_key_hash.t * Ed25519.Public_key.t * sk_locator) list tzresult Lwt.t
+  (string * Public_key_hash.t * Signature.Public_key.t * sk_locator) list tzresult Lwt.t
 
-val force_switch : unit -> (bool, #Client_context.full) Cli_entries.arg
+val force_switch : unit -> (bool, #Client_context.full) Clic.arg

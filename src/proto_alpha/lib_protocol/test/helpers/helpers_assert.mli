@@ -57,8 +57,8 @@ exception No_error
 
 val no_error : ?msg:string -> ('a, 'b) result -> 'a
 val equal_pkh :
-  ?msg:string -> Ed25519.Public_key_hash.t option ->
-  Ed25519.Public_key_hash.t option -> unit
+  ?msg:string -> Signature.Public_key_hash.t option ->
+  Signature.Public_key_hash.t option -> unit
 val equal_int64 : ?msg:string -> Int64.t -> Int64.t -> unit
 val equal_int : ?msg:string -> int -> int -> unit
 val equal_tez : ?msg:string -> Tez.t -> Tez.t -> unit
@@ -87,4 +87,3 @@ val balance_too_low : msg:string -> 'a proto_tzresult -> unit
 val non_spendable : msg:string -> 'a tzresult -> unit
 val inconsistent_pkh : msg:string -> 'a tzresult -> unit
 val non_delegatable : msg:string -> 'a tzresult -> unit
-

@@ -26,7 +26,7 @@ let equal_operation ?msg op1 op2 =
     | _ -> false in
   let prn = function
     | None -> "none"
-    | Some op -> Operation_hash.to_hex (Operation.hash op) in
+    | Some op -> Operation_hash.to_b58check (Operation.hash op) in
   equal ?msg ~prn ~eq op1 op2
 
 let equal_block ?msg st1 st2 =
@@ -37,7 +37,7 @@ let equal_block ?msg st1 st2 =
     | _ -> false in
   let prn = function
     | None -> "none"
-    | Some st -> Block_hash.to_hex (Block_header.hash st) in
+    | Some st -> Block_hash.to_b58check (Block_header.hash st) in
   equal ?msg ~prn ~eq st1 st2
 
 let make_equal_list eq prn ?(msg="") x y =

@@ -14,8 +14,8 @@
     of its public key that is stored in the contract. When the public key
     is actually reveeld, the public key instead of the hash of the key *)
 type manager_key =
-  | Hash of Ed25519.Public_key_hash.t
-  | Public_key of Ed25519.Public_key.t
+  | Hash of Signature.Public_key_hash.t
+  | Public_key of Signature.Public_key.t
 
 type t = manager_key
 

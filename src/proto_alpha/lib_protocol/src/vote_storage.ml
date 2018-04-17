@@ -15,8 +15,9 @@ let get_proposals ctxt =
     ~init:Protocol_hash.Map.empty
     ~f:(fun (proposal, _delegate) acc ->
         let previous =
-          try Protocol_hash.Map.find proposal acc
-          with Not_found -> 0l in
+          match Protocol_hash.Map.find_opt proposal acc with
+          | None -> 0l
+          | Some x -> x in
         Lwt.return (Protocol_hash.Map.add proposal (Int32.succ previous) acc))
 
 let clear_proposals ctxt =
@@ -50,7 +51,7 @@ let freeze_listings ctxt =
   Roll_storage.fold ctxt (ctxt, 0l)
     ~f:(fun _roll delegate (ctxt, total) ->
         (* TODO use snapshots *)
-        let delegate = Ed25519.Public_key.hash delegate in
+        let delegate = Signature.Public_key.hash delegate in
         begin
           Storage.Vote.Listings.get_option ctxt delegate >>=? function
           | None -> return 0l

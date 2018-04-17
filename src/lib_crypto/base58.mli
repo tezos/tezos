@@ -18,11 +18,15 @@ module Prefix : sig
   val protocol_hash: string
   val context_hash: string
   val ed25519_public_key_hash: string
+  val secp256k1_public_key_hash: string
   val cryptobox_public_key_hash: string
   val ed25519_seed: string
   val ed25519_public_key: string
   val ed25519_secret_key: string
   val ed25519_signature: string
+  val secp256k1_public_key: string
+  val secp256k1_secret_key: string
+  val secp256k1_signature: string
   val chain_id: string
 
 end
@@ -131,3 +135,4 @@ val raw_decode: ?alphabet:Alphabet.t -> string -> string option
 
 val partial_decode: ?alphabet:Alphabet.t -> string -> int -> string option
 val make_encoded_prefix: string -> int -> string * int
+val prefix: 'a encoding -> string

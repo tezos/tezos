@@ -12,7 +12,7 @@
 open Client_context_unix
 
 let builtin_commands =
-  let open Cli_entries in
+  let open Clic in
   [
     command
       ~desc: "List the protocol versions that this client understands."
@@ -69,10 +69,10 @@ let main select_commands =
     | _ :: args -> move_autocomplete_token_upfront [] args
     | [] -> [], None in
   Random.self_init () ;
-  ignore Cli_entries.(setup_formatter Format.std_formatter
-                        (if Unix.isatty Unix.stdout then Ansi else Plain) Short) ;
-  ignore Cli_entries.(setup_formatter Format.err_formatter
-                        (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
+  ignore Clic.(setup_formatter Format.std_formatter
+                 (if Unix.isatty Unix.stdout then Ansi else Plain) Short) ;
+  ignore Clic.(setup_formatter Format.err_formatter
+                 (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
   init_logger () >>= fun () ->
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
@@ -91,10 +91,10 @@ let main select_commands =
       let ctxt = new RPC_client.http_ctxt rpc_config Media_type.all_media_types in
       select_commands ctxt parsed_args >>=? fun commands ->
       let commands =
-        Cli_entries.add_manual
+        Clic.add_manual
           ~executable_name
           ~global_options
-          (if Unix.isatty Unix.stdout then Cli_entries.Ansi else Cli_entries.Plain)
+          (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
           Format.std_formatter
           (config_commands @ builtin_commands @ commands) in
       let rpc_config =
@@ -112,26 +112,26 @@ let main select_commands =
           ~rpc_config:rpc_config in
       begin match autocomplete with
         | Some (prev_arg, cur_arg, script) ->
-            Cli_entries.autocompletion
+            Clic.autocompletion
               ~script ~cur_arg ~prev_arg ~args:original_args ~global_options
               commands client_config >>=? fun completions ->
             List.iter print_endline completions ;
             return ()
         | None ->
-            Cli_entries.dispatch commands client_config remaining
+            Clic.dispatch commands client_config remaining
       end
     end >>= function
     | Ok () ->
         Lwt.return 0
-    | Error [ Cli_entries.Help command ] ->
-        Cli_entries.usage
+    | Error [ Clic.Help command ] ->
+        Clic.usage
           Format.std_formatter
           ~executable_name
           ~global_options
           (match command with None -> [] | Some c -> [ c ]) ;
         Lwt.return 0
     | Error errs ->
-        Cli_entries.pp_cli_errors
+        Clic.pp_cli_errors
           Format.err_formatter
           ~executable_name
           ~global_options
@@ -140,13 +140,13 @@ let main select_commands =
         Lwt.return 1
   end begin function
     | Client_commands.Version_not_found ->
-        Format.eprintf "@{<error>@{<title>Fatal error@}@} unknown protocol version." ;
+        Format.eprintf "@{<error>@{<title>Fatal error@}@} unknown protocol version.@." ;
         Lwt.return 1
     | Failure message ->
-        Format.eprintf "@{<error>@{<title>Fatal error@}@} %s." message ;
+        Format.eprintf "@{<error>@{<title>Fatal error@}@} %s.@." message ;
         Lwt.return 1
     | exn ->
-        Format.printf "@{<error>@{<title>Fatal error@}@} %s." (Printexc.to_string exn) ;
+        Format.printf "@{<error>@{<title>Fatal error@}@} %s.@." (Printexc.to_string exn) ;
         Lwt.return 1
   end >>= fun retcode ->
   Format.pp_print_flush Format.err_formatter () ;

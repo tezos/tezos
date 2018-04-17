@@ -9,10 +9,10 @@
 
 type error +=
   | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
-  | No_deletion of Ed25519.Public_key_hash.t (* `Permanent *)
+  | No_deletion of Signature.Public_key_hash.t (* `Permanent *)
   | Active_delegate (* `Temporary *)
   | Current_delegate (* `Temporary *)
-  | Empty_delegate_account of Ed25519.Public_key_hash.t (* `Temporary *)
+  | Empty_delegate_account of Signature.Public_key_hash.t (* `Temporary *)
 
 let () =
   register_error_kind
@@ -34,8 +34,8 @@ let () =
     ~description:"Tried to unregister a delegate"
     ~pp:(fun ppf delegate ->
         Format.fprintf ppf "Delegate deletion is forbidden (%a)"
-          Ed25519.Public_key_hash.pp delegate)
-    Data_encoding.(obj1 (req "delegate" Ed25519.Public_key_hash.encoding))
+          Signature.Public_key_hash.pp delegate)
+    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
     (function No_deletion c -> Some c | _ -> None)
     (fun c -> No_deletion c) ;
   register_error_kind
@@ -69,8 +69,8 @@ let () =
         Format.fprintf ppf
           "Delegate registration is forbidden when the delegate
            implicit account is empty (%a)"
-          Ed25519.Public_key_hash.pp delegate)
-    Data_encoding.(obj1 (req "delegate" Ed25519.Public_key_hash.encoding))
+          Signature.Public_key_hash.pp delegate)
+    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
     (function Empty_delegate_account c -> Some c | _ -> None)
     (fun c -> Empty_delegate_account c)
 
@@ -139,7 +139,7 @@ let set c contract delegate =
       is_delegatable c contract >>=? fun delegatable ->
       let self_delegation =
         match Contract_repr.is_implicit contract with
-        | Some pkh -> Ed25519.Public_key_hash.equal pkh delegate
+        | Some pkh -> Signature.Public_key_hash.equal pkh delegate
         | None -> false in
       if not known_delegate || not (registered_delegate || self_delegation) then
         fail (Roll_storage.Unregistered_delegate delegate)
@@ -149,7 +149,7 @@ let set c contract delegate =
         begin
           Storage.Contract.Delegate.get_option c contract >>=? function
           | Some current_delegate
-            when Ed25519.Public_key_hash.equal delegate current_delegate ->
+            when Signature.Public_key_hash.equal delegate current_delegate ->
               if self_delegation then
                 Storage.Contract.Inactive_delegate.mem c contract >>= function
                 | true -> return ()

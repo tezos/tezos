@@ -503,6 +503,30 @@ let expand original =
       expand_if_some ;
       expand_if_right ]
 
+let expand_rec expr =
+  let rec error_map (expanded, errors) f = function
+    | [] -> (List.rev expanded, List.rev errors)
+    | hd :: tl ->
+        let (new_expanded, new_errors) = f hd in
+        error_map
+          (new_expanded :: expanded, List.rev_append new_errors errors)
+          f tl in
+  let error_map = error_map ([], []) in
+  let rec expand_rec expr =
+    match expand expr with
+    | Ok expanded ->
+        begin
+          match expanded with
+          | Seq (loc, items, annot) ->
+              let items, errors = error_map expand_rec items in
+              (Seq (loc, items, annot), errors)
+          | Prim (loc, name, args, annot) ->
+              let args, errors = error_map expand_rec args in
+              (Prim (loc, name, args, annot), errors)
+          | Int _ | String _ as atom -> (atom, []) end
+    | Error errors -> (expr, errors) in
+  expand_rec expr
+
 let unexpand_caddadr expanded =
   let rec rsteps acc = function
     | [] -> Some acc
@@ -839,6 +863,14 @@ let unexpand original =
       unexpand_compare ;
       unexpand_if_some ;
       unexpand_if_right ]
+
+let rec unexpand_rec expr =
+  match unexpand expr with
+  | Seq (loc, items, annot) ->
+      Seq (loc, List.map unexpand_rec items, annot)
+  | Prim (loc, name, args, annot) ->
+      Prim (loc, name, List.map unexpand_rec args, annot)
+  | Int _ | String _ as atom -> atom
 
 let () =
   let open Data_encoding in

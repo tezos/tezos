@@ -117,18 +117,13 @@ module Context = struct
 
   end
 
-  type error += Unexpected_level_in_context
-
   let () =
     let open Services_registration in
     register0 S.level begin fun ctxt () () ->
-      let level = Level.current ctxt in
-      match Level.pred ctxt level with
-      | None -> fail Unexpected_level_in_context
-      | Some level -> return level
+      return (Level.current ctxt)
     end ;
     register0 S.next_level begin fun ctxt () () ->
-      return (Level.current ctxt)
+      return (Level.succ ctxt (Level.current ctxt))
     end ;
     register0 S.voting_period_kind begin fun ctxt () () ->
       Vote.get_current_period_kind ctxt
@@ -203,12 +198,9 @@ module Nonce = struct
     end ;
     register0 S.hash begin fun ctxt () () ->
       let level = Level.current ctxt in
-      match Level.pred ctxt level with
-      | None -> fail Context.Unexpected_level_in_context
-      | Some level ->
-          Nonce.get ctxt level >>=? function
-          | Unrevealed { nonce_hash ; _ } -> return nonce_hash
-          | _ -> assert false
+      Nonce.get ctxt level >>=? function
+      | Unrevealed { nonce_hash ; _ } -> return nonce_hash
+      | _ -> assert false
     end
 
   let get ctxt block level =

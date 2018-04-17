@@ -18,11 +18,7 @@ so you may want to make sure that you master these advanced concepts.
 Then, if you don’t know well about the Lwt library, that’s what you want
 to learn. This library is used extensively throughout the code base, as
 that’s the one we use to handle concurrency, and Tezos is a very
-concurrent system. You can use the online documentation. The `PDF
-manual <https://ocsigen.org/download/lwt-manual.pdf>`__ is also quite
-well written, but unfortunately not up to date, in particular the syntax
-extension has changed. It is still a valid resource for the basic
-concepts. The chapter on concurrency of `Real World
+concurrent system. You can use the `online documentation <https://ocsigen.org/lwt/3.2.1/manual/manual>`__. The chapter on concurrency of `Real World
 OCaml <https://github.com/dkim/rwo-lwt>`__ has also been ported to Lwt.
 
 After that, it is a good idea to read the tutorials for

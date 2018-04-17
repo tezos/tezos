@@ -234,12 +234,17 @@ let test_ancestor s =
 
 (****************************************************************************)
 
+let seed =
+  let receiver_id = P2p_peer.Id.of_string_exn (String.make P2p_peer.Id.size 'r') in
+  let sender_id = P2p_peer.Id.of_string_exn (String.make P2p_peer.Id.size 's') in
+  {Block_locator.receiver_id=receiver_id ; sender_id }
+
 (** Chain_traversal.block_locator *)
 
 let test_locator s =
   let check_locator length h1 expected =
     State.compute_locator s.chain
-      ~size:length (vblock s h1) >>= fun l ->
+      ~size:length (vblock s h1) seed >>= fun l ->
     let _, l = (l : Block_locator.t :> _ * _) in
     if List.length l <> List.length expected then
       Assert.fail_msg
@@ -380,35 +385,6 @@ let test_new_blocks s =
 
 (****************************************************************************)
 
-(** Block_locator.find_new *)
-
-let test_find_new s =
-  let test s h expected =
-    State.compute_locator s.chain ~size:50 (vblock s h) >>= fun loc ->
-    Block_locator_iterator.find_new
-      s.chain loc (List.length expected) >>= fun blocks ->
-    if List.length blocks <> List.length expected then
-      Assert.fail_msg
-        "Invalid find new length %s (found: %d, expected: %d)"
-        h (List.length blocks) (List.length expected) ;
-    List.iter2
-      (fun h1 h2 ->
-         if not (Block_hash.equal h1 (State.Block.hash @@ vblock s h2)) then
-           Assert.fail_msg "Invalid find new %s.%d (expected: %s)" h (List.length expected) h2)
-      blocks expected ;
-    Lwt.return_unit
-  in
-  Chain.set_head s.chain (vblock s "A8") >>= fun _ ->
-  test s "A6" [] >>= fun () ->
-  test s "A6" ["A7";"A8"] >>= fun () ->
-  test s "A6" ["A7"] >>= fun () ->
-  test s "B4" ["A4"] >>= fun () ->
-  test s "B7" ["A4";"A5";"A6";"A7"] >>= fun () ->
-  return ()
-
-
-(****************************************************************************)
-
 
 let tests : (string * (state -> unit tzresult Lwt.t)) list = [
   "init", test_init ;
@@ -420,7 +396,6 @@ let tests : (string * (state -> unit tzresult Lwt.t)) list = [
   "head", test_head ;
   "mem", test_mem ;
   "new_blocks", test_new_blocks ;
-  "find_new", test_find_new ;
 ]
 
 let wrap (n, f) =

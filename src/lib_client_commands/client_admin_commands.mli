@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val commands : unit -> #Client_context.full Cli_entries.command list
+val commands : unit -> #Client_context.full Clic.command list

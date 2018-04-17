@@ -1,0 +1,19 @@
+(jbuild_version 1)
+
+(executable
+ ((name error_doc)
+  (libraries
+   (tezos-shell
+    tezos-client-alpha))
+  (flags (:standard -w -9+27-30-32-40@8
+          -open Tezos_base
+          -open Tezos_error_monad
+          -open Tezos_data_encoding
+          -open Tezos_client_alpha
+          -safe-string
+          -linkall))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml*)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

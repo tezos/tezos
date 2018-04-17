@@ -161,15 +161,15 @@ test:proto_alpha:
   script:
     - jbuilder build @src/proto_alpha/lib_protocol/runtest
 
-test:client_alpha:transaction:
-  <<: *test_definition
-  script:
-    - jbuilder build @src/proto_alpha/lib_baking/runtest_transaction
+# test:client_alpha:transaction:
+  # <<: *test_definition
+  # script:
+    # - jbuilder build @src/proto_alpha/lib_baking/runtest_transaction
 
-test:client_alpha:origination:
-  <<: *test_definition
-  script:
-    - jbuilder build @src/proto_alpha/lib_baking/runtest_origination
+# test:client_alpha:origination:
+  # <<: *test_definition
+  # script:
+    # - jbuilder build @src/proto_alpha/lib_baking/runtest_origination
 
 test:client_alpha:endorsement:
   <<: *test_definition
@@ -279,35 +279,35 @@ opam:08:tezos-micheline:
   variables:
     package: tezos-micheline
 
-opam:09:tezos-protocol-environment-sigs:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-environment-sigs
-
-opam:10:tezos-rpc:
+opam:09:tezos-rpc:
   <<: *opam_definition
   variables:
     package: tezos-rpc
 
-opam:11:tezos-base:
+opam:10:tezos-base:
   <<: *opam_definition
   variables:
     package: tezos-base
 
-opam:12:pbkdf:
+opam:11:pbkdf:
   <<: *opam_definition
   variables:
     package: pbkdf
 
-opam:13:ocplib-resto-cohttp:
+opam:12:ocplib-resto-cohttp:
   <<: *opam_definition
   variables:
     package: ocplib-resto-cohttp
 
-opam:14:irmin-leveldb:
+opam:13:irmin-leveldb:
   <<: *opam_definition
   variables:
     package: irmin-leveldb
+
+opam:14:tezos-protocol-environment-sigs:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-environment-sigs
 
 opam:15:tezos-stdlib-unix:
   <<: *opam_definition
@@ -364,106 +364,115 @@ opam:25:tezos-client-commands:
   variables:
     package: tezos-client-commands
 
-opam:26:tezos-baking-alpha:
+opam:26:tezos-protocol-environment-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-environment-shell
+
+opam:27:tezos-baking-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baking-alpha
 
-opam:27:tezos-protocol-genesis:
+opam:28:tezos-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-protocol-genesis
 
-opam:28:tezos-protocol-updater:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-updater
-
-opam:29:tezos-p2p:
-  <<: *opam_definition
-  variables:
-    package: tezos-p2p
-
-opam:30:ocplib-resto-json:
+opam:29:ocplib-resto-json:
   <<: *opam_definition
   variables:
     package: ocplib-resto-json
 
-opam:31:tezos-baking-alpha-commands:
+opam:30:tezos-protocol-updater:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-updater
+
+opam:31:tezos-p2p:
+  <<: *opam_definition
+  variables:
+    package: tezos-p2p
+
+opam:32:tezos-baking-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-baking-alpha-commands
 
-opam:32:tezos-client-alpha-commands:
+opam:33:tezos-client-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-alpha-commands
 
-opam:33:tezos-client-base-unix:
+opam:34:tezos-client-base-unix:
   <<: *opam_definition
   variables:
     package: tezos-client-base-unix
 
-opam:34:tezos-client-genesis:
+opam:35:tezos-client-genesis:
   <<: *opam_definition
   variables:
     package: tezos-client-genesis
 
-opam:35:tezos-embedded-protocol-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-alpha
-
-opam:36:tezos-embedded-protocol-demo:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-demo
-
-opam:37:tezos-embedded-protocol-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-genesis
-
-opam:38:tezos-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
-
-opam:39:ocplib-ezresto:
+opam:36:ocplib-ezresto:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto
 
-opam:40:tezos-client:
+opam:37:tezos-embedded-protocol-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-alpha
+
+opam:38:tezos-embedded-protocol-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-demo
+
+opam:39:tezos-embedded-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-genesis
+
+opam:40:tezos-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell
+
+opam:41:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
-
-opam:41:tezos-node:
-  <<: *opam_definition
-  variables:
-    package: tezos-node
 
 opam:42:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:43:tezos-baker-alpha:
+opam:43:tezos-clic:
+  <<: *opam_definition
+  variables:
+    package: tezos-clic
+
+opam:44:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:44:tezos-protocol-demo:
+opam:45:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:45:tezos-protocol-environment-shell:
+opam:46:tezos-node:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-environment-shell
+    package: tezos-node
 
+opam:46:secp256k1-internal:
+  <<: *opam_definition
+  variables:
+    package: secp256k1-internal
 
 ##END_OPAM##
 

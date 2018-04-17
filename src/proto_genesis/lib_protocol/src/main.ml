@@ -41,20 +41,15 @@ let validation_passes = []
 type block = {
   shell: Block_header.shell_header ;
   command: Data.Command.t ;
-  signature: Ed25519.Signature.t ;
+  signature: Signature.t ;
 }
 
 let max_block_length =
   Data_encoding.Binary.length
     Data.Command.encoding
-    (Activate_testchain { protocol = Protocol_hash.hash_bytes [] ;
+    (Activate_testchain { protocol = Protocol_hash.zero ;
                           delay = 0L })
-  +
-  begin
-    match Data_encoding.Binary.fixed_length Ed25519.Signature.encoding with
-    | None -> assert false
-    | Some len -> len
-  end
+  + Signature.size
 
 let parse_block { Block_header.shell ; protocol_data } : block tzresult =
   match
@@ -67,7 +62,7 @@ let check_signature ctxt { shell ; command ; signature } =
   let bytes = Data.Command.forge shell command in
   Data.Pubkey.get_pubkey ctxt >>= fun public_key ->
   fail_unless
-    (Ed25519.Signature.check public_key signature bytes)
+    (Signature.check public_key signature bytes)
     Invalid_signature
 
 type validation_state = Updater.validation_result
@@ -82,16 +77,20 @@ let precheck_block
   Lwt.return (parse_block raw_block) >>=? fun _ ->
   return ()
 
+(* temporary hardcoded key to be removed... *)
+let protocol_parameters_key = [ "protocol_parameters" ]
 let prepare_application ctxt command level timestamp fitness =
   match command with
-  | Data.Command.Activate { protocol = hash ; fitness } ->
+  | Data.Command.Activate { protocol = hash ; fitness ; protocol_parameters } ->
       let message =
         Some (Format.asprintf "activate %a" Protocol_hash.pp_short hash) in
+      Context.set ctxt protocol_parameters_key protocol_parameters >>= fun ctxt ->
       Updater.activate ctxt hash >>= fun ctxt ->
       return { Updater.message ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
                max_operation_data_length = 0 ;
-               last_allowed_fork_level = level }
+               last_allowed_fork_level = level ;
+             }
   | Activate_testchain { protocol = hash ; delay } ->
       let message =
         Some (Format.asprintf "activate testchain %a" Protocol_hash.pp_short hash) in
@@ -103,13 +102,12 @@ let prepare_application ctxt command level timestamp fitness =
                last_allowed_fork_level = Int32.succ level ;
              }
 
-
 let begin_application
     ~predecessor_context:ctxt
     ~predecessor_timestamp:_
     ~predecessor_fitness:_
     raw_block =
-  Data.Init.may_initialize ctxt >>=? fun ctxt ->
+  Data.Init.check_inited ctxt >>=? fun () ->
   Lwt.return (parse_block raw_block) >>=? fun block ->
   check_signature ctxt block >>=? fun () ->
   prepare_application ctxt block.command
@@ -136,7 +134,7 @@ let begin_construction
       match Data_encoding.Binary.of_bytes Data.Command.encoding command with
       | None -> failwith "Failed to parse proto header"
       | Some command ->
-          Data.Init.may_initialize ctxt >>=? fun ctxt ->
+          Data.Init.check_inited ctxt >>=? fun () ->
           prepare_application ctxt command level timestamp fitness
 
 let apply_operation _vctxt _ =
@@ -146,4 +144,30 @@ let finalize_block state = return state
 
 let rpc_services = Services.rpc_services
 
-let configure_sandbox = Data.Init.configure_sandbox
+(* temporary hardcoded key to be removed... *)
+let sandbox_param_key = [ "sandbox_parameter" ]
+let get_sandbox_param ctxt =
+  Context.get ctxt sandbox_param_key >>= function
+  | None -> return None
+  | Some bytes ->
+      match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
+      | None ->
+          failwith "Internal error: failed to parse the sandbox parameter."
+      | Some json -> return (Some json)
+
+let init ctxt block_header =
+  Data.Init.tag_first_block ctxt >>=? fun ctxt ->
+  get_sandbox_param ctxt >>=? fun sandbox_param ->
+  begin
+    match sandbox_param with
+    | None -> return ctxt
+    | Some json ->
+        Data.Pubkey.may_change_default ctxt json >>= fun ctxt ->
+        return ctxt
+  end >>=? fun ctxt ->
+  return { Updater.message = None ; context = ctxt ;
+           fitness = block_header.Block_header.fitness ;
+           max_operations_ttl = 0 ;
+           max_operation_data_length = 0 ;
+           last_allowed_fork_level = block_header.level ;
+         }

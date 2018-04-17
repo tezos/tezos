@@ -91,11 +91,11 @@ let equal_pkh ?msg pkh1 pkh2 =
     match pkh1, pkh2 with
     | None, None -> true
     | Some pkh1, Some pkh2 ->
-        Ed25519.Public_key_hash.equal pkh1 pkh2
+        Signature.Public_key_hash.equal pkh1 pkh2
     | _ -> false in
   let prn = function
     | None -> "none"
-    | Some pkh -> Ed25519.Public_key_hash.to_hex pkh in
+    | Some pkh -> Signature.Public_key_hash.to_b58check pkh in
   Assert.equal ?msg ~prn ~eq pkh1 pkh2
 
 let equal_int64 ?msg =
@@ -135,8 +135,7 @@ let equal_cents_balance ~tc ?msg (contract, cents_balance) =
     (contract, Helpers_cast.cents_of_int cents_balance)
 
 let ecoproto_error f = function
-  | Alpha_environment.Ecoproto_error errors ->
-      List.exists f errors
+  | Alpha_environment.Ecoproto_error error -> f error
   | _ -> false
 
 let contain_error ?(msg="") ~f = function

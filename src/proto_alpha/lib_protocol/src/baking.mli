@@ -17,7 +17,7 @@ type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Cannot_freeze_baking_deposit (* `Permanent *)
 type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
-type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
+type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
 
 val paying_priorities: context -> int list
 
@@ -69,7 +69,7 @@ val check_endorsements_rights:
   context -> Level.t -> int list -> public_key tzresult Lwt.t
 
 (** Returns the endorsement reward calculated w.r.t a given priotiry.  *)
-val endorsement_reward: block_priority:int -> Tez.t tzresult Lwt.t
+val endorsement_reward: context -> block_priority:int -> Tez.t tzresult Lwt.t
 
 (** [baking_priorities ctxt level] is the lazy list of contract's
     public key hashes that are allowed to bake for [level]. *)

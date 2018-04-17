@@ -16,6 +16,7 @@ tezos-admin-client
 tezos-alpha-baker
 
 scripts/opam-test-all.sh.DONE
+scripts/create_genesis/src
 
 docs/introduction/readme.rst
 

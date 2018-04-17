@@ -90,8 +90,15 @@ let finalize_block ctxt =
   let fitness = Fitness.from_int64 fitness in
   return { Updater.message ; context = ctxt.context ; fitness ;
            max_operations_ttl = 0 ; max_operation_data_length = 0 ;
-           last_allowed_fork_level = 0l }
+           last_allowed_fork_level = 0l ;
+         }
 
 let rpc_services = Services.rpc_services
 
-let configure_sandbox ctxt _ = Lwt.return (Ok ctxt)
+let init context block_header =
+  return { Updater.message = None ; context ;
+           fitness = block_header.Block_header.fitness ;
+           max_operations_ttl = 0 ;
+           max_operation_data_length = 0 ;
+           last_allowed_fork_level = block_header.level ;
+         }

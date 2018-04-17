@@ -8,11 +8,11 @@
 (**************************************************************************)
 
 let group =
-  { Cli_entries.name = "protocols" ;
+  { Clic.name = "protocols" ;
     title = "Commands for managing protocols" }
 
 let commands () =
-  let open Cli_entries in
+  let open Clic in
   let check_dir _ dn =
     if Sys.is_directory dn then
       return dn

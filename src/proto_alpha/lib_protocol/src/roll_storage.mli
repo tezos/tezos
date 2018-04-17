@@ -20,7 +20,7 @@
 type error +=
   | Consume_roll_change
   | No_roll_for_delegate
-  | Unregistered_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
+  | Unregistered_delegate of Signature.Public_key_hash.t (* `Permanent *)
 
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 val init_first_cycles : Raw_context.t -> Raw_context.t tzresult Lwt.t
@@ -31,28 +31,28 @@ val snapshot_rolls : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 val fold :
   Raw_context.t ->
-  f:(Roll_repr.roll -> Ed25519.Public_key.t -> 'a -> 'a tzresult Lwt.t) ->
+  f:(Roll_repr.roll -> Signature.Public_key.t -> 'a -> 'a tzresult Lwt.t) ->
   'a -> 'a tzresult Lwt.t
 
 val baking_rights_owner :
   Raw_context.t -> Level_repr.t -> priority:int ->
-  Ed25519.Public_key.t tzresult Lwt.t
+  Signature.Public_key.t tzresult Lwt.t
 
 val endorsement_rights_owner :
   Raw_context.t -> Level_repr.t -> slot:int ->
-  Ed25519.Public_key.t tzresult Lwt.t
+  Signature.Public_key.t tzresult Lwt.t
 
 module Delegate : sig
 
   val add_amount :
-    Raw_context.t -> Ed25519.Public_key_hash.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
   val remove_amount :
-    Raw_context.t -> Ed25519.Public_key_hash.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
-  val set_inactive : Raw_context.t -> Ed25519.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+  val set_inactive : Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
-  val set_active : Raw_context.t -> Ed25519.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+  val set_active : Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
 end
 
@@ -67,10 +67,10 @@ module Contract : sig
 end
 
 val delegate_pubkey:
-  Raw_context.t -> Ed25519.Public_key_hash.t ->
-  Ed25519.Public_key.t tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t ->
+  Signature.Public_key.t tzresult Lwt.t
 
 (**/**)
 
 val get_contract_delegate:
-  Raw_context.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Signature.Public_key_hash.t option tzresult Lwt.t

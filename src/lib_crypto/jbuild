@@ -4,12 +4,21 @@
  ((name tezos_crypto)
   (public_name tezos-crypto)
   (flags (:standard -safe-string
-                    -open Tezos_stdlib))
+                    -open Tezos_stdlib
+                    -open Tezos_data_encoding
+                    -open Tezos_error_monad
+                    -open Tezos_rpc
+                    -open Tezos_clic))
   (libraries (tezos-stdlib
+              tezos-data-encoding
+              tezos-error-monad
+              tezos-rpc
+              tezos-clic
               lwt
               nocrypto
               blake2
               tweetnacl
+              secp256k1-internal
               zarith))))
 
 (alias

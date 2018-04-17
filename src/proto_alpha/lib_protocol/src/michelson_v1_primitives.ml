@@ -11,7 +11,7 @@ open Micheline
 
 type error += Unknown_primitive_name of string
 type error += Invalid_case of string
-type error += Invalid_primitive_name of Micheline.canonical_location
+type error += Invalid_primitive_name of string Micheline.canonical * Micheline.canonical_location
 
 type prim =
   | K_parameter
@@ -348,7 +348,7 @@ let prims_of_strings expr =
     | Int _ | String _ as expr -> ok expr
     | Prim (loc, prim, args, annot) ->
         Error_monad.record_trace
-          (Invalid_primitive_name loc)
+          (Invalid_primitive_name (expr, loc))
           (prim_of_string prim) >>? fun prim ->
         List.fold_left
           (fun acc arg ->
@@ -491,7 +491,7 @@ let () =
     ~title: "Unknown primitive name (typechecking error)"
     ~description:
       "In a script or data expression, a primitive was unknown."
-    ~pp:(fun ppf n -> Format.fprintf ppf "Unknown primitive %s.@," n)
+    ~pp:(fun ppf n -> Format.fprintf ppf "Unknown primitive %s." n)
     Data_encoding.(obj1 (req "wrongPrimitiveName" string))
     (function
       | Unknown_primitive_name got -> Some got
@@ -520,9 +520,11 @@ let () =
       "In a script or data expression, a primitive name is \
        unknown or has a wrong case."
     ~pp:(fun ppf _ -> Format.fprintf ppf "Invalid primitive.")
-    Data_encoding.(obj1 (req "location" Micheline.canonical_location_encoding))
+    Data_encoding.(obj2
+                     (req "expression" (Micheline.canonical_encoding ~variant:"generic" string))
+                     (req "location" Micheline.canonical_location_encoding))
     (function
-      | Invalid_primitive_name loc -> Some loc
+      | Invalid_primitive_name (expr, loc) -> Some (expr, loc)
       | _ -> None)
-    (fun loc ->
-       Invalid_primitive_name loc)
+    (fun (expr, loc) ->
+       Invalid_primitive_name (expr, loc))
