@@ -8,39 +8,27 @@
 (**************************************************************************)
 
 
-let test_rt_opt name pp enc dec input =
-  let encoded = enc input in
-  match dec encoded with
-  | Some output ->
-      if output = input then
-        ()
-      else
-        Format.kasprintf failwith
-          "%s failed for %a: got %a" name pp input pp output
-  | None ->
-      Format.kasprintf failwith
-        "%s failed for %a: unable to decode" name pp input
-  | exception exc ->
-      Format.kasprintf failwith
-        "%s failed for %a: exception whilst decoding: %s"
-        name pp input (Printexc.to_string exc)
+let test_rt_opt name testable enc dec input =
+  try
+    let roundtripped = dec (enc input) in
+    Alcotest.check (Alcotest.option testable) name (Some input) roundtripped
+  with
+    exc ->
+      Alcotest.failf "%s failed for %a: exception whilst decoding: %s"
+        name (Alcotest.pp testable) input (Printexc.to_string exc)
 
-let test_decode_opt_safe name pp dec encoded =
+let test_decode_opt_safe name testable dec encoded =
   match dec encoded with
   | Some _ | None -> ()
   | exception exc ->
-      Format.kasprintf failwith
-        "%s failed for %a: exception whilst decoding: %s"
-        name pp encoded (Printexc.to_string exc)
+      Alcotest.failf "%s failed for %a: exception whilst decoding: %s"
+        name (Alcotest.pp testable) encoded (Printexc.to_string exc)
 
-let test_decode_opt_fail name pp dec encoded =
-  match dec encoded with
-  | Some _ ->
-      Format.kasprintf failwith
-        "%s failed for %a: successful decoding of invalid input"
-        name pp encoded
-  | None -> ()
-  | exception exc ->
-      Format.kasprintf failwith
-        "%s failed for %a: exception whilst decoding: %s"
-        name pp encoded (Printexc.to_string exc)
+let test_decode_opt_fail name testable dec encoded =
+  try
+    let decoded = dec encoded in
+    Alcotest.check (Alcotest.option testable) name None decoded
+  with
+    exc ->
+      Alcotest.failf "%s failed: exception whilst decoding: %s"
+        name (Printexc.to_string exc)

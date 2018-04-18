@@ -21,7 +21,12 @@ let test_b58check_roundtrip
   : type t. (module B58CHECK with type t = t) -> t -> unit
   = fun m input ->
     let module M = (val m) in
-    Roundtrips.test_rt_opt "b58check" M.pp M.to_b58check M.of_b58check_opt input
+    let testable = Alcotest.testable M.pp (=) in
+    Roundtrips.test_rt_opt
+      "b58check"
+      testable
+      M.to_b58check M.of_b58check_opt
+      input
 
 let test_b58check_roundtrips () =
   let (pubkey_hash, pubkey, seckey) = get_keys () in
@@ -33,7 +38,7 @@ let test_b58check_roundtrips () =
 let test_b58check_invalid input =
   Roundtrips.test_decode_opt_fail
     "b58check"
-    Format.pp_print_string
+    (Alcotest.testable Ed25519.Public_key_hash.pp Ed25519.Public_key_hash.(=))
     Ed25519.Public_key_hash.of_b58check_opt
     input
 

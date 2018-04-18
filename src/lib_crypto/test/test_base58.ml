@@ -10,17 +10,15 @@
 let test_roundtrip_safe input =
   Roundtrips.test_rt_opt
     "safe base58"
-    Format.pp_print_string
-    Base58.safe_encode
-    Base58.safe_decode
+    Alcotest.string
+    Base58.safe_encode Base58.safe_decode
     input
 
 let test_roundtrip_raw input =
   Roundtrips.test_rt_opt
     "raw base58"
-    Format.pp_print_string
-    Base58.raw_encode
-    Base58.raw_decode
+    Alcotest.string
+    Base58.raw_encode Base58.raw_decode
     input
 
 let inputs = [
@@ -59,7 +57,7 @@ let test_roundtrip_raws () = List.iter test_roundtrip_raw inputs
 let test_safety input =
   Roundtrips.test_decode_opt_safe
     "safe base58"
-    Format.pp_print_string
+    Alcotest.string
     Base58.safe_decode
     input
 

@@ -11,7 +11,10 @@ let test_hashed_roundtrip name enc dec input =
   (* this wrapper to start with hashing *)
   Roundtrips.test_rt_opt
     name
-    (fun fmt (input, _) -> Format.fprintf fmt "%s" input)
+    (Alcotest.testable
+       (fun fmt (input, _) -> Format.fprintf fmt "%s" input)
+       (fun (_, hashed) (_, decoded) -> hashed = decoded)
+    )
     (fun (_, hashed) -> enc hashed)
     (fun encoded -> match dec encoded with
        | None -> None
