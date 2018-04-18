@@ -348,11 +348,14 @@ let of_string_opt s = of_bytes_opt (MBytes.of_string s)
 type Base58.data += Data of t
 let b58check_encoding =
   Base58.register_encoding
-    ~prefix: "\004\130\043"
-    ~length: 96
+    ~prefix: Base58.Prefix.generic_signature
+    ~length: Ed25519.size
     ~to_raw: to_string
     ~of_raw: of_string_opt
     ~wrap: (fun x -> Data x)
+
+let () =
+  Base58.check_encoded_prefix b58check_encoding "sig" 96
 
 include Helpers.MakeRaw(struct
     type nonrec t = t
