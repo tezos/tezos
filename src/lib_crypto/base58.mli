@@ -27,6 +27,7 @@ module Prefix : sig
   val secp256k1_public_key: string
   val secp256k1_secret_key: string
   val secp256k1_signature: string
+  val generic_signature: string
   val chain_id: string
 
 end
