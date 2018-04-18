@@ -252,7 +252,13 @@ let check_hash hash stamp_threshold =
   Compare.Uint64.(word <= stamp_threshold)
 
 let check_header_hash header stamp_threshold =
-  let hash = Block_header.hash header in
+  let hash =
+    Block_header.hash_raw
+      { shell = header.Block_header.shell ;
+        protocol_data =
+          Data_encoding.Binary.to_bytes
+            Block_header.protocol_data_encoding
+            header.protocol_data } in
   check_hash hash stamp_threshold
 
 let check_proof_of_work_stamp ctxt block =

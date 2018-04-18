@@ -103,7 +103,7 @@ val first_endorsement_slots:
     the given key *)
 val check_signature: Block_header.t -> public_key -> unit tzresult Lwt.t
 
-val check_hash: Block_hash.t -> int64 -> bool
+val check_header_hash: Block_header.t -> int64 -> bool
 
 (** verify if the proof of work stamp is valid *)
 val check_proof_of_work_stamp:
