@@ -18,7 +18,7 @@ let execute_code_pred
   let op = List.nth Helpers_account.bootstrap_accounts 0 in
   let tc = Option.unopt ~default:pred.tezos_context tc in
   Helpers_apply.script_origination_pred ~tc ~pred (script, op, init_amount)
-  >>=? fun ((dst, _), tc) ->
+  >>=? fun (dst, tc) ->
   let dst = List.hd dst in
   let ctxt = Helpers_cast.ctxt_of_tc tc in
   let gas = Proto_alpha.Alpha_context.Constants.hard_gas_limit_per_operation tc in

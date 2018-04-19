@@ -29,7 +29,8 @@ let origination_burn c ~payer contract =
   Contract.fees c contract >>=? fun fees ->
   trace Cannot_pay_storage_fee
     (Contract.spend_from_script c payer fees >>=? fun c ->
-     Contract.add_to_paid_fees c contract fees)
+     Contract.add_to_paid_fees c contract fees) >>=? fun c ->
+  return (c, fees)
 
 let update_script_storage c ~payer contract =
   Contract.paid_fees c contract >>=? fun paid_fees ->

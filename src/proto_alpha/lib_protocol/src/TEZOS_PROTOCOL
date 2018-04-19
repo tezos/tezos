@@ -31,8 +31,8 @@
         "Block_header_repr",
         "Operation_repr",
         "Manager_repr",
-	"Commitment_repr",
-	"Parameters_repr",
+        "Commitment_repr",
+        "Parameters_repr",
 
         "Raw_context",
         "Storage_sigs",
@@ -64,6 +64,7 @@
 
         "Baking",
         "Amendment",
+        "Apply_operation_result",
         "Apply",
 
         "Services_registration",

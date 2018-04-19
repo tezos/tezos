@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Alpha_context
 
 let name = "Isolate Michelson"
 module Logger = Logging.Make(struct let name = name end)
@@ -44,6 +43,21 @@ let program param st code =
 
 let quote s = "\"" ^ s ^ "\""
 
+open Apply_operation_result
+
+let extract_result rs =
+  List.fold_left
+    (fun (acc, err) (_, r) ->
+       match r with
+       | Applied (Transaction_result { originated_contracts }
+                 | Origination_result { originated_contracts }) ->
+           (originated_contracts @ acc, err)
+       | Applied Reveal_result
+       | Applied Delegation_result
+       | Skipped -> (acc, err)
+       | Failed errs -> (acc, errs))
+    ([], []) rs
+
 let parse_execute sb ?tc code_str param_str storage_str =
   let param = parse_param param_str in
   let script = parse_script code_str storage_str in
@@ -51,17 +65,17 @@ let parse_execute sb ?tc code_str param_str storage_str =
   >>=?? fun (dst, { ctxt = tc ; operations = ops ; big_map_diff = bgm }) ->
   let payer =
     (List.hd Account.bootstrap_accounts).contract in
-  Proto_alpha.Apply.apply_internal_manager_operations tc ~payer ops >>=?? fun (tc, err, _, ops) ->
-  Contract.originated_from_current_nonce tc >>=?? fun contracts ->
-  match err with
-  | None ->
+  Proto_alpha.Apply.apply_internal_manager_operations tc ~payer ops >>= function
+  | Error result ->
+      let _, err = extract_result result in
+      Lwt.return (Alpha_environment.wrap_error (Error_monad.error (List.hd err)))
+  | Ok (tc, _) ->
+      Proto_alpha.Alpha_context.Contract.originated_from_current_nonce tc >>=?? fun contracts ->
       let tc = Proto_alpha.Alpha_context.Gas.set_unlimited tc in
       Proto_alpha.Alpha_context.Contract.get_storage tc dst >>=?? begin function
         | (_, None) -> assert false
         | (tc, Some st) -> return (st, ops, tc, contracts, bgm)
       end
-  | Some err ->
-      Lwt.return (Alpha_environment.wrap_error (Error_monad.error (List.hd err)))
 
 let test ctxt ?tc (file_name: string) (storage: string) (input: string) =
   let full_path = contract_path // file_name ^ ".tz" in

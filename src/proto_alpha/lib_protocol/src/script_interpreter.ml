@@ -166,7 +166,7 @@ let rec interp
               ~script:({ code ; storage }, None (* TODO: initialize a big map from a map *))
               ~spendable ~delegatable
             >>=? fun (ctxt, contract) ->
-            Fees.origination_burn ctxt ~payer contract >>=? fun ctxt ->
+            Fees.origination_burn ctxt ~payer contract >>=? fun (ctxt, _) ->
             logged_return descr (Item ((param_type, contract), rest), ctxt) in
         let logged_return :
           a stack * context ->
@@ -676,7 +676,7 @@ let rec interp
             Contract.originate ctxt
               ~manager ~delegate ~balance
               ?script:None ~spendable:true ~delegatable >>=? fun (ctxt, contract) ->
-            Fees.origination_burn ctxt ~payer contract >>=? fun ctxt ->
+            Fees.origination_burn ctxt ~payer contract >>=? fun (ctxt, _) ->
             logged_return (Item ((Unit_t, contract), rest), ctxt)
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->

@@ -8,6 +8,29 @@
 (**************************************************************************)
 
 open Proto_alpha.Error_monad
+open Proto_alpha.Apply_operation_result
+
+let extract_result = function
+  | Sourced_operation_result (Manager_operations_result { operation_results }) ->
+      List.fold_left
+        (fun (acc, err) (_, r) ->
+           match r with
+           | Applied (Transaction_result { originated_contracts }
+                     | Origination_result { originated_contracts }) ->
+               (originated_contracts @ acc, err)
+           | Applied Reveal_result
+           | Applied Delegation_result
+           | Skipped -> (acc, err)
+           | Failed errs -> (acc, Some errs))
+        ([], None) operation_results
+  | _ -> ([], None)
+
+let bind_result (tc, result) =
+  match extract_result result with
+  | _, Some err ->
+      Lwt.return (Error err)
+  | contracts, None ->
+      return (contracts, tc)
 
 let operation
     ~tc ?(baker: Helpers_account.t option) ?(src: Helpers_account.t option)
@@ -20,8 +43,8 @@ let operation
     pred_block_hash
     0
     hash
-    operation >>=? fun { ctxt = tc ; contracts ; ignored_error } ->
-  return ((contracts, ignored_error), tc)
+    operation
+  >>=? bind_result
 
 
 let transaction ~tc ?(fee = 0) ?baker

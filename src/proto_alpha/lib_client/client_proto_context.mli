@@ -59,6 +59,9 @@ val operation_submitted_message :
 val pp_internal_operation:
   Format.formatter -> internal_operation -> unit
 
+val pp_operation_result :
+  Format.formatter -> (operation * Apply_operation_result.operation_result) -> unit
+
 val source_to_keys:
   #Proto_alpha.full ->
   Block_services.block ->

@@ -73,11 +73,7 @@ let main () =
   let src = List.hd Helpers.Account.bootstrap_accounts in
   Lwt.return (parse_script code storage) >>=? fun script ->
   Helpers.Apply.script_origination_pred
-    ~tc ~pred (script , src, 100_00) >>=?? fun ((contracts, errs), tc) ->
-  begin match errs with
-    | None | Some [] -> Proto_alpha.Error_monad.return ()
-    | Some (err :: _) -> Proto_alpha.Error_monad.fail err
-  end >>=?? fun () ->
+    ~tc ~pred (script , src, 100_00) >>=?? fun (contracts, tc) ->
   begin match contracts with
     | [ contract ] -> return contract
     | _ -> failwith "more than one contract"
@@ -103,11 +99,7 @@ let main () =
     Helpers.Apply.operation ~tc
       ~src pred.Helpers_block.hash
       (Helpers_block.get_op_header_res pred)
-      op >>=?? fun ((_, errs), tc) ->
-    begin match errs with
-      | None | Some [] -> Proto_alpha.Error_monad.return ()
-      | Some (err :: _) -> Proto_alpha.Error_monad.fail err
-    end >>=?? fun () ->
+      op >>=?? fun (_, tc) ->
     expect_big_map tc result >>=?? fun () ->
     debug "big map after call %s is ok" input ;
     return tc in

@@ -51,10 +51,7 @@ module S = struct
                  (req "operation_hash" Operation_hash.encoding)
                  (req "forged_operation" bytes)
                  (opt "signature" Signature.encoding))
-      ~output: (obj3
-                  (req "contracts" (list Contract.encoding))
-                  (req "internal_operations" (list Operation.internal_operation_encoding))
-                  (req "remaining_gas" Gas.encoding))
+      ~output: Apply_operation_result.encoding
       RPC_path.(custom_root / "apply_operation")
 
   let trace_code =
@@ -150,10 +147,7 @@ module I = struct
         let block_prio = 0 in
         Apply.apply_operation
           ctxt (Some baker_pkh) pred_block block_prio hash operation
-        >>=? function
-        | { ignored_error = Some script_err ; _ } -> Lwt.return (Error script_err)
-        | { gas ; contracts ; internal_operations ; _ } ->
-            Lwt.return (Ok (contracts, internal_operations, gas))
+        >>=? fun (_, result) -> return result
 
 end
 

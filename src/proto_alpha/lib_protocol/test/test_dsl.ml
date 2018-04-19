@@ -52,7 +52,7 @@ let test_dsl () : unit proto_tzresult Lwt.t =
   transfer
     account_a
     account_unknown_foo
-    10000 >>= Assert.ok_contract >>=? fun (_, tc) ->
+    10000 >>= Assert.ok >>=? fun (_, tc) ->
   Assert.equal_cents_balance ~msg: __LOC__ ~tc (account_unknown_foo.contract, 10000) >>=? fun () ->
   debug "Reception" ;
 
@@ -62,7 +62,7 @@ let test_dsl () : unit proto_tzresult Lwt.t =
     account_a
     account_b
     1000
-  >>=? fun ((contracts, _), _) ->
+  >>=? fun (contracts, _) ->
   Assert.equal_int ~msg: __LOC__ 0 (List.length contracts) ;
   debug "No contracts originated" ;
 
@@ -71,7 +71,7 @@ let test_dsl () : unit proto_tzresult Lwt.t =
     account_a
     account_b
     1000
-  >>= Assert.ok_contract ~msg: __LOC__ >>=? fun (_,tc) ->
+  >>= Assert.ok ~msg: __LOC__ >>=? fun (_,tc) ->
   Assert.equal_cents_balance ~msg: __LOC__ ~tc (account_a.contract, 998990) >>=? fun () ->
   Assert.equal_cents_balance ~msg: __LOC__ ~tc (account_b.contract, 1001000) >>=? fun () ->
   debug "Transfer balances" ;
@@ -90,7 +90,7 @@ let test_dsl () : unit proto_tzresult Lwt.t =
     ~spendable: false
     account_a
     1000
-  >>= Assert.ok_contract ~msg: __LOC__ >>=? fun ((contracts,_), tc) ->
+  >>= Assert.ok ~msg: __LOC__ >>=? fun (contracts, tc) ->
   Assert.equal_int (List.length contracts) 1 ;
   let non_spendable = List.hd contracts in
   let account = {account_a with contract = non_spendable} in
@@ -105,7 +105,7 @@ let test_dsl () : unit proto_tzresult Lwt.t =
     ~fee: 100
     account_a
     1000
-  >>= Assert.ok_contract ~msg: __LOC__ >>=? fun ((contracts, _), spendable_tc) ->
+  >>= Assert.ok ~msg: __LOC__ >>=? fun (contracts, spendable_tc) ->
   Assert.equal_int (List.length contracts) 1 ;
   let contract_spendable = List.hd contracts in
   let account_spendable = {account_a with contract = contract_spendable} in

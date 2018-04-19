@@ -116,7 +116,7 @@ let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
         Some baker in
   Apply.apply_operation ctxt baker pred_block block_prio
     (Alpha_context.Operation.hash operation) operation
-  >>=? fun { Apply.ctxt ; _ } ->
+  >>=? fun (ctxt, _) ->
   let op_count = op_count + 1 in
   return { data with ctxt ; op_count }
 
