@@ -17,162 +17,142 @@ module S = struct
   open Data_encoding
 
   let preserved_cycles =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "How many cycle before the 'no-automatic-fork point'"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "preserved_cycles" int31))
+      ~output: int31
       RPC_path.(custom_root / "preserved_cycles")
 
   let blocks_per_cycle =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Cycle length"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "blocks_per_cycle" int32))
+      ~output: int32
       RPC_path.(custom_root / "blocks_per_cycle")
 
   let blocks_per_voting_period =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Length of the voting period"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "blocks_per_voting_period" int32))
+      ~output: int32
       RPC_path.(custom_root / "blocks_per_voting_period")
 
   let blocks_per_commitment =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "How many blocks between random seed's nonce commitment"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "blocks_per_commitment" int32))
+      ~output: int32
       RPC_path.(custom_root / "blocks_per_commitment")
 
   let blocks_per_roll_snapshot =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "How many blocks between roll snapshots"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "blocks_per_roll_snapshot" int32))
+      ~output: int32
       RPC_path.(custom_root / "blocks_per_roll_snapshot")
 
   let time_between_blocks =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Slot durations"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "time_between_slots" (list Period.encoding)))
+      ~output: (list Period.encoding)
       RPC_path.(custom_root / "time_between_slots")
 
   let first_free_baking_slot =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "First free baking slot"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "first_free_baking_slot" uint16))
+      ~output: uint16
       RPC_path.(custom_root / "first_free_baking_slot")
 
   let endorsers_per_block =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Max signing slot"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "endorsers_per_block" uint16))
+      ~output: uint16
       RPC_path.(custom_root / "endorsers_per_block")
 
   let hard_gas_limits =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Hard maximum amount of gas per operation and per block"
       ~query: RPC_query.empty
-      ~input: empty
       ~output: (obj2 (req "per_block" z) (req "per_operation" z))
       RPC_path.(custom_root / "hard_gas_limits")
 
   let hard_storage_limits =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Hard maximum amount of bytes stored per operation and per block"
       ~query: RPC_query.empty
-      ~input: empty
       ~output: (obj2 (req "per_block" int64) (req "per_operation" int64))
       RPC_path.(custom_root / "hard_storage_limits")
 
   let cost_per_byte =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "The cost per bytes added to the storage"
       ~query: RPC_query.empty
-      ~input: empty
       ~output: (obj1 (req "cost_per_byte" Tez.encoding))
       RPC_path.(custom_root / "cost_per_byte")
 
   let proof_of_work_threshold =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Stamp threshold"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "proof_of_work_threshold" int64))
+      ~output: int64
       RPC_path.(custom_root / "proof_of_work_threshold")
 
   let seed_nonce_revelation_tip =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "seed_nonce_revelation_tip"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "seed_nonce_revelation_tip" Tez.encoding))
+      ~output: Tez.encoding
       RPC_path.(custom_root / "seed_nonce_revelation_tip")
 
   let origination_burn =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "origination_burn"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "origination_burn" Tez.encoding))
+      ~output: Tez.encoding
       RPC_path.(custom_root / "origination_burn")
 
   let block_security_deposit =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "block_security_deposit"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "block_security_deposit" Tez.encoding))
+      ~output: Tez.encoding
       RPC_path.(custom_root / "block_security_deposit")
 
   let endorsement_security_deposit =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "endorsement_security_deposit"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "endorsement_security_deposit" Tez.encoding))
+      ~output: Tez.encoding
       RPC_path.(custom_root / "endorsement_security_deposit")
 
   let block_reward =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "block_reward"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "block_reward" Tez.encoding))
+      ~output: Tez.encoding
       RPC_path.(custom_root / "block_reward")
 
   let endorsement_reward =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "endorsement_reward"
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "endorsement_reward" Tez.encoding))
+      ~output: Tez.encoding
       RPC_path.(custom_root / "endorsement_reward")
 
   let errors =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Schema for all the RPC errors from this protocol version"
       ~query: RPC_query.empty
-      ~input: empty
       ~output: json_schema
       RPC_path.(custom_root / "errors")
 
   let all =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "All constants"
       ~query: RPC_query.empty
-      ~input: empty
       ~output: Alpha_context.Constants.encoding
       custom_root
 

@@ -47,93 +47,82 @@ module S = struct
   open Data_encoding
 
   let balance =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Access the balance of a contract."
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "balance" Tez.encoding))
+      ~output: Tez.encoding
       RPC_path.(custom_root /: Contract.arg / "balance")
 
   let manager =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Access the manager of a contract."
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "manager" Signature.Public_key_hash.encoding))
+      ~output: Signature.Public_key_hash.encoding
       RPC_path.(custom_root /: Contract.arg / "manager")
 
   let manager_key =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Access the manager of a contract."
       ~query: RPC_query.empty
-      ~input: empty
       ~output: (obj2
                   (req "manager" Signature.Public_key_hash.encoding)
                   (opt "key" Signature.Public_key.encoding))
       RPC_path.(custom_root /: Contract.arg / "manager_key")
 
   let delegate =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Access the delegate of a contract, if any."
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      ~output: Signature.Public_key_hash.encoding
       RPC_path.(custom_root /: Contract.arg / "delegate")
 
   let counter =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Access the counter of a contract, if any."
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "counter" int32))
+      ~output: int32
       RPC_path.(custom_root /: Contract.arg / "counter")
 
   let spendable =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Tells if the contract tokens can be spent by the manager."
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "spendable" bool))
+      ~output: bool
       RPC_path.(custom_root /: Contract.arg / "spendable")
 
   let delegatable =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Tells if the contract delegate can be changed."
       ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "delegatable" bool))
+      ~output: bool
       RPC_path.(custom_root /: Contract.arg / "delegatable")
 
   let script =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Access the code and data of the contract."
       ~query: RPC_query.empty
-      ~input: empty
       ~output: Script.encoding
       RPC_path.(custom_root /: Contract.arg / "script")
 
   let storage =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Access the data of the contract."
       ~query: RPC_query.empty
-      ~input: empty
       ~output: Script.expr_encoding
       RPC_path.(custom_root /: Contract.arg / "storage")
 
   let info =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Access the complete status of a contract."
       ~query: RPC_query.empty
-      ~input: empty
       ~output: info_encoding
       RPC_path.(custom_root /: Contract.arg)
 
   let list =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description:
         "All existing contracts (including non-empty default contracts)."
       ~query: RPC_query.empty
-      ~input: empty
       ~output: (list Contract.encoding)
       custom_root
 
@@ -247,4 +236,3 @@ let storage ctxt block contract =
 
 let storage_opt ctxt block contract =
   RPC_context.make_opt_call1 S.storage ctxt block contract () ()
-
