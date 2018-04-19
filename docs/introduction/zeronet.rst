@@ -29,6 +29,13 @@ of the file you grab:
     Operation found in block: BKihN2QgSAu2etftNvs8FWWhwTvZiY8P3e7H3jgdj2MCpKZXXRs
     Account my_account (tz1__xxxxxxxxx__) created with ꜩ23,454.
 
+Or, if you use the ``zeronet.sh`` script, you should prefix the file
+with ``container:`` in order to copy it into the docker image:
+
+::
+
+    $ ./zeronet.sh client activate account my_account with container:tz1__xxxxxxxxx__.json
+
 Please preserve the JSON file, after each reset of the zeronet, you
 will have to reactivate the wallet.
 
