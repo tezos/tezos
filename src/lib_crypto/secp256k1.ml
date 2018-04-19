@@ -17,7 +17,7 @@ module Public_key_hash = Blake2B.Make(Base58)(struct
 let () =
   Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz2" 36
 
-open Secp256k1_ml.External
+open Libsecp256k1.External
 
 let context = Context.(create [Verify; Sign])
 

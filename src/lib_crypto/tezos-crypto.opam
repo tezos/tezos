@@ -19,8 +19,8 @@ depends: [
   "blake2"
   "tweetnacl"
   "zarith"
-  "secp256k1-internal"
-  "alcotest" { test }
+  "secp256k1"
+  "alcotest" { test & >= "0.8.3" }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

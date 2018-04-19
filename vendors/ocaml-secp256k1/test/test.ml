@@ -1,4 +1,4 @@
-open Secp256k1_ml
+open Libsecp256k1
 
 let assert_equal a b = assert (a = b)
 
