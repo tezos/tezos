@@ -1,5 +1,5 @@
 opam-version: "1.2"
-name: "secp256k1-internal"
+name: "secp256k1"
 version: "0.1"
 authors: "Vincent Bernardoff <vb@luminar.eu.org>"
 maintainer: "Vincent Bernardoff <vb@luminar.eu.org>"

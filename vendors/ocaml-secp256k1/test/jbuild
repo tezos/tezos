@@ -2,7 +2,7 @@
 
 (executable
  ((name test)
-  (libraries (hex secp256k1-internal alcotest))))
+  (libraries (hex libsecp256k1 alcotest))))
 
 (alias
  ((name    runtest)
