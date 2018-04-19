@@ -11,6 +11,7 @@ type service_repr =
   { path : string list ;
     meth : Resto.meth ;
     description : string ;
+    query : Resto.Description.query_item list ;
     input : Json_schema.schema option ;
     output : Json_schema.schema option ;
     example : string option ;
@@ -42,8 +43,10 @@ let normalize_json_schema = function
 
 let repr_of_service path
     RPC_description.{ description ; error ;
-                      meth ; input ; output ; _ }  : service_repr =
-  { path ; meth ;
+                      meth ; input ; output ;
+                      query ; _ }  : service_repr =
+
+  { path ; meth ; query ;
     description = make_descr description ;
     input = normalize_json_schema input ;
     output = normalize_json_schema (Some output) ;
@@ -83,12 +86,11 @@ let rec pp_print_service_tree fmt = function
       fprintf fmt "@]"
 
 let make_tree cctxt path =
-  (* TODO : add automatic example generation *)
   let open RPC_description in
   describe cctxt ~recurse:true path >>=? fun dir ->
   let rec loop path : _ directory -> service_tree list = function
     | Dynamic descr ->
-        [ Node ({ path ; meth=`POST ;
+        [ Node ({ path ; meth=`POST ; query = [] ;
                   description=make_descr descr ;
                   input = None ; output = None ;
                   example = None ; error = None }, []) ]
@@ -161,7 +163,7 @@ let rec pp_print_hierarchy fmt =
       else
         begin
           let name = "/" ^ List.hd (List.rev path) in
-          let offset = max 2 (String.length name / 2) in
+          let offset = max 4 (String.length name / 2) in
 
           if List.length l = 0 then
             pp_open_vbox fmt 0
@@ -277,6 +279,40 @@ let rec pp_print_rst_hierarchy fmt ~title node =
   in
   loop fmt node
 
+let pp_print_query_arg fmt =
+  let open RPC_arg in
+  function { name ; _ } ->
+    fprintf fmt "<%s>" name
+
+let pp_print_query_html_arg fmt =
+  let open RPC_arg in
+  function { name ; _ } ->
+    fprintf fmt "&lt;%s&gt;" name
+
+let pp_print_query_title fmt =
+  let open RPC_description in
+  function {name ; kind ; _ } ->
+  match kind with
+  | Single arg -> fprintf fmt "%s=%a" name pp_print_query_arg arg
+  | Optional arg -> fprintf fmt "[%s=%a]" name pp_print_query_arg arg
+  | Flag -> fprintf fmt "%s" name
+  | Multi arg -> fprintf fmt "(%s=%a)\\*" name pp_print_query_arg arg
+
+let pp_print_query_item_descr fmt =
+  let open RPC_description in
+  function { name ; description ; kind } ->
+    begin match kind with
+      | Single arg -> fprintf fmt "%s : %a" name pp_print_query_html_arg arg
+      | Optional arg -> fprintf fmt "[%s : %a] - Optional" name pp_print_query_html_arg arg
+      | Flag -> fprintf fmt "%s - Flag" name
+      | Multi arg -> fprintf fmt "(%s : %a)\\* - Can be given multiple times" name
+                       pp_print_query_html_arg arg
+    end;
+    begin match description with
+      | None -> ()
+      | Some descr -> fprintf fmt " : %s" descr
+    end
+
 let pp_print_html_tab_button fmt ?(default=false) ~shortlabel ~content path =
   let target_ref = ref_of_path path in
   fprintf fmt "<button class=\"tablinks%s\" onclick=\"showTab(this, '%s', '%s')\">%s</button>@ "
@@ -292,7 +328,7 @@ let pp_print_html_tab_content fmt ~tag ~shortlabel ~pp_content ~content path =
   fprintf fmt "<%s>@ %a</%s>@ " tag pp_content content tag;
   fprintf fmt "</div>@]"
 
-let pp_print_html_tabs fmt { path ; description ; input ; output ; _ (* example ; error *) } =
+let pp_print_html_tabs fmt { path ; description ; input ; output ; query ; _ (* example ; error *) } =
   fprintf fmt "@[<v 2>.. raw:: html@ @ ";
   fprintf fmt "@[<v 2><div class=\"tab\">@ ";
 
@@ -311,8 +347,16 @@ let pp_print_html_tabs fmt { path ; description ; input ; output ; _ (* example 
    *  | None -> ()); *)
   fprintf fmt "</div>@]@ ";
 
+  let query_item_list =
+    if query <> [] then
+      asprintf "</p> <p>Optional query arguments :<ul><li>%a</li></ul>"
+        (pp_print_list
+           ~pp_sep:(fun fmt () -> fprintf fmt "</li><li>")
+           pp_print_query_item_descr) query
+    else ""
+  in
   fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"p" ~shortlabel:"descr"
-                        ~pp_content:pp_print_string ~content:description) path;
+                        ~pp_content:pp_print_string ~content:(description^query_item_list)) path;
   (match input with
    | Some x -> fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"pre" ~shortlabel:"input"
                                      ~pp_content:Json_schema.pp ~content:x) path;
@@ -328,11 +372,13 @@ let pp_print_html_tabs fmt { path ; description ; input ; output ; _ (* example 
 
   fprintf fmt "@]"
 
-let pp_print_rst_full_service fmt ({ path ; meth } as repr) =
-  fprintf fmt ".. _%s :@\n@\n**%s %s**@\n@\n"
+let pp_print_rst_full_service fmt ({ path ; meth ; query } as repr) =
+  fprintf fmt ".. _%s :@\n@\n**%s %s%s%a**@\n@\n"
     (ref_of_path path)
     (Resto.string_of_meth meth)
-    ("/" ^ String.concat "/" path);
+    ("/" ^ String.concat "/" path)
+    (if query = [] then "" else "?")
+    (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "&") pp_print_query_title) query;
   fprintf fmt "%a" pp_print_html_tabs repr
 
 let rec pp_print_rst_service_tree fmt node =

@@ -22,7 +22,7 @@ tezos_init_sandboxed_client="${3:-$docgen_dir/../../../src/bin_client/tezos-init
 local_node="${2:-$docgen_dir/../../../_build/default/src/bin_node/main.exe}"
 local_client="${2:-$docgen_dir/../../../_build/default/src/bin_client/main_client.exe}"
 
-sandbox_file="$docgen_dir/sandbox.json"
+sandbox_file="/tmp/sandbox.json"
 usage="$docgen_dir/usage.rst"
 
 source $tezos_sandboxed_node
@@ -53,4 +53,4 @@ activate_alpha >&2
 
 sleep 2
 
-$rpc_doc $rpc < $usage | sed 's|/blocks/head/|/blocks/<block_id>/|g'
+$rpc_doc $rpc < $usage | sed -e 's|/chains/main/blocks/head/|.../<block_id>/|g'
