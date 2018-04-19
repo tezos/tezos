@@ -14,71 +14,38 @@ open Logging.Client.Endorsement
 
 module State : sig
 
+  type t = Raw_level.t
+
   val get_endorsement:
-    #Client_context.wallet ->
-    Raw_level.t ->
-    int ->
-    (Block_hash.t * Operation_hash.t) option tzresult Lwt.t
+    #Client_context.wallet -> t tzresult Lwt.t
 
   val record_endorsement:
-    #Client_context.wallet ->
-    Raw_level.t ->
-    Block_hash.t ->
-    int -> Operation_hash.t -> unit tzresult Lwt.t
+    #Client_context.wallet -> t -> unit tzresult Lwt.t
 
 end = struct
 
-  module LevelMap = Map.Make(Raw_level)
-
-  type t = (int * Block_hash.t * Operation_hash.t) list LevelMap.t
+  type t = Raw_level.t
   let encoding : t Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun x -> LevelMap.bindings x)
-      (fun l ->
-         List.fold_left
-           (fun x (y, z) -> LevelMap.add y z x)
-           LevelMap.empty l)
-      (list (obj2
-               (req "level" Raw_level.encoding)
-               (req "endorsement"
-                  (list (obj3
-                           (req "slot" int31)
-                           (req "block" Block_hash.encoding)
-                           (req "operation" Operation_hash.encoding))))))
+    Data_encoding.(obj1 (req "max_level" Raw_level.encoding))
 
-  let name =
-    "endorsements"
+  let name = "endorsed_level"
 
   let load (wallet : #Client_context.wallet) =
-    wallet#load name encoding ~default:LevelMap.empty
+    wallet#load name encoding ~default:Raw_level.root
 
   let save (wallet : #Client_context.wallet) map =
     wallet#write name encoding map
 
   let lock = Lwt_mutex.create ()
 
-  let get_endorsement (wallet : #Client_context.wallet) level slot =
-    Lwt_mutex.with_lock lock
-      (fun () ->
-         load wallet >>=? fun map ->
-         try
-           let _, block, op =
-             LevelMap.find level map
-             |> List.find (fun (slot',_,_) -> slot = slot') in
-           return (Some (block, op))
-         with Not_found -> return None)
+  let get_endorsement (wallet : #Client_context.wallet) =
+    Lwt_mutex.with_lock lock (fun () -> load wallet)
 
-  let record_endorsement (wallet : #Client_context.wallet) level hash slot oph =
+  let record_endorsement (wallet : #Client_context.wallet) level =
     Lwt_mutex.with_lock lock
       (fun () ->
-         load wallet >>=? fun map ->
-         let previous =
-           try LevelMap.find level map
-           with Not_found -> [] in
-         wallet#write name
-           (LevelMap.add level ((slot, hash, oph) :: previous) map)
-           encoding)
+         load wallet >>=? fun last ->
+         wallet#write name (Raw_level.max last level) encoding)
 
 end
 
@@ -105,25 +72,20 @@ let inject_endorsement (cctxt : #Proto_alpha.full)
   Client_keys.append cctxt src_sk bytes >>=? fun signed_bytes ->
   Shell_services.inject_operation
     cctxt ?async ~chain_id:bi.chain_id signed_bytes >>=? fun oph ->
-  iter_s
-    (fun slot ->
-       State.record_endorsement cctxt level bi.hash slot oph)
-    slots >>=? fun () ->
+  State.record_endorsement cctxt level >>=? fun () ->
   return oph
 
-let previously_endorsed_slot cctxt level slot =
-  State.get_endorsement cctxt level slot >>=? function
-  | None -> return false
-  | Some _ -> return true
+let previously_endorsed_level cctxt level =
+  State.get_endorsement cctxt >>=? fun last ->
+  return Raw_level.(level <= last)
 
-let check_endorsement cctxt level slot =
-  State.get_endorsement cctxt level slot >>=? function
-  | None -> return ()
-  | Some (block, _) ->
+let check_endorsement cctxt level =
+  previously_endorsed_level cctxt level >>=? function
+  | false -> return ()
+  | true ->
       Error_monad.failwith
-        "Already signed block %a at level %a, slot %d"
-        Block_hash.pp_short block Raw_level.pp level slot
-
+        "Already signed a block at level %a"
+        Raw_level.pp level
 
 let forge_endorsement (cctxt : #Proto_alpha.full)
     block
@@ -139,10 +101,7 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
         | [] -> cctxt#error "No slot found at level %a" Raw_level.pp level
         | slots -> return slots
   end >>=? fun slots ->
-  iter_s (check_endorsement cctxt level) slots >>=? fun () ->
-  inject_endorsement cctxt
-    block level
-    src_sk slots
+  inject_endorsement cctxt block level src_sk slots
 
 
 (** Worker *)
@@ -150,28 +109,21 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
 type state = {
   delegates: public_key_hash list ;
   mutable best: Client_baking_blocks.block_info ;
-  mutable to_endorse: endorsement list ;
+  mutable to_endorse:
+    (Client_baking_blocks.block_info * Time.t * endorsement list) option ;
   delay: int64;
 }
 and endorsement = {
-  time: Time.t ;
   delegate: public_key_hash ;
-  block: Client_baking_blocks.block_info ;
-  slot: int;
+  slots: int list;
 }
 
 let create_state delegates best delay =
   { delegates ;
     best ;
-    to_endorse = [] ;
+    to_endorse = None ;
     delay ;
   }
-
-let rec insert ({time} as e) = function
-  | [] -> [e]
-  | ({time = time'} :: _) as l when Time.compare time time' < 0 ->
-      e :: l
-  | e' :: l -> e' :: insert e l
 
 let get_delegates cctxt state =
   match state.delegates with
@@ -181,81 +133,60 @@ let get_delegates cctxt state =
   | _ :: _ as delegates ->
       return delegates
 
-let drop_old_endorsement ~before state =
-  state.to_endorse <-
-    List.filter
-      (fun { block } -> Fitness.compare before block.fitness <= 0)
-      state.to_endorse
-
 let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
-  let may_endorse (block: Client_baking_blocks.block_info) delegate time =
-    Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-    lwt_log_info "May endorse block %a for %s"
-      Block_hash.pp_short block.hash name >>= fun () ->
-    let b = `Hash (block.hash, 0) in
-    let level = block.level.level in
-    get_signing_slots cctxt b delegate level >>=? fun slots ->
-    lwt_debug "Found slots for %a/%s (%d)"
-      Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->
-    iter_p
-      (fun slot ->
-         if Fitness.compare state.best.fitness block.fitness < 0 then begin
-           state.best <- block ;
-           drop_old_endorsement ~before:block.fitness state ;
-         end ;
-         previously_endorsed_slot cctxt level slot >>=? function
-         | true ->
-             lwt_debug "slot %d: previously endorsed." slot >>= fun () ->
-             return ()
-         | false ->
-             try
-               let same_slot e =
-                 e.block.level = block.level && e.slot = slot in
-               let old = List.find same_slot state.to_endorse in
-               if Fitness.compare old.block.fitness block.fitness < 0
-               then begin
-                 lwt_log_info
-                   "Schedule endorsement for block %a \
-                    (level %a, slot %d, time %a) (replace block %a)"
-                   Block_hash.pp_short block.hash
-                   Raw_level.pp level
-                   slot
-                   Time.pp_hum time
-                   Block_hash.pp_short old.block.hash
-                 >>= fun () ->
-                 state.to_endorse <-
-                   insert
-                     { time ; delegate ; block ; slot }
-                     (List.filter
-                        (fun e -> not (same_slot e))
-                        state.to_endorse) ;
-                 return ()
-               end else begin
-                 lwt_debug
-                   "slot %d: better pending endorsement"
-                   slot >>= fun () ->
-                 return ()
-               end
-             with Not_found ->
-               lwt_log_info
-                 "Schedule endorsement for block %a \
-                  (level %a, slot %d, time %a)"
-                 Block_hash.pp_short block.hash
-                 Raw_level.pp level
-                 slot
-                 Time.pp_hum time >>= fun () ->
-               state.to_endorse <-
-                 insert { time ; delegate ; block ; slot } state.to_endorse ;
-               return ())
-      slots in
-  let time = Time.(add (now ()) state.delay) in
-  get_delegates cctxt state >>=? fun delegates ->
-  iter_p
-    (fun delegate ->
-       iter_p
-         (fun bi -> may_endorse bi delegate time)
-         bis)
-    delegates
+  let best =
+    List.fold_left
+      (fun best bi ->
+         let current_fitness =
+           match best with
+           | None -> state.best.fitness
+           | Some best -> best.Client_baking_blocks.fitness in
+         if Fitness.(current_fitness < bi.Client_baking_blocks.fitness) then
+           Some bi
+         else
+           best)
+      None bis in
+  match best with
+  | None ->
+      (* nothing to do *)
+      return ()
+  | Some bi ->
+      state.best <- bi ;
+      state.to_endorse <- None ;
+      previously_endorsed_level cctxt bi.level.level >>=? function
+      | true ->
+          (* do not endorse a shorter chain... *)
+          return ()
+      | false ->
+          (* proceed... *)
+          let time = Time.(add (now ()) state.delay) in
+          get_delegates cctxt state >>=? fun delegates ->
+          let toto delegate =
+            Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
+            lwt_log_info "May endorse block %a for %s"
+              Block_hash.pp_short bi.hash name >>= fun () ->
+            let b = `Hash (bi.hash, 0) in
+            let level = bi.level.level in
+            get_signing_slots cctxt b delegate level >>=? fun slots ->
+            lwt_debug "Found slots for %a/%s (%d)"
+              Block_hash.pp_short bi.hash name (List.length slots) >>= fun () ->
+            match slots with
+            | [] -> return None
+            | _ :: _ as slots -> return (Some { delegate ; slots }) in
+          filter_map_p toto delegates >>=? fun slots ->
+          match slots with
+          | [] ->
+              (* no rights ... *)
+              return ()
+          | _ :: _ as _slots ->
+              lwt_log_info
+                "Schedule endorsement for block %a \
+                 (level %a, time %a)"
+                Block_hash.pp_short bi.hash
+                Raw_level.pp bi.level.level
+                Time.pp_hum time >>= fun () ->
+              state.to_endorse <- Some (bi, time, slots) ;
+              return ()
 
 let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
   schedule_endorsements cctxt state bis >>= function
@@ -265,47 +196,36 @@ let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
         pp_print_error exns
   | Ok () -> Lwt.return_unit
 
-let pop_endorsements state =
-  let now = Time.now () in
-  let rec pop acc = function
-    | [] -> List.rev acc, []
-    | {time} :: _ as slots when Time.compare now time <= 0 ->
-        List.rev acc, slots
-    | slot :: slots -> pop (slot :: acc) slots in
-  let to_endorse, future_endorsement = pop [] state.to_endorse in
-  state.to_endorse <- future_endorsement ;
-  to_endorse
-
 let endorse cctxt state =
-  let to_endorse = pop_endorsements state in
-  iter_p
-    (fun { delegate ; block ; slot } ->
-       let hash = block.hash in
-       let b = `Hash (hash, 0) in
-       let level = block.level.level in
-       previously_endorsed_slot cctxt level slot >>=? function
-       | true -> return ()
-       | false ->
+  match state.to_endorse with
+  | None -> return ()
+  | Some (bi, _, slots) ->
+      state.to_endorse <- None ;
+      let hash = bi.hash in
+      let b = `Hash (hash, 0) in
+      let level = bi.level.level in
+      iter_p
+        (fun { delegate ; slots } ->
            Client_keys.get_key cctxt delegate >>=? fun (name, _pk, sk) ->
-           lwt_debug "Endorsing %a for %s (slot %d)!"
-             Block_hash.pp_short hash name slot >>= fun () ->
+           lwt_debug "Endorsing %a for %s!"
+             Block_hash.pp_short hash name >>= fun () ->
            inject_endorsement cctxt
              b level
-             sk [slot] >>=? fun oph ->
+             sk slots >>=? fun oph ->
            cctxt#message
              "Injected endorsement for block '%a' \
-              (level %a, slot %d, contract %s) '%a'"
+              (level %a, contract %s) '%a'"
              Block_hash.pp_short hash
              Raw_level.pp level
-             slot name
+             name
              Operation_hash.pp_short oph >>= fun () ->
            return ())
-    to_endorse
+        slots
 
 let compute_timeout state =
   match state.to_endorse with
-  | [] -> Lwt_utils.never_ending
-  | {time} :: _ ->
+  | None -> Lwt_utils.never_ending
+  | Some (_, time, _) ->
       let delay = (Time.diff time (Time.now ())) in
       if delay <= 0L then
         Lwt.return_unit
