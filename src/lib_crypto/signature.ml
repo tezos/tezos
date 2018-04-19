@@ -59,6 +59,8 @@ module Public_key_hash = struct
 
   let size = 1 + Ed25519.size
 
+  let zero = Ed25519 Ed25519.Public_key_hash.zero
+
   include Helpers.MakeRaw(struct
       type nonrec t = t
       let name = name

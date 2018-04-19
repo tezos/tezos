@@ -217,6 +217,8 @@ module type SIGNATURE = sig
     include ENCODER with type t := t
     include INDEXES with type t := t
 
+    val zero: t
+
   end
 
   module Public_key : sig
