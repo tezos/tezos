@@ -667,7 +667,7 @@ let begin_application ctxt block_header pred_timestamp =
   let ctxt = Fitness.increase ctxt in
   return (ctxt, delegate_pk, deposit)
 
-let finalize_application ctxt protocol_data delegate deposit =
+let finalize_application ctxt protocol_data delegate =
   let block_reward = Constants.block_reward ctxt in
   add_rewards ctxt block_reward >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
@@ -680,7 +680,7 @@ let finalize_application ctxt protocol_data delegate deposit =
     | None -> return ctxt
     | Some nonce_hash ->
         Nonce.record_hash ctxt
-          { nonce_hash ; delegate ; deposit ; rewards ; fees }
+          { nonce_hash ; delegate ; deposit = Tez.zero ; rewards ; fees }
   end >>=? fun ctxt ->
   (* end of cycle *)
   may_snapshot_roll ctxt >>=? fun ctxt ->
