@@ -5,6 +5,10 @@
   (libraries (hex libsecp256k1 alcotest))))
 
 (alias
- ((name    runtest)
+ ((name    runtest-secp256k1)
   (deps    (test.exe))
   (action  (run ${<}))))
+
+(alias
+ ((name    runtest)
+  (deps    ((alias runtest-secp256k1)))))

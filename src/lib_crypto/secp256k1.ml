@@ -19,7 +19,11 @@ let () =
 
 open Libsecp256k1.External
 
-let context = Context.(create [Verify; Sign])
+let context =
+  let ctx = Context.create () in
+  match Context.randomize ctx (Rand.generate 32) with
+  | false -> failwith "Secp256k1 context randomization failed. Aborting."
+  | true -> ctx
 
 module Public_key = struct
 
@@ -36,7 +40,7 @@ module Public_key = struct
   let to_string s = MBytes.to_string (to_bytes s)
   let of_string_opt s = of_bytes_opt (MBytes.of_string s)
 
-  let size = 33 (* TODO not hardcoded ?? *)
+  let size = Key.compressed_pk_bytes
 
   type Base58.data +=
     | Data of t
@@ -58,7 +62,7 @@ module Public_key = struct
   include Compare.Make(struct
       type nonrec t = t
       let compare a b =
-        MBytes.compare (Key.to_buffer a) (Key.to_buffer b)
+        MBytes.compare (Key.buffer a) (Key.buffer b)
     end)
 
   include Helpers.MakeRaw(struct
@@ -101,7 +105,7 @@ module Secret_key = struct
   let name = "Secp256k1.Secret_key"
   let title = "A Secp256k1 secret key"
 
-  let size = 32 (* TODO don't hardcode *)
+  let size = Key.secret_bytes
 
   let of_bytes_opt s =
     match Key.read_sk context s with
@@ -131,7 +135,7 @@ module Secret_key = struct
   include Compare.Make(struct
       type nonrec t = t
       let compare a b =
-        MBytes.compare (Key.to_buffer a) (Key.to_buffer b)
+        MBytes.compare (Key.buffer a) (Key.buffer b)
     end)
 
   include Helpers.MakeRaw(struct
@@ -167,16 +171,17 @@ module Secret_key = struct
 
 end
 
-type t = MBytes.t
+type t = Sign.plain Sign.t
 
 let name = "Secp256k1"
 let title = "A Secp256k1 signature"
 
-let size = 64 (* TODO don't hardcode? *)
+let size = Sign.plain_bytes
 
 let of_bytes_opt s =
-  if MBytes.length s = size then Some s else None
-let to_bytes x = x
+  match Sign.read context s with Ok s -> Some s | Error _ -> None
+
+let to_bytes = Sign.to_bytes ~der:false context
 
 let to_string s = MBytes.to_string (to_bytes s)
 let of_string_opt s = of_bytes_opt (MBytes.of_string s)
@@ -197,7 +202,8 @@ let () =
 
 include Compare.Make(struct
     type nonrec t = t
-    let compare = MBytes.compare
+    let compare a b =
+      MBytes.compare (Sign.buffer a) (Sign.buffer b)
   end)
 
 include Helpers.MakeRaw(struct
@@ -233,35 +239,17 @@ let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
 let zero = of_bytes_exn (MBytes.init size '\000')
 
-let sign secret_key message =
-  match Sign.msg_of_bytes message with
-  | None ->
-      Pervasives.invalid_arg
-        "Secp256k1.sign: argument message couldn't be converted"
-  | Some msg ->  begin
-      match Sign.sign context ~sk:secret_key ~msg with
-      | Ok signature ->
-          Sign.to_bytes ~der:false context signature
-      | _ ->
-          Pervasives.invalid_arg "Secp256k1.sign: couldn't sign"
-    end
-
+let sign sk msg =
+  Sign.sign_exn context ~sk msg
 
 let check public_key signature msg =
-  match Sign.msg_of_bytes msg, Sign.read context signature with
-  | Some msg, Ok signature -> begin
-      match Sign.verify context ~pk:public_key ~msg ~signature with
-      | Ok b -> b
-      | _ -> false
-    end
-  | _, _ -> false
+  Sign.verify_exn context ~pk:public_key ~msg ~signature
 
-let concat msg signature =
-  MBytes.concat msg signature
+let concat msg t =
+  MBytes.concat msg (Sign.to_bytes ~der:false context t)
 
-let append key msg =
-  let signature = sign key msg in
-  concat msg signature
+let append sk msg =
+  concat msg (Sign.sign_exn context ~sk msg)
 
 let generate_key () =
   let sk = Key.read_sk_exn context (Cstruct.to_bigarray (Tweetnacl.Rand.gen 32)) in
