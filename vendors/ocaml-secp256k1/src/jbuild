@@ -4,7 +4,7 @@
  ((name            libsecp256k1)
   (public_name     secp256k1)
   (modules         (internal external))
-  (libraries       (cstruct))
+  (libraries       (bigstring cstruct))
   (c_names         (secp256k1
                     secp256k1_wrap))
   (c_flags         (:include c_flags.sexp))
