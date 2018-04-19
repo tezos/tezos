@@ -79,6 +79,23 @@ let encoding =
        Block_header.shell_header_encoding
        protocol_data_encoding)
 
+type metadata = {
+  baker: Signature.Public_key_hash.t ;
+  level: Level_repr.t ;
+  voting_period_kind: Voting_period_repr.kind ;
+}
+let metadata_encoding =
+  let open Data_encoding in
+  conv
+    (fun { baker ; level ; voting_period_kind } ->
+       (baker, level, voting_period_kind))
+    (fun (baker, level, voting_period_kind) ->
+       { baker ; level ; voting_period_kind })
+    (obj3
+       (req "baker" Signature.Public_key_hash.encoding)
+       (req "level" Level_repr.encoding)
+       (req "voting_period_kind" Voting_period_repr.kind_encoding))
+
 (** Constants *)
 
 let max_header_length =

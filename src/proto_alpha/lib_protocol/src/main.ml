@@ -17,8 +17,8 @@ type block_header = Alpha_context.Block_header.t = {
 
 let block_header_data_encoding = Alpha_context.Block_header.protocol_data_encoding
 
-type block_header_metadata = unit
-let block_header_metadata_encoding = Data_encoding.unit
+type block_header_metadata = Alpha_context.Block_header.metadata
+let block_header_metadata_encoding = Alpha_context.Block_header.metadata_encoding
 
 type operation_data = Alpha_context.Operation.protocol_data
 type operation = Alpha_context.Operation.t = {
@@ -135,23 +135,27 @@ let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
 let finalize_block { mode ; ctxt ; op_count ; deposit = _ } =
   match mode with
   | Partial_construction _ ->
+      let level = Alpha_context. Level.current ctxt in
+      Alpha_context.Vote.get_current_period_kind ctxt >>=? fun voting_period_kind ->
+      let baker = Signature.Public_key_hash.zero in
       let ctxt = Alpha_context.finalize ctxt in
-      return (ctxt, ())
+      return (ctxt, { Alpha_context.Block_header.baker ; level ;
+                      voting_period_kind })
   | Application
       { baker ;  block_header = { protocol_data = { contents = protocol_data ; _ } ; _ } }
   | Full_construction { protocol_data ; baker ; _ } ->
       Apply.finalize_application ctxt protocol_data baker >>=? fun ctxt ->
-      let { level ; _ } : Alpha_context.Level.t =
-        Alpha_context. Level.current ctxt in
+      let level = Alpha_context.Level.current ctxt in
       let priority = protocol_data.priority in
-      let level = Alpha_context.Raw_level.to_int32 level in
+      let raw_level = Alpha_context.Raw_level.to_int32 level.level in
       let fitness = Alpha_context.Fitness.current ctxt in
       let commit_message =
         Format.asprintf
           "lvl %ld, fit %Ld, prio %d, %d ops"
-          level fitness priority op_count in
+          raw_level fitness priority op_count in
+      Alpha_context.Vote.get_current_period_kind ctxt >>=? fun voting_period_kind ->
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
-      return (ctxt, ())
+      return (ctxt, { Alpha_context.Block_header.baker ; level ; voting_period_kind })
 
 let compare_operations op1 op2 =
   Apply.compare_operations op1 op2

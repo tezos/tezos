@@ -28,6 +28,12 @@ type block_header = t
 type raw = Block_header.t
 type shell_header = Block_header.shell_header
 
+type metadata = {
+  baker: Signature.Public_key_hash.t ;
+  level: Level_repr.t ;
+  voting_period_kind: Voting_period_repr.kind ;
+}
+
 val raw: block_header -> raw
 
 val encoding: block_header Data_encoding.encoding
@@ -36,6 +42,7 @@ val contents_encoding: contents Data_encoding.t
 val unsigned_encoding: (Block_header.shell_header * contents) Data_encoding.t
 val protocol_data_encoding: protocol_data Data_encoding.encoding
 val shell_header_encoding: shell_header Data_encoding.encoding
+val metadata_encoding: metadata Data_encoding.encoding
 
 val max_header_length: int
 (** The maximum size of block headers in bytes *)
