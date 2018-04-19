@@ -13,6 +13,11 @@ type error +=
   | Cannot_parse_operation (* `Branch *)
   | Cant_parse_block_header
 
+val next_level:
+  'a #RPC_context.simple -> 'a -> Level.t shell_tzresult Lwt.t
+(** [next_level cctxt blk] returns the (protocol view of the) level
+    of the successor of [blk]. *)
+
 val minimal_time:
   'a #RPC_context.simple ->
   ?priority:int -> 'a -> Time.t shell_tzresult Lwt.t

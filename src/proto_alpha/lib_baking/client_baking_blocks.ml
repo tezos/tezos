@@ -29,7 +29,7 @@ let info cctxt ?(chain = `Main) block =
     cctxt ~chain ~block () >>=? fun next_protocol ->
   Block_services.Metadata.protocol_hash
     cctxt ~chain ~block () >>=? fun protocol ->
-  Alpha_services.Context.level cctxt (chain, block) >>=? fun level ->
+  Block_services.Metadata.protocol_data cctxt ~chain ~block () >>=? fun { level } ->
   let { Tezos_base.Block_header.predecessor ; fitness ; timestamp ; _ } = header in
   return { hash ; chain_id ; predecessor ; fitness ;
            timestamp ; protocol ; next_protocol ; level }
@@ -50,7 +50,7 @@ let monitor_heads cctxt ?next_protocols chain =
 
 let blocks_from_cycle cctxt ?(chain = `Main) block cycle =
   Block_services.hash cctxt ~chain ~block () >>=? fun hash ->
-  Alpha_services.Context.level cctxt (chain, block) >>=? fun level ->
+  Block_services.Metadata.protocol_data cctxt ~chain ~block () >>=? fun { level } ->
   Alpha_services.Helpers.levels cctxt (chain, block) cycle >>=? fun (first, last) ->
   let length = Int32.to_int (Raw_level.diff level.level first) in
   Chain_services.Blocks.list cctxt ~heads:[hash] ~length () >>=? fun blocks ->

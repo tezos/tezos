@@ -9,30 +9,7 @@
 
 open Alpha_context
 
-module Context : sig
-
-  val level:
-    'a #RPC_context.simple -> 'a -> Level.t shell_tzresult Lwt.t
-  (** [level cctxt blk] returns the (protocol view of the) level of
-      [blk]. *)
-
-  val next_level:
-    'a #RPC_context.simple -> 'a -> Level.t shell_tzresult Lwt.t
-  (** [next_level cctxt blk] returns the (protocol view of the) level
-      of the successor of [blk]. *)
-
-  val voting_period_kind:
-    'a #RPC_context.simple -> 'a -> Voting_period.kind shell_tzresult Lwt.t
-    (** [voting_period_kind cctxt blk] returns the voting period kind
-        of [blk]. *)
-
-end
-
 module Nonce : sig
-
-  val hash:
-    'a #RPC_context.simple ->
-    'a -> Nonce_hash.t shell_tzresult Lwt.t
 
   type info =
     | Revealed of Nonce.t

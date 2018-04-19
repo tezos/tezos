@@ -40,6 +40,14 @@ module S = struct
 
   let custom_root = RPC_path.(open_root / "helpers")
 
+  let next_level =
+    RPC_service.post_service
+      ~description: "Detailled level information for the next block"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: Level.encoding
+      RPC_path.(custom_root / "next_level")
+
   let minimal_timestamp =
     RPC_service.post_service
       ~description: "Minimal timestamp for the next block."
@@ -173,6 +181,9 @@ end
 
 let () =
   let open Services_registration in
+  register0 S.next_level begin fun ctxt () () ->
+    return (Level.succ ctxt (Level.current ctxt))
+  end ;
   register0 S.minimal_timestamp begin fun ctxt () slot ->
     let timestamp = Alpha_context.Timestamp.current ctxt in
     let slot = match slot with None -> 0 | Some p -> p in
@@ -242,6 +253,9 @@ let () =
     let last = List.hd levels in
     return (first.level, last.level)
   end
+
+let next_level ctxt block =
+  RPC_context.make_call0 S.next_level ctxt block () ()
 
 let minimal_time ctxt ?priority block =
   RPC_context.make_call0 S.minimal_timestamp ctxt block () priority

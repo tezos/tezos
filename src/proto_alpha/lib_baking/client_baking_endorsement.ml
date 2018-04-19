@@ -132,7 +132,8 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block
     ~src_sk ?slots ?max_priority src_pk =
   let src_pkh = Signature.Public_key.hash src_pk in
-  Alpha_services.Context.level cctxt (chain, block) >>=? fun { level } ->
+  Block_services.Metadata.protocol_data
+    cctxt ~chain ~block () >>=? fun { level = { level } } ->
   begin
     match slots with
     | Some slots -> return slots

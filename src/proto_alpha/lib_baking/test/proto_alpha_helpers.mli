@@ -19,7 +19,8 @@ val init :
     forked Tezos node and the block info of the block from where the
     tests will begin. *)
 
-val level : Chain_services.chain * Block_services.block -> Alpha_context.Level.t tzresult Lwt.t
+val level:
+  Chain_services.chain * Block_services.block -> Alpha_context.Level.t tzresult Lwt.t
 
 (** Calls the rpc service raw_context using the right rpc context *)
 val rpc_raw_context : Block_services.block -> string list -> int ->

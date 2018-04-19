@@ -21,7 +21,7 @@ let bake_block (cctxt : #Proto_alpha.full)
         return src_sk
     | Some sk -> return sk
   end >>=? fun src_sk ->
-  Alpha_services.Context.next_level cctxt (chain, block) >>=? fun level ->
+  Alpha_services.Helpers.next_level cctxt (chain, block) >>=? fun level ->
   let seed_nonce, seed_nonce_hash =
     if level.expected_commitment then
       let seed_nonce = Client_baking_forge.generate_seed_nonce () in

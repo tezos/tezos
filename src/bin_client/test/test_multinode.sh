@@ -40,8 +40,8 @@ assert_propagation_level() {
     level=$1
     printf "\n\nAsserting all nodes have reached level %s\n" "$level"
     for client in "${client_instances[@]}"; do
-        ( $client rpc post /chains/main/blocks/head/context/level with {} \
-              | assert_in_output "\"level\": $level" ) \
+        ( $client rpc get /chains/main/blocks/head/header/shell/level \
+              | assert_in_output "$level" ) \
             || exit 2
     done
 }

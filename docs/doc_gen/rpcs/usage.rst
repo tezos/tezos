@@ -9,7 +9,7 @@ client using this command ``tezos-admin-client rpc (get|post) <url>``.
 
 For instance, if you wish to request the current balance of a given
 block and contract, you can call the associated RPC via the command :
-``$ tezos-admin-client rpc post
+``$ tezos-admin-client rpc get
 /blocks/<block_id>/proto/context/contracts/<contract_id>/balance``.
 
 A RPC may takes an *input* and generates an *output* both in JSON

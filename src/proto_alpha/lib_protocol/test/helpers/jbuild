@@ -4,12 +4,14 @@
  ((name tezos_alpha_test_helpers)
   (libraries (tezos-base
               tezos-stdlib-unix
+              tezos-shell-services
               tezos-protocol-environment
               tezos-protocol-alpha
               alcotest-lwt))
   (flags (:standard -w -9-32 -safe-string
           -open Tezos_base__TzPervasives
-          -open Tezos_stdlib_unix))))
+          -open Tezos_stdlib_unix
+          -open Tezos_shell_services))))
 
 (alias
  ((name runtest_indent)

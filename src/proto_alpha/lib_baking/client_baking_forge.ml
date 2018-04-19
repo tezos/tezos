@@ -156,7 +156,7 @@ let forge_block cctxt ?(chain = `Main) block
         return (priority, time)
       end
     | `Auto (src_pkh, max_priority, free_baking) ->
-        Alpha_services.Context.next_level cctxt (chain, block) >>=? fun { level } ->
+        Alpha_services.Helpers.next_level cctxt (chain, block) >>=? fun { level } ->
         Alpha_services.Delegate.Baker.rights_for_delegate cctxt
           ?max_priority
           ~first_level:level
@@ -393,7 +393,7 @@ let compute_timeout { future_slots } =
 
 let get_unrevealed_nonces
     (cctxt : #Proto_alpha.full) ?(force = false) ?(chain = `Main) block =
-  Alpha_services.Context.next_level cctxt (chain, block) >>=? fun level ->
+  Alpha_services.Helpers.next_level cctxt (chain, block) >>=? fun level ->
   let cur_cycle = level.cycle in
   match Cycle.pred cur_cycle with
   | None -> return []
@@ -404,8 +404,8 @@ let get_unrevealed_nonces
           Client_baking_nonces.find cctxt hash >>=? function
           | None -> return None
           | Some nonce ->
-              Alpha_services.Context.level
-                cctxt (chain, `Hash (hash, 0)) >>=? fun level ->
+              Block_services.Metadata.protocol_data
+                cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { level } ->
               if force then
                 return (Some (hash, (level.level, nonce)))
               else
@@ -492,7 +492,7 @@ let bake (cctxt : #Proto_alpha.full) state =
     (fun (timestamp, (bi, priority, delegate)) ->
        let chain = `Hash bi.Client_baking_blocks.chain_id in
        let block = `Hash (bi.hash, 0) in
-       Alpha_services.Context.next_level cctxt (chain, block) >>=? fun next_level ->
+       Alpha_services.Helpers.next_level cctxt (chain, block) >>=? fun next_level ->
        let timestamp =
          if Block_hash.equal bi.Client_baking_blocks.hash state.genesis then
            Time.now ()
