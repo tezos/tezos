@@ -69,23 +69,28 @@ launch_node() {
 
     local image_version="$(cat "/usr/local/share/tezos/alphanet_version")"
     echo "Current public chain: $image_version."
-    if [ -f "$DATA_DIR/alphanet_version" ]; then
-        local local_data_version="$(cat "$DATA_DIR/alphanet_version")"
+    local local_data_version=""
+    if [ -f "$node_dir/alphanet_version" ]; then
+        local_data_version="$(cat "$node_dir/alphanet_version")"
         echo "Local chain data: $local_data_version."
-        if [ "$local_data_version" != "$image_version" ]; then
-            echo "Removing outdated chain data..."
-            if [ -f "$node_dir/identities.json" ]; then \
-                mv "$node_dir/identities.json" /tmp
-            fi
-            rm -rf "$node_dir/*"
-            ## TODO also remove stored nonces and endorsement...
-            if [ -f "/tmp/identities.json" ]; then \
-                mv /tmp/identities.json "$node_dir/"
-            fi
-            cp "/usr/local/share/tezos/alphanet_version" \
-               "$DATA_DIR/alphanet_version"
-        fi
     fi
+    if [ "$local_data_version" != "$image_version" ]; then
+        echo "Removing outdated chain data..."
+        if [ -f "$node_dir/identities.json" ]; then \
+            mv "$node_dir/identities.json" /tmp
+        fi
+        rm -rf "$node_dir/*"
+        rm -rf "$client_dir/blockss"
+        rm -rf "$client_dir/noncess"
+        rm -rf "$client_dir/endorsementss"
+        rm -rf "$client_dir/endorsed_levels"
+        if [ -f "/tmp/identities.json" ]; then \
+            mv /tmp/identities.json "$node_dir/"
+        fi
+        cp "/usr/local/share/tezos/alphanet_version" \
+           "$node_dir/alphanet_version"
+    fi
+
 
     # Generate a new identity if not present
 
