@@ -44,7 +44,7 @@ module Request = struct
         hash: Block_hash.t ;
         header: Block_header.t ;
         operations: Operation.t list list ;
-      } -> State.Block.t tzresult t
+      } -> State.Block.t option tzresult t
   let view
     : type a. a t -> view
     = fun (Request_validation { chain_db ; peer ; hash }) ->
@@ -240,7 +240,7 @@ let on_request
           bv.protocol_validator
           ?peer ~timeout:bv.limits.protocol_timeout
           block ;
-        return (Ok block)
+        return (Ok None)
     | None ->
         State.Block.read_invalid chain_state hash >>= function
         | Some { errors } ->
@@ -268,7 +268,7 @@ let on_request
                   ?peer ~timeout:bv.limits.protocol_timeout
                   block ;
                 notify_new_block block ;
-                return (Ok block)
+                return (Ok (Some block))
             (* TODO catch other temporary error (e.g. system errors)
                and do not 'commit' them on disk... *)
             | Error [Canceled | Unavailable_protocol _] as err ->
@@ -293,9 +293,11 @@ let on_completion
   : type a. t -> a Request.t -> a -> Worker_types.request_status -> unit Lwt.t
   = fun w (Request.Request_validation _ as r) v st ->
     match v with
-    | Ok _ ->
+    | Ok (Some _) ->
         Worker.record_event w
           (Event.Validation_success (Request.view r, st)) ;
+        Lwt.return ()
+    | Ok None ->
         Lwt.return ()
     | Error errs ->
         Worker.record_event w
@@ -336,7 +338,7 @@ let validate w
         bv.protocol_validator
         ?peer ~timeout:bv.limits.protocol_timeout
         block ;
-      return block
+      return None
   | None ->
       map_p (map_p (fun op ->
           let op_hash = Operation.hash op in

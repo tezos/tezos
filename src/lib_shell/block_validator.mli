@@ -26,7 +26,7 @@ val validate:
   ?notify_new_block:(State.Block.t -> unit) ->
   Distributed_db.chain_db ->
   Block_hash.t -> Block_header.t -> Operation.t list list ->
-  State.Block.t tzresult Lwt.t
+  State.Block.t option tzresult Lwt.t
 
 val fetch_and_compile_protocol:
   t ->
