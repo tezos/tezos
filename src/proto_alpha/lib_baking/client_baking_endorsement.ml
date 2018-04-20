@@ -82,14 +82,14 @@ end = struct
 
 end
 
-let get_signing_slots cctxt ?max_priority ?(chain = `Main) block delegate level =
-  Alpha_services.Delegate.Endorser.rights_for_delegate cctxt
-    ?max_priority ~first_level:level ~last_level:level
-    (chain, block) delegate >>=? fun possibilities ->
-  let slots =
-    List.map (fun (_,slot) -> slot)
-    @@ List.filter (fun (l, _) -> l = level) possibilities in
-  return slots
+let get_signing_slots cctxt ?(chain = `Main) block delegate level =
+  Alpha_services.Delegate.Endorsing_rights.get cctxt
+    ~levels:[level]
+    ~delegates:[delegate]
+    (chain, block) >>=? fun possibilities ->
+  match possibilities with
+  | [{ slots }] -> return slots
+  | _ -> return []
 
 let inject_endorsement
     (cctxt : #Proto_alpha.full)
@@ -130,7 +130,7 @@ let check_endorsement cctxt level slot =
 
 let forge_endorsement (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block
-    ~src_sk ?slots ?max_priority src_pk =
+    ~src_sk ?slots src_pk =
   let src_pkh = Signature.Public_key.hash src_pk in
   Block_services.Metadata.protocol_data
     cctxt ~chain ~block () >>=? fun { level = { level } } ->
@@ -139,7 +139,7 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
     | Some slots -> return slots
     | None ->
         get_signing_slots
-          cctxt ?max_priority ~chain block src_pkh level >>=? function
+          cctxt ~chain block src_pkh level >>=? function
         | [] -> cctxt#error "No slot found at level %a" Raw_level.pp level
         | slots -> return slots
   end >>=? fun slots ->

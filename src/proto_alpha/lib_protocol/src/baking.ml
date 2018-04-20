@@ -151,6 +151,18 @@ let minimal_time c priority pred_timestamp =
     (cumsum_time_between_blocks
        pred_timestamp (Constants.time_between_blocks c) (Int32.succ priority))
 
+let earlier_predecessor_timestamp ctxt level =
+  let current = Level.current ctxt in
+  let current_timestamp = Timestamp.current ctxt in
+  let gap = Level.diff level current in
+  let step = List.hd (Constants.time_between_blocks ctxt) in
+  if Compare.Int32.(gap < 1l) then
+    failwith "Baking.earlier_block_timestamp: past block."
+  else
+    Lwt.return (Period.mult (Int32.pred gap) step) >>=? fun delay ->
+    Lwt.return Timestamp.(current_timestamp +? delay) >>=? fun result ->
+    return result
+
 let freeze_baking_deposit ctxt { Block_header.priority ; _ } delegate =
   if Compare.Int.(priority >= Constants.first_free_baking_slot ctxt)
   then return (ctxt, Tez.zero)
@@ -160,8 +172,9 @@ let freeze_baking_deposit ctxt { Block_header.priority ; _ } delegate =
     |> trace Cannot_freeze_baking_deposit >>=? fun ctxt ->
     return (ctxt, deposit)
 
-let freeze_endorsement_deposit ctxt delegate =
+let freeze_endorsement_deposit ctxt delegate n =
   let deposit = Constants.endorsement_security_deposit ctxt in
+  Lwt.return (Tez.(deposit *? Int64.of_int n)) >>=? fun deposit ->
   Delegate.freeze_deposit ctxt delegate deposit
   |> trace Cannot_freeze_endorsement_deposit
 
@@ -196,11 +209,12 @@ let paying_priorities c =
 
 type error += Incorrect_priority
 
-let endorsement_reward ctxt ~block_priority:prio =
+let endorsement_reward ctxt ~block_priority:prio n =
   if Compare.Int.(prio >= 0)
   then
     Lwt.return
-      Tez.(Constants.endorsement_reward ctxt /? (Int64.(succ (of_int prio))))
+      Tez.(Constants.endorsement_reward ctxt /? (Int64.(succ (of_int prio)))) >>=? fun tez ->
+    Lwt.return Tez.(tez *? Int64.of_int n)
   else fail Incorrect_priority
 
 let baking_priorities c level =

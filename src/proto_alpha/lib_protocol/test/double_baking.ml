@@ -30,14 +30,8 @@ let get_first_different_bakers ctxt =
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt >>=? fun endorsers ->
-  let endorsers = List.combine endorsers (0--((List.length endorsers) - 1)) in
-  let endorser_1 = List.hd endorsers in
-  let endorser_2 =
-    List.find (fun (endorser, _slot) ->
-        Signature.Public_key_hash.(<>)
-          (fst endorser_1) endorser)
-      (List.tl endorsers)
-  in
+  let endorser_1 = (List.hd endorsers).delegate in
+  let endorser_2 = (List.hd (List.tl endorsers)).delegate in
   return (endorser_1, endorser_2)
 
 (** Bake two block at the same level using the same policy (i.e. same

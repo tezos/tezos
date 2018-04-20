@@ -26,7 +26,6 @@ val bake_block:
 (** Endorse a block *)
 val endorse_block:
   #Proto_alpha.full ->
-  ?max_priority:int ->
   Client_keys.Public_key_hash.t ->
   unit Error_monad.tzresult Lwt.t
 

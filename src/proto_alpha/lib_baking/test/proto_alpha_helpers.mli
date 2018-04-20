@@ -122,7 +122,6 @@ module Endorse : sig
     Account.t array tzresult Lwt.t
 
   val endorsement_rights :
-    ?max_priority:int ->
     Account.t ->
     Block_services.block ->
     (Raw_level.t * int) list tzresult Lwt.t

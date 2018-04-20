@@ -25,10 +25,10 @@ let sign ?(watermark = Signature.Generic_operation) sk ctxt contents =
   }
 
 let endorsement ?delegate ?level ctxt =
-  fun ?(signing_context=ctxt) slot ->
+  fun ?(signing_context=ctxt) slots ->
     begin
       match delegate with
-      | None -> Context.get_endorser ctxt slot
+      | None -> Context.get_endorser ctxt (List.hd slots)
       | Some delegate -> return delegate
     end >>=? fun delegate_pkh ->
     Account.find delegate_pkh >>=? fun delegate ->
@@ -38,7 +38,7 @@ let endorsement ?delegate ?level ctxt =
       | Some level -> return level
     end >>=? fun level ->
     let op =
-      let operations = Endorsements { block = Context.branch ctxt ; level ; slots = [slot] } in
+      let operations = Endorsements { block = Context.branch ctxt ; level ; slots = slots } in
       Sourced_operation (Consensus_operation operations) in
     return (sign ~watermark:Signature.Endorsement delegate.sk signing_context op)
 
@@ -107,7 +107,7 @@ let miss_signed_endorsement ?level ctxt slot =
   end >>=? fun level ->
   Context.get_endorser ctxt slot >>=? fun real_delegate_pkh ->
   let delegate = Account.find_alternate real_delegate_pkh in
-  endorsement ~delegate:delegate.pkh ~level ctxt slot
+  endorsement ~delegate:delegate.pkh ~level ctxt [slot]
 
 let transaction ?fee ?gas_limit ?storage_limit ?parameters ctxt
     (src:Contract.t) (dst:Contract.t)

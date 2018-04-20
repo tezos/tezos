@@ -64,21 +64,23 @@ let rpc_ctxt = object
 end
 
 let get_endorsers ctxt =
-  Alpha_services.Delegate.Endorser.rights
-    rpc_ctxt ctxt >>=? fun (_level, endorsers) ->
-  return endorsers
+  Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt
 
 let get_endorser ctxt slot =
-  Alpha_services.Delegate.Endorser.rights
-    ~max_priority:(slot+1) rpc_ctxt ctxt >>=? fun (_level, endorsers) ->
-  try return (List.nth endorsers slot)
+  Alpha_services.Delegate.Endorsing_rights.get
+    rpc_ctxt ctxt >>=? fun endorsers ->
+  try return (List.find (fun {Alpha_services.Delegate.Endorsing_rights.slots} -> List.mem slot slots) endorsers).delegate
   with _ ->
     failwith "Failed to lookup endorsers for ctxt %a, slot %d."
       Block_hash.pp_short (branch ctxt) slot
 
 let get_bakers ctxt =
-  Alpha_services.Delegate.Baker.rights rpc_ctxt ~max_priority:30 ctxt >>=? fun (_, bakers) ->
-  return (List.map fst bakers)
+  Alpha_services.Delegate.Baking_rights.get
+    ~max_priority:256
+    rpc_ctxt ctxt >>=? fun bakers ->
+  return (List.map
+            (fun p -> p.Alpha_services.Delegate.Baking_rights.delegate)
+            bakers)
 
 let get_constants b =
   Alpha_services.Constants.all rpc_ctxt b

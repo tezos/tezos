@@ -43,26 +43,31 @@ type baker_policy =
   | Excluding of public_key_hash list
 
 let get_next_baker_by_priority priority block =
-  Alpha_services.Delegate.Baker.rights rpc_ctxt
-    ~max_priority:(priority+1) block >>=? fun (_, bakers) ->
-  let pkh, timestamp = List.nth bakers priority in
-  return (pkh, priority, timestamp)
+  Alpha_services.Delegate.Baking_rights.get rpc_ctxt
+    ~all:true
+    ~max_priority:(priority+1) block >>=? fun bakers ->
+  let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
+        timestamp} = List.find (fun { Alpha_services.Delegate.Baking_rights.priority = p } -> p = priority)  bakers in
+  return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let get_next_baker_by_account pkh block =
-  Alpha_services.Delegate.Baker.rights rpc_ctxt
-    ~max_priority:30 block >>=? fun (_, bakers) ->
-  let ((_pkh, timestamp), priority) =  Test_utils.findi
-      (fun (pkh', _) -> Signature.Public_key_hash.equal pkh pkh')
-      bakers in
-  return (pkh, priority, timestamp)
+  Alpha_services.Delegate.Baking_rights.get rpc_ctxt
+    ~delegates:[pkh]
+    ~max_priority:256 block >>=? fun bakers ->
+  let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
+        timestamp ; priority } = List.hd bakers in
+  return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let get_next_baker_excluding excludes block =
-  Alpha_services.Delegate.Baker.rights rpc_ctxt
-    ~max_priority:((List.length excludes)+10) block >>=? fun (_, bakers) ->
-  let (pkh,timestamp),priority = Test_utils.findi
-      (fun (pkh, _) -> not (List.mem pkh excludes))
+  Alpha_services.Delegate.Baking_rights.get rpc_ctxt
+    ~max_priority:256 block >>=? fun bakers ->
+  let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
+        timestamp ; priority } =
+    List.find
+      (fun { Alpha_services.Delegate.Baking_rights.delegate } ->
+         not (List.mem delegate excludes))
       bakers in
-  return (pkh, priority, timestamp)
+  return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let dispatch_policy = function
   | By_priority p -> get_next_baker_by_priority p
@@ -112,9 +117,14 @@ module Forge = struct
     (* Finds the baker that should sign from the header *)
     let baker_of_a_block header =
       let priority = header.contents.priority in
-      Alpha_services.Delegate.Baker.rights rpc_ctxt
-        ~max_priority:(priority+1) pred >>=? fun (_, bakers) ->
-      let pkh, _ = List.nth bakers priority in
+      Alpha_services.Delegate.Baking_rights.get rpc_ctxt
+        ~all:true
+        ~max_priority:(priority+1)
+        pred >>=? fun bakers ->
+      let { Alpha_services.Delegate.Baking_rights.delegate = pkh } =
+        List.find
+          (fun { Alpha_services.Delegate.Baking_rights.priority = p } -> p = priority)
+          bakers in
       Account.find pkh
     in
     baker_of_a_block { shell ; contents } >>=? fun delegate ->

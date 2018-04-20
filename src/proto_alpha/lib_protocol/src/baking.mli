@@ -50,7 +50,7 @@ val freeze_baking_deposit:
     Raise an error if the baker account does not have enough
     funds to claim endorsement rights *)
 val freeze_endorsement_deposit:
-  context -> public_key_hash -> context tzresult Lwt.t
+  context -> public_key_hash -> int -> context tzresult Lwt.t
 
 (** [check_baking_rights ctxt block pred_timestamp] verifies that:
     * the contract that owned the roll at cycle start has the block signer as delegate.
@@ -69,7 +69,7 @@ val check_endorsements_rights:
   context -> Level.t -> int list -> public_key tzresult Lwt.t
 
 (** Returns the endorsement reward calculated w.r.t a given priotiry.  *)
-val endorsement_reward: context -> block_priority:int -> Tez.t tzresult Lwt.t
+val endorsement_reward: context -> block_priority:int -> int -> Tez.t tzresult Lwt.t
 
 (** [baking_priorities ctxt level] is the lazy list of contract's
     public key hashes that are allowed to bake for [level]. *)
@@ -120,3 +120,5 @@ val check_fitness_gap:
   context -> Block_header.t -> unit tzresult Lwt.t
 
 val dawn_of_a_new_cycle: context -> Cycle.t option tzresult Lwt.t
+
+val earlier_predecessor_timestamp: context -> Level.t -> Timestamp.t tzresult Lwt.t

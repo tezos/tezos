@@ -14,7 +14,7 @@ val endorsement:
   ?delegate:public_key_hash ->
   ?level:Raw_level.t ->
   Context.t -> ?signing_context:Context.t ->
-  int -> Operation.t tzresult Lwt.t
+  int list -> Operation.t tzresult Lwt.t
 
 val miss_signed_endorsement:
   ?level:Raw_level.t ->

@@ -153,15 +153,15 @@ let forge_block cctxt ?(chain = `Main) block
     | `Set priority -> begin
         Alpha_services.Helpers.minimal_time
           cctxt (chain, block) ~priority >>=? fun time ->
-        return (priority, time)
+        return (priority, Some time)
       end
     | `Auto (src_pkh, max_priority, free_baking) ->
         Alpha_services.Helpers.next_level cctxt (chain, block) >>=? fun { level } ->
-        Alpha_services.Delegate.Baker.rights_for_delegate cctxt
+        Alpha_services.Delegate.Baking_rights.get cctxt
           ?max_priority
-          ~first_level:level
-          ~last_level:level
-          (chain, block) src_pkh >>=? fun possibilities ->
+          ~levels:[level]
+          ~delegates:[src_pkh]
+          (chain, block)  >>=? fun possibilities ->
         try
           begin
             if free_baking then
@@ -169,8 +169,12 @@ let forge_block cctxt ?(chain = `Main) block
             else
               return 0
           end >>=? fun min_prio ->
-          let _, prio, time =
-            List.find (fun (l,p,_) -> l = level && p >= min_prio) possibilities in
+          let { Alpha_services.Delegate.Baking_rights.priority = prio ;
+                timestamp = time } =
+            List.find
+              (fun (p : Alpha_services.Delegate.Baking_rights.t) ->
+                 p.level = level && p.priority >= min_prio)
+              possibilities in
           return (prio, time)
         with Not_found ->
           failwith "No slot found at level %a" Raw_level.pp level
@@ -179,8 +183,10 @@ let forge_block cctxt ?(chain = `Main) block
   (* Raw_level.pp level priority >>= fun () -> *)
   begin
     match timestamp, minimal_timestamp with
-    | None, timestamp -> return timestamp
-    | Some timestamp, minimal_timestamp ->
+    | None, None -> return (Time.now ())
+    | None, Some timestamp -> return timestamp
+    | Some timestamp, None -> return timestamp
+    | Some timestamp, Some minimal_timestamp ->
         if timestamp < minimal_timestamp then
           failwith
             "Proposed timestamp %a is earlier than minimal timestamp %a"
@@ -325,29 +331,22 @@ let get_baking_slot cctxt
   let chain = `Hash bi.chain_id in
   let block = `Hash (bi.hash, 0) in
   let level = Raw_level.succ bi.level.level in
-  Lwt_list.filter_map_p
-    (fun delegate ->
-       Alpha_services.Delegate.Baker.rights_for_delegate cctxt
-         ?max_priority
-         ~first_level:level
-         ~last_level:level
-         (chain, block) delegate >>= function
-       | Error errs ->
-           log_error "Error while fetching baking possibilities:\n%a"
-             pp_print_error errs ;
-           Lwt.return_none
-       | Ok slots ->
-           let convert = fun (_lvl, slot, timestamp) ->
-             (timestamp, (bi, slot, delegate)) in
-           Lwt.return (Some (List.map convert slots)))
-    delegates >>= fun slots ->
-  let sorted_slots =
-    List.sort
-      (fun (t1,_) (t2,_) -> Time.compare t1 t2)
-      (List.flatten slots) in
-  match sorted_slots with
-  | [] -> Lwt.return None
-  | slot :: _ -> Lwt.return (Some slot)
+  Alpha_services.Delegate.Baking_rights.get cctxt
+    ?max_priority
+    ~levels:[level]
+    ~delegates
+    (chain, block) >>= function
+  | Error errs ->
+      log_error "Error while fetching baking possibilities:\n%a"
+        pp_print_error errs ;
+      Lwt.return_none
+  | Ok [] ->
+      Lwt.return_none
+  | Ok ((slot : Alpha_services.Delegate.Baking_rights.t) :: _) ->
+      match slot.timestamp with
+      | None -> Lwt.return_none
+      | Some timestamp ->
+          Lwt.return_some (timestamp, (bi, slot.priority, slot.delegate))
 
 let rec insert_baking_slot slot = function
   | [] -> [slot]

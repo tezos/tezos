@@ -30,14 +30,8 @@ let get_first_different_bakers ctxt =
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt >>=? fun endorsers ->
-  let endorsers = List.combine endorsers (0--((List.length endorsers) - 1)) in
-  let endorser_1 = List.hd endorsers in
-  let endorser_2 =
-    List.find (fun (endorser, _slot) ->
-        Signature.Public_key_hash.(<>)
-          (fst endorser_1) endorser)
-      (List.tl endorsers)
-  in
+  let endorser_1 = (List.hd endorsers) in
+  let endorser_2 = (List.hd (List.tl endorsers)) in
   return (endorser_1, endorser_2)
 
 let block_fork b =
@@ -59,8 +53,8 @@ let valid_double_endorsement_evidence () =
   block_fork b >>=? fun (blk_a, blk_b) ->
 
   Context.get_endorser (B blk_a) 0 >>=? fun delegate ->
-  Op.endorsement ~delegate (B blk_a) 0 >>=? fun endorsement_a ->
-  Op.endorsement ~delegate (B blk_b) 0 >>=? fun endorsement_b ->
+  Op.endorsement ~delegate (B blk_a) [0] >>=? fun endorsement_a ->
+  Op.endorsement ~delegate (B blk_b) [0] >>=? fun endorsement_b ->
   Block.bake ~operations:[endorsement_a] blk_a >>=? fun blk_a ->
   (* Block.bake ~operations:[endorsement_b] blk_b >>=? fun _ -> *)
 
@@ -89,7 +83,7 @@ let invalid_double_endorsement () =
   Context.init 10 >>=? fun (b, _) ->
   Block.bake b >>=? fun b ->
 
-  Op.endorsement (B b) 0 >>=? fun endorsement ->
+  Op.endorsement (B b) [0] >>=? fun endorsement ->
   Block.bake ~operation:endorsement b >>=? fun b ->
 
   Op.double_endorsement (B b) endorsement endorsement >>=? fun operation ->
@@ -105,8 +99,8 @@ let too_early_double_endorsement_evidence () =
   block_fork b >>=? fun (blk_a, blk_b) ->
 
   Context.get_endorser (B blk_a) 0 >>=? fun delegate ->
-  Op.endorsement ~delegate (B blk_a) 0 >>=? fun endorsement_a ->
-  Op.endorsement ~delegate (B blk_b) 0 >>=? fun endorsement_b ->
+  Op.endorsement ~delegate (B blk_a) [0] >>=? fun endorsement_a ->
+  Op.endorsement ~delegate (B blk_b) [0] >>=? fun endorsement_b ->
 
   Op.double_endorsement (B b) endorsement_a endorsement_b >>=? fun operation ->
   Block.bake ~operation b >>= fun res ->
@@ -124,8 +118,8 @@ let too_late_double_endorsement_evidence () =
   block_fork b >>=? fun (blk_a, blk_b) ->
 
   Context.get_endorser (B blk_a) 0 >>=? fun delegate ->
-  Op.endorsement ~delegate (B blk_a) 0 >>=? fun endorsement_a ->
-  Op.endorsement ~delegate (B blk_b) 0 >>=? fun endorsement_b ->
+  Op.endorsement ~delegate (B blk_a) [0] >>=? fun endorsement_a ->
+  Op.endorsement ~delegate (B blk_b) [0] >>=? fun endorsement_b ->
 
   fold_left_s (fun blk _ -> Block.bake_until_cycle_end blk)
     blk_a (1 -- (preserved_cycles + 1)) >>=? fun blk ->
@@ -143,10 +137,10 @@ let different_delegates () =
 
   block_fork b >>=? fun (blk_a, blk_b) ->
   get_first_different_endorsers (B blk_a)
-  >>=? fun ((endorser_a, slot_a), (endorser_b, slot_b)) ->
+  >>=? fun (endorser_a, endorser_b) ->
 
-  Op.endorsement ~delegate:endorser_a (B blk_a) slot_a >>=? fun e_a ->
-  Op.endorsement ~delegate:endorser_b (B blk_b) slot_b >>=? fun e_b ->
+  Op.endorsement ~delegate:endorser_a.delegate (B blk_a) endorser_a.slots >>=? fun e_a ->
+  Op.endorsement ~delegate:endorser_b.delegate (B blk_b) endorser_b.slots >>=? fun e_b ->
   Op.double_endorsement (B blk_a) e_a e_b >>=? fun operation ->
   Block.bake ~operation blk_a >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res begin function
@@ -160,10 +154,10 @@ let wrong_delegate () =
 
   block_fork b >>=? fun (blk_a, blk_b) ->
   get_first_different_endorsers (B blk_a)
-  >>=? fun ((_endorser_a, slot_a), (endorser_b, slot_b)) ->
+  >>=? fun (endorser_a, endorser_b) ->
 
-  Op.endorsement ~delegate:endorser_b (B blk_a) slot_a >>=? fun endorsement_a ->
-  Op.endorsement ~delegate:endorser_b (B blk_b) slot_b >>=? fun endorsement_b ->
+  Op.endorsement ~delegate:endorser_b.delegate (B blk_a) endorser_a.slots >>=? fun endorsement_a ->
+  Op.endorsement ~delegate:endorser_b.delegate (B blk_b) endorser_b.slots >>=? fun endorsement_b ->
 
   Op.double_endorsement (B blk_a) endorsement_a endorsement_b >>=? fun operation ->
   Block.bake ~operation blk_a >>= fun e ->

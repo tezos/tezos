@@ -44,10 +44,10 @@ let bake_block (cctxt : #Proto_alpha.full)
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return ()
 
-let endorse_block cctxt ?max_priority delegate =
+let endorse_block cctxt delegate =
   Client_keys.get_key cctxt delegate >>=? fun (_src_name, src_pk, src_sk) ->
   Client_baking_endorsement.forge_endorsement cctxt
-    cctxt#block ?max_priority ~src_sk src_pk >>=? fun oph ->
+    cctxt#block ~src_sk src_pk >>=? fun oph ->
   cctxt#answer "Operation successfully injected in the node." >>= fun () ->
   cctxt#answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return ()

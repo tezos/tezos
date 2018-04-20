@@ -352,9 +352,10 @@ let apply_consensus_operation_content ctxt
       Operation.check_signature delegate operation >>=? fun () ->
       let delegate = Signature.Public_key.hash delegate in
       let ctxt = Fitness.increase ~gap:(List.length slots) ctxt in
-      Baking.freeze_endorsement_deposit ctxt delegate >>=? fun ctxt ->
+      Baking.freeze_endorsement_deposit
+        ctxt delegate (List.length slots) >>=? fun ctxt ->
       Global.get_last_block_priority ctxt >>=? fun block_priority ->
-      Baking.endorsement_reward ctxt ~block_priority >>=? fun reward ->
+      Baking.endorsement_reward ctxt ~block_priority (List.length slots) >>=? fun reward ->
       Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
       return (ctxt, Endorsements_result (delegate, slots))
 

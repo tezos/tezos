@@ -68,50 +68,73 @@ val grace_period:
   Cycle.t shell_tzresult Lwt.t
 
 
-module Baker : sig
+module Baking_rights : sig
 
-  val rights:
-    'a #RPC_context.simple -> ?max_priority:int -> 'a ->
-    (Raw_level.t * (Signature.Public_key_hash.t * Time.t) list) shell_tzresult Lwt.t
+  type t = {
+    level: Raw_level.t ;
+    delegate: Signature.Public_key_hash.t ;
+    priority: int ;
+    timestamp: Timestamp.t option ;
+  }
 
-  val rights_for_level:
-    'a #RPC_context.simple -> ?max_priority:int -> 'a -> Raw_level.t ->
-    (Raw_level.t * Signature.Public_key_hash.t list) shell_tzresult Lwt.t
+  (** Compute the baking rights. By default, it computes the baking
+      rights for the next block and only returns the first available
+      priority for bakers that appears in the 64 first priorities.
 
-  val rights_for_delegate:
+      The optional arguments [levels] and [cycles] allows to compute
+      baking for an explicit list of levels or for all the levels of the given
+      cycles.
+
+      The optional argument [delegates] allows to filter
+      the non-explicitly listed delegates out of the resulting list.
+
+      When [all=false], the function only returns the minimal priority
+      for each delegates. When [all=true], all priorities are returned. *)
+  val get:
     'a #RPC_context.simple ->
-    ?max_priority:int -> ?first_level:Raw_level.t -> ?last_level:Raw_level.t ->
-    'a -> Signature.Public_key_hash.t ->
-    (Raw_level.t * int * Time.t) list shell_tzresult Lwt.t
+    ?levels: Raw_level.t list ->
+    ?cycles: Cycle.t list ->
+    ?delegates: Signature.public_key_hash list ->
+    ?all: bool ->
+    ?max_priority: int ->
+    'a -> t list shell_tzresult Lwt.t
 
 end
 
-module Endorser : sig
+module Endorsing_rights : sig
 
-  val rights:
-    'a #RPC_context.simple -> ?max_priority:int -> 'a ->
-    (Raw_level.t * Signature.Public_key_hash.t list) shell_tzresult Lwt.t
+  type t = {
+    level: Raw_level.t ;
+    delegate: Signature.Public_key_hash.t ;
+    slots: int list ;
+    estimated_time: Timestamp.t option ;
+  }
 
-  val rights_for_level:
-    'a #RPC_context.simple -> ?max_priority:int -> 'a -> Raw_level.t ->
-    (Raw_level.t * Signature.Public_key_hash.t list) shell_tzresult Lwt.t
+  (** Compute the endorsing rights. By default, it computes the
+      endorsing rights for the next block.
 
-  val rights_for_delegate:
+      The optional arguments [levels] and [cycles] allows to compute
+      baking for an explicit list of levels or for all the levels of
+      the given cycles.
+
+      The optional argument [delegates] allows to filter the
+      non-explicitly listed delegates out of the resulting list.. *)
+  val get:
     'a #RPC_context.simple ->
-    ?max_priority:int -> ?first_level:Raw_level.t -> ?last_level:Raw_level.t ->
-    'a -> Signature.Public_key_hash.t ->
-    (Raw_level.t * int) list shell_tzresult Lwt.t
+    ?levels: Raw_level.t list ->
+    ?cycles: Cycle.t list ->
+    ?delegates: Signature.public_key_hash list ->
+    'a -> t list shell_tzresult Lwt.t
 
 end
 
-(* temporary export *)
+(* temporary export for deprecated unit test *)
 val endorsement_rights:
   Alpha_context.t ->
   Level.t ->
-  int option -> (Raw_level.t * public_key_hash list) tzresult Lwt.t
+  public_key_hash list tzresult Lwt.t
 
 val baking_rights:
   Alpha_context.t ->
-  unit ->
   int option ->
-  (Raw_level.t * (public_key_hash * Time.t) list) tzresult Lwt.t
+  (Raw_level.t * (public_key_hash * Time.t option) list) tzresult Lwt.t

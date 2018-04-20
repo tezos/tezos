@@ -560,17 +560,14 @@ module Endorse = struct
     sign ~watermark:Endorsement src_sk shell contents
 
   let signing_slots
-      ?(max_priority = 1024)
       block
       delegate
       level =
-    Alpha_services.Delegate.Endorser.rights_for_delegate
-      !rpc_ctxt ~max_priority ~first_level:level ~last_level:level
-      (`Main, block) delegate >>=? fun possibilities ->
-    let slots =
-      List.map (fun (_,slot) -> slot)
-      @@ List.filter (fun (l, _) -> l = level) possibilities in
-    return slots
+    Alpha_services.Delegate.Endorsing_rights.get
+      !rpc_ctxt ~delegates:[delegate] ~levels:[level]
+      (`Main, block) >>=? function
+    | [{ slots }] -> return slots
+    | _ -> return []
 
   let endorse
       ?slot
@@ -596,15 +593,15 @@ module Endorse = struct
   (* FIXME @vb: I don't understand this function, copied from @cago. *)
   let endorsers_list block =
     let get_endorser_list result (account : Account.t) level block =
-      Alpha_services.Delegate.Endorser.rights_for_delegate
-        !rpc_ctxt (`Main, block) account.pkh
-        ~max_priority:16
-        ~first_level:level
-        ~last_level:level >>|? fun slots ->
-      List.iter (fun (_,slot) -> result.(slot) <- account) slots
-    in
+      Alpha_services.Delegate.Endorsing_rights.get
+        !rpc_ctxt (`Main, block)
+        ~delegates:[account.pkh]
+        ~levels:[level] >>|? function
+      | [{ slots }] ->
+          List.iter (fun s -> result.(s) <- account) slots
+      | _ -> () in
     let { Account.b1 ; b2 ; b3 ; b4 ; b5 } = Account.bootstrap_accounts in
-    let result = Array.make 16 b1 in
+    let result = Array.make 32 b1 in
     Block_services.Metadata.protocol_data
       !rpc_ctxt ~chain:`Main ~block () >>=? fun { level } ->
     let level = level.level in
@@ -616,18 +613,18 @@ module Endorse = struct
     return result
 
   let endorsement_rights
-      ?(max_priority = 1024)
       (contract : Account.t) block =
     Block_services.Metadata.protocol_data
       !rpc_ctxt ~chain:`Main ~block () >>=? fun { level } ->
     let level = level.level in
     let delegate = contract.pkh in
-    Alpha_services.Delegate.Endorser.rights_for_delegate
+    Alpha_services.Delegate.Endorsing_rights.get
       !rpc_ctxt
-      ~max_priority
-      ~first_level:level
-      ~last_level:level
-      (`Main, block) delegate
+      ~levels:[level]
+      ~delegates:[delegate]
+      (`Main, block) >>=? function
+    | [{ level ; slots }] -> return (List.map (fun s -> (level, s)) slots)
+    | _ -> return []
 
 end
 

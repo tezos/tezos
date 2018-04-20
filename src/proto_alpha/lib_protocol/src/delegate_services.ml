@@ -9,13 +9,6 @@
 
 open Alpha_context
 
-let slots_range_encoding =
-  let open Data_encoding in
-  (obj3
-     (opt "max_priority" int31)
-     (opt "first_level" Raw_level.encoding)
-     (opt "last_level" Raw_level.encoding))
-
 type info = {
   balance: Tez.t ;
   frozen_balance: Tez.t ;
@@ -38,13 +31,13 @@ let info_encoding =
       { balance ; frozen_balance ; frozen_balances ; delegated_balance ;
         delegated_contracts ; deactivated ; grace_period })
     (obj7
-      (req "balance" Tez.encoding)
-      (req "frozen_balance" Tez.encoding)
-      (req "frozen_balances" Delegate.frozen_balances_encoding)
-      (req "delegated_balance" Tez.encoding)
-      (req "delegated_contracts" (list Contract_hash.encoding))
-      (req "deactivated" bool)
-      (req "grace_period" Cycle.encoding))
+       (req "balance" Tez.encoding)
+       (req "frozen_balance" Tez.encoding)
+       (req "frozen_balances" Delegate.frozen_balances_encoding)
+       (req "delegated_balance" Tez.encoding)
+       (req "delegated_contracts" (list Contract_hash.encoding))
+       (req "deactivated" bool)
+       (req "grace_period" Cycle.encoding))
 
 module S = struct
 
@@ -230,313 +223,264 @@ let deactivated ctxt block pkh =
 let grace_period ctxt block pkh =
   RPC_context.make_call1 S.grace_period ctxt block pkh () ()
 
+let requested_levels ~default ctxt cycles levels =
+  match levels, cycles with
+  | [], [] ->
+      return [default]
+  | levels, cycles ->
+      (* explicitly fail when requested levels or cycle are in the past...
+         or too far in the future... *)
+      (* check_levels levels >>=? fun () -> *)
+      (* check_cycles levels >>=? fun () -> *)
+      let levels =
+        List.sort_uniq
+          Level.compare
+          (List.concat (List.map (Level.from_raw ctxt) levels ::
+                        List.map (Level.levels_in_cycle ctxt) cycles)) in
+      map_p
+        (fun level ->
+           let current_level = Level.current ctxt in
+           if Level.(level <= current_level) then
+             return (level, None)
+           else
+             Baking.earlier_predecessor_timestamp
+               ctxt level >>=? fun timestamp ->
+             return (level, Some timestamp))
+        levels
 
-module Baker = struct
+module Baking_rights = struct
+
+  type t = {
+    level: Raw_level.t ;
+    delegate: Signature.Public_key_hash.t ;
+    priority: int ;
+    timestamp: Timestamp.t option ;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun { level ; delegate ; priority ; timestamp } ->
+         (level, delegate, priority, timestamp))
+      (fun (level, delegate, priority, timestamp) ->
+         { level ; delegate ; priority ; timestamp })
+      (obj4
+         (req "level" Raw_level.encoding)
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "priority" uint16)
+         (opt "timestamp" Timestamp.encoding))
 
   module S = struct
 
     open Data_encoding
 
     let custom_root =
-      RPC_path.(open_root / "helpers" / "rights" / "baking")
+      RPC_path.(open_root / "helpers" / "baking_rights")
 
-    let slot_encoding =
-      (obj3
-         (req "level" Raw_level.encoding)
-         (req "priority" int31)
-         (req "timestamp" Timestamp.encoding))
+    type baking_rights_query = {
+      levels: Raw_level.t list ;
+      cycles: Cycle.t list ;
+      delegates: Signature.Public_key_hash.t list ;
+      max_priority: int option ;
+      all: bool ;
+    }
 
-    let rights =
-      RPC_service.post_service
-        ~description:
-          "List delegates allowed to bake for the next level, \
-           ordered by priority."
-        ~query: RPC_query.empty
-        ~input: (obj1 (opt "max_priority" int31))
-        ~output: (obj2
-                    (req "level" Raw_level.encoding)
-                    (req "baking_rights"
-                       (list
-                          (obj2
-                             (req "delegate" Signature.Public_key_hash.encoding)
-                             (req "timestamp" Timestamp.encoding)))))
+    let baking_rights_query =
+      let open RPC_query in
+      query (fun levels cycles delegates max_priority all ->
+          { levels ; cycles ; delegates ; max_priority ; all })
+      |+ multi_field "level" Raw_level.arg (fun t -> t.levels)
+      |+ multi_field "cycle" Cycle.arg (fun t -> t.cycles)
+      |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t -> t.delegates)
+      |+ opt_field "max_priority" RPC_arg.int (fun t -> t.max_priority)
+      |+ flag "all" (fun t -> t.all)
+      |> seal
+
+    let baking_rights =
+      RPC_service.get_service
+        ~description: "...FIXME..."
+        ~query: baking_rights_query
+        ~output: (list encoding)
         custom_root
 
-    let rights_for_level =
-      RPC_service.post_service
-        ~description:
-          "List delegates allowed to bake for a given level, \
-           ordered by priority."
-        ~query: RPC_query.empty
-        ~input: (obj1 (opt "max_priority" int31))
-        ~output: (obj2
-                    (req "level" Raw_level.encoding)
-                    (req "delegates"
-                       (list Signature.Public_key_hash.encoding)))
-        RPC_path.(custom_root / "level" /: Raw_level.arg)
-
-    (* let levels = *)
-    (* RPC_service.post_service *)
-    (* ~description: *)
-    (* "List level for which we might computed baking rights." *)
-    (* ~query: RPC_query.empty *)
-    (* ~input: empty *)
-    (* ~output: (obj1 (req "levels" (list Raw_level.encoding))) *)
-    (* RPC_path.(custom_root / "level") *)
-
-    let rights_for_delegate =
-      RPC_service.post_service
-        ~description: "Future baking rights for a given delegate."
-        ~query: RPC_query.empty
-        ~input: slots_range_encoding
-        ~output: (Data_encoding.list slot_encoding)
-        RPC_path.(custom_root / "delegate" /: Signature.Public_key_hash.rpc_arg)
-
-
-    (* let delegates = *)
-    (* RPC_service.post_service *)
-    (* ~description: *)
-    (* "List delegates with baking rights." *)
-    (* ~query: RPC_query.empty *)
-    (* ~input: empty *)
-    (* ~output: (obj1 (req "delegates" *)
-    (* (list Signature.Public_key_hash.encoding))) *)
-    (* RPC_path.(custom_root / "delegate") *)
-
   end
 
-  module I = struct
+  let baking_priorities ctxt max_prio (level, pred_timestamp) =
+    Baking.baking_priorities ctxt level >>=? fun contract_list ->
+    let rec loop l acc priority =
+      if Compare.Int.(priority >= max_prio) then
+        return (List.rev acc)
+      else
+        let Misc.LCons (pk, next) = l in
+        let delegate = Signature.Public_key.hash pk in
+        begin
+          match pred_timestamp with
+          | None -> return None
+          | Some pred_timestamp ->
+              Baking.minimal_time ctxt priority pred_timestamp >>=? fun t ->
+              return (Some t)
+        end>>=? fun timestamp ->
+        let acc =
+          { level = level.level ; delegate ; priority ; timestamp } :: acc in
+        next () >>=? fun l ->
+        loop l acc (priority+1) in
+    loop contract_list [] 0
 
-    let default_max_baking_priority ctxt arg =
-      let default = Constants.first_free_baking_slot ctxt in
-      match arg with
-      | None -> 2 * default
-      | Some m -> m
-
-    let baking_rights_for_level ctxt level max =
-      let max = default_max_baking_priority ctxt max in
-      Baking.baking_priorities ctxt level >>=? fun contract_list ->
-      let rec loop l n =
-        match n with
-        | 0 -> return []
-        | n ->
-            let Misc.LCons (h, t) = l in
-            t () >>=? fun t ->
-            loop t (pred n) >>=? fun t ->
-            return (Signature.Public_key.hash h :: t)
-      in
-      loop contract_list max >>=? fun prio ->
-      return (level.level, prio)
-
-    let baking_rights ctxt () max =
-      let level = Level.succ ctxt (Level.current ctxt) in
-      baking_rights_for_level ctxt level max >>=? fun (raw_level, slots) ->
-      begin
-        Lwt_list.filter_map_p (fun x -> x) @@
-        List.mapi
-          (fun prio c ->
-             let timestamp = Timestamp.current ctxt in
-             Baking.minimal_time ctxt prio timestamp >>= function
-             | Error _ -> Lwt.return None
-             | Ok minimal_timestamp -> Lwt.return (Some (c, minimal_timestamp)))
-          slots
-      end >>= fun timed_slots ->
-      return (raw_level, timed_slots)
-
-    let baking_rights_for_delegate
-        ctxt contract () (max_priority, min_level, max_level) =
-      let max_priority = default_max_baking_priority ctxt max_priority in
-      let current_level = Level.succ ctxt (Level.current ctxt) in
-      let min_level = match min_level with
-        | None -> current_level
-        | Some l -> Level.from_raw ctxt l in
-      let max_level =
-        match max_level with
-        | Some max_level -> Level.from_raw ctxt max_level
-        | None ->
-            Level.last_level_in_cycle ctxt @@
-            current_level.cycle in
-      let rec loop level =
-        if Level.(>) level max_level
-        then return []
-        else
-          loop (Level.succ ctxt level) >>=? fun t ->
-          Baking.first_baking_priorities
-            ctxt ~max_priority contract level >>=? fun priorities ->
-          let raw_level = level.level in
-          Error_monad.map_s
-            (fun priority ->
-               let timestamp = Timestamp.current ctxt in
-               Baking.minimal_time ctxt priority timestamp >>=? fun time ->
-               return (raw_level, priority, time))
-            priorities >>=? fun priorities ->
-          return (priorities @ t)
-      in
-      loop min_level
-
-  end
+  let remove_duplicated_delegates rights =
+    List.rev @@ fst @@
+    List.fold_left
+      (fun (acc, previous) r ->
+         if Signature.Public_key_hash.Set.mem r.delegate previous then
+           (acc, previous)
+         else
+           (r :: acc,
+            Signature.Public_key_hash.Set.add r.delegate previous))
+      ([], Signature.Public_key_hash.Set.empty)
+      rights
 
   let () =
     let open Services_registration in
-    register0 S.rights I.baking_rights ;
-    register1 S.rights_for_level begin fun ctxt raw_level () max ->
-      let level = Level.from_raw ctxt raw_level in
-      I.baking_rights_for_level ctxt level max
-    end;
-    register1 S.rights_for_delegate I.baking_rights_for_delegate
+    register0 S.baking_rights begin fun ctxt q () ->
+      requested_levels
+        ~default:
+          (Level.succ ctxt (Level.current ctxt), Some (Timestamp.current ctxt))
+        ctxt q.cycles q.levels >>=? fun levels ->
+      let max_priority =
+        match q.max_priority with
+        | None -> 64
+        | Some max -> max in
+      map_p (baking_priorities ctxt max_priority) levels >>=? fun rights ->
+      let rights =
+        if q.all then
+          rights
+        else
+          List.map remove_duplicated_delegates rights in
+      let rights = List.concat rights in
+      match q.delegates with
+      | [] -> return rights
+      | _ :: _ as delegates ->
+          let is_requested p =
+            List.exists (Signature.Public_key_hash.equal p.delegate) delegates in
+          return (List.filter is_requested rights)
+    end
 
-  let rights ctxt ?max_priority block =
-    RPC_context.make_call0 S.rights ctxt block () max_priority
-
-  let rights_for_level ctxt ?max_priority block level =
-    RPC_context.make_call1 S.rights_for_level ctxt block level () max_priority
-
-  let rights_for_delegate ctxt ?max_priority ?first_level ?last_level block delegate =
-    RPC_context.make_call1 S.rights_for_delegate ctxt block delegate ()
-      (max_priority, first_level, last_level)
+  let get ctxt
+      ?(levels = []) ?(cycles = []) ?(delegates = []) ?(all = false)
+      ?max_priority block =
+    RPC_context.make_call0 S.baking_rights ctxt block
+      { levels ; cycles ; delegates ; max_priority ; all }
+      ()
 
 end
 
-module Endorser = struct
+module Endorsing_rights = struct
+
+  type t = {
+    level: Raw_level.t ;
+    delegate: Signature.Public_key_hash.t ;
+    slots: int list ;
+    estimated_time: Time.t option ;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun { level ; delegate ; slots ; estimated_time } ->
+         (level, delegate, slots, estimated_time))
+      (fun (level, delegate, slots, estimated_time) ->
+         { level ; delegate ; slots ; estimated_time })
+      (obj4
+         (req "level" Raw_level.encoding)
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "slots" (list uint16))
+         (opt "estimated_time" Timestamp.encoding))
 
   module S = struct
 
     open Data_encoding
 
     let custom_root =
-      RPC_path.(open_root / "helpers" / "rights" / "endorsement")
+      RPC_path.(open_root / "helpers" / "endorsing_rights")
 
-    let slot_encoding =
-      (obj2
-         (req "level" Raw_level.encoding)
-         (req "priority" int31))
+    type endorsing_rights_query = {
+      levels: Raw_level.t list ;
+      cycles: Cycle.t list ;
+      delegates: Signature.Public_key_hash.t list ;
+    }
 
-    let rights =
-      RPC_service.post_service
-        ~description:
-          "List delegates allowed to endorse for the current block."
-        ~query: RPC_query.empty
-        ~input: (obj1 (opt "max_priority" int31))
-        ~output: (obj2
-                    (req "level" Raw_level.encoding)
-                    (req "delegates"
-                       (list Signature.Public_key_hash.encoding)))
+    let endorsing_rights_query =
+      let open RPC_query in
+      query (fun levels cycles delegates ->
+          { levels ; cycles ; delegates })
+      |+ multi_field "level" Raw_level.arg (fun t -> t.levels)
+      |+ multi_field "cycle" Cycle.arg (fun t -> t.cycles)
+      |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t -> t.delegates)
+      |> seal
+
+    let endorsing_rights =
+      RPC_service.get_service
+        ~description: "...FIXME..."
+        ~query: endorsing_rights_query
+        ~output: (list encoding)
         custom_root
 
-    let rights_for_level =
-      RPC_service.post_service
-        ~description:
-          "List delegates allowed to endorse blocks for a given level."
-        ~query: RPC_query.empty
-        ~input: (obj1 (opt "max_priority" int31))
-        ~output: (obj2
-                    (req "level" Raw_level.encoding)
-                    (req "delegates"
-                       (list Signature.Public_key_hash.encoding)))
-        RPC_path.(custom_root / "level" /: Raw_level.arg)
-
-    (* let levels = *)
-    (* RPC_service.post_service *)
-    (* ~description: *)
-    (* "List level for which we might computed endorsement rights." *)
-    (* ~query: RPC_query.empty *)
-    (* ~input: empty *)
-    (* ~output: (obj1 (req "levels" (list Raw_level.encoding))) *)
-    (* RPC_path.(custom_root / "level") *)
-
-    let rights_for_delegate =
-      RPC_service.post_service
-        ~description: "Compute endorsement rights for a given delegate."
-        ~query: RPC_query.empty
-        ~input: slots_range_encoding
-        ~output: (Data_encoding.list slot_encoding)
-        RPC_path.(custom_root / "delegate" /: Signature.Public_key_hash.rpc_arg)
-
-    (* let delegates = *)
-    (* RPC_service.post_service *)
-    (* ~description: *)
-    (* "List delegates with endorsement rights." *)
-    (* ~query: RPC_query.empty *)
-    (* ~input: empty *)
-    (* ~output: (obj1 (req "delegates" *)
-    (* (list Signature.Public_key_hash.encoding))) *)
-    (* RPC_path.(custom_root / "delegate") *)
-
   end
 
-  module I = struct
-
-    let default_max_endorsement_priority ctxt arg =
-      let default = Constants.endorsers_per_block ctxt in
-      match arg with
-      | None -> default
-      | Some m -> m
-
-    let endorsement_rights ctxt level max =
-      let max = default_max_endorsement_priority ctxt max in
-      Baking.endorsement_priorities ctxt level >>=? fun contract_list ->
-      let rec loop l n =
-        match n with
-        | 0 -> return []
-        | n ->
-            let Misc.LCons (h, t) = l in
-            t () >>=? fun t ->
-            loop t (pred n) >>=? fun t ->
-            return (Signature.Public_key.hash h :: t)
-      in
-      loop contract_list max >>=? fun prio ->
-      return (level.level, prio)
-
-    let endorsement_rights_for_delegate
-        ctxt contract () (max_priority, min_level, max_level) =
-      let current_level = Level.current ctxt in
-      let max_priority = default_max_endorsement_priority ctxt max_priority in
-      let min_level = match min_level with
-        | None -> current_level
-        | Some l -> Level.from_raw ctxt l in
-      let max_level =
-        match max_level with
-        | None -> min_level
-        | Some l -> Level.from_raw ctxt l in
-      let rec loop level =
-        if Level.(>) level max_level
-        then return []
-        else
-          loop (Level.succ ctxt level) >>=? fun t ->
-          Baking.first_endorsement_slots
-            ctxt ~max_priority contract level >>=? fun slots ->
-          let raw_level = level.level in
-          let slots = List.rev_map (fun slot -> (raw_level, slot)) slots in
-          return (List.rev_append slots t)
-      in
-      loop min_level
-
-  end
+  let endorsement_slots ctxt (level, estimated_time) =
+    let max_slot = Constants.endorsers_per_block ctxt in
+    Baking.endorsement_priorities ctxt level >>=? fun contract_list ->
+    let build (delegate, slots) = {
+      level = level.level ; delegate ; slots ; estimated_time
+    } in
+    let rec loop l map slot =
+      if Compare.Int.(slot >= max_slot) then
+        return (List.map build (Signature.Public_key_hash.Map.bindings map))
+      else
+        let Misc.LCons (pk, next) = l in
+        let delegate = Signature.Public_key.hash pk in
+        let slots =
+          match Signature.Public_key_hash.Map.find_opt delegate map with
+          | None -> [slot]
+          | Some slots -> slot :: slots in
+        let map = Signature.Public_key_hash.Map.add delegate slots map in
+        next () >>=? fun l ->
+        loop l map (slot+1) in
+    loop contract_list Signature.Public_key_hash.Map.empty 0
 
   let () =
     let open Services_registration in
-    register0 S.rights begin fun ctxt () max ->
-      let level = Level.current ctxt in
-      I.endorsement_rights ctxt level max
-    end ;
-    register1 S.rights_for_level begin fun ctxt raw_level () max ->
-      let level = Level.from_raw ctxt raw_level in
-      I.endorsement_rights ctxt level max
-    end ;
-    register1 S.rights_for_delegate I.endorsement_rights_for_delegate
+    register0 S.endorsing_rights begin fun ctxt q () ->
+      requested_levels
+        ~default: (Level.current ctxt, Some (Timestamp.current ctxt))
+        ctxt q.cycles q.levels >>=? fun levels ->
+      map_p (endorsement_slots ctxt) levels >>=? fun rights ->
+      let rights = List.concat rights in
+      match q.delegates with
+      | [] -> return rights
+      | _ :: _ as delegates ->
+          let is_requested p =
+            List.exists (Signature.Public_key_hash.equal p.delegate) delegates in
+          return (List.filter is_requested rights)
+    end
 
-  let rights ctxt ?max_priority block =
-    RPC_context.make_call0 S.rights ctxt block () max_priority
-
-  let rights_for_level ctxt ?max_priority block level =
-    RPC_context.make_call1 S.rights_for_level ctxt block level () max_priority
-
-  let rights_for_delegate ctxt ?max_priority ?first_level ?last_level block delegate =
-    RPC_context.make_call1 S.rights_for_delegate ctxt block delegate ()
-      (max_priority, first_level, last_level)
+  let get ctxt
+      ?(levels = []) ?(cycles = []) ?(delegates = []) block =
+    RPC_context.make_call0 S.endorsing_rights ctxt block
+      { levels ; cycles ; delegates }
+      ()
 
 end
 
+let endorsement_rights ctxt level =
+  Endorsing_rights.endorsement_slots ctxt (level, None) >>=? fun l ->
+  return (List.map (fun { Endorsing_rights.delegate ; _ } -> delegate) l)
 
-let baking_rights = Baker.I.baking_rights
-let endorsement_rights = Endorser.I.endorsement_rights
+let baking_rights ctxt max_priority =
+  let max = match max_priority with None -> 64 | Some m -> m in
+  let level = Level.current ctxt in
+  Baking_rights.baking_priorities ctxt max (level, None) >>=? fun l ->
+  return (level.level,
+          List.map
+            (fun { Baking_rights.delegate ; timestamp ; _ } ->
+               (delegate, timestamp)) l)
+
