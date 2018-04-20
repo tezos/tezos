@@ -13,10 +13,13 @@ type error +=
   | Cannot_parse_operation (* `Branch *)
   | Cant_parse_block_header
 
-val next_level:
-  'a #RPC_context.simple -> 'a -> Level.t shell_tzresult Lwt.t
-(** [next_level cctxt blk] returns the (protocol view of the) level
-    of the successor of [blk]. *)
+val level:
+  'a #RPC_context.simple ->
+  ?offset:int32 -> 'a -> Level.t shell_tzresult Lwt.t
+
+val levels:
+  'a #RPC_context.simple ->
+  'a -> Cycle.t -> (Raw_level.t * Raw_level.t) shell_tzresult Lwt.t
 
 val minimal_time:
   'a #RPC_context.simple ->
@@ -59,15 +62,6 @@ val typecheck_data:
 val hash_data:
   'a #RPC_context.simple ->
   'a -> Script.expr * Script.expr * Z.t option -> (string * Gas.t) shell_tzresult Lwt.t
-
-val level:
-  'a #RPC_context.simple ->
-  'a -> ?offset:int32 -> Raw_level.t -> Level.t shell_tzresult Lwt.t
-
-val levels:
-  'a #RPC_context.simple ->
-  'a -> Cycle.t -> (Raw_level.t * Raw_level.t) shell_tzresult Lwt.t
-
 
 module Forge : sig
 

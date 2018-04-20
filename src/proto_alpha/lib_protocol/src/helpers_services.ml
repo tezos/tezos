@@ -40,19 +40,44 @@ module S = struct
 
   let custom_root = RPC_path.(open_root / "helpers")
 
-  let next_level =
-    RPC_service.post_service
-      ~description: "Detailled level information for the next block"
-      ~query: RPC_query.empty
-      ~input: empty
+  type level_query = {
+    offset: int32 ;
+  }
+  let level_query : level_query RPC_query.t =
+    let open RPC_query in
+    query (fun offset -> { offset })
+    |+ field "offset" RPC_arg.int32 0l (fun t -> t.offset)
+    |> seal
+
+  let level =
+    RPC_service.get_service
+      ~description: "..."
+      ~query: level_query
       ~output: Level.encoding
-      RPC_path.(custom_root / "next_level")
+      RPC_path.(custom_root / "level")
+
+  let levels =
+    RPC_service.get_service
+      ~description: "Levels of a cycle"
+      ~query: RPC_query.empty
+      ~output: (obj2
+                  (req "first" Raw_level.encoding)
+                  (req "last" Raw_level.encoding))
+      RPC_path.(custom_root / "levels_in_cycle" /: Cycle.arg)
+
+  type minimal_timestamp_query = {
+    priority: int ;
+  }
+  let minimal_timestamp_query : minimal_timestamp_query RPC_query.t =
+    let open RPC_query in
+    query (fun priority -> { priority })
+    |+ field "priority" RPC_arg.int 0 (fun t -> t.priority)
+    |> seal
 
   let minimal_timestamp =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description: "Minimal timestamp for the next block."
-      ~query: RPC_query.empty
-      ~input: (obj1 (opt "priority" int31))
+      ~query: minimal_timestamp_query
       ~output: (obj1 (req "timestamp" Timestamp.encoding))
       RPC_path.(custom_root / "minimal_timestamp")
 
@@ -143,24 +168,6 @@ module S = struct
       ~query: RPC_query.empty
       RPC_path.(custom_root / "hash_data")
 
-  let level =
-    RPC_service.post_service
-      ~description: "..."
-      ~query: RPC_query.empty
-      ~input: (obj1 (opt "offset" int32))
-      ~output: Level.encoding
-      RPC_path.(custom_root / "level" /: Raw_level.arg)
-
-  let levels =
-    RPC_service.post_service
-      ~description: "Levels of a cycle"
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output:  (obj2
-                   (req "first" Raw_level.encoding)
-                   (req "last" Raw_level.encoding))
-      RPC_path.(custom_root / "levels" /: Cycle.arg)
-
 end
 
 module I = struct
@@ -181,13 +188,19 @@ end
 
 let () =
   let open Services_registration in
-  register0 S.next_level begin fun ctxt () () ->
-    return (Level.succ ctxt (Level.current ctxt))
+  register0 S.level begin fun ctxt q () ->
+    let level = Level.current ctxt in
+    return (Level.from_raw ctxt ~offset:q.offset level.level)
   end ;
-  register0 S.minimal_timestamp begin fun ctxt () slot ->
+  register1 S.levels begin fun ctxt cycle () () ->
+    let levels = Level.levels_in_cycle ctxt cycle in
+    let first = List.hd (List.rev levels) in
+    let last = List.hd levels in
+    return (first.level, last.level)
+  end ;
+  register0 S.minimal_timestamp begin fun ctxt q () ->
     let timestamp = Alpha_context.Timestamp.current ctxt in
-    let slot = match slot with None -> 0 | Some p -> p in
-    Baking.minimal_time ctxt slot timestamp
+    Baking.minimal_time ctxt q.priority timestamp
   end ;
   register0 S.apply_operation I.apply_operation ;
   register0 S.run_code begin fun ctxt ()
@@ -243,22 +256,16 @@ let () =
     parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
     Script_ir_translator.hash_data ctxt typ data >>=? fun (hash, ctxt) ->
     return (hash, Gas.level ctxt)
-  end ;
-  register1 S.level begin fun ctxt raw () offset ->
-    return (Level.from_raw ctxt ?offset raw)
-  end ;
-  register1 S.levels begin fun ctxt cycle () () ->
-    let levels = Level.levels_in_cycle ctxt cycle in
-    let first = List.hd (List.rev levels) in
-    let last = List.hd levels in
-    return (first.level, last.level)
   end
 
-let next_level ctxt block =
-  RPC_context.make_call0 S.next_level ctxt block () ()
+let level ctxt ?(offset = 0l) block =
+  RPC_context.make_call0 S.level ctxt block { offset } ()
 
-let minimal_time ctxt ?priority block =
-  RPC_context.make_call0 S.minimal_timestamp ctxt block () priority
+let levels ctxt block cycle =
+  RPC_context.make_call1 S.levels ctxt block cycle () ()
+
+let minimal_time ctxt ?(priority = 0) block =
+  RPC_context.make_call0 S.minimal_timestamp ctxt block { priority } ()
 
 let run_code ctxt block code (storage, input, amount, contract) =
   RPC_context.make_call0 S.run_code ctxt
@@ -280,12 +287,6 @@ let typecheck_data ctxt block =
 
 let hash_data ctxt block =
   RPC_context.make_call0 S.hash_data ctxt block ()
-
-let level ctxt block ?offset lvl =
-  RPC_context.make_call1 S.level ctxt block lvl () offset
-
-let levels ctxt block cycle =
-  RPC_context.make_call1 S.levels ctxt block cycle () ()
 
 module Forge = struct
 
