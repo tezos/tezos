@@ -16,6 +16,221 @@ let slots_range_encoding =
      (opt "first_level" Raw_level.encoding)
      (opt "last_level" Raw_level.encoding))
 
+type info = {
+  balance: Tez.t ;
+  frozen_balance: Tez.t ;
+  frozen_balances: Delegate.frozen_balance Cycle.Map.t ;
+  delegated_balance: Tez.t ;
+  delegated_contracts: Contract_hash.t list ;
+  deactivated: bool ;
+  grace_period: Cycle.t ;
+}
+
+let info_encoding =
+  let open Data_encoding in
+  conv
+    (fun { balance ; frozen_balance ; frozen_balances ; delegated_balance ;
+           delegated_contracts ; deactivated ; grace_period } ->
+      (balance, frozen_balance, frozen_balances, delegated_balance,
+       delegated_contracts, deactivated, grace_period))
+    (fun (balance, frozen_balance, frozen_balances, delegated_balance,
+          delegated_contracts, deactivated, grace_period) ->
+      { balance ; frozen_balance ; frozen_balances ; delegated_balance ;
+        delegated_contracts ; deactivated ; grace_period })
+    (obj7
+      (req "balance" Tez.encoding)
+      (req "frozen_balance" Tez.encoding)
+      (req "frozen_balances" Delegate.frozen_balances_encoding)
+      (req "delegated_balance" Tez.encoding)
+      (req "delegated_contracts" (list Contract_hash.encoding))
+      (req "deactivated" bool)
+      (req "grace_period" Cycle.encoding))
+
+module S = struct
+
+  let path = RPC_path.(open_root / "delegate")
+
+  open Data_encoding
+
+  type list_query = {
+    active: bool ;
+    inactive: bool ;
+  }
+  let list_query :list_query RPC_query.t =
+    let open RPC_query in
+    query (fun active inactive -> { active ; inactive })
+    |+ flag "active" (fun t -> t.active)
+    |+ flag "inactive" (fun t -> t.inactive)
+    |> seal
+
+  let list_delegate =
+    RPC_service.get_service
+      ~description:
+        "List all registred delegates."
+      ~query: list_query
+      ~output: (list Signature.Public_key_hash.encoding)
+      path
+
+  let path = RPC_path.(path /: Signature.Public_key_hash.rpc_arg)
+
+  let info =
+    RPC_service.get_service
+      ~description:
+        "Everything about a delegate."
+      ~query: RPC_query.empty
+      ~output: info_encoding
+      path
+
+  let balance =
+    RPC_service.get_service
+      ~description:
+        "Returns the full balance of a given delegate, \
+         including the frozen balances."
+      ~query: RPC_query.empty
+      ~output: Tez.encoding
+      RPC_path.(path / "balance")
+
+  let frozen_balance =
+    RPC_service.get_service
+      ~description:
+        "Returns the total frozen balances of a given delegate, \
+         this includes the frozen deposits, rewards and fees."
+      ~query: RPC_query.empty
+      ~output: Tez.encoding
+      RPC_path.(path / "change")
+
+  let frozen_balances =
+    RPC_service.get_service
+      ~description:
+        "Returns the amount of frozen tokens associated to a given delegate."
+      ~query: RPC_query.empty
+      ~output: Delegate.frozen_balances_encoding
+      RPC_path.(path / "frozen_balances")
+
+  let delegated_balance =
+    RPC_service.get_service
+      ~description:
+        "Returns the total amount of token delegated to a given delegate. \
+         This includes the balance of all the contracts that delegates \
+         to it, but also the balance of the delegate itself and its frozen \
+         fees and deposits. The rewards do not count in the delegated balance \
+         until they are unfrozen."
+      ~query: RPC_query.empty
+      ~output: Tez.encoding
+      RPC_path.(path / "delegated_balance")
+
+  let delegated_contracts =
+    RPC_service.get_service
+      ~description:
+        "Returns the list of contract that delegates to a given delegate."
+      ~query: RPC_query.empty
+      ~output: (list Contract_hash.encoding)
+      RPC_path.(path / "delegated_contracts")
+
+  let deactivated =
+    RPC_service.get_service
+      ~description:
+        "Returns whether the delegate is currently tagged as deactivated or not."
+      ~query: RPC_query.empty
+      ~output: bool
+      RPC_path.(path / "deactivated")
+
+  let grace_period =
+    RPC_service.get_service
+      ~description:
+        "Returns the cycle by the end of which the delegate might be \
+         deactivated, whether should she failed to execute any delegate \
+         action until then. \
+         A deactivated delegate might be reactivated \
+         (without loosing any rolls) by simply re-register as a delegate. \
+         For deactivated delegate this value contains the cycle by which \
+         they were deactivated."
+      ~query: RPC_query.empty
+      ~output: Cycle.encoding
+      RPC_path.(path / "grace_period")
+
+end
+
+let () =
+  let open Services_registration in
+  register0 S.list_delegate begin fun ctxt q () ->
+    Delegate.list ctxt >>= fun delegates ->
+    if q.active && q.inactive then
+      return delegates
+    else if q.active then
+      Lwt_list.filter_p
+        (fun pkh -> Delegate.deactivated ctxt pkh >|= not)
+        delegates >>= return
+    else if q.inactive then
+      Lwt_list.filter_p
+        (fun pkh -> Delegate.deactivated ctxt pkh)
+        delegates >>= return
+    else
+      return []
+  end ;
+  register1 S.info begin fun ctxt pkh () () ->
+    Delegate.full_balance ctxt pkh >>=? fun balance ->
+    Delegate.frozen_balance ctxt pkh >>=? fun frozen_balance ->
+    Delegate.frozen_balances ctxt pkh >>= fun frozen_balances ->
+    Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
+    Delegate.get_delegated_contracts ctxt pkh >>= fun delegated_contracts ->
+    Delegate.deactivated ctxt pkh >>= fun deactivated ->
+    Delegate.grace_period ctxt pkh >>=? fun grace_period ->
+    return {
+      balance ; frozen_balance ; frozen_balances ; delegated_balance ;
+      delegated_contracts ; deactivated ; grace_period
+    }
+  end ;
+  register1 S.balance begin fun ctxt pkh () () ->
+    Delegate.full_balance ctxt pkh
+  end ;
+  register1 S.frozen_balance begin fun ctxt pkh () () ->
+    Delegate.frozen_balance ctxt pkh
+  end ;
+  register1 S.frozen_balances begin fun ctxt pkh () () ->
+    Delegate.frozen_balances ctxt pkh >>= return
+  end ;
+  register1 S.delegated_balance begin fun ctxt pkh () () ->
+    Delegate.delegated_balance ctxt pkh
+  end ;
+  register1 S.delegated_contracts begin fun ctxt pkh () () ->
+    Delegate.get_delegated_contracts ctxt pkh >>= return
+  end ;
+  register1 S.deactivated begin fun ctxt pkh () () ->
+    Delegate.deactivated ctxt pkh >>= return
+  end ;
+  register1 S.grace_period begin fun ctxt pkh () () ->
+    Delegate.grace_period ctxt pkh
+  end
+
+let list ctxt block ?(active = true) ?(inactive = false) () =
+  RPC_context.make_call0 S.list_delegate ctxt block { active ; inactive } ()
+
+let info ctxt block pkh =
+  RPC_context.make_call1 S.info ctxt block pkh () ()
+
+let balance ctxt block pkh =
+  RPC_context.make_call1 S.balance ctxt block pkh () ()
+
+let frozen_balance ctxt block pkh =
+  RPC_context.make_call1 S.frozen_balance ctxt block pkh () ()
+
+let frozen_balances ctxt block pkh =
+  RPC_context.make_call1 S.frozen_balances ctxt block pkh () ()
+
+let delegated_balance ctxt block pkh =
+  RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
+
+let delegated_contracts ctxt block pkh =
+  RPC_context.make_call1 S.delegated_contracts ctxt block pkh () ()
+
+let deactivated ctxt block pkh =
+  RPC_context.make_call1 S.deactivated ctxt block pkh () ()
+
+let grace_period ctxt block pkh =
+  RPC_context.make_call1 S.grace_period ctxt block pkh () ()
+
+
 module Baker = struct
 
   module S = struct
@@ -322,37 +537,6 @@ module Endorser = struct
 
 end
 
-module S = struct
-  let frozen_balances_encoding =
-    let open Delegate in
-    Data_encoding.(
-      conv
-        (fun { deposit ; fees ; rewards } ->
-           (deposit, fees, rewards))
-        (fun (deposit, fees, rewards) ->
-           { deposit ; fees ; rewards }
-        )
-        (obj3
-           (req "deposit" Tez.encoding)
-           (req "fees" Tez.encoding)
-           (req "rewards" Tez.encoding)))
-
-  let frozen_balances =
-    RPC_service.post_service
-      ~description: "Returns the amount of frozen tokens associated to a given key."
-      ~query: RPC_query.empty
-      ~input: Data_encoding.empty
-      ~output: frozen_balances_encoding
-      RPC_path.(open_root / "delegate" /: Signature.Public_key_hash.rpc_arg / "frozen_balances")
-end
-let () =
-  let open Services_registration in
-  register1 S.frozen_balances begin fun ctxt pkh () () ->
-    Delegate.frozen_balances ctxt pkh
-  end
-
-let frozen_balances ctxt block pkh =
-  RPC_context.make_call1 S.frozen_balances ctxt block pkh () ()
 
 let baking_rights = Baker.I.baking_rights
 let endorsement_rights = Endorser.I.endorsement_rights

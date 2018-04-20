@@ -28,6 +28,8 @@ let pp ppf cycle = Format.fprintf ppf "%ld" cycle
 
 include (Compare.Int32 : Compare.S with type t := t)
 
+module Map = Map.Make(Compare.Int32)
+
 let root = 0l
 let succ = Int32.succ
 let pred = function

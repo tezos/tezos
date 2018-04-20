@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t
+type t = private int32
 type roll = t
 
 val encoding: roll Data_encoding.t

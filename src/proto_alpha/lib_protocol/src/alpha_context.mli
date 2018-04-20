@@ -104,6 +104,8 @@ module Cycle : sig
   val sub: cycle -> int -> cycle option
   val to_int32: cycle -> int32
 
+  module Map : S.MAP with type key = cycle
+
 end
 
 module Gas : sig
@@ -617,6 +619,9 @@ module Delegate : sig
     context -> public_key_hash -> Cycle.t ->
     (context * Tez.t) tzresult Lwt.t
 
+  val full_balance:
+    context -> public_key_hash -> Tez.t tzresult Lwt.t
+
   val has_frozen_balance:
     context -> public_key_hash -> Cycle.t ->
     bool tzresult Lwt.t
@@ -624,17 +629,34 @@ module Delegate : sig
   val frozen_balance:
     context -> public_key_hash -> Tez.t tzresult Lwt.t
 
-  type frozen_balances = {
+  type frozen_balance = {
     deposit : Tez.t ;
     fees : Tez.t ;
     rewards : Tez.t ;
   }
 
-  val frozen_balances:
-    context -> public_key_hash -> frozen_balances tzresult Lwt.t
+  val frozen_balance_encoding: frozen_balance Data_encoding.t
+  val frozen_balances_encoding: frozen_balance Cycle.Map.t Data_encoding.t
 
-  val full_balance:
-    context -> public_key_hash -> Tez.t tzresult Lwt.t
+  val frozen_balances:
+    context -> Signature.Public_key_hash.t ->
+    frozen_balance Cycle.Map.t Lwt.t
+
+  val get_delegated_contracts:
+    context -> Signature.Public_key_hash.t ->
+    Contract_hash.t list Lwt.t
+
+  val delegated_balance:
+    context -> Signature.Public_key_hash.t ->
+    Tez.t tzresult Lwt.t
+
+  val deactivated:
+    context -> Signature.Public_key_hash.t ->
+    bool Lwt.t
+
+  val grace_period:
+    context -> Signature.Public_key_hash.t ->
+    Cycle.t tzresult Lwt.t
 
 end
 
@@ -865,6 +887,11 @@ end
 
 module Roll : sig
 
+  type t = private int32
+  type roll = t
+
+  val encoding: roll Data_encoding.t
+
   val snapshot_rolls: context -> context tzresult Lwt.t
   val cycle_end: context -> Cycle.t -> context tzresult Lwt.t
 
@@ -876,6 +903,11 @@ module Roll : sig
 
   val delegate_pubkey:
     context -> public_key_hash -> public_key tzresult Lwt.t
+
+  val get_rolls:
+    context -> Signature.Public_key_hash.t -> roll list tzresult Lwt.t
+  val get_change:
+    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
 
 end
 

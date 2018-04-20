@@ -9,10 +9,64 @@
 
 open Alpha_context
 
+val list:
+  'a #RPC_context.simple -> 'a ->
+  ?active:bool ->
+  ?inactive:bool ->
+  unit -> Signature.Public_key_hash.t list shell_tzresult Lwt.t
+
+type info = {
+  balance: Tez.t ;
+  frozen_balance: Tez.t ;
+  frozen_balances: Delegate.frozen_balance Cycle.Map.t ;
+  delegated_balance: Tez.t ;
+  delegated_contracts: Contract_hash.t list ;
+  deactivated: bool ;
+  grace_period: Cycle.t ;
+}
+
+val info_encoding: info Data_encoding.t
+
+val info:
+  'a #RPC_context.simple -> 'a ->
+  Signature.Public_key_hash.t ->
+  info shell_tzresult Lwt.t
+
+val balance:
+  'a #RPC_context.simple -> 'a ->
+  Signature.Public_key_hash.t ->
+  Tez.t shell_tzresult Lwt.t
+
+val frozen_balance:
+  'a #RPC_context.simple -> 'a ->
+  Signature.Public_key_hash.t ->
+  Tez.t shell_tzresult Lwt.t
+
 val frozen_balances:
   'a #RPC_context.simple -> 'a ->
   Signature.Public_key_hash.t ->
-  Delegate.frozen_balances shell_tzresult Lwt.t
+  Delegate.frozen_balance Cycle.Map.t shell_tzresult Lwt.t
+
+val delegated_balance:
+  'a #RPC_context.simple -> 'a ->
+  Signature.Public_key_hash.t ->
+  Tez.t shell_tzresult Lwt.t
+
+val delegated_contracts:
+  'a #RPC_context.simple -> 'a ->
+  Signature.Public_key_hash.t ->
+  Contract_hash.t list shell_tzresult Lwt.t
+
+val deactivated:
+  'a #RPC_context.simple -> 'a ->
+  Signature.Public_key_hash.t ->
+  bool shell_tzresult Lwt.t
+
+val grace_period:
+  'a #RPC_context.simple -> 'a ->
+  Signature.Public_key_hash.t ->
+  Cycle.t shell_tzresult Lwt.t
+
 
 module Baker : sig
 

@@ -23,6 +23,8 @@ val succ: cycle -> cycle
 val to_int32: cycle -> int32
 val of_int32_exn: int32 -> cycle
 
+module Map : S.MAP with type key = cycle
+
 module Index : sig
   (* Storage_functors.INDEX with type t = cycle *)
   type t = cycle

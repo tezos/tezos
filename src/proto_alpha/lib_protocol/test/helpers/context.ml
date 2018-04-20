@@ -97,16 +97,23 @@ module Contract = struct
           Alpha_services.Contract.balance rpc_ctxt ctxt contract
       | _ ->
           match Alpha_context.Contract.is_implicit contract with
-          | None -> invalid_arg "get_balance: no frozen accounts for an originated contract."
+          | None ->
+              invalid_arg
+                "get_balance: no frozen accounts for an originated contract."
           | Some pkh ->
-              Alpha_services.Delegate.frozen_balances rpc_ctxt ctxt pkh >>|?
-              fun Delegate.({deposit ; fees ; rewards }) ->
-              begin match kind with
-                | Deposit -> deposit
-                | Fees -> fees
-                | Rewards -> rewards
-                | _ -> invalid_arg "get_balance: pass Main, Deposit, Fees or Rewards."
-              end
+              Alpha_services.Delegate.frozen_balances
+                rpc_ctxt ctxt pkh >>=? fun map ->
+              Lwt.return @@
+              Cycle.Map.fold
+                (fun _cycle { Delegate.deposit ; fees ; rewards } acc ->
+                   acc >>?fun acc ->
+                   match kind with
+                   | Deposit -> Test_tez.Tez.(acc +? deposit)
+                   | Fees -> Test_tez.Tez.(acc +? fees)
+                   | Rewards ->  Test_tez.Tez.(acc +? rewards)
+                   | _ -> assert false)
+                map
+                (Ok Tez.zero)
     end
 
   let counter ctxt contract =
