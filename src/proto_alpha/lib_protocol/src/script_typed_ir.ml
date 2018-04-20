@@ -333,17 +333,17 @@ and ('bef, 'aft) instr =
       ('arg * (Tez.t * ('arg typed_contract * 'rest)), internal_operation * 'rest) instr
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
-       unit typed_contract * 'rest) instr
+       internal_operation * (Contract.t * 'rest)) instr
   | Implicit_account :
       (public_key_hash * 'rest, unit typed_contract * 'rest) instr
   | Create_contract : 'g ty * 'p ty ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t *
                                                                   (('p * 'g, internal_operation list * 'g) lambda
                                                                    * ('g * 'rest)))))),
-     'p typed_contract * 'rest) instr
+     internal_operation * (Contract.t * 'rest)) instr
   | Create_contract_literal : 'g ty * 'p ty * ('p * 'g, internal_operation list * 'g) lambda  ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
-     'p typed_contract * 'rest) instr
+     internal_operation * (Contract.t * 'rest)) instr
   | Now :
       ('rest, Script_timestamp.t * 'rest) instr
   | Balance :

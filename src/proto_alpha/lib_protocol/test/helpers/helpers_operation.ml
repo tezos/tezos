@@ -52,7 +52,8 @@ let origination
     spendable ;
     delegatable ;
     script ;
-    credit
+    credit ;
+    preorigination = None ;
   }
 
 

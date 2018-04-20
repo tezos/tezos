@@ -1,12 +1,18 @@
-parameter key_hash;
+parameter (or key_hash address);
 storage unit;
 code { CAR;
-       DIP { PUSH string "dummy";
-             PUSH tez "100.00"; PUSH bool False;
-             PUSH bool False; NONE key_hash };
-       CREATE_CONTRACT { parameter string ;
-                         storage string ;
-                         code {CAR; NIL operation; PAIR } } ;
-       DIP{PUSH string ""}; PUSH tez "0.00";
-       PUSH string "abcdefg"; TRANSFER_TOKENS;
-       DIP{DROP}; NIL operation; SWAP; CONS; UNIT; SWAP; PAIR};
+       IF_LEFT
+         { DIP { PUSH string "dummy";
+                 PUSH tez "100.00" ; PUSH bool False ;
+                 PUSH bool False ; NONE key_hash } ;
+           CREATE_CONTRACT
+             { parameter string ;
+               storage string ;
+               code { CAR ; NIL operation ; PAIR } } ;
+           DIP { RIGHT key_hash ; DIP { SELF ; PUSH tez "0" } ; TRANSFER_TOKENS ;
+                 NIL operation ; SWAP ; CONS } ;
+           CONS ; UNIT ; SWAP ; PAIR }
+         { SELF ; ADDRESS ; SOURCE ; IFCMPNEQ { FAIL } {} ;
+           CONTRACT string ; IF_SOME {} { FAIL } ;
+           PUSH tez "0.00" ; PUSH string "abcdefg" ; TRANSFER_TOKENS ;
+           NIL operation; SWAP; CONS ; UNIT ; SWAP ; PAIR } };

@@ -389,14 +389,11 @@ let cleanup_balance_updates balance_updates =
 let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
   let before_operation = ctxt in
   Contract.must_exist ctxt source >>=? fun () ->
+  let spend =
+    if internal then Contract.spend_from_script else Contract.spend in
   match operation with
   | Reveal _ -> return (ctxt, Reveal_result)
   | Transaction { amount ; parameters ; destination } -> begin
-      let spend =
-        if internal then
-          Contract.spend_from_script
-        else
-          Contract.spend in
       spend ctxt source amount >>=? fun ctxt ->
       Contract.credit ctxt destination amount >>=? fun ctxt ->
       Contract.get_script ctxt destination >>=? fun (ctxt, script) -> match script with
@@ -452,14 +449,13 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
                   cleanup_balance_updates
                     [ Contract payer, Debited fees ;
                       Contract source, Debited amount ;
-                      Contract destination, Credited amount ;
-                      (* FIXME: this is wrong until we have asynchronous orignations *) ] ;
+                      Contract destination, Credited amount ] ;
                 originated_contracts ;
                 consumed_gas = gas_difference before_operation ctxt ;
                 storage_fees_increment = fees } in
           return (ctxt, result)
     end
-  | Origination { manager ; delegate ; script ;
+  | Origination { manager ; delegate ; script ; preorigination ;
                   spendable ; delegatable ; credit } ->
       begin match script with
         | None -> return (None, ctxt)
@@ -468,11 +464,15 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
             Script_ir_translator.erase_big_map_initialization ctxt script >>=? fun (script, big_map_diff, ctxt) ->
             return (Some (script, big_map_diff), ctxt)
       end >>=? fun (script, ctxt) ->
-      Contract.spend ctxt source credit >>=? fun ctxt ->
-      Contract.originate ctxt
+      spend ctxt source credit >>=? fun ctxt ->
+      begin match preorigination with
+        | Some contract -> return (ctxt, contract)
+        | None -> Contract.fresh_contract_from_current_nonce ctxt
+      end >>=? fun (ctxt, contract) ->
+      Contract.originate ctxt contract
         ~manager ~delegate ~balance:credit
         ?script
-        ~spendable ~delegatable >>=? fun (ctxt, contract) ->
+        ~spendable ~delegatable >>=? fun ctxt ->
       Fees.origination_burn ctxt ~payer contract >>=? fun (ctxt, fees) ->
       let result =
         Origination_result

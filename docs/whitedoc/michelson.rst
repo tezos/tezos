@@ -1382,15 +1382,15 @@ Operations on contracts
 
 ::
 
-    :: address : 'S   ->   key_hash : 'S
+    :: address : 'S   ->   key_hash option : 'S
     :: contract 'p : 'S   ->   key_hash : 'S
 
--  ``CREATE_CONTRACT``: Forge a new contract.
+-  ``CREATE_CONTRACT``: Forge a contract creation operation.
 
 ::
 
     :: key_hash : option key_hash : bool : bool : tez : lambda (pair 'p 'g) (pair (list operation) 'g) : 'g : 'S
-       -> contract 'p : 'S
+       -> operation : address : 'S
 
 As with non code-emitted originations the contract code takes as
 argument the transferred amount plus an ad-hoc argument and returns an
@@ -1401,7 +1401,8 @@ by another parameter. The calling convention for the code is as follows:
 the instruction type. The first parameters are the manager, optional
 delegate, then spendable and delegatable flags and finally the initial
 amount taken from the currently executed contract. The contract is
-returned as a first class value to be called immediately or stored.
+returned as a first class value (to be dropped, passed as parameter or stored).
+The ``CONTRACT 'p`` instruction will fail until it is actually originated.
 
 -  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
    Forge a new contract from a literal.
@@ -1409,20 +1410,20 @@ returned as a first class value to be called immediately or stored.
 ::
 
     :: key_hash : option key_hash : bool : bool : tez : 'g : 'S
-       -> contract 'p : 'S
+       -> operation : address : 'S
 
 Originate a contract based on a literal. This is currently the only way
 to include transfers inside of an originated contract. The first
 parameters are the manager, optional delegate, then spendable and
 delegatable flags and finally the initial amount taken from the
-currently executed contract. The contract is returned as a first class
-value to be called immediately or stored.
+currently executed contract.
 
--  ``CREATE_ACCOUNT``: Forge an account (a contract without code).
+-  ``CREATE_ACCOUNT``: Forge an account (a contract without code) creation operation.
 
 ::
 
-    :: key_hash : option key_hash : bool : tez : 'S   ->   contract unit : 'S
+    :: key_hash : option key_hash : bool : tez : 'S
+       ->   operation : contract unit : 'S
 
 Take as argument the manager, optional delegate, the delegatable flag
 and finally the initial amount taken from the currently executed

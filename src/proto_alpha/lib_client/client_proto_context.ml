@@ -313,7 +313,7 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
           | Applied (Origination_result { balance_updates ; consumed_gas ;
                                           originated_contracts ; storage_fees_increment }) ->
               Format.fprintf ppf
-                "This transaction was successfully applied:" ;
+                "This origination was successfully applied" ;
               begin match originated_contracts with
                 | [] -> ()
                 | contracts ->

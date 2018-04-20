@@ -241,13 +241,10 @@ let create_base c contract
        Storage.Contract.Paid_fees.init c contract Tez_repr.zero
    | None ->
        return c) >>=? fun c ->
-  return (c, contract)
+  return c
 
-let originate c ~balance ~manager ?script ~delegate ~spendable ~delegatable =
-  Lwt.return (Raw_context.increment_origination_nonce c) >>=? fun (c, nonce) ->
-  let contract = Contract_repr.originated_contract nonce in
-  create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable >>=? fun (ctxt, contract) ->
-  return (ctxt, contract)
+let originate c contract ~balance ~manager ?script ~delegate ~spendable ~delegatable =
+  create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable
 
 let create_implicit c manager ~balance =
   create_base c (Contract_repr.implicit_contract manager)
@@ -293,11 +290,17 @@ let must_be_allocated c contract =
 
 let list c = Storage.Contract.list c
 
+let fresh_contract_from_current_nonce c =
+  Lwt.return (Raw_context.increment_origination_nonce c) >>=? fun (c, nonce) ->
+  return (c, Contract_repr.originated_contract nonce)
+
 let originated_from_current_nonce ctxt =
   Lwt.return (Raw_context.origination_nonce ctxt) >>=? fun nonce ->
-  let contracts = Contract_repr.originated_contracts nonce in
-  iter_s (fun contract -> must_exist ctxt contract) contracts >>=? fun () ->
-  return contracts
+  filter_map_s
+    (fun contract -> exists ctxt contract >>=? function
+       | true -> return (Some contract)
+       | false -> return None)
+    (Contract_repr.originated_contracts nonce)
 
 let check_counter_increment c contract counter =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
@@ -435,8 +438,7 @@ let credit c contract amount =
       match Contract_repr.is_implicit contract with
       | None -> fail (Non_existing_contract contract)
       | Some manager ->
-          create_implicit c manager ~balance:amount >>=? fun (c, _) ->
-          return c
+          create_implicit c manager ~balance:amount
     end
   | Some balance ->
       Lwt.return Tez_repr.(amount +? balance) >>=? fun balance ->

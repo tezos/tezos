@@ -1,5 +1,5 @@
 parameter unit;
-storage (contract (list int));
+storage address;
 code { DROP; NIL int; # starting storage for contract
        LAMBDA (pair (list int) (list int)) # Start of stack for contract (see above)
               (pair (list operation) (list int)) # End of stack for contract (see above)
@@ -15,4 +15,4 @@ code { DROP; NIL int; # starting storage for contract
        NONE key_hash;                 # No delegate
        PUSH key_hash "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5";
        CREATE_CONTRACT;          # Create the contract
-       NIL operation; PAIR}      # Ending calling convention stuff
+       NIL operation; SWAP; CONS; PAIR} # Ending calling convention stuff

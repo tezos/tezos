@@ -511,18 +511,19 @@ module Contract : sig
 
   val init_origination_nonce: context -> Operation_hash.t -> context
   val unset_origination_nonce: context -> context
+  val fresh_contract_from_current_nonce : context -> (context * t) tzresult Lwt.t
   val originated_from_current_nonce: context -> contract list tzresult Lwt.t
 
   type big_map_diff = (string * Script.expr option) list
 
   val originate:
-    context ->
+    context -> contract ->
     balance: Tez.t ->
     manager: public_key_hash ->
     ?script: (Script.t * big_map_diff option) ->
     delegate: public_key_hash option ->
     spendable: bool ->
-    delegatable: bool -> (context * contract) tzresult Lwt.t
+    delegatable: bool -> context tzresult Lwt.t
 
   type error += Balance_too_low of contract * Tez.t * Tez.t
 
@@ -779,6 +780,7 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez.t ;
+      preorigination: Contract.t option ;
     }
   | Delegation of public_key_hash option
 

@@ -1,12 +1,18 @@
-parameter key_hash;
-storage string;
-code {CAR;
-      DIP{PUSH string "dummy";
-          LAMBDA (pair string string)
-                 (pair (list operation) string)
-                 {CAR; NIL operation; PAIR};
-          PUSH tez "100.00"; PUSH bool False;
-          PUSH bool False; NONE key_hash};
-      CREATE_CONTRACT; DIP{PUSH string ""}; PUSH tez "0.00";
-      PUSH string "abcdefg"; TRANSFER_TOKENS;
-      NIL operation; SWAP; CONS; PAIR};
+parameter (or key_hash address);
+storage unit;
+code { CAR;
+       IF_LEFT
+         { DIP { PUSH string "dummy";
+                 LAMBDA (pair string string)
+                        (pair (list operation) string)
+                        { CAR ; NIL operation ; PAIR };
+                 PUSH tez "100.00" ; PUSH bool False ;
+                 PUSH bool False ; NONE key_hash } ;
+           CREATE_CONTRACT ;
+           DIP { RIGHT key_hash ; DIP { SELF ; PUSH tez "0" } ; TRANSFER_TOKENS ;
+                 NIL operation ; SWAP ; CONS } ;
+           CONS ; UNIT ; SWAP ; PAIR }
+         { SELF ; ADDRESS ; SOURCE ; IFCMPNEQ { FAIL } {} ;
+           CONTRACT string ; IF_SOME {} { FAIL } ;
+           PUSH tez "0.00" ; PUSH string "abcdefg" ; TRANSFER_TOKENS ;
+           NIL operation; SWAP; CONS ; UNIT ; SWAP ; PAIR } };

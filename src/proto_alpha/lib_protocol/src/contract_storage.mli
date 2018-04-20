@@ -83,15 +83,17 @@ val spend_from_script:
 
 val originate:
   Raw_context.t ->
+  Contract_repr.t ->
   balance:Tez_repr.t ->
   manager:Signature.Public_key_hash.t ->
   ?script:(Script_repr.t * big_map_diff option) ->
   delegate:Signature.Public_key_hash.t option ->
   spendable:bool ->
   delegatable:bool ->
-  (Raw_context.t * Contract_repr.t) tzresult Lwt.t
+  Raw_context.t tzresult Lwt.t
 
-
+val fresh_contract_from_current_nonce :
+  Raw_context.t -> (Raw_context.t * Contract_repr.t) tzresult Lwt.t
 val originated_from_current_nonce :
   Raw_context.t -> Contract_repr.t list tzresult Lwt.t
 

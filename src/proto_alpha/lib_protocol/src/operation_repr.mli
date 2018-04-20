@@ -91,6 +91,7 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
+      preorigination: Contract_repr.t option ;
     }
   | Delegation of Signature.Public_key_hash.t option
 

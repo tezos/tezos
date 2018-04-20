@@ -451,13 +451,12 @@ let test_example () =
   Assert.equal_cents_balance ~tc (account.contract, amount * 100) >>=?? fun _ ->
 
   (* Test CREATE_ACCOUNT *)
-  Account.make_account ~tc: sb.tezos_context >>=?? fun (account, tc) ->
-  let account_str = quote @@ Signature.Public_key_hash.to_b58check account.hpub in
-  test_contract ~tc "create_account" account_str account_str >>=? fun (cs, tc) ->
+  Account.make_account ~tc: sb.tezos_context >>=?? fun (_, tc) ->
+  test_contract ~tc "create_account" "None" ("(Left " ^ account_str ^ ")") >>=? fun (cs, tc) ->
   Assert.equal_int 1 @@ List.length cs ;
 
   (* Test CREATE_CONTRACT *)
-  test_contract ~tc "create_contract" account_str account_str >>=? fun (cs, tc) ->
+  test_contract ~tc "create_contract" "Unit" ("(Left " ^ account_str ^ ")") >>=? fun (cs, tc) ->
   Assert.equal_int 1 @@ List.length cs ;
   let contract = List.hd cs in
   Proto_alpha.Alpha_context.Contract.get_script tc contract >>=?? fun (_, res) ->

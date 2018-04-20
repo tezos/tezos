@@ -384,17 +384,15 @@ assert_balance test_transfer_account2 "120 ꜩ" # Why isn't this 120 ꜩ? Baking
 
 
 # Tests create_account
-init_with_transfer $contract_dir/create_account.tz $key2 \
-                   "\"$(get_contract_addr test_transfer_account1)\"" 1,000 bootstrap1
+init_with_transfer $contract_dir/create_account.tz $key2 None 1,000 bootstrap1
 $client transfer 100 from bootstrap1 to create_account \
-           -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' | assert_in_output "New contract"
+           -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' | assert_in_output "New contract"
 bake
 
 # Creates a contract, transfers data to it and stores the data
-init_with_transfer $contract_dir/create_contract.tz $key2 \
-                   "\"$(get_contract_addr test_transfer_account1)\"" 1,000 bootstrap1
+init_with_transfer $contract_dir/create_contract.tz $key2 Unit 1,000 bootstrap1
 created_contract=\
-`$client transfer 0 from bootstrap1 to create_contract -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' \
+`$client transfer 0 from bootstrap1 to create_contract -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' \
 | grep 'New contract' \
 | sed -E 's/.*(TZ1[a-zA-Z0-9]+).*/\1/' \
 | head -1`

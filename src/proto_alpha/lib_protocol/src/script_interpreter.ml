@@ -144,12 +144,12 @@ let rec interp
             logged_return descr (Item (Script_int.of_int @@ op x1 x2, rest), ctxt) in
         let create_contract :
           type param rest storage.
-          (_, param typed_contract * rest) descr ->
+          (_, internal_operation * (Contract.t * rest)) descr ->
           manager:public_key_hash -> delegate:public_key_hash option -> spendable:bool ->
           delegatable:bool -> credit:Tez.t -> code:prim Micheline.canonical ->
           init:storage -> param_type:param ty -> storage_type:storage ty ->
           rest:rest stack ->
-          ((param typed_contract * rest) stack * context) tzresult Lwt.t =
+          ((internal_operation * (Contract.t * rest)) stack * context) tzresult Lwt.t =
           fun descr ~manager ~delegate ~spendable ~delegatable
             ~credit ~code ~init ~param_type ~storage_type ~rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_contract) >>=? fun ctxt ->
@@ -161,13 +161,13 @@ let rec interp
             Lwt.return @@ unparse_data ctxt storage_type init >>=? fun (storage, ctxt) ->
             let storage = Micheline.strip_locations storage in
             Contract.spend_from_script ctxt self credit >>=? fun ctxt ->
-            Contract.originate ctxt
-              ~manager ~delegate ~balance:credit
-              ~script:({ code ; storage }, None (* TODO: initialize a big map from a map *))
-              ~spendable ~delegatable
-            >>=? fun (ctxt, contract) ->
-            Fees.origination_burn ctxt ~payer contract >>=? fun (ctxt, _) ->
-            logged_return descr (Item ((param_type, contract), rest), ctxt) in
+            Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
+            let operation =
+              Origination
+                { credit ; manager ; delegate ; preorigination = Some contract ;
+                  delegatable ; script = Some { code ; storage } ; spendable } in
+            logged_return descr (Item ({ source = self ; operation ; signature = None },
+                                       Item (contract, rest)), ctxt) in
         let logged_return :
           a stack * context ->
           (a stack * context) tzresult Lwt.t =
@@ -671,13 +671,13 @@ let rec interp
         | Create_account,
           Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
-            Contract.spend_from_script ctxt self credit >>=? fun ctxt ->
-            Lwt.return Tez.(credit -? Constants.origination_burn ctxt) >>=? fun balance ->
-            Contract.originate ctxt
-              ~manager ~delegate ~balance
-              ?script:None ~spendable:true ~delegatable >>=? fun (ctxt, contract) ->
-            Fees.origination_burn ctxt ~payer contract >>=? fun (ctxt, _) ->
-            logged_return (Item ((Unit_t, contract), rest), ctxt)
+            Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
+            let operation =
+              Origination
+                { credit ; manager ; delegate ; preorigination = Some contract ;
+                  delegatable ; script = None ; spendable = true } in
+            logged_return (Item ({ source = self ; operation ; signature = None },
+                                 Item (contract, rest)), ctxt)
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
             let contract = Contract.implicit_contract key in

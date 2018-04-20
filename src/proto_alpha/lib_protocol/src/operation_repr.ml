@@ -91,6 +91,7 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
+      preorigination: Contract_repr.t option ;
     }
   | Delegation of Signature.Public_key_hash.t option
 
@@ -155,7 +156,11 @@ module Encoding = struct
     case tag ~name:"Origination" origination_encoding
       (function
         | Origination { manager ; credit ; spendable ;
-                        delegatable ; delegate ; script } ->
+                        delegatable ; delegate ; script ;
+                        preorigination = _
+                        (* the hash is only used internally
+                           when originating from smart
+                           contracts, don't serialize it *) } ->
             Some ((), manager, credit, Some spendable,
                   Some delegatable, delegate, script)
         | _ -> None)
@@ -165,7 +170,8 @@ module Encoding = struct
          let spendable =
            match spendable with None -> true | Some b -> b in
          Origination
-           {manager ; credit ; spendable ; delegatable ; delegate ; script })
+           {manager ; credit ; spendable ; delegatable ;
+            delegate ; script ; preorigination = None })
 
   let delegation_encoding =
     describe ~title:"Delegation operation" @@

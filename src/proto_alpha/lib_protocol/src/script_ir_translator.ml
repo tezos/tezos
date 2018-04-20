@@ -2062,7 +2062,7 @@ and parse_instr
               (Bool_t, Item_t
                  (Tez_t, rest, _), _), _), _) ->
         typed ctxt loc Create_account
-          (Item_t (Contract_t Unit_t, rest, instr_annot))
+          (Item_t (Operation_t, Item_t (Address_t, rest, None), instr_annot))
     | Prim (loc, I_IMPLICIT_ACCOUNT, [], instr_annot),
       Item_t (Key_hash_t, rest, _) ->
         typed ctxt loc Implicit_account
@@ -2080,7 +2080,7 @@ and parse_instr
         check_item_ty gp gr loc I_CREATE_CONTRACT 5 7 >>=? fun Eq ->
         check_item_ty ginit gp loc I_CREATE_CONTRACT 6 7 >>=? fun Eq ->
         typed ctxt loc (Create_contract (gp, p))
-          (Item_t (Contract_t p, rest, instr_annot))
+          (Item_t (Operation_t, Item_t (Address_t, rest, None), instr_annot))
     | Prim (loc, I_CREATE_CONTRACT, [ (Seq (seq_loc, _, annot) as code)], instr_annot),
       Item_t
         (Key_hash_t, Item_t
@@ -2111,7 +2111,7 @@ and parse_instr
         Lwt.return @@ ty_eq ret ret_type_full >>=? fun Eq ->
         Lwt.return @@ ty_eq storage_type ginit >>=? fun Eq ->
         typed ctxt loc (Create_contract_literal (storage_type, arg_type, lambda))
-          (Item_t (Contract_t arg_type, rest, instr_annot))
+          (Item_t (Operation_t, Item_t (Address_t, rest, None), instr_annot))
     | Prim (loc, I_NOW, [], instr_annot),
       stack ->
         typed ctxt loc Now

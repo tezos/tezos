@@ -347,7 +347,8 @@ module Forge = struct
                         script ;
                         spendable ;
                         delegatable ;
-                        credit = balance }
+                        credit = balance ;
+                        preorigination = None }
         ]
 
     let delegation ctxt

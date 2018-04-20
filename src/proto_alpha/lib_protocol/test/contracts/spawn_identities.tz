@@ -1,8 +1,8 @@
 parameter nat;
-storage (list (contract string));
+storage (list address);
 code { DUP;
        CAR;                     # Get the number
-       DIP{CDR};                # Put the accumulator on the stack
+       DIP{CDR; NIL operation}; # Put the accumulators on the stack
        PUSH bool True;          # Push true so we have a do while loop
        LOOP { DUP; PUSH nat 0; CMPEQ; # Check if the number is 0
               IF { PUSH bool False}   # End the loop
@@ -16,7 +16,7 @@ code { DUP;
                    NONE key_hash;
                    PUSH key_hash "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5";
                    CREATE_CONTRACT; # Make the contract
-                   SWAP;            # Add to the list
-                   DIP{CONS};
+                   SWAP ; DIP { SWAP ; DIP { CONS } } ; # emit the operation
+                   SWAP ; DIP { SWAP ; DIP { CONS } } ; # add to the list
                    PUSH bool True}}; # Continue the loop
-       DROP; NIL operation; PAIR}    # Calling convention
+       DROP; PAIR}    # Calling convention
