@@ -245,7 +245,5 @@ module type SIGNATURE = sig
   (** Check a signature *)
   val check: Public_key.t -> t -> MBytes.t -> bool
 
-  val concat: MBytes.t -> t -> MBytes.t
-
 end
 

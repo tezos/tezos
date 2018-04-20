@@ -430,12 +430,17 @@ let of_ed25519 s = Ed25519 s
 
 let zero = of_ed25519 Ed25519.zero
 
+let hash msg =
+  Blake2B.(to_bytes (hash_bytes [msg]))
+
 let sign secret_key message =
+  let message = hash message in
   match secret_key with
   | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign sk message)
   | Secret_key.Secp256k1 sk -> of_secp256k1 (Secp256k1.sign sk message)
 
 let check public_key signature message =
+  let message = hash message in
   match public_key, signature with
   | Public_key.Ed25519 pk, Unknown signature -> begin
       match Ed25519.of_bytes_opt signature with
@@ -454,10 +459,8 @@ let check public_key signature message =
   | Public_key.Ed25519 _, Secp256k1 _ -> false
   | Public_key.Secp256k1 _, Ed25519 _ -> false
 
-let append sk bytes =
-  match sk with
-  | Secret_key.Ed25519 s -> Ed25519.append s bytes
-  | Secret_key.Secp256k1 s -> Secp256k1.append s bytes
+let append sk msg =
+  MBytes.concat msg (to_bytes (sign sk msg))
 
 let concat msg signature =
   MBytes.concat msg (to_bytes signature)

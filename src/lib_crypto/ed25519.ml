@@ -270,12 +270,6 @@ let check public_key signature msg =
     ~signature:(Cstruct.of_bigarray signature)
     (Cstruct.of_bigarray msg)
 
-let append key msg =
-  MBytes.concat msg (sign key msg)
-
-let concat msg signature =
-  MBytes.concat msg signature
-
 module Seed = struct
 
   type t = Cstruct.t

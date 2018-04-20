@@ -313,8 +313,6 @@ module Make (Context : CONTEXT) = struct
         (** Check a signature *)
         val check: Public_key.t -> t -> MBytes.t -> bool
 
-        val concat: MBytes.t -> t -> MBytes.t
-
       end
 
     end

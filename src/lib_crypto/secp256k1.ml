@@ -245,12 +245,6 @@ let sign sk msg =
 let check public_key signature msg =
   Sign.verify_exn context ~pk:public_key ~msg ~signature
 
-let concat msg t =
-  MBytes.concat msg (Sign.to_bytes ~der:false context t)
-
-let append sk msg =
-  concat msg (Sign.sign_exn context ~sk msg)
-
 let generate_key () =
   let sk = Key.read_sk_exn context (Cstruct.to_bigarray (Tweetnacl.Rand.gen 32)) in
   let pk = Key.neuterize_exn context sk in
