@@ -44,8 +44,8 @@ module Event = struct
 
   let level req =
     match req with
-    | Debug _ -> Logging.Info
-    | Request _ -> Logging.Notice
+    | Debug _ -> Logging.Debug
+    | Request _ -> Logging.Info
 
   let encoding =
     let open Data_encoding in
