@@ -20,6 +20,12 @@
 
 open Storage_sigs
 
+module Last_block_priority : sig
+  val get : Raw_context.t -> int tzresult Lwt.t
+  val set : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
+  val init : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
+end
+
 module Roll : sig
 
   (** Storage from this submodule must only be accessed through the

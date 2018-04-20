@@ -21,6 +21,7 @@ let prepare_first_block ctxt ~level ~timestamp ~fitness =
     param.bootstrap_accounts >>=? fun ctxt ->
   Roll_storage.init_first_cycles ctxt >>=? fun ctxt ->
   Vote_storage.init ctxt >>=? fun ctxt ->
+  Storage.Last_block_priority.init ctxt 0 >>=? fun ctxt ->
   return ctxt
 
 let prepare ctxt ~level ~timestamp ~fitness =

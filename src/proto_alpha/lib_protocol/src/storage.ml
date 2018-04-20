@@ -39,6 +39,12 @@ module String_index = struct
     | [] | _ :: _ :: _ -> None
 end
 
+module Last_block_priority =
+  Make_single_data_storage
+    (Raw_context)
+    (struct let name = ["last_block_priority"] end)
+    (Make_value(Int))
+
 (** Contracts handling *)
 
 module Contract = struct

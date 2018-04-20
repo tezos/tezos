@@ -106,6 +106,11 @@ module Commitment = struct
   include Commitment_storage
 end
 
+module Global = struct
+  let get_last_block_priority = Storage.Last_block_priority.get
+  let set_last_block_priority = Storage.Last_block_priority.set
+end
+
 let prepare_first_block = Init_storage.prepare_first_block
 let prepare = Init_storage.prepare
 

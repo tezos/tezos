@@ -103,19 +103,15 @@ let begin_construction
   return { mode ; ctxt ; op_count = 0 ; deposit }
 
 let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
-  let pred_block, block_prio =
+  let predecessor =
     match mode with
-    | Partial_construction { predecessor } ->
-        predecessor, 0
+    | Partial_construction { predecessor }
     | Application
-        { block_header = { shell = { predecessor ; _ } ;
-                                    protocol_data ; _ } ; _ }
-    | Full_construction { predecessor ; protocol_data ; _ } ->
-        predecessor,
-        protocol_data.priority in
-  Apply.apply_operation ctxt pred_block block_prio
-    (Alpha_context.Operation.hash operation) operation
-  >>=? fun (ctxt, _) ->
+        { block_header = { shell = { predecessor ; _ } ; _ } ; _ }
+    | Full_construction { predecessor ; _ } ->
+        predecessor in
+  Apply.apply_operation ctxt predecessor
+    (Alpha_context.Operation.hash operation) operation >>=? fun (ctxt, _) ->
   let op_count = op_count + 1 in
   return { data with ctxt ; op_count }
 

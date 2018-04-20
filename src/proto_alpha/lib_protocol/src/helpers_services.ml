@@ -141,8 +141,7 @@ module I = struct
     | None -> Error_monad.fail Operation.Cannot_parse_operation
     | Some (shell, contents) ->
         let operation = { shell ; contents ; signature } in
-        let block_prio = 0 in
-        Apply.apply_operation ctxt pred_block block_prio hash operation
+        Apply.apply_operation ctxt pred_block hash operation
         >>=? fun (_, result) -> return result
 
 end

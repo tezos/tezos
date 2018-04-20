@@ -873,6 +873,13 @@ module Bootstrap : sig
 
 end
 
+module Global : sig
+
+  val get_last_block_priority: context -> int tzresult Lwt.t
+  val set_last_block_priority: context -> int -> context tzresult Lwt.t
+
+end
+
 val prepare_first_block:
   Context.t ->
   level:Int32.t ->

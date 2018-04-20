@@ -330,7 +330,7 @@ let () =
 open Apply_operation_result
 
 let apply_consensus_operation_content ctxt
-    pred_block block_priority operation = function
+    pred_block operation = function
   | Endorsements { block ; level ; slots } ->
       begin
         match Level.pred ctxt (Level.current ctxt) with
@@ -354,6 +354,7 @@ let apply_consensus_operation_content ctxt
       let delegate = Signature.Public_key.hash delegate in
       let ctxt = Fitness.increase ~gap:(List.length slots) ctxt in
       Baking.freeze_endorsement_deposit ctxt delegate >>=? fun ctxt ->
+      Global.get_last_block_priority ctxt >>=? fun block_priority ->
       Baking.endorsement_reward ctxt ~block_priority >>=? fun reward ->
       Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
       return (ctxt, Endorsements_result (delegate, slots))
@@ -538,7 +539,7 @@ let apply_manager_operations ctxt source ops =
                 apply ctxt applied rest in
   apply ctxt [] ops
 
-let apply_sourced_operation ctxt pred_block block_prio operation ops =
+let apply_sourced_operation ctxt pred_block operation ops =
   match ops with
   | Manager_operations { source ; fee ; counter ; operations ; gas_limit } ->
       let revealed_public_keys =
@@ -575,7 +576,7 @@ let apply_sourced_operation ctxt pred_block block_prio operation ops =
                   operation_results })
   | Consensus_operation content ->
       apply_consensus_operation_content ctxt
-        pred_block block_prio operation content >>=? fun (ctxt, result) ->
+        pred_block operation content >>=? fun (ctxt, result) ->
       return (ctxt, Consensus_operation_result result)
   | Amendment_operation { source ; operation = content } ->
       Roll.delegate_pubkey ctxt source >>=? fun delegate ->
@@ -697,8 +698,7 @@ let apply_anonymous_operation ctxt kind =
           Contract.(credit ctxt (implicit_contract (Signature.Ed25519 pkh)) amount) >>=? fun ctxt ->
           return (ctxt, Activation_result [(* FIXME *)])
 
-let apply_operation
-    ctxt pred_block block_prio hash operation =
+let apply_operation ctxt pred_block hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash  in
   begin match operation.contents with
     | Anonymous_operations ops ->
@@ -710,7 +710,7 @@ let apply_operation
         >>=? fun (ctxt, results) ->
         return (ctxt, Anonymous_operations_result (List.rev results))
     | Sourced_operation ops ->
-        apply_sourced_operation ctxt pred_block block_prio operation ops
+        apply_sourced_operation ctxt pred_block operation ops
         >>=? fun (ctxt, result) ->
         return (ctxt, Sourced_operation_result result)
   end >>=? fun (ctxt, result) ->
@@ -791,6 +791,8 @@ let finalize_application ctxt protocol_data delegate =
         Nonce.record_hash ctxt
           { nonce_hash ; delegate ; rewards ; fees }
   end >>=? fun ctxt ->
+  Alpha_context.Global.set_last_block_priority
+    ctxt protocol_data.priority >>=? fun ctxt ->
   (* end of cycle *)
   may_snapshot_roll ctxt >>=? fun ctxt ->
   may_start_new_cycle ctxt >>=? fun ctxt ->

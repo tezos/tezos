@@ -40,7 +40,6 @@ let operation
   Proto_alpha.Apply.apply_operation
     tc
     pred_block_hash
-    0
     hash
     operation
   >>=? bind_result
