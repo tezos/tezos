@@ -1,10 +1,26 @@
 Alphanet changelog
 ==================
 
-For the next reset
-------------------
+Reset 2018-05-03
+----------------
 
 [Alpha]
+
+- New faucet : https://faucet.tzalpha.net
+
+- `secp256k1` as an alternative to `ed25519`
+
+- 32 endorsers per blocks (was 15)
+
+- Selegation rights are now frozen 5 cycles in advance (approx 15 days in mainnet or 10 hours on zeronet);
+
+- Security deposits are recovered after 5 cycles;
+
+- Rewards and fees are earned after 5 cycles;
+
+- Pending deposits and fees count in the staking balance of a delegate;
+
+- Delegates will be tagged as "deactivated" after 5 cycles of inactivity and they will lose their baking rights;
 
 - Do not allow revealing the same endorsement twice.
 
@@ -35,9 +51,15 @@ For the next reset
 
 - Split the code base into separate OPAM packages.
 
+Patch 2018-01-15
+----------------
+
+[Node]
+
+- Fix a performance issue in block locator computation
 
 Reset 2017-11-20
-------------------
+----------------
 
 [Alphanet]
 
