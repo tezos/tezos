@@ -141,12 +141,8 @@ module I = struct
     | None -> Error_monad.fail Operation.Cannot_parse_operation
     | Some (shell, contents) ->
         let operation = { shell ; contents ; signature } in
-        let level = Level.succ ctxt (Level.current ctxt) in
-        Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (baker_pk, _)) ->
-        let baker_pkh = Signature.Public_key.hash baker_pk in
         let block_prio = 0 in
-        Apply.apply_operation
-          ctxt (Some baker_pkh) pred_block block_prio hash operation
+        Apply.apply_operation ctxt pred_block block_prio hash operation
         >>=? fun (_, result) -> return result
 
 end

@@ -597,7 +597,7 @@ let apply_sourced_operation ctxt pred_block block_prio operation ops =
       fork_test_chain ctxt hash expiration >>= fun ctxt ->
       return (ctxt, Dictator_operation_result)
 
-let apply_anonymous_operation ctxt _delegate kind =
+let apply_anonymous_operation ctxt kind =
   match kind with
   | Seed_nonce_revelation { level ; nonce } ->
       let level = Level.from_raw ctxt level in
@@ -698,13 +698,13 @@ let apply_anonymous_operation ctxt _delegate kind =
           return (ctxt, Activation_result [(* FIXME *)])
 
 let apply_operation
-    ctxt delegate pred_block block_prio hash operation =
+    ctxt pred_block block_prio hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash  in
   begin match operation.contents with
     | Anonymous_operations ops ->
         fold_left_s
           (fun (ctxt, acc) op ->
-             apply_anonymous_operation ctxt delegate op >>=? fun (ctxt, result) ->
+             apply_anonymous_operation ctxt op >>=? fun (ctxt, result) ->
              return (ctxt, result :: acc))
           (ctxt, []) ops
         >>=? fun (ctxt, results) ->

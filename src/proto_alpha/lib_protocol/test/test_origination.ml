@@ -20,12 +20,11 @@ open Helpers_block
 let (>>?=) = Assert.(>>?=)
 let (>>=??) = Assert.(>>=??)
 
-let originate root ?(tc=root.tezos_context) ?baker ?spendable ?fee ?delegatable src amount =
+let originate root ?(tc=root.tezos_context) ?spendable ?fee ?delegatable src amount =
   let delegatable = Option.unopt ~default:true delegatable in
   let spendable = Option.unopt ~default:true spendable in
   let fee = Option.unopt ~default:10 fee in
   Apply.origination_pred
-    ?baker
     ~tc
     ~pred: root
     (src, amount, spendable, delegatable, fee)
@@ -40,10 +39,9 @@ let test_simple_origination () =
   return ()
 
 
-let delegate root ?(tc=root.tezos_context) ?baker ?fee src delegate =
+let delegate root ?(tc=root.tezos_context) ?fee src delegate =
   let fee = Option.unopt ~default:10 fee in
   Apply.delegation_pred
-    ?baker
     ~tc
     ~pred: root
     (src, delegate, fee)
