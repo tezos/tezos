@@ -128,10 +128,14 @@ let set c contract delegate =
       | Some pkh ->
           fail (No_deletion pkh)
       | None ->
-          Storage.Contract.Balance.get c contract >>=? fun balance ->
-          unlink c contract balance >>=? fun c ->
-          Storage.Contract.Delegate.remove c contract >>= fun c ->
-          return c
+          is_delegatable c contract >>=? fun delegatable ->
+          if delegatable then
+            Storage.Contract.Balance.get c contract >>=? fun balance ->
+            unlink c contract balance >>=? fun c ->
+            Storage.Contract.Delegate.remove c contract >>= fun c ->
+            return c
+          else
+            fail (Non_delegatable_contract contract)
     end
   | Some delegate ->
       known c delegate >>=? fun known_delegate ->
