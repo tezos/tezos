@@ -176,6 +176,7 @@ module Cost_of = struct
   let create_account = step_cost 20
   let create_contract = step_cost 70
   let implicit_account = step_cost 10
+  let set_delegate = step_cost 10
   let balance = step_cost 5
   let now = step_cost 3
   let check_signature = step_cost 3

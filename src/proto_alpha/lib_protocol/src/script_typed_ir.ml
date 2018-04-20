@@ -344,6 +344,8 @@ and ('bef, 'aft) instr =
   | Create_contract_literal : 'g ty * 'p ty * ('p * 'g, internal_operation list * 'g) lambda  ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
      internal_operation * (Contract.t * 'rest)) instr
+  | Set_delegate :
+      (public_key_hash option * 'rest, internal_operation * 'rest) instr
   | Now :
       ('rest, Script_timestamp.t * 'rest) instr
   | Balance :

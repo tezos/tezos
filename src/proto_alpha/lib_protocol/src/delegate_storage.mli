@@ -38,6 +38,11 @@ val set:
   Raw_context.t -> Contract_repr.t -> Signature.Public_key_hash.t option ->
   Raw_context.t tzresult Lwt.t
 
+(** Same as {!set} ignoring the [delegatable] flag. *)
+val set_from_script:
+  Raw_context.t -> Contract_repr.t -> Signature.Public_key_hash.t option ->
+  Raw_context.t tzresult Lwt.t
+
 type error +=
   | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
   | No_deletion of Signature.Public_key_hash.t (* `Permanent *)

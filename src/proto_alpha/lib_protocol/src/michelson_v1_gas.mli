@@ -71,6 +71,7 @@ module Cost_of : sig
   val create_account : Gas.cost
   val create_contract : Gas.cost
   val implicit_account : Gas.cost
+  val set_delegate : Gas.cost
   val balance : Gas.cost
   val now : Gas.cost
   val check_signature : Gas.cost

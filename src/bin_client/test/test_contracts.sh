@@ -414,6 +414,26 @@ init_with_transfer $contract_dir/self.tz $key1 \
 bake_after $client transfer 0 from bootstrap1 to self
 assert_storage_contains self "\"$(get_contract_addr self)\""
 
+# Test SET_DELEGATE
+b2='tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN'
+b3='tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU'
+b4='tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv'
+b5='tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv'
+init_with_transfer $contract_dir/vote_for_delegate.tz bootstrap1 \
+				   "(Pair (Pair \"$b3\" None) (Pair \"$b4\" None))" 1,000 bootstrap1
+$client get delegate for vote_for_delegate | assert_in_output none
+
+assert_fails $client transfer 0 from bootstrap1 to vote_for_delegate -arg None
+assert_fails $client transfer 0 from bootstrap2 to vote_for_delegate -arg None
+bake_after $client transfer 0 from bootstrap3 to vote_for_delegate -arg "(Some \"$b5\")"
+assert_storage_contains vote_for_delegate "\"$b5\""
+$client get delegate for vote_for_delegate | assert_in_output none
+bake_after $client transfer 0 from bootstrap4 to vote_for_delegate -arg "(Some \"$b2\")"
+assert_storage_contains vote_for_delegate "\"$b2\""
+$client get delegate for vote_for_delegate | assert_in_output none
+bake_after $client transfer 0 from bootstrap4 to vote_for_delegate -arg "(Some \"$b5\")"
+$client get delegate for vote_for_delegate | assert_in_output "$b5"
+
 # Test sets and map literals
 assert_fails $client typecheck data '{ Elt 0 1 ; Elt 0 1 }' against type '(map nat nat)'
 assert_fails $client typecheck data '{ Elt 0 1 ; Elt 10 1 ; Elt 5 1 }' against type '(map nat nat)'

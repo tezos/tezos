@@ -391,6 +391,8 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
   Contract.must_exist ctxt source >>=? fun () ->
   let spend =
     if internal then Contract.spend_from_script else Contract.spend in
+  let set_delegate =
+    if internal then Delegate.set_from_script else Delegate.set in
   match operation with
   | Reveal _ -> return (ctxt, Reveal_result)
   | Transaction { amount ; parameters ; destination } -> begin
@@ -486,7 +488,7 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
             storage_fees_increment = fees } in
       return (ctxt, result)
   | Delegation delegate ->
-      Delegate.set ctxt source delegate >>=? fun ctxt ->
+      set_delegate ctxt source delegate >>=? fun ctxt ->
       return (ctxt, Delegation_result)
 
 let apply_internal_manager_operations ctxt ~payer ops =

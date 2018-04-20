@@ -145,6 +145,17 @@ let commands () =
         operation_submitted_message cctxt oph
       end ;
 
+    command ~group ~desc: "Withdraw the delegate from a contract."
+      (args1 fee_arg)
+      (prefixes [ "withdraw" ; "delegate" ; "from" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun fee (_, contract) (cctxt : Proto_alpha.full) ->
+        source_to_keys cctxt cctxt#block contract >>=? fun (src_pk, manager_sk) ->
+        set_delegate ~fee cctxt cctxt#block contract None ~src_pk ~manager_sk >>=? fun oph ->
+        operation_submitted_message cctxt oph
+      end ;
+
     command ~group ~desc:"Open a new account."
       (args4 fee_arg delegate_arg delegatable_switch (Client_keys.force_switch ()))
       (prefixes [ "originate" ; "account" ]

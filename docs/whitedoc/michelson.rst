@@ -1438,6 +1438,12 @@ contract.
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
 
+-  ``SET_DELEGATE``: Forge a delegation.
+
+::
+
+    :: option key_hash : 'S   ->   operation : S
+
 -  ``BALANCE``: Push the current amount of tez of the current contract.
 
 ::
@@ -2469,6 +2475,7 @@ XII - Full grammar
       | MANAGER
       | SELF
       | TRANSFER_TOKENS
+      | SET_DELEGATE
       | CREATE_ACCOUNT
       | CREATE_CONTRACT
       | IMPLICIT_ACCOUNT

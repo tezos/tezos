@@ -236,6 +236,7 @@ module Script : sig
     | I_SUB
     | I_SWAP
     | I_TRANSFER_TOKENS
+    | I_SET_DELEGATE
     | I_UNIT
     | I_UPDATE
     | I_XOR
@@ -564,6 +565,9 @@ module Delegate : sig
   val get: context -> Contract.t -> public_key_hash option tzresult Lwt.t
 
   val set:
+    context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
+
+  val set_from_script:
     context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
 
   val fold:

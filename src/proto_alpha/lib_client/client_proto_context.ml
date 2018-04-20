@@ -80,11 +80,11 @@ let pp_manager_operation_content ppf source operation internal pp_result result 
                 Michelson_v1_printer.print_expr storage
         end ;
         begin match delegate with
-          | None -> Format.fprintf ppf "@,Delegate is the manager"
+          | None -> Format.fprintf ppf "@,No delegate for this contract"
           | Some delegate -> Format.fprintf ppf "@,Delegate: %a" Signature.Public_key_hash.pp delegate
         end ;
-        if spendable then Format.fprintf ppf "@,Spendable by its manager" ;
-        if delegatable then Format.fprintf ppf "@,Delegate can be changed later" ;
+        if spendable then Format.fprintf ppf "@,Spendable by the manager" ;
+        if delegatable then Format.fprintf ppf "@,Delegate can be changed by the manager" ;
         pp_result ppf result ;
         Format.fprintf ppf "@]" ;
     | Reveal key ->

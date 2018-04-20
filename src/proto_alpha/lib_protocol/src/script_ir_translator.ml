@@ -211,6 +211,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Source -> 0
   | Self _ -> 1
   | Amount -> 0
+  | Set_delegate -> 0
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -302,6 +303,7 @@ let namespace = function
   | I_SUB
   | I_SWAP
   | I_TRANSFER_TOKENS
+  | I_SET_DELEGATE
   | I_UNIT
   | I_UPDATE
   | I_XOR
@@ -2055,6 +2057,9 @@ and parse_instr
                    (Contract_t cp, rest, _), _), _) ->
         check_item_ty p cp loc I_TRANSFER_TOKENS 1 4 >>=? fun Eq ->
         typed ctxt loc Transfer_tokens (Item_t (Operation_t, rest, instr_annot))
+    | Prim (loc, I_SET_DELEGATE, [], instr_annot),
+      Item_t (Option_t Key_hash_t, rest, _) ->
+        typed ctxt loc Set_delegate (Item_t (Operation_t, rest, instr_annot))
     | Prim (loc, I_CREATE_ACCOUNT, [], instr_annot),
       Item_t
         (Key_hash_t, Item_t
@@ -2165,7 +2170,7 @@ and parse_instr
                  | I_COMPARE | I_EQ | I_NEQ
                  | I_LT | I_GT | I_LE | I_GE
                  | I_MANAGER | I_TRANSFER_TOKENS | I_CREATE_ACCOUNT
-                 | I_CREATE_CONTRACT | I_NOW
+                 | I_CREATE_CONTRACT | I_SET_DELEGATE | I_NOW
                  | I_IMPLICIT_ACCOUNT | I_AMOUNT | I_BALANCE
                  | I_CHECK_SIGNATURE | I_HASH_KEY | I_SOURCE
                  | I_H | I_STEPS_TO_QUOTA | I_ADDRESS

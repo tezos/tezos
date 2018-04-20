@@ -701,6 +701,11 @@ let rec interp
                               (init, rest)))))) ->
             create_contract descr ~manager ~delegate ~spendable ~delegatable ~credit ~code ~init
               ~param_type ~storage_type ~rest
+        | Set_delegate,
+          Item (delegate, rest) ->
+            Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
+            let operation = Delegation delegate in
+            logged_return (Item ({ source = self ; operation ; signature = None }, rest), ctxt)
         | Balance, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.balance) >>=? fun ctxt ->
             Contract.get_balance ctxt self >>=? fun balance ->

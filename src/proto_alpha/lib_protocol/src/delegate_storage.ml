@@ -121,7 +121,7 @@ let init ctxt contract delegate =
 
 let get = Roll_storage.get_contract_delegate
 
-let set c contract delegate =
+let set_base c is_delegatable contract delegate =
   match delegate with
   | None -> begin
       match Contract_repr.is_implicit contract with
@@ -179,6 +179,12 @@ let set c contract delegate =
             return c
         end >>=? fun c ->
         return c
+
+let set c contract delegate =
+  set_base c is_delegatable contract delegate
+
+let set_from_script c contract delegate =
+  set_base c (fun _ _ -> return true) contract delegate
 
 let remove ctxt contract =
   Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
