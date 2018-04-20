@@ -27,10 +27,13 @@ let forge_block_header
     cctxt block >>=? fun stamp_threshold ->
   let rec loop () =
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
-    let protocol_data : Block_header.protocol_data =
-      { priority ; seed_nonce_hash ; proof_of_work_nonce } in
-    if Baking.check_header_proof_of_work_stamp shell protocol_data stamp_threshold then
-      let unsigned_header = Block_header.forge_unsigned shell protocol_data in
+    let contents =
+      { Block_header.priority ; seed_nonce_hash ; proof_of_work_nonce } in
+    if Baking.check_header_proof_of_work_stamp shell contents stamp_threshold then
+      let unsigned_header =
+        Data_encoding.Binary.to_bytes_exn
+          Alpha_context.Block_header.unsigned_encoding
+          (shell, contents) in
       Client_keys.append delegate_sk ~watermark:Block_header unsigned_header
     else
       loop () in
@@ -41,9 +44,11 @@ let empty_proof_of_work_nonce =
     (String.make Constants_repr.proof_of_work_nonce_size  '\000')
 
 let forge_faked_protocol_data ~priority ~seed_nonce_hash =
-  Alpha_context.Block_header.forge_unsigned_protocol_data
-    { priority ; seed_nonce_hash ;
-      proof_of_work_nonce = empty_proof_of_work_nonce }
+  Data_encoding.Binary.to_bytes_exn
+    Alpha_context.Block_header.protocol_data_encoding
+    { contents = { priority ; seed_nonce_hash ;
+                   proof_of_work_nonce = empty_proof_of_work_nonce } ;
+      signature = Signature.zero }
 
 let assert_valid_operations_hash shell_header operations =
   let operations_hash =
@@ -95,13 +100,14 @@ let () =
 let classify_operations (ops: Operation.raw list) =
   let t = Array.make (List.length Proto_alpha.Main.validation_passes) [] in
   List.iter
-    (fun op ->
-       match Operation.parse op with
-       | Ok o ->
+    (fun (op: Operation.raw) ->
+       match Data_encoding.Binary.of_bytes Operation.protocol_data_encoding op.proto with
+       | Some o ->
            List.iter
              (fun pass -> t.(pass) <- op :: t.(pass))
-             (Proto_alpha.Main.acceptable_passes o)
-       | Error _ -> ())
+             (Proto_alpha.Main.acceptable_passes
+                { shell = op.shell ; protocol_data = o })
+       | None -> ())
     ops ;
   Array.fold_right (fun ops acc -> List.rev ops :: acc) t []
 

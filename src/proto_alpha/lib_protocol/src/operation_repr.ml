@@ -18,11 +18,15 @@ let raw_encoding = Operation.encoding
 
 type operation = {
   shell: Operation.shell_header ;
-  contents: proto_operation ;
+  protocol_data: protocol_data ;
+}
+
+and protocol_data = {
+  contents: contents ;
   signature: Signature.t option ;
 }
 
-and proto_operation =
+and contents =
   | Anonymous_operations of anonymous_operation list
   | Sourced_operation of sourced_operation
 
@@ -307,7 +311,7 @@ module Encoding = struct
       (function Dictator_operation op -> Some op | _ -> None)
       (fun op -> Dictator_operation op)
 
-  let signed_operations_case tag =
+  let sourced_operation_case tag =
     case tag
       (union [
           consensus_kind_case (Tag 0) ;
@@ -374,7 +378,7 @@ module Encoding = struct
       )
       (fun ((), id, secret) -> Activation { id ; secret })
 
-  let unsigned_operation_case tag op_encoding =
+  let anonymous_operations_case tag op_encoding =
     case tag
       (obj1
          (req "operations"
@@ -388,40 +392,42 @@ module Encoding = struct
       (function Anonymous_operations ops -> Some ops | _ -> None)
       (fun ops -> Anonymous_operations ops)
 
-  let mu_proto_operation_encoding op_encoding =
+  let contents_encoding op_encoding =
     union [
-      signed_operations_case (Tag 0) ;
-      unsigned_operation_case (Tag 1) op_encoding ;
+      sourced_operation_case (Tag 0) ;
+      anonymous_operations_case (Tag 1) op_encoding ;
     ]
 
-  let mu_signed_proto_operation_encoding op_encoding =
-    merge_objs
-      (mu_proto_operation_encoding op_encoding)
-      (obj1 (varopt "signature" Signature.encoding))
+  let protocol_data_encoding op_encoding =
+    conv
+      (fun { contents ; signature } -> (contents, signature))
+      (fun (contents, signature) -> { contents ; signature })
+      (merge_objs
+         (contents_encoding op_encoding)
+         (obj1 (varopt "signature" Signature.encoding)))
 
   let operation_encoding =
     mu "operation"
       (fun encoding ->
          conv
-           (fun { shell ; contents ; signature } ->
-              (shell, (contents, signature)))
-           (fun (shell, (contents, signature)) ->
-              { shell ; contents ; signature })
+           (fun { shell ; protocol_data } -> (shell, protocol_data))
+           (fun (shell, protocol_data) -> { shell ; protocol_data })
            (merge_objs
               Operation.shell_header_encoding
-              (mu_signed_proto_operation_encoding encoding)))
+              (protocol_data_encoding encoding)))
 
-  let proto_operation_encoding =
-    mu_proto_operation_encoding operation_encoding
 
-  let signed_proto_operation_encoding =
-    mu_signed_proto_operation_encoding operation_encoding
+  let contents_encoding =
+    contents_encoding operation_encoding
+
+  let protocol_data_encoding =
+    protocol_data_encoding operation_encoding
 
   let unsigned_operation_encoding =
     def "operation.alpha.unsigned_operation" @@
     merge_objs
       Operation.shell_header_encoding
-      proto_operation_encoding
+      contents_encoding
 
   let internal_operation_encoding =
     conv
@@ -439,33 +445,14 @@ module Encoding = struct
            ]))
 end
 
-type error += Cannot_parse_operation
-
 let encoding = Encoding.operation_encoding
-
-let () =
-  register_error_kind
-    `Branch
-    ~id:"operation.cannot_parse"
-    ~title:"Cannot parse operation"
-    ~description:"The operation is ill-formed \
-                  or for another protocol version"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "The operation cannot be parsed")
-    Data_encoding.unit
-    (function Cannot_parse_operation -> Some () | _ -> None)
-    (fun () -> Cannot_parse_operation)
-
-let parse (op: Operation.t) =
-  match Data_encoding.Binary.of_bytes
-          Encoding.signed_proto_operation_encoding
-          op.proto with
-  | Some (contents, signature) ->
-      ok { shell = op.shell ; contents ; signature }
-  | None -> error Cannot_parse_operation
+let contents_encoding = Encoding.contents_encoding
+let protocol_data_encoding = Encoding.protocol_data_encoding
+let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
+let internal_operation_encoding = Encoding.internal_operation_encoding
 
 let acceptable_passes op =
-  match op.contents with
+  match op.protocol_data.contents with
   | Sourced_operation (Consensus_operation _) -> [0]
   | Sourced_operation (Amendment_operation _ | Dictator_operation _) -> [1]
   | Anonymous_operations _ -> [2]
@@ -498,18 +485,16 @@ let () =
     (function Missing_signature -> Some () | _ -> None)
     (fun () -> Missing_signature)
 
-let forge shell proto =
-  Data_encoding.Binary.to_bytes_exn
-    Encoding.unsigned_operation_encoding (shell, proto)
-
-let check_signature key { shell ; contents ; signature } =
-  match contents, signature with
+let check_signature key { shell ; protocol_data } =
+  match protocol_data.contents, protocol_data.signature with
   | Anonymous_operations _, _ -> return ()
   | Sourced_operation _, None ->
       fail Missing_signature
   | Sourced_operation (Consensus_operation _), Some signature ->
       (* Safe for baking *)
-      let unsigned_operation = forge shell contents in
+      let unsigned_operation =
+        Data_encoding.Binary.to_bytes_exn
+          unsigned_operation_encoding (shell, protocol_data.contents) in
       if Signature.check
           ~watermark:Endorsement
           key signature unsigned_operation then
@@ -518,7 +503,9 @@ let check_signature key { shell ; contents ; signature } =
         fail Invalid_signature
   | Sourced_operation _, Some signature ->
       (* Unsafe for baking *)
-      let unsigned_operation = forge shell contents in
+      let unsigned_operation =
+        Data_encoding.Binary.to_bytes_exn
+          unsigned_operation_encoding (shell, protocol_data.contents) in
       if Signature.check
           ~watermark:Generic_operation
           key signature unsigned_operation then
@@ -526,19 +513,10 @@ let check_signature key { shell ; contents ; signature } =
       else
         fail Invalid_signature
 
-let parse_proto bytes =
-  match Data_encoding.Binary.of_bytes
-          Encoding.signed_proto_operation_encoding
-          bytes with
-  | Some (proto, signature) -> return (proto, signature)
-  | None -> fail Cannot_parse_operation
-
 let hash_raw = Operation.hash
 let hash o =
   let proto =
     Data_encoding.Binary.to_bytes_exn
-      Encoding.signed_proto_operation_encoding
-      (o.contents, o.signature) in
+      protocol_data_encoding
+      o.protocol_data in
   Operation.hash { shell = o.shell ; proto }
-
-include Encoding

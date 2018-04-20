@@ -14,13 +14,14 @@ let protocol =
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
 let bake cctxt ?(timestamp = Time.now ()) block command sk =
-  let protocol_data = Data_encoding.Binary.to_bytes_exn Data.Command.encoding command in
+  let protocol_data =
+    Data_encoding.Binary.to_bytes_exn
+      Proto_genesis.block_header_data_encoding
+      { command ; signature = Signature.zero } in
   Block_services.preapply
     cctxt block ~timestamp ~protocol_data
     [] >>=? fun { shell_header } ->
-  let blk =
-    Data_encoding.Binary.to_bytes_exn Block_header.encoding
-      { shell = shell_header ; protocol_data } in
+  let blk = Data.Command.forge shell_header command in
   Client_keys.append sk blk >>=? fun signed_blk ->
   Shell_services.inject_block cctxt signed_blk []
 

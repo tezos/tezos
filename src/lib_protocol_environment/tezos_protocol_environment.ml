@@ -61,9 +61,18 @@ module Make (Context : CONTEXT) = struct
     type 'a tzresult
     val max_block_length: int
     val validation_passes: quota list
-    type operation
-    val parse_operation:
-      Operation_hash.t -> Operation.t -> operation tzresult
+    type block_header_data
+    val block_header_data_encoding: block_header_data Data_encoding.t
+    type block_header = {
+      shell: Block_header.shell_header ;
+      protocol_data: block_header_data ;
+    }
+    type operation_data
+    val operation_data_encoding: operation_data Data_encoding.t
+    type operation = {
+      shell: Operation.shell_header ;
+      protocol_data: operation_data ;
+    }
     val acceptable_passes: operation -> int list
     val compare_operations: operation -> operation -> int
     type validation_state
@@ -71,13 +80,13 @@ module Make (Context : CONTEXT) = struct
     val precheck_block:
       ancestor_context: context ->
       ancestor_timestamp: Time.t ->
-      Block_header.t ->
+      block_header ->
       unit tzresult Lwt.t
     val begin_application:
       predecessor_context: context ->
       predecessor_timestamp: Time.t ->
       predecessor_fitness: Fitness.t ->
-      Block_header.t ->
+      block_header ->
       validation_state tzresult Lwt.t
     val begin_construction:
       predecessor_context: context ->
@@ -86,7 +95,7 @@ module Make (Context : CONTEXT) = struct
       predecessor_fitness: Fitness.t ->
       predecessor: Block_hash.t ->
       timestamp: Time.t ->
-      ?protocol_data: MBytes.t ->
+      ?protocol_data: block_header_data ->
       unit -> validation_state tzresult Lwt.t
     val apply_operation:
       validation_state -> operation -> validation_state tzresult Lwt.t
@@ -150,7 +159,10 @@ module Make (Context : CONTEXT) = struct
     val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
 
     module Lift (P : Updater.PROTOCOL) : PROTOCOL
-      with type operation = P.operation
+      with type block_header_data = P.block_header_data
+       and type block_header = P.block_header
+       and type operation_data = P.operation_data
+       and type operation = P.operation
        and type validation_state = P.validation_state
 
     class ['block] proto_rpc_context :
@@ -642,7 +654,6 @@ module Make (Context : CONTEXT) = struct
       let apply_operation c o =
         apply_operation c o >|= wrap_error
       let finalize_block c = finalize_block c >|= wrap_error
-      let parse_operation h b = parse_operation h b |> wrap_error
       let init c bh = init c bh >|= wrap_error
     end
 

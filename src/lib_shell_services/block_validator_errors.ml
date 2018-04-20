@@ -30,6 +30,7 @@ type block_error =
   | Unallowed_pass of { operation: Operation_hash.t ;
                         pass: int ;
                         allowed_pass: int list }
+  | Cannot_parse_block_header
 
 let block_error_encoding =
   let open Data_encoding in
@@ -213,6 +214,8 @@ let pp_block_error ppf = function
         \ while only the following passes are allowed: @[<h>%a@]"
         Operation_hash.pp_short operation pass
         Format.(pp_print_list pp_print_int) allowed_pass
+  | Cannot_parse_block_header ->
+      Format.fprintf ppf "Failed to parse the block header."
 
 type error +=
   | Invalid_block of

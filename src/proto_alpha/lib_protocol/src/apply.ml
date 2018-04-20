@@ -625,7 +625,7 @@ let apply_anonymous_operation ctxt kind =
       add_rewards ctxt seed_nonce_revelation_tip >>=? fun ctxt ->
       return (ctxt, Seed_nonce_revelation_result [(* FIXME *)])
   | Double_endorsement_evidence { op1 ; op2 } -> begin
-      match op1.contents, op2.contents with
+      match op1.protocol_data.contents, op2.protocol_data.contents with
       | Sourced_operation (Consensus_operation (Endorsements e1)),
         Sourced_operation (Consensus_operation (Endorsements e2))
         when Raw_level.(e1.level = e2.level) &&
@@ -682,10 +682,10 @@ let apply_anonymous_operation ctxt kind =
              last = oldest_level }) >>=? fun () ->
       let level = Level.from_raw ctxt raw_level in
       Roll.baking_rights_owner
-        ctxt level ~priority:bh1.protocol_data.priority >>=? fun delegate1 ->
+        ctxt level ~priority:bh1.protocol_data.contents.priority >>=? fun delegate1 ->
       Baking.check_signature bh1 delegate1 >>=? fun () ->
       Roll.baking_rights_owner
-        ctxt level ~priority:bh2.protocol_data.priority >>=? fun delegate2 ->
+        ctxt level ~priority:bh2.protocol_data.contents.priority >>=? fun delegate2 ->
       Baking.check_signature bh2 delegate2 >>=? fun () ->
       fail_unless
         (Signature.Public_key.equal delegate1 delegate2)
@@ -717,7 +717,7 @@ let apply_anonymous_operation ctxt kind =
 
 let apply_operation ctxt mode pred_block hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash  in
-  begin match operation.contents with
+  begin match operation.protocol_data.contents with
     | Anonymous_operations ops ->
         fold_left_s
           (fun (ctxt, acc) op ->
@@ -759,9 +759,6 @@ let may_start_new_cycle ctxt =
       return ctxt
 
 let begin_full_construction ctxt pred_timestamp protocol_data =
-  Lwt.return
-    (Block_header.parse_unsigned_protocol_data
-       protocol_data) >>=? fun protocol_data ->
   Baking.check_baking_rights
     ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
   let delegate_pkh = Signature.Public_key.hash delegate_pk in
@@ -778,10 +775,10 @@ let begin_application ctxt block_header pred_timestamp =
   Baking.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
   Baking.check_baking_rights
-    ctxt block_header.protocol_data pred_timestamp >>=? fun delegate_pk ->
+    ctxt block_header.protocol_data.contents pred_timestamp >>=? fun delegate_pk ->
   Baking.check_signature block_header delegate_pk >>=? fun () ->
   let has_commitment =
-    match block_header.protocol_data.seed_nonce_hash with
+    match block_header.protocol_data.contents.seed_nonce_hash with
     | None -> false
     | Some _ -> true in
   fail_unless
@@ -790,7 +787,7 @@ let begin_application ctxt block_header pred_timestamp =
        { expected = current_level.expected_commitment }) >>=? fun () ->
   let delegate_pkh = Signature.Public_key.hash delegate_pk in
   Baking.freeze_baking_deposit ctxt
-    block_header.protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
+    block_header.protocol_data.contents delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, delegate_pk, deposit)
 
@@ -818,7 +815,7 @@ let finalize_application ctxt protocol_data delegate =
   return ctxt
 
 let compare_operations op1 op2 =
-  match op1.contents, op2.contents with
+  match op1.protocol_data.contents, op2.protocol_data.contents with
   | Anonymous_operations _, Anonymous_operations _ -> 0
   | Anonymous_operations _, Sourced_operation _ -> -1
   | Sourced_operation _, Anonymous_operations _ -> 1

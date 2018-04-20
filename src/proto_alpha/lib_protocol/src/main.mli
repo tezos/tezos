@@ -19,7 +19,7 @@ type validation_mode =
     }
   | Full_construction of {
       predecessor : Block_hash.t ;
-      protocol_data : Alpha_context.Block_header.protocol_data ;
+      protocol_data : Alpha_context.Block_header.contents ;
       baker : Alpha_context.public_key_hash ;
     }
 
@@ -30,5 +30,8 @@ type validation_state =
     deposit : Alpha_context.Tez.t ;
   }
 
-include Updater.PROTOCOL with type operation = Alpha_context.Operation.t
+include Updater.PROTOCOL with type block_header_data = Alpha_context.Block_header.protocol_data
+                          and type block_header = Alpha_context.Block_header.t
+                          and type operation_data = Alpha_context.Operation.protocol_data
+                          and type operation = Alpha_context.operation
                           and type validation_state := validation_state

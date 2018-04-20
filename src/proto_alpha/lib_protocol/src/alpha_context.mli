@@ -683,10 +683,14 @@ module Block_header : sig
   type t = {
     shell: Block_header.shell_header ;
     protocol_data: protocol_data ;
-    signature: Signature.t ;
   }
 
   and protocol_data = {
+    contents: contents ;
+    signature: Signature.t ;
+  }
+
+  and contents = {
     priority: int ;
     seed_nonce_hash: Nonce_hash.t option ;
     proof_of_work_nonce: MBytes.t ;
@@ -702,39 +706,27 @@ module Block_header : sig
 
   val encoding: block_header Data_encoding.encoding
   val raw_encoding: raw Data_encoding.t
+  val contents_encoding: contents Data_encoding.t
+  val unsigned_encoding: (shell_header * contents) Data_encoding.t
   val protocol_data_encoding: protocol_data Data_encoding.encoding
   val shell_header_encoding: shell_header Data_encoding.encoding
 
   val max_header_length: int
   (** The maximum size of block headers in bytes *)
 
-  val parse: Block_header.t -> block_header tzresult
-  (** Parse the protocol-specific part of a block header. *)
-
-  val parse_unsigned_protocol_data: MBytes.t -> protocol_data tzresult
-  (** Parse the (unsigned) protocol-specific part of a block header. *)
-
-  val forge_unsigned_protocol_data: protocol_data -> MBytes.t
-  (** [forge_header proto_hdr] is the binary serialization
-      (using [protocol_data_encoding]) of the protocol-specific part
-      of a block header, without the signature. *)
-
-  val forge_unsigned:
-    Block_header.shell_header -> protocol_data -> MBytes.t
-    (** [forge_header shell_hdr proto_hdr] is the binary serialization
-        (using [unsigned_header_encoding]) of a block header,
-        comprising both the shell and the protocol part of the header,
-        without the signature. *)
-
 end
 
 type operation = {
   shell: Operation.shell_header ;
-  contents: proto_operation ;
-  signature: signature option ;
+  protocol_data: protocol_data ;
 }
 
-and proto_operation =
+and protocol_data = {
+  contents: contents ;
+  signature: Signature.t option ;
+}
+
+and contents =
   | Anonymous_operations of anonymous_operation list
   | Sourced_operation of sourced_operation
 
@@ -822,36 +814,34 @@ type internal_operation = {
 
 module Operation : sig
 
+  type nonrec contents = contents
+  val contents_encoding: contents Data_encoding.t
+
+  type nonrec protocol_data = protocol_data
+  val protocol_data_encoding: protocol_data Data_encoding.t
+  val unsigned_encoding: (Operation.shell_header * contents) Data_encoding.t
+
   type raw = Operation.t = {
     shell: Operation.shell_header ;
     proto: MBytes.t ;
   }
   val raw_encoding: raw Data_encoding.t
 
-  type t = operation
+  type t = operation = {
+    shell: Operation.shell_header ;
+    protocol_data: protocol_data ;
+  }
   val encoding: operation Data_encoding.t
 
   val hash: operation -> Operation_hash.t
   val hash_raw: raw -> Operation_hash.t
 
-  type error += Cannot_parse_operation (* `Branch *)
-  val parse: Operation.t -> operation tzresult
   val acceptable_passes: operation -> int list
-
-  val parse_proto:
-    MBytes.t -> (proto_operation * signature option) tzresult Lwt.t
 
   type error += Missing_signature (* `Permanent *)
   type error += Invalid_signature (* `Permanent *)
 
   val check_signature: public_key -> operation -> unit tzresult Lwt.t
-
-  val forge: Operation.shell_header -> proto_operation -> MBytes.t
-
-  val proto_operation_encoding: proto_operation Data_encoding.t
-
-  val unsigned_operation_encoding:
-    (Operation.shell_header * proto_operation) Data_encoding.t
 
   val internal_operation_encoding: internal_operation Data_encoding.t
 

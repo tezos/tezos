@@ -108,27 +108,39 @@ let sign src oph protop =
         Some Signature.Endorsement
     | _ ->
         Some Generic_operation in
-  let bytes = Operation.forge oph protop in
-  match src with
-  | None -> bytes, None
-  | Some src ->
-      let signature =
-        Signature.sign ?watermark src.Helpers_account.ppk bytes in
-      Signature.concat bytes signature, Some signature
+  let signature =
+    match src with
+    | None -> None
+    | Some src ->
+        let contents =
+          Data_encoding.Binary.to_bytes_exn
+            Operation.unsigned_encoding (oph, protop) in
+        Some (Signature.sign ?watermark src.Helpers_account.ppk contents) in
+  let proto_bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Operation.protocol_data_encoding
+      { contents = protop ; signature } in
+  (proto_bytes, signature)
 
 let main_of_proto (src: Helpers_account.t) operation_header protocol_operation =
   let (proto,_) = sign (Some src) operation_header protocol_operation in
   let data_operation: Tezos_base.Operation.t =
     {shell = operation_header ; proto} in
   let hash = Tezos_base.Operation.hash data_operation in
-  Proto_alpha.Main.parse_operation hash data_operation >>? fun op ->
-  ok (op, hash)
+  match Data_encoding.Binary.of_bytes
+          Operation.protocol_data_encoding proto with
+  | None ->
+      Error []
+  | Some op ->
+      ok ({ shell = operation_header ; protocol_data = op }, hash)
 
 let apply_of_proto
     (source: Helpers_account.t option) operation_header protocol_operation =
   let (_proto, signature) = sign source operation_header protocol_operation in
   {
     shell = operation_header ;
-    contents = protocol_operation ;
-    signature
+    protocol_data = {
+      contents = protocol_operation ;
+      signature
+    }
   }

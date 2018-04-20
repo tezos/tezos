@@ -14,7 +14,7 @@ open Alpha_context
 
 val operation :
   tc:context -> ?src:Helpers_account.t ->
-  Block_hash.t -> Tezos_base.Operation.shell_header -> proto_operation ->
+  Block_hash.t -> Tezos_base.Operation.shell_header -> Operation.contents ->
   (Contract.contract list * context) proto_tzresult Lwt.t
 
 val transaction :

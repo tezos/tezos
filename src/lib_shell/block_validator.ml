@@ -142,15 +142,31 @@ let apply_block
     operations Proto.validation_passes >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
   check_liveness chain_state pred hash operation_hashes operations >>=? fun () ->
-  mapi2_s (fun pass -> map2_s begin fun op_hash raw ->
-      Lwt.return (Proto.parse_operation op_hash raw)
-      |> trace (invalid_block hash (Cannot_parse_operation op_hash)) >>=? fun op ->
-      let allowed_pass = Proto.acceptable_passes op in
-      fail_unless (List.mem pass allowed_pass)
-        (invalid_block hash
-           (Unallowed_pass { operation = op_hash ;
-                             pass ; allowed_pass } )) >>=? fun () ->
-      return op
+  begin
+    match
+      Data_encoding.Binary.of_bytes
+        Proto.block_header_data_encoding
+        header.protocol_data with
+    | None ->
+        fail (invalid_block hash Cannot_parse_block_header)
+    | Some protocol_data ->
+        return ({ shell = header.shell ; protocol_data } : Proto.block_header)
+  end >>=? fun header ->
+  mapi2_s (fun pass -> map2_s begin fun op_hash op ->
+      match
+        Data_encoding.Binary.of_bytes
+          Proto.operation_data_encoding
+          op.Operation.proto with
+      | None ->
+          fail (invalid_block hash (Cannot_parse_operation op_hash))
+      | Some protocol_data ->
+          let op = { Proto.shell = op.shell ; protocol_data } in
+          let allowed_pass = Proto.acceptable_passes op in
+          fail_unless (List.mem pass allowed_pass)
+            (invalid_block hash
+               (Unallowed_pass { operation = op_hash ;
+                                 pass ; allowed_pass } )) >>=? fun () ->
+          return op
     end)
     operation_hashes
     operations >>=? fun parsed_operations ->

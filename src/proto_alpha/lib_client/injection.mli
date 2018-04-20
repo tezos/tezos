@@ -18,7 +18,7 @@ val preapply:
   Block_services.block ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
-  proto_operation ->
+  Operation.contents ->
   result tzresult Lwt.t
 
 val inject_operation:
@@ -27,7 +27,7 @@ val inject_operation:
   ?confirmations:int ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
-  proto_operation ->
+  Operation.contents ->
   result tzresult Lwt.t
 
 val originated_contracts: operation_result -> Contract.t list tzresult

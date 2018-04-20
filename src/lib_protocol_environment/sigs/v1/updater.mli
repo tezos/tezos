@@ -67,13 +67,29 @@ module type PROTOCOL = sig
       operation's quota for each pass. *)
   val validation_passes: quota list
 
-  (** The version specific type of operations. *)
-  type operation
+  (** The version specific type of blocks. *)
+  type block_header_data
 
-  (** The parsing / preliminary validation function for
-      operations. Similar to {!parse_block}. *)
-  val parse_operation:
-    Operation_hash.t -> Operation.t -> operation tzresult
+  (** Encoding for version specific part of block headers.  *)
+  val block_header_data_encoding: block_header_data Data_encoding.t
+
+  (** A fully parsed block header. *)
+  type block_header = {
+    shell: Block_header.shell_header ;
+    protocol_data: block_header_data ;
+  }
+
+  (** The version specific type of operations. *)
+  type operation_data
+
+  (** Encoding for version specific part of operations.  *)
+  val operation_data_encoding: operation_data Data_encoding.t
+
+  (** A fully parsed operation. *)
+  type operation = {
+    shell: Operation.shell_header ;
+    protocol_data: operation_data ;
+  }
 
   (** The Validation passes in which an operation can appear.
       For instance [[0]] if it only belongs to the first pass.
@@ -106,7 +122,7 @@ module type PROTOCOL = sig
   val precheck_block:
     ancestor_context: Context.t ->
     ancestor_timestamp: Time.t ->
-    Block_header.t ->
+    block_header ->
     unit tzresult Lwt.t
 
   (** The first step in a block validation sequence. Initializes a
@@ -119,7 +135,7 @@ module type PROTOCOL = sig
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_fitness: Fitness.t ->
-    Block_header.t ->
+    block_header ->
     validation_state tzresult Lwt.t
 
   (** Initializes a validation context for constructing a new block
@@ -138,7 +154,7 @@ module type PROTOCOL = sig
     predecessor_fitness: Fitness.t ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
-    ?protocol_data: MBytes.t ->
+    ?protocol_data: block_header_data ->
     unit -> validation_state tzresult Lwt.t
 
   (** Called after {!begin_application} (or {!begin_construction}) and

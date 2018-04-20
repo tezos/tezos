@@ -9,6 +9,31 @@
 
 open Alpha_context
 
+type error +=
+  | Cannot_parse_operation (* `Branch *)
+  | Cant_parse_block_header
+
+let () =
+  register_error_kind
+    `Branch
+    ~id:"operation.cannot_parse"
+    ~title:"Cannot parse operation"
+    ~description:"The operation is ill-formed \
+                  or for another protocol version"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "The operation cannot be parsed")
+    Data_encoding.unit
+    (function Cannot_parse_operation -> Some () | _ -> None)
+    (fun () -> Cannot_parse_operation)
+
+let parse_operation (op: Operation.raw) =
+  match Data_encoding.Binary.of_bytes
+          Operation.protocol_data_encoding
+          op.proto with
+  | Some protocol_data ->
+      ok { shell = op.shell ; protocol_data }
+  | None -> error Cannot_parse_operation
+
 module S = struct
 
   open Data_encoding
@@ -135,13 +160,14 @@ module I = struct
   let apply_operation ctxt () (pred_block, hash, forged_operation, signature) =
     (* ctxt accept_failing_script baker_contract pred_block block_prio operation *)
     match Data_encoding.Binary.of_bytes
-            Operation.unsigned_operation_encoding
+            Operation.unsigned_encoding
             forged_operation with
-    | None -> Error_monad.fail Operation.Cannot_parse_operation
+    | None -> fail Cannot_parse_operation
     | Some (shell, contents) ->
-        let operation = { shell ; contents ; signature } in
-        Apply.apply_operation ctxt Readable pred_block hash operation
-        >>=? fun (_, result) -> return result
+        let operation = { shell ; protocol_data = { contents ; signature } } in
+        Apply.apply_operation
+          ctxt Readable pred_block hash operation >>=? fun (_, result) ->
+        return result
 
 end
 
@@ -259,7 +285,7 @@ module Forge = struct
       RPC_service.post_service
         ~description:"Forge an operation"
         ~query: RPC_query.empty
-        ~input: Operation.unsigned_operation_encoding
+        ~input: Operation.unsigned_encoding
         ~output:
           (obj1
              (req "operation" bytes))
@@ -289,11 +315,13 @@ module Forge = struct
   let () =
     let open Services_registration in
     register0_noctxt S.operations begin fun () (shell, proto) ->
-      return (Operation.forge shell proto)
+      return (Data_encoding.Binary.to_bytes_exn
+                Operation.unsigned_encoding (shell, proto))
     end ;
     register0_noctxt S.protocol_data begin fun ()
       (priority, seed_nonce_hash, proof_of_work_nonce) ->
-      return (Block_header.forge_unsigned_protocol_data
+      return (Data_encoding.Binary.to_bytes_exn
+                Block_header.contents_encoding
                 { priority ; seed_nonce_hash ; proof_of_work_nonce })
     end
 
@@ -489,37 +517,47 @@ module Parse = struct
                 Roll.delegate_pubkey ctxt manager
           end >>=? fun public_key ->
           Operation.check_signature public_key
-            { signature ; shell ; contents }
+            { shell ; protocol_data = { contents ; signature } }
       | Sourced_operation (Consensus_operation (Endorsements { level ; slots ; _ })) ->
           let level = Level.from_raw ctxt level in
           Baking.check_endorsements_rights ctxt level slots >>=? fun public_key ->
           Operation.check_signature public_key
-            { signature ; shell ; contents }
+            { shell ; protocol_data = { contents ; signature } }
       | Sourced_operation (Amendment_operation { source ; _ }) ->
           Roll.delegate_pubkey ctxt source >>=? fun source ->
           Operation.check_signature source
-            { signature ; shell ; contents }
+            { shell ; protocol_data = { contents ; signature } }
       | Sourced_operation (Dictator_operation _) ->
           let key = Constants.dictator_pubkey ctxt in
           Operation.check_signature key
-            { signature ; shell ; contents }
+            { shell ; protocol_data = { contents ; signature } }
 
   end
+
+  let parse_protocol_data protocol_data =
+    match
+      Data_encoding.Binary.of_bytes
+        Block_header.protocol_data_encoding
+        protocol_data
+    with
+    | None -> failwith "Cant_parse_protocol_data"
+    | Some protocol_data -> return protocol_data
 
   let () =
     let open Services_registration in
     register0 S.operations begin fun ctxt () (operations, check) ->
       map_s begin fun raw ->
-        Lwt.return (Operation.parse raw) >>=? fun op ->
+        Lwt.return (parse_operation raw) >>=? fun op ->
         begin match check with
-          | Some true -> I.check_signature ctxt op.signature op.shell op.contents
+          | Some true ->
+              I.check_signature ctxt
+                op.protocol_data.signature op.shell op.protocol_data.contents
           | Some false | None -> return ()
         end >>|? fun () -> op
       end operations
     end ;
     register0_noctxt S.block begin fun () raw_block ->
-      Lwt.return (Block_header.parse raw_block) >>=? fun { protocol_data ; _ } ->
-      return protocol_data
+      parse_protocol_data raw_block.protocol_data
     end
 
   let operations ctxt block ?check operations =

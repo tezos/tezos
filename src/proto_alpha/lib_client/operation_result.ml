@@ -134,7 +134,8 @@ let pp_balance_updates ppf = function
       Format.fprintf ppf "@[<v 0>%a@]"
         (Format.pp_print_list pp_one) balance_updates
 
-let pp_operation_result ppf ({ contents ; _ }, operation_result) =
+let pp_operation_result ppf
+    ({ protocol_data = { contents ; _ } }, operation_result) =
   Format.fprintf ppf "@[<v 0>" ;
   begin match contents, operation_result with
     | Anonymous_operations ops, Anonymous_operations_result rs ->

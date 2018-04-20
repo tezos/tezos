@@ -7,14 +7,24 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type operation = Operation_hash.t
-let max_operation_data_length = 42
+type block_header_data = MBytes.t
+type block_header = {
+  shell : Block_header.shell_header ;
+  protocol_data : block_header_data ;
+}
+let block_header_data_encoding =
+  Data_encoding.(obj1 (req "random_data" Variable.bytes))
+
+type operation_data = unit
+type operation = {
+  shell : Operation.shell_header ;
+  protocol_data : operation_data ;
+}
+let operation_data_encoding = Data_encoding.unit
 
 let max_block_length = 42
 let validation_passes = []
 let acceptable_passes _op = []
-
-let parse_operation h _ = Ok h
 
 let compare_operations _ _ = 0
 
@@ -57,16 +67,15 @@ end
 let precheck_block
     ~ancestor_context:_
     ~ancestor_timestamp:_
-    raw_block =
-  Fitness.to_int64 raw_block.Block_header.shell.fitness >>=? fun _ ->
+    (_raw_block : block_header) =
   return ()
 
 let begin_application
     ~predecessor_context:context
     ~predecessor_timestamp:_
     ~predecessor_fitness:_
-    raw_block =
-  Fitness.to_int64 raw_block.Block_header.shell.fitness >>=? fun fitness ->
+    (raw_block : block_header) =
+  Fitness.to_int64 raw_block.shell.fitness >>=? fun fitness ->
   return { context ; fitness }
 
 let begin_construction

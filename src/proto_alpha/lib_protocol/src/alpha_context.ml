@@ -27,7 +27,11 @@ end
 
 include Operation_repr
 module Operation = struct
-  type t = operation
+  type t = operation = {
+    shell: Operation.shell_header ;
+    protocol_data: protocol_data ;
+  }
+  let unsigned_encoding = unsigned_operation_encoding
   include Operation_repr
 end
 module Block_header = Block_header_repr

@@ -13,12 +13,13 @@ open Error_monad
 type shell_header = Block_header.shell_header
 type tezos_header = Block_header.t
 type protocol_data = Proto_alpha.Alpha_context.Block_header.protocol_data
+type contents = Proto_alpha.Alpha_context.Block_header.contents
 type operation_header = Operation.shell_header
 
 type init_block = {
   pred_block_hash : Block_hash.t ;
   pred_shell_header : shell_header ;
-  protocol_data : protocol_data ;
+  protocol_data : contents ;
   op_header : operation_header ;
   sourced_operations : (Proto_alpha.Main.operation * Helpers_account.t) list ;
   operation_hashs : Operation_hash.t list ;
@@ -40,7 +41,7 @@ let get_op_header_res (res : result) : operation_header = {
   branch = res.hash
 }
 
-let get_protocol_data priority commit : protocol_data = {
+let get_protocol_data priority commit : Alpha_context.Block_header.contents = {
   priority ;
   proof_of_work_nonce = Helpers_crypto.generate_proof_of_work_nonce ();
   seed_nonce_hash =
@@ -68,7 +69,8 @@ let init (pred_shell_header : shell_header) pred_block_hash
   let (sourced_operations, operation_hashs) = List.split src_ops_hashs in
   let protocol_data = get_protocol_data priority true in
   let protocol_data_bytes =
-    Proto_alpha.Alpha_context.Block_header.forge_unsigned_protocol_data
+    Data_encoding.Binary.to_bytes_exn
+      Proto_alpha.Alpha_context.Block_header.contents_encoding
       protocol_data
   in
   let timestamp =
@@ -155,7 +157,9 @@ let begin_construction_pre (init_block: init_block) =
     ~predecessor_fitness: init_block.pred_shell_header.fitness
     ~predecessor: init_block.pred_block_hash
     ~timestamp: init_block.timestamp
-    ~protocol_data: init_block.protocol_data_bytes
+    ~protocol_data:
+      (Alpha_context.Block_header.{ contents = init_block.protocol_data ;
+                                    signature = Signature.zero })
     ()
 
 

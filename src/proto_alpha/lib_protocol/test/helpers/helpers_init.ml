@@ -76,7 +76,7 @@ let main () =
   } in
   let protocol_data =
     Data_encoding.Binary.to_bytes_exn
-      Alpha_context.Block_header.protocol_data_encoding
+      Alpha_context.Block_header.contents_encoding
       (Helpers_block.get_protocol_data 0 true) in
   let tezos_header = { Block_header.shell = header ; protocol_data } in
   Proto_alpha.init context header >>=? fun validation ->

@@ -39,7 +39,7 @@ val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
     funds to claim baking rights. *)
 val freeze_baking_deposit:
   context ->
-  Block_header.protocol_data ->
+  Block_header.contents ->
   public_key_hash ->
   (context * Tez.t) tzresult Lwt.t
 
@@ -58,7 +58,7 @@ val freeze_endorsement_deposit:
     * the deposit have been payed if the slot is below [Constants.first_free_baking_slot].
 *)
 val check_baking_rights:
-  context -> Block_header.protocol_data -> Time.t ->
+  context -> Block_header.contents -> Time.t ->
   public_key tzresult Lwt.t
 
 (** [check_endorsements_rights c slots]:
@@ -108,7 +108,7 @@ val check_signature: Block_header.t -> public_key -> unit tzresult Lwt.t
     is does not impact the proof-of-work stamp. The stamp is checked on
     the hash of a block header whose signature has been zeroed-out. *)
 val check_header_proof_of_work_stamp:
-  Block_header.shell_header -> Block_header.protocol_data -> int64 -> bool
+  Block_header.shell_header -> Block_header.contents -> int64 -> bool
 
 (** verify if the proof of work stamp is valid *)
 val check_proof_of_work_stamp:

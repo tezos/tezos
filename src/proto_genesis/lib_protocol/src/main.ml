@@ -32,17 +32,31 @@ let () =
     (function Invalid_signature -> Some () | _ -> None)
     (fun () -> Invalid_signature)
 
-type operation = unit
-let parse_operation _h _op = Error []
+type operation_data = unit
+type operation = {
+  shell: Operation.shell_header ;
+  protocol_data: operation_data ;
+}
+let operation_data_encoding = Data_encoding.unit
+
 let acceptable_passes _op = []
 let compare_operations _ _ = 0
 let validation_passes = []
 
-type block = {
-  shell: Block_header.shell_header ;
+type block_header_data = {
   command: Data.Command.t ;
   signature: Signature.t ;
 }
+type block_header = {
+  shell: Block_header.shell_header ;
+  protocol_data: block_header_data ;
+}
+
+let block_header_data_encoding =
+  Data_encoding.conv
+    (fun { command ; signature } -> (command, signature))
+    (fun (command, signature) ->  { command ; signature })
+    Data.Command.signed_encoding
 
 let max_block_length =
   Data_encoding.Binary.length
@@ -51,14 +65,7 @@ let max_block_length =
                           delay = 0L })
   + Signature.size
 
-let parse_block { Block_header.shell ; protocol_data } : block tzresult =
-  match
-    Data_encoding.Binary.of_bytes Data.Command.signed_encoding protocol_data
-  with
-  | None -> Error [Parsing_error]
-  | Some (command, signature) -> Ok { shell ; command ; signature }
-
-let check_signature ctxt { shell ; command ; signature } =
+let check_signature ctxt { shell ; protocol_data = { command ; signature } } =
   let bytes = Data.Command.forge shell command in
   Data.Pubkey.get_pubkey ctxt >>= fun public_key ->
   fail_unless
@@ -73,8 +80,7 @@ let current_context ({ context ; _ } : validation_state) =
 let precheck_block
     ~ancestor_context:_
     ~ancestor_timestamp:_
-    raw_block =
-  Lwt.return (parse_block raw_block) >>=? fun _ ->
+    _block_header =
   return ()
 
 (* temporary hardcoded key to be removed... *)
@@ -106,12 +112,11 @@ let begin_application
     ~predecessor_context:ctxt
     ~predecessor_timestamp:_
     ~predecessor_fitness:_
-    raw_block =
+    block_header =
   Data.Init.check_inited ctxt >>=? fun () ->
-  Lwt.return (parse_block raw_block) >>=? fun block ->
-  check_signature ctxt block >>=? fun () ->
-  prepare_application ctxt block.command
-    block.shell.level block.shell.timestamp block.shell.fitness
+  check_signature ctxt block_header >>=? fun () ->
+  prepare_application ctxt block_header.protocol_data.command
+    block_header.shell.level block_header.shell.timestamp block_header.shell.fitness
 
 let begin_construction
     ~predecessor_context:ctxt
@@ -130,12 +135,9 @@ let begin_construction
                max_operation_data_length = 0 ;
                last_allowed_fork_level = 0l ;
              }
-  | Some command ->
-      match Data_encoding.Binary.of_bytes Data.Command.encoding command with
-      | None -> failwith "Failed to parse proto header"
-      | Some command ->
-          Data.Init.check_inited ctxt >>=? fun () ->
-          prepare_application ctxt command level timestamp fitness
+  | Some { command ; _ }->
+      Data.Init.check_inited ctxt >>=? fun () ->
+      prepare_application ctxt command level timestamp fitness
 
 let apply_operation _vctxt _ =
   Lwt.return (Error []) (* absurd *)

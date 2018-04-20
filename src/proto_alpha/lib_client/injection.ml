@@ -31,7 +31,7 @@ let preapply
   get_branch cctxt block branch >>=? fun branch ->
   let bytes =
     Data_encoding.Binary.to_bytes_exn
-      Operation.unsigned_operation_encoding
+      Operation.unsigned_encoding
       ({ branch }, contents) in
   let watermark =
     match contents with
@@ -49,8 +49,7 @@ let preapply
   end >>=? fun signature ->
   let op =
     { shell = { branch } ;
-      contents ;
-      signature } in
+      protocol_data = { contents ; signature } } in
   let oph = Operation.hash op in
   Block_services.hash cctxt block >>=? fun bh ->
   Alpha_services.Helpers.apply_operation cctxt

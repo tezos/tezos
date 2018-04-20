@@ -9,9 +9,22 @@
 
 (* Tezos Protocol Implementation - Protocol Signature Instance *)
 
-type operation = Alpha_context.operation
+type block_header_data = Alpha_context.Block_header.protocol_data
+type block_header = Alpha_context.Block_header.t = {
+  shell: Block_header.shell_header ;
+  protocol_data: block_header_data ;
+}
 
-let parse_operation _hash op = Alpha_context.Operation.parse op
+let block_header_data_encoding = Alpha_context.Block_header.protocol_data_encoding
+
+type operation_data = Alpha_context.Operation.protocol_data
+type operation = Alpha_context.Operation.t = {
+  shell: Operation.shell_header ;
+  protocol_data: operation_data ;
+}
+
+let operation_data_encoding = Alpha_context.Operation.protocol_data_encoding
+
 let acceptable_passes = Alpha_context.Operation.acceptable_passes
 
 let max_block_length =
@@ -36,7 +49,7 @@ type validation_mode =
     }
   | Full_construction of {
       predecessor : Block_hash.t ;
-      protocol_data : Alpha_context.Block_header.protocol_data ;
+      protocol_data : Alpha_context.Block_header.contents ;
       baker : Alpha_context.public_key_hash ;
     }
 
@@ -53,17 +66,15 @@ let current_context { ctxt ; _ } =
 let precheck_block
     ~ancestor_context:_
     ~ancestor_timestamp:_
-    raw_block =
-  Lwt.return (Alpha_context.Block_header.parse raw_block) >>=? fun _ ->
-  (* TODO: decide what other properties should be checked *)
+    _block_header =
+  (* TODO: decide what properties should be checked *)
   return ()
 
 let begin_application
     ~predecessor_context:ctxt
     ~predecessor_timestamp:pred_timestamp
     ~predecessor_fitness:pred_fitness
-    raw_block =
-  Lwt.return (Alpha_context.Block_header.parse raw_block) >>=? fun block_header ->
+    (block_header : Alpha_context.Block_header.t) =
   let level = block_header.shell.level in
   let fitness = pred_fitness in
   let timestamp = block_header.shell.timestamp in
@@ -80,7 +91,7 @@ let begin_construction
     ~predecessor_fitness:pred_fitness
     ~predecessor
     ~timestamp
-    ?protocol_data
+    ?(protocol_data : block_header_data option)
     () =
   let level = Int32.succ pred_level in
   let fitness = pred_fitness in
@@ -94,7 +105,7 @@ let begin_construction
     | Some proto_header ->
         Apply.begin_full_construction
           ctxt pred_timestamp
-          proto_header >>=? fun (ctxt, protocol_data, baker, deposit) ->
+          proto_header.contents >>=? fun (ctxt, protocol_data, baker, deposit) ->
         let mode =
           let baker = Signature.Public_key.hash baker in
           Full_construction { predecessor ; baker ; protocol_data } in
@@ -121,7 +132,7 @@ let finalize_block { mode ; ctxt ; op_count ; deposit = _ } =
       let ctxt = Alpha_context.finalize ctxt in
       return ctxt
   | Application
-      { baker ;  block_header = { protocol_data ; _ } }
+      { baker ;  block_header = { protocol_data = { contents = protocol_data ; _ } ; _ } }
   | Full_construction { protocol_data ; baker ; _ } ->
       Apply.finalize_application ctxt protocol_data baker >>=? fun ctxt ->
       let { level ; _ } : Alpha_context.Level.t =

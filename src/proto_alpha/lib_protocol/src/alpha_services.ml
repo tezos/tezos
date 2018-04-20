@@ -51,6 +51,25 @@ module S = struct
 
 end
 
+let parse_operation (op: Operation.raw) =
+  match Data_encoding.Binary.of_bytes
+          Operation.protocol_data_encoding
+          op.proto with
+  | Some protocol_data ->
+      ok { shell = op.shell ; protocol_data }
+  | None -> error Helpers_services.Cannot_parse_operation
+
+let parse_block_header
+    ({ shell ; protocol_data } : Block_header.raw) : Block_header.t tzresult =
+  match
+    Data_encoding.Binary.of_bytes
+      Block_header.protocol_data_encoding
+      protocol_data
+  with
+  | None -> Error [Helpers_services.Cant_parse_block_header]
+  | Some protocol_data -> Ok { shell ; protocol_data }
+
+
 let () =
   let open Services_registration in
   register0_fullctxt S.operations begin fun ctxt () () ->
@@ -58,21 +77,21 @@ let () =
     ctxt.operations () >>= fun operations ->
     map2_s
       (map2_s (fun h op ->
-           Lwt.return (Operation.parse op) >>=? fun op ->
+           Lwt.return (parse_operation op) >>=? fun op ->
            return (h, op)))
       operation_hashes operations
   end ;
   register0_fullctxt S.header begin fun { block_header ; _ } () () ->
-    Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
+    Lwt.return (parse_block_header block_header) >>=? fun block_header ->
     return block_header
   end ;
   register0_fullctxt S.priority begin fun { block_header ; _ } () () ->
-    Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
-    return block_header.protocol_data.priority
+    Lwt.return (parse_block_header block_header) >>=? fun block_header ->
+    return block_header.protocol_data.contents.priority
   end ;
   opt_register0_fullctxt S.seed_nonce_hash begin fun { block_header ; _ } () ( )->
-    Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
-    return block_header.protocol_data.seed_nonce_hash
+    Lwt.return (parse_block_header block_header) >>=? fun block_header ->
+    return block_header.protocol_data.contents.seed_nonce_hash
   end
 
 let operations ctxt block =

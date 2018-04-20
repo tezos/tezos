@@ -18,11 +18,15 @@ val raw_encoding: raw Data_encoding.t
 
 type operation = {
   shell: Operation.shell_header ;
-  contents: proto_operation ;
+  protocol_data: protocol_data ;
+}
+
+and protocol_data = {
+  contents: contents ;
   signature: Signature.t option ;
 }
 
-and proto_operation =
+and contents =
   | Anonymous_operations of anonymous_operation list
   | Sourced_operation of sourced_operation
 
@@ -102,20 +106,15 @@ and dictator_operation =
 
 and counter = Int32.t
 
-type error += Cannot_parse_operation (* `Branch *)
-
 val encoding: operation Data_encoding.t
+val contents_encoding: contents Data_encoding.t
+val protocol_data_encoding: protocol_data Data_encoding.t
+val unsigned_operation_encoding: (Operation.shell_header * contents) Data_encoding.t
 
 val hash_raw: raw -> Operation_hash.t
 val hash: operation -> Operation_hash.t
 
-val parse: Operation.t -> operation tzresult
-
 val acceptable_passes: operation -> int list
-
-val parse_proto:
-  MBytes.t ->
-  (proto_operation * Signature.t option) tzresult Lwt.t
 
 type error += Missing_signature (* `Permanent *)
 type error += Invalid_signature (* `Permanent *)
@@ -123,14 +122,6 @@ type error += Invalid_signature (* `Permanent *)
 
 val check_signature:
   Signature.Public_key.t -> operation -> unit tzresult Lwt.t
-
-val forge: Operation.shell_header -> proto_operation -> MBytes.t
-
-val proto_operation_encoding:
-  proto_operation Data_encoding.t
-
-val unsigned_operation_encoding:
-  (Operation.shell_header * proto_operation) Data_encoding.t
 
 type internal_operation = {
   source: Contract_repr.contract ;

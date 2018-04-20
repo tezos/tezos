@@ -82,6 +82,18 @@ let start_prevalidation
   Context.reset_test_chain
     predecessor_context predecessor
     timestamp >>= fun predecessor_context ->
+  begin
+    match protocol_data with
+    | None -> return None
+    | Some protocol_data ->
+        match
+          Data_encoding.Binary.of_bytes
+            Proto.block_header_data_encoding
+            protocol_data
+        with
+        | None -> failwith "Invalid block header"
+        | Some protocol_data -> return (Some protocol_data)
+  end >>=? fun protocol_data ->
   Proto.begin_construction
     ~predecessor_context
     ~predecessor_timestamp
@@ -105,7 +117,13 @@ let prevalidate
   let ops =
     List.map
       (fun (h, op) ->
-         (h, op, Proto.parse_operation h op |> record_trace Parse_error))
+         let parsed_op =
+           match Data_encoding.Binary.of_bytes
+                   Proto.operation_data_encoding
+                   op.Operation.proto with
+           | None -> error Parse_error
+           | Some protocol_data -> Ok ({ shell = op.shell ; protocol_data }: Proto.operation) in
+         (h, op, parsed_op))
       ops in
   let invalid_ops =
     List.filter_map

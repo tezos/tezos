@@ -9,6 +9,10 @@
 
 open Alpha_context
 
+type error +=
+  | Cannot_parse_operation (* `Branch *)
+  | Cant_parse_block_header
+
 val minimal_time:
   'a #RPC_context.simple ->
   ?priority:int -> 'a -> Time.t shell_tzresult Lwt.t

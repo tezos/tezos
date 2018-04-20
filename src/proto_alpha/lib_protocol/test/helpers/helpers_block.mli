@@ -14,13 +14,14 @@ open Proto_alpha
 type shell_header = Block_header.shell_header
 type tezos_header = Block_header.t
 type protocol_data = Alpha_context.Block_header.protocol_data
+type contents = Proto_alpha.Alpha_context.Block_header.contents
 type operation_header = Operation.shell_header
 
 (** Block before application *)
 type init_block = {
   pred_block_hash : Block_hash.t;
   pred_shell_header : shell_header;
-  protocol_data : protocol_data;
+  protocol_data : contents;
   op_header : operation_header;
   sourced_operations :
     (Main.operation * Helpers_account.t) list;
@@ -40,20 +41,20 @@ type result = {
   tezos_context : Alpha_context.t;
 }
 val get_op_header_res : result -> operation_header
-val get_protocol_data : int -> bool -> protocol_data
+val get_protocol_data : int -> bool -> contents
 val get_op_header : Block_hash.t -> operation_header
 val make_sourced_operation :
   Operation.shell_header ->
-  Alpha_context.proto_operation *
+  Alpha_context.Operation.contents *
   Helpers_account.t ->
   ((Proto_alpha.Main.operation * Helpers_account.t) * Operation_hash.t) proto_tzresult
 val init :
   shell_header -> Block_hash.t -> Int32.t -> int ->
-  (Alpha_context.proto_operation * Helpers_account.t) list ->
+  (Alpha_context.Operation.contents * Helpers_account.t) list ->
   Context.t -> init_block proto_tzresult
 val init_of_result :
   ?priority:int -> res:result ->
-  ops:(Alpha_context.proto_operation * Helpers_account.t) list ->
+  ops:(Alpha_context.Operation.contents * Helpers_account.t) list ->
   init_block proto_tzresult
 val get_level : string option -> int32
 val get_header_hash :
@@ -64,11 +65,11 @@ val begin_construction_pre :
 val make : init_block -> result proto_tzresult Lwt.t
 val make_init :
   shell_header -> Block_hash.t -> Int32.t -> int ->
-  (Alpha_context.proto_operation * Helpers_account.t) list ->
+  (Alpha_context.Operation.contents * Helpers_account.t) list ->
   Context.t -> result proto_tzresult Lwt.t
 val of_res :
   ?priority:int ->
-  ?ops:(Alpha_context.proto_operation * Helpers_account.t) list ->
+  ?ops:(Alpha_context.Operation.contents * Helpers_account.t) list ->
   res:result ->
   unit -> result proto_tzresult Lwt.t
 val endorsement :
