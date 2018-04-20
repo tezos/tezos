@@ -203,14 +203,8 @@ module type SIGNATURE = sig
 
   val zero: t
 
-  (** Check a signature *)
-  val check: Public_key.t -> t -> MBytes.t -> bool
-
-  (** Append a signature *)
-  val append: Secret_key.t -> MBytes.t -> MBytes.t
-  val concat: MBytes.t -> t -> MBytes.t
-
   val sign: Secret_key.t -> MBytes.t -> t
+  val check: Public_key.t -> t -> MBytes.t -> bool
 
   val generate_key: unit -> (Public_key_hash.t * Public_key.t * Secret_key.t)
 

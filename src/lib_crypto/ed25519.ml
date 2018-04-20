@@ -265,12 +265,6 @@ let sign key msg = Sign.detached ~key msg
 let check public_key signature msg =
   Sign.verify_detached ~key:public_key ~signature msg
 
-let append key msg =
-  MBytes.concat msg (sign key msg)
-
-let concat msg signature =
-  MBytes.concat msg signature
-
 module Seed = struct
 
   type t = Bigstring.t
