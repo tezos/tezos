@@ -34,11 +34,11 @@ let parse_operation (op: Operation.raw) =
       ok { shell = op.shell ; protocol_data }
   | None -> error Cannot_parse_operation
 
+let custom_root = RPC_path.(open_root / "context" / "helpers")
+
 module S = struct
 
   open Data_encoding
-
-  let custom_root = RPC_path.(open_root / "helpers")
 
   type level_query = {
     offset: int32 ;
@@ -294,7 +294,7 @@ module Forge = struct
 
     open Data_encoding
 
-    let custom_root = RPC_path.(open_root / "helpers" / "forge")
+    let custom_root = RPC_path.(custom_root / "forge")
 
     let operations =
       RPC_service.post_service
@@ -490,7 +490,7 @@ module Parse = struct
 
     open Data_encoding
 
-    let custom_root = RPC_path.(open_root / "helpers" / "parse")
+    let custom_root = RPC_path.(custom_root / "parse")
 
     let operations =
       RPC_service.post_service

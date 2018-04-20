@@ -522,7 +522,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
     module Helpers = struct
 
-      let path = RPC_path.(path / "helpers")
+      let path = RPC_path.(path / "context" / "helpers")
 
       let preapply_result_encoding =
         obj2

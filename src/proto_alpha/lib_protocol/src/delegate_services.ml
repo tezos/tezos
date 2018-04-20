@@ -41,7 +41,7 @@ let info_encoding =
 
 module S = struct
 
-  let path = RPC_path.(open_root / "delegate")
+  let path = RPC_path.(open_root / "context" / "delegates")
 
   open Data_encoding
 
@@ -90,7 +90,7 @@ module S = struct
          this includes the frozen deposits, rewards and fees."
       ~query: RPC_query.empty
       ~output: Tez.encoding
-      RPC_path.(path / "change")
+      RPC_path.(path / "frozen_balance")
 
   let frozen_balances =
     RPC_service.get_service
@@ -275,7 +275,7 @@ module Baking_rights = struct
     open Data_encoding
 
     let custom_root =
-      RPC_path.(open_root / "helpers" / "baking_rights")
+      RPC_path.(open_root / "context" / "helpers" / "baking_rights")
 
     type baking_rights_query = {
       levels: Raw_level.t list ;
@@ -400,7 +400,7 @@ module Endorsing_rights = struct
     open Data_encoding
 
     let custom_root =
-      RPC_path.(open_root / "helpers" / "endorsing_rights")
+      RPC_path.(open_root / "context" / "helpers" / "endorsing_rights")
 
     type endorsing_rights_query = {
       levels: Raw_level.t list ;
