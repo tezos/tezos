@@ -165,6 +165,12 @@ module Public_key_hash = struct
       let encoding = encoding
     end)
 
+  let rpc_arg =
+    RPC_arg.like
+      rpc_arg
+      ~descr:"A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)"
+      "pkh"
+
 end
 
 module Public_key = struct

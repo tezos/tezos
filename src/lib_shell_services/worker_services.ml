@@ -69,16 +69,6 @@ module Peer_validators = struct
 
   module S = struct
 
-    let (peer_id_arg : P2p_peer.Id.t RPC_arg.t) =
-      RPC_arg.make
-        ~name:"peer_id"
-        ~descr:"The peer identifier of whom the prevalidator is responsible."
-        ~destruct:(fun s -> try
-                      Ok (P2p_peer.Id.of_b58check_exn s)
-                    with Failure msg -> Error msg)
-        ~construct:P2p_peer.Id.to_b58check
-        ()
-
     let list =
       RPC_service.get_service
         ~description:"Lists the peer validator workers and their status."
@@ -88,7 +78,7 @@ module Peer_validators = struct
              (obj2
                 (req "peer_id" P2p_peer.Id.encoding)
                 (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))))
-        RPC_path.(root / "workers" / "peer_validators" /: Chain_services.chain_arg)
+        RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg / "peers_validators" )
 
     let state =
       RPC_service.get_service
@@ -99,7 +89,7 @@ module Peer_validators = struct
              Peer_validator_worker_state.Request.encoding
              Peer_validator_worker_state.Event.encoding
              RPC_error.encoding)
-        RPC_path.(root / "workers" / "peer_validators" /: Chain_services.chain_arg /: peer_id_arg)
+        RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg / "peers_validators" /: P2p_peer.Id.rpc_arg)
 
   end
 
