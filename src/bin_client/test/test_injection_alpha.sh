@@ -23,7 +23,7 @@ dictator_secret="edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
 protocol_version="Ps1ZDZdgRP4PFDkzmFpiYtE7gJHioavCMxC96i9zJsK6URwSXSJ"
 protocol_short="Ps1ZDZdgRP4PFD"
 
-$client bake for bootstrap1 -max-priority 512
+bake
 
 $client list understood protocols
 

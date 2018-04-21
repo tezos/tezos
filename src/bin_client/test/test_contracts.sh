@@ -9,8 +9,7 @@ source $test_dir/test_lib.inc.sh "$@"
 start_node 1
 activate_alpha
 
-sleep 2
-$client bake for bootstrap5 -max-priority 512
+bake
 
 key1=foo
 key2=bar
@@ -386,16 +385,12 @@ init_with_transfer $contract_dir/create_account.tz $key2 \
                    "\"$(get_contract_addr test_transfer_account1)\"" 1,000 bootstrap1
 $client transfer 100 from bootstrap1 to create_account \
            -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' | assert_in_output "New contract"
-$client bake for bootstrap1 -max-priority 512
-sleep 1
-
+bake
 
 # Creates a contract, transfers data to it and stores the data
 init_with_transfer $contract_dir/create_contract.tz $key2 \
                    "\"$(get_contract_addr test_transfer_account1)\"" 1,000 bootstrap1
-$client transfer 0 from bootstrap1 to create_contract -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
+bake_after $client transfer 0 from bootstrap1 to create_contract -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
 assert_storage_contains create_contract '"abcdefg"'
 
 # Test DEFAULT_ACCOUNT
@@ -433,52 +428,28 @@ assert_output $contract_dir/hash_consistency_checker.tz Unit \
 init_with_transfer $contract_dir/big_map_mem.tz $key1\
                    '(Pair { Elt 1 Unit ; Elt 2 Unit ; Elt 3 Unit } Unit)' \
                    100 bootstrap1
-$client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 False)'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
+bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 False)'
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 True)'
-$client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 True)'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
+bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 True)'
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 False)'
-$client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 True)'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
+bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 True)'
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 False)'
-$client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 True)'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
+bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 True)'
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 False)'
-$client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 False)'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
+bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 False)'
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 True)'
 
 init_with_transfer $contract_dir/big_map_get_add.tz $key1\
                    '(Pair { Elt 0 1 ; Elt 1 2 ; Elt 2 3 } Unit)' \
                    100 bootstrap1
 
-$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 (Some 2)) (Pair 200 (Some 2)))'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
-$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 200 None))'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
-$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 300 None))'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
-$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 None) (Pair 200 None))'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
-$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 (Some 2)) (Pair 0 (Some 1)))'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
-$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 400 (Some 1232)) (Pair 400 (Some 1232)))'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
-$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 401 (Some 0)) (Pair 400 (Some 1232)))'
-$client bake for bootstrap1 -max-priority 512
-sleep 1
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 (Some 2)) (Pair 200 (Some 2)))'
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 200 None))'
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 300 None))'
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 None) (Pair 200 None))'
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 (Some 2)) (Pair 0 (Some 1)))'
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 400 (Some 1232)) (Pair 400 (Some 1232)))'
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 401 (Some 0)) (Pair 400 (Some 1232)))'
 
 printf "\nEnd of test\n"
 

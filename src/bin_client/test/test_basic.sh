@@ -19,9 +19,7 @@ $client rpc call '/blocks/head/raw_context/delegates/?depth=2' | assert '{ "cont
 $client rpc call '/blocks/head/raw_context/non-existent?depth=-1' | assert 'No service found at this URL'
 $client rpc call '/blocks/head/raw_context/non-existent?depth=0' | assert 'No service found at this URL'
 
-
-$client bake for bootstrap1 -max-priority 512
-sleep 1
+bake
 
 key1=foo
 key2=bar
@@ -55,73 +53,43 @@ $client get balance for $key2 | assert "2,000 ꜩ"
 # Should fail
 # $client transfer 999.95 from $key2 to $key1
 
-# wait for the delay between two block
-sleep 1
-
-$client bake for bootstrap1 -max-priority 512
+bake
 
 $client remember program noop file:contracts/noop.tz
-$client typecheck program noop
-$client originate contract noop \
+$client typecheck program file:contracts/noop.tz
+bake_after $client originate contract noop \
         for $key1 transferring 1,000 from bootstrap1 \
-        running noop
-sleep 1
-$client bake for bootstrap1 -max-priority 512
-$client transfer 10 from bootstrap1 to noop -arg "Unit"
-sleep 1
-$client bake for bootstrap1 -max-priority 512
+        running file:contracts/noop.tz
+
+bake_after $client transfer 10 from bootstrap1 to noop -arg "Unit"
 
 
-$client originate contract hardlimit \
+bake_after $client originate contract hardlimit \
         for $key1 transferring 1,000 from bootstrap1 \
         running file:contracts/hardlimit.tz -init "3"
-sleep 1
-$client bake for bootstrap1 -max-priority 512
-$client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
-sleep 1
-$client bake for bootstrap1 -max-priority 512
-$client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
-# $client transfer 10 from bootstrap1 to hardlimit -arg "unit" # should fail
-sleep 1
-$client bake for bootstrap1 -max-priority 512
+bake_after $client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
+bake_after $client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
 
-$client originate account free_account for $key1 \
+bake_after $client originate account free_account for $key1 \
         transferring 1,000 from bootstrap1 -delegatable
-sleep 1
-$client bake for bootstrap1 -max-priority 512
 $client get delegate for free_account
-sleep 1
-$client bake for bootstrap1 -max-priority 512
-$client register key $key2 as delegate
-sleep 1
-$client bake for bootstrap1 -max-priority 512
-$client set delegate for free_account to $key2
-sleep 1
-$client bake for bootstrap1 -max-priority 512
+
+bake_after $client register key $key2 as delegate
+bake_after $client set delegate for free_account to $key2
 $client get delegate for free_account
 
 $client get balance for bootstrap5 | assert "4,000,000 ꜩ"
-$client transfer 400,000 from bootstrap5 to bootstrap1 -fee 0
-sleep 1
-$client bake for bootstrap1 -max-priority 512
-$client transfer 400,000 from bootstrap1 to bootstrap5 -fee 0
-sleep 1
-$client bake for bootstrap1 -max-priority 512
+bake_after $client transfer 400,000 from bootstrap5 to bootstrap1 -fee 0
+bake_after $client transfer 400,000 from bootstrap1 to bootstrap5 -fee 0
 $client get balance for bootstrap5 | assert "4,000,000 ꜩ"
-sleep 1
 
-
-$client activate account $key4 with king_commitment.json --no-confirmation
-$client activate account $key5 with queen_commitment.json --no-confirmation
-$client bake for bootstrap1 -max-priority 512
-sleep 1
+bake_after $client activate account $key4 with king_commitment.json --no-confirmation
+bake_after $client activate account $key5 with queen_commitment.json --no-confirmation
 
 $client get balance for $key4 | assert "23,932,454.669,343 ꜩ"
 $client get balance for $key5 | assert "72,954,577.464,032 ꜩ"
 
-$client transfer 10 from $key4 to $key5
-
-
+bake_after $client transfer 10 from $key4 to $key5
 
 echo
 echo End of test

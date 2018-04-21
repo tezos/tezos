@@ -140,6 +140,15 @@ init_contract_from_file () {
     $client remember program "${NAME}" "file:${FILE}"
 }
 
+bake () {
+    $client bake for bootstrap1 --max-priority 512 --minimal-timestamp
+}
+
+bake_after () {
+    "$@"
+    bake
+}
+
 init_with_transfer () {
     local FILE="$1"
     local NAME=$(contract_name_of_file "${FILE}")
@@ -151,15 +160,7 @@ init_with_transfer () {
     $client originate contract ${NAME} \
             for ${KEY} transferring "${TRANSFER_AMT}" \
             from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}"
-    $client bake for bootstrap1 -max-priority 512
-    sleep 1
-}
-
-
-bake_after () {
-    "$@"
-    $client bake for bootstrap1 -max-priority 512
-    sleep 1
+    bake
 }
 
 # Takes a grep regexp and fails with an error message if command does not include

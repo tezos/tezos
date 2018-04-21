@@ -106,6 +106,13 @@ let force_switch =
          \ current head."
     ()
 
+let minimal_timestamp_switch =
+  switch
+    ~long:"minimal-timestamp"
+    ~doc:"Use the minimal timestamp instead of the current date \
+          as timestamp of the baked block."
+    ()
+
 let delegatable_switch =
   switch
     ~long:"delegatable"

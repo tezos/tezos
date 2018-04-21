@@ -11,7 +11,8 @@ open Proto_alpha
 open Alpha_context
 
 let bake_block (cctxt : #Proto_alpha.full) block
-    ?force ?max_priority ?(free_baking=false) ?src_sk delegate =
+    ?force ?max_priority ?(free_baking=false) ?(minimal_timestamp=false)
+    ?src_sk delegate =
   begin
     match src_sk with
     | None ->
@@ -28,7 +29,7 @@ let bake_block (cctxt : #Proto_alpha.full) block
     else
       None, None in
   Client_baking_forge.forge_block cctxt
-    ~timestamp:(Time.now ())
+    ?timestamp:(if minimal_timestamp then None else Some (Time.now ()))
     ?force
     ?seed_nonce_hash ~src_sk block
     ~priority:(`Auto (delegate, max_priority, free_baking)) () >>=? fun block_hash ->
