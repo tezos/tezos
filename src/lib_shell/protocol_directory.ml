@@ -17,12 +17,16 @@ let build_rpc_directory state =
 
   gen_register0 Protocol_services.S.list begin fun () () ->
     State.Protocol.list state >>= fun set ->
-    let protocols = Protocol_hash.Set.elements set in
+    let protocols =
+      Protocol_hash.Set.elements set @
+      Registered_protocol.list_embedded () in
     RPC_answer.return protocols
   end ;
 
   register1 Protocol_services.S.contents begin fun hash () () ->
-    State.Protocol.read state hash
+    match Registered_protocol.get_embedded_sources hash with
+    | Some p -> return p
+    | None -> State.Protocol.read state hash
   end ;
 
   !dir

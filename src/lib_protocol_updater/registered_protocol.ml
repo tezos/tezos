@@ -42,6 +42,9 @@ module VersionTable = Protocol_hash.Table
 let versions : (module T) VersionTable.t =
   VersionTable.create 20
 
+let sources : Protocol.t VersionTable.t =
+  VersionTable.create 20
+
 let mem hash =
   VersionTable.mem versions hash ||
   Tezos_protocol_registerer.Registerer.mem hash
@@ -57,7 +60,17 @@ let get hash =
   try Some (get_exn hash)
   with Not_found -> None
 
-module Register
+let list_embedded () =
+  VersionTable.fold (fun k _ acc -> k :: acc) sources []
+
+let get_embedded_sources_exn hash =
+  VersionTable.find sources hash
+
+let get_embedded_sources hash =
+  try Some (get_embedded_sources_exn hash)
+  with Not_found -> None
+
+module Register_embedded
     (Env : Tezos_protocol_environment_shell.V1)
     (Proto : Env.Updater.PROTOCOL)
     (Source : sig
@@ -73,7 +86,8 @@ module Register
     let module Name = struct
       let name = Protocol_hash.to_b58check hash
     end in
-    (* TODO add a memory table for "embedded" sources... *)
+    VersionTable.add
+      sources hash Source.sources ;
     VersionTable.add
       versions hash
       (module struct
