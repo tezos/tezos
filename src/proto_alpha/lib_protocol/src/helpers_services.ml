@@ -34,7 +34,7 @@ let parse_operation (op: Operation.raw) =
       ok { shell = op.shell ; protocol_data }
   | None -> error Cannot_parse_operation
 
-let path = RPC_path.(open_root / "context" / "helpers")
+let path = RPC_path.(open_root / "helpers")
 
 module Scripts = struct
 

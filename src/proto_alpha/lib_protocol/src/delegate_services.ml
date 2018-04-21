@@ -275,7 +275,7 @@ module Baking_rights = struct
     open Data_encoding
 
     let custom_root =
-      RPC_path.(open_root / "context" / "helpers" / "baking_rights")
+      RPC_path.(open_root / "helpers" / "baking_rights")
 
     type baking_rights_query = {
       levels: Raw_level.t list ;
@@ -400,7 +400,7 @@ module Endorsing_rights = struct
     open Data_encoding
 
     let custom_root =
-      RPC_path.(open_root / "context" / "helpers" / "endorsing_rights")
+      RPC_path.(open_root / "helpers" / "endorsing_rights")
 
     type endorsing_rights_query = {
       levels: Raw_level.t list ;
