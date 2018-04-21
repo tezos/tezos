@@ -46,3 +46,5 @@ val inject_operation:
   t ->
   ?chain_id:Chain_id.t ->
   Operation.t -> unit tzresult Lwt.t
+
+val distributed_db: t -> Distributed_db.t

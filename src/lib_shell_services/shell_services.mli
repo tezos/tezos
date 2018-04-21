@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
 open RPC_context
 
 val forge_block_header:
@@ -40,23 +39,6 @@ val inject_protocol:
 
 val bootstrapped:
   #streamed -> ((Block_hash.t * Time.t) Lwt_stream.t * stopper) tzresult Lwt.t
-
-module Monitor : sig
-
-  val valid_blocks:
-    #streamed ->
-    ?chains:Chain_services.chain list ->
-    ?protocols:Protocol_hash.t list ->
-    ?next_protocols:Protocol_hash.t list ->
-    unit -> ((Chain_id.t * Block_hash.t) Lwt_stream.t * stopper) tzresult Lwt.t
-
-  val heads:
-    #streamed ->
-    ?next_protocols:Protocol_hash.t list ->
-    Chain_services.chain ->
-    (Block_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
-
-end
 
 module S : sig
 
@@ -92,22 +74,5 @@ module S : sig
     ([ `POST ], unit,
      unit, unit, unit,
      Block_hash.t * Time.t) RPC_service.t
-
-  module Monitor : sig
-
-    val valid_blocks:
-      ([ `GET ], unit,
-       unit, < chains : Chain_services.chain list;
-               next_protocols : Protocol_hash.t list;
-               protocols : Protocol_hash.t list >, unit,
-       Chain_id.t * Block_hash.t) RPC_service.t
-
-    val heads:
-      ([ `GET ], unit,
-       unit * Chain_services.chain,
-       < next_protocols : Protocol_hash.t list >, unit,
-       Block_hash.t) RPC_service.t
-
-  end
 
 end

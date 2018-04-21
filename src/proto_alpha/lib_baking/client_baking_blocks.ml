@@ -35,14 +35,14 @@ let info cctxt ?(chain = `Main) block =
            timestamp ; protocol ; next_protocol ; level }
 
 let monitor_valid_blocks cctxt ?chains ?protocols ?next_protocols () =
-  Shell_services.Monitor.valid_blocks cctxt
+  Monitor_services.valid_blocks cctxt
     ?chains ?protocols ?next_protocols () >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s
             (fun (chain, block) ->
                info cctxt ~chain:(`Hash chain) (`Hash (block, 0))) block_stream)
 
 let monitor_heads cctxt ?next_protocols chain =
-  Shell_services.Monitor.heads
+  Monitor_services.heads
     cctxt ?next_protocols chain >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s
             (fun block -> info cctxt ~chain (`Hash (block, 0)))

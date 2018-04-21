@@ -81,7 +81,7 @@ let wait_for_operation_inclusion
           end
         end in
 
-  Shell_services.Monitor.heads ctxt chain >>=? fun (stream, stop) ->
+  Monitor_services.heads ctxt chain >>=? fun (stream, stop) ->
   Lwt_stream.get stream >>= function
   | None -> assert false
   | Some head ->

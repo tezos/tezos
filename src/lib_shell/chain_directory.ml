@@ -133,7 +133,10 @@ let rpc_directory =
 
   !dir
 
-let build_rpc_directory state validator =
+let build_rpc_directory validator =
+
+  let distributed_db = Validator.distributed_db validator in
+  let state = Distributed_db.state distributed_db in
 
   let dir = ref rpc_directory in
 

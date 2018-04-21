@@ -131,3 +131,5 @@ let inject_operation v ?chain_id op =
   match pv_opt with
   | Some pv -> Prevalidator.inject_operation pv op
   | None -> failwith "Prevalidator is not running, cannot inject the operation."
+
+let distributed_db { db } = db
