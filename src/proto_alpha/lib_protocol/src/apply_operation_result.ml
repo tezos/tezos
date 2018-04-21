@@ -18,13 +18,13 @@ type balance =
 
 let balance_encoding =
   union
-    [ case Json_only
+    [ case (Tag 0)
         (obj2
            (req "kind" (constant "contract"))
            (req "contract" Contract.encoding))
         (function Contract c -> Some ((), c) | _ -> None )
         (fun ((), c) -> (Contract c)) ;
-      case Json_only
+      case (Tag 1)
         (obj4
            (req "kind" (constant "freezer"))
            (req "category" (constant "rewards"))
@@ -32,7 +32,7 @@ let balance_encoding =
            (req "level" Cycle.encoding))
         (function Rewards (d, l) -> Some ((), (), d, l) | _ -> None)
         (fun ((), (), d, l) -> Rewards (d, l)) ;
-      case Json_only
+      case (Tag 2)
         (obj4
            (req "kind" (constant "freezer"))
            (req "category" (constant "fees"))
@@ -40,7 +40,7 @@ let balance_encoding =
            (req "level" Cycle.encoding))
         (function Fees (d, l) -> Some ((), (), d, l) | _ -> None)
         (fun ((), (), d, l) -> Fees (d, l)) ;
-      case Json_only
+      case (Tag 3)
         (obj4
            (req "kind" (constant "freezer"))
            (req "category" (constant "deposits"))
@@ -55,11 +55,11 @@ type balance_update =
 
 let balance_update_encoding =
   union
-    [ case Json_only
+    [ case (Tag 0)
         (obj1 (req "credited" Tez.encoding))
         (function Credited v -> Some v | Debited _ -> None)
         (fun v -> Credited v) ;
-      case Json_only
+      case (Tag 1)
         (obj1 (req "debited" Tez.encoding))
         (function Debited v -> Some v | Credited _ -> None)
         (fun v -> Debited v) ]
@@ -77,25 +77,25 @@ type anonymous_operation_result =
 
 let anonymous_operation_result_encoding =
   union
-    [ case Json_only
+    [ case (Tag 0)
         (obj2
            (req "kind" (constant "revelation"))
            (req "balance_updates" balance_updates_encoding))
         (function Seed_nonce_revelation_result bus -> Some ((), bus) | _ -> None)
         (fun ((), bus) -> Seed_nonce_revelation_result bus) ;
-      case Json_only
+      case (Tag 1)
         (obj2
            (req "kind" (constant "double_endorsement"))
            (req "balance_updates" balance_updates_encoding))
         (function Double_endorsement_evidence_result bus -> Some ((), bus) | _ -> None)
         (fun ((), bus) -> Double_endorsement_evidence_result bus) ;
-      case Json_only
+      case (Tag 2)
         (obj2
            (req "kind" (constant "double_baking"))
            (req "balance_updates" balance_updates_encoding))
         (function Double_baking_evidence_result bus -> Some ((), bus) | _ -> None)
         (fun ((), bus) -> Double_baking_evidence_result bus) ;
-      case Json_only
+      case (Tag 3)
         (obj2
            (req "kind" (constant "activation"))
            (req "balance_updates" balance_updates_encoding))
@@ -124,10 +124,10 @@ type manager_operation_kind =
 
 let manager_operation_kind_encoding =
   union
-    [ case Json_only (constant "external")
+    [ case (Tag 0) (constant "external")
         (function External -> Some () | _ -> None)
         (fun () -> External) ;
-      case Json_only Operation.internal_operation_encoding
+      case (Tag 1) Operation.internal_operation_encoding
         (function Internal op -> Some op | _ -> None)
         (fun op -> Internal op) ]
 
@@ -138,13 +138,13 @@ type manager_operation_result =
 
 let manager_operation_result_encoding =
   union
-    [ case Json_only
+    [ case (Tag 0)
         (obj2
            (req "status" (constant "applied"))
            (req "operation_kind" (constant "reveal")))
         (function Applied Reveal_result -> Some ((),()) | _ -> None)
         (fun ((),()) -> Applied Reveal_result) ;
-      case Json_only
+      case (Tag 1)
         (obj8
            (req "status" (constant "applied"))
            (req "operation_kind" (constant "transaction"))
@@ -170,7 +170,7 @@ let manager_operation_result_encoding =
                      { operations ; storage ; balance_updates ;
                        originated_contracts ; consumed_gas ;
                        storage_size_diff })) ;
-      case Json_only
+      case (Tag 2)
         (obj6
            (req "status" (constant "applied"))
            (req "operation_kind" (constant "origination"))
@@ -194,19 +194,19 @@ let manager_operation_result_encoding =
                      { balance_updates ;
                        originated_contracts ; consumed_gas ;
                        storage_size_diff })) ;
-      case Json_only
+      case (Tag 3)
         (obj2
            (req "status" (constant "applied"))
            (req "operation_kind" (constant "delegation")))
         (function Applied Delegation_result -> Some ((),()) | _ -> None)
         (fun ((),()) -> Applied Delegation_result) ;
-      case Json_only
+      case (Tag 4)
         (obj2
            (req "status" (constant "failed"))
            (req "errors" (list Error_monad.error_encoding)))
         (function Failed errs -> Some ((), errs) | _ -> None)
         (fun ((), errs) -> Failed errs) ;
-      case Json_only
+      case (Tag 5)
         (obj1 (req "status" (constant "skipped")))
         (function Skipped -> Some () | _ -> None)
         (fun () -> Skipped) ]
@@ -228,13 +228,13 @@ type operation_result =
 
 let encoding =
   union
-    [ case Json_only
+    [ case (Tag 0)
         (obj2
            (req "kind" (constant "anonymous"))
            (req "results" (list anonymous_operation_result_encoding)))
         (function Anonymous_operations_result rs -> Some ((), rs) | _ -> None)
         (fun ((), rs) -> Anonymous_operations_result rs) ;
-      case Json_only
+      case (Tag 1)
         (obj3
            (req "kind" (constant "endorsements"))
            (req "delegate" Signature.Public_key_hash.encoding)
@@ -248,17 +248,17 @@ let encoding =
            Sourced_operation_result
              (Consensus_operation_result
                 (Endorsements_result (d, s)))) ;
-      case Json_only
+      case (Tag 2)
         (obj1
            (req "kind" (constant "amendment")))
         (function Sourced_operation_result Amendment_operation_result -> Some () | _ -> None)
         (fun () -> Sourced_operation_result Amendment_operation_result) ;
-      case Json_only
+      case (Tag 3)
         (obj1
            (req "kind" (constant "dictator")))
         (function Sourced_operation_result Dictator_operation_result -> Some () | _ -> None)
         (fun () -> Sourced_operation_result Dictator_operation_result) ;
-      case Json_only
+      case (Tag 4)
         (obj3
            (req "kind" (constant "manager"))
            (req "balance_updates" balance_updates_encoding)
