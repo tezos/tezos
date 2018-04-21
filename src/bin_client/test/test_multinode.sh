@@ -21,6 +21,7 @@ for client in "${client_instances[@]}"; do
     echo
     echo "### $client bootstrapped"
     echo
+    $client -w none config update
     $client bootstrapped
     echo
 done

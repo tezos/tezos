@@ -83,11 +83,12 @@ class unix_logger ~base_dir =
     inherit Client_context.simple_printer log
   end
 
-class unix_full ~base_dir ~block ~rpc_config : Client_context.full =
+class unix_full ~base_dir ~block ~confirmations ~rpc_config : Client_context.full =
   object
     inherit unix_logger ~base_dir
     inherit unix_prompter
     inherit unix_wallet ~base_dir
     inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
     method block = block
+    method confirmations = confirmations
   end

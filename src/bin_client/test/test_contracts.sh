@@ -9,6 +9,8 @@ source $test_dir/test_lib.inc.sh "$@"
 start_node 1
 activate_alpha
 
+$client -w none config update
+
 bake
 
 key1=foo

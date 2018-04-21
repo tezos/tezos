@@ -18,5 +18,6 @@ class unix_logger :
 class unix_full :
   base_dir:string ->
   block:Block_services.block ->
+  confirmations:int option ->
   rpc_config:RPC_client.config ->
   Client_context.full

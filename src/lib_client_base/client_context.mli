@@ -35,6 +35,7 @@ end
 
 class type block = object
   method block : Block_services.block
+  method confirmations : int option
 end
 
 class type io_wallet = object

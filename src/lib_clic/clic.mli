@@ -168,6 +168,12 @@ val args10 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) ar
   ('i, 'ctx) arg -> ('j, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j, 'ctx) options
 
+(** Include 11 optional parameters *)
+val args11 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
+  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
+  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k, 'ctx) options
+
 (** {2 Parameter based command lines} *)
 
 (** Type of parameters for a command *)

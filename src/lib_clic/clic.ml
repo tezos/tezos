@@ -729,6 +729,11 @@ let args10 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 =
     { spec = spec1 >> (spec2 >> (spec3 >> (spec4 >> (spec5 >> (spec6 >> (spec7 >> (spec8 >> (spec9 >> (spec10 >> NoArgs))))))))) ;
       converter = fun (arg1, (arg2, (arg3, (arg4, (arg5, (spec6, (spec7, (spec8, (spec9, (spec10, ())))))))))) ->
         arg1, arg2, arg3, arg4, arg5, spec6, spec7, spec8, spec9, spec10 }
+let args11 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11 =
+  Argument
+    { spec = spec1 >> (spec2 >> (spec3 >> (spec4 >> (spec5 >> (spec6 >> (spec7 >> (spec8 >> (spec9 >> (spec10 >> (spec11 >> NoArgs)))))))))) ;
+      converter = fun (arg1, (arg2, (arg3, (arg4, (arg5, (spec6, (spec7, (spec8, (spec9, (spec10, (spec11, ()))))))))))) ->
+        arg1, arg2, arg3, arg4, arg5, spec6, spec7, spec8, spec9, spec10, spec11 }
 
 (* Some combinators for writing commands concisely. *)
 let param ~name ~desc kind next = Param (name, desc, kind, next)
