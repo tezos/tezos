@@ -149,7 +149,7 @@ module Forge = struct
       | Error _ -> assert false
     end >>=? fun fitness ->
     begin
-      Alpha_services.Helpers.level ~offset:1l (rpc_ctxt) pred >>|? function
+      Alpha_services.Helpers.current_level ~offset:1l (rpc_ctxt) pred >>|? function
       | { expected_commitment = true } -> Some (fst (Proto_Nonce.generate ()))
       | { expected_commitment = false } -> None
     end >>=? fun seed_nonce_hash ->

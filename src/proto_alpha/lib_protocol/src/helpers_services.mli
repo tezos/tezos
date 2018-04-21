@@ -13,13 +13,13 @@ type error +=
   | Cannot_parse_operation (* `Branch *)
   | Cant_parse_block_header
 
-val level:
+val current_level:
   'a #RPC_context.simple ->
   ?offset:int32 -> 'a -> Level.t shell_tzresult Lwt.t
 
-val levels:
+val levels_in_current_cycle:
   'a #RPC_context.simple ->
-  'a -> Cycle.t -> (Raw_level.t * Raw_level.t) shell_tzresult Lwt.t
+  ?offset:int32 -> 'a -> (Raw_level.t * Raw_level.t) shell_tzresult Lwt.t
 
 module Scripts : sig
 

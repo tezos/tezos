@@ -48,10 +48,12 @@ let monitor_heads cctxt ?next_protocols chain =
             (fun block -> info cctxt ~chain (`Hash (block, 0)))
             block_stream)
 
-let blocks_from_cycle cctxt ?(chain = `Main) block cycle =
+let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-  Alpha_block_services.Metadata.protocol_data cctxt ~chain ~block () >>=? fun { level } ->
-  Alpha_services.Helpers.levels cctxt (chain, block) cycle >>=? fun (first, last) ->
+  Alpha_block_services.Metadata.protocol_data
+    cctxt ~chain ~block () >>=? fun { level } ->
+  Alpha_services.Helpers.levels_in_current_cycle
+    cctxt ~offset (chain, block) >>=? fun (first, last) ->
   let length = Int32.to_int (Raw_level.diff level.level first) in
   Shell_services.Blocks.list cctxt ~heads:[hash] ~length () >>=? fun blocks ->
   let blocks =

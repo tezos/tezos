@@ -159,7 +159,7 @@ let forge_block cctxt ?(chain = `Main) block
         return (priority, time)
       end
     | `Auto (src_pkh, max_priority, free_baking) ->
-        Alpha_services.Helpers.level
+        Alpha_services.Helpers.current_level
           cctxt ~offset:1l (chain, block)>>=? fun { level } ->
         Alpha_services.Delegate.Baking_rights.get cctxt
           ?max_priority
@@ -396,37 +396,32 @@ let compute_timeout { future_slots } =
 
 let get_unrevealed_nonces
     (cctxt : #Proto_alpha.full) ?(force = false) ?(chain = `Main) block =
-  Alpha_services.Helpers.level cctxt ~offset:1l (chain, block) >>=? fun level ->
-  let cur_cycle = level.cycle in
-  match Cycle.pred cur_cycle with
-  | None -> return []
-  | Some cycle ->
-      Client_baking_blocks.blocks_from_cycle
-        cctxt block cycle >>=? fun blocks ->
-      filter_map_s (fun hash ->
-          Client_baking_nonces.find cctxt hash >>=? function
-          | None -> return None
-          | Some nonce ->
-              Alpha_block_services.Metadata.protocol_data
-                cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { level } ->
-              if force then
+  Client_baking_blocks.blocks_from_current_cycle
+    cctxt block ~offset:(-1l) () >>=? fun blocks ->
+  filter_map_s (fun hash ->
+      Client_baking_nonces.find cctxt hash >>=? function
+      | None -> return None
+      | Some nonce ->
+          Alpha_block_services.Metadata.protocol_data
+            cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { level } ->
+          if force then
+            return (Some (hash, (level.level, nonce)))
+          else
+            Alpha_services.Nonce.get
+              cctxt (chain, block) level.level >>=? function
+            | Missing nonce_hash
+              when Nonce.check_hash nonce nonce_hash ->
+                cctxt#warning "Found nonce for %a (level: %a)@."
+                  Block_hash.pp_short hash
+                  Level.pp level >>= fun () ->
                 return (Some (hash, (level.level, nonce)))
-              else
-                Alpha_services.Nonce.get
-                  cctxt (chain, block) level.level >>=? function
-                | Missing nonce_hash
-                  when Nonce.check_hash nonce nonce_hash ->
-                    cctxt#warning "Found nonce for %a (level: %a)@."
-                      Block_hash.pp_short hash
-                      Level.pp level >>= fun () ->
-                    return (Some (hash, (level.level, nonce)))
-                | Missing _nonce_hash ->
-                    cctxt#error "Incoherent nonce for level %a"
-                      Raw_level.pp level.level >>= fun () ->
-                    return None
-                | Forgotten -> return None
-                | Revealed _ -> return None)
-        blocks
+            | Missing _nonce_hash ->
+                cctxt#error "Incoherent nonce for level %a"
+                  Raw_level.pp level.level >>= fun () ->
+                return None
+            | Forgotten -> return None
+            | Revealed _ -> return None)
+    blocks
 
 let safe_get_unrevealed_nonces cctxt block =
   get_unrevealed_nonces cctxt block >>= function
@@ -495,7 +490,8 @@ let bake (cctxt : #Proto_alpha.full) state =
     (fun (timestamp, (bi, priority, delegate)) ->
        let chain = `Hash bi.Client_baking_blocks.chain_id in
        let block = `Hash (bi.hash, 0) in
-       Alpha_services.Helpers.level cctxt ~offset:1l (chain, block) >>=? fun next_level ->
+       Alpha_services.Helpers.current_level cctxt
+         ~offset:1l (chain, block) >>=? fun next_level ->
        let timestamp =
          if Block_hash.equal bi.Client_baking_blocks.hash state.genesis then
            Time.now ()

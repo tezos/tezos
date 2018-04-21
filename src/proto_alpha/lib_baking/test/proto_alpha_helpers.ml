@@ -343,7 +343,7 @@ module Protocol = struct
 
   let proposals ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) proposals =
     Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
-    Alpha_services.Helpers.level
+    Alpha_services.Helpers.current_level
       !rpc_ctxt ~offset:1l (`Main, block) >>=? fun next_level ->
     let shell = { Tezos_base.Operation.branch = hash } in
     let contents =
@@ -355,7 +355,7 @@ module Protocol = struct
 
   let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
     Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
-    Alpha_services.Helpers.level
+    Alpha_services.Helpers.current_level
       !rpc_ctxt ~offset:1l (`Main, block) >>=? fun next_level ->
     let shell = { Tezos_base.Operation.branch = hash } in
     let contents =
@@ -517,7 +517,7 @@ module Baking = struct
 
   let bake block (contract: Account.t) operations =
     let ctxt = (new wrap_full (no_write_context ~block !rpc_config)) in
-    Alpha_services.Helpers.level
+    Alpha_services.Helpers.current_level
       ctxt ~offset:1l (`Main, block) >>=? fun level ->
     let seed_nonce_hash =
       if level.Level.expected_commitment then

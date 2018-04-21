@@ -40,9 +40,10 @@ val monitor_heads:
   Chain_services.chain ->
   block_info tzresult Lwt_stream.t tzresult Lwt.t
 
-val blocks_from_cycle:
+val blocks_from_current_cycle:
   #Proto_alpha.rpc_context ->
   ?chain:Chain_services.chain ->
   Block_services.block ->
-  Cycle.t ->
+  ?offset:int32 ->
+  unit ->
   Block_hash.t list tzresult Lwt.t

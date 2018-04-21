@@ -504,14 +504,14 @@ module S = struct
     |+ field "offset" RPC_arg.int32 0l (fun t -> t.offset)
     |> seal
 
-  let level =
+  let current_level =
     RPC_service.get_service
       ~description: "..."
       ~query: level_query
       ~output: Level.encoding
-      RPC_path.(path / "level")
+      RPC_path.(path / "current_level")
 
-  let levels =
+  let levels_in_current_cycle =
     RPC_service.get_service
       ~description: "Levels of a cycle"
       ~query: level_query
@@ -524,19 +524,19 @@ end
 
 let () =
   let open Services_registration in
-  register0 S.level begin fun ctxt q () ->
+  register0 S.current_level begin fun ctxt q () ->
     let level = Level.current ctxt in
     return (Level.from_raw ctxt ~offset:q.offset level.level)
   end ;
-  register0 S.levels begin fun ctxt q () ->
+  register0 S.levels_in_current_cycle begin fun ctxt q () ->
     let levels = Level.levels_in_current_cycle ctxt ~offset:q.offset () in
     let first = List.hd (List.rev levels) in
     let last = List.hd levels in
     return (first.level, last.level)
   end
 
-let level ctxt ?(offset = 0l) block =
-  RPC_context.make_call0 S.level ctxt block { offset } ()
+let current_level ctxt ?(offset = 0l) block =
+  RPC_context.make_call0 S.current_level ctxt block { offset } ()
 
-let levels ctxt block cycle =
-  RPC_context.make_call1 S.levels ctxt block cycle () ()
+let levels_in_current_cycle ctxt ?(offset = 0l) block =
+  RPC_context.make_call0 S.levels_in_current_cycle ctxt block { offset } ()
