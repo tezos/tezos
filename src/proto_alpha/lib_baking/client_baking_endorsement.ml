@@ -95,7 +95,6 @@ let inject_endorsement
     (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block level ?async
     src_sk slots =
-  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Block_services.hash cctxt ~chain ~block () >>=? fun hash ->
   Alpha_services.Forge.Consensus.endorsement cctxt
     (chain, block)
@@ -106,8 +105,7 @@ let inject_endorsement
     () >>=? fun bytes ->
   Client_keys.append
     src_sk ~watermark:Endorsement bytes >>=? fun signed_bytes ->
-  Shell_services.inject_operation
-    cctxt ?async ~chain_id signed_bytes >>=? fun oph ->
+  Injection_services.operation cctxt ?async ~chain signed_bytes >>=? fun oph ->
   iter_s
     (fun slot ->
        State.record_endorsement cctxt level hash slot oph)

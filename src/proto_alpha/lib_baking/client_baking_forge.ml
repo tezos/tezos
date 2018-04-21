@@ -71,9 +71,8 @@ let inject_block cctxt
   let block = `Hash (shell_header.Tezos_base.Block_header.predecessor, 0) in
   forge_block_header cctxt ~chain block
     src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
-  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Shell_services.inject_block cctxt
-    ?force ~chain_id signed_header operations >>=? fun block_hash ->
+  Injection_services.block cctxt
+    ?force ~chain signed_header operations >>=? fun block_hash ->
   return block_hash
 
 type error +=

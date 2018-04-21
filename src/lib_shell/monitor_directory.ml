@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let build_rpc_directory validator =
+let build_rpc_directory validator mainchain_validator =
 
   let distributed_db = Validator.distributed_db validator in
   let state = Distributed_db.state distributed_db in
@@ -17,6 +17,30 @@ let build_rpc_directory validator =
     dir := RPC_directory.gen_register !dir s (fun () p q -> f p q) in
   let gen_register1 s f =
     dir := RPC_directory.gen_register !dir s (fun ((), a) p q -> f a p q) in
+
+  gen_register0 Monitor_services.S.bootstrapped begin fun () () ->
+    let block_stream, stopper =
+      Chain_validator.new_head_watcher mainchain_validator in
+    let first_run = ref true in
+    let next () =
+      if !first_run then begin
+        first_run := false ;
+        let chain_state = Chain_validator.chain_state mainchain_validator in
+        Chain.head chain_state >>= fun head ->
+        let head_hash = State.Block.hash head in
+        let head_header = State.Block.header head in
+        Lwt.return (Some (head_hash, head_header.shell.timestamp))
+      end else begin
+        Lwt.pick [
+          ( Lwt_stream.get block_stream >|=
+            Option.map ~f:(fun b ->
+                (State.Block.hash b, (State.Block.header b).shell.timestamp)) ) ;
+          (Chain_validator.bootstrapped mainchain_validator >|= fun () -> None) ;
+        ]
+      end in
+    let shutdown () = Lwt_watcher.shutdown stopper in
+    RPC_answer.return_stream { next ; shutdown }
+  end ;
 
   gen_register0 Monitor_services.S.valid_blocks begin fun q () ->
     let block_stream, stopper = State.watcher state in

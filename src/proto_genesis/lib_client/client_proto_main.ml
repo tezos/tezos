@@ -20,7 +20,7 @@ let bake cctxt ?(timestamp = Time.now ()) block command sk =
     [] >>=? fun (shell_header, _) ->
   let blk = Data.Command.forge shell_header command in
   Client_keys.append sk blk >>=? fun signed_blk ->
-  Shell_services.inject_block cctxt signed_blk []
+  Injection_services.block cctxt signed_blk []
 
 let int64_parameter =
   (Clic.parameter (fun _ p ->

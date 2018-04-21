@@ -9,6 +9,9 @@
 
 open RPC_context
 
+val bootstrapped:
+  #streamed -> ((Block_hash.t * Time.t) Lwt_stream.t * stopper) tzresult Lwt.t
+
 val valid_blocks:
   #streamed ->
   ?chains:Chain_services.chain list ->
@@ -27,6 +30,11 @@ val protocols:
   (Protocol_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
 
 module S : sig
+
+  val bootstrapped:
+    ([ `GET ], unit,
+     unit, unit, unit,
+     Block_hash.t * Time.t) RPC_service.t
 
   val valid_blocks:
     ([ `GET ], unit,

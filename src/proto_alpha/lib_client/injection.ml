@@ -176,8 +176,7 @@ let inject_operation
         Lwt.return res
   end >>=? fun () ->
   let bytes = Data_encoding.Binary.to_bytes_exn Operation.encoding op in
-  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Shell_services.inject_operation cctxt ~chain_id bytes >>=? fun oph ->
+  Injection_services.operation cctxt ~chain bytes >>=? fun oph ->
   cctxt#message "Operation successfully injected in the node." >>= fun () ->
   cctxt#message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   begin

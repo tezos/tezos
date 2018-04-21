@@ -40,12 +40,13 @@ let commands () = Clic.[
       (prefixes [ "bootstrapped" ] @@
        stop)
       (fun () (cctxt : #Client_context.full) ->
-         Shell_services.bootstrapped cctxt >>=? fun (stream, _) ->
+         Monitor_services.bootstrapped cctxt >>=? fun (stream, _) ->
          Lwt_stream.iter_s
            (fun (hash, time) ->
-              cctxt#message "Current head: %a (%a)"
+              cctxt#message "Current head: %a (timestamp: %a, validation: %a)"
                 Block_hash.pp_short hash
-                Time.pp_hum time) stream >>= fun () ->
+                Time.pp_hum time
+                Time.pp_hum (Time.now ())) stream >>= fun () ->
          cctxt#answer "Bootstrapped." >>= fun () ->
          return ()
       )

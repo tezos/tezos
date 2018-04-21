@@ -15,12 +15,10 @@ let inject_seed_nonce_revelation rpc_config ?(chain = `Main) block ?async nonces
     List.map
       (fun (level, nonce) ->
          Seed_nonce_revelation { level ; nonce }) nonces in
-  Chain_services.chain_id rpc_config ~chain () >>=? fun chain_id ->
   Block_services.hash rpc_config ~chain ~block () >>=? fun branch ->
   Alpha_services.Forge.Anonymous.operations rpc_config
     (chain, block) ~branch operations >>=? fun bytes ->
-  Shell_services.inject_operation
-    rpc_config ?async ~chain_id bytes >>=? fun oph ->
+  Injection_services.operation rpc_config ?async ~chain bytes >>=? fun oph ->
   return oph
 
 let forge_seed_nonce_revelation

@@ -139,9 +139,10 @@ let build_rpc_directory node =
     dir := RPC_directory.register !dir s (fun () p q -> f p q) in
 
   merge (Protocol_directory.build_rpc_directory node.state) ;
-  merge (Monitor_directory.build_rpc_directory node.validator) ;
-  merge (Shell_directory.build_rpc_directory
+  merge (Monitor_directory.build_rpc_directory
            node.validator node.mainchain_validator) ;
+  merge Shell_directory.rpc_directory ;
+  merge (Injection_directory.build_rpc_directory node.validator) ;
   merge (Chain_directory.build_rpc_directory node.validator) ;
   merge (P2p.build_rpc_directory node.p2p) ;
   merge Worker_directory.rpc_directory ;

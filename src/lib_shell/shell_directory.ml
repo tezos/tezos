@@ -7,99 +7,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let inject_block validator ?force ?chain_id bytes operations =
-  Validator.validate_block
-    validator ?force ?chain_id bytes operations >>=? fun (hash, block) ->
-  return (hash, (block >>=? fun _ -> return ()))
-
-let inject_operation validator ?chain_id bytes =
-  let t =
-    match Data_encoding.Binary.of_bytes Operation.encoding bytes with
-    | None -> failwith "Can't parse the operation"
-    | Some op ->
-        Validator.inject_operation validator ?chain_id op
-  in
-  let hash = Operation_hash.hash_bytes [bytes] in
-  Lwt.return (hash, t)
-
-let inject_protocol state ?force:_ proto =
-  let proto_bytes =
-    Data_encoding.Binary.to_bytes_exn Protocol.encoding proto in
-  let hash = Protocol_hash.hash_bytes [proto_bytes] in
-  let validation =
-    Updater.compile hash proto >>= function
-    | false ->
-        failwith
-          "Compilation failed (%a)"
-          Protocol_hash.pp_short hash
-    | true ->
-        State.Protocol.store state proto >>= function
-        | None ->
-            failwith
-              "Previously registered protocol (%a)"
-              Protocol_hash.pp_short hash
-        | Some _ -> return ()
-  in
-  Lwt.return (hash, validation)
-
-let build_rpc_directory validator mainchain_validator =
-
-  let distributed_db = Validator.distributed_db validator in
-  let state = Distributed_db.state distributed_db in
+let rpc_directory =
 
   let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
-  let gen_register0 s f =
-    dir := RPC_directory.gen_register !dir s (fun () p q -> f p q) in
   let register0 s f =
     dir := RPC_directory.register !dir s (fun () p q -> f p q) in
 
   register0 Shell_services.S.forge_block_header begin fun () header ->
     return (Data_encoding.Binary.to_bytes_exn Block_header.encoding header)
-  end ;
-
-  register0 Shell_services.S.inject_block begin fun () p ->
-    let { Shell_services.S.raw ; blocking ; force ; operations } = p in
-    inject_block validator ~force raw operations >>=? fun (hash, wait) ->
-    (if blocking then wait else return ()) >>=? fun () ->
-    return hash
-  end ;
-
-  register0 Shell_services.S.inject_operation begin fun () p ->
-    let (contents, blocking, chain_id) = p in
-    inject_operation validator ?chain_id contents >>= fun (hash, wait) ->
-    (if blocking then wait else return ()) >>=? fun () ->
-    return hash
-  end ;
-
-  register0 Shell_services.S.inject_protocol begin fun () p ->
-    let (proto, blocking, force) = p in
-    inject_protocol state ?force proto >>= fun (hash, wait) ->
-    (if blocking then wait else return ()) >>=? fun () ->
-    return hash
-  end ;
-
-  gen_register0 Shell_services.S.bootstrapped begin fun () () ->
-    let block_stream, stopper =
-      Chain_validator.new_head_watcher mainchain_validator in
-    let first_run = ref true in
-    let next () =
-      if !first_run then begin
-        first_run := false ;
-        let chain_state = Chain_validator.chain_state mainchain_validator in
-        Chain.head chain_state >>= fun head ->
-        let head_hash = State.Block.hash head in
-        let head_header = State.Block.header head in
-        Lwt.return (Some (head_hash, head_header.shell.timestamp))
-      end else begin
-        Lwt.pick [
-          ( Lwt_stream.get block_stream >|=
-            Option.map ~f:(fun b ->
-                (State.Block.hash b, (State.Block.header b).shell.timestamp)) ) ;
-          (Chain_validator.bootstrapped mainchain_validator >|= fun () -> None) ;
-        ]
-      end in
-    let shutdown () = Lwt_watcher.shutdown stopper in
-    RPC_answer.return_stream { next ; shutdown }
   end ;
 
   !dir

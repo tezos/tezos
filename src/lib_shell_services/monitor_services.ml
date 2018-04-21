@@ -10,7 +10,17 @@
 module S = struct
 
   open Data_encoding
+
   let path = RPC_path.(root / "monitor")
+
+  let bootstrapped =
+    RPC_service.get_service
+      ~description:""
+      ~query: RPC_query.empty
+      ~output: (obj2
+                  (req "block" Block_hash.encoding)
+                  (req "timestamp" Time.encoding))
+      RPC_path.(path / "bootstrapped")
 
   let valid_blocks_query =
     let open RPC_query in
@@ -62,6 +72,9 @@ module S = struct
 end
 
 open RPC_context
+
+let bootstrapped ctxt =
+  make_streamed_call S.bootstrapped ctxt () () ()
 
 let valid_blocks
     ctxt ?(chains = [`Main]) ?(protocols = []) ?(next_protocols = []) () =
