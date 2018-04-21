@@ -150,9 +150,13 @@ let forge_block cctxt ?(chain = `Main) block
   begin
     match priority with
     | `Set priority -> begin
-        Alpha_services.Helpers.minimal_time
-          cctxt (chain, block) ~priority >>=? fun time ->
-        return (priority, Some time)
+        Alpha_services.Delegate.Baking_rights.get cctxt
+          ~all:true ~max_priority:(priority+1) (chain, block) >>=? fun rights ->
+        let time =
+          Option.apply
+            ~f:(fun r -> r.Alpha_services.Delegate.Baking_rights.timestamp)
+            (List.nth_opt rights priority) in
+        return (priority, time)
       end
     | `Auto (src_pkh, max_priority, free_baking) ->
         Alpha_services.Helpers.level

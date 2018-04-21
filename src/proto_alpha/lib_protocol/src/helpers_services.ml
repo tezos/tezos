@@ -65,22 +65,6 @@ module S = struct
                   (req "last" Raw_level.encoding))
       RPC_path.(custom_root / "levels_in_cycle" /: Cycle.arg)
 
-  type minimal_timestamp_query = {
-    priority: int ;
-  }
-  let minimal_timestamp_query : minimal_timestamp_query RPC_query.t =
-    let open RPC_query in
-    query (fun priority -> { priority })
-    |+ field "priority" RPC_arg.int 0 (fun t -> t.priority)
-    |> seal
-
-  let minimal_timestamp =
-    RPC_service.get_service
-      ~description: "Minimal timestamp for the next block."
-      ~query: minimal_timestamp_query
-      ~output: (obj1 (req "timestamp" Timestamp.encoding))
-      RPC_path.(custom_root / "minimal_timestamp")
-
   let run_code_input_encoding =
     (obj5
        (req "script" Script.expr_encoding)
@@ -170,10 +154,6 @@ let () =
     let last = List.hd levels in
     return (first.level, last.level)
   end ;
-  register0 S.minimal_timestamp begin fun ctxt q () ->
-    let timestamp = Alpha_context.Timestamp.current ctxt in
-    Baking.minimal_time ctxt q.priority timestamp
-  end ;
   register0 S.run_code begin fun ctxt ()
     (code, storage, parameter, amount, contract) ->
     Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
@@ -234,9 +214,6 @@ let level ctxt ?(offset = 0l) block =
 
 let levels ctxt block cycle =
   RPC_context.make_call1 S.levels ctxt block cycle () ()
-
-let minimal_time ctxt ?(priority = 0) block =
-  RPC_context.make_call0 S.minimal_timestamp ctxt block { priority } ()
 
 let run_code ctxt block code (storage, input, amount, contract) =
   RPC_context.make_call0 S.run_code ctxt

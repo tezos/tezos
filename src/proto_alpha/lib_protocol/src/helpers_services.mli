@@ -21,13 +21,6 @@ val levels:
   'a #RPC_context.simple ->
   'a -> Cycle.t -> (Raw_level.t * Raw_level.t) shell_tzresult Lwt.t
 
-val minimal_time:
-  'a #RPC_context.simple ->
-  ?priority:int -> 'a -> Time.t shell_tzresult Lwt.t
-(** [minimal_time cctxt ?prio blk] is the minimal acceptable
-    timestamp for the successor of [blk]. [?priority] defaults to
-    [0]. *)
-
 val run_code:
   'a #RPC_context.simple ->
   'a -> Script.expr ->
