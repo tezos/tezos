@@ -104,7 +104,7 @@ let run
     ~(input : Michelson_v1_parser.parsed)
     () =
   get_contract cctxt ~chain block contract >>=? fun contract ->
-  Alpha_services.Helpers.run_code cctxt
+  Alpha_services.Helpers.Scripts.run_code cctxt
     (chain, block)
     program.expanded (storage.expanded, input.expanded, amount, contract)
 
@@ -119,7 +119,7 @@ let trace
     ~(input : Michelson_v1_parser.parsed)
     () =
   get_contract cctxt ~chain block contract >>=? fun contract ->
-  Alpha_services.Helpers.trace_code cctxt
+  Alpha_services.Helpers.Scripts.trace_code cctxt
     (chain, block)
     program.expanded (storage.expanded, input.expanded, amount, contract)
 
@@ -131,7 +131,7 @@ let hash_and_sign
     (data : Michelson_v1_parser.parsed)
     (typ : Michelson_v1_parser.parsed)
     sk =
-  Alpha_services.Helpers.hash_data
+  Alpha_services.Helpers.Scripts.hash_data
     cctxt (chain, block) (data.expanded, typ.expanded, gas) >>=? fun (hash, gas) ->
   Client_keys.sign sk (MBytes.of_string hash) >>=? fun signature ->
   return (hash, Signature.to_b58check signature, gas)
@@ -144,7 +144,7 @@ let typecheck_data
     ~(data : Michelson_v1_parser.parsed)
     ~(ty : Michelson_v1_parser.parsed)
     () =
-  Alpha_services.Helpers.typecheck_data
+  Alpha_services.Helpers.Scripts.typecheck_data
     cctxt (chain, block)
     (data.expanded, ty.expanded, gas)
 
@@ -154,7 +154,7 @@ let typecheck_program
     block
     ?gas
     (program : Michelson_v1_parser.parsed) =
-  Alpha_services.Helpers.typecheck_code cctxt (chain, block) (program.expanded, gas)
+  Alpha_services.Helpers.Scripts.typecheck_code cctxt (chain, block) (program.expanded, gas)
 
 let print_typecheck_result
     ~emacs ~show_types ~print_source_on_error

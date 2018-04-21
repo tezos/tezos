@@ -199,7 +199,7 @@ let commands () =
        @@ stop)
       (fun custom_gas data typ cctxt ->
          resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
-         Alpha_services.Helpers.hash_data cctxt (`Main, cctxt#block)
+         Alpha_services.Helpers.Scripts.hash_data cctxt (`Main, cctxt#block)
            (data.expanded, typ.expanded, Some original_gas) >>= function
          | Ok (hash, remaining_gas) ->
              cctxt#message "%S@,Gas remaining: %a" hash

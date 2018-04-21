@@ -418,6 +418,7 @@ module Level : sig
 
   val last_level_in_cycle: context -> Cycle.t -> level
   val levels_in_cycle: context -> Cycle.t -> level list
+  val levels_in_current_cycle: context -> ?offset:int32 -> unit -> level list
 
   val last_allowed_fork_level: context -> Raw_level.t
 

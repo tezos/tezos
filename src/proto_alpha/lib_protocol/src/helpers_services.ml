@@ -34,203 +34,168 @@ let parse_operation (op: Operation.raw) =
       ok { shell = op.shell ; protocol_data }
   | None -> error Cannot_parse_operation
 
-let custom_root = RPC_path.(open_root / "context" / "helpers")
+let path = RPC_path.(open_root / "context" / "helpers")
 
-module S = struct
+module Scripts = struct
 
-  open Data_encoding
+  module S = struct
 
-  type level_query = {
-    offset: int32 ;
-  }
-  let level_query : level_query RPC_query.t =
-    let open RPC_query in
-    query (fun offset -> { offset })
-    |+ field "offset" RPC_arg.int32 0l (fun t -> t.offset)
-    |> seal
+    open Data_encoding
 
-  let level =
-    RPC_service.get_service
-      ~description: "..."
-      ~query: level_query
-      ~output: Level.encoding
-      RPC_path.(custom_root / "level")
+    let path = RPC_path.(path / "scripts")
 
-  let levels =
-    RPC_service.get_service
-      ~description: "Levels of a cycle"
-      ~query: RPC_query.empty
-      ~output: (obj2
-                  (req "first" Raw_level.encoding)
-                  (req "last" Raw_level.encoding))
-      RPC_path.(custom_root / "levels_in_cycle" /: Cycle.arg)
+    let run_code_input_encoding =
+      (obj5
+         (req "script" Script.expr_encoding)
+         (req "storage" Script.expr_encoding)
+         (req "input" Script.expr_encoding)
+         (req "amount" Tez.encoding)
+         (req "contract" Contract.encoding))
 
-  let run_code_input_encoding =
-    (obj5
-       (req "script" Script.expr_encoding)
-       (req "storage" Script.expr_encoding)
-       (req "input" Script.expr_encoding)
-       (req "amount" Tez.encoding)
-       (req "contract" Contract.encoding))
+    let run_code =
+      RPC_service.post_service
+        ~description: "Run a piece of code in the current context"
+        ~query: RPC_query.empty
+        ~input: run_code_input_encoding
+        ~output: (obj3
+                    (req "storage" Script.expr_encoding)
+                    (req "operations" (list Operation.internal_operation_encoding))
+                    (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
+        RPC_path.(path / "run_code")
 
-  let run_code =
-    RPC_service.post_service
-      ~description: "Run a piece of code in the current context"
-      ~query: RPC_query.empty
-      ~input: run_code_input_encoding
-      ~output: (obj3
-                  (req "storage" Script.expr_encoding)
-                  (req "operations" (list Operation.internal_operation_encoding))
-                  (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
-      RPC_path.(custom_root / "run_code")
+    let trace_code =
+      RPC_service.post_service
+        ~description: "Run a piece of code in the current context, \
+                       keeping a trace"
+        ~query: RPC_query.empty
+        ~input: run_code_input_encoding
+        ~output: (obj4
+                    (req "storage" Script.expr_encoding)
+                    (req "operations" (list Operation.internal_operation_encoding))
+                    (req "trace"
+                       (list @@ obj3
+                          (req "location" Script.location_encoding)
+                          (req "gas" Gas.encoding)
+                          (req "stack" (list (Script.expr_encoding)))))
+                    (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
+        RPC_path.(path / "trace_code")
 
-  let trace_code =
-    RPC_service.post_service
-      ~description: "Run a piece of code in the current context, \
-                     keeping a trace"
-      ~query: RPC_query.empty
-      ~input: run_code_input_encoding
-      ~output: (obj4
-                  (req "storage" Script.expr_encoding)
-                  (req "operations" (list Operation.internal_operation_encoding))
-                  (req "trace"
-                     (list @@ obj3
-                        (req "location" Script.location_encoding)
-                        (req "gas" Gas.encoding)
-                        (req "stack" (list (Script.expr_encoding)))))
-                  (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
-      RPC_path.(custom_root / "trace_code")
+    let typecheck_code =
+      RPC_service.post_service
+        ~description: "Typecheck a piece of code in the current context"
+        ~query: RPC_query.empty
+        ~input: (obj2
+                   (req "program" Script.expr_encoding)
+                   (opt "gas" z))
+        ~output: (obj2
+                    (req "type_map" Script_tc_errors_registration.type_map_enc)
+                    (req "gas" Gas.encoding))
+        RPC_path.(path / "typecheck_code")
 
-  let typecheck_code =
-    RPC_service.post_service
-      ~description: "Typecheck a piece of code in the current context"
-      ~query: RPC_query.empty
-      ~input: (obj2
-                 (req "program" Script.expr_encoding)
-                 (opt "gas" z))
-      ~output: (obj2
-                  (req "type_map" Script_tc_errors_registration.type_map_enc)
-                  (req "gas" Gas.encoding))
-      RPC_path.(custom_root / "typecheck_code")
+    let typecheck_data =
+      RPC_service.post_service
+        ~description: "Check that some data expression is well formed \
+                       and of a given type in the current context"
+        ~query: RPC_query.empty
+        ~input: (obj3
+                   (req "data" Script.expr_encoding)
+                   (req "type" Script.expr_encoding)
+                   (opt "gas" z))
+        ~output: (obj1 (req "gas" Gas.encoding))
+        RPC_path.(path / "typecheck_data")
 
-  let typecheck_data =
-    RPC_service.post_service
-      ~description: "Check that some data expression is well formed \
-                     and of a given type in the current context"
-      ~query: RPC_query.empty
-      ~input: (obj3
-                 (req "data" Script.expr_encoding)
-                 (req "type" Script.expr_encoding)
-                 (opt "gas" z))
-      ~output: (obj1 (req "gas" Gas.encoding))
-      RPC_path.(custom_root / "typecheck_data")
+    let hash_data =
+      RPC_service.post_service
+        ~description: "Computes the hash of some data expression \
+                       using the same algorithm as script instruction H"
 
-  let hash_data =
-    RPC_service.post_service
-      ~description: "Computes the hash of some data expression \
-                     using the same algorithm as script instruction H"
+        ~input: (obj3
+                   (req "data" Script.expr_encoding)
+                   (req "type" Script.expr_encoding)
+                   (opt "gas" z))
+        ~output: (obj2
+                    (req "hash" string)
+                    (req "gas" Gas.encoding))
+        ~query: RPC_query.empty
+        RPC_path.(path / "hash_data")
 
-      ~input: (obj3
-                 (req "data" Script.expr_encoding)
-                 (req "type" Script.expr_encoding)
-                 (opt "gas" z))
-      ~output: (obj2
-                  (req "hash" string)
-                  (req "gas" Gas.encoding))
-      ~query: RPC_query.empty
-      RPC_path.(custom_root / "hash_data")
-
-end
-
-let () =
-  let open Services_registration in
-  register0 S.level begin fun ctxt q () ->
-    let level = Level.current ctxt in
-    return (Level.from_raw ctxt ~offset:q.offset level.level)
-  end ;
-  register1 S.levels begin fun ctxt cycle () () ->
-    let levels = Level.levels_in_cycle ctxt cycle in
-    let first = List.hd (List.rev levels) in
-    let last = List.hd levels in
-    return (first.level, last.level)
-  end ;
-  register0 S.run_code begin fun ctxt ()
-    (code, storage, parameter, amount, contract) ->
-    Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
-    let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
-    let storage = Script.lazy_expr storage in
-    let code = Script.lazy_expr code in
-    Script_interpreter.execute
-      ctxt Readable
-      ~source:contract (* transaction initiator *)
-      ~payer:contract (* storage fees payer *)
-      ~self:(contract, { storage ; code }) (* script owner *)
-      ~amount ~parameter
-    >>=? fun { Script_interpreter.storage ; operations ; big_map_diff ; _ } ->
-    return (storage, operations, big_map_diff)
-  end ;
-  register0 S.trace_code begin fun ctxt ()
-    (code, storage, parameter, amount, contract) ->
-    Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
-    let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
-    let storage = Script.lazy_expr storage in
-    let code = Script.lazy_expr code in
-    Script_interpreter.trace
-      ctxt Readable
-      ~source:contract (* transaction initiator *)
-      ~payer:contract (* storage fees payer *)
-      ~self:(contract, { storage ; code }) (* script owner *)
-      ~amount ~parameter
-    >>=? fun ({ Script_interpreter.storage ; operations ; big_map_diff ; _ }, trace) ->
-    return (storage, operations, trace, big_map_diff)
-  end ;
-  register0 S.typecheck_code begin fun ctxt () (expr, maybe_gas) ->
-    begin match maybe_gas with
-      | None -> return (Gas.set_unlimited ctxt)
-      | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
-    Script_ir_translator.typecheck_code ctxt expr >>=? fun (res, ctxt) ->
-    return (res, Gas.level ctxt)
-  end ;
-  register0 S.typecheck_data begin fun ctxt () (data, ty, maybe_gas) ->
-    begin match maybe_gas with
-      | None -> return (Gas.set_unlimited ctxt)
-      | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
-    Script_ir_translator.typecheck_data ctxt (data, ty) >>=? fun ctxt ->
-    return (Gas.level ctxt)
-  end ;
-  register0 S.hash_data begin fun ctxt () (expr, typ, maybe_gas) ->
-    let open Script_ir_translator in
-    begin match maybe_gas with
-      | None -> return (Gas.set_unlimited ctxt)
-      | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
-    Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ, _) ->
-    parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
-    Script_ir_translator.hash_data ctxt typ data >>=? fun (hash, ctxt) ->
-    return (hash, Gas.level ctxt)
   end
 
-let level ctxt ?(offset = 0l) block =
-  RPC_context.make_call0 S.level ctxt block { offset } ()
+  let () =
+    let open Services_registration in
+    register0 S.run_code begin fun ctxt ()
+      (code, storage, parameter, amount, contract) ->
+      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
+      let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+      let storage = Script.lazy_expr storage in
+      let code = Script.lazy_expr code in
+      Script_interpreter.execute
+        ctxt Readable
+        ~source:contract (* transaction initiator *)
+        ~payer:contract (* storage fees payer *)
+        ~self:(contract, { storage ; code }) (* script owner *)
+        ~amount ~parameter
+      >>=? fun { Script_interpreter.storage ; operations ; big_map_diff ; _ } ->
+      return (storage, operations, big_map_diff)
+    end ;
+    register0 S.trace_code begin fun ctxt ()
+      (code, storage, parameter, amount, contract) ->
+      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
+      let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+      let storage = Script.lazy_expr storage in
+      let code = Script.lazy_expr code in
+      Script_interpreter.trace
+        ctxt Readable
+        ~source:contract (* transaction initiator *)
+        ~payer:contract (* storage fees payer *)
+        ~self:(contract, { storage ; code }) (* script owner *)
+        ~amount ~parameter
+      >>=? fun ({ Script_interpreter.storage ; operations ; big_map_diff ; _ }, trace) ->
+      return (storage, operations, trace, big_map_diff)
+    end ;
+    register0 S.typecheck_code begin fun ctxt () (expr, maybe_gas) ->
+      begin match maybe_gas with
+        | None -> return (Gas.set_unlimited ctxt)
+        | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
+      Script_ir_translator.typecheck_code ctxt expr >>=? fun (res, ctxt) ->
+      return (res, Gas.level ctxt)
+    end ;
+    register0 S.typecheck_data begin fun ctxt () (data, ty, maybe_gas) ->
+      begin match maybe_gas with
+        | None -> return (Gas.set_unlimited ctxt)
+        | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
+      Script_ir_translator.typecheck_data ctxt (data, ty) >>=? fun ctxt ->
+      return (Gas.level ctxt)
+    end ;
+    register0 S.hash_data begin fun ctxt () (expr, typ, maybe_gas) ->
+      let open Script_ir_translator in
+      begin match maybe_gas with
+        | None -> return (Gas.set_unlimited ctxt)
+        | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
+      Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ, _) ->
+      parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
+      Script_ir_translator.hash_data ctxt typ data >>=? fun (hash, ctxt) ->
+      return (hash, Gas.level ctxt)
+    end
 
-let levels ctxt block cycle =
-  RPC_context.make_call1 S.levels ctxt block cycle () ()
+  let run_code ctxt block code (storage, input, amount, contract) =
+    RPC_context.make_call0 S.run_code ctxt
+      block () (code, storage, input, amount, contract)
 
-let run_code ctxt block code (storage, input, amount, contract) =
-  RPC_context.make_call0 S.run_code ctxt
-    block () (code, storage, input, amount, contract)
+  let trace_code ctxt block code (storage, input, amount, contract) =
+    RPC_context.make_call0 S.trace_code ctxt
+      block () (code, storage, input, amount, contract)
 
-let trace_code ctxt block code (storage, input, amount, contract) =
-  RPC_context.make_call0 S.trace_code ctxt
-    block () (code, storage, input, amount, contract)
+  let typecheck_code ctxt block =
+    RPC_context.make_call0 S.typecheck_code ctxt block ()
 
-let typecheck_code ctxt block =
-  RPC_context.make_call0 S.typecheck_code ctxt block ()
+  let typecheck_data ctxt block =
+    RPC_context.make_call0 S.typecheck_data ctxt block ()
 
-let typecheck_data ctxt block =
-  RPC_context.make_call0 S.typecheck_data ctxt block ()
+  let hash_data ctxt block =
+    RPC_context.make_call0 S.hash_data ctxt block ()
 
-let hash_data ctxt block =
-  RPC_context.make_call0 S.hash_data ctxt block ()
+end
 
 module Forge = struct
 
@@ -238,17 +203,15 @@ module Forge = struct
 
     open Data_encoding
 
-    let custom_root = RPC_path.(custom_root / "forge")
+    let path = RPC_path.(path / "forge")
 
     let operations =
       RPC_service.post_service
         ~description:"Forge an operation"
         ~query: RPC_query.empty
         ~input: Operation.unsigned_encoding
-        ~output:
-          (obj1
-             (req "operation" bytes))
-        RPC_path.(custom_root / "operations" )
+        ~output: bytes
+        RPC_path.(path / "operations" )
 
     let empty_proof_of_work_nonce =
       MBytes.of_string
@@ -267,7 +230,7 @@ module Forge = struct
                    Alpha_context.Constants.proof_of_work_nonce_size)
                 empty_proof_of_work_nonce))
         ~output: (obj1 (req "protocol_data" bytes))
-        RPC_path.(custom_root / "protocol_data")
+        RPC_path.(path / "protocol_data")
 
   end
 
@@ -434,7 +397,7 @@ module Parse = struct
 
     open Data_encoding
 
-    let custom_root = RPC_path.(custom_root / "parse")
+    let path = RPC_path.(path / "parse")
 
     let operations =
       RPC_service.post_service
@@ -445,7 +408,7 @@ module Parse = struct
              (req "operations" (list (dynamic_size Operation.raw_encoding)))
              (opt "check_signature" bool))
         ~output: (list (dynamic_size Operation.encoding))
-        RPC_path.(custom_root / "operations" )
+        RPC_path.(path / "operations" )
 
     let block =
       RPC_service.post_service
@@ -453,7 +416,7 @@ module Parse = struct
         ~query: RPC_query.empty
         ~input: Block_header.raw_encoding
         ~output: Block_header.protocol_data_encoding
-        RPC_path.(custom_root / "block" )
+        RPC_path.(path / "block" )
 
   end
 
@@ -527,3 +490,53 @@ module Parse = struct
       S.block ctxt block () ({ shell ; protocol_data } : Block_header.raw)
 
 end
+
+module S = struct
+
+  open Data_encoding
+
+  type level_query = {
+    offset: int32 ;
+  }
+  let level_query : level_query RPC_query.t =
+    let open RPC_query in
+    query (fun offset -> { offset })
+    |+ field "offset" RPC_arg.int32 0l (fun t -> t.offset)
+    |> seal
+
+  let level =
+    RPC_service.get_service
+      ~description: "..."
+      ~query: level_query
+      ~output: Level.encoding
+      RPC_path.(path / "level")
+
+  let levels =
+    RPC_service.get_service
+      ~description: "Levels of a cycle"
+      ~query: level_query
+      ~output: (obj2
+                  (req "first" Raw_level.encoding)
+                  (req "last" Raw_level.encoding))
+      RPC_path.(path / "levels_in_current_cycle")
+
+end
+
+let () =
+  let open Services_registration in
+  register0 S.level begin fun ctxt q () ->
+    let level = Level.current ctxt in
+    return (Level.from_raw ctxt ~offset:q.offset level.level)
+  end ;
+  register0 S.levels begin fun ctxt q () ->
+    let levels = Level.levels_in_current_cycle ctxt ~offset:q.offset () in
+    let first = List.hd (List.rev levels) in
+    let last = List.hd levels in
+    return (first.level, last.level)
+  end
+
+let level ctxt ?(offset = 0l) block =
+  RPC_context.make_call0 S.level ctxt block { offset } ()
+
+let levels ctxt block cycle =
+  RPC_context.make_call1 S.levels ctxt block cycle () ()
