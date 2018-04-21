@@ -51,10 +51,10 @@ let preapply
     { shell = { branch } ;
       protocol_data = { contents ; signature } } in
   let oph = Operation.hash op in
-  Block_services.hash cctxt ~chain ~block () >>=? fun bh ->
-  Alpha_services.Helpers.apply_operation cctxt
-    (chain, block) bh oph bytes signature >>=? fun result ->
-  return (oph, op, result)
+  Block_services.Helpers.Preapply.operations cctxt ~chain ~block
+    [op] >>=? function
+  | [result] -> return (oph, op, result)
+  | _ -> failwith "Unexpected result"
 
 let estimated_gas = function
   | Sourced_operation_result (Manager_operations_result { operation_results }) ->

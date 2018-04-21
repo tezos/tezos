@@ -252,7 +252,11 @@ let rpc_directory
 
   (* helpers *)
 
-  register0 S.Helpers.preapply begin fun block q p ->
+  register0 S.Helpers.Preapply.block begin fun block q p ->
+    let timestamp =
+      match q#timestamp with
+      | None -> Time.now ()
+      | Some time -> time in
     let protocol_data =
       Data_encoding.Binary.to_bytes_exn
         Next_proto.block_header_data_encoding
@@ -269,10 +273,30 @@ let rpc_directory
         p.operations in
     Prevalidation.preapply
       ~predecessor:block
-      ~timestamp:p.timestamp
+      ~timestamp
       ~protocol_data
       ~sort_operations:q#sort_operations
       operations
+  end ;
+
+  register0 S.Helpers.Preapply.operations begin fun block () ops ->
+    State.Block.context block >>= fun ctxt ->
+    let predecessor = State.Block.hash block in
+    let header = State.Block.shell_header block in
+    Next_proto.begin_construction
+      ~predecessor_context:ctxt
+      ~predecessor_timestamp:header.timestamp
+      ~predecessor_level:header.level
+      ~predecessor_fitness:header.fitness
+      ~predecessor
+      ~timestamp:(Time.now ()) () >>=? fun state ->
+    fold_left_s
+      (fun (state, acc) op ->
+         Next_proto.apply_operation state op >>=? fun (state, result) ->
+         return (state, result :: acc))
+      (state, []) ops >>=? fun (state, acc) ->
+    Next_proto.finalize_block state >>=? fun _ ->
+    return (List.rev acc)
   end ;
 
   register1 S.Helpers.complete begin fun block prefix () () ->

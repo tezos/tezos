@@ -222,13 +222,22 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
   module Helpers : sig
 
-    val preapply:
-      #simple -> ?chain:chain -> ?block:block ->
-      ?sort:bool ->
-      timestamp:Time.t ->
-      protocol_data:Next_proto.block_header_data ->
-      Next_proto.operation list list ->
-      (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
+    module Preapply : sig
+
+      val block:
+        #simple -> ?chain:chain -> ?block:block ->
+        ?sort:bool ->
+        ?timestamp:Time.t ->
+        protocol_data:Next_proto.block_header_data ->
+        Next_proto.operation list list ->
+        (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
+
+      val operations:
+        #simple -> ?chain:chain -> ?block:block ->
+        Next_proto.operation list ->
+        Next_proto.operation_metadata list tzresult Lwt.t
+
+    end
 
     val complete:
       #simple -> ?chain:chain -> ?block:block ->
@@ -413,16 +422,25 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
     module Helpers : sig
 
-      type preapply_param = {
-        timestamp: Time.t ;
-        protocol_data: Next_proto.block_header_data ;
-        operations: Next_proto.operation list list ;
-      }
+      module Preapply : sig
 
-      val preapply:
-        ([ `POST ], prefix,
-         prefix, < sort_operations : bool >, preapply_param,
-         Block_header.shell_header * error Preapply_result.t list) RPC_service.t
+        type block_param = {
+          protocol_data: Next_proto.block_header_data ;
+          operations: Next_proto.operation list list ;
+        }
+
+        val block:
+          ([ `POST ], prefix,
+           prefix, < sort_operations : bool;
+                     timestamp : Time.t option >, block_param,
+           Block_header.shell_header * error Preapply_result.t list) RPC_service.t
+
+        val operations:
+          ([ `POST ], prefix,
+           prefix, unit, Next_proto.operation list,
+           Next_proto.operation_metadata list) RPC_service.t
+
+      end
 
       val complete:
         ([ `GET ], prefix,

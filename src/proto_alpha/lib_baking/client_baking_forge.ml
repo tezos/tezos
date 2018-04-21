@@ -199,7 +199,7 @@ let forge_block cctxt ?(chain = `Main) block
   let request = List.length operations in
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   let operations = classify_operations operations in
-  Block_services.Helpers.preapply
+  Block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~sort ~protocol_data operations >>=?
   fun (shell_header, result) ->
   let valid =
@@ -519,7 +519,8 @@ let bake (cctxt : #Proto_alpha.full) state =
        let protocol_data =
          forge_faked_protocol_data ~priority ~seed_nonce_hash in
        let operations = classify_operations operations in
-       Block_services.Helpers.preapply cctxt ~chain ~block
+       Block_services.Helpers.Preapply.block
+         cctxt ~chain ~block
          ~timestamp ~sort:true ~protocol_data operations >>= function
        | Error errs ->
            lwt_log_error "Error while prevalidating operations:@\n%a"

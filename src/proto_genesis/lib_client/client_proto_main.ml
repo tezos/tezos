@@ -15,7 +15,7 @@ let protocol =
 
 let bake cctxt ?(timestamp = Time.now ()) block command sk =
   let protocol_data = { command ; signature = Signature.zero } in
-  Block_services.Helpers.preapply
+  Block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~protocol_data
     [] >>=? fun (shell_header, _) ->
   let blk = Data.Command.forge shell_header command in

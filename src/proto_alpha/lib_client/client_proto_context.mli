@@ -10,20 +10,20 @@
 open Proto_alpha
 open Alpha_context
 
-val list_contract_labels :
+val list_contract_labels:
   #Proto_alpha.full ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
   (string * string * string) list tzresult Lwt.t
 
-val get_storage :
+val get_storage:
   #Proto_alpha.rpc_context ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
-val get_manager :
+val get_manager:
   #Proto_alpha.full ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
@@ -38,7 +38,7 @@ val get_balance:
   Contract.t ->
   Tez.t tzresult Lwt.t
 
-val set_delegate :
+val set_delegate:
   #Proto_alpha.full ->
   chain:Chain_services.chain ->
   block:Block_services.block ->

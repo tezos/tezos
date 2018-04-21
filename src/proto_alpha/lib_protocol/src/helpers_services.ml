@@ -100,18 +100,6 @@ module S = struct
                   (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
       RPC_path.(custom_root / "run_code")
 
-  let apply_operation =
-    RPC_service.post_service
-      ~description: "Applies an operation in the current context"
-      ~query: RPC_query.empty
-      ~input: (obj4
-                 (req "pred_block" Block_hash.encoding)
-                 (req "operation_hash" Operation_hash.encoding)
-                 (req "forged_operation" bytes)
-                 (opt "signature" Signature.encoding))
-      ~output: Apply_operation_result.encoding
-      RPC_path.(custom_root / "apply_operation")
-
   let trace_code =
     RPC_service.post_service
       ~description: "Run a piece of code in the current context, \
@@ -170,22 +158,6 @@ module S = struct
 
 end
 
-module I = struct
-
-  let apply_operation ctxt () (pred_block, hash, forged_operation, signature) =
-    (* ctxt accept_failing_script baker_contract pred_block block_prio operation *)
-    match Data_encoding.Binary.of_bytes
-            Operation.unsigned_encoding
-            forged_operation with
-    | None -> fail Cannot_parse_operation
-    | Some (shell, contents) ->
-        let operation = { shell ; protocol_data = { contents ; signature } } in
-        Apply.apply_operation
-          ctxt Readable pred_block hash operation >>=? fun (_, result) ->
-        return result
-
-end
-
 let () =
   let open Services_registration in
   register0 S.level begin fun ctxt q () ->
@@ -202,7 +174,6 @@ let () =
     let timestamp = Alpha_context.Timestamp.current ctxt in
     Baking.minimal_time ctxt q.priority timestamp
   end ;
-  register0 S.apply_operation I.apply_operation ;
   register0 S.run_code begin fun ctxt ()
     (code, storage, parameter, amount, contract) ->
     Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
@@ -270,10 +241,6 @@ let minimal_time ctxt ?(priority = 0) block =
 let run_code ctxt block code (storage, input, amount, contract) =
   RPC_context.make_call0 S.run_code ctxt
     block () (code, storage, input, amount, contract)
-
-let apply_operation ctxt block pred_block hash forged_operation signature =
-  RPC_context.make_call0 S.apply_operation ctxt
-    block () (pred_block, hash, forged_operation, signature)
 
 let trace_code ctxt block code (storage, input, amount, contract) =
   RPC_context.make_call0 S.trace_code ctxt

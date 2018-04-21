@@ -28,11 +28,6 @@ val minimal_time:
     timestamp for the successor of [blk]. [?priority] defaults to
     [0]. *)
 
-val apply_operation:
-  'a #RPC_context.simple ->
-  'a -> Block_hash.t -> Operation_hash.t -> MBytes.t -> Signature.t option ->
-  Apply_operation_result.operation_result shell_tzresult Lwt.t
-
 val run_code:
   'a #RPC_context.simple ->
   'a -> Script.expr ->

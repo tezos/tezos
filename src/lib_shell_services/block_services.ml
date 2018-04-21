@@ -524,52 +524,68 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
       let path = RPC_path.(path / "context" / "helpers")
 
-      let preapply_result_encoding =
-        obj2
-          (req "shell_header" Block_header.shell_header_encoding)
-          (req "operations"
-             (list (Preapply_result.encoding RPC_error.encoding)))
+      module Preapply = struct
 
-      type preapply_param = {
-        timestamp: Time.t ;
-        protocol_data: Next_proto.block_header_data ;
-        operations: Next_proto.operation list list ;
-      }
+        let path = RPC_path.(path / "preapply")
 
-      let preapply_param_encoding =
-        (conv
-           (fun { timestamp ; protocol_data ; operations } ->
-              (timestamp, protocol_data, operations))
-           (fun (timestamp, protocol_data, operations) ->
-              { timestamp ; protocol_data ; operations })
-           (obj3
-              (req "timestamp" Time.encoding)
-              (req "protocol_data"
-                 (conv
-                    (fun h -> ((), h)) (fun ((), h) -> h)
-                    (merge_objs
-                       (obj1 (req "protocol" (constant next_protocol_hash)))
-                       (dynamic_size Next_proto.block_header_data_encoding))))
-              (req "operations"
-                 (list (dynamic_size (list next_operation_encoding))))))
+        let block_result_encoding =
+          obj2
+            (req "shell_header" Block_header.shell_header_encoding)
+            (req "operations"
+               (list (Preapply_result.encoding RPC_error.encoding)))
 
-      let preapply_query : < sort_operations: bool > RPC_query.t =
-        let open RPC_query in
-        query (fun sort -> object
-                method sort_operations = sort
-              end)
-        |+ flag "sort" (fun t -> t#sort_operations)
-        |> seal
+        type block_param = {
+          protocol_data: Next_proto.block_header_data ;
+          operations: Next_proto.operation list list ;
+        }
 
-      let preapply =
-        RPC_service.post_service
-          ~description:
-            "Simulate the validation of a block that would contain \
-             the given operations and return the resulting fitness."
-          ~query: preapply_query
-          ~input: preapply_param_encoding
-          ~output: preapply_result_encoding
-          RPC_path.(path / "preapply")
+        let block_param_encoding =
+          (conv
+             (fun { protocol_data ; operations } ->
+                (protocol_data, operations))
+             (fun (protocol_data, operations) ->
+                { protocol_data ; operations })
+             (obj2
+                (req "protocol_data"
+                   (conv
+                      (fun h -> ((), h)) (fun ((), h) -> h)
+                      (merge_objs
+                         (obj1 (req "protocol" (constant next_protocol_hash)))
+                         (dynamic_size Next_proto.block_header_data_encoding))))
+                (req "operations"
+                   (list (dynamic_size (list next_operation_encoding))))))
+
+        let block_query =
+          let open RPC_query in
+          query (fun sort timestamp -> object
+                  method sort_operations = sort
+                  method timestamp = timestamp
+                end)
+          |+ flag "sort" (fun t -> t#sort_operations)
+          |+ opt_field "timestamp" Time.rpc_arg (fun t -> t#timestamp)
+          |> seal
+
+        let block =
+          RPC_service.post_service
+            ~description:
+              "Simulate the validation of a block that would contain \
+               the given operations and return the resulting fitness \
+               and context hash."
+            ~query: block_query
+            ~input: block_param_encoding
+            ~output: block_result_encoding
+            RPC_path.(path / "block")
+
+        let operations =
+          RPC_service.post_service
+            ~description:
+              "Simulate the validation of an operation."
+            ~query: RPC_query.empty
+            ~input: (list next_operation_encoding)
+            ~output: (list (dynamic_size Next_proto.operation_metadata_encoding))
+            RPC_path.(path / "operations")
+
+      end
 
       let complete =
         let prefix_arg =
@@ -830,14 +846,25 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
     module S = S.Helpers
 
-    let preapply ctxt =
-      let f = make_call0 S.preapply ctxt in
-      fun
-        ?(chain = `Main) ?(block = `Head 0)
-        ?(sort = false) ~timestamp ~protocol_data operations ->
-        f chain block
-          (object method sort_operations = sort end)
-          { timestamp ; protocol_data ; operations  }
+    module Preapply = struct
+
+      module S = S.Preapply
+
+      let block ctxt =
+        let f = make_call0 S.block ctxt in
+        fun
+          ?(chain = `Main) ?(block = `Head 0)
+          ?(sort = false) ?timestamp ~protocol_data operations ->
+          f chain block
+            (object method sort_operations = sort method timestamp = timestamp end)
+            { protocol_data ; operations  }
+
+      let operations ctxt =
+        let f = make_call0 S.operations ctxt in
+        fun ?(chain = `Main) ?(block = `Head 0) operations ->
+          f chain block () operations
+
+    end
 
     let complete ctxt =
       let f = make_call1 S.complete ctxt in
