@@ -24,7 +24,7 @@ let json  = {
         Data_encoding.Json.pp ppf json
   end ;
   construct = begin fun enc v ->
-    Data_encoding.Json.to_string ~minify:true @@
+    Data_encoding.Json.to_string ~newline:true ~minify:true @@
     Data_encoding.Json.construct enc v
   end ;
   destruct = begin fun enc body ->

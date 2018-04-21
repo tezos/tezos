@@ -24,6 +24,7 @@ type global_state = {
   global_data: global_data Shared.t ;
   protocol_store: Store.Protocol.store Shared.t ;
   main_chain: Chain_id.t ;
+  protocol_watcher: Protocol_hash.t Lwt_watcher.input ;
   block_watcher: block Lwt_watcher.input ;
 }
 
@@ -841,6 +842,7 @@ module Protocol = struct
         Lwt.return None
       else
         Store.Protocol.RawContents.store (store, hash) bytes >>= fun () ->
+        Lwt_watcher.notify global_state.protocol_watcher hash ;
         Lwt.return (Some hash)
     end
 
@@ -860,6 +862,9 @@ module Protocol = struct
         ~init:Protocol_hash.Set.empty
         ~f:(fun x acc -> Lwt.return (Protocol_hash.Set.add x acc))
     end
+
+  let watcher (state : global_state) =
+    Lwt_watcher.create_stream state.protocol_watcher
 
 end
 
@@ -903,6 +908,7 @@ let read
     global_data = Shared.create global_data ;
     protocol_store = Shared.create @@ Store.Protocol.get global_store ;
     main_chain ;
+    protocol_watcher = Lwt_watcher.create_input () ;
     block_watcher = Lwt_watcher.create_input () ;
   } in
   Chain.read_all state >>=? fun () ->

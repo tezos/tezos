@@ -571,7 +571,7 @@ module Json: sig
 
   (** Write a JSON document to a string. This goes via an intermediate
       buffer and so may be slow on large documents. *)
-  val to_string : ?minify:bool -> json -> string
+  val to_string : ?newline:bool -> ?minify:bool -> json -> string
 
   val pp : Format.formatter -> json -> unit
 

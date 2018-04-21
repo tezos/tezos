@@ -52,6 +52,13 @@ module S = struct
       ~output: Block_hash.encoding
       RPC_path.(path / "heads" /: Chain_services.chain_arg)
 
+  let protocols =
+    RPC_service.get_service
+      ~description:"...FIXME..."
+      ~query: RPC_query.empty
+      ~output: Protocol_hash.encoding
+      RPC_path.(path / "protocols")
+
 end
 
 open RPC_context
@@ -68,3 +75,6 @@ let heads ctxt ?(next_protocols = []) chain =
   make_streamed_call S.heads ctxt ((), chain) (object
     method next_protocols = next_protocols
   end) ()
+
+let protocols ctxt =
+  make_streamed_call S.protocols ctxt () () ()

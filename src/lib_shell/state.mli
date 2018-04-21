@@ -215,6 +215,8 @@ module Protocol : sig
 
   val list: global_state -> Protocol_hash.Set.t Lwt.t
 
+  val watcher: global_state -> Protocol_hash.t Lwt_stream.t * Lwt_watcher.stopper
+
 end
 
 module Current_mempool : sig

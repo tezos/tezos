@@ -138,7 +138,7 @@ let build_rpc_directory node =
   let register0 s f =
     dir := RPC_directory.register !dir s (fun () p q -> f p q) in
 
-  merge (Protocol_directory.build_rpc_directory node.state node.distributed_db) ;
+  merge (Protocol_directory.build_rpc_directory node.state) ;
   merge (Monitor_directory.build_rpc_directory node.validator) ;
   merge (Shell_directory.build_rpc_directory
            node.validator node.mainchain_validator) ;

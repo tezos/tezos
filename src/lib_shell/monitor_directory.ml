@@ -93,4 +93,11 @@ let build_rpc_directory validator =
     RPC_answer.return_stream { next ; shutdown }
   end ;
 
+  gen_register0 Monitor_services.S.protocols begin fun () () ->
+    let stream, stopper = State.Protocol.watcher state in
+    let shutdown () = Lwt_watcher.shutdown stopper in
+    let next () = Lwt_stream.get stream in
+    RPC_answer.return_stream { next ; shutdown }
+  end ;
+
   !dir

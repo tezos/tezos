@@ -8,4 +8,4 @@
 (**************************************************************************)
 
 val build_rpc_directory:
-  State.t -> Distributed_db.t -> unit RPC_directory.t
+  State.t -> unit RPC_directory.t

@@ -25,8 +25,8 @@ let commands () =
       no_options
       (prefixes [ "list" ; "protocols" ] stop)
       (fun () (cctxt : #Client_context.full) ->
-         Protocol_services.list ~contents:false cctxt >>=? fun protos ->
-         Lwt_list.iter_s (fun (ph, _p) -> cctxt#message "%a" Protocol_hash.pp ph) protos >>= fun () ->
+         Protocol_services.list cctxt >>=? fun protos ->
+         Lwt_list.iter_s (fun ph -> cctxt#message "%a" Protocol_hash.pp ph) protos >>= fun () ->
          return ()
       );
 

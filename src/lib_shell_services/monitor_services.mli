@@ -22,6 +22,10 @@ val heads:
   Chain_services.chain ->
   (Block_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
 
+val protocols:
+  #streamed ->
+  (Protocol_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
+
 module S : sig
 
   val valid_blocks:
@@ -36,6 +40,11 @@ module S : sig
      unit * Chain_services.chain,
      < next_protocols : Protocol_hash.t list >, unit,
      Block_hash.t) RPC_service.t
+
+  val protocols:
+    ([ `GET ], unit,
+     unit, unit, unit,
+     Protocol_hash.t) RPC_service.t
 
 end
 

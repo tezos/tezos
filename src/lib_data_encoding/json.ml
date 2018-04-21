@@ -271,8 +271,10 @@ let to_root = function
   | `Null -> `O []
   | oth -> `A [ oth ]
 
-let to_string ?minify j =
-  Format.asprintf "%a" Json_repr.(pp ?compact:minify (module Ezjsonm)) j
+let to_string ?(newline = false) ?minify j =
+  Format.asprintf "%a%s"
+    Json_repr.(pp ?compact:minify (module Ezjsonm)) j
+    (if newline then "\n" else "")
 
 let pp = Json_repr.(pp (module Ezjsonm))
 
