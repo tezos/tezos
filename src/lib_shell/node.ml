@@ -144,7 +144,7 @@ let build_rpc_directory node =
   merge (Injection_directory.build_rpc_directory node.validator) ;
   merge (Chain_directory.build_rpc_directory node.validator) ;
   merge (P2p.build_rpc_directory node.p2p) ;
-  merge Worker_directory.rpc_directory ;
+  merge (Worker_directory.build_rpc_directory node.state) ;
 
   register0 RPC_service.error_service begin fun () () ->
     return (Data_encoding.Json.schema Error_monad.error_encoding)

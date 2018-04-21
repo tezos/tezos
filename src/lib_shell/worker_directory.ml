@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let rpc_directory =
+let build_rpc_directory state =
 
   let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
   let register0 s f =
@@ -26,7 +26,8 @@ let rpc_directory =
          (Prevalidator.running_workers ()))
   end ;
 
-  register1 Worker_services.Prevalidators.S.state begin fun chain_id () () ->
+  register1 Worker_services.Prevalidators.S.state begin fun chain () () ->
+    Chain_directory.get_chain_id state chain >>= fun chain_id ->
     let w = List.assoc chain_id (Prevalidator.running_workers ()) in
     return
       { Worker_types.status = Prevalidator.status w ;
@@ -48,7 +49,8 @@ let rpc_directory =
 
   (* Workers : Peer validators *)
 
-  register1 Worker_services.Peer_validators.S.list begin fun chain_id () () ->
+  register1 Worker_services.Peer_validators.S.list begin fun chain () () ->
+    Chain_directory.get_chain_id state chain >>= fun chain_id ->
     return
       (List.filter_map
          (fun ((id, peer_id), w) ->
@@ -58,7 +60,8 @@ let rpc_directory =
          (Peer_validator.running_workers ()))
   end ;
 
-  register2 Worker_services.Peer_validators.S.state begin fun chain_id peer_id () () ->
+  register2 Worker_services.Peer_validators.S.state begin fun chain peer_id () () ->
+    Chain_directory.get_chain_id state chain >>= fun chain_id ->
     let w = List.assoc (chain_id, peer_id) (Peer_validator.running_workers ()) in
     return
       { Worker_types.status = Peer_validator.status w ;
@@ -76,7 +79,8 @@ let rpc_directory =
          (Chain_validator.running_workers ()))
   end ;
 
-  register1 Worker_services.Chain_validators.S.state begin fun chain_id () () ->
+  register1 Worker_services.Chain_validators.S.state begin fun chain () () ->
+    Chain_directory.get_chain_id state chain >>= fun chain_id ->
     let w = List.assoc chain_id (Chain_validator.running_workers ()) in
     return
       { Worker_types.status = Chain_validator.status w ;

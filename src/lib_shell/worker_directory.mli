@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val rpc_directory: unit RPC_directory.t
+val build_rpc_directory: State.t -> unit RPC_directory.t
