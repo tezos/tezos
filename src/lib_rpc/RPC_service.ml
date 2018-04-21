@@ -75,10 +75,9 @@ let patch_service = patch_service ~error:error_encoding
 let put_service = put_service ~error:error_encoding
 
 let error_service =
-  post_service
+  get_service
     ~description: "Schema for all the RPC errors from the shell"
     ~query: RPC_query.empty
-    ~input: Data_encoding.empty
     ~output: Data_encoding.json_schema
     RPC_path.(root / "errors")
 

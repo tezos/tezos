@@ -79,6 +79,6 @@ val description_service:
    unit, Json_schema.schema Resto.Description.directory) service
 
 val error_service:
-  ([ `POST ], unit, unit, unit, unit, Json_schema.schema) service
+  ([ `GET ], unit, unit, unit, unit, Json_schema.schema) service
 
 val error_encoding: error Data_encoding.t
