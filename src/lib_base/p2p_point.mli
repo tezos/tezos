@@ -30,6 +30,18 @@ module Map : Map.S with type key = Id.t
 module Set : Set.S with type elt = Id.t
 module Table : Hashtbl.S with type key = Id.t
 
+module Filter : sig
+
+  type t =
+    | Requested
+    | Accepted
+    | Running
+    | Disconnected
+
+  val rpc_arg : t RPC_arg.t
+
+end
+
 module State : sig
 
   type t =
@@ -43,6 +55,8 @@ module State : sig
 
   val of_p2p_peer_id : t -> P2p_peer_id.t option
   val of_peerid_state : t -> P2p_peer_id.t option -> t
+
+  val filter : Filter.t list -> t -> bool
 
 end
 

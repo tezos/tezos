@@ -7,39 +7,60 @@
 (*                                                                        *)
 (**************************************************************************)
 
+let wait_query =
+  let open RPC_query in
+  query (fun wait -> object
+          method wait = wait
+        end)
+  |+ flag "wait" (fun t -> t#wait)
+  |> seal
+
+let monitor_query =
+  let open RPC_query in
+  query (fun monitor -> object
+          method monitor = monitor
+        end)
+  |+ flag "monitor" (fun t -> t#monitor)
+  |> seal
+
+let timeout_query =
+  let open RPC_query in
+  query (fun timeout -> object
+          method timeout = timeout
+        end)
+  |+ field "timeout" RPC_arg.float 10. (fun t -> t#timeout)
+  |> seal
+
 module S = struct
 
   let versions =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description:"Supported network layer versions."
       ~query: RPC_query.empty
-      ~input: Data_encoding.empty
       ~output: (Data_encoding.list P2p_version.encoding)
       RPC_path.(root / "network" / "versions")
 
   let stat =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description:"Global network bandwidth statistics in B/s."
       ~query: RPC_query.empty
-      ~input: Data_encoding.empty
       ~output: P2p_stat.encoding
       RPC_path.(root / "network" / "stat")
 
   let events =
-    RPC_service.post_service
+    RPC_service.get_service
       ~description:"Stream of all network events"
       ~query: RPC_query.empty
-      ~input: Data_encoding.empty
       ~output: P2p_connection.Pool_event.encoding
       RPC_path.(root / "network" / "log")
 
   let connect =
-    RPC_service.post_service
+    RPC_service.put_service
       ~description:"Connect to a peer"
-      ~query: RPC_query.empty
-      ~input: Data_encoding.(obj1 (dft "timeout" float 5.))
+      ~query: timeout_query
+      ~input: Data_encoding.empty
       ~output: Data_encoding.empty
-      RPC_path.(root / "network" / "connect" /: P2p_point.Id.rpc_arg)
+      RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg)
 
 end
 
@@ -48,9 +69,7 @@ let stat ctxt = make_call S.stat ctxt () () ()
 let versions ctxt = make_call S.versions ctxt () () ()
 let events ctxt = make_streamed_call S.events ctxt () () ()
 let connect ctxt ~timeout peer_id =
-  make_call1 S.connect ctxt peer_id () timeout
-
-let monitor_encoding = Data_encoding.(obj1 (dft "monitor" bool false))
+  make_call1 S.connect ctxt peer_id (object method timeout = timeout end) ()
 
 module Connections = struct
 
@@ -62,34 +81,32 @@ module Connections = struct
   module S = struct
 
     let list =
-      RPC_service.post_service
+      RPC_service.get_service
         ~description:"List the running P2P connection."
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: (Data_encoding.list connection_info_encoding)
         RPC_path.(root / "network" / "connections")
 
     let info =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: connection_info_encoding
         ~description:"Details about the current P2P connection to the given peer."
         RPC_path.(root / "network" / "connections" /: P2p_peer.Id.rpc_arg)
 
     let kick =
-      RPC_service.post_service
-        ~query: RPC_query.empty
-        ~input: Data_encoding.(obj1 (req "wait" bool))
+      RPC_service.delete_service
+        ~query: wait_query
         ~output: Data_encoding.empty
         ~description:"Forced close of the current P2P connection to the given peer."
-        RPC_path.(root / "network" / "connections" /: P2p_peer.Id.rpc_arg / "kick")
+        RPC_path.(root / "network" / "connections" /: P2p_peer.Id.rpc_arg)
 
   end
 
   let list ctxt = make_call S.list ctxt () () ()
   let info ctxt peer_id = make_call1 S.info ctxt peer_id () ()
-  let kick ctxt ?(wait = false) peer_id = make_call1 S.kick ctxt peer_id () wait
+  let kick ctxt ?(wait = false) peer_id =
+    make_call1 S.kick ctxt peer_id (object method wait = wait end) ()
 
 end
 
@@ -98,29 +115,30 @@ module Points = struct
   module S = struct
 
     let info =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: P2p_point.Info.encoding
         ~description: "Details about a given `IP:addr`."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg)
 
     let events =
-      RPC_service.post_service
-        ~query: RPC_query.empty
-        ~input: monitor_encoding
+      RPC_service.get_service
+        ~query: monitor_query
         ~output: (Data_encoding.list
                     P2p_point.Pool_event.encoding)
         ~description: "Monitor network events related to an `IP:addr`."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "log")
 
     let list =
-      let filter =
-        let open Data_encoding in
-        obj1 (dft "filter" (list P2p_point.State.encoding) []) in
-      RPC_service.post_service
-        ~query: RPC_query.empty
-        ~input: filter
+      let filter_query =
+        let open RPC_query in
+        query (fun filters -> object
+                method filters = filters
+              end)
+        |+ multi_field "filter" P2p_point.Filter.rpc_arg (fun t -> t#filters)
+        |> seal in
+      RPC_service.get_service
+        ~query: filter_query
         ~output:
           Data_encoding.(list (tup2
                                  P2p_point.Id.encoding
@@ -130,25 +148,22 @@ module Points = struct
         RPC_path.(root / "network" / "points")
 
     let forget =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: Data_encoding.empty
         ~description:"Remove the given address from the whitelist/blacklist."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "forget" )
 
     let ban =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: Data_encoding.empty
         ~description:"Blacklist the given address."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "ban" )
 
     let trust =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: Data_encoding.empty
         ~description:"Trust a given address permanently. \
                       Connections from this address can still be closed \
@@ -156,9 +171,8 @@ module Points = struct
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "trust" )
 
     let banned =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: Data_encoding.bool
         ~description:"Check is a given address is blacklisted or \
                       greylisted."
@@ -169,8 +183,10 @@ module Points = struct
   open RPC_context
   let info ctxt peer_id = make_call1 S.info ctxt peer_id () ()
   let events ctxt point =
-    make_streamed_call S.events ctxt ((), point) () true
-  let list ?(filter = []) ctxt = make_call S.list ctxt () () filter
+    make_streamed_call S.events ctxt ((), point)
+      (object method monitor = true end) ()
+  let list ?(filter = []) ctxt = make_call S.list ctxt ()
+      (object method filters = filter end) ()
   let forget ctxt peer_id = make_call1 S.forget ctxt peer_id () ()
   let ban ctxt peer_id = make_call1 S.ban ctxt peer_id () ()
   let trust ctxt peer_id = make_call1 S.trust ctxt peer_id () ()
@@ -183,17 +199,15 @@ module Peers = struct
   module S = struct
 
     let info =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: (P2p_peer.Info.encoding Connection_metadata.encoding)
         ~description:"Details about a given peer."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg)
 
     let events =
-      RPC_service.post_service
-        ~query: RPC_query.empty
-        ~input: monitor_encoding
+      RPC_service.get_service
+        ~query: monitor_query
         ~output: (Data_encoding.list
                     P2p_peer.Pool_event.encoding)
         ~description:"Monitor network events related to a given peer."
@@ -201,11 +215,14 @@ module Peers = struct
 
     let list =
       let filter =
-        let open Data_encoding in
-        obj1 (dft "filter" (list P2p_peer.State.encoding) []) in
-      RPC_service.post_service
-        ~query: RPC_query.empty
-        ~input: filter
+        let open RPC_query in
+        query (fun filters -> object
+                method filters = filters
+              end)
+        |+ multi_field "filter" P2p_peer.Filter.rpc_arg (fun t -> t#filters)
+        |> seal in
+      RPC_service.get_service
+        ~query: filter
         ~output:
           Data_encoding.(list (tup2
                                  P2p_peer.Id.encoding
@@ -214,34 +231,30 @@ module Peers = struct
         RPC_path.(root / "network" / "peers")
 
     let forget =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: Data_encoding.empty
         ~description:"Remove the given peer from the whitelist/blacklist."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "forget" )
 
     let ban =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: Data_encoding.empty
         ~description:"Blacklist the given peer."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "ban" )
 
     let trust =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: Data_encoding.empty
         ~description:"Trust a given peer permanently: the peer cannot \
                       be blocked (but its host IP still can)."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "trust" )
 
     let banned =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: Data_encoding.bool
         ~description:"Check if a given peer is blacklisted or \
                       greylisted."
@@ -251,8 +264,10 @@ module Peers = struct
 
   let info ctxt peer_id = make_call1 S.info ctxt peer_id () ()
   let events ctxt point =
-    make_streamed_call S.events ctxt ((), point) () true
-  let list ?(filter = []) ctxt = make_call S.list ctxt () () filter
+    make_streamed_call S.events ctxt ((), point)
+      (object method monitor = true end) ()
+  let list ?(filter = []) ctxt =
+    make_call S.list ctxt () (object method filters = filter end) ()
   let forget ctxt point_id = make_call1 S.forget ctxt point_id () ()
   let ban ctxt point_id = make_call1 S.ban ctxt point_id () ()
   let trust ctxt point_id = make_call1 S.trust ctxt point_id () ()
@@ -265,12 +280,12 @@ module ACL = struct
   module S = struct
 
     let clear =
-      RPC_service.post_service
+      RPC_service.get_service
         ~query: RPC_query.empty
-        ~input: Data_encoding.empty
         ~output: Data_encoding.empty
         ~description:"Clear all greylists tables."
         RPC_path.(root / "network" / "greylist" / "clear" )
+
   end
 
   let clear ctxt = make_call S.clear ctxt () ()

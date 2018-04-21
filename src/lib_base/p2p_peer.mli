@@ -13,6 +13,17 @@ module Map = Id.Map
 module Set = Id.Set
 module Table = Id.Table
 
+module Filter : sig
+
+  type t =
+    | Accepted
+    | Running
+    | Disconnected
+
+  val rpc_arg : t RPC_arg.t
+
+end
+
 module State : sig
 
   type t =
@@ -22,6 +33,8 @@ module State : sig
 
   val pp_digram : Format.formatter -> t -> unit
   val encoding : t Data_encoding.t
+
+  val filter : Filter.t list -> t -> bool
 
 end
 

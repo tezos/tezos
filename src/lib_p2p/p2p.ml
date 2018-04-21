@@ -580,11 +580,11 @@ let build_rpc_directory net =
     end in
 
   let dir =
-    RPC_directory.register1 dir P2p_services.S.connect begin fun point () timeout ->
+    RPC_directory.register1 dir P2p_services.S.connect begin fun point q () ->
       match net.pool with
       | None -> failwith "The P2P layer is disabled."
       | Some pool ->
-          P2p_pool.connect ~timeout pool point >>=? fun _conn ->
+          P2p_pool.connect ~timeout:q#timeout pool point >>=? fun _conn ->
           return ()
     end in
 
@@ -602,13 +602,13 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.lwt_register1 dir P2p_services.Connections.S.kick
-      begin fun peer_id () wait ->
+      begin fun peer_id q () ->
         match net.pool with
         | None -> Lwt.return_unit
         | Some pool ->
             match P2p_pool.Connection.find_by_peer_id pool peer_id with
             | None -> Lwt.return_unit
-            | Some conn -> P2p_pool.disconnect ~wait conn
+            | Some conn -> P2p_pool.disconnect ~wait:q#wait conn
       end in
 
   let dir =
@@ -629,7 +629,7 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.register0 dir P2p_services.Peers.S.list
-      begin fun () restrict ->
+      begin fun q () ->
         match net.pool with
         | None -> return []
         | Some pool ->
@@ -638,9 +638,10 @@ let build_rpc_directory net =
               ~init:[]
               ~f:begin fun peer_id i a ->
                 let info = info_of_peer_info pool i in
-                match restrict with
+                match q#filters with
                 | [] -> (peer_id, info) :: a
-                | _ when List.mem info.state restrict -> (peer_id, info) :: a
+                | filters when P2p_peer.State.filter filters info.state ->
+                    (peer_id, info) :: a
                 | _ -> a
               end
       end in
@@ -658,7 +659,7 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.gen_register1 dir P2p_services.Peers.S.events
-      begin fun peer_id () monitor ->
+      begin fun peer_id q () ->
         match net.pool with
         | None -> RPC_answer.not_found
         | Some pool ->
@@ -670,7 +671,7 @@ let build_rpc_directory net =
                   P2p_peer_state.Info.fold gi ~init:[]
                     ~f:(fun a e -> e :: a) in
                 let evts = (if rev then List.rev_sub else List.sub) evts max in
-                if not monitor then
+                if not q#monitor then
                   RPC_answer.return evts
                 else
                   let stream, stopper = P2p_peer_state.Info.watch gi in
@@ -722,7 +723,7 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.register0 dir P2p_services.Points.S.list
-      begin fun () restrict ->
+      begin fun q () ->
         match net.pool with
         | None -> return []
         | Some pool ->
@@ -731,9 +732,10 @@ let build_rpc_directory net =
               pool ~init:[]
               ~f:begin fun point i a ->
                 let info = info_of_point_info i in
-                match restrict with
+                match q#filters with
                 | [] -> (point, info) :: a
-                | _ when List.mem info.state restrict -> (point, info) :: a
+                | filters when P2p_point.State.filter filters info.state ->
+                    (point, info) :: a
                 | _ -> a
               end
       end in
@@ -752,7 +754,7 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.gen_register1 dir P2p_services.Points.S.events
-      begin fun point_id () monitor ->
+      begin fun point_id q () ->
         match net.pool with
         | None -> RPC_answer.not_found
         | Some pool ->
@@ -764,7 +766,7 @@ let build_rpc_directory net =
                   P2p_point_state.Info.fold gi ~init:[]
                     ~f:(fun a e -> e :: a) in
                 let evts = (if rev then List.rev_sub else List.sub) evts max in
-                if not monitor then
+                if not q#monitor then
                   RPC_answer.return evts
                 else
                   let stream, stopper = P2p_point_state.Info.watch gi in

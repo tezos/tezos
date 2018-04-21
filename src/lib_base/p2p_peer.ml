@@ -13,6 +13,29 @@ module Table = Id.Table
 module Map = Id.Map
 module Set = Id.Set
 
+module Filter = struct
+
+  type t =
+    | Accepted
+    | Running
+    | Disconnected
+
+  let rpc_arg =
+    RPC_arg.make
+      ~name:"p2p.point.state_filter"
+      ~destruct:(function
+          | "accepted" -> Ok Accepted
+          | "running" -> Ok Running
+          | "disconnected" -> Ok Disconnected
+          | s -> Error (Format.asprintf "Invalid state: %s" s))
+      ~construct:(function
+          | Accepted -> "accepted"
+          | Running -> "running"
+          | Disconnected -> "disconnected")
+      ()
+
+end
+
 module State = struct
 
   type t =
@@ -32,6 +55,19 @@ module State = struct
       "running", Running ;
       "disconnected", Disconnected ;
     ]
+
+  let raw_filter (f : Filter.t) (s : t) =
+    match f, s with
+    | Accepted, Accepted -> true
+    | Accepted, (Running | Disconnected)
+    | (Running | Disconnected), Accepted -> false
+    | Running, Running -> true
+    | Disconnected, Disconnected -> true
+    | Running, Disconnected
+    | Disconnected, Running -> false
+
+  let filter filters state =
+    List.exists (fun f -> raw_filter f state) filters
 
 end
 
