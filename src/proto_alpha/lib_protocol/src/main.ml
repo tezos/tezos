@@ -28,8 +28,9 @@ type operation = Alpha_context.Operation.t = {
 
 let operation_data_encoding = Alpha_context.Operation.protocol_data_encoding
 
-type operation_metadata = unit
-let operation_metadata_encoding = Data_encoding.unit
+type operation_metadata = Apply_operation_result.operation_result
+let operation_metadata_encoding =
+  Data_encoding.(obj1 (req "metadata" Apply_operation_result.encoding))
 
 let acceptable_passes = Alpha_context.Operation.acceptable_passes
 
@@ -128,9 +129,9 @@ let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
     | Full_construction { predecessor ; _ } ->
         predecessor in
   Apply.apply_operation ctxt Optimized predecessor
-    (Alpha_context.Operation.hash operation) operation >>=? fun (ctxt, _) ->
+    (Alpha_context.Operation.hash operation) operation >>=? fun (ctxt, result) ->
   let op_count = op_count + 1 in
-  return ({ data with ctxt ; op_count }, ())
+  return ({ data with ctxt ; op_count }, result)
 
 let finalize_block { mode ; ctxt ; op_count ; deposit = _ } =
   match mode with

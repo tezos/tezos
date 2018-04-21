@@ -34,5 +34,6 @@ include Updater.PROTOCOL with type block_header_data = Alpha_context.Block_heade
                           and type block_header_metadata = Alpha_context.Block_header.metadata
                           and type block_header = Alpha_context.Block_header.t
                           and type operation_data = Alpha_context.Operation.protocol_data
+                          and type operation_metadata = Apply_operation_result.operation_result
                           and type operation = Alpha_context.operation
                           and type validation_state := validation_state
