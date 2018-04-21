@@ -22,6 +22,8 @@ type t = (module T)
 
 val mem: Protocol_hash.t -> bool
 
+val list: unit -> t list
+
 val get: Protocol_hash.t -> t option
 val get_exn: Protocol_hash.t -> t
 

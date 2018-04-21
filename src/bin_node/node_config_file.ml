@@ -109,46 +109,10 @@ let default_log = {
 }
 
 let default_shell = {
-  block_validator_limits = {
-    protocol_timeout = 120. ;
-    worker_limits = {
-      backlog_size = 1000 ;
-      backlog_level = Logging.Debug ;
-      zombie_lifetime = 3600. ;
-      zombie_memory = 1800. ;
-    }
-  } ;
-  prevalidator_limits = {
-    operation_timeout = 10. ;
-    max_refused_operations = 1000 ;
-    worker_limits = {
-      backlog_size = 1000 ;
-      backlog_level = Logging.Info ;
-      zombie_lifetime = 600. ;
-      zombie_memory = 120. ;
-    }
-  } ;
-  peer_validator_limits = {
-    block_header_timeout = 60. ;
-    block_operations_timeout = 60. ;
-    protocol_timeout = 120. ;
-    new_head_request_timeout = 90. ;
-    worker_limits = {
-      backlog_size = 1000 ;
-      backlog_level = Logging.Info ;
-      zombie_lifetime = 600. ;
-      zombie_memory = 120. ;
-    }
-  } ;
-  chain_validator_limits = {
-    bootstrap_threshold = 4 ;
-    worker_limits = {
-      backlog_size = 1000 ;
-      backlog_level = Logging.Info ;
-      zombie_lifetime = 600. ;
-      zombie_memory = 120. ;
-    }
-  }
+  block_validator_limits = Node.default_block_validator_limits ;
+  prevalidator_limits = Node.default_prevalidator_limits ;
+  peer_validator_limits = Node.default_peer_validator_limits ;
+  chain_validator_limits = Node.default_chain_validator_limits ;
 }
 
 let default_config = {

@@ -177,6 +177,11 @@ module Make (Encoding : ENCODING) : sig
     ('prefix, 'prefix, 'error) Service.description_service ->
     'prefix directory
 
+  val describe_directory:
+    recurse:bool ->
+    ?arg:'a ->
+    'a directory -> Encoding.schema Resto.Description.directory Lwt.t
+
   (**/**)
 
   module Curry: sig

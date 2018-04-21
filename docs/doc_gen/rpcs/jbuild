@@ -4,19 +4,23 @@
  ((name rpc_doc)
   (libraries
    (tezos-base
-    tezos-rpc-http
-    tezos-client-base
-    tezos-client-commands
-    tezos-client-base-unix))
+    tezos-stdlib-unix
+    tezos-shell
+    tezos-protocol-updater
+    tezos-embedded-protocol-alpha
+    re))
   (flags (:standard -w -9+27-30-32-40@8
           -safe-string
           -open Tezos_base__TzPervasives
-          -open Tezos_rpc_http
-          -open Tezos_client_base
-          -open Tezos_client_commands
-          -open Tezos_client_base_unix
+          -open Tezos_stdlib_unix
+          -open Tezos_shell
+          -open Tezos_protocol_updater
           -linkall))
 ))
+
+(alias
+ ((name buildtest)
+  (deps (rpc_doc.exe))))
 
 (alias
  ((name runtest_indent)

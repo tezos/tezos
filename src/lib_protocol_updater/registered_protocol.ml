@@ -60,6 +60,9 @@ let get hash =
   try Some (get_exn hash)
   with Not_found -> None
 
+let list () =
+  VersionTable.fold (fun _ p acc -> p :: acc) versions []
+
 let list_embedded () =
   VersionTable.fold (fun k _ acc -> k :: acc) sources []
 

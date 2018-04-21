@@ -7,518 +7,414 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type service_repr =
-  { path : string list ;
-    meth : Resto.meth ;
-    description : string ;
-    query : Resto.Description.query_item list ;
-    input : Json_schema.schema option ;
-    output : Json_schema.schema option ;
-    example : string option ;
-    error : Json_schema.schema option
+let protocols = [
+  "Alpha", "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" ;
+]
+
+module Rst = struct
+
+  let pp_title ~char ppf title =
+    let sub = String.map (fun _ -> char) title in
+    Format.fprintf ppf "@[<v 0>%s@ %s@ @ @]" title sub
+
+  let pp_h1 = pp_title ~char:'#'
+  let pp_h2 = pp_title ~char:'*'
+  let pp_h3 = pp_title ~char:'='
+  let pp_h4 = pp_title ~char:'`'
+
+  let pp_raw_html ppf str =
+    Format.fprintf ppf "@[<v>.. raw:: html@   @   %s@ @ @]"
+      (Re.Str.global_replace (Re.Str.regexp "\n") "\n  " str)
+
+  let pp_html ppf f =
+    Format.fprintf ppf
+      "@[<v 2>.. raw:: html@ @ %a@]@\n@\n"
+      (fun ppf () -> f ppf) ()
+
+  let pp_ref ppf name = Format.fprintf ppf ".. _%s :@\n@\n" name
+
+end
+
+let pp_name ppf = function
+  | [] | [""] -> Format.pp_print_string ppf "/"
+  | prefix -> Format.pp_print_string ppf (String.concat "/" prefix)
+
+let ref_of_service (prefix, meth) =
+  Format.asprintf "%s_%s"
+    (Resto.string_of_meth meth)
+    (Re.Str.global_replace
+       (Re.Str.regexp "<\\([^>]*\\)>")
+       "\\1"
+       (String.concat "--" prefix))
+
+module Index = struct
+
+  let rec pp prefix ppf dir =
+    let open Resto.Description in
+    match dir with
+    | Empty -> Format.fprintf ppf "Empty"
+    | Static { services ; subdirs = None } ->
+        pp_services prefix ppf services
+    | Static { services ; subdirs = Some (Suffixes map) } ->
+        Format.fprintf ppf "@[<v 2>%a@ @ %a@]"
+          (pp_services prefix) services
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ @ ")
+             (pp_suffixes prefix))
+          (Resto.StringMap.bindings map)
+    | Static { services ; subdirs = Some (Arg (arg, dir)) } ->
+        let name = Format.asprintf "<%s>" arg.name in
+        Format.fprintf ppf "@[<v 2>%a@ @ %a@]"
+          (pp_services prefix) services
+          (pp_suffixes prefix) (name, dir)
+    | Dynamic _ ->
+        Format.fprintf ppf "* %a (<dyn>)" pp_name prefix
+
+  and pp_suffixes prefix ppf (name, dir) =
+    pp (prefix @ [name]) ppf dir
+
+  and pp_services prefix ppf services =
+    match (Resto.MethMap.bindings services) with
+    | [] ->
+        Format.fprintf ppf "* %a" pp_name prefix
+    | _ :: _ as services ->
+        Format.fprintf ppf "* %a (@[<h>%a@])"
+          pp_name prefix
+          (Format.pp_print_list
+             ~pp_sep:Format.pp_print_space
+             (pp_service_method prefix)) services
+
+  and pp_service_method prefix ppf (meth, _service) =
+    Format.fprintf ppf "`%s <%s_>`_"
+      (Resto.string_of_meth meth)
+      (ref_of_service (prefix, meth))
+
+end
+
+module Description = struct
+
+  module Query = struct
+
+    let pp_arg fmt =
+      let open RPC_arg in
+      function { name ; _ } ->
+        Format.fprintf fmt "<%s>" name
+
+    let pp_title_item ppf =
+      let open RPC_description in
+      function {name ; kind ; _ } ->
+      match kind with
+      | Single arg | Optional arg ->
+          Format.fprintf ppf "[%s=%a]" name pp_arg arg
+      | Flag ->
+          Format.fprintf ppf "[%s]" name
+      | Multi arg ->
+          Format.fprintf ppf "(%s=%a)\\*" name pp_arg arg
+
+    let pp_title ppf query =
+      Format.fprintf ppf "%s%a"
+        (if query = [] then "" else "?")
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf "&")
+           pp_title_item) query
+
+    let pp_html_arg fmt =
+      let open RPC_arg in
+      function { name ; _ } ->
+        Format.fprintf fmt "&lt;%s&gt;" name
+
+    let pp_item ppf =
+      let open RPC_description in
+      function { name ; description ; kind } ->
+        begin match kind with
+          | Single arg
+          | Optional arg
+          | Multi arg ->
+              Format.fprintf ppf
+                "<span class=\"query\">%s = %a</span>"
+                name pp_html_arg arg
+          | Flag ->
+              Format.fprintf ppf
+                "<span class=\"query\">%s</span>"
+                name
+        end ;
+        begin match description with
+          | None -> ()
+          | Some descr -> Format.fprintf ppf " : %s" descr
+        end
+
+    let pp ppf query =
+      match query with
+      | [] -> ()
+      | _ :: _ as query ->
+          Format.fprintf ppf
+            "</p> <p>Optional query arguments :<ul><li>%a</li></ul>"
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.fprintf ppf "</li><li>")
+               pp_item)
+            query
+
+  end
+
+  module Tabs = struct
+
+    let pp_tab_div ppf f =
+      Format.fprintf ppf
+        "@[<v 2><div class=\"tab\">%a</div>@]"
+        (fun ppf () -> f ppf) ()
+
+    let pp_tabcontent_div ~id ~class_ ppf f =
+      Format.fprintf ppf
+        "@[<v 2><div id=\"%s\" class=\"%s tabcontent\">@ \
+         %a@ \
+         @]</div>@ "
+        id class_ (fun ppf () -> f ppf) ()
+
+    let pp_button ppf ?(default=false) ~shortlabel ~content target_ref =
+      Format.fprintf ppf
+        "<button class=\"tablinks%s\" onclick=\"showTab(this, '%s', '%s')\">%s</button>@ "
+        (if default then " defaultOpen" else "")
+        (target_ref ^ shortlabel)
+        target_ref
+        content
+
+    let pp_content ppf ~tag ~shortlabel target_ref pp_content content =
+      pp_tabcontent_div
+        ~id:(target_ref ^ shortlabel) ~class_:target_ref ppf
+        begin fun ppf ->
+          Format.fprintf ppf "<%s>@ %a</%s>" tag pp_content content tag
+        end
+
+    let pp_description ppf (service : _ RPC_description.service) =
+      let open RPC_description in
+      (* TODO collect and display arg description (in path and in query) *)
+      Format.fprintf ppf "%s%a"
+        (Option.unopt ~default:"" service.description)
+        Query.pp service.query
+
+    let pp ppf prefix service =
+      let open RPC_description in
+      let target_ref = ref_of_service (prefix, service.meth) in
+      Rst.pp_html ppf begin fun ppf ->
+        pp_tab_div ppf begin fun ppf ->
+          pp_button ppf
+            ~default:true ~shortlabel:"descr" ~content:"Description"
+            target_ref ;
+          Option.iter service.input ~f: begin fun __ ->
+            pp_button ppf
+              ~default:false ~shortlabel:"input" ~content:"Input format"
+              target_ref
+          end ;
+          pp_button ppf
+            ~default:false ~shortlabel:"output" ~content:"Output format"
+            target_ref ;
+        end ;
+        pp_content ppf
+          ~tag:"p" ~shortlabel:"descr" target_ref
+          pp_description service ;
+        Option.iter service.input ~f: begin fun schema ->
+          pp_content ppf
+            ~tag:"pre" ~shortlabel:"input" target_ref
+            Json_schema.pp schema ;
+        end ;
+        pp_content ppf
+          ~tag:"pre" ~shortlabel:"output" target_ref
+          Json_schema.pp service.output ;
+      end
+
+  end
+
+  let rec pp prefix ppf dir =
+    let open Resto.Description in
+    match dir with
+    | Empty -> ()
+    | Static { services ; subdirs = None } ->
+        pp_services prefix ppf services
+    | Static { services ; subdirs = Some (Suffixes map) } ->
+        pp_services prefix ppf services ;
+        Format.pp_print_list (pp_suffixes prefix)
+          ppf (Resto.StringMap.bindings map)
+    | Static { services ; subdirs = Some (Arg (arg, dir)) } ->
+        let name = Format.asprintf "<%s>" arg.name in
+        pp_services prefix ppf services ;
+        pp_suffixes prefix ppf (name, dir)
+    | Dynamic _ -> ()
+
+  and pp_suffixes prefix ppf (name, dir) =
+    pp (prefix @ [name]) ppf dir
+
+  and pp_services prefix ppf services =
+    List.iter
+      (pp_service prefix ppf)
+      (Resto.MethMap.bindings services)
+
+  and pp_service prefix ppf (meth, service) =
+    Rst.pp_ref ppf (ref_of_service (prefix, meth)) ;
+    Format.fprintf ppf "**%s %a%a**@\n@\n"
+      (Resto.string_of_meth meth)
+      pp_name prefix
+      Query.pp_title service.query ;
+    Tabs.pp ppf prefix service
+
+end
+
+let style = {css|
+<style>
+  .tab {
+    overflow: hidden;
+    border: 1px solid #ccc;
+    background-color: #f1f1f1;
+  }
+  .tab button {
+    background-color: inherit;
+    float: left;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 5px 10px;
+  }
+  .tab button:hover {
+    background-color: #ddd;
+  }
+  .tab button.active {
+    background-color: #ccc;
+  }
+  .tabcontent {
+    display: none;
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    border-top: none;
+    max-height: 40ex;
+    margin-bottom: 7ex;
+    overflow: auto;
+  }
+  .tabcontent p {
+    margin-bottom: 12px;
+  }
+  pre {
+    font-size: 12px
+  }
+  .rst-content .section ul p {
+    margin-bottom: 0;
+  }
+  span.query {
+    font-family: monospace;
+    white-space: pre;
+  }
+</style>
+|css}
+
+let script = {script|
+<script>
+  function showTab(elt, tab, ref) {
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName(ref);
+    for (i = 0; i < tabcontent.length; i++) {
+      tabcontent[i].style.display = 'none';
+    }
+
+    tablinks = elt.parentNode.children;
+    for (i = 0; i < tablinks.length; i++) {
+      tablinks[i].className = tablinks[i].className.replace(' active', '');
+    }
+
+    document.getElementById(tab).style.display = 'block';
+    elt.className += ' active';
   }
 
-type service_tree =
-  | Root of service_tree list
-  | Node of service_repr * service_tree list
-  | SymbNode of string list * service_tree list
+  document.addEventListener('DOMContentLoaded', function() {
+    var a = document.getElementsByClassName('defaultOpen');
+    for (i = 0; i < a.length; i++) { a[i].click() }
+  })
+</script>
+|script}
 
-let make_descr = function
-  | None | Some "" -> "No description"
-  | Some s -> s
 
-(** Inspect a JSON schema: if it doesn't contain any field (e.g. { }),
-    return None *)
-let normalize_json_schema = function
-  | None -> None
-  | Some schema ->
-      let open Json_schema in
-      let elt = root schema in
-      match elt.kind with
-      | Object specs when
-          specs = object_specs ||
-          specs = { object_specs with additional_properties = None } ->
-          None
-      | _ -> Some schema
+let pp_document ppf descriptions =
+  (* Style : hack *)
+  Format.fprintf ppf "%a@." Rst.pp_raw_html style ;
+  (* Script : hack *)
+  Format.fprintf ppf "%a@." Rst.pp_raw_html script ;
+  (* Page title *)
+  Format.fprintf ppf "%a" Rst.pp_h1 "RPC API" ;
+  (* include/copy usage.rst from input  *)
+  let rec loop () =
+    let s = read_line () in
+    Format.fprintf ppf "%s@\n" s ;
+    loop () in
+  begin try loop () with End_of_file -> () end ;
+  Format.fprintf ppf "@\n" ;
+  (* Index *)
+  Format.pp_set_margin ppf 10000 ;
+  Format.pp_set_max_indent ppf 9000 ;
+  List.iter
+    (fun (name, prefix, rpc_dir) ->
+       Rst.pp_h2 ppf (Format.asprintf "%s RPCs - Index" name) ;
+       Format.fprintf ppf "%a@\n@\n" (Index.pp prefix) rpc_dir)
+    descriptions ;
+  (* Full description *)
+  Format.pp_set_margin ppf 80 ;
+  Format.pp_set_max_indent ppf 76 ;
+  List.iter
+    (fun (name, prefix, rpc_dir) ->
+       Rst.pp_h2 ppf (Format.asprintf "%s RPCs - Full description" name) ;
+       Format.fprintf ppf "%a@\n@\n" (Description.pp prefix) rpc_dir)
+    descriptions
 
-let repr_of_service path
-    RPC_description.{ description ; error ;
-                      meth ; input ; output ;
-                      query ; _ }  : service_repr =
+let genesis : State.Chain.genesis = {
+  time =
+    Time.of_notation_exn "2018-04-17T11:46:23Z" ;
+  block =
+    Block_hash.of_b58check_exn
+      "BLockGenesisGenesisGenesisGenesisGenesisa52f8bUWPcg" ;
+  protocol =
+    Protocol_hash.of_b58check_exn
+      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
+}
 
-  { path ; meth ; query ;
-    description = make_descr description ;
-    input = normalize_json_schema input ;
-    output = normalize_json_schema (Some output) ;
-    example = None ; error = Some error  }
-
-open Format
-
-let pp_print_service fmt
-    { path ; meth }
-  =
-  fprintf fmt "%s %s" (Resto.string_of_meth meth) (String.concat "/" path)
-
-let rec pp_print_service_tree fmt = function
-  | Root l ->
-      fprintf fmt "@[<v 2>/";
-      List.iter
-        (fun tree ->
-           fprintf fmt "@ ";
-           fprintf fmt "%a" pp_print_service_tree tree
-        ) l;
-      fprintf fmt "@]"
-  | Node (repr, l) ->
-      fprintf fmt "@[<v 2>%a" pp_print_service repr;
-      List.iter
-        (fun tree ->
-           fprintf fmt "@ ";
-           fprintf fmt "%a" pp_print_service_tree tree
-        ) l;
-      fprintf fmt "@]"
-  | SymbNode (sl, l) ->
-      fprintf fmt "@[<v 2>%s" (String.concat "/" sl);
-      List.iter
-        (fun tree ->
-           fprintf fmt "@ ";
-           fprintf fmt "%a" pp_print_service_tree tree
-        ) l;
-      fprintf fmt "@]"
-
-let make_tree cctxt path =
-  let open RPC_description in
-  describe cctxt ~recurse:true path >>=? fun dir ->
-  let rec loop path : _ directory -> service_tree list = function
-    | Dynamic descr ->
-        [ Node ({ path ; meth=`POST ; query = [] ;
-                  description=make_descr descr ;
-                  input = None ; output = None ;
-                  example = None ; error = None }, []) ]
-
-    | Empty -> []
-
-    | Static { services ; subdirs = None } ->
-        let l = RPC_service.MethMap.bindings services in
-        let l = List.map snd l in
-        List.map
-          (fun service -> Node (repr_of_service path service, []))
-          l
-
-    | Static { services ; subdirs = Some (Suffixes subdirs) } ->
-        let subdirs =  Resto.StringMap.bindings subdirs in
-
-        let l = List.map (fun (name, subdir) ->
-            loop (path @ [ name ]) subdir
-          ) subdirs |> List.concat
-        in
-
-        let services = RPC_service.MethMap.bindings services in
-        let services = List.map snd services in
-
-        begin
-          match services with
-          | [] -> [ SymbNode (path, l) ]
-          | service::[] -> [ Node (repr_of_service path service, l) ]
-          | _ -> assert false (* ? *)
-        end
-
-    | Static { services ; subdirs = Some (Arg (arg, solo)) } ->
-        let name = Printf.sprintf "<%s>" arg.RPC_arg.name in
-
-        let services = RPC_service.MethMap.bindings services in
-        let services = List.map snd services in
-
-        let l = loop (path @ [ name ]) solo in
-
-        begin
-          match services with
-          | [] -> [ SymbNode (path, l) ]
-          | service::[] -> [ Node (repr_of_service path service, l) ]
-          | _ -> assert false (* ? *)
-        end
-  in
-  return (Root (loop path dir))
-
-let rec pp_print_hierarchy fmt =
-  let open Format in
-  function
-  | Root l ->
-      List.iter
-        (fun tree ->
-           fprintf fmt "@ ";
-           fprintf fmt "%a" pp_print_hierarchy tree
-        ) l;
-      fprintf fmt "@]"
-
-  | SymbNode (path, l)
-  | Node ( { path } , l) ->
-      if List.length path = 0 then begin
-        List.iter
-          (fun tree ->
-             fprintf fmt "@ ";
-             fprintf fmt "%a" pp_print_hierarchy tree
-          ) l;
-        fprintf fmt "@]"
-      end
-      else
-        begin
-          let name = "/" ^ List.hd (List.rev path) in
-          let offset = max 4 (String.length name / 2) in
-
-          if List.length l = 0 then
-            pp_open_vbox fmt 0
-          else
-            pp_open_vbox fmt offset;
-
-          fprintf fmt "%s" name;
-          List.iter
-            (fun tree ->
-               fprintf fmt "@ ";
-               fprintf fmt "%a" pp_print_hierarchy tree)
-            l;
-          pp_close_box fmt ()
-        end
-
-(**************** RST PRINTING ****************)
-
-let pp_print_rst_title ~char ppf title =
-  let sub = String.map (fun _ -> char) title in
-  Format.fprintf ppf "@[<v 0>%s@ %s@ @ @]" title sub
-
-let pp_print_rst_h1 = pp_print_rst_title ~char:'#'
-let pp_print_rst_h2 = pp_print_rst_title ~char:'*'
-let pp_print_rst_h3 = pp_print_rst_title ~char:'='
-let pp_print_rst_h4 = pp_print_rst_title ~char:'`'
-
-let pp_print_rst_raw_html fmt str =
-  (* let ic = open_in file in *)
-  fprintf fmt "@[<v 2>.. raw:: html@ @ %s@ @ @]" str
-
-let label_table = Hashtbl.create 17
-
-let make_counter () =
-  let i = ref 1 in
-  fun () -> incr i; !i
-
-let count = make_counter ()
-
-let rst_label_of_path path =
-  let label = Printf.sprintf "ref%d" (count ()) in
-  Hashtbl.add label_table path label;
-  "<" ^ label ^ "_>"
-
-let ref_of_path path =
-  Hashtbl.find label_table path
-
-let rec pp_print_rst_hierarchy fmt ~title node =
-  fprintf fmt "%a@ " pp_print_rst_h2 title;
-  let rst_name =
-    String.lowercase_ascii title
-    |> String.map (function ' ' -> '-' | x -> x)
-  in
-  let rst_name =
-    let rec loop str =
-      let open Stringext in
-      if find_from str ~pattern:"--" <> None then
-        loop (replace_all_assoc str [("--","-")])
-      else
-        str
-    in loop rst_name
-  in
-
-  fprintf fmt "%a@." pp_print_rst_raw_html
-    (sprintf "<style>#%s * { margin-bottom:0px }\
-              #%s > *:last-child { margin-bottom:15px }\
-              #%s > h2 { margin-bottom:15px}</style>" rst_name rst_name rst_name);
-
-  let rec loop fmt tree =
-    match tree with
-    | Root l ->
-        (* fprintf fmt "@[<v 4>/"; *)
-        fprintf fmt "@[<v 0>";
-        List.iter
-          (fun tree ->
-             fprintf fmt "@ ";
-             fprintf fmt "%a" loop tree
-          ) l;
-        fprintf fmt "@]"
-    | Node ( { path }, l) ->
-        let name = "/" ^ String.concat "/" path in
-        fprintf fmt "@[<v 4>";
-        fprintf fmt "`%s %s`_"  name (rst_label_of_path path);
-        fprintf fmt "@ ";
-
-        List.iter
-          (fun tree ->
-             fprintf fmt "@ ";
-             fprintf fmt "%a" loop tree
-          ) l;
-        fprintf fmt "@]"
-    | SymbNode (path, l) ->
-        if List.length path > 0 then begin
-          let name = "\\/" ^ String.concat "/" path in
-
-          fprintf fmt "@[<v 2>%s" name;
-          (* fprintf fmt "%s" name; *)
-
-          fprintf fmt "@ ";
-
-          List.iter
-            (fun tree ->
-               fprintf fmt "@ ";
-               fprintf fmt "%a" loop tree
-            ) l;
-          fprintf fmt "@]"
-
-        end else
-          List.iter
-            (fun tree ->
-               fprintf fmt "@ ";
-               fprintf fmt "%a" loop tree
-            ) l
-  in
-  loop fmt node
-
-let pp_print_query_arg fmt =
-  let open RPC_arg in
-  function { name ; _ } ->
-    fprintf fmt "<%s>" name
-
-let pp_print_query_html_arg fmt =
-  let open RPC_arg in
-  function { name ; _ } ->
-    fprintf fmt "&lt;%s&gt;" name
-
-let pp_print_query_title fmt =
-  let open RPC_description in
-  function {name ; kind ; _ } ->
-  match kind with
-  | Single arg -> fprintf fmt "%s=%a" name pp_print_query_arg arg
-  | Optional arg -> fprintf fmt "[%s=%a]" name pp_print_query_arg arg
-  | Flag -> fprintf fmt "%s" name
-  | Multi arg -> fprintf fmt "(%s=%a)\\*" name pp_print_query_arg arg
-
-let pp_print_query_item_descr fmt =
-  let open RPC_description in
-  function { name ; description ; kind } ->
-    begin match kind with
-      | Single arg -> fprintf fmt "%s : %a" name pp_print_query_html_arg arg
-      | Optional arg -> fprintf fmt "[%s : %a] - Optional" name pp_print_query_html_arg arg
-      | Flag -> fprintf fmt "%s - Flag" name
-      | Multi arg -> fprintf fmt "(%s : %a)\\* - Can be given multiple times" name
-                       pp_print_query_html_arg arg
-    end;
-    begin match description with
-      | None -> ()
-      | Some descr -> fprintf fmt " : %s" descr
-    end
-
-let pp_print_html_tab_button fmt ?(default=false) ~shortlabel ~content path =
-  let target_ref = ref_of_path path in
-  fprintf fmt "<button class=\"tablinks%s\" onclick=\"showTab(this, '%s', '%s')\">%s</button>@ "
-    (if default then " defaultOpen" else "")
-    (target_ref ^ shortlabel)
-    target_ref
-    content
-
-let pp_print_html_tab_content fmt ~tag ~shortlabel ~pp_content ~content path =
-  let target_ref = ref_of_path path in
-  fprintf fmt "@[<v 2><div id=\"%s\" class=\"%s tabcontent\" style=\"max-height:200px; overflow:auto\" >@ "
-    (target_ref ^ shortlabel) target_ref;
-  fprintf fmt "<%s>@ %a</%s>@ " tag pp_content content tag;
-  fprintf fmt "</div>@]"
-
-let pp_print_html_tabs fmt { path ; description ; input ; output ; query ; _ (* example ; error *) } =
-  fprintf fmt "@[<v 2>.. raw:: html@ @ ";
-  fprintf fmt "@[<v 2><div class=\"tab\">@ ";
-
-  fprintf fmt "%a" (pp_print_html_tab_button ~default:true ~shortlabel:"descr" ~content:"Description") path;
-  (match input with
-   | Some _ ->
-       fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"input" ~content:"Input format") path;
-   | None -> ());
-  (match output with
-   | Some _ ->
-       fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"output" ~content:"Output format") path;
-   | None -> ());
-  (* (match example with
-   *  | Some _ ->
-   *      fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"example" ~content:"Example") path;
-   *  | None -> ()); *)
-  fprintf fmt "</div>@]@ ";
-
-  let query_item_list =
-    if query <> [] then
-      asprintf "</p> <p>Optional query arguments :<ul><li>%a</li></ul>"
-        (pp_print_list
-           ~pp_sep:(fun fmt () -> fprintf fmt "</li><li>")
-           pp_print_query_item_descr) query
-    else ""
-  in
-  fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"p" ~shortlabel:"descr"
-                        ~pp_content:pp_print_string ~content:(description^query_item_list)) path;
-  (match input with
-   | Some x -> fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"pre" ~shortlabel:"input"
-                                     ~pp_content:Json_schema.pp ~content:x) path;
-   | None -> ());
-  (match output with
-   | Some x -> fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"pre" ~shortlabel:"output"
-                                     ~pp_content:Json_schema.pp ~content:x) path;
-   | None -> ());
-  (* (match example with
-   *  | Some x -> fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"pre" ~shortlabel:"example"
-   *                                    ~pp_content:pp_print_string ~content:x) path;
-   *  | None -> ()); *)
-
-  fprintf fmt "@]"
-
-let pp_print_rst_full_service fmt ({ path ; meth ; query } as repr) =
-  fprintf fmt ".. _%s :@\n@\n**%s %s%s%a**@\n@\n"
-    (ref_of_path path)
-    (Resto.string_of_meth meth)
-    ("/" ^ String.concat "/" path)
-    (if query = [] then "" else "?")
-    (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "&") pp_print_query_title) query;
-  fprintf fmt "%a" pp_print_html_tabs repr
-
-let rec pp_print_rst_service_tree fmt node =
-  let open Format in
-  match node with
-  | Root l -> (pp_print_list ~pp_sep:pp_print_cut pp_print_rst_service_tree) fmt l
-  | SymbNode (_, l) -> (pp_print_list ~pp_sep:pp_print_cut pp_print_rst_service_tree) fmt l
-  | Node ( repr , l) ->
-      (* Generates services details and ref for links  *)
-      fprintf fmt "%a@\n@\n" pp_print_rst_full_service repr;
-      fprintf fmt "%a" (pp_print_list ~pp_sep:pp_print_newline pp_print_rst_service_tree) l
-
-let style =
-  "<style>\
-   .tab {\
-   overflow: hidden;\
-   border: 1px solid #ccc;\
-   background-color: #f1f1f1;\
-   }\
-   .tab button {\
-   background-color: inherit;\
-   float: left;\
-   border: none;\
-   outline: none;\
-   cursor: pointer;\
-   padding: 5px 10px;\
-   }\
-   .tab button:hover {\
-   background-color: #ddd;\
-   }\
-   .tab button.active {\
-   background-color: #ccc;\
-   }\
-   .tabcontent {\
-   display: none;\
-   padding: 6px 12px;\
-   border: 1px solid #ccc;\
-   border-top: none;\
-   margin-bottom: 20px;\
-   }\
-   pre {\
-   font-size: 12px\
-   }</style>"
-
-let script =
-  "<script>\
-   function showTab(elt, tab, ref) {\
-   var i, tabcontent, tablinks;\
-   \
-   tabcontent = document.getElementsByClassName(ref);\
-   for (i = 0; i < tabcontent.length; i++) {\
-   tabcontent[i].style.display = 'none';\
-   }\
-   \
-   tablinks = elt.parentNode.children;\
-   for (i = 0; i < tablinks.length; i++) {\
-   tablinks[i].className = tablinks[i].className.replace(' active', '');\
-   }\
-   \
-   document.getElementById(tab).style.display = 'block';\
-   elt.className += ' active';\
-   }\
-   \
-   document.addEventListener('DOMContentLoaded', function(){\
-   var a = document.getElementsByClassName('defaultOpen');\
-   for (i = 0; i < a.length; i++) { a[i].click() }\
-   })\
-   </script>"
-
-let ppf = Format.std_formatter
-let err_ppf = Format.err_formatter
-
-let run ?(rpc_port=18731) () =
-  (* Client context *)
-  let rpc_config = { RPC_client.default_config with port=rpc_port } in
-  let open Client_config in
-  let {block; _}  = default_cli_args in
-  let (cctxt : #Tezos_client_base.Client_context.full) =
-    new Client_context_unix.unix_full
-      ~block ~confirmations:None ~base_dir: "/" ~rpc_config
-  in
-
-  let print_header () =
-    (* Style : hack *)
-    fprintf ppf "%a@." pp_print_rst_raw_html style;
-    (* Script : hack *)
-    fprintf ppf "%a@." pp_print_rst_raw_html script;
-    (* Page title *)
-    fprintf ppf "%a" pp_print_rst_h1 "RPC API";
-    (* include/copy usage.rst from input  *)
-    let rec loop () =
-      let s = read_line () in
-      fprintf ppf "%s@\n" s;
-      loop ()
-    in begin try loop () with End_of_file -> () end
-  in
-  (make_tree cctxt [] >>= function
-    | Ok service_tree ->
-        (* Print header!! *)
-        fprintf ppf "@\n";
-        print_header ();
-        fprintf ppf "@\n";
-
-        (* Shell RPCs tree *)
-        fprintf ppf "%a@." (pp_print_rst_hierarchy ~title:"Client RPCs - Index") service_tree;
-        fprintf ppf "%a" pp_print_rst_h2 "Client RPCs - Full description";
-        fprintf ppf "%a@." pp_print_rst_service_tree service_tree;
-        Lwt.return 0
-
-    | Error _ ->
-        Format.eprintf "[RPC Doc Generation] Client : Couldn't reach node\n";
-        Lwt.return 1) >>= function
-  | 0 ->
-      (* Alpha Protocol RPCs *)
-      let path_proto_alpha = String.split '/' "/blocks/head/proto" in
-      begin
-        make_tree cctxt path_proto_alpha >>= function
-        | Ok service_tree ->
-            (* Proto alpha RPCs tree *)
-            fprintf ppf "%a@." (pp_print_rst_hierarchy ~title:"Protocol Alpha RPCs - Index") service_tree;
-            fprintf ppf "%a" pp_print_rst_h2 "Protocol Alpha RPCs - Full description";
-            fprintf ppf "%a@." pp_print_rst_service_tree service_tree;
-
-            Lwt.return 0
-
-        | Error _ ->
-            Format.fprintf err_ppf "[RPC Doc Generation] Proto alpha : Couldn't reach node\n";
-            Lwt.return 1
-      end
-  | _ -> Lwt.return 1
+let main dir =
+  let (/) = Filename.concat in
+  let node_config : Node.config = {
+    genesis ;
+    patch_context = None ;
+    store_root = dir / "store" ;
+    context_root = dir / "context" ;
+    p2p = None ;
+    test_chain_max_tll = None ;
+  } in
+  Node.create
+    node_config
+    Node.default_peer_validator_limits
+    Node.default_block_validator_limits
+    Node.default_prevalidator_limits
+    Node.default_chain_validator_limits >>=? fun node ->
+  let shell_dir = Node.build_rpc_directory node in
+  let protocol_dirs =
+    List.map
+      (fun (name, hash) ->
+         let hash = Protocol_hash.of_b58check_exn hash in
+         let (module Proto) = Registered_protocol.get_exn hash in
+         "Protocol " ^ name,
+         [".." ; "<block_id>"] ,
+         RPC_directory.map (fun () -> assert false) @@
+         Block_directory.build_raw_rpc_directory (module Proto) (module Proto))
+      protocols in
+  let dirs = ("Shell", [""], shell_dir) :: protocol_dirs in
+  Lwt_list.map_p
+    (fun (name, path, dir) ->
+       RPC_directory.describe_directory ~recurse:true ~arg:() dir >>= fun dir ->
+       Lwt.return (name, path, dir))
+    dirs >>= fun descriptions ->
+  let ppf = Format.std_formatter in
+  pp_document ppf descriptions ;
+  return ()
 
 let () =
-  Pervasives.exit
-    (Lwt_main.run
-       begin try
-           if Array.length Sys.argv > 1 then
-             let rpc_port = int_of_string Sys.argv.(1) in
-             run ~rpc_port ()
-           else
-             run ()
-         with _ ->
-           run ()
-       end)
+  Lwt_main.run begin
+    Lwt_utils_unix.with_tempdir "tezos_rpcdoc_" main >>= function
+    | Ok _ ->
+        Lwt.return_unit
+    | Error err ->
+        Format.eprintf "%a@." pp_print_error err ;
+        Pervasives.exit 1
+  end

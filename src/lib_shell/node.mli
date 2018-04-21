@@ -39,6 +39,11 @@ and chain_validator_limits = {
   worker_limits : Worker_types.limits ;
 }
 
+val default_peer_validator_limits: peer_validator_limits
+val default_prevalidator_limits: prevalidator_limits
+val default_block_validator_limits: block_validator_limits
+val default_chain_validator_limits: chain_validator_limits
+
 val create:
   config ->
   peer_validator_limits ->

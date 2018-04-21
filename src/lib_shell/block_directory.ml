@@ -27,7 +27,7 @@ let rec read_partial_context context path depth =
         end >>= fun l ->
         Lwt.return (Block_services.Dir (List.rev l))
 
-let rpc_directory
+let build_raw_rpc_directory
     (module Proto : Block_services.PROTO)
     (module Next_proto : Registered_protocol.T) =
 
@@ -336,7 +336,7 @@ let get_directory block =
       let next_protocol = get_protocol next_protocol_hash in
       State.Block.predecessor block >>= function
       | None ->
-          Lwt.return (rpc_directory
+          Lwt.return (build_raw_rpc_directory
                         (module Block_services.Fake_protocol)
                         next_protocol)
       | Some pred ->
@@ -345,7 +345,7 @@ let get_directory block =
           State.Block.get_rpc_directory block >>= function
           | Some dir -> Lwt.return dir
           | None ->
-              let dir = rpc_directory (module Proto) next_protocol in
+              let dir = build_raw_rpc_directory (module Proto) next_protocol in
               State.Block.set_rpc_directory block dir >>= fun () ->
               Lwt.return dir
 
