@@ -7,14 +7,14 @@ code { DUP; CAR; DIP{CDDR};       # Stack rangling
                  PAIR}
                { DUP; CAR; DIP{CDR; DUP; H}; PAIR; SWAP; # Create the signature pair
                  DIP{ DIP{DUP; CDR; DIP{CAR}; DUP};
-                      SWAP; CAR; DIP{DUP}; CHECK_SIGNATURE }; # Check the first signature
+                      SWAP; CAR; DIP{DUP; UNPAIR}; CHECK_SIGNATURE }; # Check the first signature
                  SWAP;
                  # If the signature typechecked, get and update the first element of the pair
                  IF { DIP{DROP; SWAP; DUP}; DUP;
                       DIP{ GET; IF_NONE{PUSH (pair bool bool) (Pair False False)} {};
                            CDR; PUSH bool True; PAIR; SOME }}
                     # Check the second signature
-                    { DIP{DIP{DUP; CDR}; SWAP; CHECK_SIGNATURE}; SWAP;
+                    { DIP{DIP{DUP; CDR}; SWAP; DIP {UNPAIR}; CHECK_SIGNATURE}; SWAP;
                       IF { DUP; DIP{DIP{SWAP; DUP}; GET}; SWAP;
                            IF_NONE {PUSH (pair bool bool) (Pair False False)} {};
                            CAR; PUSH bool True; SWAP; PAIR; SOME; SWAP}

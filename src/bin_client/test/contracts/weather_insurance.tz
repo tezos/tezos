@@ -6,7 +6,7 @@ storage (pair (pair (contract @lt unit)
               (pair nat key));
 code { DUP; DUP;
        CAR; MAP_CDR{H};
-       SWAP; CDDDR; CHECK_SIGNATURE; # Check if the data has been correctly signed
+       SWAP; CDDDR; DIP {UNPAIR} ; CHECK_SIGNATURE; # Check if the data has been correctly signed
        ASSERT; # If signature is not correct, end the execution
        DUP; DUP; DUP; DIIIP{CDR}; # Place storage type on bottom of stack
        DIIP{CDAR};                # Place contracts below numbers

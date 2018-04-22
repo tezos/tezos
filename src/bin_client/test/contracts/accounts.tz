@@ -17,7 +17,7 @@ code { DUP; CAR;
                # Withdrawl
                { DUP; DUP; DUP; DUP;
                  # Check signature on data
-                 CAR; DIIP{ CDAR; H }; DIP{ CDDR; PAIR }; CHECK_SIGNATURE;
+                 CAR; DIIP{ CDAR; H }; DIP{ CDDR }; CHECK_SIGNATURE;
                  IF {} { FAIL };
                  # Get user account information
                  DIIP{ CDR; DUP }; CAR; HASH_KEY; DIP{ SWAP }; GET;

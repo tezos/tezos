@@ -351,7 +351,7 @@ and ('bef, 'aft) instr =
   | Balance :
       ('rest, Tez.t * 'rest) instr
   | Check_signature :
-      (public_key * ((signature * string) * 'rest), bool * 'rest) instr
+      (public_key * (signature * (string * 'rest)), bool * 'rest) instr
   | Hash_key :
       (public_key * 'rest, public_key_hash * 'rest) instr
   | H : 'a ty ->

@@ -714,7 +714,7 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.now) >>=? fun ctxt ->
             let now = Script_timestamp.now ctxt in
             logged_return (Item (now, rest), ctxt)
-        | Check_signature, Item (key, Item ((signature, message), rest)) ->
+        | Check_signature, Item (key, Item (signature, Item (message, rest))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.check_signature) >>=? fun ctxt ->
             let message = MBytes.of_string message in
             let res = Signature.check key signature message in

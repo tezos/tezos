@@ -7,7 +7,7 @@ code {DUP; DUP; CAR;
                # Provide the data
                CDR; DIP {CDDR}}
               {DUP; DIP{SWAP}; SWAP; CDAR; # Move key to the top
-               DIP {DUP; CAR; DIP {CDR; H}; PAIR}; # Arrange the new piece of data
+               DIP {DUP; CAR; DIP {CDR; H}}; # Arrange the new piece of data
                CHECK_SIGNATURE;                    # Check to ensure the data is authentic
                # Update data
                IF {CDR; SWAP; DIP{DUP}; CDAR; PAIR}

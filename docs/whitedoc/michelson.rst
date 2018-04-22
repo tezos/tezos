@@ -1538,7 +1538,7 @@ Cryptographic primitives
 
 ::
 
-    :: key : pair signature string : 'S   ->   bool : 'S
+    :: key : signature : string : 'S   ->   bool : 'S
 
 -  ``COMPARE``:
 

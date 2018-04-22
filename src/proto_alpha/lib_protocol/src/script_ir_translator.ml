@@ -2134,7 +2134,7 @@ and parse_instr
         typed ctxt loc Hash_key
           (Item_t (Key_hash_t, rest, instr_annot))
     | Prim (loc, I_CHECK_SIGNATURE, [], instr_annot),
-      Item_t (Key_t, Item_t (Pair_t ((Signature_t, _), (String_t, _)), rest, _), _) ->
+      Item_t (Key_t, Item_t (Signature_t, Item_t (String_t, rest, _), _), _) ->
         typed ctxt loc Check_signature
           (Item_t (Bool_t, rest, instr_annot))
     | Prim (loc, I_H, [], instr_annot),
