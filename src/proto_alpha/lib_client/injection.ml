@@ -181,13 +181,15 @@ let inject_operation
   cctxt#message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   begin
     match confirmations with
-    | None -> return ()
+    | None -> return result
     | Some confirmations ->
         cctxt#message "Waiting for the operation to be included..." >>= fun () ->
         Client_confirmations.wait_for_operation_inclusion
-          ~confirmations cctxt ~chain oph >>=? fun _ ->
-        return ()
-  end >>=? fun () ->
+          ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
+        Alpha_block_services.Operation.operation
+          cctxt ~block:(`Hash (h, 0)) i j >>=? fun op ->
+        return op.metadata
+  end >>=? fun result ->
   cctxt#message
     "@[<v 2>This sequence of operations was run:@,%a@]"
     Operation_result.pp_operation_result (op, result) >>= fun () ->
