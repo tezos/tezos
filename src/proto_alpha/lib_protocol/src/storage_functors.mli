@@ -11,13 +11,6 @@
 
 open Storage_sigs
 
-module type ENCODED_VALUE = sig
-  type t
-  val encoding: t Data_encoding.t
-end
-
-module Make_value (V : ENCODED_VALUE) : VALUE with type t = V.t
-
 module Make_subcontext (C : Raw_context.T) (N : NAME)
   : Raw_context.T with type t = C.t
 
@@ -26,7 +19,7 @@ module Make_single_data_storage
   : Single_data_storage with type t = C.t
                          and type value = V.t
 
-module Make_carbonated_value (V : ENCODED_VALUE) : CARBONATED_VALUE with type t = V.t
+module Make_carbonated_value (V : VALUE) : CARBONATED_VALUE with type t = V.t
 
 module Make_single_carbonated_data_storage
     (C : Raw_context.T) (N : NAME) (V : CARBONATED_VALUE)

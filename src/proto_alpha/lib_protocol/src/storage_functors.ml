@@ -9,13 +9,7 @@
 
 open Storage_sigs
 
-module type ENCODED_VALUE = sig
-  type t
-  val encoding: t Data_encoding.t
-end
-
-module Make_value (V : ENCODED_VALUE) = struct
-  type t = V.t
+module Make_encoder (V : VALUE) = struct
   let of_bytes ~key b =
     match Data_encoding.Binary.of_bytes V.encoding b with
     | None -> Error [Raw_context.Storage_error (Corrupted_data key)]
@@ -26,15 +20,8 @@ module Make_value (V : ENCODED_VALUE) = struct
     | None -> MBytes.create 0
 end
 
-module Make_carbonated_value (V : ENCODED_VALUE) = struct
-  type t = V.t
-  let of_bytes ~key b =
-    match Data_encoding.Binary.of_bytes V.encoding b with
-    | None -> Error [Raw_context.Storage_error (Corrupted_data key)]
-    | Some v -> Ok v
-  let to_bytes v =
-    try Data_encoding.Binary.to_bytes_exn V.encoding v
-    with _ -> MBytes.create 0
+module Make_carbonated_value (V : VALUE) = struct
+  include V
   let size =
     match Data_encoding.classify V.encoding with
     | `Fixed size -> Fixed size
@@ -100,29 +87,30 @@ module Make_single_data_storage (C : Raw_context.T) (N : NAME) (V : VALUE)
   type value = V.t
   let mem t =
     C.mem t N.name
+  include Make_encoder(V)
   let get t =
     C.get t N.name >>=? fun b ->
     let key = C.absolute_key t N.name in
-    Lwt.return (V.of_bytes ~key b)
+    Lwt.return (of_bytes ~key b)
   let get_option t =
     C.get_option t N.name >>= function
     | None -> return None
     | Some b ->
         let key = C.absolute_key t N.name in
-        match V.of_bytes ~key b with
+        match of_bytes ~key b with
         | Ok v -> return (Some v)
         | Error _ as err -> Lwt.return err
   let init t v =
-    C.init t N.name (V.to_bytes v) >>=? fun t ->
+    C.init t N.name (to_bytes v) >>=? fun t ->
     return (C.project t)
   let set t v =
-    C.set t N.name (V.to_bytes v) >>=? fun t ->
+    C.set t N.name (to_bytes v) >>=? fun t ->
     return (C.project t)
   let init_set t v =
-    C.init_set t N.name (V.to_bytes v) >>= fun t ->
+    C.init_set t N.name (to_bytes v) >>= fun t ->
     Lwt.return (C.project t)
   let set_option t v =
-    C.set_option t N.name (Option.map ~f:V.to_bytes v) >>= fun t ->
+    C.set_option t N.name (Option.map ~f:to_bytes v) >>= fun t ->
     Lwt.return (C.project t)
   let remove t =
     C.remove t N.name >>= fun t ->
@@ -141,6 +129,7 @@ module Make_single_carbonated_data_storage
   type value = V.t
   let consume_mem_gas c =
     Lwt.return (C.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero))
+  include Make_encoder(V)
   let existing_size c =
     match V.size with
     | Fixed len ->
@@ -162,9 +151,9 @@ module Make_single_carbonated_data_storage
     match V.size with
     | Fixed s ->
         Lwt.return (C.consume_gas c (Gas_limit_repr.write_bytes_cost (Z.of_int s))) >>=? fun c ->
-        return (c, V.to_bytes v)
+        return (c, to_bytes v)
     | Variable ->
-        let bytes = V.to_bytes v in
+        let bytes = to_bytes v in
         let len = MBytes.length bytes in
         Lwt.return (C.consume_gas c (Gas_limit_repr.write_bytes_cost (Z.of_int len))) >>=? fun c ->
         set c (len_name N.name) (encode_len_value bytes) >>=? fun c ->
@@ -182,7 +171,7 @@ module Make_single_carbonated_data_storage
     consume_read_gas C.get c >>=? fun c ->
     C.get c N.name >>=? fun bytes ->
     let key = C.absolute_key c N.name in
-    Lwt.return (V.of_bytes ~key bytes) >>=? fun res ->
+    Lwt.return (of_bytes ~key bytes) >>=? fun res ->
     return (C.project c, res)
   let get_option c =
     consume_mem_gas c >>=? fun c ->
@@ -312,31 +301,32 @@ module Make_indexed_data_storage
   type context = t
   type key = I.t
   type value = V.t
+  include Make_encoder(V)
   let mem s i =
     C.mem s (I.to_path i [])
   let get s i =
     C.get s (I.to_path i []) >>=? fun b ->
     let key = C.absolute_key s (I.to_path i []) in
-    Lwt.return (V.of_bytes ~key b)
+    Lwt.return (of_bytes ~key b)
   let get_option s i =
     C.get_option s (I.to_path i []) >>= function
     | None -> return None
     | Some b ->
         let key = C.absolute_key s (I.to_path i []) in
-        match V.of_bytes ~key b with
+        match of_bytes ~key b with
         | Ok v -> return (Some v)
         | Error _ as err -> Lwt.return err
   let set s i v =
-    C.set s (I.to_path i []) (V.to_bytes v) >>=? fun t ->
+    C.set s (I.to_path i []) (to_bytes v) >>=? fun t ->
     return (C.project t)
   let init s i v =
-    C.init s (I.to_path i []) (V.to_bytes v) >>=? fun t ->
+    C.init s (I.to_path i []) (to_bytes v) >>=? fun t ->
     return (C.project t)
   let init_set s i v =
-    C.init_set s (I.to_path i []) (V.to_bytes v) >>= fun t ->
+    C.init_set s (I.to_path i []) (to_bytes v) >>= fun t ->
     Lwt.return (C.project t)
   let set_option s i v =
-    C.set_option s (I.to_path i []) (Option.map ~f:V.to_bytes v) >>= fun t ->
+    C.set_option s (I.to_path i []) (Option.map ~f:to_bytes v) >>= fun t ->
     Lwt.return (C.project t)
   let remove s i =
     C.remove s (I.to_path i []) >>= fun t ->
@@ -392,6 +382,7 @@ module Make_indexed_carbonated_data_storage
   type context = t
   type key = I.t
   type value = V.t
+  include Make_encoder(V)
   let name i =
     I.to_path i []
   let len_name i =
@@ -423,9 +414,9 @@ module Make_indexed_carbonated_data_storage
     match V.size with
     | Fixed s ->
         Lwt.return (C.consume_gas c (Gas_limit_repr.write_bytes_cost (Z.of_int s))) >>=? fun c ->
-        return (c, V.to_bytes v)
+        return (c, to_bytes v)
     | Variable ->
-        let bytes = V.to_bytes v in
+        let bytes = to_bytes v in
         let len = MBytes.length bytes in
         Lwt.return (C.consume_gas c (Gas_limit_repr.write_bytes_cost (Z.of_int len))) >>=? fun c ->
         set c (len_name i) (encode_len_value bytes) >>=? fun c ->
@@ -443,7 +434,7 @@ module Make_indexed_carbonated_data_storage
     consume_read_gas C.get s i >>=? fun s ->
     C.get s (name i) >>=? fun b ->
     let key = C.absolute_key s (name i) in
-    Lwt.return (V.of_bytes ~key b) >>=? fun v ->
+    Lwt.return (of_bytes ~key b) >>=? fun v ->
     return (C.project s, v)
   let get_option s i =
     consume_mem_gas s >>=? fun s ->
@@ -537,7 +528,7 @@ module Make_indexed_carbonated_data_storage
       consume_read_gas C.get s path >>=? fun s ->
       C.get s (name path) >>=? fun b ->
       let key = C.absolute_key s (name path) in
-      Lwt.return (V.of_bytes ~key b) >>=? fun v ->
+      Lwt.return (of_bytes ~key b) >>=? fun v ->
       f path v (s, acc) in
     fold_keys_unaccounted s ~init ~f
   let bindings s =
@@ -721,32 +712,33 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     type context = t
     type key = I.t
     type value = V.t
+    include Make_encoder(V)
     let mem s i =
       Raw_context.mem (s,i) N.name
     let get s i =
       Raw_context.get (s,i) N.name >>=? fun b ->
       let key = Raw_context.absolute_key (s,i) N.name in
-      Lwt.return (V.of_bytes ~key b)
+      Lwt.return (of_bytes ~key b)
     let get_option s i =
       Raw_context.get_option (s,i) N.name >>= function
       | None -> return None
       | Some b ->
           let key = Raw_context.absolute_key (s,i) N.name in
-          match V.of_bytes ~key b with
+          match of_bytes ~key b with
           | Ok v -> return (Some v)
           | Error _ as err -> Lwt.return err
     let set s i v =
-      Raw_context.set (s,i) N.name (V.to_bytes v) >>=? fun (s, _) ->
+      Raw_context.set (s,i) N.name (to_bytes v) >>=? fun (s, _) ->
       return (C.project s)
     let init s i v =
-      Raw_context.init (s,i) N.name (V.to_bytes v) >>=? fun (s, _) ->
+      Raw_context.init (s,i) N.name (to_bytes v) >>=? fun (s, _) ->
       return (C.project s)
     let init_set s i v =
-      Raw_context.init_set (s,i) N.name (V.to_bytes v) >>= fun (s, _) ->
+      Raw_context.init_set (s,i) N.name (to_bytes v) >>= fun (s, _) ->
       Lwt.return (C.project s)
     let set_option s i v =
       Raw_context.set_option (s,i)
-        N.name (Option.map ~f:V.to_bytes v) >>= fun (s, _) ->
+        N.name (Option.map ~f:to_bytes v) >>= fun (s, _) ->
       Lwt.return (C.project s)
     let remove s i =
       Raw_context.remove (s,i) N.name >>= fun (s, _) ->
@@ -784,6 +776,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     type context = t
     type key = I.t
     type value = V.t
+    include Make_encoder(V)
     let consume_mem_gas c =
       Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero))
     let existing_size c =
@@ -807,9 +800,9 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       match V.size with
       | Fixed s ->
           Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.write_bytes_cost (Z.of_int s))) >>=? fun c ->
-          return (c, V.to_bytes v)
+          return (c, to_bytes v)
       | Variable ->
-          let bytes = V.to_bytes v in
+          let bytes = to_bytes v in
           let len = MBytes.length bytes in
           Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.write_bytes_cost (Z.of_int len))) >>=? fun c ->
           set c (len_name N.name) (encode_len_value bytes) >>=? fun c ->
@@ -827,7 +820,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       consume_read_gas Raw_context.get (s, i) >>=? fun c ->
       Raw_context.get c N.name >>=? fun b ->
       let key = Raw_context.absolute_key c N.name in
-      Lwt.return (V.of_bytes ~key b) >>=? fun v ->
+      Lwt.return (of_bytes ~key b) >>=? fun v ->
       return (Raw_context.project c, v)
     let get_option s i =
       consume_mem_gas (s, i) >>=? fun (s, _) ->
@@ -894,7 +887,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
             consume_read_gas Raw_context.get (s, i) >>=? fun (s, _) ->
             Raw_context.get (s, i) N.name >>=? fun b ->
             let key = Raw_context.absolute_key (s, i) N.name in
-            Lwt.return (V.of_bytes ~key b) >>=? fun v ->
+            Lwt.return (of_bytes ~key b) >>=? fun v ->
             f i v (s, acc)) >>=? fun (s, v) ->
       return (C.project s, v)
     let bindings s =

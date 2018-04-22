@@ -372,8 +372,7 @@ end
 
 module type VALUE = sig
   type t
-  val of_bytes: key:string list -> MBytes.t -> t tzresult
-  val to_bytes: t -> MBytes.t
+  val encoding: t Data_encoding.t
 end
 
 type value_size =

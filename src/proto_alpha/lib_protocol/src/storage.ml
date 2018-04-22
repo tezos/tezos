@@ -48,7 +48,7 @@ module Last_block_priority =
   Make_single_data_storage
     (Raw_context)
     (struct let name = ["last_block_priority"] end)
-    (Make_value(Int))
+    (Int)
 
 (** Contracts handling *)
 
@@ -61,7 +61,7 @@ module Contract = struct
     Make_single_data_storage
       (Raw_context)
       (struct let name = ["global_counter"] end)
-      (Make_value(Int32))
+      (Int32)
 
   module Indexed_context =
     Make_indexed_subcontext
@@ -74,7 +74,7 @@ module Contract = struct
   module Balance =
     Indexed_context.Make_map
       (struct let name = ["balance"] end)
-      (Make_value(Tez_repr))
+      (Tez_repr)
 
   module Frozen_balance_index =
     Make_indexed_subcontext
@@ -86,22 +86,22 @@ module Contract = struct
   module Frozen_deposits =
     Frozen_balance_index.Make_map
       (struct let name = ["deposits"] end)
-      (Make_value(Tez_repr))
+      (Tez_repr)
 
   module Frozen_fees =
     Frozen_balance_index.Make_map
       (struct let name = ["fees"] end)
-      (Make_value(Tez_repr))
+      (Tez_repr)
 
   module Frozen_rewards =
     Frozen_balance_index.Make_map
       (struct let name = ["rewards"] end)
-      (Make_value(Tez_repr))
+      (Tez_repr)
 
   module Manager =
     Indexed_context.Make_map
       (struct let name = ["manager"] end)
-      (Make_value(Manager_repr))
+      (Manager_repr)
 
   module Spendable =
     Indexed_context.Make_set
@@ -114,7 +114,7 @@ module Contract = struct
   module Delegate =
     Indexed_context.Make_map
       (struct let name = ["delegate"] end)
-      (Make_value(Signature.Public_key_hash))
+      (Signature.Public_key_hash)
 
   module Inactive_delegate =
     Indexed_context.Make_set
@@ -123,7 +123,7 @@ module Contract = struct
   module Delegate_desactivation =
     Indexed_context.Make_map
       (struct let name = ["delegate_desactivation"] end)
-      (Make_value(Cycle_repr))
+      (Cycle_repr)
 
   module Delegated =
     Make_data_set_storage
@@ -135,7 +135,7 @@ module Contract = struct
   module Counter =
     Indexed_context.Make_map
       (struct let name = ["counter"] end)
-      (Make_value(Int32))
+      (Int32)
 
   module Code =
     Indexed_context.Make_carbonated_map
@@ -169,22 +169,22 @@ module Contract = struct
   module Paid_storage_space_fees =
     Indexed_context.Make_map
       (struct let name = ["paid_bytes"] end)
-      (Make_value(Tez_repr))
+      (Tez_repr)
 
   module Used_storage_space =
     Indexed_context.Make_map
       (struct let name = ["used_bytes"] end)
-      (Make_value(Int64))
+      (Int64)
 
   module Roll_list =
     Indexed_context.Make_map
       (struct let name = ["roll_list"] end)
-      (Make_value(Roll_repr))
+      (Roll_repr)
 
   module Change =
     Indexed_context.Make_map
       (struct let name = ["change"] end)
-      (Make_value(Tez_repr))
+      (Tez_repr)
 
 end
 
@@ -208,12 +208,12 @@ module Cycle = struct
          (Indexed_context.Raw_context)
          (struct let name = ["last_roll"] end))
       (Int_index)
-      (Make_value(Roll_repr))
+      (Roll_repr)
 
   module Roll_snapshot =
     Indexed_context.Make_map
       (struct let name = ["roll_snapshot"] end)
-      (Make_value(Int))
+      (Int)
 
   type unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
@@ -255,18 +255,18 @@ module Cycle = struct
          (Indexed_context.Raw_context)
          (struct let name = ["nonces"] end))
       (Raw_level_repr.Index)
-      (Make_value(struct
-         type t = nonce_status
-         let encoding = nonce_status_encoding
-       end))
+      (struct
+        type t = nonce_status
+        let encoding = nonce_status_encoding
+      end)
 
   module Seed =
     Indexed_context.Make_map
       (struct let name = ["random_seed"] end)
-      (Make_value(struct
-         type t = Seed_repr.seed
-         let encoding = Seed_repr.seed_encoding
-       end))
+      (struct
+        type t = Seed_repr.seed
+        let encoding = Seed_repr.seed_encoding
+      end)
 
 end
 
@@ -284,13 +284,13 @@ module Roll = struct
     Make_single_data_storage
       (Raw_context)
       (struct let name = ["next"] end)
-      (Make_value(Roll_repr))
+      (Roll_repr)
 
   module Limbo =
     Make_single_data_storage
       (Raw_context)
       (struct let name = ["limbo"] end)
-      (Make_value(Roll_repr))
+      (Roll_repr)
 
   module Delegate_roll_list =
     Wrap_indexed_data_storage(Contract.Roll_list)(struct
@@ -302,7 +302,7 @@ module Roll = struct
   module Successor =
     Indexed_context.Make_map
       (struct let name = ["successor"] end)
-      (Make_value(Roll_repr))
+      (Roll_repr)
 
   module Delegate_change =
     Wrap_indexed_data_storage(Contract.Change)(struct
@@ -333,7 +333,7 @@ module Roll = struct
       (Make_subcontext(Raw_context)(struct let name = ["owner"] end))
       (Snapshoted_owner_index)
       (Roll_repr.Index)
-      (Make_value(Signature.Public_key))
+      (Signature.Public_key)
 
   module Snapshot_for_cycle = Cycle.Roll_snapshot
   module Last_for_snapshot = Cycle.Last_roll
@@ -353,34 +353,34 @@ module Vote = struct
     Make_single_data_storage
       (Raw_context)
       (struct let name = ["current_period_kind"] end)
-      (Make_value(struct
-         type t = Voting_period_repr.kind
-         let encoding = Voting_period_repr.kind_encoding
-       end))
+      (struct
+        type t = Voting_period_repr.kind
+        let encoding = Voting_period_repr.kind_encoding
+      end)
 
   module Current_quorum =
     Make_single_data_storage
       (Raw_context)
       (struct let name = ["current_quorum"] end)
-      (Make_value(Int32))
+      (Int32)
 
   module Current_proposal =
     Make_single_data_storage
       (Raw_context)
       (struct let name = ["current_proposal"] end)
-      (Make_value(Protocol_hash))
+      (Protocol_hash)
 
   module Listings_size =
     Make_single_data_storage
       (Raw_context)
       (struct let name = ["listings_size"] end)
-      (Make_value(Int32))
+      (Int32)
 
   module Listings =
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["listings"] end))
       (Signature.Public_key_hash)
-      (Make_value(Int32))
+      (Int32)
 
   module Proposals =
     Make_data_set_storage
@@ -391,10 +391,10 @@ module Vote = struct
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["ballots"] end))
       (Signature.Public_key_hash)
-      (Make_value(struct
-         type t = Vote_repr.ballot
-         let encoding = Vote_repr.ballot_encoding
-       end))
+      (struct
+        type t = Vote_repr.ballot
+        let encoding = Vote_repr.ballot_encoding
+      end)
 
 end
 
@@ -436,7 +436,7 @@ module Commitments =
   Make_indexed_data_storage
     (Make_subcontext(Raw_context)(struct let name = ["commitments"] end))
     (Blinded_public_key_hash.Index)
-    (Make_value(Tez_repr))
+    (Tez_repr)
 
 (** Ramp up security deposits... *)
 
@@ -446,19 +446,19 @@ module Ramp_up = struct
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "rewards"] end))
       (Cycle_repr.Index)
-      (Make_value(struct
-         type t = Tez_repr.t * Tez_repr.t
-         let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
-       end))
+      (struct
+        type t = Tez_repr.t * Tez_repr.t
+        let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
+      end)
 
   module Security_deposits =
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "deposits"] end))
       (Cycle_repr.Index)
-      (Make_value(struct
-         type t = Tez_repr.t * Tez_repr.t
-         let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
-       end))
+      (struct
+        type t = Tez_repr.t * Tez_repr.t
+        let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
+      end)
 
 end
 
