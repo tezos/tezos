@@ -98,7 +98,7 @@ module Make (Context : CONTEXT) : sig
     val finalize_block:
       validation_state ->
       (validation_result * block_header_metadata) tzresult Lwt.t
-    val rpc_services: rpc_context Lwt.t RPC_directory.t
+    val rpc_services: rpc_context RPC_directory.t
     val init:
       context -> Block_header.shell_header -> validation_result tzresult Lwt.t
   end

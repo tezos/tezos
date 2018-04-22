@@ -188,7 +188,7 @@ module type PROTOCOL = sig
     (validation_result * block_header_metadata) tzresult Lwt.t
 
   (** The list of remote procedures exported by this implementation *)
-  val rpc_services: rpc_context Lwt.t RPC_directory.t
+  val rpc_services: rpc_context RPC_directory.t
 
   (** Initialize the context (or upgrade the context after a protocol
       amendment). This function receives the context resulting of the

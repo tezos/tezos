@@ -15,15 +15,14 @@ type rpc_context = {
   context: Alpha_context.t ;
 }
 
-let rpc_init (rpc_context : Updater.rpc_context Lwt.t) =
-  rpc_context >>= fun { block_hash ; block_header ; context } ->
+let rpc_init ({ block_hash ; block_header ; context } : Updater.rpc_context) =
   let level = block_header.level in
   let timestamp = block_header.timestamp in
   let fitness = block_header.fitness in
   Alpha_context.prepare ~level ~timestamp ~fitness context >>=? fun context ->
   return { block_hash ; block_header ; context }
 
-let rpc_services = ref (RPC_directory.empty : Updater.rpc_context Lwt.t RPC_directory.t)
+let rpc_services = ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
 
 let register0_fullctxt s f =
   rpc_services :=

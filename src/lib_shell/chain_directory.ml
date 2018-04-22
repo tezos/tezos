@@ -81,23 +81,23 @@ let list_blocks chain_state ?(length = 1) ?min_date heads =
 
 let rpc_directory =
 
-  let dir : State.Chain.t Lwt.t RPC_directory.t ref =
+  let dir : State.Chain.t RPC_directory.t ref =
     ref RPC_directory.empty in
 
   let register0 s f =
     dir :=
       RPC_directory.register !dir (RPC_service.subst0 s)
-        (fun chain p q -> chain >>= fun chain -> f chain p q) in
+        (fun chain p q -> f chain p q) in
   let register1 s f =
     dir :=
       RPC_directory.register !dir (RPC_service.subst1 s)
-        (fun (chain, a) p q -> chain >>= fun chain -> f chain a p q) in
+        (fun (chain, a) p q -> f chain a p q) in
 
   let register_dynamic_directory2 ?descr s f =
     dir :=
       RPC_directory.register_dynamic_directory
         !dir ?descr (RPC_path.subst1 s)
-        (fun (chain, a) -> chain >>= fun chain -> f chain a) in
+        (fun (chain, a) -> f chain a) in
 
   register0 S.chain_id begin fun chain () () ->
     return (State.Chain.id chain)
@@ -145,7 +145,7 @@ let build_rpc_directory validator =
   let register0 s f =
     dir :=
       RPC_directory.register !dir (RPC_service.subst0 s)
-        (fun chain p q -> chain >>= fun chain -> f chain p q) in
+        (fun chain p q -> f chain p q) in
 
   register0 S.Mempool.pending_operations begin fun chain () () ->
     Validator.get_exn validator (State.Chain.id chain) >>= fun chain_validator ->

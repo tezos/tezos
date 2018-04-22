@@ -25,7 +25,7 @@ let level st = st.header.shell.level
 
 let rpc_context st =
   let result = Alpha_context.finalize st.state.ctxt in
-  Lwt.return {
+  {
     Alpha_environment.Updater.block_hash = Block_hash.zero ;
     block_header = { st.header.shell with fitness = result.fitness } ;
     context = result.context ;

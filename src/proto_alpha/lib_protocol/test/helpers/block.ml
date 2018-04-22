@@ -20,12 +20,11 @@ type t = {
 }
 type block = t
 
-let rpc_context block =
-  Lwt.return {
-    Alpha_environment.Updater.block_hash = block.hash ;
-    block_header = block.header.shell ;
-    context = block.context ;
-  }
+let rpc_context block = {
+  Alpha_environment.Updater.block_hash = block.hash ;
+  block_header = block.header.shell ;
+  context = block.context ;
+}
 
 let rpc_ctxt =
   new Alpha_environment.proto_rpc_context_of_directory

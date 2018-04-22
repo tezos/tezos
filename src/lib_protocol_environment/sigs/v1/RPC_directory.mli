@@ -14,7 +14,7 @@ type 'prefix directory = 'prefix t
 (** Empty list of dispatch trees *)
 val empty: 'prefix directory
 
-val map: ('a -> 'b) -> 'b directory -> 'a directory
+val map: ('a -> 'b Lwt.t) -> 'b directory -> 'a directory
 
 val prefix: ('pr, 'p) RPC_path.path -> 'p directory -> 'pr directory
 val merge: 'a directory -> 'a directory -> 'a directory

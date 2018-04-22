@@ -316,11 +316,11 @@ let build_raw_rpc_directory
     !dir
     (RPC_directory.map
        (fun block ->
-          State.Block.context block >>= fun context ->
-          Lwt.return Tezos_protocol_environment_shell.{
-              block_hash = State.Block.hash block ;
-              block_header = State.Block.shell_header block ;
-              context })
+          State.Block.context block >|= fun context ->
+          { Tezos_protocol_environment_shell.
+            block_hash = State.Block.hash block ;
+            block_header = State.Block.shell_header block ;
+            context })
        Next_proto.rpc_services)
 
 let get_protocol hash =
@@ -364,5 +364,5 @@ let get_block chain_state = function
 let build_rpc_directory chain_state block =
   get_block chain_state block >>= fun block ->
   get_directory block >>= fun dir ->
-  Lwt.return (RPC_directory.map (fun _ -> block) dir)
+  Lwt.return (RPC_directory.map (fun _ -> Lwt.return block) dir)
 

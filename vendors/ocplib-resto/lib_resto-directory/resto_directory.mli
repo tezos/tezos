@@ -91,7 +91,7 @@ module Make (Encoding : ENCODING) : sig
   (** Empty tree *)
   val empty: 'prefix directory
 
-  val map: ('a -> 'b) -> 'b directory -> 'a directory
+  val map: ('a -> 'b Lwt.t) -> 'b directory -> 'a directory
 
   val prefix: ('pr, 'p) Path.path -> 'p directory -> 'pr directory
   val merge: 'a directory -> 'a directory -> 'a directory
