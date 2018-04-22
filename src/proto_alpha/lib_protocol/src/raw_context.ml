@@ -20,7 +20,9 @@ type t = {
   fees: Tez_repr.t ;
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
-  operation_gas: Gas_repr.t ;
+  operation_gas: Gas_limit_repr.t ;
+  block_storage: Int64.t ;
+  operation_storage: Storage_limit_repr.t ;
   origination_nonce: Contract_repr.origination_nonce option ;
 }
 
@@ -92,7 +94,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"gas_limit_too_high"
-    ~title: "Gas limit higher than the hard limit"
+    ~title: "Gas limit out of protocol hard bounds"
     ~description:
       "A transaction tried to exceed the hard limit on gas"
     empty
@@ -100,18 +102,44 @@ let () =
     (fun () -> Gas_limit_too_high)
 
 let set_gas_limit ctxt remaining =
-  if Compare.Z.(remaining > ctxt.constants.hard_gas_limit_per_operation) then
+  if Compare.Z.(remaining > ctxt.constants.hard_gas_limit_per_operation)
+  || Compare.Z.(remaining < Z.zero) then
     error Gas_limit_too_high
   else
     ok { ctxt with operation_gas = Limited { remaining } }
 let set_gas_unlimited ctxt =
   { ctxt with operation_gas = Unaccounted }
 let consume_gas ctxt cost =
-  Gas_repr.consume ctxt.block_gas ctxt.operation_gas cost >>? fun (block_gas, operation_gas) ->
+  Gas_limit_repr.consume ctxt.block_gas ctxt.operation_gas cost >>? fun (block_gas, operation_gas) ->
   ok { ctxt with block_gas ; operation_gas }
 let gas_level ctxt = ctxt.operation_gas
 let block_gas_level ctxt = ctxt.block_gas
 
+type error += Storage_limit_too_high (* `Permanent *)
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"storage_limit_too_high"
+    ~title: "Storage limit out of protocol hard bounds"
+    ~description:
+      "A transaction tried to exceed the hard limit on storage"
+    empty
+    (function Storage_limit_too_high -> Some () | _ -> None)
+    (fun () -> Storage_limit_too_high)
+
+let set_storage_limit ctxt remaining =
+  if Compare.Int64.(remaining > ctxt.constants.hard_storage_limit_per_operation)
+  || Compare.Int64.(remaining < 0L)then
+    error Storage_limit_too_high
+  else
+    ok { ctxt with operation_storage = Limited { remaining } }
+let set_storage_unlimited ctxt =
+  { ctxt with operation_storage = Unaccounted }
+let record_bytes_stored ctxt bytes =
+  Storage_limit_repr.consume ctxt.block_storage ctxt.operation_storage ~bytes >>? fun (block_storage, operation_storage) ->
+  ok { ctxt with block_storage ; operation_storage }
 
 type storage_error =
   | Incompatible_protocol_version of string
@@ -331,6 +359,8 @@ let prepare ~level ~timestamp ~fitness ctxt =
     rewards = Tez_repr.zero ;
     operation_gas = Unaccounted ;
     block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
+    operation_storage = Unaccounted ;
+    block_storage = constants.Constants_repr.hard_storage_limit_per_block ;
     origination_nonce = None ;
   }
 
@@ -378,6 +408,8 @@ let register_resolvers enc resolve =
       rewards = Tez_repr.zero ;
       block_gas = Constants_repr.default.hard_gas_limit_per_block ;
       operation_gas = Unaccounted ;
+      block_storage = Constants_repr.default.hard_storage_limit_per_block ;
+      operation_storage = Unaccounted ;
       origination_nonce = None ;
     } in
     resolve faked_context str in
@@ -421,7 +453,9 @@ module type T = sig
 
   val absolute_key: context -> key -> key
 
-  val consume_gas: context -> Gas_repr.cost -> context tzresult
+  val consume_gas: context -> Gas_limit_repr.cost -> context tzresult
+
+  val record_bytes_stored: context -> Int64.t -> context tzresult
 
 end
 

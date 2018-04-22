@@ -56,6 +56,7 @@ and sourced_operation =
       counter: counter ;
       operations: manager_operation list ;
       gas_limit: Z.t;
+      storage_limit: Int64.t;
     }
   | Dictator_operation of dictator_operation
 
@@ -186,7 +187,7 @@ module Encoding = struct
       (fun ((), key) -> Delegation key)
 
   let manager_kind_encoding =
-    obj6
+    obj7
       (req "kind" (constant "manager"))
       (req "source" Contract_repr.encoding)
       (req "fee" Tez_repr.encoding)
@@ -199,15 +200,16 @@ module Encoding = struct
               delegation_case (Tag 3) ;
             ])))
       (req "gas_limit" z)
+      (req "storage_limit" int64)
 
   let manager_kind_case tag =
     case tag ~name:"Manager operations" manager_kind_encoding
       (function
-        | Manager_operations { source; fee ; counter ; operations ; gas_limit } ->
-            Some ((), source, fee, counter, operations, gas_limit)
+        | Manager_operations { source; fee ; counter ; operations ; gas_limit ; storage_limit } ->
+            Some ((), source, fee, counter, operations, gas_limit, storage_limit)
         | _ -> None)
-      (fun ((), source, fee, counter, operations, gas_limit) ->
-         Manager_operations { source; fee ; counter ; operations ; gas_limit })
+      (fun ((), source, fee, counter, operations, gas_limit, storage_limit) ->
+         Manager_operations { source; fee ; counter ; operations ; gas_limit ; storage_limit })
 
   let endorsement_encoding =
     (* describe ~title:"Endorsement operation" @@ *)

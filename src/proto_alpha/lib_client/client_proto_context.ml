@@ -39,7 +39,7 @@ let append_reveal
 let transfer (cctxt : #Proto_alpha.full)
     block ?confirmations
     ?branch ~source ~src_pk ~src_sk ~destination ?arg
-    ~amount ~fee ?(gas_limit = Z.minus_one) () =
+    ~amount ~fee ?(gas_limit = Z.minus_one) ?(storage_limit = -1L) () =
   begin match arg with
     | Some arg ->
         parse_expression arg >>=? fun { expanded = arg } ->
@@ -54,7 +54,7 @@ let transfer (cctxt : #Proto_alpha.full)
   let contents =
     Sourced_operation
       (Manager_operations { source ; fee ; counter ;
-                            gas_limit ; operations }) in
+                            gas_limit ; storage_limit ; operations }) in
   Injection.inject_operation cctxt block ?confirmations
     ?branch ~src_sk contents >>=? fun (_oph, _op, result as res) ->
   Lwt.return (Injection.originated_contracts result) >>=? fun contracts ->
@@ -70,18 +70,19 @@ let reveal cctxt
   | [] ->
       failwith "The manager key was previously revealed."
   | _ :: _ ->
-      let gas_limit = Z.zero in
       let contents =
         Sourced_operation
           (Manager_operations { source ; fee ; counter ;
-                                gas_limit ; operations }) in
+                                gas_limit = Z.zero ; storage_limit = 0L ;
+                                operations }) in
       Injection.inject_operation cctxt block ?confirmations
         ?branch ~src_sk contents >>=? fun res ->
       return res
 
 let originate
     cctxt block ?confirmations
-    ?branch ~source ~src_pk ~src_sk ~fee ?(gas_limit = Z.minus_one) origination =
+    ?branch ~source ~src_pk ~src_sk ~fee
+    ?(gas_limit = Z.minus_one) ?(storage_limit = -1L) origination =
   Alpha_services.Contract.counter cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   let operations = [origination] in
@@ -90,7 +91,7 @@ let originate
   let contents =
     Sourced_operation
       (Manager_operations { source ; fee ; counter ;
-                            gas_limit ; operations }) in
+                            gas_limit ; storage_limit ; operations }) in
   Injection.inject_operation cctxt block ?confirmations
     ?branch ~src_sk contents >>=? fun (_oph, _op, result as res) ->
   Lwt.return (Injection.originated_contracts result) >>=? function
@@ -129,7 +130,8 @@ let delegate_contract cctxt
   let contents =
     Sourced_operation
       (Manager_operations { source ; fee ; counter ;
-                            gas_limit = Z.zero ; operations }) in
+                            gas_limit = Z.zero ; storage_limit = 0L ;
+                            operations }) in
   Injection.inject_operation cctxt block ?confirmations
     ?branch ~src_sk contents >>=? fun res ->
   return res
@@ -204,6 +206,7 @@ let originate_contract
     block ?confirmations ?branch
     ~fee
     ?gas_limit
+    ?storage_limit
     ~delegate
     ?(delegatable=true)
     ?(spendable=false)
@@ -227,7 +230,7 @@ let originate_contract
                   credit = balance ;
                   preorigination = None } in
   originate cctxt block ?confirmations
-    ?branch ~source ~src_pk ~src_sk ~fee ?gas_limit origination
+    ?branch ~source ~src_pk ~src_sk ~fee ?gas_limit ?storage_limit origination
 
 type activation_key =
   { pkh : Ed25519.Public_key_hash.t ;

@@ -163,6 +163,20 @@ let gas_limit_arg =
            return v
          with _ -> failwith "invalid gas limit (must be a positive number)"))
 
+let storage_limit_arg =
+  arg
+    ~long:"storage-limit"
+    ~short:'S'
+    ~placeholder:"amount"
+    ~doc:"Set the storage limit of the transaction instead \
+          of letting the client decide based on a simulation"
+    (parameter (fun _ s ->
+         try
+           let v = Int64.of_string s in
+           assert Compare.Int64.(v >= 0L) ;
+           return v
+         with _ -> failwith "invalid storage limit (must be a positive number of bytes)"))
+
 let max_priority_arg =
   arg
     ~long:"max-priority"

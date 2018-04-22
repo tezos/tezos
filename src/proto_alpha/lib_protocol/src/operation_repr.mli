@@ -56,6 +56,7 @@ and sourced_operation =
       counter: counter ;
       operations: manager_operation list ;
       gas_limit: Z.t ;
+      storage_limit: Int64.t;
     }
   | Dictator_operation of dictator_operation
 

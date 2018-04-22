@@ -72,6 +72,22 @@ let estimated_gas = function
         (Ok Z.zero) operation_results
   | _ -> Ok Z.zero
 
+let estimated_storage = function
+  | Sourced_operation_result (Manager_operations_result { operation_results }) ->
+      List.fold_left
+        (fun acc (_, r) -> acc >>? fun acc ->
+          match r with
+          | Applied (Transaction_result { storage_size_diff }
+                    | Origination_result { storage_size_diff }) ->
+              Ok (Int64.add storage_size_diff acc)
+          | Applied Reveal_result -> Ok acc
+          | Applied Delegation_result -> Ok acc
+          | Skipped -> assert false
+          | Failed errs -> Alpha_environment.wrap_error (Error errs))
+        (Ok 0L) operation_results >>? fun diff ->
+      Ok (max 0L diff)
+  | _ -> Ok 0L
+
 let originated_contracts = function
   | Sourced_operation_result (Manager_operations_result { operation_results }) ->
       List.fold_left
@@ -87,34 +103,53 @@ let originated_contracts = function
         (Ok []) operation_results
   | _ -> Ok []
 
-let may_patch_gas_limit
+let may_patch_limits
     (cctxt : #Proto_alpha.full) block ?branch
     ?src_sk contents =
   Alpha_services.Constants.hard_gas_limits cctxt block >>=? fun (_, gas_limit) ->
+  Alpha_services.Constants.hard_storage_limits cctxt block >>=? fun (_, storage_limit) ->
   match contents with
   | Sourced_operation (Manager_operations c)
-    when c.gas_limit < Z.zero || gas_limit < c.gas_limit ->
+    when c.gas_limit < Z.zero || gas_limit < c.gas_limit
+         || c.storage_limit < 0L || storage_limit < c.storage_limit ->
       let contents =
-        Sourced_operation (Manager_operations { c with gas_limit }) in
+        Sourced_operation (Manager_operations { c with gas_limit ; storage_limit }) in
       preapply cctxt block ?branch ?src_sk contents >>=? fun (_, _, result) ->
-      Lwt.return (estimated_gas result) >>=? fun gas ->
-      begin
-        if Z.equal gas Z.zero then
-          cctxt#message "Estimated gas: none" >>= fun () ->
-          return Z.zero
-        else
-          cctxt#message
-            "Estimated gas: %s units (will add 100 for safety)"
-            (Z.to_string gas) >>= fun () ->
-          return (Z.add gas (Z.of_int 100))
+      begin if c.gas_limit < Z.zero || gas_limit < c.gas_limit then
+          Lwt.return (estimated_gas result) >>=? fun gas ->
+          begin
+            if Z.equal gas Z.zero then
+              cctxt#message "Estimated gas: none" >>= fun () ->
+              return Z.zero
+            else
+              cctxt#message
+                "Estimated gas: %s units (will add 100 for safety)"
+                (Z.to_string gas) >>= fun () ->
+              return (Z.add gas (Z.of_int 100))
+          end
+        else return c.gas_limit
       end >>=? fun gas_limit ->
-      return (Sourced_operation (Manager_operations { c with gas_limit }))
+      begin if c.storage_limit < 0L || storage_limit < c.storage_limit then
+          Lwt.return (estimated_storage result) >>=? fun storage ->
+          begin
+            if Int64.equal storage 0L then
+              cctxt#message "Estimated storage: no bytes added" >>= fun () ->
+              return 0L
+            else
+              cctxt#message
+                "Estimated storage: %Ld bytes added (will add 20 for safety)"
+                storage >>= fun () ->
+              return (Int64.add storage 20L)
+          end
+        else return c.storage_limit
+      end >>=? fun storage_limit ->
+      return (Sourced_operation (Manager_operations { c with gas_limit ; storage_limit }))
   | op -> return op
 
 let inject_operation
     cctxt block
     ?confirmations ?branch ?src_sk contents =
-  may_patch_gas_limit
+  may_patch_limits
     cctxt block ?branch ?src_sk contents >>=? fun contents ->
   preapply cctxt block
     ?branch ?src_sk contents >>=? fun (_oph, op, result) ->

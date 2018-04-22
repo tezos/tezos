@@ -89,6 +89,7 @@ val originate_contract:
   ?branch:int ->
   fee:Tez.t ->
   ?gas_limit:Z.t ->
+  ?storage_limit:Int64.t ->
   delegate:public_key_hash option ->
   ?delegatable:bool ->
   ?spendable:bool ->
@@ -114,6 +115,7 @@ val transfer :
   amount:Tez.t ->
   fee:Tez.t ->
   ?gas_limit:Z.t ->
+  ?storage_limit:Int64.t ->
   unit ->
   (Injection.result * Contract.t list) tzresult Lwt.t
 

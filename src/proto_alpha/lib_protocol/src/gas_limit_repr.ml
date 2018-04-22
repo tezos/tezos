@@ -89,9 +89,9 @@ let consume block_gas operation_gas cost = match operation_gas with
         Z.sub remaining weighted_cost in
       let block_remaining =
         Z.sub block_gas weighted_cost in
-      if Compare.Z.(remaining <= Z.zero)
+      if Compare.Z.(remaining < Z.zero)
       then error Operation_quota_exceeded
-      else if Compare.Z.(block_remaining <= Z.zero)
+      else if Compare.Z.(block_remaining < Z.zero)
       then error Block_quota_exceeded
       else ok (block_remaining, Limited { remaining })
 

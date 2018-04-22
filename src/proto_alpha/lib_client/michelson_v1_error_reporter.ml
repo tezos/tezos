@@ -204,14 +204,34 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_source (parsed, hilights) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
+    | Alpha_environment.Ecoproto_error Gas.Gas_limit_too_high :: rest ->
+        Format.fprintf ppf
+          "Gas limit for the block is out of the protocol hard bounds." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
     | Alpha_environment.Ecoproto_error Gas.Block_quota_exceeded :: rest ->
         Format.fprintf ppf
-          "@[<v 0>Gas limit for the block exceeded during typechecking or execution.@]" ;
+          "Gas limit for the block exceeded during typechecking or execution." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error Gas.Operation_quota_exceeded :: rest ->
         Format.fprintf ppf
           "@[<v 0>Gas limit exceeded during typechecking or execution.@,Try again with a higher gas limit.@]" ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Contract.Storage_limit_too_high :: rest ->
+        Format.fprintf ppf
+          "Storage limit for the block is out of the protocol hard bounds." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Contract.Block_storage_quota_exceeded :: rest ->
+        Format.fprintf ppf
+          "Storage limit for the block exceeded during typechecking or execution." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Contract.Operation_storage_quota_exceeded :: rest ->
+        Format.fprintf ppf
+          "@[<v 0>Storage limit exceeded during typechecking or execution.@,Try again with a higher storage limit.@]" ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error err :: rest ->

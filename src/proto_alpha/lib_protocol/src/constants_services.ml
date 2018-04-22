@@ -88,6 +88,14 @@ module S = struct
       ~output: (obj2 (req "per_block" z) (req "per_operation" z))
       RPC_path.(custom_root / "hard_gas_limits")
 
+  let hard_storage_limits =
+    RPC_service.post_service
+      ~description: "Hard maximum amount of bytes stored per operation and per block"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj2 (req "per_block" int64) (req "per_operation" int64))
+      RPC_path.(custom_root / "hard_storage_limits")
+
   let cost_per_byte =
     RPC_service.post_service
       ~description: "The cost per bytes added to the storage"
@@ -201,6 +209,10 @@ let () =
     return (Constants.hard_gas_limit_per_block ctxt,
             Constants.hard_gas_limit_per_operation ctxt)
   end ;
+  register0 S.hard_storage_limits begin fun ctxt () () ->
+    return (Constants.hard_storage_limit_per_block ctxt,
+            Constants.hard_storage_limit_per_operation ctxt)
+  end ;
   register0 S.cost_per_byte begin fun ctxt () () ->
     return (Constants.cost_per_byte ctxt)
   end ;
@@ -254,6 +266,8 @@ let hard_gas_limits ctxt block =
   RPC_context.make_call0 S.hard_gas_limits ctxt block () ()
 let cost_per_byte ctxt block =
   RPC_context.make_call0 S.cost_per_byte ctxt block () ()
+let hard_storage_limits ctxt block =
+  RPC_context.make_call0 S.hard_storage_limits ctxt block () ()
 let proof_of_work_threshold ctxt block =
   RPC_context.make_call0 S.proof_of_work_threshold ctxt block () ()
 let seed_nonce_revelation_tip ctxt block =

@@ -26,6 +26,7 @@ let manager (src : Helpers_account.t) ?(fee = Tez.zero) operations context gas_l
     counter ;
     operations = (if revealed then operations else Reveal src.pub :: operations) ;
     gas_limit ;
+    storage_limit = 30_000L ;
   }
 
 

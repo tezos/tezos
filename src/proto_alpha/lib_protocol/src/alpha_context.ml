@@ -62,7 +62,8 @@ end
 module Voting_period = Voting_period_repr
 
 module Gas = struct
-  include Gas_repr
+  include Gas_limit_repr
+  type error += Gas_limit_too_high = Raw_context.Gas_limit_too_high
   let set_limit = Raw_context.set_gas_limit
   let set_unlimited = Raw_context.set_gas_unlimited
   let consume = Raw_context.consume_gas
@@ -78,6 +79,11 @@ module Contract = struct
   include Contract_storage
   let init_origination_nonce = Raw_context.init_origination_nonce
   let unset_origination_nonce = Raw_context.unset_origination_nonce
+  type error += Block_storage_quota_exceeded = Storage_limit_repr.Block_quota_exceeded
+  type error += Operation_storage_quota_exceeded = Storage_limit_repr.Operation_quota_exceeded
+  type error += Storage_limit_too_high = Raw_context.Storage_limit_too_high
+  let set_storage_limit = Raw_context.set_storage_limit
+  let set_storage_unlimited = Raw_context.set_storage_unlimited
 end
 module Delegate = Delegate_storage
 module Roll = struct

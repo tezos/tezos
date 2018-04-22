@@ -300,7 +300,8 @@ module Forge = struct
   module Manager = struct
 
     let operations ctxt
-        block ~branch ~source ?sourcePubKey ~counter ~fee ~gas_limit operations =
+        block ~branch ~source ?sourcePubKey ~counter ~fee
+        ~gas_limit ~storage_limit operations =
       Contract_services.manager_key ctxt block source >>= function
       | Error _ as e -> Lwt.return e
       | Ok (_, revealed) ->
@@ -313,18 +314,22 @@ module Forge = struct
                 | Some pk -> Reveal pk :: operations in
           let ops =
             Manager_operations { source ;
-                                 counter ; operations ; fee ; gas_limit } in
+                                 counter ; operations ; fee ;
+                                 gas_limit ; storage_limit } in
           (RPC_context.make_call0 S.operations ctxt block
              () ({ branch }, Sourced_operation ops))
 
     let reveal ctxt
         block ~branch ~source ~sourcePubKey ~counter ~fee ()=
-      operations ctxt block ~branch ~source ~sourcePubKey ~counter ~fee ~gas_limit:Z.zero []
+      operations ctxt block ~branch ~source ~sourcePubKey ~counter ~fee
+        ~gas_limit:Z.zero ~storage_limit:0L []
 
     let transaction ctxt
         block ~branch ~source ?sourcePubKey ~counter
-        ~amount ~destination ?parameters ~gas_limit ~fee ()=
-      operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee ~gas_limit
+        ~amount ~destination ?parameters
+        ~gas_limit ~storage_limit ~fee ()=
+      operations ctxt block ~branch ~source ?sourcePubKey ~counter
+        ~fee ~gas_limit ~storage_limit
         Alpha_context.[Transaction { amount ; parameters ; destination }]
 
     let origination ctxt
@@ -334,8 +339,9 @@ module Forge = struct
         ?(spendable = true)
         ?(delegatable = true)
         ?delegatePubKey ?script
-        ~gas_limit ~fee () =
-      operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee ~gas_limit
+        ~gas_limit ~storage_limit ~fee () =
+      operations ctxt block ~branch ~source ?sourcePubKey ~counter
+        ~fee ~gas_limit ~storage_limit
         Alpha_context.[
           Origination { manager = managerPubKey ;
                         delegate = delegatePubKey ;
@@ -348,7 +354,8 @@ module Forge = struct
 
     let delegation ctxt
         block ~branch ~source ?sourcePubKey ~counter ~fee delegate =
-      operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee ~gas_limit:Z.zero
+      operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
+        ~gas_limit:Z.zero ~storage_limit:0L
         Alpha_context.[Delegation delegate]
 
   end

@@ -121,6 +121,7 @@ module Gas : sig
 
   type error += Block_quota_exceeded (* `Temporary *)
   type error += Operation_quota_exceeded (* `Temporary *)
+  type error += Gas_limit_too_high (* `Permanent *)
 
   val free : cost
   val step_cost : int -> cost
@@ -323,6 +324,8 @@ module Constants : sig
     block_reward: Tez.t ;
     endorsement_reward: Tez.t ;
     cost_per_byte: Tez.t ;
+    hard_storage_limit_per_operation: Int64.t ;
+    hard_storage_limit_per_block: Int64.t ;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -338,6 +341,8 @@ module Constants : sig
   val hard_gas_limit_per_operation: context -> Z.t
   val hard_gas_limit_per_block: context -> Z.t
   val cost_per_byte: context -> Tez.t
+  val hard_storage_limit_per_operation: context -> Int64.t
+  val hard_storage_limit_per_block: context -> Int64.t
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Signature.Public_key.t
   val max_operation_data_length: context -> int
@@ -541,6 +546,13 @@ module Contract : sig
     context -> contract ->
     Script.expr -> big_map_diff option ->
     context tzresult Lwt.t
+
+  type error += Block_storage_quota_exceeded (* `Temporary *)
+  type error += Operation_storage_quota_exceeded (* `Temporary *)
+  type error += Storage_limit_too_high (* `Permanent *)
+
+  val set_storage_limit: context -> Int64.t -> context tzresult
+  val set_storage_unlimited: context -> context
 
   val used_storage_space: context -> t -> Int64.t tzresult Lwt.t
   val paid_storage_space_fees: context -> t -> Tez.t tzresult Lwt.t
@@ -750,6 +762,7 @@ and sourced_operation =
       counter: counter ;
       operations: manager_operation list ;
       gas_limit: Z.t ;
+      storage_limit: Int64.t;
     }
   | Dictator_operation of dictator_operation
 

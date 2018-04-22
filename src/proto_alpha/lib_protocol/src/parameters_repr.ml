@@ -105,6 +105,12 @@ let constants_encoding =
        and cost_per_byte =
          opt Tez_repr.(=)
            default.cost_per_byte c.cost_per_byte
+       and hard_storage_limit_per_operation =
+         opt Compare.Int64.(=)
+           default.hard_storage_limit_per_operation c.hard_storage_limit_per_operation
+       and hard_storage_limit_per_block =
+         opt Compare.Int64.(=)
+           default.hard_storage_limit_per_block c.hard_storage_limit_per_block
        in
        (( preserved_cycles,
           blocks_per_cycle,
@@ -127,7 +133,9 @@ let constants_encoding =
           endorsement_security_deposit,
           block_reward),
          (endorsement_reward,
-          cost_per_byte))))
+          cost_per_byte,
+          hard_storage_limit_per_operation,
+          hard_storage_limit_per_block))))
     (fun (( preserved_cycles,
             blocks_per_cycle,
             blocks_per_commitment,
@@ -149,7 +157,9 @@ let constants_encoding =
             endorsement_security_deposit,
             block_reward),
            (endorsement_reward,
-            cost_per_byte))) ->
+            cost_per_byte,
+            hard_storage_limit_per_operation,
+            hard_storage_limit_per_block))) ->
       let unopt def = function None -> def | Some v -> v in
       let default = Constants_repr.default in
       { Constants_repr.preserved_cycles =
@@ -197,6 +207,10 @@ let constants_encoding =
           unopt default.endorsement_reward endorsement_reward ;
         cost_per_byte =
           unopt default.cost_per_byte cost_per_byte ;
+        hard_storage_limit_per_operation =
+          unopt default.hard_storage_limit_per_operation hard_storage_limit_per_operation ;
+        hard_storage_limit_per_block =
+          unopt default.hard_storage_limit_per_block hard_storage_limit_per_block ;
       } )
     (merge_objs
        (obj10
@@ -222,9 +236,11 @@ let constants_encoding =
              (opt "block_security_deposit" Tez_repr.encoding)
              (opt "endorsement_security_deposit" Tez_repr.encoding)
              (opt "block_reward" Tez_repr.encoding))
-          (obj2
+          (obj4
              (opt "endorsement_reward" Tez_repr.encoding)
-             (opt "cost_per_byte" Tez_repr.encoding))))
+             (opt "cost_per_byte" Tez_repr.encoding)
+             (opt "hard_storage_limit_per_operation" int64)
+             (opt "hard_storage_limit_per_block" int64))))
 
 let encoding =
   let open Data_encoding in

@@ -542,7 +542,7 @@ let apply_manager_operations ctxt source ops =
 
 let apply_sourced_operation ctxt pred_block operation ops =
   match ops with
-  | Manager_operations { source ; fee ; counter ; operations ; gas_limit } ->
+  | Manager_operations { source ; fee ; counter ; operations ; gas_limit ; storage_limit } ->
       let revealed_public_keys =
         List.fold_left (fun acc op ->
             match op with
@@ -564,6 +564,7 @@ let apply_sourced_operation ctxt pred_block operation ops =
       Contract.spend ctxt source fee >>=? fun ctxt ->
       add_fees ctxt fee >>=? fun ctxt ->
       Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
+      Lwt.return (Contract.set_storage_limit ctxt storage_limit) >>=? fun ctxt ->
       apply_manager_operations ctxt source operations >>= begin function
         | Ok (ctxt, operation_results) -> return (ctxt, operation_results)
         | Error operation_results -> return (ctxt (* backtracked *), operation_results)
@@ -716,6 +717,7 @@ let apply_operation ctxt pred_block hash operation =
         return (ctxt, Sourced_operation_result result)
   end >>=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
+  let ctxt = Contract.set_storage_unlimited ctxt in
   let ctxt = Contract.unset_origination_nonce ctxt in
   return (ctxt, result)
 

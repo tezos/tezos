@@ -229,7 +229,7 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
           "@[<v 2>Dictator test protocol activation:@,\
            Protocol: %a@]"
           Protocol_hash.pp protocol
-    | Sourced_operation (Manager_operations { source ; fee ; counter ; operations ; gas_limit }),
+    | Sourced_operation (Manager_operations { source ; fee ; counter ; operations ; gas_limit ; storage_limit }),
       Sourced_operation_result (Manager_operations_result { balance_updates ; operation_results }) ->
         let pp_result ppf result =
           Format.fprintf ppf "@," ;
@@ -237,10 +237,9 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
           | Skipped ->
               Format.fprintf ppf
                 "This operation was skipped"
-          | Failed errs ->
+          | Failed _errs ->
               Format.fprintf ppf
-                "@[<v 2>This operation FAILED with the folllowing error:@,%a@]"
-                (Format.pp_print_list Alpha_environment.Error_monad.pp) errs
+                "This operation FAILED."
           | Applied Reveal_result ->
               Format.fprintf ppf
                 "This revelation was successfully applied"
@@ -325,12 +324,14 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
            From: %a@,\
            Fee to the baker: %s%a@,\
            Expected counter: %ld@,\
-           Gas limit: %s"
+           Gas limit: %s@,\
+           Storage limit: %Ld bytes"
           Contract.pp source
           Client_proto_args.tez_sym
           Tez.pp fee
           counter
-          (Z.to_string gas_limit) ;
+          (Z.to_string gas_limit)
+          storage_limit ;
         begin match balance_updates with
           | [] -> ()
           | balance_updates ->

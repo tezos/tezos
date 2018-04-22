@@ -197,8 +197,8 @@ let commands () =
       end ;
 
     command ~group ~desc: "Launch a smart contract on the blockchain."
-      (args8
-         fee_arg gas_limit_arg delegate_arg (Client_keys.force_switch ())
+      (args9
+         fee_arg gas_limit_arg storage_limit_arg delegate_arg (Client_keys.force_switch ())
          delegatable_switch spendable_switch init_arg no_print_source_flag)
       (prefixes [ "originate" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
@@ -217,13 +217,13 @@ let commands () =
          ~name:"prg" ~desc: "script of the account\n\
                              Combine with -init if the storage type is not unit."
        @@ stop)
-      begin fun (fee, gas_limit, delegate, force, delegatable, spendable, initial_storage, no_print_source)
+      begin fun (fee, gas_limit, storage_limit, delegate, force, delegatable, spendable, initial_storage, no_print_source)
         alias_name manager balance (_, source) program (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
         originate_contract cctxt cctxt#block ?confirmations:cctxt#confirmations
-          ~fee ?gas_limit ~delegate ~delegatable ~spendable ~initial_storage
+          ~fee ?gas_limit ?storage_limit ~delegate ~delegatable ~spendable ~initial_storage
           ~manager ~balance ~source ~src_pk ~src_sk ~code () >>= fun errors ->
         report_michelson_errors ~no_print_source ~msg:"origination simulation failed" cctxt errors >>= function
         | None -> return ()
@@ -233,7 +233,7 @@ let commands () =
       end ;
 
     command ~group ~desc: "Transfer tokens / call a smart contract."
-      (args4 fee_arg gas_limit_arg arg_arg no_print_source_flag)
+      (args5 fee_arg gas_limit_arg storage_limit_arg arg_arg no_print_source_flag)
       (prefixes [ "transfer" ]
        @@ tez_param
          ~name: "qty" ~desc: "amount taken from source"
@@ -244,10 +244,10 @@ let commands () =
        @@ ContractAlias.destination_param
          ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
-      begin fun (fee, gas_limit, arg, no_print_source) amount (_, source) (_, destination) cctxt ->
+      begin fun (fee, gas_limit, storage_limit, arg, no_print_source) amount (_, source) (_, destination) cctxt ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
         transfer cctxt cctxt#block ?confirmations:cctxt#confirmations
-          ~source ~fee ~src_pk ~src_sk ~destination ~arg ~amount ?gas_limit () >>=
+          ~source ~fee ~src_pk ~src_sk ~destination ~arg ~amount ?gas_limit ?storage_limit () >>=
         report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
         | None -> return ()
         | Some (_res, _contracts) ->
