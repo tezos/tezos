@@ -37,6 +37,9 @@ let hard_gas_limit_per_operation c =
 let hard_gas_limit_per_block c =
   let constants = Raw_context.constants c in
   constants.hard_gas_limit_per_block
+let cost_per_byte c =
+  let constants = Raw_context.constants c in
+  constants.cost_per_byte
 let proof_of_work_threshold c =
   let constants = Raw_context.constants c in
   constants.proof_of_work_threshold

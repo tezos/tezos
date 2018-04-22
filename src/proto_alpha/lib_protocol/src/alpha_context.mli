@@ -337,6 +337,7 @@ module Constants : sig
   val endorsers_per_block: context -> int
   val hard_gas_limit_per_operation: context -> Z.t
   val hard_gas_limit_per_block: context -> Z.t
+  val cost_per_byte: context -> Tez.t
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Signature.Public_key.t
   val max_operation_data_length: context -> int
@@ -541,9 +542,9 @@ module Contract : sig
     Script.expr -> big_map_diff option ->
     context tzresult Lwt.t
 
-  val fees: context -> t -> Tez.t tzresult Lwt.t
-  val paid_fees: context -> t -> Tez.t tzresult Lwt.t
-  val add_to_paid_fees: context -> t -> Tez.t -> context tzresult Lwt.t
+  val used_storage_space: context -> t -> Int64.t tzresult Lwt.t
+  val paid_storage_space_fees: context -> t -> Tez.t tzresult Lwt.t
+  val pay_for_storage_space: context -> t -> Tez.t -> context tzresult Lwt.t
 
   val increment_counter:
     context -> contract -> context tzresult Lwt.t

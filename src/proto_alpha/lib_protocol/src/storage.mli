@@ -172,17 +172,15 @@ module Contract : sig
      and type value = Script_repr.expr
      and type t := Raw_context.t
 
-  (** Exact cost of current storage.
-      Includes code, global storage and big map elements.
-      Always less than or equal to {!Paid_fees}. *)
-  module Fees : Indexed_data_storage
+  (** Current storage space in bytes.
+      Includes code, global storage and big map elements. *)
+  module Used_storage_space : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Tez_repr.t
+     and type value = Int64.t
      and type t := Raw_context.t
 
-  (** Maximum cost of storage since the contract's origination.
-      Always greater than or equal to {!Fees}. *)
-  module Paid_fees : Indexed_data_storage
+  (** Total fees burnt for storage space. *)
+  module Paid_storage_space_fees : Indexed_data_storage
     with type key = Contract_repr.t
      and type value = Tez_repr.t
      and type t := Raw_context.t

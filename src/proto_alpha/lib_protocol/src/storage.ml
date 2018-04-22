@@ -19,6 +19,11 @@ module Int32 = struct
   let encoding = Data_encoding.int32
 end
 
+module Int64 = struct
+  type t = Int64.t
+  let encoding = Data_encoding.int64
+end
+
 module Int_index = struct
   type t = int
   let path_length = 1
@@ -161,15 +166,15 @@ module Contract = struct
          let encoding = Script_repr.expr_encoding
        end))
 
-  module Paid_fees =
+  module Paid_storage_space_fees =
     Indexed_context.Make_map
-      (struct let name = ["paid_fees"] end)
+      (struct let name = ["paid_bytes"] end)
       (Make_value(Tez_repr))
 
-  module Fees =
+  module Used_storage_space =
     Indexed_context.Make_map
-      (struct let name = ["fees"] end)
-      (Make_value(Tez_repr))
+      (struct let name = ["used_bytes"] end)
+      (Make_value(Int64))
 
   module Roll_list =
     Indexed_context.Make_map

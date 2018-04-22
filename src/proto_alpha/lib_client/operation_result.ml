@@ -249,7 +249,7 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
                 "This delegation was successfully applied"
           | Applied (Transaction_result { balance_updates ; consumed_gas ;
                                           operations ; storage ;
-                                          originated_contracts ; storage_fees_increment }) ->
+                                          originated_contracts ; storage_size_diff }) ->
               Format.fprintf ppf
                 "This transaction was successfully applied" ;
               begin match operations with
@@ -268,11 +268,10 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
                     Format.fprintf ppf "@,@[<hv 2>Updated storage:@ %a@]"
                       Michelson_v1_printer.print_expr expr
               end ;
-              begin if storage_fees_increment <> Tez.zero then
+              begin if storage_size_diff <> 0L then
                   Format.fprintf ppf
-                    "@,Storage fees increment: %s%a"
-                    Client_proto_args.tez_sym
-                    Tez.pp storage_fees_increment
+                    "@,Storage size difference: %Ld bytes"
+                    storage_size_diff
               end ;
               Format.fprintf ppf
                 "@,Consumed gas: %s"
@@ -285,7 +284,7 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
                       pp_balance_updates balance_updates
               end
           | Applied (Origination_result { balance_updates ; consumed_gas ;
-                                          originated_contracts ; storage_fees_increment }) ->
+                                          originated_contracts ; storage_size_diff }) ->
               Format.fprintf ppf
                 "This origination was successfully applied" ;
               begin match originated_contracts with
@@ -294,11 +293,10 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
                     Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
                       (Format.pp_print_list Contract.pp) contracts
               end ;
-              begin if storage_fees_increment <> Tez.zero then
+              begin if storage_size_diff <> 0L then
                   Format.fprintf ppf
-                    "@,Storage fees increment: %s%a"
-                    Client_proto_args.tez_sym
-                    Tez.pp storage_fees_increment
+                    "@,Storage size used: %Ld bytes"
+                    storage_size_diff
               end ;
               Format.fprintf ppf
                 "@,Consumed gas: %s"

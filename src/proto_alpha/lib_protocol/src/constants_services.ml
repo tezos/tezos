@@ -88,6 +88,13 @@ module S = struct
       ~output: (obj2 (req "per_block" z) (req "per_operation" z))
       RPC_path.(custom_root / "hard_gas_limits")
 
+  let cost_per_byte =
+    RPC_service.post_service
+      ~description: "The cost per bytes added to the storage"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req "cost_per_byte" Tez.encoding))
+      RPC_path.(custom_root / "cost_per_byte")
 
   let proof_of_work_threshold =
     RPC_service.post_service
@@ -194,6 +201,9 @@ let () =
     return (Constants.hard_gas_limit_per_block ctxt,
             Constants.hard_gas_limit_per_operation ctxt)
   end ;
+  register0 S.cost_per_byte begin fun ctxt () () ->
+    return (Constants.cost_per_byte ctxt)
+  end ;
   register0 S.proof_of_work_threshold begin fun ctxt () () ->
     return (Constants.proof_of_work_threshold ctxt)
   end ;
@@ -242,6 +252,8 @@ let endorsers_per_block ctxt block =
   RPC_context.make_call0 S.endorsers_per_block ctxt block () ()
 let hard_gas_limits ctxt block =
   RPC_context.make_call0 S.hard_gas_limits ctxt block () ()
+let cost_per_byte ctxt block =
+  RPC_context.make_call0 S.cost_per_byte ctxt block () ()
 let proof_of_work_threshold ctxt block =
   RPC_context.make_call0 S.proof_of_work_threshold ctxt block () ()
 let seed_nonce_revelation_tip ctxt block =

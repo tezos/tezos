@@ -83,12 +83,12 @@ and successful_manager_operation_result =
         balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_fees_increment : Tez.t }
+        storage_size_diff : Int64.t }
   | Origination_result of
       { balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_fees_increment : Tez.t }
+        storage_size_diff : Int64.t }
   | Delegation_result
 
 (** Serializer for {!proto_operation_result}. *)

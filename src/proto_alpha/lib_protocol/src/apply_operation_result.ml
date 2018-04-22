@@ -110,12 +110,12 @@ type successful_manager_operation_result =
         balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_fees_increment : Tez.t }
+        storage_size_diff : Int64.t }
   | Origination_result of
       { balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_fees_increment : Tez.t }
+        storage_size_diff : Int64.t }
   | Delegation_result
 
 type manager_operation_kind =
@@ -153,23 +153,23 @@ let manager_operation_result_encoding =
            (dft "balance_updates" balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
-           (dft "storage_fees_increment" Tez.encoding Tez.zero))
+           (dft "storage_size_diff" int64 0L))
         (function
           | Applied (Transaction_result
                        { operations ; storage ; balance_updates ;
                          originated_contracts ; consumed_gas ;
-                         storage_fees_increment }) ->
+                         storage_size_diff }) ->
               Some ((), (), operations, storage, balance_updates,
                     originated_contracts, consumed_gas,
-                    storage_fees_increment)
+                    storage_size_diff)
           | _ -> None)
         (fun ((), (), operations, storage, balance_updates,
               originated_contracts, consumed_gas,
-              storage_fees_increment) ->
+              storage_size_diff) ->
           Applied (Transaction_result
                      { operations ; storage ; balance_updates ;
                        originated_contracts ; consumed_gas ;
-                       storage_fees_increment })) ;
+                       storage_size_diff })) ;
       case Json_only
         (obj6
            (req "status" (constant "applied"))
@@ -177,23 +177,23 @@ let manager_operation_result_encoding =
            (dft "balance_updates" balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
-           (dft "storage_fees_increment" Tez.encoding Tez.zero))
+           (dft "storage_size_diff" int64 0L))
         (function
           | Applied (Origination_result
                        { balance_updates ;
                          originated_contracts ; consumed_gas ;
-                         storage_fees_increment }) ->
+                         storage_size_diff }) ->
               Some ((), (), balance_updates,
                     originated_contracts, consumed_gas,
-                    storage_fees_increment)
+                    storage_size_diff)
           | _ -> None)
         (fun ((), (), balance_updates,
               originated_contracts, consumed_gas,
-              storage_fees_increment) ->
+              storage_size_diff) ->
           Applied (Origination_result
                      { balance_updates ;
                        originated_contracts ; consumed_gas ;
-                       storage_fees_increment })) ;
+                       storage_size_diff })) ;
       case Json_only
         (obj2
            (req "status" (constant "applied"))

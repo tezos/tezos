@@ -419,7 +419,7 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
                       Contract destination, Credited amount ] ;
                 originated_contracts = [] ;
                 consumed_gas = gas_difference before_operation ctxt ;
-                storage_fees_increment = Tez.zero } in
+                storage_size_diff = 0L } in
           return (ctxt, result)
       | Some script ->
           Lwt.return @@ Script_ir_translator.parse_toplevel script.code >>=? fun (arg_type, _, _) ->
@@ -439,10 +439,11 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
             ~check_operations:(not internal)
             ~source ~payer ~self:(destination, script) ~amount ~parameter
           >>=? fun { ctxt ; storage ; big_map_diff ; operations } ->
+          Contract.used_storage_space ctxt destination >>=? fun old_size ->
           Contract.update_script_storage
             ctxt destination storage big_map_diff >>=? fun ctxt ->
           Fees.update_script_storage
-            ctxt ~payer destination >>=? fun (ctxt, fees) ->
+            ctxt ~payer destination >>=? fun (ctxt, new_size, fees) ->
           new_contracts before_operation ctxt >>=? fun originated_contracts ->
           let result =
             Transaction_result
@@ -455,7 +456,7 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
                       Contract destination, Credited amount ] ;
                 originated_contracts ;
                 consumed_gas = gas_difference before_operation ctxt ;
-                storage_fees_increment = fees } in
+                storage_size_diff = Int64.sub new_size old_size } in
           return (ctxt, result)
     end
   | Origination { manager ; delegate ; script ; preorigination ;
@@ -476,7 +477,7 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
         ~manager ~delegate ~balance:credit
         ?script
         ~spendable ~delegatable >>=? fun ctxt ->
-      Fees.origination_burn ctxt ~payer contract >>=? fun (ctxt, fees) ->
+      Fees.origination_burn ctxt ~payer contract >>=? fun (ctxt, size, fees) ->
       let result =
         Origination_result
           { balance_updates =
@@ -486,7 +487,7 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
                   Contract contract, Credited credit ] ;
             originated_contracts = [ contract ] ;
             consumed_gas = gas_difference before_operation ctxt ;
-            storage_fees_increment = fees } in
+            storage_size_diff = size } in
       return (ctxt, result)
   | Delegation delegate ->
       set_delegate ctxt source delegate >>=? fun ctxt ->
