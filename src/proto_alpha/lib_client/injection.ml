@@ -103,6 +103,20 @@ let originated_contracts = function
         (Ok []) operation_results
   | _ -> Ok []
 
+let detect_script_failure = function
+  | Sourced_operation_result (Manager_operations_result { operation_results }) ->
+      List.fold_left
+        (fun acc (_, r) -> acc >>? fun () ->
+          match r with
+          | Applied _ -> Ok ()
+          | Skipped -> assert false
+          | Failed errs ->
+              record_trace
+                (failure "The transfer simulation failed.")
+                (Alpha_environment.wrap_error (Error errs)))
+        (Ok ()) operation_results
+  | _ -> Ok ()
+
 let may_patch_limits
     (cctxt : #Proto_alpha.full) block ?branch
     ?src_sk contents =
@@ -153,6 +167,14 @@ let inject_operation
     cctxt block ?branch ?src_sk contents >>=? fun contents ->
   preapply cctxt block
     ?branch ?src_sk contents >>=? fun (_oph, op, result) ->
+  begin match detect_script_failure result with
+    | Ok () -> return ()
+    | Error _ as res ->
+        cctxt#message
+          "@[<v 2>This simulation failed:@,%a@]"
+          Operation_result.pp_operation_result (op, result) >>= fun () ->
+        Lwt.return res
+  end >>=? fun () ->
   let bytes = Data_encoding.Binary.to_bytes_exn Operation.encoding op in
   Block_services.chain_id cctxt block >>=? fun chain_id ->
   Shell_services.inject_operation cctxt ~chain_id bytes >>=? fun oph ->
