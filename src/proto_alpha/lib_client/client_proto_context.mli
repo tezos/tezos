@@ -37,30 +37,22 @@ val get_balance:
 val set_delegate :
   #Proto_alpha.full ->
   Block_services.block ->
+  ?confirmations:int ->
   fee:Tez.tez ->
   Contract.t ->
   src_pk:public_key ->
   manager_sk:Client_keys.sk_uri ->
   public_key_hash option ->
-  Operation_list_hash.elt tzresult Lwt.t
+  Injection.result tzresult Lwt.t
 
 val register_as_delegate:
   #Proto_alpha.full ->
   Block_services.block ->
+  ?confirmations:int ->
   fee:Tez.tez ->
   manager_sk:Client_keys.sk_uri ->
-  public_key -> Operation_list_hash.elt tzresult Lwt.t
-
-val operation_submitted_message :
-  #Client_context.printer ->
-  Operation_hash.t ->
-  unit tzresult Lwt.t
-
-val pp_internal_operation:
-  Format.formatter -> internal_operation -> unit
-
-val pp_operation_result :
-  Format.formatter -> (operation * Apply_operation_result.operation_result) -> unit
+  public_key ->
+  Injection.result tzresult Lwt.t
 
 val source_to_keys:
   #Proto_alpha.full ->
@@ -69,6 +61,9 @@ val source_to_keys:
   (public_key * Client_keys.sk_uri) tzresult Lwt.t
 
 val originate_account :
+  #Proto_alpha.full ->
+  Block_services.block ->
+  ?confirmations:int ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
@@ -78,9 +73,7 @@ val originate_account :
   ?delegate:public_key_hash ->
   balance:Tez.tez ->
   fee:Tez.tez ->
-  Block_services.block ->
-  #Proto_alpha.full ->
-  unit -> (Operation_list_hash.elt * Contract.t) tzresult Lwt.t
+  unit -> (Injection.result * Contract.t) tzresult Lwt.t
 
 val save_contract :
   force:bool ->
@@ -89,13 +82,11 @@ val save_contract :
   Contract.t ->
   unit tzresult Lwt.t
 
-val operation_submitted_message :
-  #Client_context.printer ->
-  ?contracts:Contract.t list ->
-  Operation_hash.t ->
-  unit tzresult Lwt.t
-
 val originate_contract:
+  #Proto_alpha.full ->
+  Block_services.block ->
+  ?confirmations:int ->
+  ?branch:int ->
   fee:Tez.t ->
   ?gas_limit:Z.t ->
   delegate:public_key_hash option ->
@@ -108,12 +99,12 @@ val originate_contract:
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   code:Script.expr ->
-  #Proto_alpha.full ->
-  (Operation_hash.t * Contract.t) tzresult Lwt.t
+  unit -> (Injection.result * Contract.t) tzresult Lwt.t
 
 val transfer :
   #Proto_alpha.full ->
   Block_services.block ->
+  ?confirmations:int ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
@@ -124,31 +115,26 @@ val transfer :
   fee:Tez.t ->
   ?gas_limit:Z.t ->
   unit ->
-  (Operation_hash.t * Contract.t list) tzresult Lwt.t
+  (Injection.result * Contract.t list) tzresult Lwt.t
 
 val reveal :
   #Proto_alpha.full ->
   Block_services.block ->
+  ?confirmations:int ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee:Tez.t ->
-  unit -> Operation_hash.t tzresult Lwt.t
+  unit -> Injection.result tzresult Lwt.t
 
 val dictate :
-  #Proto_alpha.rpc_context ->
-  Block_services.block ->
-  dictator_operation ->
-  Signature.secret_key ->
-  Operation_hash.t tzresult Lwt.t
-
-val wait_for_operation_inclusion:
   #Proto_alpha.full ->
-  ?predecessors:int ->
+  Block_services.block ->
   ?confirmations:int ->
-  Operation_hash.t ->
-  unit tzresult Lwt.t
+  dictator_operation ->
+  Client_keys.sk_uri ->
+  Injection.result tzresult Lwt.t
 
 type activation_key =
   { pkh : Ed25519.Public_key_hash.t ;
@@ -169,5 +155,5 @@ val claim_commitment:
   Block_services.block ->
   activation_key ->
   string ->
-  unit tzresult Lwt.t
+  Injection.result tzresult Lwt.t
 

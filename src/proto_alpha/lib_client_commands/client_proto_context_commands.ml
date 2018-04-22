@@ -141,8 +141,8 @@ let commands () =
        @@ stop)
       begin fun fee (_, contract) (_, delegate) (cctxt : Proto_alpha.full) ->
         source_to_keys cctxt cctxt#block contract >>=? fun (src_pk, manager_sk) ->
-        set_delegate ~fee cctxt cctxt#block contract (Some delegate) ~src_pk ~manager_sk >>=? fun oph ->
-        operation_submitted_message cctxt oph
+        set_delegate cctxt cctxt#block contract (Some delegate) ~fee ~src_pk ~manager_sk >>=? fun _ ->
+        return ()
       end ;
 
     command ~group ~desc: "Withdraw the delegate from a contract."
@@ -152,8 +152,8 @@ let commands () =
        @@ stop)
       begin fun fee (_, contract) (cctxt : Proto_alpha.full) ->
         source_to_keys cctxt cctxt#block contract >>=? fun (src_pk, manager_sk) ->
-        set_delegate ~fee cctxt cctxt#block contract None ~src_pk ~manager_sk >>=? fun oph ->
-        operation_submitted_message cctxt oph
+        set_delegate ~fee cctxt cctxt#block contract None ~src_pk ~manager_sk >>=? fun _ ->
+        return ()
       end ;
 
     command ~group ~desc:"Open a new account."
@@ -176,6 +176,8 @@ let commands () =
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
         originate_account
+          cctxt
+          cctxt#block
           ~fee
           ?delegate
           ~delegatable
@@ -184,11 +186,9 @@ let commands () =
           ~source
           ~src_pk
           ~src_sk
-          cctxt#block
-          cctxt
-          () >>=? fun (oph, contract) ->
+          () >>=? fun (_res, contract) ->
         save_contract ~force cctxt alias_name contract >>=? fun () ->
-        operation_submitted_message ~contracts:[ contract ] cctxt oph
+        return ()
       end ;
 
     command ~group ~desc: "Launch a smart contract on the blockchain."
@@ -217,14 +217,14 @@ let commands () =
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
-        originate_contract ~fee ?gas_limit ~delegate ~delegatable ~spendable ~initial_storage
-          ~manager ~balance ~source ~src_pk ~src_sk ~code cctxt >>= fun errors ->
+        originate_contract cctxt cctxt#block
+          ~fee ?gas_limit ~delegate ~delegatable ~spendable ~initial_storage
+          ~manager ~balance ~source ~src_pk ~src_sk ~code () >>= fun errors ->
         report_michelson_errors ~no_print_source ~msg:"origination simulation failed" cctxt errors >>= function
         | None -> return ()
-        | Some (oph, contract) ->
+        | Some (_res, contract) ->
             save_contract ~force cctxt alias_name contract >>=? fun () ->
-            operation_submitted_message cctxt
-              ~contracts:[contract] oph
+            return ()
       end ;
 
     command ~group ~desc: "Transfer tokens / call a smart contract."
@@ -245,8 +245,8 @@ let commands () =
           ~source ~src_pk ~src_sk ~destination ~arg ~amount ?gas_limit () >>=
         report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
         | None -> return ()
-        | Some (oph, contracts) ->
-            operation_submitted_message cctxt ~contracts oph
+        | Some (_res, _contracts) ->
+            return ()
       end;
 
     command ~group ~desc: "Reveal the public key of the contract manager."
@@ -258,8 +258,8 @@ let commands () =
       begin fun fee (_, source) cctxt ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
         reveal cctxt ~fee cctxt#block
-          ~source ~src_pk ~src_sk () >>=? fun oph ->
-        operation_submitted_message cctxt oph
+          ~source ~src_pk ~src_sk () >>=? fun _res ->
+        return ()
       end;
 
     command ~group ~desc: "Register the public key hash as a delegate."
@@ -272,8 +272,8 @@ let commands () =
       begin fun fee src_pkh cctxt ->
         Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
         register_as_delegate cctxt
-          ~fee cctxt#block ~manager_sk:src_sk src_pk >>=? fun oph ->
-        operation_submitted_message cctxt oph
+          ~fee cctxt#block ~manager_sk:src_sk src_pk >>=? fun _res ->
+        return ()
       end;
 
     command ~group ~desc:"Register and activate a predefined account using the provided activation key."
@@ -288,24 +288,23 @@ let commands () =
          ~desc:"Activation key (as JSON file) obtained from the Tezos foundation (or the Alphanet faucet)."
          file_parameter
        @@ stop)
-      (fun
-        (force, no_confirmation, encrypted)
-        name activation_key_file cctxt ->
-        Secret_key.of_fresh cctxt force name >>=? fun name ->
-        Lwt_utils_unix.Json.read_file activation_key_file >>=? fun json ->
-        match Data_encoding.Json.destruct
-                Client_proto_context.activation_key_encoding
-                json with
-        | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
-            Format.kasprintf (fun s -> failwith "%s" s)
-              "Invalid activation file: %a %a"
-              (fun ppf -> Data_encoding.Json.print_error ppf) exn
-              Data_encoding.Json.pp json
-        | key ->
-            let confirmations =
-              if no_confirmation then None else Some 0 in
-            claim_commitment cctxt cctxt#block
-              ~encrypted ?confirmations ~force key name
+      (fun (force, no_confirmation, encrypted) name activation_key_file cctxt ->
+         Secret_key.of_fresh cctxt force name >>=? fun name ->
+         Lwt_utils_unix.Json.read_file activation_key_file >>=? fun json ->
+         match Data_encoding.Json.destruct
+                 Client_proto_context.activation_key_encoding
+                 json with
+         | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
+             Format.kasprintf (fun s -> failwith "%s" s)
+               "Invalid activation file: %a %a"
+               (fun ppf -> Data_encoding.Json.print_error ppf) exn
+               Data_encoding.Json.pp json
+         | key ->
+             let confirmations =
+               if no_confirmation then None else Some 0 in
+             claim_commitment cctxt cctxt#block ?confirmations
+               ~encrypted ~force key name >>=? fun _res ->
+             return ()
       );
 
     command ~group:alphanet ~desc: "Activate a protocol (Alphanet dictator only)."
@@ -314,13 +313,13 @@ let commands () =
        @@ Protocol_hash.param ~name:"version"
          ~desc:"protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
-       @@ Signature.Secret_key.param
+       @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
         dictate cctxt cctxt#block
-          (Activate hash) seckey >>=? fun oph ->
-        operation_submitted_message cctxt oph
+          (Activate hash) seckey >>=? fun _ ->
+        return ()
       end ;
 
     command ~desc:"Wait until an operation is included in a block"
@@ -358,7 +357,7 @@ let commands () =
           (failure "confirmations cannot be negative") >>=? fun () ->
         fail_when (predecessors < 0)
           (failure "check-previous cannot be negative") >>=? fun () ->
-        wait_for_operation_inclusion ctxt
+        Client_confirmations.wait_for_operation_inclusion ctxt
           ~confirmations ~predecessors operation_hash
       end ;
 
@@ -368,13 +367,13 @@ let commands () =
        @@ Protocol_hash.param ~name:"version"
          ~desc:"protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
-       @@ Signature.Secret_key.param
+       @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
         dictate cctxt cctxt#block
-          (Activate_testchain hash) seckey >>=? fun oph ->
-        operation_submitted_message cctxt oph
+          (Activate_testchain hash) seckey >>=? fun _res ->
+        return ()
       end ;
 
   ]

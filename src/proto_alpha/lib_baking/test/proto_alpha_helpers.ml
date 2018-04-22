@@ -259,7 +259,8 @@ module Account = struct
       ~src_sk
       ~destination
       ~amount
-      ~fee ()
+      ~fee () >>=? fun ((oph, _, _), contracts) ->
+    return (oph, contracts)
 
   let originate
       ?(block = `Head 0)
@@ -275,6 +276,8 @@ module Account = struct
     let src_sk =
       Tezos_signer_backends.Unencrypted.make_sk src.sk in
     Client_proto_context.originate_account
+      (new wrap_full (no_write_context !rpc_config))
+      block
       ~source:src.contract
       ~src_pk:src.pk
       ~src_sk
@@ -283,9 +286,8 @@ module Account = struct
       ~delegatable
       ?delegate
       ~fee
-      block
-      (new wrap_full (no_write_context !rpc_config))
-      ()
+      () >>=? fun ((oph, _, _), contracts) ->
+    return (oph, contracts)
 
   let set_delegate
       ?(block = `Head 0)
@@ -301,7 +303,8 @@ module Account = struct
       contract
       ~src_pk
       ~manager_sk
-      delegate_opt
+      delegate_opt >>=? fun (oph, _, _) ->
+    return oph
 
   let balance ?(block = `Head 0) (account : t) =
     Alpha_services.Contract.balance !rpc_ctxt
