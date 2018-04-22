@@ -141,7 +141,7 @@ module Cfg_file = struct
 end
 
 type cli_args = {
-  block: Block_services.block ;
+  block: Shell_services.block ;
   confirmations: int option ;
   protocol: Protocol_hash.t option ;
   print_timings: bool ;

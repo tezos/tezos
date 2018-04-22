@@ -7,21 +7,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module S = struct
+type chain = Chain_services.chain
+type block = Block_services.block
 
-  open Data_encoding
+module Chain = Chain_services
+module Blocks = Chain.Blocks
+module Invalid_blocks = Chain.Invalid_blocks
+module Mempool = Chain.Mempool
 
-  let forge_block_header =
-    RPC_service.post_service
-      ~description: "Forge a block header"
-      ~query: RPC_query.empty
-      ~input: Block_header.encoding
-      ~output: (obj1 (req "block" bytes))
-      RPC_path.(root / "forge_block_header")
+module Protocol = Protocol_services
 
-end
+module Monitor = Monitor_services
+module Injection = Injection_services
 
-open RPC_context
-
-let forge_block_header ctxt header =
-  make_call S.forge_block_header ctxt () () header
+module P2p = P2p_services
+module Worker = Worker_services

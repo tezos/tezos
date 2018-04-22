@@ -9,6 +9,34 @@
 
 open Data_encoding
 
+type chain = [
+  | `Main
+  | `Test
+  | `Hash of Chain_id.t
+]
+
+let parse_chain s =
+  try
+    match s with
+    | "main" -> Ok `Main
+    | "test" -> Ok `Test
+    | h -> Ok (`Hash (Chain_id.of_b58check_exn h))
+  with _ -> Error "Cannot parse block identifier."
+
+let chain_to_string = function
+  | `Main -> "main"
+  | `Test -> "test"
+  | `Hash h -> Chain_id.to_b58check h
+
+let chain_arg =
+  let name = "chain_id" in
+  let descr =
+    "A chain identifier. This is either a chain hash in Base58Check notation \
+     or a one the predefined aliases: 'main', 'test'." in
+  let construct = chain_to_string in
+  let destruct = parse_chain in
+  RPC_arg.make ~name ~descr ~construct ~destruct ()
+
 type block = [
   | `Genesis
   | `Head of int
@@ -44,8 +72,12 @@ let blocks_arg =
   let destruct = parse_block in
   RPC_arg.make ~name ~descr ~construct ~destruct ()
 
-type prefix = (unit * Chain_services.chain) * block
-let path = RPC_path.(Chain_services.S.Blocks.path /: blocks_arg)
+type chain_prefix = unit * chain
+type prefix = chain_prefix * block
+let chain_path = RPC_path.(root / "chains" /: chain_arg)
+let dir_path : (chain_prefix, chain_prefix) RPC_path.t =
+  RPC_path.(open_root / "blocks")
+let path = RPC_path.(dir_path /: blocks_arg)
 
 type operation_list_quota = {
   max_size: int ;
@@ -524,6 +556,18 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
       let path = RPC_path.(path / "context" / "helpers")
 
+      module Forge = struct
+
+        let block_header =
+          RPC_service.post_service
+            ~description: "Forge a block header"
+            ~query: RPC_query.empty
+            ~input: Block_header.encoding
+            ~output: (obj1 (req "block" bytes))
+            RPC_path.(path / "forge_block_header")
+
+      end
+
       module Preapply = struct
 
         let path = RPC_path.(path / "preapply")
@@ -645,7 +689,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
   end
 
-  let path = RPC_path.prefix Chain_services.path path
+  let path = RPC_path.prefix chain_path path
 
   let make_call0 s ctxt a b q p =
     let s = RPC_service.prefix path s in
@@ -845,6 +889,19 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
   module Helpers = struct
 
     module S = S.Helpers
+
+    module Forge = struct
+
+      module S = S.Forge
+
+      let block_header ctxt =
+        let f = make_call0 S.block_header ctxt in
+        fun
+          ?(chain = `Main) ?(block = `Head 0)
+          header ->
+          f chain block () header
+
+    end
 
     module Preapply = struct
 

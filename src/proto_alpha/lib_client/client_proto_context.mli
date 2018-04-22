@@ -12,36 +12,36 @@ open Alpha_context
 
 val list_contract_labels:
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   (string * string * string) list tzresult Lwt.t
 
 val get_storage:
   #Proto_alpha.rpc_context ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
 val get_manager:
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   Contract.t ->
   (string * public_key_hash *
    public_key * Client_keys.sk_uri) tzresult Lwt.t
 
 val get_balance:
   #Proto_alpha.rpc_context ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   Contract.t ->
   Tez.t tzresult Lwt.t
 
 val set_delegate:
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   fee:Tez.tez ->
   Contract.t ->
@@ -52,8 +52,8 @@ val set_delegate:
 
 val register_as_delegate:
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   fee:Tez.tez ->
   manager_sk:Client_keys.sk_uri ->
@@ -62,15 +62,15 @@ val register_as_delegate:
 
 val source_to_keys:
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   Contract.t ->
   (public_key * Client_keys.sk_uri) tzresult Lwt.t
 
 val originate_account :
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   ?branch:int ->
   source:Contract.t ->
@@ -92,8 +92,8 @@ val save_contract :
 
 val originate_contract:
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   ?branch:int ->
   fee:Tez.t ->
@@ -113,8 +113,8 @@ val originate_contract:
 
 val transfer :
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   ?branch:int ->
   source:Contract.t ->
@@ -131,8 +131,8 @@ val transfer :
 
 val reveal :
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   ?branch:int ->
   source:Contract.t ->
@@ -143,8 +143,8 @@ val reveal :
 
 val dictate :
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   dictator_operation ->
   Client_keys.sk_uri ->
@@ -163,8 +163,8 @@ val activation_key_encoding: activation_key Data_encoding.t
 
 val claim_commitment:
   #Proto_alpha.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   ?encrypted:bool ->
   ?force:bool ->

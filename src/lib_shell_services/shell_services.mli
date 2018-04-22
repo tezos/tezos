@@ -7,18 +7,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open RPC_context
+type chain = Chain_services.chain
+type block = Block_services.block
 
-val forge_block_header:
-  #simple ->
-  Block_header.t ->
-  MBytes.t tzresult Lwt.t
+module Chain = Chain_services
+module Blocks = Chain.Blocks
+module Invalid_blocks = Chain.Invalid_blocks
+module Mempool = Chain.Mempool
 
-module S : sig
+module Protocol = Protocol_services
 
-  val forge_block_header:
-    ([ `POST ], unit,
-     unit, unit, Block_header.t,
-     MBytes.t) RPC_service.t
+module Monitor = Monitor_services
+module Injection = Injection_services
 
-end
+module P2p = P2p_services
+module Worker = Worker_services

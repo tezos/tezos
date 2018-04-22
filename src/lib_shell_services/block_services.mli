@@ -7,7 +7,19 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Chain_services
+type chain = [
+  | `Main
+  | `Test
+  | `Hash of Chain_id.t
+]
+
+type chain_prefix = unit * chain
+val chain_path: (unit, chain_prefix) RPC_path.t
+
+val parse_chain: string -> (chain, string) result
+val chain_to_string: chain -> string
+
+val chain_arg: chain RPC_arg.t
 
 type block = [
   | `Genesis
@@ -17,8 +29,9 @@ type block = [
 val parse_block: string -> (block, string) result
 val to_string: block -> string
 
-type prefix = (unit * Chain_services.chain) * block
-val path: (Chain_services.prefix, Chain_services.prefix * block) RPC_path.t
+type prefix = (unit * chain) * block
+val dir_path: (chain_prefix, chain_prefix) RPC_path.t
+val path: (chain_prefix, chain_prefix * block) RPC_path.t
 
 type operation_list_quota = {
   max_size: int ;
@@ -55,7 +68,7 @@ end
 
 module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
-  val path: (unit, Chain_services.prefix * block) RPC_path.t
+  val path: (unit, chain_prefix * block) RPC_path.t
 
   type raw_block_header = {
     shell: Block_header.shell_header ;
@@ -221,6 +234,17 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
   end
 
   module Helpers : sig
+
+    module Forge : sig
+
+      val block_header:
+        #RPC_context.simple ->
+        ?chain:chain ->
+        ?block:block ->
+        Block_header.t ->
+        MBytes.t tzresult Lwt.t
+
+    end
 
     module Preapply : sig
 
@@ -421,6 +445,14 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
     end
 
     module Helpers : sig
+
+      module Forge : sig
+
+        val block_header:
+          ([ `POST ], prefix,
+           prefix, unit, Block_header.t, MBytes.t) RPC_service.service
+
+      end
 
       module Preapply : sig
 

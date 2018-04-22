@@ -15,36 +15,18 @@ type chain = [
   | `Hash of Chain_id.t
 ]
 
-let parse_chain s =
-  try
-    match s with
-    | "main" -> Ok `Main
-    | "test" -> Ok `Test
-    | h -> Ok (`Hash (Chain_id.of_b58check_exn h))
-  with _ -> Error "Cannot parse block identifier."
-
-let to_string = function
-  | `Main -> "main"
-  | `Test -> "test"
-  | `Hash h -> Chain_id.to_b58check h
-
-let chain_arg =
-  let name = "chain_id" in
-  let descr =
-    "A chain identifier. This is either a chain hash in Base58Check notation \
-     or a one the predefined aliases: 'main', 'test'." in
-  let construct = to_string in
-  let destruct = parse_chain in
-  RPC_arg.make ~name ~descr ~construct ~destruct ()
-
-type prefix = unit * chain
-let path = RPC_path.(root / "chains" /: chain_arg)
+let chain_arg = Block_services.chain_arg
+let to_string = Block_services.chain_to_string
+let parse_chain = Block_services.parse_chain
 
 type invalid_block = {
   hash: Block_hash.t ;
   level: Int32.t ;
   errors: error list ;
 }
+
+type prefix = Block_services.chain_prefix
+let path = Block_services.chain_path
 
 let invalid_block_encoding =
   conv
@@ -205,6 +187,8 @@ module Blocks = struct
           method min_date = min_date
         end)
         ()
+
+  include Block_services.Empty
 
 end
 

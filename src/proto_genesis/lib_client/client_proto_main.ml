@@ -15,12 +15,12 @@ let protocol =
 
 let bake cctxt ?(timestamp = Time.now ()) block command sk =
   let protocol_data = { command ; signature = Signature.zero } in
-  Block_services.Helpers.Preapply.block
+  Genesis_block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~protocol_data
     [] >>=? fun (shell_header, _) ->
   let blk = Data.Command.forge shell_header command in
   Client_keys.append sk blk >>=? fun signed_blk ->
-  Injection_services.block cctxt signed_blk []
+  Shell_services.Injection.block cctxt signed_blk []
 
 let int64_parameter =
   (Clic.parameter (fun _ p ->

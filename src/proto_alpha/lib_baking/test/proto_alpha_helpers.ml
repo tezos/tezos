@@ -147,11 +147,12 @@ let init ?exe ?vote ?rpc_port () =
   return (pid, hash)
 
 let level (chain, block) =
-  Block_services.Metadata.protocol_data !rpc_ctxt ~chain ~block () >>=? fun { level } ->
+  Alpha_block_services.Metadata.protocol_data
+    !rpc_ctxt ~chain ~block () >>=? fun { level } ->
   return level
 
 let rpc_raw_context block path depth =
-  Block_services.Context.Raw.read !rpc_ctxt ~block ~depth path
+  Shell_services.Blocks.Context.Raw.read !rpc_ctxt ~block ~depth path
 
 module Account = struct
 
@@ -336,12 +337,12 @@ module Protocol = struct
   open Account
 
   let voting_period_kind ?(block = `Head 0) () =
-    Block_services.Metadata.protocol_data
+    Alpha_block_services.Metadata.protocol_data
       !rpc_ctxt ~chain:`Main ~block () >>=? fun { voting_period_kind } ->
     return voting_period_kind
 
   let proposals ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) proposals =
-    Block_services.hash !rpc_ctxt ~block () >>=? fun hash ->
+    Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
     Alpha_services.Helpers.level
       !rpc_ctxt ~offset:1l (`Main, block) >>=? fun next_level ->
     let shell = { Tezos_base.Operation.branch = hash } in
@@ -353,7 +354,7 @@ module Protocol = struct
     sign ~watermark:Generic_operation sk shell contents
 
   let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
-    Block_services.hash !rpc_ctxt ~block () >>=? fun hash ->
+    Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
     Alpha_services.Helpers.level
       !rpc_ctxt ~offset:1l (`Main, block) >>=? fun next_level ->
     let shell = { Tezos_base.Operation.branch = hash } in
@@ -489,7 +490,7 @@ module Assert = struct
     end
 
   let check_protocol ?msg ~block h =
-    Block_services.Metadata.next_protocol_hash
+    Alpha_block_services.Metadata.next_protocol_hash
       !rpc_ctxt ~block () >>=? fun block_proto ->
     return @@ equal
       ?msg
@@ -498,7 +499,7 @@ module Assert = struct
       block_proto h
 
   let check_voting_period_kind ?msg ~block kind =
-    Block_services.Metadata.protocol_data
+    Alpha_block_services.Metadata.protocol_data
       !rpc_ctxt ~chain:`Main ~block () >>=? fun { voting_period_kind } ->
     return @@ equal
       ?msg
@@ -516,7 +517,8 @@ module Baking = struct
 
   let bake block (contract: Account.t) operations =
     let ctxt = (new wrap_full (no_write_context ~block !rpc_config)) in
-    Alpha_services.Helpers.level ctxt ~offset:1l (`Main, block) >>=? fun level ->
+    Alpha_services.Helpers.level
+      ctxt ~offset:1l (`Main, block) >>=? fun level ->
     let seed_nonce_hash =
       if level.Level.expected_commitment then
         let seed_nonce =
@@ -549,8 +551,8 @@ module Endorse = struct
       block
       src_sk
       slot =
-    Block_services.hash !rpc_ctxt ~block () >>=? fun hash ->
-    Block_services.Metadata.protocol_data
+    Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
+    Alpha_block_services.Metadata.protocol_data
       !rpc_ctxt ~chain:`Main ~block () >>=? fun { level } ->
     let level = level.level in
     let shell = { Tezos_base.Operation.branch = hash } in
@@ -573,7 +575,7 @@ module Endorse = struct
       ?slot
       (contract : Account.t)
       block =
-    Block_services.Metadata.protocol_data
+    Alpha_block_services.Metadata.protocol_data
       !rpc_ctxt ~chain:`Main ~block () >>=? fun { level } ->
     let level = level.level in
     begin
@@ -602,7 +604,7 @@ module Endorse = struct
       | _ -> () in
     let { Account.b1 ; b2 ; b3 ; b4 ; b5 } = Account.bootstrap_accounts in
     let result = Array.make 32 b1 in
-    Block_services.Metadata.protocol_data
+    Alpha_block_services.Metadata.protocol_data
       !rpc_ctxt ~chain:`Main ~block () >>=? fun { level } ->
     let level = level.level in
     get_endorser_list result b1 level block >>=? fun () ->
@@ -614,7 +616,7 @@ module Endorse = struct
 
   let endorsement_rights
       (contract : Account.t) block =
-    Block_services.Metadata.protocol_data
+    Alpha_block_services.Metadata.protocol_data
       !rpc_ctxt ~chain:`Main ~block () >>=? fun { level } ->
     let level = level.level in
     let delegate = contract.pkh in
@@ -629,7 +631,7 @@ module Endorse = struct
 end
 
 let display_level block =
-  Block_services.Metadata.protocol_data
+  Alpha_block_services.Metadata.protocol_data
     !rpc_ctxt ~chain:`Main ~block () >>=? fun { level } ->
   Format.eprintf "Level: %a@." Level.pp_full level ;
   return ()

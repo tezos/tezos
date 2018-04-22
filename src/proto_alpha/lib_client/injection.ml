@@ -20,7 +20,7 @@ let get_branch (rpc_config: #Proto_alpha.full)
     | `Hash (h,n) -> return (`Hash (h,n+branch))
     | `Genesis -> return `Genesis
   end >>=? fun block ->
-  Block_services.hash rpc_config ~chain ~block () >>=? fun hash ->
+  Shell_services.Blocks.hash rpc_config ~chain ~block () >>=? fun hash ->
   return hash
 
 type result = Operation_hash.t * operation * operation_result
@@ -51,8 +51,8 @@ let preapply
     { shell = { branch } ;
       protocol_data = { contents ; signature } } in
   let oph = Operation.hash op in
-  Block_services.Helpers.Preapply.operations cctxt ~chain ~block
-    [op] >>=? function
+  Alpha_block_services.Helpers.Preapply.operations
+    cctxt ~chain ~block [op] >>=? function
   | [result] -> return (oph, op, result)
   | _ -> failwith "Unexpected result"
 
@@ -176,7 +176,7 @@ let inject_operation
         Lwt.return res
   end >>=? fun () ->
   let bytes = Data_encoding.Binary.to_bytes_exn Operation.encoding op in
-  Injection_services.operation cctxt ~chain bytes >>=? fun oph ->
+  Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
   cctxt#message "Operation successfully injected in the node." >>= fun () ->
   cctxt#message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   begin
@@ -185,7 +185,7 @@ let inject_operation
     | Some confirmations ->
         cctxt#message "Waiting for the operation to be included..." >>= fun () ->
         Client_confirmations.wait_for_operation_inclusion
-          ~confirmations cctxt ~chain oph >>=? fun () ->
+          ~confirmations cctxt ~chain oph >>=? fun _ ->
         return ()
   end >>=? fun () ->
   cctxt#message

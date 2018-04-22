@@ -56,7 +56,7 @@ let commands () =
          (switch ~doc:"output time in seconds" ~short:'s' ~long:"seconds" ()))
       (fixed [ "get" ; "timestamp" ])
       begin fun seconds (cctxt : Proto_alpha.full) ->
-        Block_services.Header.Shell.timestamp
+        Shell_services.Blocks.Header.Shell.timestamp
           cctxt ~block:cctxt#block () >>=? fun v ->
         begin
           if seconds

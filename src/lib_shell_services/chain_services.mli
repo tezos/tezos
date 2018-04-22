@@ -54,6 +54,8 @@ module Blocks : sig
     ?min_date:Time.t ->
     unit -> Block_hash.t list list tzresult Lwt.t
 
+  include (module type of Block_services.Empty)
+
 end
 
 module Invalid_blocks : sig

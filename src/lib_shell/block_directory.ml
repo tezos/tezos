@@ -252,6 +252,10 @@ let rpc_directory
 
   (* helpers *)
 
+  register0 Shell_services.Blocks.S.Helpers.Forge.block_header begin fun _block () header ->
+    return (Data_encoding.Binary.to_bytes_exn Block_header.encoding header)
+  end ;
+
   register0 S.Helpers.Preapply.block begin fun block q p ->
     let timestamp =
       match q#timestamp with

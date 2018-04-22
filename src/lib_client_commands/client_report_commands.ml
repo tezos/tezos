@@ -13,7 +13,7 @@ let skip_line ppf =
   Format.pp_print_newline ppf ();
   return @@ Format.pp_print_newline ppf ()
 
-let print_invalid_blocks ppf (b: Chain_services.invalid_block) =
+let print_invalid_blocks ppf (b: Shell_services.Chain.invalid_block) =
   Format.fprintf ppf
     "@[<v 2>Hash: %a\
      @ Level: %ld\
@@ -45,7 +45,7 @@ let commands () =
       (args1 output_arg)
       (fixed [ "list" ; "heads" ])
       (fun ppf cctxt ->
-         Chain_services.Blocks.list cctxt () >>=? fun heads ->
+         Shell_services.Blocks.list cctxt () >>=? fun heads ->
          Format.fprintf ppf "@[<v>%a@]@."
            (Format.pp_print_list Block_hash.pp)
            (List.concat heads) ;
@@ -54,7 +54,7 @@ let commands () =
       (args1 output_arg)
       (fixed [ "list" ; "rejected" ; "blocks" ])
       (fun ppf cctxt ->
-         Chain_services.Invalid_blocks.list cctxt () >>=? function
+         Shell_services.Invalid_blocks.list cctxt () >>=? function
          | [] ->
              Format.fprintf ppf "No invalid blocks." ;
              return ()

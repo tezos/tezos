@@ -10,7 +10,7 @@
 open Client_config
 
 let get_commands_for_version ctxt block protocol =
-  Block_services.Empty.Metadata.next_protocol_hash ctxt ~block () >>= function
+  Shell_services.Blocks.Metadata.next_protocol_hash ctxt ~block () >>= function
   | Ok version -> begin
       match protocol with
       | None ->

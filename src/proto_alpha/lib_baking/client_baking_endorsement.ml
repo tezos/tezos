@@ -95,7 +95,7 @@ let inject_endorsement
     (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block level ?async
     src_sk slots =
-  Block_services.hash cctxt ~chain ~block () >>=? fun hash ->
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   Alpha_services.Forge.Consensus.endorsement cctxt
     (chain, block)
     ~branch:hash
@@ -105,7 +105,7 @@ let inject_endorsement
     () >>=? fun bytes ->
   Client_keys.append
     src_sk ~watermark:Endorsement bytes >>=? fun signed_bytes ->
-  Injection_services.operation cctxt ?async ~chain signed_bytes >>=? fun oph ->
+  Shell_services.Injection.operation cctxt ?async ~chain signed_bytes >>=? fun oph ->
   iter_s
     (fun slot ->
        State.record_endorsement cctxt level hash slot oph)
@@ -130,7 +130,7 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block
     ~src_sk ?slots src_pk =
   let src_pkh = Signature.Public_key.hash src_pk in
-  Block_services.Metadata.protocol_data
+  Alpha_block_services.Metadata.protocol_data
     cctxt ~chain ~block () >>=? fun { level = { level } } ->
   begin
     match slots with

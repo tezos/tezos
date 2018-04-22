@@ -17,7 +17,7 @@ class unix_logger :
   Client_context.printer
 class unix_full :
   base_dir:string ->
-  block:Block_services.block ->
+  block:Shell_services.block ->
   confirmations:int option ->
   rpc_config:RPC_client.config ->
   Client_context.full

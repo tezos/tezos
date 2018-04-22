@@ -15,17 +15,17 @@ let inject_seed_nonce_revelation rpc_config ?(chain = `Main) block ?async nonces
     List.map
       (fun (level, nonce) ->
          Seed_nonce_revelation { level ; nonce }) nonces in
-  Block_services.hash rpc_config ~chain ~block () >>=? fun branch ->
+  Alpha_block_services.hash rpc_config ~chain ~block () >>=? fun branch ->
   Alpha_services.Forge.Anonymous.operations rpc_config
     (chain, block) ~branch operations >>=? fun bytes ->
-  Injection_services.operation rpc_config ?async ~chain bytes >>=? fun oph ->
+  Shell_services.Injection.operation rpc_config ?async ~chain bytes >>=? fun oph ->
   return oph
 
 let forge_seed_nonce_revelation
     (cctxt: #Proto_alpha.full)
     ?(chain = `Main)
     block nonces =
-  Block_services.hash cctxt ~chain ~block () >>=? fun hash ->
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   match nonces with
   | [] ->
       cctxt#message "No nonce to reveal for block %a"

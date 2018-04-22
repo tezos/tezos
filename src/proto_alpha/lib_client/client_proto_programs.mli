@@ -16,8 +16,8 @@ module Program : Client_aliases.Alias
 
 val run :
   #Proto_alpha.rpc_context ->
-  ?chain:Chain_services.chain ->
-  Block_services.block ->
+  ?chain:Shell_services.chain ->
+  Shell_services.block ->
   ?contract:Contract.t ->
   ?amount:Tez.t ->
   program:Michelson_v1_parser.parsed ->
@@ -30,8 +30,8 @@ val run :
 
 val trace :
   #Proto_alpha.rpc_context ->
-  ?chain:Chain_services.chain ->
-  Block_services.block ->
+  ?chain:Shell_services.chain ->
+  Shell_services.block ->
   ?contract:Contract.t ->
   ?amount:Tez.t ->
   program:Michelson_v1_parser.parsed ->
@@ -63,8 +63,8 @@ val print_trace_result :
 
 val hash_and_sign :
   #Proto_alpha.full ->
-  ?chain:Chain_services.chain ->
-  Block_services.block ->
+  ?chain:Shell_services.chain ->
+  Shell_services.block ->
   ?gas:Z.t ->
   Michelson_v1_parser.parsed ->
   Michelson_v1_parser.parsed ->
@@ -73,8 +73,8 @@ val hash_and_sign :
 
 val typecheck_data :
   #Proto_alpha.rpc_context ->
-  ?chain:Chain_services.chain ->
-  Block_services.block ->
+  ?chain:Shell_services.chain ->
+  Shell_services.block ->
   ?gas:Z.t ->
   data:Michelson_v1_parser.parsed ->
   ty:Michelson_v1_parser.parsed ->
@@ -83,8 +83,8 @@ val typecheck_data :
 
 val typecheck_program :
   #Proto_alpha.rpc_context ->
-  ?chain:Chain_services.chain ->
-  Block_services.block ->
+  ?chain:Shell_services.chain ->
+  Shell_services.block ->
   ?gas:Z.t ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult Lwt.t

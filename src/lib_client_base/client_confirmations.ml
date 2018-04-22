@@ -45,8 +45,8 @@ let wait_for_operation_inclusion
      assumes that the block predecessor has been processed already. *)
 
   let process block =
-    Block_services.Empty.hash ctxt ~chain ~block () >>=? fun hash ->
-    Block_services.Empty.Header.Shell.predecessor
+    Shell_services.Blocks.hash ctxt ~chain ~block () >>=? fun hash ->
+    Shell_services.Blocks.Header.Shell.predecessor
       ctxt ~chain ~block () >>=? fun predecessor ->
     match Block_hash.Table.find blocks predecessor with
     | Some n ->
@@ -59,7 +59,7 @@ let wait_for_operation_inclusion
         end else
           return true
     | None ->
-        Block_services.Empty.Operation_hash.operation_hashes
+        Shell_services.Blocks.Operation_hash.operation_hashes
           ctxt ~chain ~block () >>=? fun operations ->
         let in_block =
           List.exists
@@ -81,7 +81,7 @@ let wait_for_operation_inclusion
           end
         end in
 
-  Monitor_services.heads ctxt chain >>=? fun (stream, stop) ->
+  Shell_services.Monitor.heads ctxt chain >>=? fun (stream, stop) ->
   Lwt_stream.get stream >>= function
   | None -> assert false
   | Some head ->

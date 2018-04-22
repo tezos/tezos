@@ -43,15 +43,15 @@ val list_contracts:
 
 val get_manager:
   #Proto_alpha.rpc_context ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   Contract.t ->
   public_key_hash tzresult Lwt.t
 
 val get_delegate:
   #Proto_alpha.rpc_context ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   Contract.t ->
   public_key_hash option tzresult Lwt.t
 

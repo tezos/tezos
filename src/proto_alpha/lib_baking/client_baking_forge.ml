@@ -71,7 +71,7 @@ let inject_block cctxt
   let block = `Hash (shell_header.Tezos_base.Block_header.predecessor, 0) in
   forge_block_header cctxt ~chain block
     src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
-  Injection_services.block cctxt
+  Shell_services.Injection.block cctxt
     ?force ~chain signed_header operations >>=? fun block_hash ->
   return block_hash
 
@@ -133,7 +133,7 @@ let forge_block cctxt ?(chain = `Main) block
   begin
     match operations with
     | None ->
-        Chain_services.Mempool.pending_operations
+        Shell_services.Mempool.pending_operations
           cctxt ~chain () >>=? fun (ops, pendings) ->
         let ops =
           List.map parse @@
@@ -198,7 +198,7 @@ let forge_block cctxt ?(chain = `Main) block
   let request = List.length operations in
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   let operations = classify_operations operations in
-  Block_services.Helpers.Preapply.block
+  Alpha_block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~sort ~protocol_data operations >>=?
   fun (shell_header, result) ->
   let valid =
@@ -403,7 +403,7 @@ let get_unrevealed_nonces
           Client_baking_nonces.find cctxt hash >>=? function
           | None -> return None
           | Some nonce ->
-              Block_services.Metadata.protocol_data
+              Alpha_block_services.Metadata.protocol_data
                 cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { level } ->
               if force then
                 return (Some (hash, (level.level, nonce)))
@@ -501,7 +501,7 @@ let bake (cctxt : #Proto_alpha.full) state =
        lwt_debug "Try baking after %a (slot %d) for %s (%a)"
          Block_hash.pp_short bi.hash
          priority name Time.pp_hum timestamp >>= fun () ->
-       Chain_services.Mempool.pending_operations
+       Shell_services.Mempool.pending_operations
          cctxt ~chain () >>=? fun (res, ops) ->
        let operations =
          List.map parse @@
@@ -518,7 +518,7 @@ let bake (cctxt : #Proto_alpha.full) state =
        let protocol_data =
          forge_faked_protocol_data ~priority ~seed_nonce_hash in
        let operations = classify_operations operations in
-       Block_services.Helpers.Preapply.block
+       Alpha_block_services.Helpers.Preapply.block
          cctxt ~chain ~block
          ~timestamp ~sort:true ~protocol_data operations >>= function
        | Error errs ->
@@ -602,7 +602,7 @@ let create
   | None | Some (Error _) ->
       cctxt#error "Can't fetch the current block head."
   | Some (Ok bi) ->
-      Block_services.hash cctxt ~block:`Genesis () >>=? fun genesis_hash ->
+      Shell_services.Blocks.hash cctxt ~block:`Genesis () >>=? fun genesis_hash ->
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with
