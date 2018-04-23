@@ -60,6 +60,47 @@ struct
 
   end
 
+  type 'a lazy_state =
+    | Value of 'a
+    | Bytes of MBytes.t
+    | Both of MBytes.t * 'a
+  type 'a lazy_t =
+    { mutable state : 'a lazy_state ;
+      encoding : 'a t }
+  let force_decode le =
+    match le.state with
+    | Value value -> Some value
+    | Both (_, value) -> Some value
+    | Bytes bytes ->
+        match Binary_reader.of_bytes le.encoding bytes with
+        | Some expr -> le.state <- Both (bytes, expr) ; Some expr
+        | None -> None
+  let force_bytes le =
+    match le.state with
+    | Bytes bytes -> bytes
+    | Both (bytes, _) -> bytes
+    | Value value ->
+        let bytes = Binary_writer.to_bytes_exn le.encoding value in
+        le.state <- Both (bytes, value) ;
+        bytes
+  let lazy_encoding encoding =
+    let binary =
+      Encoding.conv
+        force_bytes
+        (fun bytes -> { state = Bytes bytes ; encoding })
+        Encoding.bytes in
+    let json =
+      Encoding.conv
+        (fun le ->
+           match force_decode le with
+           | Some r -> r
+           | None -> raise Exit)
+        (fun value -> { state = Value value ; encoding })
+        encoding in
+    splitted ~json ~binary
+  let make_lazy encoding value =
+    { encoding ; state = Value value }
+
 end
 
 include Encoding

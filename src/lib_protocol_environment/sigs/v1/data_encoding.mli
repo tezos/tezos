@@ -184,6 +184,13 @@ val conv :
 
 val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
 
+type 'a lazy_t
+
+val lazy_encoding : 'a encoding -> 'a lazy_t encoding
+val force_decode : 'a lazy_t -> 'a option
+val force_bytes : 'a lazy_t -> MBytes.t
+val make_lazy : 'a encoding -> 'a -> 'a lazy_t
+
 module Json : sig
 
   val schema : 'a encoding -> json_schema

@@ -459,6 +459,25 @@ module Encoding: sig
   (** Give a name to an encoding. *)
   val def : string -> 'a encoding -> 'a encoding
 
+  (** See {!lazy_encoding} below.*)
+  type 'a lazy_t
+
+  (** Combinator to have a part of the binary encoding lazily deserialized.
+      This is transparent on the JSON side. *)
+  val lazy_encoding : 'a encoding -> 'a lazy_t encoding
+
+  (** Force the decoding (memoized for later calls), and return the
+      value if successful. *)
+  val force_decode : 'a lazy_t -> 'a option
+
+  (** Obtain the bytes without actually deserializing.  Will serialize
+      and memoize the result if the value is not the result of a lazy
+      deserialization. *)
+  val force_bytes : 'a lazy_t -> MBytes.t
+
+  (** Make a lazy value from an immediate one. *)
+  val make_lazy : 'a encoding -> 'a -> 'a lazy_t
+
 end
 
 include module type of Encoding with type 'a t = 'a Encoding.t
