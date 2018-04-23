@@ -52,12 +52,17 @@ let commands () =
   let open Clic in
   [
     command ~group ~desc: "Access the timestamp of the block."
-      no_options
+      (args1
+         (switch ~doc:"output time in seconds" ~short:'s' ~long:"seconds" ()))
       (fixed [ "get" ; "timestamp" ])
-      begin fun () (cctxt : Proto_alpha.full) ->
+      begin fun seconds (cctxt : Proto_alpha.full) ->
         Block_services.timestamp
           cctxt cctxt#block >>=? fun v ->
-        cctxt#message "%s" (Time.to_notation v) >>= fun () ->
+        begin
+          if seconds
+          then cctxt#message "%Ld" (Time.to_seconds v)
+          else cctxt#message "%s" (Time.to_notation v)
+        end >>= fun () ->
         return ()
       end ;
 
