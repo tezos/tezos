@@ -42,7 +42,7 @@ external unsafe_blit_bigstring_to_bytes
 let _dummy = Cstruct.byte_to_int
 
 let invalid_bounds j l =
-  invalid_arg (Printf.sprintf "invalid bounds (index %d, length %d)" j l)
+  Printf.sprintf "invalid bounds (index %d, length %d)" j l
 
 let blit_from_string src srcoff dst dstoff len =
   if len < 0 || srcoff < 0 || dstoff < 0 || String.length src - srcoff < len then
