@@ -98,9 +98,9 @@ module Ptree_sig = struct
     val node : prefix:prefix -> mask:mask -> true_:not_empty t -> false_:not_empty t -> not_empty t
     val empty : empty t
 
-    val equal : 'a t -> 'b t -> bool
+    val equal : not_empty t -> not_empty t -> bool
 
-    val fast_partial_equal : 'a t -> 'b t -> bool
+    val fast_partial_equal : not_empty t -> not_empty t -> bool
     (* if [fast_partial_equal x y] is true, then [equal x y] is true,
        but if fast_partial_equal returns false, nothing can be
        asserted. *)
@@ -628,7 +628,17 @@ module Make(P:Ptree_sig.Prefix)(V:Value) = struct
   let (>) = `Do_not_use_polymorphic_comparison
   let compare = `Do_not_use_polymorphic_comparison
    *)
-  let equal (E t1) (E t2) = T.equal t1 t2
+  let equal (E t1) (E t2) =
+    match t1, t2 with
+    | T.Empty, T.Empty -> true
+    | T.Empty, T.Leaf _ -> false
+    | T.Empty, T.Node _ -> false
+    | T.Leaf _, T.Empty -> false
+    | T.Node _, T.Empty -> false
+    | T.Node _, T.Node _ -> T.equal t1 t2
+    | T.Node _, T.Leaf _ -> T.equal t1 t2
+    | T.Leaf _, T.Node _ -> T.equal t1 t2
+    | T.Leaf _, T.Leaf _ -> T.equal t1 t2
 
   let select_key_bit k m =
     P.select_bit ~prefix:(P.key_prefix k) ~mask:m
