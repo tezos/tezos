@@ -233,7 +233,7 @@ module Make (Encoding : ENCODING) = struct
                 Some (Suffixes (merge m1 m2))
             | Arg (arg1, subt1), Arg (arg2, subt2) ->
                 begin
-                  try let Ty.Eq = Ty.eq arg1.id arg2.id in
+                  try let Eq = Ty.eq arg1.id arg2.id in
                     let subt = merge (Dynamic arg1.descr :: path) subt1 subt2 in
                     Some (Arg (arg1, subt))
                   with Ty.Not_equal ->
@@ -455,7 +455,7 @@ module Make (Encoding : ENCODING) = struct
                   match Ty.eq iarg.id arg.id with
                   | exception Ty.Not_equal ->
                       Lwt.return_none
-                  | Ty.Eq ->
+                  | Eq ->
                       Lwt.return_some (dir : (_ * _) directory :> p directory)
                 end
               | Empty -> Lwt.return_none
@@ -472,7 +472,7 @@ module Make (Encoding : ENCODING) = struct
                   match Ty.eq iarg.id arg.id with
                   | exception Ty.Not_equal ->
                       Lwt.return_none
-                  | Ty.Eq ->
+                  | Eq ->
                       Lwt.return_some (dir : (_ * _) directory :> p directory)
                 end
               | Empty -> Lwt.return_none
@@ -578,7 +578,7 @@ module Make (Encoding : ENCODING) = struct
             | Static { subdirs = Some (Arg (arg', dir)) ;
                        services } -> begin
                 try
-                  let Ty.Eq = Ty.eq arg.id arg'.id in
+                  let Eq = Ty.eq arg.id arg'.id in
                   (dir :> k directory), services
                 with Ty.Not_equal ->
                   conflict path (CTypes (arg.descr, arg'.descr))
