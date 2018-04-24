@@ -248,9 +248,8 @@ end = struct
 
     let empty = Empty
 
-    (* Is there a better way to do ? *)
-    let equal (x:'a t) (y:'b t) =
-      (Obj.magic x) == (Obj.magic y)
+    let equal (x:not_empty t) (y:not_empty t) =
+      x == y
 
     let fast_partial_equal = equal
 
@@ -330,8 +329,8 @@ end = struct
       | _, _ ->
           false
 
-    let fast_partial_equal (x:'a t) (y:'b t) =
-      (Obj.magic x) == (Obj.magic y)
+    let fast_partial_equal (x:not_empty t) (y:not_empty t) =
+      x == y
 
   end [@@inline]
 
