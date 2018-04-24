@@ -548,7 +548,7 @@ module Encoding = struct
   let ranged_int minimum maximum =
     let minimum = min minimum maximum
     and maximum = max minimum maximum in
-    if minimum < ~-1_073_741_824 || 1_073_741_823 < maximum then
+    if minimum < -(1 lsl 30) || (1 lsl 30) - 1 < maximum then
       invalid_arg "Data_encoding.ranged_int" ;
     make @@ RangedInt { minimum ; maximum  }
   let ranged_float minimum maximum =

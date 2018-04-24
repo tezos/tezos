@@ -109,7 +109,12 @@ val int32 : int32 encoding
     (data is encodedas a 64-bit int in binary and a decimal string in JSON). *)
 val int64 : int64 encoding
 
-(** Integer with bounds in a given range. Both bounds are inclusive *)
+(** Integer with bounds in a given range. Both bounds are inclusive.
+
+    Raises [Invalid_argument] if the bounds are beyond the interval
+    [-2^30; 2^30-1]. These bounds are chosen to be compatible with all versions
+    of OCaml.
+*)
 val ranged_int : int -> int -> int encoding
 
 (** Float with bounds in a given range. Both bounds are inclusive *)
