@@ -490,6 +490,8 @@ module type T = sig
 
   val record_bytes_stored: context -> Int64.t -> context tzresult
 
+  val description: context Storage_description.t
+
 end
 
 let mem ctxt k = Context.mem ctxt.context k
@@ -563,3 +565,5 @@ let fold_keys ctxt k ~init ~f =
 let project x = x
 
 let absolute_key _ k = k
+
+let description = Storage_description.create ()

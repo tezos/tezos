@@ -2,6 +2,7 @@
     "hash": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
     "modules": [
         "Misc",
+        "Storage_description",
         "State_hash",
         "Nonce_hash",
         "Script_expr_hash",

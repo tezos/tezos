@@ -152,7 +152,7 @@ let level (chain, block) =
   return level
 
 let rpc_raw_context block path depth =
-  Shell_services.Blocks.Context.Raw.read !rpc_ctxt ~block ~depth path
+  Shell_services.Blocks.Context.read !rpc_ctxt ~block ~depth path
 
 module Account = struct
 

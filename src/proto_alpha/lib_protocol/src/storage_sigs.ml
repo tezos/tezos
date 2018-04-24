@@ -389,6 +389,7 @@ module type Indexed_raw_context = sig
   type t
   type context = t
   type key
+  type 'a ipath
 
   val clear: context -> Raw_context.t Lwt.t
 
@@ -412,6 +413,6 @@ module type Indexed_raw_context = sig
                                        and type key = key
                                        and type value = V.t
 
-  module Raw_context : Raw_context.T with type t = t * key
+  module Raw_context : Raw_context.T with type t = t ipath
 
 end

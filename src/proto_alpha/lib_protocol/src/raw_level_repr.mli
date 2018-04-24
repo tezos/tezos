@@ -28,9 +28,4 @@ val root: raw_level
 val succ: raw_level -> raw_level
 val pred: raw_level -> raw_level option
 
-module Index : sig
-  type t = raw_level
-  val path_length: int
-  val to_path: t -> string list -> string list
-  val of_path: string list -> t option
-end
+module Index : Storage_description.INDEX with type t = raw_level

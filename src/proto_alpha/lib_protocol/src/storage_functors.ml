@@ -77,6 +77,8 @@ module Make_subcontext (C : Raw_context.T) (N : NAME)
   let absolute_key c k = C.absolute_key c (to_key k)
   let consume_gas = C.consume_gas
   let record_bytes_stored = C.record_bytes_stored
+  let description =
+    Storage_description.register_named_subcontext C.description N.name
 end
 
 module Make_single_data_storage (C : Raw_context.T) (N : NAME) (V : VALUE)
@@ -118,6 +120,14 @@ module Make_single_data_storage (C : Raw_context.T) (N : NAME) (V : VALUE)
   let delete t =
     C.delete t N.name >>=? fun t ->
     return (C.project t)
+
+  let () =
+    let open Storage_description in
+    register_value
+      ~get:get_option
+      (register_named_subcontext C.description N.name)
+      V.encoding
+
 end
 
 module Make_single_carbonated_data_storage
@@ -219,6 +229,14 @@ module Make_single_carbonated_data_storage
     match v with
     | None -> remove c
     | Some v -> init_set c v
+
+  let () =
+    let open Storage_description in
+    register_value
+      ~get:(fun c -> get_option c >>=? fun (_, v) -> return v)
+      (register_named_subcontext C.description N.name)
+      V.encoding
+
 end
 
 module type INDEX = sig
@@ -226,6 +244,8 @@ module type INDEX = sig
   val path_length: int
   val to_path: t -> string list -> string list
   val of_path: string list -> t option
+  type 'a ipath
+  val args: ('a, t, 'a ipath) Storage_description.args
 end
 
 module Pair(I1 : INDEX)(I2 : INDEX)
@@ -240,6 +260,8 @@ module Pair(I1 : INDEX)(I2 : INDEX)
         match I1.of_path l1, I2.of_path l2 with
         | Some x, Some y -> Some (x, y)
         | _ -> None
+  type 'a ipath = 'a I1.ipath I2.ipath
+  let args = Storage_description.Pair (I1.args, I2.args)
 end
 
 module Make_data_set_storage (C : Raw_context.T) (I : INDEX)
@@ -289,6 +311,21 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX)
 
   let elements s =
     fold s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+
+  let () =
+    let open Storage_description in
+    let unpack = unpack I.args in
+    register_value
+      (* TODO fixme 'elements...' *)
+      ~get:(fun c ->
+          let (c, k) = unpack c in
+          mem c k >>= function
+          | true -> return (Some true)
+          | false -> return None)
+      (register_indexed_subcontext
+         ~list:(fun c -> elements c >>= return)
+         C.description I.args)
+      Data_encoding.bool
 
 end
 
@@ -370,6 +407,18 @@ module Make_indexed_data_storage
     fold s ~init:[] ~f:(fun p v acc -> Lwt.return ((p,v) :: acc))
   let keys s =
     fold_keys s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+
+  let () =
+    let open Storage_description in
+    let unpack = unpack I.args in
+    register_value
+      ~get:(fun c ->
+          let (c, k) = unpack c in
+          get_option c k)
+      (register_indexed_subcontext
+         ~list:(fun c -> keys c >>= return)
+         C.description I.args)
+      V.encoding
 
 end
 
@@ -536,6 +585,20 @@ module Make_indexed_carbonated_data_storage
   let keys s =
     fold_keys s ~init:[] ~f:(fun p (s, acc) -> return (s, p :: acc))
 
+  let () =
+    let open Storage_description in
+    let unpack = unpack I.args in
+    register_value
+      (* TODO export consumed gas ?? *)
+      ~get:(fun c ->
+          let (c, k) = unpack c in
+          get_option c k >>=? fun (_, v) ->
+          return v)
+      (register_indexed_subcontext
+         ~list:(fun c -> keys c >>=? fun (_, l) -> return l)
+         C.description I.args)
+      V.encoding
+
 end
 
 
@@ -574,53 +637,17 @@ end
 
 module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
   : Indexed_raw_context with type t = C.t
-                         and type key = I.t = struct
+                         and type key = I.t
+                         and type 'a ipath = 'a I.ipath = struct
 
   type t = C.t
   type context = t
   type key = I.t
+  type 'a ipath = 'a I.ipath
 
   let clear t =
     C.remove_rec t [] >>= fun t ->
     Lwt.return (C.project t)
-
-  module Raw_context = struct
-    type t = C.t * I.t
-    type context = t
-    let to_key i k = I.to_path i k
-    let of_key k = Misc.remove_elem_from_list I.path_length k
-    let mem (t, i) k = C.mem t (to_key i k)
-    let dir_mem (t, i) k = C.dir_mem t (to_key i k)
-    let get (t, i) k = C.get t (to_key i k)
-    let get_option (t, i) k = C.get_option t (to_key i k)
-    let init (t, i) k v =
-      C.init t (to_key i k) v >>=? fun t -> return (t, i)
-    let set (t, i) k v =
-      C.set t (to_key i k) v >>=? fun t -> return (t, i)
-    let init_set (t, i) k v =
-      C.init_set t (to_key i k) v >>= fun t -> Lwt.return (t, i)
-    let set_option (t, i) k v =
-      C.set_option t (to_key i k) v >>= fun t -> Lwt.return (t, i)
-    let delete (t, i) k =
-      C.delete t (to_key i k) >>=? fun t -> return (t, i)
-    let remove (t, i) k =
-      C.remove t (to_key i k) >>= fun t -> Lwt.return (t, i)
-    let remove_rec (t, i) k =
-      C.remove_rec t (to_key i k) >>= fun t -> Lwt.return (t, i)
-    let copy (t, i) ~from ~to_ =
-      C.copy t ~from:(to_key i from) ~to_:(to_key i to_) >>=? fun t ->
-      return (t, i)
-    let fold (t, i) k ~init ~f =
-      C.fold t (to_key i k) ~init
-        ~f:(fun k acc -> f (map_key of_key k) acc)
-    let keys (t, i) k = C.keys t (to_key i k) >|= fun keys -> List.map of_key keys
-    let fold_keys (t, i) k ~init ~f =
-      C.fold_keys t (to_key i k) ~init ~f:(fun k acc -> f (of_key k) acc)
-    let project (t, _) = C.project t
-    let absolute_key (t, i) k = C.absolute_key t (to_key i k)
-    let consume_gas (t, k) c = C.consume_gas t c >>? fun t -> ok (t, k)
-    let record_bytes_stored (t, k) c = C.record_bytes_stored t c >>? fun t -> ok (t, k)
-  end
 
   let fold_keys t ~init ~f =
     let rec dig i path acc =
@@ -640,6 +667,76 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     fold_keys t ~init:[] ~f:(fun i acc -> Lwt.return (i :: acc))
 
   let list t k = C.fold t k ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+
+  let description =
+    Storage_description.register_indexed_subcontext
+      ~list:(fun c -> keys c >>= return)
+      C.description
+      I.args
+
+  let unpack = Storage_description.unpack I.args
+  let pack = Storage_description.pack I.args
+
+  module Raw_context = struct
+    type t = C.t I.ipath
+    type context = t
+    let to_key i k = I.to_path i k
+    let of_key k = Misc.remove_elem_from_list I.path_length k
+    let mem c k = let (t, i) = unpack c in C.mem t (to_key i k)
+    let dir_mem c k = let (t, i) = unpack c in C.dir_mem t (to_key i k)
+    let get c k = let (t, i) = unpack c in C.get t (to_key i k)
+    let get_option c k = let (t, i) = unpack c in C.get_option t (to_key i k)
+    let init c k v =
+      let (t, i) = unpack c in
+      C.init t (to_key i k) v >>=? fun t -> return (pack t i)
+    let set c k v =
+      let (t, i) = unpack c in
+      C.set t (to_key i k) v >>=? fun t -> return (pack t i)
+    let init_set c k v =
+      let (t, i) = unpack c in
+      C.init_set t (to_key i k) v >>= fun t -> Lwt.return (pack t i)
+    let set_option c k v =
+      let (t, i) = unpack c in
+      C.set_option t (to_key i k) v >>= fun t -> Lwt.return (pack t i)
+    let delete c k =
+      let (t, i) = unpack c in
+      C.delete t (to_key i k) >>=? fun t -> return (pack t i)
+    let remove c k =
+      let (t, i) = unpack c in
+      C.remove t (to_key i k) >>= fun t -> Lwt.return (pack t i)
+    let remove_rec c k =
+      let (t, i) = unpack c in
+      C.remove_rec t (to_key i k) >>= fun t -> Lwt.return (pack t i)
+    let copy c ~from ~to_ =
+      let (t, i) = unpack c in
+      C.copy t ~from:(to_key i from) ~to_:(to_key i to_) >>=? fun t ->
+      return (pack t i)
+    let fold c k ~init ~f =
+      let (t, i) = unpack c in
+      C.fold t (to_key i k) ~init
+        ~f:(fun k acc -> f (map_key of_key k) acc)
+    let keys c k =
+      let (t, i) = unpack c in
+      C.keys t (to_key i k) >|= fun keys -> List.map of_key keys
+    let fold_keys c k ~init ~f =
+      let (t, i) = unpack c in
+      C.fold_keys t (to_key i k) ~init ~f:(fun k acc -> f (of_key k) acc)
+    let project c =
+      let (t, _) = unpack c in
+      C.project t
+    let absolute_key c k =
+      let (t, i) = unpack c in
+      C.absolute_key t (to_key i k)
+    let consume_gas c g =
+      let (t, i) = unpack c in
+      C.consume_gas t g >>? fun t -> ok (pack t i)
+    let record_bytes_stored c v =
+      let (t, i) = unpack c in
+      C.record_bytes_stored t v >>? fun t ->
+      ok (pack t i)
+    let description = description
+  end
+
   let resolve t prefix =
     let rec loop i prefix = function
       | [] when Compare.Int.(i = I.path_length) -> begin
@@ -679,12 +776,14 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     type context = t
     type elt = I.t
     let inited = MBytes.of_string "inited"
-    let mem s i = Raw_context.mem (s, i) N.name
+    let mem s i = Raw_context.mem (pack s i) N.name
     let add s i =
-      Raw_context.init_set (s, i) N.name inited >>= fun (s, _) ->
+      Raw_context.init_set (pack s i) N.name inited >>= fun c ->
+      let (s, _) = unpack c in
       Lwt.return (C.project s)
     let del s i =
-      Raw_context.remove (s, i) N.name >>= fun (s, _) ->
+      Raw_context.remove (pack s i) N.name >>= fun c ->
+      let (s, _) = unpack c in
       Lwt.return (C.project s)
     let set s i = function
       | true -> add s i
@@ -693,7 +792,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       fold_keys s
         ~init:s
         ~f:begin fun i s ->
-          Raw_context.remove (s, i) N.name >>= fun (s, _) ->
+          Raw_context.remove (pack s i) N.name >>= fun c ->
+          let (s, _) = unpack c in
           Lwt.return s
         end >>= fun t ->
       Lwt.return (C.project t)
@@ -705,6 +805,19 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
             | false -> Lwt.return acc)
     let elements s =
       fold s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+
+    let () =
+      let open Storage_description in
+      let unpack = unpack I.args in
+      register_value
+        ~get:(fun c ->
+            let (c, k) = unpack c in
+            mem c k >>= function
+            | true -> return (Some true)
+            | false -> return None)
+        (register_named_subcontext Raw_context.description N.name)
+        Data_encoding.bool
+
   end
 
   module Make_map (N : NAME) (V : VALUE) = struct
@@ -714,42 +827,49 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     type value = V.t
     include Make_encoder(V)
     let mem s i =
-      Raw_context.mem (s,i) N.name
+      Raw_context.mem (pack s i) N.name
     let get s i =
-      Raw_context.get (s,i) N.name >>=? fun b ->
-      let key = Raw_context.absolute_key (s,i) N.name in
+      Raw_context.get (pack s i) N.name >>=? fun b ->
+      let key = Raw_context.absolute_key (pack s i) N.name in
       Lwt.return (of_bytes ~key b)
     let get_option s i =
-      Raw_context.get_option (s,i) N.name >>= function
+      Raw_context.get_option (pack s i) N.name >>= function
       | None -> return None
       | Some b ->
-          let key = Raw_context.absolute_key (s,i) N.name in
+          let key = Raw_context.absolute_key (pack s i) N.name in
           match of_bytes ~key b with
           | Ok v -> return (Some v)
           | Error _ as err -> Lwt.return err
     let set s i v =
-      Raw_context.set (s,i) N.name (to_bytes v) >>=? fun (s, _) ->
+      Raw_context.set (pack s i) N.name (to_bytes v) >>=? fun c ->
+      let (s, _) = unpack c in
       return (C.project s)
     let init s i v =
-      Raw_context.init (s,i) N.name (to_bytes v) >>=? fun (s, _) ->
+      Raw_context.init (pack s i) N.name (to_bytes v) >>=? fun c ->
+      let (s, _) = unpack c in
       return (C.project s)
     let init_set s i v =
-      Raw_context.init_set (s,i) N.name (to_bytes v) >>= fun (s, _) ->
+      Raw_context.init_set (pack s i) N.name (to_bytes v) >>= fun c ->
+      let (s, _) = unpack c in
       Lwt.return (C.project s)
     let set_option s i v =
-      Raw_context.set_option (s,i)
-        N.name (Option.map ~f:to_bytes v) >>= fun (s, _) ->
+      Raw_context.set_option (pack s i)
+        N.name (Option.map ~f:to_bytes v) >>= fun c ->
+      let (s, _) = unpack c in
       Lwt.return (C.project s)
     let remove s i =
-      Raw_context.remove (s,i) N.name >>= fun (s, _) ->
+      Raw_context.remove (pack s i) N.name >>= fun c ->
+      let (s, _) = unpack c in
       Lwt.return (C.project s)
     let delete s i =
-      Raw_context.delete (s,i) N.name >>=? fun (s, _) ->
+      Raw_context.delete (pack s i) N.name >>=? fun c ->
+      let (s, _) = unpack c in
       return (C.project s)
     let clear s =
       fold_keys s ~init:s
         ~f:begin fun i s ->
-          Raw_context.remove (s,i) N.name >>= fun (s, _) ->
+          Raw_context.remove (pack s i) N.name >>= fun c ->
+          let (s, _) = unpack c in
           Lwt.return s
         end >>= fun t ->
       Lwt.return (C.project t)
@@ -769,6 +889,17 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
             | true -> f i acc)
     let keys s =
       fold_keys s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+
+    let () =
+      let open Storage_description in
+      let unpack = unpack I.args in
+      register_value
+        ~get:(fun c ->
+            let (c, k) = unpack c in
+            get_option c k)
+        (register_named_subcontext Raw_context.description N.name)
+        V.encoding
+
   end
 
   module Make_carbonated_map (N : NAME) (V : CARBONATED_VALUE) = struct
@@ -813,39 +944,40 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
           Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.write_bytes_cost Z.zero)) >>=? fun c ->
           del c (len_name N.name)
     let mem s i =
-      consume_mem_gas (s, i) >>=? fun c ->
+      consume_mem_gas (pack s i) >>=? fun c ->
       Raw_context.mem c N.name >>= fun res ->
       return (Raw_context.project c, res)
     let get s i =
-      consume_read_gas Raw_context.get (s, i) >>=? fun c ->
+      consume_read_gas Raw_context.get (pack s i) >>=? fun c ->
       Raw_context.get c N.name >>=? fun b ->
       let key = Raw_context.absolute_key c N.name in
       Lwt.return (of_bytes ~key b) >>=? fun v ->
       return (Raw_context.project c, v)
     let get_option s i =
-      consume_mem_gas (s, i) >>=? fun (s, _) ->
-      Raw_context.mem (s, i) N.name >>= fun exists ->
+      consume_mem_gas (pack s i) >>=? fun c ->
+      let (s, _) = unpack c in
+      Raw_context.mem (pack s i) N.name >>= fun exists ->
       if exists then
         get s i >>=? fun (s, v) ->
         return (s, Some v)
       else
         return (C.project s, None)
     let set s i v =
-      consume_write_gas Raw_context.set (s, i) v >>=? fun (c, bytes) ->
-      existing_size (s, i) >>=? fun prev_size ->
+      consume_write_gas Raw_context.set (pack s i) v >>=? fun (c, bytes) ->
+      existing_size (pack s i) >>=? fun prev_size ->
       Raw_context.set c N.name bytes >>=? fun c ->
       let size_diff = MBytes.length bytes - prev_size in
       Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int size_diff)) >>=? fun c ->
       return (Raw_context.project c, size_diff)
     let init s i v =
-      consume_write_gas Raw_context.init (s, i) v >>=? fun (c, bytes) ->
+      consume_write_gas Raw_context.init (pack s i) v >>=? fun (c, bytes) ->
       Raw_context.init c N.name bytes >>=? fun c ->
       let size = MBytes.length bytes in
       Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int size)) >>=? fun c ->
       return (Raw_context.project c, size)
     let init_set s i v =
       let init_set c k v = Raw_context.init_set c k v >>= return in
-      consume_write_gas init_set (s, i) v >>=? fun (c, bytes) ->
+      consume_write_gas init_set (pack s i) v >>=? fun (c, bytes) ->
       existing_size c >>=? fun prev_size ->
       init_set c N.name bytes >>=? fun c ->
       let size_diff = MBytes.length bytes - prev_size in
@@ -853,14 +985,14 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       return (Raw_context.project c, size_diff)
     let remove s i =
       let remove c k = Raw_context.remove c k >>= return in
-      consume_remove_gas remove (s, i) >>=? fun c ->
-      existing_size (s, i) >>=? fun prev_size ->
+      consume_remove_gas remove (pack s i) >>=? fun c ->
+      existing_size (pack s i) >>=? fun prev_size ->
       remove c N.name >>=? fun c ->
       Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int ~-prev_size)) >>=? fun c ->
       return (Raw_context.project c, prev_size)
     let delete s i =
-      consume_remove_gas Raw_context.delete (s, i) >>=? fun c ->
-      existing_size (s, i) >>=? fun prev_size ->
+      consume_remove_gas Raw_context.delete (pack s i) >>=? fun c ->
+      existing_size (pack s i) >>=? fun prev_size ->
       Raw_context.delete c N.name >>=? fun c ->
       Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int ~-prev_size)) >>=? fun c ->
       return (Raw_context.project c, prev_size)
@@ -873,10 +1005,13 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
         ~f:begin fun i s ->
           Lwt.return s >>=? fun (s, total) ->
           let remove c k = Raw_context.remove c k >>= return in
-          consume_remove_gas remove (s, i) >>=? fun (s, _) ->
-          existing_size (s, i) >>=? fun prev_size ->
-          remove (s,i) N.name >>=? fun (s, _) ->
-          Lwt.return (Raw_context.record_bytes_stored (s, i) (Int64.of_int ~-prev_size)) >>=? fun (s, _) ->
+          consume_remove_gas remove (pack s i) >>=? fun c ->
+          let (s, _) = unpack c in
+          existing_size (pack s i) >>=? fun prev_size ->
+          remove (pack s i) N.name >>=? fun c ->
+          let (s, _) = unpack c in
+          Lwt.return (Raw_context.record_bytes_stored (pack s i) (Int64.of_int ~-prev_size)) >>=? fun c ->
+          let (s, _) = unpack c in
           return (s, Z.add total (Z.of_int prev_size))
         end >>=? fun (s, total) ->
       return (C.project s, total)
@@ -884,9 +1019,10 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       fold_keys s ~init:(ok (s, init))
         ~f:(fun i acc ->
             Lwt.return acc >>=? fun (s, acc) ->
-            consume_read_gas Raw_context.get (s, i) >>=? fun (s, _) ->
-            Raw_context.get (s, i) N.name >>=? fun b ->
-            let key = Raw_context.absolute_key (s, i) N.name in
+            consume_read_gas Raw_context.get (pack s i) >>=? fun c ->
+            let (s, _) = unpack c in
+            Raw_context.get (pack s i) N.name >>=? fun b ->
+            let key = Raw_context.absolute_key (pack s i) N.name in
             Lwt.return (of_bytes ~key b) >>=? fun v ->
             f i v (s, acc)) >>=? fun (s, v) ->
       return (C.project s, v)
@@ -896,14 +1032,28 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       fold_keys s ~init:(ok (s, init))
         ~f:(fun i acc ->
             Lwt.return acc >>=? fun (s, acc) ->
-            consume_mem_gas (s, i) >>=? fun (s, _) ->
-            Raw_context.mem (s, i) N.name >>= function
+            consume_mem_gas (pack s i) >>=? fun c ->
+            let (s, _) = unpack c in
+            Raw_context.mem (pack s i) N.name >>= function
             | false -> return (s, acc)
             | true -> f i (s, acc)) >>=? fun (s, v) ->
       return (C.project s, v)
     let keys s =
       fold_keys s ~init:[] ~f:(fun p (s, acc) -> return (s, p :: acc))
+
+    let () =
+      let open Storage_description in
+      let unpack = unpack I.args in
+      register_value
+        ~get:(fun c ->
+            let (c, k) = unpack c in
+            get_option c k >>=? fun (_, v) ->
+            return v)
+        (register_named_subcontext Raw_context.description N.name)
+        V.encoding
+
   end
+
 end
 
 module Wrap_indexed_data_storage

@@ -648,35 +648,29 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
     module Context = struct
 
-      let path = RPC_path.(path / "context")
+      let path = RPC_path.(path / "context" / "raw" / "bytes")
 
-      module Raw = struct
+      let context_path_arg : string RPC_arg.t =
+        let name = "context_path" in
+        let descr = "A path inside the context" in
+        let construct = fun s -> s in
+        let destruct = fun s -> Ok s in
+        RPC_arg.make ~name ~descr ~construct ~destruct ()
 
-        let path = RPC_path.(path / "raw")
+      let raw_context_query : < depth: int option > RPC_query.t =
+        let open RPC_query in
+        query (fun depth -> object
+                method depth = depth
+              end)
+        |+ opt_field "depth" RPC_arg.int (fun t -> t#depth)
+        |> seal
 
-        let context_path_arg : string RPC_arg.t =
-          let name = "context_path" in
-          let descr = "A path inside the context" in
-          let construct = fun s -> s in
-          let destruct = fun s -> Ok s in
-          RPC_arg.make ~name ~descr ~construct ~destruct ()
-
-        let raw_context_query : < depth: int option > RPC_query.t =
-          let open RPC_query in
-          query (fun depth -> object
-                  method depth = depth
-                end)
-          |+ opt_field "depth" RPC_arg.int (fun t -> t#depth)
-          |> seal
-
-        let read =
-          RPC_service.get_service
-            ~description:"Returns the raw context."
-            ~query: raw_context_query
-            ~output: raw_context_encoding
-            RPC_path.(path /:* context_path_arg)
-
-      end
+      let read =
+        RPC_service.get_service
+          ~description:"Returns the raw context."
+          ~query: raw_context_query
+          ~output: raw_context_encoding
+          RPC_path.(path /:* context_path_arg)
 
     end
 
@@ -872,17 +866,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
     module S = S.Context
 
-    module Raw = struct
-
-      module S = S.Raw
-
-      let read ctxt =
-        let f = make_call1 S.read ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) ?depth path ->
-          f chain block path
-            (object method depth = depth end) ()
-
-    end
+    let read ctxt =
+      let f = make_call1 S.read ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) ?depth path ->
+        f chain block path
+          (object method depth = depth end) ()
 
   end
 

@@ -61,10 +61,7 @@ val origination_nonce_encoding : origination_nonce Data_encoding.t
 val rpc_arg : contract RPC_arg.arg
 
 module Index : sig
-  type t = contract
-  val path_length: int
-  val to_path: t -> string list -> string list
-  val of_path: string list -> t option
+  include Storage_description.INDEX with type t = t
   val contract_prefix: string -> string list
   val pkh_prefix_ed25519: string -> string list
   val pkh_prefix_secp256k1: string -> string list

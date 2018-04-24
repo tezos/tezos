@@ -182,6 +182,8 @@ module type T = sig
       within a view. *)
   val record_bytes_stored: context -> Int64.t -> context tzresult
 
+  val description: context Storage_description.t
+
 end
 
 include T with type t := t and type context := context

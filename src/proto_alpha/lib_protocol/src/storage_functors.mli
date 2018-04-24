@@ -31,6 +31,8 @@ module type INDEX = sig
   val path_length: int
   val to_path: t -> string list -> string list
   val of_path: string list -> t option
+  type 'a ipath
+  val args: ('a, t, 'a ipath) Storage_description.args
 end
 
 module Pair(I1 : INDEX)(I2 : INDEX) : INDEX with type t = I1.t * I2.t
@@ -60,6 +62,7 @@ module Make_indexed_data_snapshotable_storage (C : Raw_context.T)
 module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
   : Indexed_raw_context with type t = C.t
                          and type key = I.t
+                         and type 'a ipath = 'a I.ipath
 
 module Wrap_indexed_data_storage
     (C : Indexed_data_storage)

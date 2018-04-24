@@ -64,4 +64,15 @@ let register2_fullctxt s f =
 let register2 s f =
   register2_fullctxt s (fun { context ; _ } a1 a2 q i -> f context a1 a2 q i)
 
-let get_rpc_services () = !rpc_services
+let get_rpc_services () =
+  let p =
+    RPC_directory.map
+      (fun c ->
+         rpc_init c >>= function
+         | Error _ -> assert false
+         | Ok c -> Lwt.return c.context)
+      (Storage_description.build_directory Alpha_context.description) in
+  RPC_directory.register_dynamic_directory
+    !rpc_services
+    RPC_path.(open_root / "context" / "raw" / "json")
+    (fun _ -> Lwt.return p)

@@ -273,21 +273,21 @@ module Make (Encoding : ENCODING) = struct
         end
       | DynamicTail ( _, dir) -> describe_directory ~recurse dir
       | Static dir ->
-          describe_static_directory recurse arg dir >>= fun dir ->
+          describe_static_directory recurse dir >>= fun dir ->
           Lwt.return (Static dir : Encoding.schema Description.directory)
 
   and describe_static_directory
     : type a.
-      bool -> a option -> a static_directory ->
+      bool -> a static_directory ->
       Encoding.schema Description.static_directory Lwt.t
-    = fun recurse arg dir ->
+    = fun recurse dir ->
       let services = MethMap.map describe_service dir.services in
       begin
         if recurse then
           match dir.subdirs with
           | None -> Lwt.return_none
           | Some subdirs ->
-              describe_static_subdirectories arg subdirs >>= fun dirs ->
+              describe_static_subdirectories subdirs >>= fun dirs ->
               Lwt.return (Some dirs)
         else
           Lwt.return_none
@@ -296,14 +296,14 @@ module Make (Encoding : ENCODING) = struct
 
   and describe_static_subdirectories
     : type a.
-      a option -> a static_subdirectories ->
+      a static_subdirectories ->
       Encoding.schema Description.static_subdirectories Lwt.t
-    = fun arg dir ->
+    = fun dir ->
       match dir with
       | Suffixes map ->
           StringMap.fold (fun key dir map ->
               map >>= fun map ->
-              describe_directory ~recurse:true ?arg dir >>= fun dir ->
+              describe_directory ~recurse:true dir >>= fun dir ->
               Lwt.return (StringMap.add key dir map))
             map (Lwt.return StringMap.empty) >>= fun map ->
           Lwt.return (Suffixes map : Encoding.schema Description.static_subdirectories)

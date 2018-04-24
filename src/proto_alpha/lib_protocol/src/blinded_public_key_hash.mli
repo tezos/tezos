@@ -19,9 +19,4 @@ val of_ed25519_pkh : activation_code -> Ed25519.Public_key_hash.t -> t
 
 val activation_code_of_hex : string -> activation_code
 
-module Index : sig
-  type nonrec t = t
-  val path_length : int
-  val to_path : t -> string list -> string list
-  val of_path : string list -> t option
-end
+module Index : Storage_description.INDEX with type t = t

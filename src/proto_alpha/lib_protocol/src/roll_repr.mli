@@ -23,9 +23,4 @@ val to_int32: roll -> Int32.t
 
 val (=): roll -> roll -> bool
 
-module Index : sig
-  type t = roll
-  val path_length: int
-  val to_path: t -> string list -> string list
-  val of_path: string list -> t option
-end
+module Index : Storage_description.INDEX with type t = roll

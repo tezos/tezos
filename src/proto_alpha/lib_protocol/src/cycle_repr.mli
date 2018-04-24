@@ -25,10 +25,4 @@ val of_int32_exn: int32 -> cycle
 
 module Map : S.MAP with type key = cycle
 
-module Index : sig
-  (* Storage_functors.INDEX with type t = cycle *)
-  type t = cycle
-  val path_length: int
-  val to_path: t -> string list -> string list
-  val of_path: string list -> t option
-end
+module Index : Storage_description.INDEX with type t = cycle

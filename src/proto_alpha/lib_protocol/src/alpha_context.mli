@@ -975,3 +975,5 @@ val add_rewards: context -> Tez.t -> context tzresult Lwt.t
 
 val get_fees: context -> Tez.t
 val get_rewards: context -> Tez.t
+
+val description: context Storage_description.t

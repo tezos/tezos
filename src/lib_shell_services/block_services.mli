@@ -222,14 +222,10 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
   module Context : sig
 
-    module Raw : sig
-
-      val read:
-        #simple -> ?chain:chain -> ?block:block ->
-        ?depth: int ->
-        string list -> raw_context tzresult Lwt.t
-
-    end
+    val read:
+      #simple -> ?chain:chain -> ?block:block ->
+      ?depth: int ->
+      string list -> raw_context tzresult Lwt.t
 
   end
 
@@ -433,14 +429,10 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
     module Context : sig
 
-      module Raw : sig
-
-        val read:
-          ([ `GET ], prefix,
-           prefix * string list, < depth : int option >, unit,
-           raw_context) RPC_service.t
-
-      end
+      val read:
+        ([ `GET ], prefix,
+         prefix * string list, < depth : int option >, unit,
+         raw_context) RPC_service.t
 
     end
 

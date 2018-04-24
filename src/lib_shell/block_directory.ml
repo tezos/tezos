@@ -218,7 +218,7 @@ let build_raw_rpc_directory
 
   (* context *)
 
-  register1 S.Context.Raw.read begin fun block path q () ->
+  register1 S.Context.read begin fun block path q () ->
     let depth = Option.unopt ~default:max_int q#depth in
     fail_unless (depth >= 0)
       (Tezos_shell_services.Block_services.Invalid_depth_arg (path, depth)) >>=? fun () ->

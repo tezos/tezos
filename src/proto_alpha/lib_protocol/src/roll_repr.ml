@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = int32
+include Compare.Int32
 type roll = t
 
 let encoding = Data_encoding.int32
@@ -25,7 +25,6 @@ let rpc_arg =
 
 let to_int32 v = v
 
-let (=) = Compare.Int32.(=)
 
 module Index = struct
   type t = roll
@@ -40,4 +39,7 @@ module Index = struct
         with _ -> None
       end
     | _ -> None
+  let rpc_arg = rpc_arg
+  let encoding = encoding
+  let compare = compare
 end

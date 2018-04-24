@@ -43,4 +43,8 @@ module Index = struct
     | [ h1 ; h2 ] -> of_bytes_opt (MBytes.of_hex (`Hex (h1 ^ h2)))
     | _ -> None
 
+  let compare = compare
+  let encoding = encoding
+  let rpc_arg = rpc_arg
+
 end

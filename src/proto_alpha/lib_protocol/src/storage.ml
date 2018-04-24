@@ -33,6 +33,12 @@ module Int_index = struct
     | [ c ] ->
         try Some (int_of_string c)
         with _ -> None
+  type 'a ipath = 'a * t
+  let args = Storage_description.One {
+      rpc_arg = RPC_arg.int ;
+      encoding = Data_encoding.int31 ;
+      compare = Compare.Int.compare ;
+    }
 end
 
 module String_index = struct
@@ -42,6 +48,23 @@ module String_index = struct
   let of_path = function
     | [ c ] -> Some c
     | [] | _ :: _ :: _ -> None
+  type 'a ipath = 'a * t
+  let args = Storage_description.One {
+      rpc_arg = RPC_arg.string ;
+      encoding = Data_encoding.string ;
+      compare = Compare.String.compare ;
+    }
+end
+
+module Make_index(H : Storage_description.INDEX)
+  : INDEX with type t = H.t and type 'a ipath = 'a * H.t = struct
+  include H
+  type 'a ipath = 'a * t
+  let args = Storage_description.One {
+      rpc_arg ;
+      encoding ;
+      compare ;
+    }
 end
 
 module Last_block_priority =
@@ -66,7 +89,7 @@ module Contract = struct
   module Indexed_context =
     Make_indexed_subcontext
       (Make_subcontext(Raw_context)(struct let name = ["index"] end))
-      (Contract_repr.Index)
+      (Make_index(Contract_repr.Index))
 
   let fold = Indexed_context.fold_keys
   let list = Indexed_context.keys
@@ -81,7 +104,7 @@ module Contract = struct
       (Make_subcontext
          (Indexed_context.Raw_context)
          (struct let name = ["frozen_balance"] end))
-      (Cycle_repr.Index)
+      (Make_index(Cycle_repr.Index))
 
   module Frozen_deposits =
     Frozen_balance_index.Make_map
@@ -130,7 +153,7 @@ module Contract = struct
       (Make_subcontext
          (Indexed_context.Raw_context)
          (struct let name = ["delegated"] end))
-      (Contract_hash)
+      (Make_index(Contract_hash))
 
   module Counter =
     Indexed_context.Make_map
@@ -191,7 +214,7 @@ end
 module Delegates =
   Make_data_set_storage
     (Make_subcontext(Raw_context)(struct let name = ["delegates"] end))
-    (Signature.Public_key_hash)
+    (Make_index(Signature.Public_key_hash))
 
 (** Rolls *)
 
@@ -200,7 +223,7 @@ module Cycle = struct
   module Indexed_context =
     Make_indexed_subcontext
       (Make_subcontext(Raw_context)(struct let name = ["cycle"] end))
-      (Cycle_repr.Index)
+      (Make_index(Cycle_repr.Index))
 
   module Last_roll =
     Make_indexed_data_storage
@@ -254,7 +277,7 @@ module Cycle = struct
       (Make_subcontext
          (Indexed_context.Raw_context)
          (struct let name = ["nonces"] end))
-      (Raw_level_repr.Index)
+      (Make_index(Raw_level_repr.Index))
       (struct
         type t = nonce_status
         let encoding = nonce_status_encoding
@@ -278,7 +301,7 @@ module Roll = struct
   module Indexed_context =
     Make_indexed_subcontext
       (Make_subcontext(Raw_context)(struct let name = ["index"] end))
-      (Roll_repr.Index)
+      (Make_index(Roll_repr.Index))
 
   module Next =
     Make_single_data_storage
@@ -326,13 +349,28 @@ module Roll = struct
               try Some (c, int_of_string l2)
               with _ -> None
             end
+    type 'a ipath = ('a * Cycle_repr.t) * int
+    let left_args =
+      Storage_description.One {
+        rpc_arg = Cycle_repr.rpc_arg ;
+        encoding = Cycle_repr.encoding ;
+        compare = Cycle_repr.compare
+      }
+    let right_args =
+      Storage_description.One {
+        rpc_arg = RPC_arg.int ;
+        encoding = Data_encoding.int31 ;
+        compare = Compare.Int.compare ;
+      }
+    let args =
+      Storage_description.(Pair (left_args, right_args))
   end
 
   module Owner =
     Make_indexed_data_snapshotable_storage
       (Make_subcontext(Raw_context)(struct let name = ["owner"] end))
       (Snapshoted_owner_index)
-      (Roll_repr.Index)
+      (Make_index(Roll_repr.Index))
       (Signature.Public_key)
 
   module Snapshot_for_cycle = Cycle.Roll_snapshot
@@ -379,18 +417,18 @@ module Vote = struct
   module Listings =
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["listings"] end))
-      (Signature.Public_key_hash)
+      (Make_index(Signature.Public_key_hash))
       (Int32)
 
   module Proposals =
     Make_data_set_storage
       (Make_subcontext(Raw_context)(struct let name = ["proposals"] end))
-      (Pair(Protocol_hash)(Signature.Public_key_hash))
+      (Pair(Make_index(Protocol_hash))(Make_index(Signature.Public_key_hash)))
 
   module Ballots =
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["ballots"] end))
-      (Signature.Public_key_hash)
+      (Make_index(Signature.Public_key_hash))
       (struct
         type t = Vote_repr.ballot
         let encoding = Vote_repr.ballot_encoding
@@ -435,7 +473,7 @@ end
 module Commitments =
   Make_indexed_data_storage
     (Make_subcontext(Raw_context)(struct let name = ["commitments"] end))
-    (Blinded_public_key_hash.Index)
+    (Make_index(Blinded_public_key_hash.Index))
     (Tez_repr)
 
 (** Ramp up security deposits... *)
@@ -445,7 +483,7 @@ module Ramp_up = struct
   module Rewards =
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "rewards"] end))
-      (Cycle_repr.Index)
+      (Make_index(Cycle_repr.Index))
       (struct
         type t = Tez_repr.t * Tez_repr.t
         let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
@@ -454,7 +492,7 @@ module Ramp_up = struct
   module Security_deposits =
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "deposits"] end))
-      (Cycle_repr.Index)
+      (Make_index(Cycle_repr.Index))
       (struct
         type t = Tez_repr.t * Tez_repr.t
         let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding

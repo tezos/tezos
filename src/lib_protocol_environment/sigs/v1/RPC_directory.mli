@@ -202,3 +202,10 @@ val lwt_register5:
   ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q , 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
+
+(** Registring dynamic subtree. *)
+val register_dynamic_directory:
+  ?descr:string ->
+  'prefix directory ->
+  ('prefix, 'a) RPC_path.t -> ('a -> 'a directory Lwt.t) ->
+  'prefix directory

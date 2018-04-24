@@ -56,4 +56,7 @@ module Index = struct
         with _ -> None
       end
     | _ -> None
+  let rpc_arg = rpc_arg
+  let encoding = encoding
+  let compare = compare
 end

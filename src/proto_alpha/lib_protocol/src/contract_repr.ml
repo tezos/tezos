@@ -178,4 +178,7 @@ module Index = struct
     Ed25519.Public_key_hash.prefix_path s
   let pkh_prefix_secp256k1 s =
     Secp256k1.Public_key_hash.prefix_path s
+  let rpc_arg = rpc_arg
+  let encoding = encoding
+  let compare = compare
 end
