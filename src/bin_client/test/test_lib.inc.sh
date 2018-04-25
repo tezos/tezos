@@ -49,6 +49,7 @@ display_logs() {
 ### Node/Client instances control
 
 client_instances=()
+admin_client_instances=()
 
 start_node() {
     local id=${1:-1}
@@ -58,6 +59,7 @@ start_node() {
     wait_for_the_node_to_be_ready
     add_sandboxed_bootstrap_identities
     client_instances+=("$client")
+    admin_client_instances+=("$admin_client")
     export "client$id=$client"
 }
 
