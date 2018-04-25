@@ -313,11 +313,11 @@ assert_storage  $contract_dir/map_caddaadr.tz \
 
 # Did the given key sign the string? (key is bootstrap1)
 assert_output $contract_dir/check_signature.tz \
-'(Pair "26981d372a7b3866621bf79713d249197fe6d518ef702fa65738e1715bde9da54df04fefbcc84287ecaa9f74ad9296462731aa24bbcece63c6bf73a8f5752309" "hello")' \
+'(Pair "1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01" "hello")' \
 '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"' True
 
 assert_output $contract_dir/check_signature.tz \
-'(Pair "26981d372a7b3866621bf79713d249197fe6d518ef702fa65738e1715bde9da54df04fefbcc84287ecaa9f74ad9296462731aa24bbcece63c6bf73a8f5752309" "abcd")' \
+'(Pair "1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01" "abcd")' \
 '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"' False
 
 # Convert a public key to a public key hash
