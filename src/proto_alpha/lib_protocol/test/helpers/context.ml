@@ -103,7 +103,7 @@ module Contract = struct
               invalid_arg
                 "get_balance: no frozen accounts for an originated contract."
           | Some pkh ->
-              Alpha_services.Delegate.frozen_balances
+              Alpha_services.Delegate.frozen_balance_by_cycle
                 rpc_ctxt ctxt pkh >>=? fun map ->
               Lwt.return @@
               Cycle.Map.fold

@@ -12,9 +12,10 @@ open Alpha_context
 type info = {
   balance: Tez.t ;
   frozen_balance: Tez.t ;
-  frozen_balances: Delegate.frozen_balance Cycle.Map.t ;
-  delegated_balance: Tez.t ;
+  frozen_balance_by_cycle: Delegate.frozen_balance Cycle.Map.t ;
+  staking_balance: Tez.t ;
   delegated_contracts: Contract_hash.t list ;
+  delegated_balance: Tez.t ;
   deactivated: bool ;
   grace_period: Cycle.t ;
 }
@@ -22,20 +23,25 @@ type info = {
 let info_encoding =
   let open Data_encoding in
   conv
-    (fun { balance ; frozen_balance ; frozen_balances ; delegated_balance ;
-           delegated_contracts ; deactivated ; grace_period } ->
-      (balance, frozen_balance, frozen_balances, delegated_balance,
-       delegated_contracts, deactivated, grace_period))
-    (fun (balance, frozen_balance, frozen_balances, delegated_balance,
-          delegated_contracts, deactivated, grace_period) ->
-      { balance ; frozen_balance ; frozen_balances ; delegated_balance ;
-        delegated_contracts ; deactivated ; grace_period })
-    (obj7
+    (fun { balance ; frozen_balance ; frozen_balance_by_cycle ;
+           staking_balance ; delegated_contracts ;  delegated_balance ;
+           deactivated ; grace_period } ->
+      (balance, frozen_balance, frozen_balance_by_cycle,
+       staking_balance, delegated_contracts, delegated_balance,
+       deactivated, grace_period))
+    (fun (balance, frozen_balance, frozen_balance_by_cycle,
+          staking_balance, delegated_contracts, delegated_balance,
+          deactivated, grace_period) ->
+      { balance ; frozen_balance ; frozen_balance_by_cycle ;
+        staking_balance ; delegated_contracts ;  delegated_balance ;
+        deactivated ; grace_period })
+    (obj8
        (req "balance" Tez.encoding)
        (req "frozen_balance" Tez.encoding)
-       (req "frozen_balances" Delegate.frozen_balances_encoding)
-       (req "delegated_balance" Tez.encoding)
+       (req "frozen_balance_by_cycle" Delegate.frozen_balance_by_cycle_encoding)
+       (req "staking_balance" Tez.encoding)
        (req "delegated_contracts" (list Contract_hash.encoding))
+       (req "delegated_balance" Tez.encoding)
        (req "deactivated" bool)
        (req "grace_period" Cycle.encoding))
 
@@ -92,15 +98,16 @@ module S = struct
       ~output: Tez.encoding
       RPC_path.(path / "frozen_balance")
 
-  let frozen_balances =
+  let frozen_balance_by_cycle =
     RPC_service.get_service
       ~description:
-        "Returns the amount of frozen tokens associated to a given delegate."
+        "Returns the frozen balances of a given delegate, \
+         indexed by the cycle by which it will be unfrozen"
       ~query: RPC_query.empty
-      ~output: Delegate.frozen_balances_encoding
-      RPC_path.(path / "frozen_balances")
+      ~output: Delegate.frozen_balance_by_cycle_encoding
+      RPC_path.(path / "frozen_balance_by_cycle")
 
-  let delegated_balance =
+  let staking_balance =
     RPC_service.get_service
       ~description:
         "Returns the total amount of token delegated to a given delegate. \
@@ -110,7 +117,7 @@ module S = struct
          until they are unfrozen."
       ~query: RPC_query.empty
       ~output: Tez.encoding
-      RPC_path.(path / "delegated_balance")
+      RPC_path.(path / "staking_balance")
 
   let delegated_contracts =
     RPC_service.get_service
@@ -119,6 +126,16 @@ module S = struct
       ~query: RPC_query.empty
       ~output: (list Contract_hash.encoding)
       RPC_path.(path / "delegated_contracts")
+
+  let delegated_balance =
+    RPC_service.get_service
+      ~description:
+        "The includes the balance of all the contracts that delegates \
+         to it. This excludes the delegate own balance and its frozen \
+         balances."
+      ~query: RPC_query.empty
+      ~output: Tez.encoding
+      RPC_path.(path / "delegated_balance")
 
   let deactivated =
     RPC_service.get_service
@@ -164,14 +181,16 @@ let () =
   register1 S.info begin fun ctxt pkh () () ->
     Delegate.full_balance ctxt pkh >>=? fun balance ->
     Delegate.frozen_balance ctxt pkh >>=? fun frozen_balance ->
-    Delegate.frozen_balances ctxt pkh >>= fun frozen_balances ->
+    Delegate.frozen_balance_by_cycle ctxt pkh >>= fun frozen_balance_by_cycle ->
+    Delegate.staking_balance ctxt pkh >>=? fun staking_balance ->
+    Delegate.delegated_contracts ctxt pkh >>= fun delegated_contracts ->
     Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
-    Delegate.get_delegated_contracts ctxt pkh >>= fun delegated_contracts ->
     Delegate.deactivated ctxt pkh >>= fun deactivated ->
     Delegate.grace_period ctxt pkh >>=? fun grace_period ->
     return {
-      balance ; frozen_balance ; frozen_balances ; delegated_balance ;
-      delegated_contracts ; deactivated ; grace_period
+      balance ; frozen_balance ; frozen_balance_by_cycle ;
+      staking_balance ; delegated_contracts ; delegated_balance ;
+      deactivated ; grace_period
     }
   end ;
   register1 S.balance begin fun ctxt pkh () () ->
@@ -180,14 +199,17 @@ let () =
   register1 S.frozen_balance begin fun ctxt pkh () () ->
     Delegate.frozen_balance ctxt pkh
   end ;
-  register1 S.frozen_balances begin fun ctxt pkh () () ->
-    Delegate.frozen_balances ctxt pkh >>= return
+  register1 S.frozen_balance_by_cycle begin fun ctxt pkh () () ->
+    Delegate.frozen_balance_by_cycle ctxt pkh >>= return
+  end ;
+  register1 S.staking_balance begin fun ctxt pkh () () ->
+    Delegate.staking_balance ctxt pkh
+  end ;
+  register1 S.delegated_contracts begin fun ctxt pkh () () ->
+    Delegate.delegated_contracts ctxt pkh >>= return
   end ;
   register1 S.delegated_balance begin fun ctxt pkh () () ->
     Delegate.delegated_balance ctxt pkh
-  end ;
-  register1 S.delegated_contracts begin fun ctxt pkh () () ->
-    Delegate.get_delegated_contracts ctxt pkh >>= return
   end ;
   register1 S.deactivated begin fun ctxt pkh () () ->
     Delegate.deactivated ctxt pkh >>= return
@@ -208,14 +230,17 @@ let balance ctxt block pkh =
 let frozen_balance ctxt block pkh =
   RPC_context.make_call1 S.frozen_balance ctxt block pkh () ()
 
-let frozen_balances ctxt block pkh =
-  RPC_context.make_call1 S.frozen_balances ctxt block pkh () ()
+let frozen_balance_by_cycle ctxt block pkh =
+  RPC_context.make_call1 S.frozen_balance_by_cycle ctxt block pkh () ()
 
-let delegated_balance ctxt block pkh =
-  RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
+let staking_balance ctxt block pkh =
+  RPC_context.make_call1 S.staking_balance ctxt block pkh () ()
 
 let delegated_contracts ctxt block pkh =
   RPC_context.make_call1 S.delegated_contracts ctxt block pkh () ()
+
+let delegated_balance ctxt block pkh =
+  RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
 
 let deactivated ctxt block pkh =
   RPC_context.make_call1 S.deactivated ctxt block pkh () ()

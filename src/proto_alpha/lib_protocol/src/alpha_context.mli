@@ -637,13 +637,17 @@ module Delegate : sig
   }
 
   val frozen_balance_encoding: frozen_balance Data_encoding.t
-  val frozen_balances_encoding: frozen_balance Cycle.Map.t Data_encoding.t
+  val frozen_balance_by_cycle_encoding: frozen_balance Cycle.Map.t Data_encoding.t
 
-  val frozen_balances:
+  val frozen_balance_by_cycle:
     context -> Signature.Public_key_hash.t ->
     frozen_balance Cycle.Map.t Lwt.t
 
-  val get_delegated_contracts:
+  val staking_balance:
+    context -> Signature.Public_key_hash.t ->
+    Tez.t tzresult Lwt.t
+
+  val delegated_contracts:
     context -> Signature.Public_key_hash.t ->
     Contract_hash.t list Lwt.t
 

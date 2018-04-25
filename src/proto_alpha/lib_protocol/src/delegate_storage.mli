@@ -107,12 +107,13 @@ type frozen_balance = {
 }
 
 val frozen_balance_encoding: frozen_balance Data_encoding.t
-val frozen_balances_encoding: frozen_balance Cycle_repr.Map.t Data_encoding.t
+val frozen_balance_by_cycle_encoding:
+  frozen_balance Cycle_repr.Map.t Data_encoding.t
 
 (** Returns the amount of frozen deposit, fees and rewards associated
     to a given delegate, indexed by the cycle by which at the end the
     balance will be unfrozen. *)
-val frozen_balances:
+val frozen_balance_by_cycle:
   Raw_context.t -> Signature.Public_key_hash.t ->
   frozen_balance Cycle_repr.Map.t Lwt.t
 
@@ -123,8 +124,12 @@ val full_balance:
   Raw_context.t -> Signature.Public_key_hash.t ->
   Tez_repr.t tzresult Lwt.t
 
+val staking_balance:
+  Raw_context.t -> Signature.Public_key_hash.t ->
+  Tez_repr.t tzresult Lwt.t
+
 (** Returns the list of contract that delegated towards a given delegate *)
-val get_delegated_contracts:
+val delegated_contracts:
   Raw_context.t -> Signature.Public_key_hash.t ->
   Contract_hash.t list Lwt.t
 

@@ -193,7 +193,7 @@ let remove ctxt contract =
 let fold = Storage.Delegates.fold
 let list = Storage.Delegates.elements
 
-let get_delegated_contracts ctxt delegate =
+let delegated_contracts ctxt delegate =
   let contract = Contract_repr.implicit_contract delegate in
   Storage.Contract.Delegated.elements (ctxt, contract)
 
@@ -368,7 +368,7 @@ let frozen_balance_encoding =
        (req "fees" Tez_repr.encoding)
        (req "rewards" Tez_repr.encoding))
 
-let frozen_balances_encoding =
+let frozen_balance_by_cycle_encoding =
   let open Data_encoding in
   conv
     (Cycle_repr.Map.bindings)
@@ -384,7 +384,7 @@ let empty_frozen_balance =
     fees = Tez_repr.zero ;
     rewards = Tez_repr.zero }
 
-let frozen_balances ctxt delegate =
+let frozen_balance_by_cycle ctxt delegate =
   let contract = Contract_repr.implicit_contract delegate in
   let map = Cycle_repr.Map.empty in
   Storage.Contract.Frozen_deposits.fold
@@ -449,10 +449,26 @@ let grace_period ctxt delegate =
   let contract = Contract_repr.implicit_contract delegate in
   Storage.Contract.Delegate_desactivation.get ctxt contract
 
-let delegated_balance ctxt delegate =
+let staking_balance ctxt delegate =
   let token_per_rolls = Constants_storage.tokens_per_roll ctxt in
   Roll_storage.get_rolls ctxt delegate >>=? fun rolls ->
   Roll_storage.get_change ctxt delegate >>=? fun change ->
   let rolls = Int64.of_int (List.length rolls) in
   Lwt.return Tez_repr.(token_per_rolls *? rolls) >>=? fun balance ->
   Lwt.return Tez_repr.(balance +? change)
+
+let delegated_balance ctxt delegate =
+  let contract = Contract_repr.implicit_contract delegate in
+  staking_balance ctxt delegate >>=? fun staking_balance ->
+  Storage.Contract.Balance.get ctxt contract >>= fun self_staking_balance ->
+  Storage.Contract.Frozen_deposits.fold
+    (ctxt, contract) ~init:self_staking_balance
+    ~f:(fun _cycle amount acc ->
+        Lwt.return acc >>=? fun acc ->
+        Lwt.return (Tez_repr.(acc +? amount))) >>= fun self_staking_balance ->
+  Storage.Contract.Frozen_fees.fold
+    (ctxt, contract) ~init:self_staking_balance
+    ~f:(fun _cycle amount acc ->
+        Lwt.return acc >>=? fun acc ->
+        Lwt.return (Tez_repr.(acc +? amount))) >>=? fun self_staking_balance ->
+  Lwt.return Tez_repr.(staking_balance -? self_staking_balance)
