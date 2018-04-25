@@ -43,11 +43,11 @@ val clear : t -> unit
 module IPGreylist : sig
 
   (** [add t addr] adds [addr] to the address greylist. *)
-  val add: t -> P2p_addr.t -> unit
+  val add: t -> P2p_addr.t -> Time.t -> unit
 
-  (** [gc time] removes all banned peers older than the given time in
-      seconds. *)
-  val gc: t -> delay:float -> unit
+  (** [remove_old t ~older_than] removes all banned peers older than the
+      given time. *)
+  val remove_old: t -> older_than:Time.t -> unit
 
   val encoding: P2p_addr.t list Data_encoding.t
 
@@ -88,7 +88,7 @@ module IpSet : sig
   val mem : Ipaddr.V6.t -> t -> bool
   val fold: (Ipaddr.V6.Prefix.t -> Time.t -> 'a -> 'a) -> t -> 'a -> 'a
   val pp : Format.formatter -> t -> unit
-  val gc : t -> delay:float -> t
+  val remove_old : t -> older_than:Time.t -> t
 end
 
 module IpTable : Hashtbl.S with type key = Ipaddr.V6.t

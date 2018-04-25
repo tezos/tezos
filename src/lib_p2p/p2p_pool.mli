@@ -81,7 +81,7 @@ type config = {
   authentication_timeout : float ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
-  greylist_timeout : float ;
+  greylist_timeout : int ;
   (** GC delay for the grelists tables, in seconds. *)
 
   incoming_app_message_queue_size : int option ;
@@ -281,8 +281,8 @@ val greylist_peer : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
 (** [greylist_peer pool peer] adds [peer] to [pool]'s peer greylist
     and [peer]'s address to [pool]'s IP greylist. *)
 
-val gc_greylist: delay:float -> ('msg, 'meta) pool -> unit
-(** [gc_greylist ~delay pool] *)
+val gc_greylist: older_than:Time.t -> ('msg, 'meta) pool -> unit
+(** [gc_greylist ~older_than pool] *)
 
 val acl_clear : ('msg, 'meta) pool -> unit
 (** [acl_clear pool] clears ACL tables. *)

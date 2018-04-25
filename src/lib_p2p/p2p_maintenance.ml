@@ -95,7 +95,10 @@ let rec maintain st =
   let Pool pool = st.pool in
   let n_connected = P2p_pool.active_connections pool in
   let pool_cfg = P2p_pool.config pool in
-  P2p_pool.gc_greylist pool ~delay:pool_cfg.greylist_timeout;
+  let older_than =
+    Time.(add (now ()) (Int64.of_int (- pool_cfg.greylist_timeout)))
+  in
+  P2p_pool.gc_greylist pool ~older_than;
   if n_connected < st.bounds.min_threshold then
     too_few_connections st n_connected
   else if st.bounds.max_threshold < n_connected then

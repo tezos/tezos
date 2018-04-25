@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
-
 include Logging.Make (struct let name = "test-p2p-banned_peers" end)
 
 let assert_equal_bool ~msg a b =
@@ -32,7 +30,7 @@ let test_empty _ =
 
 let test_ban _ =
   let set = P2p_acl.create 10 in
-  List.iter (fun (_,addr) -> P2p_acl.IPGreylist.add set addr) peers;
+  List.iter (fun (_,addr) -> P2p_acl.IPGreylist.add set addr Time.epoch) peers;
   List.iter (fun (_,addr) ->
       assert_equal_bool ~msg:__LOC__ true (P2p_acl.banned_addr set addr)
     ) peers ;
@@ -41,13 +39,12 @@ let test_ban _ =
 
 let test_gc _ =
   let set = P2p_acl.create 10 in
-  List.iter (fun (_,addr) -> P2p_acl.IPGreylist.add set addr) peers;
+  List.iter (fun (_,addr) -> P2p_acl.IPGreylist.add set addr Time.epoch) peers;
   List.iter (fun (_peer,addr) ->
       assert_equal_bool ~msg:__LOC__ true (P2p_acl.banned_addr set addr)
     ) peers ;
-  Lwt_unix.sleep 3. >>= fun _ ->
-  (* remove all peers after one second *)
-  P2p_acl.IPGreylist.gc set ~delay:1. ;
+  (* remove all peers *)
+  P2p_acl.IPGreylist.remove_old set ~older_than:Time.max_value ;
   List.iter (fun (_peer,addr) ->
       assert_equal_bool ~msg:__LOC__ false (P2p_acl.banned_addr set addr)
     ) peers ;

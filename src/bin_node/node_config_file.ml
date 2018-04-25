@@ -62,7 +62,7 @@ and shell = {
 let default_p2p_limits : P2p.limits = {
   connection_timeout = 10. ;
   authentication_timeout = 5. ;
-  greylist_timeout = 86400. ; (* one day *)
+  greylist_timeout = 86400 ; (* one day *)
   min_connections = 10 ;
   expected_connections = 50 ;
   max_connections = 100 ;
@@ -278,7 +278,7 @@ let limit : P2p.limits Data_encoding.t =
           (dft "greylist-timeout"
              (Data_encoding.describe
                 ~description: "GC delay for the greylists tables, in seconds."
-                float) default_p2p_limits.greylist_timeout)
+                int31) default_p2p_limits.greylist_timeout)
 
        ))
 

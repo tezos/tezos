@@ -54,7 +54,7 @@ type config = {
 
   closed_network : bool ;
   (** If [true], the only accepted connections are from peers whose
-      addresses are in [trusted_peers]. *)
+      addresses are in [trusted_points]. *)
 
   identity : P2p_identity.t ;
   (** Cryptographic identity of the peer. *)
@@ -73,7 +73,7 @@ type limits = {
   authentication_timeout : float ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
-  greylist_timeout : float ;
+  greylist_timeout : int ;
   (** GC delay for the grelists tables, in seconds. *)
 
   min_connections : int ;

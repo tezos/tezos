@@ -105,19 +105,18 @@ module IpSet = struct
 
   include PatriciaTree(Time)
 
-  let gc t ~delay =
-    let timenow = Time.now() in
+  let remove_old t ~older_than =
     let module MI =
     struct
       type result = Time.t
-      let default = Time.now()
+      let default = Time.max_value
       let map _t _key value = value
       let reduce _t left right = Time.(min left right)
     end
     in
     let module MR = M.Map_Reduce(MI) in
     MR.filter (fun addtime ->
-        Time.(timenow < (add addtime (Int64.of_float delay)))
+        Time.(older_than <= addtime)
       ) t
 
 end
@@ -162,8 +161,8 @@ let clear acl =
 
 module IPGreylist = struct
 
-  let add acl addr =
-    acl.greylist_ips <- IpSet.add addr (Time.now ()) acl.greylist_ips
+  let add acl addr time =
+    acl.greylist_ips <- IpSet.add addr time acl.greylist_ips
 
   let mem acl addr = IpSet.mem addr !acl.greylist_ips
 
@@ -171,8 +170,8 @@ module IPGreylist = struct
      from the ring in a round-robin fashion. If a address is removed
      by the GC from the acl.greylist set, it could potentially
      persist in the acl.peers set until more peers are banned. *)
-  let gc acl ~delay =
-    acl.greylist_ips <- IpSet.gc acl.greylist_ips ~delay
+  let remove_old acl ~older_than =
+    acl.greylist_ips <- IpSet.remove_old acl.greylist_ips ~older_than
 
   let encoding = Data_encoding.(list P2p_addr.encoding)
 

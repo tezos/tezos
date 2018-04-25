@@ -176,7 +176,7 @@ type config = {
   max_incoming_connections : int ;
   connection_timeout : float ;
   authentication_timeout : float ;
-  greylist_timeout : float ;
+  greylist_timeout : int ;
 
   incoming_app_message_queue_size : int option ;
   incoming_message_queue_size : int option ;
@@ -585,19 +585,19 @@ module Connection = struct
 end
 
 let greylist_addr pool addr =
-  P2p_acl.IPGreylist.add pool.acl addr
+  P2p_acl.IPGreylist.add pool.acl addr (Time.now ())
 
 let greylist_peer pool peer =
   Option.iter (get_addr pool peer) ~f:begin fun (addr, _port) ->
-    P2p_acl.IPGreylist.add pool.acl addr ;
+    greylist_addr pool addr ;
     P2p_acl.PeerGreylist.add pool.acl peer
   end
 
 let acl_clear pool =
   P2p_acl.clear pool.acl
 
-let gc_greylist ~delay pool =
-  P2p_acl.IPGreylist.gc ~delay pool.acl
+let gc_greylist ~older_than pool =
+  P2p_acl.IPGreylist.remove_old ~older_than pool.acl
 
 let pool_stat { io_sched } =
   P2p_io_scheduler.global_stat io_sched

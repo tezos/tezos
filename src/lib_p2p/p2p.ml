@@ -43,7 +43,7 @@ type limits = {
 
   connection_timeout : float ;
   authentication_timeout : float ;
-  greylist_timeout : float ;
+  greylist_timeout : int ;
 
   min_connections : int ;
   expected_connections : int ;
