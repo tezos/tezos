@@ -219,7 +219,7 @@ type ('msg, 'meta) t = {
   encoding : 'msg Message.t Data_encoding.t ;
   events : events ;
   watcher : P2p_connection.Pool_event.t Lwt_watcher.input ;
-  acl : P2p_acl.t;
+  acl : P2p_acl.t ;
   mutable new_connection_hook :
     (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) list ;
   mutable latest_accepted_swap : Time.t ;
@@ -414,8 +414,8 @@ let get_addr pool peer_id =
           | _ -> None)
   in
   match find_by_peer_id peer_id with
-  |None -> None
-  |Some ci ->
+  | None -> None
+  | Some ci ->
       let info = P2p_socket.info ci.conn in
       Some(info.id_point)
 
