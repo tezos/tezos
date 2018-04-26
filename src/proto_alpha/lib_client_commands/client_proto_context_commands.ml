@@ -48,6 +48,10 @@ let alphanet =
   { Clic.name = "alphanet" ;
     title = "Alphanet only commands" }
 
+let binary_description =
+  { Clic.name = "description" ;
+    title = "Binary Description" }
+
 let commands () =
   let open Clic in
   [
@@ -368,5 +372,29 @@ let commands () =
           ~chain:`Main ~confirmations ~predecessors operation_hash >>=? fun _ ->
         return ()
       end ;
+
+    command ~group:binary_description ~desc:"Describe unsigned block header"
+      no_options
+      (fixed [ "describe" ; "unsigned" ; "block" ; "header" ])
+      begin fun () (cctxt : Proto_alpha.full) ->
+        cctxt#message "%a"
+          Data_encoding.Binary_schema.pp
+          (Data_encoding.Binary.describe
+             ~toplevel_name:"Unsigned block header"
+             (Alpha_context.Block_header.unsigned_encoding)) >>= fun () ->
+        return ()
+      end ;
+
+    command ~group:binary_description ~desc:"Describe unsigned block header"
+      no_options
+      (fixed [ "describe" ; "unsigned" ; "operation" ])
+      begin fun () (cctxt : Proto_alpha.full) ->
+        cctxt#message "%a"
+          Data_encoding.Binary_schema.pp
+          (Data_encoding.Binary.describe
+             ~toplevel_name:"Unsigned operation"
+             Alpha_context.Operation.unsigned_encoding) >>= fun () ->
+        return ()
+      end
 
   ]
