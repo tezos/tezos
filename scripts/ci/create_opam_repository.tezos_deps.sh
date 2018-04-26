@@ -48,7 +48,7 @@ done
 # Hack: it loks like there is too many cycle in the opam-repository,
 # when using `opam-bundle --with-test --with-doc`, so we manually
 # inline some of the test and doc dependencies.
-extra_packages="depext alcotest-lwt ocp-indent odoc ounit"
+extra_packages="depext alcotest-lwt ocp-indent odoc ounit crowbar"
 
 if ! [ -f "$build_dir"/opam-repository-master.tgz ]; then
     echo
