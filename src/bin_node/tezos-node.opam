@@ -18,7 +18,7 @@ depends: [
   "tezos-embedded-protocol-demo"
   "tezos-embedded-protocol-alpha"
   "cmdliner"
-  "ssl"
+  "tls"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

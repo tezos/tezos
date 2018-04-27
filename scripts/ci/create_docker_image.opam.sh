@@ -52,8 +52,8 @@ COPY leveldb-dev-$leveldb_version-r0.apk .
 
 RUN apk --no-cache add \
         build-base bash perl xz m4 git curl tar rsync patch sudo jq \
-        ncurses-dev gmp-dev libev-dev libressl-dev \
-        pcre-dev zlib-dev libsodium-dev \
+        ncurses-dev gmp-dev libev-dev \
+        pcre-dev zlib-dev \
         snappy snappy-dev \
         leveldb-$leveldb_version-r0.apk \
         leveldb-dev-$leveldb_version-r0.apk && \

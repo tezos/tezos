@@ -188,13 +188,6 @@ let init_node ?sandbox (config : Node_config_file.t) =
     config.shell.prevalidator_limits
     config.shell.chain_validator_limits
 
-let () =
-  let old_hook = !Lwt.async_exception_hook in
-  Lwt.async_exception_hook := function
-    | Ssl.Read_error _ -> ()
-    | Ssl.Write_error _ -> ()
-    | exn -> old_hook exn
-
 let init_rpc (rpc_config: Node_config_file.rpc) node =
   match rpc_config.listen_addr with
   | None ->
