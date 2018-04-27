@@ -11,12 +11,12 @@ export OPAMYES=yes
 
 ## Should be in sync with `opam-unpin.sh`
 opam pin add --no-action leveldb git://github.com/chambart/ocaml-leveldb.git#update_4.06
-opam pin add --no-action --dev-repo ocplib-json-typed
 
 ## Unpin package we used to pin...
 opam pin remove --no-action ocp-ocamlres
 opam pin remove --no-action ocplib-resto
 opam pin remove --no-action sodium
+opam pin remove --no-action ocplib-json-typed
 
 ### End of temporary HACK
 
