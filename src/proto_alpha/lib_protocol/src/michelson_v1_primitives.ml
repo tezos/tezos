@@ -50,6 +50,7 @@ type prim =
   | I_EQ
   | I_EXEC
   | I_FAIL
+  | I_FAILWITH
   | I_GE
   | I_GET
   | I_GT
@@ -177,6 +178,7 @@ let string_of_prim = function
   | I_EQ -> "EQ"
   | I_EXEC -> "EXEC"
   | I_FAIL -> "FAIL"
+  | I_FAILWITH -> "FAILWITH"
   | I_GE -> "GE"
   | I_GET -> "GET"
   | I_GT -> "GT"
@@ -285,6 +287,7 @@ let prim_of_string = function
   | "EQ" -> ok I_EQ
   | "EXEC" -> ok I_EXEC
   | "FAIL" -> ok I_FAIL
+  | "FAILWITH" -> ok I_FAILWITH
   | "GE" -> ok I_GE
   | "GET" -> ok I_GET
   | "GT" -> ok I_GT
@@ -438,6 +441,7 @@ let prim_encoding =
     ("EQ", I_EQ) ;
     ("EXEC", I_EXEC) ;
     ("FAIL", I_FAIL) ;
+    ("FAILWITH", I_FAILWITH) ;
     ("GE", I_GE) ;
     ("GET", I_GET) ;
     ("GT", I_GT) ;

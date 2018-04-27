@@ -48,6 +48,7 @@ type prim =
   | I_EQ
   | I_EXEC
   | I_FAIL
+  | I_FAILWITH
   | I_GE
   | I_GET
   | I_GT

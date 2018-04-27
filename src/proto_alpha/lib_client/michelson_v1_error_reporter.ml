@@ -91,7 +91,7 @@ let collect_error_locations errs =
         | Invalid_contract (loc, _)
         | Comparable_type_expected (loc, _)
         | Overflow (loc, _)
-        | Reject (loc, _)) :: rest ->
+        | Reject (loc, _, _)) :: rest ->
         collect (loc :: acc) rest
     | _ :: rest -> collect acc rest in
   collect [] errs
@@ -431,11 +431,22 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  @[<hov 2>is not compatible with type@ %a.@]@]"
                 print_ty tya
                 print_ty tyb
-          | Reject (loc, trace) ->
+          | Reject (loc, None, trace) ->
               Format.fprintf ppf
                 "%ascript reached FAIL instruction@ \
                  %a"
                 print_loc loc
+                (fun ppf -> function
+                   | None -> ()
+                   | Some trace ->
+                       Format.fprintf ppf "@,@[<v 2>trace@,%a@]"
+                         print_execution_trace trace)
+                trace
+          | Reject (loc, Some v, trace) ->
+              Format.fprintf ppf
+                "%ascript reached FAILWITH instruction@ \
+                 @[<hov 2>with@ %a@]%a"
+                print_loc loc print_expr v
                 (fun ppf -> function
                    | None -> ()
                    | Some trace ->

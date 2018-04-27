@@ -26,18 +26,19 @@ code { DUP; CAR;
                  CAR %from;
                  DIIP{ CDAR %withdraw_amount; H @signed_amount };
                  DIP{ CDDR %sig }; CHECK_SIGNATURE;
-                 IF {} { FAIL };
+                 IF {} { PUSH string "Bad signature"; FAILWITH };
                  # Get user account information
                  DIIP{ CDR %stored_balance; DUP };
-                 CAR %from; HASH_KEY @from_hash; DIP{ SWAP }; GET;
+                 CAR %from; HASH_KEY @from_hash; DUP; DIP{ DIP { SWAP }; SWAP}; GET;
                  # Account does not exist
-                 IF_NONE { FAIL }
+                 IF_NONE { PUSH string "Account does not exist"; PAIR; FAILWITH }
                          # Account exists
                          { RENAME @previous_balance;
+                           DIP { DROP };
                            DUP; DIIP{ DUP; CDAR %withdraw_amount; DUP };
                            # Ensure funds are available
                            DIP{ CMPLT @not_enough }; SWAP;
-                           IF { FAIL }
+                           IF { PUSH string "Not enough funds"; FAILWITH }
                               { SUB @new_balance; DIP{ DUP; DIP{ SWAP }}; DUP;
                                 # Delete account if balance is 0
                                 PUSH @zero mutez 0; CMPEQ @null_balance;

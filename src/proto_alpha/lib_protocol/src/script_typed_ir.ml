@@ -294,6 +294,8 @@ and ('bef, 'aft) instr =
     ('rest, ('arg, 'ret) lambda * 'rest) instr
   | Fail :
       ('bef, 'aft) instr
+  | Failwith :
+      'a ty -> ('a * 'rest, 'aft) instr
   | Nop :
       ('rest, 'rest) instr
   (* comparison *)

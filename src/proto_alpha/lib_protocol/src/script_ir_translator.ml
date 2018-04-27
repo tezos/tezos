@@ -183,6 +183,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Exec -> 0
   | Lambda _ -> 1
   | Fail -> 1
+  | Failwith _ -> 1
   | Nop -> 0
   | Compare _ -> 1
   | Eq -> 0
@@ -261,6 +262,7 @@ let namespace = function
   | I_EQ
   | I_EXEC
   | I_FAIL
+  | I_FAILWITH
   | I_GE
   | I_GET
   | I_GT
@@ -1454,13 +1456,15 @@ and parse_instr
       Lwt.return check in
     let check_item_ty exp got loc n =
       check_item (ty_eq exp got) loc n in
+    let log_stack loc stack_ty aft =
+      match type_logger, script_instr with
+      | None, _
+      | Some _, (Seq (-1, _) | Int _ | String _) -> ()
+      | Some log, (Prim _ | Seq _) ->
+          log loc (unparse_stack stack_ty) (unparse_stack aft)
+    in
     let typed ctxt loc instr aft =
-      begin match type_logger, script_instr with
-        | None, _
-        | Some _, (Seq (-1, _) | Int _ | String _) -> ()
-        | Some log, (Prim _ | Seq _) ->
-            log loc (unparse_stack stack_ty) (unparse_stack aft)
-      end ;
+      log_stack loc stack_ty aft ;
       return ctxt (Typed { loc ; instr ; bef = stack_ty ; aft }) in
     match script_instr, stack_ty with
     (* stack ops *)
@@ -1886,7 +1890,14 @@ and parse_instr
     | Prim (loc, I_FAIL, [], annot),
       bef ->
         fail_unexpected_annot loc annot >>=? fun () ->
-        let descr aft = { loc ; instr = Fail ; bef ; aft } in
+        let descr aft = { loc ; instr = Fail; bef ; aft } in
+        log_stack loc stack_ty Empty_t ;
+        return ctxt (Failed { descr } )
+    | Prim (loc, I_FAILWITH, [], annot),
+      Item_t (v, _rest, _) ->
+        fail_unexpected_annot loc annot >>=? fun () ->
+        let descr aft = { loc ; instr = Failwith v ; bef = stack_ty ; aft } in
+        log_stack loc stack_ty Empty_t ;
         return ctxt (Failed { descr })
     (* timestamp operations *)
     | Prim (loc, I_ADD, [], annot),
