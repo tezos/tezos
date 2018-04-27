@@ -55,8 +55,7 @@ COPY keys /etc/apk/keys/
 COPY leveldb-$leveldb_version-r0.apk .
 
 RUN apk --no-cache add \
-      libssl1.0 libsodium libev gmp vim \
-      leveldb-1.18-r0.apk && \
+      libev gmp vim leveldb-1.18-r0.apk && \
     rm leveldb-$leveldb_version-r0.apk
 
 COPY bin/* /usr/local/bin/
