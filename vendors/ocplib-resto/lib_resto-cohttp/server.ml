@@ -131,6 +131,8 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
           let headers = Header.init () in
           let headers =
             Header.add headers "content-type" output_content_type in
+          let headers = Cors.add_allow_origin
+              headers server.cors (Header.get req_headers "origin") in
           begin
             match s.types.input with
             | Service.No_input ->

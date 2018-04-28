@@ -14,6 +14,9 @@ type t = {
 
 val default: t
 
+val add_allow_origin:
+  Cohttp.Header.t -> t -> string option -> Cohttp.Header.t
+
 val add_headers:
   Cohttp.Header.t -> t -> string option -> Cohttp.Header.t
 
