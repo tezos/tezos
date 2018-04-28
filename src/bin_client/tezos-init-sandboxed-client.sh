@@ -12,9 +12,15 @@ init_sandboxed_client() {
     rpc=$((18730 + id))
     client_dir="$(mktemp -d -t tezos-tmp-client.XXXXXXXX)"
     client_dirs+=("$client_dir")
-    client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-    admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-    alpha_baker="$local_alpha_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+    if [ -n "$USE_TLS" ]; then
+        client="$local_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        admin_client="$local_admin_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        alpha_baker="$local_alpha_baker -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+    else
+        client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        alpha_baker="$local_alpha_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+    fi
     parameters_file="${parameters_file:-$client_dir/protocol_parameters.json}"
 
     if ! [ -f "$parameters_file" ]; then
