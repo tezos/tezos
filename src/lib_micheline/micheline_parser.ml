@@ -240,7 +240,7 @@ let tokenize source =
               skip (tok stop :: acc)
         end
     | (`End, stop) as other ->
-        if first && base = `bin || base = `hex then begin
+        if first && (base = `bin || base = `hex) then begin
           errors := Unterminated_integer { start ; stop } :: !errors
         end ;
         back other ;
