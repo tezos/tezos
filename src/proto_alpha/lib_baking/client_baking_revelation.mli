@@ -16,7 +16,7 @@ val inject_seed_nonce_revelation:
   Block_services.block ->
   ?async:bool ->
   (Raw_level.t * Nonce.t) list ->
-  Operation_hash.t tzresult Lwt.t
+  Operation_hash.t list tzresult Lwt.t
 
 val forge_seed_nonce_revelation:
   #Proto_alpha.full ->

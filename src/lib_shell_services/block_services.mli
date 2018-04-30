@@ -57,13 +57,16 @@ module type PROTO = sig
   val block_header_metadata_encoding:
     block_header_metadata Data_encoding.t
   type operation_data
-  val operation_data_encoding: operation_data Data_encoding.t
-  type operation_metadata
-  val operation_metadata_encoding: operation_metadata Data_encoding.t
+  type operation_receipt
   type operation = {
     shell: Operation.shell_header ;
     protocol_data: operation_data ;
   }
+
+  val operation_data_encoding: operation_data Data_encoding.t
+  val operation_receipt_encoding: operation_receipt Data_encoding.t
+  val operation_data_and_receipt_encoding:
+    (operation_data * operation_receipt) Data_encoding.t
 end
 
 module Make(Proto : PROTO)(Next_proto : PROTO) : sig
@@ -96,7 +99,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
     hash: Operation_hash.t ;
     shell: Operation.shell_header ;
     protocol_data: Proto.operation_data ;
-    metadata: Proto.operation_metadata ;
+    receipt: Proto.operation_receipt ;
   }
 
   type block_info = {
@@ -255,7 +258,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
       val operations:
         #simple -> ?chain:chain -> ?block:block ->
         Next_proto.operation list ->
-        Next_proto.operation_metadata list tzresult Lwt.t
+        (Next_proto.operation_data * Next_proto.operation_receipt) list tzresult Lwt.t
 
     end
 
@@ -462,7 +465,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
         val operations:
           ([ `POST ], prefix,
            prefix, unit, Next_proto.operation list,
-           Next_proto.operation_metadata list) RPC_service.t
+           (Next_proto.operation_data * Next_proto.operation_receipt) list) RPC_service.t
 
       end
 

@@ -347,17 +347,19 @@ let pp_document ppf descriptions =
   (* Index *)
   Format.pp_set_margin ppf 10000 ;
   Format.pp_set_max_indent ppf 9000 ;
+  Rst.pp_h2 ppf "RPCs - Index" ;
   List.iter
     (fun (name, prefix, rpc_dir) ->
-       Rst.pp_h2 ppf (Format.asprintf "%s RPCs - Index" name) ;
+       Rst.pp_h3 ppf name ;
        Format.fprintf ppf "%a@\n@\n" (Index.pp prefix) rpc_dir)
     descriptions ;
   (* Full description *)
+  Rst.pp_h2 ppf "RPCs - Full description" ;
   Format.pp_set_margin ppf 80 ;
   Format.pp_set_max_indent ppf 76 ;
   List.iter
     (fun (name, prefix, rpc_dir) ->
-       Rst.pp_h2 ppf (Format.asprintf "%s RPCs - Full description" name) ;
+       Rst.pp_h3 ppf name ;
        Format.fprintf ppf "%a@\n@\n" (Description.pp prefix) rpc_dir)
     descriptions
 
@@ -418,3 +420,4 @@ let () =
         Format.eprintf "%a@." pp_print_error err ;
         Pervasives.exit 1
   end
+

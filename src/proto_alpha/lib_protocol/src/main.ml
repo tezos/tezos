@@ -20,17 +20,23 @@ let block_header_data_encoding = Alpha_context.Block_header.protocol_data_encodi
 type block_header_metadata = Alpha_context.Block_header.metadata
 let block_header_metadata_encoding = Alpha_context.Block_header.metadata_encoding
 
-type operation_data = Alpha_context.Operation.protocol_data
-type operation = Alpha_context.Operation.t = {
+type operation_data = Alpha_context.packed_protocol_data =
+  | Operation_data : 'kind Alpha_context.Operation.protocol_data -> operation_data
+let operation_data_encoding = Alpha_context.Operation.protocol_data_encoding
+
+type operation_receipt = Apply_operation_result.packed_operation_metadata =
+  | Operation_metadata : 'kind Apply_operation_result.operation_metadata -> operation_receipt
+let operation_receipt_encoding =
+  Apply_operation_result.operation_metadata_encoding
+
+let operation_data_and_receipt_encoding =
+  Apply_operation_result.operation_data_and_metadata_encoding
+
+type operation = Alpha_context.packed_operation = {
   shell: Operation.shell_header ;
   protocol_data: operation_data ;
 }
 
-let operation_data_encoding = Alpha_context.Operation.protocol_data_encoding
-
-type operation_metadata = Apply_operation_result.operation_result
-let operation_metadata_encoding =
-  Data_encoding.(obj1 (req "metadata" Apply_operation_result.encoding))
 
 let acceptable_passes = Alpha_context.Operation.acceptable_passes
 
@@ -120,7 +126,11 @@ let begin_construction
   end >>=? fun (mode, ctxt, deposit) ->
   return { mode ; ctxt ; op_count = 0 ; deposit }
 
-let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
+let apply_operation
+    ({ mode ; ctxt ; op_count ; _ } as data)
+    (operation : Alpha_context.packed_operation) =
+  let { shell ; protocol_data = Operation_data protocol_data } = operation in
+  let operation : _ Alpha_context.operation = { shell ; protocol_data } in
   let predecessor =
     match mode with
     | Partial_construction { predecessor }
@@ -129,9 +139,10 @@ let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
     | Full_construction { predecessor ; _ } ->
         predecessor in
   Apply.apply_operation ctxt Optimized predecessor
-    (Alpha_context.Operation.hash operation) operation >>=? fun (ctxt, result) ->
+    (Alpha_context.Operation.hash operation)
+    operation >>=? fun (ctxt, result) ->
   let op_count = op_count + 1 in
-  return ({ data with ctxt ; op_count }, result)
+  return ({ data with ctxt ; op_count }, Operation_metadata result)
 
 let finalize_block { mode ; ctxt ; op_count ; deposit = _ } =
   match mode with
@@ -158,8 +169,7 @@ let finalize_block { mode ; ctxt ; op_count ; deposit = _ } =
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
       return (ctxt, { Alpha_context.Block_header.baker ; level ; voting_period_kind })
 
-let compare_operations op1 op2 =
-  Apply.compare_operations op1 op2
+let compare_operations = Apply.compare_operations
 
 let init ctxt block_header =
   let level = block_header.Block_header.level in

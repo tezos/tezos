@@ -146,13 +146,16 @@ module type PROTO = sig
   val block_header_metadata_encoding:
     block_header_metadata Data_encoding.t
   type operation_data
-  val operation_data_encoding: operation_data Data_encoding.t
-  type operation_metadata
-  val operation_metadata_encoding: operation_metadata Data_encoding.t
+  type operation_receipt
   type operation = {
     shell: Operation.shell_header ;
     protocol_data: operation_data ;
   }
+
+  val operation_data_encoding: operation_data Data_encoding.t
+  val operation_receipt_encoding: operation_receipt Data_encoding.t
+  val operation_data_and_receipt_encoding:
+    (operation_data * operation_receipt) Data_encoding.t
 end
 
 module Make(Proto : PROTO)(Next_proto : PROTO) = struct
@@ -238,8 +241,10 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
     let open Data_encoding in
     def "next_operation" @@
     conv
-      (fun Next_proto.{ shell ; protocol_data } -> ((), (shell, protocol_data)))
-      (fun ((), (shell, protocol_data)) -> { shell ; protocol_data } )
+      (fun Next_proto.{ shell ; protocol_data } ->
+         ((), (shell, protocol_data)))
+      (fun ((), (shell, protocol_data)) ->
+         { shell ; protocol_data } )
       (merge_objs
          (obj1 (req "protocol" (constant next_protocol_hash)))
          (merge_objs
@@ -251,28 +256,25 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
     hash: Operation_hash.t ;
     shell: Operation.shell_header ;
     protocol_data: Proto.operation_data ;
-    metadata: Proto.operation_metadata ;
+    receipt: Proto.operation_receipt ;
   }
 
   let operation_encoding =
     def "operation" @@
     let open Data_encoding in
     conv
-      (fun { chain_id ; hash ; shell ; protocol_data ; metadata } ->
-         (((), chain_id, hash), ((shell, protocol_data), metadata)))
-      (fun (((), chain_id, hash), ((shell, protocol_data), metadata)) ->
-         { chain_id ; hash ; shell ; protocol_data ; metadata } )
+      (fun { chain_id ; hash ; shell ; protocol_data ; receipt } ->
+         (((), chain_id, hash), (shell, (protocol_data, receipt))))
+      (fun (((), chain_id, hash), (shell, (protocol_data,  receipt))) ->
+         { chain_id ; hash ; shell ; protocol_data ; receipt })
       (merge_objs
          (obj3
             (req "protocol" (constant protocol_hash))
             (req "chain_id" Chain_id.encoding)
             (req "hash" Operation_hash.encoding))
          (merge_objs
-            (dynamic_size
-               (merge_objs
-                  Operation.shell_header_encoding
-                  Proto.operation_data_encoding))
-            (dynamic_size Proto.operation_metadata_encoding)))
+            (dynamic_size Operation.shell_header_encoding)
+            (dynamic_size Proto.operation_data_and_receipt_encoding)))
 
   type block_info = {
     chain_id: Chain_id.t ;
@@ -285,20 +287,17 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
   let block_info_encoding =
     conv
       (fun { chain_id ; hash ; header ; metadata ; operations } ->
-         ((((), chain_id, hash), (header, metadata)), operations))
-      (fun ((((), chain_id, hash), (header, metadata)), operations) ->
+         ((), chain_id, hash, header, metadata, operations))
+      (fun ((), chain_id, hash, header, metadata, operations) ->
          { chain_id ; hash ; header ; metadata ; operations })
-      (merge_objs
-         (merge_objs
-            (obj3
-               (req "protocol" (constant protocol_hash))
-               (req "chain_id" Chain_id.encoding)
-               (req "hash" Block_hash.encoding))
-            (merge_objs
-               (dynamic_size raw_block_header_encoding)
-               (dynamic_size block_metadata_encoding)))
-         (obj1 (req "operations"
-                  (list (dynamic_size (list operation_encoding))))))
+      (obj6
+         (req "protocol" (constant protocol_hash))
+         (req "chain_id" Chain_id.encoding)
+         (req "hash" Block_hash.encoding)
+         (req "header" (dynamic_size raw_block_header_encoding))
+         (req "metadata" (dynamic_size block_metadata_encoding))
+         (req "operations"
+            (list (dynamic_size (list operation_encoding)))))
 
   module S = struct
 
@@ -630,7 +629,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
               "Simulate the validation of an operation."
             ~query: RPC_query.empty
             ~input: (list next_operation_encoding)
-            ~output: (list (dynamic_size Next_proto.operation_metadata_encoding))
+            ~output: (list (dynamic_size Next_proto.operation_data_and_receipt_encoding))
             RPC_path.(path / "operations")
 
       end
@@ -936,13 +935,18 @@ module Fake_protocol = struct
   type block_header_metadata = unit
   let block_header_metadata_encoding = Data_encoding.empty
   type operation_data = unit
-  let operation_data_encoding = Data_encoding.empty
-  type operation_metadata = unit
-  let operation_metadata_encoding = Data_encoding.empty
+  type operation_receipt = unit
   type operation = {
     shell: Operation.shell_header ;
     protocol_data: operation_data ;
   }
+  let operation_data_encoding = Data_encoding.empty
+  let operation_receipt_encoding = Data_encoding.empty
+  let operation_data_and_receipt_encoding =
+    Data_encoding.conv
+      (fun ((), ()) -> ())
+      (fun () -> ((), ()))
+      Data_encoding.empty
 end
 
 module Empty = Make(Fake_protocol)(Fake_protocol)

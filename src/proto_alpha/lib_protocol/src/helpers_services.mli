@@ -25,10 +25,9 @@ module Scripts : sig
 
   val run_code:
     'a #RPC_context.simple ->
-    'a -> Script.expr ->
-    (Script.expr * Script.expr * Tez.t * Contract.t) ->
+    'a -> Script.expr -> (Script.expr * Script.expr * Tez.t * Contract.t) ->
     (Script.expr *
-     internal_operation list *
+     packed_internal_operation list *
      Contract.big_map_diff option) shell_tzresult Lwt.t
 
   val trace_code:
@@ -36,7 +35,7 @@ module Scripts : sig
     'a -> Script.expr ->
     (Script.expr * Script.expr * Tez.t * Contract.t) ->
     (Script.expr *
-     internal_operation list *
+     packed_internal_operation list *
      Script_interpreter.execution_trace *
      Contract.big_map_diff option) shell_tzresult Lwt.t
 
@@ -69,7 +68,7 @@ module Forge : sig
       fee:Tez.t ->
       gas_limit:Z.t ->
       storage_limit:Int64.t ->
-      manager_operation list -> MBytes.t shell_tzresult Lwt.t
+      packed_manager_operation list -> MBytes.t shell_tzresult Lwt.t
 
     val reveal:
       'a #RPC_context.simple -> 'a ->
@@ -123,73 +122,47 @@ module Forge : sig
 
   end
 
-  module Dictator : sig
+  val activate_protocol:
+    'a #RPC_context.simple -> 'a ->
+    branch:Block_hash.t ->
+    Protocol_hash.t -> MBytes.t shell_tzresult Lwt.t
 
-    val operation:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      dictator_operation -> MBytes.t shell_tzresult Lwt.t
+  val activate_test_protocol:
+    'a #RPC_context.simple -> 'a ->
+    branch:Block_hash.t ->
+    Protocol_hash.t -> MBytes.t shell_tzresult Lwt.t
 
-    val activate:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      Protocol_hash.t -> MBytes.t shell_tzresult Lwt.t
+  val endorsement:
+    'a #RPC_context.simple -> 'a ->
+    branch:Block_hash.t ->
+    block:Block_hash.t ->
+    level:Raw_level.t ->
+    slots:int list ->
+    unit -> MBytes.t shell_tzresult Lwt.t
 
-    val activate_testchain:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      Protocol_hash.t -> MBytes.t shell_tzresult Lwt.t
+  val proposals:
+    'a #RPC_context.simple -> 'a ->
+    branch:Block_hash.t ->
+    source:public_key_hash ->
+    period:Voting_period.t ->
+    proposals:Protocol_hash.t list ->
+    unit -> MBytes.t shell_tzresult Lwt.t
 
-  end
+  val ballot:
+    'a #RPC_context.simple -> 'a ->
+    branch:Block_hash.t ->
+    source:public_key_hash ->
+    period:Voting_period.t ->
+    proposal:Protocol_hash.t ->
+    ballot:Vote.ballot ->
+    unit -> MBytes.t shell_tzresult Lwt.t
 
-  module Consensus : sig
-
-    val endorsement:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      block:Block_hash.t ->
-      level:Raw_level.t ->
-      slots:int list ->
-      unit -> MBytes.t shell_tzresult Lwt.t
-
-  end
-
-  module Amendment : sig
-
-    val proposals:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      source:public_key_hash ->
-      period:Voting_period.t ->
-      proposals:Protocol_hash.t list ->
-      unit -> MBytes.t shell_tzresult Lwt.t
-
-    val ballot:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      source:public_key_hash ->
-      period:Voting_period.t ->
-      proposal:Protocol_hash.t ->
-      ballot:Vote.ballot ->
-      unit -> MBytes.t shell_tzresult Lwt.t
-
-  end
-
-  module Anonymous : sig
-
-    val operations:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      anonymous_operation list -> MBytes.t shell_tzresult Lwt.t
-
-    val seed_nonce_revelation:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      level:Raw_level.t ->
-      nonce:Nonce.t ->
-      unit -> MBytes.t shell_tzresult Lwt.t
-
-  end
+  val seed_nonce_revelation:
+    'a #RPC_context.simple -> 'a ->
+    branch:Block_hash.t ->
+    level:Raw_level.t ->
+    nonce:Nonce.t ->
+    unit -> MBytes.t shell_tzresult Lwt.t
 
   val protocol_data:
     'a #RPC_context.simple -> 'a ->
@@ -205,7 +178,7 @@ module Parse : sig
   val operations:
     'a #RPC_context.simple -> 'a ->
     ?check:bool -> Operation.raw list ->
-    Operation.t list shell_tzresult Lwt.t
+    Operation.packed list shell_tzresult Lwt.t
 
   val block:
     'a #RPC_context.simple -> 'a ->

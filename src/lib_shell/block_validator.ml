@@ -230,7 +230,8 @@ let apply_block
   let ops_metadata =
     List.map
       (List.map
-         (Data_encoding.Binary.to_bytes_exn Proto.operation_metadata_encoding))
+         (Data_encoding.Binary.to_bytes_exn
+            Proto.operation_receipt_encoding))
       ops_metadata in
   return (validation_result, block_data, ops_metadata)
 

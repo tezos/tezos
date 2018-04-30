@@ -21,13 +21,21 @@ type block_header_metadata = unit
 let block_header_metadata_encoding = Data_encoding.unit
 
 type operation_data = unit
-type operation = {
-  shell : Operation.shell_header ;
-  protocol_data : operation_data ;
-}
 let operation_data_encoding = Data_encoding.unit
-type operation_metadata = unit
-let operation_metadata_encoding = Data_encoding.unit
+
+type operation_receipt = unit
+let operation_receipt_encoding = Data_encoding.unit
+
+let operation_data_and_receipt_encoding =
+  Data_encoding.conv
+    (function ((), ()) -> ())
+    (fun () -> ((), ()))
+    Data_encoding.unit
+
+type operation = {
+  shell: Operation.shell_header ;
+  protocol_data: operation_data ;
+}
 
 let max_operation_data_length = 42
 

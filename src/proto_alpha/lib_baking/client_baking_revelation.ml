@@ -8,18 +8,16 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Alpha_context
 
 let inject_seed_nonce_revelation rpc_config ?(chain = `Main) block ?async nonces =
-  let operations =
-    List.map
-      (fun (level, nonce) ->
-         Seed_nonce_revelation { level ; nonce }) nonces in
   Alpha_block_services.hash rpc_config ~chain ~block () >>=? fun branch ->
-  Alpha_services.Forge.Anonymous.operations rpc_config
-    (chain, block) ~branch operations >>=? fun bytes ->
-  Shell_services.Injection.operation rpc_config ?async ~chain bytes >>=? fun oph ->
-  return oph
+  map_p
+    (fun (level, nonce) ->
+       Alpha_services.Forge.seed_nonce_revelation rpc_config
+         (chain, block) ~branch ~level ~nonce () >>=? fun bytes ->
+       Shell_services.Injection.operation rpc_config ?async ~chain bytes)
+    nonces >>=? fun ophs ->
+  return ophs
 
 let forge_seed_nonce_revelation
     (cctxt: #Proto_alpha.full)
@@ -37,6 +35,6 @@ let forge_seed_nonce_revelation
         "Operation successfully injected %d revelation(s) for %a."
         (List.length nonces)
         Block_hash.pp_short hash >>= fun () ->
-      cctxt#answer "Operation hash is '%a'."
-        Operation_hash.pp_short oph >>= fun () ->
+      cctxt#answer "@[<v 2>Operation hash are:@ %a@]"
+        (Format.pp_print_list Operation_hash.pp_short) oph >>= fun () ->
       return ()

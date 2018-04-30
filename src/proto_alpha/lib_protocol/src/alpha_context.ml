@@ -27,10 +27,11 @@ end
 
 include Operation_repr
 module Operation = struct
-  type t = operation = {
+  type 'kind t = 'kind operation = {
     shell: Operation.shell_header ;
-    protocol_data: protocol_data ;
+    protocol_data: 'kind protocol_data ;
   }
+  type packed = packed_operation
   let unsigned_encoding = unsigned_operation_encoding
   include Operation_repr
 end

@@ -33,15 +33,21 @@ let () =
     (fun () -> Invalid_signature)
 
 type operation_data = unit
+let operation_data_encoding = Data_encoding.unit
+
+type operation_receipt = unit
+let operation_receipt_encoding = Data_encoding.unit
+
+let operation_data_and_receipt_encoding =
+  Data_encoding.conv
+    (function ((), ()) -> ())
+    (fun () -> ((), ()))
+    Data_encoding.unit
+
 type operation = {
   shell: Operation.shell_header ;
   protocol_data: operation_data ;
 }
-
-let operation_data_encoding = Data_encoding.unit
-
-type operation_metadata = unit
-let operation_metadata_encoding = Data_encoding.unit
 
 let acceptable_passes _op = []
 let compare_operations _ _ = 0

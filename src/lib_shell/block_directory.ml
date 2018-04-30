@@ -160,20 +160,20 @@ let build_raw_rpc_directory
 
   (* operations *)
 
-  let convert chain_id (op : Operation.t) metadata =
+  let convert chain_id (op : Operation.t) metadata : Block_services.operation =
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn
         Proto.operation_data_encoding
         op.proto in
-    let metadata =
+    let receipt =
       Data_encoding.Binary.of_bytes_exn
-        Proto.operation_metadata_encoding
+        Proto.operation_receipt_encoding
         metadata in
     { Block_services.chain_id ;
       hash = Operation.hash op ;
       shell = op.shell ;
       protocol_data ;
-      metadata ;
+      receipt ;
     } in
 
   let operations block =
@@ -268,11 +268,11 @@ let build_raw_rpc_directory
     let operations =
       List.map
         (List.map
-           (fun (op : Next_proto.operation) ->
+           (fun op ->
               let proto =
                 Data_encoding.Binary.to_bytes_exn
                   Next_proto.operation_data_encoding
-                  op.protocol_data in
+                  op.Next_proto.protocol_data in
               { Operation.shell = op.shell ; proto }))
         p.operations in
     Prevalidation.preapply
@@ -297,7 +297,7 @@ let build_raw_rpc_directory
     fold_left_s
       (fun (state, acc) op ->
          Next_proto.apply_operation state op >>=? fun (state, result) ->
-         return (state, result :: acc))
+         return (state, (op.protocol_data, result) :: acc))
       (state, []) ops >>=? fun (state, acc) ->
     Next_proto.finalize_block state >>=? fun _ ->
     return (List.rev acc)

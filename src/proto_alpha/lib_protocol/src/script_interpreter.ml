@@ -595,7 +595,7 @@ let rec interp
                 { amount ; destination ;
                   parameters = Some (Script.lazy_expr (Micheline.strip_locations p)) } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
-            logged_return (Item ({ source = self ; operation ; nonce }, rest), ctxt)
+            logged_return (Item (Internal_operation { source = self ; operation ; nonce }, rest), ctxt)
         | Create_account,
           Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
@@ -605,7 +605,7 @@ let rec interp
                 { credit ; manager ; delegate ; preorigination = Some contract ;
                   delegatable ; script = None ; spendable = true } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
-            logged_return (Item ({ source = self ; operation ; nonce },
+            logged_return (Item (Internal_operation { source = self ; operation ; nonce },
                                  Item (contract, rest)), ctxt)
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
@@ -636,14 +636,14 @@ let rec interp
                                   storage = Script.lazy_expr storage } } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return
-              (Item ({ source = self ; operation ; nonce },
+              (Item (Internal_operation { source = self ; operation ; nonce },
                      Item (contract, rest)), ctxt)
         | Set_delegate,
           Item (delegate, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
             let operation = Delegation delegate in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
-            logged_return (Item ({ source = self ; operation ; nonce }, rest), ctxt)
+            logged_return (Item (Internal_operation { source = self ; operation ; nonce }, rest), ctxt)
         | Balance, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.balance) >>=? fun ctxt ->
             Contract.get_balance ctxt self >>=? fun balance ->
@@ -693,7 +693,7 @@ let rec interp
 (* ---- contract handling ---------------------------------------------------*)
 
 and execute ?log ctxt mode ~source ~payer ~self script amount arg :
-  (Script.expr * internal_operation list * context *
+  (Script.expr * packed_internal_operation list * context *
    Script_typed_ir.ex_big_map option) tzresult Lwt.t =
   parse_script ctxt script
   >>=? fun ((Ex_script { code ; arg_type ; storage ; storage_type }), ctxt) ->
@@ -711,7 +711,7 @@ type execution_result =
   { ctxt : context ;
     storage : Script.expr ;
     big_map_diff : Contract.big_map_diff option ;
-    operations : internal_operation list }
+    operations : packed_internal_operation list }
 
 let trace ctxt mode ~source ~payer ~self:(self, script) ~parameter ~amount =
   let log = ref [] in

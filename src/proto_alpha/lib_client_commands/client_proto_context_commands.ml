@@ -323,7 +323,7 @@ let commands () =
                (fun ppf -> Data_encoding.Json.print_error ppf) exn
                Data_encoding.Json.pp json
          | key ->
-             claim_commitment cctxt
+             activate_account cctxt
                ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
                ~encrypted ~force key name >>=? fun _res ->
              return ()
@@ -339,9 +339,9 @@ let commands () =
          ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
-        dictate cctxt
+        activate_protocol cctxt
           ~chain:`Main ~block:cctxt#block
-          (Activate hash) seckey >>=? fun _ ->
+          hash seckey >>=? fun _ ->
         return ()
       end ;
 
@@ -395,9 +395,9 @@ let commands () =
          ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
-        dictate cctxt
+        activate_test_protocol cctxt
           ~chain:`Main ~block:cctxt#block
-          (Activate_testchain hash) seckey >>=? fun _res ->
+          hash seckey >>=? fun _res ->
         return ()
       end ;
 

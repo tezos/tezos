@@ -96,7 +96,7 @@ let inject_endorsement
     ?(chain = `Main) block level ?async
     src_sk slots =
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-  Alpha_services.Forge.Consensus.endorsement cctxt
+  Alpha_services.Forge.endorsement cctxt
     (chain, block)
     ~branch:hash
     ~block:hash

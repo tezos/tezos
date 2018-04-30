@@ -98,25 +98,27 @@ let () =
       | _ -> None)
     (fun (hash, err) -> Failed_to_preapply (hash, err))
 
-let classify_operations (ops: Operation.t list) =
+let classify_operations (ops: Proto_alpha.operation list) =
   let t = Array.make (List.length Proto_alpha.Main.validation_passes) [] in
   List.iter
-    (fun (op: Operation.t) ->
+    (fun (op: Proto_alpha.operation) ->
        List.iter
          (fun pass -> t.(pass) <- op :: t.(pass))
          (Proto_alpha.Main.acceptable_passes op))
     ops ;
   Array.fold_right (fun ops acc -> List.rev ops :: acc) t []
 
-let parse (op : Operation.raw) : Operation.t = {
-  shell = op.shell ;
-  protocol_data =
+let parse (op : Operation.raw) : Operation.packed =
+  let protocol_data =
     Data_encoding.Binary.of_bytes_exn
       Alpha_context.Operation.protocol_data_encoding
-      op.proto
-}
+      op.proto in
+  {
+    shell = op.shell ;
+    protocol_data ;
+  }
 
-let forge (op : Operation.t) : Operation.raw = {
+let forge (op : Operation.packed) : Operation.raw = {
   shell = op.shell ;
   proto =
     Data_encoding.Binary.to_bytes_exn

@@ -24,43 +24,24 @@ let parse_expression arg =
     (Micheline_parser.no_parsing_error
        (Michelson_v1_parser.parse_expression arg))
 
-let append_reveal
-    cctxt ~chain ~block
-    ~source ~src_pk ops =
-  Alpha_services.Contract.manager_key
-    cctxt (chain, block) source >>=? fun (_pkh, pk) ->
-  let is_reveal = function
-    | Reveal _ -> true
-    | _ -> false in
-  match pk with
-  | None when not (List.exists is_reveal ops) ->
-      return (Reveal src_pk :: ops)
-  | _ -> return ops
-
 let transfer (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
     ?branch ~source ~src_pk ~src_sk ~destination ?arg
-    ~amount ~fee ?(gas_limit = Z.minus_one) ?(storage_limit = -1L) () =
+    ~amount ~fee ?gas_limit ?storage_limit () =
   begin match arg with
     | Some arg ->
         parse_expression arg >>=? fun { expanded = arg } ->
         return (Some arg)
     | None -> return None
   end >>=? fun parameters ->
-  Alpha_services.Contract.counter
-    cctxt (chain, block) source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
   let parameters = Option.map ~f:Script.lazy_expr parameters in
-  let operations = [Transaction { amount ; parameters ; destination }] in
-  append_reveal cctxt ~chain ~block
-    ~source ~src_pk operations >>=? fun operations ->
-  let contents =
-    Sourced_operation
-      (Manager_operations { source ; fee ; counter ;
-                            gas_limit ; storage_limit ; operations }) in
-  Injection.inject_operation cctxt ~chain ~block ?confirmations
-    ?branch ~src_sk contents >>=? fun (_oph, _op, result as res) ->
-  Lwt.return (Injection.originated_contracts result) >>=? fun contracts ->
+  let contents = Transaction { amount ; parameters ; destination } in
+  Injection.inject_manager_operation
+    cctxt ~chain ~block ?confirmations
+    ?branch ~source ~fee ?gas_limit ?storage_limit
+    ~src_pk ~src_sk contents >>=? fun (_oph, _op, result as res) ->
+  Lwt.return
+    (Injection.originated_contracts (Single_result result)) >>=? fun contracts ->
   return (res, contracts)
 
 let reveal cctxt
@@ -69,37 +50,36 @@ let reveal cctxt
   Alpha_services.Contract.counter
     cctxt (chain, block) source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
-  append_reveal cctxt ~chain ~block ~source ~src_pk [] >>=? fun operations ->
-  match operations with
-  | [] ->
+  Alpha_services.Contract.manager_key
+    cctxt (chain, block) source >>=? fun (_, key) ->
+  match key with
+  | Some _ ->
       failwith "The manager key was previously revealed."
-  | _ :: _ ->
+  | None -> begin
       let contents =
-        Sourced_operation
-          (Manager_operations { source ; fee ; counter ;
-                                gas_limit = Z.zero ; storage_limit = 0L ;
-                                operations }) in
+        Single
+          (Manager_operation { source ; fee ; counter ;
+                               gas_limit = Z.zero ; storage_limit = 0L ;
+                               operation = Reveal src_pk }) in
       Injection.inject_operation cctxt ~chain ~block ?confirmations
-        ?branch ~src_sk contents >>=? fun res ->
-      return res
+        ?branch ~src_sk contents >>=? fun (oph, op, result) ->
+      match Apply_operation_result.pack_contents_list op result with
+      | Apply_operation_result.Single_and_result
+          (Manager_operation _ as op, result) ->
+          return (oph, op, result)
+      | _ -> .
+    end
 
 let originate
     cctxt ~chain ~block ?confirmations
     ?branch ~source ~src_pk ~src_sk ~fee
-    ?(gas_limit = Z.minus_one) ?(storage_limit = -1L) origination =
-  Alpha_services.Contract.counter
-    cctxt (chain, block) source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
-  let operations = [origination] in
-  append_reveal
-    cctxt ~chain ~block ~source ~src_pk operations >>=? fun operations ->
-  let contents =
-    Sourced_operation
-      (Manager_operations { source ; fee ; counter ;
-                            gas_limit ; storage_limit ; operations }) in
-  Injection.inject_operation cctxt ~chain ~block ?confirmations
-    ?branch ~src_sk contents >>=? fun (_oph, _op, result as res) ->
-  Lwt.return (Injection.originated_contracts result) >>=? function
+    ?gas_limit ?storage_limit contents =
+  Injection.inject_manager_operation
+    cctxt ~chain ~block ?confirmations
+    ?branch ~source ~fee ?gas_limit ?storage_limit
+    ~src_pk ~src_sk contents >>=? fun (_oph, _op, result as res) ->
+  Lwt.return
+    (Injection.originated_contracts (Single_result result)) >>=? function
   | [ contract ] -> return (res, contract)
   | contracts ->
       failwith
@@ -120,25 +100,17 @@ let originate_account
                   preorigination = None } in
   originate
     cctxt ~chain ~block ?confirmations
-    ?branch ~source ~gas_limit:Z.zero~src_pk ~src_sk ~fee origination
+    ?branch ~source ~gas_limit:Z.zero ~src_pk ~src_sk ~fee origination
 
 let delegate_contract cctxt
     ~chain ~block ?branch ?confirmations
     ~source ~src_pk ~src_sk
     ~fee delegate_opt =
-  Alpha_services.Contract.counter
-    cctxt (chain, block) source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
-  let operations = [Delegation delegate_opt] in
-  append_reveal
-    cctxt ~chain ~block ~source ~src_pk operations >>=? fun operations ->
-  let contents =
-    Sourced_operation
-      (Manager_operations { source ; fee ; counter ;
-                            gas_limit = Z.zero ; storage_limit = 0L ;
-                            operations }) in
-  Injection.inject_operation cctxt ~chain ~block ?confirmations
-    ?branch ~src_sk contents >>=? fun res ->
+  let operation = Delegation delegate_opt in
+  Injection.inject_manager_operation
+    cctxt ~chain ~block ?confirmations
+    ?branch ~source ~fee ~gas_limit:Z.zero ~storage_limit:0L
+    ~src_pk ~src_sk operation >>=? fun res ->
   return res
 
 let list_contract_labels
@@ -179,19 +151,32 @@ let get_manager
   Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
   return (src_name, src_pkh, src_pk, src_sk)
 
-let dictate rpc_config ~chain ~block ?confirmations command src_sk =
-  let contents = Sourced_operation (Dictator_operation command) in
+let activate_protocol rpc_config ~chain ~block ?confirmations hash src_sk =
   Injection.inject_operation
     rpc_config ~chain ~block ?confirmations
-    ~src_sk contents >>=? fun res ->
-  return res
+    ~src_sk (Single (Activate_protocol hash)) >>=? fun (oph, op, result) ->
+  match Apply_operation_result.pack_contents_list op result with
+  | Apply_operation_result.Single_and_result
+      (Activate_protocol _ as op, result) ->
+      return (oph, op, result)
+  | _ -> .
 
-let set_delegate
-    cctxt ~chain ~block ?confirmations
-    ~fee contract ~src_pk ~manager_sk opt_delegate =
-  delegate_contract
-    cctxt ~chain ~block ?confirmations
-    ~source:contract ~src_pk ~src_sk:manager_sk ~fee opt_delegate
+    let activate_test_protocol rpc_config ~chain ~block ?confirmations hash src_sk =
+      Injection.inject_operation
+        rpc_config ~chain ~block ?confirmations
+        ~src_sk (Single (Activate_test_protocol hash)) >>=? fun (oph, op, result) ->
+      match Apply_operation_result.pack_contents_list op result with
+      | Apply_operation_result.Single_and_result
+          (Activate_test_protocol _ as op, result) ->
+          return (oph, op, result)
+      | _ -> .
+
+        let set_delegate
+            cctxt ~chain ~block ?confirmations
+            ~fee contract ~src_pk ~manager_sk opt_delegate =
+          delegate_contract
+            cctxt ~chain ~block ?confirmations
+            ~source:contract ~src_pk ~src_sk:manager_sk ~fee opt_delegate
 
 let register_as_delegate
     cctxt ~chain ~block ?confirmations
@@ -306,7 +291,7 @@ let read_key key =
       let pkh = Signature.Public_key.hash pk in
       return (pkh, pk, sk)
 
-let claim_commitment
+let activate_account
     (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
     ?(encrypted = false) ?force key name =
@@ -318,11 +303,10 @@ let claim_commitment
        Signature.Public_key_hash.pp pkh
        Ed25519.Public_key_hash.pp key.pkh) >>=? fun () ->
   let contents =
-    Anonymous_operations
-      [ Activation { id = key.pkh ; activation_code = key.activation_code } ] in
+    Single ( Activate_account { id = key.pkh ; activation_code = key.activation_code } ) in
   Injection.inject_operation
     cctxt ?confirmations ~chain ~block
-    contents >>=? fun (_oph, _op, _result as res) ->
+    contents >>=? fun (oph, op, result) ->
   let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
   begin
     if encrypted then
@@ -346,5 +330,9 @@ let claim_commitment
           Tez.pp balance >>= fun () ->
         return ()
   end >>=? fun () ->
-  return res
+  match Apply_operation_result.pack_contents_list op result with
+  | Apply_operation_result.Single_and_result
+      (Activate_account _ as op, result) ->
+      return (oph, op, result)
+  | _ -> .
 

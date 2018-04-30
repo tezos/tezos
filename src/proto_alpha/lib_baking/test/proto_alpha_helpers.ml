@@ -322,14 +322,13 @@ module Account = struct
 
 end
 
-let sign ?watermark src_sk shell contents =
-  let contents = Sourced_operation contents in
+let sign ?watermark src_sk shell (Contents_list contents) =
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Operation.unsigned_encoding
-      (shell, contents) in
+      (shell, (Contents_list contents)) in
   let signature = Some (Signature.sign ?watermark src_sk bytes) in
-  let protocol_data = { contents ; signature } in
+  let protocol_data = Operation_data { contents ; signature } in
   return { shell ; protocol_data }
 
 module Protocol = struct
@@ -347,11 +346,10 @@ module Protocol = struct
       !rpc_ctxt ~offset:1l (`Main, block) >>=? fun next_level ->
     let shell = { Tezos_base.Operation.branch = hash } in
     let contents =
-      Amendment_operation
-        { source = pkh ;
-          operation = Proposals { period = next_level.voting_period ;
-                                  proposals } } in
-    sign ~watermark:Generic_operation sk shell contents
+      Proposals { source = pkh ;
+                  period = next_level.voting_period ;
+                  proposals } in
+    sign ~watermark:Generic_operation sk shell (Contents_list (Single contents))
 
   let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
     Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
@@ -359,12 +357,12 @@ module Protocol = struct
       !rpc_ctxt ~offset:1l (`Main, block) >>=? fun next_level ->
     let shell = { Tezos_base.Operation.branch = hash } in
     let contents =
-      Amendment_operation
-        { source = pkh ;
-          operation = Ballot { period = next_level.voting_period ;
-                               proposal ;
-                               ballot } } in
-    sign ~watermark:Generic_operation sk shell contents
+      Single
+        (Ballot { source = pkh ;
+                  period = next_level.voting_period ;
+                  proposal ;
+                  ballot }) in
+    sign ~watermark:Generic_operation sk shell (Contents_list contents)
 
 end
 
@@ -431,8 +429,8 @@ module Assert = struct
           begin
             match op with
             | None -> true
-            | Some op ->
-                let h = Operation.hash op and h' = hash op' in
+            | Some { shell ; protocol_data = Operation_data protocol_data } ->
+                let h = Operation.hash { shell ; protocol_data } and h' = hash op' in
                 Operation_hash.equal h h'
           end && List.exists (ecoproto_error f) err
       | _ -> false
@@ -557,9 +555,8 @@ module Endorse = struct
     let level = level.level in
     let shell = { Tezos_base.Operation.branch = hash } in
     let contents =
-      Consensus_operation
-        (Endorsements { block = hash ; level ; slots = [ slot ]}) in
-    sign ~watermark:Endorsement src_sk shell contents
+      Single (Endorsements { block = hash ; level ; slots = [ slot ]}) in
+    sign ~watermark:Endorsement src_sk shell (Contents_list contents)
 
   let signing_slots
       block

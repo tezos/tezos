@@ -17,10 +17,10 @@
                     -open Tezos_alpha_test_helpers
 ))))
 
-(alias
- ((name buildtest)
-  (package tezos-protocol-alpha)
-  (deps (main.exe))))
+;;(alias
+;; ((name buildtest)
+;;  (package tezos-protocol-alpha)
+;;  (deps (main.exe))))
 
 ; runs only the `Quick tests
 (alias
@@ -34,10 +34,10 @@
   (package tezos-protocol-alpha)
   (action (chdir ${ROOT} (run ${exe:main.exe} -v)))))
 
-(alias
- ((name runtest)
-  (package tezos-protocol-alpha)
-  (deps ((alias runtest_proto_alpha)))))
+;;(alias
+;; ((name runtest)
+;;  (package tezos-protocol-alpha)
+;;  (deps ((alias runtest_proto_alpha)))))
 
 (alias
  ((name runtest_indent)

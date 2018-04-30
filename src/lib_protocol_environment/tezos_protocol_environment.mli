@@ -61,13 +61,15 @@ module Make (Context : CONTEXT) : sig
     type block_header_metadata
     val block_header_metadata_encoding: block_header_metadata Data_encoding.t
     type operation_data
-    val operation_data_encoding: operation_data Data_encoding.t
+    type operation_receipt
     type operation = {
       shell: Operation.shell_header ;
       protocol_data: operation_data ;
     }
-    type operation_metadata
-    val operation_metadata_encoding: operation_metadata Data_encoding.t
+    val operation_data_encoding: operation_data Data_encoding.t
+    val operation_receipt_encoding: operation_receipt Data_encoding.t
+    val operation_data_and_receipt_encoding:
+      (operation_data * operation_receipt) Data_encoding.t
     val acceptable_passes: operation -> int list
     val compare_operations: operation -> operation -> int
     type validation_state
@@ -94,7 +96,7 @@ module Make (Context : CONTEXT) : sig
       unit -> validation_state tzresult Lwt.t
     val apply_operation:
       validation_state -> operation ->
-      (validation_state * operation_metadata) tzresult Lwt.t
+      (validation_state * operation_receipt) tzresult Lwt.t
     val finalize_block:
       validation_state ->
       (validation_result * block_header_metadata) tzresult Lwt.t
@@ -159,6 +161,7 @@ module Make (Context : CONTEXT) : sig
       with type block_header_data = P.block_header_data
        and type block_header = P.block_header
        and type operation_data = P.operation_data
+       and type operation_receipt = P.operation_receipt
        and type operation = P.operation
        and type validation_state = P.validation_state
 

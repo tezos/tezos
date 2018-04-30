@@ -90,8 +90,10 @@ module type PROTOCOL = sig
   (** The version specific type of operations. *)
   type operation_data
 
-  (** Encoding for version specific part of operations.  *)
-  val operation_data_encoding: operation_data Data_encoding.t
+  (** Version-specific side information computed by the protocol
+      during the validation of each operation, to be used conjointly
+      with {!block_header_metadata}. *)
+  type operation_receipt
 
   (** A fully parsed operation. *)
   type operation = {
@@ -99,13 +101,15 @@ module type PROTOCOL = sig
     protocol_data: operation_data ;
   }
 
-  (** Version-specific side information computed by the protocol
-      during the validation of each operation, to be used conjointly
-      with {!block_header_metadata}. *)
-  type operation_metadata
+  (** Encoding for version-specific operation data. *)
+  val operation_data_encoding: operation_data Data_encoding.t
 
-  (** Encoding for version-specific operation metadata. *)
-  val operation_metadata_encoding: operation_metadata Data_encoding.t
+  (** Encoding for version-specific operation receipts. *)
+  val operation_receipt_encoding: operation_receipt Data_encoding.t
+
+  (** Encoding that mixes an operation data and its receipt. *)
+  val operation_data_and_receipt_encoding:
+    (operation_data * operation_receipt) Data_encoding.t
 
   (** The Validation passes in which an operation can appear.
       For instance [[0]] if it only belongs to the first pass.
@@ -178,7 +182,7 @@ module type PROTOCOL = sig
   val apply_operation:
     validation_state ->
     operation ->
-    (validation_state * operation_metadata) tzresult Lwt.t
+    (validation_state * operation_receipt) tzresult Lwt.t
 
   (** The last step in a block validation sequence. It produces the
       context that will be used as input for the validation of its

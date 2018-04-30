@@ -25,7 +25,7 @@ val run :
   input:Michelson_v1_parser.parsed ->
   unit ->
   (Script.expr *
-   internal_operation list *
+   packed_internal_operation list *
    Contract.big_map_diff option) tzresult Lwt.t
 
 val trace :
@@ -39,7 +39,7 @@ val trace :
   input:Michelson_v1_parser.parsed ->
   unit ->
   (Script.expr *
-   internal_operation list *
+   packed_internal_operation list *
    Script_interpreter.execution_trace *
    Contract.big_map_diff option) tzresult Lwt.t
 
@@ -48,7 +48,7 @@ val print_run_result :
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr *
-   internal_operation list *
+   packed_internal_operation list *
    Contract.big_map_diff option) tzresult -> unit tzresult Lwt.t
 
 val print_trace_result :
@@ -56,7 +56,7 @@ val print_trace_result :
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr *
-   internal_operation list *
+   packed_internal_operation list *
    Script_interpreter.execution_trace *
    Contract.big_map_diff option)
     tzresult -> unit tzresult Lwt.t

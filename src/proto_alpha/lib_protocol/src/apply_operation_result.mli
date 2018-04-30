@@ -29,67 +29,112 @@ type balance_update =
 (** A list of balance updates. Duplicates may happen. *)
 type balance_updates = (balance * balance_update) list
 
-(** Result of applying a {!proto_operation}. Follows the same structure. *)
-type operation_result =
-  | Anonymous_operations_result of anonymous_operation_result list
-  | Sourced_operation_result of sourced_operation_result
+(** Result of applying a {!Operation.t}. Follows the same structure. *)
+type 'kind operation_metadata = {
+  contents: 'kind contents_result_list ;
+}
 
-(** Result of applying an {!anonymous_operation}. Follows the same structure. *)
-and anonymous_operation_result =
-  | Seed_nonce_revelation_result of balance_updates
-  | Double_endorsement_evidence_result of balance_updates
-  | Double_baking_evidence_result of balance_updates
-  | Activation_result of balance_updates
+and packed_operation_metadata =
+  | Operation_metadata : 'kind operation_metadata -> packed_operation_metadata
 
-(** Result of applying a {!sourced_operation}.
-    Follows the same structure, except for [Manager_operations_result]
-    which includes the results of internal operations, in execution order. *)
-and sourced_operation_result =
-  | Consensus_operation_result of consensus_operation_result
-  | Amendment_operation_result
-  | Manager_operations_result of
+(** Result of applying a {!Operation.contents_list}. Follows the same structure. *)
+and 'kind contents_result_list =
+  | Single_result : 'kind contents_result -> 'kind contents_result_list
+  | Cons_result :
+      'kind Kind.manager contents_result * 'rest Kind.manager contents_result_list ->
+    (('kind * 'rest) Kind.manager ) contents_result_list
+
+and packed_contents_result_list =
+  | Contents_result_list : 'kind contents_result_list -> packed_contents_result_list
+
+(** Result of applying an {!Operation.contents}. Follows the same structure. *)
+and 'kind contents_result =
+  | Endorsements_result :
+      Signature.Public_key_hash.t * int list -> Kind.endorsements contents_result
+  | Seed_nonce_revelation_result :
+      balance_updates -> Kind.seed_nonce_revelation contents_result
+  | Double_endorsement_evidence_result :
+      balance_updates -> Kind.double_endorsement_evidence contents_result
+  | Double_baking_evidence_result :
+      balance_updates -> Kind.double_baking_evidence contents_result
+  | Activate_account_result :
+      balance_updates -> Kind.activate_account contents_result
+  | Proposals_result : Kind.proposals contents_result
+  | Ballot_result : Kind.ballot contents_result
+  | Manager_operation_result :
       { balance_updates : balance_updates ;
-        operation_results : (manager_operation_kind * manager_operation_result) list }
-  | Dictator_operation_result
+        operation_result : 'kind manager_operation_result ;
+        internal_operation_results : packed_internal_operation_result list ;
+      } -> 'kind Kind.manager contents_result
+  | Activate_protocol_result :
+      Kind.activate_protocol contents_result
+  | Activate_test_protocol_result :
+      Kind.activate_test_protocol contents_result
 
-(** Result of applying a {!consensus_operation}. Follows the same structure. *)
-and consensus_operation_result =
-  | Endorsements_result of Signature.Public_key_hash.t * int list
-
-(** An operation descriptor in the queue of emitted manager
-    operations. [External] points to a {!manager_operation_content} in
-    the toplevel {!manager_operation}. The operations are executed in a
-    queue, so the n-th [External] corresponds to the [n-th]
-    {!manager_operation_content}. [Internal] points to an operation
-    emitted by a contract, whose contents is given verbatim. *)
-and manager_operation_kind =
-  | External
-  | Internal of internal_operation
+and packed_contents_result =
+  | Contents_result : 'kind contents_result -> packed_contents_result
 
 (** The result of an operation in the queue. [Skipped] ones should
     always be at the tail, and after a single [Failed]. *)
-and manager_operation_result =
-  | Applied of successful_manager_operation_result
-  | Failed of error list
-  | Skipped
+and 'kind manager_operation_result =
+  | Applied of 'kind successful_manager_operation_result
+  | Failed : 'kind Kind.manager * error list -> 'kind manager_operation_result
+  | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
 
 (** Result of applying a {!manager_operation_content}, either internal
     or external. *)
-and successful_manager_operation_result =
-  | Reveal_result
-  | Transaction_result of
-      { operations : internal_operation list ;
-        storage : Script.expr option ;
+and _ successful_manager_operation_result =
+  | Reveal_result : Kind.reveal successful_manager_operation_result
+  | Transaction_result :
+      { storage : Script.expr option ;
         balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Int64.t }
-  | Origination_result of
+        storage_size_diff : Int64.t ;
+      } -> Kind.transaction successful_manager_operation_result
+  | Origination_result :
       { balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Int64.t }
-  | Delegation_result
+        storage_size_diff : Int64.t ;
+      } -> Kind.origination successful_manager_operation_result
+  | Delegation_result : Kind.delegation successful_manager_operation_result
 
-(** Serializer for {!proto_operation_result}. *)
-val encoding : operation_result Data_encoding.t
+and packed_successful_manager_operation_result =
+  | Successful_manager_result :
+      'kind successful_manager_operation_result -> packed_successful_manager_operation_result
+
+and packed_internal_operation_result =
+  | Internal_operation_result :
+      'kind internal_operation * 'kind manager_operation_result ->
+    packed_internal_operation_result
+
+(** Serializer for {!packed_operation_result}. *)
+val operation_metadata_encoding : packed_operation_metadata Data_encoding.t
+
+val operation_data_and_metadata_encoding
+  : (Operation.packed_protocol_data * packed_operation_metadata) Data_encoding.t
+
+
+
+type 'kind contents_and_result_list =
+  | Single_and_result : 'kind Alpha_context.contents * 'kind contents_result -> 'kind contents_and_result_list
+  | Cons_and_result : 'kind Kind.manager Alpha_context.contents * 'kind Kind.manager contents_result * 'rest Kind.manager contents_and_result_list -> ('kind * 'rest) Kind.manager contents_and_result_list
+
+type packed_contents_and_result_list =
+  | Contents_and_result_list : 'kind contents_and_result_list -> packed_contents_and_result_list
+
+val contents_and_result_list_encoding :
+  packed_contents_and_result_list Data_encoding.t
+
+val pack_contents_list :
+  'kind contents_list -> 'kind contents_result_list ->
+  'kind contents_and_result_list
+
+val unpack_contents_list :
+  'kind contents_and_result_list ->
+  'kind contents_list * 'kind contents_result_list
+
+type ('a, 'b) eq = Eq : ('a, 'a) eq
+val kind_equal_list :
+  'kind contents_list -> 'kind2 contents_result_list -> ('kind, 'kind2) eq option

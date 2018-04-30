@@ -48,7 +48,7 @@ val set_delegate:
   src_pk:public_key ->
   manager_sk:Client_keys.sk_uri ->
   public_key_hash option ->
-  Injection.result tzresult Lwt.t
+  Kind.delegation Kind.manager Injection.result tzresult Lwt.t
 
 val register_as_delegate:
   #Proto_alpha.full ->
@@ -58,7 +58,7 @@ val register_as_delegate:
   fee:Tez.tez ->
   manager_sk:Client_keys.sk_uri ->
   public_key ->
-  Injection.result tzresult Lwt.t
+  Kind.delegation Kind.manager Injection.result tzresult Lwt.t
 
 val source_to_keys:
   #Proto_alpha.full ->
@@ -81,7 +81,7 @@ val originate_account :
   ?delegate:public_key_hash ->
   balance:Tez.tez ->
   fee:Tez.tez ->
-  unit -> (Injection.result * Contract.t) tzresult Lwt.t
+  unit -> (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
 
 val save_contract :
   force:bool ->
@@ -109,7 +109,7 @@ val originate_contract:
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   code:Script.expr ->
-  unit -> (Injection.result * Contract.t) tzresult Lwt.t
+  unit -> (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
 
 val transfer :
   #Proto_alpha.full ->
@@ -127,7 +127,7 @@ val transfer :
   ?gas_limit:Z.t ->
   ?storage_limit:Int64.t ->
   unit ->
-  (Injection.result * Contract.t list) tzresult Lwt.t
+  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
 
 val reveal :
   #Proto_alpha.full ->
@@ -139,16 +139,25 @@ val reveal :
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee:Tez.t ->
-  unit -> Injection.result tzresult Lwt.t
+  unit -> Kind.reveal Kind.manager Injection.result tzresult Lwt.t
 
-val dictate :
+val activate_protocol :
   #Proto_alpha.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
-  dictator_operation ->
+  Protocol_hash.t ->
   Client_keys.sk_uri ->
-  Injection.result tzresult Lwt.t
+  Kind.activate_protocol Injection.result tzresult Lwt.t
+
+val activate_test_protocol :
+  #Proto_alpha.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  Protocol_hash.t ->
+  Client_keys.sk_uri ->
+  Kind.activate_test_protocol Injection.result tzresult Lwt.t
 
 type activation_key =
   { pkh : Ed25519.Public_key_hash.t ;
@@ -161,7 +170,7 @@ type activation_key =
 
 val activation_key_encoding: activation_key Data_encoding.t
 
-val claim_commitment:
+val activate_account:
   #Proto_alpha.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -170,5 +179,5 @@ val claim_commitment:
   ?force:bool ->
   activation_key ->
   string ->
-  Injection.result tzresult Lwt.t
+  Kind.activate_account Injection.result tzresult Lwt.t
 

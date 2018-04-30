@@ -122,7 +122,8 @@ let prevalidate
                    Proto.operation_data_encoding
                    op.Operation.proto with
            | None -> error Parse_error
-           | Some protocol_data -> Ok ({ shell = op.shell ; protocol_data }: Proto.operation) in
+           | Some protocol_data ->
+               Ok ({ shell = op.shell ; protocol_data } : Proto.operation) in
          (h, op, parsed_op))
       ops in
   let invalid_ops =
@@ -140,14 +141,15 @@ let prevalidate
       let compare (_, _, op1) (_, _, op2) = Proto.compare_operations op1 op2 in
       List.sort compare parsed_ops
     else parsed_ops in
-  let apply_operation state max_ops op parse_op =
+  let apply_operation state max_ops op (parse_op) =
     let size = Data_encoding.Binary.length Operation.encoding op in
     if max_ops <= 0 then
       fail Too_many_operations
     else if size > max_operation_data_length then
       fail (Oversized_operation { size ; max = max_operation_data_length })
     else
-      Proto.apply_operation state parse_op in
+      Proto.apply_operation state parse_op >>=? fun (state, receipt) ->
+      return (state, receipt) in
   apply_operations
     apply_operation
     state Preapply_result.empty max_number_of_operations

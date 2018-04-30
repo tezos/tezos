@@ -35,6 +35,10 @@ module Index = struct
   type nonrec t = t
   let path_length = 2
 
+  let rpc_arg = rpc_arg
+  let compare = compare
+  let encoding = encoding
+
   let to_path bpkh l =
     let `Hex h =  MBytes.to_hex (to_bytes bpkh) in
     String.sub h 0 2 :: String.sub h 2 (size - 2) :: l

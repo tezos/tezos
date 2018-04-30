@@ -104,7 +104,7 @@ module Baking : sig
   val bake:
     Block_services.block ->
     Account.t ->
-    Operation.t list ->
+    Operation.packed list ->
     Block_hash.t tzresult Lwt.t
 
 end
@@ -115,7 +115,7 @@ module Endorse : sig
     ?slot:int ->
     Account.t ->
     Block_services.block ->
-    Operation.t tzresult Lwt.t
+    Operation.packed tzresult Lwt.t
 
   val endorsers_list :
     Block_services.block ->
@@ -134,14 +134,14 @@ module Protocol : sig
     ?block:Block_services.block ->
     src:Account.t ->
     Protocol_hash.t list ->
-    Operation.t tzresult Lwt.t
+    Operation.packed tzresult Lwt.t
 
   val ballot :
     ?block:Block_services.block ->
     src:Account.t ->
     proposal:Protocol_hash.t ->
     Vote.ballot ->
-    Operation.t tzresult Lwt.t
+    Operation.packed tzresult Lwt.t
 
 end
 
@@ -166,7 +166,7 @@ module Assert : sig
 
   val failed_to_preapply:
     msg:string ->
-    ?op:Operation.t ->
+    ?op:Operation.packed ->
     (Alpha_environment.Error_monad.error ->
      bool) ->
     'a tzresult -> unit

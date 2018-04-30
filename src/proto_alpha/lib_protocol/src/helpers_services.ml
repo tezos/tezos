@@ -255,22 +255,28 @@ module Forge = struct
       Contract_services.manager_key ctxt block source >>= function
       | Error _ as e -> Lwt.return e
       | Ok (_, revealed) ->
-          let operations =
-            match revealed with
-            | Some _ -> operations
-            | None ->
-                match sourcePubKey with
-                | None -> operations
-                | Some pk -> Reveal pk :: operations in
           let ops =
-            Manager_operations { source ;
-                                 counter ; operations ; fee ;
-                                 gas_limit ; storage_limit } in
-          (RPC_context.make_call0 S.operations ctxt block
-             () ({ branch }, Sourced_operation ops))
+            List.map
+              (fun (Manager operation) ->
+                 Contents
+                   (Manager_operation { source ;
+                                        counter ; operation ; fee ;
+                                        gas_limit ; storage_limit }))
+              operations in
+          let ops =
+            match sourcePubKey, revealed with
+            | None, _ | _, Some _ ->  ops
+            | Some pk, None ->
+                let operation = Reveal pk in
+                Contents
+                  (Manager_operation { source ;
+                                       counter ; operation ; fee ;
+                                       gas_limit ; storage_limit }) :: ops in
+          RPC_context.make_call0 S.operations ctxt block
+            () ({ branch }, Operation.of_list ops)
 
     let reveal ctxt
-        block ~branch ~source ~sourcePubKey ~counter ~fee ()=
+        block ~branch ~source ~sourcePubKey ~counter ~fee () =
       operations ctxt block ~branch ~source ~sourcePubKey ~counter ~fee
         ~gas_limit:Z.zero ~storage_limit:0L []
 
@@ -281,7 +287,7 @@ module Forge = struct
       let parameters = Option.map ~f:Script.lazy_expr parameters in
       operations ctxt block ~branch ~source ?sourcePubKey ~counter
         ~fee ~gas_limit ~storage_limit
-        Alpha_context.[Transaction { amount ; parameters ; destination }]
+        [Manager (Transaction { amount ; parameters ; destination })]
 
     let origination ctxt
         block ~branch
@@ -293,89 +299,53 @@ module Forge = struct
         ~gas_limit ~storage_limit ~fee () =
       operations ctxt block ~branch ~source ?sourcePubKey ~counter
         ~fee ~gas_limit ~storage_limit
-        Alpha_context.[
-          Origination { manager = managerPubKey ;
-                        delegate = delegatePubKey ;
-                        script ;
-                        spendable ;
-                        delegatable ;
-                        credit = balance ;
-                        preorigination = None }
-        ]
+        [Manager (Origination { manager = managerPubKey ;
+                                delegate = delegatePubKey ;
+                                script ;
+                                spendable ;
+                                delegatable ;
+                                credit = balance ;
+                                preorigination = None })]
 
     let delegation ctxt
         block ~branch ~source ?sourcePubKey ~counter ~fee delegate =
       operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
         ~gas_limit:Z.zero ~storage_limit:0L
-        Alpha_context.[Delegation delegate]
+        [Manager (Delegation delegate)]
 
   end
 
-  module Consensus = struct
+  let operation ctxt
+      block ~branch operation =
+    RPC_context.make_call0 S.operations ctxt block
+      () ({ branch }, Contents_list (Single operation))
 
-    let operations ctxt
-        block ~branch operation =
-      let ops = Consensus_operation operation in
-      (RPC_context.make_call0 S.operations ctxt block
-         () ({ branch }, Sourced_operation ops))
+  let endorsement ctxt
+      b ~branch ~block ~level ~slots () =
+    operation ctxt b ~branch
+      (Endorsements { block ; level ; slots })
 
-    let endorsement ctxt
-        b ~branch ~block ~level ~slots () =
-      operations ctxt b ~branch
-        Alpha_context.(Endorsements { block ; level ; slots })
+  let proposals ctxt
+      b ~branch ~source ~period ~proposals () =
+    operation ctxt b ~branch
+      (Proposals { source ; period ; proposals })
 
+  let ballot ctxt
+      b ~branch ~source ~period ~proposal ~ballot () =
+    operation ctxt b ~branch
+      (Ballot { source ; period ; proposal ; ballot })
 
-  end
+  let activate_protocol ctxt
+      b ~branch hash =
+    operation ctxt b ~branch (Activate_protocol hash)
 
-  module Amendment = struct
+  let activate_test_protocol ctxt
+      b ~branch hash =
+    operation ctxt b ~branch (Activate_test_protocol hash)
 
-    let operation ctxt
-        block ~branch ~source operation =
-      let ops = Amendment_operation { source ; operation } in
-      (RPC_context.make_call0 S.operations ctxt block
-         () ({ branch }, Sourced_operation ops))
-
-    let proposals ctxt
-        b ~branch ~source ~period ~proposals () =
-      operation ctxt b ~branch ~source
-        Alpha_context.(Proposals { period ; proposals })
-
-    let ballot ctxt
-        b ~branch ~source ~period ~proposal ~ballot () =
-      operation ctxt b ~branch ~source
-        Alpha_context.(Ballot { period ; proposal ; ballot })
-
-  end
-
-  module Dictator = struct
-
-    let operation ctxt
-        block ~branch operation =
-      let op = Dictator_operation operation in
-      (RPC_context.make_call0 S.operations ctxt block
-         () ({ branch }, Sourced_operation op))
-
-    let activate ctxt
-        b ~branch hash =
-      operation ctxt b ~branch (Activate hash)
-
-    let activate_testchain ctxt
-        b ~branch hash =
-      operation ctxt b ~branch (Activate_testchain hash)
-
-  end
-
-  module Anonymous = struct
-
-    let operations ctxt block ~branch operations =
-      (RPC_context.make_call0 S.operations ctxt block
-         () ({ branch }, Anonymous_operations operations))
-
-    let seed_nonce_revelation ctxt
-        block ~branch ~level ~nonce () =
-      operations ctxt block ~branch [Seed_nonce_revelation { level ; nonce }]
-
-  end
+  let seed_nonce_revelation ctxt
+      block ~branch ~level ~nonce () =
+    operation ctxt block ~branch (Seed_nonce_revelation { level ; nonce })
 
   let empty_proof_of_work_nonce =
     MBytes.of_string
@@ -420,42 +390,6 @@ module Parse = struct
 
   end
 
-  module I = struct
-
-    let check_signature ctxt signature shell contents =
-      match contents with
-      | Anonymous_operations _ -> return ()
-      | Sourced_operation (Manager_operations op) ->
-          let public_key =
-            List.fold_left (fun acc op ->
-                match op with
-                | Reveal pk -> Some pk
-                | _ -> acc) None op.operations in
-          begin
-            match public_key with
-            | Some key -> return key
-            | None ->
-                Contract.get_manager ctxt op.source >>=? fun manager ->
-                Roll.delegate_pubkey ctxt manager
-          end >>=? fun public_key ->
-          Operation.check_signature public_key
-            { shell ; protocol_data = { contents ; signature } }
-      | Sourced_operation (Consensus_operation (Endorsements { level ; slots ; _ })) ->
-          let level = Level.from_raw ctxt level in
-          Baking.check_endorsements_rights ctxt level slots >>=? fun public_key ->
-          Operation.check_signature public_key
-            { shell ; protocol_data = { contents ; signature } }
-      | Sourced_operation (Amendment_operation { source ; _ }) ->
-          Roll.delegate_pubkey ctxt source >>=? fun source ->
-          Operation.check_signature source
-            { shell ; protocol_data = { contents ; signature } }
-      | Sourced_operation (Dictator_operation _) ->
-          let key = Constants.dictator_pubkey ctxt in
-          Operation.check_signature key
-            { shell ; protocol_data = { contents ; signature } }
-
-  end
-
   let parse_protocol_data protocol_data =
     match
       Data_encoding.Binary.of_bytes
@@ -467,13 +401,14 @@ module Parse = struct
 
   let () =
     let open Services_registration in
-    register0 S.operations begin fun ctxt () (operations, check) ->
+    register0 S.operations begin fun _ctxt () (operations, check) ->
       map_s begin fun raw ->
         Lwt.return (parse_operation raw) >>=? fun op ->
         begin match check with
           | Some true ->
-              I.check_signature ctxt
-                op.protocol_data.signature op.shell op.protocol_data.contents
+              return () (* FIXME *)
+          (* I.check_signature ctxt *)
+          (* op.protocol_data.signature op.shell op.protocol_data.contents *)
           | Some false | None -> return ()
         end >>|? fun () -> op
       end operations

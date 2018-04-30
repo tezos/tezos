@@ -40,7 +40,7 @@ val forge_block:
   ?chain:Chain_services.chain ->
   Block_services.block ->
   ?force:bool ->
-  ?operations:Operation.t list ->
+  ?operations: Operation.packed list ->
   ?best_effort:bool ->
   ?sort:bool ->
   ?timestamp:Time.t ->

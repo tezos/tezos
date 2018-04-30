@@ -17,7 +17,7 @@ type execution_result =
   { ctxt : context ;
     storage : Script.expr ;
     big_map_diff : Contract.big_map_diff option ;
-    operations : internal_operation list }
+    operations : packed_internal_operation list }
 
 val execute:
   Alpha_context.t ->
