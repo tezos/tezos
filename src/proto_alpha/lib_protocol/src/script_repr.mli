@@ -32,3 +32,5 @@ val lazy_expr : expr -> lazy_expr
 type t = { code : lazy_expr ; storage : lazy_expr }
 
 val encoding : t Data_encoding.encoding
+
+val expr_cost : expr -> Gas_limit_repr.cost

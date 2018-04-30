@@ -63,3 +63,34 @@ let encoding =
     (obj2
        (req "code" lazy_expr_encoding)
        (req "storage" lazy_expr_encoding))
+
+let rec node_size node =
+  let open Micheline in
+  match node with
+  | Int (_, n) -> (1, 1 + (Z.numbits n + 63) / 64)
+  | String (_, s) -> (1, 1 + (String.length s + 7) / 8)
+  | Prim (_, _, args, annot) ->
+      List.fold_left
+        (fun (blocks, words) node ->
+           let (nblocks, nwords) = node_size node in
+           (blocks + 1 + nblocks, words + 2 + nwords))
+        (match annot with
+         | None -> (1, 2)
+         | Some annot -> (1, 4 + (String.length annot + 7) / 8))
+        args
+  | Seq (_, args, annot) ->
+      List.fold_left
+        (fun (blocks, words) node ->
+           let (nblocks, nwords) = node_size node in
+           (blocks + 1 + nblocks, words + 2 + nwords))
+        (match annot with
+         | None -> (1, 2)
+         | Some annot -> (1, 3 + (String.length annot + 7) / 8))
+        args
+
+let expr_size expr =
+  node_size (Micheline.root expr)
+
+let expr_cost expr =
+  let blocks, words = expr_size expr in
+  Gas_limit_repr.(((Compare.Int.max 0 (blocks - 1)) *@ alloc_cost 0) +@ alloc_cost words)
