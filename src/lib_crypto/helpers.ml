@@ -103,7 +103,7 @@ module MakeEncoder(H : sig
       ~binary:
         H.raw_encoding
       ~json:
-        (def H.title
+        (def H.name
            ~title: (H.title ^ " (Base58Check-encoded)") @@
          conv
            H.to_b58check

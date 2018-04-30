@@ -1,7 +1,8 @@
 (jbuild_version 1)
 
-(executable
- ((name rpc_doc)
+(executables
+ ((names (rpc_doc
+          p2p_doc))
   (libraries
    (tezos-base
     tezos-stdlib-unix
@@ -20,7 +21,8 @@
 
 (alias
  ((name buildtest)
-  (deps (rpc_doc.exe))))
+  (deps (rpc_doc.exe
+         p2p_doc.exe))))
 
 (alias
  ((name runtest_indent)
