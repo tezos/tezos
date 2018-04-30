@@ -166,6 +166,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
   }
 
   let raw_block_header_encoding =
+    def "raw_block_header" @@
     conv
       (fun { shell ; protocol_data } -> (shell, protocol_data))
       (fun (shell, protocol_data) -> { shell ; protocol_data } )
@@ -181,6 +182,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
   }
 
   let block_header_encoding =
+    def "block_header" @@
     conv
       (fun { chain_id ; hash ; shell ; protocol_data } ->
          (((), chain_id, hash), { shell ; protocol_data }))
@@ -204,6 +206,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
   }
 
   let block_metadata_encoding =
+    def "block_header_metadata" @@
     conv
       (fun { protocol_data ; test_chain_status ; max_operations_ttl ;
              max_operation_data_length ; max_block_header_length ;
@@ -252,6 +255,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
   }
 
   let operation_encoding =
+    def "operation" @@
     let open Data_encoding in
     conv
       (fun { chain_id ; hash ; shell ; protocol_data ; metadata } ->
@@ -942,3 +946,14 @@ module Fake_protocol = struct
 end
 
 module Empty = Make(Fake_protocol)(Fake_protocol)
+
+let () =
+  Printexc.register_printer
+    (function
+      | (Json_schema.Cannot_parse _
+        | Json_schema.Dangling_reference _
+        | Json_schema.Bad_reference _
+        | Json_schema.Unexpected _
+        | Json_schema.Duplicate_definition _ ) as exn ->
+          Some (Format.asprintf "%a" (fun ppf -> Json_schema.print_error ppf) exn)
+      | _ -> None)

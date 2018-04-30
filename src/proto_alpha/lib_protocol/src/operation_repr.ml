@@ -407,7 +407,7 @@ module Encoding = struct
          (obj1 (varopt "signature" Signature.encoding)))
 
   let operation_encoding =
-    mu "operation"
+    mu "operation.alpha"
       (fun encoding ->
          conv
            (fun { shell ; protocol_data } -> (shell, protocol_data))
@@ -430,6 +430,7 @@ module Encoding = struct
       contents_encoding
 
   let internal_operation_encoding =
+    def "operation.alpha.internal_operation" @@
     conv
       (fun { source ; operation ; nonce } -> ((source, nonce), operation))
       (fun ((source, nonce), operation) -> { source ; operation ; nonce })

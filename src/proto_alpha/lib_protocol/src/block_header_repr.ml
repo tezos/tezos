@@ -35,6 +35,7 @@ let shell_header_encoding = Block_header.shell_header_encoding
 
 let contents_encoding =
   let open Data_encoding in
+  def "block_header.alpha.unsigned_contents" @@
   conv
     (fun { priority ; seed_nonce_hash ; proof_of_work_nonce } ->
        (priority, proof_of_work_nonce, seed_nonce_hash))
@@ -48,6 +49,7 @@ let contents_encoding =
 
 let protocol_data_encoding =
   let open Data_encoding in
+  def "block_header.alpha.signed_contents" @@
   conv
     (fun { contents ; signature } -> (contents, signature))
     (fun (contents, signature) -> { contents ; signature })
@@ -70,6 +72,7 @@ let unsigned_encoding =
 
 let encoding =
   let open Data_encoding in
+  def "block_header.alpha.full_header" @@
   conv
     (fun { shell ; protocol_data } ->
        (shell, protocol_data))
@@ -86,6 +89,7 @@ type metadata = {
 }
 let metadata_encoding =
   let open Data_encoding in
+  def "block_header.alpha.metadata" @@
   conv
     (fun { baker ; level ; voting_period_kind } ->
        (baker, level, voting_period_kind))

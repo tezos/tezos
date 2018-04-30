@@ -10,6 +10,19 @@
 open Alpha_context
 open Data_encoding
 
+let error_encoding =
+  def "error"
+    (* FIXME RPC /chains/blocks/head/errors lint*)
+    ~description:"... FIXME ..." @@
+  splitted
+    ~json:(conv
+             (fun err ->
+                Data_encoding.Json.construct Error_monad.error_encoding err)
+             (fun json ->
+                Data_encoding.Json.destruct Error_monad.error_encoding json)
+             json)
+    ~binary:Error_monad.error_encoding
+
 type balance =
   | Contract of Contract.t
   | Rewards of Signature.Public_key_hash.t * Cycle.t
@@ -17,6 +30,7 @@ type balance =
   | Deposits of Signature.Public_key_hash.t * Cycle.t
 
 let balance_encoding =
+  def "operation_metadata.alpha.balance" @@
   union
     [ case (Tag 0)
         (obj2
@@ -54,6 +68,7 @@ type balance_update =
   | Credited of Tez.t
 
 let balance_update_encoding =
+  def "operation_metadata.alpha.balance_update" @@
   union
     [ case (Tag 0)
         (obj1 (req "credited" Tez.encoding))
@@ -67,6 +82,7 @@ let balance_update_encoding =
 type balance_updates = (balance * balance_update) list
 
 let balance_updates_encoding =
+  def "operation_metadata.alpha.balance_updates" @@
   list (merge_objs balance_encoding balance_update_encoding)
 
 type anonymous_operation_result =
@@ -203,7 +219,7 @@ let manager_operation_result_encoding =
       case (Tag 4)
         (obj2
            (req "status" (constant "failed"))
-           (req "errors" (list Error_monad.error_encoding)))
+           (req "errors" (list error_encoding)))
         (function Failed errs -> Some ((), errs) | _ -> None)
         (fun ((), errs) -> Failed errs) ;
       case (Tag 5)
@@ -227,6 +243,7 @@ type operation_result =
   | Sourced_operation_result of sourced_operation_result
 
 let encoding =
+  def "alpha.metadata" @@
   union
     [ case (Tag 0)
         (obj2
