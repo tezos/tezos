@@ -1741,6 +1741,9 @@ language can only be one of the four following constructs.
 
 This simple four cases notation is called Micheline.
 
+The encoding of a Micheline source file must be UTF-8, and non-ASCII
+characters can only appear in comments and strings.
+
 Constants
 ~~~~~~~~~
 
@@ -1748,12 +1751,12 @@ There are two kinds of constants:
 
 1. Integers or naturals in decimal (no prefix), hexadecimal (0x prefix),
    octal (0o prefix) or binary (0b prefix).
-2. Strings with usual escapes ``\n``, ``\t``, ``\b``, ``\r``, ``\\``,
-   ``\"``. The encoding of a Michelson source file must be UTF-8, and
-   non-ASCII characters can only appear in comments. No line break can
-   appear in a string. Any non-printable characters must be escaped
-   using two hexadecimal characters, as in ``\xHH`` or the
-   predefine escape sequences above..
+2. Strings, with usual escape sequences: ``\n``, ``\t``, ``\b``,
+   ``\r``, ``\\``, ``\"``. Unescaped line breaks (both ``\n`` and ``\r``)
+   cannot appear in the middle of a string.
+
+The current version of Michelson restricts strings to be the printable
+subset of 7-bit ASCII, plus the line break ``\n``.
 
 Primitive applications
 ~~~~~~~~~~~~~~~~~~~~~~

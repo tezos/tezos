@@ -255,7 +255,7 @@ let tokenize source =
     | `Uchar c, stop ->
         match uchar_to_char c with
         | Some '"' -> skip (tok () :: acc)
-        | Some '\n' ->
+        | Some ('\n' | '\r') ->
             errors := Unterminated_string { start ; stop } :: !errors ;
             skip (tok () :: acc)
         | Some '\\' ->

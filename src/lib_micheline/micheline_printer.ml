@@ -26,12 +26,13 @@ let print_comment ppf text =
 let print_string ppf text =
   Format.fprintf ppf "\"" ;
   String.iter (function
-      | '"' | 'r' | 'n' | 't' | 'b' | '\\' as c ->
-          Format.fprintf ppf "%c" c
-      | '\x20'..'\x7E' as c ->
-          Format.fprintf ppf "%c" c
-      | c ->
-          Format.fprintf ppf "\\x%02X" (Char.code c))
+      | '"' -> Format.fprintf ppf "\\\""
+      | '\n' -> Format.fprintf ppf "\\n"
+      | '\r' -> Format.fprintf ppf "\\r"
+      | '\b' -> Format.fprintf ppf "\\b"
+      | '\t' -> Format.fprintf ppf "\\t"
+      | '\\' -> Format.fprintf ppf "\\\\"
+      | c -> Format.fprintf ppf "%c" c)
     text ;
   Format.fprintf ppf "\""
 

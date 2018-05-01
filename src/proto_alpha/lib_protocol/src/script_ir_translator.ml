@@ -1109,8 +1109,16 @@ let rec parse_data
         traced (fail (unexpected expr [] Constant_namespace [ D_True ; D_False ]))
     (* Strings *)
     | String_t, String (_, v) ->
-        Lwt.return (Gas.consume ctxt (Typecheck_costs.string (String.length v))) >>|? fun ctxt ->
-        (v, ctxt)
+        Lwt.return (Gas.consume ctxt (Typecheck_costs.string (String.length v))) >>=? fun ctxt ->
+        let rec check_printable_ascii i =
+          if Compare.Int.(i < 0) then true
+          else match String.get v i with
+            | '\n' | '\x20'..'\x7E' -> check_printable_ascii (i - 1)
+            | _ -> false in
+        if check_printable_ascii (String.length v - 1) then
+          return (v, ctxt)
+        else
+          fail (error ())
     | String_t, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Integers *)
