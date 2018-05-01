@@ -114,20 +114,16 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Cons_list -> 1
   | Nil -> 1
   | If_cons _ -> 0
-  | List_map -> 1
-  | List_map_body _ -> 1
-  | List_reduce -> 0
+  | List_map _ -> 1
   | List_size -> 0
   | List_iter _ -> 1
   | Empty_set _ -> 1
-  | Set_reduce -> 0
   | Set_iter _ -> 0
   | Set_mem -> 0
   | Set_update -> 0
   | Set_size -> 0
   | Empty_map _ -> 1
-  | Map_map -> 1
-  | Map_reduce -> 0
+  | Map_map _ -> 1
   | Map_iter _ -> 1
   | Map_mem -> 0
   | Map_get -> 0
@@ -201,7 +197,6 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Create_account -> 0
   | Implicit_account -> 0
   | Create_contract _ -> 1
-  | Create_contract_literal _ -> 1
   | Now -> 0
   | Balance -> 0
   | Check_signature -> 0
@@ -293,7 +288,6 @@ let namespace = function
   | I_OR
   | I_PAIR
   | I_PUSH
-  | I_REDUCE
   | I_RIGHT
   | I_SIZE
   | I_SOME
@@ -1508,11 +1502,6 @@ and parse_instr
       Item_t (List_t _, rest, _) ->
         typed ctxt loc List_size
           (Item_t (Nat_t, rest, instr_annot))
-    | Prim (loc, I_MAP, [], instr_annot),
-      Item_t (Lambda_t (param, ret), Item_t (List_t elt, rest, _), _) ->
-        check_item_ty elt param loc I_MAP 2 2 >>=? fun Eq ->
-        typed ctxt loc List_map
-          (Item_t (List_t ret, rest, instr_annot))
     | Prim (loc, I_MAP, [ body ], instr_annot),
       (Item_t (List_t elt, starting_rest, _)) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
@@ -1523,19 +1512,11 @@ and parse_instr
               trace
                 (Invalid_map_body (loc, ibody.aft))
                 (Lwt.return (stack_ty_eq 1 rest starting_rest)) >>=? fun Eq ->
-              typed ctxt loc (List_map_body ibody)
+              typed ctxt loc (List_map ibody)
                 (Item_t (List_t ret, rest, instr_annot))
           | Typed { aft ; _ } -> fail (Invalid_map_body (loc, aft))
           | Failed _ -> fail (Invalid_map_block_fail loc)
         end
-    | Prim (loc, I_REDUCE, [], instr_annot),
-      Item_t (Lambda_t (Pair_t ((pelt, _), (pr, _)), r),
-              Item_t (List_t elt, Item_t (init, rest, _), _), _) ->
-        check_item_ty r pr loc I_REDUCE 1 3 >>=? fun Eq ->
-        check_item_ty elt pelt loc I_REDUCE 2 3 >>=? fun Eq ->
-        check_item_ty init r loc I_REDUCE 3 3 >>=? fun Eq ->
-        typed ctxt loc List_reduce
-          (Item_t (r, rest, instr_annot))
     | Prim (loc, I_ITER, [ body ], instr_annot),
       Item_t (List_t elt, rest, _) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
@@ -1557,15 +1538,6 @@ and parse_instr
         (Lwt.return (parse_comparable_ty t)) >>=? fun (Ex_comparable_ty t) ->
         typed ctxt loc (Empty_set t)
           (Item_t (Set_t t, rest, instr_annot))
-    | Prim (loc, I_REDUCE, [], instr_annot),
-      Item_t (Lambda_t (Pair_t ((pelt, _), (pr, _)), r),
-              Item_t (Set_t elt, Item_t (init, rest, _), _), _) ->
-        let elt = ty_of_comparable_ty elt in
-        check_item_ty r pr loc I_REDUCE 1 3 >>=? fun Eq ->
-        check_item_ty elt pelt loc I_REDUCE 2 3 >>=? fun Eq ->
-        check_item_ty init r loc I_REDUCE 3 3 >>=? fun Eq ->
-        typed ctxt loc Set_reduce
-          (Item_t (r, rest, instr_annot))
     | Prim (loc, I_ITER, [ body ], annot),
       Item_t (Set_t comp_elt, rest, _) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
@@ -1605,25 +1577,22 @@ and parse_instr
         (Lwt.return (parse_ty ~allow_big_map:false tv)) >>=? fun (Ex_ty tv, _) ->
         typed ctxt loc (Empty_map (tk, tv))
           (Item_t (Map_t (tk, tv), stack, instr_annot))
-    | Prim (loc, I_MAP, [], instr_annot),
-      Item_t (Lambda_t (Pair_t ((pk, _), (pv, _)), ret),
-              Item_t (Map_t (ck, v), rest, _), _) ->
+    | Prim (loc, I_MAP, [ body ], instr_annot),
+      Item_t (Map_t (ck, elt), starting_rest, _) ->
         let k = ty_of_comparable_ty ck in
-        check_item_ty pk k loc I_MAP 1 2 >>=? fun Eq ->
-        check_item_ty pv v loc I_MAP 1 2 >>=? fun Eq ->
-        typed ctxt loc Map_map
-          (Item_t (Map_t (ck, ret), rest, instr_annot))
-    | Prim (loc, I_REDUCE, [], instr_annot),
-      Item_t (Lambda_t (Pair_t ((Pair_t ((pk, _), (pv, _)), _), (pr, _)), r),
-              Item_t (Map_t (ck, v),
-                      Item_t (init, rest, _), _), _) ->
-        let k = ty_of_comparable_ty ck in
-        check_item_ty pk k loc I_REDUCE 2 3 >>=? fun Eq ->
-        check_item_ty pv v loc I_REDUCE 2 3 >>=? fun Eq ->
-        check_item_ty r pr loc I_REDUCE 1 3 >>=? fun Eq ->
-        check_item_ty init r loc I_REDUCE 3 3 >>=? fun Eq ->
-        typed ctxt loc Map_reduce
-          (Item_t (r, rest, instr_annot))
+        check_kind [ Seq_kind ] body >>=? fun () ->
+        parse_instr ?type_logger tc_context ctxt ~check_operations
+          body (Item_t (Pair_t ((k, None), (elt, None)), starting_rest, None)) >>=? begin fun (judgement, ctxt) ->
+          match judgement with
+          | Typed ({ aft = Item_t (ret, rest, _) ; _ } as ibody) ->
+              trace
+                (Invalid_map_body (loc, ibody.aft))
+                (Lwt.return (stack_ty_eq 1 rest starting_rest)) >>=? fun Eq ->
+              typed ctxt loc (Map_map ibody)
+                (Item_t (Map_t (ck, ret), rest, instr_annot))
+          | Typed { aft ; _ } -> fail (Invalid_map_body (loc, aft))
+          | Failed _ -> fail (Invalid_map_block_fail loc)
+        end
     | Prim (loc, I_ITER, [ body ], instr_annot),
       Item_t (Map_t (comp_elt, element_ty), rest, _) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
@@ -2080,20 +2049,6 @@ and parse_instr
       Item_t (Key_hash_t, rest, _) ->
         typed ctxt loc Implicit_account
           (Item_t (Contract_t Unit_t, rest, instr_annot))
-    | Prim (loc, I_CREATE_CONTRACT, [], instr_annot),
-      Item_t
-        (Key_hash_t, Item_t
-           (Option_t Key_hash_t, Item_t
-              (Bool_t, Item_t
-                 (Bool_t, Item_t
-                    (Tez_t, Item_t
-                       (Lambda_t (Pair_t ((p, _), (gp, _)),
-                                  Pair_t ((List_t Operation_t, _), (gr, _))), Item_t
-                          (ginit, rest, _), _), _), _), _), _), _) ->
-        check_item_ty gp gr loc I_CREATE_CONTRACT 5 7 >>=? fun Eq ->
-        check_item_ty ginit gp loc I_CREATE_CONTRACT 6 7 >>=? fun Eq ->
-        typed ctxt loc (Create_contract (gp, p))
-          (Item_t (Operation_t, Item_t (Address_t, rest, None), instr_annot))
     | Prim (loc, I_CREATE_CONTRACT, [ (Seq (seq_loc, _, annot) as code)], instr_annot),
       Item_t
         (Key_hash_t, Item_t
@@ -2123,7 +2078,7 @@ and parse_instr
         Lwt.return @@ ty_eq arg arg_type_full >>=? fun Eq ->
         Lwt.return @@ ty_eq ret ret_type_full >>=? fun Eq ->
         Lwt.return @@ ty_eq storage_type ginit >>=? fun Eq ->
-        typed ctxt loc (Create_contract_literal (storage_type, arg_type, lambda))
+        typed ctxt loc (Create_contract (storage_type, arg_type, lambda))
           (Item_t (Operation_t, Item_t (Address_t, rest, None), instr_annot))
     | Prim (loc, I_NOW, [], instr_annot),
       stack ->
@@ -2169,7 +2124,7 @@ and parse_instr
     (* Primitive parsing errors *)
     | Prim (loc, (I_DROP | I_DUP | I_SWAP | I_SOME | I_UNIT
                  | I_PAIR | I_CAR | I_CDR | I_CONS
-                 | I_MEM | I_UPDATE | I_MAP | I_REDUCE
+                 | I_MEM | I_UPDATE | I_MAP
                  | I_GET | I_EXEC | I_FAIL | I_SIZE
                  | I_CONCAT | I_ADD | I_SUB
                  | I_MUL | I_EDIV | I_OR | I_AND | I_XOR
@@ -2208,9 +2163,9 @@ and parse_instr
             [], _),
       Item_t (t, _, _) ->
         fail (Undefined_unop (loc, name, t))
-    | Prim (loc, (I_REDUCE | I_UPDATE as name), [], _),
+    | Prim (loc, I_UPDATE, [], _),
       stack ->
-        fail (Bad_stack (loc, name, 3, stack))
+        fail (Bad_stack (loc, I_UPDATE, 3, stack))
     | Prim (loc, I_CREATE_CONTRACT, [], _),
       stack ->
         fail (Bad_stack (loc, I_CREATE_CONTRACT, 7, stack))
@@ -2239,7 +2194,7 @@ and parse_instr
         fail @@ unexpected expr [ Seq_kind ] Instr_namespace
           [ I_DROP ; I_DUP ; I_SWAP ; I_SOME ; I_UNIT ;
             I_PAIR ; I_CAR ; I_CDR ; I_CONS ;
-            I_MEM ; I_UPDATE ; I_MAP ; I_REDUCE ; I_ITER ;
+            I_MEM ; I_UPDATE ; I_MAP ; I_ITER ;
             I_GET ; I_EXEC ; I_FAIL ; I_SIZE ;
             I_CONCAT ; I_ADD ; I_SUB ;
             I_MUL ; I_EDIV ; I_OR ; I_AND ; I_XOR ;

@@ -77,7 +77,6 @@ type prim =
   | I_OR
   | I_PAIR
   | I_PUSH
-  | I_REDUCE
   | I_RIGHT
   | I_SIZE
   | I_SOME

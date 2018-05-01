@@ -79,7 +79,6 @@ type prim =
   | I_OR
   | I_PAIR
   | I_PUSH
-  | I_REDUCE
   | I_RIGHT
   | I_SIZE
   | I_SOME
@@ -205,7 +204,6 @@ let string_of_prim = function
   | I_OR -> "OR"
   | I_PAIR -> "PAIR"
   | I_PUSH -> "PUSH"
-  | I_REDUCE -> "REDUCE"
   | I_RIGHT -> "RIGHT"
   | I_SIZE -> "SIZE"
   | I_SOME -> "SOME"
@@ -312,7 +310,6 @@ let prim_of_string = function
   | "OR" -> ok I_OR
   | "PAIR" -> ok I_PAIR
   | "PUSH" -> ok I_PUSH
-  | "REDUCE" -> ok I_REDUCE
   | "RIGHT" -> ok I_RIGHT
   | "SIZE" -> ok I_SIZE
   | "SOME" -> ok I_SOME
@@ -463,7 +460,6 @@ let prim_encoding =
     ("OR", I_OR) ;
     ("PAIR", I_PAIR) ;
     ("PUSH", I_PUSH) ;
-    ("REDUCE", I_REDUCE) ;
     ("RIGHT", I_RIGHT) ;
     ("SIZE", I_SIZE) ;
     ("SOME", I_SOME) ;

@@ -1,9 +1,9 @@
 parameter (list int);
 storage (option int);
 code {CAR; DIP{NONE int};
-      LAMBDA
-        (pair int (option int))
-        (option int)
-        {DUP; DUP; CAR; SWAP; CDR;
-         IF_NONE {DIP{DROP}; SOME} {CMPGT; IF {CDR} {CAR; SOME}}};
-      REDUCE; NIL operation; PAIR};
+      ITER {SWAP;
+            IF_NONE {SOME}
+                    {DIP {DUP}; DUP; DIP{SWAP};
+                     CMPLE; IF {DROP} {DIP {DROP}};
+                     SOME}};
+      NIL operation; PAIR};

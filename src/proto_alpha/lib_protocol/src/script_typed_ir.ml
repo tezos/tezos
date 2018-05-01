@@ -140,25 +140,15 @@ and ('bef, 'aft) instr =
       ('rest, ('a list * 'rest)) instr
   | If_cons : ('a * ('a list * 'bef), 'aft) descr * ('bef, 'aft) descr ->
     ('a list * 'bef, 'aft) instr
-  | List_map :
-      (('param, 'ret) lambda * ('param list * 'rest), 'ret list * 'rest) instr
-  | List_map_body : ('a * 'rest, 'b * 'rest) descr ->
+  | List_map : ('a * 'rest, 'b * 'rest) descr ->
     ('a list * 'rest, 'b list * 'rest) instr
-  | List_reduce :
-      (('param * 'res, 'res) lambda *
-       ('param list * ('res * 'rest)), 'res * 'rest) instr
-  | List_size : ('a list * 'rest, n num * 'rest) instr
-  | List_iter :
-      ('a * 'rest, 'rest) descr ->
+  | List_iter : ('a * 'rest, 'rest) descr ->
     ('a list * 'rest, 'rest) instr
+  | List_size : ('a list * 'rest, n num * 'rest) instr
   (* sets *)
   | Empty_set : 'a comparable_ty ->
     ('rest, 'a set * 'rest) instr
-  | Set_reduce :
-      (('param * 'res, 'res) lambda *
-       ('param set * ('res * 'rest)), 'res * 'rest) instr
-  | Set_iter :
-      ('a * 'rest, 'rest) descr ->
+  | Set_iter : ('a * 'rest, 'rest) descr ->
     ('a set * 'rest, 'rest) instr
   | Set_mem :
       ('elt * ('elt set * 'rest), bool * 'rest) instr
@@ -168,13 +158,9 @@ and ('bef, 'aft) instr =
   (* maps *)
   | Empty_map : 'a comparable_ty * 'v ty ->
     ('rest, ('a, 'v) map * 'rest) instr
-  | Map_map :
-      (('a * 'v, 'r) lambda * (('a, 'v) map * 'rest), ('a, 'r) map * 'rest) instr
-  | Map_reduce :
-      ((('a * 'v) * 'res, 'res) lambda *
-       (('a, 'v) map * ('res * 'rest)), 'res * 'rest) instr
-  | Map_iter :
-      (('a * 'v) * 'rest, 'rest) descr ->
+  | Map_map : (('a * 'v) * 'rest, 'r * 'rest) descr ->
+    (('a, 'v) map * 'rest, ('a, 'r) map * 'rest) instr
+  | Map_iter : (('a * 'v) * 'rest, 'rest) descr ->
     (('a, 'v) map * 'rest, 'rest) instr
   | Map_mem :
       ('a * (('a, 'v) map * 'rest), bool * 'rest) instr
@@ -336,12 +322,7 @@ and ('bef, 'aft) instr =
        internal_operation * (Contract.t * 'rest)) instr
   | Implicit_account :
       (public_key_hash * 'rest, unit typed_contract * 'rest) instr
-  | Create_contract : 'g ty * 'p ty ->
-    (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t *
-                                                                  (('p * 'g, internal_operation list * 'g) lambda
-                                                                   * ('g * 'rest)))))),
-     internal_operation * (Contract.t * 'rest)) instr
-  | Create_contract_literal : 'g ty * 'p ty * ('p * 'g, internal_operation list * 'g) lambda  ->
+  | Create_contract : 'g ty * 'p ty * ('p * 'g, internal_operation list * 'g) lambda  ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
      internal_operation * (Contract.t * 'rest)) instr
   | Set_delegate :

@@ -1,5 +1,5 @@
 parameter (list string);
 storage string;
 code {CAR; PUSH string ""; SWAP;
-      LAMBDA (pair string string) string {DUP; CDR; DIP{CAR}; CONCAT};
-      REDUCE; NIL operation; PAIR};
+      ITER {SWAP; CONCAT};
+      NIL operation; PAIR};

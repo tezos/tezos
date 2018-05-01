@@ -73,7 +73,7 @@ The rules have the main following form.
     > (syntax pattern) / (initial stack pattern)  =>  (result stack pattern)
         iff (conditions)
         where (recursions)
-	and (more recursions)
+        and (more recursions)
 
 The left hand side of the ``=>`` sign is used for selecting the rule.
 Given a program and an initial stack, one (and only one) rule can be
@@ -899,17 +899,6 @@ Operations on sets
     > UPDATE / x : true : { hd ; <tl> } : S  =>  { x ; hd ; <tl> } : S
         iff COMPARE / x : hd : []  =>  -1 : []
 
--  ``REDUCE``: Apply a function on a set passing the result of each
-   application to the next one and return the last.
-
-::
-
-    :: lambda (pair 'elt * 'b) 'b : set 'elt : 'b : 'S   ->   'b : 'S
-
-    > REDUCE / f : {} : b : S  =>  b : S
-    > REDUCE / f : { hd : <tl> } : b : S  =>  REDUCE / f : { <tl> } : c : S
-        where f / Pair hd b : []  =>  c : []
-
 -  ``ITER body``: Apply the body expression to each element of a set.
    The body sequence has access to the stack.
 
@@ -957,7 +946,7 @@ Operations on maps
     > GET / x : {} : S  =>  None : S
     > GET / x : { Elt k v ; <tl> } : S  =>  opt_y : S
         iff COMPARE / x : k : []  =>  1 : []
-	where GET / x : { <tl> } : S  =>  opt_y : S
+        where GET / x : { <tl> } : S  =>  opt_y : S
     > GET / x : { Elt k v ; <tl> } : S  =>  Some v : S
         iff COMPARE / x : k : []  =>  0 : []
     > GET / x : { Elt k v ; <tl> } : S  =>  None : S
@@ -988,7 +977,7 @@ Operations on maps
     > UPDATE / x : Some y : {} : S  =>  { Elt x y } : S
     > UPDATE / x : opt_y : { Elt k v ; <tl> } : S  =>  { Elt k v ; <tl'> } : S
         iff COMPARE / x : k : []  =>  1 : []
-	where UPDATE / x : opt_y : { <tl> } : S  =>  { <tl'> } : S
+	      where UPDATE / x : opt_y : { <tl> } : S  =>  { <tl'> } : S
     > UPDATE / x : None : { Elt k v ; <tl> } : S  =>  { <tl> } : S
         iff COMPARE / x : k : []  =>  0 : []
     > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt k y ; <tl> } : S
@@ -997,19 +986,6 @@ Operations on maps
         iff COMPARE / x : k : []  =>  -1 : []
     > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt x y ; Elt k v ; <tl> } : S
         iff COMPARE / x : k : []  =>  -1 : []
-
-
--  ``MAP``: Apply a function on a map and return the map of results
-   under the same bindings.
-
-::
-
-    :: lambda (pair 'key 'val) 'b : map 'key 'val : 'S   ->   map 'key 'b : 'S
-
-    > MAP / f : {} : S  =>  {} : S
-    > MAP / f : { Elt k v ; <tl> } : S  =>  { Elt k (f (Pair k v)) ; <tl'> } : S
-        where MAP / f : { <tl> } : S  =>  { <tl'> } : S
-
 
 -  ``MAP body``: Apply the body expression to each element of a map. The
    body sequence has access to the stack.
@@ -1022,18 +998,6 @@ Operations on maps
     > MAP body / {} : S  =>  {} : S
     > MAP body / { Elt k v ; <tl> } : S  =>  { Elt k (body (Pair k v)) ; <tl'> } : S
         where MAP body / { <tl> } : S  =>  { <tl'> } : S
-
-
--  ``REDUCE``: Apply a function on a map passing the result of each
-   application to the next one and return the last.
-
-::
-
-    :: lambda (pair (pair 'key 'val) 'b) 'b : map 'key 'val : 'b : 'S   ->   'b : 'S
-
-    > REDUCE / f : {} : b : S  =>  b : S
-    > REDUCE / f : { Elt k v ; <tl> } : b : S  =>  REDUCE / f : { <tl> } : c : S
-        where f / Pair (Pair k v) b : []  =>  c
 
 -  ``ITER body``: Apply the body expression to each element of a map.
    The body sequence has access to the stack.
@@ -1186,18 +1150,6 @@ Operations on lists
     > IF_CONS bt bf / { a ; <rest> } : S  =>  bt / a : { <rest> } : S
     > IF_CONS bt bf / {} : S  =>  bf / S
 
--  ``MAP``: Apply a function on a list from left to right and return the
-   list of results in the same order.
-
-::
-
-    :: lambda 'a 'b : list 'a : 'S -> list 'b : 'S
-
-    > MAP / f : { a ; <rest> } : S  =>  { f a ; <rest'> } : S
-        where MAP / f : { <rest> } : S  =>  { <rest'> } : S
-    > MAP / f : {} : S  =>  {} : S
-
-
 -  ``MAP body``: Apply the body expression to each element of the list.
    The body sequence has access to the stack.
 
@@ -1209,19 +1161,6 @@ Operations on lists
     > MAP body / { a ; <rest> } : S  =>  { body a ; <rest'> } : S
         where MAP body / { <rest> } : S  =>  { <rest'> } : S
     > MAP body / {} : S  =>  {} : S
-
-
--  ``REDUCE``: Apply a function on a list from left to right passing the
-   result of each application to the next one and return the last.
-
-::
-
-    :: lambda (pair 'a 'b) 'b : list 'a : 'b : 'S -> 'b : 'S
-
-    > REDUCE / f : { a : <rest> } : b : S  =>  REDUCE / f : { <rest> } : c : S
-        where f / Pair a b : []  =>  c
-    > REDUCE / f : {} : b : S  =>  b : S
-
 
 -  ``SIZE``: Get the number of elements in the list.
 
@@ -2439,9 +2378,7 @@ XII - Full grammar
       | IF_CONS { <instruction> ... } { <instruction> ... }
       | EMPTY_SET <type>
       | EMPTY_MAP <comparable type> <type>
-      | MAP
       | MAP { <instruction> ... }
-      | REDUCE
       | ITER { <instruction> ... }
       | MEM
       | GET

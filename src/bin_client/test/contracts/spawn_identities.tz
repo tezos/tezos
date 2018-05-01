@@ -8,14 +8,14 @@ code { DUP;
               IF { PUSH bool False}   # End the loop
                  { PUSH nat 1; SWAP; SUB; ABS; # Subtract 1. The ABS is to make it back into a nat
                    PUSH string "init"; # Storage type
-                   LAMBDA (pair string string)   # Identity contract
-                          (pair (list operation) string)
-                          { CAR ; NIL operation ; PAIR };
                    PUSH tez "5.00"; # Strating balance
                    PUSH bool False; DUP; # Not spendable or delegatable
                    NONE key_hash;
                    PUSH key_hash "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5";
-                   CREATE_CONTRACT; # Make the contract
+                   CREATE_CONTRACT
+                     { parameter string ;
+                       storage string ;
+                       code { CAR ; NIL operation ; PAIR } } ; # Make the contract
                    SWAP ; DIP { SWAP ; DIP { CONS } } ; # emit the operation
                    SWAP ; DIP { SWAP ; DIP { CONS } } ; # add to the list
                    PUSH bool True}}; # Continue the loop
