@@ -16,6 +16,7 @@ type t = (Block_hash.t * Nonce.t) list
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
+  def "seed_nonce" @@
   list
     (obj2
        (req "block" Block_hash.encoding)

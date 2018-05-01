@@ -50,9 +50,11 @@ module Public_key_hash = struct
     def "public_key_hash" ~description:title @@
     union [
       case (Tag 0) Ed25519.Public_key_hash.encoding
+        ~name:"Ed25519"
         (function Ed25519 x -> Some x | _ -> None)
         (function x -> Ed25519 x);
       case (Tag 1) Secp256k1.Public_key_hash.encoding
+        ~name:"Secp256k1"
         (function Secp256k1 x -> Some x | _ -> None)
         (function x -> Secp256k1 x)
     ]
@@ -240,9 +242,11 @@ module Public_key = struct
         def "public_key" ~description:title @@
         union [
           case (Tag 0) Ed25519.Public_key.encoding
+            ~name:"Ed25519"
             (function Ed25519 x -> Some x | _ -> None)
             (function x -> Ed25519 x);
           case (Tag 1) Secp256k1.Public_key.encoding
+            ~name:"Secp256k1"
             (function Secp256k1 x -> Some x | _ -> None)
             (function x -> Secp256k1 x)
         ]
@@ -323,9 +327,11 @@ module Secret_key = struct
         def "secret_key" ~description:title @@
         union [
           case (Tag 0) Ed25519.Secret_key.encoding
+            ~name:"Ed25519"
             (function Ed25519 x -> Some x | _ -> None)
             (function x -> Ed25519 x);
           case (Tag 1) Secp256k1.Secret_key.encoding
+            ~name:"Secp256k1"
             (function Secp256k1 x -> Some x | _ -> None)
             (function x -> Secp256k1 x)
         ]
