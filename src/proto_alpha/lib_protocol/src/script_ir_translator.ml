@@ -2240,6 +2240,7 @@ and parse_contract
 and parse_toplevel
   : Script.expr -> (Script.node * Script.node * Script.node) tzresult
   = fun toplevel ->
+    record_trace (Ill_typed_contract (toplevel, [])) @@
     match root toplevel with
     | Int (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], Int_kind))
     | String (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], String_kind))

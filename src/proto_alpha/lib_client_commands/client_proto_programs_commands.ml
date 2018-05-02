@@ -148,7 +148,7 @@ let commands () =
                     ~details:(not no_print_source) ~parsed
                     ~show_source:(not no_print_source)
                     ppf errors) () >>= fun () ->
-             return ()
+             cctxt#error "syntax error in program"
       ) ;
 
     command ~group ~desc: "Ask the node to typecheck a data expression."
