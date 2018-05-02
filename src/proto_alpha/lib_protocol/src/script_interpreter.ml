@@ -517,7 +517,7 @@ let rec interp
             consume_gaz_comparison descr Compare.Bool.compare Interp_costs.compare_bool a b rest
         | Compare String_key, Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Compare.String.compare Interp_costs.compare_string a b rest
-        | Compare Tez_key, Item (a, Item (b, rest)) ->
+        | Compare Mutez_key, Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Tez.compare Interp_costs.compare_tez a b rest
         | Compare Int_key, Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Script_int.compare Interp_costs.compare_int a b rest

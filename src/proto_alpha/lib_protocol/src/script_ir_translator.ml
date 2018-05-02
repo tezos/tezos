@@ -42,7 +42,7 @@ let comparable_type_size : type t. t comparable_ty -> int = function
   | Int_key -> 1
   | Nat_key -> 1
   | String_key -> 1
-  | Tez_key -> 1
+  | Mutez_key -> 1
   | Bool_key -> 1
   | Key_hash_key -> 1
   | Timestamp_key -> 1
@@ -54,7 +54,7 @@ let rec type_size : type t. t ty -> int = function
   | Nat_t -> 1
   | Signature_t -> 1
   | String_t -> 1
-  | Tez_t -> 1
+  | Mutez_t -> 1
   | Key_hash_t -> 1
   | Key_t -> 1
   | Timestamp_t -> 1
@@ -322,7 +322,7 @@ let namespace = function
   | T_set
   | T_signature
   | T_string
-  | T_tez
+  | T_mutez
   | T_timestamp
   | T_unit
   | T_operation
@@ -358,7 +358,7 @@ let compare_comparable
   = fun kind x y -> match kind with
     | String_key -> Compare.String.compare x y
     | Bool_key -> Compare.Bool.compare x y
-    | Tez_key -> Tez.compare x y
+    | Mutez_key -> Tez.compare x y
     | Key_hash_key -> Signature.Public_key_hash.compare x y
     | Int_key ->
         let res = (Script_int.compare x y) in
@@ -495,7 +495,7 @@ let ty_of_comparable_ty
   | Int_key -> Int_t
   | Nat_key -> Nat_t
   | String_key -> String_t
-  | Tez_key -> Tez_t
+  | Mutez_key -> Mutez_t
   | Bool_key -> Bool_t
   | Key_hash_key -> Key_hash_t
   | Timestamp_key -> Timestamp_t
@@ -506,7 +506,7 @@ let unparse_comparable_ty
   | Int_key -> Prim (-1, T_int, [], None)
   | Nat_key -> Prim (-1, T_nat, [], None)
   | String_key -> Prim (-1, T_string, [], None)
-  | Tez_key -> Prim (-1, T_tez, [], None)
+  | Mutez_key -> Prim (-1, T_mutez, [], None)
   | Bool_key -> Prim (-1, T_bool, [], None)
   | Key_hash_key -> Prim (-1, T_key_hash, [], None)
   | Timestamp_key -> Prim (-1, T_timestamp, [], None)
@@ -519,7 +519,7 @@ let rec unparse_ty
   | Int_t -> Prim (-1, T_int, [], annot)
   | Nat_t -> Prim (-1, T_nat, [], annot)
   | String_t -> Prim (-1, T_string, [], annot)
-  | Tez_t -> Prim (-1, T_tez, [], annot)
+  | Mutez_t -> Prim (-1, T_mutez, [], annot)
   | Bool_t -> Prim (-1, T_bool, [], annot)
   | Key_hash_t -> Prim (-1, T_key_hash, [], annot)
   | Key_t -> Prim (-1, T_key, [], annot)
@@ -604,9 +604,9 @@ let rec unparse_data
           MBytes.to_hex
             (Data_encoding.Binary.to_bytes_exn Signature.encoding s) in
         (String (-1, text), gas)
-    | Tez_t, v ->
+    | Mutez_t, v ->
         Gas.consume ctxt Unparse_costs.tez >|? fun gas ->
-        (String (-1, Tez.to_string v), gas)
+        (Int (-1, Z.of_int64 (Tez.to_mutez v)), gas)
     | Key_t, k ->
         Gas.consume ctxt Unparse_costs.key >|? fun gas ->
         (String (-1, Signature.Public_key.to_b58check k), gas)
@@ -686,7 +686,7 @@ let comparable_ty_eq
     | Int_key, Int_key -> Ok Eq
     | Nat_key, Nat_key -> Ok Eq
     | String_key, String_key -> Ok Eq
-    | Tez_key, Tez_key -> Ok Eq
+    | Mutez_key, Mutez_key -> Ok Eq
     | Bool_key, Bool_key -> Ok Eq
     | Key_hash_key, Key_hash_key -> Ok Eq
     | Timestamp_key, Timestamp_key -> Ok Eq
@@ -704,7 +704,7 @@ let rec ty_eq
     | Key_hash_t, Key_hash_t -> Ok Eq
     | String_t, String_t -> Ok Eq
     | Signature_t, Signature_t -> Ok Eq
-    | Tez_t, Tez_t -> Ok Eq
+    | Mutez_t, Mutez_t -> Ok Eq
     | Timestamp_t, Timestamp_t -> Ok Eq
     | Address_t, Address_t -> Ok Eq
     | Bool_t, Bool_t -> Ok Eq
@@ -783,7 +783,7 @@ let merge_comparable_types
     | Int_key, Int_key -> ta
     | Nat_key, Nat_key -> ta
     | String_key, String_key -> ta
-    | Tez_key, Tez_key -> ta
+    | Mutez_key, Mutez_key -> ta
     | Bool_key, Bool_key -> ta
     | Key_hash_key, Key_hash_key -> ta
     | Timestamp_key, Timestamp_key -> ta
@@ -816,7 +816,7 @@ let merge_types :
       | Key_hash_t, Key_hash_t -> ok Key_hash_t
       | String_t, String_t -> ok String_t
       | Signature_t, Signature_t -> ok Signature_t
-      | Tez_t, Tez_t -> ok Tez_t
+      | Mutez_t, Mutez_t -> ok Mutez_t
       | Timestamp_t, Timestamp_t -> ok Timestamp_t
       | Address_t, Address_t -> ok Address_t
       | Bool_t, Bool_t -> ok Bool_t
@@ -921,13 +921,13 @@ let rec parse_comparable_ty
     | Prim (_, T_int, [], _) -> ok (Ex_comparable_ty Int_key)
     | Prim (_, T_nat, [], _) -> ok (Ex_comparable_ty Nat_key)
     | Prim (_, T_string, [], _) -> ok (Ex_comparable_ty String_key)
-    | Prim (_, T_tez, [], _) -> ok (Ex_comparable_ty Tez_key)
+    | Prim (_, T_mutez, [], _) -> ok (Ex_comparable_ty Mutez_key)
     | Prim (_, T_bool, [], _) -> ok (Ex_comparable_ty Bool_key)
     | Prim (_, T_key_hash, [], _) -> ok (Ex_comparable_ty Key_hash_key)
     | Prim (_, T_timestamp, [], _) -> ok (Ex_comparable_ty Timestamp_key)
     | Prim (_, T_address, [], _) -> ok (Ex_comparable_ty Address_key)
     | Prim (loc, (T_int | T_nat
-                 | T_string | T_tez | T_bool
+                 | T_string | T_mutez | T_bool
                  | T_key | T_address | T_timestamp as prim), l, _) ->
         error (Invalid_arity (loc, prim, 0, List.length l))
     | Prim (loc, (T_pair | T_or | T_set | T_map
@@ -938,7 +938,7 @@ let rec parse_comparable_ty
     | expr ->
         error @@ unexpected expr [] Type_namespace
           [ T_int ; T_nat ;
-            T_string ; T_tez ; T_bool ;
+            T_string ; T_mutez ; T_bool ;
             T_key ; T_key_hash ; T_timestamp ]
 
 and parse_ty
@@ -968,8 +968,8 @@ and parse_ty
         ok (Ex_ty Nat_t, annot)
     | Prim (_, T_string, [], annot) ->
         ok (Ex_ty String_t, annot)
-    | Prim (_, T_tez, [], annot) ->
-        ok (Ex_ty Tez_t, annot)
+    | Prim (_, T_mutez, [], annot) ->
+        ok (Ex_ty Mutez_t, annot)
     | Prim (_, T_bool, [], annot) ->
         ok (Ex_ty Bool_t, annot)
     | Prim (_, T_key, [], annot) ->
@@ -1019,7 +1019,7 @@ and parse_ty
         error (Unexpected_big_map loc)
     | Prim (loc, (T_unit | T_signature
                  | T_int | T_nat
-                 | T_string | T_tez | T_bool
+                 | T_string | T_mutez | T_bool
                  | T_key | T_key_hash
                  | T_timestamp | T_address as prim), l, _) ->
         error (Invalid_arity (loc, prim, 0, List.length l))
@@ -1033,7 +1033,7 @@ and parse_ty
             T_list ; T_option  ; T_lambda ;
             T_unit ; T_signature  ; T_contract ;
             T_int ; T_nat ; T_operation ;
-            T_string ; T_tez ; T_bool ;
+            T_string ; T_mutez ; T_bool ;
             T_key ; T_key_hash ; T_timestamp ]
 
 let rec unparse_stack
@@ -1128,16 +1128,16 @@ let rec parse_data
     | Nat_t, expr ->
         traced (fail (Invalid_kind (location expr, [ Int_kind ], kind expr)))
     (* Tez amounts *)
-    | Tez_t, String (_, v) ->
+    | Mutez_t, Int (_, v) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.tez) >>=? fun ctxt ->
         begin try
-            match Tez.of_string v with
+            match Tez.of_mutez (Z.to_int64 v) with
             | None -> raise Exit
             | Some tez -> return (tez, ctxt)
           with _ ->
             fail @@ error ()
         end
-    | Tez_t, expr ->
+    | Mutez_t, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Timestamps *)
     | Timestamp_t, (Int (_, v)) ->
@@ -1790,21 +1790,21 @@ and parse_instr
           (Item_t (String_t, rest, instr_annot))
     (* currency operations *)
     | Prim (loc, I_ADD, [], instr_annot),
-      Item_t (Tez_t, Item_t (Tez_t, rest, _), _) ->
+      Item_t (Mutez_t, Item_t (Mutez_t, rest, _), _) ->
         typed ctxt loc Add_tez
-          (Item_t (Tez_t, rest, instr_annot))
+          (Item_t (Mutez_t, rest, instr_annot))
     | Prim (loc, I_SUB, [], instr_annot),
-      Item_t (Tez_t, Item_t (Tez_t, rest, _), _) ->
+      Item_t (Mutez_t, Item_t (Mutez_t, rest, _), _) ->
         typed ctxt loc Sub_tez
-          (Item_t (Tez_t, rest, instr_annot))
+          (Item_t (Mutez_t, rest, instr_annot))
     | Prim (loc, I_MUL, [], instr_annot),
-      Item_t (Tez_t, Item_t (Nat_t, rest, _), _) ->
+      Item_t (Mutez_t, Item_t (Nat_t, rest, _), _) ->
         typed ctxt loc Mul_teznat
-          (Item_t (Tez_t, rest, instr_annot))
+          (Item_t (Mutez_t, rest, instr_annot))
     | Prim (loc, I_MUL, [], instr_annot),
-      Item_t (Nat_t, Item_t (Tez_t, rest, _), _) ->
+      Item_t (Nat_t, Item_t (Mutez_t, rest, _), _) ->
         typed ctxt loc Mul_nattez
-          (Item_t (Tez_t, rest, instr_annot))
+          (Item_t (Mutez_t, rest, instr_annot))
     (* boolean operations *)
     | Prim (loc, I_OR, [], instr_annot),
       Item_t (Bool_t, Item_t (Bool_t, rest, _), _) ->
@@ -1896,13 +1896,13 @@ and parse_instr
         typed ctxt loc Mul_natnat
           (Item_t (Nat_t, rest, instr_annot))
     | Prim (loc, I_EDIV, [], instr_annot),
-      Item_t (Tez_t, Item_t (Nat_t, rest, _), _) ->
+      Item_t (Mutez_t, Item_t (Nat_t, rest, _), _) ->
         typed ctxt loc Ediv_teznat
-          (Item_t (Option_t (Pair_t ((Tez_t, None), (Tez_t, None))), rest, instr_annot))
+          (Item_t (Option_t (Pair_t ((Mutez_t, None), (Mutez_t, None))), rest, instr_annot))
     | Prim (loc, I_EDIV, [], instr_annot),
-      Item_t (Tez_t, Item_t (Tez_t, rest, _), _) ->
+      Item_t (Mutez_t, Item_t (Mutez_t, rest, _), _) ->
         typed ctxt loc Ediv_tez
-          (Item_t (Option_t (Pair_t ((Nat_t, None), (Tez_t, None))), rest, instr_annot))
+          (Item_t (Option_t (Pair_t ((Nat_t, None), (Mutez_t, None))), rest, instr_annot))
     | Prim (loc, I_EDIV, [], instr_annot),
       Item_t (Int_t, Item_t (Int_t, rest, _), _) ->
         typed ctxt loc Ediv_intint
@@ -1969,8 +1969,8 @@ and parse_instr
         typed ctxt loc (Compare String_key)
           (Item_t (Int_t, rest, instr_annot))
     | Prim (loc, I_COMPARE, [], instr_annot),
-      Item_t (Tez_t, Item_t (Tez_t, rest, _), _) ->
-        typed ctxt loc (Compare Tez_key)
+      Item_t (Mutez_t, Item_t (Mutez_t, rest, _), _) ->
+        typed ctxt loc (Compare Mutez_key)
           (Item_t (Int_t, rest, instr_annot))
     | Prim (loc, I_COMPARE, [], instr_annot),
       Item_t (Key_hash_t, Item_t (Key_hash_t, rest, _), _) ->
@@ -2030,7 +2030,7 @@ and parse_instr
           (Item_t (Option_t Key_hash_t, rest, instr_annot))
     | Prim (loc, I_TRANSFER_TOKENS, [], instr_annot),
       Item_t (p, Item_t
-                (Tez_t, Item_t
+                (Mutez_t, Item_t
                    (Contract_t cp, rest, _), _), _) ->
         check_item_ty p cp loc I_TRANSFER_TOKENS 1 4 >>=? fun Eq ->
         typed ctxt loc Transfer_tokens (Item_t (Operation_t, rest, instr_annot))
@@ -2042,7 +2042,7 @@ and parse_instr
         (Key_hash_t, Item_t
            (Option_t Key_hash_t, Item_t
               (Bool_t, Item_t
-                 (Tez_t, rest, _), _), _), _) ->
+                 (Mutez_t, rest, _), _), _), _) ->
         typed ctxt loc Create_account
           (Item_t (Operation_t, Item_t (Address_t, rest, None), instr_annot))
     | Prim (loc, I_IMPLICIT_ACCOUNT, [], instr_annot),
@@ -2055,7 +2055,7 @@ and parse_instr
            (Option_t Key_hash_t, Item_t
               (Bool_t, Item_t
                  (Bool_t, Item_t
-                    (Tez_t, Item_t
+                    (Mutez_t, Item_t
                        (ginit, rest, _), _), _), _), _), _) ->
         fail_unexpected_annot seq_loc annot >>=? fun () ->
         let cannonical_code = fst @@ Micheline.extract_locations code in
@@ -2087,11 +2087,11 @@ and parse_instr
     | Prim (loc, I_AMOUNT, [], instr_annot),
       stack ->
         typed ctxt loc Amount
-          (Item_t (Tez_t, stack, instr_annot))
+          (Item_t (Mutez_t, stack, instr_annot))
     | Prim (loc, I_BALANCE, [], instr_annot),
       stack ->
         typed ctxt loc Balance
-          (Item_t (Tez_t, stack, instr_annot))
+          (Item_t (Mutez_t, stack, instr_annot))
     | Prim (loc, I_HASH_KEY, [], instr_annot),
       Item_t (Key_t, rest, _) ->
         typed ctxt loc Hash_key

@@ -2,7 +2,7 @@ parameter key_hash;
 storage unit;
 code { CAR; IMPLICIT_ACCOUNT; # Create an account for the recipient of the funds
        DIP{UNIT};             # Push a value of the storage type below the contract
-       PUSH tez "1.00";       # The person can have a ꜩ
+       PUSH mutez 1000000;       # The person can have a ꜩ
        UNIT;                 # Push the contract's argument type
        TRANSFER_TOKENS;      # Run the transfer
        NIL operation; SWAP; CONS;

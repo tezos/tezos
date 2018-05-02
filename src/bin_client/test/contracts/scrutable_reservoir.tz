@@ -5,7 +5,7 @@ storage
      (pair
         timestamp # T
         (pair
-           (pair tez tez) # P N
+           (pair mutez mutez) # P N
            (pair
               (contract unit) # X
               (pair (contract unit) (contract unit)))))) ; # A B
@@ -18,8 +18,8 @@ code
          NOW ;
          COMPARE ; LT ;
          IF { # Before timeout
-              # We compute ((1 + P) + N) tez for keeping the contract alive
-              PUSH tez "1.00" ;
+              # We compute ((1 + P) + N) mutez for keeping the contract alive
+              PUSH mutez 1000000 ;
               DIP { DUP ; CDDDAAR } ; ADD ; # P
               DIP { DUP ; CDDDADR } ; ADD ; # N
               # We compare to the cumulated amount
@@ -45,17 +45,17 @@ code
               # We update the global
               CDDR ; PUSH string "timeout" ; PAIR ;
               # We try to transfer the fee to the broker
-              PUSH tez "1.00" ; BALANCE ; SUB ; # available
+              PUSH mutez 1000000 ; BALANCE ; SUB ; # available
               DIP { DUP ; CDDAAR } ; # P
               COMPARE ; LT ; # available < P
-              IF { PUSH tez "1.00" ; BALANCE ; SUB ; # available
+              IF { PUSH mutez 1000000 ; BALANCE ; SUB ; # available
                    DIP { DUP ; CDDDAR } ; # X
                    UNIT ; TRANSFER_TOKENS }
                  { DUP ; CDDAAR ; # P
                    DIP { DUP ; CDDDAR } ; # X
                    UNIT ; TRANSFER_TOKENS } ;
               # We transfer the rest to B
-              DIP { PUSH tez "1.00" ; BALANCE ; SUB ; # available
+              DIP { PUSH mutez 1000000 ; BALANCE ; SUB ; # available
                     DIP { DUP ; CDDDDDR } ; # B
                     UNIT ; TRANSFER_TOKENS } ;
               NIL operation ; SWAP ; CONS ; SWAP ; CONS ;

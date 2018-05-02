@@ -2,11 +2,11 @@ parameter
   (or string nat) ;
 storage
   (pair
-     (pair nat (pair tez tez)) # counter from_buyer from_seller
+     (pair nat (pair mutez mutez)) # counter from_buyer from_seller
      (pair
         (pair nat (pair timestamp timestamp)) # Q T Z
         (pair
-           (pair tez tez) # K C
+           (pair mutez mutez) # K C
            (pair
               (pair (contract unit) (contract unit)) # B S
               (contract unit))))) ; # W
@@ -40,12 +40,12 @@ code
            { FAIL } } # (Right _)
        { # After Z + 24
          # if balance is emptied, just fail
-         BALANCE ; PUSH tez "0" ; IFCMPEQ { FAIL } {} ;
+         BALANCE ; PUSH mutez 0 ; IFCMPEQ { FAIL } {} ;
          # test if the required amount is reached
          DUP ; CDDAAR ; # Q
          DIP { DUP ; CDDDADR } ; MUL ; # C
          PUSH nat 2 ; MUL ;
-         PUSH tez "1.00" ; ADD ;
+         PUSH mutez 1000000 ; ADD ;
          BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C) + 1
          IF { # refund the parties
               CDR ; DUP ; CADAR ; # amount versed by the buyer

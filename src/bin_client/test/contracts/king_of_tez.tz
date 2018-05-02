@@ -1,9 +1,9 @@
 parameter key_hash;
-storage (pair timestamp (pair tez key_hash));
+storage (pair timestamp (pair mutez key_hash));
 code { DUP; CDAR;
        # If the time is more than 2 weeks, any amount makes you king
        NOW; CMPGT;
-       # User becomes king of tez
+       # User becomes king of mutez
        IF { CAR; AMOUNT; PAIR; NOW; PUSH int 604800; ADD; PAIR;
             NIL operation }
           # Check balance to see if user has paid enough to become the new king

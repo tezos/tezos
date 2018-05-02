@@ -3,16 +3,16 @@ storage unit;
 code { CAR;
        IF_LEFT
          { DIP { PUSH string "dummy";
-                 PUSH tez "100.00" ; PUSH bool False ;
+                 PUSH mutez 100000000 ; PUSH bool False ;
                  PUSH bool False ; NONE key_hash } ;
            CREATE_CONTRACT
              { parameter string ;
                storage string ;
                code { CAR ; NIL operation ; PAIR } } ;
-           DIP { RIGHT key_hash ; DIP { SELF ; PUSH tez "0" } ; TRANSFER_TOKENS ;
+           DIP { RIGHT key_hash ; DIP { SELF ; PUSH mutez 0 } ; TRANSFER_TOKENS ;
                  NIL operation ; SWAP ; CONS } ;
            CONS ; UNIT ; SWAP ; PAIR }
          { SELF ; ADDRESS ; SOURCE ; IFCMPNEQ { FAIL } {} ;
            CONTRACT string ; IF_SOME {} { FAIL } ;
-           PUSH tez "0.00" ; PUSH string "abcdefg" ; TRANSFER_TOKENS ;
+           PUSH mutez 0 ; PUSH string "abcdefg" ; TRANSFER_TOKENS ;
            NIL operation; SWAP; CONS ; UNIT ; SWAP ; PAIR } };

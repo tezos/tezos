@@ -8,7 +8,7 @@ code { DUP;
               IF { PUSH bool False}   # End the loop
                  { PUSH nat 1; SWAP; SUB; ABS; # Subtract 1. The ABS is to make it back into a nat
                    PUSH string "init"; # Storage type
-                   PUSH tez "5.00"; # Strating balance
+                   PUSH mutez 5000000; # Strating balance
                    PUSH bool False; DUP; # Not spendable or delegatable
                    NONE key_hash;
                    PUSH key_hash "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5";

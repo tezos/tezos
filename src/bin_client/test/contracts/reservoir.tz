@@ -1,7 +1,7 @@
 parameter unit ;
 storage
   (pair
-     (pair (timestamp @T) (tez @N))
+     (pair (timestamp @T) (mutez @N))
      (pair (contract @A unit) (contract @B  unit))) ;
 code
   { CDR ; DUP ; CAAR ; # T

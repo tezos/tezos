@@ -313,18 +313,18 @@ let test_example () =
 
   let bootstrap_0 = List.nth Account.bootstrap_accounts 0 in
   get_balance_res bootstrap_0 sb >>=?? fun _balance ->
-  let amount = Proto_alpha.Alpha_context.Tez.to_string @@ Cast.cents_of_int Script.init_amount in
+  let amount = string_of_int (Script.init_amount * 10000) in
   (*  Get the current balance of the contract *)
-  test_output ~location: __LOC__ "balance" "\"111\"" "Unit" ("\"" ^ amount ^ "\"") >>=? fun _ ->
+  test_output ~location: __LOC__ "balance" "111000000" "Unit" amount >>=? fun _ ->
 
   (*  Test comparisons on tez { EQ ; GT ; LT ; GE ; LE } *)
-  test_output ~location: __LOC__ "compare" "{}" "(Pair \"1.00\" \"2.00\")" "{ False ; False ; True ; False ; True }" >>=? fun _ ->
-  test_output ~location: __LOC__ "compare" "{}" "(Pair \"2.00\" \"1.00\")" "{ False ; True ; False ; True ; False }" >>=? fun _ ->
-  test_output ~location: __LOC__ "compare" "{}" "(Pair \"2.37\" \"2.37\")" "{ True ; False ; False ; True ; True }" >>=? fun _ ->
+  test_output ~location: __LOC__ "compare" "{}" "(Pair 1000000 2000000)" "{ False ; False ; True ; False ; True }" >>=? fun _ ->
+  test_output ~location: __LOC__ "compare" "{}" "(Pair 2000000 1000000)" "{ False ; True ; False ; True ; False }" >>=? fun _ ->
+  test_output ~location: __LOC__ "compare" "{}" "(Pair 2370000 2370000)" "{ True ; False ; False ; True ; True }" >>=? fun _ ->
 
   (*  Test addition and subtraction on tez *)
-  test_output ~location: __LOC__ "tez_add_sub" "None" "(Pair \"2\" \"1\")" "(Some (Pair \"3\" \"1\"))" >>=? fun _ ->
-  test_output ~location: __LOC__ "tez_add_sub" "None" "(Pair \"2.31\" \"1.01\")" "(Some (Pair \"3.32\" \"1.3\"))" >>=? fun _ ->
+  test_output ~location: __LOC__ "tez_add_sub" "None" "(Pair 2000000 1000000)" "(Some (Pair 3000000 1000000))" >>=? fun _ ->
+  test_output ~location: __LOC__ "tez_add_sub" "None" "(Pair 2310000 1010000)" "(Some (Pair 3320000 1300000))" >>=? fun _ ->
 
   (*  Test get first element of list *)
   test_output ~location: __LOC__ "first" "111" "{ 1 ; 2 ; 3 ; 4 }" "1" >>=? fun _ ->
@@ -404,9 +404,9 @@ let test_example () =
   test_output ~location: __LOC__ "set_cdr" "(Pair \"hello\" 500)" "3" "(Pair \"hello\" 3)" >>=? fun _ ->
   test_output ~location: __LOC__ "set_cdr" "(Pair \"hello\" 7)" "100" "(Pair \"hello\" 100)" >>=? fun _ ->
 
-  test_storage ~location: __LOC__ "set_caddaadr" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 \"0\") 4) 5))) 6)" "\"3\"" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 \"3\") 4) 5))) 6)" >>=? fun _ ->
+  test_storage ~location: __LOC__ "set_caddaadr" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 0) 4) 5))) 6)" "3000000" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 3000000) 4) 5))) 6)" >>=? fun _ ->
 
-  test_storage ~location: __LOC__ "map_caddaadr" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 \"0\") 4) 5))) 6)" "Unit" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 \"1\") 4) 5))) 6)" >>=? fun _ ->
+  test_storage ~location: __LOC__ "map_caddaadr" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 0) 4) 5))) 6)" "Unit" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 1000000) 4) 5))) 6)" >>=? fun _ ->
 
   (*  Did the given key sign the string? (key is bootstrap1) *)
   test_success ~location: __LOC__ "check_signature" "(Pair \"1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01\" \"hello\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" >>=? fun _ ->

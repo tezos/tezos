@@ -113,7 +113,7 @@ type prim =
   | T_set
   | T_signature
   | T_string
-  | T_tez
+  | T_mutez
   | T_timestamp
   | T_unit
   | T_operation
@@ -238,7 +238,7 @@ let string_of_prim = function
   | T_set -> "set"
   | T_signature -> "signature"
   | T_string -> "string"
-  | T_tez -> "tez"
+  | T_mutez -> "mutez"
   | T_timestamp -> "timestamp"
   | T_unit -> "unit"
   | T_operation -> "operation"
@@ -344,7 +344,7 @@ let prim_of_string = function
   | "set" -> ok T_set
   | "signature" -> ok T_signature
   | "string" -> ok T_string
-  | "tez" -> ok T_tez
+  | "mutez" -> ok T_mutez
   | "timestamp" -> ok T_timestamp
   | "unit" -> ok T_unit
   | "operation" -> ok T_operation
@@ -494,7 +494,7 @@ let prim_encoding =
     ("set", T_set) ;
     ("signature", T_signature) ;
     ("string", T_string) ;
-    ("tez", T_tez) ;
+    ("mutez", T_mutez) ;
     ("timestamp", T_timestamp) ;
     ("unit", T_unit) ;
     ("operation", T_operation) ;

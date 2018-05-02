@@ -2,7 +2,7 @@
 parameter (option (pair signature int));
 storage (pair key int);
 code {DUP; DUP; CAR;
-      IF_NONE {PUSH tez "1.00"; # Fee pattern from July 26
+      IF_NONE {PUSH mutez 1000000; # Fee pattern from July 26
                AMOUNT; CMPLE; IF {FAIL} {};
                # Provide the data
                CDR; DIP {CDDR}}

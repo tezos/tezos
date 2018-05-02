@@ -17,7 +17,7 @@ type 'ty comparable_ty =
   | Int_key : (z num) comparable_ty
   | Nat_key : (n num) comparable_ty
   | String_key : string comparable_ty
-  | Tez_key : Tez.t comparable_ty
+  | Mutez_key : Tez.t comparable_ty
   | Bool_key : bool comparable_ty
   | Key_hash_key : public_key_hash comparable_ty
   | Timestamp_key : Script_timestamp.t comparable_ty
@@ -68,7 +68,7 @@ and 'ty ty =
   | Nat_t : n num ty
   | Signature_t : signature ty
   | String_t : string ty
-  | Tez_t : Tez.t ty
+  | Mutez_t : Tez.t ty
   | Key_hash_t : public_key_hash ty
   | Key_t : public_key ty
   | Timestamp_t : Script_timestamp.t ty

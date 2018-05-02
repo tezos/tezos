@@ -261,7 +261,7 @@ module Script : sig
     | T_set
     | T_signature
     | T_string
-    | T_tez
+    | T_mutez
     | T_timestamp
     | T_unit
     | T_operation

@@ -1,4 +1,4 @@
-parameter (pair tez tez);
+parameter (pair mutez mutez);
 storage (list bool);
 code {CAR; DUP; DUP; DUP; DUP; DIIIIIP {NIL bool};
       DIIIIP {DUP; CAR; DIP {CDR}; COMPARE; LE; CONS};

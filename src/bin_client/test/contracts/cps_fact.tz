@@ -11,6 +11,6 @@ code { UNPAIR ;
            IF_NONE
              { NIL operation ; PAIR }
              { DUP ; DIP { PUSH nat 1 ; ADD ; MUL @storage } ; SWAP;
-               DIP { DIP { SELF; PUSH tez "0" } ;
+               DIP { DIP { SELF; PUSH mutez 0 } ;
                      TRANSFER_TOKENS ; NIL operation ; SWAP ; CONS } ;
                SWAP ; PAIR } } }

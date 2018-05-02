@@ -1,5 +1,5 @@
 parameter unit;
-storage (pair timestamp (pair tez (contract unit)));
+storage (pair timestamp (pair mutez (contract unit)));
 code { CDR;                      # Ignore the parameter
        DUP;                      # Duplicate the storage
        CAR;                      # Get the timestamp

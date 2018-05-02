@@ -213,16 +213,16 @@ assert_storage $contract_dir/exec_concat.tz '"?"' '"test"' '"test_abc"'
 assert_storage $contract_dir/steps_to_quota.tz 111 Unit 399992
 
 # Get the current balance of the contract
-assert_storage $contract_dir/balance.tz '"111"' Unit '"4,000,000"'
+assert_storage $contract_dir/balance.tz '111' Unit '4000000000000'
 
 # Test comparisons on tez { EQ ; GT ; LT ; GE ; LE }
-assert_storage $contract_dir/compare.tz '{}' '(Pair "1.00" "2.00")' '{ False ; False ; True ; False ; True }'
-assert_storage $contract_dir/compare.tz '{}' '(Pair "2.00" "1.00")' '{ False ; True ; False ; True ; False }'
-assert_storage $contract_dir/compare.tz '{}' '(Pair "2.37" "2.37")' '{ True ; False ; False ; True ; True }'
+assert_storage $contract_dir/compare.tz '{}' '(Pair 1000000 2000000)' '{ False ; False ; True ; False ; True }'
+assert_storage $contract_dir/compare.tz '{}' '(Pair 2000000 1000000)' '{ False ; True ; False ; True ; False }'
+assert_storage $contract_dir/compare.tz '{}' '(Pair 2370000 2370000)' '{ True ; False ; False ; True ; True }'
 
 # Test addition and subtraction on tez
-assert_storage $contract_dir/tez_add_sub.tz None '(Pair "2" "1")' '(Some (Pair "3" "1"))'
-assert_storage $contract_dir/tez_add_sub.tz None '(Pair "2.31" "1.01")' '(Some (Pair "3.32" "1.3"))'
+assert_storage $contract_dir/tez_add_sub.tz None '(Pair 2000000 1000000)' '(Some (Pair 3000000 1000000))'
+assert_storage $contract_dir/tez_add_sub.tz None '(Pair 2310000 1010000)' '(Some (Pair 3320000 1300000))'
 
 # Test get first element of list
 assert_storage $contract_dir/first.tz '111' '{ 1 ; 2 ; 3 ; 4 }' '1'
@@ -303,14 +303,14 @@ assert_storage  $contract_dir/set_cdr.tz '(Pair "hello" 500)' '3' '(Pair "hello"
 assert_storage  $contract_dir/set_cdr.tz '(Pair "hello" 7)' '100' '(Pair "hello" 100)'
 
 assert_storage  $contract_dir/set_caddaadr.tz \
-'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0") 4) 5))) 6)' \
-'"3"' \
-'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "3") 4) 5))) 6)'
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 0) 4) 5))) 6)' \
+'3000000' \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 3000000) 4) 5))) 6)'
 
 assert_storage  $contract_dir/map_caddaadr.tz \
-'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0") 4) 5))) 6)' \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 0) 4) 5))) 6)' \
 'Unit' \
-'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "1") 4) 5))) 6)'
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 1000000) 4) 5))) 6)'
 
 # Did the given key sign the string? (key is bootstrap1)
 assert_success $client run program $contract_dir/check_signature.tz \
@@ -343,7 +343,7 @@ assert_storage_contains store_input '"abcdefg"'
 bake_after $client transfer 100 from bootstrap1 to store_input -arg '"xyz"'
 assert_storage_contains store_input '"xyz"'
 
-init_with_transfer $contract_dir/transfer_amount.tz $key1 '"0"' "100" bootstrap1
+init_with_transfer $contract_dir/transfer_amount.tz $key1 '0' "100" bootstrap1
 bake_after $client transfer 500 from bootstrap1 to transfer_amount -arg Unit
 assert_storage_contains transfer_amount 500
 
@@ -443,14 +443,14 @@ assert_fails $client typecheck data '{ "A" ; "C" ; "B" }' against type '(set str
 assert_fails $client typecheck data '{ "A" ; "B" ; "B" }' against type '(set string)'
 
 # Test hash consistency between Michelson and the CLI
-hash_result=`$client hash data '(Pair "22220.00" (Pair "2017-12-13T04:49:00Z" 034))' \
-                     of type '(pair tez (pair timestamp int))' | grep expr`
+hash_result=`$client hash data '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))' \
+                     of type '(pair mutez (pair timestamp int))' | grep expr`
 
 assert_storage $contract_dir/hash_consistency_checker.tz '"?"' \
-              '(Pair "22220.00" (Pair "2017-12-13T04:49:00Z" 034))' "$hash_result"
+              '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))' "$hash_result"
 
 assert_storage $contract_dir/hash_consistency_checker.tz '"?"' \
-              '(Pair "22,220" (Pair "2017-12-13T04:49:00+00:00" 34))' "$hash_result"
+              '(Pair 22220000000 (Pair "2017-12-13T04:49:00+00:00" 34))' "$hash_result"
 
 # Test for big maps
 init_with_transfer $contract_dir/big_map_mem.tz $key1\
