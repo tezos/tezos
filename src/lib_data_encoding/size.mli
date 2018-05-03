@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** This is for use *within* the data encoding library only. *)
+
 val bool: int
 val int8: int
 val uint8: int
