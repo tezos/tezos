@@ -6,6 +6,7 @@
 (*    All rights reserved. No warranty, explicit or implicit, provided.   *)
 (*                                                                        *)
 (**************************************************************************)
+
 module Encoding =
 struct
   include Encoding

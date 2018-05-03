@@ -8,11 +8,12 @@
 (**************************************************************************)
 
 include (module type of (struct include Tezos_stdlib end))
-include (module type of (struct include Tezos_data_encoding end))
 include (module type of (struct include Tezos_error_monad end))
 include (module type of (struct include Tezos_rpc end))
 include (module type of (struct include Tezos_clic end))
 include (module type of (struct include Tezos_crypto end))
+
+module Data_encoding = Data_encoding
 
 module List : sig
   include (module type of (struct include List end))
