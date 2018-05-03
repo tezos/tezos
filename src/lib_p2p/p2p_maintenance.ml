@@ -27,10 +27,11 @@ type 'meta t = {
   mutable maintain_worker : unit Lwt.t ;
 }
 
-(** Select [expected] points amongst the disconnected known points.
+(** Select [expected] points among the disconnected known points.
     It ignores points which are greylisted, or for which a connection
     failed after [start_time] and the pointes that are banned. It
-    first selects points with the oldest last tentative. *)
+    first selects points with the oldest last tentative.
+    Non-trusted points are also ignored if option --closed is set. *)
 let connectable st start_time expected =
   let Pool pool = st.pool in
   let now = Time.now () in
@@ -45,18 +46,22 @@ let connectable st start_time expected =
         | Some t1, Some t2 -> Time.compare t2 t1
     end) in
   let acc = Bounded_point_info.create expected in
+  let closed = (P2p_pool.config pool).P2p_pool.closed_network in
   P2p_pool.Points.fold_known pool ~init:()
     ~f:begin fun point pi () ->
-      match P2p_point_state.get pi with
-      | Disconnected -> begin
-          match P2p_point_state.Info.last_miss pi with
-          | Some last when Time.(start_time < last)
-                        || P2p_point_state.Info.greylisted ~now pi -> ()
-          | _ when (P2p_pool.Points.banned pool point) -> ()
-          | last ->
-              Bounded_point_info.insert (last, point) acc
-        end
-      | _ -> ()
+      (* consider the point only if --closed is not set, or if pi is
+         trusted *)
+      if not closed || P2p_point_state.Info.trusted pi then
+        match P2p_point_state.get pi with
+        | Disconnected -> begin
+            match P2p_point_state.Info.last_miss pi with
+            | Some last when Time.(start_time < last)
+                          || P2p_point_state.Info.greylisted ~now pi -> ()
+            | _ when (P2p_pool.Points.banned pool point) -> ()
+            | last ->
+                Bounded_point_info.insert (last, point) acc
+          end
+        | _ -> ()
     end ;
   List.map snd (Bounded_point_info.get acc)
 
