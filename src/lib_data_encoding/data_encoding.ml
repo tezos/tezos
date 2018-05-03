@@ -21,7 +21,10 @@ include Encoding
 
 module Json = Json
 module Bson = Bson
-module Binary = Binary
+module Binary = struct
+  include Binary
+  include Binary_stream
+end
 
 type json = Json.t
 let json = Json.encoding

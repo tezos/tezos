@@ -17,11 +17,5 @@ val to_bytes : 'a Encoding.t -> 'a -> MBytes.t
 val of_bytes : 'a Encoding.t -> MBytes.t -> 'a option
 val of_bytes_exn : 'a Encoding.t -> MBytes.t -> 'a
 val to_bytes_list : ?copy_blocks:bool -> int  -> 'a Encoding.t -> 'a -> MBytes.t list
-type 'a status =
-  | Success of { res : 'a ; res_len : int ; remaining : MBytes.t list }
-  | Await of (MBytes.t -> 'a status)
-  | Error
-val read_stream_of_bytes : ?init:MBytes.t list -> 'a Encoding.t -> 'a status
-val check_stream_of_bytes : ?init:MBytes.t list -> 'a Encoding.t -> unit status
 val fixed_length : 'a Encoding.t -> int option
 val fixed_length_exn : 'a Encoding.t -> int
