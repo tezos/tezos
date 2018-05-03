@@ -326,10 +326,10 @@ module Sign = struct
     begin match seed with
       | None -> keypair pk sk
       | Some buf ->
-        if Bigstring.length buf < seedbytes then
-          invalid_arg "Sign.keypair: seed must be at least 32 bytes long" ;
-        Bigstring.blit buf 0 sk 0 pkbytes ;
-        keypair_seed pk sk
+          if Bigstring.length buf < seedbytes then
+            invalid_arg "Sign.keypair: seed must be at least 32 bytes long" ;
+          Bigstring.blit buf 0 sk 0 pkbytes ;
+          keypair_seed pk sk
     end ;
     Pk pk, Sk sk
 

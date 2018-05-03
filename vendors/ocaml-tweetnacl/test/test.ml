@@ -26,7 +26,7 @@ let sign () =
   match Sign.verify ~key:pk signed_msg with
   | None -> assert false
   | Some verified_msg ->
-    Alcotest.check bigstring "sign" msg verified_msg
+      Alcotest.check bigstring "sign" msg verified_msg
 
 let sign_detached () =
   let pk, sk = Sign.keypair () in
@@ -42,7 +42,7 @@ let sign_extended () =
   match Sign.verify ~key:pk signed_msg with
   | None -> assert false
   | Some verified_msg ->
-    Alcotest.check bigstring "sign_extended" msg verified_msg
+      Alcotest.check bigstring "sign_extended" msg verified_msg
 
 let sign_extended_detached () =
   let pk, sk = Sign.keypair () in
