@@ -28,28 +28,6 @@ let apply ?(error=No_case_matched) fs v =
   loop fs
 
 
-module Size = struct
-  let bool = 1
-  let int8 = 1
-  let uint8 = 1
-  let char = 1
-  let int16 = 2
-  let uint16 = 2
-  let uint30 = 4
-  let uint32 = 4
-  let uint64 = 8
-  let int31 = 4
-  let int32 = 4
-  let int64 = 8
-  let float = 8
-end
-
-type tag_size = [ `Uint8 | `Uint16 ]
-
-let tag_size = function
-  | `Uint8 -> Size.uint8
-  | `Uint16 -> Size.uint16
-
 module Kind = struct
 
   type t =
@@ -99,7 +77,7 @@ module Kind = struct
     | [] -> assert false (* should be rejected by Data_encoding.union *)
     | k :: ks ->
         match List.fold_left merge k ks with
-        | `Fixed n -> `Fixed (n + tag_size sz)
+        | `Fixed n -> `Fixed (n + Size.tag_size sz)
         | k -> k
 
 end
@@ -131,7 +109,7 @@ type 'a desc =
   | Objs : Kind.t * 'a t * 'b t -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
   | Tups : Kind.t * 'a t * 'b t -> ('a * 'b) desc
-  | Union : Kind.t * tag_size * 'a case list -> 'a desc
+  | Union : Kind.t * Size.tag_size * 'a case list -> 'a desc
   | Mu : Kind.enum * string * ('a t -> 'a t) -> 'a desc
   | Conv :
       { proj : ('a -> 'b) ;
@@ -168,41 +146,6 @@ and 'a t = {
   mutable json_encoding: 'a Json_encoding.encoding option ;
 }
 
-type signed_integer = [ `Int31 | `Int16 | `Int8 ]
-type unsigned_integer = [ `Uint30 | `Uint16 | `Uint8 ]
-type integer = [ signed_integer | unsigned_integer ]
-
-let signed_range_to_size min max : [> signed_integer ] =
-  if min >= ~-128 && max <= 127
-  then `Int8
-  else if min >= ~-32_768 && max <= 32_767
-  then `Int16
-  else `Int31
-
-(* max should be centered at zero *)
-let unsigned_range_to_size max : [> unsigned_integer ] =
-  if max <= 255
-  then `Uint8
-  else if max <= 65535
-  then `Uint16
-  else `Uint30
-
-let integer_to_size = function
-  | `Int31 -> Size.int31
-  | `Int16 -> Size.int16
-  | `Int8 -> Size.int8
-  | `Uint30 -> Size.uint30
-  | `Uint16 -> Size.uint16
-  | `Uint8 -> Size.uint8
-
-let range_to_size ~minimum ~maximum : integer =
-  if minimum < 0
-  then signed_range_to_size minimum maximum
-  else unsigned_range_to_size (maximum - minimum)
-
-let enum_size arr =
-  unsigned_range_to_size (Array.length arr)
-
 type 'a encoding = 'a t
 
 let rec classify : type a. a t -> Kind.t = fun e ->
@@ -220,14 +163,14 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Int32 -> `Fixed Size.int32
   | Int64 -> `Fixed Size.int64
   | RangedInt { minimum ; maximum } ->
-      `Fixed (integer_to_size @@ range_to_size ~minimum ~maximum)
+      `Fixed Size.(integer_to_size @@ range_to_size ~minimum ~maximum)
   | Float -> `Fixed Size.float
   | RangedFloat _ -> `Fixed Size.float
   (* Tagged *)
   | Bytes kind -> (kind :> Kind.t)
   | String kind -> (kind :> Kind.t)
   | String_enum (_, cases) ->
-      `Fixed (integer_to_size (enum_size cases))
+      `Fixed Size.(integer_to_size @@ enum_size cases)
   | Obj (Opt (kind, _, _)) -> (kind :> Kind.t)
   | Objs (kind, _, _) -> kind
   | Tups (kind, _, _) -> kind

@@ -32,13 +32,13 @@ let rec length : type x. x t -> x -> int = fun e ->
   | Int32 -> fun _ -> Size.int32
   | Int64 -> fun _ -> Size.int64
   | RangedInt { minimum ; maximum } ->
-      fun _ -> integer_to_size @@ range_to_size ~minimum ~maximum
+      fun _ -> Size.(integer_to_size @@ range_to_size ~minimum ~maximum)
   | Float -> fun _ -> Size.float
   | RangedFloat _ -> fun _ -> Size.float
   | Bytes `Fixed n -> fun _ -> n
   | String `Fixed n -> fun _ -> n
   | String_enum (_, arr) ->
-      fun _ -> integer_to_size @@ enum_size arr
+      fun _ -> Size.(integer_to_size @@ enum_size arr)
   | Objs (`Fixed n, _, _) -> fun _ -> n
   | Tups (`Fixed n, _, _) -> fun _ -> n
   | Union (`Fixed n, _, _) -> fun _ -> n
@@ -52,7 +52,7 @@ let rec length : type x. x t -> x -> int = fun e ->
       let length2 = length e2 in
       fun (v1, v2) -> length1 v1 + length2 v2
   | Union (`Dynamic, sz, cases) ->
-      let tag_size = tag_size sz in
+      let tag_size = Size.tag_size sz in
       let case_length (Case { encoding = e ; proj }) =
         let length v = tag_size + length e v in
         fun v -> Option.map ~f:length (proj v) in
@@ -94,7 +94,7 @@ let rec length : type x. x t -> x -> int = fun e ->
         | [] -> (List.rev acc, json_only_cases)
         | Case { tag = Json_only } :: tl -> case_lengths true acc tl
         | Case { encoding = e ; proj ; tag = Tag _ } :: tl ->
-            let length v = tag_size sz + length e v in
+            let length v = Size.tag_size sz + length e v in
             case_lengths
               json_only_cases
               ((fun v ->
@@ -339,7 +339,7 @@ let rec write_rec
           if v < minimum || v > maximum
           then invalid_arg (Printf.sprintf "Integer %d not in range [%d, %d]." v minimum maximum) ;
           let v = if minimum >= 0 then v - minimum else v in
-          match range_to_size ~minimum ~maximum with
+          match Size.range_to_size ~minimum ~maximum with
           | `Uint8 -> uint8 v
           | `Uint16 -> uint16 v
           | `Uint30 -> uint30 v
@@ -362,7 +362,7 @@ let rec write_rec
   | String_enum (tbl, arr) ->
       (fun v ->
          let value = get_string_enum_case tbl v in
-         match enum_size arr with
+         match Size.enum_size arr with
          | `Uint30 -> uint30 value
          | `Uint16 -> uint16 value
          | `Uint8 -> uint8 value)
@@ -424,7 +424,7 @@ let rec write_rec_buffer
                             value minimum maximum) ;
         let value = if minimum >= 0 then value - minimum else value in
         begin
-          match range_to_size ~minimum ~maximum with
+          match Size.range_to_size ~minimum ~maximum with
           | `Uint30 -> uint30 value buffer
           | `Uint16 -> uint16 value buffer
           | `Uint8 -> uint8 value buffer
@@ -438,7 +438,7 @@ let rec write_rec_buffer
                             value minimum maximum) ;
         float value buffer
     | String_enum (tbl, arr) ->
-        (match enum_size arr with
+        (match Size.enum_size arr with
          | `Uint30 -> BufferedWriter.uint30
          | `Uint16 -> BufferedWriter.uint16
          | `Uint8 -> BufferedWriter.uint8)
@@ -638,7 +638,7 @@ module Reader = struct
         cases in
     fun buf ofs len ->
       let ofs, tag = read_tag sz buf ofs len in
-      try List.assoc tag read_cases buf ofs (len - tag_size sz)
+      try List.assoc tag read_cases buf ofs (len - Size.tag_size sz)
       with Not_found -> raise (Unexpected_tag tag)
 
 end
@@ -661,7 +661,7 @@ let rec read_rec : type a. a t-> MBytes.t -> int -> int -> int * a = fun e ->
   | RangedInt { minimum ; maximum } ->
       (fun buf ofs alpha ->
          let ofs, value =
-           match range_to_size ~minimum ~maximum with
+           match Size.range_to_size ~minimum ~maximum with
            | `Int8 -> int8 buf ofs alpha
            | `Int16 -> int16 buf ofs alpha
            | `Int31 -> int31 buf ofs alpha
@@ -686,7 +686,7 @@ let rec read_rec : type a. a t-> MBytes.t -> int -> int -> int * a = fun e ->
   | String_enum (_, arr) -> begin
       fun buf ofs a ->
         let ofs, ind =
-          match enum_size arr with
+          match Size.enum_size arr with
           | `Uint8 -> uint8 buf ofs a
           | `Uint16 -> uint16 buf ofs a
           | `Uint30 -> uint30 buf ofs a in
@@ -944,7 +944,7 @@ module Stream_reader = struct
         | Int64  -> next_path path (fst (int64  buf))
         | RangedInt { minimum ; maximum }  ->
             let (stream, ranged) =
-              match range_to_size ~minimum ~maximum with
+              match Size.range_to_size ~minimum ~maximum with
               | `Int8 -> int8 buf
               | `Int16 -> int16 buf
               | `Int31 -> int31 buf
@@ -973,7 +973,7 @@ module Stream_reader = struct
 
         | String_enum (_, arr) ->
             next_path path
-              (match enum_size arr with
+              (match Size.enum_size arr with
                | `Uint8 -> fst @@ uint8 buf
                | `Uint16 -> fst @@ uint16 buf
                | `Uint30 -> fst @@ uint30 buf)
@@ -1051,7 +1051,7 @@ module Stream_reader = struct
             in
             begin match opt with
               | None -> raise (Unexpected_tag ctag)
-              | Some func -> func (len - (tag_size sz))
+              | Some func -> func (len - (Size.tag_size sz))
             end
 
         | Dynamic_size e ->
