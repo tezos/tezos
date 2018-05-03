@@ -21,7 +21,6 @@ type execution_result =
 
 val execute:
   Alpha_context.t ->
-  check_operations: bool ->
   source: Contract.t ->
   payer: Contract.t ->
   self: (Contract.t * Script.t) ->
@@ -34,7 +33,6 @@ type execution_trace =
 
 val trace:
   Alpha_context.t ->
-  check_operations: bool ->
   source: Contract.t ->
   payer: Contract.t ->
   self: (Contract.t * Script.t) ->

@@ -162,7 +162,6 @@ let () =
     let code = Script.lazy_expr code in
     Script_interpreter.execute
       ctxt
-      ~check_operations:true
       ~source:contract (* transaction initiator *)
       ~payer:contract (* storage fees payer *)
       ~self:(contract, { storage ; code }) (* script owner *)
@@ -178,7 +177,6 @@ let () =
     let code = Script.lazy_expr code in
     Script_interpreter.trace
       ctxt
-      ~check_operations:true
       ~source:contract (* transaction initiator *)
       ~payer:contract (* storage fees payer *)
       ~self:(contract, { storage ; code }) (* script owner *)
@@ -197,7 +195,7 @@ let () =
     begin match maybe_gas with
       | None -> return (Gas.set_unlimited ctxt)
       | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
-    Script_ir_translator.typecheck_data ctxt ~check_operations:true (data, ty) >>=? fun ctxt ->
+    Script_ir_translator.typecheck_data ctxt (data, ty) >>=? fun ctxt ->
     return (Gas.level ctxt)
   end ;
   register0 S.hash_data begin fun ctxt () (expr, typ, maybe_gas) ->
@@ -205,8 +203,8 @@ let () =
     begin match maybe_gas with
       | None -> return (Gas.set_unlimited ctxt)
       | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
-    Lwt.return (parse_ty ~allow_big_map:false (Micheline.root typ)) >>=? fun (Ex_ty typ, _) ->
-    parse_data ctxt ~check_operations:true typ (Micheline.root expr) >>=? fun (data, ctxt) ->
+    Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ, _) ->
+    parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
     Lwt.return (Script_ir_translator.hash_data ctxt typ data) >>=? fun (hash, ctxt) ->
     return (hash, Gas.level ctxt)
   end ;

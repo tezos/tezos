@@ -135,7 +135,6 @@ val unsigned_operation_encoding:
 type internal_operation = {
   source: Contract_repr.contract ;
   operation: manager_operation ;
-  signature: Signature.t option
 }
 
 val internal_operation_encoding:

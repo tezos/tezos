@@ -817,7 +817,6 @@ and counter = Int32.t
 type internal_operation = {
   source: Contract.contract ;
   operation: manager_operation ;
-  signature: Signature.t option
 }
 
 module Operation : sig

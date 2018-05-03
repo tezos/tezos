@@ -593,7 +593,7 @@ let rec interp
               Transaction
                 { amount ; destination ;
                   parameters = Some (Script.lazy_expr (Micheline.strip_locations p)) } in
-            logged_return (Item ({ source = self ; operation ; signature = None }, rest), ctxt)
+            logged_return (Item ({ source = self ; operation }, rest), ctxt)
         | Create_account,
           Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
@@ -602,7 +602,7 @@ let rec interp
               Origination
                 { credit ; manager ; delegate ; preorigination = Some contract ;
                   delegatable ; script = None ; spendable = true } in
-            logged_return (Item ({ source = self ; operation ; signature = None },
+            logged_return (Item ({ source = self ; operation },
                                  Item (contract, rest)), ctxt)
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
@@ -632,13 +632,13 @@ let rec interp
                   script = Some { code = Script.lazy_expr code ;
                                   storage = Script.lazy_expr storage } } in
             logged_return
-              (Item ({ source = self ; operation ; signature = None },
+              (Item ({ source = self ; operation },
                      Item (contract, rest)), ctxt)
         | Set_delegate,
           Item (delegate, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
             let operation = Delegation delegate in
-            logged_return (Item ({ source = self ; operation ; signature = None }, rest), ctxt)
+            logged_return (Item ({ source = self ; operation }, rest), ctxt)
         | Balance, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.balance) >>=? fun ctxt ->
             Contract.get_balance ctxt self >>=? fun balance ->
@@ -685,12 +685,12 @@ let rec interp
 
 (* ---- contract handling ---------------------------------------------------*)
 
-and execute ?log ctxt ~check_operations ~source ~payer ~self script amount arg :
+and execute ?log ctxt ~source ~payer ~self script amount arg :
   (Script.expr * internal_operation list * context *
    Script_typed_ir.ex_big_map option) tzresult Lwt.t =
-  parse_script ctxt ~check_operations script
+  parse_script ctxt script
   >>=? fun ((Ex_script { code ; arg_type ; storage ; storage_type }), ctxt) ->
-  parse_data ctxt ~check_operations arg_type arg >>=? fun (arg, ctxt) ->
+  parse_data ctxt arg_type arg >>=? fun (arg, ctxt) ->
   Lwt.return (Script.force_decode script.code) >>=? fun script_code ->
   trace
     (Runtime_contract_error (self, script_code))
@@ -706,9 +706,9 @@ type execution_result =
     big_map_diff : Contract.big_map_diff option ;
     operations : internal_operation list }
 
-let trace ctxt ~check_operations ~source ~payer ~self:(self, script) ~parameter ~amount =
+let trace ctxt ~source ~payer ~self:(self, script) ~parameter ~amount =
   let log = ref [] in
-  execute ~log ctxt ~check_operations ~source ~payer ~self script amount (Micheline.root parameter)
+  execute ~log ctxt ~source ~payer ~self script amount (Micheline.root parameter)
   >>=? fun (storage, operations, ctxt, big_map_diff) ->
   begin match big_map_diff with
     | None -> return (None, ctxt)
@@ -719,8 +719,8 @@ let trace ctxt ~check_operations ~source ~payer ~self:(self, script) ~parameter 
   let trace = List.rev !log in
   return ({ ctxt ; storage ; big_map_diff ; operations }, trace)
 
-let execute ctxt ~check_operations ~source ~payer ~self:(self, script) ~parameter ~amount =
-  execute ctxt ~check_operations ~source ~payer ~self script amount (Micheline.root parameter)
+let execute ctxt ~source ~payer ~self:(self, script) ~parameter ~amount =
+  execute ctxt ~source ~payer ~self script amount (Micheline.root parameter)
   >>=? fun (storage, operations, ctxt, big_map_diff) ->
   begin match big_map_diff with
     | None -> return (None, ctxt)

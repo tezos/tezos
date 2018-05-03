@@ -433,14 +433,12 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
                 Lwt.return (Script.force_decode parameters) >>=? fun arg ->
                 trace
                   (Bad_contract_parameter (destination, Some arg_type, Some parameters))
-                  (Script_ir_translator.typecheck_data ctxt ~check_operations:true (arg, arg_type)) >>=? fun ctxt ->
+                  (Script_ir_translator.typecheck_data ctxt (arg, arg_type)) >>=? fun ctxt ->
                 return (ctxt, arg)
             | None, _ -> fail (Bad_contract_parameter (destination, Some arg_type, None))
           end >>=? fun (ctxt, parameter) ->
           Script_interpreter.execute
-            ctxt
-            ~check_operations:(not internal)
-            ~source ~payer ~self:(destination, script) ~amount ~parameter
+            ctxt ~source ~payer ~self:(destination, script) ~amount ~parameter
           >>=? fun { ctxt ; storage ; big_map_diff ; operations } ->
           Contract.used_storage_space ctxt destination >>=? fun old_size ->
           Contract.update_script_storage
@@ -467,7 +465,7 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
       begin match script with
         | None -> return (None, ctxt)
         | Some script ->
-            Script_ir_translator.parse_script ctxt ~check_operations:true script >>=? fun (_, ctxt) ->
+            Script_ir_translator.parse_script ctxt script >>=? fun (_, ctxt) ->
             Script_ir_translator.erase_big_map_initialization ctxt script >>=? fun (script, big_map_diff, ctxt) ->
             return (Some (script, big_map_diff), ctxt)
       end >>=? fun (script, ctxt) ->
@@ -500,10 +498,7 @@ let apply_internal_manager_operations ctxt ~payer ops =
   let rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Ok (ctxt, applied))
-    | { source ; operation ;
-        signature = _ (* at this point the signature must have been
-                         checked if the operation has been
-                         deserialized from the outside world *) } as op :: rest ->
+    | { source ; operation } as op :: rest ->
         apply_manager_operation_content ctxt ~source ~payer ~internal:true operation >>= function
         | Error errors ->
             let result = Internal op, Failed errors in

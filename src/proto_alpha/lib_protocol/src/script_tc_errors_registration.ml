@@ -30,7 +30,7 @@ let ex_ty_enc =
   Data_encoding.conv
     (fun (Ex_ty ty) -> strip_locations (unparse_ty None ty))
     (fun expr ->
-       match parse_ty true (root expr) with
+       match parse_ty ~allow_big_map:true ~allow_operation:true (root expr) with
        | Ok (Ex_ty ty, _) -> Ex_ty ty
        | _ -> assert false)
     Script.expr_encoding
@@ -176,6 +176,18 @@ let () =
        (req "loc" location_encoding))
     (function Unexpected_big_map loc -> Some loc | _ -> None)
     (fun loc -> Unexpected_big_map loc) ;
+  (* Unexpected operation *)
+  register_error_kind
+    `Permanent
+    ~id:"unexpectedOperation"
+    ~title: "Big map in unauthorized position (type error)"
+    ~description:
+      "When parsing script, a operation type was found \
+       in the storage or parameter field."
+    (obj1
+       (req "loc" location_encoding))
+    (function Unexpected_operation loc -> Some loc | _ -> None)
+    (fun loc -> Unexpected_operation loc) ;
   (* -- Value typing errors ---------------------- *)
   (* Unordered map keys *)
   register_error_kind

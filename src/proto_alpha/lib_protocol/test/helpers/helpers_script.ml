@@ -33,7 +33,6 @@ let execute_code_pred
   let tc = Contract.init_origination_nonce tc hash in
   Script_interpreter.execute
     tc
-    ~check_operations: true
     ~source: op.contract
     ~payer: op.contract
     ~self: (dst, script)

@@ -105,7 +105,6 @@ and counter = Int32.t
 type internal_operation = {
   source: Contract_repr.contract ;
   operation: manager_operation ;
-  signature: Signature.t option
 }
 
 module Encoding = struct
@@ -430,12 +429,11 @@ module Encoding = struct
 
   let internal_operation_encoding =
     conv
-      (fun { source ; operation ; signature } -> ((source, signature), operation))
-      (fun ((source, signature), operation) -> { source ; operation ; signature })
+      (fun { source ; operation } -> (source, operation))
+      (fun (source, operation) -> { source ; operation })
       (merge_objs
-         (obj2
-            (req "source" Contract_repr.encoding)
-            (opt "signature" Signature.encoding))
+         (obj1
+            (req "source" Contract_repr.encoding))
          (union ~tag_size:`Uint8 [
              reveal_case (Tag 0) ;
              transaction_case (Tag 1) ;

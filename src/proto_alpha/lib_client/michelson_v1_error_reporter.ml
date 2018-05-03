@@ -71,6 +71,7 @@ let collect_error_locations errs =
         | Invalid_kind (loc, _, _)
         | Duplicate_field (loc, _)
         | Unexpected_big_map loc
+        | Unexpected_operation loc
         | Fail_not_in_tail_position loc
         | Undefined_binop (loc, _, _, _)
         | Undefined_unop (loc, _, _)
@@ -190,6 +191,10 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Unexpected_big_map loc) :: rest ->
         Format.fprintf ppf "%abig_map type only allowed on the left of the toplevel storage pair"
+          print_loc loc ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error (Unexpected_operation loc) :: rest ->
+        Format.fprintf ppf "%aoperation type forbidden in parameter, storage and constants"
           print_loc loc ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Runtime_contract_error (contract, expr)) :: rest ->
