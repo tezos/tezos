@@ -730,11 +730,12 @@ Bitwise logical operators are also available on unsigned integers.
 
     > OR / x : y : S  =>  (x | y) : S
 
--  ``AND``
+-  ``AND`` (also available when the top operand is signed)
 
 ::
 
     :: nat : nat : 'S   ->   nat : 'S
+    :: int : nat : 'S   ->   nat : 'S
 
     > AND / x : y : S  =>  (x & y) : S
 
@@ -749,7 +750,8 @@ Bitwise logical operators are also available on unsigned integers.
 -  ``NOT`` The return type of ``NOT`` is an ``int`` and not a ``nat``.
    This is because the sign is also negated. The resulting integer is
    computed using two’s complement. For instance, the boolean negation
-   of ``0`` is ``-1``.
+   of ``0`` is ``-1``. To get a natural back, a possibility is to use
+   ``AND`` with an unsigned mask afterwards.
 
 ::
 

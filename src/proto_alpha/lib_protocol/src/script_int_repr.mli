@@ -101,7 +101,6 @@ val int : n num -> z num
     Also applies to the sign. *)
 val lognot : _ num -> z num
 
-
 (** Shifts the natural to the left of a number of bits between 0 and 256.
     Returns [None] if the amount is too high. *)
 val shift_left_n : n num -> n num -> n num option
@@ -119,10 +118,10 @@ val shift_left : 'a num -> n num -> 'a num option
 val shift_right : 'a num -> n num -> 'a num option
 
 (** Applies a boolean or operation to each bit. *)
-val logor : n num -> n num -> n num
+val logor : 'a num -> 'a num -> 'a num
 
 (** Applies a boolean and operation to each bit. *)
-val logand : n num -> n num -> n num
+val logand : _ num -> n num -> n num
 
 (** Applies a boolean xor operation to each bit. *)
 val logxor : n num -> n num -> n num

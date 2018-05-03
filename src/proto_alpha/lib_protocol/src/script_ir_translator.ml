@@ -173,6 +173,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Lsr_nat -> 0
   | Or_nat -> 0
   | And_nat -> 0
+  | And_int_nat -> 0
   | Xor_nat -> 0
   | Not_nat -> 0
   | Not_int -> 0
@@ -1954,6 +1955,10 @@ and parse_instr
     | Prim (loc, I_AND, [], instr_annot),
       Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
         typed ctxt loc And_nat
+          (Item_t (Nat_t, rest, instr_annot))
+    | Prim (loc, I_AND, [], instr_annot),
+      Item_t (Int_t, Item_t (Nat_t, rest, _), _) ->
+        typed ctxt loc And_int_nat
           (Item_t (Nat_t, rest, instr_annot))
     | Prim (loc, I_XOR, [], instr_annot),
       Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->

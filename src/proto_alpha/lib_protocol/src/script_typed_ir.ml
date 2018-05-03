@@ -276,6 +276,8 @@ and ('bef, 'aft) instr =
       (n num * (n num * 'rest), n num * 'rest) instr
   | And_nat :
       (n num * (n num * 'rest), n num * 'rest) instr
+  | And_int_nat :
+      (z num * (n num * 'rest), n num * 'rest) instr
   | Xor_nat :
       (n num * (n num * 'rest), n num * 'rest) instr
   | Not_nat :

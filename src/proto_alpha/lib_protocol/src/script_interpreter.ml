@@ -547,6 +547,8 @@ let rec interp
             consume_gas_binop descr (Script_int.logor, x, y) Interp_costs.logor rest ctxt
         | And_nat, Item (x, Item (y, rest)) ->
             consume_gas_binop descr (Script_int.logand, x, y) Interp_costs.logand rest ctxt
+        | And_int_nat, Item (x, Item (y, rest)) ->
+            consume_gas_binop descr (Script_int.logand, x, y) Interp_costs.logand rest ctxt
         | Xor_nat, Item (x, Item (y, rest)) ->
             consume_gas_binop descr (Script_int.logxor, x, y) Interp_costs.logxor rest ctxt
         | Not_int, Item (x, rest) ->
