@@ -7,17 +7,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Encoding (* TODO: unoppen *)
-
 type 'l writer = {
-  write: 'a. 'a t -> 'a -> MBytes.t -> int -> int ;
+  write: 'a. 'a Encoding.t -> 'a -> MBytes.t -> int -> int ;
 }
 
 type 'l reader = {
-  read: 'a. 'a t -> MBytes.t -> int -> int -> (int * 'a) ;
+  read: 'a. 'a Encoding.t -> MBytes.t -> int -> int -> (int * 'a) ;
 }
 
-let rec length : type x. x t -> x -> int = fun e ->
+let rec length : type x. x Encoding.t -> x -> int = fun e ->
+  let open Encoding in
   match e.encoding with
   (* Fixed *)
   | Null -> fun _ -> 0
@@ -222,6 +221,7 @@ module Writer = struct
     | `Uint16 -> uint16
 
   let union w sz cases =
+    let open Encoding in
     let writes_case = function
       | Case { tag = Json_only } -> None
       | Case { encoding = e ; proj ; tag = Tag tag } ->
@@ -305,7 +305,7 @@ module BufferedWriter = struct
 end
 
 let rec assoc_snd target = function
-  | [] -> raise No_case_matched
+  | [] -> raise Encoding.No_case_matched
   | (value, hd) :: tl ->
       if hd = target
       then value
@@ -315,10 +315,11 @@ let get_string_enum_case tbl v =
   try
     snd (Hashtbl.find tbl v)
   with _ ->
-    raise No_case_matched
+    raise Encoding.No_case_matched
 
 let rec write_rec
-  : type a. a t -> a -> MBytes.t -> int -> int = fun e ->
+  : type a. a Encoding.t -> a -> MBytes.t -> int -> int = fun e ->
+  let open Encoding in
   let open Writer in
   match e.encoding with
   | Null -> (fun () _buf ofs -> ofs)
@@ -395,8 +396,9 @@ let rec write_rec
   | Delayed f -> write_rec (f ())
 
 let rec write_rec_buffer
-  : type a. a encoding -> a -> MBytes_buffer.t -> unit =
+  : type a. a Encoding.t -> a -> MBytes_buffer.t -> unit =
   fun encoding value buffer ->
+    let open Encoding in
     let open BufferedWriter in
     match encoding.encoding with
     | Null -> ()
@@ -588,8 +590,8 @@ module Reader = struct
     ofs'', (v1, v2)
 
   let varseq r e1 e2 buf ofs len =
-    let k1 = classify e1
-    and k2 = classify e2 in
+    let k1 = Encoding.classify e1
+    and k2 = Encoding.classify e2 in
     match k1, k2 with
     | (`Dynamic | `Fixed _), `Variable ->
         let ofs', v1 = r.read e1 buf ofs len in
@@ -626,6 +628,7 @@ module Reader = struct
     | `Uint16 -> uint16
 
   let union r sz cases =
+    let open Encoding in
     let read_cases =
       TzList.filter_map
         (function
@@ -643,7 +646,8 @@ module Reader = struct
 
 end
 
-let rec read_rec : type a. a t-> MBytes.t -> int -> int -> int * a = fun e ->
+let rec read_rec : type a. a Encoding.t-> MBytes.t -> int -> int -> int * a = fun e ->
+  let open Encoding in
   let open Reader in
   match e.encoding with
   | Null -> (fun _buf ofs _len -> ofs, ())
@@ -755,7 +759,7 @@ let to_bytes = to_bytes
 let length = length
 
 let fixed_length e =
-  match classify e with
+  match Encoding.classify e with
   | `Fixed n -> Some n
   | `Dynamic | `Variable -> None
 let fixed_length_exn e =
@@ -781,10 +785,10 @@ module Stream_reader = struct
      number of elements that have been read so far. *)
   type path =
     | P_top : path
-    | P_await : { path : path ; encoding : 'a t ; data_len : int } -> path
-    | P_seq : { path : path ; encoding : 'a t ;
+    | P_await : { path : path ; encoding : 'a Encoding.t ; data_len : int } -> path
+    | P_seq : { path : path ; encoding : 'a Encoding.t ;
                 fun_data_len : int -> int } -> path
-    | P_list : { path:path ; encoding:'a t ; data_len : int ;
+    | P_list : { path:path ; encoding:'a Encoding.t ; data_len : int ;
                  base_ofs : int ; nb_elts_read : int } -> path
 
   (* used to accumulate given mbytes when reading a list of blocks,
@@ -854,6 +858,7 @@ module Stream_reader = struct
           buf, reader b ofs delta_ofs
         end
 
+  open Encoding (* open here, shadow below, use shadowed definitions later *)
 
   (* functions that try to read data from a given mbytes_stream,
      or raise Need_more_data *)
@@ -913,7 +918,7 @@ module Stream_reader = struct
 
   (* auxiliary function: computing size of data in branches
      Objs(`Variable) and Tups(`Variable) *)
-  let varseq_lengths e1 e2 ofs len = match classify e1, classify e2 with
+  let varseq_lengths e1 e2 ofs len = match Encoding.classify e1, Encoding.classify e2 with
     | (`Dynamic | `Fixed _), `Variable -> len, (fun ofs' -> len - ofs' + ofs)
     | `Variable, `Fixed n -> (len - n), (fun _ -> n)
     | _ -> assert false (* Should be rejected by Kind.combine *)
@@ -924,11 +929,11 @@ module Stream_reader = struct
      incrementality), and 'mbytes_stream' *)
   let rec data_checker
     : type a.
-      path -> a encoding -> mbytes_stream -> int ->
+      path -> a Encoding.t -> mbytes_stream -> int ->
       path * mbytes_stream =
     fun path e buf len ->
       (*length of data with `Variable kind should be given by the caller*)
-      assert (classify e != `Variable || len >= 0) ;
+      assert (Encoding.classify e != `Variable || len >= 0) ;
       try match e.encoding with
         | Null   -> next_path path buf
         | Empty  -> next_path path buf
@@ -1050,14 +1055,14 @@ module Stream_reader = struct
                 )None cases
             in
             begin match opt with
-              | None -> raise (Unexpected_tag ctag)
+              | None -> raise (Encoding.Unexpected_tag ctag)
               | Some func -> func (len - (Size.tag_size sz))
             end
 
         | Dynamic_size e ->
             let buf, sz = int32 buf in
             let sz = Int32.to_int sz in
-            if sz < 0 then raise (Invalid_size sz) ;
+            if sz < 0 then raise (Encoding.Invalid_size sz) ;
             data_checker path e buf sz
 
         | Delayed f -> data_checker path (f ()) buf len

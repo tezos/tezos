@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Encoding (* TODO: unopen *)
-
 
 type json =
   [ `O of (string * json) list
@@ -21,7 +19,7 @@ type json =
 type schema = Json_schema.schema
 
 type pair_builder = {
-  build: 'a 'b. Kind.t -> 'a t -> 'b t -> ('a * 'b) t
+  build: 'a 'b. Encoding.Kind.t -> 'a Encoding.t -> 'b Encoding.t -> ('a * 'b) Encoding.t
 }
 
 exception Parse_error of string
@@ -70,7 +68,8 @@ let bytes_jsont =
        (fun h -> `Hex h)
        string)
 
-let rec lift_union : type a. a t -> a t = fun e ->
+let rec lift_union : type a. a Encoding.t -> a Encoding.t = fun e ->
+  let open Encoding in
   match e.encoding with
   | Conv { proj ; inj ; encoding = e ; schema } -> begin
       match lift_union e with
@@ -98,8 +97,9 @@ let rec lift_union : type a. a t -> a t = fun e ->
   | _ -> e
 
 and lift_union_in_pair
-  : type a b. pair_builder -> Kind.t -> a t -> b t -> (a * b) t
+  : type a b. pair_builder -> Encoding.Kind.t -> a Encoding.t -> b Encoding.t -> (a * b) Encoding.t
   = fun b p e1 e2 ->
+    let open Encoding in
     match lift_union e1, lift_union e2 with
     | e1, { encoding = Union (_kind, tag, cases) } ->
         make @@
@@ -131,7 +131,8 @@ and lift_union_in_pair
                  cases)
     | e1, e2 -> b.build p e1 e2
 
-let rec json : type a. a desc -> a Json_encoding.encoding =
+let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
+  let open Encoding in
   let open Json_encoding in
   function
   | Null -> null
@@ -172,19 +173,19 @@ let rec json : type a. a desc -> a Json_encoding.encoding =
   | Delayed f -> get_json (f ())
 
 and field_json
-  : type a. a field -> a Json_encoding.field =
+  : type a. a Encoding.field -> a Json_encoding.field =
   let open Json_encoding in
   function
-  | Req (name, e) -> req name (get_json e)
-  | Opt (_, name, e) -> opt name (get_json e)
-  | Dft (name, e, d) -> dft name (get_json e) d
+  | Encoding.Req (name, e) -> req name (get_json e)
+  | Encoding.Opt (_, name, e) -> opt name (get_json e)
+  | Encoding.Dft (name, e, d) -> dft name (get_json e) d
 
-and case_json : type a. a case -> a Json_encoding.case =
+and case_json : type a. a Encoding.case -> a Json_encoding.case =
   let open Json_encoding in
   function
-  | Case { encoding = e ; proj ; inj ; _ } -> case (get_json e) proj inj
+  | Encoding.Case { encoding = e ; proj ; inj ; _ } -> case (get_json e) proj inj
 
-and get_json : type a. a t -> a Json_encoding.encoding = fun e ->
+and get_json : type a. a Encoding.t -> a Json_encoding.encoding = fun e ->
   match e.json_encoding with
   | None ->
       let json_encoding = json (lift_union e).encoding in
@@ -267,7 +268,7 @@ let encoding =
       Encoding.string in
   let json =
     Json_encoding.any_ezjson_value in
-  raw_splitted ~binary ~json
+  Encoding.raw_splitted ~binary ~json
 
 let schema_encoding =
   Encoding.conv
