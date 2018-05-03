@@ -17,16 +17,6 @@ exception Int_out_of_range of int * int * int
 exception Float_out_of_range of float * float * float
 exception Parse_error of string
 
-(*TODO: provide a more specialised function that doesn't need as many closures*)
-let apply ?(error=No_case_matched) fs v =
-  let rec loop = function
-    | [] -> raise error
-    | f :: fs ->
-        match f v with
-        | Some l -> l
-        | None -> loop fs in
-  loop fs
-
 
 module Kind = struct
 

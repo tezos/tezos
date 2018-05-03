@@ -50,8 +50,6 @@
  * predicates, etc.) *)
 (* TODO: move the doc into the packing module *)
 
-val apply: ?error:exn -> ('a -> 'b option) list -> 'a -> 'b
-
 module Kind: sig
 
   type t = [ `Fixed of int | `Dynamic | `Variable ]

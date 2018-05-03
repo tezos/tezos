@@ -7,6 +7,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
+let apply_and_get_first_some ?(error=Encoding.No_case_matched) fs v =
+  let rec loop = function
+    | [] -> raise error
+    | f :: fs ->
+        match f v with
+        | Some l -> l
+        | None -> loop fs in
+  loop fs
+
 type 'l writer = {
   write: 'a. 'a Encoding.t -> 'a -> MBytes.t -> int -> int ;
 }
@@ -55,7 +64,7 @@ let rec length : type x. x Encoding.t -> x -> int = fun e ->
       let case_length (Case { encoding = e ; proj }) =
         let length v = tag_size + length e v in
         fun v -> Option.map ~f:length (proj v) in
-      apply (List.map case_length cases)
+      apply_and_get_first_some (List.map case_length cases)
   | Mu (`Dynamic, _name, self) ->
       fun v -> length (self e) v
   | Obj (Opt (`Dynamic, _, e)) ->
@@ -102,7 +111,7 @@ let rec length : type x. x Encoding.t -> x -> int = fun e ->
                   | Some v -> Some (length v)) :: acc)
               tl in
       let cases, json_only = case_lengths false [] cases in
-      apply
+      apply_and_get_first_some
         ~error:(if json_only
                 then Failure "No case matched, but JSON only cases were present in union"
                 else No_case_matched)
@@ -232,7 +241,7 @@ module Writer = struct
               match proj v with
               | None -> None
               | Some v -> Some (write v)) in
-    apply (TzList.filter_map writes_case cases)
+    apply_and_get_first_some (TzList.filter_map writes_case cases)
 
 end
 
