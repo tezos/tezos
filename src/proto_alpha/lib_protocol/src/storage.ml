@@ -141,16 +141,16 @@ module Contract = struct
     Indexed_context.Make_carbonated_map
       (struct let name = ["code"] end)
       (Make_carbonated_value(struct
-         type t = Script_repr.expr
-         let encoding = Script_repr.expr_encoding
+         type t = Script_repr.lazy_expr
+         let encoding = Script_repr.lazy_expr_encoding
        end))
 
   module Storage =
     Indexed_context.Make_carbonated_map
       (struct let name = ["storage"] end)
       (Make_carbonated_value(struct
-         type t = Script_repr.expr
-         let encoding = Script_repr.expr_encoding
+         type t = Script_repr.lazy_expr
+         let encoding = Script_repr.lazy_expr_encoding
        end))
 
   type bigmap_key = Raw_context.t * Contract_repr.t

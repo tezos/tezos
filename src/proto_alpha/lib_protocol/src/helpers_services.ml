@@ -158,6 +158,8 @@ let () =
     (code, storage, parameter, amount, contract) ->
     Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
     let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+    let storage = Script.lazy_expr storage in
+    let code = Script.lazy_expr code in
     Script_interpreter.execute
       ctxt
       ~check_operations:true
@@ -172,6 +174,8 @@ let () =
     (code, storage, parameter, amount, contract) ->
     Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
     let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+    let storage = Script.lazy_expr storage in
+    let code = Script.lazy_expr code in
     Script_interpreter.trace
       ctxt
       ~check_operations:true
@@ -328,6 +332,7 @@ module Forge = struct
         block ~branch ~source ?sourcePubKey ~counter
         ~amount ~destination ?parameters
         ~gas_limit ~storage_limit ~fee ()=
+      let parameters = Option.map ~f:Script.lazy_expr parameters in
       operations ctxt block ~branch ~source ?sourcePubKey ~counter
         ~fee ~gas_limit ~storage_limit
         Alpha_context.[Transaction { amount ; parameters ; destination }]

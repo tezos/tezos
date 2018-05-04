@@ -165,7 +165,9 @@ let rec interp
             let operation =
               Origination
                 { credit ; manager ; delegate ; preorigination = Some contract ;
-                  delegatable ; script = Some { code ; storage } ; spendable } in
+                  delegatable ; spendable ;
+                  script = Some { code = Script.lazy_expr code ;
+                                  storage = Script.lazy_expr storage } } in
             logged_return descr (Item ({ source = self ; operation ; signature = None },
                                        Item (contract, rest)), ctxt) in
         let logged_return :
@@ -666,7 +668,7 @@ let rec interp
             let operation =
               Transaction
                 { amount ; destination ;
-                  parameters = Some (Micheline.strip_locations p) } in
+                  parameters = Some (Script.lazy_expr (Micheline.strip_locations p)) } in
             logged_return (Item ({ source = self ; operation ; signature = None }, rest), ctxt)
         | Create_account,
           Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
@@ -758,8 +760,9 @@ and execute ?log ctxt ~check_operations ~source ~payer ~self script amount arg :
   parse_script ctxt ~check_operations script
   >>=? fun ((Ex_script { code ; arg_type ; storage ; storage_type }), ctxt) ->
   parse_data ctxt ~check_operations arg_type arg >>=? fun (arg, ctxt) ->
+  Lwt.return (Script.force_decode script.code) >>=? fun script_code ->
   trace
-    (Runtime_contract_error (self, script.code))
+    (Runtime_contract_error (self, script_code))
     (interp ?log ctxt ~source ~payer ~self amount code (arg, storage))
   >>=? fun ((ops, sto), ctxt) ->
   Lwt.return @@ unparse_data ctxt storage_type sto >>=? fun (storage, ctxt) ->

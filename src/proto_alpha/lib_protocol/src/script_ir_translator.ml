@@ -2267,7 +2267,8 @@ and parse_contract
                ok (contract, ctxt))
         | Some { code ; _ } ->
             Lwt.return
-              (parse_toplevel code >>? fun (arg_type, _, _) ->
+              (Script.force_decode code >>? fun code ->
+               parse_toplevel code >>? fun (arg_type, _, _) ->
                parse_ty ~allow_big_map:false arg_type >>? fun (Ex_ty targ, _) ->
                ty_eq targ arg >>? fun Eq ->
                let contract : arg typed_contract = (arg, contract) in
@@ -2318,6 +2319,8 @@ let parse_script
   : ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
     context -> check_operations:bool -> Script.t -> (ex_script * context) tzresult Lwt.t
   = fun ?type_logger ctxt ~check_operations { code ; storage } ->
+    Lwt.return (Script.force_decode code) >>=? fun code ->
+    Lwt.return (Script.force_decode storage) >>=? fun storage ->
     Lwt.return (parse_toplevel code) >>=? fun (arg_type, storage_type, code_field) ->
     trace
       (Ill_formed_type (Some "parameter", code, location arg_type))
@@ -2348,7 +2351,8 @@ let parse_contract :
           | _ -> fail (Invalid_contract (loc, contract))
         end
     | Some script ->
-        Lwt.return @@ parse_toplevel script.code >>=? fun (arg_type, _, _) ->
+        Lwt.return (Script.force_decode script.code) >>=? fun code ->
+        Lwt.return @@ parse_toplevel code >>=? fun (arg_type, _, _) ->
         let arg_type = Micheline.strip_locations arg_type in
         Lwt.return (parse_ty ~allow_big_map:false (Micheline.root arg_type)) >>=? fun (Ex_ty arg_type, _) ->
         Lwt.return (ty_eq ty arg_type) >>=? fun Eq ->
@@ -2468,6 +2472,8 @@ let to_printable_big_map ctxt (Ex_bm { diff ; key_type ; value_type }) =
          Option.map ~f:(fun x -> Micheline.strip_locations @@ unparse value_type x) value) :: acc)) [] pairs
 
 let erase_big_map_initialization ctxt ({ code ; storage } : Script.t) =
+  Lwt.return (Script.force_decode code) >>=? fun code ->
+  Lwt.return (Script.force_decode storage) >>=? fun storage ->
   Lwt.return @@ parse_toplevel code >>=? fun (_, storage_type, _) ->
   Lwt.return @@ parse_ty ~allow_big_map:true storage_type >>=? fun (Ex_ty ty, _) ->
   parse_data ctxt ~check_operations:true ty
@@ -2479,4 +2485,5 @@ let erase_big_map_initialization ctxt ({ code ; storage } : Script.t) =
         return (Some bm, ctxt)
   end >>=? fun (bm, ctxt) ->
   Lwt.return @@ unparse_data ctxt ty storage >>=? fun (storage, ctxt) ->
-  return ({ code ; storage = Micheline.strip_locations storage }, bm, ctxt)
+  return ({ code = Script.lazy_expr code ;
+            storage = Script.lazy_expr (Micheline.strip_locations storage) }, bm, ctxt)

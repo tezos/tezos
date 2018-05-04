@@ -272,16 +272,23 @@ module Script : sig
 
   type expr = prim Micheline.canonical
 
+  type lazy_expr = expr Data_encoding.lazy_t
+
+  val force_decode : lazy_expr -> expr tzresult
+  val force_bytes : lazy_expr -> MBytes.t tzresult
+  val lazy_expr : expr -> lazy_expr
+
   type node = (location, prim) Micheline.node
 
   type t =
-    { code: expr ;
-      storage: expr }
+    { code: lazy_expr ;
+      storage: lazy_expr }
 
   val location_encoding: location Data_encoding.t
   val expr_encoding: expr Data_encoding.t
   val prim_encoding: prim Data_encoding.t
   val encoding: t Data_encoding.t
+  val lazy_expr_encoding: lazy_expr Data_encoding.t
 end
 
 module Constants : sig
@@ -788,7 +795,7 @@ and manager_operation =
   | Reveal of Signature.Public_key.t
   | Transaction of {
       amount: Tez.t ;
-      parameters: Script.expr option ;
+      parameters: Script.lazy_expr option ;
       destination: Contract.contract ;
     }
   | Origination of {

@@ -82,7 +82,7 @@ and manager_operation =
   | Reveal of Signature.Public_key.t
   | Transaction of {
       amount: Tez_repr.tez ;
-      parameters: Script_repr.expr option ;
+      parameters: Script_repr.lazy_expr option ;
       destination: Contract_repr.contract ;
     }
   | Origination of {
@@ -131,7 +131,7 @@ module Encoding = struct
       (req "kind" (constant "transaction"))
       (req "amount" Tez_repr.encoding)
       (req "destination" Contract_repr.encoding)
-      (opt "parameters" Script_repr.expr_encoding)
+      (opt "parameters" Script_repr.lazy_expr_encoding)
 
   let transaction_case tag =
     case tag ~name:"Transaction" transaction_encoding

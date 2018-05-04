@@ -82,7 +82,7 @@ and manager_operation =
   | Reveal of Signature.Public_key.t
   | Transaction of {
       amount: Tez_repr.tez ;
-      parameters: Script_repr.expr option ;
+      parameters: Script_repr.lazy_expr option ;
       destination: Contract_repr.contract ;
     }
   | Origination of {

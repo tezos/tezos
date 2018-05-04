@@ -49,6 +49,7 @@ let transfer (cctxt : #Proto_alpha.full)
   Alpha_services.Contract.counter
     cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
+  let parameters = Option.map ~f:Script.lazy_expr parameters in
   let operations = [Transaction { amount ; parameters ; destination }] in
   append_reveal cctxt block ~source ~src_pk operations >>=? fun operations ->
   let contents =
@@ -221,6 +222,7 @@ let originate_contract
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage) >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
   fun { Michelson_v1_parser.expanded = storage } ->
+  let code = Script.lazy_expr code and storage = Script.lazy_expr storage in
   let origination =
     Origination { manager ;
                   delegate ;

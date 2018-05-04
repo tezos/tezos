@@ -30,8 +30,8 @@ let parse_param s : Proto_alpha.Alpha_context.Script.expr =
 
 
 let parse_script code_str storage_str : Proto_alpha.Alpha_context.Script.t =
-  let code = parse_param code_str in
-  let storage = parse_param storage_str in
+  let code = Script_repr.lazy_expr (parse_param code_str) in
+  let storage = Script_repr.lazy_expr (parse_param storage_str) in
   let return: Proto_alpha.Alpha_context.Script.t = {code ; storage} in
   return
 

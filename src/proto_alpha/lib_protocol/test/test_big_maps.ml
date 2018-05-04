@@ -25,7 +25,9 @@ let parse_expr s : Proto_alpha.Alpha_context.Script.expr tzresult =
 
 let parse_script code_str storage_str : Proto_alpha.Alpha_context.Script.t tzresult =
   parse_expr code_str >>? fun code ->
+  let code = Proto_alpha.Alpha_context.Script.lazy_expr code in
   parse_expr storage_str >>? fun storage ->
+  let storage = Proto_alpha.Alpha_context.Script.lazy_expr storage in
   ok { Proto_alpha.Alpha_context.Script.code ; storage }
 
 let code = {|

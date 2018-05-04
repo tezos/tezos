@@ -164,12 +164,12 @@ module Contract : sig
 
   module Code : Indexed_carbonated_data_storage
     with type key = Contract_repr.t
-     and type value = Script_repr.expr
+     and type value = Script_repr.lazy_expr
      and type t := Raw_context.t
 
   module Storage : Indexed_carbonated_data_storage
     with type key = Contract_repr.t
-     and type value = Script_repr.expr
+     and type value = Script_repr.lazy_expr
      and type t := Raw_context.t
 
   (** Current storage space in bytes.

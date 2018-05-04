@@ -14,7 +14,7 @@ open Alpha_context
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
 type error += Duplicate_endorsement of int (* `Branch *)
-type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.expr option (* `Permanent *)
+type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.lazy_expr option (* `Permanent *)
 type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
 
@@ -79,7 +79,7 @@ let () =
     Data_encoding.(obj3
                      (req "contract" Contract.encoding)
                      (opt "expectedType" Script.expr_encoding)
-                     (opt "providedArgument" Script.expr_encoding))
+                     (opt "providedArgument" Script.lazy_expr_encoding))
     (function Bad_contract_parameter (c, expected, supplied) ->
        Some (c, expected, supplied) | _ -> None)
     (fun (c, expected, supplied) -> Bad_contract_parameter (c, expected, supplied)) ;
@@ -404,6 +404,7 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
           match parameters with
           | None -> return ()
           | Some arg ->
+              Lwt.return (Script.force_decode arg) >>=? fun arg ->
               match Micheline.root arg with
               | Prim (_, D_Unit, [], _) ->
                   return ()
@@ -422,16 +423,18 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
                 storage_size_diff = 0L } in
           return (ctxt, result)
       | Some script ->
-          Lwt.return @@ Script_ir_translator.parse_toplevel script.code >>=? fun (arg_type, _, _) ->
+          Lwt.return (Script.force_decode script.code) >>=? fun code ->
+          Lwt.return @@ Script_ir_translator.parse_toplevel code >>=? fun (arg_type, _, _) ->
           let arg_type = Micheline.strip_locations arg_type in
           begin match parameters, Micheline.root arg_type with
             | None, Prim (_, T_unit, _, _) ->
                 return (ctxt, (Micheline.strip_locations (Prim (0, Script.D_Unit, [], None))))
             | Some parameters, _ ->
+                Lwt.return (Script.force_decode parameters) >>=? fun arg ->
                 trace
                   (Bad_contract_parameter (destination, Some arg_type, Some parameters))
-                  (Script_ir_translator.typecheck_data ctxt ~check_operations:true (parameters, arg_type)) >>=? fun ctxt ->
-                return (ctxt, parameters)
+                  (Script_ir_translator.typecheck_data ctxt ~check_operations:true (arg, arg_type)) >>=? fun ctxt ->
+                return (ctxt, arg)
             | None, _ -> fail (Bad_contract_parameter (destination, Some arg_type, None))
           end >>=? fun (ctxt, parameter) ->
           Script_interpreter.execute

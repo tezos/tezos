@@ -35,6 +35,7 @@ let manager_full src ?(fee = Tez.zero) ops context gas_limit =
 
 
 let transaction ?parameters amount destination =
+  let parameters = Option.map ~f:Script.lazy_expr parameters in
   Transaction {
     amount ;
     parameters ;

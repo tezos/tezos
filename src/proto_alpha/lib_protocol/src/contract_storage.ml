@@ -309,7 +309,12 @@ let get_script c contract =
   | Some code, Some storage -> return (c, Some { Script_repr.code ; storage })
   | None, Some _ | Some _, None -> failwith "get_script"
 
-let get_storage = Storage.Contract.Storage.get_option
+let get_storage ctxt contract =
+  Storage.Contract.Storage.get_option ctxt contract >>=? function
+  | (ctxt, None) -> return (ctxt, None)
+  | (ctxt, Some storage) ->
+      Lwt.return (Script_repr.force_decode storage) >>=? fun storage ->
+      return (ctxt, Some storage)
 
 let get_counter c contract =
   Storage.Contract.Counter.get_option c contract >>=? function
@@ -370,6 +375,7 @@ let is_spendable c contract =
       Storage.Contract.Spendable.mem c contract >>= return
 
 let update_script_storage c contract storage big_map_diff =
+  let storage = Script_repr.lazy_expr storage in
   update_script_big_map c contract big_map_diff >>=? fun (c, big_map_size_diff) ->
   Storage.Contract.Storage.set c contract storage >>=? fun (c, size_diff) ->
   Storage.Contract.Used_storage_space.get c contract >>=? fun previous_size ->

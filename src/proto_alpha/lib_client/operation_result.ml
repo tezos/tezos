@@ -28,6 +28,10 @@ let pp_manager_operation_content ppf source operation internal pp_result result 
         begin match parameters with
           | None -> ()
           | Some expr ->
+              let expr =
+                Option.unopt_exn
+                  (Failure "ill-serialized argument")
+                  (Data_encoding.force_decode expr) in
               Format.fprintf ppf
                 "@,Parameter: @[<v 0>%a@]"
                 Michelson_v1_printer.print_expr expr
@@ -47,6 +51,14 @@ let pp_manager_operation_content ppf source operation internal pp_result result 
         begin match script with
           | None -> Format.fprintf ppf "@,No script (accepts all transactions)"
           | Some { code ; storage } ->
+              let code =
+                Option.unopt_exn
+                  (Failure "ill-serialized code")
+                  (Data_encoding.force_decode code)
+              and storage =
+                Option.unopt_exn
+                  (Failure "ill-serialized storage")
+                  (Data_encoding.force_decode storage) in
               Format.fprintf ppf
                 "@,@[<hv 2>Script:@ %a\
                  @,@[<hv 2>Initial storage:@ %a@]"

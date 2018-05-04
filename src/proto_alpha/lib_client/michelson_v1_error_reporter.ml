@@ -248,6 +248,10 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 Contract.pp c
                 print_expr expected
           | Apply.Bad_contract_parameter (c, Some expected, Some argument) ->
+              let argument =
+                Option.unopt_exn
+                  (Failure "ill-serialized argument")
+                  (Data_encoding.force_decode argument) in
               Format.fprintf ppf
                 "@[<v 0>Contract %a expected an argument of type@,  %a@,but received@,  %a@]"
                 Contract.pp c
