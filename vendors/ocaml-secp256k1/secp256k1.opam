@@ -16,4 +16,5 @@ depends: [
   "conf-gmp" {build}
   "jbuilder" {build & >= "1.0+beta19.1"}
   "cstruct" {>= "3.2.1"}
+  "bigstring" {>= "0.1.1"}
 ]
