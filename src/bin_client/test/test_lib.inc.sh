@@ -53,7 +53,8 @@ admin_client_instances=()
 
 start_node() {
     local id=${1:-1}
-    start_sandboxed_node $id > LOG.$id 2>&1
+    shift
+    start_sandboxed_node $id "$@" > LOG.$id 2>&1
     register_log LOG.$id
     init_sandboxed_client $id
     wait_for_the_node_to_be_ready
