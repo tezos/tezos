@@ -385,6 +385,10 @@ bake_after $client transfer 100 from bootstrap1 to transfer_to \
 assert_balance test_transfer_account2 "120 ꜩ" # Why isn't this 120 ꜩ? Baking fee?
 
 
+# Test replay prevention
+init_with_transfer $contract_dir/replay.tz $key2 Unit 0 bootstrap1
+assert_fails $client transfer 0 from bootstrap1 to replay
+
 # Tests create_account
 init_with_transfer $contract_dir/create_account.tz $key2 None 1,000 bootstrap1
 $client transfer 100 from bootstrap1 to create_account \

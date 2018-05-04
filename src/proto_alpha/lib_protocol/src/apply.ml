@@ -17,6 +17,7 @@ type error += Duplicate_endorsement of int (* `Branch *)
 type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.lazy_expr option (* `Permanent *)
 type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
+type error += Internal_operation_replay of internal_operation
 
 type error += Invalid_double_endorsement_evidence (* `Permanent *)
 type error += Inconsistent_double_endorsement_evidence
@@ -114,9 +115,19 @@ let () =
           Format.fprintf ppf "Missing seed's nonce commitment in block header."
         else
           Format.fprintf ppf "Unexpected seed's nonce commitment in block header.")
-    Data_encoding.(obj1 (req "expected "bool))
+    Data_encoding.(obj1 (req "expected" bool))
     (function Invalid_commitment { expected } -> Some expected | _ -> None)
     (fun expected -> Invalid_commitment { expected }) ;
+  register_error_kind
+    `Permanent
+    ~id:"internal_operation_replay"
+    ~title:"Internal operation replay"
+    ~description:"An internal operation was emitted twice by a script"
+    ~pp:(fun ppf { nonce } ->
+        Format.fprintf ppf "Internal operation %d was emitted twice by a script" nonce)
+    Operation.internal_operation_encoding
+    (function Internal_operation_replay op -> Some op | _ -> None)
+    (fun op -> Internal_operation_replay op) ;
   register_error_kind
     `Permanent
     ~id:"block.invalid_double_endorsement_evidence"
@@ -498,8 +509,13 @@ let apply_internal_manager_operations ctxt ~payer ops =
   let rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Ok (ctxt, applied))
-    | { source ; operation } as op :: rest ->
-        apply_manager_operation_content ctxt ~source ~payer ~internal:true operation >>= function
+    | { source ; operation ; nonce } as op :: rest ->
+        begin if internal_nonce_already_recorded ctxt nonce then
+            fail (Internal_operation_replay op)
+          else
+            let ctxt = record_internal_nonce ctxt nonce in
+            apply_manager_operation_content ctxt ~source ~payer ~internal:true operation
+        end >>= function
         | Error errors ->
             let result = Internal op, Failed errors in
             let skipped = List.rev_map (fun op -> Internal op, Skipped) rest in
@@ -561,6 +577,7 @@ let apply_sourced_operation ctxt pred_block operation ops =
       Contract.increment_counter ctxt source >>=? fun ctxt ->
       Contract.spend ctxt source fee >>=? fun ctxt ->
       add_fees ctxt fee >>=? fun ctxt ->
+      let ctxt = reset_internal_nonce ctxt in
       Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
       Lwt.return (Contract.set_storage_limit ctxt storage_limit) >>=? fun ctxt ->
       apply_manager_operations ctxt source operations >>= begin function

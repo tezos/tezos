@@ -188,3 +188,16 @@ include T with type t := t and type context := context
 
 val record_endorsement: context -> int -> context
 val endorsement_already_recorded: context -> int -> bool
+
+(** Initialize the local nonce used for preventing a script to
+    duplicate an internal operation to replay it. *)
+val reset_internal_nonce: context -> context
+
+(** Increments the internal operation nonce. *)
+val fresh_internal_nonce: context -> (context * int) tzresult
+
+(** Mark an internal operation nonce as taken. *)
+val record_internal_nonce: context -> int -> context
+
+(** Check is the internal operation nonce has been taken. *)
+val internal_nonce_already_recorded: context -> int -> bool

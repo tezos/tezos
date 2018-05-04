@@ -209,6 +209,12 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_source (parsed, hilights) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
+    | Alpha_environment.Ecoproto_error (Apply.Internal_operation_replay op) :: rest ->
+        Format.fprintf ppf
+          "@[<v 2>Internal operation replay attempt:@,%a@]"
+          Operation_result.pp_internal_operation op ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
     | Alpha_environment.Ecoproto_error Gas.Gas_limit_too_high :: rest ->
         Format.fprintf ppf
           "Gas limit for the block is out of the protocol hard bounds." ;

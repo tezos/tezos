@@ -136,6 +136,11 @@ let fork_test_chain = Raw_context.fork_test_chain
 let endorsement_already_recorded = Raw_context.endorsement_already_recorded
 let record_endorsement = Raw_context.record_endorsement
 
+let reset_internal_nonce = Raw_context.reset_internal_nonce
+let fresh_internal_nonce = Raw_context.fresh_internal_nonce
+let record_internal_nonce = Raw_context.record_internal_nonce
+let internal_nonce_already_recorded = Raw_context.internal_nonce_already_recorded
+
 let add_fees = Raw_context.add_fees
 let add_rewards = Raw_context.add_rewards
 

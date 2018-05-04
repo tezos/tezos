@@ -135,6 +135,7 @@ val unsigned_operation_encoding:
 type internal_operation = {
   source: Contract_repr.contract ;
   operation: manager_operation ;
+  nonce: int ;
 }
 
 val internal_operation_encoding:

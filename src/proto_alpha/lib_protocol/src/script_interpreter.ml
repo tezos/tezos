@@ -593,7 +593,8 @@ let rec interp
               Transaction
                 { amount ; destination ;
                   parameters = Some (Script.lazy_expr (Micheline.strip_locations p)) } in
-            logged_return (Item ({ source = self ; operation }, rest), ctxt)
+            Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
+            logged_return (Item ({ source = self ; operation ; nonce }, rest), ctxt)
         | Create_account,
           Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
@@ -602,7 +603,8 @@ let rec interp
               Origination
                 { credit ; manager ; delegate ; preorigination = Some contract ;
                   delegatable ; script = None ; spendable = true } in
-            logged_return (Item ({ source = self ; operation },
+            Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
+            logged_return (Item ({ source = self ; operation ; nonce },
                                  Item (contract, rest)), ctxt)
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
@@ -631,14 +633,16 @@ let rec interp
                   delegatable ; spendable ;
                   script = Some { code = Script.lazy_expr code ;
                                   storage = Script.lazy_expr storage } } in
+            Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return
-              (Item ({ source = self ; operation },
+              (Item ({ source = self ; operation ; nonce },
                      Item (contract, rest)), ctxt)
         | Set_delegate,
           Item (delegate, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
             let operation = Delegation delegate in
-            logged_return (Item ({ source = self ; operation }, rest), ctxt)
+            Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
+            logged_return (Item ({ source = self ; operation ; nonce }, rest), ctxt)
         | Balance, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.balance) >>=? fun ctxt ->
             Contract.get_balance ctxt self >>=? fun balance ->

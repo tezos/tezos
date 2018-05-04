@@ -817,6 +817,7 @@ and counter = Int32.t
 type internal_operation = {
   source: Contract.contract ;
   operation: manager_operation ;
+  nonce : int ;
 }
 
 module Operation : sig
@@ -920,6 +921,11 @@ val fork_test_chain: context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
 val endorsement_already_recorded: context -> int -> bool
 val record_endorsement: context -> int -> context
+
+val reset_internal_nonce: context -> context
+val fresh_internal_nonce: context -> (context * int) tzresult
+val record_internal_nonce: context -> int -> context
+val internal_nonce_already_recorded: context -> int -> bool
 
 val add_fees: context -> Tez.t -> context tzresult Lwt.t
 val add_rewards: context -> Tez.t -> context tzresult Lwt.t

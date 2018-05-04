@@ -16,7 +16,7 @@ type t = {
   level: Level_repr.t ;
   timestamp: Time.t ;
   fitness: Int64.t ;
-  endorsements_received: Int_set.t;
+  endorsements_received: Int_set.t ;
   fees: Tez_repr.t ;
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
@@ -24,6 +24,8 @@ type t = {
   block_storage: Int64.t ;
   operation_storage: Storage_limit_repr.t ;
   origination_nonce: Contract_repr.origination_nonce option ;
+  internal_nonce: int ;
+  internal_nonces_used: Int_set.t ;
 }
 
 type context = t
@@ -38,6 +40,33 @@ let recover ctxt = ctxt.context
 
 let record_endorsement ctxt k = { ctxt with endorsements_received = Int_set.add k ctxt.endorsements_received }
 let endorsement_already_recorded ctxt k = Int_set.mem k ctxt.endorsements_received
+
+type error += Too_many_internal_operations (* `Permanent *)
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"too_many_internal_operations"
+    ~title: "Too many internal operations"
+    ~description:
+      "A transaction exceeded the hard limit \
+       of internal operations it can emit"
+    empty
+    (function Too_many_internal_operations -> Some () | _ -> None)
+    (fun () -> Too_many_internal_operations)
+
+let fresh_internal_nonce ctxt =
+  if Compare.Int.(ctxt.internal_nonce >= 65_535) then
+    error Too_many_internal_operations
+  else
+    ok ({ ctxt with internal_nonce = ctxt.internal_nonce + 1 }, ctxt.internal_nonce)
+let reset_internal_nonce ctxt =
+  { ctxt with internal_nonces_used = Int_set.empty ; internal_nonce = 0 }
+let record_internal_nonce ctxt k =
+  { ctxt with internal_nonces_used = Int_set.add k ctxt.internal_nonces_used }
+let internal_nonce_already_recorded ctxt k =
+  Int_set.mem k ctxt.internal_nonces_used
 
 let set_current_fitness ctxt fitness = { ctxt with fitness }
 
@@ -362,6 +391,8 @@ let prepare ~level ~timestamp ~fitness ctxt =
     operation_storage = Unaccounted ;
     block_storage = constants.Constants_repr.hard_storage_limit_per_block ;
     origination_nonce = None ;
+    internal_nonce = 0 ;
+    internal_nonces_used = Int_set.empty ;
   }
 
 let check_first_block ctxt =
@@ -411,6 +442,8 @@ let register_resolvers enc resolve =
       block_storage = Constants_repr.default.hard_storage_limit_per_block ;
       operation_storage = Unaccounted ;
       origination_nonce = None ;
+      internal_nonce = 0 ;
+      internal_nonces_used = Int_set.empty ;
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve
