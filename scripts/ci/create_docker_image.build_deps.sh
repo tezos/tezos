@@ -37,7 +37,7 @@ RUN opam exec -- ./tezos/scripts/install_build_deps.sh || \
       echo ; \
       opam remote add default https://opam.ocaml.org/2.0 && \
       opam exec -- ./tezos/scripts/install_build_deps.sh )
-RUN opam install --yes ocp-indent alcotest-lwt
+RUN opam install --yes ocp-indent alcotest.0.8.3 alcotest-lwt
 EOF
 
 tar -c $dependencies | tar -C "$tmp_dir" -x
