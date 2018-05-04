@@ -15,7 +15,6 @@
               tezos-rpc
               tezos-clic
               lwt
-              nocrypto
               blake2
               hacl
               secp256k1

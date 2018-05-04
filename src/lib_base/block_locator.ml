@@ -65,20 +65,20 @@ module Step : sig
 
 end = struct
 
-  type state = int * int * Cstruct.t
+  type state = int * int * MBytes.t
 
   let init seed head =
-    let seed =
-      Nocrypto.Hash.digest `SHA256 @@
-      Cstruct.concat
-        [ Cstruct.of_bigarray @@ P2p_peer.Id.to_bytes seed.sender_id ;
-          Cstruct.of_bigarray @@ P2p_peer.Id.to_bytes seed.receiver_id ;
-          Cstruct.of_bigarray @@ Block_hash.to_bytes head ] in
-    (1, 9, seed)
+    let open Hacl.Hash in
+    let st = SHA256.init () in
+    List.iter (SHA256.update st) [
+      P2p_peer.Id.to_bytes seed.sender_id ;
+      P2p_peer.Id.to_bytes seed.receiver_id ;
+      Block_hash.to_bytes head ] ;
+    (1, 9, SHA256.finish st)
 
   let draw seed n =
-    Int32.to_int (MBytes.get_int32 (Cstruct.to_bigarray seed) 0) mod n,
-    Nocrypto.Hash.digest `SHA256 seed
+    Int32.to_int (MBytes.get_int32 seed 0) mod n,
+    Hacl.Hash.SHA256.digest seed
 
   let next (step, counter, seed) =
     let random_gap, seed =

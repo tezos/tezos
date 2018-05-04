@@ -15,7 +15,6 @@ depends: [
   "tezos-rpc"
   "tezos-clic"
   "lwt"
-  "nocrypto"
   "blake2"
   "hacl"
   "zarith"
