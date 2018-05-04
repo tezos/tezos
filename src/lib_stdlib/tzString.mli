@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Set : Set.S with type elt = string
 module Map : Map.S with type key = string
 
 (** Splits a string on slashes, grouping multiple slashes, and

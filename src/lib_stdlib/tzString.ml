@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Set = Set.Make (String)
 module Map = Map.Make (String)
 
 let split delim ?(dup = true) ?(limit = max_int) path =
