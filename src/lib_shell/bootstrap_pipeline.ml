@@ -61,6 +61,9 @@ let fetch_step pipeline (step : Block_locator.step)  =
           pipeline.chain_db ~peer:pipeline.peer_id
           hash ()
       end >>=? fun header ->
+      fail_unless
+        (Time.(now () >= header.shell.timestamp))
+        (Future_block_header hash) >>=? fun () ->
       lwt_debug "fetched block header %a from peer %a."
         Block_hash.pp_short hash
         P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
@@ -95,6 +98,12 @@ let headers_fetch_worker_loop pipeline =
       Lwt.return_unit
   | Error [ Distributed_db.Block_header.Timeout bh ] ->
       lwt_log_info "request for header %a from peer %a timed out."
+        Block_hash.pp_short bh
+        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
+      Lwt.return_unit
+  | Error [ Future_block_header bh ] ->
+      lwt_log_notice "Block locator %a from peer %a contains future blocks."
         Block_hash.pp_short bh
         P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
@@ -214,6 +223,7 @@ let create
   Lwt_canceler.on_cancel pipeline.canceler begin fun () ->
     Lwt_pipe.close fetched_blocks ;
     Lwt_pipe.close fetched_headers ;
+    (* TODO proper cleanup of ressources... *)
     Lwt.return_unit
   end ;
   let head, _ = (pipeline.locator : Block_locator.t :> _ * _) in
