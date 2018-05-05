@@ -87,8 +87,10 @@ let same_blocks () =
   Context.init 2 >>=? fun (b, _contracts) ->
   Block.bake b >>=? fun ba ->
   Op.double_baking (B ba) ba.header ba.header >>=? fun operation ->
-  Block.bake ~operation ba >>=? fun _ ->
-  (* TODO: should fail *)
+  Block.bake ~operation ba >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res begin function
+    | Apply.Invalid_double_baking_evidence _ -> true
+    | _ -> false end >>=? fun () ->
   return ()
 
 (** Check that a double baking operation exposing two blocks with
@@ -174,7 +176,7 @@ let tests = [
   Test.tztest "valid double baking evidence" `Quick valid_double_baking_evidence ;
 
   (* Should fail*)
-  (* Test.tztest "same blocks" `Quick same_blocks ; *)
+  Test.tztest "same blocks" `Quick same_blocks ;
   Test.tztest "different levels" `Quick different_levels ;
   Test.tztest "too early double baking evidence" `Quick too_early_double_baking_evidence ;
   Test.tztest "too late double baking evidence" `Quick too_late_double_baking_evidence ;

@@ -28,7 +28,10 @@ type error += Outdated_double_endorsement_evidence
   of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
 
 type error += Invalid_double_baking_evidence
-  of { level1: Int32.t ; level2: Int32.t } (* `Permanent *)
+  of { hash1: Block_hash.t ;
+       level1: Int32.t ;
+       hash2: Block_hash.t ;
+       level2: Int32.t } (* `Permanent *)
 type error += Inconsistent_double_baking_evidence
   of { delegate1: Signature.Public_key_hash.t ; delegate2: Signature.Public_key_hash.t } (* `Permanent *)
 type error += Unrequired_double_baking_evidence (* `Branch*)
@@ -201,17 +204,22 @@ let () =
     ~title:"Invalid double baking evidence"
     ~description:"A double-baking evidence is inconsistent \
                  \ (two distinct level)"
-    ~pp:(fun ppf (level1, level2) ->
+    ~pp:(fun ppf (hash1, level1, hash2, level2) ->
         Format.fprintf ppf
-          "Inconsistent double-baking evidence (levels: %ld and %ld)"
+          "Invalid double-baking evidence (hash: %a and %a, levels: %ld and %ld)"
+          Block_hash.pp hash1 Block_hash.pp hash2
           level1 level2)
-    Data_encoding.(obj2
+    Data_encoding.(obj4
+                     (req "hash1" Block_hash.encoding)
                      (req "level1" int32)
+                     (req "hash2" Block_hash.encoding)
                      (req "level2" int32))
     (function
-      | Invalid_double_baking_evidence { level1 ; level2 } -> Some (level1, level2)
+      | Invalid_double_baking_evidence { hash1 ; level1 ; hash2 ; level2 } ->
+          Some (hash1, level1, hash2, level2)
       | _ -> None)
-    (fun (level1, level2) -> Invalid_double_baking_evidence { level1 ; level2 }) ;
+    (fun (hash1, level1, hash2, level2) ->
+       Invalid_double_baking_evidence { hash1 ; level1 ; hash2 ; level2 }) ;
   register_error_kind
     `Permanent
     ~id:"block.inconsistent_double_baking_evidence"
@@ -677,10 +685,17 @@ let apply_contents_list
       | _, _ -> fail Invalid_double_endorsement_evidence
     end
   | Single (Double_baking_evidence { bh1 ; bh2 }) ->
-      fail_unless Compare.Int32.(bh1.shell.level = bh2.shell.level)
+      let hash1 = Block_header.hash bh1 in
+      let hash2 = Block_header.hash bh2 in
+      fail_unless
+        (Compare.Int32.(bh1.shell.level = bh2.shell.level) &&
+         not (Block_hash.equal hash1 hash2))
         (Invalid_double_baking_evidence
-           { level1 = bh1.shell.level ;
-             level2 = bh2.shell.level }) >>=? fun () ->
+           { hash1 ;
+             level1 = bh1.shell.level ;
+             hash2 ;
+             level2 = bh2.shell.level ;
+           }) >>=? fun () ->
       Lwt.return (Raw_level.of_int32 bh1.shell.level) >>=? fun raw_level ->
       let oldest_level = Level.last_allowed_fork_level ctxt in
       fail_unless Raw_level.(raw_level < (Level.current ctxt).level)
