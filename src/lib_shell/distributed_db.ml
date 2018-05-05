@@ -483,10 +483,18 @@ module P2p_reader = struct
         Lwt_list.exists_p
           (State.Block.known_invalid chain_db.chain_state)
           (Block_header.hash head :: hist) >>= fun known_invalid ->
-        if not known_invalid then
+        if known_invalid then
+          Lwt.return_unit (* TODO Kickban *)
+        else if Time.(now () < head.shell.timestamp) then begin
+          (* TODO some penalty *)
+          lwt_log_notice "Received future block %a from peer %a."
+            Block_hash.pp_short (Block_header.hash head)
+            P2p_peer.Id.pp_short state.gid >>= fun () ->
+          Lwt.return_unit
+        end else begin
           chain_db.callback.notify_branch state.gid locator ;
-        (* TODO Kickban *)
-        Lwt.return_unit
+          Lwt.return_unit
+        end
 
     | Deactivate chain_id ->
         may_handle state chain_id @@ fun chain_db ->
@@ -507,10 +515,18 @@ module P2p_reader = struct
         may_handle state chain_id @@ fun chain_db ->
         let head = Block_header.hash header in
         State.Block.known_invalid chain_db.chain_state head >>= fun known_invalid ->
-        if not known_invalid then
+        if known_invalid then
+          Lwt.return_unit (* TODO Kickban *)
+        else if Time.(now () < header.shell.timestamp) then begin
+          (* TODO some penalty *)
+          lwt_log_notice "Received future block %a from peer %a."
+            Block_hash.pp_short head
+            P2p_peer.Id.pp_short state.gid >>= fun () ->
+          Lwt.return_unit
+        end else begin
           chain_db.callback.notify_head state.gid header mempool ;
-        (* TODO Kickban *)
-        Lwt.return_unit
+          Lwt.return_unit
+        end
 
     | Get_block_headers hashes ->
         Lwt_list.iter_p

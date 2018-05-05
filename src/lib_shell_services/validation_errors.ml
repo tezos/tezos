@@ -12,6 +12,7 @@
 type error += Parse_error
 type error += Too_many_operations
 type error += Oversized_operation of { size: int ; max: int }
+type error += Future_block_header of Block_hash.t
 
 let () =
   (* Parse error *)
