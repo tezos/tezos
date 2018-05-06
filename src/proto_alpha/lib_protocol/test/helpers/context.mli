@@ -20,7 +20,7 @@ val get_level: t -> Raw_level.t tzresult Lwt.t
 
 val get_endorsers: t -> Alpha_services.Delegate.Endorsing_rights.t list tzresult Lwt.t
 
-val get_endorser: t -> int -> public_key_hash tzresult Lwt.t
+val get_endorser: t -> (public_key_hash * int list) tzresult Lwt.t
 
 val get_bakers: t -> public_key_hash list tzresult Lwt.t
 

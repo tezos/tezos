@@ -215,9 +215,9 @@ let compare_operations op1 op2 =
   let Operation_data op1 = op1.protocol_data in
   let Operation_data op2 = op2.protocol_data in
   match op1.contents, op2.contents with
-  | Single (Endorsements _), Single (Endorsements _) -> 0
-  | _, Single (Endorsements _) -> 1
-  | Single (Endorsements _), _ -> -1
+  | Single (Endorsement _), Single (Endorsement _) -> 0
+  | _, Single (Endorsement _) -> 1
+  | Single (Endorsement _), _ -> -1
 
   | Single (Seed_nonce_revelation _), Single (Seed_nonce_revelation _) -> 0
   | _, Single (Seed_nonce_revelation _) -> 1

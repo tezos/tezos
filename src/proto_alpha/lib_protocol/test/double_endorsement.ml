@@ -52,9 +52,9 @@ let valid_double_endorsement_evidence () =
 
   block_fork b >>=? fun (blk_a, blk_b) ->
 
-  Context.get_endorser (B blk_a) 0 >>=? fun delegate ->
-  Op.endorsement ~delegate (B blk_a) [0] >>=? fun endorsement_a ->
-  Op.endorsement ~delegate (B blk_b) [0] >>=? fun endorsement_b ->
+  Context.get_endorser (B blk_a) >>=? fun (delegate, _slots) ->
+  Op.endorsement ~delegate (B blk_a) () >>=? fun endorsement_a ->
+  Op.endorsement ~delegate (B blk_b) () >>=? fun endorsement_b ->
   Block.bake ~operations:[Operation.pack endorsement_a] blk_a >>=? fun blk_a ->
   (* Block.bake ~operations:[endorsement_b] blk_b >>=? fun _ -> *)
 
@@ -82,7 +82,7 @@ let invalid_double_endorsement () =
   Context.init 10 >>=? fun (b, _) ->
   Block.bake b >>=? fun b ->
 
-  Op.endorsement (B b) [0] >>=? fun endorsement ->
+  Op.endorsement (B b) () >>=? fun endorsement ->
   Block.bake ~operation:(Operation.pack endorsement) b >>=? fun b ->
 
   Op.double_endorsement (B b) endorsement endorsement >>=? fun operation ->
@@ -97,9 +97,9 @@ let too_early_double_endorsement_evidence () =
   Context.init 2 >>=? fun (b, _) ->
   block_fork b >>=? fun (blk_a, blk_b) ->
 
-  Context.get_endorser (B blk_a) 0 >>=? fun delegate ->
-  Op.endorsement ~delegate (B blk_a) [0] >>=? fun endorsement_a ->
-  Op.endorsement ~delegate (B blk_b) [0] >>=? fun endorsement_b ->
+  Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
+  Op.endorsement ~delegate (B blk_a) () >>=? fun endorsement_a ->
+  Op.endorsement ~delegate (B blk_b) () >>=? fun endorsement_b ->
 
   Op.double_endorsement (B b) endorsement_a endorsement_b >>=? fun operation ->
   Block.bake ~operation b >>= fun res ->
@@ -116,9 +116,9 @@ let too_late_double_endorsement_evidence () =
 
   block_fork b >>=? fun (blk_a, blk_b) ->
 
-  Context.get_endorser (B blk_a) 0 >>=? fun delegate ->
-  Op.endorsement ~delegate (B blk_a) [0] >>=? fun endorsement_a ->
-  Op.endorsement ~delegate (B blk_b) [0] >>=? fun endorsement_b ->
+  Context.get_endorser (B blk_a) >>=? fun (delegate, _slots) ->
+  Op.endorsement ~delegate (B blk_a) () >>=? fun endorsement_a ->
+  Op.endorsement ~delegate (B blk_b) () >>=? fun endorsement_b ->
 
   fold_left_s (fun blk _ -> Block.bake_until_cycle_end blk)
     blk_a (1 -- (preserved_cycles + 1)) >>=? fun blk ->
@@ -134,12 +134,13 @@ let too_late_double_endorsement_evidence () =
 let different_delegates () =
   Context.init 2 >>=? fun (b, _) ->
 
-  block_fork b >>=? fun (blk_a, blk_b) ->
-  get_first_different_endorsers (B blk_a)
-  >>=? fun (endorser_a, endorser_b) ->
+  Block.bake b >>=? fun b ->
+  Block.bake b >>=? fun blk_a ->
+  Block.bake b >>=? fun blk_b ->
+  get_first_different_endorsers (B blk_a) >>=? fun (endorser_a, endorser_b) ->
 
-  Op.endorsement ~delegate:endorser_a.delegate (B blk_a) endorser_a.slots >>=? fun e_a ->
-  Op.endorsement ~delegate:endorser_b.delegate (B blk_b) endorser_b.slots >>=? fun e_b ->
+  Op.endorsement ~delegate:endorser_a.delegate (B blk_a) () >>=? fun e_a ->
+  Op.endorsement ~delegate:endorser_b.delegate (B blk_b) () >>=? fun e_b ->
   Op.double_endorsement (B blk_a) e_a e_b >>=? fun operation ->
   Block.bake ~operation blk_a >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res begin function
@@ -153,10 +154,10 @@ let wrong_delegate () =
 
   block_fork b >>=? fun (blk_a, blk_b) ->
   get_first_different_endorsers (B blk_a)
-  >>=? fun (endorser_a, endorser_b) ->
+  >>=? fun (_endorser_a, endorser_b) ->
 
-  Op.endorsement ~delegate:endorser_b.delegate (B blk_a) endorser_a.slots >>=? fun endorsement_a ->
-  Op.endorsement ~delegate:endorser_b.delegate (B blk_b) endorser_b.slots >>=? fun endorsement_b ->
+  Op.endorsement ~delegate:endorser_b.delegate (B blk_a) () >>=? fun endorsement_a ->
+  Op.endorsement ~delegate:endorser_b.delegate (B blk_b) () >>=? fun endorsement_b ->
 
   Op.double_endorsement (B blk_a) endorsement_a endorsement_b >>=? fun operation ->
   Block.bake ~operation blk_a >>= fun e ->
@@ -173,3 +174,4 @@ let tests = [
   Test.tztest "different delegates" `Quick different_delegates ;
   Test.tztest "wrong delegate" `Quick wrong_delegate ;
 ]
+

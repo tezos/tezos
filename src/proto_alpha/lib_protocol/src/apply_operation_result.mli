@@ -53,8 +53,8 @@ and packed_contents_result_list =
 
 (** Result of applying an {!Operation.contents}. Follows the same structure. *)
 and 'kind contents_result =
-  | Endorsements_result :
-      Signature.Public_key_hash.t * int list -> Kind.endorsements contents_result
+  | Endorsement_result :
+      Signature.Public_key_hash.t * int list -> Kind.endorsement contents_result
   | Seed_nonce_revelation_result :
       balance_updates -> Kind.seed_nonce_revelation contents_result
   | Double_endorsement_evidence_result :

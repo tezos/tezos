@@ -547,14 +547,14 @@ module Endorse = struct
   let forge_endorsement
       block
       src_sk
-      slot =
+    =
     Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
     Alpha_block_services.metadata
       !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
     let level = level.level in
     let shell = { Tezos_base.Operation.branch = hash } in
     let contents =
-      Single (Endorsements { block = hash ; level ; slots = [ slot ]}) in
+      Single (Endorsement { block = hash ; level }) in
     sign ~watermark:Endorsement src_sk shell (Contents_list contents)
 
   let signing_slots
@@ -568,25 +568,9 @@ module Endorse = struct
     | _ -> return []
 
   let endorse
-      ?slot
       (contract : Account.t)
       block =
-    Alpha_block_services.metadata
-      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
-    let level = level.level in
-    begin
-      match slot with
-      | Some slot -> return slot
-      | None -> begin
-          signing_slots
-            block contract.Account.pkh
-            level >>=? function
-          | slot::_ -> return slot
-          | [] ->
-              failwith "No slot found at level %a" Raw_level.pp level
-        end
-    end >>=? fun slot ->
-    forge_endorsement block contract.sk slot
+    forge_endorsement block contract.sk
 
   (* FIXME @vb: I don't understand this function, copied from @cago. *)
   let endorsers_list block =

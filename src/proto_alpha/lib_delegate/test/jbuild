@@ -1,8 +1,7 @@
 (jbuild_version 1)
 
 (executables
- ((names (test_endorsement
-          test_michelson_parser
+ ((names (test_michelson_parser
           test_origination
           test_transaction
           test_rpc
@@ -29,17 +28,11 @@
 
 (alias
  ((name buildtest)
-  (deps (test_endorsement.exe
-         test_michelson_parser.exe
+  (deps (test_michelson_parser.exe
          ;test_origination.exe
          ;test_transaction.exe
          test_rpc.exe
          test_vote.exe))))
-
-(alias
- ((name runtest_endorsement)
-  (locks  (/tcp-port/18100))
-  (action (chdir ${ROOT} (run ${exe:test_endorsement.exe} ${bin:tezos-node} 18100)))))
 
 (alias
  ((name runtest_michelson_parser)
@@ -67,8 +60,7 @@
 
 (alias
  ((name runtest)
-  (deps ((alias runtest_endorsement)
-         (alias runtest_michelson_parser)
+  (deps ((alias runtest_michelson_parser)
          ;(alias runtest_origination)
          ;(alias runtest_transaction)
          (alias runtest_rpc)

@@ -112,7 +112,6 @@ end
 module Endorse : sig
 
   val endorse :
-    ?slot:int ->
     Account.t ->
     Block_services.block ->
     Operation.packed tzresult Lwt.t

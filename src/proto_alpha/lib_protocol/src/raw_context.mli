@@ -192,9 +192,6 @@ end
 
 include T with type t := t and type context := context
 
-val record_endorsement: context -> int -> context
-val endorsement_already_recorded: context -> int -> bool
-
 (** Initialize the local nonce used for preventing a script to
     duplicate an internal operation to replay it. *)
 val reset_internal_nonce: context -> context
@@ -207,3 +204,13 @@ val record_internal_nonce: context -> int -> context
 
 (** Check is the internal operation nonce has been taken. *)
 val internal_nonce_already_recorded: context -> int -> bool
+
+val record_endorsement:
+  context -> Signature.Public_key_hash.t -> context
+val allowed_endorsements:
+  context ->
+  (Signature.Public_key.t * int list) Signature.Public_key_hash.Map.t
+val init_endorsements:
+  context ->
+  (Signature.Public_key.t * int list) Signature.Public_key_hash.Map.t ->
+  context

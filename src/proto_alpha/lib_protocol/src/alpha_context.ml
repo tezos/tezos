@@ -137,8 +137,9 @@ let finalize ?commit_message:message c =
 let activate = Raw_context.activate
 let fork_test_chain = Raw_context.fork_test_chain
 
-let endorsement_already_recorded = Raw_context.endorsement_already_recorded
 let record_endorsement = Raw_context.record_endorsement
+let allowed_endorsements = Raw_context.allowed_endorsements
+let init_endorsements = Raw_context.init_endorsements
 
 let reset_internal_nonce = Raw_context.reset_internal_nonce
 let fresh_internal_nonce = Raw_context.fresh_internal_nonce

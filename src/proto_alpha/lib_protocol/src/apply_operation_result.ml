@@ -334,8 +334,8 @@ let internal_operation_result_encoding :
   ]
 
 type 'kind contents_result =
-  | Endorsements_result :
-      Signature.Public_key_hash.t * int list -> Kind.endorsements contents_result
+  | Endorsement_result :
+      Signature.Public_key_hash.t * int list -> Kind.endorsement contents_result
   | Seed_nonce_revelation_result :
       balance_updates -> Kind.seed_nonce_revelation contents_result
   | Double_endorsement_evidence_result :
@@ -389,17 +389,17 @@ module Encoding = struct
            (req "slots" (list uint8))) ;
       select =
         (function
-          | Contents_result (Endorsements_result _ as op) -> Some op
+          | Contents_result (Endorsement_result _ as op) -> Some op
           | _ -> None) ;
       mselect =
         (function
-          | Contents_and_result (Endorsements _ as op, res) -> Some (op, res)
+          | Contents_and_result (Endorsement _ as op, res) -> Some (op, res)
           | _ -> None) ;
       proj =
         (function
-          | Endorsements_result (d, s) -> (d, s)) ;
+          | Endorsement_result (d, s) -> (d, s)) ;
       inj =
-        (fun (d, s) -> Endorsements_result (d, s))
+        (fun (d, s) -> Endorsement_result (d, s))
     }
 
   let seed_nonce_revelation_case =
@@ -543,7 +543,7 @@ module Encoding = struct
               Some (Manager_operation_result
                       { op with operation_result = Failed (res_case.kind, errs) })
           | Contents_result Ballot_result -> None
-          | Contents_result (Endorsements_result _) -> None
+          | Contents_result (Endorsement_result _) -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
           | Contents_result (Double_endorsement_evidence_result _) -> None
           | Contents_result (Double_baking_evidence_result _) -> None
@@ -754,8 +754,8 @@ let kind_equal
   : type kind kind2. kind contents -> kind2 contents_result -> (kind, kind2) eq option =
   fun op res ->
     match op, res with
-    | Endorsements _, Endorsements_result _ -> Some Eq
-    | Endorsements _, _ -> None
+    | Endorsement _, Endorsement_result _ -> Some Eq
+    | Endorsement _, _ -> None
     | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq
     | Seed_nonce_revelation _, _ -> None
     | Double_endorsement_evidence _, Double_endorsement_evidence_result _ -> Some Eq

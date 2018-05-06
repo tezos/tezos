@@ -13,7 +13,6 @@ open Alpha_context
 
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
-type error += Duplicate_endorsement of int (* `Branch *)
 type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
 type error += Internal_operation_replay of packed_internal_operation
@@ -71,16 +70,6 @@ let () =
                      (req "provided" Voting_period.encoding))
     (function Wrong_voting_period (e, p) -> Some (e, p) | _ -> None)
     (fun (e, p) -> Wrong_voting_period (e, p));
-  register_error_kind
-    `Branch
-    ~id:"operation.duplicate_endorsement"
-    ~title:"Duplicate endorsement"
-    ~description:"Two endorsements received for the same slot"
-    ~pp:(fun ppf k ->
-        Format.fprintf ppf "Duplicate endorsement for slot %d." k)
-    Data_encoding.(obj1 (req "slot" uint16))
-    (function Duplicate_endorsement k -> Some k | _ -> None)
-    (fun k -> Duplicate_endorsement k);
   register_error_kind
     `Temporary
     ~id:"operation.invalid_endorsement_level"
@@ -602,30 +591,21 @@ let rec apply_manager_contents_list
             Lwt.return (ctxt, Cons_result (result, mark_skipped rest))
 
 let apply_contents_list
-    (type kind) ctxt mode pred_block operation (contents_list : kind contents_list)
+    (type kind) ctxt mode pred_block
+    (operation : kind operation)
+    (contents_list : kind contents_list)
   : (context * kind contents_result_list) tzresult Lwt.t =
   match contents_list with
-  | Single (Endorsements { block ; level ; slots }) ->
-      begin
-        match Level.pred ctxt (Level.current ctxt) with
-        | None -> assert false (* absurd: (Level.current ctxt).raw_level > 0 *)
-        | Some lvl -> return lvl
-      end >>=? fun ({ level = current_level ;_ } as lvl) ->
+  | Single (Endorsement { block ; level }) ->
+      let current_level = (Level.current ctxt).level in
       fail_unless
         (Block_hash.equal block pred_block)
         (Wrong_endorsement_predecessor (pred_block, block)) >>=? fun () ->
       fail_unless
-        Raw_level.(level = current_level)
+        Raw_level.(succ level = current_level)
         Invalid_endorsement_level >>=? fun () ->
-      fold_left_s (fun ctxt slot ->
-          fail_when
-            (endorsement_already_recorded ctxt slot)
-            (Duplicate_endorsement slot) >>=? fun () ->
-          return (record_endorsement ctxt slot))
-        ctxt slots >>=? fun ctxt ->
-      Baking.check_endorsements_rights ctxt lvl slots >>=? fun delegate ->
-      Operation.check_signature delegate operation >>=? fun () ->
-      let delegate = Signature.Public_key.hash delegate in
+      Baking.check_endorsement_rights ctxt operation >>=? fun (delegate, slots) ->
+      let ctxt = record_endorsement ctxt delegate in
       let gap = List.length slots in
       let ctxt = Fitness.increase ~gap ctxt in
       Lwt.return
@@ -635,7 +615,7 @@ let apply_contents_list
       Global.get_last_block_priority ctxt >>=? fun block_priority ->
       Baking.endorsement_reward ctxt ~block_priority gap >>=? fun reward ->
       Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
-      return (ctxt, Single_result (Endorsements_result (delegate, slots)))
+      return (ctxt, Single_result (Endorsement_result (delegate, slots)))
   | Single (Seed_nonce_revelation { level ; nonce }) ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
@@ -645,8 +625,8 @@ let apply_contents_list
       return (ctxt, Single_result (Seed_nonce_revelation_result [(* FIXME *)]))
   | Single (Double_endorsement_evidence { op1 ; op2 }) -> begin
       match op1.protocol_data.contents, op2.protocol_data.contents with
-      | Single (Endorsements e1),
-        Single (Endorsements e2)
+      | Single (Endorsement e1),
+        Single (Endorsement e2)
         when Raw_level.(e1.level = e2.level) &&
              not (Block_hash.equal e1.block e2.block) ->
           let level = Level.from_raw ctxt e1.level in
@@ -659,23 +639,15 @@ let apply_contents_list
             (Outdated_double_endorsement_evidence
                { level = level.level ;
                  last = oldest_level }) >>=? fun () ->
-          (* Whenever a delegate might have multiple endorsement slots for
-             given level, she should not endorse different block with different
-             slots. Hence, we don't check that [e1.slots] and [e2.slots]
-             intersect. *)
-          Baking.check_endorsements_rights ctxt level e1.slots >>=? fun delegate1 ->
-          Operation.check_signature delegate1 op1 >>=? fun () ->
-          Baking.check_endorsements_rights ctxt level e2.slots >>=? fun delegate2 ->
-          Operation.check_signature delegate2 op2 >>=? fun () ->
+          Baking.check_endorsement_rights ctxt op1 >>=? fun (delegate1, _) ->
+          Baking.check_endorsement_rights ctxt op2 >>=? fun (delegate2, _) ->
           fail_unless
-            (Signature.Public_key.equal delegate1 delegate2)
+            (Signature.Public_key_hash.equal delegate1 delegate2)
             (Inconsistent_double_endorsement_evidence
-               { delegate1 = Signature.Public_key.hash delegate1 ;
-                 delegate2 = Signature.Public_key.hash delegate2 }) >>=? fun () ->
-          let delegate = Signature.Public_key.hash delegate1 in
-          Delegate.has_frozen_balance ctxt delegate level.cycle >>=? fun valid ->
+               { delegate1 ; delegate2 }) >>=? fun () ->
+          Delegate.has_frozen_balance ctxt delegate1 level.cycle >>=? fun valid ->
           fail_unless valid Unrequired_double_endorsement_evidence >>=? fun () ->
-          Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, burned) ->
+          Delegate.punish ctxt delegate1 level.cycle >>=? fun (ctxt, burned) ->
           let reward =
             match Tez.(burned /? 2L) with
             | Ok v -> v
@@ -799,11 +771,21 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
   Baking.check_baking_rights
     ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, protocol_data, delegate_pk)
+  match Level.pred ctxt (Level.current ctxt) with
+  | None -> assert false (* genesis *)
+  | Some pred_level ->
+      Baking.endorsement_rights ctxt pred_level >>=? fun rights ->
+      let ctxt = init_endorsements ctxt rights in
+      return (ctxt, protocol_data, delegate_pk)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
-  return ctxt
+  match Level.pred ctxt (Level.current ctxt) with
+  | None -> assert false (* genesis *)
+  | Some pred_level ->
+      Baking.endorsement_rights ctxt pred_level >>=? fun rights ->
+      let ctxt = init_endorsements ctxt rights in
+      return ctxt
 
 let begin_application ctxt block_header pred_timestamp =
   let current_level = Alpha_context.Level.current ctxt in
@@ -821,7 +803,12 @@ let begin_application ctxt block_header pred_timestamp =
     (Invalid_commitment
        { expected = current_level.expected_commitment }) >>=? fun () ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, delegate_pk)
+  match Level.pred ctxt (Level.current ctxt) with
+  | None -> assert false (* genesis *)
+  | Some pred_level ->
+      Baking.endorsement_rights ctxt pred_level >>=? fun rights ->
+      let ctxt = init_endorsements ctxt rights in
+      return (ctxt, delegate_pk)
 
 let finalize_application ctxt protocol_data delegate =
   let deposit = Constants.block_security_deposit ctxt in

@@ -42,7 +42,7 @@ let preapply (type t)
       ({ branch }, Contents_list contents) in
   let watermark =
     match contents with
-    | Single (Endorsements _) -> Signature.Endorsement
+    | Single (Endorsement _) -> Signature.Endorsement
     | _ -> Signature.Generic_operation in
   begin
     match src_sk with

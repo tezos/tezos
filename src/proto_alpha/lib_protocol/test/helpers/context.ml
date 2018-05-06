@@ -66,13 +66,10 @@ end
 let get_endorsers ctxt =
   Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt
 
-let get_endorser ctxt slot =
-  Alpha_services.Delegate.Endorsing_rights.get
-    rpc_ctxt ctxt >>=? fun endorsers ->
-  try return (List.find (fun {Alpha_services.Delegate.Endorsing_rights.slots} -> List.mem slot slots) endorsers).delegate
-  with _ ->
-    failwith "Failed to lookup endorsers for ctxt %a, slot %d."
-      Block_hash.pp_short (branch ctxt) slot
+let get_endorser ctxt =
+  Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt >>=? fun endorsers ->
+  let endorser = List.hd endorsers in
+  return (endorser.delegate, endorser.slots)
 
 let get_bakers ctxt =
   Alpha_services.Delegate.Baking_rights.get

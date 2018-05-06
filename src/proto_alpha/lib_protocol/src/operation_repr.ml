@@ -14,7 +14,7 @@ module Kind = struct
   type double_endorsement_evidence = Double_endorsement_evidence_kind
   type double_baking_evidence = Double_baking_evidence_kind
   type activate_account = Activate_account_kind
-  type endorsements = Endorsements_kind
+  type endorsement = Endorsement_kind
   type proposals = Proposals_kind
   type ballot = Ballot_kind
   type reveal = Reveal_kind
@@ -51,18 +51,17 @@ and _ contents_list =
     (('kind * 'rest) Kind.manager ) contents_list
 
 and _ contents =
-  | Endorsements : {
+  | Endorsement : {
       block: Block_hash.t ;
       level: Raw_level_repr.t ;
-      slots: int list ;
-    } -> Kind.endorsements contents
+    } -> Kind.endorsement contents
   | Seed_nonce_revelation : {
       level: Raw_level_repr.t ;
       nonce: Seed_repr.nonce ;
     } -> Kind.seed_nonce_revelation contents
   | Double_endorsement_evidence : {
-      op1: Kind.endorsements operation ;
-      op2: Kind.endorsements operation ;
+      op1: Kind.endorsement operation ;
+      op2: Kind.endorsement operation ;
     } -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
       bh1: Block_header_repr.t ;
@@ -305,25 +304,24 @@ module Encoding = struct
                proj: 'b contents -> 'a ;
                inj: 'a -> 'b contents } -> 'b case
 
-  let endorsements_encoding =
-    obj3
+  let endorsement_encoding =
+    obj2
       (req "block" Block_hash.encoding)
       (req "level" Raw_level_repr.encoding)
-      (req "slots" (list int31))
 
   let endorsement_case =
     Case {
       tag = 0 ;
       name = "endorsement" ;
-      encoding = endorsements_encoding ;
+      encoding = endorsement_encoding ;
       select =
         (function
-          | Contents (Endorsements _ as op) -> Some op
+          | Contents (Endorsement _ as op) -> Some op
           | _ -> None) ;
       proj =
-        (fun (Endorsements { block ; level ; slots }) -> (block, level, slots)) ;
+        (fun (Endorsement { block ; level }) -> (block, level)) ;
       inj =
-        (fun (block, level, slots) -> Endorsements { block ; level ; slots })
+        (fun (block, level) -> Endorsement { block ; level })
     }
 
   let endorsement_encoding =
@@ -331,9 +329,9 @@ module Encoding = struct
       case (Tag tag) name encoding
         (fun o -> Some (proj o))
         (fun x -> inj x) in
-    let to_list : Kind.endorsements contents_list -> _ = function
+    let to_list : Kind.endorsement contents_list -> _ = function
       | Single o -> o in
-    let of_list : Kind.endorsements contents -> _ = function
+    let of_list : Kind.endorsement contents -> _ = function
       | o -> Single o in
     def "inlined.endorsement" @@
     conv
@@ -608,7 +606,7 @@ let acceptable_passes (op : packed_operation) =
   let Operation_data protocol_data = op.protocol_data in
   match protocol_data.contents with
 
-  | Single (Endorsements _) -> [0]
+  | Single (Endorsement _) -> [0]
 
   | Single (Proposals _ ) -> [1]
   | Single (Ballot _ ) -> [1]
@@ -648,26 +646,29 @@ let () =
     (function Missing_signature -> Some () | _ -> None)
     (fun () -> Missing_signature)
 
-let check_signature (type kind) key ({ shell ; protocol_data } : kind operation) =
+let raw_check_signature (type kind) key ({ shell ; protocol_data } : kind operation) =
   let check ~watermark contents signature =
     let unsigned_operation =
       Data_encoding.Binary.to_bytes_exn
         unsigned_operation_encoding (shell, contents) in
     if Signature.check ~watermark key signature unsigned_operation then
-      return ()
+      Ok ()
     else
-      fail Invalid_signature in
+      Error [Invalid_signature] in
   match protocol_data.contents, protocol_data.signature with
   | Single _, None ->
-      fail Missing_signature
+      Error [Missing_signature]
   | Cons _, None ->
-      fail Missing_signature
-  | Single (Endorsements _) as contents, Some signature ->
+      Error [Missing_signature]
+  | Single (Endorsement _) as contents, Some signature ->
       check ~watermark:Endorsement (Contents_list contents) signature
   | Single _ as contents, Some signature ->
       check ~watermark:Generic_operation (Contents_list contents) signature
   | Cons _ as contents, Some signature ->
       check ~watermark:Generic_operation (Contents_list contents) signature
+
+let check_signature pk op =
+  Lwt.return (raw_check_signature pk op)
 
 let hash_raw = Operation.hash
 let hash (o : _ operation) =
@@ -702,8 +703,8 @@ let equal_contents_kind
   : type a b. a contents -> b contents -> (a, b) eq option
   = fun op1 op2 ->
     match op1, op2 with
-    | Endorsements _, Endorsements _ -> Some Eq
-    | Endorsements _, _ -> None
+    | Endorsement _, Endorsement _ -> Some Eq
+    | Endorsement _, _ -> None
     | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
     | Seed_nonce_revelation _, _ -> None
     | Double_endorsement_evidence _, Double_endorsement_evidence _ -> Some Eq

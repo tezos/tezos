@@ -772,7 +772,7 @@ module Kind : sig
   type double_endorsement_evidence = Double_endorsement_evidence_kind
   type double_baking_evidence = Double_baking_evidence_kind
   type activate_account = Activate_account_kind
-  type endorsements = Endorsements_kind
+  type endorsement = Endorsement_kind
   type proposals = Proposals_kind
   type ballot = Ballot_kind
   type reveal = Reveal_kind
@@ -802,18 +802,17 @@ and _ contents_list =
     (('kind * 'rest) Kind.manager ) contents_list
 
 and _ contents =
-  | Endorsements : {
+  | Endorsement : {
       block: Block_hash.t ;
       level: Raw_level.t ;
-      slots: int list ;
-    } -> Kind.endorsements contents
+    } -> Kind.endorsement contents
   | Seed_nonce_revelation : {
       level: Raw_level.t ;
       nonce: Nonce.t ;
     } -> Kind.seed_nonce_revelation contents
   | Double_endorsement_evidence : {
-      op1: Kind.endorsements operation ;
-      op2: Kind.endorsements operation ;
+      op1: Kind.endorsement operation ;
+      op2: Kind.endorsement operation ;
     } -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
       bh1: Block_header.t ;
@@ -929,6 +928,7 @@ module Operation : sig
   type error += Invalid_signature (* `Permanent *)
 
   val check_signature: public_key -> _ operation -> unit tzresult Lwt.t
+  val raw_check_signature: public_key -> _ operation -> unit tzresult
 
   val internal_operation_encoding: packed_internal_operation Data_encoding.t
 
@@ -947,7 +947,7 @@ module Operation : sig
                  proj: 'b contents -> 'a ;
                  inj: 'a -> 'b contents } -> 'b case
 
-    val endorsement_case: Kind.endorsements case
+    val endorsement_case: Kind.endorsement case
     val seed_nonce_revelation_case: Kind.seed_nonce_revelation case
     val double_endorsement_evidence_case: Kind.double_endorsement_evidence case
     val double_baking_evidence_case: Kind.double_baking_evidence case
@@ -1055,8 +1055,15 @@ val finalize: ?commit_message:string -> context -> Updater.validation_result
 val activate: context -> Protocol_hash.t -> context Lwt.t
 val fork_test_chain: context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
-val endorsement_already_recorded: context -> int -> bool
-val record_endorsement: context -> int -> context
+val record_endorsement:
+  context -> Signature.Public_key_hash.t -> context
+val allowed_endorsements:
+  context ->
+  (Signature.Public_key.t * int list) Signature.Public_key_hash.Map.t
+val init_endorsements:
+  context ->
+  (Signature.Public_key.t * int list) Signature.Public_key_hash.Map.t ->
+  context
 
 val reset_internal_nonce: context -> context
 val fresh_internal_nonce: context -> (context * int) tzresult

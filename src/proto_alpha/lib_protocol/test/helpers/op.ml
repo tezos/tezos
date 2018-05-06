@@ -25,24 +25,25 @@ let sign ?(watermark = Signature.Generic_operation)
      } ;
    } : _ Operation.t)
 
-let endorsement ?delegate ?level ctxt =
-  fun ?(signing_context=ctxt) slots ->
-    begin
-      match delegate with
-      | None -> Context.get_endorser ctxt (List.hd slots)
-      | Some delegate -> return delegate
-    end >>=? fun delegate_pkh ->
-    Account.find delegate_pkh >>=? fun delegate ->
-    begin
-      match level with
-      | None -> Context.get_level ctxt
-      | Some level -> return level
-    end >>=? fun level ->
-    let op =
-      Single
-        (Endorsements
-           { block = Context.branch ctxt ; level ; slots = slots }) in
-    return (sign ~watermark:Signature.Endorsement delegate.sk signing_context op)
+let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
+  begin
+    match delegate with
+    | None ->
+        Context.get_endorser ctxt >>=? fun (delegate, _slots) ->
+        return delegate
+    | Some delegate -> return delegate
+  end >>=? fun delegate_pkh ->
+  Account.find delegate_pkh >>=? fun delegate ->
+  begin
+    match level with
+    | None -> Context.get_level ctxt
+    | Some level -> return level
+  end >>=? fun level ->
+  let op =
+    Single
+      (Endorsement
+         { block = Context.branch ctxt ; level }) in
+  return (sign ~watermark:Signature.Endorsement delegate.sk signing_context op)
 
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
@@ -137,15 +138,15 @@ let origination ?delegate ?script
   let op = sign account.sk ctxt sop in
   return (op , originated_contract op)
 
-let miss_signed_endorsement ?level ctxt slot =
+let miss_signed_endorsement ?level ctxt  =
   begin
     match level with
     | None -> Context.get_level ctxt
     | Some level -> return level
   end >>=? fun level ->
-  Context.get_endorser ctxt slot >>=? fun real_delegate_pkh ->
+  Context.get_endorser ctxt >>=? fun (real_delegate_pkh, _slots) ->
   let delegate = Account.find_alternate real_delegate_pkh in
-  endorsement ~delegate:delegate.pkh ~level ctxt [slot]
+  endorsement ~delegate:delegate.pkh ~level ctxt ()
 
 let transaction ?fee ?gas_limit ?storage_limit ?parameters ctxt
     (src:Contract.t) (dst:Contract.t)

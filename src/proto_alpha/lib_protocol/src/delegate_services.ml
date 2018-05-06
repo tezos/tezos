@@ -480,25 +480,13 @@ module Endorsing_rights = struct
   end
 
   let endorsement_slots ctxt (level, estimated_time) =
-    let max_slot = Constants.endorsers_per_block ctxt in
-    Baking.endorsement_priorities ctxt level >>=? fun contract_list ->
-    let build (delegate, slots) = {
-      level = level.level ; delegate ; slots ; estimated_time
-    } in
-    let rec loop l map slot =
-      if Compare.Int.(slot >= max_slot) then
-        return (List.map build (Signature.Public_key_hash.Map.bindings map))
-      else
-        let Misc.LCons (pk, next) = l in
-        let delegate = Signature.Public_key.hash pk in
-        let slots =
-          match Signature.Public_key_hash.Map.find_opt delegate map with
-          | None -> [slot]
-          | Some slots -> slot :: slots in
-        let map = Signature.Public_key_hash.Map.add delegate slots map in
-        next () >>=? fun l ->
-        loop l map (slot+1) in
-    loop contract_list Signature.Public_key_hash.Map.empty 0
+    Baking.endorsement_rights ctxt level >>=? fun rights ->
+    return
+      (Signature.Public_key_hash.Map.fold
+         (fun delegate (_, slots) acc -> {
+              level = level.level ; delegate ; slots ; estimated_time
+            } :: acc)
+         rights [])
 
   let register () =
     let open Services_registration in

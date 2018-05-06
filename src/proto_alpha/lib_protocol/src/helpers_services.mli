@@ -131,7 +131,6 @@ module Forge : sig
     branch:Block_hash.t ->
     block:Block_hash.t ->
     level:Raw_level.t ->
-    slots:int list ->
     unit -> MBytes.t shell_tzresult Lwt.t
 
   val proposals:

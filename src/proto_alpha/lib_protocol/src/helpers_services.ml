@@ -390,9 +390,9 @@ module Forge = struct
       () ({ branch }, Contents_list (Single operation))
 
   let endorsement ctxt
-      b ~branch ~block ~level ~slots () =
+      b ~branch ~block ~level () =
     operation ctxt b ~branch
-      (Endorsements { block ; level ; slots })
+      (Endorsement { block ; level })
 
   let proposals ctxt
       b ~branch ~source ~period ~proposals () =

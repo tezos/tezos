@@ -16,8 +16,9 @@ type t = {
   level: Level_repr.t ;
   timestamp: Time.t ;
   fitness: Int64.t ;
-  endorsements_received: Int_set.t ;
   deposits: Tez_repr.t Signature.Public_key_hash.Map.t ;
+  allowed_endorsements:
+    (Signature.Public_key.t * int list) Signature.Public_key_hash.Map.t ;
   fees: Tez_repr.t ;
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
@@ -39,8 +40,14 @@ let first_level ctxt = ctxt.first_level
 let constants ctxt = ctxt.constants
 let recover ctxt = ctxt.context
 
-let record_endorsement ctxt k = { ctxt with endorsements_received = Int_set.add k ctxt.endorsements_received }
-let endorsement_already_recorded ctxt k = Int_set.mem k ctxt.endorsements_received
+let record_endorsement ctxt k =
+  { ctxt with
+    allowed_endorsements =
+      Signature.Public_key_hash.Map.remove k ctxt.allowed_endorsements }
+let init_endorsements ctxt allowed_endorsements =
+  { ctxt with allowed_endorsements }
+let allowed_endorsements ctxt =
+  ctxt.allowed_endorsements
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -402,7 +409,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
   return {
     context = ctxt ; constants ; level ;
     timestamp ; fitness ; first_level ;
-    endorsements_received = Int_set.empty ;
+    allowed_endorsements = Signature.Public_key_hash.Map.empty ;
     fees = Tez_repr.zero ;
     rewards = Tez_repr.zero ;
     deposits = Signature.Public_key_hash.Map.empty ;
@@ -454,7 +461,7 @@ let register_resolvers enc resolve =
       level =  Level_repr.root Raw_level_repr.root ;
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
-      endorsements_received = Int_set.empty ;
+      allowed_endorsements = Signature.Public_key_hash.Map.empty ;
       fees = Tez_repr.zero ;
       rewards = Tez_repr.zero ;
       deposits = Signature.Public_key_hash.Map.empty ;

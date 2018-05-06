@@ -25,13 +25,11 @@ let get_signing_slots cctxt ?(chain = `Main) block delegate level =
 let inject_endorsement
     (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block hash level ?async
-    src_sk slots pkh =
+    src_sk pkh =
   Alpha_services.Forge.endorsement cctxt
     (chain, block)
     ~branch:hash
-    ~block:hash
     ~level:level
-    ~slots
     () >>=? fun bytes ->
   Client_keys.append cctxt
     src_sk ~watermark:Endorsement bytes >>=? fun signed_bytes ->
@@ -77,13 +75,15 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
             | Some slots -> return slots
       end >>=? fun slots ->
       Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-      inject_endorsement cctxt ~chain ?async block hash level src_sk slots src_pkh >>=? fun oph ->
+      inject_endorsement cctxt ~chain ?async block hash level src_sk src_pkh >>=? fun oph ->
       Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
       cctxt#message
-        "Injected endorsement level %a, contract %s '%a'"
+        "Injected endorsement level %a, contract %s '%a', slots @[<h>%a@]"
         Raw_level.pp level
         name
-        Operation_hash.pp_short oph >>=
+        Operation_hash.pp_short oph
+        (Format.pp_print_list Format.pp_print_int) slots
+      >>=
       fun () -> return oph
 
 (** Worker *)
@@ -124,7 +124,7 @@ let endorse_for_delegate cctxt { delegate ; block ; slots ; } =
     (List.length slots) >>= fun () ->
   inject_endorsement cctxt
     b hash level
-    sk slots delegate >>=? fun oph ->
+    sk delegate >>=? fun oph ->
   lwt_log_info
     "Injected endorsement for block '%a' \
      (level %a, contract %s) '%a'"

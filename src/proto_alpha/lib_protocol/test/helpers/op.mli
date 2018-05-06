@@ -13,12 +13,12 @@ open Alpha_context
 val endorsement:
   ?delegate:public_key_hash ->
   ?level:Raw_level.t ->
-  Context.t -> ?signing_context:Context.t ->
-  int list -> Kind.endorsements Operation.t tzresult Lwt.t
+  Context.t -> ?signing_context:Context.t -> unit ->
+  Kind.endorsement Operation.t tzresult Lwt.t
 
 val miss_signed_endorsement:
   ?level:Raw_level.t ->
-  Context.t -> int -> Kind.endorsements Operation.t tzresult Lwt.t
+  Context.t -> Kind.endorsement Operation.t tzresult Lwt.t
 
 val transaction:
   ?fee:Tez.tez ->
@@ -60,8 +60,8 @@ val originated_contract:
 
 val double_endorsement:
   Context.t ->
-  Kind.endorsements Operation.t ->
-  Kind.endorsements Operation.t ->
+  Kind.endorsement Operation.t ->
+  Kind.endorsement Operation.t ->
   Operation.packed tzresult Lwt.t
 
 val double_baking:
