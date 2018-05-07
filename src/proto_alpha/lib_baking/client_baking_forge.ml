@@ -29,9 +29,7 @@ let forge_block_header
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
     let protocol_data : Block_header.protocol_data =
       { priority ; seed_nonce_hash ; proof_of_work_nonce } in
-    let faked_header : Block_header.t =
-      { shell ; protocol_data ; signature = Signature.zero } in
-    if Baking.check_header_hash faked_header stamp_threshold then
+    if Baking.check_header_proof_of_work_stamp shell protocol_data stamp_threshold then
       let unsigned_header =
         Alpha_context.Block_header.forge_unsigned shell protocol_data in
       Client_keys.append cctxt delegate_sk unsigned_header >>=? fun signed_header ->

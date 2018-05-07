@@ -251,19 +251,18 @@ let check_hash hash stamp_threshold =
   let word = MBytes.get_int64 bytes 0 in
   Compare.Uint64.(word <= stamp_threshold)
 
-let check_header_hash header stamp_threshold =
+let check_header_proof_of_work_stamp shell protocol_data stamp_threshold =
   let hash =
-    Block_header.hash_raw
-      { shell = header.Block_header.shell ;
-        protocol_data =
-          Data_encoding.Binary.to_bytes
-            Block_header.protocol_data_encoding
-            header.protocol_data } in
+    Block_header.hash
+      { shell ; protocol_data ; signature = Signature.zero } in
   check_hash hash stamp_threshold
 
 let check_proof_of_work_stamp ctxt block =
   let proof_of_work_threshold = Constants.proof_of_work_threshold ctxt in
-  if check_header_hash block proof_of_work_threshold then
+  if check_header_proof_of_work_stamp
+      block.Block_header.shell
+      block.protocol_data
+      proof_of_work_threshold then
     return ()
   else
     fail Invalid_stamp
