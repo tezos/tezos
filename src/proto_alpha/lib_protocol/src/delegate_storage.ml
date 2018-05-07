@@ -17,9 +17,9 @@ type error +=
 let () =
   register_error_kind
     `Permanent
-    ~id:"contract.undelagatable_contract"
+    ~id:"contract.undelegatable_contract"
     ~title:"Non delegatable contract"
-    ~description:"Tried to delegate a implicit contract \
+    ~description:"Tried to delegate an implicit contract \
                   or a non delegatable originated contract"
     ~pp:(fun ppf contract ->
         Format.fprintf ppf "Contract %a is not delegatable"

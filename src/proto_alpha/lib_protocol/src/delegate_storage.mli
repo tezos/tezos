@@ -40,6 +40,10 @@ val set:
 
 type error +=
   | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
+  | No_deletion of Signature.Public_key_hash.t (* `Permanent *)
+  | Active_delegate (* `Temporary *)
+  | Current_delegate (* `Temporary *)
+  | Empty_delegate_account of Signature.Public_key_hash.t (* `Temporary *)
 
 (** Iterate on all registered delegates. *)
 val fold:
