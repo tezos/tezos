@@ -45,7 +45,8 @@ prepare:opam:
   <<: *dind_definition
   stage: prepare
   only:
-    - schedules
+    variables:
+    - $UPDATE_OPAM
   script:
     - ./scripts/ci/create_docker_image.opam.sh "${opam_image}"
     - docker push "${opam_image}:alpine-${alpine_version}_ocaml-${ocaml_version}"
