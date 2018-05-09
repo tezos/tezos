@@ -400,7 +400,7 @@ let validate_block w ?(force = false) hash block operations =
   Chain.head nv.parameters.chain_state >>= fun head ->
   let head = State.Block.header head in
   if
-    force || Fitness.(head.shell.fitness <= block.shell.fitness)
+    force || Fitness.(head.shell.fitness < block.shell.fitness)
   then
     Block_validator.validate
       ~canceler:(Worker.canceler w)
