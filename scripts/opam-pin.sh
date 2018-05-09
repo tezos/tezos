@@ -11,7 +11,8 @@ export OPAMYES=yes
 
 ## Should be in sync with `opam-unpin.sh`
 opam pin add --no-action leveldb git://github.com/chambart/ocaml-leveldb.git#update_4.06
-opam pin add --no-action --dev-repo ocplib-json-typed
+rm -rf vendors/ocplib-json-typed
+opam pin add ocplib-json-typed  git://github.com/OCamlPro/ocplib-json-typed.git#2836a94
 
 ## Unpin package we used to pin...
 opam pin remove --no-action ocp-ocamlres
