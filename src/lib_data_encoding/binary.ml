@@ -196,17 +196,8 @@ module Writer = struct
       MBytes.set_int8 res ofs 0x00 ;
       ofs + 1
     end else
-      let raw = Z.to_bits v in
-      let get_chunk pos len (* < 8 *) =
-        let byte = pos / 8 in
-        let bit = pos mod 8 in
-        if bit + len <= 8 then
-          let mask = 0xFF lsr (8 - len) in
-          (Char.code (String.get raw byte) lsr bit) land mask
-        else
-          let mask = 0xFF lsr (16 - len - bit) in
-          (Char.code (String.get raw byte) lsr bit)
-          lor ((Char.code (String.get raw (byte + 1))) land mask) lsl (8 - bit) in
+      let v = Z.abs v in
+      let get_chunk pos len = Z.to_int (Z.extract v pos len) in
       let length = (bits + 1 + 6) / 7 in
       MBytes.set_int8 res ofs
         ((if sign then 0x40 else 0x00)
