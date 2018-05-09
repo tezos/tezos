@@ -23,6 +23,7 @@ type t = {
   listen_addr: string option ;
   rpc_listen_addr: string option ;
   closed: bool ;
+  disable_mempool: bool ;
   cors_origins: string list ;
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;

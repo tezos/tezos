@@ -28,6 +28,7 @@ type t = {
   listen_addr: string option ;
   rpc_listen_addr: string option ;
   closed: bool ;
+  disable_mempool: bool ;
   cors_origins: string list ;
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;
@@ -39,8 +40,8 @@ let wrap
     data_dir config_file
     connections max_download_speed max_upload_speed binary_chunks_size
     peer_table_size
-    listen_addr peers no_bootstrap_peers bootstrap_threshold closed expected_pow
-    rpc_listen_addr rpc_tls
+    listen_addr peers no_bootstrap_peers bootstrap_threshold closed disable_mempool
+    expected_pow rpc_listen_addr rpc_tls
     cors_origins cors_headers log_output =
 
   let actual_data_dir =
@@ -80,6 +81,7 @@ let wrap
     listen_addr ;
     rpc_listen_addr ;
     closed ;
+    disable_mempool ;
     cors_origins ;
     cors_headers ;
     rpc_tls ;
@@ -212,6 +214,15 @@ module Term = struct
       "Only accept connections from the configured bootstrap peers." in
     Arg.(value & flag & info ~docs ~doc ["closed"])
 
+  let disable_mempool =
+    let doc =
+      "If set to [true], the node will not participate in the propagation \
+       of pending operations (mempool). \
+       Default value is [false]. \
+       It can be used to decrease the memory and computation footprints \
+       of the node." in
+    Arg.(value & flag & info ~docs ~doc ["disable-mempool"])
+
   (* rpc args *)
   let docs = Manpage.rpc_section
 
@@ -249,8 +260,8 @@ module Term = struct
     $ connections
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size
-    $ listen_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold $ closed $ expected_pow
-    $ rpc_listen_addr $ rpc_tls
+    $ listen_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold $ closed $ disable_mempool
+    $ expected_pow $ rpc_listen_addr $ rpc_tls
     $ cors_origins $ cors_headers
     $ log_output
 
@@ -270,6 +281,7 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         expected_pow ;
         peers ; no_bootstrap_peers ;
         listen_addr ; closed ;
+        disable_mempool ;
         rpc_listen_addr ; rpc_tls ;
         cors_origins ; cors_headers ;
         log_output ;
@@ -287,5 +299,5 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
     ?max_download_speed ?max_upload_speed ?binary_chunks_size
     ?peer_table_size ?expected_pow
     ~bootstrap_peers ?listen_addr ?rpc_listen_addr
-    ~closed ~cors_origins ~cors_headers ?rpc_tls ?log_output
+    ~closed ~disable_mempool ~cors_origins ~cors_headers ?rpc_tls ?log_output
     ?bootstrap_threshold cfg

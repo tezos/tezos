@@ -67,6 +67,8 @@ type config = {
   proof_of_work_target : Crypto_box.target ;
   (** Expected level of proof of work of peers' identity. *)
 
+  disable_mempool : bool ;
+  (** If [true], all non-empty mempools will be ignored. *)
 }
 
 (** Network capacities *)

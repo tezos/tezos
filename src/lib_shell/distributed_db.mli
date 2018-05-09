@@ -18,7 +18,7 @@ module Message = Distributed_db_message
 
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
-val create: State.t -> p2p -> t
+val create: State.t -> p2p -> (P2p_peer.Id.t -> Connection_metadata.t) -> t
 val state: db -> State.t
 val shutdown: t -> unit Lwt.t
 

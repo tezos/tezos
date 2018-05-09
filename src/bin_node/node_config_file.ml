@@ -31,6 +31,7 @@ and p2p = {
   listen_addr : string option ;
   closed : bool ;
   limits : P2p.limits ;
+  disable_mempool : bool ;
 }
 
 and rpc = {
@@ -90,6 +91,7 @@ let default_p2p = {
   listen_addr  = Some ("[::]:" ^ string_of_int default_p2p_port) ;
   closed  = false ;
   limits = default_p2p_limits ;
+  disable_mempool = false ;
 }
 
 let default_rpc = {
@@ -274,14 +276,14 @@ let p2p =
   let open Data_encoding in
   conv
     (fun { expected_pow ; bootstrap_peers ;
-           listen_addr ; closed ; limits } ->
+           listen_addr ; closed ; limits ; disable_mempool } ->
       ( expected_pow, bootstrap_peers,
-        listen_addr, closed, limits ))
+        listen_addr, closed, limits, disable_mempool ))
     (fun ( expected_pow, bootstrap_peers,
-           listen_addr, closed, limits ) ->
+           listen_addr, closed, limits, disable_mempool ) ->
       { expected_pow ; bootstrap_peers ;
-        listen_addr ; closed ; limits })
-    (obj5
+        listen_addr ; closed ; limits ; disable_mempool })
+    (obj6
        (dft "expected-proof-of-work"
           ~description: "Floating point number between 0 and 256 that represents a \
                          difficulty, 24 signifies for example that at least 24 leading \
@@ -303,6 +305,13 @@ let p2p =
        (dft "limits"
           ~description: "Network limits"
           limit default_p2p_limits)
+       (dft "disable_mempool"
+          ~description: "If set to [true], the node will not participate in \
+                         the propagation of pending operations (mempool). \
+                         Default value is [false]. \
+                         It can be used to decrease the memory and \
+                         computation footprints of the node."
+          bool false)
     )
 
 let rpc : rpc Data_encoding.t =
@@ -566,6 +575,7 @@ let update
     ?listen_addr
     ?rpc_listen_addr
     ?(closed = false)
+    ?(disable_mempool = false)
     ?(cors_origins = [])
     ?(cors_headers = [])
     ?rpc_tls
@@ -616,6 +626,7 @@ let update
       Option.first_some listen_addr cfg.p2p.listen_addr ;
     closed = cfg.p2p.closed || closed ;
     limits ;
+    disable_mempool = cfg.p2p.disable_mempool || disable_mempool ;
   }
   and rpc : rpc = {
     listen_addr =

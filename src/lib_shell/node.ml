@@ -71,25 +71,37 @@ let peer_metadata_cfg : _ P2p.peer_meta_config = {
   score = fun _ -> 0. ;
 }
 
-let connection_metadata_cfg : _ P2p.conn_meta_config = {
+let connection_metadata_cfg cfg : _ P2p.conn_meta_config = {
   conn_meta_encoding = Connection_metadata.encoding ;
-  conn_meta_value = fun _ -> { disable_mempool = false ; private_node = false} ;
+  conn_meta_value = fun _ -> cfg;
 }
 
 let init_p2p p2p_params =
   match p2p_params with
   | None ->
+      let conn_metadata_cfg =
+        connection_metadata_cfg {
+          Connection_metadata.
+          disable_mempool = false ;
+          private_node = false ;
+        } in
       lwt_log_notice "P2P layer is disabled" >>= fun () ->
-      return (P2p.faked_network peer_metadata_cfg)
+      return (P2p.faked_network peer_metadata_cfg, conn_metadata_cfg)
   | Some (config, limits) ->
+      let conn_metadata_cfg =
+        connection_metadata_cfg {
+          Connection_metadata.
+          disable_mempool = config.P2p.disable_mempool ;
+          private_node = false ;
+        } in
       lwt_log_notice "bootstraping chain..." >>= fun () ->
       P2p.create
         ~config ~limits
         peer_metadata_cfg
-        connection_metadata_cfg
+        conn_metadata_cfg
         Distributed_db_message.cfg >>=? fun p2p ->
       Lwt.async (fun () -> P2p.maintain p2p) ;
-      return p2p
+      return (p2p, conn_metadata_cfg)
 
 type config = {
   genesis: State.Chain.genesis ;
@@ -137,10 +149,11 @@ let create { genesis ; store_root ; context_root ;
     block_validator_limits
     prevalidator_limits
     chain_validator_limits =
-  init_p2p p2p_params >>=? fun p2p ->
+  init_p2p p2p_params >>=? fun (p2p, conn_metadata_cfg) ->
   State.read
     ~store_root ~context_root ?patch_context genesis >>=? fun (state, mainchain_state) ->
-  let distributed_db = Distributed_db.create state p2p in
+  let distributed_db =
+    Distributed_db.create state p2p conn_metadata_cfg.conn_meta_value in
   Validator.create state distributed_db
     peer_validator_limits
     block_validator_limits

@@ -305,6 +305,7 @@ type db = {
   protocol_db: Raw_protocol.t ;
   block_input: (Block_hash.t * Block_header.t) Lwt_watcher.input ;
   operation_input: (Operation_hash.t * Operation.t) Lwt_watcher.input ;
+  connection_metadata_value: (P2p_peer.Id.t -> Connection_metadata.t)
 }
 
 and chain_db = {
@@ -497,7 +498,15 @@ module P2p_reader = struct
 
     | Get_current_head chain_id ->
         may_handle state chain_id @@ fun chain_db ->
-        State.Current_mempool.get chain_db.chain_state >>= fun (head, mempool) ->
+        let { Connection_metadata.disable_mempool } =
+          P2p.connection_metadata chain_db.global_db.p2p state.conn in
+        begin
+          if disable_mempool then
+            Chain.head chain_db.chain_state >>= fun head ->
+            Lwt.return (State.Block.header head, Mempool.empty)
+          else
+            State.Current_mempool.get chain_db.chain_state
+        end >>= fun (head, mempool) ->
         (* TODO bound the sent mempool size *)
         ignore
         @@ P2p.try_send global_db.p2p state.conn
@@ -508,6 +517,15 @@ module P2p_reader = struct
         may_handle state chain_id @@ fun chain_db ->
         let head = Block_header.hash header in
         State.Block.known_invalid chain_db.chain_state head >>= fun known_invalid ->
+        let { Connection_metadata.disable_mempool } =
+          chain_db.global_db.connection_metadata_value state.gid in
+        let known_invalid =
+          known_invalid ||
+          (disable_mempool && mempool <> Mempool.empty)
+          (* A non-empty mempool was received while mempool is desactivated,
+               so the message is ignored.
+               This should probably warrant a reduction of the sender's score. *)
+        in
         if not known_invalid then
           chain_db.callback.notify_head state.gid header mempool
         else
@@ -690,7 +708,7 @@ let raw_try_send p2p peer_id msg =
   | Some conn -> ignore (P2p.try_send p2p conn msg : bool)
 
 
-let create disk p2p =
+let create disk p2p connection_metadata_value =
   let global_request =
     { data = () ;
       active = active_peer_ids p2p ;
@@ -704,7 +722,8 @@ let create disk p2p =
   let db =
     { p2p ; p2p_readers ; disk ;
       active_chains ; protocol_db ;
-      block_input ; operation_input } in
+      block_input ; operation_input ;
+      connection_metadata_value } in
   P2p.on_new_connection p2p (P2p_reader.run db) ;
   P2p.iter_connections p2p (P2p_reader.run db) ;
   db
@@ -935,8 +954,26 @@ module Advertise = struct
   let current_head chain_db ?peer ?(mempool = Mempool.empty) head =
     let chain_id = State.Chain.id chain_db.chain_state in
     assert (Chain_id.equal chain_id (State.Block.chain_id head)) ;
-    send chain_db ?peer @@
-    Current_head (chain_id, State.Block.header head, mempool)
+    let msg_mempool =
+      Message.Current_head (chain_id, State.Block.header head, mempool) in
+    if mempool = Mempool.empty then
+      send chain_db ?peer msg_mempool
+    else
+      let msg_disable_mempool =
+        Message.Current_head (chain_id, State.Block.header head, Mempool.empty) in
+      let send_mempool state =
+        let { Connection_metadata.disable_mempool } =
+          P2p.connection_metadata chain_db.global_db.p2p state.conn in
+        let msg = if disable_mempool then msg_disable_mempool else msg_mempool in
+        ignore @@ P2p.try_send chain_db.global_db.p2p state.conn msg
+      in
+      match peer with
+      | Some receiver_id ->
+          let state = P2p_peer.Table.find chain_db.active_connections receiver_id in
+          send_mempool state
+      | None ->
+          List.iter (fun (_receiver_id, state) -> send_mempool state)
+            (P2p_peer.Table.fold (fun k v acc -> (k,v)::acc) chain_db.active_connections [])
 
   let current_branch ?peer chain_db =
     let chain_id = State.Chain.id chain_db.chain_state in

@@ -169,6 +169,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
             identity ;
             proof_of_work_target =
               Crypto_box.make_target config.p2p.expected_pow ;
+            disable_mempool = config.p2p.disable_mempool ;
           }
         in
         return (Some (p2p_config, config.p2p.limits))

@@ -42,6 +42,7 @@ type config = {
   closed_network : bool ;
   identity : P2p_identity.t ;
   proof_of_work_target : Crypto_box.target ;
+  disable_mempool : bool ;
 }
 
 type limits = {

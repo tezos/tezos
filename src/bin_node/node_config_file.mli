@@ -21,6 +21,7 @@ and p2p = {
   listen_addr : string option ;
   closed : bool ;
   limits : P2p.limits ;
+  disable_mempool : bool ;
 }
 
 and rpc = {
@@ -69,6 +70,7 @@ val update:
   ?listen_addr:string ->
   ?rpc_listen_addr:string ->
   ?closed:bool ->
+  ?disable_mempool:bool ->
   ?cors_origins:string list ->
   ?cors_headers:string list ->
   ?rpc_tls:tls ->
