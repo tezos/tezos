@@ -17,9 +17,48 @@ type error +=
   | Previously_revealed_nonce
   | Unexpected_nonce
 
-let get_unrevealed c level =
-  let cur_level = Level_storage.current c in
-  let min_cycle =
+let () =
+  register_error_kind
+    `Branch
+    ~id:"nonce.too_late_revelation"
+    ~title:"Too late nonce revelation"
+    ~description:"Nonce revelation happens too late"
+    ~pp: (fun ppf () ->
+        Format.fprintf ppf "This nonce cannot be revealed anymore.")
+    Data_encoding.unit
+    (function Too_late_revelation -> Some () | _ -> None)
+    (fun () -> Too_late_revelation) ;
+  register_error_kind
+    `Temporary
+    ~id:"nonce.too_early_revelation"
+    ~title:"Too early nonce revelation"
+    ~description:"None revelation happens before cycle end"
+    ~pp: (fun ppf () ->
+        Format.fprintf ppf "This nonce should not yet be revealed")
+    Data_encoding.unit
+    (function Too_early_revelation -> Some () | _ -> None)
+    (fun () -> Too_early_revelation) ;
+  register_error_kind
+    `Branch
+    ~id:"nonce.previously_revealed"
+    ~title:"Previously revealed nonce"
+    ~description:"Duplicated revelation for a nonce."
+    ~pp: (fun ppf () ->
+        Format.fprintf ppf "This nonce was previously revealed")
+    Data_encoding.unit
+    (function Previously_revealed_nonce -> Some () | _ -> None)
+    (fun () -> Previously_revealed_nonce) ;
+  register_error_kind
+    `Branch
+    ~id:"nonce.unexpected"
+    ~title:"Unexpected nonce"
+    ~description:"The provided nonce is inconsistent with the commit nonce hash."
+    ~pp: (fun ppf () ->
+        Format.fprintf ppf "This nonce revelation is invalid (inconsistent with the commited hash)")
+    Data_encoding.unit
+    (function Unexpected_nonce -> Some () | _ -> None)
+    (fun () -> Unexpected_nonce)
+
     match Cycle_repr.pred cur_level.cycle with
     | None -> Cycle_repr.root
     | Some min_cycle -> min_cycle in
