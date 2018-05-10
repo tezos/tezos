@@ -6,6 +6,7 @@
   (libraries (tezos-base))
   (flags (:standard -w +27@8
                     -safe-string
+                    -linkall
                     -open Tezos_base__TzPervasives))))
 
 (alias
