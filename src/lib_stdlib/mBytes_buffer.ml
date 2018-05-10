@@ -71,7 +71,7 @@ let write_double buf float =
 let write_string_data buf str =
   let len = String.length str in
   resize_if_necessary buf len ;
-  MBytes.blit_from_string str 0 buf.buffer buf.offset len ;
+  MBytes.blit_of_string str 0 buf.buffer buf.offset len ;
   buf.offset <- buf.offset + len
 
 let write_sized buffer (writer : unit -> unit) =

@@ -462,10 +462,10 @@ let check public_key signature message =
   | Public_key.Secp256k1 _, Ed25519 _ -> false
 
 let append sk msg =
-  MBytes.concat msg (to_bytes (sign sk msg))
+  MBytes.concat "" [msg; (to_bytes (sign sk msg))]
 
 let concat msg signature =
-  MBytes.concat msg (to_bytes signature)
+  MBytes.concat "" [msg; (to_bytes signature)]
 
 type algo =
   | Ed25519

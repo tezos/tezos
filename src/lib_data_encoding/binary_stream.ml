@@ -139,7 +139,7 @@ let fixed_length_bytes length buf =
   generic_read_data length MBytes.sub buf
 
 let fixed_length_string length buf =
-  generic_read_data length MBytes.substring buf
+  generic_read_data length MBytes.sub_string buf
 
 let read_tag = function
   | `Uint8 -> uint8

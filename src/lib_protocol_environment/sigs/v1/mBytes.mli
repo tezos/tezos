@@ -20,14 +20,11 @@ val sub: t -> int -> int -> t
     and of length [len]. No copying of elements is involved: the
     sub-array and the original array share the same storage space. *)
 
-val shift: t -> int -> t
-(** [shift src ofs] is equivalent to [sub src ofs (length src - ofs)] *)
-
 val blit: t -> int -> t -> int -> int -> unit
 (** [blit src ofs_src dst ofs_dst len] copy [len] bytes from [src]
     starting at [ofs_src] into [dst] starting at [ofs_dst]. *)
 
-val blit_from_string: string -> int -> t -> int -> int -> unit
+val blit_of_string: string -> int -> t -> int -> int -> unit
 (** See [blit] *)
 
 val blit_to_bytes: t -> int -> bytes -> int -> int -> unit
@@ -39,8 +36,8 @@ val of_string: string -> t
 val to_string: t -> string
 (** [to_string b] dump the array content in a [string]. *)
 
-val substring: t -> int -> int -> string
-(** [substring b ofs len] is equivalent to [to_string (sub b ofs len)]. *)
+val sub_string: t -> int -> int -> string
+(** [sub_string b ofs len] is equivalent to [to_string (sub b ofs len)]. *)
 
 
 
@@ -129,7 +126,7 @@ val (>=) : t -> t -> bool
 val (>) : t -> t -> bool
 val compare : t -> t -> int
 
-val concat: t -> t -> t
+val concat: string -> t list -> t
 
 val to_hex: t -> [ `Hex of string ]
 val of_hex: [ `Hex of string ] -> t

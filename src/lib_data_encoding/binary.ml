@@ -229,12 +229,12 @@ module Writer = struct
 
   let fixed_kind_string length s buf ofs =
     if String.length s <> length then invalid_arg "fixed_kind_string";
-    MBytes.blit_from_string s 0 buf ofs length;
+    MBytes.blit_of_string s 0 buf ofs length;
     ofs + length
 
   let variable_length_string s buf ofs =
     let length = String.length s in
-    MBytes.blit_from_string s 0 buf ofs length ;
+    MBytes.blit_of_string s 0 buf ofs length ;
     ofs + length
 
   let objs w1 w2 (v1,v2) buf ofs =
@@ -651,7 +651,7 @@ module Reader = struct
     ofs + length, s
 
   let fixed_length_string length buf ofs _len =
-    let s = MBytes.substring buf ofs length in
+    let s = MBytes.sub_string buf ofs length in
     ofs + length, s
 
   let seq r1 r2 buf ofs len =

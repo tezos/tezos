@@ -35,7 +35,7 @@ module Crypto = struct
     let msglen = MBytes.length msg in
     fail_unless
       (msglen <= max_content_length) P2p_errors.Invalid_message_size >>=? fun () ->
-    let buf = MBytes.init (msglen + Crypto_box.zerobytes) '\x00' in
+    let buf = MBytes.make (msglen + Crypto_box.zerobytes) '\x00' in
     MBytes.blit msg 0 buf Crypto_box.zerobytes msglen ;
     let local_nonce = cryptobox_data.local_nonce in
     cryptobox_data.local_nonce <- Crypto_box.increment_nonce local_nonce ;
@@ -52,7 +52,7 @@ module Crypto = struct
     let header_buf = MBytes.create header_length in
     P2p_io_scheduler.read_full ~len:header_length fd header_buf >>=? fun () ->
     let encrypted_length = MBytes.get_uint16 header_buf 0 in
-    let buf = MBytes.init (encrypted_length + Crypto_box.boxzerobytes) '\x00' in
+    let buf = MBytes.make (encrypted_length + Crypto_box.boxzerobytes) '\x00' in
     P2p_io_scheduler.read_full
       ~pos:Crypto_box.boxzerobytes ~len:encrypted_length fd buf >>=? fun () ->
     let remote_nonce = cryptobox_data.remote_nonce in

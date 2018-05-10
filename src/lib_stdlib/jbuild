@@ -4,6 +4,8 @@
  ((name tezos_stdlib)
   (public_name tezos-stdlib)
   (libraries (ocplib-endian.bigstring
+              bigstring
+              cstruct
               hex
               re
               zarith

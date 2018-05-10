@@ -19,7 +19,7 @@ let zero = MBytes.of_string (String.make size '\000')
 let to_b58check s =
   Ed25519.Public_key_hash.to_b58check
     (Ed25519.Public_key_hash.of_bytes_exn
-       (MBytes.concat s zero))
+       (MBytes.concat "" [s; zero]))
 
 let of_b58check_exn s =
   let pkh = Ed25519.Public_key_hash.of_b58check_exn s in

@@ -51,7 +51,7 @@ let random_keypair () =
   let pk, sk = Box.keypair () in
   sk, pk, hash pk
 
-let zero_nonce = Tweetnacl.Nonce.(of_bytes_exn (MBytes.init bytes '\x00'))
+let zero_nonce = Tweetnacl.Nonce.(of_bytes_exn (MBytes.make bytes '\x00'))
 let random_nonce = Nonce.gen
 let increment_nonce = Nonce.increment
 

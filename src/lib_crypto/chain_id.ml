@@ -15,7 +15,7 @@ let name = "Chain_id"
 let title = "Network identifier"
 
 let extract bh =
-  MBytes.substring (Block_hash.to_bytes bh) 0 4
+  MBytes.sub_string (Block_hash.to_bytes bh) 0 4
 let hash_bytes ?key l = extract (Block_hash.hash_bytes ?key l)
 let hash_string ?key l = extract (Block_hash.hash_string ?key l)
 

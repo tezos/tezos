@@ -258,7 +258,7 @@ include Helpers.MakeEncoder(struct
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let zero = MBytes.init size '\000'
+let zero = MBytes.make size '\000'
 
 let sign key msg = Sign.detached ~key msg
 

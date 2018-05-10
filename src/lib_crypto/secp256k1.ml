@@ -237,7 +237,7 @@ include Helpers.MakeEncoder(struct
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let zero = of_bytes_exn (MBytes.init size '\000')
+let zero = of_bytes_exn (MBytes.make size '\000')
 
 let sign sk msg =
   Sign.sign_exn context ~sk msg
