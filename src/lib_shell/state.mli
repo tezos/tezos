@@ -71,6 +71,8 @@ module Chain : sig
   val expiration: chain_state -> Time.t option
   val allow_forked_chain: chain_state -> bool
 
+  val checkpoint: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+
 end
 
 (** {2 Block database} *****************************************************)

@@ -57,6 +57,7 @@ and genesis = {
 
 and chain_data_state = {
   mutable data: chain_data ;
+  mutable checkpoint: Int32.t * Block_hash.t ;
   chain_data_store: Store.Chain_data.store ;
 }
 
@@ -257,7 +258,7 @@ module Chain = struct
 
   let allocate
       ~genesis ~faked_genesis_hash ~expiration ~allow_forked_chain
-      ~current_head
+      ~current_head ~checkpoint
       global_state context_index chain_data_store block_store =
     Store.Block.Contents.read_exn
       (block_store, current_head) >>= fun current_block ->
@@ -273,6 +274,7 @@ module Chain = struct
         live_operations = Operation_hash.Set.empty ;
         test_chain = None ;
       } ;
+      checkpoint ;
       chain_data_store ;
     }
     and chain_state = {
@@ -295,11 +297,13 @@ module Chain = struct
     let chain_store = Store.Chain.get data.global_store chain_id in
     let block_store = Store.Block.get chain_store
     and chain_data_store = Store.Chain_data.get chain_store in
+    let checkpoint = 0l, genesis.block in
     Store.Chain.Genesis_hash.store chain_store genesis.block >>= fun () ->
     Store.Chain.Genesis_time.store chain_store genesis.time >>= fun () ->
     Store.Chain.Genesis_protocol.store chain_store genesis.protocol >>= fun () ->
     Store.Chain_data.Current_head.store chain_data_store genesis.block >>= fun () ->
     Store.Chain_data.Known_heads.store chain_data_store genesis.block >>= fun () ->
+    Store.Chain_data.Checkpoint.store chain_data_store checkpoint >>= fun () ->
     begin
       match expiration with
       | None -> Lwt.return_unit
@@ -319,6 +323,7 @@ module Chain = struct
       ~current_head:genesis.block
       ~expiration
       ~allow_forked_chain
+      ~checkpoint
       global_state
       data.context_index
       chain_data_store
@@ -354,6 +359,7 @@ module Chain = struct
     Store.Block.Contents.read (block_store, genesis_hash) >>=? fun genesis_header ->
     let genesis = { time ; protocol ; block = genesis_hash } in
     Store.Chain_data.Current_head.read chain_data_store >>=? fun current_head ->
+    Store.Chain_data.Checkpoint.read chain_data_store >>=? fun checkpoint ->
     try
       allocate
         ~genesis
@@ -361,6 +367,7 @@ module Chain = struct
         ~current_head
         ~expiration
         ~allow_forked_chain
+        ~checkpoint
         global_state
         data.context_index
         chain_data_store
@@ -406,6 +413,10 @@ module Chain = struct
   let expiration { expiration } = expiration
   let allow_forked_chain { allow_forked_chain } = allow_forked_chain
   let global_state { global_state } = global_state
+  let checkpoint chain_state =
+    Shared.use chain_state.chain_data begin fun { checkpoint } ->
+      Lwt.return checkpoint
+    end
 
   let destroy state chain =
     lwt_debug "destroy %a" Chain_id.pp (id chain) >>= fun () ->

@@ -75,6 +75,10 @@ module Chain_data : sig
     with type t = store * Block_hash.t
      and type value := Block_hash.t (* successor *)
 
+  module Checkpoint : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
+
 end
 
 
