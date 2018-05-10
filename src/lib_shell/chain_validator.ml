@@ -408,22 +408,35 @@ let child w =
       try Some (List.assoc (State.Chain.id chain_state) (Worker.list table))
       with Not_found -> None
 
-let validate_block w ?(force = false) hash block operations =
+let assert_fitness_increases ?(force = false) w distant_header =
+  let pv = Worker.state w in
+  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  Chain.head chain_state >>= fun local_header ->
+  fail_when
+    (not force &&
+     Fitness.compare
+       distant_header.Block_header.shell.fitness
+       (State.Block.fitness local_header) <= 0)
+    (failure "Fitness too low")
+
+let assert_checkpoint w hash (header: Block_header.t) =
+  let pv = Worker.state w in
+  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  State.Chain.acceptable_block chain_state hash header >>= fun acceptable ->
+  fail_unless acceptable
+    (Validation_errors.Checkpoint_error (hash, None))
+
+let validate_block w ?force hash block operations =
   let nv = Worker.state w in
   assert (Block_hash.equal hash (Block_header.hash block)) ;
-  Chain.head nv.parameters.chain_state >>= fun head ->
-  let head = State.Block.header head in
-  if
-    force || Fitness.(head.shell.fitness < block.shell.fitness)
-  then
-    Block_validator.validate
-      ~canceler:(Worker.canceler w)
-      ~notify_new_block:(notify_new_block w)
-      nv.parameters.block_validator
-      nv.parameters.chain_db
-      hash block operations
-  else
-    failwith "Fitness too low"
+  assert_fitness_increases ?force w block >>=? fun () ->
+  assert_checkpoint w hash block >>=? fun () ->
+  Block_validator.validate
+    ~canceler:(Worker.canceler w)
+    ~notify_new_block:(notify_new_block w)
+    nv.parameters.block_validator
+    nv.parameters.chain_db
+    hash block operations
 
 let bootstrapped w =
   let { bootstrapped_waiter } = Worker.state w in

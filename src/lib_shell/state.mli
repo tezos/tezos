@@ -84,6 +84,13 @@ module Chain : sig
     Int32.t * Block_hash.t ->
     unit Lwt.t
 
+  (** Check that a block is compatible with the current checkpoint.
+      This function assumes that the predecessor is known valid. *)
+  val acceptable_block:
+    chain_state ->
+    Block_hash.t -> Block_header.t ->
+    bool Lwt.t
+
 end
 
 (** {2 Block database} *****************************************************)

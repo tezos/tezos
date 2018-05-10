@@ -571,6 +571,11 @@ module Chain = struct
       end
     end
 
+  let acceptable_block chain_state hash (header : Block_header.t) =
+    Shared.use chain_state.chain_data begin fun chain_data ->
+      Locked_block.acceptable chain_data hash header
+    end
+
   let destroy state chain =
     lwt_debug "destroy %a" Chain_id.pp (id chain) >>= fun () ->
     Shared.use state.global_data begin fun { global_store ; chains } ->
