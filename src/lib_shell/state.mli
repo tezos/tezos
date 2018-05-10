@@ -73,6 +73,17 @@ module Chain : sig
 
   val checkpoint: chain_state -> (Int32.t * Block_hash.t) Lwt.t
 
+  (** Update the current checkpoint. The current head should be
+      consistent (i.e. it should either have a lower level or pass
+      through the checkpoint). In the process all the blocks from
+      invalid alternate heads are removed from the disk, either
+      completely (when `level <= checkpoint`) or still tagged as
+      invalid (when `level > checkpoint`). *)
+  val set_checkpoint:
+    chain_state ->
+    Int32.t * Block_hash.t ->
+    unit Lwt.t
+
 end
 
 (** {2 Block database} *****************************************************)

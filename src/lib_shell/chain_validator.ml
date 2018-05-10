@@ -127,6 +127,19 @@ let may_activate_peer_validator w peer_id =
     P2p_peer.Table.add nv.active_peers peer_id pv ;
     pv
 
+let may_update_checkpoint chain_state new_head =
+  State.Chain.checkpoint chain_state >>= fun (old_level, _old_block) ->
+  let new_level = State.Block.last_allowed_fork_level new_head in
+  if new_level <= old_level then
+    Lwt.return_unit
+  else
+    let head_level = State.Block.level new_head in
+    State.Block.predecessor_n new_head
+      (Int32.to_int (Int32.sub head_level new_level)) >>= function
+    | None -> Lwt.return_unit (* should not happen *)
+    | Some new_block ->
+        State.Chain.set_checkpoint chain_state (new_level, new_block)
+
 let may_switch_test_chain w spawn_child block =
   let nv = Worker.state w in
   let create_child genesis protocol expiration =
@@ -234,6 +247,7 @@ let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
     return Event.Ignored_head
   else begin
     Chain.set_head nv.parameters.chain_state block >>= fun previous ->
+    may_update_checkpoint nv.parameters.chain_state block >>= fun () ->
     broadcast_head w ~previous block >>= fun () ->
     begin match nv.prevalidator with
       | Some prevalidator ->
