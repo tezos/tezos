@@ -885,7 +885,10 @@ end
 let may_create_chain state chain genesis =
   Chain.get state chain >>= function
   | Ok chain -> Lwt.return chain
-  | Error _ -> Chain.create state genesis
+  | Error _ ->
+      Chain.create
+        ~allow_forked_chain:true
+        state genesis
 
 let read
     ?patch_context
