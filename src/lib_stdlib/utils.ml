@@ -18,6 +18,7 @@ module Infix = struct
 
 end
 
+let nbsp = Re.(compile (str "\xC2\xA0"))
 let display_paragraph ppf description =
   Format.fprintf ppf "@[%a@]"
     (Format.pp_print_list ~pp_sep:Format.pp_print_newline
@@ -26,7 +27,7 @@ let display_paragraph ppf description =
             (fun ppf w ->
                (* replace &nbsp; by real spaces... *)
                Format.fprintf ppf "%s@ "
-                 (Stringext.replace_all ~pattern:"\xC2\xA0" ~with_:" " w))
+                 (Re.replace ~all:true nbsp ~f:(fun _ -> " ") w))
             ppf
             (TzString.split ' ' line)))
     (TzString.split ~dup:false '\n' description)
