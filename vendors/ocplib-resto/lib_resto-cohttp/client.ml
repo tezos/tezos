@@ -98,11 +98,11 @@ module Make (Encoding : Resto.ENCODING) = struct
         let id = !cpt in
         let uri = Uri.to_string uri in
         incr cpt ;
-        Format.fprintf ppf "@[<2>>>>>%d: %s@,%a@]@." id uri (media.pp enc) body ;
+        Format.fprintf ppf "@[<v 2>>>>>%d: %s@,%a@]@." id uri (media.pp enc) body ;
         Lwt.return (id, uri)
       let log_response (id, _uri) ?(media = faked_media) enc code body =
         Lazy.force body >>= fun body ->
-        Format.fprintf ppf "@[<2><<<<%d: %s@,%a@]@."
+        Format.fprintf ppf "@[<v 2><<<<%d: %s@,%a@]@."
           id (Cohttp.Code.string_of_status code) (media.pp enc) body ;
         Lwt.return_unit
     end : LOGGER)
