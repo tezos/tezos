@@ -169,7 +169,7 @@ this:
         | _ -> None)
 
 I’m also renaming the ``error`` function to ``fail``. This is the
-convention used by the actual Errormonad module. I’m also exposing the
+convention used by the actual `Error_monad` module. I’m also exposing the
 ``'a t`` type so that you can dispatch on it if you need to. This is
 used several times in the Tezos codebase.
 

@@ -356,17 +356,17 @@ writing your own configuration file if needed.
 Debugging
 ---------
 
-It is possible to set independant log levels for different logging
+It is possible to set independent log levels for different logging
 sections in Tezos, as well as specifying an output file for logging. See
 the description of log parameters above as well as documentation under
-the DEBUG section diplayed by \`tezos-node run –help’.
+the DEBUG section displayed by \`tezos-node run –help’.
 
 JSON/RPC interface
 ------------------
 
 The Tezos node provides a JSON/RPC interface. Note that it is an RPC,
 and it is JSON based, but it does not follow the “JSON-RPC” protocol. It
-is not active by default and it must be explicitely activated with the
+is not active by default and it must be explicitly activated with the
 ``--rpc-addr`` option. Typically, if you are not trying to run a local
 network and just want to explore the RPC, you would run:
 

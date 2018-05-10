@@ -7,7 +7,7 @@ This document explains the inner workings of the peer-to-peer layer of
 the Tezos shell. This part is in charge of establishing and
 maintaining network connections with other nodes (gossip).
 
-The P2P layer is instanciated by the node. It is parametrized by the
+The P2P layer is instantiated by the node. It is parametrized by the
 type of messages that are exchanged over the network (to allow
 different P2P protocol versions/extensions), and the type of metadata
 associated to each peer. The latter is useful to compute a score for
