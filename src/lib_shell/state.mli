@@ -120,6 +120,7 @@ module Block : sig
   val message: t -> string option
   val max_operations_ttl: t -> int
   val metadata: t -> MBytes.t
+  val last_allowed_fork_level: t -> Int32.t
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t

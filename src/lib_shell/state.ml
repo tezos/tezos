@@ -221,8 +221,9 @@ module Locked_block = struct
     let header : Block_header.t = { shell ; protocol_data = MBytes.create 0 } in
     Store.Block.Contents.store (store, genesis.block)
       { Store.Block.header ; message = Some "Genesis" ;
-        max_operations_ttl = 0 ;
-        context ; metadata = MBytes.create 0 ;
+        max_operations_ttl = 0 ; context ;
+        metadata = MBytes.create 0 ;
+        last_allowed_fork_level = 0l ;
       } >>= fun () ->
     Lwt.return header
 
@@ -442,6 +443,8 @@ module Block = struct
   let message { contents = { message } } = message
   let max_operations_ttl { contents = { max_operations_ttl } } =
     max_operations_ttl
+  let last_allowed_fork_level { contents = { last_allowed_fork_level } } =
+    last_allowed_fork_level
 
   let is_genesis b = Block_hash.equal b.hash b.chain_state.genesis.block
 
@@ -540,7 +543,7 @@ module Block = struct
       chain_state block_header block_header_metadata
       operations operations_metadata
       { Tezos_protocol_environment_shell.context ; message ;
-        max_operations_ttl } =
+        max_operations_ttl ; last_allowed_fork_level } =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     fail_unless
@@ -577,6 +580,7 @@ module Block = struct
               block_header ;
           message ;
           max_operations_ttl ;
+          last_allowed_fork_level ;
           context = commit ;
           metadata = block_header_metadata ;
         } in
