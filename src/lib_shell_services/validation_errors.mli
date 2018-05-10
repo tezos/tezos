@@ -45,3 +45,4 @@ type error +=
 (************************ Validator errors ********************************)
 
 type error +=  Inactive_chain of Chain_id.t
+type error += Checkpoint_error of Block_hash.t * P2p_peer.Id.t option
