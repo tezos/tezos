@@ -123,43 +123,33 @@ let bootstrap_new_branch w _ancestor _head unknown_prefix =
 
 let validate_new_head w hash (header : Block_header.t) =
   let pv = Worker.state w in
-  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Block.known chain_state header.shell.predecessor >>= function
-  | false ->
-      debug w
-        "missing predecessor for new head %a from peer %a"
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pv.peer_id ;
-      Distributed_db.Request.current_branch pv.parameters.chain_db ~peer:pv.peer_id () ;
-      return ()
-  | true ->
-      debug w
-        "fetching operations for new head %a from peer %a"
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pv.peer_id ;
-      map_p
-        (fun i ->
-           Worker.protect w begin fun () ->
-             Distributed_db.Operations.fetch
-               ~timeout:pv.parameters.limits.block_operations_timeout
-               pv.parameters.chain_db ~peer:pv.peer_id
-               (hash, i) header.shell.operations_hash
-           end)
-        (0 -- (header.shell.validation_passes - 1)) >>=? fun operations ->
-      debug w
-        "requesting validation for new head %a from peer %a"
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pv.peer_id ;
-      Block_validator.validate
-        ~notify_new_block:pv.parameters.notify_new_block
-        pv.parameters.block_validator pv.parameters.chain_db
-        hash header operations >>=? fun _block ->
-      debug w
-        "end of validation for new head %a from peer %a"
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pv.peer_id ;
-      set_bootstrapped pv ;
-      return ()
+  debug w
+    "fetching operations for new head %a from peer %a"
+    Block_hash.pp_short hash
+    P2p_peer.Id.pp_short pv.peer_id ;
+  map_p
+    (fun i ->
+       Worker.protect w begin fun () ->
+         Distributed_db.Operations.fetch
+           ~timeout:pv.parameters.limits.block_operations_timeout
+           pv.parameters.chain_db ~peer:pv.peer_id
+           (hash, i) header.shell.operations_hash
+       end)
+    (0 -- (header.shell.validation_passes - 1)) >>=? fun operations ->
+  debug w
+    "requesting validation for new head %a from peer %a"
+    Block_hash.pp_short hash
+    P2p_peer.Id.pp_short pv.peer_id ;
+  Block_validator.validate
+    ~notify_new_block:pv.parameters.notify_new_block
+    pv.parameters.block_validator pv.parameters.chain_db
+    hash header operations >>=? fun _block ->
+  debug w
+    "end of validation for new head %a from peer %a"
+    Block_hash.pp_short hash
+    P2p_peer.Id.pp_short pv.peer_id ;
+  set_bootstrapped pv ;
+  return ()
 
 let only_if_fitness_increases w distant_header cont =
   let pv = Worker.state w in
@@ -177,35 +167,64 @@ let only_if_fitness_increases w distant_header cont =
     return ()
   end else cont ()
 
-let may_validate_new_head w hash header =
+let assert_acceptable_head w hash (header: Block_header.t) =
   let pv = Worker.state w in
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Block.known chain_state hash >>= function
-  | true -> begin
-      State.Block.known_valid chain_state hash >>= function
-      | true ->
-          debug w
-            "ignoring previously validated block %a from peer %a"
-            Block_hash.pp_short hash
-            P2p_peer.Id.pp_short pv.peer_id ;
-          set_bootstrapped pv ;
-          pv.last_validated_head <- header ;
-          return ()
-      | false ->
-          debug w
-            "ignoring known invalid block %a from peer %a"
-            Block_hash.pp_short hash
-            P2p_peer.Id.pp_short pv.peer_id ;
-          fail Validation_errors.Known_invalid
-    end
-  | false ->
-      only_if_fitness_increases w header @@ fun () ->
-      validate_new_head w hash header
+  State.Chain.acceptable_block chain_state hash header >>= fun acceptable ->
+  fail_unless acceptable
+    (Validation_errors.Checkpoint_error (hash, Some pv.peer_id))
+
+let may_validate_new_head w hash (header : Block_header.t) =
+  let pv = Worker.state w in
+  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  State.Block.known_valid chain_state hash >>= fun valid_block ->
+  State.Block.known_invalid chain_state hash >>= fun invalid_block ->
+  State.Block.known_valid chain_state
+    header.shell.predecessor >>= fun valid_predecessor ->
+  State.Block.known_invalid chain_state
+    header.shell.predecessor >>= fun invalid_predecessor ->
+  if valid_block then begin
+    debug w
+      "ignoring previously validated block %a from peer %a"
+      Block_hash.pp_short hash
+      P2p_peer.Id.pp_short pv.peer_id ;
+    set_bootstrapped pv ;
+    pv.last_validated_head <- header ;
+    return ()
+  end else if invalid_block then begin
+    debug w
+      "ignoring known invalid block %a from peer %a"
+      Block_hash.pp_short hash
+      P2p_peer.Id.pp_short pv.peer_id ;
+    fail Validation_errors.Known_invalid
+  end else if invalid_predecessor then begin
+    debug w
+      "ignoring known invalid block %a from peer %a"
+      Block_hash.pp_short hash
+      P2p_peer.Id.pp_short pv.peer_id ;
+    Distributed_db.commit_invalid_block pv.parameters.chain_db
+      hash header [Validation_errors.Known_invalid] >>=? fun _ ->
+    fail Validation_errors.Known_invalid
+  end else if not valid_predecessor then begin
+    debug w
+      "missing predecessor for new head %a from peer %a"
+      Block_hash.pp_short hash
+      P2p_peer.Id.pp_short pv.peer_id ;
+    Distributed_db.Request.current_branch
+      pv.parameters.chain_db ~peer:pv.peer_id () ;
+    return ()
+  end else begin
+    only_if_fitness_increases w header @@ fun () ->
+    assert_acceptable_head w hash header >>=? fun () ->
+    validate_new_head w hash header
+  end
 
 let may_validate_new_branch w distant_hash locator =
   let pv = Worker.state w in
   let distant_header, _ = (locator : Block_locator.t :> Block_header.t * _) in
   only_if_fitness_increases w distant_header @@ fun () ->
+  assert_acceptable_head w
+    (Block_header.hash distant_header) distant_header >>=? fun () ->
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
   State.Block.known_ancestor chain_state locator >>= function
   | None ->
