@@ -207,7 +207,6 @@ module Cycle = struct
   type unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
     delegate: Signature.Public_key_hash.t ;
-    deposit: Tez_repr.t ;
     rewards: Tez_repr.t ;
     fees: Tez_repr.t ;
   }
@@ -220,18 +219,17 @@ module Cycle = struct
     let open Data_encoding in
     union [
       case (Tag 0)
-        (tup5
+        (tup4
            Nonce_hash.encoding
            Signature.Public_key_hash.encoding
            Tez_repr.encoding
-           Tez_repr.encoding
            Tez_repr.encoding)
         (function
-          | Unrevealed { nonce_hash ; delegate ; deposit ; rewards ; fees } ->
-              Some (nonce_hash, delegate, deposit, rewards, fees)
+          | Unrevealed { nonce_hash ; delegate ; rewards ; fees } ->
+              Some (nonce_hash, delegate, rewards, fees)
           | _ -> None)
-        (fun (nonce_hash, delegate, deposit, rewards, fees) ->
-           Unrevealed { nonce_hash ; delegate ; deposit ; rewards ; fees }) ;
+        (fun (nonce_hash, delegate, rewards, fees) ->
+           Unrevealed { nonce_hash ; delegate ; rewards ; fees }) ;
       case (Tag 1)
         Seed_repr.nonce_encoding
         (function
@@ -396,7 +394,6 @@ module Seed = struct
   type unrevealed_nonce = Cycle.unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
     delegate: Signature.Public_key_hash.t ;
-    deposit: Tez_repr.t ;
     rewards: Tez_repr.t ;
     fees: Tez_repr.t ;
   }

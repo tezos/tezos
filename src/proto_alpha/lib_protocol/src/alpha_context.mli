@@ -388,7 +388,6 @@ module Nonce : sig
   type unrevealed = {
     nonce_hash: Nonce_hash.t ;
     delegate: public_key_hash ;
-    deposit: Tez.t ;
     rewards: Tez.t ;
     fees: Tez.t ;
   }

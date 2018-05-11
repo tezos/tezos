@@ -680,7 +680,7 @@ let finalize_application ctxt protocol_data delegate =
     | None -> return ctxt
     | Some nonce_hash ->
         Nonce.record_hash ctxt
-          { nonce_hash ; delegate ; deposit = Tez.zero ; rewards ; fees }
+          { nonce_hash ; delegate ; rewards ; fees }
   end >>=? fun ctxt ->
   (* end of cycle *)
   may_snapshot_roll ctxt >>=? fun ctxt ->
