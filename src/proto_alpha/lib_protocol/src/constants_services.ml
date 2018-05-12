@@ -130,19 +130,19 @@ module S = struct
 
   let block_reward =
     RPC_service.post_service
-      ~description: "    block_reward"
+      ~description: "block_reward"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "    block_reward" Tez.encoding))
-      RPC_path.(custom_root / "    block_reward")
+      ~output: (obj1 (req "block_reward" Tez.encoding))
+      RPC_path.(custom_root / "block_reward")
 
   let endorsement_reward =
     RPC_service.post_service
-      ~description: " endorsement_reward"
+      ~description: "endorsement_reward"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req " endorsement_reward" Tez.encoding))
-      RPC_path.(custom_root / " endorsement_reward")
+      ~output: (obj1 (req "endorsement_reward" Tez.encoding))
+      RPC_path.(custom_root / "endorsement_reward")
 
   let errors =
     RPC_service.post_service
