@@ -22,10 +22,10 @@ let no_exception f =
       Alcotest.failf
         "@[v 2>json failed:@ %a@]"
         (fun ppf -> Json_encoding.print_error ppf) exn
-  | exn ->
+  | Binary.Read_error error ->
       Alcotest.failf
-        "@[v 2>unexpected exception:@ %s@]"
-        (Printexc.to_string exn)
+        "@[v 2>bytes reading failed:@ %a@]"
+        Binary.pp_read_error error
 
 let check_raises expected f =
   match f () with
@@ -40,14 +40,13 @@ let chunked_read sz encoding bytes =
       (fun status chunk ->
          match status with
          | Binary.Await f -> f chunk
-         | Success _ when MBytes.length chunk <> 0 -> Error
-         | Success _ | Error -> status)
-      (Binary.read_stream_of_bytes encoding)
+         | Success _ when MBytes.length chunk <> 0 -> Error Extra_bytes
+         | Success _ | Error _ -> status)
+      (Binary.read_stream encoding)
       (MBytes.cut sz bytes) in
   match status with
-  | Success { remaining ; _ } when
-      List.exists (fun b -> MBytes.length b <> 0) remaining ->
-      Binary.Error
+  | Success { stream ; _ } when not (Binary_stream.is_empty stream) ->
+      Binary.Error Extra_bytes
   | _ -> status
 
 let streamed_read encoding bytes =
@@ -55,6 +54,6 @@ let streamed_read encoding bytes =
     (fun (status, count as acc) chunk ->
        match status with
        | Binary.Await f -> (f chunk, succ count)
-       | Success _ | Error -> acc)
-    (Binary.read_stream_of_bytes encoding, 0)
+       | Success _ | Error _ -> acc)
+    (Binary.read_stream encoding, 0)
     (MBytes.cut 1 bytes)

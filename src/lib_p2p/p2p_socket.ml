@@ -233,14 +233,14 @@ module Reader = struct
     mutable worker: unit Lwt.t ;
   }
 
-  let read_message st init_mbytes =
+  let read_message st init =
     let rec loop status =
       Lwt_unix.yield () >>= fun () ->
       let open Data_encoding.Binary in
       match status with
-      | Success { res ; res_len ; remaining } ->
-          return (Some (res, res_len, remaining))
-      | Error ->
+      | Success { result ; size ; stream } ->
+          return (Some (result, size, stream))
+      | Error _ ->
           lwt_debug "[read_message] incremental decoding error" >>= fun () ->
           return None
       | Await decode_next_buf ->
@@ -251,27 +251,26 @@ module Reader = struct
             "reading %d bytes from %a"
             (MBytes.length buf) P2p_connection.Info.pp st.conn.info >>= fun () ->
           loop (decode_next_buf buf) in
-    loop
-      (Data_encoding.Binary.read_stream_of_bytes ~init:init_mbytes st.encoding)
+    loop (Data_encoding.Binary.read_stream ?init st.encoding)
 
 
-  let rec worker_loop st init_mbytes =
+  let rec worker_loop st stream =
     begin
-      read_message st init_mbytes >>=? fun msg ->
+      read_message st stream >>=? fun msg ->
       match msg with
       | None ->
           protect ~canceler:st.canceler begin fun () ->
             Lwt_pipe.push st.messages (Error [P2p_errors.Decoding_error]) >>= fun () ->
             return None
           end
-      | Some (msg, size, rem_mbytes) ->
+      | Some (msg, size, stream) ->
           protect ~canceler:st.canceler begin fun () ->
             Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
-            return (Some rem_mbytes)
+            return (Some stream)
           end
     end >>= function
-    | Ok Some rem_mbytes ->
-        worker_loop st rem_mbytes
+    | Ok (Some stream) ->
+        worker_loop st (Some stream)
     | Ok None ->
         Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
@@ -301,7 +300,7 @@ module Reader = struct
     end ;
     st.worker <-
       Lwt_utils.worker "reader"
-        ~run:(fun () -> worker_loop st [])
+        ~run:(fun () -> worker_loop st None)
         ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
     st
 

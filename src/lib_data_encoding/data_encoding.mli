@@ -534,29 +534,25 @@ module Binary: sig
   val of_bytes : 'a Encoding.t -> MBytes.t -> 'a option
   val of_bytes_exn : 'a Encoding.t -> MBytes.t -> 'a
 
-  (** This type is used when decoding binary data incrementally.
-      - In case of 'Success', the decoded data, the size of used data
-       to decode the result, and the remaining data are returned
-      - In case of error, 'Error' is returned
-      - 'Await' status embeds a function that waits for additional data
-       to continue decoding, when given data are not sufficient *)
-  type 'a status =
-    | Success of { res : 'a ; res_len : int ; remaining : MBytes.t list }
-    | Await of (MBytes.t -> 'a status)
-    | Error
+  type read_error =
+    | Not_enough_data
+    | Extra_bytes
+    | No_case_matched
+    | Unexpected_tag of int
+    | Invalid_size of int
+    | Invalid_int of { min : int ; v : int ; max : int }
+    | Invalid_float of { min : float ; v : float ; max : float }
+    | Trailing_zero
+  exception Read_error of read_error
+  val pp_read_error: Format.formatter -> read_error -> unit
 
-  (** This function allows to decode (or to initialize decoding) a
-      stream of 'MByte.t'. The given data encoding should have a
-      'Fixed' or a 'Dynamic' size, otherwise an exception
-      'Invalid_argument "streaming data with variable size"' is
-      raised *)
-  val read_stream_of_bytes : ?init:MBytes.t list -> 'a Encoding.t -> 'a status
+  type 'ret status =
+    | Success of { result : 'ret ; size : int ; stream : Binary_stream.t }
+    | Await of (MBytes.t -> 'ret status)
+    | Error of read_error
 
-  (** Like read_stream_of_bytes, but only checks that the stream can
-      be read. Note that this is an approximation because failures
-      that may come from conversion functions present in encodings are
-      not checked *)
-  val check_stream_of_bytes : ?init:MBytes.t list -> 'a Encoding.t -> unit status
+  val read_stream: ?init:Binary_stream.t -> 'a Encoding.t -> 'a status
+
   val fixed_length : 'a Encoding.t -> int option
   val fixed_length_exn : 'a Encoding.t -> int
 

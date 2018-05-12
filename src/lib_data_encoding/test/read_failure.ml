@@ -14,19 +14,19 @@ open Helpers
 open Types
 
 let not_enough_data = function
-  | Invalid_argument _ -> true
+  | Binary.Read_error Not_enough_data -> true
   | _ -> false
 
 let extra_bytes = function
-  | Failure _ -> true
+  | Binary.Read_error Extra_bytes -> true
   | _ -> false
 
 let trailing_zero = function
-  | Failure _ -> true
+  | Binary.Read_error Trailing_zero -> true
   | _ -> false
 
 let invalid_int = function
-  | Data_encoding.Int_out_of_range _ -> true
+  | Binary.Read_error (Invalid_int _) -> true
   | Json_encoding.Cannot_destruct ([] , Failure _) -> true
   | _ -> false
 
@@ -35,17 +35,17 @@ let invalid_string_length = function
       ([], Json_encoding.Unexpected ("string (len 9)", "string (len 4)")) -> true
   | Json_encoding.Cannot_destruct
       ([], Json_encoding.Unexpected ("bytes (len 9)", "bytes (len 4)")) -> true
-  | Failure _ -> true
+  | Binary.Read_error Extra_bytes -> true
   | _ -> false
 
 let missing_case = function
   | Json_encoding.Cannot_destruct ([], Json_encoding.No_case_matched _ ) -> true
-  | Unexpected_tag _ -> true
+  | Binary.Read_error (Unexpected_tag _) -> true
   | _ -> false
 
 let missing_enum = function
   | Json_encoding.Cannot_destruct ([], Json_encoding.Unexpected _ ) -> true
-  | No_case_matched -> true
+  | Binary.Read_error No_case_matched -> true
   | _ -> false
 
 let json ?(expected = fun _ -> true) read_encoding json () =
@@ -63,7 +63,7 @@ let binary ?(expected = fun _ -> true) read_encoding bytes () =
     ignore (Binary.of_bytes_exn read_encoding bytes) ;
   end
 
-let stream read_encoding bytes () =
+let stream ?(expected = fun _ -> true) read_encoding bytes () =
   let len_data = MBytes.length bytes in
   for sz = 1 to max 1 len_data do
     let name = Format.asprintf "stream (%d)" sz in
@@ -72,7 +72,13 @@ let stream read_encoding bytes () =
         Alcotest.failf "%s failed: expecting exception, got success." name
     | Binary.Await _ ->
         Alcotest.failf "%s failed: not enough data" name
-    | Error -> ()
+    | Binary.Error error when expected (Binary.Read_error error) ->
+        ()
+    | Binary.Error error ->
+        Alcotest.failf
+          "@[<v 2>%s failed: read error@ %a@]"
+          name
+          Binary.pp_read_error error
   done
 
 let all ?expected name write_encoding read_encoding value =
@@ -82,7 +88,7 @@ let all ?expected name write_encoding read_encoding value =
   [ name ^ ".json", `Quick, json ?expected read_encoding json_value ;
     name ^ ".bson", `Quick, bson ?expected read_encoding bson_value ;
     name ^ ".bytes", `Quick, binary ?expected read_encoding bytes_value ;
-    name ^ ".stream", `Quick, stream read_encoding bytes_value ;
+    name ^ ".stream", `Quick, stream ?expected read_encoding bytes_value ;
   ]
 
 let all_ranged_int minimum maximum =

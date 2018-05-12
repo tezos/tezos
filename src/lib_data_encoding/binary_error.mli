@@ -7,29 +7,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Encoding =
-struct
-  include Encoding
-  let splitted ~json ~binary = raw_splitted ~json:(Json.convert json) ~binary
-  let assoc enc =
-    let json = Json_encoding.assoc (Json.convert enc) in
-    let binary = list (tup2 string enc) in
-    raw_splitted ~json ~binary
-end
+(** This is for use *within* the data encoding library only. Instead, you should
+    use the corresponding module intended for use: {Data_encoding.Binary}. *)
 
-include Encoding
-
-module Json = Json
-module Bson = Bson
-module Binary = struct
-  include Binary
-  include Binary_error
-  include Binary_reader
-  include Binary_stream_reader
-end
-
-type json = Json.t
-let json = Json.encoding
-type json_schema = Json.schema
-let json_schema = Json.schema_encoding
-type bson = Bson.t
+type read_error =
+  | Not_enough_data
+  | Extra_bytes
+  | No_case_matched
+  | Unexpected_tag of int
+  | Invalid_size of int
+  | Invalid_int of { min : int ; v : int ; max : int }
+  | Invalid_float of { min : float ; v : float ; max : float }
+  | Trailing_zero
+exception Read_error of read_error
+val pp_read_error: Format.formatter -> read_error -> unit

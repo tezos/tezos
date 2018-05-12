@@ -48,15 +48,18 @@ let stream ty encoding value () =
     for sz = 1 to max 1 len_data do
       let name = Format.asprintf "stream (%d)" sz in
       match chunked_read sz encoding bytes with
-      | Binary.Success { res = result ; res_len = size ; remaining } ->
+      | Binary.Success { result ; size ; stream } ->
           if size <> MBytes.length bytes ||
-             List.exists (fun b -> MBytes.length b <> 0) remaining then
+             not (Binary_stream.is_empty stream) then
             Alcotest.failf "%s failed: remaining data" name ;
           Alcotest.check ty name value result
       | Binary.Await _ ->
           Alcotest.failf "%s failed: not enough data" name
-      | Binary.Error ->
-          Alcotest.failf "@[<v 2>%s failed: read error@]" name
+      | Binary.Error error ->
+          Alcotest.failf
+            "@[<v 2>%s failed: read error@ %a@]"
+            name
+            Binary.pp_read_error error
     done ;
   end
 
@@ -97,10 +100,12 @@ let all_ranged_float minimum maximum =
   all (name ^ ".max") Alcotest.float encoding maximum
 
 let test_z_sequence () =
-  let test i = binary Alcotest.z z i () in
-  for i = -1_00_000 to 1_00_000 do test (Z.of_int i) done ;
-  for i = 100_000_000 to 100_100_000 do test (Z.of_int i) done ;
-  for i = -100_000_000 downto -100_100_000 do test (Z.of_int i) done
+  let test i =
+    binary Alcotest.z z i () ;
+    stream Alcotest.z z i () in
+  for i = -10_000 to 10_000 do test (Z.of_int i) done ;
+  for i = 100_000_000 to 100_010_000 do test (Z.of_int i) done ;
+  for i = -100_000_000 downto -100_010_000 do test (Z.of_int i) done
 
 let test_string_enum_boundary () =
   let entries = List.rev_map (fun x -> string_of_int x, x) (0 -- 254) in

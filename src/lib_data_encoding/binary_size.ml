@@ -27,7 +27,6 @@ let tag_size = function
   | `Uint8 -> uint8
   | `Uint16 -> uint16
 
-
 type signed_integer = [ `Int31 | `Int16 | `Int8 ]
 type unsigned_integer = [ `Uint30 | `Uint16 | `Uint8 ]
 type integer = [ signed_integer | unsigned_integer ]
@@ -62,4 +61,3 @@ let range_to_size ~minimum ~maximum : integer =
 
 let enum_size arr =
   unsigned_range_to_size (Array.length arr)
-

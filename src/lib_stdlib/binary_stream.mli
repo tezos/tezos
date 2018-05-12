@@ -7,29 +7,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Encoding =
-struct
-  include Encoding
-  let splitted ~json ~binary = raw_splitted ~json:(Json.convert json) ~binary
-  let assoc enc =
-    let json = Json_encoding.assoc (Json.convert enc) in
-    let binary = list (tup2 string enc) in
-    raw_splitted ~json ~binary
-end
+type t
 
-include Encoding
+type buffer = {
+  buffer : MBytes.t ;
+  ofs : int ;
+  len : int ;
+}
 
-module Json = Json
-module Bson = Bson
-module Binary = struct
-  include Binary
-  include Binary_error
-  include Binary_reader
-  include Binary_stream_reader
-end
+exception Need_more_data
 
-type json = Json.t
-let json = Json.encoding
-type json_schema = Json.schema
-let json_schema = Json.schema_encoding
-type bson = Bson.t
+val is_empty: t -> bool
+val empty: t
+val of_buffer: buffer -> t
+val read: t -> int -> buffer * t
+val push: MBytes.t -> t -> t
