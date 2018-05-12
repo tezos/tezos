@@ -268,7 +268,9 @@ cycle ``(n-ALLOWED_FORK-2)``, in one out of every
 ``BLOCKS_PER_COMMITMENT`` = 32 blocks.
 
 The commitment must be revealed by the original baker during cycle
-``(n-ALLOWED_FORK-1)`` under penalty of forfeiting the security deposit.
+``(n-ALLOWED_FORK-1)`` under penalty of forfeiting the rewards and
+fees of the block that included the seed commitment (the associated
+security deposit is not forfeited).
 
 A "revelation" is an operation, and multiple revelations can thus be
 included in a block. The revelations are hashed together to generate a
