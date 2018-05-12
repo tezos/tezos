@@ -20,116 +20,6 @@ type 'l writer = {
   write: 'a. 'a Encoding.t -> 'a -> MBytes.t -> int -> int ;
 }
 
-let rec length : type x. x Encoding.t -> x -> int = fun e ->
-  let open Encoding in
-  match e.encoding with
-  (* Fixed *)
-  | Null -> fun _ -> 0
-  | Empty -> fun _ -> 0
-  | Constant _ -> fun _ -> 0
-  | Bool -> fun _ -> Binary_size.bool
-  | Int8 -> fun _ -> Binary_size.int8
-  | Uint8 -> fun _ -> Binary_size.uint8
-  | Int16 -> fun _ -> Binary_size.int16
-  | Uint16 -> fun _ -> Binary_size.uint16
-  | Int31 -> fun _ -> Binary_size.int31
-  | Int32 -> fun _ -> Binary_size.int32
-  | Int64 -> fun _ -> Binary_size.int64
-  | Z -> fun z -> (Z.numbits z + 1 + 6) / 7
-  | RangedInt { minimum ; maximum } ->
-      fun _ -> Binary_size.(integer_to_size @@ range_to_size ~minimum ~maximum)
-  | Float -> fun _ -> Binary_size.float
-  | RangedFloat _ -> fun _ -> Binary_size.float
-  | Bytes `Fixed n -> fun _ -> n
-  | String `Fixed n -> fun _ -> n
-  | String_enum (_, arr) ->
-      fun _ -> Binary_size.(integer_to_size @@ enum_size arr)
-  | Objs (`Fixed n, _, _) -> fun _ -> n
-  | Tups (`Fixed n, _, _) -> fun _ -> n
-  | Union (`Fixed n, _, _) -> fun _ -> n
-  (* Dynamic *)
-  | Objs (`Dynamic, e1, e2) ->
-      let length1 = length e1 in
-      let length2 = length e2 in
-      fun (v1, v2) -> length1 v1 + length2 v2
-  | Tups (`Dynamic, e1, e2) ->
-      let length1 = length e1 in
-      let length2 = length e2 in
-      fun (v1, v2) -> length1 v1 + length2 v2
-  | Union (`Dynamic, sz, cases) ->
-      let tag_size = Binary_size.tag_size sz in
-      let case_length (Case { encoding = e ; proj }) =
-        let length v = tag_size + length e v in
-        fun v -> Option.map ~f:length (proj v) in
-      apply_and_get_first_some (List.map case_length cases)
-  | Mu (`Dynamic, _name, self) ->
-      fun v -> length (self e) v
-  | Obj (Opt (`Dynamic, _, e)) ->
-      let length = length e in
-      (function None -> 1 | Some x -> 1 + length x)
-  (* Variable *)
-  | Ignore -> fun _ -> 0
-  | Bytes `Variable -> MBytes.length
-  | String `Variable -> String.length
-  | Array e ->
-      let length = length e in
-      fun v ->
-        Array.fold_left
-          (fun acc v -> length v + acc)
-          0 v
-  | List e ->
-      let length = length e in
-      fun v ->
-        List.fold_left
-          (fun acc v -> length v + acc)
-          0 v
-  | Objs (`Variable, e1, e2) ->
-      let length1 = length e1 in
-      let length2 = length e2 in
-      fun (v1, v2) -> length1 v1 + length2 v2
-  | Tups (`Variable, e1, e2) ->
-      let length1 = length e1
-      and length2 = length e2 in
-      fun (v1, v2) -> length1 v1 + length2 v2
-  | Obj (Opt (`Variable, _, e)) ->
-      let length = length e in
-      (function None -> 0 | Some x -> length x)
-  | Union (`Variable, sz, cases) ->
-      let rec case_lengths json_only_cases acc = function
-        | [] -> (List.rev acc, json_only_cases)
-        | Case { tag = Json_only } :: tl -> case_lengths true acc tl
-        | Case { encoding = e ; proj ; tag = Tag _ } :: tl ->
-            let length v = Binary_size.tag_size sz + length e v in
-            case_lengths
-              json_only_cases
-              ((fun v ->
-                  match proj v with
-                  | None -> None
-                  | Some v -> Some (length v)) :: acc)
-              tl in
-      let cases, json_only = case_lengths false [] cases in
-      apply_and_get_first_some
-        ~error:(if json_only
-                then Failure "No case matched, but JSON only cases were present in union"
-                else No_case_matched)
-        cases
-  | Mu (`Variable, _name, self) ->
-      fun v -> length (self e) v
-  (* Recursive*)
-  | Obj (Req (_, e)) -> length e
-  | Obj (Dft (_, e, _)) -> length e
-  | Tup e -> length e
-  | Conv  { encoding = e ; proj } ->
-      let length = length e in
-      fun v -> length (proj v)
-  | Describe { encoding = e } -> length e
-  | Def { encoding = e } -> length e
-  | Splitted { encoding = e } -> length e
-  | Dynamic_size e ->
-      let length = length e in
-      fun v -> Binary_size.int32 + length v
-  | Delayed f -> length (f ())
-
 (** Writer *)
 
 module Writer = struct
@@ -428,7 +318,7 @@ let rec write_rec
   | Union (_, sz, cases) -> union { write = write_rec } sz cases
   | Mu (_, _, self) -> fun v buf ofs -> write_rec (self e) v buf ofs
   | Dynamic_size e ->
-      let length = length e
+      let length = Binary_length.length e
       and write = write_rec e in
       fun v buf ofs ->
         int32 (Int32.of_int @@ length v) buf ofs |> write v buf
@@ -541,10 +431,6 @@ let to_bytes t v =
   let bytes = MBytes_buffer.create () in
   write_rec_buffer t v bytes ;
   MBytes_buffer.to_mbytes bytes
-
-let to_bytes = to_bytes
-
-let length = length
 
 let fixed_length e =
   match Encoding.classify e with
