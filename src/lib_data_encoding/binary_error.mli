@@ -21,3 +21,15 @@ type read_error =
   | Trailing_zero
 exception Read_error of read_error
 val pp_read_error: Format.formatter -> read_error -> unit
+
+type write_error =
+  | Size_limit_exceeded
+  | No_case_matched
+  | Invalid_int of { min : int ; v : int ; max : int }
+  | Invalid_float of { min : float ; v : float ; max : float }
+  | Invalid_bytes_length of { expected : int ; found : int }
+  | Invalid_string_length of { expected : int ; found : int }
+
+val pp_write_error : Format.formatter -> write_error -> unit
+
+exception Write_error of write_error

@@ -119,7 +119,7 @@ module Connection_message = struct
     let len = Crypto.header_length + encoded_message_len in
     let buf = MBytes.create len in
     match Data_encoding.Binary.write
-            encoding message buf Crypto.header_length with
+            encoding message buf Crypto.header_length len with
     | None ->
         fail P2p_errors.Encoding_error
     | Some last ->

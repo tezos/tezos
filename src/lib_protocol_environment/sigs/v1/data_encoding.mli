@@ -237,8 +237,8 @@ module Binary : sig
   val length : 'a encoding -> 'a -> int
   val fixed_length : 'a encoding -> int option
   val read : 'a encoding -> MBytes.t -> int -> int -> (int * 'a) option
-  val write : 'a encoding -> 'a -> MBytes.t -> int -> int option
   val to_bytes : 'a encoding -> 'a -> MBytes.t
+  val write : 'a encoding -> 'a -> MBytes.t -> int -> int -> int option
   val of_bytes : 'a encoding -> MBytes.t -> 'a option
 
 end

@@ -528,9 +528,11 @@ end
 module Binary: sig
 
   val length : 'a Encoding.t -> 'a -> int
+  val fixed_length : 'a Encoding.t -> int option
+  val fixed_length_exn : 'a Encoding.t -> int
+
   val read : 'a Encoding.t -> MBytes.t -> int -> int -> (int * 'a) option
-  val write : 'a Encoding.t -> 'a -> MBytes.t -> int -> int option
-  val to_bytes : 'a Encoding.t -> 'a -> MBytes.t
+
   val of_bytes : 'a Encoding.t -> MBytes.t -> 'a option
   val of_bytes_exn : 'a Encoding.t -> MBytes.t -> 'a
 
@@ -551,10 +553,23 @@ module Binary: sig
     | Await of (MBytes.t -> 'ret status)
     | Error of read_error
 
-  val read_stream: ?init:Binary_stream.t -> 'a Encoding.t -> 'a status
+  val read_stream : ?init:Binary_stream.t -> 'a Encoding.t -> 'a status
 
-  val fixed_length : 'a Encoding.t -> int option
-  val fixed_length_exn : 'a Encoding.t -> int
+  val write : 'a Encoding.t -> 'a -> MBytes.t -> int -> int -> int option
+
+  type write_error =
+    | Size_limit_exceeded
+    | No_case_matched
+    | Invalid_int of { min : int ; v : int ; max : int }
+    | Invalid_float of { min : float ; v : float ; max : float }
+    | Invalid_bytes_length of { expected : int ; found : int }
+    | Invalid_string_length of { expected : int ; found : int }
+
+  val pp_write_error : Format.formatter -> write_error -> unit
+
+  exception Write_error of write_error
+
+  val to_bytes : 'a Encoding.t -> 'a -> MBytes.t
 
 end
 

@@ -26,6 +26,10 @@ let no_exception f =
       Alcotest.failf
         "@[v 2>bytes reading failed:@ %a@]"
         Binary.pp_read_error error
+  | Binary.Write_error error ->
+      Alcotest.failf
+        "@[v 2>bytes writing failed:@ %a@]"
+        Binary.pp_write_error error
 
 let check_raises expected f =
   match f () with

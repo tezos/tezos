@@ -47,7 +47,7 @@ let rec length : type x. x Encoding.t -> x -> int =
         length e1 v1 + length e2 v2
     | Union (`Dynamic, sz, cases) ->
         let rec length_case = function
-          | [] -> raise (Read_error No_case_matched)
+          | [] -> raise (Write_error No_case_matched)
           | Case { tag = Json_only } :: tl -> length_case tl
           | Case { encoding = e ; proj ; _ } :: tl ->
               match proj value with
@@ -88,7 +88,7 @@ let rec length : type x. x Encoding.t -> x -> int =
       end
     | Union (`Variable, sz, cases) ->
         let rec length_case = function
-          | [] -> raise (Read_error No_case_matched)
+          | [] -> raise (Write_error No_case_matched)
           | Case { tag = Json_only } :: tl -> length_case tl
           | Case { encoding = e ; proj ; _ } :: tl ->
               match proj value with

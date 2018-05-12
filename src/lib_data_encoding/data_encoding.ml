@@ -22,9 +22,9 @@ include Encoding
 module Json = Json
 module Bson = Bson
 module Binary = struct
-  include Binary
   include Binary_error
   include Binary_length
+  include Binary_writer
   include Binary_reader
   include Binary_stream_reader
 end
