@@ -87,18 +87,6 @@ type 'a encoding = 'a t
 
 val make: ?json_encoding: 'a Json_encoding.encoding -> 'a desc -> 'a t
 
-
-exception No_case_matched
-exception Unexpected_tag of int
-exception Duplicated_tag of int
-exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
-exception Unexpected_enum of string * string list
-exception Parse_error of string
-exception Float_out_of_range of float * float * float
-exception Int_out_of_range of int * int * int
-exception Invalid_size of int
-
-
 val null : unit encoding
 val empty : unit encoding
 val unit : unit encoding

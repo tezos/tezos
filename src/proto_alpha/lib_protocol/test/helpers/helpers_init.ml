@@ -19,7 +19,7 @@ let sandbox_parameters =
 |json} with
   | Error err -> raise (Failure err)
   | Ok json ->
-      Data_encoding.Binary.to_bytes Data_encoding.json json
+      Data_encoding.Binary.to_bytes_exn Data_encoding.json json
 
 let protocol_parameters =
   let json_result =
@@ -52,7 +52,7 @@ let protocol_parameters =
   match json_result with
   | Error err -> raise (Failure err)
   | Ok json ->
-      Data_encoding.Binary.to_bytes Data_encoding.json json
+      Data_encoding.Binary.to_bytes_exn Data_encoding.json json
 
 
 let main () =
@@ -75,7 +75,7 @@ let main () =
     context = Context_hash.zero ; (* don't care *)
   } in
   let protocol_data =
-    Data_encoding.Binary.to_bytes
+    Data_encoding.Binary.to_bytes_exn
       Alpha_context.Block_header.protocol_data_encoding
       (Helpers_block.get_protocol_data 0 true) in
   let tezos_header = { Block_header.shell = header ; protocol_data } in

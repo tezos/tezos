@@ -360,7 +360,7 @@ let build_rpc_directory node =
   let dir =
     let implementation () header =
       let res =
-        Data_encoding.Binary.to_bytes Block_header.encoding header in
+        Data_encoding.Binary.to_bytes_exn Block_header.encoding header in
       RPC_answer.return res in
     RPC_directory.gen_register0 dir Shell_services.S.forge_block_header
       implementation in

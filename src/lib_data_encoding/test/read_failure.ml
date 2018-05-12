@@ -84,7 +84,7 @@ let stream ?(expected = fun _ -> true) read_encoding bytes () =
 let all ?expected name write_encoding read_encoding value =
   let json_value = Json.construct write_encoding value in
   let bson_value = Bson.construct write_encoding value in
-  let bytes_value = Binary.to_bytes write_encoding value in
+  let bytes_value = Binary.to_bytes_exn write_encoding value in
   [ name ^ ".json", `Quick, json ?expected read_encoding json_value ;
     name ^ ".bson", `Quick, bson ?expected read_encoding bson_value ;
     name ^ ".bytes", `Quick, binary ?expected read_encoding bytes_value ;

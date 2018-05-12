@@ -98,7 +98,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
       | Some json ->
           Tezos_storage.Context.set ctxt
             ["sandbox_parameter"]
-            (Data_encoding.Binary.to_bytes Data_encoding.json json)
+            (Data_encoding.Binary.to_bytes_exn Data_encoding.json json)
     end >>= fun ctxt ->
     let module Proto = (val Registered_protocol.get_exn genesis.protocol) in
     Proto.init ctxt {

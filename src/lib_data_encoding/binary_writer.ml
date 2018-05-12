@@ -287,7 +287,7 @@ let write e v buffer offset len =
     Some state.offset
   with Write_error _ -> None
 
-let to_bytes e v =
+let to_bytes_exn e v =
   match Encoding.classify e with
   | `Fixed n -> begin
       (* Preallocate the complete buffer *)
@@ -303,3 +303,7 @@ let to_bytes e v =
                     offset = 0 ; allowed_bytes = None } in
       write_rec e state v ;
       MBytes.sub state.buffer 0 state.offset
+
+let to_bytes e v =
+  try Some (to_bytes_exn e v)
+  with Write_error _ -> None

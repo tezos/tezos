@@ -336,8 +336,9 @@ module Writer = struct
   let encode_message st msg =
     try ok (MBytes.cut
               st.binary_chunks_size
-              (Data_encoding.Binary.to_bytes st.encoding msg))
-    with _ -> error P2p_errors.Encoding_error
+              (Data_encoding.Binary.to_bytes_exn st.encoding msg))
+    with Data_encoding.Binary.Write_error _ ->
+      error P2p_errors.Encoding_error
 
   let rec worker_loop st =
     Lwt_unix.yield () >>= fun () ->

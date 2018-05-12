@@ -21,8 +21,9 @@ module Make_value (V : ENCODED_VALUE) = struct
     | None -> Error [Raw_context.Storage_error (Corrupted_data [(* FIXME??*)])]
     | Some v -> Ok v
   let to_bytes v =
-    try Data_encoding.Binary.to_bytes V.encoding v
-    with _ -> MBytes.create 0
+    match Data_encoding.Binary.to_bytes V.encoding v with
+    | Some b -> b
+    | None -> MBytes.create 0
 end
 
 module Raw_value = struct

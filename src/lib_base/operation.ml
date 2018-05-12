@@ -44,7 +44,7 @@ let pp fmt op =
   Data_encoding.Json.pp fmt
     (Data_encoding.Json.construct encoding op)
 
-let to_bytes v = Data_encoding.Binary.to_bytes encoding v
+let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v
 let of_bytes b = Data_encoding.Binary.of_bytes encoding b
 let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 

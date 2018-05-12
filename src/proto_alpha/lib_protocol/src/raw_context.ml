@@ -150,7 +150,7 @@ let get_first_level ctxt =
 
 let set_first_level ctxt level =
   let bytes =
-    Data_encoding.Binary.to_bytes Raw_level_repr.encoding level in
+    Data_encoding.Binary.to_bytes_exn Raw_level_repr.encoding level in
   Context.set ctxt first_level_key bytes >>= fun ctxt ->
   return ctxt
 
@@ -212,7 +212,7 @@ let get_proto_param ctxt =
 
 let set_constants ctxt constants =
   let bytes =
-    Data_encoding.Binary.to_bytes
+    Data_encoding.Binary.to_bytes_exn
       Parameters_repr.constants_encoding constants in
   Context.set ctxt constants_key bytes
 

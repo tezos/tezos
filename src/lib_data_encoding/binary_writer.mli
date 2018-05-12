@@ -11,4 +11,5 @@
     use the corresponding module intended for use: {Data_encoding.Binary}. *)
 
 val write : 'a Encoding.t -> 'a -> MBytes.t -> int -> int -> int option
-val to_bytes : 'a Encoding.t -> 'a -> MBytes.t
+val to_bytes_exn : 'a Encoding.t -> 'a -> MBytes.t
+val to_bytes : 'a Encoding.t -> 'a -> MBytes.t option

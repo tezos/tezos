@@ -22,7 +22,7 @@ let inject_operation validator ?chain_id bytes =
 
 let inject_protocol state ?force:_ proto =
   let proto_bytes =
-    Data_encoding.Binary.to_bytes Protocol.encoding proto in
+    Data_encoding.Binary.to_bytes_exn Protocol.encoding proto in
   let hash = Protocol_hash.hash_bytes [proto_bytes] in
   let validation =
     Updater.compile hash proto >>= function

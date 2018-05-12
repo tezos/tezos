@@ -14,12 +14,12 @@ let protocol =
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
 let bake cctxt ?(timestamp = Time.now ()) block command sk =
-  let protocol_data = Data_encoding.Binary.to_bytes Data.Command.encoding command in
+  let protocol_data = Data_encoding.Binary.to_bytes_exn Data.Command.encoding command in
   Block_services.preapply
     cctxt block ~timestamp ~protocol_data
     [] >>=? fun { shell_header } ->
   let blk =
-    Data_encoding.Binary.to_bytes Block_header.encoding
+    Data_encoding.Binary.to_bytes_exn Block_header.encoding
       { shell = shell_header ; protocol_data } in
   Client_keys.append cctxt sk blk >>=? fun signed_blk ->
   Shell_services.inject_block cctxt signed_blk []
@@ -74,7 +74,7 @@ let commands () =
       begin fun timestamp hash fitness sk param_json_file (cctxt : Client_context.full) ->
         let fitness = Proto_alpha.Fitness_repr.from_int64 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file >>=? fun json ->
-        let protocol_parameters = Data_encoding.Binary.to_bytes Data_encoding.json json in
+        let protocol_parameters = Data_encoding.Binary.to_bytes_exn Data_encoding.json json in
         bake cctxt ?timestamp cctxt#block
           (Activate { protocol = hash ; fitness ; protocol_parameters })
           sk >>=? fun hash ->

@@ -7,17 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-exception No_case_matched
-exception Unexpected_tag of int
-exception Duplicated_tag of int
-exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
-exception Unexpected_enum of string * string list
-exception Invalid_size of int
-exception Int_out_of_range of int * int * int
-exception Float_out_of_range of float * float * float
-exception Parse_error of string
-
-
 module Kind = struct
 
   type t =
@@ -453,9 +442,12 @@ let check_cases tag_size cases =
        match tag with
        | Json_only -> others
        | Tag tag ->
-           if List.mem tag others then raise (Duplicated_tag tag) ;
+           if List.mem tag others then
+             Format.kasprintf invalid_arg
+               "The tag %d appears twice in an union."
+               tag ;
            if tag < 0 || max_tag <= tag then
-             raise (Invalid_tag (tag, tag_size)) ;
+             Format.kasprintf invalid_arg "The tag %d is invalid." tag ;
            tag :: others
     )
     [] cases

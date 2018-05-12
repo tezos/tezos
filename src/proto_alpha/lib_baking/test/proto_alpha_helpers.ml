@@ -86,7 +86,7 @@ let protocol_parameters =
   match json_result with
   | Error err -> raise (Failure err)
   | Ok json ->
-      Data_encoding.Binary.to_bytes Data_encoding.json json
+      Data_encoding.Binary.to_bytes_exn Data_encoding.json json
 
 let vote_protocol_parameters =
   let json_result =
@@ -110,7 +110,7 @@ let vote_protocol_parameters =
   match json_result with
   | Error err -> raise (Failure err)
   | Ok json ->
-      Data_encoding.Binary.to_bytes Data_encoding.json json
+      Data_encoding.Binary.to_bytes_exn Data_encoding.json json
 
 let activate_alpha ?(vote = false) () =
   let fitness = Fitness_repr.from_int64 0L in

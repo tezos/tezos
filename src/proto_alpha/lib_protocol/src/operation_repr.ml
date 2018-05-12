@@ -474,7 +474,7 @@ let () =
     (fun () -> Missing_signature)
 
 let forge shell proto =
-  Data_encoding.Binary.to_bytes
+  Data_encoding.Binary.to_bytes_exn
     Encoding.unsigned_operation_encoding (shell, proto)
 
 let check_signature key { shell ; contents ; signature } =
@@ -499,7 +499,7 @@ let parse_proto bytes =
 let hash_raw = Operation.hash
 let hash o =
   let proto =
-    Data_encoding.Binary.to_bytes
+    Data_encoding.Binary.to_bytes_exn
       Encoding.signed_proto_operation_encoding
       (o.contents, o.signature) in
   Operation.hash { shell = o.shell ; proto }

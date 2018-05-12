@@ -107,7 +107,7 @@ let sign src oph protop =
       Operation.proto_operation_encoding
       (obj1 @@ varopt "signature" Signature.encoding) in
   let proto_bytes =
-    Data_encoding.Binary.to_bytes
+    Data_encoding.Binary.to_bytes_exn
       signed_proto_operation_encoding
       (protop, signature) in
   (proto_bytes, signature)

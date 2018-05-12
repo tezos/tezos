@@ -64,13 +64,6 @@ module Encoding: sig
   type 'a t
   type 'a encoding = 'a t
 
-  (** Exceptions that can be raised by the functions of this library. *)
-  exception No_case_matched
-  exception Unexpected_tag of int
-  exception Duplicated_tag of int
-  exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
-  exception Unexpected_enum of string * string list
-
   (** {3 Ground descriptors} *)
 
   (** Special value [null] in JSON, nothing in binary. *)
@@ -568,8 +561,9 @@ module Binary: sig
   val pp_write_error : Format.formatter -> write_error -> unit
 
   exception Write_error of write_error
+  val to_bytes : 'a Encoding.t -> 'a -> MBytes.t option
 
-  val to_bytes : 'a Encoding.t -> 'a -> MBytes.t
+  val to_bytes_exn : 'a Encoding.t -> 'a -> MBytes.t
 
 end
 
@@ -578,6 +572,3 @@ val json: json Encoding.t
 type json_schema = Json.schema
 val json_schema: json_schema Encoding.t
 type bson = Bson.t
-
-exception Float_out_of_range of float * float * float
-exception Int_out_of_range of int * int * int

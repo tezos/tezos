@@ -18,12 +18,6 @@ type json =
 
 type json_schema
 
-exception No_case_matched
-exception Unexpected_tag of int
-exception Duplicated_tag of int
-exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
-exception Unexpected_enum of string * string list
-
 type 'a t
 type 'a encoding = 'a t
 
@@ -237,8 +231,12 @@ module Binary : sig
   val length : 'a encoding -> 'a -> int
   val fixed_length : 'a encoding -> int option
   val read : 'a encoding -> MBytes.t -> int -> int -> (int * 'a) option
-  val to_bytes : 'a encoding -> 'a -> MBytes.t
   val write : 'a encoding -> 'a -> MBytes.t -> int -> int -> int option
+  val to_bytes : 'a encoding -> 'a -> MBytes.t option
+  val to_bytes_exn : 'a encoding -> 'a -> MBytes.t
   val of_bytes : 'a encoding -> MBytes.t -> 'a option
+
+  type write_error
+  exception Write_error of write_error
 
 end

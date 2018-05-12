@@ -31,7 +31,7 @@ let bson ?(expected = fun _ -> true) encoding value () =
 
 let binary ?(expected = fun _ -> true) encoding value () =
   check_raises expected begin fun () ->
-    ignore (Binary.to_bytes encoding value : MBytes.t) ;
+    ignore (Binary.to_bytes_exn encoding value : MBytes.t) ;
   end
 
 let all name encoding value =

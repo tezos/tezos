@@ -36,14 +36,14 @@ let bson ty encoding value () =
 
 let binary ty encoding value () =
   no_exception begin fun () ->
-    let bytes = Binary.to_bytes encoding value in
+    let bytes = Binary.to_bytes_exn encoding value in
     let result = Binary.of_bytes_exn encoding bytes in
     Alcotest.check ty "binary" value result
   end
 
 let stream ty encoding value () =
   no_exception begin fun () ->
-    let bytes = Binary.to_bytes encoding value in
+    let bytes = Binary.to_bytes_exn encoding value in
     let len_data = MBytes.length bytes in
     for sz = 1 to max 1 len_data do
       let name = Format.asprintf "stream (%d)" sz in

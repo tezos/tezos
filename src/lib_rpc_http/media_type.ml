@@ -90,7 +90,7 @@ let octet_stream = {
   end ;
   construct = begin fun enc v ->
     MBytes.to_string @@
-    Data_encoding.Binary.to_bytes enc v
+    Data_encoding.Binary.to_bytes_exn enc v
   end ;
   destruct = begin fun enc s ->
     match Data_encoding.Binary.of_bytes enc (MBytes.of_string s) with
