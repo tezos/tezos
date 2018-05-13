@@ -16,6 +16,5 @@ val write : 'a Encoding.t -> 'a -> MBytes.t -> int -> int option
 val to_bytes : 'a Encoding.t -> 'a -> MBytes.t
 val of_bytes : 'a Encoding.t -> MBytes.t -> 'a option
 val of_bytes_exn : 'a Encoding.t -> MBytes.t -> 'a
-val to_bytes_list : ?copy_blocks:bool -> int  -> 'a Encoding.t -> 'a -> MBytes.t list
 val fixed_length : 'a Encoding.t -> int option
 val fixed_length_exn : 'a Encoding.t -> int

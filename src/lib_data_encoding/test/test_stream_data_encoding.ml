@@ -28,7 +28,7 @@ let test_read_simple_bin_ko_invalid_data
   let len_data = MBytes.length (Binary.to_bytes encoding value) in
   if classify encoding != `Variable && len_data > 0 then
     for sz = 1 to len_data do
-      let l = (Binary.to_bytes_list sz encoding value) in
+      let l = MBytes.cut sz (Binary.to_bytes encoding value) in
       List.iter (fun b ->
           for i = 0 to MBytes.length b - 1 do
             (* alter data *)
@@ -70,7 +70,7 @@ let test_read_simple_bin_ko_await encoding value =
   let len_data = MBytes.length (Binary.to_bytes encoding value) in
   if classify encoding != `Variable && len_data > 0 then
     for sz = 1 to len_data do
-      let l = Binary.to_bytes_list sz encoding value in
+      let l = MBytes.cut sz (Binary.to_bytes encoding value) in
       match List.rev l with
       | [] -> Assert.fail_msg "%s" (unexpected __LOC__)
       | _ :: r ->
@@ -136,7 +136,7 @@ let test_read_simple_bin_ok ?msg ?(equal=Assert.equal) encoding value =
                    Assert.fail_msg "%s" (unexpected __LOC__)
            end;
            _done
-        )[] (Binary.to_bytes_list sz encoding value)
+        )[] (MBytes.cut sz (Binary.to_bytes encoding value))
     )
   done
 
@@ -145,7 +145,7 @@ let test_check_simple_bin_ko_invalid_data
   let len_data = MBytes.length (Binary.to_bytes encoding value) in
   if classify encoding != `Variable && len_data > 0 then
     for sz = 1 to len_data do
-      let l = (Binary.to_bytes_list sz encoding value) in
+      let l = MBytes.cut sz (Binary.to_bytes encoding value) in
       List.iter (fun b ->
           for i = 0 to MBytes.length b - 1 do
             (* alter data *)
@@ -183,7 +183,7 @@ let test_check_simple_bin_ko_await encoding value =
   let len_data = MBytes.length (Binary.to_bytes encoding value) in
   if classify encoding != `Variable && len_data > 0 then
     for sz = 1 to len_data do
-      let l = Binary.to_bytes_list sz encoding value in
+      let l = MBytes.cut sz (Binary.to_bytes encoding value) in
       match List.rev l with
       | [] -> Assert.fail_msg "%s" (unexpected __LOC__)
       | _ :: r ->
@@ -249,7 +249,7 @@ let test_check_simple_bin_ok encoding value =
                    Assert.fail_msg "%s" (unexpected __LOC__)
            end;
            _done
-        )[] (Binary.to_bytes_list sz encoding value)
+        )[] (MBytes.cut sz (Binary.to_bytes encoding value))
     )
   done
 
@@ -354,10 +354,10 @@ let test_union _ =
   Assert.equal ~prn:prn_t ~msg:__LOC__ (B "2") (Json.destruct enc jsonB) ;
   Assert.equal ~prn:prn_t ~msg:__LOC__ (A 3) (Json.destruct enc jsonC) ;
   Assert.equal ~prn:prn_t ~msg:__LOC__ (D "4") (Json.destruct enc jsonD) ;
-  let binA = Binary.to_bytes_list 1 enc (A 1) in
-  let binB = Binary.to_bytes_list 1 enc (B "2") in
-  let binC = Binary.to_bytes_list 1 enc (C 3) in
-  let binD = Binary.to_bytes_list 1 enc (D "4") in
+  let binA = MBytes.cut 1 @@ Binary.to_bytes enc (A 1) in
+  let binB = MBytes.cut 1 @@ Binary.to_bytes enc (B "2") in
+  let binC = MBytes.cut 1 @@ Binary.to_bytes enc (C 3) in
+  let binD = MBytes.cut 1 @@ Binary.to_bytes enc (D "4") in
   Assert.test_fail ~msg:__LOC__ (fun () -> Binary.to_bytes enc E)
     (function
       | No_case_matched -> true
@@ -425,8 +425,8 @@ let test_splitted _ =
   in
   let jsonA = Json.construct enc "41" in
   let jsonB = Json.construct s_enc {field = 42} in
-  let binA = Binary.to_bytes_list 1 enc "43" in
-  let binB = Binary.to_bytes_list 1 s_enc {field = 44} in
+  let binA = MBytes.cut 1 @@ Binary.to_bytes enc "43" in
+  let binB = MBytes.cut 1 @@ Binary.to_bytes s_enc {field = 44} in
   Assert.equal ~msg:__LOC__ "41" (Json.destruct enc jsonA);
   Assert.equal ~msg:__LOC__ "42" (Json.destruct enc jsonB);
   Assert.equal ~msg:__LOC__ "43" (get_result ~msg:__LOC__ binA);

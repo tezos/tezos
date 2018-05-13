@@ -534,16 +534,6 @@ module Binary: sig
   val of_bytes : 'a Encoding.t -> MBytes.t -> 'a option
   val of_bytes_exn : 'a Encoding.t -> MBytes.t -> 'a
 
-  (** [to_bytes_list ?copy_blocks blocks_size encod data] encode the
-      given data as a list of successive blocks of length
-      'blocks_size' at most.
-
-      NB. If 'copy_blocks' is false (default), the blocks of the list
-      can be garbage-collected only when all the blocks are
-      unreachable (because of the 'optimized' implementation of
-      MBytes.sub used internally *)
-  val to_bytes_list : ?copy_blocks:bool -> int  -> 'a Encoding.t -> 'a -> MBytes.t list
-
   (** This type is used when decoding binary data incrementally.
       - In case of 'Success', the decoded data, the size of used data
        to decode the result, and the remaining data are returned
