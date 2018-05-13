@@ -219,6 +219,7 @@ module Writer = struct
     ofs + Size.float
 
   let fixed_kind_bytes length s buf ofs =
+    if MBytes.length s <> length then invalid_arg "fixed_kind_bytes";
     MBytes.blit s 0 buf ofs length;
     ofs + length
 
@@ -325,6 +326,7 @@ module BufferedWriter = struct
     MBytes_buffer.write_double buf v
 
   let fixed_kind_bytes length s buf =
+    if MBytes.length s <> length then invalid_arg "fixed_kind_bytes";
     MBytes_buffer.write_mbytes buf s 0 length
 
   let variable_length_bytes s buf =

@@ -197,12 +197,12 @@ let rec data_checker
             | `Uint16 -> uint16 buf
             | `Uint30 -> uint30 buf in
           let ranged = if minimum > 0 then ranged + minimum else ranged in
-          assert (minimum < ranged && ranged < maximum) ;
+          assert (minimum <= ranged && ranged <= maximum) ;
           next_path path stream
       | Float  -> next_path path (fst (float buf))
       | RangedFloat { minimum ; maximum } ->
           let stream, float = float buf in
-          assert (minimum < float && maximum > float) ;
+          assert (minimum <= float && maximum >= float) ;
           next_path path stream
       | Bytes (`Fixed n) ->
           next_path path (fst (fixed_length_bytes n buf))

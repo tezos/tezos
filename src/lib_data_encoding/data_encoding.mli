@@ -567,3 +567,6 @@ val json: json Encoding.t
 type json_schema = Json.schema
 val json_schema: json_schema Encoding.t
 type bson = Bson.t
+
+exception Float_out_of_range of float * float * float
+exception Int_out_of_range of int * int * int
