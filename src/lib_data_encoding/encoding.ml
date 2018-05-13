@@ -467,14 +467,55 @@ let union ?(tag_size = `Uint8) cases =
   let kind = Kind.merge_list tag_size kinds in
   make @@ Union (kind, tag_size, cases)
 let case ?name tag encoding proj inj = Case { name ; encoding ; proj ; inj ; tag }
+
+let rec is_nullable: type t. t encoding -> bool = fun e ->
+  match e.encoding with
+  | Null -> true
+  | Empty -> false
+  | Ignore -> true
+  | Constant _ -> false
+  | Bool -> false
+  | Int8 -> false
+  | Uint8 -> false
+  | Int16 -> false
+  | Uint16 -> false
+  | Int31 -> false
+  | Int32 -> false
+  | Int64 -> false
+  | Z -> false
+  | RangedInt _ -> false
+  | RangedFloat _ -> false
+  | Float -> false
+  | Bytes _ -> false
+  | String _ -> false
+  | String_enum _ -> false
+  | Array _ -> false
+  | List _ -> false
+  | Obj _ -> false
+  | Objs _ -> false
+  | Tup _ -> false
+  | Tups _ -> false
+  | Union (_, _, cases) ->
+      List.exists (fun (Case { encoding = e }) -> is_nullable e) cases
+  | Mu (_, _, f) -> is_nullable (f e)
+  | Conv { encoding = e } -> is_nullable e
+  | Describe { encoding = e } -> is_nullable e
+  | Def { encoding = e } -> is_nullable e
+  | Splitted { json_encoding } -> Json_encoding.is_nullable json_encoding
+  | Dynamic_size e -> is_nullable e
+  | Delayed _ -> true
+
 let option ty =
+  if is_nullable ty then
+    invalid_arg "Data_encoding.option: cannot nest nullable encodings" ;
+  (* TODO add a special construct `Option` in the GADT *)
   union
     ~tag_size:`Uint8
     [ case (Tag 1) ty
         ~name:"Some"
         (fun x -> x)
         (fun x -> Some x) ;
-      case (Tag 0) empty
+      case (Tag 0) null
         ~name:"None"
         (function None -> Some () | Some _ -> None)
         (fun () -> None) ;

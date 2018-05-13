@@ -493,3 +493,6 @@ val repr_agnostic_custom :
 
 (** A raw JSON value in its original representation. *)
 val any_value : Json_repr.any encoding
+
+(** Returns [true] is the encoding might construct [null]. *)
+val is_nullable : 't encoding -> bool
