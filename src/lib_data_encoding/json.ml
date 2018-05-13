@@ -159,8 +159,28 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Bool -> bool
   | Float -> float
   | RangedFloat { minimum; maximum } -> ranged_float ~minimum ~maximum "rangedFloat"
-  | String _ -> string (* TODO: check length *)
-  | Bytes _ -> bytes_jsont (* TODO check length *)
+  | String (`Fixed expected) ->
+      let check s =
+        let found = String.length s in
+        if found <> expected then
+          raise (Cannot_destruct
+                   ([] ,
+                    Unexpected (Format.asprintf "string (len %d)" found,
+                                Format.asprintf "string (len %d)" expected))) ;
+        s in
+      conv check check string
+  | String _ -> string
+  | Bytes (`Fixed expected) ->
+      let check s =
+        let found = MBytes.length s in
+        if found <> expected then
+          raise (Cannot_destruct
+                   ([] ,
+                    Unexpected (Format.asprintf "string (len %d)" found,
+                                Format.asprintf "string (len %d)" expected))) ;
+        s in
+      conv check check bytes_jsont
+  | Bytes _ -> bytes_jsont
   | String_enum (tbl, _) -> string_enum (Hashtbl.fold (fun a (str, _) acc -> (str, a) :: acc) tbl [])
   | Array e -> array (get_json e)
   | List e -> list (get_json e)
