@@ -27,3 +27,7 @@ let to_hex t =
 
 let of_hex hex =
   Cstruct.to_bigarray (Hex.to_cstruct hex)
+
+let pp_hex ppf s =
+  let `Hex hex = to_hex s in
+  Format.pp_print_string ppf hex

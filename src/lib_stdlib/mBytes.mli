@@ -21,3 +21,4 @@ module LE : EndianBigstring.EndianBigstringSig
 val make : int -> char -> t
 val of_hex : Hex.t -> t
 val to_hex : t -> Hex.t
+val pp_hex : Format.formatter -> t -> unit
