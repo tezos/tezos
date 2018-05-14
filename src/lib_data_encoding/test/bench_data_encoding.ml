@@ -11,7 +11,7 @@ let bench ?(num_iterations=1000) name thunk =
   Gc.full_major () ;
   Gc.compact () ;
   let start_time = Sys.time () in
-  for i = 0 to (num_iterations - 1) do
+  for _i = 0 to (num_iterations - 1) do
     thunk ()
   done ;
   let end_time = Sys.time () in
@@ -21,17 +21,31 @@ let bench ?(num_iterations=1000) name thunk =
     (end_time -. start_time)
     num_iterations
 
-let bench_json_binary ?(num_iterations=1000) name encoding value =
+let read_stream encoding bytes =
+  let rec loop bytes status =
+    match bytes, status with
+    | [], Data_encoding.Binary.Success _ -> ()
+    | bytes :: bytess, Await f -> loop bytess (f bytes)
+    | _, _ -> assert false in
+  loop bytes (Data_encoding.Binary.read_stream encoding)
+
+let bench_all ?(num_iterations=1000) name encoding value =
   bench ~num_iterations ("writing " ^ name ^ " json")
-    (fun () -> ignore @@ Data_encoding_ezjsonm.to_string @@ Data_encoding.Json.construct encoding value) ;
-  let encoded_json = Data_encoding_ezjsonm.to_string @@ Data_encoding.Json.construct encoding value in
-  bench ~num_iterations ("reading " ^ name ^ " json")
-    (fun () -> Data_encoding.Json.destruct encoding (Ezjsonm.from_string encoded_json)) ;
+    (fun () -> ignore @@ Data_encoding.Json.to_string @@ Data_encoding.Json.construct encoding value) ;
   bench ~num_iterations ("writing " ^ name ^ " binary")
-    (fun () -> ignore @@ Data_encoding.Binary.to_bytes encoding value) ;
-  let encoded_binary =  Data_encoding.Binary.to_bytes encoding value in
+    (fun () -> ignore @@ Data_encoding.Binary.to_bytes_exn encoding value) ;
+  let encoded_json = Data_encoding.Json.to_string @@ Data_encoding.Json.construct encoding value in
+  bench ~num_iterations ("reading " ^ name ^ " json")
+    (fun () -> ignore (Data_encoding.Json.destruct encoding (Ezjsonm.from_string encoded_json))) ;
+  let encoded_binary =  Data_encoding.Binary.to_bytes_exn encoding value in
   bench ~num_iterations ("reading " ^ name ^ " binary")
-    (fun () -> ignore @@ Data_encoding.Binary.of_bytes_exn encoding encoded_binary)
+    (fun () -> ignore @@ Data_encoding.Binary.of_bytes encoding encoded_binary ) ;
+  bench ~num_iterations ("reading " ^ name ^ " streamed binary (one chunk)")
+    (fun () -> read_stream encoding [encoded_binary]) ;
+  bench ~num_iterations
+    ("reading " ^ name ^ " streamed binary (small chunks)")
+    (fun () -> read_stream encoding (MBytes.cut 1 encoded_binary)) ;
+  ()
 
 type t =
   | A of string
@@ -73,18 +87,28 @@ let cases_encoding : t Data_encoding.t =
        ])
 
 let () =
-  (* bench_json_binary "1000_element_int_list" Data_encoding.(list int31) (Array.to_list (Array.make 1000 0)) *)
-  (* bench_json_binary "option_element_int_list" Data_encoding.(list (option int31)) (Array.to_list (Array.make 1000 (Some 0))) *)
-  (* bench_json_binary "option_option_element_list"
-   *   Data_encoding.(list (option (option int31)))
-   *   (Array.to_list (Array.make 1000 (Some None))) *)
-  bench_json_binary "option_option_result_element_list"
-    Data_encoding.(list (result (option (option int31)) string))
-    (Array.to_list (Array.make 1000 (Error "hello")))
-(* bench ~num_iterations:10000 "binary_encoding"
- *   (let encoding = Data_encoding.(list cases_encoding) in
- *    let value = Array.to_list (Array.make 1000 (R (R (A "asdf", B true), F 1.0))) in
- *    (fun () -> ignore @@ Data_encoding.Binary.to_bytes encoding value)) *)
-(* bench_json_binary "binary_encoding_large_list"
- *   Data_encoding.(list cases_encoding)
- *   (Array.to_list (Array.make 10000 (R (R (A "asdf", B true), F 1.0)))) *)
+
+  bench_all
+    "10000_element_int_list"
+    Data_encoding.(list int31)
+    ~num_iterations:1000
+    (Array.to_list (Array.make 10000 0)) ;
+
+  bench_all
+    "option_element_int_list"
+    Data_encoding.(list (option int31))
+    (Array.to_list (Array.make 10000 (Some 0))) ;
+
+  let encoding = Data_encoding.(list (result (option int31) string)) in
+  let value = (Array.to_list (Array.make 10000 (Error "hello"))) in
+  bench_all "option_result_element_list" encoding value;
+
+  let encoding = Data_encoding.(list cases_encoding) in
+  let value = Array.to_list (Array.make 1000 (R (R (A "asdf", B true), F 1.0))) in
+  bench ~num_iterations:1000 "binary_encoding"
+    (fun () -> ignore @@ Data_encoding.Binary.to_bytes encoding value) ;
+
+  bench_all "binary_encoding_large_list"
+    Data_encoding.(list cases_encoding)
+    (Array.to_list (Array.make 2000 (R (R (A "asdf", B true), F 1.0))))
+

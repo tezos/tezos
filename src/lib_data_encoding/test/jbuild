@@ -2,7 +2,7 @@
 
 (executables
  ((names (test
-          ;; bench_data_encoding
+          bench_data_encoding
           ))
   (libraries (tezos-stdlib
               tezos_data_encoding
@@ -14,12 +14,16 @@
 (alias
   ((name buildtest)
    (deps (test.exe
-          ;; bench_data_encoding.exe
+          bench_data_encoding.exe
           ))))
 
 (alias
  ((name runtest)
   (action (run ${exe:test.exe}))))
+
+(alias
+ ((name run_bench)
+  (action (run ${exe:bench_data_encoding.exe}))))
 
 (alias
  ((name runtest_indent)
