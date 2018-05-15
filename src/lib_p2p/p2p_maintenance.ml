@@ -32,7 +32,7 @@ type 'meta t = {
     failed after [start_time] and the pointes that are banned. It
     first selects points with the oldest last tentative.
     Non-trusted points are also ignored if option --closed is set. *)
-let connectable st start_time expected =
+let connectable st start_time expected seen_points =
   let Pool pool = st.pool in
   let now = Time.now () in
   let module Bounded_point_info =
@@ -47,37 +47,49 @@ let connectable st start_time expected =
     end) in
   let acc = Bounded_point_info.create expected in
   let closed = (P2p_pool.config pool).P2p_pool.closed_network in
-  P2p_pool.Points.fold_known pool ~init:()
-    ~f:begin fun point pi () ->
-      (* consider the point only if --closed is not set, or if pi is
-         trusted *)
-      if not closed || P2p_point_state.Info.trusted pi then
-        match P2p_point_state.get pi with
-        | Disconnected -> begin
-            match P2p_point_state.Info.last_miss pi with
-            | Some last when Time.(start_time < last)
-                          || P2p_point_state.Info.greylisted ~now pi -> ()
-            | _ when (P2p_pool.Points.banned pool point) -> ()
-            | last ->
-                Bounded_point_info.insert (last, point) acc
-          end
-        | _ -> ()
-    end ;
-  List.map snd (Bounded_point_info.get acc)
+  let seen_points =
+    P2p_pool.Points.fold_known pool ~init:seen_points
+      ~f:begin fun point pi seen_points ->
+        (* consider the point only if:
+           - it is not in seen_points and
+           - it is not banned, and
+           - it is trusted if we are in `closed` mode
+        *)
+        if P2p_point.Set.mem point seen_points ||
+           P2p_pool.Points.banned pool point ||
+           (closed && not (P2p_point_state.Info.trusted pi))
+        then
+          seen_points
+        else
+          let seen_points = P2p_point.Set.add point seen_points in
+          match P2p_point_state.get pi with
+          | Disconnected -> begin
+              match P2p_point_state.Info.last_miss pi with
+              | Some last when Time.(start_time < last)
+                            || P2p_point_state.Info.greylisted ~now pi ->
+                  seen_points
+              | last ->
+                  Bounded_point_info.insert (last, point) acc ;
+                  seen_points
+            end
+          | _ -> seen_points
+      end
+  in
+  List.map snd (Bounded_point_info.get acc), seen_points
 
 (** Try to create connections to new peers. It tries to create at
     least [min_to_contact] connections, and will never creates more
     than [max_to_contact]. But, if after trying once all disconnected
     peers, it returns [false]. *)
 let rec try_to_contact
-    st ?(start_time = Time.now ())
+    st ?(start_time = Time.now ()) ~seen_points
     min_to_contact max_to_contact =
   let Pool pool = st.pool in
   if min_to_contact <= 0 then
     Lwt.return_true
   else
-    let contactable =
-      connectable st start_time max_to_contact in
+    let contactable, seen_points =
+      connectable st start_time max_to_contact seen_points in
     if contactable = [] then
       Lwt_unix.yield () >>= fun () ->
       Lwt.return_false
@@ -89,7 +101,7 @@ let rec try_to_contact
            | Error _ -> acc)
         (Lwt.return 0)
         contactable >>= fun established ->
-      try_to_contact st ~start_time
+      try_to_contact st ~start_time ~seen_points
         (min_to_contact - established) (max_to_contact - established)
 
 (** Do a maintenance step. It will terminate only when the number
@@ -121,7 +133,9 @@ and too_few_connections st n_connected =
   lwt_log_notice "Too few connections (%d)" n_connected >>= fun () ->
   let min_to_contact = st.bounds.min_target - n_connected in
   let max_to_contact = st.bounds.max_target - n_connected in
-  try_to_contact st min_to_contact max_to_contact >>= fun success ->
+  try_to_contact
+    st min_to_contact max_to_contact ~seen_points:P2p_point.Set.empty >>=
+  fun success ->
   if success then begin
     maintain st
   end else begin
