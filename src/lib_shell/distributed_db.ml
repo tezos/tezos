@@ -8,10 +8,9 @@
 (**************************************************************************)
 
 module Message = Distributed_db_message
-module Metadata = Distributed_db_metadata
 
-type p2p = (Message.t, Metadata.t) P2p.net
-type connection = (Message.t, Metadata.t) P2p.connection
+type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
+type connection = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.connection
 
 type 'a request_param = {
   data: 'a ;

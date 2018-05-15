@@ -9,13 +9,14 @@
 
 open P2p_peer
 
-type 'data t =
+type ('conn, 'conn_meta) t =
   | Accepted of { current_point: P2p_connection.Id.t ;
                   cancel: Lwt_canceler.t }
-  | Running of { data: 'data ;
+  | Running of { data: 'conn ;
+                 conn_metadata: 'conn_meta ;
                  current_point: P2p_connection.Id.t }
   | Disconnected
-type 'data state = 'data t
+type ('conn, 'conn_meta) state = ('conn, 'conn_meta) t
 
 let pp ppf = function
   | Accepted { current_point ; _ } ->
@@ -27,11 +28,11 @@ let pp ppf = function
 
 module Info = struct
 
-  type ('conn, 'meta) t = {
+  type ('conn, 'peer_meta, 'conn_meta) t = {
     peer_id : Id.t ;
     created : Time.t ;
-    mutable state : 'conn state ;
-    mutable metadata : 'meta ;
+    mutable state : ('conn, 'conn_meta) state ;
+    mutable peer_metadata : 'peer_meta ;
     mutable trusted : bool ;
     mutable last_failed_connection : (P2p_connection.Id.t * Time.t) option ;
     mutable last_rejected_connection : (P2p_connection.Id.t * Time.t) option ;
@@ -40,17 +41,17 @@ module Info = struct
     events : Pool_event.t Ring.t ;
     watchers : Pool_event.t Lwt_watcher.input ;
   }
-  type ('conn, 'meta) peer_info = ('conn, 'meta) t
+  type ('conn, 'peer_meta, 'conn_meta) peer_info = ('conn, 'peer_meta, 'conn_meta) t
 
   let compare gi1 gi2 = Id.compare gi1.peer_id gi2.peer_id
 
   let log_size = 100
 
-  let create ?(created = Time.now ()) ?(trusted = false) ~metadata peer_id =
+  let create ?(created = Time.now ()) ?(trusted = false) ~peer_metadata peer_id =
     { peer_id ;
       created ;
       state = Disconnected ;
-      metadata ;
+      peer_metadata ;
       trusted ;
       last_failed_connection = None ;
       last_rejected_connection = None ;
@@ -60,23 +61,23 @@ module Info = struct
       watchers = Lwt_watcher.create_input () ;
     }
 
-  let encoding metadata_encoding =
+  let encoding peer_metadata_encoding =
     let open Data_encoding in
     conv
-      (fun { peer_id ; trusted ; metadata ; events ; created ;
+      (fun { peer_id ; trusted ; peer_metadata ; events ; created ;
              last_failed_connection ; last_rejected_connection ;
              last_established_connection ; last_disconnection ; _ } ->
-        (peer_id, created, trusted, metadata, Ring.elements events,
+        (peer_id, created, trusted, peer_metadata, Ring.elements events,
          last_failed_connection, last_rejected_connection,
          last_established_connection, last_disconnection))
-      (fun (peer_id, created, trusted, metadata, event_list,
+      (fun (peer_id, created, trusted, peer_metadata, event_list,
             last_failed_connection, last_rejected_connection,
             last_established_connection, last_disconnection) ->
-        let info = create ~trusted ~metadata peer_id in
+        let info = create ~trusted ~peer_metadata peer_id in
         let events = Ring.create log_size in
         Ring.add_list info.events event_list ;
         { state = Disconnected ;
-          trusted ; peer_id ; metadata ; created ;
+          trusted ; peer_id ; peer_metadata ; created ;
           last_failed_connection ;
           last_rejected_connection ;
           last_established_connection ;
@@ -88,7 +89,7 @@ module Info = struct
          (req "peer_id" Id.encoding)
          (req "created" Time.encoding)
          (dft "trusted" bool false)
-         (req "metadata" metadata_encoding)
+         (req "peer_metadata" peer_metadata_encoding)
          (dft "events" (list Pool_event.encoding) [])
          (opt "last_failed_connection"
             (tup2 P2p_connection.Id.encoding Time.encoding))
@@ -101,8 +102,8 @@ module Info = struct
 
   let peer_id { peer_id ; _ } = peer_id
   let created { created ; _ } = created
-  let metadata { metadata ; _ } = metadata
-  let set_metadata gi metadata = gi.metadata <- metadata
+  let peer_metadata { peer_metadata ; _ } = peer_metadata
+  let set_peer_metadata gi peer_metadata = gi.peer_metadata <- peer_metadata
   let trusted { trusted ; _ } = trusted
   let set_trusted gi = gi.trusted <- true
   let unset_trusted gi = gi.trusted <- false
@@ -130,18 +131,19 @@ module Info = struct
 
   module File = struct
 
-    let load path metadata_encoding =
-      let enc = Data_encoding.list (encoding metadata_encoding) in
+    let load path peer_metadata_encoding =
+      let enc =
+        Data_encoding.list (encoding peer_metadata_encoding) in
       if path <> "/dev/null" && Sys.file_exists path then
         Lwt_utils_unix.Json.read_file path >>=? fun json ->
         return (Data_encoding.Json.destruct enc json)
       else
         return []
 
-    let save path metadata_encoding peers =
+    let save path peer_metadata_encoding peers =
       let open Data_encoding in
       Lwt_utils_unix.Json.write_file path @@
-      Json.construct (list (encoding metadata_encoding)) peers
+      Json.construct (list (encoding peer_metadata_encoding)) peers
 
   end
 
@@ -170,7 +172,7 @@ let set_accepted
 
 let set_running
     ?(timestamp = Time.now ())
-    peer_info point data =
+    peer_info point data conn_metadata =
   assert begin
     match peer_info.Info.state with
     | Disconnected -> true (* request to unknown peer_id. *)
@@ -178,7 +180,7 @@ let set_running
     | Accepted { current_point ; _ } ->
         P2p_connection.Id.equal point current_point
   end ;
-  peer_info.state <- Running { data ; current_point = point } ;
+  peer_info.state <- Running { data ; conn_metadata ; current_point = point } ;
   peer_info.last_established_connection <- Some (point, timestamp) ;
   Info.log peer_info ~timestamp point Connection_established
 

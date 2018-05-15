@@ -152,25 +152,67 @@ end
 
 module Ack = struct
 
-  type t = Ack | Nack
-  let ack = MBytes.of_string "\255"
-  let nack = MBytes.of_string "\000"
+  type 'a t = Ack of 'a | Nack
 
-  let write cryptobox_data fd b =
-    Crypto.write_chunk cryptobox_data fd
-      (match b with Ack -> ack | Nack -> nack)
+  let encoding ack_encoding =
+    let open Data_encoding in
+    let ack_encoding = obj1 (req "ack" ack_encoding) in
+    let nack_encoding = obj1 (req "nack" empty) in
+    let ack_case tag =
+      case tag ack_encoding
+        (function
+          | Ack param -> Some param
+          | _ -> None)
+        (fun param -> Ack param) in
+    let nack_case tag =
+      case tag nack_encoding
+        (function
+          | Nack -> Some ()
+          | _ -> None
+        )
+        (fun _ -> Nack) in
+    union [
+      ack_case (Tag 0) ;
+      nack_case (Tag 1) ;
+    ]
 
-  let read fd cryptobox_data =
+  let write ack_encoding cryptobox_data fd message =
+    let encoding = encoding ack_encoding in
+    let encoded_message_len =
+      Data_encoding.Binary.length encoding message in
+    let buf = MBytes.create encoded_message_len in
+    match Data_encoding.Binary.write encoding message buf 0 encoded_message_len with
+    | None ->
+        fail P2p_errors.Encoding_error
+    | Some last ->
+        fail_unless (last = encoded_message_len)
+          P2p_errors.Encoding_error >>=? fun () ->
+        Crypto.write_chunk cryptobox_data fd buf
+
+  let read ack_encoding fd cryptobox_data =
+    let encoding = encoding ack_encoding in
     Crypto.read_chunk fd cryptobox_data >>=? fun buf ->
-    return (buf <> nack)
+    let length = MBytes.length buf in
+    match Data_encoding.Binary.read encoding buf 0 length with
+    | None ->
+        fail P2p_errors.Decoding_error
+    | Some (read_len, message) ->
+        if read_len <> length then
+          fail P2p_errors.Decoding_error
+        else
+          return message
 
 end
 
-type authenticated_fd =
-  P2p_io_scheduler.connection * P2p_connection.Info.t * Crypto.data
+type 'conn_meta authenticated_fd = {
+  fd: P2p_io_scheduler.connection ;
+  info: P2p_connection.Info.t ;
+  cryptobox_data: Crypto.data ;
+  ack_encoding: 'conn_meta Data_encoding.t ;
+}
 
-let kick (fd, _ , cryptobox_data) =
-  Ack.write fd cryptobox_data Nack >>= fun _ ->
+let kick { fd ; ack_encoding ; cryptobox_data ; _ } =
+  Ack.write ack_encoding fd cryptobox_data Nack >>= fun _ ->
   P2p_io_scheduler.close fd >>= fun _ ->
   Lwt.return_unit
 
@@ -180,7 +222,7 @@ let kick (fd, _ , cryptobox_data) =
 let authenticate
     ~proof_of_work_target
     ~incoming fd (remote_addr, remote_socket_port as point)
-    ?listening_port identity supported_versions =
+    ?listening_port identity supported_versions ack_encoding =
   let local_nonce_seed = Crypto_box.random_nonce () in
   lwt_debug "Sending authenfication to %a" P2p_point.Id.pp point >>= fun () ->
   Connection_message.write fd
@@ -210,7 +252,7 @@ let authenticate
     { P2p_connection.Info.peer_id = remote_peer_id ;
       versions = msg.versions ; incoming ;
       id_point ; remote_socket_port ;} in
-  return (info, (fd, info, cryptobox_data))
+  return (info, { fd ; info ; cryptobox_data ; ack_encoding })
 
 type connection = {
   id : int ;
@@ -449,33 +491,38 @@ let info { conn } = conn.info
 
 let accept
     ?incoming_message_queue_size ?outgoing_message_queue_size
-    ?binary_chunks_size (fd, info, cryptobox_data) encoding =
+    ?binary_chunks_size
+    { fd ; info ; cryptobox_data ; ack_encoding }
+    ack_param
+    encoding =
   protect begin fun () ->
-    Ack.write fd cryptobox_data Ack >>=? fun () ->
-    Ack.read fd cryptobox_data
+    Ack.write ack_encoding fd cryptobox_data (Ack ack_param) >>=? fun () ->
+    Ack.read ack_encoding fd cryptobox_data
   end ~on_error:begin fun err ->
     P2p_io_scheduler.close fd >>= fun _ ->
     match err with
     | [ P2p_errors.Connection_closed ] -> fail P2p_errors.Rejected_socket_connection
     | [ P2p_errors.Decipher_error ] -> fail P2p_errors.Invalid_auth
     | err -> Lwt.return (Error err)
-  end >>=? fun accepted ->
-  fail_unless accepted P2p_errors.Rejected_socket_connection >>=? fun () ->
-  let canceler = Lwt_canceler.create () in
-  let conn = { id = next_conn_id () ; fd ; info ; cryptobox_data } in
-  let reader =
-    Reader.run ?size:incoming_message_queue_size conn encoding canceler
-  and writer =
-    Writer.run
-      ?size:outgoing_message_queue_size ?binary_chunks_size
-      conn encoding canceler
-  in
-  let conn = { conn ; reader ; writer } in
-  Lwt_canceler.on_cancel canceler begin fun () ->
-    P2p_io_scheduler.close fd >>= fun _ ->
-    Lwt.return_unit
-  end ;
-  return conn
+  end >>=? function
+  | Ack ack_cfg ->
+      let canceler = Lwt_canceler.create () in
+      let conn = { id = next_conn_id () ; fd ; info ; cryptobox_data } in
+      let reader =
+        Reader.run ?size:incoming_message_queue_size conn encoding canceler
+      and writer =
+        Writer.run
+          ?size:outgoing_message_queue_size ?binary_chunks_size
+          conn encoding canceler
+      in
+      let conn = { conn ; reader ; writer } in
+      Lwt_canceler.on_cancel canceler begin fun () ->
+        P2p_io_scheduler.close fd >>= fun _ ->
+        Lwt.return_unit
+      end ;
+      return (conn, ack_cfg)
+  | Nack ->
+      fail P2p_errors.Rejected_socket_connection
 
 let catch_closed_pipe f =
   Lwt.catch f begin function

@@ -16,7 +16,7 @@ type bounds = {
   max_threshold: int ;
 }
 
-type 'meta pool = Pool : ('msg, 'meta) P2p_pool.t -> 'meta pool
+type 'meta pool = Pool : ('msg, 'meta, 'meta_conn) P2p_pool.t -> 'meta pool
 
 type 'meta t = {
   canceler: Lwt_canceler.t ;

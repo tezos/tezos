@@ -9,7 +9,7 @@
 
 include Logging.Make (struct let name = "p2p.welcome" end)
 
-type pool = Pool : ('msg, 'meta) P2p_pool.t -> pool
+type pool = Pool : ('msg, 'meta, 'meta_conn) P2p_pool.t -> pool
 
 type t = {
   socket: Lwt_unix.file_descr ;

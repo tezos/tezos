@@ -9,10 +9,15 @@
 
 include Logging.Make(struct let name = "p2p" end)
 
-type 'meta meta_config = 'meta P2p_pool.meta_config = {
-  encoding : 'meta Data_encoding.t;
-  initial : 'meta;
-  score : 'meta -> float
+type 'peer_meta peer_meta_config = 'peer_meta P2p_pool.peer_meta_config = {
+  peer_meta_encoding : 'peer_meta Data_encoding.t ;
+  peer_meta_initial : 'peer_meta ;
+  score : 'peer_meta -> float ;
+}
+
+type 'conn_meta conn_meta_config = 'conn_meta P2p_pool.conn_meta_config = {
+  conn_meta_encoding : 'conn_meta Data_encoding.t ;
+  conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
 }
 
 type 'msg app_message_encoding = 'msg P2p_pool.encoding =
@@ -146,23 +151,24 @@ let may_create_welcome_worker config limits pool =
         port >>= fun w ->
       Lwt.return (Some w)
 
-type ('msg, 'meta) connection = ('msg, 'meta) P2p_pool.connection
+type ('msg, 'peer_meta, 'conn_meta) connection =
+  ('msg, 'peer_meta, 'conn_meta) P2p_pool.connection
 
 module Real = struct
 
-  type ('msg, 'meta) net = {
+  type ('msg, 'peer_meta, 'conn_meta) net = {
     config: config ;
     limits: limits ;
     io_sched: P2p_io_scheduler.t ;
-    pool: ('msg, 'meta) P2p_pool.t ;
-    maintenance: 'meta P2p_maintenance.t ;
+    pool: ('msg, 'peer_meta, 'conn_meta) P2p_pool.t ;
+    maintenance: 'peer_meta P2p_maintenance.t ;
     welcome: P2p_welcome.t option ;
   }
 
-  let create ~config ~limits meta_cfg msg_cfg =
+  let create ~config ~limits meta_cfg conn_meta_cfg msg_cfg =
     let io_sched = create_scheduler limits in
     create_connection_pool
-      config limits meta_cfg msg_cfg io_sched >>= fun pool ->
+      config limits meta_cfg conn_meta_cfg msg_cfg io_sched >>= fun pool ->
     let maintenance = create_maintenance_worker limits pool in
     may_create_welcome_worker config limits pool >>= fun welcome ->
     return {
@@ -202,10 +208,10 @@ module Real = struct
     P2p_pool.Connection.stat conn
   let global_stat { pool } () =
     P2p_pool.pool_stat pool
-  let set_metadata { pool } conn meta =
-    P2p_pool.Peers.set_metadata pool conn meta
-  let get_metadata { pool } conn =
-    P2p_pool.Peers.get_metadata pool conn
+  let set_peer_metadata { pool } conn meta =
+    P2p_pool.Peers.set_peer_metadata pool conn meta
+  let get_peer_metadata { pool } conn =
+    P2p_pool.Peers.get_peer_metadata pool conn
 
   let recv _net conn =
     P2p_pool.read conn >>=? fun msg ->
@@ -307,32 +313,42 @@ module Fake = struct
 
 end
 
-type ('msg, 'meta) t = {
+type ('msg, 'peer_meta, 'conn_meta) t = {
   versions : P2p_version.t list ;
   peer_id : P2p_peer.Id.t ;
   maintain : unit -> unit Lwt.t ;
   roll : unit -> unit Lwt.t ;
   shutdown : unit -> unit Lwt.t ;
-  connections : unit -> ('msg, 'meta) connection list ;
-  find_connection : P2p_peer.Id.t -> ('msg, 'meta) connection option ;
-  disconnect : ?wait:bool -> ('msg, 'meta) connection -> unit Lwt.t ;
-  connection_info : ('msg, 'meta) connection -> P2p_connection.Info.t ;
-  connection_stat : ('msg, 'meta) connection -> P2p_stat.t ;
+  connections : unit -> ('msg, 'peer_meta, 'conn_meta) connection list ;
+  find_connection :
+    P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection option ;
+  disconnect :
+    ?wait:bool -> ('msg, 'peer_meta, 'conn_meta) connection -> unit Lwt.t ;
+  connection_info :
+    ('msg, 'peer_meta, 'conn_meta) connection -> P2p_connection.Info.t ;
+  connection_stat : ('msg, 'peer_meta, 'conn_meta) connection -> P2p_stat.t ;
   global_stat : unit -> P2p_stat.t ;
-  get_metadata : P2p_peer.Id.t -> 'meta ;
-  set_metadata : P2p_peer.Id.t -> 'meta -> unit ;
-  recv : ('msg, 'meta) connection -> 'msg tzresult Lwt.t ;
-  recv_any : unit -> (('msg, 'meta) connection * 'msg) Lwt.t ;
-  send : ('msg, 'meta) connection -> 'msg -> unit tzresult Lwt.t ;
-  try_send : ('msg, 'meta) connection -> 'msg -> bool ;
+  get_peer_metadata : P2p_peer.Id.t -> 'peer_meta ;
+  set_peer_metadata : P2p_peer.Id.t -> 'peer_meta -> unit ;
+  recv : ('msg, 'peer_meta, 'conn_meta) connection -> 'msg tzresult Lwt.t ;
+  recv_any : unit -> (('msg, 'peer_meta, 'conn_meta) connection * 'msg) Lwt.t ;
+  send :
+    ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit tzresult Lwt.t ;
+  try_send : ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> bool ;
   broadcast : 'msg -> unit ;
-  pool : ('msg, 'meta) P2p_pool.t option ;
+  pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t option ;
   fold_connections :
-    'a. init:'a -> f:(P2p_peer.Id.t -> ('msg, 'meta) connection -> 'a -> 'a) -> 'a ;
-  iter_connections : (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit ;
-  on_new_connection : (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit ;
+    'a. init: 'a ->
+    f:(P2p_peer.Id.t ->
+       ('msg, 'peer_meta, 'conn_meta) connection -> 'a -> 'a) -> 'a ;
+  iter_connections :
+    (P2p_peer.Id.t ->
+     ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit ;
+  on_new_connection :
+    (P2p_peer.Id.t ->
+     ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit ;
 }
-type ('msg, 'meta) net = ('msg, 'meta) t
+type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
 let check_limits =
   let fail_1 v orig =
@@ -372,9 +388,9 @@ let check_limits =
     end >>=? fun () ->
     return ()
 
-let create ~config ~limits meta_cfg msg_cfg =
+let create ~config ~limits peer_cfg conn_cfg msg_cfg =
   check_limits limits >>=? fun () ->
-  Real.create ~config ~limits meta_cfg msg_cfg  >>=? fun net ->
+  Real.create ~config ~limits peer_cfg conn_cfg msg_cfg  >>=? fun net ->
   return {
     versions = msg_cfg.versions ;
     peer_id = Real.peer_id net ;
@@ -387,8 +403,8 @@ let create ~config ~limits meta_cfg msg_cfg =
     connection_info = Real.connection_info net  ;
     connection_stat = Real.connection_stat net ;
     global_stat = Real.global_stat net ;
-    get_metadata = Real.get_metadata net ;
-    set_metadata = Real.set_metadata net ;
+    get_peer_metadata = Real.get_peer_metadata net ;
+    set_peer_metadata = Real.set_peer_metadata net ;
     recv = Real.recv net ;
     recv_any = Real.recv_any net ;
     send = Real.send net ;
@@ -400,7 +416,7 @@ let create ~config ~limits meta_cfg msg_cfg =
     on_new_connection = Real.on_new_connection net ;
   }
 
-let faked_network meta_config = {
+let faked_network peer_cfg = {
   versions = [] ;
   peer_id = Fake.id.peer_id ;
   maintain = Lwt.return ;
@@ -412,8 +428,8 @@ let faked_network meta_config = {
   connection_info = (fun _ -> Fake.connection_info) ;
   connection_stat = (fun _ -> Fake.empty_stat) ;
   global_stat = (fun () -> Fake.empty_stat) ;
-  get_metadata = (fun _ -> meta_config.initial) ;
-  set_metadata = (fun _ _ -> ()) ;
+  get_peer_metadata = (fun _ -> peer_cfg.peer_meta_initial) ;
+  set_peer_metadata = (fun _ _ -> ()) ;
   recv = (fun _ -> Lwt_utils.never_ending) ;
   recv_any = (fun () -> Lwt_utils.never_ending) ;
   send = (fun _ _ -> fail P2p_errors.Connection_closed) ;
@@ -435,8 +451,8 @@ let find_connection net = net.find_connection
 let connection_info net = net.connection_info
 let connection_stat net = net.connection_stat
 let global_stat net = net.global_stat ()
-let get_metadata net = net.get_metadata
-let set_metadata net = net.set_metadata
+let get_peer_metadata net = net.get_peer_metadata
+let set_peer_metadata net = net.set_peer_metadata
 let recv net = net.recv
 let recv_any net = net.recv_any ()
 let send net = net.send

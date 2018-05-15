@@ -15,10 +15,15 @@
     nodes.
 *)
 
-type 'meta meta_config = {
-  encoding : 'meta Data_encoding.t;
-  initial : 'meta;
-  score : 'meta -> float
+type 'peer_meta peer_meta_config = {
+  peer_meta_encoding : 'peer_meta Data_encoding.t;
+  peer_meta_initial : 'peer_meta;
+  score : 'peer_meta -> float ;
+}
+
+type 'conn_meta conn_meta_config = {
+  conn_meta_encoding : 'conn_meta Data_encoding.t;
+  conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
 }
 
 type 'msg app_message_encoding = Encoding : {
@@ -127,94 +132,123 @@ type limits = {
 
 (** Type of a P2P layer instance, parametrized by:
     ['msg]: type of messages exchanged between peers
-    ['meta]: type of the metadata associated with peers (score, etc.)
+    ['peer_meta]: type of the metadata associated with peers (score, etc.)
+    ['conn_meta]: type of the metadata associated with connection (ack_cfg)
 *)
-type ('msg, 'meta) t
-type ('msg, 'meta) net = ('msg, 'meta) t
+type ('msg, 'peer_meta, 'conn_meta) t
+type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
 (** A faked p2p layer, which do not initiate any connection
     nor open any listening socket *)
-val faked_network : 'meta meta_config -> ('msg, 'meta) net
+val faked_network :
+  'peer_meta peer_meta_config ->
+  ('msg, 'peer_meta, 'conn_meta) net
 
 (** Main network initialisation function *)
 val create :
   config:config -> limits:limits ->
-  'meta meta_config -> 'msg message_config ->  ('msg, 'meta) net tzresult Lwt.t
+  'peer_meta peer_meta_config -> 'conn_meta conn_meta_config ->
+  'msg message_config ->  ('msg, 'peer_meta, 'conn_meta) net tzresult Lwt.t
 
 (** Return one's peer_id *)
-val peer_id : ('msg, 'meta) net -> P2p_peer.Id.t
+val peer_id : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t
 
 (** A maintenance operation : try and reach the ideal number of peers *)
-val maintain : ('msg, 'meta) net -> unit Lwt.t
+val maintain : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
 
 (** Voluntarily drop some peers and replace them by new buddies *)
-val roll : ('msg, 'meta) net -> unit Lwt.t
+val roll : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
 
 (** Close all connections properly *)
-val shutdown : ('msg, 'meta) net -> unit Lwt.t
+val shutdown : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
 
 (** A connection to a peer *)
-type ('msg, 'meta) connection
+type ('msg, 'peer_meta, 'conn_meta) connection
 
 (** Access the domain of active peers *)
-val connections : ('msg, 'meta) net -> ('msg, 'meta) connection list
+val connections :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection list
 
 (** Return the active peer with identity [peer_id] *)
-val find_connection : ('msg, 'meta) net -> P2p_peer.Id.t -> ('msg, 'meta) connection option
+val find_connection :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  P2p_peer.Id.t ->
+  ('msg, 'peer_meta, 'conn_meta) connection option
 
 (** Access the info of an active peer, if available *)
 val connection_info :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> P2p_connection.Info.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  P2p_connection.Info.t
 val connection_stat :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> P2p_stat.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  P2p_stat.t
 
 (** Cleanly closes a connection. *)
 val disconnect :
-  ('msg, 'meta) net -> ?wait:bool -> ('msg, 'meta) connection -> unit Lwt.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ?wait:bool ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  unit Lwt.t
 
-val global_stat : ('msg, 'meta) net -> P2p_stat.t
+val global_stat : ('msg, 'peer_meta, 'conn_meta) net -> P2p_stat.t
 
 (** Accessors for meta information about a global identifier *)
-val get_metadata : ('msg, 'meta) net -> P2p_peer.Id.t -> 'meta
-val set_metadata : ('msg, 'meta) net -> P2p_peer.Id.t -> 'meta -> unit
+val get_peer_metadata :
+  ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> 'peer_meta
+val set_peer_metadata :
+  ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> 'peer_meta -> unit
 
 (** Wait for a message from a given connection. *)
 val recv :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg tzresult Lwt.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'msg tzresult Lwt.t
 
 (** Wait for a message from any active connections. *)
 val recv_any :
-  ('msg, 'meta) net -> (('msg, 'meta) connection * 'msg) Lwt.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  (('msg, 'peer_meta, 'conn_meta) connection * 'msg) Lwt.t
 
 (** [send net peer msg] is a thread that returns when [msg] has been
     successfully enqueued in the send queue. *)
 val send :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg -> unit tzresult Lwt.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'msg ->
+  unit tzresult Lwt.t
 
 (** [try_send net peer msg] is [true] if [msg] has been added to the
     send queue for [peer], [false] otherwise *)
 val try_send :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg -> bool
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'msg ->
+  bool
 
 (** Send a message to all peers *)
-val broadcast : ('msg, 'meta) net -> 'msg -> unit
+val broadcast : ('msg, 'peer_meta, 'conn_meta) net -> 'msg -> unit
 
 val fold_connections :
-  ('msg, 'meta) net ->
-  init:'a -> f:(P2p_peer.Id.t -> ('msg, 'meta) connection -> 'a -> 'a) -> 'a
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  init:'a ->
+  f:(P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> 'a -> 'a) ->
+  'a
 
 val iter_connections :
-  ('msg, 'meta) net ->
-  (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
 
 val on_new_connection :
-  ('msg, 'meta) net ->
-  (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
 
 val build_rpc_directory : _ t -> unit RPC_directory.t
 
-val greylist_addr : ('msg, 'meta) net -> P2p_addr.t -> unit
-val greylist_peer : ('msg, 'meta) net -> P2p_peer.Id.t -> unit
+val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
+val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit
 
 (**/**)
 
