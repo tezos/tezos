@@ -76,12 +76,12 @@ let protocol_parameters =
     [ "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ],
     [ "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ]
   ],
-  "time_between_blocks" : [ 1, 0 ],
+  "time_between_blocks" : [ "1", "0" ],
   "blocks_per_cycle" : 4,
   "blocks_per_roll_snapshot" : 2,
   "preserved_cycles" : 1,
   "first_free_baking_slot" : 4,
-  "proof_of_work_threshold": -1
+  "proof_of_work_threshold": "-1"
 }
 |json} in
   match json_result with
@@ -99,13 +99,13 @@ let vote_protocol_parameters =
     [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
     [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
   ],
-  "time_between_blocks" : [ 1, 0 ],
+  "time_between_blocks" : [ "1", "0" ],
   "blocks_per_cycle" : 4,
   "blocks_per_roll_snapshot" : 2,
   "preserved_cycles" : 1,
   "first_free_baking_slot" : 4,
   "blocks_per_voting_period": 2,
-  "proof_of_work_threshold": -1
+  "proof_of_work_threshold": "-1"
 }
 |json} in
   match json_result with

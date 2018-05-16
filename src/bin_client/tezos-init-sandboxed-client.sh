@@ -37,7 +37,7 @@ init_sandboxed_client() {
   ],
   "dictator_pubkey":
     "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
-  "time_between_blocks" : [ 1, 0 ],
+  "time_between_blocks" : [ "1", "0" ],
   "blocks_per_roll_snapshot" : 4,
   "blocks_per_cycle" : 8,
   "preserved_cycles" : 2,

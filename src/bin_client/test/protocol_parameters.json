@@ -20,10 +20,10 @@
   ],
   "dictator_pubkey":
     "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
-  "time_between_blocks" : [ 1, 0 ],
+  "time_between_blocks" : [ "1", "0" ],
   "blocks_per_cycle" : 128,
   "blocks_per_roll_snapshot" : 32,
   "preserved_cycles" : 1,
   "first_free_baking_slot" : 4,
-  "proof_of_work_threshold": -1
+  "proof_of_work_threshold": "-1"
 }

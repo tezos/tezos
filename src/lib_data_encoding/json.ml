@@ -31,18 +31,13 @@ let wrap_error f =
 
 let int64_encoding =
   let open Json_encoding in
-  union [
-    case
-      int32
-      (fun i ->
-         let j = Int64.to_int32 i in
-         if Int64.equal (Int64.of_int32 j) i then Some j else None)
-      Int64.of_int32 ;
-    case
-      string
-      (fun i -> Some (Int64.to_string i))
-      Int64.of_string
-  ]
+  def "int64"
+    ~title: "64 bit integers"
+    ~description: "Decimal representation of 64 bit integers" @@
+  conv
+    Int64.to_string
+    (wrap_error Int64.of_string)
+    string
 
 let n_encoding =
   let open Json_encoding in
@@ -51,8 +46,7 @@ let n_encoding =
     ~description: "Decimal representation of a positive big number" @@
   conv
     (fun z ->
-       if Z.sign z < 0 then
-         raise (Json_encoding.Cannot_destruct ([], Failure "negative natural")) ;
+       if Z.sign z < 0 then invalid_arg "negative natural" ;
        Z.to_string z)
     (fun s ->
        let n = Z.of_string s in
