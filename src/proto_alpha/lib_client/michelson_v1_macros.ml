@@ -274,7 +274,7 @@ let expand_paaiair original =
 
 let expand_unpaaiair original =
   match original with
-  | Prim (loc, str, args, []) ->
+  | Prim (loc, str, args, annot) ->
       let len = String.length str in
       if len >= 6
       && String.sub str 0 3 = "UNP"
@@ -282,35 +282,40 @@ let expand_unpaaiair original =
       && check_letters str 3 (len - 2)
            (function 'A' | 'I' -> true | _ -> false) then
         try
-          let rec parse i acc =
+          let rec parse i remaining_annots acc =
             if i = 2 then
               match acc with
               | [ Seq _ as acc ] -> acc
               | _ -> Seq (loc, List.rev acc)
             else if String.get str i = 'I'
                  && String.get str (i - 1) = 'A' then
-              parse (i - 2)
+              let car_annot, cdr_annot, remaining_annots =
+                match remaining_annots with
+                | [] -> [], [], []
+                | a :: b :: r when i = 4 -> [ a ], [ b ], r
+                | a :: r -> [ a ], [], r in
+              parse (i - 2) remaining_annots
                 (Seq (loc, [ Prim (loc, "DUP", [], []) ;
-                             Prim (loc, "CAR", [], []) ;
+                             Prim (loc, "CAR", [], car_annot) ;
                              Prim (loc, "DIP",
                                    [ Seq (loc,
-                                          [ Prim (loc, "CDR", [], []) ]) ], []) ])
+                                          [ Prim (loc, "CDR", [], cdr_annot) ]) ], []) ])
                  :: acc)
             else if String.get str i = 'A' then
               match acc with
               | [] ->
                   raise_notrace Not_a_pair
               | (Seq _ as acc) :: accs ->
-                  parse (i - 1)
+                  parse (i - 1) remaining_annots
                     (Prim (loc, "DIP", [ acc ], []) :: accs)
               | acc :: accs ->
-                  parse (i - 1)
+                  parse (i - 1) remaining_annots
                     (Prim (loc, "DIP",
                            [ Seq (loc, [ acc ]) ],
                            []) :: accs)
             else
               raise_notrace Not_a_pair in
-          let expanded = parse (len - 2) [] in
+          let expanded = parse (len - 2) annot [] in
           begin match args with
             | [] -> ok ()
             | _ :: _ -> error (Invalid_arity (str, List.length args, 0))

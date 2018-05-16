@@ -9,6 +9,8 @@
 
 type location = Micheline.canonical_location
 
+type annot = Micheline.annot
+
 type expr = Michelson_v1_primitives.prim Micheline.canonical
 
 type error += Lazy_script_decode (* `Permanent *)

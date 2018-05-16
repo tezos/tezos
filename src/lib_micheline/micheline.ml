@@ -7,10 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type annot = string list
+
 type ('l, 'p) node =
   | Int of 'l * Z.t
   | String of 'l * string
-  | Prim of 'l * 'p * ('l, 'p) node list * string list
+  | Prim of 'l * 'p * ('l, 'p) node list * annot
   | Seq of 'l * ('l, 'p) node list
 
 type canonical_location = int
@@ -40,7 +42,6 @@ let annotations = function
   | String (_, _) -> []
   | Seq (_, _) -> []
   | Prim (_, _, _, annots) -> annots
-
 
 let root (Canonical expr) = expr
 

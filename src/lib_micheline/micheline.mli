@@ -7,13 +7,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type annot = string list
+
 (** The abstract syntax tree of Micheline expressions. The first
     parameter is used to conatin locations, but can also embed custom
     data. The second parameter is the type of primitive names. *)
 type ('l, 'p) node =
   | Int of 'l * Z.t
   | String of 'l * string
-  | Prim of 'l * 'p * ('l, 'p) node list * string list
+  | Prim of 'l * 'p * ('l, 'p) node list * annot
   | Seq of 'l * ('l, 'p) node list
 
 (** Encoding for expressions, as their {!canonical} encoding.

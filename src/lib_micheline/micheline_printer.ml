@@ -36,6 +36,9 @@ let print_string ppf text =
     text ;
   Format.fprintf ppf "\""
 
+let print_annotations =
+  Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_string
+
 let preformat root =
   let preformat_loc = function
     | { comment = None } ->
@@ -81,7 +84,8 @@ let rec print_expr_unwrapped ppf = function
   | Prim ((ml, s, { comment }), name, args, annot) ->
       let name = match annot with
         | [] -> name
-        | annots -> Format.asprintf "%s @[<h>%a@]" name (Format.pp_print_list Format.pp_print_string) annots in
+        | annots ->
+            Format.asprintf "%s @[<h>%a@]" name print_annotations annots in
       if not ml && s < 80 then begin
         if args = [] then
           Format.fprintf ppf "%s" name

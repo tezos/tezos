@@ -527,22 +527,22 @@ let rec interp
         | Nop, stack ->
             logged_return (stack, ctxt)
         (* comparison *)
-        | Compare Bool_key, Item (a, Item (b, rest)) ->
+        | Compare (Bool_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Compare.Bool.compare Interp_costs.compare_bool a b rest
-        | Compare String_key, Item (a, Item (b, rest)) ->
+        | Compare (String_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Compare.String.compare Interp_costs.compare_string a b rest
-        | Compare Mutez_key, Item (a, Item (b, rest)) ->
+        | Compare (Mutez_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Tez.compare Interp_costs.compare_tez a b rest
-        | Compare Int_key, Item (a, Item (b, rest)) ->
+        | Compare (Int_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Script_int.compare Interp_costs.compare_int a b rest
-        | Compare Nat_key, Item (a, Item (b, rest)) ->
+        | Compare (Nat_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Script_int.compare Interp_costs.compare_nat a b rest
-        | Compare Key_hash_key, Item (a, Item (b, rest)) ->
+        | Compare (Key_hash_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Signature.Public_key_hash.compare
               Interp_costs.compare_key_hash a b rest
-        | Compare Timestamp_key, Item (a, Item (b, rest)) ->
+        | Compare (Timestamp_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Script_timestamp.compare Interp_costs.compare_timestamp a b rest
-        | Compare Address_key, Item (a, Item (b, rest)) ->
+        | Compare (Address_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Contract.compare Interp_costs.compare_address a b rest
         (* comparators *)
         | Eq, Item (cmpres, rest) ->
@@ -623,7 +623,7 @@ let rec interp
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
             let contract = Contract.implicit_contract key in
-            logged_return (Item ((Unit_t, contract), rest), ctxt)
+            logged_return (Item ((Unit_t None, contract), rest), ctxt)
         | Create_contract (storage_type, param_type, Lam (_, code)),
           Item (manager, Item
                   (delegate, Item
@@ -634,8 +634,8 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.create_contract) >>=? fun ctxt ->
             let code =
               Micheline.strip_locations
-                (Seq (0, [ Prim (0, K_parameter, [ unparse_ty [] param_type ], []) ;
-                           Prim (0, K_storage, [ unparse_ty [] storage_type ], []) ;
+                (Seq (0, [ Prim (0, K_parameter, [ unparse_ty param_type ], []) ;
+                           Prim (0, K_storage, [ unparse_ty storage_type ], []) ;
                            Prim (0, K_code, [ Micheline.root code ], []) ])) in
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
             let storage = Micheline.strip_locations storage in

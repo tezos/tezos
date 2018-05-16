@@ -11,6 +11,8 @@ type location = Micheline.canonical_location
 
 let location_encoding = Micheline.canonical_location_encoding
 
+type annot = Micheline.annot
+
 type expr = Michelson_v1_primitives.prim Micheline.canonical
 
 type lazy_expr = expr Data_encoding.lazy_t

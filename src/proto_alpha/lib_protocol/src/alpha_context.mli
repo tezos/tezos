@@ -272,6 +272,8 @@ module Script : sig
 
   type location = Micheline.canonical_location
 
+  type annot = Micheline.annot
+
   type expr = prim Micheline.canonical
 
   type lazy_expr = expr Data_encoding.lazy_t
