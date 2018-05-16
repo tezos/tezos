@@ -175,8 +175,10 @@ let tests =
   all_ranged_float ~-. 100. 300. @
   all "string.fixed" ~expected:invalid_string_length
     string (Fixed.string 4) "turlututu" @
+  all "string.bounded" string (Bounded.string 4) "turlututu" @
   all "bytes.fixed"  ~expected:invalid_string_length
     bytes (Fixed.bytes 4) (MBytes.of_string "turlututu") @
+  all "bytes.bounded" bytes (Bounded.bytes 4) (MBytes.of_string "turlututu") @
   all "unknown_case.B" ~expected:missing_case union_enc mini_union_enc (B "2") @
   all "unknown_case.E" ~expected:missing_case union_enc mini_union_enc E @
   all "enum.missing" ~expected:missing_enum enum_enc mini_enum_enc 4 @

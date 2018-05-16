@@ -75,7 +75,9 @@ let tests =
   all_ranged_int ~-300_000_000 300_000_000 @
   all_ranged_float ~-. 100. 300. @
   all "string.fixed" (Fixed.string 4) "turlututu" @
+  all "string.bounded" (Bounded.string 4) "turlututu" @
   all "bytes.fixed" (Fixed.bytes 4) (MBytes.of_string "turlututu") @
+  all "bytes.bounded" (Bounded.bytes 4) (MBytes.of_string "turlututu") @
   all "unknown_case.B" mini_union_enc (B "2") @
   all "unknown_case.E" mini_union_enc E @
   test_bounded_string_list @

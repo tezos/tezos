@@ -57,6 +57,11 @@ module Variable : sig
   val list : 'a encoding -> 'a list encoding
 end
 
+module Bounded : sig
+  val string : int -> string encoding
+  val bytes : int -> MBytes.t encoding
+end
+
 val dynamic_size :
   ?kind: [ `Uint30 | `Uint16 | `Uint8 ] ->
   'a encoding -> 'a encoding

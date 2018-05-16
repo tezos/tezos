@@ -52,3 +52,5 @@ val from_string : string -> (json, string) result
 val from_stream : string Lwt_stream.t -> (json, string) result Lwt_stream.t
 val to_string : ?minify:bool -> json -> string
 val pp : Format.formatter -> json -> unit
+
+val bytes_jsont: MBytes.t Json_encoding.encoding

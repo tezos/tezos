@@ -37,5 +37,6 @@ val min_int: [< integer ] -> int
 val max_int: [< integer ] -> int
 
 val range_to_size: minimum:int -> maximum:int -> integer
+val unsigned_range_to_size: int -> unsigned_integer
 
 val enum_size: 'a array -> [> unsigned_integer ]

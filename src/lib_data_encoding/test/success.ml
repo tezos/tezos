@@ -163,11 +163,15 @@ let tests =
   all "string" Alcotest.string string "tutu" @
   all "string.fixed" Alcotest.string (Fixed.string 4) "tutu" @
   all "string.variable" Alcotest.string Variable.string "tutu" @
+  all "string.bounded1" Alcotest.string (Bounded.string 4) "tu" @
+  all "string.bounded2" Alcotest.string (Bounded.string 4) "tutu" @
   all "bytes" Alcotest.bytes bytes (MBytes.of_string "titi") @
   all "bytes.fixed" Alcotest.bytes (Fixed.bytes 4)
     (MBytes.of_string "titi") @
   all "bytes.variable" Alcotest.bytes Variable.bytes
     (MBytes.of_string "titi") @
+  all "bytes.bounded1" Alcotest.bytes (Bounded.bytes 4) (MBytes.of_string "tu") @
+  all "bytes.bounded2" Alcotest.bytes (Bounded.bytes 4) (MBytes.of_string "tutu") @
   all "float" Alcotest.float float 42. @
   all "float.max" Alcotest.float float max_float @
   all "float.min" Alcotest.float float min_float @

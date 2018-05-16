@@ -412,6 +412,18 @@ module Encoding: sig
     val list : 'a encoding -> 'a list encoding
   end
 
+  module Bounded : sig
+    (** Encoding of a string whose length does not exceed the specified length
+        Attempting to construct a string with a length that is too long causes
+        an invalid_argument exception, however the size field will use the minimum
+        integer that can accomidate the maximum size.
+        - default variable in width
+        - encoded as a byte sequence in binary
+        - encoded as a string in JSON. *)
+    val string : int -> string encoding
+    val bytes : int -> MBytes.t encoding
+  end
+
   (** Mark an encoding as being of dynamic size.
       Forces the size to be stored alongside content when needed.
       Typically used to combine two variable encodings in a same
