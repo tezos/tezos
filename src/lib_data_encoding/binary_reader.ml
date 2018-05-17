@@ -15,7 +15,14 @@ type state = {
   buffer : MBytes.t ;
   mutable offset : int ;
   mutable remaining_bytes : int ;
+  mutable allowed_bytes : int option ;
 }
+
+let check_allowed_bytes state size =
+  match state.allowed_bytes with
+  | Some len when len < size -> raise Size_limit_exceeded
+  | Some len -> Some (len - size)
+  | None -> None
 
 let check_remaining_bytes state size =
   if state.remaining_bytes < size then
@@ -23,11 +30,11 @@ let check_remaining_bytes state size =
   state.remaining_bytes - size
 
 let read_atom size conv state =
-  let remaining_bytes = check_remaining_bytes state size in
-  let res = conv state.buffer state.offset in
+  let offset = state.offset in
+  state.remaining_bytes <- check_remaining_bytes state size ;
+  state.allowed_bytes <- check_allowed_bytes state size ;
   state.offset <- state.offset + size ;
-  state.remaining_bytes <- remaining_bytes ;
-  res
+  conv state.buffer offset
 
 (** Reader for all the atomic types. *)
 module Atom = struct
@@ -179,6 +186,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
           Some (read_rec e state)
     | Objs (`Fixed sz, e1, e2) ->
         ignore (check_remaining_bytes state sz : int) ;
+        ignore (check_allowed_bytes state sz : int option) ;
         let left = read_rec e1 state in
         let right = read_rec e2 state in
         (left, right)
@@ -191,6 +199,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
     | Tup e -> read_rec e state
     | Tups (`Fixed sz, e1, e2) ->
         ignore (check_remaining_bytes state sz : int) ;
+        ignore (check_allowed_bytes state sz : int option) ;
         let left = read_rec e1 state in
         let right = read_rec e2 state in
         (left, right)
@@ -219,9 +228,30 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
         if sz < 0 then raise (Invalid_size sz) ;
         let remaining = check_remaining_bytes state sz in
         state.remaining_bytes <- sz ;
+        ignore (check_allowed_bytes state sz : int option) ;
         let v = read_rec e state in
         if state.remaining_bytes <> 0 then raise Extra_bytes ;
         state.remaining_bytes <- remaining ;
+        v
+    | Check_size { limit ; encoding = e } ->
+        let old_allowed_bytes = state.allowed_bytes in
+        let limit =
+          match state.allowed_bytes with
+          | None -> limit
+          | Some current_limit -> min current_limit limit in
+        state.allowed_bytes <- Some limit ;
+        let v = read_rec e state in
+        let allowed_bytes =
+          match old_allowed_bytes with
+          | None -> None
+          | Some old_limit ->
+              let remaining =
+                match state.allowed_bytes with
+                | None -> assert false
+                | Some remaining -> remaining in
+              let read = limit - remaining in
+              Some (old_limit - read) in
+        state.allowed_bytes <- allowed_bytes ;
         v
     | Describe { encoding = e } -> read_rec e state
     | Def { encoding = e } -> read_rec e state
@@ -267,7 +297,8 @@ and read_list : type a. a Encoding.t -> state -> a list
 
 let read encoding buffer ofs len =
   let state =
-    { buffer ; offset = ofs ; remaining_bytes = len } in
+    { buffer ; offset = ofs ;
+      remaining_bytes = len ; allowed_bytes = None } in
   match read_rec encoding state with
   | exception Read_error _ -> None
   | v -> Some (state.offset, v)
@@ -275,7 +306,8 @@ let read encoding buffer ofs len =
 let of_bytes_exn encoding buffer =
   let len = MBytes.length buffer in
   let state =
-    { buffer ; offset = 0 ; remaining_bytes = len } in
+    { buffer ; offset = 0 ;
+      remaining_bytes = len ; allowed_bytes = None } in
   let v = read_rec encoding state in
   if state.offset <> len then raise Extra_bytes ;
   v

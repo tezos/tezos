@@ -107,6 +107,7 @@ type 'a desc =
         json_encoding : 'a Json_encoding.encoding ;
         is_obj : bool ; is_tup : bool } -> 'a desc
   | Dynamic_size : 'a t -> 'a desc
+  | Check_size : { limit : int ; encoding : 'a t } -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
@@ -170,6 +171,7 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Def { encoding } -> classify encoding
   | Splitted { encoding } -> classify encoding
   | Dynamic_size _ -> `Dynamic
+  | Check_size { encoding } -> classify encoding
   | Delayed f -> classify (f ())
 
 let make ?json_encoding encoding = { encoding ; json_encoding }
@@ -199,6 +201,9 @@ end
 
 let dynamic_size e =
   make @@ Dynamic_size e
+
+let check_size limit encoding =
+  make @@ Check_size { limit ; encoding }
 
 let delayed f =
   make @@ Delayed f
@@ -495,6 +500,7 @@ let rec is_nullable: type t. t encoding -> bool = fun e ->
   | Def { encoding = e } -> is_nullable e
   | Splitted { json_encoding } -> Json_encoding.is_nullable json_encoding
   | Dynamic_size e -> is_nullable e
+  | Check_size { encoding = e } -> is_nullable e
   | Delayed _ -> true
 
 let option ty =

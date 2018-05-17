@@ -199,6 +199,7 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Union (_tag_size, _, cases) -> union (List.map case_json cases)
   | Splitted { json_encoding } -> json_encoding
   | Dynamic_size e -> get_json e
+  | Check_size { encoding } -> get_json encoding
   | Delayed f -> get_json (f ())
 
 and field_json

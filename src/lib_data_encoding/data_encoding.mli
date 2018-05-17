@@ -387,6 +387,12 @@ module Encoding: sig
       Usually used to fix errors from combining two encodings. *)
   val dynamic_size : 'a encoding -> 'a encoding
 
+  (** [check_size size encoding] ensures that the binary encoding
+      of a value will not be allowed to exceed [size] bytes. The reader and
+      and the writer fails otherwise. This function do not modify
+      the JSON encoding. *)
+  val check_size : int -> 'a encoding -> 'a encoding
+
   (** Recompute the encoding definition each time it is used.
       Useful for dynamically updating the encoding of values of an extensible
       type via a global reference (e.g. exceptions). *)
@@ -538,6 +544,7 @@ module Binary: sig
     | Invalid_int of { min : int ; v : int ; max : int }
     | Invalid_float of { min : float ; v : float ; max : float }
     | Trailing_zero
+    | Size_limit_exceeded
   exception Read_error of read_error
   val pp_read_error: Format.formatter -> read_error -> unit
 

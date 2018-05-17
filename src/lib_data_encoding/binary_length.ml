@@ -110,6 +110,10 @@ let rec length : type x. x Encoding.t -> x -> int =
     | Splitted { encoding = e } -> length e value
     | Dynamic_size e ->
         Binary_size.int32 + length e value
+    | Check_size { limit ; encoding = e } ->
+        let length = length e value in
+        if length > limit then raise (Write_error Size_limit_exceeded) ;
+        length
     | Delayed f -> length (f ()) value
 
 let fixed_length e =

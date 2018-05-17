@@ -162,6 +162,9 @@ let mu_list_enc enc =
       (fun (x, xs) -> x :: xs) ;
   ]
 
+let bounded_list ~total ~elements enc =
+  check_size total (Variable.list (check_size elements enc))
+
 module Alcotest = struct
   include Alcotest
   let float =

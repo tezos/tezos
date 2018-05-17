@@ -19,6 +19,7 @@ type read_error =
   | Invalid_int of { min : int ; v : int ; max : int }
   | Invalid_float of { min : float ; v : float ; max : float }
   | Trailing_zero
+  | Size_limit_exceeded
 exception Read_error of read_error
 val pp_read_error: Format.formatter -> read_error -> unit
 

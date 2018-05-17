@@ -268,6 +268,28 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
         MBytes.set_int32
           state.buffer (initial_offset - Binary_size.int32)
           (Int32.of_int size)
+    | Check_size { limit ; encoding = e } -> begin
+        (* backup the current limit *)
+        let old_limit = state.allowed_bytes in
+        (* install the new limit (only if smaller than the current limit) *)
+        let limit =
+          match state.allowed_bytes with
+          | None -> limit
+          | Some old_limit -> min old_limit limit in
+        state.allowed_bytes <- Some limit ;
+        write_rec e state value ;
+        (* restore the previous limit (minus the read bytes) *)
+        match old_limit with
+        | None ->
+            state.allowed_bytes <- None
+        | Some old_limit ->
+            let remaining =
+              match state.allowed_bytes with
+              | None -> assert false
+              | Some len -> len in
+            let read = limit - remaining in
+            state.allowed_bytes <- Some (old_limit - read)
+      end
     | Describe { encoding = e } -> write_rec e state value
     | Def { encoding = e } -> write_rec e state value
     | Splitted { encoding = e } -> write_rec e state value

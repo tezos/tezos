@@ -22,6 +22,10 @@ type state = {
       illimited). Reading less bytes should raise [Extra_bytes] and
       trying to read more bytes should raise [Not_enough_data]. *)
 
+  allowed_bytes : int option ;
+  (** Maximum number of bytes that are allowed to be read from 'stream'
+      before to fail (None = illimited). *)
+
   total_read : int ;
   (** Total number of bytes that has been read from [stream] since the
       beginning. *)
@@ -38,6 +42,12 @@ type 'ret status =
 let check_remaining_bytes state size =
   match state.remaining_bytes with
   | Some len when len < size -> raise Not_enough_data
+  | Some len -> Some (len - size)
+  | None -> None
+
+let check_allowed_bytes state size =
+  match state.allowed_bytes with
+  | Some len when len < size -> raise Size_limit_exceeded
   | Some len -> Some (len - size)
   | None -> None
 
@@ -61,9 +71,10 @@ let check_remaining_bytes state size =
 let read_atom resume size conv state k =
   match
     let remaining_bytes = check_remaining_bytes state size in
+    let allowed_bytes = check_allowed_bytes state size in
     let res, stream = Binary_stream.read state.stream size in
     conv res.buffer res.ofs,
-    { remaining_bytes ; stream ;
+    { remaining_bytes ; allowed_bytes ; stream ;
       total_read = state.total_read + size }
   with
   | exception (Read_error error) -> Error error
@@ -242,6 +253,7 @@ let rec read_rec
           k (Some v, state)
     | Objs (`Fixed sz, e1, e2) ->
         ignore (check_remaining_bytes state sz : int option) ;
+        ignore (check_allowed_bytes state sz : int option) ;
         read_rec e1 state @@ fun (left, state) ->
         read_rec e2 state @@ fun (right, state) ->
         k ((left, right), state)
@@ -254,6 +266,7 @@ let rec read_rec
     | Tup e -> read_rec e state k
     | Tups (`Fixed sz, e1, e2) ->
         ignore (check_remaining_bytes state sz : int option) ;
+        ignore (check_allowed_bytes state sz : int option) ;
         read_rec e1 state @@ fun (left, state) ->
         read_rec e2 state @@ fun (right, state) ->
         k ((left, right), state)
@@ -288,11 +301,31 @@ let rec read_rec
         else
           let remaining = check_remaining_bytes state sz in
           let state = { state with remaining_bytes = Some sz } in
+          ignore (check_allowed_bytes state sz : int option) ;
           read_rec e state @@ fun (v, state) ->
           if state.remaining_bytes <> Some 0 then
             Error Extra_bytes
           else
             k (v, { state with remaining_bytes = remaining })
+    | Check_size { limit ; encoding = e } ->
+        let old_allowed_bytes = state.allowed_bytes in
+        let limit =
+          match state.allowed_bytes with
+          | None -> limit
+          | Some current_limit -> min current_limit limit in
+        let state = { state with allowed_bytes = Some limit } in
+        read_rec e state @@ fun (v, state) ->
+        let allowed_bytes =
+          match old_allowed_bytes with
+          | None -> None
+          | Some old_limit ->
+              let remaining =
+                match state.allowed_bytes with
+                | None -> assert false
+                | Some remaining -> remaining in
+              let read = limit - remaining in
+              Some (old_limit - read) in
+        k (v, { state with allowed_bytes })
     | Describe { encoding = e } -> read_rec e state k
     | Def { encoding = e } -> read_rec e state k
     | Splitted { encoding = e } -> read_rec e state k
@@ -362,6 +395,6 @@ let read_stream ?(init = Binary_stream.empty) encoding =
       invalid_arg "Data_encoding.Binary.read_stream: variable encoding"
   | `Dynamic | `Fixed _ ->
       (* No hardcoded read limit in a stream. *)
-      let state = { remaining_bytes = None ;
+      let state = { remaining_bytes = None ; allowed_bytes = None ;
                     stream = init ; total_read = 0 } in
       read_rec encoding state success

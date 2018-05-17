@@ -65,6 +65,7 @@ type 'a desc =
         json_encoding : 'a Json_encoding.encoding ;
         is_obj : bool ; is_tup : bool } -> 'a desc
   | Dynamic_size : 'a t -> 'a desc
+  | Check_size : { limit : int ; encoding : 'a t } -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
@@ -121,6 +122,7 @@ module Variable : sig
   val list : 'a encoding -> 'a list encoding
 end
 val dynamic_size : 'a encoding -> 'a encoding
+val check_size : int -> 'a encoding -> 'a encoding
 val delayed : (unit -> 'a encoding) -> 'a encoding
 val req :
   ?title:string -> ?description:string ->

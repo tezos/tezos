@@ -16,6 +16,7 @@ type read_error =
   | Invalid_int of { min : int ; v : int ; max : int }
   | Invalid_float of { min : float ; v : float ; max : float }
   | Trailing_zero
+  | Size_limit_exceeded
 
 let pp_read_error ppf = function
   | Not_enough_data ->
@@ -34,6 +35,8 @@ let pp_read_error ppf = function
       Format.fprintf ppf "Invalid float (%f <= %f <= %f) " min v max
   | Trailing_zero ->
       Format.fprintf ppf "Trailing zero in Z"
+  | Size_limit_exceeded ->
+      Format.fprintf ppf "Size limit exceeded"
 
 exception Read_error of read_error
 

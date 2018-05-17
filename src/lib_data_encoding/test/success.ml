@@ -122,6 +122,18 @@ let test_string_enum_boundary () =
   run_test entries2 ;
   run_test (("256", 256) :: entries2)
 
+let test_bounded_string_list =
+  let test name ~total ~elements v =
+    "bounded_string_list." ^ name, `Quick,
+    binary Alcotest.(list string)
+      (bounded_list ~total ~elements string) v in
+  [ test "a" ~total:0 ~elements:0 [] ;
+    test "b" ~total:4 ~elements:4 [""] ;
+    test "c" ~total:20 ~elements:4 ["";"";"";"";""] ;
+    test "d" ~total:21 ~elements:5 ["";"";"";"";"a"] ;
+    test "e" ~total:31 ~elements:10 ["ab";"c";"def";"gh";"ijk"] ;
+  ]
+
 let tests =
   all "null" Alcotest.pass null () @
   all "empty" Alcotest.pass empty () @
@@ -219,5 +231,6 @@ let tests =
   all "array" Alcotest.(array int) (array int31) [|1;2;3;4;5|] @
   all "mu_list.empty" Alcotest.(list int) (mu_list_enc int31) [] @
   all "mu_list" Alcotest.(list int) (mu_list_enc int31) [1;2;3;4;5] @
+  test_bounded_string_list @
   [ "string_enum_boundary", `Quick, test_string_enum_boundary ;
   ]
