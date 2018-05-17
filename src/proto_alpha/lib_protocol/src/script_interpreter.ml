@@ -634,9 +634,9 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.create_contract) >>=? fun ctxt ->
             let code =
               Micheline.strip_locations
-                (Seq (0, [ Prim (0, K_parameter, [ unparse_ty None param_type ], None) ;
-                           Prim (0, K_storage, [ unparse_ty None storage_type ], None) ;
-                           Prim (0, K_code, [ Micheline.root code ], None) ], None)) in
+                (Seq (0, [ Prim (0, K_parameter, [ unparse_ty [] param_type ], []) ;
+                           Prim (0, K_storage, [ unparse_ty [] storage_type ], []) ;
+                           Prim (0, K_code, [ Micheline.root code ], []) ])) in
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
             let storage = Micheline.strip_locations storage in
             Contract.spend_from_script ctxt self credit >>=? fun ctxt ->

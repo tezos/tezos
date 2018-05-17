@@ -32,16 +32,16 @@ let expand_caddadr original =
           | [] -> ok ()
           | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
         end >>? fun () ->
-        let rec parse i ?annot acc =
+        let rec parse i annot acc =
           if i = 0 then
-            Seq (loc, acc, None)
+            Seq (loc, acc)
           else
-            let annot = if i = (String.length str - 2) then annot else None in
+            let annot = if i = (String.length str - 2) then annot else [] in
             match String.get str i with
-            | 'A' -> parse (i - 1) (Prim (loc, "CAR", [], annot) :: acc)
-            | 'D' -> parse (i - 1) (Prim (loc, "CDR", [], annot) :: acc)
+            | 'A' -> parse (i - 1) [] (Prim (loc, "CAR", [], annot) :: acc)
+            | 'D' -> parse (i - 1) [] (Prim (loc, "CDR", [], annot) :: acc)
             | _ -> assert false in
-        ok (Some (parse (len - 2) ?annot []))
+        ok (Some (parse (len - 2) annot []))
       else
         ok None
   | _ -> ok None
@@ -67,45 +67,45 @@ let expand_set_caddadr original =
             | 'A' ->
                 let acc =
                   Seq (loc,
-                       [ Prim (loc, "DUP", [], None) ;
+                       [ Prim (loc, "DUP", [], []) ;
                          Prim (loc, "DIP",
                                [ Seq (loc,
-                                      [ Prim (loc, "CAR", [], None) ;
-                                        acc ], None) ], None) ;
-                         Prim (loc, "CDR", [], None) ;
-                         Prim (loc, "SWAP", [], None) ;
-                         Prim (loc, "PAIR", [], None) ], None) in
+                                      [ Prim (loc, "CAR", [], []) ;
+                                        acc ]) ], []) ;
+                         Prim (loc, "CDR", [], []) ;
+                         Prim (loc, "SWAP", [], []) ;
+                         Prim (loc, "PAIR", [], []) ]) in
                 parse (i - 1) acc
             | 'D' ->
                 let acc =
                   Seq (loc,
-                       [ Prim (loc, "DUP", [], None) ;
+                       [ Prim (loc, "DUP", [], []) ;
                          Prim (loc, "DIP",
                                [ Seq (loc,
-                                      [ Prim (loc, "CDR", [], None) ;
-                                        acc ], None) ], None) ;
-                         Prim (loc, "CAR", [], None) ;
-                         Prim (loc, "PAIR", [], None) ], None) in
+                                      [ Prim (loc, "CDR", [], []) ;
+                                        acc ]) ], []) ;
+                         Prim (loc, "CAR", [], []) ;
+                         Prim (loc, "PAIR", [], []) ]) in
                 parse (i - 1) acc
             | _ -> assert false in
         match String.get str (len - 2) with
         | 'A' ->
             let init =
               Seq (loc,
-                   [ Prim (loc, "CDR", [], None) ;
+                   [ Prim (loc, "CDR", [], []) ;
                      Prim (loc, "SWAP", [], annot) ;
-                     Prim (loc, "PAIR", [], None) ], None) in
+                     Prim (loc, "PAIR", [], []) ]) in
             ok (Some (parse (len - 3) init))
         | 'D' ->
             let init =
               Seq (loc,
-                   (Prim (loc, "CAR", [], None)) ::
-                   (let pair = Prim (loc, "PAIR", [], None) in
+                   (Prim (loc, "CAR", [], [])) ::
+                   (let pair = Prim (loc, "PAIR", [], []) in
                     match annot with
-                    | None -> [ pair ]
-                    | Some _ -> [ Prim (loc, "SWAP", [], annot) ;
-                                  Prim (loc, "SWAP", [], None) ;
-                                  pair]), None) in
+                    | [] -> [ pair ]
+                    | _ -> [ Prim (loc, "SWAP", [], annot) ;
+                             Prim (loc, "SWAP", [], []) ;
+                             pair])) in
             ok (Some (parse (len - 3) init))
         | _ -> assert false
       else
@@ -122,8 +122,8 @@ let expand_map_caddadr original =
       && check_letters str 5 (len - 2)
            (function 'A' | 'D' -> true | _ -> false) then
         begin match annot with
-          | Some _ -> (error (Unexpected_macro_annotation str))
-          | None -> ok ()
+          | _ :: _ -> (error (Unexpected_macro_annotation str))
+          | [] -> ok ()
         end >>? fun () ->
         begin match args with
           | [ Seq _ as code ] -> ok code
@@ -138,47 +138,47 @@ let expand_map_caddadr original =
             | 'A' ->
                 let acc =
                   Seq (loc,
-                       [ Prim (loc, "DUP", [], None) ;
+                       [ Prim (loc, "DUP", [], []) ;
                          Prim (loc, "DIP",
                                [ Seq (loc,
-                                      [ Prim (loc, "CAR", [], None) ;
-                                        acc ], None) ], None) ;
-                         Prim (loc, "CDR", [], None) ;
-                         Prim (loc, "SWAP", [], None) ;
-                         Prim (loc, "PAIR", [], None) ], None) in
+                                      [ Prim (loc, "CAR", [], []) ;
+                                        acc ]) ], []) ;
+                         Prim (loc, "CDR", [], []) ;
+                         Prim (loc, "SWAP", [], []) ;
+                         Prim (loc, "PAIR", [], []) ]) in
                 parse (i - 1) acc
             | 'D' ->
                 let acc =
                   Seq (loc,
-                       [ Prim (loc, "DUP", [], None) ;
+                       [ Prim (loc, "DUP", [], []) ;
                          Prim (loc, "DIP",
                                [ Seq (loc,
-                                      [ Prim (loc, "CDR", [], None) ;
-                                        acc ], None) ], None) ;
-                         Prim (loc, "CAR", [], None) ;
-                         Prim (loc, "PAIR", [], None) ], None) in
+                                      [ Prim (loc, "CDR", [], []) ;
+                                        acc ]) ], []) ;
+                         Prim (loc, "CAR", [], []) ;
+                         Prim (loc, "PAIR", [], []) ]) in
                 parse (i - 1) acc
             | _ -> assert false in
         match String.get str (len - 2) with
         | 'A' ->
             let init =
               Seq (loc,
-                   [ Prim (loc, "DUP", [], None) ;
-                     Prim (loc, "CDR", [], None) ;
+                   [ Prim (loc, "DUP", [], []) ;
+                     Prim (loc, "CDR", [], []) ;
                      Prim (loc, "DIP",
-                           [ Seq (loc, [ Prim (loc, "CAR", [], None) ; code ], None) ], None) ;
-                     Prim (loc, "SWAP", [], None) ;
-                     Prim (loc, "PAIR", [], None) ], None) in
+                           [ Seq (loc, [ Prim (loc, "CAR", [], []) ; code ]) ], []) ;
+                     Prim (loc, "SWAP", [], []) ;
+                     Prim (loc, "PAIR", [], []) ]) in
             ok (Some (parse (len - 3) init))
         | 'D' ->
             let init =
               Seq (loc,
-                   [ Prim (loc, "DUP", [], None) ;
-                     Prim (loc, "CDR", [], None) ;
+                   [ Prim (loc, "DUP", [], []) ;
+                     Prim (loc, "CDR", [], []) ;
                      code ;
-                     Prim (loc, "SWAP", [], None) ;
-                     Prim (loc, "CAR", [], None) ;
-                     Prim (loc, "PAIR", [], None) ], None) in
+                     Prim (loc, "SWAP", [], []) ;
+                     Prim (loc, "CAR", [], []) ;
+                     Prim (loc, "PAIR", [], []) ]) in
             ok (Some (parse (len - 3) init))
         | _ -> assert false
       else
@@ -224,9 +224,9 @@ let expand_dxiiivp original =
               acc
             else
               make (i - 1)
-                (Seq (loc, [ Prim (loc, "DIP", [ acc ], annot) ], None)) in
+                (Seq (loc, [ Prim (loc, "DIP", [ acc ], annot) ])) in
           match args with
-          | [ Seq (_, _, _) as arg ] -> ok @@ Some (make depth arg)
+          | [ Seq (_, _) as arg ] -> ok @@ Some (make depth arg)
           | [ _ ] -> error (Sequence_expected str)
           | [] | _ :: _ :: _ -> error (Invalid_arity (str, List.length args, 1))
         with Not_a_roman -> ok None
@@ -250,14 +250,14 @@ let expand_paaiair original =
               acc
             else if String.get str i = 'I'
                  && String.get str (i - 1) = 'A' then
-              parse (i - 2) (Prim (loc, "PAIR", [], if i = (len - 2) then annot else None) :: acc)
+              parse (i - 2) (Prim (loc, "PAIR", [], if i = (len - 2) then annot else []) :: acc)
             else if String.get str i = 'A' then
               match acc with
               | [] ->
                   raise_notrace Not_a_pair
               | acc :: accs ->
                   parse (i - 1)
-                    (Prim (loc, "DIP", [ Seq (loc, [ acc ], None) ], None)
+                    (Prim (loc, "DIP", [ Seq (loc, [ acc ]) ], [])
                      :: accs)
             else
               raise_notrace Not_a_pair in
@@ -266,7 +266,7 @@ let expand_paaiair original =
             | [] -> ok ()
             | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
           end >>? fun () ->
-          ok (Some (Seq (loc, expanded, None)))
+          ok (Some (Seq (loc, expanded)))
         with Not_a_pair -> ok None
       else
         ok None
@@ -274,7 +274,7 @@ let expand_paaiair original =
 
 let expand_unpaaiair original =
   match original with
-  | Prim (loc, str, args, None) ->
+  | Prim (loc, str, args, []) ->
       let len = String.length str in
       if len >= 6
       && String.sub str 0 3 = "UNP"
@@ -286,16 +286,15 @@ let expand_unpaaiair original =
             if i = 2 then
               match acc with
               | [ Seq _ as acc ] -> acc
-              | _ -> Seq (loc, List.rev acc, None)
+              | _ -> Seq (loc, List.rev acc)
             else if String.get str i = 'I'
                  && String.get str (i - 1) = 'A' then
               parse (i - 2)
-                (Seq (loc, [ Prim (loc, "DUP", [], None) ;
-                             Prim (loc, "CAR", [], None) ;
+                (Seq (loc, [ Prim (loc, "DUP", [], []) ;
+                             Prim (loc, "CAR", [], []) ;
                              Prim (loc, "DIP",
                                    [ Seq (loc,
-                                          [ Prim (loc, "CDR", [], None) ],
-                                          None) ], None) ], None)
+                                          [ Prim (loc, "CDR", [], []) ]) ], []) ])
                  :: acc)
             else if String.get str i = 'A' then
               match acc with
@@ -303,12 +302,12 @@ let expand_unpaaiair original =
                   raise_notrace Not_a_pair
               | (Seq _ as acc) :: accs ->
                   parse (i - 1)
-                    (Prim (loc, "DIP", [ acc ], None) :: accs)
+                    (Prim (loc, "DIP", [ acc ], []) :: accs)
               | acc :: accs ->
                   parse (i - 1)
                     (Prim (loc, "DIP",
-                           [ Seq (loc, [ acc ], None) ],
-                           None) :: accs)
+                           [ Seq (loc, [ acc ]) ],
+                           []) :: accs)
             else
               raise_notrace Not_a_pair in
           let expanded = parse (len - 2) [] in
@@ -341,11 +340,11 @@ let expand_duuuuup original =
             if i = 1 then acc
             else if String.get str i = 'U' then
               parse (i - 1)
-                (Seq (loc, [ Prim (loc, "DIP", [ acc ], None) ;
-                             Prim (loc, "SWAP", [], None) ], None))
+                (Seq (loc, [ Prim (loc, "DIP", [ acc ], []) ;
+                             Prim (loc, "SWAP", [], []) ]))
             else
               raise_notrace Not_a_dup in
-          ok (Some (parse (len - 2) (Seq (loc, [ Prim (loc, "DUP", [], annot) ], None))))
+          ok (Some (parse (len - 2) (Seq (loc, [ Prim (loc, "DUP", [], annot) ]))))
         with Not_a_dup -> ok None
       else
         ok None
@@ -354,88 +353,88 @@ let expand_duuuuup original =
 let expand_compare original =
   let cmp loc is =
     let is =
-      List.map (fun i -> Prim (loc, i, [], None)) is in
-    ok (Some (Seq (loc, is, None))) in
+      List.map (fun i -> Prim (loc, i, [], [])) is in
+    ok (Some (Seq (loc, is))) in
   let ifcmp loc is l r =
     let is =
-      List.map (fun i -> Prim (loc, i, [], None)) is @
-      [ Prim (loc, "IF", [ l ; r ], None) ] in
-    ok (Some (Seq (loc, is, None))) in
+      List.map (fun i -> Prim (loc, i, [], [])) is @
+      [ Prim (loc, "IF", [ l ; r ], []) ] in
+    ok (Some (Seq (loc, is))) in
   match original with
-  | Prim (loc, "CMPEQ", [], None) ->
+  | Prim (loc, "CMPEQ", [], []) ->
       cmp loc [ "COMPARE" ; "EQ" ]
-  | Prim (loc, "CMPNEQ", [], None) ->
+  | Prim (loc, "CMPNEQ", [], []) ->
       cmp loc [ "COMPARE" ; "NEQ" ]
-  | Prim (loc, "CMPLT", [], None) ->
+  | Prim (loc, "CMPLT", [], []) ->
       cmp loc [ "COMPARE" ; "LT" ]
-  | Prim (loc, "CMPGT", [], None) ->
+  | Prim (loc, "CMPGT", [], []) ->
       cmp loc [ "COMPARE" ; "GT" ]
-  | Prim (loc, "CMPLE", [], None) ->
+  | Prim (loc, "CMPLE", [], []) ->
       cmp loc [ "COMPARE" ; "LE" ]
-  | Prim (loc, "CMPGE", [], None) ->
+  | Prim (loc, "CMPGE", [], []) ->
       cmp loc [ "COMPARE" ; "GE" ]
   | Prim (_, ("CMPEQ" |  "CMPNEQ" |  "CMPLT"
-             |  "CMPGT" |  "CMPLE" | "CMPGE" as str), args, None) ->
+             |  "CMPGT" |  "CMPLE" | "CMPGE" as str), args, []) ->
       error (Invalid_arity (str, List.length args, 0))
-  | Prim (loc, "IFCMPEQ", [ l ; r ], None) ->
+  | Prim (loc, "IFCMPEQ", [ l ; r ], []) ->
       ifcmp loc [ "COMPARE" ; "EQ" ] l r
-  | Prim (loc, "IFCMPNEQ", [ l ; r ], None) ->
+  | Prim (loc, "IFCMPNEQ", [ l ; r ], []) ->
       ifcmp loc [ "COMPARE" ; "NEQ" ] l r
-  | Prim (loc, "IFCMPLT", [ l ; r ], None) ->
+  | Prim (loc, "IFCMPLT", [ l ; r ], []) ->
       ifcmp loc [ "COMPARE" ; "LT" ] l r
-  | Prim (loc, "IFCMPGT", [ l ; r ], None) ->
+  | Prim (loc, "IFCMPGT", [ l ; r ], []) ->
       ifcmp loc [ "COMPARE" ; "GT" ] l r
-  | Prim (loc, "IFCMPLE", [ l ; r ], None) ->
+  | Prim (loc, "IFCMPLE", [ l ; r ], []) ->
       ifcmp loc [ "COMPARE" ; "LE" ] l r
-  | Prim (loc, "IFCMPGE", [ l ; r ], None) ->
+  | Prim (loc, "IFCMPGE", [ l ; r ], []) ->
       ifcmp loc [ "COMPARE" ; "GE" ] l r
-  | Prim (loc, "IFEQ", [ l ; r ], None) ->
+  | Prim (loc, "IFEQ", [ l ; r ], []) ->
       ifcmp loc [ "EQ" ] l r
-  | Prim (loc, "IFNEQ", [ l ; r ], None) ->
+  | Prim (loc, "IFNEQ", [ l ; r ], []) ->
       ifcmp loc [ "NEQ" ] l r
-  | Prim (loc, "IFLT", [ l ; r ], None) ->
+  | Prim (loc, "IFLT", [ l ; r ], []) ->
       ifcmp loc [ "LT" ] l r
-  | Prim (loc, "IFGT", [ l ; r ], None) ->
+  | Prim (loc, "IFGT", [ l ; r ], []) ->
       ifcmp loc [ "GT" ] l r
-  | Prim (loc, "IFLE", [ l ; r ], None) ->
+  | Prim (loc, "IFLE", [ l ; r ], []) ->
       ifcmp loc [ "LE" ] l r
-  | Prim (loc, "IFGE", [ l ; r ], None) ->
+  | Prim (loc, "IFGE", [ l ; r ], []) ->
       ifcmp loc [ "GE" ] l r
   | Prim (_, ("IFCMPEQ" | "IFCMPNEQ" | "IFCMPLT"
              | "IFCMPGT" | "IFCMPLE" | "IFCMPGE"
              | "IFEQ" | "IFNEQ" | "IFLT"
-             | "IFGT" | "IFLE" | "IFGE" as str), args, None) ->
+             | "IFGT" | "IFLE" | "IFGE" as str), args, []) ->
       error (Invalid_arity (str, List.length args, 2))
   | Prim (_, ("IFCMPEQ" | "IFCMPNEQ" | "IFCMPLT"
              | "IFCMPGT" | "IFCMPLE" | "IFCMPGE"
              | "IFEQ" | "IFNEQ" | "IFLT"
              | "IFGT" | "IFLE" | "IFGE"
              | "CMPEQ" |  "CMPNEQ" |  "CMPLT"
-             | "CMPGT" |  "CMPLE" | "CMPGE" as str), [], Some _) ->
+             | "CMPGT" |  "CMPLE" | "CMPGE" as str), [], _ :: _) ->
       error (Unexpected_macro_annotation str)
   | _ -> ok None
 
 let expand_asserts original =
   let fail_false loc =
-    [ Seq(loc, [], None) ; Seq(loc, [ Prim (loc, "FAIL", [], None) ], None) ] in
+    [ Seq(loc, []) ; Seq(loc, [ Prim (loc, "FAIL", [], []) ]) ] in
   let fail_true loc =
-    [ Seq(loc, [ Prim (loc, "FAIL", [], None) ], None) ; Seq(loc, [], None) ] in
+    [ Seq(loc, [ Prim (loc, "FAIL", [], []) ]) ; Seq(loc, []) ] in
   match original with
-  | Prim (loc, "ASSERT", [], None) ->
-      ok @@ Some (Seq (loc, [ Prim (loc, "IF", fail_false loc, None) ], None))
-  | Prim (loc, "ASSERT_NONE", [], None) ->
-      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_false loc, None) ], None))
-  | Prim (loc, "ASSERT_SOME", [], None) ->
-      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_true loc, None) ], None))
-  | Prim (loc, "ASSERT_LEFT", [], None) ->
-      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_false loc, None) ], None))
-  | Prim (loc, "ASSERT_RIGHT", [], None) ->
-      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_true loc, None) ], None))
+  | Prim (loc, "ASSERT", [], []) ->
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF", fail_false loc, []) ]))
+  | Prim (loc, "ASSERT_NONE", [], []) ->
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_false loc, []) ]))
+  | Prim (loc, "ASSERT_SOME", [], []) ->
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_true loc, []) ]))
+  | Prim (loc, "ASSERT_LEFT", [], []) ->
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_false loc, []) ]))
+  | Prim (loc, "ASSERT_RIGHT", [], []) ->
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_true loc, []) ]))
   | Prim (_, ("ASSERT" | "ASSERT_NONE" | "ASSERT_SOME"
-             | "ASSERT_LEFT" | "ASSERT_RIGHT" as str), args, None) ->
+             | "ASSERT_LEFT" | "ASSERT_RIGHT" as str), args, []) ->
       error (Invalid_arity (str, List.length args, 0))
   | Prim (_, ("ASSERT" | "ASSERT_NONE" | "ASSERT_SOME"
-             | "ASSERT_LEFT" | "ASSERT_RIGHT" as str), [], Some _) ->
+             | "ASSERT_LEFT" | "ASSERT_RIGHT" as str), [], _ :: _) ->
       error (Unexpected_macro_annotation str)
   | Prim (loc, s, args, annot)
     when String.(length s >  7 && equal (sub s 0 7) "ASSERT_") ->
@@ -444,42 +443,42 @@ let expand_asserts original =
         | _ :: _ -> error (Invalid_arity (s, List.length args, 0))
       end >>? fun () ->
       begin match annot with
-        | Some _ -> (error (Unexpected_macro_annotation s))
-        | None -> ok () end >>? fun () ->
+        | _ :: _ -> (error (Unexpected_macro_annotation s))
+        | [] -> ok () end >>? fun () ->
       begin
         let remaining = String.(sub s 7 ((length s) - 7)) in
-        let remaining_prim = Prim(loc, remaining, [], None) in
+        let remaining_prim = Prim (loc, remaining, [], []) in
         match remaining with
         | "EQ" | "NEQ" | "LT" | "LE" | "GE" | "GT" ->
             ok @@ Some (Seq (loc, [ remaining_prim ;
-                                    Prim (loc, "IF", fail_false loc, None) ], None))
+                                    Prim (loc, "IF", fail_false loc, []) ]))
         | _ ->
             begin
               expand_compare remaining_prim >|? function
               | None -> None
               | Some seq ->
                   Some (Seq (loc, [ seq ;
-                                    Prim (loc, "IF", fail_false loc, None) ], None))
+                                    Prim (loc, "IF", fail_false loc, []) ]))
             end
       end
   | _ -> ok None
 
 
 let expand_if_some = function
-  | Prim (loc, "IF_SOME", [ right ; left ], None) ->
-      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", [ left ; right ], None) ], None))
-  | Prim (_, "IF_SOME", args, None) ->
+  | Prim (loc, "IF_SOME", [ right ; left ], []) ->
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", [ left ; right ], []) ]))
+  | Prim (_, "IF_SOME", args, []) ->
       error (Invalid_arity ("IF_SOME", List.length args, 2))
-  | Prim (_, "IF_SOME", [], Some _) ->
+  | Prim (_, "IF_SOME", [], _ :: _) ->
       error (Unexpected_macro_annotation "IF_SOME")
   | _ -> ok @@ None
 
 let expand_if_right = function
-  | Prim (loc, "IF_RIGHT", [ right ; left ], None) ->
-      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", [ left ; right ], None) ], None))
-  | Prim (_, "IF_RIGHT", args, None) ->
+  | Prim (loc, "IF_RIGHT", [ right ; left ], []) ->
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", [ left ; right ], []) ]))
+  | Prim (_, "IF_RIGHT", args, []) ->
       error (Invalid_arity ("IF_RIGHT", List.length args, 2))
-  | Prim (_, "IF_RIGHT", [], Some _) ->
+  | Prim (_, "IF_RIGHT", [], _ :: _) ->
       error (Unexpected_macro_annotation "IF_RIGHT")
   | _ -> ok @@ None
 
@@ -517,9 +516,9 @@ let expand_rec expr =
     | Ok expanded ->
         begin
           match expanded with
-          | Seq (loc, items, annot) ->
+          | Seq (loc, items) ->
               let items, errors = error_map expand_rec items in
-              (Seq (loc, items, annot), errors)
+              (Seq (loc, items), errors)
           | Prim (loc, name, args, annot) ->
               let args, errors = error_map expand_rec args in
               (Prim (loc, name, args, annot), errors)
@@ -530,18 +529,18 @@ let expand_rec expr =
 let unexpand_caddadr expanded =
   let rec rsteps acc = function
     | [] -> Some acc
-    | Prim (_, "CAR" , [], None) :: rest ->
+    | Prim (_, "CAR" , [], []) :: rest ->
         rsteps ("A" :: acc) rest
-    | Prim (_, "CDR" , [], None) :: rest ->
+    | Prim (_, "CDR" , [], []) :: rest ->
         rsteps ("D" :: acc) rest
     | _ -> None in
   match expanded with
-  | Seq (loc, (Prim (_, "CAR" , [], None) :: _ as nodes), None)
-  | Seq (loc, (Prim (_, "CDR" , [], None) :: _ as nodes), None) ->
+  | Seq (loc, (Prim (_, "CAR" , [], []) :: _ as nodes))
+  | Seq (loc, (Prim (_, "CDR" , [], []) :: _ as nodes)) ->
       begin match rsteps [] nodes with
         | Some steps ->
             let name = String.concat "" ("C" :: List.rev ("R" :: steps)) in
-            Some (Prim (loc, name, [], None))
+            Some (Prim (loc, name, [], []))
         | None -> None
       end
   | _ -> None
@@ -549,82 +548,82 @@ let unexpand_caddadr expanded =
 let unexpand_set_caddadr expanded =
   let rec steps acc = function
     | Seq (loc,
-           [ Prim (_, "CDR", [], None) ;
-             Prim (_, "SWAP", [], None) ;
-             Prim (_, "PAIR", [], None) ], None) ->
+           [ Prim (_, "CDR", [], []) ;
+             Prim (_, "SWAP", [], []) ;
+             Prim (_, "PAIR", [], []) ]) ->
         Some (loc, "A" :: acc)
     | Seq (loc,
-           [ Prim (_, "CAR", [], None) ;
-             Prim (_, "PAIR", [], None) ], None) ->
+           [ Prim (_, "CAR", [], []) ;
+             Prim (_, "PAIR", [], []) ]) ->
         Some (loc, "D" :: acc)
     | Seq (_,
-           [ Prim (_, "DUP", [], None) ;
+           [ Prim (_, "DUP", [], []) ;
              Prim (_, "DIP",
                    [ Seq (_,
-                          [ Prim (_, "CAR", [], None) ;
-                            sub ], None) ], None) ;
-             Prim (_, "CDR", [], None) ;
-             Prim (_, "SWAP", [], None) ;
-             Prim (_, "PAIR", [], None) ], None) ->
+                          [ Prim (_, "CAR", [], []) ;
+                            sub ]) ], []) ;
+             Prim (_, "CDR", [], []) ;
+             Prim (_, "SWAP", [], []) ;
+             Prim (_, "PAIR", [], []) ]) ->
         steps ("A" :: acc) sub
     | Seq (_,
-           [ Prim (_, "DUP", [], None) ;
+           [ Prim (_, "DUP", [], []) ;
              Prim (_, "DIP",
                    [ Seq (_,
-                          [ Prim (_, "CDR", [], None) ;
-                            sub ], None) ], None) ;
-             Prim (_, "CAR", [], None) ;
-             Prim (_, "PAIR", [], None) ], None) ->
+                          [ Prim (_, "CDR", [], []) ;
+                            sub ]) ], []) ;
+             Prim (_, "CAR", [], []) ;
+             Prim (_, "PAIR", [], []) ]) ->
         steps ("D" :: acc) sub
     | _ -> None in
   match steps [] expanded with
   | Some (loc, steps) ->
       let name = String.concat "" ("SET_C" :: List.rev ("R" :: steps)) in
-      Some (Prim (loc, name, [], None))
+      Some (Prim (loc, name, [], []))
   | None -> None
 
 let unexpand_map_caddadr expanded =
   let rec steps acc = function
     | Seq (loc,
-           [ Prim (_, "DUP", [], None) ;
-             Prim (_, "CDR", [], None) ;
-             Prim (_, "SWAP", [], None) ;
-             Prim (_, "CAR", [], None) ;
+           [ Prim (_, "DUP", [], []) ;
+             Prim (_, "CDR", [], []) ;
+             Prim (_, "SWAP", [], []) ;
+             Prim (_, "CAR", [], []) ;
              code ;
-             Prim (_, "PAIR", [], None) ], None) ->
+             Prim (_, "PAIR", [], []) ]) ->
         Some (loc, "A" :: acc, code)
     | Seq (loc,
-           [ Prim (_, "DUP", [], None) ;
-             Prim (_, "CDR", [], None) ;
+           [ Prim (_, "DUP", [], []) ;
+             Prim (_, "CDR", [], []) ;
              code ;
-             Prim (_, "SWAP", [], None) ;
-             Prim (_, "CAR", [], None) ;
-             Prim (_, "PAIR", [], None) ], None) ->
+             Prim (_, "SWAP", [], []) ;
+             Prim (_, "CAR", [], []) ;
+             Prim (_, "PAIR", [], []) ]) ->
         Some (loc, "D" :: acc, code)
     | Seq (_,
-           [ Prim (_, "DUP", [], None) ;
+           [ Prim (_, "DUP", [], []) ;
              Prim (_, "DIP",
                    [ Seq (_,
-                          [ Prim (_, "CAR", [], None) ;
-                            sub ], None) ], None) ;
-             Prim (_, "CDR", [], None) ;
-             Prim (_, "SWAP", [], None) ;
-             Prim (_, "PAIR", [], None) ], None) ->
+                          [ Prim (_, "CAR", [], []) ;
+                            sub ]) ], []) ;
+             Prim (_, "CDR", [], []) ;
+             Prim (_, "SWAP", [], []) ;
+             Prim (_, "PAIR", [], []) ]) ->
         steps ("A" :: acc) sub
     | Seq (_,
-           [ Prim (_, "DUP", [], None) ;
+           [ Prim (_, "DUP", [], []) ;
              Prim (_, "DIP",
                    [ Seq (_,
-                          [ Prim (_, "CDR", [], None) ;
-                            sub ], None) ], None) ;
-             Prim (_, "CAR", [], None) ;
-             Prim (_, "PAIR", [], None) ], None) ->
+                          [ Prim (_, "CDR", [], []) ;
+                            sub ]) ], []) ;
+             Prim (_, "CAR", [], []) ;
+             Prim (_, "PAIR", [], []) ]) ->
         steps ("D" :: acc) sub
     | _ -> None in
   match steps [] expanded with
   | Some (loc, steps, code) ->
       let name = String.concat "" ("MAP_C" :: List.rev ("R" :: steps)) in
-      Some (Prim (loc, name, [ code ], None))
+      Some (Prim (loc, name, [ code ], []))
   | None -> None
 
 let roman_of_decimal decimal =
@@ -658,23 +657,22 @@ let unexpand_dxiiivp expanded =
   match expanded with
   | Seq (loc,
          [ Prim (_, "DIP",
-                 [ Seq (_, [ Prim (_, "DIP", [ _ ], None) ], None) as sub ],
-                 None) ],
-         None) ->
+                 [ Seq (_, [ Prim (_, "DIP", [ _ ], []) ]) as sub ],
+                 []) ]) ->
       let rec count acc = function
-        | Seq (_, [ Prim (_, "DIP", [ sub ], None) ], None) -> count (acc + 1) sub
+        | Seq (_, [ Prim (_, "DIP", [ sub ], []) ]) -> count (acc + 1) sub
         | sub -> (acc, sub) in
       let depth, sub = count 1 sub in
       let name = "D" ^ roman_of_decimal depth ^ "P" in
-      Some (Prim (loc, name, [ sub ], None))
+      Some (Prim (loc, name, [ sub ], []))
   | _ -> None
 
 let unexpand_duuuuup expanded =
   let rec help expanded =
     match expanded with
-    | Seq (loc, [ Prim (_, "DUP", [], None) ], None) -> Some (loc, 1)
-    | Seq (_, [ Prim (_, "DIP", [expanded'], None);
-                Prim (_, "SWAP", [], None) ], None) ->
+    | Seq (loc, [ Prim (_, "DUP", [], []) ]) -> Some (loc, 1)
+    | Seq (_, [ Prim (_, "DIP", [expanded'], []);
+                Prim (_, "SWAP", [], []) ]) ->
         begin
           match help expanded' with
           | None -> None
@@ -686,158 +684,157 @@ let unexpand_duuuuup expanded =
       | n -> "U" ^ (dupn (n - 1)) in
   match help expanded with
   | None -> None
-  | Some (loc, n) -> Some (Prim (loc, "D" ^ (dupn n), [], None))
+  | Some (loc, n) -> Some (Prim (loc, "D" ^ (dupn n), [], []))
 
 let unexpand_paaiair expanded =
   match expanded with
-  | Seq (_,  [ Prim (_, "PAIR", [], None) ], None) -> Some expanded
-  | Seq (loc, (_ :: _ as nodes), None) ->
+  | Seq (_,  [ Prim (_, "PAIR", [], []) ]) -> Some expanded
+  | Seq (loc, (_ :: _ as nodes)) ->
       let rec destruct acc = function
         | [] -> Some acc
-        | Prim (_, "DIP", [ Seq (_, [ sub ], None) ], None) :: rest ->
+        | Prim (_, "DIP", [ Seq (_, [ sub ]) ], []) :: rest ->
             destruct ("A" :: acc) (sub :: rest)
-        | Prim (_, "PAIR", [], None) :: rest ->
+        | Prim (_, "PAIR", [], []) :: rest ->
             destruct ("AI" :: acc) rest
         | _ -> None in
       begin match destruct [] nodes with
         | None -> None
         | Some seq ->
             let name = String.concat "" ("P" :: List.rev ("R" :: seq)) in
-            Some (Prim (loc, name, [], None))
+            Some (Prim (loc, name, [], []))
       end
   | _ -> None
 
 let unexpand_unpaaiair expanded =
   match expanded with
-  | Seq (loc, (_ :: _ as nodes), None) ->
+  | Seq (loc, (_ :: _ as nodes)) ->
       let rec destruct sacc acc = function
         | [] -> Some acc
-        | Prim (_, "DIP", [ Seq (_, [ sub ], None) ], None) :: rest
-        | Prim (_, "DIP", [ Seq (_, _, _) as sub ], None) :: rest ->
+        | Prim (_, "DIP", [ Seq (_, [ sub ]) ], []) :: rest
+        | Prim (_, "DIP", [ Seq (_, _) as sub ], []) :: rest ->
             destruct ("A" :: sacc) acc (sub :: rest)
-        | Seq (_, [ Prim (_, "DUP", [], None) ;
-                    Prim (_, "CAR", [], None) ;
+        | Seq (_, [ Prim (_, "DUP", [], []) ;
+                    Prim (_, "CAR", [], []) ;
                     Prim (_, "DIP",
-                          [ Seq (_,
-                                 [ Prim (_, "CDR", [], None) ], None) ],
-                          None) ], None) :: rest ->
+                          [ Seq (_, [ Prim (_, "CDR", [], []) ]) ],
+                          []) ]) :: rest ->
             destruct [] (List.rev ("AI" :: sacc) :: acc) rest
         | _ -> None in
       begin match destruct [] [ [ "R" ] ] nodes with
         | None -> None
         | Some seq ->
             let name = String.concat "" ("UNP" :: List.flatten seq) in
-            Some (Prim (loc, name, [], None))
+            Some (Prim (loc, name, [], []))
       end
   | _ -> None
 
 let unexpand_compare expanded =
   match expanded with
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "EQ", [], None) ], None) ->
-      Some (Prim (loc, "CMPEQ", [], None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "NEQ", [], None) ], None) ->
-      Some (Prim (loc, "CMPNEQ", [], None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "LT", [], None) ], None) ->
-      Some (Prim (loc, "CMPLT", [], None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "GT", [], None) ], None) ->
-      Some (Prim (loc, "CMPGT", [], None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "LE", [], None) ], None) ->
-      Some (Prim (loc, "CMPLE", [], None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "GE", [], None) ], None) ->
-      Some (Prim (loc, "CMPGE", [], None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "EQ", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFCMPEQ", args, None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "NEQ", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFCMPNEQ", args, None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "LT", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFCMPLT", args, None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "GT", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFCMPGT", args, None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "LE", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFCMPLE", args, None))
-  | Seq (loc, [ Prim (_, "COMPARE", [], None) ;
-                Prim (_, "GE", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFCMPGE", args, None))
-  | Seq (loc, [ Prim (_, "EQ", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFEQ", args, None))
-  | Seq (loc, [ Prim (_, "NEQ", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFNEQ", args, None))
-  | Seq (loc, [ Prim (_, "LT", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFLT", args, None))
-  | Seq (loc, [ Prim (_, "GT", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFGT", args, None))
-  | Seq (loc, [ Prim (_, "LE", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFLE", args, None))
-  | Seq (loc, [ Prim (_, "GE", [], None) ;
-                Prim (_, "IF", args, None) ], None) ->
-      Some (Prim (loc, "IFGE", args, None))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "EQ", [], []) ]) ->
+      Some (Prim (loc, "CMPEQ", [], []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "NEQ", [], []) ]) ->
+      Some (Prim (loc, "CMPNEQ", [], []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "LT", [], []) ]) ->
+      Some (Prim (loc, "CMPLT", [], []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "GT", [], []) ]) ->
+      Some (Prim (loc, "CMPGT", [], []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "LE", [], []) ]) ->
+      Some (Prim (loc, "CMPLE", [], []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "GE", [], []) ]) ->
+      Some (Prim (loc, "CMPGE", [], []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "EQ", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFCMPEQ", args, []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "NEQ", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFCMPNEQ", args, []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "LT", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFCMPLT", args, []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "GT", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFCMPGT", args, []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "LE", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFCMPLE", args, []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
+                Prim (_, "GE", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFCMPGE", args, []))
+  | Seq (loc, [ Prim (_, "EQ", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFEQ", args, []))
+  | Seq (loc, [ Prim (_, "NEQ", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFNEQ", args, []))
+  | Seq (loc, [ Prim (_, "LT", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFLT", args, []))
+  | Seq (loc, [ Prim (_, "GT", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFGT", args, []))
+  | Seq (loc, [ Prim (_, "LE", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFLE", args, []))
+  | Seq (loc, [ Prim (_, "GE", [], []) ;
+                Prim (_, "IF", args, []) ]) ->
+      Some (Prim (loc, "IFGE", args, []))
   | _ -> None
 
 let unexpand_asserts expanded =
   match expanded with
-  | Seq (loc, [ Prim (_, "IF", [ Seq (_, [ ], None) ;
-                                 Seq (_, [ Prim(_, "FAIL", [], None) ], None) ],
-                      None) ], None) ->
-      Some (Prim (loc, "ASSERT", [], None))
-  | Seq (loc, [ Seq (_, [ Prim(_, "COMPARE", [], None) ; Prim(_, comparison, [], None) ], None) ;
-                Prim (_, "IF", [ Seq (_, [ ], None) ;
-                                 Seq (_, [ Prim(_, "FAIL", [], None) ], None) ],
-                      None) ], None) ->
-      Some (Prim (loc, "ASSERT_CMP" ^ comparison, [], None))
-  | Seq (loc, [ Prim (_, comparison, [], None) ;
-                Prim (_, "IF", [ Seq (_, [ ], None) ;
-                                 Seq (_, [ Prim(_, "FAIL", [], None) ], None) ],
-                      None) ], None) ->
-      Some (Prim (loc, "ASSERT_" ^ comparison, [], None))
-  | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, [ ], None) ;
-                                      Seq (_, [ Prim(_, "FAIL", [], None) ], None) ],
-                      None) ], None) ->
-      Some (Prim (loc, "ASSERT_NONE", [], None))
-  | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, [ Prim(_, "FAIL", [], None) ], None) ;
-                                      Seq (_, [ ], None)],
-                      None) ], None) ->
-      Some (Prim (loc, "ASSERT_SOME", [], None))
-  | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, [ ], None) ;
-                                      Seq (_, [ Prim(_, "FAIL", [], None) ], None) ],
-                      None) ], None) ->
-      Some (Prim (loc, "ASSERT_LEFT", [], None))
-  | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, [ Prim(_, "FAIL", [], None) ], None) ;
-                                      Seq (_, [ ], None) ],
-                      None) ], None) ->
-      Some (Prim (loc, "ASSERT_RIGHT", [], None))
+  | Seq (loc, [ Prim (_, "IF", [ Seq (_, []) ;
+                                 Seq (_, [ Prim(_, "FAIL", [], []) ]) ],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT", [], []))
+  | Seq (loc, [ Seq (_, [ Prim(_, "COMPARE", [], []) ; Prim (_, comparison, [], []) ]) ;
+                Prim (_, "IF", [ Seq (_, []) ;
+                                 Seq (_, [ Prim (_, "FAIL", [], []) ]) ],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT_CMP" ^ comparison, [], []))
+  | Seq (loc, [ Prim (_, comparison, [], []) ;
+                Prim (_, "IF", [ Seq (_, []) ;
+                                 Seq (_, [ Prim (_, "FAIL", [], []) ]) ],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT_" ^ comparison, [], []))
+  | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, []) ;
+                                      Seq (_, [ Prim (_, "FAIL", [], []) ]) ],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT_NONE", [], []))
+  | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, [ Prim (_, "FAIL", [], []) ]) ;
+                                      Seq (_, [])],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT_SOME", [], []))
+  | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, []) ;
+                                      Seq (_, [ Prim (_, "FAIL", [], []) ]) ],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT_LEFT", [], []))
+  | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, [ Prim (_, "FAIL", [], []) ]) ;
+                                      Seq (_, []) ],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT_RIGHT", [], []))
   | _ -> None
 
 
 let unexpand_if_some = function
-  | Seq (loc, [ Prim (_, "IF_NONE", [ left ; right ], None) ], None) ->
-      Some (Prim (loc, "IF_SOME", [ right ; left ], None))
+  | Seq (loc, [ Prim (_, "IF_NONE", [ left ; right ], []) ]) ->
+      Some (Prim (loc, "IF_SOME", [ right ; left ], []))
   | _ -> None
 
 let unexpand_if_right = function
-  | Seq (loc, [ Prim (_, "IF_LEFT", [ left ; right ], None) ], None) ->
-      Some (Prim (loc, "IF_RIGHT", [ right ; left ], None))
+  | Seq (loc, [ Prim (_, "IF_LEFT", [ left ; right ], []) ]) ->
+      Some (Prim (loc, "IF_RIGHT", [ right ; left ], []))
   | _ -> None
 
 let unexpand original =
@@ -866,8 +863,8 @@ let unexpand original =
 
 let rec unexpand_rec expr =
   match unexpand expr with
-  | Seq (loc, items, annot) ->
-      Seq (loc, List.map unexpand_rec items, annot)
+  | Seq (loc, items) ->
+      Seq (loc, List.map unexpand_rec items)
   | Prim (loc, name, args, annot) ->
       Prim (loc, name, List.map unexpand_rec args, annot)
   | Int _ | String _ as atom -> atom

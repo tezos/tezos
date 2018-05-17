@@ -152,7 +152,7 @@ let tokenize source =
     | `Uchar c, start ->
         begin match uchar_to_char c with
           | Some ('a'..'z' | 'A'..'Z') -> ident acc start (fun s _ -> Ident s)
-          | Some '@' ->
+          | Some ('@' | ':' | '$' | '&' | '%' | '!' | '?') ->
               ident acc start
                 (fun str stop ->
                    if String.length str > max_annot_length
@@ -366,7 +366,7 @@ let min_point : node list -> point = function
   | Int ({ start }, _) :: _
   | String ({ start }, _) :: _
   | Prim ({ start }, _, _, _) :: _
-  | Seq ({ start }, _, _) :: _ -> start
+  | Seq ({ start }, _) :: _ -> start
 
 (* End of a sequence of consecutive primitives *)
 let rec max_point : node list -> point  = function
@@ -375,7 +375,7 @@ let rec max_point : node list -> point  = function
   | Int ({ stop }, _) :: []
   | String ({ stop }, _) :: []
   | Prim ({ stop }, _, _, _) :: []
-  | Seq ({ stop }, _, _) :: [] -> stop
+  | Seq ({ stop }, _) :: [] -> stop
 
 (* An item in the parser's state stack.
    Not every value of type [mode list] is a valid parsing context.
@@ -388,9 +388,9 @@ let rec max_point : node list -> point  = function
 type mode =
   | Toplevel of node list
   | Expression of node option
-  | Sequence of token * node list * string option
-  | Unwrapped of location * string * node list * string option
-  | Wrapped of token * string * node list * string option
+  | Sequence of token * node list
+  | Unwrapped of location * string * node list * string list
+  | Wrapped of token * string * node list * string list
 
 (* Enter a new parsing state. *)
 let push_mode mode stack =
@@ -413,8 +413,8 @@ let fill_mode result = function
       Expression (Some result) :: []
   | Toplevel exprs :: [] ->
       Toplevel (result :: exprs) :: []
-  | Sequence (token, exprs, annot) :: rest ->
-      Sequence (token, result :: exprs, annot) :: rest
+  | Sequence (token, exprs) :: rest ->
+      Sequence (token, result :: exprs) :: rest
   | Wrapped (token, name, exprs, annot) :: rest ->
       Wrapped (token, name, result :: exprs, annot) :: rest
   | Unwrapped (start, name, exprs, annot) :: rest ->
@@ -425,6 +425,12 @@ type error += Unexpected of token
 type error += Extra of token
 type error += Misaligned of node
 type error += Empty
+
+let rec annots = function
+  | { token = Annot annot } :: rest ->
+      let annots, rest = annots rest in
+      annot :: annots, rest
+  | rest -> [], rest
 
 let rec parse ?(check = true) errors tokens stack =
   (* Two steps:
@@ -451,8 +457,8 @@ let rec parse ?(check = true) errors tokens stack =
   | Expression None :: _, [] ->
       let errors = Empty :: errors in
       let ghost = { start = point_zero ; stop = point_zero} in
-      [ Seq (ghost, [], None) ], List.rev errors
-  | Toplevel [ Seq (_, exprs, _) as expr ] :: [],
+      [ Seq (ghost, []) ], List.rev errors
+  | Toplevel [ Seq (_, exprs) as expr ] :: [],
     [] ->
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       exprs, List.rev errors
@@ -460,7 +466,7 @@ let rec parse ?(check = true) errors tokens stack =
     [] ->
       let exprs = List.rev exprs in
       let loc = { start = min_point exprs ; stop = max_point exprs } in
-      let expr = Seq (loc, exprs, None) in
+      let expr = Seq (loc, exprs) in
       let errors = if check then do_check ~toplevel: true errors expr else errors in
       exprs, List.rev errors
   (* Ignore comments *)
@@ -517,19 +523,20 @@ let rec parse ?(check = true) errors tokens stack =
       let fake = { token with token = Close_paren } in
       let tokens = (* insert *) fake :: tokens  in
       parse ~check errors tokens stack
-  | (Sequence (token, _, _) :: _ | Unwrapped _ :: Sequence (token, _, _) :: _), [] ->
+  | (Sequence (token, _) :: _ | Unwrapped _ :: Sequence (token, _) :: _), [] ->
       let errors = Unclosed token :: errors in
       let fake = { token with token = Close_brace } in
       let tokens = (* insert *) fake :: tokens  in
       parse ~check errors tokens stack
   (* Valid states *)
-  | (Toplevel _ | Sequence (_, _, _)) :: _ ,
-    { token = Ident name ; loc } :: { token = Annot annot } :: rest ->
-      let mode = Unwrapped (loc, name, [], Some annot) in
+  | (Toplevel _ | Sequence (_, _)) :: _ ,
+    { token = Ident name ; loc } :: ({ token = Annot _ } :: _ as rest) ->
+      let annots, rest = annots rest in
+      let mode = Unwrapped (loc, name, [], annots) in
       parse ~check errors rest (push_mode mode stack)
-  | (Expression None | Toplevel _ | Sequence (_, _, _)) :: _ ,
+  | (Expression None | Toplevel _ | Sequence (_, _)) :: _ ,
     { token = Ident name ; loc } :: rest ->
-      let mode = Unwrapped (loc, name, [], None) in
+      let mode = Unwrapped (loc, name, [], []) in
       parse ~check errors rest (push_mode mode stack)
   | (Unwrapped _ | Wrapped _) :: _,
     { token = Int value ; loc } :: rest
@@ -545,10 +552,10 @@ let rec parse ?(check = true) errors tokens stack =
       let expr : node = String (loc, contents) in
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr stack)
-  | Sequence ({ loc = { start } }, exprs, annot) :: _ ,
+  | Sequence ({ loc = { start } }, exprs) :: _ ,
     { token = Close_brace ; loc = { stop } } :: rest ->
       let exprs = List.rev exprs in
-      let expr = Micheline.Seq ({ start ; stop }, exprs, annot) in
+      let expr = Micheline.Seq ({ start ; stop }, exprs) in
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr (pop_mode stack))
   | (Sequence _ | Toplevel _) :: _ ,
@@ -568,34 +575,31 @@ let rec parse ?(check = true) errors tokens stack =
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr (pop_mode stack))
   | (Wrapped _ | Unwrapped _) :: _ ,
-    ({ token = Open_paren } as token) :: { token = Ident name } :: { token = Annot annot } :: rest ->
-      let mode = Wrapped (token, name, [], Some annot) in
+    ({ token = Open_paren } as token) :: { token = Ident name } :: ({ token = Annot _ } :: _ as rest) ->
+      let annots, rest = annots rest in
+      let mode = Wrapped (token, name, [], annots) in
       parse ~check errors rest (push_mode mode stack)
   | (Wrapped _ | Unwrapped _) :: _ ,
     ({ token = Open_paren } as token) :: { token = Ident name } :: rest ->
-      let mode = Wrapped (token, name, [], None) in
+      let mode = Wrapped (token, name, [], []) in
       parse ~check errors rest (push_mode mode stack)
   | (Wrapped _ | Unwrapped _) :: _ ,
     { token = Ident name ; loc } :: rest ->
-      let expr = Micheline.Prim (loc, name, [], None) in
+      let expr = Micheline.Prim (loc, name, [], []) in
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr stack)
   | (Wrapped _ | Unwrapped _ | Toplevel _ | Sequence _ | Expression None) :: _ ,
-    ({ token = Open_brace } as token) :: { token = Annot annot } :: rest ->
-      let mode = Sequence (token, [], Some annot) in
-      parse ~check errors rest (push_mode mode stack)
-  | (Wrapped _ | Unwrapped _ | Toplevel _ | Sequence _ | Expression None) :: _ ,
     ({ token = Open_brace } as token) :: rest ->
-      let mode = Sequence (token, [], None) in
+      let mode = Sequence (token, []) in
       parse ~check errors rest (push_mode mode stack)
 (* indentation checker *)
 and do_check ?(toplevel = false) errors = function
-  | Seq ({ start ; stop }, [], _) as expr ->
+  | Seq ({ start ; stop }, []) as expr ->
       if start.column >= stop.column then
         Misaligned expr :: errors
       else errors
   | Prim ({ start ; stop }, _, first :: rest, _)
-  | Seq ({ start ; stop }, first :: rest, _) as expr ->
+  | Seq ({ start ; stop }, first :: rest) as expr ->
       let { column = first_column ; line = first_line } =
         min_point [ first ] in
       if start.column >= stop.column then
@@ -623,11 +627,12 @@ and do_check ?(toplevel = false) errors = function
 
 let parse_expression ?check tokens =
   let result = match tokens with
-    | ({ token = Open_paren } as token) :: { token = Ident name } :: { token = Annot annot } :: rest ->
-        let mode = Wrapped (token, name, [], Some annot) in
+    | ({ token = Open_paren } as token) :: { token = Ident name } :: { token = Annot _ } :: rest ->
+        let annots, rest = annots rest in
+        let mode = Wrapped (token, name, [], annots) in
         parse ?check [] rest [ mode ; Expression None ]
     | ({ token = Open_paren } as token) :: { token = Ident name } :: rest ->
-        let mode = Wrapped (token, name, [], None) in
+        let mode = Wrapped (token, name, [], []) in
         parse ?check [] rest [ mode ; Expression None ]
     | _ ->
         parse ?check [] tokens [ Expression None ] in

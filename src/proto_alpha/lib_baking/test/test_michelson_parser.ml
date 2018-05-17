@@ -115,80 +115,72 @@ let assert_expands original expanded =
       ok ()
   | errors -> Error errors
 
-let left_branch = Seq(zero_loc, [ Prim(zero_loc, "SWAP", [], None) ], None)
-let right_branch = Seq(zero_loc, [ ], None)
+let left_branch = Seq(zero_loc, [ Prim(zero_loc, "SWAP", [], []) ])
+let right_branch = Seq(zero_loc, [])
 
 let test_expansion () =
-  assert_expands (Prim (zero_loc, "CAAR", [], None))
+  assert_expands (Prim (zero_loc, "CAAR", [], []))
     (Seq (zero_loc,
-          [(Prim (zero_loc, "CAR", [], None));
-           (Prim (zero_loc, "CAR", [], None)) ],
-          None)) >>? fun () ->
-  assert_expands (Prim (zero_loc, "CAAR", [], Some "annot"))
+          [(Prim (zero_loc, "CAR", [], []));
+           (Prim (zero_loc, "CAR", [], [])) ])) >>? fun () ->
+  assert_expands (Prim (zero_loc, "CAAR", [], [ "annot" ]))
     (Seq (zero_loc,
-          [(Prim (zero_loc, "CAR", [], None));
-           (Prim (zero_loc, "CAR", [], Some "annot")) ],
-          None)) >>? fun () ->
-  let car = Prim (zero_loc, "CAR", [], Some "annot") in
+          [(Prim (zero_loc, "CAR", [], []));
+           (Prim (zero_loc, "CAR", [], [ "annot" ])) ])) >>? fun () ->
+  let car = Prim (zero_loc, "CAR", [], [ "annot" ]) in
   assert_expands car car >>? fun () ->
-  let arg = [ Seq (zero_loc, [ car ], None) ] in
+  let arg = [ Seq (zero_loc, [ car ]) ] in
   assert_expands
-    (Prim (zero_loc, "DIP", arg, Some "new_annot"))
-    (Prim (zero_loc, "DIP", arg, Some "new_annot")) >>? fun () ->
+    (Prim (zero_loc, "DIP", arg, [ "new_annot" ]))
+    (Prim (zero_loc, "DIP", arg, [ "new_annot" ])) >>? fun () ->
   assert_expands
-    (Prim (zero_loc, "DIIP", arg, None))
+    (Prim (zero_loc, "DIIP", arg, []))
     (Seq (zero_loc,
           [ Prim (zero_loc, "DIP",
                   [ (Seq (zero_loc,
-                          [ Prim (zero_loc, "DIP", arg, None) ],
-                          None)) ],
-                  None) ],
-          None)) >>? fun () ->
+                          [ Prim (zero_loc, "DIP", arg, []) ])) ],
+                  []) ])) >>? fun () ->
   assert_expands
-    (Prim (zero_loc, "DIIIP", arg, None))
+    (Prim (zero_loc, "DIIIP", arg, []))
     (Seq (zero_loc,
           [ Prim (zero_loc, "DIP",
                   [ (Seq (zero_loc,
                           [ Prim (zero_loc,
                                   "DIP",
                                   [ (Seq (zero_loc,
-                                          [ Prim (zero_loc, "DIP", arg, None) ],
-                                          None)) ],
-                                  None) ],
-                          None)) ],
-                  None) ],
-          None)) >>? fun () ->
+                                          [ Prim (zero_loc, "DIP", arg, []) ])) ],
+                                  []) ])) ],
+                  []) ])) >>? fun () ->
   assert_expands
-    (Prim (zero_loc, "DUUP", [], None))
+    (Prim (zero_loc, "DUUP", [], []))
     (Seq (zero_loc,
-          [ Prim (zero_loc, "DIP", [ Seq (zero_loc, [ Prim (zero_loc, "DUP", [], None) ], None) ], None) ;
-            Prim (zero_loc, "SWAP", [], None) ], None)) >>? fun () ->
+          [ Prim (zero_loc, "DIP", [ Seq (zero_loc, [ Prim (zero_loc, "DUP", [], []) ]) ], []) ;
+            Prim (zero_loc, "SWAP", [], []) ])) >>? fun () ->
   assert_expands
-    (Prim (zero_loc, "DUUUP", [], None))
+    (Prim (zero_loc, "DUUUP", [], []))
     (Seq (zero_loc,
           [ Prim (zero_loc, "DIP",
                   [ Seq (zero_loc, [
                         Prim (zero_loc, "DIP", [
-                            Seq (zero_loc, [ Prim (zero_loc, "DUP", [], None) ], None)],
-                              None);
-                        Prim (zero_loc, "SWAP", [], None) ],
-                         None) ],
-                  None) ;
-            Prim (zero_loc, "SWAP", [], None) ], None)) >>? fun () ->
+                            Seq (zero_loc, [ Prim (zero_loc, "DUP", [], []) ])],
+                              []);
+                        Prim (zero_loc, "SWAP", [], []) ]) ],
+                  []) ;
+            Prim (zero_loc, "SWAP", [], []) ])) >>? fun () ->
   let assert_compare_macro prim_name compare_name =
     assert_expands
-      (Prim (zero_loc, prim_name, [], None))
+      (Prim (zero_loc, prim_name, [], []))
       (Seq (zero_loc,
-            [ Prim (zero_loc, "COMPARE", [], None) ;
-              Prim (zero_loc, compare_name, [], None) ], None)) in
+            [ Prim (zero_loc, "COMPARE", [], []) ;
+              Prim (zero_loc, compare_name, [], []) ])) in
   let assert_compare_if_macro prim_name compare_name =
     assert_expands
       (Prim (zero_loc, prim_name,
              [ left_branch ; right_branch ],
-             None))
-      (Seq (zero_loc, [ Prim(zero_loc, "COMPARE", [], None);
-                        Prim(zero_loc, compare_name, [], None);
-                        Prim (zero_loc, "IF", [ left_branch ; right_branch ], None) ], None)) in
+             []))
+      (Seq (zero_loc, [ Prim(zero_loc, "COMPARE", [], []);
+                        Prim(zero_loc, compare_name, [], []);
+                        Prim (zero_loc, "IF", [ left_branch ; right_branch ], []) ])) in
   assert_compare_macro "CMPEQ" "EQ" >>? fun () ->
   assert_compare_macro "CMPNEQ" "NEQ" >>? fun () ->
   assert_compare_macro "CMPLT" "LT" >>? fun () ->
@@ -201,50 +193,41 @@ let test_expansion () =
   assert_compare_if_macro "IFCMPLE" "LE" >>? fun () ->
   assert_compare_if_macro "IFCMPGT" "GT" >>? fun () ->
   assert_compare_if_macro "IFCMPGE" "GE" >>? fun () ->
-  assert_expands (Prim (zero_loc, "ASSERT_LEFT", [], None))
+  assert_expands (Prim (zero_loc, "ASSERT_LEFT", [], []))
     (Seq (zero_loc, [ Prim (zero_loc, "IF_LEFT",
-                            [ Seq (zero_loc, [ ], None) ;
-                              Seq (zero_loc, [ Prim(zero_loc, "FAIL", [], None) ], None) ],
-                            None) ], None)) >>? fun () ->
-  assert_expands (Prim (zero_loc, "ASSERT_RIGHT", [], None))
+                            [ Seq (zero_loc, []) ;
+                              Seq (zero_loc, [ Prim(zero_loc, "FAIL", [], []) ]) ],
+                            []) ])) >>? fun () ->
+  assert_expands (Prim (zero_loc, "ASSERT_RIGHT", [], []))
     (Seq (zero_loc, [ Prim (zero_loc, "IF_LEFT",
-                            [ Seq (zero_loc, [ Prim(zero_loc, "FAIL", [], None) ], None) ;
-                              Seq (zero_loc, [ ], None) ],
-                            None) ], None)) >>? fun () ->
-  assert_expands (Prim (zero_loc, "IF_RIGHT", [ left_branch ; right_branch ], None))
-    (Seq (zero_loc, [ Prim (zero_loc, "IF_LEFT", [ right_branch ; left_branch ], None) ], None)) >>? fun () ->
-  assert_expands (Prim (zero_loc, "IF_SOME", [ left_branch ; right_branch ], None))
-    (Seq (zero_loc, [ Prim (zero_loc, "IF_NONE", [ right_branch ; left_branch ], None) ], None)) >>? fun () ->
+                            [ Seq (zero_loc, [ Prim(zero_loc, "FAIL", [], []) ]) ;
+                              Seq (zero_loc, []) ],
+                            []) ])) >>? fun () ->
+  assert_expands (Prim (zero_loc, "IF_RIGHT", [ left_branch ; right_branch ], []))
+    (Seq (zero_loc, [ Prim (zero_loc, "IF_LEFT", [ right_branch ; left_branch ], []) ])) >>? fun () ->
+  assert_expands (Prim (zero_loc, "IF_SOME", [ left_branch ; right_branch ], []))
+    (Seq (zero_loc, [ Prim (zero_loc, "IF_NONE", [ right_branch ; left_branch ], []) ])) >>? fun () ->
   assert_expands
-    (Prim (zero_loc, "PAIR", [], None))
-    (Prim (zero_loc, "PAIR", [], None)) >>? fun () ->
+    (Prim (zero_loc, "PAIR", [], []))
+    (Prim (zero_loc, "PAIR", [], [])) >>? fun () ->
   assert_expands
-    (Prim (zero_loc, "PAAIR", [], None))
+    (Prim (zero_loc, "PAAIR", [], []))
     (Seq (zero_loc,
           [Prim
              (zero_loc,
               "DIP",
-              [Seq (zero_loc, [Prim
-                                 (zero_loc, "PAIR", [], None)],
-                    None)],
-              None)],
-          None)) >>? fun () ->
+              [Seq (zero_loc, [Prim (zero_loc, "PAIR", [], [])])],
+              [])])) >>? fun () ->
   assert_expands
-    (Prim (zero_loc, "PAAIAIR", [], None))
+    (Prim (zero_loc, "PAAIAIR", [], []))
     (Seq (zero_loc, [Prim
                        (zero_loc,
                         "DIP",
                         [Seq
                            (zero_loc,
-                            [Prim
-                               (zero_loc,
-                                "PAIR", [], None)],
-                            None)],
-                        None);
-                     Prim
-                       (zero_loc,
-                        "PAIR", [], None)],
-          None))
+                            [Prim (zero_loc, "PAIR", [], [])])],
+                        []);
+                     Prim (zero_loc, "PAIR", [], [])]))
 
 let assert_unexpansion_consistent original =
   let { Michelson_v1_parser.expanded }, errors =
@@ -259,30 +242,30 @@ let assert_unexpansion_consistent original =
       ok ()
 
 let test_unexpansion_consistency () =
-  assert_unexpansion_consistent (Prim (zero_loc, "PAAAIAIR", [], None)) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "PAAAIAIR", [], [])) >>? fun () ->
   assert_unexpansion_consistent
-    (Prim (zero_loc, "DIIIP", [ Seq (zero_loc, [ Prim (zero_loc, "DROP", [], None) ], None) ], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "SET_CAR", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "SET_CDR", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "DUP", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "DUUP", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "DUUUP", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "DUUUUP", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "DUUUUUP", [], None)) >>? fun () ->
+    (Prim (zero_loc, "DIIIP", [ Seq (zero_loc, [ Prim (zero_loc, "DROP", [], []) ]) ], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "SET_CAR", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "SET_CDR", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "DUP", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "DUUP", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "DUUUP", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "DUUUUP", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "DUUUUUP", [], [])) >>? fun () ->
 
-  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_EQ", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_NEQ", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_LT", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_LE", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_GT", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_GE", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_NONE", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_SOME", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_LEFT", [], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_RIGHT", [], None)) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_EQ", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_NEQ", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_LT", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_LE", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_GT", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_GE", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_NONE", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_SOME", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_LEFT", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "ASSERT_RIGHT", [], [])) >>? fun () ->
 
-  assert_unexpansion_consistent (Prim (zero_loc, "IF_RIGHT", [ left_branch ; right_branch], None)) >>? fun () ->
-  assert_unexpansion_consistent (Prim (zero_loc, "IF_SOME", [ left_branch ; right_branch], None))
+  assert_unexpansion_consistent (Prim (zero_loc, "IF_RIGHT", [ left_branch ; right_branch], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "IF_SOME", [ left_branch ; right_branch], []))
 
 let test_lexing () =
   let open Micheline_parser in
@@ -329,96 +312,96 @@ let test_parsing () =
             ok () in
 
   assert_parses "PUSH int 100"
-    [ (Prim ((), "PUSH", [ Prim ((), "int", [], None) ;
-                           Int ((), Z.of_int 100) ], None)) ] >>? fun () ->
+    [ (Prim ((), "PUSH", [ Prim ((), "int", [], []) ;
+                           Int ((), Z.of_int 100) ], [])) ] >>? fun () ->
 
-  assert_parses "DROP" [ (Prim ((), "DROP", [], None)) ] >>? fun () ->
+  assert_parses "DROP" [ (Prim ((), "DROP", [], [])) ] >>? fun () ->
   assert_parses "DIP{DROP}"
-    [ Prim ((), "DIP", [ Seq((), [ Prim ((), "DROP", [], None) ], None) ], None) ] >>? fun () ->
+    [ Prim ((), "DIP", [ Seq((), [ Prim ((), "DROP", [], []) ]) ], []) ] >>? fun () ->
 
   assert_parses "LAMBDA int int {}"
-    [ Prim ((), "LAMBDA", [ Prim ((), "int", [], None) ;
-                            Prim ((), "int", [], None) ;
-                            Seq ((), [ ], None) ], None) ] >>? fun () ->
+    [ Prim ((), "LAMBDA", [ Prim ((), "int", [], []) ;
+                            Prim ((), "int", [], []) ;
+                            Seq ((), []) ], []) ] >>? fun () ->
 
   assert_parses "LAMBDA @name int int {}"
-    [ Prim ((), "LAMBDA", [ Prim ((), "int", [], None) ;
-                            Prim ((), "int", [], None) ;
-                            Seq ((), [ ], None) ], Some "@name") ] >>? fun () ->
+    [ Prim ((), "LAMBDA", [ Prim ((), "int", [], []) ;
+                            Prim ((), "int", [], []) ;
+                            Seq ((), []) ], [ "@name" ]) ] >>? fun () ->
 
   assert_parses "NIL @annot string; # comment\n"
-    [ Prim ((), "NIL", [ Prim ((), "string", [], None) ], Some "@annot") ] >>? fun () ->
+    [ Prim ((), "NIL", [ Prim ((), "string", [], []) ], [ "@annot" ]) ] >>? fun () ->
 
   assert_parses "PUSH (pair bool string) (Pair False \"abc\")"
     [ Prim ((), "PUSH", [ Prim ((), "pair",
-                                [ Prim ((), "bool", [], None) ;
-                                  Prim ((), "string", [], None) ], None) ;
+                                [ Prim ((), "bool", [], []) ;
+                                  Prim ((), "string", [], []) ], []) ;
                           Prim ((), "Pair",
-                                [ Prim ((), "False", [], None) ;
-                                  String ((), "abc")], None) ], None) ] >>? fun () ->
+                                [ Prim ((), "False", [], []) ;
+                                  String ((), "abc")], []) ], []) ] >>? fun () ->
   assert_parses "PUSH (list nat) (List 1 2 3)"
     [ Prim ((), "PUSH", [ Prim ((), "list",
-                                [ Prim ((), "nat", [], None) ], None) ;
+                                [ Prim ((), "nat", [], []) ], []) ;
                           Prim ((), "List",
                                 [ Int((), Z.of_int 1);
                                   Int ((), Z.of_int 2);
                                   Int ((), Z.of_int 3)],
-                                None) ], None) ] >>? fun () ->
+                                []) ], []) ] >>? fun () ->
   assert_parses "PUSH (lambda nat nat) {}"
     [ Prim ((), "PUSH", [ Prim ((), "lambda",
-                                [ Prim ((), "nat", [], None);
-                                  Prim ((), "nat", [], None)], None) ;
-                          Seq((), [], None)],
-            None) ] >>? fun () ->
+                                [ Prim ((), "nat", [], []);
+                                  Prim ((), "nat", [], [])], []) ;
+                          Seq((), [])],
+            []) ] >>? fun () ->
   assert_parses "PUSH key \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\""
-    [ Prim ((), "PUSH", [ Prim ((), "key", [], None) ;
+    [ Prim ((), "PUSH", [ Prim ((), "key", [], []) ;
                           String ((),"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") ],
-            None) ] >>? fun () ->
+            []) ] >>? fun () ->
   assert_parses "PUSH (map int bool) (Map (Item 100 False))"
     [ Prim ((), "PUSH", [ Prim ((), "map",
-                                [ Prim((), "int", [], None);
-                                  Prim((), "bool", [], None)], None) ;
+                                [ Prim((), "int", [], []);
+                                  Prim((), "bool", [], [])], []) ;
                           Prim ((), "Map",
                                 [Prim ((), "Item",
                                        [Int ((), Z.of_int 100);
-                                        Prim ((), "False", [], None)], None)], None) ],
-            None) ] >>? fun () ->
+                                        Prim ((), "False", [], [])], [])], []) ],
+            []) ] >>? fun () ->
   assert_parses
     "parameter int; \
      return int; \
      storage unit; \
      code {}"
-    [ Prim ((), "parameter", [ Prim((), "int", [], None) ], None);
-      Prim ((), "return", [ Prim((), "int", [], None) ], None);
-      Prim ((), "storage", [ Prim((), "unit", [], None) ], None);
-      Prim ((), "code", [ Seq((), [], None) ], None)] >>? fun () ->
+    [ Prim ((), "parameter", [ Prim((), "int", [], []) ], []);
+      Prim ((), "return", [ Prim((), "int", [], []) ], []);
+      Prim ((), "storage", [ Prim((), "unit", [], []) ], []);
+      Prim ((), "code", [ Seq((), []) ], [])] >>? fun () ->
   assert_parses
     "parameter int; \
      storage unit; \
      return int; \
      code {CAR; PUSH int 1; ADD; UNIT; SWAP; PAIR};"
-    [ Prim ((), "parameter", [ Prim((), "int", [], None) ], None);
-      Prim ((), "storage", [ Prim((), "unit", [], None) ], None);
-      Prim ((), "return", [ Prim((), "int", [], None) ], None);
-      Prim ((), "code", [ Seq((), [ Prim ((), "CAR", [], None) ;
-                                    Prim ((), "PUSH", [ Prim((), "int", [], None) ;
-                                                        Int ((), Z.of_int 1)], None) ;
-                                    Prim ((), "ADD", [], None) ;
-                                    Prim ((), "UNIT", [], None) ;
-                                    Prim ((), "SWAP", [], None) ;
-                                    Prim ((), "PAIR", [], None)], None) ], None)] >>? fun () ->
+    [ Prim ((), "parameter", [ Prim((), "int", [], []) ], []);
+      Prim ((), "storage", [ Prim((), "unit", [], []) ], []);
+      Prim ((), "return", [ Prim((), "int", [], []) ], []);
+      Prim ((), "code", [ Seq((), [ Prim ((), "CAR", [], []) ;
+                                    Prim ((), "PUSH", [ Prim((), "int", [], []) ;
+                                                        Int ((), Z.of_int 1)], []) ;
+                                    Prim ((), "ADD", [], []) ;
+                                    Prim ((), "UNIT", [], []) ;
+                                    Prim ((), "SWAP", [], []) ;
+                                    Prim ((), "PAIR", [], [])]) ], [])] >>? fun () ->
   assert_parses
     "code {DUP @test; DROP}"
-    [ Prim ((), "code", [Seq ((), [ Prim ((), "DUP", [], Some "@test");
-                                    Prim ((), "DROP", [], None)], None)], None) ] >>? fun () ->
+    [ Prim ((), "code", [Seq ((), [ Prim ((), "DUP", [], [ "@test" ]);
+                                    Prim ((), "DROP", [], [])])], []) ] >>? fun () ->
   assert_parses
     "IF {CAR} {CDR}"
-    [ Prim ((), "IF", [ Seq ((), [ Prim ((), "CAR", [], None) ], None);
-                        Seq ((), [ Prim ((), "CDR", [], None) ], None) ], None) ] >>? fun () ->
+    [ Prim ((), "IF", [ Seq ((), [ Prim ((), "CAR", [], []) ]);
+                        Seq ((), [ Prim ((), "CDR", [], []) ]) ], []) ] >>? fun () ->
   assert_parses
     "IF_NONE {FAIL} {}"
-    [ Prim ((), "IF_NONE", [ Seq ((), [ Prim ((), "FAIL", [], None) ], None);
-                             Seq ((), [ ], None) ], None) ]
+    [ Prim ((), "IF_NONE", [ Seq ((), [ Prim ((), "FAIL", [], []) ]);
+                             Seq ((), []) ], []) ]
 
 let tests = [
   "lexing", (fun _ -> Lwt.return (test_lexing ())) ;

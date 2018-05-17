@@ -148,7 +148,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
              | Some s -> Format.fprintf ppf "%s " s)
           name
           print_source (parsed, hilights)
-          print_ty (None, ty) ;
+          print_ty ([], ty) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
     | Alpha_environment.Ecoproto_error (Ill_formed_type (_, expr, loc)) :: rest ->
@@ -325,21 +325,21 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  @[<hov 2>and@ %a.@]@]"
                 print_loc loc
                 (Michelson_v1_primitives.string_of_prim name)
-                print_ty (None, tya)
-                print_ty (None, tyb)
+                print_ty ([], tya)
+                print_ty ([], tyb)
           | Undefined_unop (loc, name, ty) ->
               Format.fprintf ppf
                 "@[<hov 0>@[<hov 2>%aoperator %s is undefined on@ %a@]@]"
                 print_loc loc
                 (Michelson_v1_primitives.string_of_prim name)
-                print_ty (None, ty)
+                print_ty ([], ty)
           | Bad_return (loc, got, exp) ->
               Format.fprintf ppf
                 "@[<v 2>%awrong stack type at end of body:@,\
                  - @[<v 0>expected return stack type:@ %a,@]@,\
                  - @[<v 0>actual stack type:@ %a.@]@]"
                 print_loc loc
-                (fun ppf -> print_stack_ty ppf) (Item_t (exp, Empty_t, None))
+                (fun ppf -> print_stack_ty ppf) (Item_t (exp, Empty_t, []))
                 (fun ppf -> print_stack_ty ppf) got
           | Bad_stack (loc, name, depth, sty) ->
               Format.fprintf ppf
@@ -358,17 +358,18 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           | Inconsistent_annotations (annot1, annot2) ->
               Format.fprintf ppf
                 "@[<v 2>The two annotations do not match:@,\
-                 - @[<hov>%s@]@,\
-                 - @[<hov>%s@]"
-                annot1 annot2
+                 - @[<v>%a@]@,\
+                 - @[<v>%a@]@]"
+                (Format.pp_print_list Format.pp_print_string) annot1
+                (Format.pp_print_list Format.pp_print_string) annot2
           | Inconsistent_type_annotations (loc, ty1, ty2) ->
               Format.fprintf ppf
                 "@[<v 2>%athe two types contain incompatible annotations:@,\
                  - @[<hov>%a@]@,\
-                 - @[<hov>%a@]"
+                 - @[<hov>%a@]@]"
                 print_loc loc
-                print_ty (None, ty1)
-                print_ty (None, ty2)
+                print_ty ([], ty1)
+                print_ty ([], ty2)
           | Unexpected_annotation loc ->
               Format.fprintf ppf
                 "@[<v 2>%aunexpected annotation."
@@ -395,7 +396,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  @[<hov 2>is invalid for type@ %a.@]@]"
                 print_loc loc
                 print_expr got
-                print_ty (None, exp)
+                print_ty ([], exp)
           | Invalid_contract (loc, contract) ->
               Format.fprintf ppf
                 "%ainvalid contract %a."
@@ -404,13 +405,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               Format.fprintf ppf "%acomparable type expected."
                 print_loc loc ;
               Format.fprintf ppf "@[<hov 0>@[<hov 2>Type@ %a@]@ is not comparable.@]"
-                print_ty (None, ty)
+                print_ty ([], ty)
           | Inconsistent_types (tya, tyb) ->
               Format.fprintf ppf
                 "@[<hov 0>@[<hov 2>Type@ %a@]@ \
                  @[<hov 2>is not compatible with type@ %a.@]@]"
-                print_ty (None, tya)
-                print_ty (None, tyb)
+                print_ty ([], tya)
+                print_ty ([], tyb)
           | Reject loc ->
               Format.fprintf ppf "%ascript reached FAIL instruction"
                 print_loc loc

@@ -369,14 +369,14 @@ let prims_of_strings expr =
              ok (arg :: args))
           (ok []) args >>? fun args ->
         ok (Prim (0, prim, List.rev args, annot))
-    | Seq (_, args, annot) ->
+    | Seq (_, args) ->
         List.fold_left
           (fun acc arg ->
              acc >>? fun args ->
              convert arg >>? fun arg ->
              ok (arg :: args))
           (ok []) args >>? fun args ->
-        ok (Seq (0, List.rev args, annot)) in
+        ok (Seq (0, List.rev args)) in
   convert (root expr) >>? fun expr ->
   ok (strip_locations expr)
 
@@ -387,9 +387,9 @@ let strings_of_prims expr =
         let prim = string_of_prim prim in
         let args = List.map convert args in
         Prim (0, prim, args, annot)
-    | Seq (_, args, annot) ->
+    | Seq (_, args) ->
         let args = List.map convert args in
-        Seq (0, args, annot) in
+        Seq (0, args) in
   strip_locations (convert (root expr))
 
 let prim_encoding =

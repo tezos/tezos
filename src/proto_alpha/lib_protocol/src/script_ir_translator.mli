@@ -71,7 +71,7 @@ val parse_ty :
   Script.node ->
   (ex_ty * Script_typed_ir.annot) tzresult
 val unparse_ty :
-  string option -> 'a Script_typed_ir.ty -> Script.node
+  string list -> 'a Script_typed_ir.ty -> Script.node
 
 val parse_toplevel
   : Script.expr -> (Script.node * Script.node * Script.node) tzresult

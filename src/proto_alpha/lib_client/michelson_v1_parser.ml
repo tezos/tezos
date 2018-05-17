@@ -54,7 +54,7 @@ let expand_all source ast errors =
       errors @ expansion_errors
   | Error errs ->
       { source ; unexpanded ;
-        expanded = Micheline.strip_locations (Seq ((), [], None)) ;
+        expanded = Micheline.strip_locations (Seq ((), [])) ;
         expansion_table ; unexpansion_table },
       errors @ expansion_errors @ errs
 
@@ -63,7 +63,7 @@ let parse_toplevel ?check source =
   let asts, parsing_errors = Micheline_parser.parse_toplevel ?check tokens in
   let ast =
     let start = min_point asts and stop = max_point asts in
-    Seq ({ start ; stop }, asts, None) in
+    Seq ({ start ; stop }, asts) in
   expand_all source ast (lexing_errors @ parsing_errors)
 
 let parse_expression ?check source =

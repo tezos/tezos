@@ -28,7 +28,7 @@ let type_map_enc =
 
 let ex_ty_enc =
   Data_encoding.conv
-    (fun (Ex_ty ty) -> strip_locations (unparse_ty None ty))
+    (fun (Ex_ty ty) -> strip_locations (unparse_ty [] ty))
     (fun expr ->
        match parse_ty ~allow_big_map:true ~allow_operation:true (root expr) with
        | Ok (Ex_ty ty, _) -> Ex_ty ty
@@ -73,7 +73,7 @@ let () =
           let Ex_stack_ty rest = fold rest in
           Ex_stack_ty (Item_t (ty, rest, annot))
       | [] -> Ex_stack_ty Empty_t in
-    conv unfold fold (list (tup2 ex_ty_enc (option string))) in
+    conv unfold fold (list (tup2 ex_ty_enc (list string))) in
   (* -- Structure errors ---------------------- *)
   (* Invalid arity *)
   register_error_kind
@@ -327,8 +327,8 @@ let () =
     ~title:"Annotations inconsistent between branches"
     ~description:"The annotations on two types could not be merged"
     (obj2
-       (req "annot1" string)
-       (req "annot2" string))
+       (req "annot1" (list string))
+       (req "annot2" (list string)))
     (function Inconsistent_annotations (annot1, annot2) -> Some (annot1, annot2)
             | _ -> None)
     (fun (annot1, annot2) -> Inconsistent_annotations (annot1, annot2)) ;

@@ -76,17 +76,17 @@ let rec node_size node =
            let (nblocks, nwords) = node_size node in
            (blocks + 1 + nblocks, words + 2 + nwords))
         (match annot with
-         | None -> (1, 2)
-         | Some annot -> (1, 4 + (String.length annot + 7) / 8))
+         | [] -> (1, 2)
+         | annots ->
+             let annots_length = List.fold_left (fun acc s -> acc + String.length s) 0 annots in
+             (1, 4 + (annots_length + 7) / 8))
         args
-  | Seq (_, args, annot) ->
+  | Seq (_, args) ->
       List.fold_left
         (fun (blocks, words) node ->
            let (nblocks, nwords) = node_size node in
            (blocks + 1 + nblocks, words + 2 + nwords))
-        (match annot with
-         | None -> (1, 2)
-         | Some annot -> (1, 3 + (String.length annot + 7) / 8))
+        (1, 2)
         args
 
 let expr_size expr =

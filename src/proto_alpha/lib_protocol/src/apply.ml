@@ -373,7 +373,7 @@ let apply_manager_operation_content :
             begin match parameters with
               | None ->
                   (* Forge a [Unit] parameter that will be checked by [execute]. *)
-                  let unit = Micheline.strip_locations (Prim (0, Script.D_Unit, [], None)) in
+                  let unit = Micheline.strip_locations (Prim (0, Script.D_Unit, [], [])) in
                   return (ctxt, unit)
               | Some parameters ->
                   Lwt.return (Script.force_decode parameters) >>=? fun arg ->

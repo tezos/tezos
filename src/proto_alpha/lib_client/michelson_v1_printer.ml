@@ -37,8 +37,8 @@ let print_stack ppf = function
 
 let inject_types type_map parsed =
   let rec inject_expr = function
-    | Seq (loc, items, annot) ->
-        Seq (inject_loc `before loc, List.map inject_expr items, annot)
+    | Seq (loc, items) ->
+        Seq (inject_loc `before loc, List.map inject_expr items)
     | Prim (loc, name, items, annot) ->
         Prim (inject_loc `after loc, name, List.map inject_expr items, annot)
     | Int (loc, value) ->
@@ -69,8 +69,8 @@ let unparse ?type_map parse expanded =
           |> Michelson_v1_primitives.strings_of_prims
           |> root |> Michelson_v1_macros.unexpand_rec |> Micheline.extract_locations in
         let rec inject_expr = function
-          | Seq (loc, items, annot) ->
-              Seq (inject_loc `before loc, List.map inject_expr items, annot)
+          | Seq (loc, items) ->
+              Seq (inject_loc `before loc, List.map inject_expr items)
           | Prim (loc, name, items, annot) ->
               Prim (inject_loc `after loc, name, List.map inject_expr items, annot)
           | Int (loc, value) ->

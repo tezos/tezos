@@ -42,7 +42,7 @@ end
 
 type ('key, 'value) map = (module Boxed_map with type key = 'key and type value = 'value)
 
-type annot = string option
+type annot = string list
 
 type ('arg, 'storage) script =
   { code : (('arg, 'storage) pair, (packed_internal_operation list, 'storage) pair) lambda ;
