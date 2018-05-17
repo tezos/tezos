@@ -1,7 +1,7 @@
 #use "topfind";;
 #thread;;
 #require "threads";;
-#require "stringext";;
+#require "re";;
 #require "lwt";;
 #require "lwt.unix";;
 #require "zarith";;
@@ -17,13 +17,15 @@ let date =
   Lwt_main.run (Lwt_process.pread_line (Lwt_process.shell "date +%FT%TZ --utc"))
 
 let prefix = "BLockGenesisGenesisGenesisGenesisGenesis"
-let suffix = String.sub Digest.(to_hex (string date)) 0 5
-let p =
-  match Base58.raw_decode (prefix ^ suffix ^ "crcCRC") with
-  | None -> assert false
-  | Some s -> s
-let p = String.sub p 0 (String.length p - 4)
-let genesis = Base58.safe_encode p
+let rec genesis () =
+  let suffix = String.sub Digest.(to_hex (string date)) 0 5 in
+  let p =
+    match Base58.raw_decode (prefix ^ suffix ^ "crcCRC") with
+    | None -> genesis ()
+    | Some s -> s in
+  let p = String.sub p 0 (String.length p - 4) in
+  Base58.safe_encode p
+let genesis = genesis ()
 
 let () =
   Lwt_main.run (Lwt_io.lines_to_file "alphanet_version"
