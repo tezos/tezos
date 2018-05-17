@@ -1,7 +1,7 @@
 .. _alphanet:
 
-Participating in the Alphanet
-=============================
+Alphanet
+========
 
 Welcome to the Tezos alphanet, which is a pre-release network for the
 Tezos blockchain. Currently, the chain is reset every few weeks.
@@ -81,32 +81,10 @@ set an environment variable:
 Compilation from sources
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``alphanet`` branch in the tezos git repository will always contain
-the up-to-date sources of the tezos-node required for running the
-alphanet. See ``docs/README.master`` on how to compile it.
+Please refer to the :ref:`instructions<howto>`.
 
-Once built, you might launch a node by running:
-
-::
-
-    ./tezos-node identity generate 24.
-    ./tezos-node run --rpc-addr localhost
-
-By default this instance will store its data in ``$HOME/.tezos-node``
-and will listen to incoming peers on port 9732. It will also listen to
-RPC requests on port 8732 (only from ``localhost``). You might find more
-options by running ``./tezos-node config --help``.
-
-If you want to stake (see below for more details), you will also have to
-run:
-
-::
-
-    ./tezos-client launch daemon
-
-That’s all. For the rest of the document, to execute the example
-commands, you will have to replace ``./alphanet.sh client`` by
-``./tezos-client``.
+For the rest of the document, to execute the example commands, you
+will have to replace ``./alphanet.sh client`` by ``./tezos-client``.
 
 How to observe the network ?
 ----------------------------
@@ -124,47 +102,10 @@ In an upcoming version, we will also provide an opt-in tool for node
 runners that will allow us to provide a global monitoring panel of the
 alphanet.
 
-How to obtain free Tez from the faucet contract ?
--------------------------------------------------
+How to obtain free Tezzies
+--------------------------
 
-The alphanet contains an ad-hoc faucet contract, that will generate new
-tezzies for you to test. Obviously, this contract will not be available
-outside of the test network.
-
-First, if you don’t have any cryptographic identity yet, you need to
-generate one (replace ``my_identity`` with any name that suits you
-best):
-
-::
-
-    ./alphanet.sh client gen keys "my_identity"
-
-Then, you have to generate a new “free” account (replace ``my_account``
-with any name that suits you best and ``my_identity`` by the name used
-in the previous command):
-
-::
-
-    ./alphanet.sh client originate free account "my_account" for "my_identity"
-
-That’s all. You might check your balance:
-
-::
-
-    ./alphanet.sh client get balance for "my_account"
-
-If you want MORE tezzies, you need to generate as many free accounts as
-you need (you should receive ꜩ100.000 per account) and then transfer the
-tezzies into a single account. For instance:
-
-::
-
-    ./alphanet.sh client originate free account "my_alt_account" for "my_identity"
-    ./alphanet.sh client transfer 100,000.00 from "my_alt_account" to "my_account" -fee 0.00
-    ./alphanet.sh client forget contract "my_alt_account"
-
-Note that the test network is kind enough to accept transactions without
-fees…
+See :ref:`this page<faucet>`.
 
 How to play with smart-contracts ?
 ----------------------------------
@@ -179,7 +120,7 @@ Some test contracts are in
 
 For details and examples, see:
 
-http://www.michelson-lang.com/
+https://www.michelson-lang.com/
 
 How to stake on the alphanet ?
 ------------------------------
@@ -308,3 +249,5 @@ and regenerate a new one:
 
     ./alphanet.sh client forget contract "my_account"
     ./alphanet.sh client originate free account "my_account" for "my_identity"
+
+.. include:: alphanet_changes.rst

@@ -49,10 +49,10 @@ license when the main network lunches.
 
 .. toctree::
    :maxdepth: 2
-   :caption: The Alphanet:
+   :caption: Test Networks:
 
+   introduction/faucet
    introduction/alphanet
-   introduction/alphanet_changes
    introduction/zeronet
 
 .. toctree::

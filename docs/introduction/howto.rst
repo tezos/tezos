@@ -1,3 +1,5 @@
+.. _howto:
+
 How to build and run
 ====================
 
@@ -13,8 +15,8 @@ You also need to **choose a branch**:
 
 - The *master* branch is where code is merged, but there is no test
   network using the *master* branch directly.
-- The *zeronet* and *zeronet-lmdb* is what you want to use if you want
-  to connect to the most cutting-edge test network, the *Zeronet*. The
+- The *alphanet* and *alphanet-lmdb* is what you want to use if you want
+  to connect to Tezos' test network, the *Alphanet*. The
   *-lmdb* version uses LMDB instead of LevelDB.
 
 **TL;DR**: Typically you want to do:
@@ -22,7 +24,7 @@ You also need to **choose a branch**:
 ::
 
    git clone git@gitlab.com:tezos/tezos.git
-   git checkout zeronet
+   git checkout alphanet
 
 Install OPAM
 ------------
@@ -117,12 +119,12 @@ opam internal state with the following commands:
     make
 
 
-Join the Zeronet!
------------------
+Join the Alphanet!
+------------------
 
-If you succesfully built Tezos on the *zeronet* or *zeronet-lmdb*
+If you succesfully built Tezos on the *alphanet* or *alphanet-lmdb*
 branch, then your node is elligible to join Tezos'
-:ref:`Zeronet<zeronet>`.
+:ref:`Alphanet<alphanet>`.
 
 Command-line basics
 ~~~~~~~~~~~~~~~~~~~
@@ -149,7 +151,7 @@ them.
 Configure your node
 ~~~~~~~~~~~~~~~~~~~
 
-The following steps are required to connect to Zeronet.
+The following steps are required to connect to Alphanet.
 
 ::
 
@@ -170,7 +172,7 @@ The identity will be stored in `$HOME/.tezos-node/identity.json`.
 This will initialize an configuration file for the node in
 `$HOME/.tezos-node/config.json`, using default values. It only
 specifies that the node will listen to incoming connections on socket
-address ``[::]:19732``.
+address ``[::]:9732``.
 
 The easiest way to amend this default configuration is to use
 
@@ -217,7 +219,7 @@ To interact with your node, read the doc of clients:
    ./tezos-admin-client man
    ./tezos-alpha-baker man
 
-And read :ref:`this page<zeronet>` to get zeronet tezzies.
+And read :ref:`this page<alphanet>` to get alphanet tezzies.
 
 Run the node in a sandbox
 -------------------------

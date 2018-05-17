@@ -1,8 +1,8 @@
-Alphanet changelog
-==================
+Changelog
+---------
 
 For the next reset
-------------------
+~~~~~~~~~~~~~~~~~~
 
 [Alpha]
 
@@ -37,7 +37,7 @@ For the next reset
 
 
 Reset 2017-11-20
-------------------
+~~~~~~~~~~~~~~~~
 
 [Alphanet]
 
@@ -107,7 +107,7 @@ Reset 2017-11-20
 - Add `SIZE` on lists.
 
 Reset 2017-11-17
-----------------
+~~~~~~~~~~~~~~~~
 
 [Node]
 
@@ -115,7 +115,7 @@ Reset 2017-11-17
 - Irmin: restore usage `git-repack`... (mistakenly removed)
 
 Reset 2017-10-13
-----------------
+~~~~~~~~~~~~~~~~
 
 [Client]
 
@@ -137,7 +137,7 @@ Reset 2017-10-13
    prevent an error raised when using an unrevealed key.
 
 Reset 2017-09-21
-----------------
+~~~~~~~~~~~~~~~~
 
 [Node]
 
@@ -159,7 +159,7 @@ Reset 2017-09-21
    prevent an error raised when using an unrevealed key.
 
 Reset 2017-08-10
-----------------
+~~~~~~~~~~~~~~~~
 
 This update includes changes in the on-disk state of the node and in
 the format of blocks and operations. It thus requires a chain reset.
@@ -194,7 +194,7 @@ Main changes includes:
 - minor language enhancements, mostly resulting from the feedback of
   Milo's daily challenge:
 
-    http://www.michelson-lang.com/
+    https://www.michelson-lang.com/
 
 - the alphanet scripts now understands a container: prefix wherever a
   file: prefix is accepted, temporarily copying the file into the
