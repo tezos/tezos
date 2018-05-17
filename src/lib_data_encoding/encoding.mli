@@ -16,7 +16,7 @@ module Kind: sig
   type enum = [ `Dynamic | `Variable ]
   val combine: string -> t -> t -> t
   val merge : t -> t -> t
-  val merge_list: Size.tag_size -> t list -> t
+  val merge_list: Binary_size.tag_size -> t list -> t
 end
 
 type case_tag = Tag of int | Json_only
@@ -47,7 +47,7 @@ type 'a desc =
   | Objs : Kind.t * 'a t * 'b t -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
   | Tups : Kind.t * 'a t * 'b t -> ('a * 'b) desc
-  | Union : Kind.t * Size.tag_size * 'a case list -> 'a desc
+  | Union : Kind.t * Binary_size.tag_size * 'a case list -> 'a desc
   | Mu : Kind.enum * string * ('a t -> 'a t) -> 'a desc
   | Conv :
       { proj : ('a -> 'b) ;

@@ -88,7 +88,7 @@ let all ?expected name write_encoding read_encoding value =
 let all_ranged_int minimum maximum =
   let encoding = ranged_int minimum maximum in
   let signed =
-    match Size.range_to_size ~minimum ~maximum with
+    match Binary_size.range_to_size ~minimum ~maximum with
     | `Int31 | `Int8 | `Int16 -> true
     | `Uint8 | `Uint16 | `Uint30 -> false in
   let write_encoding =

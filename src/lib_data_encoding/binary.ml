@@ -31,23 +31,23 @@ let rec length : type x. x Encoding.t -> x -> int = fun e ->
   | Null -> fun _ -> 0
   | Empty -> fun _ -> 0
   | Constant _ -> fun _ -> 0
-  | Bool -> fun _ -> Size.bool
-  | Int8 -> fun _ -> Size.int8
-  | Uint8 -> fun _ -> Size.uint8
-  | Int16 -> fun _ -> Size.int16
-  | Uint16 -> fun _ -> Size.uint16
-  | Int31 -> fun _ -> Size.int31
-  | Int32 -> fun _ -> Size.int32
-  | Int64 -> fun _ -> Size.int64
+  | Bool -> fun _ -> Binary_size.bool
+  | Int8 -> fun _ -> Binary_size.int8
+  | Uint8 -> fun _ -> Binary_size.uint8
+  | Int16 -> fun _ -> Binary_size.int16
+  | Uint16 -> fun _ -> Binary_size.uint16
+  | Int31 -> fun _ -> Binary_size.int31
+  | Int32 -> fun _ -> Binary_size.int32
+  | Int64 -> fun _ -> Binary_size.int64
   | Z -> fun z -> (Z.numbits z + 1 + 6) / 7
   | RangedInt { minimum ; maximum } ->
-      fun _ -> Size.(integer_to_size @@ range_to_size ~minimum ~maximum)
-  | Float -> fun _ -> Size.float
-  | RangedFloat _ -> fun _ -> Size.float
+      fun _ -> Binary_size.(integer_to_size @@ range_to_size ~minimum ~maximum)
+  | Float -> fun _ -> Binary_size.float
+  | RangedFloat _ -> fun _ -> Binary_size.float
   | Bytes `Fixed n -> fun _ -> n
   | String `Fixed n -> fun _ -> n
   | String_enum (_, arr) ->
-      fun _ -> Size.(integer_to_size @@ enum_size arr)
+      fun _ -> Binary_size.(integer_to_size @@ enum_size arr)
   | Objs (`Fixed n, _, _) -> fun _ -> n
   | Tups (`Fixed n, _, _) -> fun _ -> n
   | Union (`Fixed n, _, _) -> fun _ -> n
@@ -61,7 +61,7 @@ let rec length : type x. x Encoding.t -> x -> int = fun e ->
       let length2 = length e2 in
       fun (v1, v2) -> length1 v1 + length2 v2
   | Union (`Dynamic, sz, cases) ->
-      let tag_size = Size.tag_size sz in
+      let tag_size = Binary_size.tag_size sz in
       let case_length (Case { encoding = e ; proj }) =
         let length v = tag_size + length e v in
         fun v -> Option.map ~f:length (proj v) in
@@ -103,7 +103,7 @@ let rec length : type x. x Encoding.t -> x -> int = fun e ->
         | [] -> (List.rev acc, json_only_cases)
         | Case { tag = Json_only } :: tl -> case_lengths true acc tl
         | Case { encoding = e ; proj ; tag = Tag _ } :: tl ->
-            let length v = Size.tag_size sz + length e v in
+            let length v = Binary_size.tag_size sz + length e v in
             case_lengths
               json_only_cases
               ((fun v ->
@@ -131,7 +131,7 @@ let rec length : type x. x Encoding.t -> x -> int = fun e ->
   | Splitted { encoding = e } -> length e
   | Dynamic_size e ->
       let length = length e in
-      fun v -> Size.int32 + length v
+      fun v -> Binary_size.int32 + length v
   | Delayed f -> length (f ())
 
 (** Writer *)
@@ -142,17 +142,17 @@ module Writer = struct
     if (v < - (1 lsl 7) || v >= 1 lsl 7) then
       invalid_arg "Data_encoding.Binary.Writer.int8" ;
     MBytes.set_int8 buf ofs v;
-    ofs + Size.int8
+    ofs + Binary_size.int8
 
   let uint8 v buf ofs =
     if (v < 0 || v >= 1 lsl 8) then
       invalid_arg "Data_encoding.Binary.Writer.uint8" ;
     MBytes.set_int8 buf ofs v;
-    ofs + Size.uint8
+    ofs + Binary_size.uint8
 
   let char v buf ofs =
     MBytes.set_char buf ofs v;
-    ofs + Size.char
+    ofs + Binary_size.char
 
   let bool v buf ofs =
     uint8 (if v then 255 else 0) buf ofs
@@ -161,33 +161,33 @@ module Writer = struct
     if (v < - (1 lsl 15) || v >= 1 lsl 15) then
       invalid_arg "Data_encoding.Binary.Writer.int16" ;
     MBytes.set_int16 buf ofs v;
-    ofs + Size.int16
+    ofs + Binary_size.int16
 
   let uint16 v buf ofs =
     if (v < 0 || v >= 1 lsl 16) then
       invalid_arg "Data_encoding.Binary.Writer.uint16" ;
     MBytes.set_int16 buf ofs v;
-    ofs + Size.uint16
+    ofs + Binary_size.uint16
 
   let uint30 v buf ofs =
     if v < 0 || (Sys.int_size > 31 && v >= 1 lsl 30) then
       invalid_arg "Data_encoding.Binary.Writer.uint30" ;
     MBytes.set_int32 buf ofs (Int32.of_int v);
-    ofs + Size.uint30
+    ofs + Binary_size.uint30
 
   let int31 v buf ofs =
     if Sys.int_size > 31 && (v < ~- (1 lsl 30) || v >= 1 lsl 30) then
       invalid_arg "Data_encoding.Binary.Writer.int31" ;
     MBytes.set_int32 buf ofs (Int32.of_int v);
-    ofs + Size.int31
+    ofs + Binary_size.int31
 
   let int32 v buf ofs =
     MBytes.set_int32 buf ofs v;
-    ofs + Size.int32
+    ofs + Binary_size.int32
 
   let int64 v buf ofs =
     MBytes.set_int64 buf ofs v;
-    ofs + Size.int64
+    ofs + Binary_size.int64
 
   let z v res ofs =
     let sign = Z.sign v < 0 in
@@ -216,7 +216,7 @@ module Writer = struct
   let float v buf ofs =
     (*Here, float means float64, which is written using MBytes.set_double !!*)
     MBytes.set_double buf ofs v;
-    ofs + Size.float
+    ofs + Binary_size.float
 
   let fixed_kind_bytes length s buf ofs =
     if MBytes.length s <> length then invalid_arg "fixed_kind_bytes";
@@ -383,7 +383,7 @@ let rec write_rec
           if v < minimum || v > maximum
           then invalid_arg (Printf.sprintf "Integer %d not in range [%d, %d]." v minimum maximum) ;
           let v = if minimum >= 0 then v - minimum else v in
-          match Size.range_to_size ~minimum ~maximum with
+          match Binary_size.range_to_size ~minimum ~maximum with
           | `Uint8 -> uint8 v
           | `Uint16 -> uint16 v
           | `Uint30 -> uint30 v
@@ -406,7 +406,7 @@ let rec write_rec
   | String_enum (tbl, arr) ->
       (fun v ->
          let value = get_string_enum_case tbl v in
-         match Size.enum_size arr with
+         match Binary_size.enum_size arr with
          | `Uint30 -> uint30 value
          | `Uint16 -> uint16 value
          | `Uint8 -> uint8 value)
@@ -470,7 +470,7 @@ let rec write_rec_buffer
                             value minimum maximum) ;
         let value = if minimum >= 0 then value - minimum else value in
         begin
-          match Size.range_to_size ~minimum ~maximum with
+          match Binary_size.range_to_size ~minimum ~maximum with
           | `Uint30 -> uint30 value buffer
           | `Uint16 -> uint16 value buffer
           | `Uint8 -> uint8 value buffer
@@ -484,7 +484,7 @@ let rec write_rec_buffer
                             value minimum maximum) ;
         float value buffer
     | String_enum (tbl, arr) ->
-        (match Size.enum_size arr with
+        (match Binary_size.enum_size arr with
          | `Uint30 -> BufferedWriter.uint30
          | `Uint16 -> BufferedWriter.uint16
          | `Uint8 -> BufferedWriter.uint8)
@@ -551,38 +551,38 @@ let to_bytes t v =
 module Reader = struct
 
   let int8 buf ofs _len =
-    ofs + Size.int8, MBytes.get_int8 buf ofs
+    ofs + Binary_size.int8, MBytes.get_int8 buf ofs
 
   let uint8 buf ofs _len =
-    ofs + Size.uint8, MBytes.get_uint8 buf ofs
+    ofs + Binary_size.uint8, MBytes.get_uint8 buf ofs
 
   let char buf ofs _len =
-    ofs + Size.char, MBytes.get_char buf ofs
+    ofs + Binary_size.char, MBytes.get_char buf ofs
 
   let bool buf ofs len =
     let ofs, v = int8 buf ofs len in
     ofs, v <> 0
 
   let int16 buf ofs _len =
-    ofs + Size.int16, MBytes.get_int16 buf ofs
+    ofs + Binary_size.int16, MBytes.get_int16 buf ofs
 
   let uint16 buf ofs _len =
-    ofs + Size.uint16, MBytes.get_uint16 buf ofs
+    ofs + Binary_size.uint16, MBytes.get_uint16 buf ofs
 
   let uint30 buf ofs _len =
     let v = Int32.to_int (MBytes.get_int32 buf ofs) in
     if v < 0 then
       failwith "Data_encoding.Binary.Reader.uint30: invalid data." ;
-    ofs + Size.uint30, v
+    ofs + Binary_size.uint30, v
 
   let int31 buf ofs _len =
-    ofs + Size.int31, Int32.to_int (MBytes.get_int32 buf ofs)
+    ofs + Binary_size.int31, Int32.to_int (MBytes.get_int32 buf ofs)
 
   let int32 buf ofs _len =
-    ofs + Size.int32, MBytes.get_int32 buf ofs
+    ofs + Binary_size.int32, MBytes.get_int32 buf ofs
 
   let int64 buf ofs _len =
-    ofs + Size.int64, MBytes.get_int64 buf ofs
+    ofs + Binary_size.int64, MBytes.get_int64 buf ofs
 
   let z buf ofs _len =
     let res = Buffer.create 100 in
@@ -615,7 +615,7 @@ module Reader = struct
   (** read a float64 (double) **)
   let float buf ofs _len =
     (*Here, float means float64, which is read using MBytes.get_double !!*)
-    ofs + Size.float, MBytes.get_double buf ofs
+    ofs + Binary_size.float, MBytes.get_double buf ofs
 
   let int_of_int32 i =
     let i' = Int32.to_int i in
@@ -690,7 +690,7 @@ module Reader = struct
         cases in
     fun buf ofs len ->
       let ofs, tag = read_tag sz buf ofs len in
-      try List.assoc tag read_cases buf ofs (len - Size.tag_size sz)
+      try List.assoc tag read_cases buf ofs (len - Binary_size.tag_size sz)
       with Not_found -> raise (Unexpected_tag tag)
 
 end
@@ -715,7 +715,7 @@ let rec read_rec : type a. a Encoding.t-> MBytes.t -> int -> int -> int * a = fu
   | RangedInt { minimum ; maximum } ->
       (fun buf ofs alpha ->
          let ofs, value =
-           match Size.range_to_size ~minimum ~maximum with
+           match Binary_size.range_to_size ~minimum ~maximum with
            | `Int8 -> int8 buf ofs alpha
            | `Int16 -> int16 buf ofs alpha
            | `Int31 -> int31 buf ofs alpha
@@ -740,7 +740,7 @@ let rec read_rec : type a. a Encoding.t-> MBytes.t -> int -> int -> int * a = fu
   | String_enum (_, arr) -> begin
       fun buf ofs a ->
         let ofs, ind =
-          match Size.enum_size arr with
+          match Binary_size.enum_size arr with
           | `Uint8 -> uint8 buf ofs a
           | `Uint16 -> uint16 buf ofs a
           | `Uint30 -> uint30 buf ofs a in
@@ -756,7 +756,7 @@ let rec read_rec : type a. a Encoding.t-> MBytes.t -> int -> int -> int * a = fu
       (fun buf ofs len ->
          let ofs, v = int8 buf ofs len in
          if v = 0 then ofs, None
-         else let ofs, v = read buf ofs (len - Size.int8) in ofs, Some v)
+         else let ofs, v = read buf ofs (len - Binary_size.int8) in ofs, Some v)
   | Obj (Opt (`Variable, _, t)) ->
       let read = read_rec t in
       (fun buf ofs len ->

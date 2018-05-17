@@ -93,10 +93,10 @@ open Encoding (* open here, shadow below, use shadowed definitions later *)
    or raise Need_more_data *)
 
 let int8 buf =
-  generic_read_data Size.int8 (fun x y _ -> MBytes.get_int8 x y) buf
+  generic_read_data Binary_size.int8 (fun x y _ -> MBytes.get_int8 x y) buf
 
 let uint8 buf =
-  generic_read_data Size.uint8 (fun x y _ -> MBytes.get_uint8 x y) buf
+  generic_read_data Binary_size.uint8 (fun x y _ -> MBytes.get_uint8 x y) buf
 
 let char buf =
   let buf, v = int8 buf in
@@ -107,13 +107,13 @@ let bool buf =
   buf, v <> 0
 
 let int16 buf =
-  generic_read_data Size.int16 (fun x y _ -> MBytes.get_int16 x y) buf
+  generic_read_data Binary_size.int16 (fun x y _ -> MBytes.get_int16 x y) buf
 
 let uint16 buf =
-  generic_read_data Size.uint16 (fun x y _ -> MBytes.get_uint16 x y) buf
+  generic_read_data Binary_size.uint16 (fun x y _ -> MBytes.get_uint16 x y) buf
 
 let uint30 buf =
-  generic_read_data Size.uint30
+  generic_read_data Binary_size.uint30
     (fun x y _ ->
        let v = Int32.to_int (MBytes.get_int32 x y) in
        if v < 0 then
@@ -121,19 +121,19 @@ let uint30 buf =
        v) buf
 
 let int31 buf =
-  generic_read_data Size.int31
+  generic_read_data Binary_size.int31
     (fun x y _ -> Int32.to_int (MBytes.get_int32 x y)) buf
 
 let int32 buf =
-  generic_read_data Size.int32 (fun x y _ -> MBytes.get_int32 x y) buf
+  generic_read_data Binary_size.int32 (fun x y _ -> MBytes.get_int32 x y) buf
 
 let int64 buf =
-  generic_read_data Size.int64 (fun x y _ -> MBytes.get_int64 x y) buf
+  generic_read_data Binary_size.int64 (fun x y _ -> MBytes.get_int64 x y) buf
 
 (** read a float64 (double) **)
 let float buf =
   (*Here, float means float64, which is read using MBytes.get_double !!*)
-  generic_read_data Size.float (fun x y _ -> MBytes.get_double x y) buf
+  generic_read_data Binary_size.float (fun x y _ -> MBytes.get_double x y) buf
 
 let fixed_length_bytes length buf =
   generic_read_data length MBytes.sub buf
@@ -189,7 +189,7 @@ let rec data_checker
           while_not_terminator 0 buf
       | RangedInt { minimum ; maximum }  ->
           let (stream, ranged) =
-            match Size.range_to_size ~minimum ~maximum with
+            match Binary_size.range_to_size ~minimum ~maximum with
             | `Int8 -> int8 buf
             | `Int16 -> int16 buf
             | `Int31 -> int31 buf
@@ -218,7 +218,7 @@ let rec data_checker
 
       | String_enum (_, arr) ->
           next_path path
-            (match Size.enum_size arr with
+            (match Binary_size.enum_size arr with
              | `Uint8 -> fst @@ uint8 buf
              | `Uint16 -> fst @@ uint16 buf
              | `Uint30 -> fst @@ uint30 buf)
@@ -238,7 +238,7 @@ let rec data_checker
       | Obj (Opt (`Dynamic, _, e)) ->
           let buf, v = int8 buf in
           if v = 0 then next_path path buf
-          else data_checker path e buf (len - Size.int8)
+          else data_checker path e buf (len - Binary_size.int8)
 
       | Obj (Opt (`Variable, _, e)) ->
           if len = 0 then next_path path buf
@@ -296,7 +296,7 @@ let rec data_checker
           in
           begin match opt with
             | None -> raise (Encoding.Unexpected_tag ctag)
-            | Some func -> func (len - (Size.tag_size sz))
+            | Some func -> func (len - (Binary_size.tag_size sz))
           end
 
       | Dynamic_size e ->

@@ -67,7 +67,7 @@ module Kind = struct
     | [] -> assert false (* should be rejected by Data_encoding.union *)
     | k :: ks ->
         match List.fold_left merge k ks with
-        | `Fixed n -> `Fixed (n + Size.tag_size sz)
+        | `Fixed n -> `Fixed (n + Binary_size.tag_size sz)
         | k -> k
 
 end
@@ -100,7 +100,7 @@ type 'a desc =
   | Objs : Kind.t * 'a t * 'b t -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
   | Tups : Kind.t * 'a t * 'b t -> ('a * 'b) desc
-  | Union : Kind.t * Size.tag_size * 'a case list -> 'a desc
+  | Union : Kind.t * Binary_size.tag_size * 'a case list -> 'a desc
   | Mu : Kind.enum * string * ('a t -> 'a t) -> 'a desc
   | Conv :
       { proj : ('a -> 'b) ;
@@ -145,24 +145,24 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Null -> `Fixed 0
   | Empty -> `Fixed 0
   | Constant _ -> `Fixed 0
-  | Bool -> `Fixed Size.bool
-  | Int8 -> `Fixed Size.int8
-  | Uint8 -> `Fixed Size.uint8
-  | Int16 -> `Fixed Size.int16
-  | Uint16 -> `Fixed Size.uint16
-  | Int31 -> `Fixed Size.int31
-  | Int32 -> `Fixed Size.int32
-  | Int64 -> `Fixed Size.int64
+  | Bool -> `Fixed Binary_size.bool
+  | Int8 -> `Fixed Binary_size.int8
+  | Uint8 -> `Fixed Binary_size.uint8
+  | Int16 -> `Fixed Binary_size.int16
+  | Uint16 -> `Fixed Binary_size.uint16
+  | Int31 -> `Fixed Binary_size.int31
+  | Int32 -> `Fixed Binary_size.int32
+  | Int64 -> `Fixed Binary_size.int64
   | Z -> `Dynamic
   | RangedInt { minimum ; maximum } ->
-      `Fixed Size.(integer_to_size @@ range_to_size ~minimum ~maximum)
-  | Float -> `Fixed Size.float
-  | RangedFloat _ -> `Fixed Size.float
+      `Fixed Binary_size.(integer_to_size @@ range_to_size ~minimum ~maximum)
+  | Float -> `Fixed Binary_size.float
+  | RangedFloat _ -> `Fixed Binary_size.float
   (* Tagged *)
   | Bytes kind -> (kind :> Kind.t)
   | String kind -> (kind :> Kind.t)
   | String_enum (_, cases) ->
-      `Fixed Size.(integer_to_size @@ enum_size cases)
+      `Fixed Binary_size.(integer_to_size @@ enum_size cases)
   | Obj (Opt (kind, _, _)) -> (kind :> Kind.t)
   | Objs (kind, _, _) -> kind
   | Tups (kind, _, _) -> kind

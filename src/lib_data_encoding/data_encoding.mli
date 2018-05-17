@@ -128,7 +128,7 @@ module Encoding: sig
       bytes, with a running unary size bit: the most significant bit of
       each byte tells is this is the last byte in the sequence (0) or if
       there is more to read (1). The second most significant bit of the
-      first byte is reserved for the sign (positive if zero). Size and
+      first byte is reserved for the sign (positive if zero). Binary_size and
       sign bits ignored, data is then the binary representation of the
       absolute value of the number in little endian order. *)
   val z : Z.t encoding
