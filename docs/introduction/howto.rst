@@ -61,11 +61,7 @@ OS, but it has not been tested recently. A Windows port is in progress.
 
 Note that, when executing ``make build-deps``, OPAM will detect if
 required system dependencies are installed. However, it is not able to
-detect which versions you actually have. Typically, ``make`` will
-probably fail if you have an libsodium < 1.0.11. In this case, make sure
-you have a recent version of libsodium and libsodium-dev, or download
-and install them from, eg, https://pkgs.org/download/libsodium18 and
-https://pkgs.org/download/libsodium-dev
+detect which versions you actually have.
 
 If after a ``git pull``, the build fails (either at ``make
 build-deps`` or ``make``), you might try to clean up a little bit the
