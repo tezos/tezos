@@ -14,7 +14,8 @@
 (** {2 Overview}
 
     This module provides type-safe serialization and deserialization of
-    data structures. Backends are provided to both binary and JSON.
+    data structures. Backends are provided to both /ad hoc/ binary, JSON
+    and BSON.
 
     This works by writing type descriptors by hand, using the provided
     combinators. These combinators can fine-tune the binary
@@ -109,7 +110,7 @@ module Encoding: sig
 
   (** Integer with bounds in a given range. Both bounds are inclusive.
 
-      Raises [Invalid_argument] if the bounds are beyond the interval
+      @raise [Invalid_argument] if the bounds are beyond the interval
       [-2^30; 2^30-1]. These bounds are chosen to be compatible with all versions
       of OCaml.
   *)
@@ -138,8 +139,8 @@ module Encoding: sig
   val bool : bool encoding
 
   (** Encoding of a string
-      - default variable in width
-      - encoded as a byte sequence in binary
+      - encoded as a byte sequence in binary prefixed by the length
+        of the string
       - encoded as a string in JSON. *)
   val string : string encoding
 
@@ -160,10 +161,20 @@ module Encoding: sig
        encodings do not collide)). *)
   val result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
 
-  (** Array combinator. *)
+  (** Array combinator.
+      - encoded as an array in JSON
+      - encoded as the concatenation of all the element in binary
+       prefixed its length in bytes
+
+      @raise [Invalid_argument] if the inner encoding is variable. *)
   val array : 'a encoding -> 'a array encoding
 
-  (** List combinator. *)
+  (** List combinator.
+      - encoded as an array in JSON
+      - encoded as the concatenation of all the element in binary
+       prefixed its length in bytes
+
+      @raise [Invalid_argument] if the inner encoding is also variable. *)
   val list : 'a encoding -> 'a list encoding
 
   (** Provide a transformer from one encoding to a different one.
@@ -197,7 +208,7 @@ module Encoding: sig
 
   (** Optional field. Omitted entirely in JSON encoding if None.
       Omitted in binary if the only optional field in a [`Variable]
-      encoding, otherwise a 1-byte prefix (`0` or `1`) tells if the
+      encoding, otherwise a 1-byte prefix (`0` or `255`) tells if the
       field is present or not. *)
   val opt :
     ?title:string -> ?description:string ->
@@ -217,9 +228,16 @@ module Encoding: sig
     string -> 't encoding -> 't -> 't field
 
   (** {4 Constructors for objects with N fields} *)
-  (** These are serialized to binary by converting each internal object to binary
-      and placing them in the order of the original object.
-      These are serialized to JSON as a JSON object with the field names. *)
+
+  (** These are serialized to binary by converting each internal
+      object to binary and placing them in the order of the original
+      object. These are serialized to JSON as a JSON object with the
+      field names. An object might only contains one 'variable'
+      field, typically the last one. If the encoding of more than one
+      field are 'variable', the first ones should be wrapped with
+      [dynamic_size].
+
+      @raise invalid_arg if more than one field is a variable one. *)
 
   val obj1 :
     'f1 field -> 'f1 encoding
@@ -255,15 +273,21 @@ module Encoding: sig
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) encoding
 
   (** Create a larger object from the encodings of two smaller ones.
-      @raise invalid_arg if both arguments are not objects. *)
+      @raise invalid_arg if both arguments are not objects  or if both
+      tuples contains a variable field.. *)
   val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
 
   (** {4 Constructors for tuples with N fields} *)
 
-  (** These are serialized to binary by converting each internal object to binary
-      and placing them in the order of the original object.
-      These are serialized to JSON as JSON arrays/lists. *)
+  (** These are serialized to binary by converting each internal
+      object to binary and placing them in the order of the original
+      object. These are serialized to JSON as JSON arrays/lists.  Like
+      objects, a tuple might only contains one 'variable' field,
+      typically the last one. If the encoding of more than one field
+      are 'variable', the first ones should be wrapped with
+      [dynamic_size].
 
+      @raise invalid_arg if more than one field is a variable one. *)
 
   val tup1 :
     'f1 encoding ->
@@ -306,7 +330,8 @@ module Encoding: sig
 
 
   (** Create a large tuple encoding from two smaller ones.
-      @raise invalid_arg if both values are not tuples. *)
+      @raise invalid_arg if both values are not tuples or if both
+      tuples contains a variable field. *)
   val merge_tups : 'a1 encoding -> 'a2 encoding -> ('a1 * 'a2) encoding
 
   (** {3 Sum descriptors} *)
@@ -343,7 +368,7 @@ module Encoding: sig
       cases. The default is `Uint8 and you must use a `Uint16 if you are
       going to have more than 256 cases.
 
-      This function will raise an exception if it is given the empty list
+      @raise [Invalid_arg] if it is given the empty list
       or if there are more cases than can fit in the tag size. *)
   val union :
     ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
@@ -363,7 +388,9 @@ module Encoding: sig
   (** {3 Specialized descriptors} *)
 
   (** Encode enumeration via association list
-      (represented as a string in JSON and binary). *)
+      - represented as a string in JSON and
+      - represented as an integer representing the element's position
+        in the list in binary. The integer size depends on the list size.*)
   val string_enum : (string * 'a) list -> 'a encoding
 
   (** Create encodings that produce data of a fixed length when binary encoded.
@@ -384,7 +411,8 @@ module Encoding: sig
 
   (** Mark an encoding as being of dynamic size.
       Forces the size to be stored alongside content when needed.
-      Usually used to fix errors from combining two encodings. *)
+      Typically used to combine two variable encodings in a same
+      objects or tuple, or to use a variable encoding in an array or a list. *)
   val dynamic_size : 'a encoding -> 'a encoding
 
   (** [check_size size encoding] ensures that the binary encoding
@@ -526,15 +554,7 @@ end
 
 module Binary: sig
 
-  val length : 'a Encoding.t -> 'a -> int
-  val fixed_length : 'a Encoding.t -> int option
-  val fixed_length_exn : 'a Encoding.t -> int
-
-  val read : 'a Encoding.t -> MBytes.t -> int -> int -> (int * 'a) option
-
-  val of_bytes : 'a Encoding.t -> MBytes.t -> 'a option
-  val of_bytes_exn : 'a Encoding.t -> MBytes.t -> 'a
-
+  (** All the errors that might be returned while reading a binary value *)
   type read_error =
     | Not_enough_data
     | Extra_bytes
@@ -548,15 +568,7 @@ module Binary: sig
   exception Read_error of read_error
   val pp_read_error: Format.formatter -> read_error -> unit
 
-  type 'ret status =
-    | Success of { result : 'ret ; size : int ; stream : Binary_stream.t }
-    | Await of (MBytes.t -> 'ret status)
-    | Error of read_error
-
-  val read_stream : ?init:Binary_stream.t -> 'a Encoding.t -> 'a status
-
-  val write : 'a Encoding.t -> 'a -> MBytes.t -> int -> int -> int option
-
+  (** All the errors that might be returned while writing a binary value *)
   type write_error =
     | Size_limit_exceeded
     | No_case_matched
@@ -564,12 +576,60 @@ module Binary: sig
     | Invalid_float of { min : float ; v : float ; max : float }
     | Invalid_bytes_length of { expected : int ; found : int }
     | Invalid_string_length of { expected : int ; found : int }
-
   val pp_write_error : Format.formatter -> write_error -> unit
-
   exception Write_error of write_error
+
+  (** Compute the expected length of the binary represention of a value *)
+  val length : 'a Encoding.t -> 'a -> int
+
+  (** Returns the sized of the binary represention that the given
+      encoding might produce, only when the size of the represention
+      does not depends of the value itself. *)
+  val fixed_length : 'a Encoding.t -> int option
+  val fixed_length_exn : 'a Encoding.t -> int
+
+  (** [read enc buf ofs len] tries to reconstruct a value from the
+      bytes in [buf] starting ot offset [ofs] and reading at most
+      [len] bytes. This function also returns the offset of the first
+      unread bytes in the [buf]. *)
+  val read : 'a Encoding.t -> MBytes.t -> int ->  int -> (int * 'a) option
+
+  (** Return type for the function [read_stream]. *)
+  type 'ret status =
+    | Success of { result : 'ret ; size : int ; stream : Binary_stream.t }
+    (** Fully decoded value, together with the total amount of bytes reads,
+        and the remaining unread stream. *)
+    | Await of (MBytes.t -> 'ret status)
+    (** Partially decoded value.*)
+    | Error of read_error
+    (** Failure. The stream is garbled and it should be dropped. *)
+
+  (** Streamed equivalent of [read]. This variant cannot be called on
+      variable-size encodings. *)
+  val read_stream : ?init:Binary_stream.t -> 'a Encoding.t -> 'a status
+
+  (** [write enc v buf ofs len] writes the binary represention of [v]
+      as described by to [enc], in  [buf] starting at the offset [ofs]
+      and writing at most [len] bytes. The function returns the offset
+      of first unwritten bytes, or returns [None] in case of failure.
+      In the latter case, some data might have been written un the buffer. *)
+  val write : 'a Encoding.t -> 'a -> MBytes.t -> int -> int -> int option
+
+  (** [of_bytes enc buf] is equivalent to [read enc buf 0 (length buf)].
+      The function fails if the buffer is not fully read. *)
+  val of_bytes : 'a Encoding.t -> MBytes.t -> 'a option
+
+  (** [of_bytes_exn enc buf] is equivalent to [to_bytes], except
+      it raises [Read_error] instead of return [None] in case of error. *)
+  val of_bytes_exn : 'a Encoding.t -> MBytes.t -> 'a
+
+  (** [to_bytes enc v] is the equivalent of [write env buf 0 len]
+      where [buf] is a newly allocated buffer of the expected
+      length [len] (see [length env v]). *)
   val to_bytes : 'a Encoding.t -> 'a -> MBytes.t option
 
+  (** [to_bytes_exn enc v] is equivalent to [to_bytes enc v], except
+      it raises [Write_error] instead of return [None] in case of error. *)
   val to_bytes_exn : 'a Encoding.t -> 'a -> MBytes.t
 
 end
