@@ -120,8 +120,7 @@ let trace
 let hash_and_sign ?gas (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser.parsed) sk block cctxt =
   Alpha_services.Helpers.hash_data cctxt block (data.expanded, typ.expanded, gas) >>=? fun (hash, gas) ->
   Client_keys.sign sk (MBytes.of_string hash) >>=? fun signature ->
-  let `Hex signature = Signature.to_hex signature in
-  return (hash, signature, gas)
+  return (hash, Signature.to_b58check signature, gas)
 
 let typecheck_data
     ?gas

@@ -32,7 +32,7 @@ let execute_code_pred
   Lwt.return (Proto_alpha.Alpha_context.Gas.set_limit tc gas) >>=? fun tc ->
   let tc = Contract.init_origination_nonce tc hash in
   Script_interpreter.execute
-    tc
+    tc Readable
     ~source: op.contract
     ~payer: op.contract
     ~self: (dst, script)

@@ -398,7 +398,7 @@ let cleanup_balance_updates balance_updates =
        not (Tez.equal update Tez.zero))
     balance_updates
 
-let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
+let apply_manager_operation_content ctxt mode ~payer ~source ~internal operation =
   let before_operation = ctxt in
   Contract.must_exist ctxt source >>=? fun () ->
   let spend =
@@ -449,7 +449,7 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
             | None, _ -> fail (Bad_contract_parameter (destination, Some arg_type, None))
           end >>=? fun (ctxt, parameter) ->
           Script_interpreter.execute
-            ctxt ~source ~payer ~self:(destination, script) ~amount ~parameter
+            ctxt mode ~source ~payer ~self:(destination, script) ~amount ~parameter
           >>=? fun { ctxt ; storage ; big_map_diff ; operations } ->
           Contract.used_storage_space ctxt destination >>=? fun old_size ->
           Contract.update_script_storage
@@ -477,7 +477,7 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
         | None -> return (None, ctxt)
         | Some script ->
             Script_ir_translator.parse_script ctxt script >>=? fun (_, ctxt) ->
-            Script_ir_translator.erase_big_map_initialization ctxt script >>=? fun (script, big_map_diff, ctxt) ->
+            Script_ir_translator.erase_big_map_initialization ctxt Optimized script >>=? fun (script, big_map_diff, ctxt) ->
             return (Some (script, big_map_diff), ctxt)
       end >>=? fun (script, ctxt) ->
       spend ctxt source credit >>=? fun ctxt ->
@@ -505,7 +505,7 @@ let apply_manager_operation_content ctxt ~payer ~source ~internal operation =
       set_delegate ctxt source delegate >>=? fun ctxt ->
       return (ctxt, Delegation_result)
 
-let apply_internal_manager_operations ctxt ~payer ops =
+let apply_internal_manager_operations ctxt mode ~payer ops =
   let rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Ok (ctxt, applied))
@@ -514,7 +514,7 @@ let apply_internal_manager_operations ctxt ~payer ops =
             fail (Internal_operation_replay op)
           else
             let ctxt = record_internal_nonce ctxt nonce in
-            apply_manager_operation_content ctxt ~source ~payer ~internal:true operation
+            apply_manager_operation_content ctxt mode ~source ~payer ~internal:true operation
         end >>= function
         | Error errors ->
             let result = Internal op, Failed errors in
@@ -526,12 +526,12 @@ let apply_internal_manager_operations ctxt ~payer ops =
             apply ctxt ((Internal op, Applied result) :: applied) rest in
   apply ctxt [] ops
 
-let apply_manager_operations ctxt source ops =
+let apply_manager_operations ctxt mode source ops =
   let rec apply ctxt applied ops =
     match ops with
     | [] -> Lwt.return (Ok (ctxt, List.rev applied))
     | operation :: rest ->
-        apply_manager_operation_content ctxt ~source ~payer:source ~internal:false operation
+        apply_manager_operation_content ctxt mode ~source ~payer:source ~internal:false operation
         >>= function
         | Error errors ->
             let result = External, Failed errors in
@@ -542,7 +542,7 @@ let apply_manager_operations ctxt source ops =
               match result with
               | Transaction_result { operations = emitted ; _ } -> emitted
               | _ -> [] in
-            apply_internal_manager_operations ctxt ~payer:source emitted
+            apply_internal_manager_operations ctxt mode ~payer:source emitted
             >>= function
             | Error (results) ->
                 let result = (External, Applied result) in
@@ -554,7 +554,7 @@ let apply_manager_operations ctxt source ops =
                 apply ctxt applied rest in
   apply ctxt [] ops
 
-let apply_sourced_operation ctxt pred_block operation ops =
+let apply_sourced_operation ctxt mode pred_block operation ops =
   match ops with
   | Manager_operations { source ; fee ; counter ; operations ; gas_limit ; storage_limit } ->
       let revealed_public_keys =
@@ -580,7 +580,7 @@ let apply_sourced_operation ctxt pred_block operation ops =
       let ctxt = reset_internal_nonce ctxt in
       Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
       Lwt.return (Contract.set_storage_limit ctxt storage_limit) >>=? fun ctxt ->
-      apply_manager_operations ctxt source operations >>= begin function
+      apply_manager_operations ctxt mode source operations >>= begin function
         | Ok (ctxt, operation_results) -> return (ctxt, operation_results)
         | Error operation_results -> return (ctxt (* backtracked *), operation_results)
       end >>=? fun (ctxt, operation_results) ->
@@ -715,7 +715,7 @@ let apply_anonymous_operation ctxt kind =
           Contract.(credit ctxt (implicit_contract (Signature.Ed25519 pkh)) amount) >>=? fun ctxt ->
           return (ctxt, Activation_result [(* FIXME *)])
 
-let apply_operation ctxt pred_block hash operation =
+let apply_operation ctxt mode pred_block hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash  in
   begin match operation.contents with
     | Anonymous_operations ops ->
@@ -727,7 +727,7 @@ let apply_operation ctxt pred_block hash operation =
         >>=? fun (ctxt, results) ->
         return (ctxt, Anonymous_operations_result (List.rev results))
     | Sourced_operation ops ->
-        apply_sourced_operation ctxt pred_block operation ops
+        apply_sourced_operation ctxt mode pred_block operation ops
         >>=? fun (ctxt, result) ->
         return (ctxt, Sourced_operation_result result)
   end >>=? fun (ctxt, result) ->

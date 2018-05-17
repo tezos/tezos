@@ -21,6 +21,7 @@ type execution_result =
 
 val execute:
   Alpha_context.t ->
+  Script_ir_translator.unparsing_mode ->
   source: Contract.t ->
   payer: Contract.t ->
   self: (Contract.t * Script.t) ->
@@ -33,6 +34,7 @@ type execution_trace =
 
 val trace:
   Alpha_context.t ->
+  Script_ir_translator.unparsing_mode ->
   source: Contract.t ->
   payer: Contract.t ->
   self: (Contract.t * Script.t) ->

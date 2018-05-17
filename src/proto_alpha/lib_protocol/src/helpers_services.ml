@@ -141,7 +141,7 @@ module I = struct
     | None -> Error_monad.fail Operation.Cannot_parse_operation
     | Some (shell, contents) ->
         let operation = { shell ; contents ; signature } in
-        Apply.apply_operation ctxt pred_block hash operation
+        Apply.apply_operation ctxt Readable pred_block hash operation
         >>=? fun (_, result) -> return result
 
 end
@@ -161,7 +161,7 @@ let () =
     let storage = Script.lazy_expr storage in
     let code = Script.lazy_expr code in
     Script_interpreter.execute
-      ctxt
+      ctxt Readable
       ~source:contract (* transaction initiator *)
       ~payer:contract (* storage fees payer *)
       ~self:(contract, { storage ; code }) (* script owner *)
@@ -176,7 +176,7 @@ let () =
     let storage = Script.lazy_expr storage in
     let code = Script.lazy_expr code in
     Script_interpreter.trace
-      ctxt
+      ctxt Readable
       ~source:contract (* transaction initiator *)
       ~payer:contract (* storage fees payer *)
       ~self:(contract, { storage ; code }) (* script owner *)
@@ -205,7 +205,7 @@ let () =
       | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
     Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ, _) ->
     parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
-    Lwt.return (Script_ir_translator.hash_data ctxt typ data) >>=? fun (hash, ctxt) ->
+    Script_ir_translator.hash_data ctxt typ data >>=? fun (hash, ctxt) ->
     return (hash, Gas.level ctxt)
   end ;
   register1 S.level begin fun ctxt raw () offset ->

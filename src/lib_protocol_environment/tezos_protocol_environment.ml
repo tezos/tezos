@@ -188,11 +188,25 @@ module Make (Context : CONTEXT) = struct
     module Buffer = Buffer
     module Format = Format
     module Option = Option
-    module Z = Z
+    module MBytes = MBytes
+    module Z = struct
+      include Z
+      let to_bits ?(pad_to = 0) z =
+        let bits = to_bits z in
+        let len = Pervasives.((numbits z + 7) / 8) in
+        let full_len = Compare.Int.max pad_to len in
+        if full_len = 0 then
+          MBytes.empty
+        else
+          let res = MBytes.make full_len '\000' in
+          MBytes.blit_of_string bits 0 res 0 len ;
+          res
+      let of_bits bytes =
+        of_bits (MBytes.to_string bytes)
+    end
     module Lwt_sequence = Lwt_sequence
     module Lwt = Lwt
     module Lwt_list = Lwt_list
-    module MBytes = MBytes
     module Uri = Uri
     module Data_encoding = Data_encoding
     module Time = Time

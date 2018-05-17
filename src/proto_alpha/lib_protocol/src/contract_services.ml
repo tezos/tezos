@@ -19,17 +19,20 @@ type info = {
   delegate: bool * public_key_hash option ;
   counter: int32 ;
   script: Script.t option ;
-  storage: Script.expr option ;
 }
 
 let info_encoding =
   let open Data_encoding in
   conv
-    (fun {manager ; balance ; spendable ; delegate ; script ; counter ; storage } ->
-       (manager, balance, spendable, delegate, script, storage, counter))
-    (fun (manager, balance, spendable, delegate, script, storage, counter) ->
-       {manager ; balance ; spendable ; delegate ; script ; storage ; counter}) @@
-  obj7
+    (fun {manager ; balance ; spendable ; delegate ;
+          script ; counter } ->
+      (manager, balance, spendable, delegate,
+       script, counter))
+    (fun (manager, balance, spendable, delegate,
+          script, counter) ->
+      {manager ; balance ; spendable ; delegate ;
+       script ; counter}) @@
+  obj6
     (req "manager" Signature.Public_key_hash.encoding)
     (req "balance" Tez.encoding)
     (req "spendable" bool)
@@ -37,7 +40,6 @@ let info_encoding =
        (req "setable" bool)
        (opt "value" Signature.Public_key_hash.encoding))
     (opt "script" Script.encoding)
-    (opt "storage" Script.expr_encoding)
     (req "counter" int32)
 
 module S = struct
@@ -172,8 +174,17 @@ let () =
   register_field S.delegatable Contract.is_delegatable ;
   register_opt_field S.script
     (fun c v -> Contract.get_script c v >>=? fun (_, v) -> return v) ;
-  register_opt_field S.storage
-    (fun c v -> Contract.get_storage c v >>=? fun (_, v) -> return v) ;
+  register_opt_field S.storage (fun ctxt contract ->
+      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+      match script with
+      | None -> return None
+      | Some script ->
+          let ctxt = Gas.set_unlimited ctxt in
+          let open Script_ir_translator in
+          parse_script ctxt script >>=? fun (Ex_script script, ctxt) ->
+          unparse_script ctxt Readable script >>=? fun (script, _ctxt) ->
+          Lwt.return (Script.force_decode script.storage) >>=? fun storage ->
+          return (Some storage)) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Contract.get_manager ctxt contract >>=? fun manager ->
@@ -182,10 +193,18 @@ let () =
       Contract.is_delegatable ctxt contract >>=? fun delegatable ->
       Contract.is_spendable ctxt contract >>=? fun spendable ->
       Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-      Contract.get_storage ctxt contract >>=? fun (_ctxt, storage) ->
+      begin match script with
+        | None -> return (None, ctxt)
+        | Some script ->
+            let ctxt = Gas.set_unlimited ctxt in
+            let open Script_ir_translator in
+            parse_script ctxt script >>=? fun (Ex_script script, ctxt) ->
+            unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
+            return (Some script, ctxt)
+      end >>=? fun (script, _ctxt) ->
       return { manager ; balance ;
                spendable ; delegate = (delegatable, delegate) ;
-               script ; counter ; storage})
+               script ; counter })
 
 let list ctxt block =
   RPC_context.make_call0 S.list ctxt block () ()

@@ -38,7 +38,7 @@ let operation
   return @@ Helpers_operation.apply_of_proto src op_sh proto_op >>=? fun operation ->
   let hash = Proto_alpha.Alpha_context.Operation.hash operation in
   Proto_alpha.Apply.apply_operation
-    tc
+    tc Readable
     pred_block_hash
     hash
     operation

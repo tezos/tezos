@@ -65,7 +65,7 @@ let parse_execute sb ?tc code_str param_str storage_str =
   >>=?? fun (dst, { ctxt = tc ; operations = ops ; big_map_diff = bgm }) ->
   let payer =
     (List.hd Account.bootstrap_accounts).contract in
-  Proto_alpha.Apply.apply_internal_manager_operations tc ~payer ops >>= function
+  Proto_alpha.Apply.apply_internal_manager_operations tc Readable ~payer ops >>= function
   | Error result ->
       let _, err = extract_result result in
       Lwt.return (Alpha_environment.wrap_error (Error_monad.error (List.hd err)))
@@ -409,9 +409,9 @@ let test_example () =
   test_storage ~location: __LOC__ "map_caddaadr" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 0) 4) 5))) 6)" "Unit" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 1000000) 4) 5))) 6)" >>=? fun _ ->
 
   (*  Did the given key sign the string? (key is bootstrap1) *)
-  test_success ~location: __LOC__ "check_signature" "(Pair \"1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01\" \"hello\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" >>=? fun _ ->
+  test_success ~location: __LOC__ "check_signature" "(Pair \"edsigtbsm9RwhfQuJWSmZrvbDqDR9t1TJs34KrX4wkt9uUJ4PJG1aT6uLDiCqKz6vcGZAbNpoW7PvXUzdXo1E3c6ap6GoUU366J\" \"hello\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" >>=? fun _ ->
 
-  test_fails ~location: __LOC__ "check_signature" "(Pair \"1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01\" \"abcd\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\""  >>=? fun _ ->
+  test_fails ~location: __LOC__ "check_signature" "(Pair \"edsigtbsm9RwhfQuJWSmZrvbDqDR9t1TJs34KrX4wkt9uUJ4PJG1aT6uLDiCqKz6vcGZAbNpoW7PvXUzdXo1E3c6ap6GoUU366J\" \"abcd\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\""  >>=? fun _ ->
 
   (*  Convert a public key to a public key hash *)
   test_output ~location: __LOC__ "hash_key" "None" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "(Some \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\")" >>=? fun _ ->

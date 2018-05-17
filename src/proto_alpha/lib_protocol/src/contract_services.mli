@@ -19,7 +19,6 @@ type info = {
   delegate: bool * public_key_hash option ;
   counter: int32 ;
   script: Script.t option ;
-  storage: Script.expr option ;
 }
 
 val info_encoding: info Data_encoding.t

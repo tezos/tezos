@@ -110,7 +110,7 @@ let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
         { block_header = { shell = { predecessor ; _ } ; _ } ; _ }
     | Full_construction { predecessor ; _ } ->
         predecessor in
-  Apply.apply_operation ctxt predecessor
+  Apply.apply_operation ctxt Optimized predecessor
     (Alpha_context.Operation.hash operation) operation >>=? fun (ctxt, _) ->
   let op_count = op_count + 1 in
   return { data with ctxt ; op_count }

@@ -17,6 +17,8 @@ type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 type ex_stack_ty = Ex_stack_ty : 'a Script_typed_ir.stack_ty -> ex_stack_ty
 type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
 
+type unparsing_mode = Optimized | Readable
+
 (* ---- Sets and Maps -------------------------------------------------------*)
 
 val empty_set : 'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.set
@@ -60,7 +62,8 @@ val parse_data :
   context ->
   'a Script_typed_ir.ty -> Script.node -> ('a * context) tzresult Lwt.t
 val unparse_data :
-  context -> 'a Script_typed_ir.ty -> 'a -> (Script.node * context) tzresult
+  context -> unparsing_mode ->
+  'a Script_typed_ir.ty -> 'a -> (Script.node * context) tzresult Lwt.t
 
 val parse_ty :
   allow_big_map: bool ->
@@ -83,23 +86,23 @@ val typecheck_data :
 val parse_script :
   ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
   context -> Script.t -> (ex_script * context) tzresult Lwt.t
+val unparse_script :
+  context -> unparsing_mode ->
+  ('a, 'b) Script_typed_ir.script -> (Script.t * context) tzresult Lwt.t
 
 val parse_contract :
   context -> Script.location -> 'a Script_typed_ir.ty -> Contract.t ->
   (context * 'a Script_typed_ir.typed_contract) tzresult Lwt.t
 
-val hash_data : context -> 'a Script_typed_ir.ty -> 'a -> (string * context) tzresult
+val hash_data : context -> 'a Script_typed_ir.ty -> 'a -> (string * context) tzresult Lwt.t
 
-val extract_big_map : 'a Script_typed_ir.ty -> 'a -> Script_typed_ir.ex_big_map option
+val extract_big_map :
+  'a Script_typed_ir.ty -> 'a -> Script_typed_ir.ex_big_map option
 
-val to_serializable_big_map :
-  context -> Script_typed_ir.ex_big_map ->
+val diff_of_big_map :
+  context -> unparsing_mode -> Script_typed_ir.ex_big_map ->
   (Contract.big_map_diff * context) tzresult Lwt.t
 
-val to_printable_big_map :
-  context -> Script_typed_ir.ex_big_map ->
-  (Script.expr * Script.expr option) list
-
 val erase_big_map_initialization :
-  context -> Script.t ->
+  context -> unparsing_mode -> Script.t ->
   (Script.t * Contract.big_map_diff option * context) tzresult Lwt.t
