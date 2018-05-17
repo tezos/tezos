@@ -1,14 +1,44 @@
 How to build and run
 ====================
 
-Build instructions
-------------------
+Get the sources
+---------------
+
+Tezos *git* repository is hosted at `GitLab
+<https://gitlab.com/tezos/tezos/>`_. All development happens here. Do
+**not** use our `GitHub mirror <https://github.com/tezos/tezos>`_
+which we don't use anymore and only mirrors what happens at GitLab.
+
+You also need to **choose a branch**:
+
+- The *master* branch is where code is merged, but there is no test
+  network using the *master* branch directly.
+- The *zeronet* and *zeronet-lmdb* is what you want to use if you want
+  to connect to the most cutting-edge test network, the *Zeronet*. The
+  *-lmdb* version uses LMDB instead of LevelDB.
+
+**TL;DR**: Typically you want to do:
+
+::
+
+   git clone git@gitlab.com:tezos/tezos.git
+   git checkout zeronet
+
+Install OPAM
+------------
 
 To compile Tezos, you need an OCaml compiler (version 4.06.1) and all
 the libraries listed in the various ``tezos-*.opam`` files.
 
-The best way to install all dependencies is by first installing
-`OPAM <https://opam.ocaml.org/>`__, the OCaml package manager.
+The simplest way to install all dependencies is by using `OPAM
+<https://opam.ocaml.org/>`__, the OCaml package manager.
+
+
+**IMPORTANT**: Please use `version 2
+<https://github.com/ocaml/opam/releases/tag/2.0.0-rc>`_ of OPAM. That
+is what the Tezos Core team uses. Most distribution probably ship
+**version 1** of OPAM out of the box, but installing version 2 is
+preferable for many reasons.
 
 Then, you need to create a new switch alias for Tezos. A switch is your
 own version of the OPAM configuration, including the OCaml compiler, all
@@ -19,17 +49,26 @@ projects or other versions of Tezos.
 ::
 
     opam update
-    opam switch "tezos" --alias-of 4.06.1
+    opam switch create tezos 4.06.1
+    eval $(opam env)
 
-Note that if you previously created a switch named ``tezos`` but with an
-older OCaml version you need to remove the switch with
-``opam switch remove "tezos"``.
-
-When the switch is ready, you need to activate it:
+If you are stuck with OPAM1:
 
 ::
 
-    eval `opam config env`
+    opam update
+    opam switch tezos --alias-of 4.06.1
+    eval $(opam config env)
+
+The last command-line activates the switch.
+
+Note that if you previously created a switch named ``tezos`` but with
+an older OCaml version you need to remove the switch with ``opam
+switch remove tezos``.
+
+
+Install Tezos dependencies with OPAM
+------------------------------------
 
 Install the libraries which Tezos depends on:
 
@@ -52,13 +91,15 @@ At last, compile the project:
 This should produce three binaries:
 
 -  ``tezos-node``: the tezos daemon itself;
--  ``tezos-client``: a minimal command-line client;
+-  ``tezos-client``: a command-line client;
+-  ``tezos-admin-client``: a command-line administration tool for the node;
+-  ``tezos-alpha-baker``: a client and daemon to bake on the Tezos network;
 -  ``tezos-protocol-compiler``: a protocol compiler used for developing
    new version of the economic protocol.
 
 Currently Tezos is being developed for Linux only. It should work on
-macOS, but it has not been tested recently. A Windows port is in
-progress.
+macOS, but it has not been tested recently. A Windows port is feasible
+and might be developed in the future.
 
 Note that, when executing ``make build-deps``, OPAM will detect if
 required system dependencies are installed. However, it is not able to
@@ -76,69 +117,110 @@ opam internal state with the following commands:
     make
 
 
-Running the node
-----------------
+Join the Zeronet!
+-----------------
 
-So far there is no official Tezos network being run, but you might run a
-local test network (the development team is running its own testnet, if
-you’re interested in joining this network, please make a request on our
-slack channel. We have limited support abilities at the moment but we’ll
-try to help you best we can).
+If you succesfully built Tezos on the *zeronet* or *zeronet-lmdb*
+branch, then your node is elligible to join Tezos'
+:ref:`Zeronet<zeronet>`.
 
-Use the following command to run a node that will accept incoming
-connections:
+Command-line basics
+~~~~~~~~~~~~~~~~~~~
+
+The `tezos-node` executable uses subcommands. You can obtain help on a
+subcommand by using `./tezos-node <subcommand> --help`. There are
+three subcommands:
 
 ::
 
-    ./tezos-node identity generate 24.
+   ./tezos-node identity --help
+   ./tezos-node config --help
+   ./tezos-node run --help
 
-This will first generate a new node identity and compute the associated
-stamp of proof-of-work. Then, the node will listen to connections coming
-in on ``[::]:9732``. All used data is stored at ``$HOME/.tezos-node/``.
-For example, the default configuration file is at
-``$HOME/.tezos-node/config.json``.
+
+The `identity` and `config` serve the purpose of managing
+configuration files for the node, we will describe them below. The
+`run` command is for running the node.
+
+Pretty much all configuration parameters can be overriden by a
+command-line argument. Check out `./tezos-node run --help` to discover
+them.
+
+Configure your node
+~~~~~~~~~~~~~~~~~~~
+
+The following steps are required to connect to Zeronet.
+
+::
+
+    ./tezos-node identity generate
+
+This will generate a new node identity and compute the associated
+stamp of proof-of-work. The identity comprises a pair of cryptographic
+keys that nodes use to encrypt messages sent to each other, and an
+antispam-PoW stamp proving that enough computing power has been
+dedicated to creating this identity.
+
+The identity will be stored in `$HOME/.tezos-node/identity.json`.
+
+::
+
+   ./tezos-node config init
+
+This will initialize an configuration file for the node in
+`$HOME/.tezos-node/config.json`, using default values. It only
+specifies that the node will listen to incoming connections on socket
+address ``[::]:19732``.
+
+The easiest way to amend this default configuration is to use
+
+::
+
+   # Update the config file
+   ./tezos-node config update <…>
+   # Start from an empty cfg file
+   ./tezos-node config reset <…>
+
+
+All blockchain data is stored under ``$HOME/.tezos-node/``.  You can
+change this by doing `./tezos-node config update --data-dir
+</somewhere/in/your/disk>`.
 
 To run multiple nodes on the same machine, you can duplicate and edit
-``$HOME/.tezos-node/config.json`` while making sure they don’t share
-paths to the database or any other data file (cf. options ``db.store`` ;
-``db.context`` ; ``db.protocol``, ``net.peers-metadata`` and
-``net.identity``).
+``$HOME/.tezos-node/config.json`` while making sure they don't share
+the same ``data-dir``. Then run your node with `./tezos-node
+run --config-file=</path/to/alternate_cfg>`.
 
-You could also let Tezos generate a config file by specifying options on
-the command line. For instance, if ``$dir/config.json`` does not exist,
-the following command will generate it and replace the default values
-with the values from the command line:
+Lastly, you want to enable RPC communication with clients. Use:
 
 ::
 
-    ./tezos-node run --data-dir "$dir" --net-addr localhost:9733
+   ./tezos-node config update --rpc-addr=127.0.0.1:8732
 
-The Tezos server has a built-in mechanism to discover peers on the local
-network (using UDP packets broadcasted on port 7732).
+This is the default socket address that the client will try, so
+`./tezos-client` will work out-of-the-box that way.
 
-If this mechanism is not sufficient, one can provide Tezos with a list
-of initial peers, either by editing the option ``net.bootstrap-peers``
-in the ``config.json`` file, or by specifying a command line parameter:
+Run your node
+~~~~~~~~~~~~~
 
-::
-
-    ./tezos-node run \
-                 --data-dir "$dir" --net-addr localhost:2023 \
-                 --peer localhost:2021 --peer localhost:2022
-
-If ``"$dir"/config.json`` exists, the command line options override
-those read in the config file. By default, Tezos won’t modify the
-content of an existing ``"$dir"/config.json`` file. But, you may
-explicit ask the node to reset or to update the file according to the
-command line parameters with the following commands line:
+You are all set! Now you just need to do:
 
 ::
 
-    ./tezos-node config reset --data-dir "$dir" --net-addr localhost:9733
-    ./tezos-node config update --data-dir "$dir" --net-addr localhost:9734
+   ./tezos-node run
 
-Running the node in a sandbox
------------------------------
+To interact with your node, read the doc of clients:
+
+::
+
+   ./tezos-client man
+   ./tezos-admin-client man
+   ./tezos-alpha-baker man
+
+And read :ref:`this page<zeronet>` to get zeronet tezzies.
+
+Run the node in a sandbox
+-------------------------
 
 To run a ‘localhost-only’ instance of a Tezos network, we provide two
 helper scripts:
@@ -356,7 +438,7 @@ Debugging
 It is possible to set independent log levels for different logging
 sections in Tezos, as well as specifying an output file for logging. See
 the description of log parameters above as well as documentation under
-the DEBUG section displayed by \`tezos-node run –help’.
+the DEBUG section displayed by `tezos-node run –-help`.
 
 JSON/RPC interface
 ------------------
