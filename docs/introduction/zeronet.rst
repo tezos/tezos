@@ -1,3 +1,5 @@
+.. _zeronet:
+
 The zeronet network
 ===================
 
