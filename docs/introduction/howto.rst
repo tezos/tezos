@@ -56,8 +56,9 @@ This should produce three binaries:
 -  ``tezos-protocol-compiler``: a protocol compiler used for developing
    new version of the economic protocol.
 
-Currently Tezos is being developed for Linux only. It should work on mac
-OS, but it has not been tested recently. A Windows port is in progress.
+Currently Tezos is being developed for Linux only. It should work on
+macOS, but it has not been tested recently. A Windows port is in
+progress.
 
 Note that, when executing ``make build-deps``, OPAM will detect if
 required system dependencies are installed. However, it is not able to
