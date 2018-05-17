@@ -13,7 +13,7 @@ channel before filling `GitLab issues
 
 For more information about the project in general, see:
 
-https://www.tezos.com/
+https://tezos.com/
 
 How to join the alphanet ?
 --------------------------
