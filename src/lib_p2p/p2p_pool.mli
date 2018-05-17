@@ -55,9 +55,11 @@ type config = {
   (** The path to the JSON file where the metadata associated to
       peer_ids are loaded / stored. *)
 
-  closed_network : bool ;
-  (** If [true], the only accepted connections are from peers whose
-      addresses are in [trusted_peers]. *)
+  private_mode : bool ;
+  (** If [true], only open outgoing/accept incoming connections
+      to/from peers whose addresses are in [trusted_peers], and inform
+      these peers that the identity of this node should be revealed to
+      the rest of the network. *)
 
   listening_port : P2p_addr.port option ;
   (** If provided, it will be passed to [P2p_connection.authenticate]

@@ -27,7 +27,7 @@ type t = {
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
   rpc_listen_addr: string option ;
-  closed: bool ;
+  private_mode: bool ;
   disable_mempool: bool ;
   cors_origins: string list ;
   cors_headers: string list ;
@@ -40,7 +40,7 @@ let wrap
     data_dir config_file
     connections max_download_speed max_upload_speed binary_chunks_size
     peer_table_size
-    listen_addr peers no_bootstrap_peers bootstrap_threshold closed disable_mempool
+    listen_addr peers no_bootstrap_peers bootstrap_threshold private_mode disable_mempool
     expected_pow rpc_listen_addr rpc_tls
     cors_origins cors_headers log_output =
 
@@ -80,7 +80,7 @@ let wrap
     no_bootstrap_peers ;
     listen_addr ;
     rpc_listen_addr ;
-    closed ;
+    private_mode ;
     disable_mempool ;
     cors_origins ;
     cors_headers ;
@@ -209,10 +209,11 @@ module Term = struct
     Arg.(value & opt (some float) None &
          info ~docs ~doc ~docv:"FLOAT" ["expected-pow"])
 
-  let closed =
+  let private_mode =
     let doc =
-      "Only accept connections from the configured bootstrap peers." in
-    Arg.(value & flag & info ~docs ~doc ["closed"])
+      "Only open outgoing/accept incoming connections to/from peers \
+       listed in 'bootstrap-peers' or provided with '--peer' option." in
+    Arg.(value & flag & info ~docs ~doc ["private-mode"])
 
   let disable_mempool =
     let doc =
@@ -260,7 +261,8 @@ module Term = struct
     $ connections
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size
-    $ listen_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold $ closed $ disable_mempool
+    $ listen_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold
+    $ private_mode $ disable_mempool
     $ expected_pow $ rpc_listen_addr $ rpc_tls
     $ cors_origins $ cors_headers
     $ log_output
@@ -280,7 +282,7 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         peer_table_size ;
         expected_pow ;
         peers ; no_bootstrap_peers ;
-        listen_addr ; closed ;
+        listen_addr ; private_mode ;
         disable_mempool ;
         rpc_listen_addr ; rpc_tls ;
         cors_origins ; cors_headers ;
@@ -298,6 +300,6 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
     ?data_dir ?min_connections ?expected_connections ?max_connections
     ?max_download_speed ?max_upload_speed ?binary_chunks_size
     ?peer_table_size ?expected_pow
-    ~bootstrap_peers ?listen_addr ?rpc_listen_addr
-    ~closed ~disable_mempool ~cors_origins ~cors_headers ?rpc_tls ?log_output
+    ~bootstrap_peers ?listen_addr ?rpc_listen_addr ~private_mode
+    ~disable_mempool ~cors_origins ~cors_headers ?rpc_tls ?log_output
     ?bootstrap_threshold cfg

@@ -338,10 +338,14 @@ writing your own configuration file if needed.
 
         "bootstrap-peers": ["::1:10732", "::ffff:192.168.1.3:9733", "mynode.tezos.com"],
 
-        /* Specify if the network is closed or not. A closed network
-        allows only peers listed in "bootstrap-peers". */
+        /* Specify if the node is in private mode or not. A node in
+        private mode only opens outgoing connections to peers whose
+        addresses are in [trusted_peers] and only accepts incoming
+        connections from trusted peers. In addition, it informs these
+        peers that the identity of the node should not be revealed to
+        the rest of the network. */
 
-        "closed": false,
+        "private-mode": false,
 
         /* Network limits */
 

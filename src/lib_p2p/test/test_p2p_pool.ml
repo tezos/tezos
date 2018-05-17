@@ -69,7 +69,7 @@ let detach_node f points n =
       proof_of_work_target ;
       trusted_points = points ;
       peers_file = "/dev/null" ;
-      closed_network = true ;
+      private_mode = true ;
       listening_port = Some port ;
       min_connections = nb_points ;
       max_connections = nb_points ;

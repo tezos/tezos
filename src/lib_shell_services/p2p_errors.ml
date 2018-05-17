@@ -144,7 +144,7 @@ type error += Connected
 type error += Connection_refused
 type error += Rejected of P2p_peer.Id.t
 type error += Too_many_connections
-type error += Closed_network
+type error += Private_mode
 type error += Point_banned of P2p_point.Id.t
 type error += Peer_banned of P2p_peer.Id.t
 
@@ -200,16 +200,16 @@ let () =
     Data_encoding.empty
     (function Too_many_connections -> Some () | _ -> None)
     (fun () -> Too_many_connections) ;
-  (* Closed network *)
+  (* Private mode *)
   register_error_kind
     `Permanent
-    ~id:"node.p2p_pool.closed_network"
-    ~title:"Closed network"
-    ~description:"Network is closed."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Network is closed.")
+    ~id:"node.p2p_pool.private_mode"
+    ~title:"Private mode"
+    ~description:"Node is in private mode."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Node is in private mode.")
     Data_encoding.empty
-    (function Closed_network -> Some () | _ -> None)
-    (fun () -> Closed_network) ;
+    (function Private_mode -> Some () | _ -> None)
+    (fun () -> Private_mode) ;
   (* Point Banned *)
   register_error_kind
     `Permanent

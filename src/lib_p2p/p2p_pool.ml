@@ -168,7 +168,7 @@ type config = {
 
   trusted_points : P2p_point.Id.t list ;
   peers_file : string ;
-  closed_network : bool ;
+  private_mode : bool ;
 
   listening_port : P2p_addr.port option ;
   min_connections : int ;
@@ -673,8 +673,8 @@ let rec connect ?timeout pool point =
       register_point pool pool.config.identity.peer_id point in
     let addr, port as point = P2p_point_state.Info.point point_info in
     fail_unless
-      (not pool.config.closed_network || P2p_point_state.Info.trusted point_info)
-      P2p_errors.Closed_network >>=? fun () ->
+      (not pool.config.private_mode || P2p_point_state.Info.trusted point_info)
+      P2p_errors.Private_mode >>=? fun () ->
     fail_unless_disconnected_point point_info >>=? fun () ->
     P2p_point_state.set_requested point_info canceler ;
     let fd = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
@@ -766,12 +766,12 @@ and authenticate pool ?point_info canceler fd point =
   in
   let acceptable_point =
     Option.unopt_map connection_point_info
-      ~default:(not pool.config.closed_network)
+      ~default:(not pool.config.private_mode)
       ~f:begin fun connection_point_info ->
         match P2p_point_state.get connection_point_info with
         | Requested _ -> not incoming
         | Disconnected ->
-            not pool.config.closed_network
+            not pool.config.private_mode
             || P2p_point_state.Info.trusted connection_point_info
         | Accepted _ | Running _ -> false
       end

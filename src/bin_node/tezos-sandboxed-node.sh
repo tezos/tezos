@@ -21,7 +21,7 @@ start_sandboxed_node() {
         peers+=("--peer")
         peers+=("127.0.0.1:$peer_port")
     done
-    peers+=("--closed")
+    peers+=("--private-mode")
     node="${local_node}"
     sandbox_param="--sandbox=$sandbox_file"
 

@@ -165,7 +165,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
             trusted_points ;
             peers_file =
               (config.data_dir // "peers.json") ;
-            closed_network = config.p2p.closed ;
+            private_mode = config.p2p.private_mode ;
             identity ;
             proof_of_work_target =
               Crypto_box.make_target config.p2p.expected_pow ;

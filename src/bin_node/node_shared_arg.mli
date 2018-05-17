@@ -22,7 +22,7 @@ type t = {
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
   rpc_listen_addr: string option ;
-  closed: bool ;
+  private_mode: bool ;
   disable_mempool: bool ;
   cors_origins: string list ;
   cors_headers: string list ;

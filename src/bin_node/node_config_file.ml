@@ -29,7 +29,7 @@ and p2p = {
   expected_pow : float ;
   bootstrap_peers : string list ;
   listen_addr : string option ;
-  closed : bool ;
+  private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
 }
@@ -89,7 +89,7 @@ let default_p2p = {
   expected_pow = 24. ;
   bootstrap_peers  = ["bootstrap.tezos.com"] ;
   listen_addr  = Some ("[::]:" ^ string_of_int default_p2p_port) ;
-  closed  = false ;
+  private_mode  = false ;
   limits = default_p2p_limits ;
   disable_mempool = false ;
 }
@@ -276,13 +276,13 @@ let p2p =
   let open Data_encoding in
   conv
     (fun { expected_pow ; bootstrap_peers ;
-           listen_addr ; closed ; limits ; disable_mempool } ->
+           listen_addr ; private_mode ; limits ; disable_mempool } ->
       ( expected_pow, bootstrap_peers,
-        listen_addr, closed, limits, disable_mempool ))
+        listen_addr, private_mode, limits, disable_mempool ))
     (fun ( expected_pow, bootstrap_peers,
-           listen_addr, closed, limits, disable_mempool ) ->
+           listen_addr, private_mode, limits, disable_mempool ) ->
       { expected_pow ; bootstrap_peers ;
-        listen_addr ; closed ; limits ; disable_mempool })
+        listen_addr ; private_mode ; limits ; disable_mempool })
     (obj6
        (dft "expected-proof-of-work"
           ~description: "Floating point number between 0 and 256 that represents a \
@@ -298,9 +298,15 @@ let p2p =
                          specified, the default port 8732 will be \
                          assumed."
           string)
-       (dft "closed"
-          ~description: "Specify if the network is closed or not. A closed network allows \
-                         only peers listed in 'bootstrap-peers'."
+       (dft "private-mode"
+          ~description: "Specify if the node is in private mode or \
+                         not. A node in private mode rejects incoming \
+                         connections from untrusted peers and only \
+                         opens outgoing connections to peers listed in \
+                         'bootstrap-peers' or provided with '--peer' \
+                         option. Moreover, these peers will keep the \
+                         identity and the address of the private node \
+                         secret."
           bool false)
        (dft "limits"
           ~description: "Network limits"
@@ -574,7 +580,7 @@ let update
     ?bootstrap_peers
     ?listen_addr
     ?rpc_listen_addr
-    ?(closed = false)
+    ?(private_mode = false)
     ?(disable_mempool = false)
     ?(cors_origins = [])
     ?(cors_headers = [])
@@ -624,7 +630,7 @@ let update
       Option.unopt ~default:cfg.p2p.bootstrap_peers bootstrap_peers ;
     listen_addr =
       Option.first_some listen_addr cfg.p2p.listen_addr ;
-    closed = cfg.p2p.closed || closed ;
+    private_mode = cfg.p2p.private_mode || private_mode ;
     limits ;
     disable_mempool = cfg.p2p.disable_mempool || disable_mempool ;
   }

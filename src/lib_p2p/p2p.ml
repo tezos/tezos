@@ -39,7 +39,7 @@ type config = {
   listening_addr : P2p_addr.t option;
   trusted_points : P2p_point.Id.t list ;
   peers_file : string ;
-  closed_network : bool ;
+  private_mode : bool ;
   identity : P2p_identity.t ;
   proof_of_work_target : Crypto_box.target ;
   disable_mempool : bool ;
@@ -98,7 +98,7 @@ let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg io_sched
     listening_port = config.listening_port ;
     trusted_points = config.trusted_points ;
     peers_file = config.peers_file ;
-    closed_network = config.closed_network ;
+    private_mode = config.private_mode ;
     min_connections = limits.min_connections ;
     max_connections = limits.max_connections ;
     max_incoming_connections = limits.max_incoming_connections ;
