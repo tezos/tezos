@@ -18,6 +18,6 @@ set -e
 
 cd scripts
 
-utop gen_genesis.ml
+ocaml gen_genesis.ml
 
 git commit -a -m "Reset the chain"

@@ -5,7 +5,8 @@
 #require "lwt";;
 #require "lwt.unix";;
 #require "zarith";;
-#require "nocrypto";;
+#require "re";;
+#require "hacl";;
 #require "calendar";;
 #mod_use "../src/lib_stdlib/tzString.ml";;
 #mod_use "../src/lib_stdlib/option.ml";;
