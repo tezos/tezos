@@ -103,7 +103,12 @@ val first_endorsement_slots:
     the given key *)
 val check_signature: Block_header.t -> public_key -> unit tzresult Lwt.t
 
-val check_hash: Block_hash.t -> int64 -> bool
+(** Checks if the header that would be built from the given components
+    is valid for the given diffculty. The signature is not passed as it
+    is does not impact the proof-of-work stamp. The stamp is checked on
+    the hash of a block header whose signature has been zeroed-out. *)
+val check_header_proof_of_work_stamp:
+  Block_header.shell_header -> Block_header.protocol_data -> int64 -> bool
 
 (** verify if the proof of work stamp is valid *)
 val check_proof_of_work_stamp:

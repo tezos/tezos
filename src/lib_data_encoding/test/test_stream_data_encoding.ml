@@ -432,7 +432,28 @@ let test_splitted _ =
   Assert.equal ~msg:__LOC__ "43" (get_result ~msg:__LOC__ binA);
   Assert.equal ~msg:__LOC__ "44" (get_result ~msg:__LOC__ binB)
 
+let test_zarith value =
+  let msg = "failed on Z number " ^ Z.to_string value in
+  test_check_simple_bin_ok z value;
+  test_check_simple_bin_ko_await z value;
+  test_read_simple_bin_ok ~msg ~equal:Assert.equal z value;
+  test_read_simple_bin_ko_await z value
+
+let test_zarith _ =
+  for i = -1_00_000 to 1_00_000 do test_zarith (Z.of_int i) done ;
+  for i = 100_000_000 to 100_100_000 do test_zarith (Z.of_int i) done ;
+  for i = -100_000_000 downto -100_100_000 do test_zarith (Z.of_int i) done ;
+  test_zarith (Z.of_string "123574503164821730218493275982143254986574985328") ;
+  test_zarith (Z.of_string "8493275982143254986574985328") ;
+  test_zarith (Z.of_string "123574503164821730218474985328") ;
+  test_zarith (Z.of_string "10000000000100000000001000003050000000060600000000000777000008") ;
+  test_zarith (Z.of_string "-123574503164821730218493275982143254986574985328") ;
+  test_zarith (Z.of_string "-8493275982143254986574985328") ;
+  test_zarith (Z.of_string "-123574503164821730218474985328") ;
+  test_zarith (Z.of_string "-10000000000100000000001000003050000000060600000000000777000008")
+
 let tests = [
+  "zarith", `Quick, test_zarith ;
   "simple", `Quick, test_simple_values ;
   "union", `Quick, test_union ;
   "splitted", `Quick, test_splitted ;

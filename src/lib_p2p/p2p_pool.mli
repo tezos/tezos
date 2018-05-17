@@ -81,6 +81,9 @@ type config = {
   authentication_timeout : float ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
+  greylist_timeout : int ;
+  (** GC delay for the grelists tables, in seconds. *)
+
   incoming_app_message_queue_size : int option ;
   (** Size of the message queue for user messages (messages returned
       by this module's [read] function. *)
@@ -150,6 +153,10 @@ val pool_stat: ('msg, 'meta) pool -> P2p_stat.t
 (** [pool_stat pool] is a snapshot of current bandwidth usage for the
     entire [pool]. *)
 
+val config : _ pool -> config
+(** [config pool] is the [config] argument passed to [pool] at
+    creation. *)
+
 val send_swap_request: ('msg, 'meta) pool -> unit
 
 (** {2 Pool events} *)
@@ -173,6 +180,7 @@ module Pool_event : sig
       succesfully established in the pool. *)
 
 end
+
 
 (** {1 Connections management} *)
 
@@ -266,6 +274,19 @@ val broadcast_bootstrap_msg:  ('msg, 'meta) pool -> unit
 (** [write_all pool msg] is [P2P_connection.write_now conn Bootstrap]
     for all member connections to [pool] in [Running] state. *)
 
+val greylist_addr : ('msg, 'meta) pool -> P2p_addr.t -> unit
+(** [greylist_addr pool addr] adds [addr] to [pool]'s IP greylist. *)
+
+val greylist_peer : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
+(** [greylist_peer pool peer] adds [peer] to [pool]'s peer greylist
+    and [peer]'s address to [pool]'s IP greylist. *)
+
+val gc_greylist: older_than:Time.t -> ('msg, 'meta) pool -> unit
+(** [gc_greylist ~older_than pool] *)
+
+val acl_clear : ('msg, 'meta) pool -> unit
+(** [acl_clear pool] clears ACL tables. *)
+
 (** {1 Functions on [Peer_id]} *)
 
 module Peers : sig
@@ -295,6 +316,11 @@ module Peers : sig
     f:(P2p_peer.Id.t ->  ('msg, 'meta) info -> 'a -> 'a) ->
     'a
 
+  val forget : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
+  val ban : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
+  val trust : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
+  val banned : ('msg, 'meta) pool -> P2p_peer.Id.t -> bool
+
 end
 
 (** {1 Functions on [Points]} *)
@@ -321,6 +347,11 @@ module Points : sig
     init:'a ->
     f:(P2p_point.Id.t -> ('msg, 'meta) info  -> 'a -> 'a) ->
     'a
+
+  val forget : ('msg, 'meta) pool -> P2p_point.Id.t -> unit
+  val ban : ('msg, 'meta) pool -> P2p_point.Id.t -> unit
+  val trust : ('msg, 'meta) pool -> P2p_point.Id.t -> unit
+  val banned : ('msg, 'meta) pool -> P2p_point.Id.t -> bool
 
 end
 

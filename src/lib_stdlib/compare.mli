@@ -37,6 +37,7 @@ module Int64 : S with type t = int64
 module Uint64 : S with type t = int64
 module Float : S with type t = float
 module String : S with type t = string
+module Z : S with type t = Z.t
 
 module List (P : COMPARABLE) : S with type t = P.t list
 module Option (P : COMPARABLE) : S with type t = P.t option

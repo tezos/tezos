@@ -3,11 +3,14 @@
 
 .DS_Store
 __pycache__
+**/*.pyc
 
 _build
 _opam
 _docker_build
 docs/_build
+docs/api/tezos-client.html
+docs/api/tezos-admin-client.html
 
 tezos-node
 tezos-protocol-compiler
@@ -19,6 +22,10 @@ scripts/opam-test-all.sh.DONE
 scripts/create_genesis/src
 
 docs/introduction/readme.rst
+docs/api/errors.rst
+docs/api/rpc.rst
+
+src/bin_client/test/LOG.*
 
 **/*.install
 **/.merlin

@@ -8,7 +8,7 @@ readable by anyone, describes the main elements of Tezos from a
 distance. It abstracts from all plumbing and both internal and system
 dependencies to give a simple view of the main components, their
 responsibilities and interactions. The second part is written for
-developpers, and is at the level of OPAM packages.
+developers, and is at the level of OPAM packages.
 
 The Big Picture
 ---------------
@@ -44,7 +44,7 @@ is called :ref:`the validator<validation>`.
 
 The rest of the shell includes the peer-to-peer layer, the disk storage
 of blocks, the operations to allow the node to transmit the chain data
-to new nodes and the versioned state of the ledger. Inbetween the
+to new nodes and the versioned state of the ledger. In-between the
 validator, the peer-to-peer layer and the storage sits a component
 called the distributed database, that abstracts the fetching and
 replication of new chain data to the validator.
@@ -80,9 +80,9 @@ dropped for clarity.
 
 |Tezos source packages diagram|
 
-In green at the bottom are binaries. Hilighted in yellow are the OPAM
+In green at the bottom are binaries. Highlighted in yellow are the OPAM
 packages (sometimes with shortened names). Black arrows show direct
-dependencies. Orange arrows show other indirect relashionships (code
+dependencies. Orange arrows show other indirect relationships (code
 generation, interface sharing), explained below. The part circled in
 blue, contains modules that bear no dependency to Unix, and can thus
 be compiled to JavaScript. External dependencies are not shown in this
@@ -100,10 +100,10 @@ that are used everywhere for basic operations.
    module, etc.), a few ``Lwt`` utilities, and a ``Compare`` module
    that implements monomorphic comparison operators.
  - :package:`tezos-data-encoding` is the in-house
-   comibnator-based serialization library. From a single type
+   combinator-based serialization library. From a single type
    description ``t encoding``, the code can read to and write from
    values of type ``t`` both binary and JSON representations. For
-   both, the library provides machine and human-redable documentations
+   both, the library provides machine and human-readable documentations
    by the use of documentation combinators. The JSON part depends on
    :opam:`ocplib-json-typed`.
    A :ref:`tutorial<data_encoding>` is available for this library.
@@ -124,7 +124,7 @@ that are used everywhere for basic operations.
  - :package:`tezos-crypto` wraps the external cryptography
    libraries that we use. We try to use minimal references
    implementations, with as thin as possible bindings. A possible plan
-   is to use libraries from the HACL projet, so that all of our crypto
+   is to use libraries from the HACL project, so that all of our crypto
    is extracted from Fstar, either with thin C bindings or directly in
    OCaml.
  - :package:`tezos-micheline` is the concrete syntax used by
@@ -209,9 +209,9 @@ protocol in alternative environment possible.
     that let you build an environment from a few context accessors.
 
   - ``tezos-embedded-protocol-xxx`` contains a version of protocol
-    ``xxx`` whose standard library is pre-instanciated to the shell's
+    ``xxx`` whose standard library is pre-instantiated to the shell's
     implementation, these are the ones that are linked into the
-    node. It alse contains a module that registers the protocol in the
+    node. It also contains a module that registers the protocol in the
     node's protocol table.
 
 The Embedded Economic Protocols
@@ -246,7 +246,7 @@ compatible, and library vs command line interface.
     :package:`tezos-shell-services` and
     :package:`tezos-protocol-alpha`, are abstracted over this object
     type. That way, it is possible to use the same code for different
-    platforms ot toolkits.
+    platforms or toolkits.
   - :package:`tezos-client-alpha` provides some functions to perform
     the operations of protocol alpha using the wallet and signers from
     the client context.
@@ -265,7 +265,7 @@ compatible, and library vs command line interface.
 Tests Packages
 ~~~~~~~~~~~~~~
 
-The tests are splitted into various packages, testing more and more
+The tests are split into various packages, testing more and more
 elements while following the dependency chain. Use ``make test`` to
 run them.
 
@@ -321,6 +321,6 @@ The Final Executables
   - :package:`tezos-protocol-compiler` provides the
     ``tezos-protocol-compiler`` binary that is used by the node to
     compile new protocols on the fly, and that can be used for
-    developping new protocols.
+    developing new protocols.
 
 .. |Tezos source packages diagram| image:: packages.svg

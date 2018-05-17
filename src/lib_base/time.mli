@@ -10,6 +10,8 @@
 type t
 include Compare.S with type t := t
 
+val hash : t -> int
+
 val min_value : t
 val epoch : t
 val max_value : t

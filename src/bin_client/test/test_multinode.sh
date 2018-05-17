@@ -19,10 +19,17 @@ done
 
 for client in "${client_instances[@]}"; do
     echo
-    echo "### $client p2p stat"
+    echo "### $client bootstrapped"
     echo
     $client bootstrapped
-    $client p2p stat
+    echo
+done
+
+for admin_client in "${admin_client_instances[@]}"; do
+    echo
+    echo "### $admin_client network stat"
+    echo
+    $admin_client p2p stat
     echo
 done
 
@@ -72,16 +79,16 @@ retry() {
 
 retry 2 15 assert_protocol "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 
-$client1 bake for bootstrap1 -max-priority 512
+$client1 bake for bootstrap1 --max-priority 512 --minimal-timestamp
 retry 2 15 assert_propagation_level 2
 
-$client2 bake for bootstrap2 -max-priority 512
+$client2 bake for bootstrap2 --max-priority 512 --minimal-timestamp
 retry 2 15 assert_propagation_level 3
 
-$client3 bake for bootstrap3 -max-priority 512
+$client3 bake for bootstrap3 --max-priority 512 --minimal-timestamp
 retry 2 15 assert_propagation_level 4
 
-$client4 bake for bootstrap4 -max-priority 512
+$client4 bake for bootstrap4 --max-priority 512 --minimal-timestamp
 retry 2 15 assert_propagation_level 5
 
 endorse_hash=$($client3 endorse for bootstrap3 | extract_operation_hash)
@@ -100,7 +107,7 @@ assert_contains_operation() {
     done
 }
 
-$client4 bake for bootstrap4 -max-priority 512
+$client4 bake for bootstrap4 --max-priority 512 --minimal-timestamp
 retry 2 15 assert_contains_operation $endorse_hash
 retry 2 15 assert_contains_operation $transfer_hash
 

@@ -4,9 +4,11 @@
  ((name tezos_stdlib)
   (public_name tezos-stdlib)
   (libraries (ocplib-endian.bigstring
+              bigstring
               cstruct
-              stringext
               hex
+              re
+              zarith
               lwt
               lwt.log))
   (flags (:standard -safe-string))))

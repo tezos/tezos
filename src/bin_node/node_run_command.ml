@@ -11,10 +11,10 @@ open Logging.Node.Main
 
 let genesis : State.Chain.genesis = {
   time =
-    Time.of_notation_exn "2018-04-17T09:47:00Z" ;
+    Time.of_notation_exn "2018-05-17T10:58:43Z" ;
   block =
     Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesis385e5hNnQTe" ;
+      "BLockGenesisGenesisGenesisGenesisGenesise9aefcyoeHk" ;
   protocol =
     Protocol_hash.of_b58check_exn
       "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
@@ -188,6 +188,13 @@ let init_node ?sandbox (config : Node_config_file.t) =
     config.shell.prevalidator_limits
     config.shell.chain_validator_limits
 
+(* Add default accepted CORS headers *)
+let sanitize_cors_headers ~default headers =
+  List.map String.lowercase_ascii headers |>
+  String.Set.of_list |>
+  String.Set.(union (of_list default)) |>
+  String.Set.elements
+
 let init_rpc (rpc_config: Node_config_file.rpc) node =
   match rpc_config.listen_addr with
   | None ->
@@ -210,12 +217,15 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
             "Starting the RPC server listening on port %d%s."
             port
             (if rpc_config.tls = None then "" else " (TLS enabled)") >>= fun () ->
+          let cors_headers =
+            sanitize_cors_headers
+              ~default:["Content-Type"] rpc_config.cors_headers in
           Lwt.catch
             (fun () ->
                RPC_server.launch ~host mode dir
                  ~media_types:Media_type.all_media_types
                  ~cors:{ allowed_origins = rpc_config.cors_origins ;
-                         allowed_headers = rpc_config.cors_headers } >>= fun server ->
+                         allowed_headers = cors_headers } >>= fun server ->
                return (Some server))
             (function
               |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->

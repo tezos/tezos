@@ -29,7 +29,7 @@ module type MINIMAL_HASH = sig
 
   include Compare.S with type t := t
 
-  val hash_bytes: ?key:Cstruct.buffer -> Cstruct.buffer list -> t
+  val hash_bytes: ?key:MBytes.t -> MBytes.t list -> t
   val hash_string: ?key:string -> string list -> t
 
   val zero: t
@@ -94,6 +94,8 @@ end
 module type INDEXES = sig
 
   type t
+
+  val hash : t -> int
 
   val to_path: t -> string list -> string list
   val of_path: string list -> t option
@@ -164,6 +166,8 @@ module type SIGNATURE = sig
     include ENCODER with type t := t
     include INDEXES with type t := t
 
+    val zero: t
+
   end
 
   module Public_key : sig
@@ -201,14 +205,8 @@ module type SIGNATURE = sig
 
   val zero: t
 
-  (** Check a signature *)
-  val check: Public_key.t -> t -> MBytes.t -> bool
-
-  (** Append a signature *)
-  val append: Secret_key.t -> MBytes.t -> MBytes.t
-  val concat: MBytes.t -> t -> MBytes.t
-
   val sign: Secret_key.t -> MBytes.t -> t
+  val check: Public_key.t -> t -> MBytes.t -> bool
 
   val generate_key: unit -> (Public_key_hash.t * Public_key.t * Secret_key.t)
 

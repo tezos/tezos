@@ -114,7 +114,7 @@ module Encrypted_signer : SIGNER = struct
     let key = Crypto_box.Secretbox.of_bytes_exn (pbkdf ~password ~salt) in
     let msg = Data_encoding.Binary.to_bytes Signature.Secret_key.encoding sk in
     let encrypted_passwd = Crypto_box.Secretbox.box key msg nonce in
-    let payload = MBytes.(to_string (concat salt encrypted_passwd)) in
+    let payload = MBytes.(to_string (concat "" [salt; encrypted_passwd])) in
     let location = Base58.safe_encode payload in
     Hashtbl.replace decrypted_sks location sk ;
     return (Secret_key_locator.create ~scheme ~location)

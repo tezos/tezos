@@ -217,6 +217,8 @@ module type SIGNATURE = sig
     include ENCODER with type t := t
     include INDEXES with type t := t
 
+    val zero: t
+
   end
 
   module Public_key : sig
@@ -244,8 +246,6 @@ module type SIGNATURE = sig
 
   (** Check a signature *)
   val check: Public_key.t -> t -> MBytes.t -> bool
-
-  val concat: MBytes.t -> t -> MBytes.t
 
 end
 

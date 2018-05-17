@@ -20,14 +20,14 @@ let () =
     match List.rev !anonymous with
     | [ source_dir ] -> source_dir
     | _ -> Arg.usage args_spec usage_msg ; Pervasives.exit 1 in
-  let _hash, protocol =
+  let hash, protocol =
     match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir source_dir) with
     | Ok v -> v
     | Error err ->
         Format.kasprintf Pervasives.failwith
           "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err in
   (* Generate the 'functor' *)
-  Packer.dump stdout
+  Packer.dump stdout hash
     (Array.map
        begin fun { Protocol.name ; _ }  ->
          let name_lowercase = String.uncapitalize_ascii name in

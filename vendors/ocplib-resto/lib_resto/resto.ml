@@ -265,6 +265,11 @@ module Path = struct
   let (/:) = add_arg
   let (/:*) = add_final_args
 
+  let subst0 = Internal.subst0
+  let subst1 = Internal.subst1
+  let subst2 = Internal.subst2
+  let subst3 = Internal.subst3
+
 end
 
 module Query = struct

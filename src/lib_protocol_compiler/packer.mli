@@ -7,6 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val dump: out_channel -> string array -> unit
-
-val main: unit -> unit
+val dump: out_channel -> Protocol_hash.t -> string array -> unit

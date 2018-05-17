@@ -5,7 +5,8 @@
   (public_name tezos-data-encoding)
   (libraries (tezos-stdlib
               ocplib-json-typed
-              ocplib-json-typed.bson
+              ocplib-json-typed-bson
+              zarith
               ezjsonm))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string

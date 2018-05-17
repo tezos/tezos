@@ -84,7 +84,7 @@ The ``alphanet`` branch in the tezos git repository will always contain
 the up-to-date sources of the tezos-node required for running the
 alphanet. See ``docs/README.master`` on how to compile it.
 
-Once built, you might launch the a node by running:
+Once built, you might launch a node by running:
 
 ::
 

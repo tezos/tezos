@@ -22,17 +22,17 @@ let generate_seed_nonce () =
   | Ok nonce -> nonce
 
 let forge_block_header
-    cctxt block delegate_sk shell priority seed_nonce_hash =
+    (cctxt : #Proto_alpha.full) block delegate_sk shell priority seed_nonce_hash =
   Alpha_services.Constants.proof_of_work_threshold
     cctxt block >>=? fun stamp_threshold ->
   let rec loop () =
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
-    let unsigned_header =
-      Alpha_context.Block_header.forge_unsigned
-        shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
-    Client_keys.append cctxt delegate_sk unsigned_header >>=? fun signed_header ->
-    let block_hash = Block_hash.hash_bytes [signed_header] in
-    if Baking.check_hash block_hash stamp_threshold then
+    let protocol_data : Block_header.protocol_data =
+      { priority ; seed_nonce_hash ; proof_of_work_nonce } in
+    if Baking.check_header_proof_of_work_stamp shell protocol_data stamp_threshold then
+      let unsigned_header =
+        Alpha_context.Block_header.forge_unsigned shell protocol_data in
+      Client_keys.append cctxt delegate_sk unsigned_header >>=? fun signed_header ->
       return signed_header
     else
       loop () in

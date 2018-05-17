@@ -73,12 +73,12 @@ Reset 2017-11-20
 - Refactor the economic protocol amendment code. Protocols are
    now compiled to functors, taking the type signature of their
    runtime environment as parameter. This simplifies the
-   dependencies, and will allow third party developpers to
-   instanciate economic protocols in other contexts than the node.
+   dependencies, and will allow third party developers to
+   instantiate economic protocols in other contexts than the node.
 
 - Switch from Makefiles to jbuilder, yay!
 
-- Rename (hopefully) all occurences of "mining" into "baking".
+- Rename (hopefully) all occurrences of "mining" into "baking".
 
 [Michelson]
 
@@ -87,13 +87,13 @@ Reset 2017-11-20
    of the client or node.
 
 - Implement a basic semantics of annotations.
-   The typechecker now propagates annotations on types througout the
+   The typechecker now propagates annotations on types throughout the
    code, and tagging instructions with an annotation allows the
    programmer to reannotate the element produced by the instruction.
    The emacs mode displays propagated annotations.
 
 - Add a version of `ITER` that takes a static code block and expects
-   a colletion on the initial stack, and works like a `LOOP`, pushing
+   a collection on the initial stack, and works like a `LOOP`, pushing
    the element of the collection one at a time on the stack. This is
    like `REDUCE` but using a static code block instead of a dynamic
    lambda. In the same vein, `MAP` can take a code block.
@@ -173,7 +173,7 @@ Main changes includes:
 
     https://raw.githubusercontent.com/tezos/tezos/alphanet/README.md
 
-- The `alphanet` branch of the github repository is now automaticaly
+- The `alphanet` branch of the github repository is now automatically
   synchronized with `alphanet` docker image. And the latest version of
   the `alphanet.sh` is available at:
 
@@ -225,6 +225,6 @@ Main changes includes:
 [CI]
 
 - This is not directly visible in the alphanet, but our CI
-  infrastrucre is now ready for open development.
+  infrastructure is now ready for open development.
   More about that soon (or later).
 

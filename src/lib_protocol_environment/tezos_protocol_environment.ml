@@ -141,6 +141,7 @@ module Make (Context : CONTEXT) = struct
        and type RPC_service.meth = RPC_service.meth
        and type (+'m,'pr,'p,'q,'i,'o) RPC_service.t = ('m,'pr,'p,'q,'i,'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
+       and type Z.t = Z.t
 
     type error += Ecoproto_error of Error_monad.error
     val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
@@ -285,6 +286,8 @@ module Make (Context : CONTEXT) = struct
           include ENCODER with type t := t
           include INDEXES with type t := t
 
+          val zero: t
+
         end
 
         module Public_key : sig
@@ -312,8 +315,6 @@ module Make (Context : CONTEXT) = struct
 
         (** Check a signature *)
         val check: Public_key.t -> t -> MBytes.t -> bool
-
-        val concat: MBytes.t -> t -> MBytes.t
 
       end
 

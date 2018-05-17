@@ -9,11 +9,12 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & = "1.0+beta19.1" }
-  "cstruct"
+  "bigstring"
   "hex"
   "ocplib-endian"
-  "stringext"
+  "re"
   "lwt"
+  "zarith"
   "alcotest" { test }
 ]
 build: [

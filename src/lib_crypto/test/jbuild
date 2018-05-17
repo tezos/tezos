@@ -1,7 +1,10 @@
 (jbuild_version 1)
 
 (executables
- ((names (test_merkle))
+ ((names (test_merkle
+          test_base58
+          test_ed25519
+          test_blake2b))
   (libraries (tezos-stdlib
               tezos-crypto
               alcotest))
@@ -12,15 +15,33 @@
 
 (alias
   ((name buildtest)
-   (deps (test_merkle.exe))))
+   (deps (test_merkle.exe
+          test_base58.exe
+          test_ed25519.exe
+          test_blake2b.exe))))
 
 (alias
  ((name runtest_merkle)
   (action (run ${exe:test_merkle.exe}))))
 
 (alias
+ ((name runtest_base58)
+  (action (run ${exe:test_base58.exe}))))
+
+(alias
+ ((name runtest_ed25519)
+  (action (run ${exe:test_ed25519.exe}))))
+
+(alias
+ ((name runtest_blake2b)
+  (action (run ${exe:test_blake2b.exe}))))
+
+(alias
  ((name runtest)
-  (deps ((alias runtest_merkle)))))
+  (deps ((alias runtest_merkle)
+         (alias runtest_base58)
+         (alias runtest_ed25519)
+         (alias runtest_blake2b)))))
 
 (alias
  ((name runtest_indent)

@@ -6,7 +6,7 @@ The validation subsystem
 This document explains the inner workings of the validation subsystem
 of the Tezos shell, that sits between the peer-to-peer layer and the
 economic protocol. This part is in charge of validating chains, blocks
-and operations that come from the network, and deciding wether they
+and operations that come from the network, and deciding whether they
 are worthy to propagate. It is composed of three main parts: the
 :ref:`validator<validator_component>`, the
 :ref:`prevalidator<prevalidator_component>`, and
@@ -45,7 +45,7 @@ peer, one at a time, in a loop. In the simple case, when a peer
 receives a new head proposal that is a direct successor of the current
 local head, it launches a simple *head increment* task: it retrieves
 all the operations and triggers a validation of the block. When the
-difference between the current head and the examinated proposal is
+difference between the current head and the examined proposal is
 more than one block, mostly during the initial bootstrap phase, the
 peer worker launches a *bootstrap pipeline* task.
 
@@ -95,7 +95,7 @@ that it considers valid, and the ones that it chooses to broadcast.
 This is done by constantly baking a dummy block, floating over the
 current head, and growing as new operations are received.
 
-Operations that get included can be broadcasted unconditionally.
+Operations that get included can be broadcast unconditionally.
 
 Operations that are included are classified into categories. Some
 (such as bad signatures or garbage byte sequences) are dismissed. They

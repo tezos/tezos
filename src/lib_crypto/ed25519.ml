@@ -28,11 +28,11 @@ module Public_key = struct
   let name = "Ed25519.Public_key"
   let title = "Ed25519 public key"
 
-  let to_string s = Cstruct.to_string (Sign.to_cstruct s)
-  let of_string_opt s = Sign.pk_of_cstruct (Cstruct.of_string s)
+  let to_string s = MBytes.to_string (Sign.to_bytes s)
+  let of_string_opt s = Sign.pk_of_bytes (MBytes.of_string s)
 
-  let to_bytes pk = Cstruct.to_bigarray (Sign.to_cstruct pk)
-  let of_bytes_opt s = Sign.pk_of_cstruct (Cstruct.of_bigarray s)
+  let to_bytes = Sign.to_bytes
+  let of_bytes_opt = Sign.pk_of_bytes
 
   let size = Sign.pkbytes
 
@@ -51,13 +51,12 @@ module Public_key = struct
     Base58.check_encoded_prefix b58check_encoding "edpk" 54
 
   let hash v =
-    Public_key_hash.hash_bytes
-      [ Cstruct.to_bigarray (Sign.to_cstruct v) ]
+    Public_key_hash.hash_bytes [ Sign.to_bytes v ]
 
   include Compare.Make(struct
       type nonrec t = t
       let compare a b =
-        Cstruct.compare (Sign.to_cstruct a) (Sign.to_cstruct b)
+        MBytes.compare (Sign.to_bytes a) (Sign.to_bytes b)
     end)
 
   include Helpers.MakeRaw(struct
@@ -102,12 +101,11 @@ module Secret_key = struct
 
   let size = Sign.seedbytes
 
-  let to_bytes x = Cstruct.to_bigarray (Sign.seed x)
+  let to_bytes = Sign.seed
   let of_bytes_opt s =
-    let s = Cstruct.of_bigarray s in
-    match Cstruct.len s with
+    match MBytes.length s with
     | 32 -> let _pk, sk = Sign.keypair ~seed:s () in Some sk
-    | 64 -> Sign.sk_of_cstruct s
+    | 64 -> Sign.sk_of_bytes s
     | _ -> None
 
   let to_string s = MBytes.to_string (to_bytes s)
@@ -122,9 +120,9 @@ module Secret_key = struct
     Base58.register_encoding
       ~prefix: Base58.Prefix.ed25519_seed
       ~length: size
-      ~to_raw: (fun sk -> Cstruct.to_string (Sign.seed sk))
+      ~to_raw: (fun sk -> MBytes.to_string (Sign.seed sk))
       ~of_raw: (fun buf ->
-          let seed = Cstruct.of_string buf in
+          let seed = MBytes.of_string buf in
           match Sign.keypair ~seed () with
           | exception _ -> None
           | _pk, sk -> Some sk)
@@ -134,8 +132,8 @@ module Secret_key = struct
     Base58.register_encoding
       ~prefix: Base58.Prefix.ed25519_secret_key
       ~length: Sign.skbytes
-      ~to_raw: (fun sk -> Cstruct.to_string (Sign.to_cstruct sk))
-      ~of_raw: (fun buf -> Sign.sk_of_cstruct (Cstruct.of_string buf))
+      ~to_raw: (fun sk -> MBytes.to_string (Sign.to_bytes sk))
+      ~of_raw: (fun buf -> Sign.sk_of_bytes (MBytes.of_string buf))
       ~wrap: (fun x -> Data x)
 
   let of_b58check_opt s =
@@ -167,7 +165,7 @@ module Secret_key = struct
   include Compare.Make(struct
       type nonrec t = t
       let compare a b =
-        Cstruct.compare (Sign.to_cstruct a) (Sign.to_cstruct b)
+        MBytes.compare (Sign.to_bytes a) (Sign.to_bytes b)
     end)
 
   include Helpers.MakeRaw(struct
@@ -260,25 +258,16 @@ include Helpers.MakeEncoder(struct
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let zero = MBytes.init size '\000'
+let zero = MBytes.make size '\000'
 
-let sign key msg =
-  Cstruct.(to_bigarray (Sign.detached ~key (of_bigarray msg)))
+let sign key msg = Sign.detached ~key msg
 
 let check public_key signature msg =
-  Sign.verify_detached ~key:public_key
-    ~signature:(Cstruct.of_bigarray signature)
-    (Cstruct.of_bigarray msg)
-
-let append key msg =
-  MBytes.concat msg (sign key msg)
-
-let concat msg signature =
-  MBytes.concat msg signature
+  Sign.verify_detached ~key:public_key ~signature msg
 
 module Seed = struct
 
-  type t = Cstruct.t
+  type t = Bigstring.t
 
   let generate () = Rand.gen 32
   let extract = Sign.seed

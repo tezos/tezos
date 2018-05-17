@@ -93,6 +93,7 @@ module T = struct
 
   let encoding =
     let open Data_encoding in
+    describe ~title:"timestamp" @@
     splitted
       ~binary: int64
       ~json:
@@ -113,10 +114,18 @@ module T = struct
       ~descr:(Format.asprintf "A date in seconds from epoch")
       ~destruct:
         (fun s ->
-           match Int64.of_string s with
-           | exception _ ->
-               Error (Format.asprintf "failed to parse time (epoch): %S" s)
-           | v -> Ok v)
+           if s = "none" || s = "epoch" then
+             Ok epoch
+           else
+             match of_notation s with
+             | None -> begin
+                 match Int64.of_string s with
+                 | exception _ -> begin
+                     Error (Format.asprintf "failed to parse time (epoch): %S" s)
+                   end
+                 | t -> Ok t
+               end
+             | Some t -> Ok t)
       ~construct:Int64.to_string
       ()
 

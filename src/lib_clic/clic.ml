@@ -973,8 +973,6 @@ let complete_func autocomplete cctxt =
 let list_command_args (Command { options = Argument { spec ; _ } ; _ }) =
   list_args spec
 
-module StringSet = Set.Make(String)
-
 let get_arg_parameter (type a) (arg : (a, _) arg) =
   match arg with
   | Arg { parameter ; _ } -> parameter
@@ -988,12 +986,12 @@ let complete_arg : type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t
     | Switch _ -> return []
 
 let rec remaining_spec :
-  type a ctx. StringSet.t -> (a, ctx) args -> string list =
+  type a ctx. TzString.Set.t -> (a, ctx) args -> string list =
   fun seen -> function
     | NoArgs -> []
     | AddArg (arg, rest) ->
         let (long, _) = get_arg_parameter arg in
-        if StringSet.mem long seen
+        if TzString.Set.mem long seen
         then remaining_spec seen rest
         else get_arg arg @ remaining_spec seen rest
 
@@ -1018,7 +1016,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
         if TzString.Map.mem arg arities
         then
           let arity, long = TzString.Map.find arg arities in
-          let seen = StringSet.add long seen in
+          let seen = TzString.Set.add long seen in
           match arity, tl with
           | 0, args when ind = 0 ->
               continuation args 0 >>|? fun cont_args ->
@@ -1028,7 +1026,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
           | 1, _ :: tl -> help tl (ind - 2) seen
           | _ -> Pervasives.failwith "cli_entries internal error, invalid arity"
         else continuation args ind
-  in help args ind StringSet.empty
+  in help args ind TzString.Set.empty
 
 let complete_next_tree cctxt = function
   | TPrefix { stop; prefix } ->

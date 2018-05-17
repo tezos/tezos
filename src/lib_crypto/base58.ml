@@ -126,10 +126,12 @@ let safe_encode ?alphabet s =
 let safe_decode ?alphabet s =
   raw_decode ?alphabet s |> Option.apply ~f:begin fun s ->
     let len = String.length s in
-    let msg = String.sub s 0 (len-4) in
-    let msg_hash = String.sub s (len-4) 4 in
-    if msg_hash <> checksum msg then None
-    else Some msg
+    if len < 4 then None else
+      (* only if the string is long enough to extract a checksum do we check it *)
+      let msg = String.sub s 0 (len-4) in
+      let msg_hash = String.sub s (len-4) 4 in
+      if msg_hash <> checksum msg then None
+      else Some msg
   end
 
 type data = ..

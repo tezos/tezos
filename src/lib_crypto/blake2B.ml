@@ -38,7 +38,7 @@ module Make_minimal (K : Name) = struct
     if String.length s <> size then
       None
     else
-      Some (Blake2b.Hash (Cstruct.of_string s))
+      Some (Blake2b.Hash (MBytes.of_string s))
   let of_string s =
     match of_string_opt s with
     | None ->
@@ -52,7 +52,7 @@ module Make_minimal (K : Name) = struct
           "%s.of_string: wrong string size (%d)"
           K.name (String.length s)
     | Some h -> h
-  let to_string (Blake2b.Hash h) = Cstruct.to_string h
+  let to_string (Blake2b.Hash h) = MBytes.to_string h
 
   let of_hex s = of_string (Hex.to_string s)
   let of_hex_opt s = of_string_opt (Hex.to_string s)
@@ -70,7 +70,7 @@ module Make_minimal (K : Name) = struct
     if MBytes.length b <> size then
       None
     else
-      Some (Blake2b.Hash (Cstruct.of_bigarray b))
+      Some (Blake2b.Hash b)
   let of_bytes_exn b =
     match of_bytes_opt b with
     | None ->
@@ -84,21 +84,20 @@ module Make_minimal (K : Name) = struct
     | Some x -> Ok x
     | None ->
         generic_error "Failed to deserialize a hash (%s)" K.name
-  let to_bytes (Blake2b.Hash h) = Cstruct.to_bigarray h
+  let to_bytes (Blake2b.Hash h) = h
 
   (* let read src off = of_bytes_exn @@ MBytes.sub src off size *)
   (* let write dst off h = MBytes.blit (to_bytes h) 0 dst off size *)
 
   let hash_bytes ?key l =
-    let key = Option.map ~f:Cstruct.of_bigarray key in
     let state = Blake2b.init ?key size in
-    List.iter (fun b -> Blake2b.update state (Cstruct.of_bigarray b)) l ;
+    List.iter (fun b -> Blake2b.update state b) l ;
     Blake2b.final state
 
   let hash_string ?key l =
-    let key = Option.map ~f:Cstruct.of_string key in
+    let key = Option.map ~f:Bigstring.of_string key in
     let state = Blake2b.init ?key size in
-    List.iter (fun s -> Blake2b.update state (Cstruct.of_string s)) l ;
+    List.iter (fun s -> Blake2b.update state (MBytes.of_string s)) l ;
     Blake2b.final state
 
   let path_length = 6
@@ -129,7 +128,7 @@ module Make_minimal (K : Name) = struct
 
   include Compare.Make(struct
       type nonrec t = t
-      let compare (Blake2b.Hash h1) (Blake2b.Hash h2) = Cstruct.compare h1 h2
+      let compare (Blake2b.Hash h1) (Blake2b.Hash h2) = MBytes.compare h1 h2
     end)
 
 end

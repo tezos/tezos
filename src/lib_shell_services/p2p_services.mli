@@ -87,6 +87,14 @@ module Points : sig
     P2p_point.Id.t ->
     (P2p_point.Pool_event.t list Lwt_stream.t * stopper) tzresult Lwt.t
 
+  val forget : #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
+
+  val ban: #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
+
+  val trust: #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
+
+  val banned: #simple -> P2p_point.Id.t -> bool tzresult Lwt.t
+
   module S : sig
 
     val list :
@@ -104,10 +112,29 @@ module Points : sig
        unit * P2p_point.Id.t, unit, bool,
        P2p_point.Pool_event.t list) RPC_service.t
 
+    val forget :
+      ([ `POST ], unit,
+       unit * P2p_point.Id.t, unit, unit,
+       unit) RPC_service.t
+
+    val ban :
+      ([ `POST ], unit,
+       unit * P2p_point.Id.t, unit, unit,
+       unit) RPC_service.t
+
+    val trust :
+      ([ `POST ], unit,
+       unit * P2p_point.Id.t, unit, unit,
+       unit) RPC_service.t
+
+    val banned :
+      ([ `POST ], unit,
+       unit * P2p_point.Id.t, unit, unit,
+       bool) RPC_service.t
+
   end
 
 end
-
 
 module Peers : sig
 
@@ -121,6 +148,14 @@ module Peers : sig
   val events:
     #streamed -> P2p_peer.Id.t ->
     (P2p_peer.Pool_event.t list Lwt_stream.t * stopper) tzresult Lwt.t
+
+  val forget : #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
+
+  val ban: #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
+
+  val trust: #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
+
+  val banned: #simple -> P2p_peer.Id.t -> bool tzresult Lwt.t
 
   module S : sig
 
@@ -138,6 +173,41 @@ module Peers : sig
       ([ `POST ], unit,
        unit * P2p_peer.Id.t, unit, bool,
        P2p_peer.Pool_event.t list) RPC_service.t
+
+    val forget :
+      ([ `POST ], unit,
+       unit * P2p_peer.Id.t, unit, unit,
+       unit) RPC_service.t
+
+    val ban :
+      ([ `POST ], unit,
+       unit * P2p_peer.Id.t, unit, unit,
+       unit) RPC_service.t
+
+    val trust :
+      ([ `POST ], unit,
+       unit * P2p_peer.Id.t, unit, unit,
+       unit) RPC_service.t
+
+    val banned :
+      ([ `POST ], unit,
+       unit * P2p_peer.Id.t, unit, unit,
+       bool) RPC_service.t
+
+  end
+
+end
+
+module ACL : sig
+
+  val clear: #simple -> unit -> unit tzresult Lwt.t
+
+  module S : sig
+
+    val clear :
+      ([ `POST ], unit,
+       unit, unit, unit,
+       unit) RPC_service.t
 
   end
 

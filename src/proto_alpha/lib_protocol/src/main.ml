@@ -120,7 +120,7 @@ let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
   let op_count = op_count + 1 in
   return { data with ctxt ; op_count }
 
-let finalize_block { mode ; ctxt ; op_count ; deposit } =
+let finalize_block { mode ; ctxt ; op_count ; deposit = _ } =
   match mode with
   | Partial_construction _ ->
       let ctxt = Alpha_context.finalize ctxt in
@@ -128,8 +128,7 @@ let finalize_block { mode ; ctxt ; op_count ; deposit } =
   | Application
       { baker ;  block_header = { protocol_data ; _ } }
   | Full_construction { protocol_data ; baker ; _ } ->
-      Apply.finalize_application
-        ctxt protocol_data baker deposit  >>=? fun ctxt ->
+      Apply.finalize_application ctxt protocol_data baker >>=? fun ctxt ->
       let { level ; _ } : Alpha_context.Level.t =
         Alpha_context. Level.current ctxt in
       let priority = protocol_data.priority in

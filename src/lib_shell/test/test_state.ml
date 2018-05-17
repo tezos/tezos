@@ -127,7 +127,6 @@ type state = {
   vblock: (string, State.Block.t) Hashtbl.t ;
   state: State.t ;
   chain: State.Chain.t ;
-  init: unit -> State.t tzresult Lwt.t;
 }
 
 let vblock s = Hashtbl.find s.vblock
@@ -142,15 +141,12 @@ let wrap_state_init f base_dir =
   begin
     let store_root = base_dir // "store" in
     let context_root = base_dir // "context" in
-    let init () =
-      State.read
-        ~store_root
-        ~context_root
-        () in
-    init () >>=? fun state ->
-    State.Chain.create state genesis >>= fun chain ->
+    State.read
+      ~store_root
+      ~context_root
+      genesis >>=? fun (state, chain) ->
     build_example_tree chain >>= fun vblock ->
-    f { state ; chain ; vblock ; init } >>=? fun () ->
+    f { state ; chain ; vblock } >>=? fun () ->
     return ()
   end
 

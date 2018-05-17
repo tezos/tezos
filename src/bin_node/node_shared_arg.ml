@@ -102,7 +102,7 @@ module Manpage = struct
 
   let bugs = [
     `S "BUGS";
-    `P "Check bug reports at https://github.com/tezos/tezos/issues.";
+    `P "Check bug reports at https://gitlab.com/tezos/tezos/issues.";
   ]
 
 end

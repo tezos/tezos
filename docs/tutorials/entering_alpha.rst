@@ -26,7 +26,7 @@ linking order.
 Protocol Alpha is structured as a tower of abstraction layers, a coding
 discipline that we designed to have OCaml check as many invariants as
 possible at typing time. You will also see empty lines in
-``TEZOS_PROTOCOL`` that denotate these layers of abstraction.
+``TEZOS_PROTOCOL`` that denote these layers of abstraction.
 
 These layers follow the linking order: the first modules are the tower’s
 foundation that talk to the raw key-value store, and going forward in
@@ -35,7 +35,7 @@ the module list means climbing up the abstraction tower.
 The big abstraction barrier: ``Alpha_context``
 ----------------------------------------------
 
-the proof-of-stake algorithm, as described in the white paper, relies on
+The proof-of-stake algorithm, as described in the white paper, relies on
 an abstract state of the ledger, that is read and transformed during
 validation of a block.
 
@@ -101,7 +101,7 @@ value with a wrong key, or a key bound to another value. The next
 abstraction barrier is a remedy to that.
 
 The storage module is the single place in the protocol where key
-litterals are defined. Hence, it is the only module necessary to audit,
+literals are defined. Hence, it is the only module necessary to audit,
 to know that the keys are not colliding.
 
 It also abstracts the keys, so that each kind of key get its own
@@ -111,7 +111,7 @@ accessors specific to contracts’ balances.
 Moreover, the keys bear the type of the values they point to. For
 instance, only values of type ``Tez_repr.t`` can by stored at keys
 ``Storage.Contract.Balance``. And in case a key is not a global key, but
-a parametric one, this key is parametered by an OCaml value, and not the
+a parametric one, this key is parameterized by an OCaml value, and not the
 raw key part.
 
 So in the end, the only way to be used when accessing a contract balance
@@ -132,12 +132,12 @@ deleted, all of the keys that store its state in the context are indeed
 deleted.
 
 This last series of modules named ``*_storage`` is there to enforce just
-that kind of invariants: ensuring the insternal consistency of the
+that kind of invariants: ensuring the internal consistency of the
 context structure.
 
 These transaction do not go as far as checking that, for instance, when
 the destination of a transaction is credited, the source is also
-debitted, as in some cases, it might not be the case.
+debited, as in some cases, it might not be the case.
 
 Above the ``Alpha_context``
 ---------------------------
@@ -170,7 +170,7 @@ Smart contracts
 From ``Apply``, you will also end up in modules ``Script_ir_translator``
 and ``Script_interpreter``. The former is the typechecker of Michelson
 that is called when creating a new smart contract, and the latter is the
-interpreter that is called when transfering tokens to a new smart
+interpreter that is called when transferring tokens to a new smart
 contract.
 
 Protocol RPC API
@@ -182,7 +182,7 @@ Finally, the RPCs specific to Alpha are also defined above the
 Services are defined in a few modules, divided by theme. Each module
 defines the RPC API: URL schemes with the types of parameters, and
 input and output JSON schemas. This interface serves three
-purposes. As it is thourouhgly typed, it makes sure that the handlers
+purposes. As it is thoroughly typed, it makes sure that the handlers
 (that are registered in the same file) have the right input and output
 types. It is also used by the client to perform RPC calls, to make
 sure that the URL schemes and JSON formats and consistent between the

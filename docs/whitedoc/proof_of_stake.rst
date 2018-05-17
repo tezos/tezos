@@ -41,7 +41,7 @@ Protocol header (for tezos.alpha):
    ordered list of bakers. The first baker in that list is the first one
    who can bake a block at that height, one minute after the previous
    block. The second baker in the list can do so, but only two minutes
-   after the previous block, etc, the third baker three minutes after.
+   after the previous block, etc., the third baker three minutes after.
    This integer is the priority of the block.
 -  ``seed_nonce_hash``: a commitment to a random number, used to
    generate entropy on the chain. Present in only one out of
@@ -58,7 +58,7 @@ size in bytes is applied to the list of transactions
 ``MAX_TRANSACTION_LIST_SIZE`` = 500kB (that's 5MB every 10 minutes at
 most).
 
-Other lists of operations (endorsements, denounciations, reveals) are
+Other lists of operations (endorsements, denunciations, reveals) are
 limited in terms of number of operations (though the defensive
 programming style also puts limits on the size of operations it
 expects).
@@ -125,7 +125,7 @@ Rolls
 
 In theory, it would be possible to give each token a serial number, and
 track the specific tokens assigned to specific delegates. However, it
-would be too demanding of nodes to track assignement at such a granular
+would be too demanding of nodes to track assignment at such a granular
 level. Instead we introduce the concept of rolls. A roll represents a
 set of coins delegated to a given key. When tokens are moved, or a
 delegate for a contract is changed, the rolls change delegate according
@@ -164,7 +164,7 @@ Roll snapshots represent the state of rolls for a given block. Roll
 snapshots are taken every ``BLOCKS_PER_ROLL_SNAPSHOT`` = 256 blocks,
 that is 16 times per cycle. There is a tradeoff between memory
 consumption and economic efficiency. If roll snapshots are too frequent,
-they will consumme a lot of memory. If they are too rare, strategic
+they will consume a lot of memory. If they are too rare, strategic
 participants could purchase many tokens in anticipation of a snapshot
 and resell them right after.
 
@@ -268,7 +268,9 @@ cycle ``(n-ALLOWED_FORK-2)``, in one out of every
 ``BLOCKS_PER_COMMITMENT`` = 32 blocks.
 
 The commitment must be revealed by the original baker during cycle
-``(n-ALLOWED_FORK-1)`` under penalty of forfeiting the security deposit.
+``(n-ALLOWED_FORK-1)`` under penalty of forfeiting the rewards and
+fees of the block that included the seed commitment (the associated
+security deposit is not forfeited).
 
 A "revelation" is an operation, and multiple revelations can thus be
 included in a block. The revelations are hashed together to generate a
@@ -284,10 +286,10 @@ Denounciations
 --------------
 
 If two endorsements are made for the same slot or two blocks at the same
-height by a delegate, this can be denounced. The denounciation would be
+height by a delegate, this can be denounced. The denunciation would be
 typically be made by the baker, who includes it as a special operation.
-In a first time, denounciation will only forfeit the security deposit
+In a first time, denunciation will only forfeit the security deposit
 for the doubly signed operation. However, over time, as the risk of
-accidental double signing becomes small enough, denounciation will
+accidental double signing becomes small enough, denunciation will
 forfeit the entirety of the safety deposits. Half is burned, and half is
 added to the block reward.

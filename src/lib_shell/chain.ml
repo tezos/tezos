@@ -39,6 +39,7 @@ type data = State.chain_data = {
   current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
+  test_chain: Chain_id.t option ;
 }
 
 let data chain_state =
@@ -87,6 +88,7 @@ let locked_set_head chain_store data block =
                current_mempool = Mempool.empty ;
                live_blocks ;
                live_operations ;
+               test_chain = None ;
              }
 
 let set_head chain_state block =

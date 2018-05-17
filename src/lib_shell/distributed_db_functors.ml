@@ -406,7 +406,7 @@ end = struct
     | Some peer -> P2p_peer.Id.pp_short ppf peer
 
   (* TODO should depend on the ressource kind... *)
-  let initial_delay = 0.1
+  let initial_delay = 0.5
 
   let process_event state now = function
     | Request (peer, key) -> begin
@@ -503,7 +503,7 @@ end = struct
                       else remaining_peers) in
                  let next = { peers = remaining_peers ;
                               next_request = now +. delay ;
-                              delay = delay *. 1.2 } in
+                              delay = delay *. 1.5 } in
                  Table.replace state.pending key next ;
                  let requests =
                    try key :: P2p_peer.Map.find requested_peer acc

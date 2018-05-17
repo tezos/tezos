@@ -20,26 +20,14 @@ type target = Z.t
 module Secretbox = struct
   include Secretbox
 
-  let of_bytes bytes =
-    of_cstruct (Cstruct.of_bigarray bytes)
+  let box key msg nonce = box ~key ~msg ~nonce
 
-  let of_bytes_exn bytes =
-    of_cstruct_exn (Cstruct.of_bigarray bytes)
-
-  let box key msg nonce =
-    let msg = Cstruct.of_bigarray msg in
-    Cstruct.to_bigarray (box ~key ~msg ~nonce)
-
-  let box_open key cmsg nonce =
-    let cmsg = Cstruct.of_bigarray cmsg in
-    Option.map ~f:Cstruct.to_bigarray (box_open ~key ~cmsg ~nonce)
+  let box_open key cmsg nonce = box_open ~key ~cmsg ~nonce
 
   let box_noalloc key nonce msg =
-    let msg = Cstruct.of_bigarray msg in
     box_noalloc ~key ~nonce ~msg
 
   let box_open_noalloc key nonce cmsg =
-    let cmsg = Cstruct.of_bigarray cmsg in
     box_open_noalloc ~key ~nonce ~cmsg
 end
 
@@ -54,7 +42,7 @@ let () =
   Base58.check_encoded_prefix Public_key_hash.b58check_encoding "id" 30
 
 let hash pk =
-  Public_key_hash.hash_bytes [Cstruct.to_bigarray (Box.to_cstruct pk)]
+  Public_key_hash.hash_bytes [Box.to_bytes pk]
 
 let zerobytes = Box.zerobytes
 let boxzerobytes = Box.boxzerobytes
@@ -63,42 +51,32 @@ let random_keypair () =
   let pk, sk = Box.keypair () in
   sk, pk, hash pk
 
-let zero_nonce = Tweetnacl.Nonce.(of_cstruct_exn (Cstruct.create bytes))
+let zero_nonce = Tweetnacl.Nonce.(of_bytes_exn (MBytes.make bytes '\x00'))
 let random_nonce = Nonce.gen
 let increment_nonce = Nonce.increment
 
-let box sk pk msg nonce =
-  let msg = Cstruct.of_bigarray msg in
-  Cstruct.to_bigarray (Box.box ~sk ~pk ~msg ~nonce)
+let box sk pk msg nonce = Box.box ~sk ~pk ~msg ~nonce
 
-let box_open sk pk cmsg nonce =
-  let cmsg = Cstruct.of_bigarray cmsg in
-  Option.map ~f:Cstruct.to_bigarray (Box.box_open ~sk ~pk ~cmsg ~nonce)
+let box_open sk pk cmsg nonce = Box.box_open ~sk ~pk ~cmsg ~nonce
 
 let box_noalloc sk pk nonce msg =
-  let msg = Cstruct.of_bigarray msg in
   Box.box_noalloc ~sk ~pk ~nonce ~msg
 
 let box_open_noalloc sk pk nonce cmsg =
-  let cmsg = Cstruct.of_bigarray cmsg in
   Box.box_open_noalloc ~sk ~pk ~nonce ~cmsg
 
 let precompute sk pk = Box.combine pk sk
 
 let fast_box k msg nonce =
-  let msg = Cstruct.of_bigarray msg in
-  Cstruct.to_bigarray (Box.box_combined ~k ~msg ~nonce)
+  Box.box_combined ~k ~msg ~nonce
 
 let fast_box_open k cmsg nonce =
-  let cmsg = Cstruct.of_bigarray cmsg in
-  Option.map ~f:Cstruct.to_bigarray (Box.box_open_combined ~k ~cmsg ~nonce)
+  Box.box_open_combined ~k ~cmsg ~nonce
 
 let fast_box_noalloc k nonce msg =
-  let msg = Cstruct.of_bigarray msg in
   Box.box_combined_noalloc ~k ~nonce ~msg
 
 let fast_box_open_noalloc k nonce cmsg =
-  let cmsg = Cstruct.of_bigarray cmsg in
   Box.box_open_combined_noalloc ~k ~nonce ~cmsg
 
 let compare_target hash target =
@@ -128,8 +106,8 @@ let default_target = make_target 24.
 let check_proof_of_work pk nonce target =
   let hash =
     Blake2B.hash_bytes [
-      Cstruct.to_bigarray (Box.to_cstruct pk) ;
-      Cstruct.to_bigarray (Nonce.to_cstruct nonce) ;
+      Box.to_bytes pk ;
+      Nonce.to_bytes nonce ;
     ] in
   compare_target hash target
 
@@ -146,16 +124,16 @@ let generate_proof_of_work ?max pk target =
       loop (Nonce.increment nonce) (cpt + 1) in
   loop (random_nonce ()) 0
 
-let public_key_to_bigarray x = Cstruct.to_bigarray (Box.to_cstruct x)
-let public_key_of_bigarray x = Box.pk_of_cstruct_exn (Cstruct.of_bigarray x)
+let public_key_to_bigarray = Box.to_bytes
+let public_key_of_bigarray = Box.pk_of_bytes_exn
 let public_key_size = Box.pkbytes
 
-let secret_key_to_bigarray x = Cstruct.to_bigarray (Box.to_cstruct x)
-let secret_key_of_bigarray x = Box.sk_of_cstruct_exn (Cstruct.of_bigarray x)
+let secret_key_to_bigarray = Box.to_bytes
+let secret_key_of_bigarray = Box.sk_of_bytes_exn
 let secret_key_size = Box.skbytes
 
-let nonce_to_bigarray x = Cstruct.to_bigarray (Nonce.to_cstruct x)
-let nonce_of_bigarray x = Nonce.of_cstruct_exn (Cstruct.of_bigarray x)
+let nonce_to_bigarray = Nonce.to_bytes
+let nonce_of_bigarray = Nonce.of_bytes_exn
 let nonce_size = Nonce.bytes
 
 let public_key_encoding =

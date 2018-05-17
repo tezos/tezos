@@ -46,12 +46,14 @@ let opened_modules = [
   "Logging" ;
 ]
 
-let dump oc files =
+let dump oc hash files =
   Printf.fprintf oc
     "module Make (Tezos_protocol_environment : Tezos_protocol_environment_sigs__V1.T) = struct\n" ;
   Printf.fprintf oc "[@@@ocaml.warning \"-33\"]\n" ;
   List.iter (Printf.fprintf oc "open %s\n") opened_modules ;
   Printf.fprintf oc "[@@@ocaml.warning \"+33\"]\n" ;
+  Printf.fprintf oc "let hash = Protocol_hash.of_b58check_exn %S;;\n"
+    (Protocol_hash.to_b58check hash) ;
   for i = 0 to Array.length files - 1 do
     include_ml oc files.(i) ;
   done ;
@@ -60,6 +62,3 @@ let dump oc files =
        (Filename.basename
           (Filename.chop_extension files.(Array.length files - 1)))) ;
   Printf.fprintf oc "end\n%!"
-
-let main () =
-  dump stdout (Array.sub Sys.argv 1 (Array.length Sys.argv - 2))

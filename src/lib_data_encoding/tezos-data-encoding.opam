@@ -11,8 +11,8 @@ depends: [
   "jbuilder" { build & = "1.0+beta19.1" }
   "tezos-stdlib"
   "ezjsonm"
-  "js_of_ocaml" # for ocplib-json-typed.bson
   "ocplib-json-typed"
+  "ocplib-json-typed-bson"
   "ocplib-endian"
   "alcotest" { test }
 ]

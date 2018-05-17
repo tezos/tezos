@@ -23,6 +23,14 @@ include S.SIGNATURE with type Public_key_hash.t = public_key_hash
                      and type Public_key.t = public_key
                      and type Secret_key.t = secret_key
 
+val append : secret_key -> MBytes.t -> MBytes.t
+(** [append sk buf] is the concatenation of [buf] and the
+    serialization of the signature of [buf] signed by [sk]. *)
+
+val concat : MBytes.t -> t -> MBytes.t
+(** [concat buf t] is the concatenation of [buf] and the serialization
+    of [t]. *)
+
 include S.RAW_DATA with type t := t
 
 type algo =

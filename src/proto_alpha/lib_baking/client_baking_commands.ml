@@ -37,14 +37,15 @@ let commands () =
       (fun max_priority delegate cctxt ->
          endorse_block cctxt ?max_priority delegate) ;
     command ~group ~desc: "Forge and inject block using the delegate rights."
-      (args3 max_priority_arg force_switch free_baking_switch)
+      (args4 max_priority_arg force_switch
+         free_baking_switch minimal_timestamp_switch)
       (prefixes [ "bake"; "for" ]
        @@ Client_keys.Public_key_hash.source_param
          ~name:"baker" ~desc: "name of the delegate owning the baking right"
        @@ stop)
-      (fun (max_priority, force, free_baking) delegate cctxt ->
+      (fun (max_priority, force, free_baking, minimal_timestamp) delegate cctxt ->
          bake_block cctxt cctxt#block
-           ~force ?max_priority ~free_baking delegate) ;
+           ~force ?max_priority ~minimal_timestamp ~free_baking delegate) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation."
       no_options
       (prefixes [ "reveal"; "nonce"; "for" ]

@@ -387,8 +387,8 @@ let test_example () =
   test_storage ~location: __LOC__ "map_caddaadr" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 \"0\") 4) 5))) 6)" "Unit" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 \"1\") 4) 5))) 6)" >>=? fun _ ->
 
   (*  Did the given key sign the string? (key is bootstrap1) *)
-  test_output ~location: __LOC__ "check_signature" "(Pair \"26981d372a7b3866621bf79713d249197fe6d518ef702fa65738e1715bde9da54df04fefbcc84287ecaa9f74ad9296462731aa24bbcece63c6bf73a8f5752309\" \"hello\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "check_signature" "(Pair \"26981d372a7b3866621bf79713d249197fe6d518ef702fa65738e1715bde9da54df04fefbcc84287ecaa9f74ad9296462731aa24bbcece63c6bf73a8f5752309\" \"abcd\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "False" >>=? fun _ ->
+  test_output ~location: __LOC__ "check_signature" "(Pair \"1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01\" \"hello\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "True" >>=? fun _ ->
+  test_output ~location: __LOC__ "check_signature" "(Pair \"1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01\" \"abcd\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "False" >>=? fun _ ->
 
   (*  Convert a public key to a public key hash *)
   test_output ~location: __LOC__ "hash_key" "Unit" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "\"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\"" >>=? fun _ ->

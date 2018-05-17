@@ -4,8 +4,8 @@
    contain the root `toctree` directive.
 
 
-Welcome to the Tezos Developper Documentation!
-==============================================
+Welcome to the Tezos Developer Documentation!
+=============================================
 
 Tezos is a distributed consensus platform with meta-consensus
 capability. Tezos not only comes to consensus about the state of its ledger,

@@ -145,6 +145,8 @@ type error += Connection_refused
 type error += Rejected of P2p_peer.Id.t
 type error += Too_many_connections
 type error += Closed_network
+type error += Point_banned of P2p_point.Id.t
+type error += Peer_banned of P2p_peer.Id.t
 
 let () =
   (* Pending connection *)
@@ -207,4 +209,30 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Network is closed.")
     Data_encoding.empty
     (function Closed_network -> Some () | _ -> None)
-    (fun () -> Closed_network)
+    (fun () -> Closed_network) ;
+  (* Point Banned *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_pool.point_banned"
+    ~title:"Point Banned"
+    ~description:"The addr you tried to connect is banned."
+    ~pp:(fun ppf (addr, _port) ->
+        Format.fprintf ppf
+          "The addr you tried to connect (%a) is banned."
+          P2p_addr.pp addr)
+    Data_encoding.(obj1 (req "point" P2p_point.Id.encoding))
+    (function Point_banned point -> Some point | _ -> None)
+    (fun point -> Point_banned point) ;
+  (* Peer Banned *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_pool.peer_banned"
+    ~title:"Peer Banned"
+    ~description:"The peer identity you tried to connect is banned."
+    ~pp:(fun ppf peer_id ->
+        Format.fprintf ppf
+          "The peer identity you tried to connect (%a) is banned."
+          P2p_peer.Id.pp peer_id)
+    Data_encoding.(obj1 (req "peer" P2p_peer.Id.encoding))
+    (function Peer_banned peer_id -> Some peer_id | _ -> None)
+    (fun peer_id -> Peer_banned peer_id)

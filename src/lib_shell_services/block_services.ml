@@ -95,9 +95,11 @@ let pp_block_info ppf
 
 let block_info_encoding =
   let operation_encoding =
+    describe ~title:"Operation hash" @@
     merge_objs
       (obj1 (req "hash" Operation_hash.encoding))
       Operation.encoding in
+  describe ~title:"Block info" @@
   conv
     (fun { hash ; chain_id ; level ; proto_level ; predecessor ;
            fitness ; timestamp ; protocol ;
@@ -136,6 +138,7 @@ type preapply_result = {
 }
 
 let preapply_result_encoding =
+  describe ~title:"Preapply result" @@
   (conv
      (fun { shell_header ; operations } ->
         (shell_header, operations))
@@ -188,7 +191,7 @@ module S = struct
     RPC_service.post_service
       ~description:"All the information about a block."
       ~query: RPC_query.empty
-      ~input: (obj1 (dft "operations" bool true))
+      ~input: (describe ~title:"Operations" (obj1 (dft "operations" bool true)))
       ~output: block_info_encoding
       block_path
 
@@ -197,7 +200,7 @@ module S = struct
       ~description:"Returns the chain in which the block belongs."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "chain_id" Chain_id.encoding))
+      ~output: (describe ~title:"Chain ID" (obj1 (req "chain_id" Chain_id.encoding)))
       RPC_path.(block_path / "chain_id")
 
   let level =
@@ -205,7 +208,7 @@ module S = struct
       ~description:"Returns the block's level."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "level" int32))
+      ~output: (describe ~title:"Level" (obj1 (req "level" int32)))
       RPC_path.(block_path / "level")
 
   let predecessor =
@@ -213,7 +216,7 @@ module S = struct
       ~description:"Returns the previous block's id."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "predecessor" Block_hash.encoding))
+      ~output: (describe ~title:"Predecessor" (obj1 (req "predecessor" Block_hash.encoding)))
       RPC_path.(block_path / "predecessor")
 
   let predecessors =
@@ -221,9 +224,10 @@ module S = struct
       ~description:
         "...."
       ~query: RPC_query.empty
-      ~input: (obj1 (req "length" Data_encoding.uint16))
-      ~output: (obj1
-                  (req "blocks" (Data_encoding.list Block_hash.encoding)))
+      ~input: (describe ~title:"Num predecessors" (obj1 (req "length" Data_encoding.uint16)))
+      ~output:(describe ~title:"Block hash list"
+                 (obj1
+                    (req "blocks" (list Block_hash.encoding))))
       RPC_path.(block_path / "predecessors")
 
   let hash =
@@ -239,7 +243,7 @@ module S = struct
       ~description:"Returns the block's fitness."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "fitness" Fitness.encoding))
+      ~output: (describe ~title:"Fitness" (obj1 (req "fitness" Fitness.encoding)))
       RPC_path.(block_path / "fitness")
 
   let context =
@@ -247,7 +251,7 @@ module S = struct
       ~description:"Returns the hash of the resulting context."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "context" Context_hash.encoding))
+      ~output: (describe ~title:"Context hash" (obj1 (req "context" Context_hash.encoding)))
       RPC_path.(block_path / "context")
 
   let raw_context_args : string RPC_arg.t =
@@ -259,16 +263,17 @@ module S = struct
 
   let raw_context_result_encoding : raw_context_result Data_encoding.t =
     let open Data_encoding in
+    describe ~title:"Raw Context" @@
     obj1 (req "content"
             (mu "context_tree" (fun raw_context_result_encoding ->
                  union [
-                   case (Tag 0) bytes
+                   case (Tag 0) ~name:"Key" bytes
                      (function Key k -> Some k | _ -> None)
                      (fun k -> Key k) ;
-                   case (Tag 1) (assoc raw_context_result_encoding)
+                   case (Tag 1) ~name:"Dir" (assoc raw_context_result_encoding)
                      (function Dir k -> Some k | _ -> None)
                      (fun k -> Dir k) ;
-                   case (Tag 2) null
+                   case (Tag 2) ~name:"Cut" null
                      (function Cut -> Some () | _ -> None)
                      (fun () -> Cut) ;
                  ])))
@@ -296,7 +301,7 @@ module S = struct
       ~description:"Returns the block's timestamp."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "timestamp" Time.encoding))
+      ~output:(describe ~title:"Timestamp" (obj1 (req "timestamp" Time.encoding)))
       RPC_path.(block_path / "timestamp")
 
   type operations_param = {
@@ -305,6 +310,7 @@ module S = struct
 
   let operations_param_encoding =
     let open Data_encoding in
+    describe ~title:"Operations param" @@
     conv
       (fun { contents } -> (contents))
       (fun (contents) -> { contents })
@@ -315,13 +321,18 @@ module S = struct
       ~description:"List the block operations."
       ~query: RPC_query.empty
       ~input: operations_param_encoding
-      ~output: (obj1
-                  (req "operations"
-                     (list (list
-                              (obj2
-                                 (req "hash" Operation_hash.encoding)
-                                 (opt "contents"
-                                    (dynamic_size Operation.encoding)))))))
+      ~output:
+        (describe ~title:"Operations" @@
+         obj1
+           (req "operations"
+              (list
+                 (describe ~title:"Operation/operation hash pair list"
+                    (list
+                       (describe ~title:"Operation, operation hash pairs"
+                          (obj2
+                             (req "hash" Operation_hash.encoding)
+                             (opt "contents"
+                                (dynamic_size Operation.encoding)))))))))
       RPC_path.(block_path / "operations")
 
   let protocol =
@@ -329,7 +340,8 @@ module S = struct
       ~description:"List the block protocol."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "protocol" Protocol_hash.encoding))
+      ~output: (describe ~title:"Block protocol"
+                  (obj1 (req "protocol" Protocol_hash.encoding)))
       RPC_path.(block_path / "protocol")
 
   let test_chain =
@@ -348,6 +360,7 @@ module S = struct
   }
 
   let preapply_param_encoding =
+    describe ~title:"Preapply param" @@
     (conv
        (fun { timestamp ; protocol_data ; operations ; sort_operations } ->
           (timestamp, protocol_data, operations, sort_operations))
@@ -380,7 +393,7 @@ module S = struct
                      block, operations, public_keys and contracts."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (list string)
+      ~output: (describe ~title:"String list" (list string))
       RPC_path.(block_path / "complete" /: prefix_arg )
 
   type list_param = {
@@ -393,6 +406,7 @@ module S = struct
     min_heads: int option;
   }
   let list_param_encoding =
+    describe ~title:"List blocks param" @@
     conv
       (fun { include_ops ; length ; heads ; monitor ;
              delay ; min_date ; min_heads } ->
@@ -467,10 +481,11 @@ module S = struct
       ~query: RPC_query.empty
       ~input:empty
       ~output:(Data_encoding.list
-                 (obj3
-                    (req "block" Block_hash.encoding)
-                    (req "level" int32)
-                    (req "errors" RPC_error.encoding)))
+                 (describe ~title:"Invalid block"
+                    (obj3
+                       (req "block" Block_hash.encoding)
+                       (req "level" int32)
+                       (req "errors" RPC_error.encoding))))
       RPC_path.(root / "invalid_blocks")
 
   let unmark_invalid =

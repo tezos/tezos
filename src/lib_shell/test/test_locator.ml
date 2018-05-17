@@ -54,10 +54,11 @@ let incr_fitness fitness =
 let init_chain base_dir : State.Chain.t Lwt.t =
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in
-  State.read ~store_root ~context_root () >>= function
+  State.read
+    ~store_root ~context_root state_genesis_block >>= function
   | Error _ -> Pervasives.failwith "read err"
-  | Ok (state:State.global_state) ->
-      State.Chain.create state state_genesis_block
+  | Ok (_state, chain) ->
+      Lwt.return chain
 
 
 let block_header

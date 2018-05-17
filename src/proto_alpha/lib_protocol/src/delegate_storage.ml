@@ -17,9 +17,9 @@ type error +=
 let () =
   register_error_kind
     `Permanent
-    ~id:"contract.undelagatable_contract"
+    ~id:"contract.undelegatable_contract"
     ~title:"Non delegatable contract"
-    ~description:"Tried to delegate a implicit contract \
+    ~description:"Tried to delegate an implicit contract \
                   or a non delegatable originated contract"
     ~pp:(fun ppf contract ->
         Format.fprintf ppf "Contract %a is not delegatable"
@@ -205,24 +205,6 @@ let freeze_deposit ctxt delegate amount =
   Storage.Contract.Balance.set ctxt contract new_balance >>=? fun ctxt ->
   credit_frozen_deposit ctxt contract cycle amount
 
-let burn_deposit ctxt delegate cycle amount =
-  let contract = Contract_repr.implicit_contract delegate in
-  get_frozen_deposit ctxt contract cycle >>=? fun old_amount ->
-  begin
-    match Tez_repr.(old_amount -? amount) with
-    | Ok new_amount ->
-        Roll_storage.Delegate.remove_amount
-          ctxt delegate amount >>=? fun ctxt ->
-        return (new_amount, ctxt)
-    | Error _ ->
-        Roll_storage.Delegate.remove_amount
-          ctxt delegate old_amount >>=? fun ctxt ->
-        return (Tez_repr.zero, ctxt)
-  end >>=? fun (new_amount, ctxt) ->
-  Storage.Contract.Frozen_deposits.set (ctxt, contract) cycle new_amount
-
-
-
 let get_frozen_fees ctxt contract cycle =
   Storage.Contract.Frozen_fees.get_option (ctxt, contract) cycle >>=? function
   | None -> return Tez_repr.zero
@@ -311,8 +293,6 @@ let cycle_end ctxt last_cycle unrevealed =
         List.fold_left
           (fun ctxt (u : Nonce_storage.unrevealed) ->
              ctxt >>=? fun ctxt ->
-             burn_deposit
-               ctxt u.delegate revealed_cycle u.deposit >>=? fun ctxt ->
              burn_fees
                ctxt u.delegate revealed_cycle u.fees >>=? fun ctxt ->
              burn_rewards

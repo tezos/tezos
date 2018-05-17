@@ -16,8 +16,9 @@ build: [ "jbuilder" "build" "-j" jobs "-p" name "@install" ]
 build-test: [ "jbuilder" "runtest" "-p" name "-j" jobs ]
 depends: [
   "jbuilder" {build & >= "1.0+beta16"}
-  "hex" {>= "1.2.0"}
-  "cstruct" {>= "3.2.1"}
-  "zarith" {>= "1.7" }
-  "alcotest" { test }
+  "bigstring" {>= "0.1.1"}
+  "ocplib-endian" {>= "1.0"}
+  "zarith" {>= "1.7"}
+  "alcotest" {test & >= "0.8.1"}
+  "hex" {test & >= "1.2.0"}
 ]

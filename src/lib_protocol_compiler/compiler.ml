@@ -116,25 +116,6 @@ let debug fmt =
   if !debug_flag then Format.eprintf fmt
   else Format.ifprintf Format.err_formatter fmt
 
-let hash_file file =
-  let open Blake2 in
-  let buflen = 8092 in
-  let buf = BytesLabels.create buflen in
-  let fd = Unix.openfile file [Unix.O_RDONLY] 0o600 in
-  let state = Blake2b.init 32 in
-  let loop () =
-    match Unix.read fd buf 0 buflen with
-    | 0 -> ()
-    | nb_read ->
-        Blake2b.update state
-          (Cstruct.of_bytes
-             (if nb_read = buflen then buf else BytesLabels.sub buf ~pos:0 ~len:nb_read))
-  in
-  loop () ;
-  Unix.close fd ;
-  let Blake2b.Hash h = Blake2b.final state in
-  Cstruct.to_string h
-
 let mktemp_dir () =
   Filename.get_temp_dir_name () //
   Printf.sprintf "tezos-protocol-build-%06X" (Random.int 0xFFFFFF)
@@ -190,7 +171,7 @@ let main { compile_ml ; pack_objects ; link_shared } =
   (* Generate the 'functor' *)
   let functor_file = build_dir // "functor.ml" in
   let oc = open_out functor_file in
-  Packer.dump oc
+  Packer.dump oc hash
     (Array.map
        begin fun { Protocol.name }  ->
          let name_lowercase = String.uncapitalize_ascii name in

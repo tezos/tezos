@@ -27,10 +27,11 @@ type 'meta t = {
   mutable maintain_worker : unit Lwt.t ;
 }
 
-(** Select [expected] points amongst the disconnected known points.
+(** Select [expected] points among the disconnected known points.
     It ignores points which are greylisted, or for which a connection
-    failed after [start_time]. It first selects points with the oldest
-    last tentative. *)
+    failed after [start_time] and the pointes that are banned. It
+    first selects points with the oldest last tentative.
+    Non-trusted points are also ignored if option --closed is set. *)
 let connectable st start_time expected =
   let Pool pool = st.pool in
   let now = Time.now () in
@@ -45,17 +46,22 @@ let connectable st start_time expected =
         | Some t1, Some t2 -> Time.compare t2 t1
     end) in
   let acc = Bounded_point_info.create expected in
+  let closed = (P2p_pool.config pool).P2p_pool.closed_network in
   P2p_pool.Points.fold_known pool ~init:()
     ~f:begin fun point pi () ->
-      match P2p_point_state.get pi with
-      | Disconnected -> begin
-          match P2p_point_state.Info.last_miss pi with
-          | Some last when Time.(start_time < last)
-                        || P2p_point_state.Info.greylisted ~now pi -> ()
-          | last ->
-              Bounded_point_info.insert (last, point) acc
-        end
-      | _ -> ()
+      (* consider the point only if --closed is not set, or if pi is
+         trusted *)
+      if not closed || P2p_point_state.Info.trusted pi then
+        match P2p_point_state.get pi with
+        | Disconnected -> begin
+            match P2p_point_state.Info.last_miss pi with
+            | Some last when Time.(start_time < last)
+                          || P2p_point_state.Info.greylisted ~now pi -> ()
+            | _ when (P2p_pool.Points.banned pool point) -> ()
+            | last ->
+                Bounded_point_info.insert (last, point) acc
+          end
+        | _ -> ()
     end ;
   List.map snd (Bounded_point_info.get acc)
 
@@ -87,10 +93,17 @@ let rec try_to_contact
         (min_to_contact - established) (max_to_contact - established)
 
 (** Do a maintenance step. It will terminate only when the number
-    of connections is between `min_threshold` and `max_threshold`. *)
+    of connections is between `min_threshold` and `max_threshold`.
+    Do a pass in the list of banned peers and remove all peers that
+    have been banned for more then xxx seconds *)
 let rec maintain st =
   let Pool pool = st.pool in
   let n_connected = P2p_pool.active_connections pool in
+  let pool_cfg = P2p_pool.config pool in
+  let older_than =
+    Time.(add (now ()) (Int64.of_int (- pool_cfg.greylist_timeout)))
+  in
+  P2p_pool.gc_greylist pool ~older_than ;
   if n_connected < st.bounds.min_threshold then
     too_few_connections st n_connected
   else if st.bounds.max_threshold < n_connected then

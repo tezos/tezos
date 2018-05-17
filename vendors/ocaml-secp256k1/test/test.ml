@@ -1,13 +1,11 @@
-open Secp256k1_ml
-
-let assert_equal a b = assert (a = b)
+open Libsecp256k1
 
 module Num = struct
   open Internal
   open Num
   let basic () =
     let z = zero () in
-    assert_equal true (is_zero z)
+    Alcotest.(check bool "Num.is_zero" true (is_zero z))
 
   let runtest =
     [ "basic", `Quick, basic ;
@@ -19,12 +17,12 @@ module Scalar = struct
   open Scalar
   let basic () =
     let z = zero () in
-    assert_equal true (is_zero z) ;
+    Alcotest.(check bool "Scalar.is_zero" true (is_zero z)) ;
     (* set_int z 1 ; *)
     let z = const ~d0:1L () in
-    assert_equal false (is_zero z) ;
-    assert_equal false (is_even z) ;
-    assert_equal true (is_one z)
+    Alcotest.(check bool "Scalar.is_zero" false (is_zero z)) ;
+    Alcotest.(check bool "Scalar.is_even" false (is_even z)) ;
+    Alcotest.(check bool "Scalar.is_one" true (is_one z))
 
   let runtest =
     [ "basic", `Quick, basic ;
@@ -34,10 +32,9 @@ end
 module External = struct
   open External
   let buffer_of_hex s =
-    let { Cstruct.buffer; off = _ ; len = _ } = Hex.to_cstruct (`Hex s) in
-    buffer
+    Cstruct.to_bigarray (Hex.to_cstruct (`Hex s))
 
-  let ctx = Context.create [ Sign ; Verify ]
+  let ctx = Context.create ()
 
   let cstruct_testable =
     Alcotest.testable Cstruct.hexdump_pp Cstruct.equal
@@ -55,8 +52,7 @@ module External = struct
     assert_eq_cstruct sign_orig sign
 
   let test_valid_signature _ =
-    let ctx = Context.create [Verify] in
-    let msg = Sign.msg_of_bytes_exn @@ buffer_of_hex
+    let msg = buffer_of_hex
         "CF80CD8AED482D5D1527D7DC72FCEFF84E6326592848447D2DC0B0E87DFC9A90" in
     let signature = Sign.read_der_exn ctx
         (buffer_of_hex "3044022079BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F817980220294F14E883B3F525B5367756C2A11EF6CF84B730B36C17CB0C56F0AAB2C98589") in
@@ -65,8 +61,7 @@ module External = struct
     assert (Sign.verify_exn ctx ~signature ~pk ~msg)
 
   let test_invalid_signature _  =
-    let ctx = Context.create [Verify] in
-    let msg = Sign.msg_of_bytes_exn @@ buffer_of_hex
+    let msg = buffer_of_hex
         "CF80CD8AED482D5D1527D7DC72FCEFF84E6326592848447D2DC0B0E87DFC9A91" in
     let signature = Sign.read_der_exn ctx
         (buffer_of_hex "3044022079BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F817980220294F14E883B3F525B5367756C2A11EF6CF84B730B36C17CB0C56F0AAB2C98589") in
@@ -98,27 +93,25 @@ module External = struct
     assert_eq_cstruct pubtrue pubkey_serialized
 
   let test_sign _ =
-    let ctx = Context.create [Sign] in
-    let msg = Sign.msg_of_bytes_exn @@ buffer_of_hex "CF80CD8AED482D5D1527D7DC72FCEFF84E6326592848447D2DC0B0E87DFC9A90" in
+    let msg =  buffer_of_hex "CF80CD8AED482D5D1527D7DC72FCEFF84E6326592848447D2DC0B0E87DFC9A90" in
     let sk = Key.read_sk_exn ctx (buffer_of_hex "67E56582298859DDAE725F972992A07C6C4FB9F62A8FFF58CE3CA926A1063530") in
     let validsign = Sign.read_der_exn ctx (buffer_of_hex "30440220182a108e1448dc8f1fb467d06a0f3bb8ea0533584cb954ef8da112f1d60e39a202201c66f36da211c087f3af88b50edf4f9bdaa6cf5fd6817e74dca34db12390c6e9") in
-    let sign = Sign.sign_exn ctx ~sk ~msg in
+    let sign = Sign.sign_exn ctx ~sk msg in
     assert (Sign.equal sign validsign)
 
   let test_recover _ =
-    let ctx = Context.create [Sign; Verify] in
-    let msg = Sign.msg_of_bytes_exn @@ buffer_of_hex "CF80CD8AED482D5D1527D7DC72FCEFF84E6326592848447D2DC0B0E87DFC9A90" in
+    let msg = buffer_of_hex "CF80CD8AED482D5D1527D7DC72FCEFF84E6326592848447D2DC0B0E87DFC9A90" in
     let seckey = Key.read_sk_exn ctx (buffer_of_hex "67E56582298859DDAE725F972992A07C6C4FB9F62A8FFF58CE3CA926A1063530") in
     let pubkey = Key.neuterize_exn ctx seckey in
     let recoverable_sign = Sign.sign_recoverable_exn ctx ~sk:seckey msg in
     let usual_sign = Sign.to_plain ctx recoverable_sign in
     assert (Sign.verify_exn ctx ~pk:pubkey ~signature:usual_sign ~msg);
-    let compact, recid = Sign.to_bytes_recid ctx recoverable_sign in
-    let usual_sign' = Sign.read_exn ctx compact in
+    let recoverable_bytes = Sign.to_bytes ctx recoverable_sign in
+    let usual_sign' = Sign.read_exn ctx recoverable_bytes in
     assert (Sign.equal usual_sign' usual_sign) ;
-    let parsed = Sign.read_recoverable_exn ctx compact ~recid in
-    assert (Sign.equal parsed recoverable_sign);
-    match Sign.recover ctx ~signature:recoverable_sign ~msg with
+    let recoverable_sign' = Sign.read_recoverable_exn ctx recoverable_bytes in
+    assert (Sign.equal recoverable_sign' recoverable_sign);
+    match Sign.recover ctx ~signature:recoverable_sign msg with
     | Error _ -> assert false
     | Ok recovered -> assert (Key.equal recovered pubkey)
 
