@@ -149,6 +149,10 @@ let create { genesis ; store_root ; context_root ;
     block_validator_limits
     prevalidator_limits
     chain_validator_limits =
+  let start_prevalidator =
+    match p2p_params with
+    | Some (config, _limits) -> not config.P2p.disable_mempool
+    | None -> true in
   init_p2p p2p_params >>=? fun (p2p, conn_metadata_cfg) ->
   State.read
     ~store_root ~context_root ?patch_context genesis >>=? fun (state, mainchain_state) ->
@@ -160,7 +164,7 @@ let create { genesis ; store_root ; context_root ;
     prevalidator_limits
     chain_validator_limits >>= fun validator ->
   Validator.activate validator
-    ?max_child_ttl mainchain_state >>= fun mainchain_validator ->
+    ?max_child_ttl ~start_prevalidator mainchain_state >>= fun mainchain_validator ->
   let shutdown () =
     P2p.shutdown p2p >>= fun () ->
     Validator.shutdown validator >>= fun () ->
@@ -319,8 +323,12 @@ module RPC = struct
 
   let pending_operations node =
     let validator = get_validator node (`Head 0) in
-    let pv = Chain_validator.prevalidator validator in
-    Lwt.return (Prevalidator.operations pv)
+    let pv_opt = Chain_validator.prevalidator validator in
+    match pv_opt with
+    | Some pv ->
+        Lwt.return (Prevalidator.operations pv)
+    | None ->
+        Lwt.return (Preapply_result.empty, Operation_hash.Map.empty)
 
   let protocols { state } =
     State.Protocol.list state >>= fun set ->

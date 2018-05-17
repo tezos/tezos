@@ -38,7 +38,7 @@ let create state db
       valid_block_input ;
       active_chains = Chain_id.Table.create 7 }
 
-let activate v ?max_child_ttl chain_state =
+let activate v ?max_child_ttl ~start_prevalidator chain_state =
   let chain_id = State.Chain.id chain_state in
   lwt_log_notice "activate chain %a" Chain_id.pp chain_id >>= fun () ->
   try Chain_id.Table.find v.active_chains chain_id
@@ -46,6 +46,7 @@ let activate v ?max_child_ttl chain_state =
     let nv =
       Chain_validator.create
         ?max_child_ttl
+        ~start_prevalidator
         v.peer_validator_limits v.prevalidator_limits
         v.block_validator v.valid_block_input v.db chain_state
         v.chain_validator_limits in
@@ -126,5 +127,7 @@ let inject_operation v ?chain_id op =
             failwith "Unknown branch (%a), cannot inject the operation."
               Block_hash.pp_short op.shell.branch
   end >>=? fun nv ->
-  let pv = Chain_validator.prevalidator nv in
-  Prevalidator.inject_operation pv op
+  let pv_opt = Chain_validator.prevalidator nv in
+  match pv_opt with
+  | Some pv -> Prevalidator.inject_operation pv op
+  | None -> failwith "Prevalidator is not running, cannot inject the operation."
