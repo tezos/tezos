@@ -6,9 +6,10 @@ Participating in the Alphanet
 Welcome to the Tezos alphanet, which is a pre-release network for the
 Tezos blockchain. Currently, the chain is reset every few weeks.
 
-For news and support about the alphanet, please join IRC (``#tezos`` on
-freenode). Please, report bugs related to the alphanet on the IRC
-channel before filling Github issues.
+For news and support about the alphanet, please join IRC (*#tezos*
+on freenode). Please, report bugs related to the alphanet on the IRC
+channel before filling `GitLab issues
+<https://gitlab.com/tezos/tezos/issues>`_.
 
 For more information about the project in general, see:
 

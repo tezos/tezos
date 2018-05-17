@@ -14,8 +14,8 @@ protocol and the nodes should adapt and upgrade.
 
  - Developer documentation is available online at http://doc.tzalpha.net
  - The page https://www.tezos.com/ contains more information about the
-   project, even though it is frozen in time due to external reasons
- - All development now happens on Gitlab at https://gitlab.com/tezos/tezos
+   project.
+ - All development now happens on GitLab at https://gitlab.com/tezos/tezos
 
 The Tezos Alpha (test) network has been live and open since February 2017.
 
