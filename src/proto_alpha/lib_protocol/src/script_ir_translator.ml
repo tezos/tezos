@@ -1009,7 +1009,6 @@ let parse_field_annot
     | [ `Field_annot _ as a ] -> ok (Some a)
     | _ -> error (Unexpected_annotation loc) (* (Invalid_var_annotation (loc, annot)) *)
 
-
 let extract_field_annot
   : Script.node -> (Script.node * field_annot option) tzresult
   = function
@@ -1024,6 +1023,14 @@ let extract_field_annot
         Prim (loc, prim, args, annot), field_annot
     | expr -> ok (expr, None)
 
+let check_correct_field
+  : field_annot option -> field_annot option -> unit tzresult
+  = fun f1 f2 ->
+    match f1, f2 with
+    | None, _ | _, None -> ok ()
+    | Some `Field_annot s1, Some `Field_annot s2 ->
+        if String.equal s1 s2 then ok ()
+        else error (Inconsistent_field_annotations ("%" ^ s1, "%" ^ s2))
 
 let rec parse_comparable_ty
   : Script.node -> ex_comparable_ty tzresult
@@ -1773,14 +1780,16 @@ and parse_instr
         typed ctxt loc Cons_pair
           (Item_t (Pair_t((a, l_field), (b, r_field), ty_name), rest, annot))
     | Prim (loc, I_CAR, [], annot),
-      Item_t (Pair_t ((a, field_annot), _, _), rest, pair_annot) ->
-        parse_var_annot loc annot ~default:(access_annot pair_annot field_annot)
-        >>=? fun annot ->
+      Item_t (Pair_t ((a, expected_field_annot), _, _), rest, pair_annot) ->
+        parse_var_field_annot loc annot >>=? fun (annot, field_annot) ->
+        let annot = default_annot annot ~default:(access_annot pair_annot expected_field_annot) in
+        Lwt.return (check_correct_field field_annot expected_field_annot) >>=? fun () ->
         typed ctxt loc Car (Item_t (a, rest, annot))
     | Prim (loc, I_CDR, [], annot),
-      Item_t (Pair_t (_, (b, field_annot), _), rest, pair_annot) ->
-        parse_var_annot loc annot ~default:(access_annot pair_annot field_annot)
-        >>=? fun annot ->
+      Item_t (Pair_t (_, (b, expected_field_annot), _), rest, pair_annot) ->
+        parse_var_field_annot loc annot >>=? fun (annot, field_annot) ->
+        let annot = default_annot annot ~default:(access_annot pair_annot expected_field_annot) in
+        Lwt.return (check_correct_field field_annot expected_field_annot) >>=? fun () ->
         typed ctxt loc Cdr (Item_t (b, rest, annot))
     (* unions *)
     | Prim (loc, I_LEFT, [ tr ], annot),

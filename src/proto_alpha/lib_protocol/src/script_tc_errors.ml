@@ -43,6 +43,7 @@ type error += Inconsistent_annotations of string * string
 type error += Inconsistent_type_annotations : Script.location * _ ty * _ ty -> error
 type error += Invalid_type_annotation : Script.location * annot list -> error
 type error += Invalid_var_annotation : Script.location * annot list -> error
+type error += Inconsistent_field_annotations of string * string
 type error += Unexpected_annotation of Script.location
 type error += Invalid_map_body : Script.location * _ stack_ty -> error
 type error += Invalid_map_block_fail of Script.location

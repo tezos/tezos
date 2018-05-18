@@ -368,6 +368,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  - @[<v>%s@]@]"
                 annot1
                 annot2
+          | Inconsistent_field_annotations (annot1, annot2) ->
+              Format.fprintf ppf
+                "@[<v 2>The field access annotation does not match:@,\
+                 - @[<v>%s@]@,\
+                 - @[<v>%s@]@]"
+                annot1
+                annot2
           | Inconsistent_type_annotations (loc, ty1, ty2) ->
               Format.fprintf ppf
                 "@[<v 2>%athe two types contain incompatible annotations:@,\

@@ -335,6 +335,18 @@ let () =
     (function Inconsistent_annotations (annot1, annot2) -> Some (annot1, annot2)
             | _ -> None)
     (fun (annot1, annot2) -> Inconsistent_annotations (annot1, annot2)) ;
+  (* Inconsistent field annotations *)
+  register_error_kind
+    `Permanent
+    ~id:"inconsistentFieldAnnotations"
+    ~title:"Annotations for field accesses is inconsistent"
+    ~description:"The specified field does not match the field annotation in the type"
+    (obj2
+       (req "annot1" string)
+       (req "annot2" string))
+    (function Inconsistent_field_annotations (annot1, annot2) -> Some (annot1, annot2)
+            | _ -> None)
+    (fun (annot1, annot2) -> Inconsistent_field_annotations (annot1, annot2)) ;
   (* Inconsistent type annotations *)
   register_error_kind
     `Permanent
