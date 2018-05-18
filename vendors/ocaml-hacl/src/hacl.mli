@@ -71,6 +71,8 @@ module Nonce : sig
   val bytes : int
   val gen : unit -> t
   val increment : ?step:int -> t -> t
+  val of_bytes : Bigstring.t -> t option
+  val of_bytes_exn : Bigstring.t -> t
 end
 
 module Secretbox : sig

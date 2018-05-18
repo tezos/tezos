@@ -64,6 +64,23 @@ let random_keypair () =
 let zero_nonce = MBytes.make Nonce.bytes '\x00'
 let random_nonce = Nonce.gen
 let increment_nonce = Nonce.increment
+let generate_nonce mbytes =
+  let hash = Blake2B.hash_bytes mbytes in
+  Nonce.of_bytes_exn @@ (Bigstring.sub (Blake2B.to_bytes hash) 0 Nonce.bytes)
+
+let init_to_resp_seed = MBytes.of_string "Init -> Resp"
+let resp_to_init_seed  = MBytes.of_string "Resp -> Init"
+let generate_nonces ~incoming ~sent_msg ~recv_msg =
+  let (init_msg, resp_msg, false)
+    | (resp_msg, init_msg, true) = (sent_msg, recv_msg, incoming) in
+  let nonce_init_to_resp =
+    generate_nonce [ init_msg ; resp_msg ; init_to_resp_seed ] in
+  let nonce_resp_to_init =
+    generate_nonce [ init_msg ; resp_msg ; resp_to_init_seed ] in
+  if incoming then
+    (nonce_init_to_resp, nonce_resp_to_init)
+  else
+    (nonce_resp_to_init, nonce_init_to_resp)
 
 let precompute sk pk = Box.dh pk sk
 

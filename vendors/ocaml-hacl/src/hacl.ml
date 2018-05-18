@@ -166,6 +166,15 @@ module Nonce = struct
     Bigstring.blit nonce 0 new_nonce 0 24 ;
     incr_byte new_nonce step 22 ;
     new_nonce
+
+  let of_bytes buf =
+    if Bigstring.length buf <> bytes then None else Some buf
+
+  let of_bytes_exn buf =
+    match of_bytes buf with
+    | Some s -> s
+    | None -> invalid_arg "Hacl.Nonce.of_bytes_exn: invalid length"
+
 end
 
 module Secretbox = struct

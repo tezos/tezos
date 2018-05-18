@@ -125,23 +125,28 @@ module Connection_message = struct
     | Some last ->
         fail_unless (last = len) P2p_errors.Encoding_error >>=? fun () ->
         MBytes.set_int16 buf 0 encoded_message_len ;
-        P2p_io_scheduler.write fd buf
+        P2p_io_scheduler.write fd buf >>=? fun () ->
+        (* We return the raw message as it is used later to compute
+           the nonces *)
+        return buf
 
   let read fd =
     let header_buf = MBytes.create Crypto.header_length in
     P2p_io_scheduler.read_full
       ~len:Crypto.header_length fd header_buf >>=? fun () ->
     let len = MBytes.get_uint16 header_buf 0 in
-    let buf = MBytes.create len in
-    P2p_io_scheduler.read_full ~len fd buf >>=? fun () ->
-    match Data_encoding.Binary.read encoding buf 0 len with
+    let pos = Crypto.header_length in
+    let buf = MBytes.create (pos + len) in
+    MBytes.set_int16 buf 0 len ;
+    P2p_io_scheduler.read_full ~len ~pos fd buf >>=? fun () ->
+    match Data_encoding.Binary.read encoding buf pos len with
     | None ->
         fail P2p_errors.Decoding_error
-    | Some (read_len, message) ->
-        if read_len <> len then
+    | Some (next_pos, message) ->
+        if next_pos <> pos+len then
           fail P2p_errors.Decoding_error
         else
-          return message
+          return (message, buf)
 
 end
 
@@ -176,15 +181,15 @@ let authenticate
     ~proof_of_work_target
     ~incoming fd (remote_addr, remote_socket_port as point)
     ?listening_port identity supported_versions =
-  let local_nonce = Crypto_box.random_nonce () in
+  let local_nonce_seed = Crypto_box.random_nonce () in
   lwt_debug "Sending authenfication to %a" P2p_point.Id.pp point >>= fun () ->
   Connection_message.write fd
     { public_key = identity.P2p_identity.public_key ;
       proof_of_work_stamp = identity.proof_of_work_stamp ;
-      message_nonce = local_nonce ;
+      message_nonce = local_nonce_seed ;
       port = listening_port ;
-      versions = supported_versions } >>=? fun () ->
-  Connection_message.read fd >>=? fun msg ->
+      versions = supported_versions } >>=? fun sent_msg ->
+  Connection_message.read fd >>=? fun (msg, recv_msg) ->
   let remote_listening_port =
     if incoming then msg.port else Some remote_socket_port in
   let id_point = remote_addr, remote_listening_port in
@@ -198,13 +203,13 @@ let authenticate
     (P2p_errors.Not_enough_proof_of_work remote_peer_id) >>=? fun () ->
   let channel_key =
     Crypto_box.precompute identity.P2p_identity.secret_key msg.public_key in
+  let (local_nonce, remote_nonce) =
+    Crypto_box.generate_nonces ~incoming ~sent_msg ~recv_msg in
+  let cryptobox_data = { Crypto.channel_key ; local_nonce ; remote_nonce } in
   let info =
     { P2p_connection.Info.peer_id = remote_peer_id ;
       versions = msg.versions ; incoming ;
       id_point ; remote_socket_port ;} in
-  let cryptobox_data =
-    { Crypto.channel_key ; local_nonce ;
-      remote_nonce = msg.message_nonce } in
   return (info, (fd, info, cryptobox_data))
 
 type connection = {
@@ -552,4 +557,3 @@ let close ?(wait = false) st =
   Writer.shutdown st.writer >>= fun () ->
   P2p_io_scheduler.close st.conn.fd >>= fun _ ->
   Lwt.return_unit
-

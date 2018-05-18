@@ -16,6 +16,16 @@ val zero_nonce : nonce
 val random_nonce : unit -> nonce
 val increment_nonce : ?step:int -> nonce -> nonce
 
+(** [generate_nonces ~incoming ~sent_msg ~recv_msg] generates two
+    nonces by hashing (Blake2B) the arguments. The nonces should be
+    used to initialize the encryption on the communication
+    channels. Because an attacker cannot control both messages,
+    it cannot determine the nonces that will be used to encrypt
+    the messages. The sent message should contains a random nonce,
+    and we should never send the exact same message twice. *)
+val generate_nonces :
+  incoming:bool -> sent_msg:MBytes.t -> recv_msg:MBytes.t -> nonce * nonce
+
 module Secretbox : sig
   type key
 
