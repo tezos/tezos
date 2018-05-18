@@ -556,6 +556,11 @@ let unparse_comparable_ty
     | Timestamp_key tname -> Prim (-1, T_timestamp, [], unparse_type_annot tname)
     | Address_key tname -> Prim (-1, T_address, [], unparse_type_annot tname)
 
+let add_field_annot a = function
+  | Prim (loc, prim, args, annots) ->
+      Prim (loc, prim, args, annots @ (unparse_field_annot a) )
+  | expr -> expr
+
 let rec unparse_ty
   : type a. a ty -> Script.node
   = function
@@ -575,28 +580,22 @@ let rec unparse_ty
       let t = unparse_ty ut in
       Prim (-1, T_contract, [ t ], unparse_type_annot tname)
   | Pair_t ((utl, l_field), (utr, r_field ), tname) ->
-      let annot = unparse_type_annot tname @
-                  unparse_field_annot l_field @
-                  unparse_field_annot r_field in
-      let tl = unparse_ty utl in
-      let tr = unparse_ty utr in
+      let annot = unparse_type_annot tname in
+      let tl = unparse_ty utl |> add_field_annot l_field in
+      let tr = unparse_ty utr |> add_field_annot r_field in
       Prim (-1, T_pair, [ tl; tr ], annot)
   | Union_t ((utl, l_field), (utr, r_field), tname) ->
-      let annot = unparse_type_annot tname @
-                  unparse_field_annot l_field @
-                  unparse_field_annot r_field in
-      let tl = unparse_ty utl in
-      let tr = unparse_ty utr in
+      let annot = unparse_type_annot tname in
+      let tl = unparse_ty utl |> add_field_annot l_field in
+      let tr = unparse_ty utr |> add_field_annot r_field in
       Prim (-1, T_or, [ tl; tr ], annot)
   | Lambda_t (uta, utr, tname) ->
       let ta = unparse_ty uta in
       let tr = unparse_ty utr in
       Prim (-1, T_lambda, [ ta; tr ], unparse_type_annot tname)
-  | Option_t ((ut, some_field), none_field, tname) ->
-      let annot = unparse_type_annot tname @
-                  unparse_field_annot some_field @
-                  unparse_field_annot none_field in
-      let t = unparse_ty ut in
+  | Option_t ((ut, some_field), _none_field, tname) ->
+      let annot = unparse_type_annot tname in
+      let t = unparse_ty ut |> add_field_annot some_field in
       Prim (-1, T_option, [ t ], annot)
   | List_t (ut, tname) ->
       let t = unparse_ty ut in
@@ -1001,6 +1000,31 @@ let check_const_type_annot
     Lwt.return
     (parse_type_annot loc annot >>? merge_type_annot expected_annot >|? fun _ -> ())
 
+let parse_field_annot
+  : int -> string list -> field_annot option tzresult
+  = fun loc annot ->
+    annots_of_strings loc annot >>?
+    function
+    | [] -> ok None
+    | [ `Field_annot _ as a ] -> ok (Some a)
+    | _ -> error (Unexpected_annotation loc) (* (Invalid_var_annotation (loc, annot)) *)
+
+
+let extract_field_annot
+  : Script.node -> (Script.node * field_annot option) tzresult
+  = function
+    | Prim (loc, prim, args, annot) ->
+        let field_annots, annot = List.partition (fun s ->
+            match s.[0] with
+            | '%' -> true
+            | _ -> false
+            | exception Invalid_argument _ -> false
+          ) annot in
+        parse_field_annot loc field_annots >|? fun field_annot ->
+        Prim (loc, prim, args, annot), field_annot
+    | expr -> ok (expr, None)
+
+
 let rec parse_comparable_ty
   : Script.node -> ex_comparable_ty tzresult
   = function
@@ -1113,14 +1137,18 @@ and parse_ty :
         parse_type_annot loc annot >|? fun ty_name ->
         Ex_ty (Contract_t (tl, ty_name))
     | Prim (loc, T_pair, [ utl; utr ], annot) ->
+        extract_field_annot utl >>? fun (utl, left_field) ->
+        extract_field_annot utr >>? fun (utr, right_field) ->
         parse_ty ~allow_big_map:false ~allow_operation utl >>? fun (Ex_ty tl) ->
         parse_ty ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr) ->
-        parse_composed_type_annot loc annot >|? fun (ty_name, left_field, right_field) ->
+        parse_type_annot loc annot >|? fun ty_name ->
         Ex_ty (Pair_t ((tl, left_field), (tr, right_field), ty_name))
     | Prim (loc, T_or, [ utl; utr ], annot) ->
+        extract_field_annot utl >>? fun (utl, left_constr) ->
+        extract_field_annot utr >>? fun (utr, right_constr) ->
         parse_ty ~allow_big_map:false ~allow_operation utl >>? fun (Ex_ty tl) ->
         parse_ty ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr) ->
-        parse_composed_type_annot loc annot >|? fun (ty_name, left_constr, right_constr) ->
+        parse_type_annot loc annot >|? fun ty_name ->
         Ex_ty (Union_t ((tl, left_constr), (tr, right_constr), ty_name))
     | Prim (loc, T_lambda, [ uta; utr ], annot) ->
         parse_ty ~allow_big_map:false ~allow_operation uta >>? fun (Ex_ty ta) ->
@@ -1128,9 +1156,10 @@ and parse_ty :
         parse_type_annot loc annot >|? fun ty_name ->
         Ex_ty (Lambda_t (ta, tr, ty_name))
     | Prim (loc, T_option, [ ut ], annot) ->
+        extract_field_annot ut >>? fun (ut, some_constr) ->
         parse_ty ~allow_big_map:false ~allow_operation ut >>? fun (Ex_ty t) ->
-        parse_composed_type_annot loc annot >|? fun (ty_name, some_constr, none_constr) ->
-        Ex_ty (Option_t ((t, some_constr), none_constr, ty_name))
+        parse_type_annot loc annot >|? fun ty_name ->
+        Ex_ty (Option_t ((t, some_constr), None, ty_name))
     | Prim (loc, T_list, [ ut ], annot) ->
         parse_ty ~allow_big_map:false ~allow_operation ut >>? fun (Ex_ty t) ->
         parse_type_annot loc annot >|? fun ty_name ->
@@ -1183,18 +1212,11 @@ let parse_var_annot
       | [], None -> ok None
       | [], Some d -> ok d
       | [ `Var_annot _ as a ], _ -> ok (Some a)
-      | _ -> error (Invalid_var_annotation (loc, annot))
+      | _ -> error (Unexpected_annotation loc) (* (Invalid_var_annotation (loc, annot)) *)
     end |> Lwt.return
 
-let parse_field_annot
-  : int -> string list -> field_annot option tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (annots_of_strings loc annot) >>=? fun annot ->
-    begin match annot with
-      | [] -> ok None
-      | [ `Field_annot _ as a ] -> ok (Some a)
-      | _ -> error (Invalid_var_annotation (loc, annot))
-    end |> Lwt.return
+let parse_field_annot loc annot =
+  Lwt.return (parse_field_annot loc annot)
 
 let classify_annot
   : annot list -> var_annot list * type_annot list * field_annot list
@@ -1266,6 +1288,21 @@ let parse_var_type_annot
     get_one_annot loc vars >>=? fun v ->
     get_one_annot loc types >>|? fun t ->
     (v, t)
+
+(* let check_and_remove_type_annot
+ *   : type a. Script.node -> a stack_ty -> Script.node tzresult Lwt.t
+ *   = fun instr stack ->
+ *     match instr, stack with
+ *     | Prim (loc, prim, args, annot), Item_t (ty, _, _) ->
+ *         let type_annots, annot = List.partition (fun s ->
+ *             match s.[0] with
+ *             | ':' -> true
+ *             | _ -> false
+ *             | exception Invalid_argument _ -> false
+ *           ) annot in
+ *         check_const_type_annot loc type_annots (name_of_ty ty) >>|? fun () ->
+ *         Prim (loc, prim, args, annot)
+ *     | _ -> Lwt.return @@ ok @@ instr *)
 
 let field_to_var_annot : field_annot option -> var_annot option =
   function
@@ -1734,7 +1771,7 @@ and parse_instr
         let l_field = default_annot l_field ~default:(var_to_field_annot fst_annot) in
         let r_field = default_annot r_field ~default:(var_to_field_annot snd_annot) in
         typed ctxt loc Cons_pair
-          (Item_t (Pair_t((a, r_field), (b, l_field), ty_name), rest, annot))
+          (Item_t (Pair_t((a, l_field), (b, r_field), ty_name), rest, annot))
     | Prim (loc, I_CAR, [], annot),
       Item_t (Pair_t ((a, field_annot), _, _), rest, pair_annot) ->
         parse_var_annot loc annot ~default:(access_annot pair_annot field_annot)
