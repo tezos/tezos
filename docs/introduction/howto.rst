@@ -221,14 +221,17 @@ To interact with your node, read the doc of clients:
 
 And read :ref:`this page<alphanet>` to get alphanet tezzies.
 
-Run the node in a sandbox
--------------------------
+Use sandboxed mode
+------------------
 
 To run a ‘localhost-only’ instance of a Tezos network, we provide two
 helper scripts:
 
 -  ``./src/bin_node/tezos-sandboxed-node.sh``
 -  ``./src/bin_client/tezos-init-sandboxed-client.sh``
+
+Run a sandboxed node
+~~~~~~~~~~~~~~~~~~~~
 
 For instance, if you want to run local network with two nodes, in a
 first terminal, the following command will initialize a node listening
@@ -257,6 +260,9 @@ command instead:
 ::
 
     ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0
+
+Use the sandboxed client
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once your node(s) is/are running, open a new terminal and initialize the
 “sandboxed” client data:
@@ -288,6 +294,15 @@ activating the whole network. For instance:
     Injected BMBcK869jaHQDc
     $ tezos-client rpc call blocks/head/protocol
     { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" }
+
+Tune protocol alpha parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``tezos-active-alpha`` alias use parameters from
+``scripts/protocol_parameters.json`` to activate protocol alpha. It can
+be useful to tune these parameters when you need to debug something,
+for example, change the number of blocks per cycle, the time between
+blocks, etc.
 
 Configuration options
 ---------------------
