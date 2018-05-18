@@ -78,6 +78,7 @@ class type full = object
 end
 
 class proxy_context (obj : full) = object
+  method base = obj#base
   method block = obj#block
   method answer : type a. (a, unit) lwt_format -> a = obj#answer
   method call_service :

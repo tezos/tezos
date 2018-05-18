@@ -437,4 +437,5 @@ class http_ctxt config media_types : RPC_context.json =
       fun service ~on_chunk ~on_close params query body ->
         call_streamed_service media_types service
           ~logger ~base ~on_chunk ~on_close params query body
+    method base = base
   end
