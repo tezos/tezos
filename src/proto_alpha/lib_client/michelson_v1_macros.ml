@@ -356,55 +356,58 @@ let expand_duuuuup original =
   | _ -> ok None
 
 let expand_compare original =
-  let cmp loc is =
+  let cmp loc is annot =
     let is =
-      List.map (fun i -> Prim (loc, i, [], [])) is in
+      match List.rev_map (fun i -> Prim (loc, i, [], [])) is with
+      | Prim (loc, i, args, _) :: r -> List.rev (Prim (loc, i, args, annot) :: r)
+      | is -> List.rev is
+    in
     ok (Some (Seq (loc, is))) in
-  let ifcmp loc is l r =
+  let ifcmp loc is l r annot =
     let is =
       List.map (fun i -> Prim (loc, i, [], [])) is @
-      [ Prim (loc, "IF", [ l ; r ], []) ] in
+      [ Prim (loc, "IF", [ l ; r ], annot) ] in
     ok (Some (Seq (loc, is))) in
   match original with
-  | Prim (loc, "CMPEQ", [], []) ->
-      cmp loc [ "COMPARE" ; "EQ" ]
-  | Prim (loc, "CMPNEQ", [], []) ->
-      cmp loc [ "COMPARE" ; "NEQ" ]
-  | Prim (loc, "CMPLT", [], []) ->
-      cmp loc [ "COMPARE" ; "LT" ]
-  | Prim (loc, "CMPGT", [], []) ->
-      cmp loc [ "COMPARE" ; "GT" ]
-  | Prim (loc, "CMPLE", [], []) ->
-      cmp loc [ "COMPARE" ; "LE" ]
-  | Prim (loc, "CMPGE", [], []) ->
-      cmp loc [ "COMPARE" ; "GE" ]
+  | Prim (loc, "CMPEQ", [], annot) ->
+      cmp loc [ "COMPARE" ; "EQ" ] annot
+  | Prim (loc, "CMPNEQ", [], annot) ->
+      cmp loc [ "COMPARE" ; "NEQ" ] annot
+  | Prim (loc, "CMPLT", [], annot) ->
+      cmp loc [ "COMPARE" ; "LT" ] annot
+  | Prim (loc, "CMPGT", [], annot) ->
+      cmp loc [ "COMPARE" ; "GT" ] annot
+  | Prim (loc, "CMPLE", [], annot) ->
+      cmp loc [ "COMPARE" ; "LE" ] annot
+  | Prim (loc, "CMPGE", [], annot) ->
+      cmp loc [ "COMPARE" ; "GE" ] annot
   | Prim (_, ("CMPEQ" |  "CMPNEQ" |  "CMPLT"
              |  "CMPGT" |  "CMPLE" | "CMPGE" as str), args, []) ->
       error (Invalid_arity (str, List.length args, 0))
-  | Prim (loc, "IFCMPEQ", [ l ; r ], []) ->
-      ifcmp loc [ "COMPARE" ; "EQ" ] l r
-  | Prim (loc, "IFCMPNEQ", [ l ; r ], []) ->
-      ifcmp loc [ "COMPARE" ; "NEQ" ] l r
-  | Prim (loc, "IFCMPLT", [ l ; r ], []) ->
-      ifcmp loc [ "COMPARE" ; "LT" ] l r
-  | Prim (loc, "IFCMPGT", [ l ; r ], []) ->
-      ifcmp loc [ "COMPARE" ; "GT" ] l r
-  | Prim (loc, "IFCMPLE", [ l ; r ], []) ->
-      ifcmp loc [ "COMPARE" ; "LE" ] l r
-  | Prim (loc, "IFCMPGE", [ l ; r ], []) ->
-      ifcmp loc [ "COMPARE" ; "GE" ] l r
-  | Prim (loc, "IFEQ", [ l ; r ], []) ->
-      ifcmp loc [ "EQ" ] l r
-  | Prim (loc, "IFNEQ", [ l ; r ], []) ->
-      ifcmp loc [ "NEQ" ] l r
-  | Prim (loc, "IFLT", [ l ; r ], []) ->
-      ifcmp loc [ "LT" ] l r
-  | Prim (loc, "IFGT", [ l ; r ], []) ->
-      ifcmp loc [ "GT" ] l r
-  | Prim (loc, "IFLE", [ l ; r ], []) ->
-      ifcmp loc [ "LE" ] l r
-  | Prim (loc, "IFGE", [ l ; r ], []) ->
-      ifcmp loc [ "GE" ] l r
+  | Prim (loc, "IFCMPEQ", [ l ; r ], annot) ->
+      ifcmp loc [ "COMPARE" ; "EQ" ] l r annot
+  | Prim (loc, "IFCMPNEQ", [ l ; r ], annot) ->
+      ifcmp loc [ "COMPARE" ; "NEQ" ] l r annot
+  | Prim (loc, "IFCMPLT", [ l ; r ], annot) ->
+      ifcmp loc [ "COMPARE" ; "LT" ] l r annot
+  | Prim (loc, "IFCMPGT", [ l ; r ], annot) ->
+      ifcmp loc [ "COMPARE" ; "GT" ] l r annot
+  | Prim (loc, "IFCMPLE", [ l ; r ], annot) ->
+      ifcmp loc [ "COMPARE" ; "LE" ] l r annot
+  | Prim (loc, "IFCMPGE", [ l ; r ], annot) ->
+      ifcmp loc [ "COMPARE" ; "GE" ] l r annot
+  | Prim (loc, "IFEQ", [ l ; r ], annot) ->
+      ifcmp loc [ "EQ" ] l r annot
+  | Prim (loc, "IFNEQ", [ l ; r ], annot) ->
+      ifcmp loc [ "NEQ" ] l r annot
+  | Prim (loc, "IFLT", [ l ; r ], annot) ->
+      ifcmp loc [ "LT" ] l r annot
+  | Prim (loc, "IFGT", [ l ; r ], annot) ->
+      ifcmp loc [ "GT" ] l r annot
+  | Prim (loc, "IFLE", [ l ; r ], annot) ->
+      ifcmp loc [ "LE" ] l r annot
+  | Prim (loc, "IFGE", [ l ; r ], annot) ->
+      ifcmp loc [ "GE" ] l r annot
   | Prim (_, ("IFCMPEQ" | "IFCMPNEQ" | "IFCMPLT"
              | "IFCMPGT" | "IFCMPLE" | "IFCMPGE"
              | "IFEQ" | "IFNEQ" | "IFLT"
@@ -413,9 +416,7 @@ let expand_compare original =
   | Prim (_, ("IFCMPEQ" | "IFCMPNEQ" | "IFCMPLT"
              | "IFCMPGT" | "IFCMPLE" | "IFCMPGE"
              | "IFEQ" | "IFNEQ" | "IFLT"
-             | "IFGT" | "IFLE" | "IFGE"
-             | "CMPEQ" |  "CMPNEQ" |  "CMPLT"
-             | "CMPGT" |  "CMPLE" | "CMPGE" as str), [], _ :: _) ->
+             | "IFGT" | "IFLE" | "IFGE" as str), [], _ :: _) ->
       error (Unexpected_macro_annotation str)
   | _ -> ok None
 
@@ -746,66 +747,66 @@ let unexpand_unpaaiair expanded =
 
 let unexpand_compare expanded =
   match expanded with
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "EQ", [], []) ]) ->
-      Some (Prim (loc, "CMPEQ", [], []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "NEQ", [], []) ]) ->
-      Some (Prim (loc, "CMPNEQ", [], []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "LT", [], []) ]) ->
-      Some (Prim (loc, "CMPLT", [], []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "GT", [], []) ]) ->
-      Some (Prim (loc, "CMPGT", [], []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "LE", [], []) ]) ->
-      Some (Prim (loc, "CMPLE", [], []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "GE", [], []) ]) ->
-      Some (Prim (loc, "CMPGE", [], []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "EQ", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFCMPEQ", args, []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "NEQ", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFCMPNEQ", args, []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "LT", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFCMPLT", args, []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "GT", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFCMPGT", args, []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "LE", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFCMPLE", args, []))
-  | Seq (loc, [ Prim (_, "COMPARE", [], []) ;
-                Prim (_, "GE", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFCMPGE", args, []))
-  | Seq (loc, [ Prim (_, "EQ", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFEQ", args, []))
-  | Seq (loc, [ Prim (_, "NEQ", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFNEQ", args, []))
-  | Seq (loc, [ Prim (_, "LT", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFLT", args, []))
-  | Seq (loc, [ Prim (_, "GT", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFGT", args, []))
-  | Seq (loc, [ Prim (_, "LE", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFLE", args, []))
-  | Seq (loc, [ Prim (_, "GE", [], []) ;
-                Prim (_, "IF", args, []) ]) ->
-      Some (Prim (loc, "IFGE", args, []))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "EQ", [], annot) ]) ->
+      Some (Prim (loc, "CMPEQ", [], annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "NEQ", [], annot) ]) ->
+      Some (Prim (loc, "CMPNEQ", [], annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "LT", [], annot) ]) ->
+      Some (Prim (loc, "CMPLT", [], annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "GT", [], annot) ]) ->
+      Some (Prim (loc, "CMPGT", [], annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "LE", [], annot) ]) ->
+      Some (Prim (loc, "CMPLE", [], annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "GE", [], annot) ]) ->
+      Some (Prim (loc, "CMPGE", [], annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "EQ", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFCMPEQ", args, annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "NEQ", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFCMPNEQ", args, annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "LT", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFCMPLT", args, annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "GT", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFCMPGT", args, annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "LE", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFCMPLE", args, annot))
+  | Seq (loc, [ Prim (_, "COMPARE", [], _) ;
+                Prim (_, "GE", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFCMPGE", args, annot))
+  | Seq (loc, [ Prim (_, "EQ", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFEQ", args, annot))
+  | Seq (loc, [ Prim (_, "NEQ", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFNEQ", args, annot))
+  | Seq (loc, [ Prim (_, "LT", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFLT", args, annot))
+  | Seq (loc, [ Prim (_, "GT", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFGT", args, annot))
+  | Seq (loc, [ Prim (_, "LE", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFLE", args, annot))
+  | Seq (loc, [ Prim (_, "GE", [], _) ;
+                Prim (_, "IF", args, annot) ]) ->
+      Some (Prim (loc, "IFGE", args, annot))
   | _ -> None
 
 let unexpand_asserts expanded =
@@ -844,13 +845,13 @@ let unexpand_asserts expanded =
 
 
 let unexpand_if_some = function
-  | Seq (loc, [ Prim (_, "IF_NONE", [ left ; right ], []) ]) ->
-      Some (Prim (loc, "IF_SOME", [ right ; left ], []))
+  | Seq (loc, [ Prim (_, "IF_NONE", [ left ; right ], annot) ]) ->
+      Some (Prim (loc, "IF_SOME", [ right ; left ], annot))
   | _ -> None
 
 let unexpand_if_right = function
-  | Seq (loc, [ Prim (_, "IF_LEFT", [ left ; right ], []) ]) ->
-      Some (Prim (loc, "IF_RIGHT", [ right ; left ], []))
+  | Seq (loc, [ Prim (_, "IF_LEFT", [ left ; right ], annot) ]) ->
+      Some (Prim (loc, "IF_RIGHT", [ right ; left ], annot))
   | _ -> None
 
 let unexpand_rename = function
