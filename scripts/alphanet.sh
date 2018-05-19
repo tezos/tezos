@@ -512,7 +512,7 @@ case $(basename $0) in
         ;;
     *)
         docker_base_dir="$HOME/.tezos-alphanet"
-        docker_image=tezos:latest
+        docker_image=tezos/tezos:alphanet
         docker_compose_base_name="alphanet"
         default_port=9732
         ;;
