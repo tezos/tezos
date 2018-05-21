@@ -124,7 +124,7 @@ module Hash = struct
 
       let bytes = 64
       let blockbytes = 128
-      let statebytes = 169 * 4
+      let statebytes = 169 * 8
     end)
 
   module HMAC_SHA256 = struct
