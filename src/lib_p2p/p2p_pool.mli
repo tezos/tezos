@@ -292,8 +292,9 @@ val write_all:  ('msg, 'peer_meta,'conn_meta) pool -> 'msg -> unit
     connections to [pool] in [Running] state. *)
 
 val broadcast_bootstrap_msg:  ('msg, 'peer_meta,'conn_meta) pool -> unit
-(** [write_all pool msg] is [P2P_connection.write_now conn Bootstrap]
-    for all member connections to [pool] in [Running] state. *)
+(** [broadcast_bootstrap_msg pool] is [P2P_connection.write_now conn Bootstrap]
+    for all member connections to [pool] in [Running] state.
+    This behavior is deactivated if the node is in private mode  *)
 
 val greylist_addr : ('msg, 'peer_meta,'conn_meta) pool -> P2p_addr.t -> unit
 (** [greylist_addr pool addr] adds [addr] to [pool]'s IP greylist. *)

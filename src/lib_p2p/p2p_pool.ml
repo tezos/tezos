@@ -409,13 +409,14 @@ let write_all pool msg =
     pool.connected_peer_ids
 
 let broadcast_bootstrap_msg pool =
-  P2p_peer.Table.iter
-    (fun _peer_id peer_info ->
-       match P2p_peer_state.get peer_info with
-       | Running { data = { conn } } ->
-           ignore (P2p_socket.write_now conn Bootstrap : bool tzresult )
-       | _ -> ())
-    pool.connected_peer_ids
+  if not pool.config.private_mode then
+    P2p_peer.Table.iter
+      (fun _peer_id peer_info ->
+         match P2p_peer_state.get peer_info with
+         | Running { data = { conn } } ->
+             ignore (P2p_socket.write_now conn Bootstrap : bool tzresult )
+         | _ -> ())
+      pool.connected_peer_ids
 
 
 (***************************************************************************)
