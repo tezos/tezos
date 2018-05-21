@@ -27,6 +27,7 @@ let commands () =
            if (not endorsement) && (not baking) && (not denunciation)
            then (true, true, true)
            else (endorsement, baking, denunciation) in
+         iter_s (fun d -> Client_keys.get_key cctxt d >>|? fun _ -> ()) delegates >>=? fun () ->
          run_daemon cctxt ?max_priority ~endorsement_delay ~endorsement ~baking ~denunciation delegates) ;
     command ~group ~desc: "Forge and inject an endorsement operation."
       (args1 max_priority_arg)
