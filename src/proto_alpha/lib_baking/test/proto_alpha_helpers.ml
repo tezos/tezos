@@ -459,7 +459,7 @@ module Assert = struct
 
   let missing_public_key ~msg =
     contain_error ~msg ~f:begin ecoproto_error (function
-        | Contract_storage.Missing_public_key _ -> true
+        | Contract_storage.Unrevealed_manager_key _ -> true
         | _ -> false)
     end
 

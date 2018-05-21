@@ -16,7 +16,6 @@ type error +=
   | Empty_implicit_contract of Signature.Public_key_hash.t (* `Temporary *)
   | Inconsistent_hash of Signature.Public_key.t * Signature.Public_key_hash.t * Signature.Public_key_hash.t (* `Permanent *)
   | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t (* `Permanent *)
-  | Missing_public_key of Signature.Public_key_hash.t (* `Permanent *)
   | Failure of string (* `Permanent *)
   | Previously_revealed_key of Contract_repr.t (* `Permanent *)
   | Unrevealed_manager_key of Contract_repr.t (* `Permanent *)
@@ -121,17 +120,6 @@ let () =
                      (req "expected_public_key" Signature.Public_key.encoding))
     (function Inconsistent_public_key (eh, ph) -> Some (eh, ph) | _ -> None)
     (fun (eh, ph) -> Inconsistent_public_key (eh, ph)) ;
-  register_error_kind
-    `Permanent
-    ~id:"contract.manager.missing_public_key"
-    ~title:"Missing public key"
-    ~description:"The manager public key must be provided to execute the current operation"
-    ~pp:(fun ppf k ->
-        Format.fprintf ppf "The manager public key ( with hash %a ) is missing"
-          Signature.Public_key_hash.pp k)
-    Data_encoding.(obj1 (req "hash" Signature.Public_key_hash.encoding))
-    (function Missing_public_key k -> Some k | _ -> None)
-    (fun k -> Missing_public_key k) ;
   register_error_kind
     `Permanent
     ~id:"contract.failure"
