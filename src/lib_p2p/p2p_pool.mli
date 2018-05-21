@@ -168,6 +168,9 @@ val config : _ pool -> config
     creation. *)
 
 val send_swap_request: ('msg, 'peer_meta,'conn_meta) pool -> unit
+(** [send_swap_request pool] given two connected peers pi and pj (pi
+    <> pj), suggest swap with pi for the peer pj. This behaviour is
+    disabled in private mode *)
 
 (** {2 Pool events} *)
 

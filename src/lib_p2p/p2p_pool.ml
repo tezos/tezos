@@ -1023,8 +1023,7 @@ let accept pool fd point =
 
 let send_swap_request pool =
   match Connection.random pool with
-  | None -> ()
-  | Some recipient ->
+  | Some recipient when not pool.config.private_mode -> begin
       let recipient_peer_id = (Connection.info recipient).peer_id in
       match Connection.random_lowid ~different_than:recipient pool with
       | None -> ()
@@ -1034,6 +1033,8 @@ let send_swap_request pool =
             Some (Time.now (), proposed_peer_id) ;
           ignore (P2p_socket.write_now recipient.conn
                     (Swap_request (proposed_point, proposed_peer_id)))
+    end
+  | Some _ | None -> ()
 
 (***************************************************************************)
 
