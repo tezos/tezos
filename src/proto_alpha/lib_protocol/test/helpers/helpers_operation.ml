@@ -17,13 +17,14 @@ let manager (src : Helpers_account.t) ?(fee = Tez.zero) operations context =
   Alpha_context.prepare
     ~level:0l ~timestamp:(Time.now ()) ~fitness:[] context >>=? fun context ->
   Contract.get_counter context src.contract >>=? fun counter ->
+  Contract.is_manager_key_revealed context src.contract >>=? fun revealed ->
   let counter = Int32.succ counter in
   return @@
   Manager_operations {
     source = src.contract ;
     fee ;
     counter ;
-    operations = Reveal src.pub :: operations ;
+    operations = (if revealed then operations else Reveal src.pub :: operations) ;
   }
 
 

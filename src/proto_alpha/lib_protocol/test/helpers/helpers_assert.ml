@@ -181,6 +181,7 @@ let contain_error_alpha ?msg ~f = function
 let unknown_contract ~msg =
   let f = function
     | Proto_alpha.Raw_context.Storage_error _ -> true
+    | Proto_alpha.Contract_storage.Empty_implicit_contract _ -> true
     | _ -> false
   in
   contain_error_alpha ~msg ~f

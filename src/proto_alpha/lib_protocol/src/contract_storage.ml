@@ -295,6 +295,12 @@ let get_manager_key c contract =
   | Some (Manager_repr.Hash _) -> fail (Unrevealed_manager_key contract)
   | Some (Manager_repr.Public_key v) -> return v
 
+let is_manager_key_revealed c contract =
+  Storage.Contract.Manager.get_option c contract >>=? function
+  | None -> return false
+  | Some (Manager_repr.Hash _) -> return false
+  | Some (Manager_repr.Public_key _) -> return true
+
 let reveal_manager_key c contract public_key =
   Storage.Contract.Manager.get c contract >>=? function
   | Public_key _ -> fail (Previously_revealed_key contract)

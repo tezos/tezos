@@ -45,6 +45,8 @@ val get_manager:
 
 val get_manager_key:
   Raw_context.t -> Contract_repr.t -> Signature.Public_key.t tzresult Lwt.t
+val is_manager_key_revealed:
+  Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 
 val reveal_manager_key:
   Raw_context.t -> Contract_repr.t -> Signature.Public_key.t  ->

@@ -456,6 +456,8 @@ module Contract : sig
 
   val get_manager_key:
     context -> contract -> public_key tzresult Lwt.t
+  val is_manager_key_revealed:
+    context -> contract -> bool tzresult Lwt.t
 
   val reveal_manager_key:
     context -> contract -> public_key -> context tzresult Lwt.t

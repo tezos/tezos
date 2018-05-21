@@ -298,15 +298,21 @@ module Forge = struct
 
     let operations ctxt
         block ~branch ~source ?sourcePubKey ~counter ~fee operations =
-      let operations =
-        match sourcePubKey with
-        | None -> operations
-        | Some pk -> Reveal pk :: operations in
-      let ops =
-        Manager_operations { source ;
-                             counter ; operations ; fee } in
-      (RPC_context.make_call0 S.operations ctxt block
-         () ({ branch }, Sourced_operations ops))
+      Contract_services.manager_key ctxt block source >>= function
+      | Error _ as e -> Lwt.return e
+      | Ok (_, revealed) ->
+          let operations =
+            match revealed with
+            | Some _ -> operations
+            | None ->
+                match sourcePubKey with
+                | None -> operations
+                | Some pk -> Reveal pk :: operations in
+          let ops =
+            Manager_operations { source ;
+                                 counter ; operations ; fee } in
+          (RPC_context.make_call0 S.operations ctxt block
+             () ({ branch }, Sourced_operations ops))
 
     let reveal ctxt
         block ~branch ~source ~sourcePubKey ~counter ~fee ()=

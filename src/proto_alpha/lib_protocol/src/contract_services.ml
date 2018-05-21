@@ -60,6 +60,16 @@ module S = struct
       ~output: (obj1 (req "manager" Signature.Public_key_hash.encoding))
       RPC_path.(custom_root /: Contract.arg / "manager")
 
+  let manager_key =
+    RPC_service.post_service
+      ~description: "Access the manager of a contract."
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj2
+                  (req "manager" Signature.Public_key_hash.encoding)
+                  (opt "key" Signature.Public_key.encoding))
+      RPC_path.(custom_root /: Contract.arg / "manager_key")
+
   let delegate =
     RPC_service.post_service
       ~description: "Access the delegate of a contract, if any."
@@ -148,6 +158,14 @@ let () =
          | Some v -> return v) in
   register_field S.balance Contract.get_balance ;
   register_field S.manager Contract.get_manager ;
+  register_field S.manager_key
+    (fun ctxt c ->
+       Contract.get_manager ctxt c >>=? fun mgr ->
+       Contract.is_manager_key_revealed ctxt c >>=? fun revealed ->
+       if revealed then
+         Contract.get_manager_key ctxt c >>=? fun key ->
+         return (mgr, Some key)
+       else return (mgr, None)) ;
   register_opt_field S.delegate Delegate.get ;
   register_field S.counter Contract.get_counter ;
   register_field S.spendable Contract.is_spendable ;
@@ -178,6 +196,9 @@ let balance ctxt block contract =
 
 let manager ctxt block contract =
   RPC_context.make_call1 S.manager ctxt block contract () ()
+
+let manager_key ctxt block contract =
+  RPC_context.make_call1 S.manager_key ctxt block contract () ()
 
 let delegate ctxt block contract =
   RPC_context.make_call1 S.delegate ctxt block contract () ()
