@@ -105,6 +105,8 @@ module Answerer = struct
       P2p_socket.read st.conn
     end >>= function
     | Ok (_, Bootstrap) -> begin
+        (* st.callback.bootstrap will return an empty list if the node
+           is in private mode *)
         st.callback.bootstrap () >>= function
         | [] ->
             worker_loop st
@@ -118,6 +120,8 @@ module Answerer = struct
                 Lwt.return_unit
       end
     | Ok (_, Advertise points) ->
+        (* st.callback.advertise will ignore the points if the node is
+           in private mode *)
         st.callback.advertise points >>= fun () ->
         worker_loop st
     | Ok (_, Swap_request (point, peer)) ->
@@ -273,6 +277,8 @@ end
 
 let watch { watcher } = Lwt_watcher.create_stream watcher
 let log { watcher } event = Lwt_watcher.notify watcher event
+let private_node_warn fmt =
+  Format.kasprintf (fun s -> lwt_warn "[private node] %s" s) fmt
 
 module Gc_point_set = List.Bounded(struct
     type t = Time.t * P2p_point.Id.t
@@ -851,7 +857,8 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
       ~f:(fun qs -> qs, fun (size, _) ->
           (Sys.word_size / 8) * 11 + size + Lwt_pipe.push_overhead) in
   let messages = Lwt_pipe.create ?size () in
-  let rec callback =
+
+  let rec callback_default =
     { Answerer.message =
         (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
       advertise =
@@ -863,7 +870,48 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
       swap_ack =
         (fun point peer_id -> swap_ack pool conn point peer_id ) ;
     }
-  and answerer = lazy (Answerer.run p2p_conn canceler callback)
+
+  (* when the node is in private mode: deactivate advertising,
+     peers_swap and sending list of peers in callback *)
+  and callback_private =
+    { Answerer.message =
+        (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
+      advertise =
+        (fun _points ->
+           private_node_warn
+             "Received new peers addresses from %a"
+             P2p_peer.Id.pp peer_id >>= fun () ->
+           Lwt.return_unit
+        ) ;
+      bootstrap =
+        (fun () ->
+           private_node_warn
+             "Receive requests for peers addresses from %a"
+             P2p_peer.Id.pp peer_id >>= fun () ->
+           Lwt.return []
+        ) ;
+      swap_request =
+        (fun _point _peer_id ->
+           private_node_warn
+             "Received swap requests from %a"
+             P2p_peer.Id.pp peer_id >>= fun () ->
+           Lwt.return_unit
+        ) ;
+      swap_ack =
+        (fun _point _peer_id ->
+           private_node_warn
+             "Received swap ack from %a"
+             P2p_peer.Id.pp peer_id >>= fun () ->
+           Lwt.return_unit
+        ) ;
+    }
+
+  and answerer =
+    lazy (
+      Answerer.run p2p_conn canceler @@
+      if pool.config.private_mode then callback_private else callback_default
+    )
+
   and conn =
     { conn = p2p_conn ; point_info ; peer_info ;
       messages ; canceler ; answerer ; wait_close = false ;
