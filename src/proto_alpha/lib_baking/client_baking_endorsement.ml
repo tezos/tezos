@@ -235,11 +235,19 @@ let schedule_endorsements (cctxt : #Proto_alpha.full) ~(max_past:Time.t) state b
   in
   let time = Time.(add (now ()) state.delay) in
   get_delegates cctxt state >>=? fun delegates ->
-
-  ignore max_past;
-
-  iter_s
-    (fun delegate -> may_endorse bis delegate time)
+  iter_p
+    (fun delegate ->
+       iter_p
+         (fun (bi : Client_baking_blocks.block_info) ->
+            if Time.compare bi.timestamp (Time.now ()) > 0  then
+              lwt_log_info "Ignore block %a: forged in the future"
+                Block_hash.pp_short bi.hash >>= return
+            else if Time.(min (now ()) bi.timestamp > max_past) then
+              lwt_log_info "Ignore block %a: forged too far the past"
+                Block_hash.pp_short bi.hash >>= return
+            else
+              may_endorse bi delegate time)
+         bis)
     delegates
 
 let schedule_endorsements (cctxt : #Proto_alpha.full) ~max_past state bis =
@@ -317,7 +325,7 @@ let create (cctxt : #Proto_alpha.full) ?(max_past=(Time.of_seconds 110L)) ~delay
         | `Hash (Some (Ok bi)) ->
             Lwt.cancel timeout ;
             last_get_block := None ;
-            schedule_endorsements cctxt ~max_past state bi >>= fun () ->
+            schedule_endorsements cctxt ~max_past state [ bi ] >>= fun () ->
             worker_loop ()
         | `Timeout ->
             begin
@@ -329,7 +337,7 @@ let create (cctxt : #Proto_alpha.full) ?(max_past=(Time.of_seconds 110L)) ~delay
                     errs >>= fun () ->
                   Lwt.return_unit
             end >>= fun () ->
-            worker_loop () in
-
-      schedule_endorsements cctxt  ~max_past state head >>= fun () ->
+            worker_loop ()
+      in
+      schedule_endorsements cctxt ~max_past state [ head ] >>= fun () ->
       worker_loop ()
