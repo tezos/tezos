@@ -473,13 +473,20 @@ end
 
 module Seed : sig
 
+  type seed
+
   type error +=
     | Unknown of { oldest : Cycle.t ;
                    cycle : Cycle.t ;
                    latest : Cycle.t }
 
+  val for_cycle:
+    context -> Cycle.t -> seed tzresult Lwt.t
+
   val cycle_end:
     context -> Cycle.t -> (context * Nonce.unrevealed list) tzresult Lwt.t
+
+  val seed_encoding : seed Data_encoding.t
 
 end
 

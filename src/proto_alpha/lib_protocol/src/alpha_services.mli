@@ -9,6 +9,12 @@
 
 open Alpha_context
 
+module Seed : sig
+
+  val get: 'a #RPC_context.simple -> 'a -> Seed.seed shell_tzresult Lwt.t
+
+end
+
 module Nonce : sig
 
   type info =
