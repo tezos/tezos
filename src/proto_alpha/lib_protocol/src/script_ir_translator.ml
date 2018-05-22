@@ -42,6 +42,11 @@ let default_self_annot = Some (`Var_annot "self")
 
 let default_param_annot = Some (`Field_annot "parameter")
 let default_storage_annot = Some (`Field_annot "storage")
+let default_car_annot = Some (`Field_annot "car")
+let default_cdr_annot = Some (`Field_annot "cdr")
+let default_left_annot = Some (`Field_annot "left")
+let default_right_annot = Some (`Field_annot "right")
+let default_some_annot = Some (`Field_annot "some")
 let default_elt_annot = Some (`Field_annot "elt")
 let default_key_annot = Some (`Field_annot "key")
 let default_hd_annot = Some (`Field_annot "hd")
@@ -53,14 +58,17 @@ let default_annot ~default = function
   | None -> default
   | annot -> annot
 
-let access_annot (value_annot : var_annot option) (field_annot : field_annot option) =
-  match value_annot, field_annot with
-  | _, None -> None
-  | None, Some `Field_annot f ->
+let access_annot
+  : var_annot option ->  ?default:field_annot option -> field_annot option -> var_annot option
+  = fun value_annot ?(default=None) field_annot ->
+  match value_annot, field_annot, default with
+  | None, None, _ | Some _, None, None -> None
+  | None, Some `Field_annot f, _ ->
       Some (`Var_annot f)
-  | Some `Var_annot v, Some `Field_annot f ->
+  | Some `Var_annot v, None, Some `Field_annot f ->
       Some (`Var_annot (String.concat "." [v; f]))
-  (* TODO maybe remove . *)
+  | Some `Var_annot v, Some `Field_annot f, _ ->
+      Some (`Var_annot (String.concat "." [v; f]))
 
 (* ---- Type size accounting ------------------------------------------------*)
 
@@ -1763,7 +1771,8 @@ and parse_instr
       (Item_t (Option_t ((t, some_field), _none_field, _), rest, option_annot) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_var_annot loc annot ~default:(access_annot option_annot some_field)
+        parse_var_annot loc annot
+          ~default:(access_annot option_annot some_field ~default:default_some_annot)
         >>=? fun some_annot ->
         parse_instr ?type_logger tc_context ctxt bt rest >>=? fun (btr, ctxt) ->
         parse_instr ?type_logger tc_context ctxt bf (Item_t (t, rest, some_annot)) >>=? fun (bfr, ctxt) ->
@@ -1782,13 +1791,15 @@ and parse_instr
     | Prim (loc, I_CAR, [], annot),
       Item_t (Pair_t ((a, expected_field_annot), _, _), rest, pair_annot) ->
         parse_var_field_annot loc annot >>=? fun (annot, field_annot) ->
-        let annot = default_annot annot ~default:(access_annot pair_annot expected_field_annot) in
+        let annot = default_annot annot
+            ~default:(access_annot pair_annot expected_field_annot ~default:default_car_annot) in
         Lwt.return (check_correct_field field_annot expected_field_annot) >>=? fun () ->
         typed ctxt loc Car (Item_t (a, rest, annot))
     | Prim (loc, I_CDR, [], annot),
       Item_t (Pair_t (_, (b, expected_field_annot), _), rest, pair_annot) ->
         parse_var_field_annot loc annot >>=? fun (annot, field_annot) ->
-        let annot = default_annot annot ~default:(access_annot pair_annot expected_field_annot) in
+        let annot = default_annot annot
+            ~default:(access_annot pair_annot expected_field_annot ~default:default_cdr_annot) in
         Lwt.return (check_correct_field field_annot expected_field_annot) >>=? fun () ->
         typed ctxt loc Cdr (Item_t (b, rest, annot))
     (* unions *)
@@ -1807,10 +1818,10 @@ and parse_instr
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
         parse_two_var_annot loc annot >>=? fun (left_annot, right_annot) ->
-        let left_annot =
-          default_annot left_annot ~default:(access_annot union_annot l_field) in
-        let right_annot =
-          default_annot right_annot ~default:(access_annot union_annot r_field) in
+        let left_annot = default_annot left_annot
+            ~default:(access_annot union_annot l_field ~default:default_left_annot) in
+        let right_annot = default_annot right_annot
+            ~default:(access_annot union_annot r_field ~default:default_right_annot) in
         parse_instr ?type_logger tc_context ctxt bt (Item_t (tl, rest, left_annot)) >>=? fun (btr, ctxt) ->
         parse_instr ?type_logger tc_context ctxt bf (Item_t (tr, rest, right_annot)) >>=? fun (bfr, ctxt) ->
         let branch ibt ibf =
