@@ -78,7 +78,7 @@ module Make (T: QTY) : S = struct
   let one_mutez = 1L
   let one_cent = Int64.mul one_mutez 10_000L
   let fifty_cents = Int64.mul one_cent 50L
-  (* 1 tez = 100 cents = 10_000_000 mutez *)
+  (* 1 tez = 100 cents = 1_000_000 mutez *)
   let one = Int64.mul one_cent 100L
   let id = T.id
 
@@ -159,12 +159,12 @@ module Make (T: QTY) : S = struct
     then Some (Int64.sub t1 t2)
     else None
 
-  let (-?) t1 t2 =
+  let ( -? ) t1 t2 =
     match t1 - t2 with
     | None -> error (Subtraction_underflow (t1, t2))
     | Some v -> ok v
 
-  let (+?) t1 t2 =
+  let ( +? ) t1 t2 =
     let t = Int64.add t1 t2 in
     if t < t1
     then error (Addition_overflow (t1, t2))

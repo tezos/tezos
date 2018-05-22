@@ -50,7 +50,7 @@ module Baker = struct
     let rights_for_level =
       RPC_service.post_service
         ~description:
-          "List delegate allowed to bake for a given level, \
+          "List delegates allowed to bake for a given level, \
            ordered by priority."
         ~query: RPC_query.empty
         ~input: (obj1 (opt "max_priority" int31))

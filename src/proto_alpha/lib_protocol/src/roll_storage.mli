@@ -12,7 +12,7 @@
    Basic roll manipulation.
 
    If storage related to roll (a.k.a. `Storage.Roll`) are not used
-   outside this module, this interface enforce the invariant that a
+   outside of this module, this interface enforces the invariant that a
    roll is always either in the limbo list or in a contract list.
 
 *)
