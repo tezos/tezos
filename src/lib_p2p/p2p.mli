@@ -251,7 +251,8 @@ val on_new_connection :
   ('msg, 'peer_meta, 'conn_meta) net ->
   (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
 
-val build_rpc_directory : _ t -> unit RPC_directory.t
+val build_rpc_directory :
+  (_, _, Connection_metadata.t) t -> unit RPC_directory.t
 
 val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
 val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit

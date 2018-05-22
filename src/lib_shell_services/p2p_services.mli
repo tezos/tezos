@@ -141,9 +141,11 @@ module Peers : sig
   val list:
     ?filter:(P2p_peer.State.t list) ->
     #simple ->
-    (P2p_peer.Id.t * P2p_peer.Info.t) list tzresult Lwt.t
+    (P2p_peer.Id.t * Connection_metadata.t P2p_peer.Info.t) list tzresult Lwt.t
 
-  val info: #simple -> P2p_peer.Id.t -> P2p_peer.Info.t tzresult Lwt.t
+  val info:
+    #simple -> P2p_peer.Id.t ->
+    Connection_metadata.t P2p_peer.Info.t tzresult Lwt.t
 
   val events:
     #streamed -> P2p_peer.Id.t ->
@@ -162,12 +164,12 @@ module Peers : sig
     val list :
       ([ `POST ], unit,
        unit, unit, P2p_peer.State.t list,
-       (P2p_peer.Id.t * P2p_peer.Info.t) list) RPC_service.t
+       (P2p_peer.Id.t * Connection_metadata.t P2p_peer.Info.t) list) RPC_service.t
 
     val info :
       ([ `POST ], unit,
        unit * P2p_peer.Id.t, unit, unit,
-       P2p_peer.Info.t) RPC_service.t
+       Connection_metadata.t P2p_peer.Info.t) RPC_service.t
 
     val events :
       ([ `POST ], unit,

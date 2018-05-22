@@ -37,9 +37,10 @@ end
 
 module Info = struct
 
-  type t = {
+  type 'conn_meta t = {
     score : float ;
     trusted : bool ;
+    conn_metadata : 'conn_meta option;
     state : State.t ;
     id_point : P2p_connection.Id.t option ;
     stat : P2p_stat.t ;
@@ -51,30 +52,31 @@ module Info = struct
     last_miss : (P2p_connection.Id.t * Time.t) option ;
   }
 
-  let encoding =
+  let encoding conn_metadata_encoding =
     let open Data_encoding in
     conv
       (fun (
-         { score ; trusted ; state ; id_point ; stat ;
+         { score ; trusted ; conn_metadata ; state ; id_point ; stat ;
            last_failed_connection ; last_rejected_connection ;
            last_established_connection ; last_disconnection ;
            last_seen ; last_miss }) ->
-         ((score, trusted, state, id_point, stat),
+         ((score, trusted, conn_metadata, state, id_point, stat),
           (last_failed_connection, last_rejected_connection,
            last_established_connection, last_disconnection,
            last_seen, last_miss)))
-      (fun ((score, trusted, state, id_point, stat),
+      (fun ((score, trusted, conn_metadata, state, id_point, stat),
             (last_failed_connection, last_rejected_connection,
              last_established_connection, last_disconnection,
              last_seen, last_miss)) ->
-        { score ; trusted ; state ; id_point ; stat ;
+        { score ; trusted ; conn_metadata ; state ; id_point ; stat ;
           last_failed_connection ; last_rejected_connection ;
           last_established_connection ; last_disconnection ;
           last_seen ; last_miss })
       (merge_objs
-         (obj5
+         (obj6
             (req "score" float)
             (req "trusted" bool)
+            (opt "conn_metadata" conn_metadata_encoding)
             (req "state" State.encoding)
             (opt "reachable_at" P2p_connection.Id.encoding)
             (req "stat" P2p_stat.encoding))

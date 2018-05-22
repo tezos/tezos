@@ -86,7 +86,8 @@ let init_p2p p2p_params =
           private_node = false ;
         } in
       lwt_log_notice "P2P layer is disabled" >>= fun () ->
-      return (P2p.faked_network peer_metadata_cfg, conn_metadata_cfg)
+      return
+        (P2p.faked_network peer_metadata_cfg, conn_metadata_cfg)
   | Some (config, limits) ->
       let conn_metadata_cfg =
         connection_metadata_cfg {

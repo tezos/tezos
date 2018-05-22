@@ -515,13 +515,19 @@ let info_of_peer_info pool i =
     | Disconnected -> Disconnected, None in
   let peer_id = P2p_peer_state.Info.peer_id i in
   let score = P2p_pool.Peers.get_score pool peer_id in
+  let conn_opt = P2p_pool.Connection.find_by_peer_id pool peer_id in
   let stat =
-    match P2p_pool.Connection.find_by_peer_id pool peer_id with
+    match conn_opt with
     | None -> P2p_stat.empty
     | Some conn -> P2p_pool.Connection.stat conn in
+  let meta_opt =
+    match conn_opt with
+    | None -> None
+    | Some conn -> Some (P2p_pool.Connection.meta conn) in
   P2p_peer_state.Info.{
     score ;
     trusted = trusted i ;
+    conn_metadata = meta_opt ;
     state ;
     id_point ;
     stat ;
