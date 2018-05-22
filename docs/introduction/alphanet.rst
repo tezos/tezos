@@ -6,17 +6,17 @@ Alphanet
 Welcome to the Tezos alphanet, which is a pre-release network for the
 Tezos blockchain. Currently, the chain is reset every few weeks.
 
-For news and support about the alphanet, please join IRC (*#tezos*
-on freenode). Please, report bugs related to the alphanet on the IRC
+For news and support about the alphanet, please join IRC (*#tezos* on
+freenode). Please, report bugs related to the alphanet on the IRC
 channel before filling `GitLab issues
-<https://gitlab.com/tezos/tezos/issues>`_.
+<https://gitlab.com/tezos/tezos/issues>`__.
 
 For more information about the project in general, see:
 
 https://tezos.com/
 
-How to join the alphanet ?
---------------------------
+How to join the alphanet
+------------------------
 
 We provide two ways of joining the alphanet :
 
@@ -29,7 +29,7 @@ The ``alphanet.sh`` script
 
 The recommended way for running an up-to-date Tezos node connected to
 the alphanet is to use ``scripts/alphanet.sh``. Its only requirement is
-a working installation of `Docker <https://www.docker.com/>`_.
+a working installation of `Docker <https://www.docker.com/>`__.
 
 First, you need to download the script:
 
@@ -86,8 +86,8 @@ Please refer to the :ref:`instructions<howto>`.
 For the rest of the document, to execute the example commands, you
 will have to replace ``./alphanet.sh client`` by ``./tezos-client``.
 
-How to observe the network ?
-----------------------------
+How to observe the network
+--------------------------
 
 The alphanet script provides a basic command ``./alphanet.sh head`` that
 allows you to see if your own node is synchronized.
@@ -102,13 +102,44 @@ In an upcoming version, we will also provide an opt-in tool for node
 runners that will allow us to provide a global monitoring panel of the
 alphanet.
 
+.. _faucet:
+
 How to obtain free Tezzies
 --------------------------
 
-See :ref:`this page<faucet>`.
+You must first grab a wallet from the `faucet
+<https://faucet.tzalpha.net>`__.
 
-How to play with smart-contracts ?
-----------------------------------
+This will provide you with a JSON file, named like
+``tz1__xxxxxxxxx__.json``.  Once your node is synchronized, you should
+run the following command to activate your wallet, where ``my_account``
+is a local name you choose, and ``tz1__xxxxxxxxx__.json`` is the name
+of the file you grab:
+
+::
+
+    $ tezos-client activate account my_account with tz1__xxxxxxxxx__.json
+    Operation successfully injected in the node.
+    Operation hash is 'ooGoVS5cikbTHEimTzYhQWrYqY2LeJYmfkbzoiW8KQ59jtGQaXr'.
+    Waiting for the operation to be included...
+    Operation found in block: BKihN2QgSAu2etftNvs8FWWhwTvZiY8P3e7H3jgdj2MCpKZXXRs
+    Account my_account (tz1__xxxxxxxxx__) created with ꜩ23,454.
+
+Or, if you use the ``alphanet.sh`` script, you should prefix the file
+with ``container:`` in order to copy it into the docker image:
+
+::
+
+    $ ./alphanet.sh client activate account my_account with container:tz1__xxxxxxxxx__.json
+
+Please preserve the JSON file, after each reset of the Alphanet (or
+Zeronet), you will have to reactivate the wallet.
+
+Please drink carefully and don't abuse the faucet: it only contains
+30.000 wallets for a total amount of ꜩ760.000.000.
+
+How to play with smart-contracts
+--------------------------------
 
 An advanced documentation of the smart contract language is in
 
@@ -122,68 +153,143 @@ For details and examples, see:
 
 https://www.michelson-lang.com/
 
-How to stake on the alphanet ?
-------------------------------
+How to bake on the alphanet
+---------------------------
 
-By default, the faucet of the alphanet (the one behind
-``./alphanet.sh originate free account "my_account" for "my_identity"``)
-creates contracts which are managed by ``my_identity`` but whose staking
-rights are delegated to the baker of the block including the
-origination. That way we are sure that staking rights are attributed to
-an active baker.
+Baking 101
+~~~~~~~~~~
 
-But, nonetheless, you might claim your staking rights!
+In order to understand how baking works, please refer to :ref:`this
+section <proof-of-stake>`. The following is a **TL;DR** to help you
+get started.
 
-The following command returns the current delegate of a contract:
+In Tezos there are two kinds of accounts: *implicit* and *originated*
+accounts. Originated accounts can have michelson code, in which case
+they are also called *contracts*.
 
-::
+- An *implicit account* is identified by a public key hash and is
+  automatically created when a public key hash is the recipient of a
+  transfer. The genesis block will contain one account per
+  contributor.
 
-    ./alphanet.sh client get delegate for "my_account"
+- An *originated account* or *contract* is *originated* with an
+  operation sent to the blockchain. It has a *manager* and an optional
+  *delegate* account.
 
-If it is one the following, it is indeed one of our “bootstrap”
-contracts!
-
--  ``tz1YLtLqD1fWHthSVHPD116oYvsd4PTAHUoc``
--  ``tz1irovm9SKduvL3npv8kDM54PSWY5VJXoyz``
--  ``tz1UsgSSdRwwhYrqq7iVp2jMbYvNsGbWTozp``
--  ``tz1TwYbKYYJxw7AyubY4A9BUm2BMCPq7moaC``
--  ``tz1QWft73Zhj5VSA1sCuEi9HhDDJqywE6BtC``
-
-You might change the delegate of a contract with a single command:
-
-::
-
-    ./alphanet.sh client set delegate for "my_account" to "my_identity"
-
-You now have staking rights!
-
-Well, almost.
-
-You should wait.
-
-A little bit.
-
-At most two cycles. Which, on the alphanet is 128 blocks (something
-around 2 hours). On the mainnet, this will be between 2 weeks and a
-month.
-
-But, to enforce your right a last step is required. When baking or
-endorsing a block, a bond is taken out of the default account associated
-to the public key of the delegate. Hence, in order to stake, you must be
-provisioning for bond deposit.
+The baking itself is done by *implicit accounts*. By default, they
+don't participate in baking unless they are *registred* as
+delegates. In order to register an *implicit account* as a delegate,
+use:
 
 ::
 
-    ./alphanet.sh client transfer 50,000.00 from "my_account" to "my_identity"
+   ./alphanet.sh client register key <mgr> as delegate
 
-On the alphanet, a bond is ꜩ1000. Hence, with the previous command you
-provisioned 50 bonds. If you want more, see section “How to obtain free
-Tez from the faucet contract ?”.
+Once registered, an *implicit account* can participate in baking for
+its own balance plus the balance of *originated accounts* and
+*contracts* that are delegated to it.
 
-Now, you are settled. The ``alphanet`` docker image runs a baker daemon
-and a endorser daemon, by default for all your keys.
+Originated accounts and contracts thus participate in baking only via
+their delegate. If they don't have a delegate set (the default, unless
+you specify one), they don't participate in baking.
 
-To know if you staked, just run:
+Implicit accounts cannot have a delegate. In order to delegate funds,
+they need to be transfered to an *originated account* beforehand, and
+a delegate must be set.
+
+To summarize:
+
+- *Implicit accounts* only can be registered as *delegates* and
+  actually bake.
+
+- Funds in *implicit accounts* which are not registered as *delegates*
+  do not participate in baking.
+
+- *Originated accounts* and *contracts* do not participate in baking
+  unless they have a delegate account set **and** this delegate is
+  actually baking.
+
+In order to be entitled to bake, *delegates* need enough tezzies
+(delegated or otherwise) to have a least one *roll*. Baking rights are
+randomly chosen around rolls, which are blocks of 10K tezzies.
+
+When you obtain Alphanet coins from :ref:`the faucet<faucet>`, if you
+are lucky to obtain more than one roll, you can bake using this
+identity (after it is registered as a delegate). Otherwise, you need
+to ask the faucet for more coins. When you obtain more than 10K
+tezzies into one or multiple identities, you are ready to start
+baking!
+
+Before we see how to bake with your delegate, you might want to know
+how to delegate your tezzies. Although not necessary (you can just
+bake with your delegate if it has enough tezzies), it is useful if you
+want for example to avoid transfering all your coins in one
+account.
+
+Delegating your coins
+~~~~~~~~~~~~~~~~~~~~~
+
+As explained above, *implicit accounts* cannot have a delegate, so the
+first step is to *originate* an *account* and transfer your tezzies
+there. During the origination step, we will set the delegate.
+
+::
+
+   ./alphanet.sh client originate account <new> for <implicit> transfering <qty> from <implicit> --delegate <implicit>
+
+
+Where ``<new>`` must be a contract alias that you choose,
+``<implicit>`` is the alias of one *implicit account* that you own, and
+``<qty>`` is the amount in tezzies that you want to transfer.
+
+This will originate an *account*, transfer ``<qty>`` tezzies from
+``<implicit>`` in it, and set that ``<implicit>`` is the manager and
+the delegate for this freshly minted account.
+
+If you already own contracts that are delegatable and want to change
+the delegate to ``<implicit>``, use the following command:
+
+::
+
+    ./alphanet.sh client set delegate for <account> to <implicit>
+
+
+You need to wait at most two cycles which, on the alphanet is 128
+blocks (something about 2 hours). On the mainnet, this will be between
+2 weeks and a month.
+
+From now on, the funds in ``<new>`` will be delegated to
+``<implicit>``. In the next section, we will learn how to bake with
+your delegate.
+
+Baking with your delegate
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you have read and followed the doc up until this point, you now
+have a delegate, which have enough tezzies (delegated or otherwise) to
+bake.
+
+When baking or endorsing a block, a *security deposit* (or *bond*) is
+taken out of the default account associated to the public key of the
+delegate. Hence, in order to bake, your delegate must have enough
+funds to be able to pay security deposits for baking and endorsing.
+
+Check out the Alphanet *constants* for this:
+
+::
+
+    ./alphanet.sh client rpc call /blocks/head/proto/constants
+
+Check for the ``endorsement_security_deposit`` and
+``block_security_deposit`` keys of the JSON record. The value is in
+*µtez*, one millionth of a tezzie. In the alphanet, the current value
+is set to *512tz* per block and *64tz* per endorsement. If you run out
+of funds, you will not be able to bake.
+
+Now, you are settled. The ``alphanet`` docker image runs a baker
+daemon and a endorser daemon, by default for all your keys.
+
+To know if you baked, just run:
 
 ::
 
@@ -202,11 +308,12 @@ Or:
 
     Injected endorsement for block 'BLSrg4dXzL2aqq'  (level 1381, slot 3, contract bootstrap5) 'oo524wKiEWBoPD'
 
-On the alphanet, rewards for staking are credited after 24 hours. The
-reward for baking or endorsing a block is ꜩ150. The safety bond is
-returned together with the reward.
+On the alphanet, rewards for staking are credited after 5 cycles (~10
+hours). The reward for baking a block is ꜩ16 and ``ꜩ2 /
+<block_priority>`` for endorsing a block. The safety bond is returned
+together with the reward.
 
-To know when you will be allowed to stake in the current cycle, you
+To know when you will be allowed to bake in the current cycle, you
 might try the following RPCs, where you replaced ``tz1iFY8ads...`` by
 the appropriate value:
 
@@ -215,39 +322,6 @@ the appropriate value:
     $ ./alphanet.sh client list known identities
     my_identity: tz1iFY8aDskx9QGbgBy68SNAGgkc7AE2iG9H (public key known) (secret key known)
     $ ./alphanet.sh client rpc call /blocks/head/proto/helpers/rights/baking/delegate/tz1iFY8aDskx9QGbgBy68SNAGgkc7AE2iG9H with '{}'
-    { "ok":
-        [ { "level": 1400.000000, "priority": 2.000000,
-            "timestamp": "2017-05-19T03:21:52Z" },
-          ...  ] }
-
-Known issues
-------------
-
-Missing account ``my_account``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The chain synchronization has not been optimized yet and the
-``alphanet.sh`` script might mis-detect the end of the synchronization
-step. If so, it will try to create your free account in an outdated
-context and your new account will never be included in the chain.
-
-To fix this, just wait for your node to be synchronized: for that run
-the following command, in the middle of a (raw) json object, it should
-display the date of the last block (which should not be too far in the
-past):
-
-::
-
-    ./alphanet.sh head
-
-Please note that the printed date is GMT, don’t forget the time shift.
-
-Then, you need to remove from the client state the non-existent contract
-and regenerate a new one:
-
-::
-
-    ./alphanet.sh client forget contract "my_account"
-    ./alphanet.sh client originate free account "my_account" for "my_identity"
+    [ { "level": 1400.000000, "priority": 2.000000,"timestamp": "2017-05-19T03:21:52Z" }, ...  ]
 
 .. include:: alphanet_changes.rst

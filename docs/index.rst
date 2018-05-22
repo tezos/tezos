@@ -51,7 +51,6 @@ license when the main network lunches.
    :maxdepth: 2
    :caption: Test Networks:
 
-   introduction/faucet
    introduction/alphanet
    introduction/zeronet
 
