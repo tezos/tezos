@@ -14,6 +14,7 @@ val forge_endorsement:
   #Proto_alpha.full ->
   ?chain:Chain_services.chain ->
   Block_services.block ->
+  ?async: bool ->
   src_sk:Client_keys.sk_uri ->
   ?slots:int list ->
   public_key ->
@@ -21,6 +22,7 @@ val forge_endorsement:
 
 val create :
   #Proto_alpha.full ->
+  ?max_past:Time.t ->
   delay:int ->
   public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t -> unit Lwt.t

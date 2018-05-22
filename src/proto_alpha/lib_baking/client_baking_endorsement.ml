@@ -106,12 +106,19 @@ let check_endorsement cctxt level pkh =
       else
         return ()
 
+let previously_endorsed_level cctxt pkh new_lvl  =
+  State.get_endorsement cctxt pkh  >>=? function
+  | None -> return false
+  | Some last_lvl ->
+      return (not Raw_level.(last_lvl < new_lvl))
+
 let forge_endorsement (cctxt : #Proto_alpha.full)
-    ?(chain = `Main) block
-    ~src_sk ?slots src_pk =
+    ?(chain = `Main) block ?async
+    ~src_sk  ?slots src_pk =
   let src_pkh = Signature.Public_key.hash src_pk in
   Alpha_block_services.metadata cctxt
     ~chain ~block () >>=? fun { protocol_data = { level = { level } } } ->
+  check_endorsement cctxt level src_pkh >>=? fun () ->
   begin
     match slots with
     | Some slots -> return slots
@@ -122,7 +129,7 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
         | slots -> return slots
   end >>=? fun slots ->
   check_endorsement cctxt level src_pkh >>=? fun () ->
-  inject_endorsement cctxt ~chain block level src_sk slots src_pkh
+  inject_endorsement cctxt ~chain ?async block level src_sk slots src_pkh
 
 (** Worker *)
 
@@ -166,7 +173,7 @@ let drop_old_endorsement ~before state =
       (fun { block } -> Fitness.compare before block.fitness <= 0)
       state.to_endorse
 
-let schedule_endorsements (cctxt : #Proto_alpha.full) state bi =
+let schedule_endorsements (cctxt : #Proto_alpha.full) ~(max_past:Time.t) state bis =
   let may_endorse (block: Client_baking_blocks.block_info) delegate time =
     Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
     lwt_log_info "May endorse block %a for %s"
@@ -176,61 +183,67 @@ let schedule_endorsements (cctxt : #Proto_alpha.full) state bi =
     get_signing_slots cctxt b delegate level >>=? fun slots ->
     lwt_debug "Found %d slots for %a/%s"
       (List.length slots) Block_hash.pp_short block.hash name >>= fun () ->
-
-    if Fitness.compare state.best.fitness block.fitness < 0 then begin
-      state.best <- block ;
-      drop_old_endorsement ~before:block.fitness state ;
-    end ;
-    begin try
-        let same_slot endorsement =
-          endorsement.block.level = block.level && endorsement.slots = slots in
-        let old = List.find same_slot state.to_endorse in
-        if Fitness.compare old.block.fitness block.fitness < 0
-        then begin
-          lwt_log_info
-            "Schedule endorsement for block %a \
-             (level %a, slots { %a }, time %a) (replace block %a)"
-            Block_hash.pp_short block.hash
-            Raw_level.pp level
-            (Format.pp_print_list Format.pp_print_int) slots
-            Time.pp_hum time
-            Block_hash.pp_short old.block.hash
-          >>= fun () ->
-          state.to_endorse <-
-            insert
-              { time ; delegate ; block ; slots }
-              (List.filter
-                 (fun e -> not (same_slot e))
-                 state.to_endorse) ;
-          return ()
-        end else begin
-          lwt_debug
-            "slot { %a } : better pending endorsement"
-            (Format.pp_print_list Format.pp_print_int) slots >>= fun () ->
-          return ()
+    previously_endorsed_level cctxt delegate level >>=? function
+    | true ->
+        lwt_debug "Level %a : previously endorsed."
+          Raw_level.pp level >>= return
+    | false ->
+        if Fitness.compare state.best.fitness block.fitness < 0 then begin
+          state.best <- block ;
+          drop_old_endorsement ~before:block.fitness state ;
+        end ;
+        begin try
+            let same_slot endorsement =
+              endorsement.block.level = block.level && endorsement.slots = slots in
+            let old = List.find same_slot state.to_endorse in
+            if Fitness.compare old.block.fitness block.fitness < 0
+            then begin
+              lwt_log_info
+                "Schedule endorsement for block %a \
+                 (level %a, slots { %a }, time %a) (replace block %a)"
+                Block_hash.pp_short block.hash
+                Raw_level.pp level
+                (Format.pp_print_list Format.pp_print_int) slots
+                Time.pp_hum time
+                Block_hash.pp_short old.block.hash
+              >>= fun () ->
+              state.to_endorse <-
+                insert
+                  { time ; delegate ; block ; slots }
+                  (List.filter
+                     (fun e -> not (same_slot e))
+                     state.to_endorse) ;
+              return ()
+            end else begin
+              lwt_debug
+                "slot { %a } : better pending endorsement"
+                (Format.pp_print_list Format.pp_print_int) slots >>= fun () ->
+              return ()
+            end
+          with Not_found ->
+            lwt_log_info
+              "Schedule endorsement for block %a \
+               (level %a, slot { %a }, time %a)"
+              Block_hash.pp_short block.hash
+              Raw_level.pp level
+              (Format.pp_print_list Format.pp_print_int) slots
+              Time.pp_hum time >>= fun () ->
+            state.to_endorse <-
+              insert { time ; delegate ; block ; slots } state.to_endorse ;
+            return ()
         end
-      with Not_found ->
-        lwt_log_info
-          "Schedule endorsement for block %a \
-           (level %a, slot { %a }, time %a)"
-          Block_hash.pp_short block.hash
-          Raw_level.pp level
-          (Format.pp_print_list Format.pp_print_int) slots
-          Time.pp_hum time >>= fun () ->
-        state.to_endorse <-
-          insert { time ; delegate ; block ; slots } state.to_endorse ;
-        return ()
-    end
   in
-
   let time = Time.(add (now ()) state.delay) in
   get_delegates cctxt state >>=? fun delegates ->
+
+  ignore max_past;
+
   iter_s
-    (fun delegate -> may_endorse bi delegate time)
+    (fun delegate -> may_endorse bis delegate time)
     delegates
 
-let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
-  schedule_endorsements cctxt state bis >>= function
+let schedule_endorsements (cctxt : #Proto_alpha.full) ~max_past state bis =
+  schedule_endorsements cctxt ~max_past state bis >>= function
   | Error exns ->
       lwt_log_error
         "@[<v 2>Error(s) while scheduling endorsements@,%a@]"
@@ -279,7 +292,8 @@ let compute_timeout state =
       else
         Lwt_unix.sleep (Int64.to_float delay)
 
-let create (cctxt : #Proto_alpha.full) ~delay contracts block_stream =
+
+let create (cctxt : #Proto_alpha.full) ?(max_past=(Time.of_seconds 110L)) ~delay contracts block_stream =
   lwt_log_info "Starting endorsement daemon" >>= fun () ->
   Lwt_stream.get block_stream >>= function
   | None | Some (Error _) ->
@@ -303,7 +317,7 @@ let create (cctxt : #Proto_alpha.full) ~delay contracts block_stream =
         | `Hash (Some (Ok bi)) ->
             Lwt.cancel timeout ;
             last_get_block := None ;
-            schedule_endorsements cctxt state bi >>= fun () ->
+            schedule_endorsements cctxt ~max_past state bi >>= fun () ->
             worker_loop ()
         | `Timeout ->
             begin
@@ -316,5 +330,6 @@ let create (cctxt : #Proto_alpha.full) ~delay contracts block_stream =
                   Lwt.return_unit
             end >>= fun () ->
             worker_loop () in
-      schedule_endorsements cctxt state head >>= fun () ->
+
+      schedule_endorsements cctxt  ~max_past state head >>= fun () ->
       worker_loop ()
