@@ -1,9 +1,9 @@
 parameter (option key_hash) ;
 storage (pair
-           (pair (address @mgr1) (option key_hash))
-           (pair (address @mgr2) (option key_hash))) ;
+           (pair %mgr1 (address %addr) (option key_hash))
+           (pair %mgr2 (address %addr) (option key_hash))) ;
 code { # Update the storage
-       DUP ; CDAAR ; SOURCE ;
+       DUP ; CDAAR %addr; SOURCE ;
        IFCMPEQ
          { UNPAIR ; SWAP ; SET_CADR }
          { DUP ; CDDAR ; SOURCE ;

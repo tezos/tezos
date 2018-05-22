@@ -1,5 +1,5 @@
 parameter mutez;
-storage (pair (pair nat (pair nat (pair (pair (pair nat mutez) nat) nat))) nat);
+storage (pair (pair nat (pair nat (pair (pair (pair (nat %p) (mutez %value)) nat) nat))) nat);
 code { DUP ; CAR ; SWAP ; CDR ;
-       SET_CADDAADR @annot ;
+       SET_CADDAADR @toplevel_pair_name %value ;
        NIL operation ; PAIR };

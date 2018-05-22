@@ -1,6 +1,6 @@
 parameter unit;
-storage (pair @truc unit unit);
-code { DROP; UNIT ; UNIT ; PAIR ; UNIT ;
-       DUUP @truc ;
+storage (pair (unit %truc) unit);
+code { DROP; UNIT ; UNIT ; PAIR %truc ; UNIT ;
+       DUUP @new_storage ;
        DIP { DROP ; DROP } ;
        NIL operation ; PAIR }

@@ -1,3 +1,3 @@
-parameter (pair (pair unit (string @no_name)) bool);
+parameter (pair (pair %p1 unit (string %no_name)) bool);
 storage unit;
-code { CAR @name; CADR @second_name; DROP; UNIT; NIL operation; PAIR }
+code { CAR @param; CADR @name %no_name; DROP; UNIT; NIL operation; PAIR }
