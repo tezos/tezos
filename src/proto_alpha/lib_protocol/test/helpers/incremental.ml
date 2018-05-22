@@ -20,6 +20,7 @@ type t = {
 type incremental = t
 
 let predecessor { predecessor ; _ } = predecessor
+let header st = st.header
 
 let level st = st.header.shell.level
 

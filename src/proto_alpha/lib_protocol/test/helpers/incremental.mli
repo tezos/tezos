@@ -14,6 +14,7 @@ type t
 type incremental = t
 
 val predecessor: incremental -> Block.t
+val header: incremental -> Block_header.t
 
 val level: incremental -> int32
 

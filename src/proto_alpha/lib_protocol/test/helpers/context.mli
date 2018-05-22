@@ -24,6 +24,11 @@ val get_endorser: t -> int -> public_key_hash tzresult Lwt.t
 
 val get_bakers: t -> public_key_hash list tzresult Lwt.t
 
+val get_seed_nonce_hash: t -> Nonce_hash.t tzresult Lwt.t
+
+(** Returns the seed of the cycle to which the block belongs to. *)
+val get_seed: t -> Seed.seed tzresult Lwt.t
+
 (** Returns all the constants of the protocol *)
 val get_constants: t -> Constants.t tzresult Lwt.t
 

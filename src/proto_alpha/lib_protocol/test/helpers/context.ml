@@ -82,6 +82,17 @@ let get_bakers ctxt =
             (fun p -> p.Alpha_services.Delegate.Baking_rights.delegate)
             bakers)
 
+let get_seed_nonce_hash ctxt =
+  let header =
+    match ctxt with
+    | B { header } -> header
+    | I i -> Incremental.header i in
+  match header.protocol_data.contents.seed_nonce_hash with
+  | None -> failwith "Ne committed nonce"
+  | Some hash -> return hash
+
+let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
+
 let get_constants b =
   Alpha_services.Constants.all rpc_ctxt b
 
