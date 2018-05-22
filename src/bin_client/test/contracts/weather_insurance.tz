@@ -13,6 +13,6 @@ code { DUP; DUP;
        DIP{CADR %actual_level};   # Get actual rain
        CDDAR %rain_level;         # Get rain threshold
        CMPLT; IF {CAR %under_key} {CDR %over_key};     # Select contract to receive tokens
-       BALANCE; UNIT ; TRANSFER_TOKENS @trans_op; # Setup and execute transfer
+       BALANCE; UNIT ; TRANSFER_TOKENS @trans.op; # Setup and execute transfer
        NIL operation ; SWAP ; CONS ;
        PAIR };

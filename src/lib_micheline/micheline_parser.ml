@@ -146,6 +146,14 @@ let tokenize source =
       Some (Uchar.to_char c)
     else
       None in
+  let allowed_ident_char c =
+    match uchar_to_char c with
+    | Some ('a'..'z' | 'A'..'Z' | '_' | '0'..'9') -> true
+    | Some _ | None -> false in
+  let allowed_annot_char c =
+    match uchar_to_char c with
+    | Some ('a'..'z' | 'A'..'Z' | '_' | '.' | '0'..'9') -> true
+    | Some _ | None -> false in
   let rec skip acc =
     match next () with
     | `End, _ -> List.rev acc
@@ -153,7 +161,7 @@ let tokenize source =
         begin match uchar_to_char c with
           | Some ('a'..'z' | 'A'..'Z') -> ident acc start (fun s _ -> Ident s)
           | Some ('@' | ':' | '$' | '&' | '%' | '!' | '?') ->
-              ident acc start
+              annot acc start
                 (fun str stop ->
                    if String.length str > max_annot_length
                    then errors := (Annotation_length { start ; stop }) :: !errors ;
@@ -290,23 +298,24 @@ let tokenize source =
             let byte = Uutf.decoder_byte_count decoder in
             let s = String.sub source stop.byte (byte - stop.byte) in
             string acc (s :: sacc) start
-  and ident acc start (ret : string -> point -> token_value) =
+  and generic_ident allow_char acc start (ret : string -> point -> token_value) =
     let tok stop =
       let name =
         String.sub source start.byte (stop.byte - start.byte) in
       tok start stop (ret name stop) in
     match next () with
     | (`Uchar c, stop) as charloc ->
-        begin match uchar_to_char c with
-          | Some ('a'..'z' | 'A'..'Z' | '_' | '0'..'9') ->
-              ident acc start ret
-          | Some _ | None ->
-              back charloc ;
-              skip (tok stop :: acc)
+        if allow_char c then
+          generic_ident allow_char acc start ret
+        else begin
+          back charloc ;
+          skip (tok stop :: acc)
         end
     | (_, stop) as other ->
         back other ;
         skip (tok stop :: acc)
+  and ident acc start ret = generic_ident allowed_ident_char acc start ret
+  and annot acc start ret = generic_ident allowed_annot_char acc start ret
   and comment acc start lvl =
     match next () with
     | `End, stop ->
