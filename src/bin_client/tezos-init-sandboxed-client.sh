@@ -16,10 +16,12 @@ init_sandboxed_client() {
         client="$local_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         admin_client="$local_admin_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         alpha_baker="$local_alpha_baker -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        signer="$local_signer -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
     else
         client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         alpha_baker="$local_alpha_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        signer="$local_signer -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
     fi
     parameters_file="${parameters_file:-$client_dir/protocol_parameters.json}"
 
@@ -246,12 +248,14 @@ main () {
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
         local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
         local_alpha_baker="${local_alpha_baker:-$bin_dir/../../_build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe}"
+        local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_client/main_signer.exe}"
         parameters_file="${parameters_file:-$bin_dir/../../scripts/protocol_parameters.json}"
     else
 	# we assume a clean install with tezos-(admin-)client in the path
         local_client="${local_client:-$(which tezos-client)}"
         local_admin_client="${local_admin_client:-$(which tezos-admin-client)}"
         local_alpha_baker="${local_alpha_baker:-$(which tezos-alpha-baker)}"
+        local_signer="${local_signer:-$(which tezos-signer)}"
     fi
 
     if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
@@ -276,6 +280,10 @@ main () {
     echo '#!/bin/sh' > $client_dir/bin/tezos-alpha-baker
     echo "exec $alpha_baker \"\$@\""  >> $client_dir/bin/tezos-alpha-baker
     chmod +x $client_dir/bin/tezos-alpha-baker
+
+    echo '#!/bin/sh' > $client_dir/bin/tezos-signer
+    echo "exec $signer \"\$@\""  >> $client_dir/bin/tezos-signer
+    chmod +x $client_dir/bin/tezos-signer
 
     cat <<EOF
 if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;

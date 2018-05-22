@@ -44,6 +44,7 @@ module Client : sig
   module Endorsement : LOG
   module Revelation : LOG
   module Denunciation : LOG
+  module Sign : LOG
 end
 
 module Make(S: sig val name: string end) : LOG

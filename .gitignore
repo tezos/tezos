@@ -17,6 +17,7 @@ __pycache__
 /tezos-client
 /tezos-admin-client
 /tezos-alpha-baker
+/tezos-signer
 
 /scripts/opam-test-all.sh.DONE
 /scripts/create_genesis/src

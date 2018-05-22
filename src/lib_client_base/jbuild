@@ -12,6 +12,7 @@
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_rpc
+                    -open Tezos_stdlib_unix
                     -open Tezos_shell_services))))
 
 (alias
