@@ -60,12 +60,16 @@ end = struct
             load wallet >>=? fun l  ->
             let delegate_key = Signature.Public_key_hash.to_short_b58check delegate
             in
-            match List.assoc_opt delegate_key l  with
-            | None ->
-                save wallet ((delegate_key, new_lvl)::l)
-            | Some _ ->
-                save wallet ((delegate_key, new_lvl)::
-                             List.remove_assoc delegate_key l)
+            let rec remove_old acc = function
+              | [] -> List.rev acc
+              | ((_,lvl) as hd)::tl ->
+                  if Raw_level.diff new_lvl  lvl > 50l (*?*)  then
+                    remove_old (hd::acc) tl
+                  else
+                    List.rev acc
+            in
+            save wallet ((delegate_key, new_lvl)::
+                         List.remove_assoc delegate_key (remove_old [] l))
           end)
     end
 end
