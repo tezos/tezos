@@ -102,7 +102,8 @@ let inject_endorsement (cctxt : #Proto_alpha.full)
     ~level:level
     ~slots
     () >>=? fun bytes ->
-  Client_keys.append cctxt src_sk bytes >>=? fun signed_bytes ->
+  Client_keys.append
+    cctxt src_sk ~watermark:Endorsement bytes >>=? fun signed_bytes ->
   Shell_services.inject_operation
     cctxt ?async ~chain_id:bi.chain_id signed_bytes >>=? fun oph ->
   iter_s

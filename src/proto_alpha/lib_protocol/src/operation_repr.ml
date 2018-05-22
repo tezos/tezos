@@ -482,9 +482,21 @@ let check_signature key { shell ; contents ; signature } =
   | Anonymous_operations _, _ -> return ()
   | Sourced_operations _, None ->
       fail Missing_signature
-  | Sourced_operations _, Some signature ->
+  | Sourced_operations (Consensus_operation _), Some signature ->
+      (* Safe for baking *)
       let unsigned_operation = forge shell contents in
-      if Signature.check key signature unsigned_operation then
+      if Signature.check
+          ~watermark:Endorsement
+          key signature unsigned_operation then
+        return ()
+      else
+        fail Invalid_signature
+  | Sourced_operations _, Some signature ->
+      (* Unsafe for baking *)
+      let unsigned_operation = forge shell contents in
+      if Signature.check
+          ~watermark:Generic_operation
+          key signature unsigned_operation then
         return ()
       else
         fail Invalid_signature

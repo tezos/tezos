@@ -330,7 +330,7 @@ module Protocol = struct
       ~period:next_level.voting_period
       ~proposals
       () >>=? fun bytes ->
-    let signed_bytes = Signature.append sk bytes in
+    let signed_bytes = Signature.append ~watermark:Generic_operation sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
@@ -343,7 +343,7 @@ module Protocol = struct
       ~proposal
       ~ballot
       () >>=? fun bytes ->
-    let signed_bytes = Signature.append sk bytes in
+    let signed_bytes = Signature.append ~watermark:Generic_operation sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
 end
@@ -538,7 +538,7 @@ module Endorse = struct
       ~level:level.level
       ~slots:[slot]
       () >>=? fun bytes ->
-    let signed_bytes = Signature.append src_sk bytes in
+    let signed_bytes = Signature.append ~watermark:Endorsement src_sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let signing_slots

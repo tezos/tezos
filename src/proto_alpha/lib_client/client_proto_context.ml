@@ -54,7 +54,8 @@ let transfer cctxt
     ~branch ~source ~sourcePubKey:src_pk ~counter ~amount
     ~destination ?parameters ~fee () >>=? fun bytes ->
   Block_services.predecessor cctxt block >>=? fun predecessor ->
-  Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
+  Client_keys.sign
+    cctxt src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   let signed_bytes = Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Alpha_services.Helpers.apply_operation cctxt block
@@ -72,7 +73,8 @@ let reveal cctxt
   Alpha_services.Forge.Manager.reveal
     cctxt block
     ~branch ~source ~sourcePubKey:src_pk ~counter ~fee () >>=? fun bytes ->
-  Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
+  Client_keys.sign
+    cctxt src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   let signed_bytes = Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Shell_services.inject_operation
@@ -120,7 +122,8 @@ let originate_account ?branch
     ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ~spendable:true
     ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
-  Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
+  Client_keys.sign
+    cctxt src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   originate cctxt ~block ~chain_id ~signature bytes
 
 let delegate_contract cctxt
@@ -134,7 +137,8 @@ let delegate_contract cctxt
   Alpha_services.Forge.Manager.delegation cctxt block
     ~branch ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
   >>=? fun bytes ->
-  Client_keys.sign cctxt manager_sk bytes >>=? fun signature ->
+  Client_keys.sign
+    cctxt manager_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   let signed_bytes = Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Shell_services.inject_operation
@@ -182,8 +186,8 @@ let dictate rpc_config block command seckey =
     rpc_config block >>=? fun { chain_id ; hash = branch } ->
   Alpha_services.Forge.Dictator.operation
     rpc_config block ~branch command >>=? fun bytes ->
-  let signature = Signature.sign seckey bytes in
-  let signed_bytes = Signature.concat bytes signature in
+  let signed_bytes =
+    Signature.append ~watermark:Generic_operation seckey bytes in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Shell_services.inject_operation
     rpc_config ~chain_id signed_bytes >>=? fun injected_oph ->
@@ -236,7 +240,8 @@ let originate_contract
     ~counter ~balance ~spendable:spendable
     ~delegatable ?delegatePubKey:delegate
     ~script:{ code ; storage } ~fee () >>=? fun bytes ->
-  Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
+  Client_keys.sign
+    cctxt src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   originate cctxt ~block ~signature bytes
 
 let wait_for_operation_inclusion

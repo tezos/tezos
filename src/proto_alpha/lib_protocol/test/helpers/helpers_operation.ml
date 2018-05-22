@@ -95,23 +95,22 @@ let endorsement_full ?(slot = 0) block level =
   sourced
   @@ Consensus_operation (endorsements block level ~slot)
 
-
 let sign src oph protop =
-  let signature_content = Operation.forge oph protop in
-  let signature = match src with
-    | None -> None
-    | Some(src: Helpers_account.t) -> Some (Signature.sign src.ppk signature_content) in
-  let open Data_encoding in
-  let signed_proto_operation_encoding =
-    Data_encoding.merge_objs
-      Operation.proto_operation_encoding
-      (obj1 @@ varopt "signature" Signature.encoding) in
-  let proto_bytes =
-    Data_encoding.Binary.to_bytes_exn
-      signed_proto_operation_encoding
-      (protop, signature) in
-  (proto_bytes, signature)
-
+  let watermark =
+    match protop with
+    | Proto_alpha.Alpha_context.Anonymous_operations _ -> None
+    | Proto_alpha.Alpha_context.Sourced_operations
+        (Proto_alpha.Alpha_context.Consensus_operation (Endorsements _)) ->
+        Some Signature.Endorsement
+    | _ ->
+        Some Generic_operation in
+  let bytes = Operation.forge oph protop in
+  match src with
+  | None -> bytes, None
+  | Some src ->
+      let signature =
+        Signature.sign ?watermark src.Helpers_account.ppk bytes in
+      Signature.concat bytes signature, Some signature
 
 let main_of_proto (src: Helpers_account.t) operation_header protocol_operation =
   let (proto,_) = sign (Some src) operation_header protocol_operation in
@@ -120,7 +119,6 @@ let main_of_proto (src: Helpers_account.t) operation_header protocol_operation =
   let hash = Tezos_base.Operation.hash data_operation in
   Proto_alpha.Main.parse_operation hash data_operation >>? fun op ->
   ok (op, hash)
-
 
 let apply_of_proto
     (source: Helpers_account.t option) operation_header protocol_operation =

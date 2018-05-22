@@ -270,7 +270,7 @@ let check_proof_of_work_stamp ctxt block =
 let check_signature block key =
   let check_signature key { Block_header.protocol_data ; shell ; signature } =
     let unsigned_header = Block_header.forge_unsigned shell protocol_data in
-    Signature.check key signature unsigned_header in
+    Signature.check ~watermark:Block_header key signature unsigned_header in
   if check_signature key block then
     return ()
   else
