@@ -13,12 +13,15 @@ type error +=
   | Unkwnon_alias_key of string
   | Unkwnon_request_kind
 
+type path =
+  | Unix of string
+  | Tcp of string * string
 type key = string
 
 module Connection : sig
   type t = Lwt_unix.file_descr
-  val bind : Uri.t -> t Lwt.t
-  val connect : Uri.t -> t Lwt.t
+  val bind : path -> (t * string) tzresult Lwt.t
+  val connect : path -> t tzresult Lwt.t
   val read : len:int -> t -> MBytes.t -> unit tzresult Lwt.t
   val write : t -> MBytes.t -> unit tzresult Lwt.t
 end

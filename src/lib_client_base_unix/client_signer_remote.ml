@@ -15,112 +15,116 @@ let sign conn key data =
   send conn Request.encoding (Request.Sign req) >>=? fun () ->
   recv conn Sign.Response.encoding >>=? function
   | Error err -> Lwt.return (Error err)
-  | Ok res -> return res.signature
+  | Ok res -> Lwt_unix.close conn >>= fun () -> return res.signature
 
 let public_key conn key =
   let req = { Public_key.Request.key = key } in
   send conn Request.encoding (Request.Public_key req) >>=? fun () ->
   recv conn Public_key.Response.encoding >>=? function
   | Error err -> Lwt.return (Error err)
-  | Ok res -> return res.public_key
-
+  | Ok res -> Lwt_unix.close conn >>= fun () -> return res.public_key
 
 module Remote_signer : SIGNER = struct
   let scheme = "remote"
 
   let title =
-    "Built-in signer using remote wallet."
+    "Built-in tezos-signer using remote wallet."
 
-  let description = ""
+  let description =
+    "Valid locators are one of these two forms:\n\
+    \  - unix [path to local signer socket] <remote key alias>\n\
+    \  - tcp [host] [port] <remote key alias>\n\
+     All fields except the key can be of the form '$VAR', \
+     in which case their value is taken from environment variable \
+     VAR each time the key is accessed.\n\
+     Not specifiyng fields sets them to $TEZOS_SIGNER_UNIX_PATH, \
+     $TEZOS_SIGNER_TCP_HOST and $TEZOS_SIGNER_TCP_PORT, \
+     that get evaluated to default values '$HOME/.tezos-signer-socket', \
+     localhost and 6732, and can be set later on."
+
+  type path =
+    Client_signer_remote_messages.path * Client_signer_remote_messages.key
 
   (* secret key is the identifier of the location key identifier *)
-  type secret_key = Uri.t * string
-  (* public key is the key itself *)
-  type public_key = Signature.Public_key.t
+  type secret_key = path
+  (* public key is the identifier of the location key identifier *)
+  type public_key = path * Signature.Public_key.t
 
-  let pks : (secret_key,public_key) Hashtbl.t = Hashtbl.create 53
-
-  (* XXX : I want to reuse the connection, but this doesn't work
-     let conn_table = Hashtbl.create 53
-     let connect uri =
-     match Hashtbl.find_opt conn_table uri with
-     | None ->
-        Connection.connect uri >>= fun conn ->
-        Hashtbl.add conn_table uri conn;
-        Lwt.return conn
-     | Some conn -> Lwt.return conn
-  *)
+  let pks : (secret_key, Signature.Public_key.t) Hashtbl.t = Hashtbl.create 53
 
   (* load and init the remote wallet. initialize the connection *)
   let init _cctxt = return ()
 
-  let pk_locator_of_human_input _cctxt = function
-    | [] -> failwith "Remote Schema : Missing public key argument"
-    | uri :: key :: _ ->
-        return (
-          Public_key_locator.create
-            ~scheme ~location:[String.trim uri; String.trim key]
-        )
-    | l -> failwith
-             "Remote Schema : Wrong location type %a"
-             Format.(pp_print_list ~pp_sep:pp_print_cut pp_print_string) l
+  let path_of_human_input = function
+    | "unix" :: key :: [] ->
+        return (Unix "$TEZOS_SIGNER_UNIX_PATH", key)
+    | "unix" :: file :: key :: [] ->
+        return (Unix file, key)
+    | "tcp" :: host :: port :: key :: [] ->
+        return (Tcp (host, port), key)
+    | "tcp" :: host :: key :: [] ->
+        return (Tcp (host, "$TEZOS_SIGNER_TCP_PORT"), key)
+    | "tcp" :: key :: [] ->
+        return (Tcp ("$TEZOS_SIGNER_TCP_HOST", "$TEZOS_SIGNER_TCP_PORT"), key)
+    | location ->
+        failwith
+          "@[<v 2>Remote Schema : wrong locator %s.@,@[<hov 0>%a@]@]"
+          (Secret_key_locator.to_string (Secret_key_locator.create ~scheme ~location))
+          Format.pp_print_text description
 
-  let sk_to_locator (uri,key) =
-    Lwt.return (
-      Secret_key_locator.create
-        ~scheme ~location:[Uri.to_string uri; String.trim key]
-    )
+  let locator_of_path = function
+    | Unix path, key -> [ "unix" ; path ; key ]
+    | Tcp (host, port), key -> [ "tcp" ; host ; port ; key ]
 
-  let sk_locator_of_human_input _cctxt = function
-    | [] -> failwith "Remote Schema : Missing secret key argument"
-    | uri_string :: key :: _ ->
-        let uri = Uri.of_string uri_string in
-        Connection.connect uri >>= fun conn ->
-        public_key conn key >>=? fun pk ->
-        Hashtbl.replace pks (uri,key) pk ;
-        sk_to_locator (uri,key) >>= fun locator ->
-        return locator
-    | l -> failwith
-             "Remote Schema : Missing secret key argument %a"
-             Format.(pp_print_list ~pp_sep:pp_print_cut pp_print_string) l
+  let pk_locator_of_human_input _cctxt path =
+    path_of_human_input path >>=? fun pk ->
+    let location = locator_of_path pk in
+    return (Public_key_locator.create ~scheme ~location)
 
-  let sk_of_locator = function
-    | (Sk_locator { location  = (uri :: key :: _) }) ->
-        return (Uri.of_string uri, key)
-    | skloc ->
-        failwith "Remote Schema : sk_of_locator Wrong locator type: %s"
-          (Secret_key_locator.to_string skloc)
+  let sk_to_locator sk =
+    let location = locator_of_path sk in
+    Lwt.return (Secret_key_locator.create ~scheme ~location)
 
-  let pk_of_locator = function
-    | (Pk_locator { location = ( location :: _ ) }) ->
-        Lwt.return (Signature.Public_key.of_b58check location)
-    | pkloc ->
-        failwith "Remote Schema : pk_of_locator Wrong locator type: %s"
-          (Public_key_locator.to_string pkloc)
+  let sk_locator_of_human_input _cctxt input =
+    path_of_human_input input >>=? fun (path, key) ->
+    Connection.connect path >>=? fun conn ->
+    public_key conn key >>=? fun pk ->
+    Hashtbl.replace pks (path, key) pk ;
+    sk_to_locator (path,key) >>= fun locator ->
+    return locator
 
-  let pk_to_locator pk =
-    Public_key_locator.create
-      ~scheme ~location:[Signature.Public_key.to_b58check pk] |>
-    Lwt.return
+  let sk_of_locator loc =
+    path_of_human_input (Secret_key_locator.location loc)
 
-  let neuterize ((uri, key) as sk) =
+  let pk_of_locator loc =
+    path_of_human_input (Public_key_locator.location loc) >>=? fun (path, key) ->
+    Connection.connect path >>=? fun conn ->
+    public_key conn key >>=? fun pk ->
+    Hashtbl.replace pks (path, key) pk ;
+    return ((path, key), pk)
+
+  let pk_to_locator (path, _) =
+    let location = locator_of_path path in
+    Lwt.return (Public_key_locator.create ~scheme ~location)
+
+  let neuterize ((path, key) as sk) =
     match Hashtbl.find_opt pks sk with
-    | Some pk -> Lwt.return pk
+    | Some pk -> Lwt.return (sk, pk)
     | None -> begin
-        Connection.connect uri >>= fun conn ->
-        public_key conn key >>= function
+        (Connection.connect path >>=? fun conn ->
+         public_key conn key) >>= function
         | Error _ -> Lwt.fail_with "Remote : Cannot obtain public key from remote signer"
         | Ok pk -> begin
             Hashtbl.replace pks sk pk ;
-            Lwt.return pk
+            Lwt.return (sk, pk)
           end
       end
 
-  let public_key x = return x
-  let public_key_hash x = return (Signature.Public_key.hash x)
+  let public_key (_, x) = return x
+  let public_key_hash (_, x) = return (Signature.Public_key.hash x)
 
-  let sign (uri, key) msg =
-    Connection.connect uri >>= fun conn ->
+  let sign (path, key) msg =
+    Connection.connect path >>=? fun conn ->
     sign conn key msg
 end
 

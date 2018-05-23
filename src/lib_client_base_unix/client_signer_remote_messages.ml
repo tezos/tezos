@@ -51,6 +51,9 @@ let () =
     (function Decoding_error -> Some () | _ -> None)
     (fun () -> Decoding_error)
 
+type path =
+  | Unix of string
+  | Tcp of string * string
 type key = string
 
 module Connection = struct
@@ -58,53 +61,82 @@ module Connection = struct
   type t = Lwt_unix.file_descr
 
   let backlog = 10
-  let default_port = 9000
-  let localhost = Ipaddr.V4 (Ipaddr.V4.localhost)
 
-  let getaddr uri =
-    match Uri.scheme uri with
-    | Some "file" ->
-        let path = Uri.path uri in
-        Lwt.catch
-          (fun () -> Lwt_unix.unlink path)
-          (fun _ -> Lwt.return ())
-        >>= fun () ->
-        Lwt.return (Lwt_unix.ADDR_UNIX path)
-    | Some "tezos" -> begin
-        match Uri.host uri, Uri.port uri with
-        | Some host, port_opt ->
-            begin match Ipaddr.of_string host with
-              |Some host ->
-                  let h = Ipaddr_unix.to_inet_addr host in
-                  let p = Option.unopt ~default:default_port port_opt in
-                  Lwt.return (Lwt_unix.ADDR_INET(h,p))
-              | None ->
-                  Lwt.fail_with ("Cannot parse host " ^ (Uri.to_string uri))
-            end
-        | None, _ ->
-            let h = Ipaddr_unix.to_inet_addr localhost in
-            Lwt.return (Lwt_unix.ADDR_INET(h, default_port))
-      end
-    | _ -> Lwt.fail_with ("Cannot parse URI " ^ (Uri.to_string uri))
+  let read_env path =
+    if path <> "" && String.get path 0 = '$' then
+      try
+        return (Sys.getenv (String.sub path 1 (String.length path - 1)))
+      with
+        Not_found ->
+          match path with
+          | "$TEZOS_SIGNER_TCP_HOST" -> return "localhost"
+          | "$TEZOS_SIGNER_TCP_PORT" -> return "6732"
+          | "$TEZOS_SIGNER_UNIX_PATH" -> return (Filename.concat (Sys.getenv "HOME") ".tezos-signer-socket")
+          | _ ->
+              failwith "Remote signer location uses environment variable %s which is not bound" path
+    else return path
 
-  let bind remote =
-    getaddr remote >>= fun addr ->
-    let sock = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
-    Lwt_unix.setsockopt sock SO_REUSEADDR true;
-    Lwt_unix.bind sock @@ addr >|= fun () ->
-    Lwt_unix.listen sock backlog;
-    sock
+  let catch_unix_error msg f =
+    Lwt.catch f @@ function
+    | Unix.Unix_error (err, syscall, _) ->
+        failwith "%s\nUnix error (%s): %s" msg syscall (Unix.error_message err)
+    | Failure err -> failwith "%s\n%s" msg err
+    | exn -> Lwt.fail exn
 
-  let connect remote =
-    getaddr remote >>= fun addr ->
-    let sock = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
-    Lwt_unix.connect sock @@ addr >|= fun () ->
-    sock
+  let bind path =
+    match path with
+    | Unix path ->
+        read_env path >>=? fun path ->
+        catch_unix_error ("Cannot listen on " ^ path) @@ fun () ->
+        let addr = Lwt_unix.ADDR_UNIX path in
+        let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
+        Lwt_unix.bind sock addr >>= fun () ->
+        Lwt_unix.listen sock backlog ;
+        return (sock, path)
+    | Tcp (host, port) ->
+        read_env host >>=? fun host ->
+        read_env port >>=? fun port ->
+        let full = host ^ ":" ^ port in
+        catch_unix_error ("Cannot listen on " ^ full) @@ fun () ->
+        let port = int_of_string port in
+        let host = try
+            (Unix.gethostbyname host).h_addr_list.(0)
+          with Not_found -> Pervasives.failwith ("Host " ^ host ^ " not found") in
+        let addr = Lwt_unix.ADDR_INET (host, port) in
+        let sock = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
+        Lwt_unix.setsockopt sock SO_REUSEADDR true;
+        Lwt_unix.bind sock addr >>= fun () ->
+        Lwt_unix.listen sock backlog ;
+        return (sock, full)
+
+  let connect path =
+    match path with
+    | Unix path ->
+        read_env path >>=? fun path ->
+        let addr = Lwt_unix.ADDR_UNIX path in
+        let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
+        catch_unix_error ("Cannot connect to local socket " ^ path) @@ fun () ->
+        Lwt_unix.connect sock addr >>= fun () ->
+        return sock
+    | Tcp (host, port) ->
+        read_env host >>=? fun host ->
+        read_env port >>=? fun port ->
+        catch_unix_error ("Cannot connect to " ^ host ^ ":" ^ port) @@ fun () ->
+        let port = int_of_string port in
+        let host = try
+            (Unix.gethostbyname host).h_addr_list.(0)
+          with Not_found -> Pervasives.failwith ("Host " ^ host ^ " not found") in
+        let addr = Lwt_unix.ADDR_INET (host, port) in
+        let sock = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
+        Lwt_unix.connect sock addr >>= fun () ->
+        return sock
 
   let read ~len fd buf =
+    catch_unix_error "Cannot receive message" @@ fun () ->
     Lwt_utils_unix.read_mbytes ~len fd buf >>= return
 
   let write fd buf =
+    catch_unix_error "Cannot send message" @@ fun () ->
     Lwt_utils_unix.write_mbytes fd buf >>= return
 
 end
