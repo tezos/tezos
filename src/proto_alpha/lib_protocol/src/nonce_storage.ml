@@ -52,27 +52,28 @@ let () =
     `Branch
     ~id:"nonce.unexpected"
     ~title:"Unexpected nonce"
-    ~description:"The provided nonce is inconsistent with the commit nonce hash."
+    ~description:"The provided nonce is inconsistent with the committed nonce hash."
     ~pp: (fun ppf () ->
-        Format.fprintf ppf "This nonce revelation is invalid (inconsistent with the commited hash)")
+        Format.fprintf ppf "This nonce revelation is invalid (inconsistent with the committed hash)")
     Data_encoding.unit
     (function Unexpected_nonce -> Some () | _ -> None)
     (fun () -> Unexpected_nonce)
 
+(* checks that the level of a revelation is not too early or too late wrt to the
+   current context and that a nonce has not been already revealed for that level *)
 let get_unrevealed ctxt level =
-  let revealed_cycle =
-    let cur_level = Level_storage.current ctxt in
-    match Cycle_repr.pred cur_level.cycle with
-    | None -> Cycle_repr.root
-    | Some min_cycle -> min_cycle in
-  if Cycle_repr.(revealed_cycle < level.Level_repr.cycle) then
-    fail Too_early_revelation
-  else if Cycle_repr.(level.Level_repr.cycle < revealed_cycle) then
-    fail Too_late_revelation
-  else
-    Storage.Seed.Nonce.get ctxt level >>=? function
-    | Revealed _ -> fail Previously_revealed_nonce
-    | Unrevealed status -> return status
+  let cur_level = Level_storage.current ctxt in
+  match Cycle_repr.pred cur_level.cycle with
+  | None -> fail Too_early_revelation (* no revelations during cycle 0 *)
+  | Some revealed_cycle ->
+      if Cycle_repr.(revealed_cycle < level.Level_repr.cycle) then
+        fail Too_early_revelation
+      else if Cycle_repr.(level.Level_repr.cycle < revealed_cycle) then
+        fail Too_late_revelation
+      else
+        Storage.Seed.Nonce.get ctxt level >>=? function
+        | Revealed _ -> fail Previously_revealed_nonce
+        | Unrevealed status -> return status
 
 let record_hash ctxt unrevealed =
   let level = Level_storage.current ctxt in
