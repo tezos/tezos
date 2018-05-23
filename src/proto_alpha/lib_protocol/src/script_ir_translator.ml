@@ -61,14 +61,14 @@ let default_annot ~default = function
 let access_annot
   : var_annot option ->  ?default:field_annot option -> field_annot option -> var_annot option
   = fun value_annot ?(default=None) field_annot ->
-  match value_annot, field_annot, default with
-  | None, None, _ | Some _, None, None -> None
-  | None, Some `Field_annot f, _ ->
-      Some (`Var_annot f)
-  | Some `Var_annot v, None, Some `Field_annot f ->
-      Some (`Var_annot (String.concat "." [v; f]))
-  | Some `Var_annot v, Some `Field_annot f, _ ->
-      Some (`Var_annot (String.concat "." [v; f]))
+    match value_annot, field_annot, default with
+    | None, None, _ | Some _, None, None -> None
+    | None, Some `Field_annot f, _ ->
+        Some (`Var_annot f)
+    | Some `Var_annot v, None, Some `Field_annot f ->
+        Some (`Var_annot (String.concat "." [v; f]))
+    | Some `Var_annot v, Some `Field_annot f, _ ->
+        Some (`Var_annot (String.concat "." [v; f]))
 
 (* ---- Type size accounting ------------------------------------------------*)
 
@@ -88,36 +88,36 @@ let comparable_type_size : type t. t comparable_ty -> int = fun ty ->
 (* TODO include annot in size ? *)
 let rec type_size : type t. t ty -> int =
   fun ty -> match ty with
-  | Unit_t _ -> 1
-  | Int_t _ -> 1
-  | Nat_t _ -> 1
-  | Signature_t _ -> 1
-  | String_t _ -> 1
-  | Mutez_t _ -> 1
-  | Key_hash_t _ -> 1
-  | Key_t _ -> 1
-  | Timestamp_t _ -> 1
-  | Address_t _ -> 1
-  | Bool_t _ -> 1
-  | Operation_t _ -> 1
-  | Pair_t ((l, _), (r, _), _) ->
-      1 + type_size l + type_size r
-  | Union_t ((l, _), (r, _), _) ->
-      1 + type_size l + type_size r
-  | Lambda_t (arg, ret, _) ->
-      1 + type_size arg + type_size ret
-  | Option_t ((t,_), _, _) ->
-      1 + type_size t
-  | List_t (t, _) ->
-      1 + type_size t
-  | Set_t (k, _) ->
-      1 + comparable_type_size k
-  | Map_t (k, v, _) ->
-      1 + comparable_type_size k + type_size v
-  | Big_map_t (k, v, _) ->
-      1 + comparable_type_size k + type_size v
-  | Contract_t (arg, _) ->
-      1 + type_size arg
+    | Unit_t _ -> 1
+    | Int_t _ -> 1
+    | Nat_t _ -> 1
+    | Signature_t _ -> 1
+    | String_t _ -> 1
+    | Mutez_t _ -> 1
+    | Key_hash_t _ -> 1
+    | Key_t _ -> 1
+    | Timestamp_t _ -> 1
+    | Address_t _ -> 1
+    | Bool_t _ -> 1
+    | Operation_t _ -> 1
+    | Pair_t ((l, _), (r, _), _) ->
+        1 + type_size l + type_size r
+    | Union_t ((l, _), (r, _), _) ->
+        1 + type_size l + type_size r
+    | Lambda_t (arg, ret, _) ->
+        1 + type_size arg + type_size ret
+    | Option_t ((t,_), _, _) ->
+        1 + type_size t
+    | List_t (t, _) ->
+        1 + type_size t
+    | Set_t (k, _) ->
+        1 + comparable_type_size k
+    | Map_t (k, v, _) ->
+        1 + comparable_type_size k + type_size v
+    | Big_map_t (k, v, _) ->
+        1 + comparable_type_size k + type_size v
+    | Contract_t (arg, _) ->
+        1 + type_size arg
 
 let rec type_size_of_stack_head
   : type st. st stack_ty -> up_to:int -> int
@@ -572,78 +572,78 @@ let add_field_annot a = function
 let rec unparse_ty
   : type a. a ty -> Script.node
   = function
-  | Unit_t tname -> Prim (-1, T_unit, [], unparse_type_annot tname)
-  | Int_t tname -> Prim (-1, T_int, [], unparse_type_annot tname)
-  | Nat_t tname -> Prim (-1, T_nat, [], unparse_type_annot tname)
-  | String_t tname -> Prim (-1, T_string, [], unparse_type_annot tname)
-  | Mutez_t tname -> Prim (-1, T_mutez, [], unparse_type_annot tname)
-  | Bool_t tname -> Prim (-1, T_bool, [], unparse_type_annot tname)
-  | Key_hash_t tname -> Prim (-1, T_key_hash, [], unparse_type_annot tname)
-  | Key_t tname -> Prim (-1, T_key, [], unparse_type_annot tname)
-  | Timestamp_t tname -> Prim (-1, T_timestamp, [], unparse_type_annot tname)
-  | Address_t tname -> Prim (-1, T_address, [], unparse_type_annot tname)
-  | Signature_t tname -> Prim (-1, T_signature, [], unparse_type_annot tname)
-  | Operation_t tname -> Prim (-1, T_operation, [], unparse_type_annot tname)
-  | Contract_t (ut, tname) ->
-      let t = unparse_ty ut in
-      Prim (-1, T_contract, [ t ], unparse_type_annot tname)
-  | Pair_t ((utl, l_field), (utr, r_field ), tname) ->
-      let annot = unparse_type_annot tname in
-      let tl = unparse_ty utl |> add_field_annot l_field in
-      let tr = unparse_ty utr |> add_field_annot r_field in
-      Prim (-1, T_pair, [ tl; tr ], annot)
-  | Union_t ((utl, l_field), (utr, r_field), tname) ->
-      let annot = unparse_type_annot tname in
-      let tl = unparse_ty utl |> add_field_annot l_field in
-      let tr = unparse_ty utr |> add_field_annot r_field in
-      Prim (-1, T_or, [ tl; tr ], annot)
-  | Lambda_t (uta, utr, tname) ->
-      let ta = unparse_ty uta in
-      let tr = unparse_ty utr in
-      Prim (-1, T_lambda, [ ta; tr ], unparse_type_annot tname)
-  | Option_t ((ut, some_field), _none_field, tname) ->
-      let annot = unparse_type_annot tname in
-      let t = unparse_ty ut |> add_field_annot some_field in
-      Prim (-1, T_option, [ t ], annot)
-  | List_t (ut, tname) ->
-      let t = unparse_ty ut in
-      Prim (-1, T_list, [ t ], unparse_type_annot tname)
-  | Set_t (ut, tname) ->
-      let t = unparse_comparable_ty ut in
-      Prim (-1, T_set, [ t ], unparse_type_annot tname)
-  | Map_t (uta, utr, tname) ->
-      let ta = unparse_comparable_ty uta in
-      let tr = unparse_ty utr in
-      Prim (-1, T_map, [ ta; tr ], unparse_type_annot tname)
-  | Big_map_t (uta, utr, tname) ->
-      let ta = unparse_comparable_ty uta in
-      let tr = unparse_ty utr in
-      Prim (-1, T_big_map, [ ta; tr ], unparse_type_annot tname)
+    | Unit_t tname -> Prim (-1, T_unit, [], unparse_type_annot tname)
+    | Int_t tname -> Prim (-1, T_int, [], unparse_type_annot tname)
+    | Nat_t tname -> Prim (-1, T_nat, [], unparse_type_annot tname)
+    | String_t tname -> Prim (-1, T_string, [], unparse_type_annot tname)
+    | Mutez_t tname -> Prim (-1, T_mutez, [], unparse_type_annot tname)
+    | Bool_t tname -> Prim (-1, T_bool, [], unparse_type_annot tname)
+    | Key_hash_t tname -> Prim (-1, T_key_hash, [], unparse_type_annot tname)
+    | Key_t tname -> Prim (-1, T_key, [], unparse_type_annot tname)
+    | Timestamp_t tname -> Prim (-1, T_timestamp, [], unparse_type_annot tname)
+    | Address_t tname -> Prim (-1, T_address, [], unparse_type_annot tname)
+    | Signature_t tname -> Prim (-1, T_signature, [], unparse_type_annot tname)
+    | Operation_t tname -> Prim (-1, T_operation, [], unparse_type_annot tname)
+    | Contract_t (ut, tname) ->
+        let t = unparse_ty ut in
+        Prim (-1, T_contract, [ t ], unparse_type_annot tname)
+    | Pair_t ((utl, l_field), (utr, r_field ), tname) ->
+        let annot = unparse_type_annot tname in
+        let tl = unparse_ty utl |> add_field_annot l_field in
+        let tr = unparse_ty utr |> add_field_annot r_field in
+        Prim (-1, T_pair, [ tl; tr ], annot)
+    | Union_t ((utl, l_field), (utr, r_field), tname) ->
+        let annot = unparse_type_annot tname in
+        let tl = unparse_ty utl |> add_field_annot l_field in
+        let tr = unparse_ty utr |> add_field_annot r_field in
+        Prim (-1, T_or, [ tl; tr ], annot)
+    | Lambda_t (uta, utr, tname) ->
+        let ta = unparse_ty uta in
+        let tr = unparse_ty utr in
+        Prim (-1, T_lambda, [ ta; tr ], unparse_type_annot tname)
+    | Option_t ((ut, some_field), _none_field, tname) ->
+        let annot = unparse_type_annot tname in
+        let t = unparse_ty ut |> add_field_annot some_field in
+        Prim (-1, T_option, [ t ], annot)
+    | List_t (ut, tname) ->
+        let t = unparse_ty ut in
+        Prim (-1, T_list, [ t ], unparse_type_annot tname)
+    | Set_t (ut, tname) ->
+        let t = unparse_comparable_ty ut in
+        Prim (-1, T_set, [ t ], unparse_type_annot tname)
+    | Map_t (uta, utr, tname) ->
+        let ta = unparse_comparable_ty uta in
+        let tr = unparse_ty utr in
+        Prim (-1, T_map, [ ta; tr ], unparse_type_annot tname)
+    | Big_map_t (uta, utr, tname) ->
+        let ta = unparse_comparable_ty uta in
+        let tr = unparse_ty utr in
+        Prim (-1, T_big_map, [ ta; tr ], unparse_type_annot tname)
 
 let name_of_ty
   : type a. a ty -> type_annot option
   = function
-  | Unit_t tname -> tname
-  | Int_t tname -> tname
-  | Nat_t tname -> tname
-  | String_t tname -> tname
-  | Mutez_t tname -> tname
-  | Bool_t tname -> tname
-  | Key_hash_t tname -> tname
-  | Key_t tname -> tname
-  | Timestamp_t tname -> tname
-  | Address_t tname -> tname
-  | Signature_t tname -> tname
-  | Operation_t tname -> tname
-  | Contract_t (_, tname) -> tname
-  | Pair_t (_, _, tname) -> tname
-  | Union_t (_, _, tname) -> tname
-  | Lambda_t (_, _, tname) -> tname
-  | Option_t (_, _, tname) -> tname
-  | List_t (_, tname) -> tname
-  | Set_t (_, tname) -> tname
-  | Map_t (_, _, tname) -> tname
-  | Big_map_t (_, _, tname) -> tname
+    | Unit_t tname -> tname
+    | Int_t tname -> tname
+    | Nat_t tname -> tname
+    | String_t tname -> tname
+    | Mutez_t tname -> tname
+    | Bool_t tname -> tname
+    | Key_hash_t tname -> tname
+    | Key_t tname -> tname
+    | Timestamp_t tname -> tname
+    | Address_t tname -> tname
+    | Signature_t tname -> tname
+    | Operation_t tname -> tname
+    | Contract_t (_, tname) -> tname
+    | Pair_t (_, _, tname) -> tname
+    | Union_t (_, _, tname) -> tname
+    | Lambda_t (_, _, tname) -> tname
+    | Option_t (_, _, tname) -> tname
+    | List_t (_, tname) -> tname
+    | Set_t (_, tname) -> tname
+    | Map_t (_, _, tname) -> tname
+    | Big_map_t (_, _, tname) -> tname
 
 (* ---- Equality witnesses --------------------------------------------------*)
 
@@ -739,38 +739,37 @@ let rec stack_ty_eq
 let merge_type_annot
   : type_annot option -> type_annot option -> type_annot option tzresult
   = fun annot1 annot2 ->
-  match annot1, annot2 with
-  | None, None
-  | Some _, None
-  | None, Some _ -> ok None
-  | Some `Type_annot a1, Some `Type_annot a2 ->
-      if String.equal a1 a2
-      then ok annot1
-      else error (Inconsistent_annotations (":" ^ a1, ":" ^ a2))
+    match annot1, annot2 with
+    | None, None
+    | Some _, None
+    | None, Some _ -> ok None
+    | Some `Type_annot a1, Some `Type_annot a2 ->
+        if String.equal a1 a2
+        then ok annot1
+        else error (Inconsistent_annotations (":" ^ a1, ":" ^ a2))
 
 let merge_field_annot
   : field_annot option -> field_annot option -> field_annot option tzresult
   = fun annot1 annot2 ->
-  match annot1, annot2 with
-  | None, None
-  | Some _, None
-  | None, Some _ -> ok None
-  | Some `Field_annot a1, Some `Field_annot a2 ->
-      if String.equal a1 a2
-      then ok annot1
-      else ok None
-           (* TODO check this, do we want typechecking here ? *)
-           (* error (Inconsistent_annotations ("%" ^ a1, "%" ^ a2)) *)
+    match annot1, annot2 with
+    | None, None
+    | Some _, None
+    | None, Some _ -> ok None
+    | Some `Field_annot a1, Some `Field_annot a2 ->
+        if String.equal a1 a2
+        then ok annot1
+        else ok None (* TODO check this, do we want typechecking here ?
+                        error (Inconsistent_annotations ("%" ^ a1, "%" ^ a2)) *)
 
 let merge_var_annot
   : var_annot option -> var_annot option -> var_annot option
   = fun annot1 annot2 ->
-  match annot1, annot2 with
-  | None, None
-  | Some _, None
-  | None, Some _ -> None
-  | Some `Var_annot a1, Some `Var_annot a2 ->
-      if String.equal a1 a2 then annot1 else None
+    match annot1, annot2 with
+    | None, None
+    | Some _, None
+    | None, Some _ -> None
+    | Some `Var_annot a1, Some `Var_annot a2 ->
+        if String.equal a1 a2 then annot1 else None
 
 let merge_comparable_types
   : type ta. ta comparable_ty -> ta comparable_ty -> ta comparable_ty tzresult
@@ -1008,7 +1007,7 @@ let check_const_type_annot
   : int -> string list -> type_annot option -> unit tzresult Lwt.t
   = fun loc annot expected_annot ->
     Lwt.return
-    (parse_type_annot loc annot >>? merge_type_annot expected_annot >|? fun _ -> ())
+      (parse_type_annot loc annot >>? merge_type_annot expected_annot >|? fun _ -> ())
 
 let parse_field_annot
   : int -> string list -> field_annot option tzresult
@@ -2324,7 +2323,7 @@ and parse_instr
         Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
         typed ctxt loc Ediv_tez
           (Item_t (Option_t ((Pair_t ((Nat_t None, None), (Mutez_t tname, None), None), None),
-                            None, None), rest, annot))
+                             None, None), rest, annot))
     | Prim (loc, I_EDIV, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
@@ -2339,7 +2338,7 @@ and parse_instr
         typed ctxt loc Ediv_intnat
           (Item_t (Option_t
                      ((Pair_t ((Int_t tname, None), (Nat_t None, None), None), None),
-                     None, None), rest, annot))
+                      None, None), rest, annot))
     | Prim (loc, I_EDIV, [], annot),
       Item_t (Nat_t tname, Item_t (Int_t _, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->

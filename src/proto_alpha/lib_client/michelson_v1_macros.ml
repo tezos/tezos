@@ -50,7 +50,7 @@ let extract_first_field_annot annot =
   let rec extract_first_field_annot others = function
     | [] -> None, List.rev others
     | a :: rest ->
-      match a.[0] with
+        match a.[0] with
         | '%' -> Some a, List.rev_append others rest
         | _ -> extract_first_field_annot (a :: others) rest
         | exception Invalid_argument _ -> extract_first_field_annot (a :: others) rest
@@ -934,10 +934,10 @@ let unexpand_if_right = function
 
 let unexpand_rename = function
   | Seq (loc, [
-          Prim (_, "DUP", [], annot) ;
-          Prim (_, "SWAP", [], []) ;
-          Prim (_, "DROP", [], []) ;
-        ]) ->
+      Prim (_, "DUP", [], annot) ;
+      Prim (_, "SWAP", [], []) ;
+      Prim (_, "DROP", [], []) ;
+    ]) ->
       Some (Prim (loc, "RENAME", [], annot))
   | _ -> None
 
