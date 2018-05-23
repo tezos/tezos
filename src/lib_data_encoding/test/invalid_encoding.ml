@@ -22,4 +22,9 @@ let tests = [
   test "duplicated_tag" (fun () ->
       union [ case (Tag 0) empty (fun () -> None) (fun () -> ()) ;
               case (Tag 0) empty (fun () -> None) (fun () -> ()) ]) ;
+  test "fixed_negative_size" (fun () -> Fixed.string (~- 1)) ;
+  test "fixed_null_size" (fun () -> Fixed.bytes 0) ;
+  test "array_null_size" (fun () -> Variable.list empty) ;
+  test "list_null_size" (fun () -> Variable.list null) ;
+  test "zeroable_in_list" (fun () -> list (obj1 (varopt "x" int8))) ;
 ]
