@@ -177,9 +177,68 @@ let rec classify : type a. a t -> Kind.t = fun e ->
 let make ?json_encoding encoding = { encoding ; json_encoding }
 
 module Fixed = struct
-  let string n = make @@ String (`Fixed n)
-  let bytes n = make @@ Bytes (`Fixed n)
+  let string n =
+    if n <= 0 then
+      invalid_arg "Cannot create a string encoding fo negative or null fixed length."
+    else
+      make @@ String (`Fixed n)
+  let bytes n =
+    if n <= 0 then
+      invalid_arg "Cannot create a byte encoding fo negative or null fixed length."
+    else
+      make @@ Bytes (`Fixed n)
 end
+
+let rec is_zeroable: type t. t encoding -> bool = fun e ->
+  (* Whether an encoding can ever produce zero-byte of encoding. It is dnagerous
+     to place zero-size elements in a collection (list/array) because
+     they are indistinguishable from the abscence of elements. *)
+  match e.encoding with
+  (* trivially true *)
+  | Null -> true (* always true *)
+  | Empty -> true (* always true *)
+  | Ignore -> true (* always true *)
+  | Constant _ -> true (* always true *)
+  (* trivially false *)
+  | Bool -> false
+  | Int8 -> false
+  | Uint8 -> false
+  | Int16 -> false
+  | Uint16 -> false
+  | Int31 -> false
+  | Int32 -> false
+  | Int64 -> false
+  | Z -> false
+  | RangedInt _ -> false
+  | RangedFloat _ -> false
+  | Float -> false
+  | Bytes _ -> false
+  | String _ -> false
+  | String_enum _ -> false
+  (* true in some cases, but in practice always protected by Dynamic *)
+  | Array _ -> true (* 0-element array *)
+  | List _ -> true (* 0-element list *)
+  (* represented as whatever is inside: truth mostly propagates *)
+  | Obj (Req (_, e)) -> is_zeroable e (* represented as-is *)
+  | Obj (Opt (`Variable, _, _)) -> true (* optional field ommited *)
+  | Obj (Dft (_, e, _)) -> is_zeroable e (* represented as-is *)
+  | Obj _ -> false
+  | Objs (_, e1, e2) -> is_zeroable e1 && is_zeroable e2
+  | Tup e -> is_zeroable e
+  | Tups (_, e1, e2) -> is_zeroable e1 && is_zeroable e2
+  | Union (_, _, _) -> false (* includes a tag *)
+  (* other recursive cases: truth propagates *)
+  | Mu (`Dynamic, _, _) -> false (* size prefix *)
+  | Mu (`Variable, _, f) -> is_zeroable (f e)
+  | Conv { encoding } -> is_zeroable encoding
+  | Describe { encoding } -> is_zeroable encoding
+  | Def { encoding } -> is_zeroable encoding
+  | Splitted { encoding } -> is_zeroable encoding
+  | Check_size { encoding } -> is_zeroable encoding
+  (* Unscrutable: true by default *)
+  | Delayed f -> is_zeroable (f ())
+  (* Protected against zeroable *)
+  | Dynamic_size _ -> false (* always some data for size *)
 
 module Variable = struct
   let string = make @@ String `Variable
@@ -191,11 +250,19 @@ module Variable = struct
           "Cannot insert variable length element in %s. \
            You should wrap the contents using Data_encoding.dynamic_size." name
     | `Dynamic | `Fixed _ -> ()
+  let check_not_zeroable name e =
+    if is_zeroable e then
+      Printf.ksprintf invalid_arg
+        "Cannot insert potentially zero-sized element in %s." name
+    else
+      ()
   let array e =
     check_not_variable "an array" e ;
+    check_not_zeroable "an array" e ;
     make @@ Array e
   let list e =
     check_not_variable "a list" e ;
+    check_not_zeroable "a list" e ;
     make @@ List e
 end
 
