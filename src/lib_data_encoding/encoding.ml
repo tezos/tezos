@@ -159,7 +159,7 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Union (kind, _, _) -> (kind :> Kind.t)
   | Mu (kind, _, _) -> (kind :> Kind.t)
   (* Variable *)
-  | Ignore -> `Variable
+  | Ignore -> `Fixed 0
   | Array _ -> `Variable
   | List _ -> `Variable
   (* Recursive *)
