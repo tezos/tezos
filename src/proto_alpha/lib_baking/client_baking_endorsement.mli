@@ -25,4 +25,4 @@ val create :
   ?max_past:Time.t ->
   delay:int ->
   public_key_hash list ->
-  Client_baking_blocks.block_info tzresult Lwt_stream.t -> unit Lwt.t
+  Client_baking_blocks.block_info list tzresult Lwt_stream.t -> unit Lwt.t
