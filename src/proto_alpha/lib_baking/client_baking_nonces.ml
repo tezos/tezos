@@ -37,26 +37,26 @@ let mem (wallet : #Client_context.wallet) block_hash =
 
 let find (wallet : #Client_context.wallet) block_hash =
   wallet#with_lock ( fun () ->
-    load wallet >>|? fun data ->
-    try Some (List.assoc block_hash data)
-    with Not_found -> None)
+      load wallet >>|? fun data ->
+      try Some (List.assoc block_hash data)
+      with Not_found -> None)
 
 
 let add (wallet : #Client_context.wallet) block_hash nonce =
   wallet#with_lock ( fun () ->
-  load wallet >>=? fun data ->
-  save wallet ((block_hash, nonce) ::
-               List.remove_assoc block_hash data))
+      load wallet >>=? fun data ->
+      save wallet ((block_hash, nonce) ::
+                   List.remove_assoc block_hash data))
 
 let del (wallet : #Client_context.wallet) block_hash =
   wallet#with_lock ( fun () ->
-    load wallet >>=? fun data ->
-    save wallet (List.remove_assoc block_hash data))
+      load wallet >>=? fun data ->
+      save wallet (List.remove_assoc block_hash data))
 
 let dels (wallet : #Client_context.wallet) hashes =
   wallet#with_lock ( fun () ->
-  load wallet >>=? fun data ->
-  save wallet @@
-  List.fold_left
-    (fun data hash -> List.remove_assoc hash data)
-    data hashes)
+      load wallet >>=? fun data ->
+      save wallet @@
+      List.fold_left
+        (fun data hash -> List.remove_assoc hash data)
+        data hashes)

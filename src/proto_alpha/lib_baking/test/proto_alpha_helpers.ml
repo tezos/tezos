@@ -37,6 +37,7 @@ let no_write_context ?(block = `Head 0) config : #Client_context.full = object
     a ->
     a Data_encoding.encoding -> unit Error_monad.tzresult Lwt.t =
     fun _ _ _ -> return ()
+  method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = fun f -> f ()
   method block = block
   method confirmations = None
   method prompt : type a. (a, string tzresult) Client_context.lwt_format -> a =
