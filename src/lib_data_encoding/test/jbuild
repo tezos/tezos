@@ -2,11 +2,13 @@
 
 (executables
  ((names (test
+          test_generated
           bench_data_encoding
           ))
   (libraries (tezos-stdlib
               tezos_data_encoding
-              alcotest))
+              alcotest
+              crowbar))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_stdlib
                     -open Tezos_data_encoding))))
@@ -14,12 +16,22 @@
 (alias
   ((name buildtest)
    (deps (test.exe
+          test_generated.exe
           bench_data_encoding.exe
           ))))
 
 (alias
- ((name runtest)
+ ((name runtest_test)
   (action (run ${exe:test.exe}))))
+
+(alias
+ ((name runtest_test_generated)
+  (action (run ${exe:test_generated.exe}))))
+
+(alias
+ ((name runtest)
+  (deps ((alias runtest_test)
+         (alias runtest_test_generated)))))
 
 (alias
  ((name run_bench)
