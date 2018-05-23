@@ -12,6 +12,7 @@ open Alpha_context
 open Tezos_micheline
 open Script_typed_ir
 open Script_tc_errors
+open Script_ir_annot
 open Script_ir_translator
 open Script_interpreter
 open Michelson_v1_printer

@@ -16,7 +16,7 @@ code { DUP; CAR;
        IF_LEFT { DUP; DIIP{ CDR %stored_balance; DUP };
                  DIP{ SWAP }; GET;
                  # Create the account
-                 IF_SOME @previous_balance
+                 IF_SOME $previous_balance
                          # Add to an existing account
                          { AMOUNT; ADD; SOME; SWAP; UPDATE; NIL operation; PAIR }
                          { DIP{ AMOUNT; SOME }; UPDATE; NIL operation; PAIR }}
@@ -31,7 +31,7 @@ code { DUP; CAR;
                  DIIP{ CDR %stored_balance; DUP };
                  CAR %from; HASH_KEY @from_hash; DIP{ SWAP }; GET;
                  # Account does not exist
-                 IF_NONE @previous_balance
+                 IF_NONE $previous_balance
                          { FAIL }
                          # Account exists
                          { DUP; DIIP{ DUP; CDAR %withdraw_amount; DUP };

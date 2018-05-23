@@ -10,27 +10,14 @@
 open Alpha_context
 open Script_int
 
-
 (* ---- Auxiliary types -----------------------------------------------------*)
 
 type var_annot = [ `Var_annot of string ]
 type type_annot = [ `Type_annot of string ]
 type field_annot = [ `Field_annot of string ]
+type binding_annot = [ `Binding_annot of string ]
 
-type annot = [ var_annot | type_annot | field_annot ]
-
-(* type 'ty comparable_ty_desc =
- *   | Int_key : (z num) comparable_ty_desc
- *   | Nat_key : (n num) comparable_ty_desc
- *   | String_key : string comparable_ty_desc
- *   | Mutez_key : Tez.t comparable_ty_desc
- *   | Bool_key : bool comparable_ty_desc
- *   | Key_hash_key : public_key_hash comparable_ty_desc
- *   | Timestamp_key : Script_timestamp.t comparable_ty_desc
- *   | Address_key : Contract.t comparable_ty_desc
- *
- * type 'ty comparable_ty =
- *   { comp_ty_desc : 'ty comparable_ty_desc ; comp_ty_name : type_annot option } *)
+type annot = [ var_annot | type_annot | field_annot | binding_annot ]
 
 type 'ty comparable_ty =
   | Int_key : type_annot option -> (z num) comparable_ty
@@ -79,31 +66,6 @@ and ('arg, 'ret) lambda =
 
 and 'arg typed_contract =
   'arg ty * Contract.t
-
-(* and 'ty ty_desc =
- *   | Unit_t : unit ty_desc
- *   | Int_t : z num ty_desc
- *   | Nat_t : n num ty_desc
- *   | Signature_t : signature ty_desc
- *   | String_t : string ty_desc
- *   | Mutez_t : Tez.t ty_desc
- *   | Key_hash_t : public_key_hash ty_desc
- *   | Key_t : public_key ty_desc
- *   | Timestamp_t : Script_timestamp.t ty_desc
- *   | Address_t : Contract.t ty_desc
- *   | Bool_t : bool ty_desc
- *   | Pair_t : ('a ty * field_annot option) * ('b ty * field_annot option) -> ('a, 'b) pair ty_desc
- *   | Union_t : ('a ty * field_annot option) * ('b ty * field_annot option) -> ('a, 'b) union ty_desc
- *   | Lambda_t : 'arg ty * 'ret ty -> ('arg, 'ret) lambda ty_desc
- *   | Option_t : ('v ty * field_annot option) * field_annot option -> 'v option ty_desc
- *   | List_t : 'v ty -> 'v list ty_desc
- *   | Set_t : 'v comparable_ty -> 'v set ty_desc
- *   | Map_t : 'k comparable_ty * 'v ty -> ('k, 'v) map ty_desc
- *   | Big_map_t : 'k comparable_ty * 'v ty -> ('k, 'v) big_map ty_desc
- *   | Contract_t : 'arg ty -> 'arg typed_contract ty_desc
- *   | Operation_t : internal_operation ty_desc
- *
- * and 'ty ty = { ty_desc : 'ty ty_desc ; ty_name : type_annot option } *)
 
 and 'ty ty =
   | Unit_t : type_annot option -> unit ty

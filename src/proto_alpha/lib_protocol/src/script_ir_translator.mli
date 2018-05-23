@@ -67,7 +67,6 @@ val parse_data :
 val unparse_data :
   context -> unparsing_mode -> 'a Script_typed_ir.ty -> 'a ->
   (Script.node * context) tzresult Lwt.t
-val unparse_var_annot : Script_typed_ir.var_annot option -> string list
 
 val parse_ty :
   allow_big_map: bool ->

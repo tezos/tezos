@@ -12,6 +12,7 @@ open Micheline
 open Script
 open Script_typed_ir
 open Script_tc_errors
+open Script_ir_annot
 
 type ex_comparable_ty = Ex_comparable_ty : 'a comparable_ty -> ex_comparable_ty
 type ex_ty = Ex_ty : 'a ty -> ex_ty
@@ -31,44 +32,6 @@ let add_dip ty annot prev =
   match prev with
   | Lambda | Toplevel _ -> Dip (Item_t (ty, Empty_t, annot), prev)
   | Dip (stack, _) -> Dip (Item_t (ty, stack, annot), prev)
-
-let default_arg_annot = Some (`Var_annot "arg")
-let default_now_annot = Some (`Var_annot "now")
-let default_amount_annot = Some (`Var_annot "amount")
-let default_balance_annot = Some (`Var_annot "balance")
-let default_steps_annot = Some (`Var_annot "steps")
-let default_source_annot = Some (`Var_annot "source")
-let default_self_annot = Some (`Var_annot "self")
-
-let default_param_annot = Some (`Field_annot "parameter")
-let default_storage_annot = Some (`Field_annot "storage")
-let default_car_annot = Some (`Field_annot "car")
-let default_cdr_annot = Some (`Field_annot "cdr")
-let default_left_annot = Some (`Field_annot "left")
-let default_right_annot = Some (`Field_annot "right")
-let default_some_annot = Some (`Field_annot "some")
-let default_elt_annot = Some (`Field_annot "elt")
-let default_key_annot = Some (`Field_annot "key")
-let default_hd_annot = Some (`Field_annot "hd")
-let default_contract_annot = Some (`Field_annot "contract")
-let default_addr_annot = Some (`Field_annot "address")
-let default_manager_annot = Some (`Field_annot "manager")
-
-let default_annot ~default = function
-  | None -> default
-  | annot -> annot
-
-let access_annot
-  : var_annot option ->  ?default:field_annot option -> field_annot option -> var_annot option
-  = fun value_annot ?(default=None) field_annot ->
-    match value_annot, field_annot, default with
-    | None, None, _ | Some _, None, None -> None
-    | None, Some `Field_annot f, _ ->
-        Some (`Var_annot f)
-    | Some `Var_annot v, None, Some `Field_annot f ->
-        Some (`Var_annot (String.concat "." [v; f]))
-    | Some `Var_annot v, Some `Field_annot f, _ ->
-        Some (`Var_annot (String.concat "." [v; f]))
 
 (* ---- Type size accounting ------------------------------------------------*)
 
@@ -540,18 +503,6 @@ let ty_of_comparable_ty
     | Timestamp_key tname -> Timestamp_t tname
     | Address_key tname -> Address_t tname
 
-let unparse_type_annot : type_annot option -> string list = function
-  | None -> []
-  | Some `Type_annot a -> [ ":" ^ a ]
-
-let unparse_var_annot : var_annot option -> string list = function
-  | None -> []
-  | Some `Var_annot a -> [ "@" ^ a ]
-
-let unparse_field_annot : field_annot option -> string list = function
-  | None -> []
-  | Some `Field_annot a -> [ "%" ^ a ]
-
 let unparse_comparable_ty
   : type a. a comparable_ty -> Script.node
   = function
@@ -736,41 +687,6 @@ let rec stack_ty_eq
   | Empty_t, Empty_t -> Ok Eq
   | _, _ -> error Bad_stack_length
 
-let merge_type_annot
-  : type_annot option -> type_annot option -> type_annot option tzresult
-  = fun annot1 annot2 ->
-    match annot1, annot2 with
-    | None, None
-    | Some _, None
-    | None, Some _ -> ok None
-    | Some `Type_annot a1, Some `Type_annot a2 ->
-        if String.equal a1 a2
-        then ok annot1
-        else error (Inconsistent_annotations (":" ^ a1, ":" ^ a2))
-
-let merge_field_annot
-  : field_annot option -> field_annot option -> field_annot option tzresult
-  = fun annot1 annot2 ->
-    match annot1, annot2 with
-    | None, None
-    | Some _, None
-    | None, Some _ -> ok None
-    | Some `Field_annot a1, Some `Field_annot a2 ->
-        if String.equal a1 a2
-        then ok annot1
-        else ok None (* TODO check this, do we want typechecking here ?
-                        error (Inconsistent_annotations ("%" ^ a1, "%" ^ a2)) *)
-
-let merge_var_annot
-  : var_annot option -> var_annot option -> var_annot option
-  = fun annot1 annot2 ->
-    match annot1, annot2 with
-    | None, None
-    | Some _, None
-    | None, Some _ -> None
-    | Some `Var_annot a1, Some `Var_annot a2 ->
-        if String.equal a1 a2 then annot1 else None
-
 let merge_comparable_types
   : type ta. ta comparable_ty -> ta comparable_ty -> ta comparable_ty tzresult
   = fun ta tb ->
@@ -801,19 +717,11 @@ let merge_comparable_types
         Address_key annot
     | _, _ -> assert false (* FIXME: fix injectivity of some types *)
 
-let error_unexpected_annot loc annot =
-  match annot with
-  | [] -> ok ()
-  | _ :: _ -> error (Unexpected_annotation loc)
-
 let rec strip_annotations = function
   | (Int (_,_) as i) -> i
   | (String (_,_) as s) -> s
   | Prim (loc, prim, args, _) -> Prim (loc, prim, List.map strip_annotations args, [])
   | Seq (loc, items) -> Seq (loc, List.map strip_annotations items)
-
-let fail_unexpected_annot loc annot =
-  Lwt.return (error_unexpected_annot loc annot)
 
 let merge_types :
   type b.Script.location -> b ty -> b ty -> b ty tzresult =
@@ -964,82 +872,6 @@ let merge_branches
         return (Typed (branch (descrt dbf.aft) dbf))
 
 module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
-
-let annots_of_strings loc l =
-  List.fold_left (fun acc s ->
-      match acc with
-      | Ok acc ->
-          begin match s.[0] with
-            | '@' -> ok (`Var_annot (String.sub s 1 @@ String.length s - 1) :: acc)
-            | ':' -> ok (`Type_annot (String.sub s 1 @@ String.length s - 1) :: acc)
-            | '%' -> ok (`Field_annot (String.sub s 1 @@ String.length s - 1) :: acc)
-            | _ -> error (Unexpected_annotation loc)
-            | exception Invalid_argument _ -> error (Unexpected_annotation loc)
-          end
-      | Error _ -> acc
-    ) (ok []) l
-  >|? List.rev
-
-let parse_type_annot
-  : int -> string list -> type_annot option tzresult
-  = fun loc annot ->
-    annots_of_strings loc annot >>? function
-    | [] -> ok None
-    | [ `Type_annot _ as a ] -> ok (Some a)
-    | _ -> error (Unexpected_annotation loc)
-
-let parse_composed_type_annot
-  : int -> string list -> (type_annot option * field_annot option * field_annot option) tzresult
-  = fun loc annot ->
-    annots_of_strings loc annot >>? function
-    | [] -> ok (None, None, None)
-    | [ `Type_annot _ as a ] -> ok (Some a, None, None)
-    | [ `Type_annot _ as a ; `Field_annot _ as b] -> ok (Some a, Some b, None)
-    | [ `Type_annot _ as a ; `Field_annot _ as b; `Field_annot _ as c ] ->
-        ok (Some a, Some b, Some c)
-    | [ `Field_annot _ as b ] ->
-        ok (None, Some b, None)
-    | [ `Field_annot _ as b; `Field_annot _ as c ] ->
-        ok (None, Some b, Some c)
-    | _ -> error (Unexpected_annotation loc)
-
-let check_const_type_annot
-  : int -> string list -> type_annot option -> unit tzresult Lwt.t
-  = fun loc annot expected_annot ->
-    Lwt.return
-      (parse_type_annot loc annot >>? merge_type_annot expected_annot >|? fun _ -> ())
-
-let parse_field_annot
-  : int -> string list -> field_annot option tzresult
-  = fun loc annot ->
-    annots_of_strings loc annot >>?
-    function
-    | [] -> ok None
-    | [ `Field_annot _ as a ] -> ok (Some a)
-    | _ -> error (Unexpected_annotation loc) (* (Invalid_var_annotation (loc, annot)) *)
-
-let extract_field_annot
-  : Script.node -> (Script.node * field_annot option) tzresult
-  = function
-    | Prim (loc, prim, args, annot) ->
-        let field_annots, annot = List.partition (fun s ->
-            match s.[0] with
-            | '%' -> true
-            | _ -> false
-            | exception Invalid_argument _ -> false
-          ) annot in
-        parse_field_annot loc field_annots >|? fun field_annot ->
-        Prim (loc, prim, args, annot), field_annot
-    | expr -> ok (expr, None)
-
-let check_correct_field
-  : field_annot option -> field_annot option -> unit tzresult
-  = fun f1 f2 ->
-    match f1, f2 with
-    | None, _ | _, None -> ok ()
-    | Some `Field_annot s1, Some `Field_annot s2 ->
-        if String.equal s1 s2 then ok ()
-        else error (Inconsistent_field_annotations ("%" ^ s1, "%" ^ s2))
 
 let rec parse_comparable_ty
   : Script.node -> ex_comparable_ty tzresult
@@ -1218,122 +1050,6 @@ let rec unparse_stack
         (strip_locations (unparse_ty ty), unparse_var_annot annot) :: unparse_stack rest
 
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
-
-let parse_var_annot
-  : int -> ?default:var_annot option -> string list ->
-    var_annot option tzresult Lwt.t
-  = fun loc ?default annot ->
-    Lwt.return (annots_of_strings loc annot) >>=? fun annot ->
-    begin match annot, default with
-      | [], None -> ok None
-      | [], Some d -> ok d
-      | [ `Var_annot _ as a ], _ -> ok (Some a)
-      | _ -> error (Unexpected_annotation loc) (* (Invalid_var_annotation (loc, annot)) *)
-    end |> Lwt.return
-
-let parse_field_annot loc annot =
-  Lwt.return (parse_field_annot loc annot)
-
-let classify_annot
-  : annot list -> var_annot list * type_annot list * field_annot list
-  = fun l ->
-    let rv, rt, rf = List.fold_left (fun (rv, rt, rf) -> function
-        | `Var_annot _ as a -> a :: rv, rt, rf
-        | `Type_annot _ as a -> rv, a :: rt, rf
-        | `Field_annot _ as a -> rv, rt, a :: rf
-      ) ([], [], []) l in
-    List.rev rv, List.rev rt, List.rev rf
-
-let get_one_annot loc = function
-  | [] -> Lwt.return (ok None)
-  | [ a ] -> Lwt.return (ok (Some a))
-  | _ -> Lwt.return (error (Unexpected_annotation loc))
-
-let get_two_annot loc = function
-  | [] -> Lwt.return (ok (None, None))
-  | [ a ] -> Lwt.return (ok (Some a, None))
-  | [ a; b ] -> Lwt.return (ok (Some a, Some b))
-  | _ -> Lwt.return (error (Unexpected_annotation loc))
-
-let parse_constr_annot
-  : int -> string list ->
-    (var_annot option * type_annot option * field_annot option * field_annot option) tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (annots_of_strings loc annot) >>=? fun annot ->
-    let vars, types, fields = classify_annot annot in
-    get_one_annot loc vars >>=? fun v ->
-    get_one_annot loc types >>=? fun t ->
-    get_two_annot loc fields >>|? fun (f1, f2) ->
-    (v, t, f1, f2)
-
-let parse_two_var_annot
-  : int -> string list -> (var_annot option * var_annot option) tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (annots_of_strings loc annot) >>=? fun annot ->
-    let vars, types, fields = classify_annot annot in
-    fail_unexpected_annot loc types >>=? fun () ->
-    fail_unexpected_annot loc fields >>=? fun () ->
-    get_two_annot loc vars
-
-let parse_two_field_annot
-  : int -> string list -> (field_annot option * field_annot option) tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (annots_of_strings loc annot) >>=? fun annot ->
-    let vars, types, fields = classify_annot annot in
-    fail_unexpected_annot loc vars >>=? fun () ->
-    fail_unexpected_annot loc types >>=? fun () ->
-    get_two_annot loc fields
-
-
-let parse_var_field_annot
-  : int -> string list -> (var_annot option * field_annot option) tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (annots_of_strings loc annot) >>=? fun annot ->
-    let vars, types, fields = classify_annot annot in
-    fail_unexpected_annot loc types >>=? fun () ->
-    get_one_annot loc vars >>=? fun v ->
-    get_one_annot loc fields >>|? fun f ->
-    (v, f)
-
-let parse_var_type_annot
-  : int -> string list -> (var_annot option * type_annot option) tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (annots_of_strings loc annot) >>=? fun annot ->
-    let vars, types, fields = classify_annot annot in
-    fail_unexpected_annot loc fields >>=? fun () ->
-    get_one_annot loc vars >>=? fun v ->
-    get_one_annot loc types >>|? fun t ->
-    (v, t)
-
-(* let check_and_remove_type_annot
- *   : type a. Script.node -> a stack_ty -> Script.node tzresult Lwt.t
- *   = fun instr stack ->
- *     match instr, stack with
- *     | Prim (loc, prim, args, annot), Item_t (ty, _, _) ->
- *         let type_annots, annot = List.partition (fun s ->
- *             match s.[0] with
- *             | ':' -> true
- *             | _ -> false
- *             | exception Invalid_argument _ -> false
- *           ) annot in
- *         check_const_type_annot loc type_annots (name_of_ty ty) >>|? fun () ->
- *         Prim (loc, prim, args, annot)
- *     | _ -> Lwt.return @@ ok @@ instr *)
-
-let field_to_var_annot : field_annot option -> var_annot option =
-  function
-  | None -> None
-  | Some (`Field_annot s) -> Some (`Var_annot s)
-
-let type_to_field_annot : type_annot option -> field_annot option =
-  function
-  | None -> None
-  | Some (`Type_annot s) -> Some (`Field_annot s)
-
-let var_to_field_annot : var_annot option -> field_annot option =
-  function
-  | None -> None
-  | Some (`Var_annot s) -> Some (`Field_annot s)
 
 let public_key_hash_size =
   match Data_encoding.Binary.fixed_length Signature.Public_key_hash.encoding with
@@ -1772,11 +1488,13 @@ and parse_instr
       (Item_t (Option_t ((t, some_field), _none_field, _), rest, option_annot) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_var_annot loc annot
-          ~default:(access_annot option_annot some_field ~default:default_some_annot)
-        >>=? fun some_annot ->
+        parse_binding_annot loc annot >>=? fun binding_annot ->
+        let binding_annot = default_annot binding_annot
+            ~default:(gen_binding_access_annot option_annot (field_to_binding_annot some_field)
+                        ~default:default_some_annot) in
+        let annot = binding_to_var_annot binding_annot in
         parse_instr ?type_logger tc_context ctxt bt rest >>=? fun (btr, ctxt) ->
-        parse_instr ?type_logger tc_context ctxt bf (Item_t (t, rest, some_annot)) >>=? fun (bfr, ctxt) ->
+        parse_instr ?type_logger tc_context ctxt bf (Item_t (t, rest, annot)) >>=? fun (bfr, ctxt) ->
         let branch ibt ibf =
           { loc ; instr = If_none (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch } >>=? fun judgement ->
@@ -1793,14 +1511,14 @@ and parse_instr
       Item_t (Pair_t ((a, expected_field_annot), _, _), rest, pair_annot) ->
         parse_var_field_annot loc annot >>=? fun (annot, field_annot) ->
         let annot = default_annot annot
-            ~default:(access_annot pair_annot expected_field_annot ~default:default_car_annot) in
+            ~default:(gen_access_annot pair_annot expected_field_annot ~default:default_car_annot) in
         Lwt.return (check_correct_field field_annot expected_field_annot) >>=? fun () ->
         typed ctxt loc Car (Item_t (a, rest, annot))
     | Prim (loc, I_CDR, [], annot),
       Item_t (Pair_t (_, (b, expected_field_annot), _), rest, pair_annot) ->
         parse_var_field_annot loc annot >>=? fun (annot, field_annot) ->
         let annot = default_annot annot
-            ~default:(access_annot pair_annot expected_field_annot ~default:default_cdr_annot) in
+            ~default:(gen_access_annot pair_annot expected_field_annot ~default:default_cdr_annot) in
         Lwt.return (check_correct_field field_annot expected_field_annot) >>=? fun () ->
         typed ctxt loc Cdr (Item_t (b, rest, annot))
     (* unions *)
@@ -1818,11 +1536,17 @@ and parse_instr
       (Item_t (Union_t ((tl, l_field), (tr, r_field), _), rest, union_annot) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_two_var_annot loc annot >>=? fun (left_annot, right_annot) ->
-        let left_annot = default_annot left_annot
-            ~default:(access_annot union_annot l_field ~default:default_left_annot) in
-        let right_annot = default_annot right_annot
-            ~default:(access_annot union_annot r_field ~default:default_right_annot) in
+        parse_two_binding_annot loc annot >>=? fun (left_bind_annot, right_bind_annot) ->
+        let left_bind_annot = default_annot left_bind_annot
+            ~default:(gen_binding_access_annot union_annot
+                        (field_to_binding_annot l_field)
+                        ~default:default_left_annot) in
+        let left_annot = binding_to_var_annot left_bind_annot in
+        let right_bind_annot = default_annot right_bind_annot
+            ~default:(gen_binding_access_annot union_annot
+                        (field_to_binding_annot r_field)
+                        ~default:default_right_annot) in
+        let right_annot = binding_to_var_annot right_bind_annot in
         parse_instr ?type_logger tc_context ctxt bt (Item_t (tl, rest, left_annot)) >>=? fun (btr, ctxt) ->
         parse_instr ?type_logger tc_context ctxt bf (Item_t (tr, rest, right_annot)) >>=? fun (bfr, ctxt) ->
         let branch ibt ibf =
@@ -1844,8 +1568,10 @@ and parse_instr
       (Item_t (List_t (t, _), rest, list_annot) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_var_annot loc annot ~default:(access_annot list_annot default_hd_annot)
-        >>=? fun hd_annot ->
+        parse_binding_annot loc annot >>=? fun hd_bind_annot ->
+        let hd_bind_annot = default_annot hd_bind_annot
+            ~default:(gen_binding_access_annot list_annot default_hd_annot) in
+        let hd_annot = binding_to_var_annot hd_bind_annot in
         parse_instr ?type_logger tc_context ctxt bt
           (Item_t (t, bef, hd_annot)) >>=? fun (btr, ctxt) ->
         parse_instr ?type_logger tc_context ctxt bf
@@ -1861,9 +1587,10 @@ and parse_instr
     | Prim (loc, I_MAP, [ body ], annot),
       (Item_t (List_t (elt, _), starting_rest, list_annot)) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_var_field_annot loc annot >>=? fun (ret_annot, elt_annot) ->
-        let elt_annot = default_annot (field_to_var_annot elt_annot)
-            ~default:(access_annot list_annot default_elt_annot) in
+        parse_var_binding_annot loc annot >>=? fun (ret_annot, elt_bind_annot) ->
+        let elt_bind_annot = default_annot elt_bind_annot
+            ~default:(gen_binding_access_annot list_annot default_elt_annot) in
+        let elt_annot = binding_to_var_annot elt_bind_annot in
         parse_instr ?type_logger tc_context ctxt
           body (Item_t (elt, starting_rest, elt_annot)) >>=? begin fun (judgement, ctxt) ->
           match judgement with
@@ -1879,9 +1606,10 @@ and parse_instr
     | Prim (loc, I_ITER, [ body ], annot),
       Item_t (List_t (elt, _), rest, list_annot) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_field_annot loc annot >>=? fun elt_annot ->
-        let elt_annot = default_annot (field_to_var_annot elt_annot)
-            ~default:(access_annot list_annot default_elt_annot) in
+        parse_binding_annot loc annot >>=? fun elt_bind_annot ->
+        let elt_bind_annot = default_annot elt_bind_annot
+            ~default:(gen_binding_access_annot list_annot default_elt_annot) in
+        let elt_annot = binding_to_var_annot elt_bind_annot in
         parse_instr ?type_logger tc_context ctxt
           body (Item_t (elt, rest, elt_annot)) >>=? begin fun (judgement, ctxt) ->
           match judgement with
@@ -1902,9 +1630,10 @@ and parse_instr
     | Prim (loc, I_ITER, [ body ], annot),
       Item_t (Set_t (comp_elt, _), rest, set_annot) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_field_annot loc annot >>=? fun elt_annot ->
-        let elt_annot = default_annot (field_to_var_annot elt_annot)
-            ~default:(access_annot set_annot default_elt_annot) in
+        parse_binding_annot loc annot >>=? fun elt_bind_annot ->
+        let elt_bind_annot = default_annot elt_bind_annot
+            ~default:(gen_binding_access_annot set_annot default_elt_annot) in
+        let elt_annot = binding_to_var_annot elt_bind_annot in
         let elt = ty_of_comparable_ty comp_elt in
         parse_instr ?type_logger tc_context ctxt
           body (Item_t (elt, rest, elt_annot)) >>=? begin fun (judgement, ctxt) ->
@@ -1944,9 +1673,9 @@ and parse_instr
       Item_t (Map_t (ck, elt, _), starting_rest, _map_annot) ->
         let k = ty_of_comparable_ty ck in
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_constr_annot loc annot >>=? fun (ret_annot, ty_name, key_annot, elt_annot) ->
-        let key_field = default_annot key_annot ~default:default_key_annot in
-        let elt_field = default_annot elt_annot ~default:default_elt_annot in
+        parse_map_annot loc annot >>=? fun (ret_annot, ty_name, key_bind_annot, elt_bind_annot) ->
+        let key_field = default_annot key_bind_annot ~default:default_key_annot |> binding_to_field_annot in
+        let elt_field = default_annot elt_bind_annot ~default:default_elt_annot |> binding_to_field_annot in
         parse_instr ?type_logger tc_context ctxt
           body (Item_t (Pair_t ((k, key_field), (elt, elt_field), None), starting_rest, None)) >>=? begin fun (judgement, ctxt) ->
           match judgement with
@@ -1962,9 +1691,9 @@ and parse_instr
     | Prim (loc, I_ITER, [ body ], annot),
       Item_t (Map_t (comp_elt, element_ty, _), rest, _) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_two_field_annot loc annot >>=? fun (key_annot, elt_annot) ->
-        let key_field = default_annot key_annot ~default:default_key_annot in
-        let elt_field = default_annot elt_annot ~default:default_elt_annot in
+        parse_two_binding_annot loc annot >>=? fun (key_bind_annot, elt_bind_annot) ->
+        let key_field = default_annot key_bind_annot ~default:default_key_annot |> binding_to_field_annot in
+        let elt_field = default_annot elt_bind_annot ~default:default_elt_annot |> binding_to_field_annot in
         let key = ty_of_comparable_ty comp_elt in
         parse_instr ?type_logger tc_context ctxt body
           (Item_t (Pair_t ((key, key_field), (element_ty, elt_field), None), rest, None))
@@ -2094,7 +1823,7 @@ and parse_instr
         fail_unexpected_annot loc annot >>=? fun () ->
         parse_var_field_annot loc annot >>=? fun (r_annot, l_annot) ->
         let l_annot = default_annot (field_to_var_annot l_annot)
-            ~default:(access_annot union_annot l_field) in
+            ~default:(gen_access_annot union_annot l_field) in
         parse_instr ?type_logger tc_context ctxt body
           (Item_t (tl, rest, l_annot)) >>=? begin fun (judgement, ctxt) -> match judgement with
           | Typed ibody ->
@@ -2113,8 +1842,9 @@ and parse_instr
         (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:true ret))
         >>=? fun (Ex_ty ret) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
-        parse_var_field_annot loc annot >>=? fun (annot, arg_annot) ->
-        let arg_annot = default_annot (field_to_var_annot arg_annot) ~default:default_arg_annot in
+        parse_var_binding_annot loc annot >>=? fun (annot, arg_bind_annot) ->
+        let arg_bind_annot = default_annot arg_bind_annot ~default:default_arg_annot in
+        let arg_annot = binding_to_var_annot arg_bind_annot in
         parse_returning Lambda ?type_logger ctxt
           (arg, arg_annot) ret code >>=? fun (lambda, ctxt) ->
         typed ctxt loc (Lambda lambda) (Item_t (Lambda_t (arg, ret, None), stack, annot))
@@ -2480,26 +2210,26 @@ and parse_instr
     (* protocol *)
     | Prim (loc, I_ADDRESS, [], annot),
       Item_t (Contract_t _, rest, contract_annot) ->
-        parse_var_annot loc annot ~default:(access_annot contract_annot default_addr_annot)
+        parse_var_annot loc annot ~default:(gen_access_annot contract_annot default_addr_annot)
         >>=? fun annot ->
         typed ctxt loc Address
           (Item_t (Address_t None, rest, annot))
     | Prim (loc, I_CONTRACT, [ ty ], annot),
       Item_t (Address_t _, rest, addr_annot) ->
         Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false ty) >>=? fun (Ex_ty t) ->
-        parse_var_annot loc annot ~default:(access_annot addr_annot default_contract_annot)
+        parse_var_annot loc annot ~default:(gen_access_annot addr_annot default_contract_annot)
         >>=? fun annot ->
         typed ctxt loc (Contract t)
           (Item_t (Option_t ((Contract_t (t, None), None), None, None), rest, annot))
     | Prim (loc, I_MANAGER, [], annot),
       Item_t (Contract_t _, rest, contract_annot) ->
-        parse_var_annot loc annot ~default:(access_annot contract_annot default_manager_annot)
+        parse_var_annot loc annot ~default:(gen_access_annot contract_annot default_manager_annot)
         >>=? fun annot ->
         typed ctxt loc Manager
           (Item_t (Key_hash_t None, rest, annot))
     | Prim (loc, I_MANAGER, [], annot),
       Item_t (Address_t _, rest, addr_annot) ->
-        parse_var_annot loc annot ~default:(access_annot addr_annot default_manager_annot)
+        parse_var_annot loc annot ~default:(gen_access_annot addr_annot default_manager_annot)
         >>=? fun annot ->
         typed ctxt loc Address_manager
           (Item_t (Option_t ((Key_hash_t None, None), None, None), rest, annot))
