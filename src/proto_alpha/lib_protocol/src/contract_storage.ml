@@ -14,6 +14,7 @@ type error +=
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
   | Empty_implicit_contract of Signature.Public_key_hash.t (* `Temporary *)
+  | Empty_transaction of Contract_repr.t (* `Temporary *)
   | Inconsistent_hash of Signature.Public_key.t * Signature.Public_key_hash.t * Signature.Public_key_hash.t (* `Permanent *)
   | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t (* `Permanent *)
   | Failure of string (* `Permanent *)
@@ -165,7 +166,19 @@ let () =
           Signature.Public_key_hash.pp implicit)
     Data_encoding.(obj1 (req "implicit" Signature.Public_key_hash.encoding))
     (function Empty_implicit_contract c -> Some c | _ -> None)
-    (fun c -> Empty_implicit_contract c)
+    (fun c -> Empty_implicit_contract c) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.empty_transaction"
+    ~title:"Empty transaction"
+    ~description:"Forbidden to credit 0ꜩ to a contract without code."
+    ~pp:(fun ppf contract ->
+        Format.fprintf ppf
+          "Transaction of 0ꜩ towards a contract without code are forbidden (%a)."
+          Contract_repr.pp contract)
+    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
+    (function Empty_transaction c -> Some c | _ -> None)
+    (fun c -> Empty_transaction c)
 
 let failwith msg = fail (Failure msg)
 
@@ -383,6 +396,13 @@ let spend_from_script c contract amount =
                 delete c contract
 
 let credit c contract amount =
+  begin
+    if Tez_repr.(amount <> Tez_repr.zero) then
+      return ()
+    else
+      Storage.Contract.Code.mem c contract >>= fun target_has_code ->
+      fail_unless target_has_code (Empty_transaction contract)
+  end >>=? fun () ->
   Storage.Contract.Balance.get_option c contract >>=? function
   | None -> begin
       match Contract_repr.is_implicit contract with
