@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(executable
+ ((name test)
+  (libraries (cstruct rresult lmdb alcotest))))
+
+(alias
+ ((name    runtest-lmdb)
+  (deps    (test.exe))
+  (action  (run ${<}))))
