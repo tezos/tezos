@@ -490,27 +490,32 @@ opam:49:ocplib-ezresto-directory:
   variables:
     package: ocplib-ezresto-directory
 
-opam:50:tezos-baker-alpha:
+opam:50:irmin-lmdb:
+  <<: *opam_definition
+  variables:
+    package: irmin-lmdb
+
+opam:51:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:51:tezos-protocol-demo:
+opam:52:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:52:tezos-signer:
+opam:53:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:53:tezos-node:
+opam:54:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:54:ocplib-json-typed-browser:
+opam:55:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
