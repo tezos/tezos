@@ -15,6 +15,7 @@ depends: [
   "ocplib-json-typed-bson"
   "ocplib-endian"
   "alcotest" { test }
+  "crowbar" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]
