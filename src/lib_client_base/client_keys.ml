@@ -183,7 +183,7 @@ let sign ?watermark cctxt ((Sk_locator { scheme }) as skloc) buf =
   Signer.neuterize t >>= fun pk ->
   Signer.public_key pk >>=? fun pubkey ->
   fail_unless
-    (Signature.check pubkey signature buf)
+    (Signature.check ?watermark pubkey signature buf)
     (Signature_mismatch skloc) >>=? fun () ->
   return signature
 

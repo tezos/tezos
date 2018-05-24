@@ -7,29 +7,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type error +=
-  | Encoding_error
-  | Decoding_error
-  | Unkwnon_alias_key of string
-  | Unkwnon_request_kind
+type error += Unkwnon_alias_key of string
 
-type path =
-  | Unix of string
-  | Tcp of string * string
 type key = string
-
-module Connection : sig
-  type t = Lwt_unix.file_descr
-  val bind : path -> (t * string) tzresult Lwt.t
-  val connect : path -> t tzresult Lwt.t
-  val read : len:int -> t -> MBytes.t -> unit tzresult Lwt.t
-  val write : t -> MBytes.t -> unit tzresult Lwt.t
-end
 
 module Sign : sig
   module Request : sig
     type t = {
-      key : string ;
+      key : key ;
       data: MBytes.t ;
     }
     val encoding : t Data_encoding.t
@@ -38,22 +23,22 @@ module Sign : sig
     type t = {
       signature : Signature.t ;
     }
-    val encoding : t tzresult Data_encoding.t
+    val encoding : t Data_encoding.t
   end
 end
 
 module Public_key : sig
   module Request : sig
     type t = {
-      key : string
+      key : key ;
     }
     val encoding : t Data_encoding.t
   end
   module Response : sig
     type t = {
-      public_key : Signature.Public_key.t
+      public_key : Signature.Public_key.t ;
     }
-    val encoding : t tzresult Data_encoding.t
+    val encoding : t Data_encoding.t
   end
 end
 
@@ -63,6 +48,3 @@ module Request : sig
     | Public_key of Public_key.Request.t
   val encoding : t Data_encoding.t
 end
-
-val send : Connection.t -> 'a Data_encoding.t -> 'a -> unit tzresult Lwt.t
-val recv : Connection.t -> 'a Data_encoding.t -> 'a tzresult Lwt.t

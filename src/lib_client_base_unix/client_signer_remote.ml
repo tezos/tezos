@@ -10,19 +10,41 @@
 open Client_keys
 open Client_signer_remote_messages
 
-let sign conn key data =
+type path =
+  | Socket of Client_signer_remote_socket.path
+  | Https of Client_signer_remote_services.path
+
+let socket_sign path key data =
+  let open Client_signer_remote_socket in
   let req = { Sign.Request.key = key ; data } in
+  Connection.connect path >>=? fun conn ->
   send conn Request.encoding (Request.Sign req) >>=? fun () ->
-  recv conn Sign.Response.encoding >>=? function
+  let encoding = result_encoding Sign.Response.encoding in
+  recv conn encoding >>=? function
   | Error err -> Lwt.return (Error err)
   | Ok res -> Lwt_unix.close conn >>= fun () -> return res.signature
 
-let public_key conn key =
+let socket_request_public_key path key =
+  let open Client_signer_remote_socket in
   let req = { Public_key.Request.key = key } in
+  Connection.connect path >>=? fun conn ->
   send conn Request.encoding (Request.Public_key req) >>=? fun () ->
-  recv conn Public_key.Response.encoding >>=? function
+  let encoding = result_encoding Public_key.Response.encoding in
+  recv conn encoding >>=? function
   | Error err -> Lwt.return (Error err)
   | Ok res -> Lwt_unix.close conn >>= fun () -> return res.public_key
+
+let sign path key data = match path with
+  | Socket path -> socket_sign path key data
+  | Https path ->
+      Client_signer_remote_services.(call path sign) { key ; data } >>=? fun res ->
+      return res.signature
+
+let request_public_key path key = match path with
+  | Socket path -> socket_request_public_key path key
+  | Https path ->
+      Client_signer_remote_services.(call path public_key) { key } >>=? fun res ->
+      return res.public_key
 
 module Remote_signer : SIGNER = struct
   let scheme = "remote"
@@ -34,21 +56,22 @@ module Remote_signer : SIGNER = struct
     "Valid locators are one of these two forms:\n\
     \  - unix [path to local signer socket] <remote key alias>\n\
     \  - tcp [host] [port] <remote key alias>\n\
+    \  - https [host] [port] <remote key alias>\n\
      All fields except the key can be of the form '$VAR', \
      in which case their value is taken from environment variable \
      VAR each time the key is accessed.\n\
      Not specifiyng fields sets them to $TEZOS_SIGNER_UNIX_PATH, \
      $TEZOS_SIGNER_TCP_HOST and $TEZOS_SIGNER_TCP_PORT, \
+     $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT, \
      that get evaluated to default values '$HOME/.tezos-signer-socket', \
      localhost and 6732, and can be set later on."
 
-  type path =
-    Client_signer_remote_messages.path * Client_signer_remote_messages.key
+  type key_path = path * key
 
   (* secret key is the identifier of the location key identifier *)
-  type secret_key = path
+  type secret_key = key_path
   (* public key is the identifier of the location key identifier *)
-  type public_key = path * Signature.Public_key.t
+  type public_key = key_path * Signature.Public_key.t
 
   let pks : (secret_key, Signature.Public_key.t) Hashtbl.t = Hashtbl.create 53
 
@@ -57,15 +80,21 @@ module Remote_signer : SIGNER = struct
 
   let path_of_human_input = function
     | "unix" :: key :: [] ->
-        return (Unix "$TEZOS_SIGNER_UNIX_PATH", key)
+        return (Socket (Unix "$TEZOS_SIGNER_UNIX_PATH"), key)
     | "unix" :: file :: key :: [] ->
-        return (Unix file, key)
+        return (Socket (Unix file), key)
     | "tcp" :: host :: port :: key :: [] ->
-        return (Tcp (host, port), key)
+        return (Socket (Tcp (host, port)), key)
     | "tcp" :: host :: key :: [] ->
-        return (Tcp (host, "$TEZOS_SIGNER_TCP_PORT"), key)
+        return (Socket (Tcp (host, "$TEZOS_SIGNER_TCP_PORT")), key)
     | "tcp" :: key :: [] ->
-        return (Tcp ("$TEZOS_SIGNER_TCP_HOST", "$TEZOS_SIGNER_TCP_PORT"), key)
+        return (Socket (Tcp ("$TEZOS_SIGNER_TCP_HOST", "$TEZOS_SIGNER_TCP_PORT")), key)
+    | "https" :: host :: port :: key :: [] ->
+        return (Https (host, port), key)
+    | "https" :: host :: key :: [] ->
+        return (Https (host, "$TEZOS_SIGNER_HTTPS_PORT"), key)
+    | "https" :: key :: [] ->
+        return (Https ("$TEZOS_SIGNER_HTTPS_HOST", "$TEZOS_SIGNER_HTTPS_PORT"), key)
     | location ->
         failwith
           "@[<v 2>Remote Schema : wrong locator %s.@,@[<hov 0>%a@]@]"
@@ -73,8 +102,9 @@ module Remote_signer : SIGNER = struct
           Format.pp_print_text description
 
   let locator_of_path = function
-    | Unix path, key -> [ "unix" ; path ; key ]
-    | Tcp (host, port), key -> [ "tcp" ; host ; port ; key ]
+    | Socket (Unix path), key -> [ "unix" ; path ; key ]
+    | Socket (Tcp (host, port)), key -> [ "tcp" ; host ; port ; key ]
+    | Https (host, port), key -> [ "https" ; host ; port ; key ]
 
   let pk_locator_of_human_input _cctxt path =
     path_of_human_input path >>=? fun pk ->
@@ -87,8 +117,7 @@ module Remote_signer : SIGNER = struct
 
   let sk_locator_of_human_input _cctxt input =
     path_of_human_input input >>=? fun (path, key) ->
-    Connection.connect path >>=? fun conn ->
-    public_key conn key >>=? fun pk ->
+    request_public_key path key >>=? fun pk ->
     Hashtbl.replace pks (path, key) pk ;
     sk_to_locator (path,key) >>= fun locator ->
     return locator
@@ -98,8 +127,7 @@ module Remote_signer : SIGNER = struct
 
   let pk_of_locator loc =
     path_of_human_input (Public_key_locator.location loc) >>=? fun (path, key) ->
-    Connection.connect path >>=? fun conn ->
-    public_key conn key >>=? fun pk ->
+    request_public_key path key >>=? fun pk ->
     Hashtbl.replace pks (path, key) pk ;
     return ((path, key), pk)
 
@@ -111,8 +139,7 @@ module Remote_signer : SIGNER = struct
     match Hashtbl.find_opt pks sk with
     | Some pk -> Lwt.return (sk, pk)
     | None -> begin
-        (Connection.connect path >>=? fun conn ->
-         public_key conn key) >>= function
+        request_public_key path key >>= function
         | Error _ -> Lwt.fail_with "Remote : Cannot obtain public key from remote signer"
         | Ok pk -> begin
             Hashtbl.replace pks sk pk ;
@@ -123,9 +150,14 @@ module Remote_signer : SIGNER = struct
   let public_key (_, x) = return x
   let public_key_hash (_, x) = return (Signature.Public_key.hash x)
 
-  let sign (path, key) msg =
-    Connection.connect path >>=? fun conn ->
-    sign conn key msg
+  let sign ?watermark (path, key) msg =
+    let msg =
+      match watermark with
+      | None -> msg
+      | Some watermark ->
+          MBytes.concat "" [ Signature.bytes_of_watermark watermark ; msg ] in
+    sign path key msg
+
 end
 
 let () =
