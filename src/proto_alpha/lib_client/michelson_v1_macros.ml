@@ -10,6 +10,8 @@
 open Tezos_micheline
 open Micheline
 
+module IntMap = Map.Make (Compare.Int)
+
 type 'l node = ('l, string) Micheline.node
 
 type error += Unexpected_macro_annotation of string
@@ -277,7 +279,44 @@ let expand_dxiiivp original =
 
 exception Not_a_pair
 
-let expand_paaiair original =
+let rec dip ~loc depth instr =
+  if depth <= 0
+  then instr
+  else dip ~loc (depth - 1) (Prim (loc, "DIP", [ Seq (loc, [ instr ]) ], []))
+
+type pair_item =
+  | A
+  | I
+  | P of int * pair_item * pair_item
+
+let parse_pair_substr str ~len start =
+  let rec parse ?left i =
+    if i = len - 1 then
+      raise_notrace Not_a_pair
+    else if String.get str i = 'P' then
+      let next_i, l = parse ~left:true (i + 1) in
+      let next_i, r = parse ~left:false next_i in
+      next_i, P (i, l, r)
+    else if String.get str i = 'A' && left = Some true then
+      i + 1, A
+    else if String.get str i = 'I' && left <> Some true then
+      i + 1, I
+    else
+      raise_notrace Not_a_pair in
+  let last, ast = parse start in
+  if last <> len - 1 then
+    raise_notrace Not_a_pair
+  else
+    ast
+
+let unparse_pair_item ast =
+  let rec unparse ast acc = match ast with
+    | P (_, l, r) -> unparse r (unparse l ("P" :: acc))
+    | A -> "A" :: acc
+    | I -> "I" :: acc in
+  List.rev ("R" :: unparse ast []) |> String.concat ""
+
+let expand_pappaiir original =
   match original with
   | Prim (loc, str, args, annot) ->
       let len = String.length str in
@@ -285,25 +324,20 @@ let expand_paaiair original =
       && String.get str 0 = 'P'
       && String.get str (len - 1) = 'R'
       && check_letters str 1 (len - 2)
-           (function 'A' | 'I' -> true | _ -> false) then
+           (function 'P' | 'A' | 'I' -> true | _ -> false) then
         try
-          let rec parse i acc =
-            if i = 0 then
-              acc
-            else if String.get str i = 'I'
-                 && String.get str (i - 1) = 'A' then
-              parse (i - 2) (Prim (loc, "PAIR", [], if i = (len - 2) then annot else []) :: acc)
-            else if String.get str i = 'A' then
-              match acc with
-              | [] ->
-                  raise_notrace Not_a_pair
-              | acc :: accs ->
-                  parse (i - 1)
-                    (Prim (loc, "DIP", [ Seq (loc, [ acc ]) ], [])
-                     :: accs)
-            else
-              raise_notrace Not_a_pair in
-          let expanded = parse (len - 2) [] in
+          let rec parse p (depth, acc) =
+            match p with
+            | P (i, left, right) ->
+                let annot = if i = 0 then annot else [] in
+                let acc = dip ~loc depth (Prim (loc, "PAIR", [], annot)) :: acc in
+                (depth, acc)
+                |> parse left
+                |> parse right
+            | A | I -> (depth + 1, acc)
+          in
+          let ast = parse_pair_substr str ~len 0 in
+          let _, expanded = parse ast (0, []) in
           begin match args with
             | [] -> ok ()
             | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
@@ -314,8 +348,7 @@ let expand_paaiair original =
         ok None
   | _ -> ok None
 
-(* TODO incorrect annotations *)
-let expand_unpaaiair original =
+let expand_unpappaiir original =
   match original with
   | Prim (loc, str, args, annot) ->
       let len = String.length str in
@@ -323,42 +356,45 @@ let expand_unpaaiair original =
       && String.sub str 0 3 = "UNP"
       && String.get str (len - 1) = 'R'
       && check_letters str 3 (len - 2)
-           (function 'A' | 'I' -> true | _ -> false) then
+           (function 'P' | 'A' | 'I' -> true | _ -> false) then
         try
-          let rec parse i remaining_annots acc =
-            if i = 2 then
-              match acc with
-              | [ Seq _ as acc ] -> acc
-              | _ -> Seq (loc, List.rev acc)
-            else if String.get str i = 'I'
-                 && String.get str (i - 1) = 'A' then
-              let car_annot, cdr_annot, remaining_annots =
-                match remaining_annots with
-                | [] -> [], [], []
-                | a :: b :: r when i = 4 -> [ a ], [ b ], r
-                | a :: r -> [ a ], [], r in
-              parse (i - 2) remaining_annots
-                (Seq (loc, [ Prim (loc, "DUP", [], []) ;
-                             Prim (loc, "CAR", [], car_annot) ;
-                             Prim (loc, "DIP",
-                                   [ Seq (loc,
-                                          [ Prim (loc, "CDR", [], cdr_annot) ]) ], []) ])
-                 :: acc)
-            else if String.get str i = 'A' then
-              match acc with
-              | [] ->
-                  raise_notrace Not_a_pair
-              | (Seq _ as acc) :: accs ->
-                  parse (i - 1) remaining_annots
-                    (Prim (loc, "DIP", [ acc ], []) :: accs)
-              | acc :: accs ->
-                  parse (i - 1) remaining_annots
-                    (Prim (loc, "DIP",
-                           [ Seq (loc, [ acc ]) ],
-                           []) :: accs)
-            else
-              raise_notrace Not_a_pair in
-          let expanded = parse (len - 2) annot [] in
+          let unpair car_annot cdr_annot =
+            Seq (loc, [ Prim (loc, "DUP", [], []) ;
+                        Prim (loc, "CAR", [], car_annot) ;
+                        dip ~loc 1 (Prim (loc, "CDR", [], cdr_annot)) ;
+                      ]) in
+          let rec find_annots_pos p_pos ast annots acc =
+            match ast, annots with
+            | _, [] -> annots, acc
+            | P (i, left, right), _ ->
+                let annots, acc = find_annots_pos i left annots acc in
+                find_annots_pos i right annots acc
+            | A, a :: annots ->
+                let pos = match IntMap.find_opt p_pos acc with
+                  | None -> [ a ], []
+                  | Some (_, cdr) -> [ a ], cdr in
+                annots, IntMap.add p_pos pos acc
+            | I, a :: annots ->
+                let pos = match IntMap.find_opt p_pos acc with
+                  | None -> [], [ a ]
+                  | Some (car, _) -> car, [ a ] in
+                annots, IntMap.add p_pos pos acc in
+          let ast = parse_pair_substr str ~len 2 in
+          let _, annots_pos = find_annots_pos 0 ast annot IntMap.empty in
+          let rec parse p (depth, acc) =
+            match p with
+            | P (i, left, right) ->
+                let car_annot, cdr_annot =
+                  match IntMap.find_opt i annots_pos with
+                  | None -> [], []
+                  | Some (car_annot, cdr_annot) -> car_annot, cdr_annot in
+                let acc = dip ~loc depth (unpair car_annot cdr_annot) :: acc in
+                (depth, acc)
+                |> parse left
+                |> parse right
+            | A | I -> (depth + 1, acc) in
+          let _, rev_expanded = parse ast (0, []) in
+          let expanded = Seq (loc, List.rev rev_expanded) in
           begin match args with
             | [] -> ok ()
             | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
@@ -548,8 +584,10 @@ let expand original =
       expand_set_caddadr ;
       expand_map_caddadr ;
       expand_dxiiivp ;
-      expand_paaiair ;
-      expand_unpaaiair ;
+      (* expand_paaiair ; *)
+      expand_pappaiir ;
+      (* expand_unpaaiair ; *)
+      expand_unpappaiir ;
       expand_duuuuup ;
       expand_compare ;
       expand_asserts ;
@@ -781,47 +819,80 @@ let unexpand_duuuuup expanded =
   | None -> None
   | Some (loc, n) -> Some (Prim (loc, "D" ^ (dupn n), [], []))
 
-let unexpand_paaiair expanded =
+let rec normalize_pair_item ?(right=false) = function
+  | P (i, a, b) -> P (i, normalize_pair_item a, normalize_pair_item ~right:true b)
+  | A when right -> I
+  | A -> A
+  | I -> I
+
+let unexpand_pappaiir expanded =
   match expanded with
   | Seq (_,  [ Prim (_, "PAIR", [], []) ]) -> Some expanded
   | Seq (loc, (_ :: _ as nodes)) ->
-      let rec destruct acc = function
-        | [] -> Some acc
-        | Prim (_, "DIP", [ Seq (_, [ sub ]) ], []) :: rest ->
-            destruct ("A" :: acc) (sub :: rest)
-        | Prim (_, "PAIR", [], []) :: rest ->
-            destruct ("AI" :: acc) rest
-        | _ -> None in
-      begin match destruct [] nodes with
-        | None -> None
-        | Some seq ->
-            let name = String.concat "" ("P" :: List.rev ("R" :: seq)) in
+      let rec exec stack nodes = match nodes, stack with
+        | [], _ -> stack
+        | Prim (_, "DIP", [ Seq (_, sub) ], []) :: rest, a :: rstack ->
+            exec (a :: exec rstack sub) rest
+        | Prim (_, "DIP", [ Seq (_, sub) ], []) :: rest, [] ->
+            exec (A :: exec [] sub) rest
+        | Prim (_, "PAIR", [], []) :: rest, a :: b :: rstack ->
+            exec (P (0, a, b) :: rstack) rest
+        | Prim (_, "PAIR", [], []) :: rest, [ a ]  ->
+            exec [ P (0, a, I) ] rest
+        | Prim (_, "PAIR", [], []) :: rest, []  ->
+            exec [ P (0, A, I) ] rest
+        | _ -> raise_notrace Not_a_pair in
+      begin match exec [] nodes with
+        | [] -> None
+        | res :: _ ->
+            let res = normalize_pair_item res in
+            let name = unparse_pair_item res in
             Some (Prim (loc, name, [], []))
+        | exception Not_a_pair -> None
       end
   | _ -> None
 
-let unexpand_unpaaiair expanded =
+let unexpand_unpappaiir expanded =
   match expanded with
   | Seq (loc, (_ :: _ as nodes)) ->
-      let rec destruct sacc acc = function
-        | [] -> Some acc
-        | Prim (_, "DIP", [ Seq (_, [ sub ]) ], []) :: rest
-        | Prim (_, "DIP", [ Seq (_, _) as sub ], []) :: rest ->
-            destruct ("A" :: sacc) acc (sub :: rest)
+      let rec exec stack nodes = match nodes, stack with
+        | [], _ -> stack
+        | Prim (_, "DIP", [ Seq (_, sub) ], []) :: rest, a :: rstack ->
+            exec (a :: exec rstack sub) rest
+        | Prim (_, "DIP", [ Seq (_, sub) ], []) :: rest, [] ->
+            exec (A :: exec [] sub) rest
         | Seq (_, [ Prim (_, "DUP", [], []) ;
                     Prim (_, "CAR", [], []) ;
                     Prim (_, "DIP",
                           [ Seq (_, [ Prim (_, "CDR", [], []) ]) ],
-                          []) ]) :: rest ->
-            destruct [] (List.rev ("AI" :: sacc) :: acc) rest
-        | _ -> None in
-      begin match destruct [] [ [ "R" ] ] nodes with
-        | None -> None
-        | Some seq ->
-            let name = String.concat "" ("UNP" :: List.flatten seq) in
+                          []) ]) :: rest,
+          a :: b :: rstack ->
+            exec (P (0, a, b) :: rstack) rest
+        | Seq (_, [ Prim (_, "DUP", [], []) ;
+                    Prim (_, "CAR", [], []) ;
+                    Prim (_, "DIP",
+                          [ Seq (_, [ Prim (_, "CDR", [], []) ]) ],
+                          []) ]) :: rest,
+          [ a ]  ->
+            exec [ P (0, a, I) ] rest
+        | Seq (_, [ Prim (_, "DUP", [], []) ;
+                    Prim (_, "CAR", [], []) ;
+                    Prim (_, "DIP",
+                          [ Seq (_, [ Prim (_, "CDR", [], []) ]) ],
+                          []) ]) :: rest,
+          []  ->
+            exec [ P (0, A, I) ] rest
+        | _ -> raise_notrace Not_a_pair in
+      begin match exec [] (List.rev nodes) with
+        | [] -> None
+        | res :: _ ->
+            let res = normalize_pair_item res in
+            let name = "UN" ^ unparse_pair_item res in
             Some (Prim (loc, name, [], []))
+        | exception Not_a_pair -> None
       end
   | _ -> None
+
 
 let unexpand_compare expanded =
   match expanded with
@@ -958,8 +1029,8 @@ let unexpand original =
       unexpand_set_caddadr ;
       unexpand_map_caddadr ;
       unexpand_dxiiivp ;
-      unexpand_paaiair ;
-      unexpand_unpaaiair ;
+      unexpand_pappaiir ;
+      unexpand_unpappaiir ;
       unexpand_duuuuup ;
       unexpand_compare ;
       unexpand_if_some ;

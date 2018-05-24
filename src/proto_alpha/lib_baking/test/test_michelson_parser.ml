@@ -211,16 +211,15 @@ let test_expansion () =
     (Prim (zero_loc, "PAIR", [], []))
     (Prim (zero_loc, "PAIR", [], [])) >>? fun () ->
   assert_expands
-    (Prim (zero_loc, "PAAIR", [], []))
-    (Seq (zero_loc,
-          [Prim
-             (zero_loc,
-              "DIP",
-              [Seq (zero_loc, [Prim (zero_loc, "PAIR", [], [])])],
-              [])])) >>? fun () ->
-  assert_expands
-    (Prim (zero_loc, "PAAIAIR", [], []))
+    (Prim (zero_loc, "PAPPAIIR", [], []))
     (Seq (zero_loc, [Prim
+                       (zero_loc,
+                        "DIP",
+                        [Seq
+                           (zero_loc,
+                            [Prim (zero_loc, "PAIR", [], [])])],
+                        []);
+                     Prim
                        (zero_loc,
                         "DIP",
                         [Seq
@@ -242,7 +241,10 @@ let assert_unexpansion_consistent original =
       ok ()
 
 let test_unexpansion_consistency () =
-  assert_unexpansion_consistent (Prim (zero_loc, "PAAAIAIR", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "PAPPAIIR", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "PPAIPAIR", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "UNPAPPAIIR", [], [])) >>? fun () ->
+  assert_unexpansion_consistent (Prim (zero_loc, "UNPAPAPAIR", [], [])) >>? fun () ->
   assert_unexpansion_consistent
     (Prim (zero_loc, "DIIIP", [ Seq (zero_loc, [ Prim (zero_loc, "DROP", [], []) ]) ], [])) >>? fun () ->
   assert_unexpansion_consistent (Prim (zero_loc, "SET_CAR", [], [])) >>? fun () ->

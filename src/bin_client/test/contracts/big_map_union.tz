@@ -1,6 +1,6 @@
 parameter (list (pair string int)) ;
 storage (pair (big_map string int) unit) ;
-code { UNPAAIAIR ;
+code { UNPAPAIR ;
        ITER { UNPAIR ; DUUUP ; DUUP; GET ;
               IF_NONE { PUSH int 0 } {} ;
               SWAP ; DIP { ADD ; SOME } ;
