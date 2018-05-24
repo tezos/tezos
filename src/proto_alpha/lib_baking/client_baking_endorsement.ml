@@ -30,11 +30,7 @@ end = struct
   type t = (string * Raw_level.t) list
 
   let encoding : t Data_encoding.t =
-    Data_encoding.(
-      list (obj2
-              (req "delegate" string)
-              (req "last_level" Raw_level.encoding)
-           ))
+    Data_encoding.assoc Raw_level.encoding
 
   let name =
     "endorsements"
