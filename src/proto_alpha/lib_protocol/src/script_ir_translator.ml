@@ -182,7 +182,6 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Dip _ -> 0
   | Exec -> 0
   | Lambda _ -> 1
-  | Fail -> 1
   | Failwith _ -> 1
   | Nop -> 0
   | Compare _ -> 1
@@ -261,7 +260,6 @@ let namespace = function
   | I_EMPTY_SET
   | I_EQ
   | I_EXEC
-  | I_FAIL
   | I_FAILWITH
   | I_GE
   | I_GET
@@ -1887,12 +1885,6 @@ and parse_instr
           | Failed _ ->
               fail (Fail_not_in_tail_position loc)
         end
-    | Prim (loc, I_FAIL, [], annot),
-      bef ->
-        fail_unexpected_annot loc annot >>=? fun () ->
-        let descr aft = { loc ; instr = Fail; bef ; aft } in
-        log_stack loc stack_ty Empty_t ;
-        return ctxt (Failed { descr } )
     | Prim (loc, I_FAILWITH, [], annot),
       Item_t (v, _rest, _) ->
         fail_unexpected_annot loc annot >>=? fun () ->
@@ -2402,7 +2394,7 @@ and parse_instr
     | Prim (loc, (I_DROP | I_DUP | I_SWAP | I_SOME | I_UNIT
                  | I_PAIR | I_CAR | I_CDR | I_CONS
                  | I_MEM | I_UPDATE | I_MAP
-                 | I_GET | I_EXEC | I_FAIL | I_SIZE
+                 | I_GET | I_EXEC | I_FAILWITH | I_SIZE
                  | I_CONCAT | I_ADD | I_SUB
                  | I_MUL | I_EDIV | I_OR | I_AND | I_XOR
                  | I_NOT
@@ -2472,7 +2464,7 @@ and parse_instr
           [ I_DROP ; I_DUP ; I_SWAP ; I_SOME ; I_UNIT ;
             I_PAIR ; I_CAR ; I_CDR ; I_CONS ;
             I_MEM ; I_UPDATE ; I_MAP ; I_ITER ;
-            I_GET ; I_EXEC ; I_FAIL ; I_SIZE ;
+            I_GET ; I_EXEC ; I_FAILWITH ; I_SIZE ;
             I_CONCAT ; I_ADD ; I_SUB ;
             I_MUL ; I_EDIV ; I_OR ; I_AND ; I_XOR ;
             I_NOT ;

@@ -17,7 +17,7 @@ open Script_ir_translator
 type execution_trace =
   (Script.location * Gas.t * (Script.expr * string option) list) list
 
-type error += Reject of Script.location * Script.expr option * execution_trace option
+type error += Reject of Script.location * Script.expr * execution_trace option
 type error += Overflow of Script.location * execution_trace option
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
@@ -41,7 +41,7 @@ let () =
     ~description: "A FAILWITH instruction was reached"
     (obj3
        (req "location" Script.location_encoding)
-       (opt "with" Script.expr_encoding)
+       (req "with" Script.expr_encoding)
        (opt "trace" trace_encoding))
     (function Reject (loc, v, trace) -> Some (loc, v, trace) | _ -> None)
     (fun (loc, v, trace) -> Reject (loc, v, trace));
@@ -543,11 +543,10 @@ let rec interp
         | Lambda lam, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.push) >>=? fun ctxt ->
             logged_return (Item (lam, rest), ctxt)
-            fail (Reject (loc, None, get_log log))
         | Failwith tv, Item (v, _) ->
             unparse_data ctxt Optimized tv v >>=? fun (v, _ctxt) ->
             let v = Micheline.strip_locations v in
-            fail (Reject (loc, Some v, get_log log))
+            fail (Reject (loc, v, get_log log))
         | Nop, stack ->
             logged_return (stack, ctxt)
         (* comparison *)

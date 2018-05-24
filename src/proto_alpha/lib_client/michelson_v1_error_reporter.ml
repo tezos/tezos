@@ -431,18 +431,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  @[<hov 2>is not compatible with type@ %a.@]@]"
                 print_ty tya
                 print_ty tyb
-          | Reject (loc, None, trace) ->
-              Format.fprintf ppf
-                "%ascript reached FAIL instruction@ \
-                 %a"
-                print_loc loc
-                (fun ppf -> function
-                   | None -> ()
-                   | Some trace ->
-                       Format.fprintf ppf "@,@[<v 2>trace@,%a@]"
-                         print_execution_trace trace)
-                trace
-          | Reject (loc, Some v, trace) ->
+          | Reject (loc, v, trace) ->
               Format.fprintf ppf
                 "%ascript reached FAILWITH instruction@ \
                  @[<hov 2>with@ %a@]%a"

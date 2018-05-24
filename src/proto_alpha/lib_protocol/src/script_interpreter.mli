@@ -12,7 +12,7 @@ open Alpha_context
 type execution_trace =
   (Script.location * Gas.t * (Script.expr * string option) list) list
 
-type error += Reject of Script.location * Script.expr option * execution_trace option
+type error += Reject of Script.location * Script.expr * execution_trace option
 type error += Overflow of Script.location * execution_trace option
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)

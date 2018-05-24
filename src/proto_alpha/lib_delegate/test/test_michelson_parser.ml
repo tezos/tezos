@@ -196,11 +196,21 @@ let test_expansion () =
   assert_expands (Prim (zero_loc, "ASSERT_LEFT", [], []))
     (Seq (zero_loc, [ Prim (zero_loc, "IF_LEFT",
                             [ Seq (zero_loc, []) ;
-                              Seq (zero_loc, [ Prim(zero_loc, "FAIL", [], []) ]) ],
+                              Seq (zero_loc, [
+                                  Seq (zero_loc, [
+                                      Prim(zero_loc, "UNIT", [], []) ;
+                                      Prim(zero_loc, "FAILWITH", [], [])
+                                    ])
+                                ]) ],
                             []) ])) >>? fun () ->
   assert_expands (Prim (zero_loc, "ASSERT_RIGHT", [], []))
     (Seq (zero_loc, [ Prim (zero_loc, "IF_LEFT",
-                            [ Seq (zero_loc, [ Prim(zero_loc, "FAIL", [], []) ]) ;
+                            [ Seq (zero_loc, [
+                                  Seq (zero_loc, [
+                                      Prim(zero_loc, "UNIT", [], []) ;
+                                      Prim(zero_loc, "FAILWITH", [], [])
+                                    ])
+                                ]) ;
                               Seq (zero_loc, []) ],
                             []) ])) >>? fun () ->
   assert_expands (Prim (zero_loc, "IF_RIGHT", [ left_branch ; right_branch ], []))
