@@ -107,7 +107,9 @@ type 'a desc =
       { encoding : 'a t ;
         json_encoding : 'a Json_encoding.encoding ;
         is_obj : bool ; is_tup : bool } -> 'a desc
-  | Dynamic_size : 'a t -> 'a desc
+  | Dynamic_size :
+      { kind : Binary_size.unsigned_integer ;
+        encoding : 'a t } -> 'a desc
   | Check_size : { limit : int ; encoding : 'a t } -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
@@ -269,8 +271,8 @@ module Variable = struct
     make @@ List e
 end
 
-let dynamic_size e =
-  make @@ Dynamic_size e
+let dynamic_size ?(kind = `Uint30) e =
+  make @@ Dynamic_size { kind ; encoding = e }
 
 let check_size limit encoding =
   make @@ Check_size { limit ; encoding }
@@ -352,7 +354,7 @@ let rec is_obj : type a. a t -> bool = fun e ->
   | Obj _ -> true
   | Objs _ (* by construction *) -> true
   | Conv { encoding = e } -> is_obj e
-  | Dynamic_size e  -> is_obj e
+  | Dynamic_size { encoding = e } -> is_obj e
   | Union (_,_,cases) ->
       List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
   | Empty -> true
@@ -369,7 +371,7 @@ let rec is_tup : type a. a t -> bool = fun e ->
   | Tup _ -> true
   | Tups _ (* by construction *) -> true
   | Conv { encoding = e } -> is_tup e
-  | Dynamic_size e  -> is_tup e
+  | Dynamic_size { encoding = e } -> is_tup e
   | Union (_,_,cases) ->
       List.for_all (function Case { encoding = e} -> is_tup e) cases
   | Mu (_,_,self) -> is_tup (self e)
@@ -571,7 +573,7 @@ let rec is_nullable: type t. t encoding -> bool = fun e ->
   | Describe { encoding = e } -> is_nullable e
   | Def { encoding = e } -> is_nullable e
   | Splitted { json_encoding } -> Json_encoding.is_nullable json_encoding
-  | Dynamic_size e -> is_nullable e
+  | Dynamic_size { encoding = e } -> is_nullable e
   | Check_size { encoding = e } -> is_nullable e
   | Delayed _ -> true
 

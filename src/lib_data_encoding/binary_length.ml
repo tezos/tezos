@@ -114,8 +114,9 @@ let rec length : type x. x Encoding.t -> x -> int =
     | Describe { encoding = e } -> length e value
     | Def { encoding = e } -> length e value
     | Splitted { encoding = e } -> length e value
-    | Dynamic_size e ->
-        Binary_size.int32 + length e value
+    | Dynamic_size { kind ; encoding = e } ->
+        let length = length e value in
+        Binary_size.integer_to_size kind + length
     | Check_size { limit ; encoding = e } ->
         let length = length e value in
         if length > limit then raise (Write_error Size_limit_exceeded) ;

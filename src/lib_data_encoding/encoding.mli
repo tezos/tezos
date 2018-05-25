@@ -65,7 +65,9 @@ type 'a desc =
       { encoding : 'a t ;
         json_encoding : 'a Json_encoding.encoding ;
         is_obj : bool ; is_tup : bool } -> 'a desc
-  | Dynamic_size : 'a t -> 'a desc
+  | Dynamic_size :
+      { kind : Binary_size.unsigned_integer ;
+        encoding : 'a t } -> 'a desc
   | Check_size : { limit : int ; encoding : 'a t } -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
@@ -123,7 +125,8 @@ module Variable : sig
   val array : 'a encoding -> 'a array encoding
   val list : 'a encoding -> 'a list encoding
 end
-val dynamic_size : 'a encoding -> 'a encoding
+val dynamic_size :
+  ?kind:Binary_size.unsigned_integer -> 'a encoding -> 'a encoding
 val check_size : int -> 'a encoding -> 'a encoding
 val delayed : (unit -> 'a encoding) -> 'a encoding
 val req :

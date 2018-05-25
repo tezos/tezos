@@ -109,6 +109,14 @@ module Atom = struct
     read_atom r Binary_size.int31 @@ fun buffer ofs ->
     Int32.to_int (MBytes.get_int32 buffer ofs)
 
+  let int = function
+  | `Int31 -> int31
+  | `Int16 -> int16
+  | `Int8 -> int8
+  | `Uint30 -> uint30
+  | `Uint16 -> uint16
+  | `Uint8 -> uint8
+
   let ranged_int ~minimum ~maximum resume state k =
     let read_int =
       match Binary_size.range_to_size ~minimum ~maximum with
@@ -302,20 +310,16 @@ let rec read_rec
             read_rec encoding state @@ fun (v, state) ->
             k (inj v, state)
       end
-    | Dynamic_size e ->
-        Atom.int32 resume state @@ fun (sz, state) ->
-        let sz = Int32.to_int sz in
-        if sz < 0 then
-          Error (Invalid_size sz)
+    | Dynamic_size { kind ; encoding = e } ->
+        Atom.int kind resume state @@ fun (sz, state) ->
+        let remaining = check_remaining_bytes state sz in
+        let state = { state with remaining_bytes = Some sz } in
+        ignore (check_allowed_bytes state sz : int option) ;
+        read_rec e state @@ fun (v, state) ->
+        if state.remaining_bytes <> Some 0 then
+          Error Extra_bytes
         else
-          let remaining = check_remaining_bytes state sz in
-          let state = { state with remaining_bytes = Some sz } in
-          ignore (check_allowed_bytes state sz : int option) ;
-          read_rec e state @@ fun (v, state) ->
-          if state.remaining_bytes <> Some 0 then
-            Error Extra_bytes
-          else
-            k (v, { state with remaining_bytes = remaining })
+          k (v, { state with remaining_bytes = remaining })
     | Check_size { limit ; encoding = e } ->
         let old_allowed_bytes = state.allowed_bytes in
         let limit =

@@ -64,44 +64,27 @@ module Atom = struct
     if (v < min || max < v) then
       raise (Invalid_float { min ; v ; max })
 
-  let int8 state v =
-    check_int_range (- (1 lsl 7)) v (1 lsl 7 - 1) ;
-    let ofs = state.offset in
-    may_resize state Binary_size.int8 ;
-    MBytes.set_int8 state.buffer ofs v
+  let set_int kind buffer ofs v =
+    match kind with
+    | `Int31 | `Uint30 -> MBytes.set_int32 buffer ofs (Int32.of_int v)
+    | `Int16 | `Uint16 -> MBytes.set_int16 buffer ofs v
+    | `Int8 | `Uint8 -> MBytes.set_int8 buffer ofs v
 
-  let uint8 state v =
-    check_int_range 0 v (1 lsl 8 - 1) ;
+  let int kind state v =
+    check_int_range (Binary_size.min_int kind) v (Binary_size.max_int kind) ;
     let ofs = state.offset in
-    may_resize state Binary_size.uint8 ;
-    MBytes.set_int8 state.buffer ofs v
+    may_resize state (Binary_size.integer_to_size kind) ;
+    set_int kind state.buffer ofs v
+
+  let int8 = int `Int8
+  let uint8 = int `Uint8
+  let int16 = int `Int16
+  let uint16 = int `Uint16
+  let uint30 = int `Uint30
+  let int31 = int `Int31
 
   let char state v = int8 state (int_of_char v)
   let bool state v = uint8 state (if v then 255 else 0)
-
-  let int16 state v =
-    check_int_range (- (1 lsl 15)) v (1 lsl 15 - 1) ;
-    let ofs = state.offset in
-    may_resize state Binary_size.int16 ;
-    MBytes.set_int16 state.buffer ofs v
-
-  let uint16 state v =
-    check_int_range 0 v (1 lsl 16 - 1) ;
-    let ofs = state.offset in
-    may_resize state Binary_size.uint16 ;
-    MBytes.set_int16 state.buffer ofs v
-
-  let uint30 state v =
-    check_int_range 0 v (1 lsl 30 - 1) ;
-    let ofs = state.offset in
-    may_resize state Binary_size.uint30 ;
-    MBytes.set_int32 state.buffer ofs (Int32.of_int v)
-
-  let int31 state v =
-    check_int_range (- (1 lsl 30)) v (1 lsl 30 - 1) ;
-    let ofs = state.offset in
-    may_resize state Binary_size.int31 ;
-    MBytes.set_int32 state.buffer ofs (Int32.of_int v)
 
   let int32 state v =
     let ofs = state.offset in
@@ -277,43 +260,45 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
                   Atom.tag sz state tag ;
                   write_rec e state value in
         write_case cases
-    | Dynamic_size e ->
-        Atom.int32 state 0l ; (* place holder for [size] *)
+    | Dynamic_size { kind ; encoding = e }  ->
         let initial_offset = state.offset in
-        write_rec e state value ;
+        Atom.int kind state 0 ; (* place holder for [size] *)
+        write_with_limit (Binary_size.max_int kind) e state value ;
         (* patch the written [size] *)
-        let size = state.offset - initial_offset in
-        (* FIXME overflow *)
-        MBytes.set_int32
-          state.buffer (initial_offset - Binary_size.int32)
-          (Int32.of_int size)
-    | Check_size { limit ; encoding = e } -> begin
-        (* backup the current limit *)
-        let old_limit = state.allowed_bytes in
-        (* install the new limit (only if smaller than the current limit) *)
-        let limit =
-          match state.allowed_bytes with
-          | None -> limit
-          | Some old_limit -> min old_limit limit in
-        state.allowed_bytes <- Some limit ;
-        write_rec e state value ;
-        (* restore the previous limit (minus the read bytes) *)
-        match old_limit with
-        | None ->
-            state.allowed_bytes <- None
-        | Some old_limit ->
-            let remaining =
-              match state.allowed_bytes with
-              | None -> assert false
-              | Some len -> len in
-            let read = limit - remaining in
-            state.allowed_bytes <- Some (old_limit - read)
-      end
+        Atom.set_int kind
+          state.buffer
+          initial_offset
+          (state.offset - initial_offset - Binary_size.integer_to_size kind)
+    | Check_size { limit ; encoding = e } ->
+        write_with_limit limit e state value
     | Describe { encoding = e } -> write_rec e state value
     | Def { encoding = e } -> write_rec e state value
     | Splitted { encoding = e } -> write_rec e state value
     | Mu (_, _, self) -> write_rec (self e) state value
     | Delayed f -> write_rec (f ()) state value
+
+and write_with_limit : type a. int -> a Encoding.t -> state -> a -> unit =
+  fun limit e state value ->
+  (* backup the current limit *)
+  let old_limit = state.allowed_bytes in
+  (* install the new limit (only if smaller than the current limit) *)
+  let limit =
+    match state.allowed_bytes with
+    | None -> limit
+    | Some old_limit -> min old_limit limit in
+  state.allowed_bytes <- Some limit ;
+  write_rec e state value ;
+  (* restore the previous limit (minus the read bytes) *)
+  match old_limit with
+  | None ->
+      state.allowed_bytes <- None
+  | Some old_limit ->
+      let remaining =
+        match state.allowed_bytes with
+        | None -> assert false
+        | Some len -> len in
+      let read = limit - remaining in
+      state.allowed_bytes <- Some (old_limit - read)
 
 
 (** ******************** *)

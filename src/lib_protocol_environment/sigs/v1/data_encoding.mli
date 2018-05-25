@@ -57,7 +57,9 @@ module Variable : sig
   val list : 'a encoding -> 'a list encoding
 end
 
-val dynamic_size : 'a encoding -> 'a encoding
+val dynamic_size :
+  ?kind: [ `Uint30 | `Uint16 | `Uint8 ] ->
+  'a encoding -> 'a encoding
 
 val json : json encoding
 val json_schema : json_schema encoding

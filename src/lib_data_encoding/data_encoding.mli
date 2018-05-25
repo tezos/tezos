@@ -416,7 +416,9 @@ module Encoding: sig
       Forces the size to be stored alongside content when needed.
       Typically used to combine two variable encodings in a same
       objects or tuple, or to use a variable encoding in an array or a list. *)
-  val dynamic_size : 'a encoding -> 'a encoding
+  val dynamic_size :
+    ?kind: [ `Uint30 | `Uint16 | `Uint8 ] ->
+    'a encoding -> 'a encoding
 
   (** [check_size size encoding] ensures that the binary encoding
       of a value will not be allowed to exceed [size] bytes. The reader and

@@ -30,7 +30,12 @@ val tag_size: tag_size -> int
 type signed_integer = [ `Int31 | `Int16 | `Int8 ]
 type unsigned_integer = [ `Uint30 | `Uint16 | `Uint8 ]
 type integer = [ signed_integer | unsigned_integer ]
-val integer_to_size: integer -> int
-val range_to_size: minimum:int -> maximum:int -> integer
-val enum_size: 'a array -> [> unsigned_integer ]
 
+val integer_to_size: [< integer ] -> int
+
+val min_int: [< integer ] -> int
+val max_int: [< integer ] -> int
+
+val range_to_size: minimum:int -> maximum:int -> integer
+
+val enum_size: 'a array -> [> unsigned_integer ]
