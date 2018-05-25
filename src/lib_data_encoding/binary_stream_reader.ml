@@ -110,12 +110,12 @@ module Atom = struct
     Int32.to_int (MBytes.get_int32 buffer ofs)
 
   let int = function
-  | `Int31 -> int31
-  | `Int16 -> int16
-  | `Int8 -> int8
-  | `Uint30 -> uint30
-  | `Uint16 -> uint16
-  | `Uint8 -> uint8
+    | `Int31 -> int31
+    | `Int16 -> int16
+    | `Int8 -> int8
+    | `Uint30 -> uint30
+    | `Uint16 -> uint16
+    | `Uint8 -> uint8
 
   let ranged_int ~minimum ~maximum resume state k =
     let read_int =
