@@ -59,7 +59,7 @@ module Unencrypted_signer : SIGNER = struct
   let neuterize x = Lwt.return (Signature.Secret_key.to_public_key x)
   let public_key x = Lwt.return x
   let public_key_hash x = Lwt.return (Signature.Public_key.hash x)
-  let sign t buf = return (Signature.sign t buf)
+  let sign ?watermark t buf = return (Signature.sign ?watermark t buf)
 end
 
 let () =

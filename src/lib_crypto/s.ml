@@ -205,8 +205,9 @@ module type SIGNATURE = sig
 
   val zero: t
 
-  val sign: Secret_key.t -> MBytes.t -> t
-  val check: Public_key.t -> t -> MBytes.t -> bool
+  type watermark
+  val sign: ?watermark:watermark -> Secret_key.t -> MBytes.t -> t
+  val check: ?watermark:watermark -> Public_key.t -> t -> MBytes.t -> bool
 
   val generate_key: ?seed:MBytes.t -> unit -> (Public_key_hash.t * Public_key.t * Secret_key.t)
 

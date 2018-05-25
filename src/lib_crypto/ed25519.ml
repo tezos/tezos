@@ -225,6 +225,8 @@ end
 
 type t = MBytes.t
 
+type watermark = MBytes.t
+
 let name = "Ed25519"
 let title = "An Ed25519 signature"
 
@@ -284,12 +286,24 @@ let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
 let zero = MBytes.make size '\000'
 
-let sign sk msg =
+let sign ?watermark sk msg =
+  let msg =
+    Blake2B.to_bytes @@
+    Blake2B.hash_bytes @@
+    match watermark with
+    | None -> [msg]
+    | Some prefix -> [ prefix ; msg ] in
   let signature = MBytes.create Sign.bytes in
   Sign.sign ~sk ~msg ~signature ;
   signature
 
-let check pk signature msg =
+let check ?watermark pk signature msg =
+  let msg =
+    Blake2B.to_bytes @@
+    Blake2B.hash_bytes @@
+    match watermark with
+    | None -> [msg]
+    | Some prefix -> [ prefix ; msg ] in
   Sign.verify ~pk ~signature ~msg
 
 let generate_key ?seed () =

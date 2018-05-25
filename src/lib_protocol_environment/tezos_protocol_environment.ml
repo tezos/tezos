@@ -134,6 +134,7 @@ module Make (Context : CONTEXT) = struct
        and type Signature.public_key_hash = Signature.public_key_hash
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t
+       and type Signature.watermark = Signature.watermark
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
@@ -313,8 +314,10 @@ module Make (Context : CONTEXT) = struct
 
         val zero: t
 
+        type watermark
+
         (** Check a signature *)
-        val check: Public_key.t -> t -> MBytes.t -> bool
+        val check: ?watermark:watermark -> Public_key.t -> t -> MBytes.t -> bool
 
       end
 

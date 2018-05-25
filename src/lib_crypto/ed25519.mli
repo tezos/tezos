@@ -9,5 +9,5 @@
 
 (** Tezos - Ed25519 cryptography *)
 
-include S.SIGNATURE
+include S.SIGNATURE with type watermark = MBytes.t
 include S.RAW_DATA with type t := t

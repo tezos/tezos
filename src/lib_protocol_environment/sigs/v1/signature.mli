@@ -15,5 +15,12 @@ type public_key =
   | Ed25519 of Ed25519.Public_key.t
   | Secp256k1 of Secp256k1.Public_key.t
 
+type watermark =
+  | Block_header
+  | Endorsement
+  | Generic_operation
+  | Custom of MBytes.t
+
 include S.SIGNATURE with type Public_key_hash.t = public_key_hash
                      and type Public_key.t = public_key
+                     and type watermark := watermark

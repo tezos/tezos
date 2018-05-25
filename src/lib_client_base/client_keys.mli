@@ -90,9 +90,11 @@ module type SIGNER = sig
   val public_key_hash : public_key -> Signature.Public_key_hash.t Lwt.t
   (** [public_key_hash pk] is the hash of [pk]. *)
 
-  val sign : secret_key -> MBytes.t -> Signature.t tzresult Lwt.t
-  (** [sign sk data] is signature obtained by signing [data] with
-      [sk]. *)
+  val sign :
+    ?watermark: Signature.watermark ->
+    secret_key -> MBytes.t -> Signature.t tzresult Lwt.t
+    (** [sign ?watermark sk data] is signature obtained by signing [data] with
+        [sk]. *)
 end
 
 val register_signer : (module SIGNER) -> unit
@@ -103,10 +105,14 @@ val registered_signers : unit -> (string * (module SIGNER)) list
 
 val find_signer_for_key :
   #Client_context.io_wallet -> scheme:string -> (module SIGNER) tzresult Lwt.t
+
 val sign :
+  ?watermark:Signature.watermark ->
   #Client_context.io_wallet ->
   sk_locator -> MBytes.t -> Signature.t tzresult Lwt.t
+
 val append :
+  ?watermark:Signature.watermark ->
   #Client_context.io_wallet ->
   sk_locator -> MBytes.t -> MBytes.t tzresult Lwt.t
 

@@ -127,6 +127,7 @@ module Make (Context : CONTEXT) : sig
        and type Signature.public_key_hash = Signature.public_key_hash
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t
+       and type Signature.watermark = Signature.watermark
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema

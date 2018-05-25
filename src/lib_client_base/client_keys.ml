@@ -127,7 +127,9 @@ module type SIGNER = sig
   val neuterize : secret_key -> public_key Lwt.t
   val public_key : public_key -> Signature.Public_key.t Lwt.t
   val public_key_hash : public_key -> Signature.Public_key_hash.t Lwt.t
-  val sign : secret_key -> MBytes.t -> Signature.t tzresult Lwt.t
+  val sign :
+    ?watermark: Signature.watermark ->
+    secret_key -> MBytes.t -> Signature.t tzresult Lwt.t
 end
 
 let signers_table : (string, (module SIGNER) * bool) Hashtbl.t = Hashtbl.create 13
@@ -149,14 +151,14 @@ let find_signer_for_key cctxt ~scheme =
 let registered_signers () : (string * (module SIGNER)) list =
   Hashtbl.fold (fun k (v, _) acc -> (k, v) :: acc) signers_table []
 
-let sign cctxt ((Sk_locator { scheme }) as skloc) buf =
+let sign ?watermark cctxt ((Sk_locator { scheme }) as skloc) buf =
   find_signer_for_key cctxt ~scheme >>=? fun signer ->
   let module Signer = (val signer : SIGNER) in
   Signer.sk_of_locator skloc >>=? fun t ->
-  Signer.sign t buf
+  Signer.sign ?watermark t buf
 
-let append cctxt loc buf =
-  sign cctxt loc buf >>|? fun signature ->
+let append ?watermark cctxt loc buf =
+  sign ?watermark cctxt loc buf >>|? fun signature ->
   Signature.concat buf signature
 
 let register_key cctxt ?(force=false)

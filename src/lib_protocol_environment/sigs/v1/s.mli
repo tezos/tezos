@@ -244,8 +244,10 @@ module type SIGNATURE = sig
 
   val zero: t
 
+  type watermark
+
   (** Check a signature *)
-  val check: Public_key.t -> t -> MBytes.t -> bool
+  val check: ?watermark:watermark -> Public_key.t -> t -> MBytes.t -> bool
 
 end
 
