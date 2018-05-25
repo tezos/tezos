@@ -9,6 +9,11 @@
 
 open Binary_error
 
+let n_length value =
+  let bits = Z.numbits value in
+  if bits = 0 then 1 else (bits + 6) / 7
+let z_length value = (Z.numbits value + 1 + 6) / 7
+
 let rec length : type x. x Encoding.t -> x -> int =
   fun e value ->
     let open Encoding in
@@ -25,7 +30,8 @@ let rec length : type x. x Encoding.t -> x -> int =
     | Int31 -> Binary_size.int31
     | Int32 -> Binary_size.int32
     | Int64 -> Binary_size.int64
-    | Z -> (Z.numbits value + 1 + 6) / 7
+    | N -> n_length value
+    | Z -> z_length value
     | RangedInt { minimum ; maximum } ->
         Binary_size.integer_to_size @@
         Binary_size.range_to_size ~minimum ~maximum

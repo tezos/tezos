@@ -83,33 +83,43 @@ module Atom = struct
       raise (Invalid_float { min = minimum ; v = ranged ; max = maximum }) ;
     ranged
 
-  let z state =
-    let res = Buffer.create 100 in
+  let rec read_z res value bit_in_value state =
+    let byte = uint8 state in
+    let value = value lor ((byte land 0x7F) lsl bit_in_value) in
+    let bit_in_value = bit_in_value + 7 in
+    let bit_in_value, value =
+      if bit_in_value < 8 then
+        (bit_in_value, value)
+      else begin
+        Buffer.add_char res (Char.unsafe_chr (value land 0xFF)) ;
+        bit_in_value - 8, value lsr 8
+      end in
+    if byte land 0x80 = 0x80 then
+      read_z res value bit_in_value state
+    else begin
+      if bit_in_value > 0 then Buffer.add_char res (Char.unsafe_chr value) ;
+      if byte = 0x00 then raise Trailing_zero ;
+      Z.of_bits (Buffer.contents res)
+    end
+
+  let n state =
     let first = uint8 state in
-    if first = 0 then
-      Z.zero
+    let first_value = first land 0x7F in
+    if first land 0x80 = 0x80 then
+      read_z (Buffer.create 100) first_value 7 state
     else
-      let first_value = first land 0x3F in
-      let sign = (first land 0x40) <> 0 in
-      let rec read prev value bit state =
-        if prev land 0x80 = 0x00 then begin
-          if bit > 0 then Buffer.add_char res (Char.unsafe_chr value) ;
-          if prev = 0x00 then raise Trailing_zero ;
-          let bits = Buffer.contents res in
-          let res = Z.of_bits bits in
-          if sign then Z.neg res else res
-        end else
-          let byte = uint8 state in
-          let value = value lor ((byte land 0x7F) lsl bit) in
-          let bit = bit + 7 in
-          let bit, value =
-            if bit >= 8 then begin
-              Buffer.add_char res (Char.unsafe_chr (value land 0xFF)) ;
-              bit - 8, value lsr 8
-            end else
-              bit, value in
-          read byte value bit state in
-      read first first_value 6 state
+      Z.of_int first_value
+
+  let z state =
+    let first = uint8 state in
+    let first_value = first land 0x3F in
+    let sign = (first land 0x40) <> 0 in
+    if first land 0x80 = 0x80 then
+      let n = read_z (Buffer.create 100) first_value 6 state in
+      if sign then Z.neg n else n
+    else
+      let n = Z.of_int first_value in
+      if sign then Z.neg n else n
 
   let string_enum arr state =
     let read_index =
@@ -153,6 +163,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
     | Int31  -> Atom.int31 state
     | Int32  -> Atom.int32 state
     | Int64  -> Atom.int64 state
+    | N -> Atom.n state
     | Z -> Atom.z state
     | Float -> Atom.float state
     | Bytes (`Fixed n) -> Atom.fixed_length_bytes n state

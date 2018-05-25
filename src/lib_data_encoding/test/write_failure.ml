@@ -79,4 +79,5 @@ let tests =
   all "unknown_case.B" mini_union_enc (B "2") @
   all "unknown_case.E" mini_union_enc E @
   test_bounded_string_list @
+  all "n" n (Z.of_string "-12") @
   []

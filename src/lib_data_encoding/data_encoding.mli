@@ -127,6 +127,9 @@ module Encoding: sig
       absolute value of the number in little endian order. *)
   val z : Z.t encoding
 
+  (** Positive big number, sedd [z]. *)
+  val n : Z.t encoding
+
   (** Encoding of floating point number
       (encoded as a floating point number in JSON and a double in binary). *)
   val float : float encoding
@@ -576,6 +579,7 @@ module Binary: sig
     | Invalid_float of { min : float ; v : float ; max : float }
     | Invalid_bytes_length of { expected : int ; found : int }
     | Invalid_string_length of { expected : int ; found : int }
+    | Invalid_natural
   val pp_write_error : Format.formatter -> write_error -> unit
   exception Write_error of write_error
 

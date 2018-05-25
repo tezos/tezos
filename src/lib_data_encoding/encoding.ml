@@ -76,6 +76,7 @@ type 'a desc =
   | Int31 : int desc
   | Int32 : Int32.t desc
   | Int64 : Int64.t desc
+  | N : Z.t desc
   | Z : Z.t desc
   | RangedInt : { minimum : int ; maximum : int } -> int desc
   | RangedFloat : { minimum : float ; maximum : float } -> float desc
@@ -143,6 +144,7 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Int31 -> `Fixed Binary_size.int31
   | Int32 -> `Fixed Binary_size.int32
   | Int64 -> `Fixed Binary_size.int64
+  | N -> `Dynamic
   | Z -> `Dynamic
   | RangedInt { minimum ; maximum } ->
       `Fixed Binary_size.(integer_to_size @@ range_to_size ~minimum ~maximum)
@@ -208,6 +210,7 @@ let rec is_zeroable: type t. t encoding -> bool = fun e ->
   | Int31 -> false
   | Int32 -> false
   | Int64 -> false
+  | N -> false
   | Z -> false
   | RangedInt _ -> false
   | RangedFloat _ -> false
@@ -297,6 +300,7 @@ let ranged_float minimum maximum =
   and maximum = max minimum maximum in
   make @@ RangedFloat { minimum ; maximum }
 let int64 = make @@ Int64
+let n = make @@ N
 let z = make @@ Z
 let float = make @@ Float
 
@@ -546,6 +550,7 @@ let rec is_nullable: type t. t encoding -> bool = fun e ->
   | Int31 -> false
   | Int32 -> false
   | Int64 -> false
+  | N -> false
   | Z -> false
   | RangedInt _ -> false
   | RangedFloat _ -> false

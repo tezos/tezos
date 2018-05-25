@@ -13,3 +13,6 @@
 val length : 'a Encoding.t -> 'a -> int
 val fixed_length : 'a Encoding.t -> int option
 val fixed_length_exn : 'a Encoding.t -> int
+
+val z_length : Z.t -> int
+val n_length : Z.t -> int

@@ -30,6 +30,7 @@ type write_error =
   | Invalid_float of { min : float ; v : float ; max : float }
   | Invalid_bytes_length of { expected : int ; found : int }
   | Invalid_string_length of { expected : int ; found : int }
+  | Invalid_natural
 
 val pp_write_error : Format.formatter -> write_error -> unit
 

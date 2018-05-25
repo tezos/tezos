@@ -47,6 +47,7 @@ type write_error =
   | Invalid_float of { min : float ; v : float ; max : float }
   | Invalid_bytes_length of { expected : int ; found : int }
   | Invalid_string_length of { expected : int ; found : int }
+  | Invalid_natural
 
 let pp_write_error ppf = function
   | Size_limit_exceeded ->
@@ -65,5 +66,7 @@ let pp_write_error ppf = function
       Format.fprintf ppf
         "Invalid string length (expected: %d ; found %d)"
         expected found
+  | Invalid_natural ->
+      Format.fprintf ppf "Negative natural"
 
 exception Write_error of write_error

@@ -124,6 +124,24 @@ module Atom = struct
     | `Int16 -> int16 state v
     | `Int31 -> int31 state v
 
+  let n state v =
+    if (Z.sign v < 0) then raise Invalid_natural ;
+    if Z.equal v Z.zero then
+      uint8 state 0x00
+    else
+      let bits = Z.numbits v in
+      let get_chunk pos len = Z.to_int (Z.extract v pos len) in
+      let length = Binary_length.n_length v in
+      let offset = state.offset in
+      may_resize state length ;
+      for i = 0 to length - 1 do
+        let pos = i * 7 in
+        let chunk_len = if i = length - 1 then bits - pos else 7 in
+        MBytes.set_int8 state.buffer (offset + i)
+          ((if i = length - 1 then 0x00 else 0x80)
+           lor (get_chunk pos chunk_len))
+      done
+
   let z state v =
     let sign = Z.sign v < 0 in
     let bits = Z.numbits v in
@@ -132,7 +150,7 @@ module Atom = struct
     else
       let v = Z.abs v in
       let get_chunk pos len = Z.to_int (Z.extract v pos len) in
-      let length = (bits + 1 + 6) / 7 in
+      let length = Binary_length.z_length v in
       let offset = state.offset in
       may_resize state length ;
       MBytes.set_int8 state.buffer offset
@@ -143,7 +161,7 @@ module Atom = struct
         let pos = 6 + (i - 1) * 7 in
         let chunk_len = if i = length - 1 then bits - pos else 7 in
         MBytes.set_int8 state.buffer (offset + i)
-          ((if i = bits / 7 then 0x00 else 0x80)
+          ((if i = length - 1 then 0x00 else 0x80)
            lor (get_chunk pos chunk_len))
       done
 
@@ -204,6 +222,7 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
     | Int31 -> Atom.int31 state value
     | Int32 -> Atom.int32 state value
     | Int64 -> Atom.int64 state value
+    | N -> Atom.n state value
     | Z -> Atom.z state value
     | Float -> Atom.float state value
     | Bytes (`Fixed n) -> Atom.fixed_kind_bytes n state value

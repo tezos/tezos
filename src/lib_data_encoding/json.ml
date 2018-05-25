@@ -44,6 +44,24 @@ let int64_encoding =
       Int64.of_string
   ]
 
+let n_encoding =
+  let open Json_encoding in
+  def "positive_bignum" @@
+  describe
+    ~title: "Positive big number"
+    ~description: "Decimal representation of a positive big number" @@
+  conv
+    (fun z ->
+       if Z.sign z < 0 then
+         raise (Json_encoding.Cannot_destruct ([], Failure "negative natural")) ;
+       Z.to_string z)
+    (fun s ->
+       let n = Z.of_string s in
+       if Z.sign n < 0 then
+         raise (Json_encoding.Cannot_destruct ([], Failure "negative natural")) ;
+       n)
+    string
+
 let z_encoding =
   let open Json_encoding in
   def "bignum" @@
@@ -155,6 +173,7 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Int31 -> int
   | Int32 -> int32
   | Int64 -> int64_encoding
+  | N -> n_encoding
   | Z -> z_encoding
   | Bool -> bool
   | Float -> float

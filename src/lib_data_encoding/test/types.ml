@@ -182,6 +182,7 @@ module Alcotest = struct
     testable
       (Fmt.of_to_string Z.to_string)
       Z.equal
+  let n = z
   let record =
     testable
       (Fmt.of_to_string record_to_string)

@@ -99,6 +99,13 @@ let all_ranged_float minimum maximum =
   all (name ^ ".mean") Alcotest.float encoding ((minimum +. maximum) /. 2.) @
   all (name ^ ".max") Alcotest.float encoding maximum
 
+let test_n_sequence () =
+  let test i =
+    binary Alcotest.z z i () ;
+    stream Alcotest.z z i () in
+  for i = 0 to 10_000 do test (Z.of_int i) done ;
+  for i = 100_000_000 to 100_010_000 do test (Z.of_int i) done
+
 let test_z_sequence () =
   let test i =
     binary Alcotest.z z i () ;
@@ -171,6 +178,25 @@ let tests =
   all "float.epsilon" Alcotest.float float epsilon_float @
   all "float.nan" Alcotest.float float nan @
   all_ranged_float ~-. 100. 300. @
+  all "n.zero" Alcotest.n n (Z.zero) @
+  all "n.one" Alcotest.n n (Z.one) @
+  [ "n.sequence", `Quick, test_n_sequence ] @
+  let rec fact i l =
+    if i < 1 then
+      []
+    else
+      let l = Z.mul l (Z.of_int i) in
+      fact (i - 1) l @
+      all (Format.asprintf "n.fact.%d" i) Alcotest.n n l in
+  fact 35 Z.one @
+  all "n.a" Alcotest.n n
+    (Z.of_string "123574503164821730218493275982143254986574985328") @
+  all "n.b" Alcotest.n n
+    (Z.of_string "8493275982143254986574985328") @
+  all "n.c" Alcotest.n n
+    (Z.of_string "123574503164821730218474985328") @
+  all "n.d" Alcotest.n n
+    (Z.of_string "10000000000100000000001000003050000000060600000000000777000008") @
   all "z.zero" Alcotest.z z (Z.zero) @
   all "z.one" Alcotest.z z (Z.one) @
   [ "z.sequence", `Quick, test_z_sequence ] @

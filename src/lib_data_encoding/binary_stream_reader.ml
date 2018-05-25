@@ -132,38 +132,46 @@ module Atom = struct
     else
       k (ranged, state)
 
-  let z resume state k =
-    let res = Buffer.create 100 in
+  let rec read_z res value bit_in_value state k =
+    let resume buffer =
+      let stream = Binary_stream.push buffer state.stream in
+      read_z res value bit_in_value { state with stream } k in
+    uint8 resume state @@ fun (byte, state) ->
+    let value = value lor ((byte land 0x7F) lsl bit_in_value) in
+    let bit_in_value = bit_in_value + 7 in
+    let bit_in_value, value =
+      if bit_in_value < 8 then
+        (bit_in_value, value)
+      else begin
+        Buffer.add_char res (Char.unsafe_chr (value land 0xFF)) ;
+        bit_in_value - 8, value lsr 8
+      end in
+    if byte land 0x80 = 0x80 then
+      read_z res value bit_in_value state k
+    else begin
+      if bit_in_value > 0 then Buffer.add_char res (Char.unsafe_chr value) ;
+      if byte = 0x00 then raise Trailing_zero ;
+      k (Z.of_bits (Buffer.contents res), state)
+    end
+
+  let n resume state k =
     uint8 resume state @@ fun (first, state) ->
-    if first = 0 then
-      k (Z.zero, state)
+    let first_value = first land 0x7F in
+    if first land 0x80 = 0x80 then
+      read_z (Buffer.create 100) first_value 7 state k
     else
-      let first_value = first land 0x3F in
-      let sign = (first land 0x40) <> 0 in
-      let rec read prev value bit state =
-        if prev land 0x80 = 0x00 then begin
-          if bit > 0 then Buffer.add_char res (Char.unsafe_chr value) ;
-          if prev = 0x00 then raise Trailing_zero ;
-          let bits = Buffer.contents res in
-          let res = Z.of_bits bits in
-          let res = if sign then Z.neg res else res in
-          k (res, state)
-        end else
-          let resume buffer =
-            let stream = Binary_stream.push buffer state.stream in
-            uint8 resume { state with stream } (read_next value bit) in
-          uint8 resume state (read_next value bit)
-      and read_next value bit (byte, state) =
-        let value = value lor ((byte land 0x7F) lsl bit) in
-        let bit = bit + 7 in
-        let bit, value =
-          if bit >= 8 then begin
-            Buffer.add_char res (Char.unsafe_chr (value land 0xFF)) ;
-            bit - 8, value lsr 8
-          end else
-            bit, value in
-        read byte value bit state in
-      read first first_value 6 state
+      k (Z.of_int first_value, state)
+
+  let z resume state k =
+    uint8 resume state @@ fun (first, state) ->
+    let first_value = first land 0x3F in
+    let sign = (first land 0x40) <> 0 in
+    if first land 0x80 = 0x80 then
+      read_z (Buffer.create 100) first_value 6 state @@ fun (n, state) ->
+      k ((if sign then Z.neg n else n), state)
+    else
+      let n = Z.of_int first_value in
+      k ((if sign then Z.neg n else n), state)
 
   let string_enum arr resume state k =
     let read_index =
@@ -215,6 +223,7 @@ let rec read_rec
     | Int31  -> Atom.int31 resume state k
     | Int32  -> Atom.int32 resume state k
     | Int64  -> Atom.int64 resume state k
+    | N -> Atom.n resume state k
     | Z -> Atom.z resume state k
     | Float -> Atom.float resume state k
     | Bytes (`Fixed n) -> Atom.fixed_length_bytes n resume state k

@@ -181,7 +181,13 @@ let tests =
   all "unknown_case.E" ~expected:missing_case union_enc mini_union_enc E @
   all "enum.missing" ~expected:missing_enum enum_enc mini_enum_enc 4 @
   test_bounded_string_list @
-  [ "z.truncated", `Quick,
+  [ "n.truncated", `Quick,
+    binary ~expected:not_enough_data n (MBytes.of_string "\x83") ;
+    "n.trailing_zero", `Quick,
+    binary ~expected:trailing_zero n (MBytes.of_string "\x83\x00") ;
+    "n.trailing_zero2", `Quick,
+    binary ~expected:trailing_zero n (MBytes.of_string "\x83\x00") ;
+    "z.truncated", `Quick,
     binary ~expected:not_enough_data z (MBytes.of_string "\x83") ;
     "z.trailing_zero", `Quick,
     binary ~expected:trailing_zero z (MBytes.of_string "\x83\x00") ;
