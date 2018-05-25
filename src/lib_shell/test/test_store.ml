@@ -28,13 +28,16 @@ let genesis_time =
 
 (** *)
 
+let mapsize = 4_096_000_000L (* ~4 GiB *)
+
 let wrap_store_init f _ () =
   Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir ->
     let root = base_dir // "store" in
-    Store.init root >>= function
+    Store.init ~mapsize root >>= function
     | Ok store ->
-        f store >>= fun () ->
-        Lwt.return ()
+        Lwt.finalize
+          (fun () -> f store)
+          (fun () -> Store.close store ; Lwt.return_unit)
     | Error err ->
         Format.kasprintf Pervasives.failwith
           "@[Cannot initialize store:@ %a@]" pp_print_error err
@@ -43,10 +46,11 @@ let wrap_store_init f _ () =
 let wrap_raw_store_init f _ () =
   Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir ->
     let root = base_dir // "store" in
-    Raw_store.init root >>= function
+    Raw_store.init ~mapsize root >>= function
     | Ok store ->
-        f store >>= fun () ->
-        Lwt.return ()
+        Lwt.finalize
+          (fun () -> f store)
+          (fun () -> Raw_store.close store ; Lwt.return_unit)
     | Error err ->
         Format.kasprintf Pervasives.failwith
           "@[Cannot initialize store:@ %a@]" pp_print_error err
@@ -153,11 +157,15 @@ let test_expand s =
 
 let check (type t)
     (module Store: Store_sigs.STORE with type t = t) (s: Store.t) k d =
-  Store.read_opt s k >|= fun d' ->
-  if d' <> Some d then begin
-    Assert.fail_msg
-      "Error while reading key %S\n%!"  (String.concat Filename.dir_sep k) ;
-  end
+  Store.read_opt s k >|= function
+  | Some d' when MBytes.equal d d' -> ()
+  | Some d' ->
+      Assert.fail_msg ~expected:(MBytes.to_string d) ~given:(MBytes.to_string d')
+        "Error while reading key %d %S\n%!"
+        Cstruct.(compare (of_bigarray d) (of_bigarray d')) (String.concat Filename.dir_sep k)
+  | None ->
+      Assert.fail_msg ~expected:(MBytes.to_string d) ~given:""
+        "Error while reading key %S\n%!" (String.concat Filename.dir_sep k)
 
 let check_none (type t)
     (module Store: Store_sigs.STORE with type t = t) (s: Store.t) k =
@@ -179,7 +187,7 @@ let test_generic (type t)
 
 let list (type t)
     (module Store: Store_sigs.STORE with type t = t) (s: Store.t) k =
-  Store.fold_keys s k ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+  Store.keys s k
 
 let test_generic_list (type t)
     (module Store: Store_sigs.STORE with type t = t) (s: Store.t) =
@@ -216,12 +224,11 @@ let test_hashset (type t)
       (Make_substore(Store)(struct let name = ["test_set"] end))
       (Block_hash)
       (BlockSet) in
-  let bhset : BlockSet.t = BlockSet.add bh2 (BlockSet.add bh1 BlockSet.empty) in
+  let bhset = BlockSet.(add bh2 (add bh1 empty)) in
   StoreSet.store_all s bhset >>= fun () ->
   StoreSet.read_all s >>= fun bhset' ->
   Assert.equal_block_set ~msg:__LOC__ bhset bhset' ;
-  let bhset2 =
-    Pervasives.(bhset |> BlockSet.add bh3 |> BlockSet.remove bh1) in
+  let bhset2 = BlockSet.(bhset |> add bh3 |> remove bh1) in
   StoreSet.store_all s bhset2 >>= fun () ->
   StoreSet.read_all s >>= fun bhset2' ->
   Assert.equal_block_set ~msg:__LOC__ bhset2 bhset2' ;
@@ -252,14 +259,11 @@ let test_hashmap (type t)
        end))
       (BlockMap) in
   let eq = (=) in
-  let map =
-    Pervasives.(BlockMap.empty |>
-                BlockMap.add bh1 (1, 'a') |> BlockMap.add bh2 (2, 'b')) in
+  let map = BlockMap.(empty |> add bh1 (1, 'a') |> add bh2 (2, 'b')) in
   StoreMap.store_all s map >>= fun () ->
   StoreMap.read_all s >>= fun map' ->
   Assert.equal_block_map ~msg:__LOC__ ~eq map map' ;
-  let map2 =
-    Pervasives.(map |> BlockMap.add bh3 (3, 'c') |> BlockMap.remove bh1) in
+  let map2 = map |> BlockMap.add bh3 (3, 'c') |> BlockMap.remove bh1 in
   StoreMap.store_all s map2 >>= fun () ->
   StoreMap.read_all s >>= fun map2' ->
   Assert.equal_block_map ~msg:__LOC__ ~eq map2 map2' ;
@@ -324,16 +328,10 @@ let test_subblock s =
   SubBlocksSet.known s bh2 >>= fun known ->
   Assert.is_true ~msg:__LOC__ known ;
   SubBlocksSet.read_all s >>= fun set ->
-  let set' =
-    Block_hash.Set.empty
-    |> Block_hash.Set.add bh1
-    |> Block_hash.Set.add bh2 in
+  let set' = Block_hash.Set.(empty |> add bh1 |> add bh2) in
   Assert.equal_block_set ~msg:__LOC__ set set' ;
   SubBlocksSet.remove s bh2 >>= fun () ->
-  let set =
-    Block_hash.Set.empty
-    |> Block_hash.Set.add bh3'
-    |> Block_hash.Set.add bh3 in
+  let set = Block_hash.Set.(empty |> add bh3' |> add bh3) in
   SubBlocksSet.store_all s set >>= fun () ->
   SubBlocksSet.elements s >>= fun elts ->
   Assert.equal_block_hash_list ~msg:__LOC__
@@ -355,10 +353,7 @@ let test_subblock s =
   SubBlocksMap.read_opt s bh1 >>= fun v1' ->
   Assert.equal ~msg:__LOC__ (Some v1) v1' ;
   Assert.is_true ~msg:__LOC__ known ;
-  let map =
-    Block_hash.Map.empty
-    |> Block_hash.Map.add bh1 v1
-    |> Block_hash.Map.add bh2 v2 in
+  let map = Block_hash.Map.(empty |> add bh1 v1 |> add bh2 v2) in
   SubBlocksMap.read_all s >>= fun map' ->
   Assert.equal_block_map ~eq:(=) ~msg:__LOC__ map map' ;
 

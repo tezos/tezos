@@ -19,7 +19,8 @@ type context = t
 (** Open or initialize a versioned store at a given path. *)
 val init:
   ?patch_context:(context -> context Lwt.t) ->
-  root:string ->
+  ?mapsize:int64 ->
+  string ->
   index Lwt.t
 
 val commit_genesis:

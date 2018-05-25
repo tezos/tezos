@@ -10,7 +10,9 @@
 let fail expected given msg =
   Format.kasprintf Pervasives.failwith
     "@[%s@ expected: %s@ got: %s@]" msg expected given
-let fail_msg fmt = Format.kasprintf (fail "" "") fmt
+
+let fail_msg ?(expected="") ?(given="") fmt =
+  Format.kasprintf (fail expected given) fmt
 
 let default_printer _ = ""
 
@@ -47,11 +49,12 @@ let make_equal_list eq prn ?(msg="") x y =
         if eq hd_x hd_y then
           iter (succ i) tl_x tl_y
         else
-          let fm = Printf.sprintf "%s (at index %d)" msg i in
-          fail (prn hd_x) (prn hd_y) fm
+          fail_msg ~expected:(prn hd_x) ~given:(prn hd_y)
+            "%s (at index %d)" msg i
     | _ :: _, [] | [], _ :: _ ->
-        let fm = Printf.sprintf "%s (lists of different sizes)" msg in
-        fail_msg "%s" fm
+        fail_msg ~expected:"" ~given:""
+          "%s (lists of different sizes %d %d)" msg
+          (List.length x) (List.length y)
     | [], [] ->
         () in
   iter 0 x y

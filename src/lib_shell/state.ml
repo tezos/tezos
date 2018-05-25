@@ -889,11 +889,15 @@ let may_create_chain state chain genesis =
 
 let read
     ?patch_context
+    ?(store_mapsize=4_096_000_000_000L)
+    ?(context_mapsize=40_960_000_000L)
     ~store_root
     ~context_root
     genesis =
-  Store.init store_root >>=? fun global_store ->
-  Context.init ?patch_context ~root:context_root >>= fun context_index ->
+  Store.init ~mapsize:store_mapsize store_root >>=? fun global_store ->
+  Context.init
+    ~mapsize:context_mapsize ?patch_context
+    context_root >>= fun context_index ->
   let global_data = {
     chains = Chain_id.Table.create 17 ;
     global_store ;

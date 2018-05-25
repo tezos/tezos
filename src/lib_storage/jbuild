@@ -4,8 +4,8 @@
  ((name tezos_storage)
   (public_name tezos-storage)
   (libraries (tezos-base
-              leveldb
-              irmin-leveldb))
+              lmdb
+              irmin-lmdb))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives))))

@@ -10,8 +10,8 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build & = "1.0+beta20" }
   "tezos-base"
-  "leveldb"
-  "irmin-leveldb"
+  "lmdb"
+  "irmin-lmdb"
   "tezos-stdlib-unix" { test }
   "alcotest-lwt" { test }
 ]
