@@ -2,7 +2,7 @@ parameter unit;
 storage unit;
 code { UNIT @4; UNIT @3; UNIT @2; UNIT @1;
        PAIR; UNPAIR @x1 @x2;
-       PPAIPAIR; UNPPAIPAIR @uno @due @tres @quatro;
-       PAPAPAIR; UNPAPAPAIR @un @deux @trois @quatre;
-       PAPPAIIR; UNPAPPAIIR @one @two @three @four;
+       PPAIPAIR @p1 %x1 %x2 %x3 %x4; UNPPAIPAIR @uno @due @tre @quattro;
+       PAPAPAIR @p2 %x1 %x2 %x3 %x4; UNPAPAPAIR @un @deux @trois @quatre;
+       PAPPAIIR @p3 %x1 %x2 %x3 %x4; UNPAPPAIIR @one @two @three @four;
        DROP; DROP; DROP; DROP; CAR; NIL operation; PAIR }

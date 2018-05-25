@@ -59,6 +59,14 @@ let extract_first_field_annot annot =
   in
   extract_first_field_annot [] annot
 
+let extract_field_annots annot =
+  List.partition (fun a ->
+      match a.[0] with
+      | '%' -> true
+      | _ -> false
+      | exception Invalid_argument _ -> false
+    ) annot
+
 let expand_set_caddadr original =
   match original with
   | Prim (loc, str, args, annot) ->
@@ -316,6 +324,25 @@ let unparse_pair_item ast =
     | I -> "I" :: acc in
   List.rev ("R" :: unparse ast []) |> String.concat ""
 
+let pappaiir_annots_pos ast annot =
+  let rec find_annots_pos p_pos ast annots acc =
+    match ast, annots with
+    | _, [] -> annots, acc
+    | P (i, left, right), _ ->
+        let annots, acc = find_annots_pos i left annots acc in
+        find_annots_pos i right annots acc
+    | A, a :: annots ->
+        let pos = match IntMap.find_opt p_pos acc with
+          | None -> [ a ], []
+          | Some (_, cdr) -> [ a ], cdr in
+        annots, IntMap.add p_pos pos acc
+    | I, a :: annots ->
+        let pos = match IntMap.find_opt p_pos acc with
+          | None -> [], [ a ]
+          | Some (car, _) -> car, [ a ] in
+        annots, IntMap.add p_pos pos acc in
+  snd (find_annots_pos 0 ast annot IntMap.empty)
+
 let expand_pappaiir original =
   match original with
   | Prim (loc, str, args, annot) ->
@@ -326,17 +353,28 @@ let expand_pappaiir original =
       && check_letters str 1 (len - 2)
            (function 'P' | 'A' | 'I' -> true | _ -> false) then
         try
+          let field_annots, annot = extract_field_annots annot in
+          let ast = parse_pair_substr str ~len 0 in
+          let field_annots_pos = pappaiir_annots_pos ast field_annots in
           let rec parse p (depth, acc) =
             match p with
             | P (i, left, right) ->
-                let annot = if i = 0 then annot else [] in
+                let annot =
+                  match i, IntMap.find_opt i field_annots_pos with
+                  | 0, None -> annot
+                  | _, None -> []
+                  (* XXX Hackish, cannot annotate cdr only with PAIR *)
+                  | 0, Some ([], cdr_annot) -> "%" :: cdr_annot @ annot
+                  | _, Some ([], cdr_annot) -> "%" :: cdr_annot
+                  | 0, Some (car_annot, cdr_annot) -> car_annot @ cdr_annot @ annot
+                  | _, Some (car_annot, cdr_annot) -> car_annot @ cdr_annot
+                in
                 let acc = dip ~loc depth (Prim (loc, "PAIR", [], annot)) :: acc in
                 (depth, acc)
                 |> parse left
                 |> parse right
             | A | I -> (depth + 1, acc)
           in
-          let ast = parse_pair_substr str ~len 0 in
           let _, expanded = parse ast (0, []) in
           begin match args with
             | [] -> ok ()
@@ -363,24 +401,8 @@ let expand_unpappaiir original =
                         Prim (loc, "CAR", [], car_annot) ;
                         dip ~loc 1 (Prim (loc, "CDR", [], cdr_annot)) ;
                       ]) in
-          let rec find_annots_pos p_pos ast annots acc =
-            match ast, annots with
-            | _, [] -> annots, acc
-            | P (i, left, right), _ ->
-                let annots, acc = find_annots_pos i left annots acc in
-                find_annots_pos i right annots acc
-            | A, a :: annots ->
-                let pos = match IntMap.find_opt p_pos acc with
-                  | None -> [ a ], []
-                  | Some (_, cdr) -> [ a ], cdr in
-                annots, IntMap.add p_pos pos acc
-            | I, a :: annots ->
-                let pos = match IntMap.find_opt p_pos acc with
-                  | None -> [], [ a ]
-                  | Some (car, _) -> car, [ a ] in
-                annots, IntMap.add p_pos pos acc in
           let ast = parse_pair_substr str ~len 2 in
-          let _, annots_pos = find_annots_pos 0 ast annot IntMap.empty in
+          let annots_pos = pappaiir_annots_pos ast annot in
           let rec parse p (depth, acc) =
             match p with
             | P (i, left, right) ->
