@@ -1470,8 +1470,8 @@ and parse_instr
         typed ctxt loc (Const v) (Item_t (t, stack, annot))
     | Prim (loc, I_UNIT, [], annot),
       stack ->
-        parse_var_annot loc annot >>=? fun annot ->
-        typed ctxt loc (Const ()) (Item_t (Unit_t None, stack, annot))
+        parse_var_type_annot loc annot >>=? fun (annot, ty_name) ->
+        typed ctxt loc (Const ()) (Item_t (Unit_t ty_name, stack, annot))
     (* options *)
     | Prim (loc, I_SOME, [], annot),
       Item_t (t, rest, _) ->
@@ -1587,7 +1587,8 @@ and parse_instr
     | Prim (loc, I_MAP, [ body ], annot),
       (Item_t (List_t (elt, _), starting_rest, list_annot)) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_var_binding_annot loc annot >>=? fun (ret_annot, elt_bind_annot) ->
+        parse_var_type_binding_annot loc annot
+        >>=? fun (ret_annot, list_ty_name, elt_bind_annot) ->
         let elt_bind_annot = default_annot elt_bind_annot
             ~default:(gen_binding_access_annot list_annot default_elt_annot) in
         let elt_annot = binding_to_var_annot elt_bind_annot in
@@ -1599,7 +1600,7 @@ and parse_instr
                 (Invalid_map_body (loc, ibody.aft))
                 (Lwt.return (stack_ty_eq 1 rest starting_rest)) >>=? fun Eq ->
               typed ctxt loc (List_map ibody)
-                (Item_t (List_t (ret, None), rest, ret_annot))
+                (Item_t (List_t (ret, list_ty_name), rest, ret_annot))
           | Typed { aft ; _ } -> fail (Invalid_map_body (loc, aft))
           | Failed _ -> fail (Invalid_map_block_fail loc)
         end
@@ -1660,15 +1661,15 @@ and parse_instr
         typed ctxt loc Set_update (Item_t (Set_t (elt, tname), rest, annot))
     | Prim (loc, I_SIZE, [], annot),
       Item_t (Set_t _, rest, _) ->
-        parse_var_type_annot loc annot >>=? fun (annot, tname) ->
-        typed ctxt loc Set_size (Item_t (Nat_t tname, rest, annot))
+        parse_var_annot loc annot >>=? fun annot ->
+        typed ctxt loc Set_size (Item_t (Nat_t None, rest, annot))
     (* maps *)
     | Prim (loc, I_EMPTY_MAP, [ tk ; tv ], annot),
       stack ->
         (Lwt.return (parse_comparable_ty tk)) >>=? fun (Ex_comparable_ty tk) ->
         (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:true tv)) >>=? fun (Ex_ty tv) ->
-        parse_var_annot loc annot >>=? fun annot ->
-        typed ctxt loc (Empty_map (tk, tv)) (Item_t (Map_t (tk, tv, None), stack, annot))
+        parse_var_type_annot loc annot >>=? fun (annot, ty_name) ->
+        typed ctxt loc (Empty_map (tk, tv)) (Item_t (Map_t (tk, tv, ty_name), stack, annot))
     | Prim (loc, I_MAP, [ body ], annot),
       Item_t (Map_t (ck, elt, _), starting_rest, _map_annot) ->
         let k = ty_of_comparable_ty ck in

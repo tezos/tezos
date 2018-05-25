@@ -209,7 +209,7 @@ let parse_field_annot
     function
     | [] -> ok None
     | [ `Field_annot _ as a ] -> ok (Some a)
-    | _ -> error (Unexpected_annotation loc) (* (Invalid_var_annotation (loc, annot)) *)
+    | _ -> error (Unexpected_annotation loc)
 
 let extract_field_annot
   : Script.node -> (Script.node * field_annot option) tzresult
@@ -243,7 +243,7 @@ let parse_var_annot
       | [], None -> ok None
       | [], Some d -> ok d
       | [ `Var_annot _ as a ], _ -> ok (Some a)
-      | _ -> error (Unexpected_annotation loc) (* (Invalid_var_annotation (loc, annot)) *)
+      | _ -> error (Unexpected_annotation loc)
     end |> Lwt.return
 
 let parse_field_annot loc annot =
@@ -357,3 +357,15 @@ let parse_var_binding_annot
     get_one_annot loc vars >>=? fun v ->
     get_one_annot loc bindings >>|? fun b ->
     (v, b)
+
+let parse_var_type_binding_annot
+  : int -> string list ->
+    (var_annot option * type_annot option * binding_annot option) tzresult Lwt.t
+  = fun loc annot ->
+    Lwt.return (parse_annots loc annot) >>=? fun annot ->
+    let vars, types, fields, bindings = classify_annot annot in
+    fail_unexpected_annot loc fields >>=? fun () ->
+    get_one_annot loc vars >>=? fun v ->
+    get_one_annot loc types >>=? fun t ->
+    get_one_annot loc bindings >>|? fun b ->
+    (v, t, b)

@@ -146,3 +146,7 @@ val parse_binding_annot :
 
 val parse_var_binding_annot :
   int -> string list -> (var_annot option * binding_annot option) tzresult Lwt.t
+
+val parse_var_type_binding_annot :
+  int -> string list ->
+  (var_annot option * type_annot option * binding_annot option) tzresult Lwt.t
