@@ -7,7 +7,7 @@ src_dir="$(dirname "$script_dir")"
 
 export OPAMYES=yes
 
-opams=$(find "$src_dir" -name \*.opam -print)
+opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
 
 packages=
 for opam in $opams; do
@@ -18,7 +18,7 @@ for opam in $opams; do
     opam pin add --no-action $package $dir
 done
 
-packages=$(opam list --short --all --sort $packages)
+packages=$(opam list --short --sort --pinned $packages)
 
 echo
 echo "Pinned packages:"

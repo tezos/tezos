@@ -16,6 +16,7 @@ depends: [
   "lwt"
   "zarith"
   "alcotest" { test }
+  "ocp-indent" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

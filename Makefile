@@ -1,12 +1,16 @@
 
 DEV ?= --dev
-PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find . -name *.opam -print)))
+PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 
 current_ocaml_version := $(shell ocamlc -version)
+current_opam_version := $(shell opam --version)
 include scripts/version.sh
 
 ifneq (${current_ocaml_version},${ocaml_version})
 $(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
+endif
+ifneq (${current_opam_version},${opam_version})
+$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}))
 endif
 
 all:
@@ -30,15 +34,15 @@ all:
 
 all.pkg:
 	@jbuilder build ${DEV} \
-	    $(patsubst %.opam,%.install, $(shell find . -name \*.opam -print))
+	    $(patsubst %.opam,%.install, $(shell find src vendors -name \*.opam -print))
 
 $(addsuffix .pkg,${PACKAGES}): %.pkg:
 	@jbuilder build ${DEV} \
-	    $(patsubst %.opam,%.install, $(shell find . -name $*.opam -print))
+	    $(patsubst %.opam,%.install, $(shell find src vendors -name $*.opam -print))
 
 $(addsuffix .test,${PACKAGES}): %.test:
 	@jbuilder build ${DEV} \
-	    @$(patsubst %/$*.opam,%,$(shell find -name $*.opam))/runtest
+	    @$(patsubst %/$*.opam,%,$(shell find src vendors -name $*.opam))/runtest
 
 doc-html: all
 	@jbuilder build @doc ${DEV}
