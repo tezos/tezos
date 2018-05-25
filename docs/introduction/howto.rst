@@ -37,42 +37,16 @@ The simplest way to install all dependencies is by using `OPAM
 
 
 **IMPORTANT**: Please use `version 2
-<https://opam.ocaml.org/blog/opam-2-0-0-rc2/>`_ of OPAM. That
+<https://opam.ocaml.org/blog/opam-2-0-0-rc3/>`_ of OPAM. That
 is what the Tezos Core team uses. Most distribution probably ship
 **version 1** of OPAM out of the box, but installing version 2 is
 preferable for many reasons.
-
-Then, you need to create a new switch alias for Tezos. A switch is your
-own version of the OPAM configuration, including the OCaml compiler, all
-packages, and package manager configuration related to your project.
-This is necessary so that the project doesn’t conflict with other OCaml
-projects or other versions of Tezos.
-
-::
-
-    opam update
-    opam switch create tezos 4.06.1
-    eval $(opam env)
-
-If you are stuck with OPAM1:
-
-::
-
-    opam update
-    opam switch tezos --alias-of 4.06.1
-    eval $(opam config env)
-
-The last command-line activates the switch.
-
-Note that if you previously created a switch named ``tezos`` but with
-an older OCaml version you need to remove the switch with ``opam
-switch remove tezos``.
 
 
 Install Tezos dependencies with OPAM
 ------------------------------------
 
-Install the libraries which Tezos depends on:
+Install the OCaml compiler and the libraries which Tezos depends on:
 
 ::
 
@@ -106,17 +80,6 @@ and might be developed in the future.
 Note that, when executing ``make build-deps``, OPAM will detect if
 required system dependencies are installed. However, it is not able to
 detect which versions you actually have.
-
-If after a ``git pull``, the build fails (either at ``make
-build-deps`` or ``make``), you might try to clean up a little bit the
-opam internal state with the following commands:
-
-::
-
-    opam update
-    opam pin list -s | xargs opam pin remove
-    make build-deps
-    make
 
 
 Join the Alphanet!

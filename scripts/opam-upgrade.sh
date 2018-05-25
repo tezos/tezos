@@ -26,7 +26,7 @@ silent () {
 echo "Updating package description..."
 silent . ./scripts/opam-pin.sh
 
-upgradables=$(opam list --short --installed $packages)
+upgradables=$(opam list --short --installed --pinned $packages)
 
 if [ -z "$upgradables" ]; then
     echo "No previously installed package. Nothing to do."
