@@ -1403,8 +1403,9 @@ and parse_returning
     | (Typed ({ loc ; aft = (Item_t (ty, Empty_t, _) as stack_ty) ; _ } as descr), gas) ->
         trace
           (Bad_return (loc, stack_ty, ret))
-          (Lwt.return (ty_eq ty ret)) >>=? fun Eq ->
-        return ((Lam (descr, strip_locations script_instr) : (arg, ret) lambda), gas)
+          (Lwt.return (ty_eq ty ret) >>=? fun Eq ->
+           Lwt.return (merge_types loc ty ret) >>=? fun _ret ->
+           return ((Lam (descr, strip_locations script_instr) : (arg, ret) lambda), gas))
     | (Typed { loc ; aft = stack_ty ; _ }, _gas) ->
         fail (Bad_return (loc, stack_ty, ret))
     | (Failed { descr }, gas) ->
@@ -1596,11 +1597,12 @@ and parse_instr
           body (Item_t (elt, starting_rest, elt_annot)) >>=? begin fun (judgement, ctxt) ->
           match judgement with
           | Typed ({ aft = Item_t (ret, rest, _) ; _ } as ibody) ->
-              trace
-                (Invalid_map_body (loc, ibody.aft))
-                (Lwt.return (stack_ty_eq 1 rest starting_rest)) >>=? fun Eq ->
-              typed ctxt loc (List_map ibody)
-                (Item_t (List_t (ret, list_ty_name), rest, ret_annot))
+              let invalid_map_body = Invalid_map_body (loc, ibody.aft) in
+              trace invalid_map_body
+                (Lwt.return (stack_ty_eq 1 rest starting_rest) >>=? fun Eq ->
+                 Lwt.return (merge_stacks loc rest starting_rest) >>=? fun rest ->
+                 typed ctxt loc (List_map ibody)
+                   (Item_t (List_t (ret, list_ty_name), rest, ret_annot)))
           | Typed { aft ; _ } -> fail (Invalid_map_body (loc, aft))
           | Failed _ -> fail (Invalid_map_block_fail loc)
         end
@@ -1615,10 +1617,11 @@ and parse_instr
           body (Item_t (elt, rest, elt_annot)) >>=? begin fun (judgement, ctxt) ->
           match judgement with
           | Typed ({ aft ; _ } as ibody) ->
-              trace
-                (Invalid_iter_body (loc, rest, ibody.aft))
-                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun Eq ->
-              typed ctxt loc (List_iter ibody) rest
+              let invalid_iter_body = Invalid_iter_body (loc, rest, ibody.aft) in
+              trace invalid_iter_body
+                (Lwt.return (stack_ty_eq 1 aft rest) >>=? fun Eq ->
+                 Lwt.return (merge_stacks loc aft rest) >>=? fun rest ->
+                 typed ctxt loc (List_iter ibody) rest)
           | Failed { descr } ->
               typed ctxt loc (List_iter (descr rest)) rest
         end
@@ -1640,10 +1643,11 @@ and parse_instr
           body (Item_t (elt, rest, elt_annot)) >>=? begin fun (judgement, ctxt) ->
           match judgement with
           | Typed ({ aft ; _ } as ibody) ->
-              trace
-                (Invalid_iter_body (loc, rest, ibody.aft))
-                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun Eq ->
-              typed ctxt loc (Set_iter ibody) rest
+              let invalid_iter_body = Invalid_iter_body (loc, rest, ibody.aft) in
+              trace invalid_iter_body
+                (Lwt.return (stack_ty_eq 1 aft rest) >>=? fun Eq ->
+                 Lwt.return (merge_stacks loc aft rest) >>=? fun rest ->
+                 typed ctxt loc (Set_iter ibody) rest)
           | Failed { descr } ->
               typed ctxt loc (Set_iter (descr rest)) rest
         end
@@ -1681,11 +1685,12 @@ and parse_instr
           body (Item_t (Pair_t ((k, key_field), (elt, elt_field), None), starting_rest, None)) >>=? begin fun (judgement, ctxt) ->
           match judgement with
           | Typed ({ aft = Item_t (ret, rest, _) ; _ } as ibody) ->
-              trace
-                (Invalid_map_body (loc, ibody.aft))
-                (Lwt.return (stack_ty_eq 1 rest starting_rest)) >>=? fun Eq ->
-              typed ctxt loc (Map_map ibody)
-                (Item_t (Map_t (ck, ret, ty_name), rest, ret_annot))
+              let invalid_map_body = Invalid_map_body (loc, ibody.aft) in
+              trace invalid_map_body
+                (Lwt.return (stack_ty_eq 1 rest starting_rest) >>=? fun Eq ->
+                 Lwt.return (merge_stacks loc rest starting_rest) >>=? fun rest ->
+                 typed ctxt loc (Map_map ibody)
+                   (Item_t (Map_t (ck, ret, ty_name), rest, ret_annot)))
           | Typed { aft ; _ } -> fail (Invalid_map_body (loc, aft))
           | Failed _ -> fail (Invalid_map_block_fail loc)
         end
@@ -1700,10 +1705,11 @@ and parse_instr
           (Item_t (Pair_t ((key, key_field), (element_ty, elt_field), None), rest, None))
         >>=? begin fun (judgement, ctxt) -> match judgement with
           | Typed ({ aft ; _ } as ibody) ->
-              trace
-                (Invalid_iter_body (loc, rest, ibody.aft))
-                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun Eq ->
-              typed ctxt loc (Map_iter ibody) rest
+              let invalid_iter_body = Invalid_iter_body (loc, rest, ibody.aft) in
+              trace invalid_iter_body
+                (Lwt.return (stack_ty_eq 1 aft rest) >>=? fun Eq ->
+                 Lwt.return (merge_stacks loc aft rest) >>=? fun rest ->
+                 typed ctxt loc (Map_iter ibody) rest)
           | Failed { descr } ->
               typed ctxt loc (Map_iter (descr rest)) rest
         end
@@ -1810,10 +1816,11 @@ and parse_instr
           rest >>=? begin fun (judgement, ctxt) ->
           match judgement with
           | Typed ibody ->
-              trace
-                (Unmatched_branches (loc, ibody.aft, stack))
-                (Lwt.return (stack_ty_eq 1 ibody.aft stack)) >>=? fun Eq ->
-              typed ctxt loc (Loop ibody) rest
+              let unmatched_branches = Unmatched_branches (loc, ibody.aft, stack) in
+              trace unmatched_branches
+                (Lwt.return (stack_ty_eq 1 ibody.aft stack) >>=? fun Eq ->
+                 Lwt.return (merge_stacks loc ibody.aft stack) >>=? fun _stack ->
+                 typed ctxt loc (Loop ibody) rest)
           | Failed { descr } ->
               let ibody = descr stack in
               typed ctxt loc (Loop ibody) rest
@@ -1828,10 +1835,11 @@ and parse_instr
         parse_instr ?type_logger tc_context ctxt body
           (Item_t (tl, rest, l_annot)) >>=? begin fun (judgement, ctxt) -> match judgement with
           | Typed ibody ->
-              trace
-                (Unmatched_branches (loc, ibody.aft, stack))
-                (Lwt.return (stack_ty_eq 1 ibody.aft stack)) >>=? fun Eq ->
-              typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, r_annot))
+              let unmatched_branches = Unmatched_branches (loc, ibody.aft, stack) in
+              trace unmatched_branches
+                (Lwt.return (stack_ty_eq 1 ibody.aft stack) >>=? fun Eq ->
+                 Lwt.return (merge_stacks loc ibody.aft stack) >>=? fun _stack ->
+                 typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, r_annot)))
           | Failed { descr } ->
               let ibody = descr stack in
               typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, r_annot))
@@ -2292,8 +2300,11 @@ and parse_instr
         fun (Lam ({ bef = Item_t (arg, Empty_t, _) ;
                     aft = Item_t (ret, Empty_t, _) ; _ }, _) as lambda, ctxt) ->
         Lwt.return @@ ty_eq arg arg_type_full >>=? fun Eq ->
+        Lwt.return @@ merge_types loc arg arg_type_full >>=? fun _ ->
         Lwt.return @@ ty_eq ret ret_type_full >>=? fun Eq ->
+        Lwt.return @@ merge_types loc ret ret_type_full >>=? fun _ ->
         Lwt.return @@ ty_eq storage_type ginit >>=? fun Eq ->
+        Lwt.return @@ merge_types loc storage_type ginit >>=? fun _ ->
         typed ctxt loc (Create_contract (storage_type, arg_type, lambda))
           (Item_t (Operation_t None, Item_t (Address_t None, rest, addr_annot), op_annot))
     | Prim (loc, I_NOW, [], annot),
@@ -2449,7 +2460,7 @@ and parse_contract
         Contract.get_script ctxt contract >>=? fun (ctxt, script) -> match script with
         | None ->
             Lwt.return
-              (ty_eq arg (Unit_t None)>>? fun Eq ->
+              (ty_eq arg (Unit_t None) >>? fun Eq ->
                let contract : arg typed_contract = (arg, contract) in
                ok (ctxt, contract))
         | Some { code ; _ } ->
@@ -2458,6 +2469,7 @@ and parse_contract
                parse_toplevel code >>? fun (arg_type, _, _) ->
                parse_ty ~allow_big_map:false ~allow_operation:false arg_type >>? fun (Ex_ty targ) ->
                ty_eq targ arg >>? fun Eq ->
+               merge_types loc targ arg >>? fun arg ->
                let contract : arg typed_contract = (arg, contract) in
                ok (ctxt, contract))
 

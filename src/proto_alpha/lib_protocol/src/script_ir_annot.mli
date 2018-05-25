@@ -67,7 +67,8 @@ val gen_binding_access_annot :
   binding_annot option -> binding_annot option
 
 (** Merge type annotations.
-    @returns {!Inconsistent_type_annotations} if they are both present and different *)
+    @returns an error {!Inconsistent_type_annotations} if they are both present
+    and different *)
 val merge_type_annot :
   type_annot option -> type_annot option -> type_annot option tzresult
 
