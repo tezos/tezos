@@ -35,7 +35,7 @@ First, you need to download the script:
 
 ::
 
-    wget https://raw.githubusercontent.com/tezos/tezos/alphanet/scripts/alphanet.sh
+    wget https://gitlab.com/tezos/tezos/blob/alphanet/scripts/alphanet.sh
     chmod +x alphanet.sh
 
 You are now one step away from a working node:
@@ -47,17 +47,6 @@ You are now one step away from a working node:
 This will launch a docker container running the various daemons that
 form a working tezos node. The first launch might take a few minutes to
 synchronize the chain.
-
-On first launch the script will also create a cryptographic identity
-(nicknamed ``my_identity``) and provide you with free tezzies on a fresh
-account (nicknamed ``my_account``). You might check your balance with:
-
-::
-
-    ./alphanet.sh client get balance for my_account
-
-On some circumstances the account creation might fail. If so, see
-section “Known issues” below on how to force the account creation.
 
 See ``./alphanet.sh --help`` for more informations about the script. In
 particular see ``./alphanet.sh client --help`` and
@@ -95,12 +84,13 @@ allows you to see if your own node is synchronized.
 The Tezos client also offers a lot of commands to introspect the state
 of the node, and also to list and call the RPCs of the nodes.
 
-Enthusiastic Tezos adopter fredcy has also developed a nice block
-explorer for the alphanet. See https://github.com/fredcy/tezos-client.
+Enthusiastic Tezos adopters have also developed some block
+explorer for the alphanet. See for instance:
 
-In an upcoming version, we will also provide an opt-in tool for node
-runners that will allow us to provide a global monitoring panel of the
-alphanet.
+   - https://ostez.com
+   - https://tzscan.io
+   - https://tezos.id
+   - https://tezoschain.io
 
 .. _faucet:
 
@@ -118,7 +108,7 @@ of the file you grab:
 
 ::
 
-    $ tezos-client activate account my_account with tz1__xxxxxxxxx__.json
+    $ tezos-client activate account "my_account" with "tz1__xxxxxxxxx__.json"
     Operation successfully injected in the node.
     Operation hash is 'ooGoVS5cikbTHEimTzYhQWrYqY2LeJYmfkbzoiW8KQ59jtGQaXr'.
     Waiting for the operation to be included...
@@ -130,10 +120,17 @@ with ``container:`` in order to copy it into the docker image:
 
 ::
 
-    $ ./alphanet.sh client activate account my_account with container:tz1__xxxxxxxxx__.json
+    $ ./alphanet.sh client activate account "my_account" with "container:tz1__xxxxxxxxx__.json"
 
-Please preserve the JSON file, after each reset of the Alphanet (or
-Zeronet), you will have to reactivate the wallet.
+You might check your balance with:
+
+::
+
+    ./alphanet.sh client get balance for "my_account"
+
+Please preserve the JSON file, after each reset of the Alphanet, you
+will have to reactivate the wallet. The same file might be use ta activate
+an account on the Zeronet.
 
 Please drink carefully and don't abuse the faucet: it only contains
 30.000 wallets for a total amount of ꜩ760.000.000.
@@ -163,7 +160,7 @@ In order to understand how baking works, please refer to :ref:`this
 section <proof-of-stake>`. The following is a **TL;DR** to help you
 get started.
 
-In Tezos there are two kinds of accounts: *implicit* and *originated*
+In Tezos there are two kinds of contracts: *implicit* and *originated*
 accounts. Originated accounts can have michelson code, in which case
 they are also called *contracts*.
 
@@ -183,7 +180,7 @@ use:
 
 ::
 
-   ./alphanet.sh client register key <mgr> as delegate
+   ./alphanet.sh client register key "my_account" as delegate
 
 Once registered, an *implicit account* can participate in baking for
 its own balance plus the balance of *originated accounts* and
@@ -254,9 +251,9 @@ the delegate to ``<implicit>``, use the following command:
     ./alphanet.sh client set delegate for <account> to <implicit>
 
 
-You need to wait at most two cycles which, on the alphanet is 128
-blocks (something about 2 hours). On the mainnet, this will be between
-2 weeks and a month.
+You need to wait at most seven cycles which, on the Alphanet, is 7*128
+blocks (something about 15 hours). On the mainnet, this will be around
+3 weeks.
 
 From now on, the funds in ``<new>`` will be delegated to
 ``<implicit>``. In the next section, we will learn how to bake with
