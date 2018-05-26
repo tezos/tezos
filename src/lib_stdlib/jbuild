@@ -15,7 +15,7 @@
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files *.ml*)))
+  (deps ((glob_files *.ml{,i})))
   (action (run bash ${path:test-ocp-indent.sh} ${^}))))
 
 (install
