@@ -21,7 +21,7 @@ let bake cctxt ?(timestamp = Time.now ()) block command sk =
   let blk =
     Data_encoding.Binary.to_bytes_exn Block_header.encoding
       { shell = shell_header ; protocol_data } in
-  Client_keys.append cctxt sk blk >>=? fun signed_blk ->
+  Client_keys.append sk blk >>=? fun signed_blk ->
   Shell_services.inject_block cctxt signed_blk []
 
 let int64_parameter =

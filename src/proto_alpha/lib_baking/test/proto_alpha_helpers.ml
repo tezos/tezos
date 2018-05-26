@@ -114,9 +114,10 @@ let vote_protocol_parameters =
 
 let activate_alpha ?(vote = false) () =
   let fitness = Fitness_repr.from_int64 0L in
-  let dictator_sk = Client_keys.Secret_key_locator.create
-      ~scheme:"unencrypted"
-      ~location:["edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"] in
+  let dictator_sk =
+    Tezos_signer_backends.Unencrypted.make_sk
+      (Signature.Secret_key.of_b58check_exn
+         "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6") in
   let protocol_parameters =
     if vote then vote_protocol_parameters else protocol_parameters in
   Tezos_client_genesis.Client_proto_main.bake
@@ -248,9 +249,8 @@ module Account = struct
       ~(account:t)
       ~destination
       ~amount () =
-    let src_sk = Client_keys.Secret_key_locator.create
-        ~scheme:"unencrypted"
-        ~location:[Signature.Secret_key.to_b58check account.sk] in
+    let src_sk =
+      Tezos_signer_backends.Unencrypted.make_sk account.sk in
     Client_proto_context.transfer
       (new wrap_full (no_write_context !rpc_config ~block))
       block
@@ -272,9 +272,8 @@ module Account = struct
     let delegatable, delegate = match delegate with
       | None -> false, None
       | Some delegate -> true, Some delegate in
-    let src_sk = Client_keys.Secret_key_locator.create
-        ~scheme:"unencrypted"
-        ~location:[Signature.Secret_key.to_b58check src.sk] in
+    let src_sk =
+      Tezos_signer_backends.Unencrypted.make_sk src.sk in
     Client_proto_context.originate_account
       ~source:src.contract
       ~src_pk:src.pk
@@ -506,9 +505,8 @@ module Baking = struct
         Some (Nonce.hash seed_nonce)
       else
         None in
-    let src_sk = Client_keys.Secret_key_locator.create
-        ~scheme:"unencrypted"
-        ~location:[Signature.Secret_key.to_b58check contract.sk] in
+    let src_sk =
+      Tezos_signer_backends.Unencrypted.make_sk contract.sk in
     Client_baking_forge.forge_block
       ctxt
       block

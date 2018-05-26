@@ -9,6 +9,7 @@
               tezos-shell-services
               tezos-client-base
               tezos-rpc
+              tezos-signer-backends
               bip39))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8

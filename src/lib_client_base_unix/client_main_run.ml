@@ -77,9 +77,15 @@ let main select_commands =
   Client_keys.register_signer
     (module Tezos_signer_backends.Unencrypted) ;
   Client_keys.register_signer
-    (module Tezos_signer_backends.Encrypted) ;
+    (module Tezos_signer_backends.Encrypted.Make(struct
+         let cctxt = new Client_context_unix.unix_prompter
+       end)) ;
   Client_keys.register_signer
-    (module Tezos_signer_backends.Remote) ;
+    (module Tezos_signer_backends.Https) ;
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Socket.Unix) ;
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Socket.Tcp) ;
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
         (new unix_full

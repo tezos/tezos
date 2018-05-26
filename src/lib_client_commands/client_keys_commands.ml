@@ -22,7 +22,64 @@ let sig_algo_arg =
     ~default: "ed25519"
     (Signature.algo_param ())
 
-let commands () =
+let gen_keys_containing
+    ?(prefix=false) ?(force=false)
+    ~containing ~name (cctxt : #Client_context.io_wallet) =
+  let unrepresentable =
+    List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
+  match unrepresentable with
+  | _ :: _ ->
+      cctxt#warning
+        "The following can't be written in the key alphabet (%a): %a"
+        Base58.Alphabet.pp Base58.Alphabet.bitcoin
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+           (fun ppf s -> Format.fprintf ppf "'%s'" s))
+        unrepresentable >>= return
+  | [] ->
+      Public_key_hash.mem cctxt name >>=? fun name_exists ->
+      if name_exists && not force
+      then
+        cctxt#warning
+          "Key for name '%s' already exists. Use -force to update." name >>= return
+      else
+        begin
+          cctxt#warning "This process uses a brute force search and \
+                         may take a long time to find a key." >>= fun () ->
+          let matches =
+            if prefix then
+              let containing_tz1 = List.map ((^) "tz1") containing in
+              (fun key -> List.exists
+                  (fun containing ->
+                     String.sub key 0 (String.length containing) = containing)
+                  containing_tz1)
+            else
+              let re = Re.Str.regexp (String.concat "\\|" containing) in
+              (fun key -> try ignore (Re.Str.search_forward re key 0); true
+                with Not_found -> false) in
+          let rec loop attempts =
+            let public_key_hash, public_key, secret_key =
+              Signature.generate_key () in
+            let hash = Signature.Public_key_hash.to_b58check @@
+              Signature.Public_key.hash public_key in
+            if matches hash
+            then
+              let pk_uri = Tezos_signer_backends.Unencrypted.make_pk public_key in
+              let sk_uri = Tezos_signer_backends.Unencrypted.make_sk secret_key in
+              register_key cctxt ~force
+                (public_key_hash, pk_uri, sk_uri) name >>=? fun () ->
+              return hash
+            else begin if attempts mod 25_000 = 0
+              then cctxt#message "Tried %d keys without finding a match" attempts
+              else Lwt.return () end >>= fun () ->
+              loop (attempts + 1) in
+          loop 1 >>=? fun key_hash ->
+          cctxt#message
+            "Generated '%s' under the name '%s'." key_hash name >>= fun () ->
+          return ()
+        end
+
+let commands () : Client_context.io_wallet Clic.command list =
   let open Clic in
   let show_private_switch =
     switch
@@ -61,7 +118,10 @@ let commands () =
        @@ stop)
       (fun (force, algo) name (cctxt : #Client_context.io_wallet) ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
-         gen_keys ~force ~algo cctxt name) ;
+         let (pkh, pk, sk) = Signature.generate_key ~algo () in
+         let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
+         let sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
+         register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
 
     command ~group ~desc: "Generate (unencrypted) keys including the given string."
       (args2
@@ -82,69 +142,53 @@ let commands () =
     command ~group ~desc: "Add a secret key to the wallet."
       (args1 (Secret_key.force_switch ()))
       (prefix "import"
-       @@ string
-         ~name:"scheme"
-         ~desc:"signer to use for this secret key\n\
-                Use command `list signing schemes` for a list of \
-                supported signers."
        @@ prefixes [ "secret" ; "key" ]
        @@ Secret_key.fresh_alias_param
-       @@ seq_of_param
-         (string
-            ~name:"spec"
-            ~desc:"secret key specification\n\
-                   Varies from one scheme to the other.\n\
-                   Use command `list signing schemes` for more \
-                   information."))
-      (fun force scheme name spec cctxt ->
+       @@ param
+         ~name:"uri"
+         ~desc:"secret key\n\
+                Varies from one scheme to the other.\n\
+                Use command `list signing schemes` for more \
+                information."
+         (parameter (fun _ s ->
+              try return (Client_keys.make_sk_uri @@ Uri.of_string s)
+              with Failure s -> failwith "Error while parsing uri: %s" s))
+       @@ stop)
+      (fun force name sk_uri (cctxt : Client_context.io_wallet) ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
-         find_signer_for_key ~scheme cctxt >>=? fun signer ->
-         let module Signer = (val signer : SIGNER) in
-         Signer.sk_locator_of_human_input
-           (cctxt :> Client_context.io_wallet) spec >>=? fun skloc ->
-         Signer.sk_of_locator skloc >>=? fun sk ->
-         Signer.neuterize sk >>= fun pk ->
-         Signer.pk_to_locator pk >>= fun pkloc ->
-         Public_key.find_opt cctxt name >>=? function
-         | None ->
-             Signer.public_key_hash pk >>=? fun pkh ->
-             Secret_key.add ~force cctxt name skloc >>=? fun () ->
-             Public_key_hash.add ~force cctxt name pkh >>=? fun () ->
-             Public_key.add ~force cctxt name pkloc
-         | Some pk ->
-             fail_unless (pkloc = pk || force)
-               (failure
-                  "public and secret keys '%s' don't correspond, \
-                   please don't use -force" name) >>=? fun () ->
-             Secret_key.add ~force cctxt name skloc) ;
+         Client_keys.neuterize sk_uri >>=? fun pk_uri ->
+         begin
+           Public_key.find_opt cctxt name >>=? function
+           | None -> return ()
+           | Some pk ->
+               fail_unless (pk_uri = pk || force)
+                 (failure
+                    "public and secret keys '%s' don't correspond, \
+                     please don't use -force" name)
+         end >>=? fun () ->
+         Client_keys.public_key_hash pk_uri >>=? fun pkh ->
+         register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
 
     command ~group ~desc: "Add a public key to the wallet."
       (args1 (Public_key.force_switch ()))
       (prefix "import"
-       @@ string
-         ~name:"scheme"
-         ~desc:"signer to use for this public key\n\
-                Use command `list signing schemes` for a list of \
-                supported signers."
        @@ prefixes [ "public" ; "key" ]
        @@ Public_key.fresh_alias_param
-       @@ seq_of_param
-         (string
-            ~name:"spec"
-            ~desc:"public key specification\n\
-                   Varies from one scheme to the other.\n\
-                   Use command `list signing schemes` for more \
-                   information."))
-      (fun force scheme name location cctxt ->
+       @@ param
+         ~name:"uri"
+         ~desc:"public key\n\
+                Varies from one scheme to the other.\n\
+                Use command `list signing schemes` for more \
+                information."
+         (parameter (fun _ s ->
+              try return (Client_keys.make_pk_uri @@ Uri.of_string s)
+              with Failure s -> failwith "Error while parsing uri: %s" s))
+       @@ stop)
+      (fun force name pk_uri (cctxt : Client_context.io_wallet) ->
          Public_key.of_fresh cctxt force name >>=? fun name ->
-         find_signer_for_key ~scheme cctxt >>=? fun signer ->
-         let module Signer = (val signer : SIGNER) in
-         Signer.pk_locator_of_human_input
-           (cctxt :> Client_context.io_wallet) location >>=? fun pkloc ->
-         Signer.pk_of_locator pkloc >>=? fun pk ->
-         Signer.public_key_hash pk >>=? fun pkh ->
+         Client_keys.public_key_hash pk_uri >>=? fun pkh ->
          Public_key_hash.add ~force cctxt name pkh >>=? fun () ->
-         Public_key.add ~force cctxt name pkloc) ;
+         Public_key.add ~force cctxt name pk_uri) ;
 
     command ~group ~desc: "Add an identity to the wallet."
       (args1 (Public_key.force_switch ()))
@@ -166,10 +210,13 @@ let commands () =
            begin match pk, sk with
              | None, None ->
                  cctxt#message "%s: %s" name v
-             | _, Some Sk_locator { scheme } ->
+             | _, Some uri ->
+                 let scheme =
+                   Option.unopt ~default:"unencrypted" @@
+                   Uri.scheme (uri : sk_uri :> Uri.t) in
                  cctxt#message "%s: %s (%s sk known)" name v scheme
-             | Some Pk_locator { scheme }, _ ->
-                 cctxt#message "%s: %s (%s pk known)" name v scheme
+             | Some _, _ ->
+                 cctxt#message "%s: %s (pk known)" name v
            end >>= fun () -> return ()
          end l) ;
 
@@ -179,36 +226,35 @@ let commands () =
        @@ Public_key_hash.alias_param
        @@ stop)
       (fun show_private (name, _) (cctxt : #Client_context.io_wallet) ->
-         let ok_lwt x = x >>= (fun x -> return x) in
          alias_keys cctxt name >>=? fun key_info ->
          match key_info with
-         | None -> ok_lwt @@ cctxt#message "No keys found for identity"
+         | None ->
+             cctxt#message "No keys found for identity" >>= fun () ->
+             return ()
          | Some (pkh, pk, skloc) ->
-             ok_lwt @@ cctxt#message "Hash: %a"
-               Signature.Public_key_hash.pp pkh >>=? fun () ->
+             cctxt#message "Hash: %a"
+               Signature.Public_key_hash.pp pkh >>= fun () ->
              match pk with
              | None -> return ()
-             | Some (Pk_locator { scheme } as pkloc) ->
-                 find_signer_for_key ~scheme cctxt >>=? fun signer ->
-                 let module Signer = (val signer : SIGNER) in
-                 Signer.pk_of_locator pkloc >>=? fun pk ->
-                 Signer.public_key pk >>=? fun pk ->
-                 ok_lwt @@ cctxt#message "Public Key: %a"
-                   Signature.Public_key.pp pk >>=? fun () ->
+             | Some pk ->
+                 cctxt#message "Public Key: %a"
+                   Signature.Public_key.pp pk >>= fun () ->
                  if show_private then
                    match skloc with
                    | None -> return ()
                    | Some skloc ->
                        Secret_key.to_source skloc >>=? fun skloc ->
-                       ok_lwt @@ cctxt#message "Secret Key: %s" skloc
-                 else return ()) ;
+                       cctxt#message "Secret Key: %s" skloc >>= fun () ->
+                       return ()
+                 else
+                   return ()) ;
 
     command ~group ~desc: "Forget the entire wallet of keys."
       (args1 (Clic.switch
                 ~long:"force" ~short:'f'
                 ~doc:"you got to use the force for that" ()))
       (fixed [ "forget" ; "all" ; "keys" ])
-      (fun force cctxt ->
+      (fun force (cctxt : Client_context.io_wallet) ->
          fail_unless force
            (failure "this can only used with option -force") >>=? fun () ->
          Public_key.set cctxt [] >>=? fun () ->

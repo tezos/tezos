@@ -84,7 +84,7 @@ module Account : sig
     ?block:Block_services.block ->
     ?fee: Tez.t ->
     contract:Contract.t ->
-    manager_sk:Client_keys.Secret_key_locator.t ->
+    manager_sk:Client_keys.sk_uri ->
     src_pk:public_key ->
     public_key_hash option ->
     Operation_hash.t tzresult Lwt.t

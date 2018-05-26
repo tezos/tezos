@@ -16,7 +16,7 @@ let sign (cctxt : #Client_context.wallet) pkh data =
     (MBytes.get_uint8 data 0) >>= fun () ->
   Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
   log "Signing data for key %s" name >>= fun () ->
-  Client_keys.sign cctxt sk_uri data >>=? fun signature ->
+  Client_keys.sign sk_uri data >>=? fun signature ->
   return signature
 
 let public_key (cctxt : #Client_context.wallet) pkh =

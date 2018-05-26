@@ -119,7 +119,7 @@ let trace
 
 let hash_and_sign (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser.parsed) sk block cctxt =
   Alpha_services.Helpers.hash_data cctxt block (data.expanded, typ.expanded) >>=? fun hash ->
-  Client_keys.sign cctxt sk (MBytes.of_string hash) >>=? fun signature ->
+  Client_keys.sign sk (MBytes.of_string hash) >>=? fun signature ->
   let `Hex signature = Signature.to_hex signature in
   return (hash, signature)
 

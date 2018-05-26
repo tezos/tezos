@@ -22,11 +22,7 @@ let description =
    The format for importing public keys is the raw Base58-encoded \
    key (starting with 'edpk')."
 
-type secret_key = Signature.Secret_key.t
-type public_key = Signature.Public_key.t
-
-let init _wallet = return ()
-
+(*
 let sk_locator_of_human_input _cctxt = function
   | sk :: _ ->
       return (Secret_key_locator.create ~scheme ~location:[sk])
@@ -39,30 +35,31 @@ let pk_locator_of_human_input _cctxt = function
   | [] -> failwith "Missing public key argument"
   | pk :: _ -> return (Public_key_locator.create ~scheme ~location:[pk])
 
-let sk_of_locator = function
-  |(Sk_locator { location = ( location :: _ ) }) ->
-      Lwt.return (Signature.Secret_key.of_b58check location)
-  |(Sk_locator { location = _ }) ->
-      failwith "Wrong type of location"
-
-
-let pk_of_locator = function
-  |(Pk_locator { location = ( location :: _ ) }) ->
-      Lwt.return (Signature.Public_key.of_b58check location)
-  |(Pk_locator { location = _ }) ->
-      failwith "Wrong type of location"
-
-let sk_to_locator sk =
-  Secret_key_locator.create
-    ~scheme ~location:[Signature.Secret_key.to_b58check sk] |>
+*)
+let secret_key sk_uri =
   Lwt.return
+    (Signature.Secret_key.of_b58check (Uri.path (sk_uri : sk_uri :> Uri.t)))
 
-let pk_to_locator pk =
-  Public_key_locator.create
-    ~scheme ~location:[Signature.Public_key.to_b58check pk] |>
+let make_sk sk =
+  Client_keys.make_sk_uri
+    (Uri.make ~scheme ~path:(Signature.Secret_key.to_b58check sk) ())
+
+let public_key pk_uri =
   Lwt.return
+    (Signature.Public_key.of_b58check (Uri.path (pk_uri : pk_uri :> Uri.t)))
 
-let neuterize x = Lwt.return (Signature.Secret_key.to_public_key x)
-let public_key x = return x
-let public_key_hash x = return (Signature.Public_key.hash x)
-let sign ?watermark t buf = return (Signature.sign ?watermark t buf)
+let make_pk pk =
+  Client_keys.make_pk_uri
+    (Uri.make ~scheme ~path:(Signature.Public_key.to_b58check pk) ())
+
+let neuterize sk_uri =
+  secret_key sk_uri >>=? fun sk ->
+  return (make_pk (Signature.Secret_key.to_public_key sk))
+
+let public_key_hash pk_uri =
+  public_key pk_uri >>=? fun pk ->
+  return (Signature.Public_key.hash pk)
+
+let sign ?watermark sk_uri buf =
+  secret_key sk_uri >>=? fun sk ->
+  return (Signature.sign ?watermark sk buf)

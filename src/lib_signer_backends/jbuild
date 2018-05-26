@@ -14,8 +14,7 @@
                     -open Tezos_stdlib_unix
                     -open Tezos_client_base
                     -open Tezos_signer_services
-                    -open Tezos_rpc_http
-                    -w -9))))
+                    -open Tezos_rpc_http))))
 
 (alias
  ((name runtest_indent)

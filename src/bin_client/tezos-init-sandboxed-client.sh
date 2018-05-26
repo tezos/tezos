@@ -190,35 +190,35 @@ log_endorser() {
 
 BOOTSTRAP1_IDENTITY="tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
 BOOTSTRAP1_PUBLIC="edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
-BOOTSTRAP1_SECRET="edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
+BOOTSTRAP1_SECRET="unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
 
 BOOTSTRAP2_IDENTITY="tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"
 BOOTSTRAP2_PUBLIC="edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9"
-BOOTSTRAP2_SECRET="edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo"
+BOOTSTRAP2_SECRET="unencrypted:edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo"
 
 BOOTSTRAP3_IDENTITY="tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
 BOOTSTRAP3_PUBLIC="edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV"
-BOOTSTRAP3_SECRET="edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ"
+BOOTSTRAP3_SECRET="unencrypted:edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ"
 
 BOOTSTRAP4_IDENTITY="tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
 BOOTSTRAP4_PUBLIC="edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU"
-BOOTSTRAP4_SECRET="edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3"
+BOOTSTRAP4_SECRET="unencrypted:edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3"
 
 BOOTSTRAP5_IDENTITY="tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"
 BOOTSTRAP5_PUBLIC="edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
-BOOTSTRAP5_SECRET="edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm"
+BOOTSTRAP5_SECRET="unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm"
 
-DICTATOR_SECRET="edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
+DICTATOR_SECRET="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
 
 add_sandboxed_bootstrap_identities() {
 
-    ${client} import unencrypted secret key bootstrap1 ${BOOTSTRAP1_SECRET}
-    ${client} import unencrypted secret key bootstrap2 ${BOOTSTRAP2_SECRET}
-    ${client} import unencrypted secret key bootstrap3 ${BOOTSTRAP3_SECRET}
-    ${client} import unencrypted secret key bootstrap4 ${BOOTSTRAP4_SECRET}
-    ${client} import unencrypted secret key bootstrap5 ${BOOTSTRAP5_SECRET}
+    ${client} import secret key bootstrap1 ${BOOTSTRAP1_SECRET}
+    ${client} import secret key bootstrap2 ${BOOTSTRAP2_SECRET}
+    ${client} import secret key bootstrap3 ${BOOTSTRAP3_SECRET}
+    ${client} import secret key bootstrap4 ${BOOTSTRAP4_SECRET}
+    ${client} import secret key bootstrap5 ${BOOTSTRAP5_SECRET}
 
-    ${client} import unencrypted secret key dictator ${DICTATOR_SECRET}
+    ${client} import secret key dictator ${DICTATOR_SECRET}
 
 }
 

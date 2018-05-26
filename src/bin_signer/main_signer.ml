@@ -163,7 +163,9 @@ let main () =
         inherit Client_context_unix.unix_wallet ~base_dir
       end in
       Client_keys.register_signer
-        (module Tezos_signer_backends.Encrypted) ;
+        (module Tezos_signer_backends.Encrypted.Make(struct
+             let cctxt = new Client_context_unix.unix_prompter
+           end)) ;
       Client_keys.register_signer
         (module Tezos_signer_backends.Unencrypted) ;
       let commands =

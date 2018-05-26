@@ -55,7 +55,7 @@ let transfer cctxt
     ~destination ?parameters ~fee () >>=? fun bytes ->
   Block_services.predecessor cctxt block >>=? fun predecessor ->
   Client_keys.sign
-    cctxt src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
+    src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   let signed_bytes = Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Alpha_services.Helpers.apply_operation cctxt block
@@ -74,7 +74,7 @@ let reveal cctxt
     cctxt block
     ~branch ~source ~sourcePubKey:src_pk ~counter ~fee () >>=? fun bytes ->
   Client_keys.sign
-    cctxt src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
+    src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   let signed_bytes = Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Shell_services.inject_operation
@@ -123,7 +123,7 @@ let originate_account ?branch
     ~counter ~balance ~spendable:true
     ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
   Client_keys.sign
-    cctxt src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
+    src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   originate cctxt ~block ~chain_id ~signature bytes
 
 let delegate_contract cctxt
@@ -138,7 +138,7 @@ let delegate_contract cctxt
     ~branch ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
   >>=? fun bytes ->
   Client_keys.sign
-    cctxt manager_sk ~watermark:Generic_operation bytes >>=? fun signature ->
+    manager_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   let signed_bytes = Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Shell_services.inject_operation
@@ -241,7 +241,7 @@ let originate_contract
     ~delegatable ?delegatePubKey:delegate
     ~script:{ code ; storage } ~fee () >>=? fun bytes ->
   Client_keys.sign
-    cctxt src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
+    src_sk ~watermark:Generic_operation bytes >>=? fun signature ->
   originate cctxt ~block ~signature bytes
 
 let wait_for_operation_inclusion
@@ -345,15 +345,17 @@ let claim_commitment (cctxt : #Proto_alpha.full)
   Shell_services.inject_operation
     cctxt ~chain_id:bi.chain_id bytes >>=? fun oph ->
   operation_submitted_message cctxt oph >>=? fun () ->
+  let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
+  let sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
   begin
     match confirmations with
     | None ->
-        Client_keys.register_key cctxt ?force (pkh, pk, sk) name >>=? fun () ->
+        Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name >>=? fun () ->
         return ()
     | Some confirmations ->
         cctxt#message "Waiting for the operation to be included..." >>= fun () ->
         wait_for_operation_inclusion ~confirmations cctxt oph >>=? fun () ->
-        Client_keys.register_key cctxt ?force (pkh, pk, sk) name >>=? fun () ->
+        Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name >>=? fun () ->
         Alpha_services.Contract.balance
           cctxt (`Head 0) (Contract.implicit_contract pkh) >>=? fun balance ->
         cctxt#message "Account %s (%a) created with %s%a."

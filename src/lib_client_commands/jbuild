@@ -6,7 +6,8 @@
   (libraries (tezos-base
               tezos-client-base
               tezos-rpc
-              tezos-shell-services))
+              tezos-shell-services
+              tezos-signer-backends))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
