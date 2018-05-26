@@ -263,3 +263,121 @@ let with_tempdir name f =
   Lwt_unix.unlink base_dir >>= fun () ->
   Lwt_unix.mkdir base_dir 0o700 >>= fun () ->
   Lwt.finalize (fun () -> f base_dir) (fun () -> remove_dir base_dir)
+
+
+module Socket = struct
+
+  type addr =
+    | Unix of string
+    | Tcp of string * int
+
+  let get_addrs host =
+    try return (Array.to_list (Unix.gethostbyname host).h_addr_list)
+    with Not_found -> failwith "Host %s not found" host
+
+  let connect path =
+    match path with
+    | Unix path ->
+        let addr = Lwt_unix.ADDR_UNIX path in
+        let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
+        Lwt_unix.connect sock addr >>= fun () ->
+        return sock
+    | Tcp (host, port) ->
+        get_addrs host >>=? fun addrs ->
+        let rec try_connect = function
+          | [] -> failwith "..."
+          | addr :: addrs ->
+              Lwt.catch
+                (fun () ->
+                   let addr = Lwt_unix.ADDR_INET (addr, port) in
+                   let sock = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
+                   Lwt_unix.connect sock addr >>= fun () ->
+                   return sock)
+                (fun _ -> try_connect addrs) in
+        try_connect addrs
+
+  let bind ?(backlog = 10) path =
+    match path with
+    | Unix path ->
+        let addr = Lwt_unix.ADDR_UNIX path in
+        let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
+        Lwt_unix.bind sock addr >>= fun () ->
+        Lwt_unix.listen sock backlog ;
+        return sock
+    | Tcp (host, port) ->
+        get_addrs host >>=? fun addrs ->
+        let rec try_bind = function
+          | [] -> failwith "..."
+          | addr :: addrs ->
+              Lwt.catch
+                (fun () ->
+                   let addr = Lwt_unix.ADDR_INET (addr, port) in
+                   let sock = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
+                   Lwt_unix.setsockopt sock SO_REUSEADDR true ;
+                   Lwt_unix.bind sock addr >>= fun () ->
+                   Lwt_unix.listen sock backlog ;
+                   return sock)
+                (fun _ -> try_bind addrs) in
+        try_bind addrs
+
+  type error +=
+    | Encoding_error
+    | Decoding_error
+
+  let () =
+    register_error_kind `Permanent
+      ~id: "signer.encoding_error"
+      ~title: "Encoding_error"
+      ~description: "Error while encoding a request to the remote signer"
+      ~pp: (fun ppf () ->
+          Format.fprintf ppf "Could not encode a request to the remote signer")
+      Data_encoding.empty
+      (function Encoding_error -> Some () | _ -> None)
+      (fun () -> Encoding_error) ;
+    register_error_kind `Permanent
+      ~id: "signer.decoding_error"
+      ~title: "Decoding_error"
+      ~description: "Error while decoding a request to the remote signer"
+      ~pp: (fun ppf () ->
+          Format.fprintf ppf "Could not decode a request to the remote signer")
+      Data_encoding.empty
+      (function Decoding_error -> Some () | _ -> None)
+      (fun () -> Decoding_error)
+
+  let message_len_size = 2
+
+  let send fd encoding message =
+    let encoded_message_len = Data_encoding.Binary.length encoding message in
+    fail_unless
+      (encoded_message_len < 1 lsl (message_len_size * 8))
+      Encoding_error >>=? fun () ->
+    (* len is the length of int16 plus the length of the message we want to send *)
+    let len = message_len_size + encoded_message_len in
+    let buf = MBytes.create len in
+    match Data_encoding.Binary.write
+            encoding message buf message_len_size encoded_message_len with
+    | None ->
+        fail Encoding_error
+    | Some last ->
+        fail_unless (last = len) Encoding_error >>=? fun () ->
+        (* we set the beginning of the buf with the length of what is next *)
+        MBytes.set_int16 buf 0 encoded_message_len ;
+        write_mbytes fd buf >>= fun () ->
+        return ()
+
+  let recv fd encoding =
+    let header_buf = MBytes.create message_len_size in
+    read_mbytes ~len:message_len_size fd header_buf >>= fun () ->
+    let len = MBytes.get_uint16 header_buf 0 in
+    let buf = MBytes.create len in
+    read_mbytes ~len fd buf >>= fun () ->
+    match Data_encoding.Binary.read encoding buf 0 len with
+    | None ->
+        fail Decoding_error
+    | Some (read_len, message) ->
+        if read_len <> len then
+          fail Decoding_error
+        else
+          return message
+
+end

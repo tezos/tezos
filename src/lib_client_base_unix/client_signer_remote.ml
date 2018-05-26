@@ -11,26 +11,24 @@ open Client_keys
 open Client_signer_remote_messages
 
 type path =
-  | Socket of Client_signer_remote_socket.path
+  | Socket of Lwt_utils_unix.Socket.addr
   | Https of Client_signer_remote_services.path
 
 let socket_sign path key data =
-  let open Client_signer_remote_socket in
   let req = { Sign.Request.key = key ; data } in
-  Connection.connect path >>=? fun conn ->
-  send conn Request.encoding (Request.Sign req) >>=? fun () ->
+  Lwt_utils_unix.Socket.connect path >>=? fun conn ->
+  Lwt_utils_unix.Socket.send conn Request.encoding (Request.Sign req) >>=? fun () ->
   let encoding = result_encoding Sign.Response.encoding in
-  recv conn encoding >>=? function
+  Lwt_utils_unix.Socket.recv conn encoding >>=? function
   | Error err -> Lwt.return (Error err)
   | Ok res -> Lwt_unix.close conn >>= fun () -> return res.signature
 
 let socket_request_public_key path key =
-  let open Client_signer_remote_socket in
   let req = { Public_key.Request.key = key } in
-  Connection.connect path >>=? fun conn ->
-  send conn Request.encoding (Request.Public_key req) >>=? fun () ->
+  Lwt_utils_unix.Socket.connect path >>=? fun conn ->
+  Lwt_utils_unix.Socket.send conn Request.encoding (Request.Public_key req) >>=? fun () ->
   let encoding = result_encoding Public_key.Response.encoding in
-  recv conn encoding >>=? function
+  Lwt_utils_unix.Socket.recv conn encoding >>=? function
   | Error err -> Lwt.return (Error err)
   | Ok res -> Lwt_unix.close conn >>= fun () -> return res.public_key
 
@@ -84,11 +82,12 @@ module Remote_signer : SIGNER = struct
     | "unix" :: file :: key :: [] ->
         return (Socket (Unix file), key)
     | "tcp" :: host :: port :: key :: [] ->
-        return (Socket (Tcp (host, port)), key)
-    | "tcp" :: host :: key :: [] ->
-        return (Socket (Tcp (host, "$TEZOS_SIGNER_TCP_PORT")), key)
-    | "tcp" :: key :: [] ->
-        return (Socket (Tcp ("$TEZOS_SIGNER_TCP_HOST", "$TEZOS_SIGNER_TCP_PORT")), key)
+        return (Socket (Tcp (host, int_of_string port)), key)
+    (* Temporary FIXME *)
+    (* | "tcp" :: host :: key :: [] -> *)
+    (* return (Socket (Tcp (host, "$TEZOS_SIGNER_TCP_PORT")), key) *)
+    (* | "tcp" :: key :: [] -> *)
+    (* return (Socket (Tcp ("$TEZOS_SIGNER_TCP_HOST", "$TEZOS_SIGNER_TCP_PORT")), key) *)
     | "https" :: host :: port :: key :: [] ->
         return (Https (host, port), key)
     | "https" :: host :: key :: [] ->
@@ -103,7 +102,7 @@ module Remote_signer : SIGNER = struct
 
   let locator_of_path = function
     | Socket (Unix path), key -> [ "unix" ; path ; key ]
-    | Socket (Tcp (host, port)), key -> [ "tcp" ; host ; port ; key ]
+    | Socket (Tcp (host, port)), key -> [ "tcp" ; host ; string_of_int port ; key ]
     | Https (host, port), key -> [ "https" ; host ; port ; key ]
 
   let pk_locator_of_human_input _cctxt path =

@@ -9,15 +9,39 @@
 
 open Client_signer_remote_messages
 
+let default_tcp_host =
+  match Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST" with
+  | None -> "localhost"
+  | Some host -> host
+
+let default_tcp_port =
+  match Sys.getenv_opt "TEZOS_SIGNER_TCP_PORT" with
+  | None -> "7732"
+  | Some port -> port
+
+let default_unix_path =
+  match Sys.getenv_opt "TEZOS_SIGNER_UNIX_PATH" with
+  | None -> Filename.concat (Sys.getenv "HOME") (".tezos-signer.sock")
+  | Some path -> path
+
+let default_https_host =
+  match Sys.getenv_opt "TEZOS_SIGNER_HTTPS_HOST" with
+  | None -> "localhost"
+  | Some host -> host
+
+let default_https_port =
+  match Sys.getenv_opt "TEZOS_SIGNER_HTTPS_PORT" with
+  | None -> "443"
+  | Some port -> port
+
 let log = Logging.Client.Sign.lwt_log_notice
 
 let run_socket_daemon (cctxt : #Client_context.io_wallet) path =
-  let open Client_signer_remote_socket in
-  Connection.bind path >>=? fun (fd, display_path) ->
+  Lwt_utils_unix.Socket.bind path >>=? fun fd ->
   let rec loop () =
     Lwt_unix.accept fd >>= fun (fd, _) ->
     Lwt.async (fun () ->
-        recv fd Request.encoding >>=? function
+        Lwt_utils_unix.Socket.recv fd Request.encoding >>=? function
         | Sign req ->
             log "Request for signing %d bytes of data for key %s, magic byte = %02X"
               (MBytes.length req.data) req.key (MBytes.get_uint8 req.data 0) >>= fun () ->
@@ -26,9 +50,9 @@ let run_socket_daemon (cctxt : #Client_context.io_wallet) path =
               | Some (_, _, Some skloc) ->
                   log "Signing data for key %s" req.key >>= fun () ->
                   Client_keys.sign cctxt skloc req.data >>=? fun signature ->
-                  send fd encoding (ok { Sign.Response.signature = signature })
+                  Lwt_utils_unix.Socket.send fd encoding (ok { Sign.Response.signature = signature })
               | _ ->
-                  send fd encoding (error (Unkwnon_alias_key req.key)) >>=? fun _ ->
+                  Lwt_utils_unix.Socket.send fd encoding (error (Unkwnon_alias_key req.key)) >>=? fun _ ->
                   log "Cannot get alias for key %s" req.key >>= fun () ->
                   return ()
             end
@@ -38,7 +62,7 @@ let run_socket_daemon (cctxt : #Client_context.io_wallet) path =
             let encoding = result_encoding Public_key.Response.encoding in
             Client_keys.alias_keys cctxt req.key >>= begin function
               | Error err ->
-                  send fd encoding (Error err) >>=? fun _ ->
+                  Lwt_utils_unix.Socket.send fd encoding (Error err) >>=? fun _ ->
                   log "Cannot get alias for key %s" req.key >>= fun () ->
                   return ()
               | Ok value ->
@@ -48,17 +72,17 @@ let run_socket_daemon (cctxt : #Client_context.io_wallet) path =
                           Signature.Public_key_hash.pp public_key_hash req.key >>= fun () ->
                         Client_keys.get_key cctxt public_key_hash >>= begin function
                           | Error err ->
-                              send fd encoding (Error err) >>=? fun _ ->
+                              Lwt_utils_unix.Socket.send fd encoding (Error err) >>=? fun _ ->
                               log "Cannot get key %s" req.key >>= fun () ->
                               return ()
                           | Ok (_, public_key, _) ->
                               log "Send public key %a for key %s"
                                 Signature.Public_key.pp public_key req.key >>= fun () ->
-                              send fd encoding (ok { Public_key.Response.public_key = public_key }) >>=? fun _ ->
+                              Lwt_utils_unix.Socket.send fd encoding (ok { Public_key.Response.public_key = public_key }) >>=? fun _ ->
                               return ()
                         end
                     | None -> begin
-                        send fd encoding (error (Unkwnon_alias_key req.key)) >>=? fun _ ->
+                        Lwt_utils_unix.Socket.send fd encoding (error (Unkwnon_alias_key req.key)) >>=? fun _ ->
                         log "Cannot find key %s" req.key >>= fun () ->
                         return ()
                       end
@@ -69,20 +93,19 @@ let run_socket_daemon (cctxt : #Client_context.io_wallet) path =
   in
   Lwt_unix.listen fd 10 ;
   begin match path with
-    | Tcp _ ->
-        log "Accepting TCP requests on %s" display_path
+    | Tcp (host, port) ->
+        log "Accepting TCP requests on %s:%d" host port
     | Unix path ->
         Sys.set_signal Sys.sigint (Signal_handle (fun _ ->
             Format.printf "Removing the local socket file and quitting.@." ;
             Unix.unlink path ;
             exit 0)) ;
-        log "Accepting UNIX requests on %s" display_path
+        log "Accepting UNIX requests on %s" path
   end >>= fun () ->
   loop ()
 
 let run_https_daemon (cctxt : #Client_context.io_wallet) host port cert key =
   let open Client_signer_remote_services in
-  base (host, port) >>=? fun (host, port) ->
   log "Accepting HTTPS requests on port %d" port >>= fun () ->
   let mode : Conduit_lwt_unix.server =
     `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port) in
@@ -161,17 +184,18 @@ let select_commands _ _ =
                    ~short: 'a'
                    ~long: "address"
                    ~placeholder: "host|address"
-                   ~default: "$TEZOS_SIGNER_TCP_HOST"
+                   ~default: default_tcp_host
                    (parameter (fun _ s -> return s)))
                 (default_arg
                    ~doc: "listening TCP port"
                    ~short: 'p'
                    ~long: "port"
                    ~placeholder: "port number"
-                   ~default: "$TEZOS_SIGNER_TCP_PORT"
+                   ~default: default_tcp_port
                    (parameter (fun _ s -> return s))))
              (prefixes [ "launch" ; "socket" ; "signer" ] @@ stop)
              (fun (host, port) cctxt ->
+                let port = int_of_string port in
                 run_socket_daemon cctxt (Tcp (host, port))) ;
            command ~group
              ~desc: "Launch a signer daemon over a local Unix socket."
@@ -181,7 +205,7 @@ let select_commands _ _ =
                    ~short: 's'
                    ~long: "socket"
                    ~placeholder: "path"
-                   ~default: "TEZOS_SIGNER_UNIX_PATH"
+                   ~default: default_unix_path
                    (parameter (fun _ s -> return s))))
              (prefixes [ "launch" ; "local" ; "signer" ] @@ stop)
              (fun path cctxt ->
@@ -194,14 +218,14 @@ let select_commands _ _ =
                    ~short: 'a'
                    ~long: "address"
                    ~placeholder: "host|address"
-                   ~default: "$TEZOS_SIGNER_HTTPS_HOST"
+                   ~default: default_https_host
                    (parameter (fun _ s -> return s)))
                 (default_arg
                    ~doc: "listening HTTPS port"
                    ~short: 'p'
                    ~long: "port"
                    ~placeholder: "port number"
-                   ~default: "$TEZOS_SIGNER_HTTPS_PORT"
+                   ~default: default_https_port
                    (parameter (fun _ s -> return s))))
              (prefixes [ "launch" ; "https" ; "signer" ] @@
               param
@@ -213,6 +237,7 @@ let select_commands _ _ =
                 ~desc: "path to th TLS key"
                 (parameter (fun _ s -> return s)) @@ stop)
              (fun (host, port) cert key cctxt ->
+                let port = int_of_string port in
                 run_https_daemon cctxt host port cert key) ;
          ]])
 
