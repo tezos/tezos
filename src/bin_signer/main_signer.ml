@@ -62,6 +62,7 @@ let commands =
                   with Failure _ -> failwith "Invalid port %s" x))))
       (prefixes [ "launch" ; "socket" ; "signer" ] @@ stop)
       (fun (host, port) cctxt ->
+         Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
          Socket_daemon.run cctxt (Tcp (host, port))) ;
     command ~group
       ~desc: "Launch a signer daemon over a local Unix socket."
@@ -75,6 +76,7 @@ let commands =
             (parameter (fun _ s -> return s))))
       (prefixes [ "launch" ; "local" ; "signer" ] @@ stop)
       (fun path cctxt ->
+         Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
          Socket_daemon.run cctxt (Unix path)) ;
     command ~group
       ~desc: "Launch a signer daemon over HTTPS."
@@ -106,6 +108,7 @@ let commands =
          ~desc: "path to th TLS key"
          (parameter (fun _ s -> return s)) @@ stop)
       (fun (host, port) cert key cctxt ->
+         Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
          Https_daemon.run cctxt ~host ~port ~cert ~key) ;
   ]
 
