@@ -30,6 +30,7 @@ type ('a, 'ctx) arg =
   | Switch : { doc : string ;
                parameter : string * char option } ->
     (bool, 'ctx) arg
+  | Constant : 'a  -> ('a, 'ctx) arg
 
 type ('a, 'arg) args =
   | NoArgs : (unit, 'args) args
@@ -115,7 +116,8 @@ let print_options_detailed (type ctx) =
       | Switch { parameter ; doc } ->
           Format.fprintf ppf "@{<opt>%a@}: %a"
             print_parameter parameter
-            print_desc doc in
+            print_desc doc
+      | Constant _ -> () in
   let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
     fun ppf -> function
       | NoArgs -> ()
@@ -144,6 +146,7 @@ let print_options_brief (type ctx) =
       | Switch { parameter ; _ } ->
           Format.fprintf ppf "[@{<opt>%a@}]"
             print_parameter parameter
+      | Constant _ -> ()
   in let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
        fun ppf -> function
          | NoArgs -> ()
@@ -537,6 +540,8 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights=[]) command
     (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,") ()
     print_groups by_group
 
+let constant c = Constant c
+
 let arg ~doc ?short ~long ~placeholder kind =
   Arg { doc ;
         parameter = (long, short) ;
@@ -595,6 +600,7 @@ let parse_arg :
           | [ _ ] -> return true
           | _ :: _ -> fail (Multiple_occurences (long, command))
         end
+    | Constant c -> return c
 
 (* Argument parsing *)
 let rec parse_args :
@@ -625,6 +631,7 @@ let rec make_arities_dict :
         | Arg { parameter ; _ } -> recur parameter 1
         | DefArg { parameter ; _ } -> recur parameter 1
         | Switch { parameter ; _ } -> recur parameter 0
+        | Constant _c -> make_arities_dict rest acc
 
 type error += Help : 'a command option -> error
 
@@ -951,18 +958,23 @@ let find_command tree initial_arguments =
         fail (Command_not_found (List.rev acc, []))
   in traverse tree initial_arguments []
 
+
+let get_arg_parameter (type a) (arg : (a, _) arg) =
+  match arg with
+  | Arg { parameter ; _ } -> parameter
+  | DefArg { parameter ; _ } -> parameter
+  | Switch { parameter ; _ } -> parameter
+  | Constant _ -> assert false
+
 let get_arg
   : type a ctx. (a, ctx) arg -> string list
   = fun arg ->
-    let long, short =
-      match arg with
-      | Arg { parameter ; _ } -> parameter
-      | DefArg { parameter ; _ } -> parameter
-      | Switch { parameter ; _ } -> parameter in
+    let long, short = get_arg_parameter arg in
     ("--" ^ long) :: match short with None -> [] | Some c -> [ "-" ^ String.make 1 c ]
 
 let rec list_args : type arg ctx. (arg, ctx) args -> string list = function
   | NoArgs -> []
+  | AddArg (Constant _, args) -> list_args args
   | AddArg (arg, args) -> get_arg arg @ list_args args
 
 let complete_func autocomplete cctxt =
@@ -973,22 +985,19 @@ let complete_func autocomplete cctxt =
 let list_command_args (Command { options = Argument { spec ; _ } ; _ }) =
   list_args spec
 
-let get_arg_parameter (type a) (arg : (a, _) arg) =
-  match arg with
-  | Arg { parameter ; _ } -> parameter
-  | DefArg { parameter ; _ } -> parameter
-  | Switch { parameter ; _ } -> parameter
-
 let complete_arg : type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t =
   fun ctx -> function
     | Arg { kind = { autocomplete ; _ } ; _ } -> complete_func autocomplete ctx
     | DefArg { kind = { autocomplete ; _ } ; _ } -> complete_func autocomplete ctx
     | Switch _ -> return []
+    | Constant _ -> return []
 
 let rec remaining_spec :
   type a ctx. TzString.Set.t -> (a, ctx) args -> string list =
   fun seen -> function
     | NoArgs -> []
+    | AddArg (Constant _, rest) ->
+        remaining_spec seen rest
     | AddArg (arg, rest) ->
         let (long, _) = get_arg_parameter arg in
         if TzString.Set.mem long seen
@@ -1000,6 +1009,8 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   let rec complete_spec : type a. string -> (a, ctx) args -> string list tzresult Lwt.t =
     fun name -> function
       | NoArgs -> return []
+      | AddArg (Constant _, rest) ->
+          complete_spec name rest
       | AddArg (arg, rest) ->
           if fst (get_arg_parameter arg) = name
           then complete_arg ctx arg

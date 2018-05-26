@@ -53,6 +53,8 @@ val parameter :
     ["lowercase short description\nOptional longer description."]. *)
 type ('a, 'ctx) arg
 
+val constant: 'a -> ('a, 'ctx) arg
+
 (** [arg ~doc ~long ?short converter] creates an argument to a command.
     The [~long] argument is the long format, without the double dashes.
     The [?short] argument is the optional one letter shortcut.
