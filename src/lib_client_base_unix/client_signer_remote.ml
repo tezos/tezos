@@ -10,9 +10,15 @@
 open Client_keys
 open Client_signer_remote_messages
 
+let call host port service arg =
+  RPC_client.call_service
+    Media_type.all_media_types
+    ~base: (Uri.of_string (Format.asprintf "https://%s:%d" host port))
+    service () () arg
+
 type path =
   | Socket of Lwt_utils_unix.Socket.addr
-  | Https of Client_signer_remote_services.path
+  | Https of string * int
 
 let socket_sign path key data =
   let req = { Sign.Request.key = key ; data } in
@@ -34,14 +40,16 @@ let socket_request_public_key path key =
 
 let sign path key data = match path with
   | Socket path -> socket_sign path key data
-  | Https path ->
-      Client_signer_remote_services.(call path sign) { key ; data } >>=? fun res ->
+  | Https (host, port) ->
+      call host port
+        Client_signer_remote_services.sign { key ; data } >>=? fun res ->
       return res.signature
 
 let request_public_key path key = match path with
   | Socket path -> socket_request_public_key path key
-  | Https path ->
-      Client_signer_remote_services.(call path public_key) { key } >>=? fun res ->
+  | Https (host, port) ->
+      call host port
+        Client_signer_remote_services.public_key { key } >>=? fun res ->
       return res.public_key
 
 module Remote_signer : SIGNER = struct
@@ -89,11 +97,12 @@ module Remote_signer : SIGNER = struct
     (* | "tcp" :: key :: [] -> *)
     (* return (Socket (Tcp ("$TEZOS_SIGNER_TCP_HOST", "$TEZOS_SIGNER_TCP_PORT")), key) *)
     | "https" :: host :: port :: key :: [] ->
-        return (Https (host, port), key)
-    | "https" :: host :: key :: [] ->
-        return (Https (host, "$TEZOS_SIGNER_HTTPS_PORT"), key)
-    | "https" :: key :: [] ->
-        return (Https ("$TEZOS_SIGNER_HTTPS_HOST", "$TEZOS_SIGNER_HTTPS_PORT"), key)
+        return (Https (host, int_of_string port), key)
+    (* Temporary FIXME *)
+    (* | "https" :: host :: key :: [] -> *)
+    (* return (Https (host, "$TEZOS_SIGNER_HTTPS_PORT"), key) *)
+    (* | "https" :: key :: [] -> *)
+    (* return (Https ("$TEZOS_SIGNER_HTTPS_HOST", "$TEZOS_SIGNER_HTTPS_PORT"), key) *)
     | location ->
         failwith
           "@[<v 2>Remote Schema : wrong locator %s.@,@[<hov 0>%a@]@]"
@@ -103,7 +112,7 @@ module Remote_signer : SIGNER = struct
   let locator_of_path = function
     | Socket (Unix path), key -> [ "unix" ; path ; key ]
     | Socket (Tcp (host, port)), key -> [ "tcp" ; host ; string_of_int port ; key ]
-    | Https (host, port), key -> [ "https" ; host ; port ; key ]
+    | Https (host, port), key -> [ "https" ; host ; string_of_int port ; key ]
 
   let pk_locator_of_human_input _cctxt path =
     path_of_human_input path >>=? fun pk ->

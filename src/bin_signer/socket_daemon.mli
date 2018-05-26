@@ -7,10 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_signer_remote_messages
-
-val sign :
-  ([ `POST ], unit, unit, unit, Sign.Request.t, Sign.Response.t) RPC_service.t
-
-val public_key :
-  ([ `POST ], unit, unit, unit, Public_key.Request.t, Public_key.Response.t) RPC_service.t
+val run:
+  #Client_context.io_wallet ->
+  Lwt_utils_unix.Socket.addr -> 'a tzresult Lwt.t
