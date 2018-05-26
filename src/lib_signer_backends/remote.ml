@@ -10,45 +10,44 @@
 open Client_keys
 open Signer_messages
 
-let call host port service arg =
-  RPC_client.call_service
-    Media_type.all_media_types
-    ~base: (Uri.of_string (Format.asprintf "https://%s:%d" host port))
-    service () () arg
-
 type path =
   | Socket of Lwt_utils_unix.Socket.addr
   | Https of string * int
 
-let socket_sign path key data =
-  let req = { Sign.Request.key = key ; data } in
+let socket_sign path pkh data =
+  let req = { Sign.Request.pkh ; data } in
   Lwt_utils_unix.Socket.connect path >>=? fun conn ->
   Lwt_utils_unix.Socket.send conn Request.encoding (Request.Sign req) >>=? fun () ->
   let encoding = result_encoding Sign.Response.encoding in
-  Lwt_utils_unix.Socket.recv conn encoding >>=? function
-  | Error err -> Lwt.return (Error err)
-  | Ok res -> Lwt_unix.close conn >>= fun () -> return res.signature
+  Lwt_utils_unix.Socket.recv conn encoding >>=? fun res ->
+  Lwt_unix.close conn >>= fun () ->
+  Lwt.return res
 
-let socket_request_public_key path key =
-  let req = { Public_key.Request.key = key } in
+let socket_request_public_key path pkh =
   Lwt_utils_unix.Socket.connect path >>=? fun conn ->
-  Lwt_utils_unix.Socket.send conn Request.encoding (Request.Public_key req) >>=? fun () ->
+  Lwt_utils_unix.Socket.send conn Request.encoding (Request.Public_key pkh) >>=? fun () ->
   let encoding = result_encoding Public_key.Response.encoding in
-  Lwt_utils_unix.Socket.recv conn encoding >>=? function
-  | Error err -> Lwt.return (Error err)
-  | Ok res -> Lwt_unix.close conn >>= fun () -> return res.public_key
+  Lwt_utils_unix.Socket.recv conn encoding >>=? fun res ->
+  Lwt_unix.close conn >>= fun () ->
+  Lwt.return res
 
-let sign path key data = match path with
-  | Socket path -> socket_sign path key data
+let sign path pkh data =
+  match path with
+  | Socket path -> socket_sign path pkh data
   | Https (host, port) ->
-      call host port Signer_services.sign { key ; data } >>=? fun res ->
-      return res.signature
+      RPC_client.call_service
+        Media_type.all_media_types
+        ~base: (Uri.of_string (Format.asprintf "https://%s:%d" host port))
+        Signer_services.sign ((), pkh) () data
 
-let request_public_key path key = match path with
-  | Socket path -> socket_request_public_key path key
+let request_public_key path pkh =
+  match path with
+  | Socket path -> socket_request_public_key path pkh
   | Https (host, port) ->
-      call host port Signer_services.public_key { key } >>=? fun res ->
-      return res.public_key
+      RPC_client.call_service
+        Media_type.all_media_types
+        ~base: (Uri.of_string (Format.asprintf "https://%s:%d" host port))
+        Signer_services.public_key ((), pkh) () ()
 
 module Remote_signer : SIGNER = struct
   let scheme = "remote"
@@ -70,7 +69,7 @@ module Remote_signer : SIGNER = struct
      that get evaluated to default values '$HOME/.tezos-signer-socket', \
      localhost and 6732, and can be set later on."
 
-  type key_path = path * key
+  type key_path = path * Signature.Public_key_hash.t
 
   (* secret key is the identifier of the location key identifier *)
   type secret_key = key_path
@@ -84,18 +83,22 @@ module Remote_signer : SIGNER = struct
 
   let path_of_human_input = function
     | "unix" :: key :: [] ->
-        return (Socket (Unix "$TEZOS_SIGNER_UNIX_PATH"), key)
+        return (Socket (Unix "$TEZOS_SIGNER_UNIX_PATH"),
+                Signature.Public_key_hash.of_b58check_exn key)
     | "unix" :: file :: key :: [] ->
-        return (Socket (Unix file), key)
+        return (Socket (Unix file),
+                Signature.Public_key_hash.of_b58check_exn key)
     | "tcp" :: host :: port :: key :: [] ->
-        return (Socket (Tcp (host, int_of_string port)), key)
+        return (Socket (Tcp (host, int_of_string port)),
+                Signature.Public_key_hash.of_b58check_exn key)
     (* Temporary FIXME *)
     (* | "tcp" :: host :: key :: [] -> *)
     (* return (Socket (Tcp (host, "$TEZOS_SIGNER_TCP_PORT")), key) *)
     (* | "tcp" :: key :: [] -> *)
     (* return (Socket (Tcp ("$TEZOS_SIGNER_TCP_HOST", "$TEZOS_SIGNER_TCP_PORT")), key) *)
     | "https" :: host :: port :: key :: [] ->
-        return (Https (host, int_of_string port), key)
+        return (Https (host, int_of_string port),
+                Signature.Public_key_hash.of_b58check_exn key)
     (* Temporary FIXME *)
     (* | "https" :: host :: key :: [] -> *)
     (* return (Https (host, "$TEZOS_SIGNER_HTTPS_PORT"), key) *)
@@ -108,9 +111,9 @@ module Remote_signer : SIGNER = struct
           Format.pp_print_text description
 
   let locator_of_path = function
-    | Socket (Unix path), key -> [ "unix" ; path ; key ]
-    | Socket (Tcp (host, port)), key -> [ "tcp" ; host ; string_of_int port ; key ]
-    | Https (host, port), key -> [ "https" ; host ; string_of_int port ; key ]
+    | Socket (Unix path), key -> [ "unix" ; path ; Signature.Public_key_hash.to_b58check key ]
+    | Socket (Tcp (host, port)), key -> [ "tcp" ; host ; string_of_int port ; Signature.Public_key_hash.to_b58check key ]
+    | Https (host, port), key -> [ "https" ; host ; string_of_int port ; Signature.Public_key_hash.to_b58check key ]
 
   let pk_locator_of_human_input _cctxt path =
     path_of_human_input path >>=? fun pk ->

@@ -19,13 +19,13 @@ let run (cctxt : #Client_context.wallet) path =
       Lwt_utils_unix.Socket.recv fd Request.encoding >>=? function
       | Sign req ->
           let encoding = result_encoding Sign.Response.encoding in
-          Handler.sign cctxt req.key req.data >>= fun res ->
+          Handler.sign cctxt req.pkh req.data >>= fun res ->
           Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
           Lwt_unix.close fd >>= fun () ->
           return ()
-      | Public_key req ->
+      | Public_key pkh ->
           let encoding = result_encoding Public_key.Response.encoding in
-          Handler.public_key cctxt req.key >>= fun res ->
+          Handler.public_key cctxt pkh >>= fun res ->
           Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
           Lwt_unix.close fd >>= fun () ->
           return ()

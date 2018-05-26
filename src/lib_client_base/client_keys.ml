@@ -274,6 +274,18 @@ let get_key (cctxt : #Client_context.wallet) pkh =
       Signer.public_key pk >>=? fun pk ->
       return (n, pk, sk)
 
+let get_public_key (cctxt : #Client_context.wallet) pkh =
+  Public_key_hash.rev_find cctxt pkh >>=? function
+  | None -> failwith "no keys for the source contract manager"
+  | Some n ->
+      Public_key.find cctxt n >>=? fun pk ->
+      let scheme = Public_key_locator.scheme pk in
+      find_signer_for_key cctxt ~scheme >>=? fun signer ->
+      let module Signer = (val signer : SIGNER) in
+      Signer.pk_of_locator pk >>=? fun pk ->
+      Signer.public_key pk >>=? fun pk ->
+      return (n, pk)
+
 let get_keys (wallet : #Client_context.io_wallet) =
   Secret_key.load wallet >>=? fun sks ->
   Lwt_list.filter_map_s begin fun (name, sk) ->

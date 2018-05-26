@@ -150,6 +150,11 @@ val get_key:
   Public_key_hash.t ->
   (string * Signature.Public_key.t * sk_locator) tzresult Lwt.t
 
+val get_public_key:
+  #Client_context.io_wallet ->
+  Public_key_hash.t ->
+  (string * Signature.Public_key.t) tzresult Lwt.t
+
 val get_keys:
   #Client_context.io_wallet ->
   (string * Public_key_hash.t * Signature.Public_key.t * sk_locator) list tzresult Lwt.t

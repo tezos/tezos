@@ -7,18 +7,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Signer_messages
-
-let sign = RPC_service.post_service
+let sign =
+  RPC_service.post_service
     ~description: "Sign a piece of data with a given remote key"
     ~query: RPC_query.empty
-    ~input: Sign.Request.encoding
-    ~output: Sign.Response.encoding
-    RPC_path.(root / "sign")
+    ~input: Data_encoding.bytes
+    ~output:  Data_encoding.(obj1 (req "signature" Signature.encoding))
+    RPC_path.(root /: Signature.Public_key_hash.rpc_arg)
 
-let public_key = RPC_service.post_service
+let public_key =
+  RPC_service.get_service
     ~description: "Retrieve the public key of a given remote key"
     ~query: RPC_query.empty
-    ~input: Public_key.Request.encoding
-    ~output: Public_key.Response.encoding
-    RPC_path.(root / "public_key")
+    ~output: Data_encoding.(obj1 (req "public_key" Signature.Public_key.encoding))
+    RPC_path.(root /: Signature.Public_key_hash.rpc_arg)

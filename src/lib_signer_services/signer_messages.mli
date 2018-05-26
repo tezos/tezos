@@ -7,44 +7,44 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type error += Unkwnon_alias_key of string
-
-type key = string
+type error += Unknown_alias_key of string
 
 module Sign : sig
+
   module Request : sig
     type t = {
-      key : key ;
+      pkh: Signature.Public_key_hash.t ;
       data: MBytes.t ;
     }
     val encoding : t Data_encoding.t
   end
+
   module Response : sig
-    type t = {
-      signature : Signature.t ;
-    }
+    type t = Signature.t
     val encoding : t Data_encoding.t
   end
+
 end
 
 module Public_key : sig
+
   module Request : sig
-    type t = {
-      key : key ;
-    }
+    type t = Signature.Public_key_hash.t
     val encoding : t Data_encoding.t
   end
+
   module Response : sig
-    type t = {
-      public_key : Signature.Public_key.t ;
-    }
+    type t = Signature.Public_key.t
     val encoding : t Data_encoding.t
   end
+
 end
 
 module Request : sig
+
   type t =
     | Sign of Sign.Request.t
     | Public_key of Public_key.Request.t
   val encoding : t Data_encoding.t
+
 end

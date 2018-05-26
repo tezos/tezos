@@ -7,10 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Signer_messages
-
 val sign :
-  ([ `POST ], unit, unit, unit, Sign.Request.t, Sign.Response.t) RPC_service.t
+  ([ `POST ], unit, unit * Signature.Public_key_hash.t,
+   unit, MBytes.t, Signature.t) RPC_service.t
 
 val public_key :
-  ([ `POST ], unit, unit, unit, Public_key.Request.t, Public_key.Response.t) RPC_service.t
+  ([ `GET ], unit, unit * Signature.Public_key_hash.t,
+   unit, unit, Signature.Public_key.t) RPC_service.t
