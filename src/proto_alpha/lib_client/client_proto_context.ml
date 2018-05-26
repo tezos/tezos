@@ -330,7 +330,7 @@ let read_key key =
       return (pkh, pk, sk)
 
 let claim_commitment (cctxt : #Proto_alpha.full)
-    ?confirmations ?force block key name =
+    ?(encrypted = false) ?confirmations ?force block key name =
   read_key key >>=? fun (pkh, pk, sk) ->
   fail_unless (Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
     (failure "@[<v 2>Inconsistent activation key:@ \
@@ -346,7 +346,12 @@ let claim_commitment (cctxt : #Proto_alpha.full)
     cctxt ~chain_id:bi.chain_id bytes >>=? fun oph ->
   operation_submitted_message cctxt oph >>=? fun () ->
   let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
-  let sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
+  begin
+    if encrypted then
+      Tezos_signer_backends.Encrypted.encrypt cctxt sk
+    else
+      return (Tezos_signer_backends.Unencrypted.make_sk sk)
+  end >>=? fun sk_uri ->
   begin
     match confirmations with
     | None ->

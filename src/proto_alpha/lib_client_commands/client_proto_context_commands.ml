@@ -261,7 +261,10 @@ let commands () =
       end;
 
     command ~group ~desc:"Register and activate a predefined account using the provided activation key."
-      (args2 (Secret_key.force_switch ()) (Client_proto_args.no_confirmation))
+      (args3
+         (Secret_key.force_switch ())
+         (Client_proto_args.no_confirmation)
+         (Client_keys_commands.encrypted_switch ()))
       (prefixes [ "activate" ; "account" ]
        @@ Secret_key.fresh_alias_param
        @@ prefixes [ "with" ]
@@ -269,21 +272,24 @@ let commands () =
          ~desc:"Activation key (as JSON file) obtained from the Tezos foundation (or the Alphanet faucet)."
          file_parameter
        @@ stop)
-      (fun (force, no_confirmation) name activation_key_file cctxt ->
-         Secret_key.of_fresh cctxt force name >>=? fun name ->
-         Lwt_utils_unix.Json.read_file activation_key_file >>=? fun json ->
-         match Data_encoding.Json.destruct
-                 Client_proto_context.activation_key_encoding
-                 json with
-         | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
-             Format.kasprintf (fun s -> failwith "%s" s)
-               "Invalid activation file: %a %a"
-               (fun ppf -> Data_encoding.Json.print_error ppf) exn
-               Data_encoding.Json.pp json
-         | key ->
-             let confirmations =
-               if no_confirmation then None else Some 0 in
-             claim_commitment cctxt cctxt#block ?confirmations ~force key name
+      (fun
+        (force, no_confirmation, encrypted)
+        name activation_key_file cctxt ->
+        Secret_key.of_fresh cctxt force name >>=? fun name ->
+        Lwt_utils_unix.Json.read_file activation_key_file >>=? fun json ->
+        match Data_encoding.Json.destruct
+                Client_proto_context.activation_key_encoding
+                json with
+        | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
+            Format.kasprintf (fun s -> failwith "%s" s)
+              "Invalid activation file: %a %a"
+              (fun ppf -> Data_encoding.Json.print_error ppf) exn
+              Data_encoding.Json.pp json
+        | key ->
+            let confirmations =
+              if no_confirmation then None else Some 0 in
+            claim_commitment cctxt cctxt#block
+              ~encrypted ?confirmations ~force key name
       );
 
     command ~group:alphanet ~desc: "Activate a protocol (Alphanet dictator only)."

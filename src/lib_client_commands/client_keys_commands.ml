@@ -13,6 +13,17 @@ let group =
   { Clic.name = "keys" ;
     title = "Commands for managing the wallet of cryptographic keys" }
 
+let encrypted_switch () =
+  if List.exists
+      (fun (_, (module Signer : Client_keys.SIGNER)) ->
+         Signer.scheme = Tezos_signer_backends.Unencrypted.scheme)
+      (Client_keys.registered_signers ()) then
+    Clic.switch
+      ~long:"encrypted"
+      ~doc:("Encrypt the key on-disk") ()
+  else
+    Clic.constant true
+
 let sig_algo_arg =
   Clic.default_arg
     ~doc:"use custom signature algorithm"
@@ -23,7 +34,7 @@ let sig_algo_arg =
     (Signature.algo_param ())
 
 let gen_keys_containing
-    ?(prefix=false) ?(force=false)
+    ?(encrypted = false) ?(prefix=false) ?(force=false)
     ~containing ~name (cctxt : #Client_context.io_wallet) =
   let unrepresentable =
     List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
@@ -65,7 +76,12 @@ let gen_keys_containing
             if matches hash
             then
               let pk_uri = Tezos_signer_backends.Unencrypted.make_pk public_key in
-              let sk_uri = Tezos_signer_backends.Unencrypted.make_sk secret_key in
+              begin
+                if encrypted then
+                  Tezos_signer_backends.Encrypted.encrypt cctxt secret_key
+                else
+                  return (Tezos_signer_backends.Unencrypted.make_sk secret_key)
+              end >>=? fun sk_uri ->
               register_key cctxt ~force
                 (public_key_hash, pk_uri, sk_uri) name >>=? fun () ->
               return hash
@@ -111,33 +127,39 @@ let commands () : Client_context.io_wallet Clic.command list =
                 n S.title Format.pp_print_text S.description)
            signers >>= return) ;
 
-    command ~group ~desc: "Generate a pair of (unencrypted) keys."
-      (args2 (Secret_key.force_switch ()) sig_algo_arg)
+    command ~group ~desc: "Generate a pair of keys."
+      (args3 (Secret_key.force_switch ()) sig_algo_arg (encrypted_switch ()))
       (prefixes [ "gen" ; "keys" ]
        @@ Secret_key.fresh_alias_param
        @@ stop)
-      (fun (force, algo) name (cctxt : #Client_context.io_wallet) ->
+      (fun (force, algo, encrypted) name (cctxt : Client_context.io_wallet) ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
          let (pkh, pk, sk) = Signature.generate_key ~algo () in
          let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
-         let sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
+         begin
+           if encrypted then
+             Tezos_signer_backends.Encrypted.encrypt cctxt sk
+           else
+             return (Tezos_signer_backends.Unencrypted.make_sk sk)
+         end >>=? fun sk_uri ->
          register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
 
-    command ~group ~desc: "Generate (unencrypted) keys including the given string."
-      (args2
+    command ~group ~desc: "Generate keys including the given string."
+      (args3
          (switch
             ~long:"prefix"
             ~short:'P'
             ~doc:"the key must begin with tz1[word]"
             ())
-         (force_switch ()))
+         (force_switch ())
+         (encrypted_switch ()))
       (prefixes [ "gen" ; "vanity" ; "keys" ]
        @@ Public_key_hash.fresh_alias_param
        @@ prefix "matching"
        @@ (seq_of_param @@ string ~name:"words" ~desc:"string key must contain one of these words"))
-      (fun (prefix, force) name containing (cctxt : #Client_context.io_wallet) ->
+      (fun (prefix, force, encrypted) name containing (cctxt : Client_context.io_wallet) ->
          Public_key_hash.of_fresh cctxt force name >>=? fun name ->
-         gen_keys_containing ~force ~prefix ~containing ~name cctxt) ;
+         gen_keys_containing ~encrypted ~force ~prefix ~containing ~name cctxt) ;
 
     command ~group ~desc: "Add a secret key to the wallet."
       (args1 (Secret_key.force_switch ()))

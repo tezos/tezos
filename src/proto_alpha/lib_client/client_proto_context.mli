@@ -155,6 +155,7 @@ val activation_key_encoding: activation_key Data_encoding.t
 
 val claim_commitment:
   #Proto_alpha.full ->
+  ?encrypted:bool ->
   ?confirmations:int ->
   ?force:bool ->
   Block_services.block ->
