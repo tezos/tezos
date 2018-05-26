@@ -122,6 +122,12 @@ let main select_commands =
           ~block:parsed_args.block
           ~base_dir:parsed_config_file.base_dir
           ~rpc_config:rpc_config in
+      Option.iter parsed_config_file.remote_signer ~f: begin fun signer ->
+        Client_keys.register_signer
+          (module Tezos_signer_backends.Remote.Make(struct
+               let default = signer
+             end))
+      end ;
       begin match autocomplete with
         | Some (prev_arg, cur_arg, script) ->
             Clic.autocompletion

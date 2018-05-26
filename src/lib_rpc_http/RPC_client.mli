@@ -93,3 +93,4 @@ val generic_call :
   [< RPC_service.meth ] ->
   Uri.t -> (content, content) RPC_context.rest_result Lwt.t
 
+val uri_encoding: Uri.t Data_encoding.t

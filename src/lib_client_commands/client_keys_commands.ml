@@ -15,8 +15,8 @@ let group =
 
 let encrypted_switch () =
   if List.exists
-      (fun (_, (module Signer : Client_keys.SIGNER)) ->
-         Signer.scheme = Tezos_signer_backends.Unencrypted.scheme)
+      (fun (scheme, _) ->
+         scheme = Tezos_signer_backends.Unencrypted.scheme)
       (Client_keys.registered_signers ()) then
     Clic.switch
       ~long:"encrypted"

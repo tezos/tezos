@@ -16,6 +16,11 @@ open Client_proto_programs
 open Client_keys
 open Client_proto_args
 
+let encrypted_switch =
+  Clic.switch
+    ~long:"encrypted"
+    ~doc:("Encrypt the key on-disk") ()
+
 let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_context.printer) = function
   | Error errs ->
       cctxt#warning "%a"
@@ -264,7 +269,7 @@ let commands () =
       (args3
          (Secret_key.force_switch ())
          (Client_proto_args.no_confirmation)
-         (Client_keys_commands.encrypted_switch ()))
+         encrypted_switch)
       (prefixes [ "activate" ; "account" ]
        @@ Secret_key.fresh_alias_param
        @@ prefixes [ "with" ]

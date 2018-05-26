@@ -12,6 +12,7 @@
 type error += Invalid_block_argument of string
 type error += Invalid_protocol_argument of string
 type error += Invalid_port_arg of string
+type error += Invalid_remote_signer_argument of string
 let () =
   register_error_kind
     `Branch
@@ -45,11 +46,22 @@ let () =
          Format.fprintf ppf "Value %s is not a valid TCP port." s)
     Data_encoding.(obj1 (req "value" string))
     (function Invalid_port_arg s -> Some s | _ -> None)
-    (fun s -> Invalid_port_arg s)
+    (fun s -> Invalid_port_arg s) ;
+  register_error_kind
+    `Branch
+    ~id: "invalid_remote_signer_argument"
+    ~title: "Unexpected URI of remote signer"
+    ~description: "The remote signer argument could not be parsed"
+    ~pp:
+      (fun ppf s ->
+         Format.fprintf ppf "Value '%s' is not a valid URI." s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_remote_signer_argument s -> Some s | _ -> None)
+    (fun s -> Invalid_remote_signer_argument s)
 
+let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
 let default_base_dir =
-  let home = try Sys.getenv "HOME" with Not_found -> "/root" in
   Filename.concat home ".tezos-client"
 
 let default_block = `Head 0
@@ -64,6 +76,7 @@ module Cfg_file = struct
     node_port: int ;
     tls: bool ;
     web_port: int ;
+    remote_signer: Uri.t option ;
   }
 
   let default = {
@@ -72,27 +85,29 @@ module Cfg_file = struct
     node_port = 8732 ;
     tls = false ;
     web_port = 8080 ;
+    remote_signer = None ;
   }
 
   open Data_encoding
 
   let encoding =
     conv
-      (fun { base_dir ; node_addr ; node_port ; tls ; web_port } ->
+      (fun { base_dir ; node_addr ; node_port ; tls ; web_port ; remote_signer } ->
          (base_dir, Some node_addr, Some node_port,
-          Some tls, Some web_port))
-      (fun (base_dir, node_addr, node_port, tls, web_port) ->
+          Some tls, Some web_port, remote_signer))
+      (fun (base_dir, node_addr, node_port, tls, web_port, remote_signer) ->
          let node_addr = Option.unopt ~default:default.node_addr node_addr in
          let node_port = Option.unopt ~default:default.node_port node_port in
          let tls = Option.unopt ~default:default.tls tls in
          let web_port = Option.unopt ~default:default.web_port web_port in
-         { base_dir ; node_addr ; node_port ; tls ; web_port })
-      (obj5
+         { base_dir ; node_addr ; node_port ; tls ; web_port ; remote_signer })
+      (obj6
          (req "base_dir" string)
          (opt "node_addr" string)
          (opt "node_port" int16)
          (opt "tls" bool)
-         (opt "web_port" int16))
+         (opt "web_port" int16)
+         (opt "remote_signer" RPC_client.uri_encoding))
 
   let from_json json =
     Data_encoding.Json.destruct encoding json
@@ -218,6 +233,17 @@ let tls_switch () =
     ~short:'S'
     ~doc:"use TLS to connect to node."
     ()
+let remote_signer_arg () =
+  arg
+    ~long:"remote-signer"
+    ~short:'R'
+    ~placeholder:"uri"
+    ~doc:"URI of the remote signer"
+    (parameter
+       (fun _ x ->
+          (* TODO check scheme = 'unix/tcp/https' *)
+          try return (Uri.of_string x)
+          with _ -> fail (Invalid_remote_signer_argument x)))
 
 let read_config_file config_file =
   Lwt_utils_unix.Json.read_file config_file >>=? fun cfg_json ->
@@ -292,7 +318,8 @@ let commands config_file cfg =
   ]
 
 let global_options () =
-  args9 (base_dir_arg ())
+  args10
+    (base_dir_arg ())
     (config_file_arg ())
     (timings_switch ())
     (block_arg ())
@@ -301,6 +328,7 @@ let global_options () =
     (addr_arg ())
     (port_arg ())
     (tls_switch ())
+    (remote_signer_arg ())
 
 let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options
@@ -315,7 +343,8 @@ let parse_config_args (ctx : #Client_context.full) argv =
         log_requests,
         node_addr,
         node_port,
-        tls), remaining) ->
+        tls,
+        remote_signer), remaining) ->
   begin match base_dir with
     | None ->
         let base_dir = default_base_dir in
@@ -352,7 +381,8 @@ let parse_config_args (ctx : #Client_context.full) argv =
   let tls = cfg.tls || tls in
   let node_addr = Option.unopt ~default:cfg.node_addr node_addr in
   let node_port = Option.unopt ~default:cfg.node_port node_port in
-  let cfg = { cfg with tls ; node_port ; node_addr } in
+  let remote_signer = Option.first_some remote_signer cfg.remote_signer in
+  let cfg = { cfg with tls ; node_port ; node_addr ; remote_signer } in
   if Sys.file_exists base_dir && not (Sys.is_directory base_dir) then begin
     Format.eprintf "%s is not a directory.@." base_dir ;
     exit 1 ;
