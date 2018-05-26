@@ -495,12 +495,17 @@ opam:48:tezos-protocol-demo:
   variables:
     package: tezos-protocol-demo
 
-opam:49:tezos-node:
+opam:49:tezos-signer:
+  <<: *opam_definition
+  variables:
+    package: tezos-signer
+
+opam:50:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:50:ocplib-json-typed-browser:
+opam:51:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
