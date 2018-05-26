@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Client_keys
-open Client_signer_remote_messages
+open Signer_messages
 
 let call host port service arg =
   RPC_client.call_service
@@ -41,15 +41,13 @@ let socket_request_public_key path key =
 let sign path key data = match path with
   | Socket path -> socket_sign path key data
   | Https (host, port) ->
-      call host port
-        Client_signer_remote_services.sign { key ; data } >>=? fun res ->
+      call host port Signer_services.sign { key ; data } >>=? fun res ->
       return res.signature
 
 let request_public_key path key = match path with
   | Socket path -> socket_request_public_key path key
   | Https (host, port) ->
-      call host port
-        Client_signer_remote_services.public_key { key } >>=? fun res ->
+      call host port Signer_services.public_key { key } >>=? fun res ->
       return res.public_key
 
 module Remote_signer : SIGNER = struct

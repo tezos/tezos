@@ -15,11 +15,11 @@ let run (cctxt : #Client_context.io_wallet) ~host ~port ~cert ~key =
     `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port) in
   let dir = RPC_directory.empty in
   let dir =
-    RPC_directory.register0 dir Client_signer_remote_services.sign begin fun () req ->
+    RPC_directory.register0 dir Signer_services.sign begin fun () req ->
       Handler.sign cctxt req.key req.data
     end in
   let dir =
-    RPC_directory.register0 dir Client_signer_remote_services.public_key begin fun () req ->
+    RPC_directory.register0 dir Signer_services.public_key begin fun () req ->
       Handler.public_key cctxt req.key
     end in
   Lwt.catch

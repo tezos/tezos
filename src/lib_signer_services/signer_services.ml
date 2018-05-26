@@ -7,10 +7,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_signer_remote_messages
+open Signer_messages
 
-val sign :
-  ([ `POST ], unit, unit, unit, Sign.Request.t, Sign.Response.t) RPC_service.t
+let sign = RPC_service.post_service
+    ~description: "Sign a piece of data with a given remote key"
+    ~query: RPC_query.empty
+    ~input: Sign.Request.encoding
+    ~output: Sign.Response.encoding
+    RPC_path.(root / "sign")
 
-val public_key :
-  ([ `POST ], unit, unit, unit, Public_key.Request.t, Public_key.Response.t) RPC_service.t
+let public_key = RPC_service.post_service
+    ~description: "Retrieve the public key of a given remote key"
+    ~query: RPC_query.empty
+    ~input: Public_key.Request.encoding
+    ~output: Public_key.Response.encoding
+    RPC_path.(root / "public_key")

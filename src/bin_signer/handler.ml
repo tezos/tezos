@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_signer_remote_messages
+open Signer_messages
 
 let log = Logging.Client.Sign.lwt_log_notice
 

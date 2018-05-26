@@ -13,7 +13,8 @@
               tezos-stdlib-unix
               tezos-client-base-unix
               tezos-client-alpha-commands.registration
-              tezos-baking-alpha-commands.registration))
+              tezos-baking-alpha-commands.registration
+              tezos-signer-backends))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
