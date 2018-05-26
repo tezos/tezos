@@ -11,7 +11,7 @@ open Client_signer_remote_messages
 
 let log = Logging.Client.Sign.lwt_log_notice
 
-let run_socket_daemon (cctxt : #Client_context_unix.unix_full) path =
+let run_socket_daemon (cctxt : #Client_context.io_wallet) path =
   let open Client_signer_remote_socket in
   Connection.bind path >>=? fun (fd, display_path) ->
   let rec loop () =
@@ -80,7 +80,7 @@ let run_socket_daemon (cctxt : #Client_context_unix.unix_full) path =
   end >>= fun () ->
   loop ()
 
-let run_https_daemon (cctxt : #Client_context_unix.unix_full) host port cert key =
+let run_https_daemon (cctxt : #Client_context.io_wallet) host port cert key =
   let open Client_signer_remote_services in
   base (host, port) >>=? fun (host, port) ->
   log "Accepting HTTPS requests on port %d" port >>= fun () ->
@@ -148,7 +148,10 @@ let group =
 
 let select_commands _ _ =
   return
-    (List.flatten
+    (List.map
+       (Clic.map_command
+          (fun (o : Client_context.full) -> (o :> Client_context.io_wallet))) @@
+     List.flatten
        [ Client_keys_commands.commands () ;
          [ command ~group
              ~desc: "Launch a signer daemon over a TCP socket."
@@ -213,4 +216,5 @@ let select_commands _ _ =
                 run_https_daemon cctxt host port cert key) ;
          ]])
 
-let () = Client_main_run.run select_commands
+let () =
+  Client_main_run.run select_commands

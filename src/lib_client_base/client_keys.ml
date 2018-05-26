@@ -205,7 +205,7 @@ let gen_keys ?(force=false) ?algo ?seed (cctxt : #Client_context.io_wallet) name
   let key = Signature.generate_key ?algo ?seed () in
   register_key cctxt ~force key name
 
-let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : #Client_context.full) =
+let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : #Client_context.io_wallet) =
   let unrepresentable =
     List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
   match unrepresentable with
