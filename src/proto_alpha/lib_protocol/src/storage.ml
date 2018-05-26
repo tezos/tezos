@@ -431,6 +431,15 @@ module Commitments =
 
 module Ramp_up = struct
 
+  module Rewards =
+    Make_indexed_data_storage
+      (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "rewards"] end))
+      (Cycle_repr.Index)
+      (Make_value(struct
+         type t = Tez_repr.t * Tez_repr.t
+         let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
+       end))
+
   module Security_deposits =
     Make_indexed_data_storage
       (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "deposits"] end))

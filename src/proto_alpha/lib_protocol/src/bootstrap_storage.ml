@@ -17,8 +17,26 @@ let init_account ctxt (account: Parameters_repr.bootstrap_account) =
   Delegate_storage.set ctxt contract (Some public_key_hash) >>=? fun ctxt ->
   return ctxt
 
-let init ctxt ?ramp_up_cycles accounts =
+let init ctxt ?ramp_up_cycles ?no_reward_cycles accounts =
   fold_left_s init_account ctxt accounts >>=? fun ctxt ->
+  begin
+    match no_reward_cycles with
+    | None -> return ctxt
+    | Some cycles ->
+        (* Store pending ramp ups. *)
+        let constants = Raw_context.constants ctxt in
+        (* Start without reward *)
+        Raw_context.patch_constants ctxt
+          (fun c ->
+             { c with
+               block_reward = Tez_repr.zero ;
+               endorsement_reward = Tez_repr.zero  }) >>= fun ctxt ->
+        (* Store the final reward. *)
+        Storage.Ramp_up.Rewards.init ctxt
+          (Cycle_repr.of_int32_exn (Int32.of_int cycles))
+          (constants.block_reward,
+           constants.endorsement_reward)
+  end >>=? fun ctxt ->
   match ramp_up_cycles with
   | None -> return ctxt
   | Some cycles ->
@@ -50,6 +68,17 @@ let init ctxt ?ramp_up_cycles accounts =
 
 let cycle_end ctxt last_cycle =
   let next_cycle = Cycle_repr.succ last_cycle in
+  begin
+    Storage.Ramp_up.Rewards.get_option ctxt next_cycle >>=? function
+    | None -> return ctxt
+    | Some (block_reward, endorsement_reward) ->
+        Storage.Ramp_up.Rewards.delete ctxt next_cycle >>=? fun ctxt ->
+        Raw_context.patch_constants ctxt
+          (fun c ->
+             { c with block_reward ;
+                      endorsement_reward }) >>= fun ctxt ->
+        return ctxt
+  end >>=? fun ctxt ->
   Storage.Ramp_up.Security_deposits.get_option ctxt next_cycle >>=? function
   | None -> return ctxt
   | Some (block_security_deposit, endorsement_security_deposit) ->

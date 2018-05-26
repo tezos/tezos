@@ -10,6 +10,7 @@
 val init:
   Raw_context.t ->
   ?ramp_up_cycles:int ->
+  ?no_reward_cycles:int ->
   Parameters_repr.bootstrap_account list ->
   Raw_context.t tzresult Lwt.t
 

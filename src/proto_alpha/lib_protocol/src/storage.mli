@@ -268,6 +268,12 @@ module Commitments : Indexed_data_storage
 
 module Ramp_up : sig
 
+  module Rewards :
+    Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t * Tez_repr.t (* baking * endorsement *)
+     and type t := Raw_context.t
+
   module Security_deposits :
     Indexed_data_storage
     with type key = Cycle_repr.t

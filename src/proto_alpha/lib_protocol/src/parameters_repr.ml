@@ -17,6 +17,7 @@ type t = {
   commitments : (Unclaimed_public_key_hash.t * Commitment_repr.t) list ;
   constants : Constants_repr.parametric ;
   security_deposit_ramp_up_cycles : int option ;
+  no_reward_cycles : int option ;
 }
 
 let bootstrap_account_encoding =
@@ -210,19 +211,22 @@ let encoding =
   let open Data_encoding in
   conv
     (fun { bootstrap_accounts ; commitments ; constants ;
-           security_deposit_ramp_up_cycles } ->
-      ((bootstrap_accounts, commitments, security_deposit_ramp_up_cycles),
+           security_deposit_ramp_up_cycles ; no_reward_cycles } ->
+      ((bootstrap_accounts, commitments,
+        security_deposit_ramp_up_cycles, no_reward_cycles),
        constants))
-    (fun ( (bootstrap_accounts, commitments, security_deposit_ramp_up_cycles),
+    (fun ( (bootstrap_accounts, commitments,
+            security_deposit_ramp_up_cycles, no_reward_cycles),
            constants) ->
       { bootstrap_accounts ; commitments ; constants ;
-        security_deposit_ramp_up_cycles})
+        security_deposit_ramp_up_cycles ; no_reward_cycles })
     (merge_objs
-       (obj3
+       (obj4
           (req "bootstrap_accounts" (list bootstrap_account_encoding))
           (dft "commitments"
              (list (merge_tups
                       (tup1 Unclaimed_public_key_hash.encoding)
                       Commitment_repr.encoding)) [])
-          (opt "security_deposit_ramp_up_cycles" int31))
+          (opt "security_deposit_ramp_up_cycles" int31)
+          (opt "no_reward_cycles" int31))
        constants_encoding)
