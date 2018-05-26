@@ -35,7 +35,7 @@ First, you need to download the script:
 
 ::
 
-    wget https://gitlab.com/tezos/tezos/blob/alphanet/scripts/alphanet.sh
+    wget https://gitlab.com/tezos/tezos/raw/alphanet/scripts/alphanet.sh
     chmod +x alphanet.sh
 
 You are now one step away from a working node:
