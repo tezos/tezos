@@ -17,6 +17,7 @@ depends: [
   "tezos-client-commands"
   "tezos-client-alpha"
   "tezos-baking-alpha"
+  "tezos-signer-backends" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

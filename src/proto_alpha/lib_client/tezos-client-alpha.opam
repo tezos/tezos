@@ -14,6 +14,7 @@ depends: [
   "tezos-protocol-alpha"
   "tezos-shell-services"
   "tezos-client-base"
+  "tezos-signer-backends"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

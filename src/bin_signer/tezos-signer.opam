@@ -11,13 +11,12 @@ depends: [
   "jbuilder" { build & = "1.0+beta19.1" }
   "tezos-base"
   "tezos-client-base"
-  "tezos-client-genesis"
-  "tezos-client-alpha"
-  "tezos-client-alpha-commands"
-  "tezos-baking-alpha"
-  "tezos-baking-alpha-commands"
   "tezos-client-base-unix"
-  "tezos-node" { test }
+  "tezos-client-commands"
+  "tezos-signer-services"
+  "tezos-rpc-http"
+  "tezos-stdlib-unix"
+  "tezos-signer-backends"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

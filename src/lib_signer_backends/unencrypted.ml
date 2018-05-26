@@ -22,20 +22,6 @@ let description =
    The format for importing public keys is the raw Base58-encoded \
    key (starting with 'edpk')."
 
-(*
-let sk_locator_of_human_input _cctxt = function
-  | sk :: _ ->
-      return (Secret_key_locator.create ~scheme ~location:[sk])
-  | [] ->
-      let _, _, sk = Ed25519.generate_key () in
-      return (Secret_key_locator.create ~scheme
-                ~location:[Ed25519.Secret_key.to_b58check sk])
-
-let pk_locator_of_human_input _cctxt = function
-  | [] -> failwith "Missing public key argument"
-  | pk :: _ -> return (Public_key_locator.create ~scheme ~location:[pk])
-
-*)
 let secret_key sk_uri =
   Lwt.return
     (Signature.Secret_key.of_b58check (Uri.path (sk_uri : sk_uri :> Uri.t)))

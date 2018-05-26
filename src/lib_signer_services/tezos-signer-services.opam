@@ -11,7 +11,7 @@ depends: [
   "jbuilder" { build & = "1.0+beta19.1" }
   "tezos-base"
   "tezos-client-base"
-  "tezos-client-commands"
+  "tezos-rpc"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

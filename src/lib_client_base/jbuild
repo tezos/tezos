@@ -4,7 +4,6 @@
  ((name tezos_client_base)
   (public_name tezos-client-base)
   (libraries (tezos-base
-              tezos-stdlib-unix
               tezos-shell-services
               tezos-rpc))
   (library_flags (:standard -linkall))
@@ -12,7 +11,6 @@
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_rpc
-                    -open Tezos_stdlib_unix
                     -open Tezos_shell_services))))
 
 (alias

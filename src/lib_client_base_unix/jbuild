@@ -9,8 +9,6 @@
               tezos-stdlib-unix
               tezos-rpc-http
               tezos-signer-backends
-              pbkdf
-              bip39
               tezos-shell-services))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
