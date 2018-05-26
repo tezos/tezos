@@ -43,12 +43,12 @@ module type LOCATOR = sig
   val pp : Format.formatter -> t -> unit
 end
 
-type sk_locator = Sk_locator of { scheme : string ; location : location }
-type pk_locator = Pk_locator of { scheme : string ; location : location }
+type sk_uri = Sk_locator of { scheme : string ; location : location }
+type pk_uri = Pk_locator of { scheme : string ; location : location }
 
 module Sk_locator = struct
   let name = "secret key"
-  type t = sk_locator
+  type t = sk_uri
 
   let create ~scheme ~location =
     Sk_locator { scheme ; location }
@@ -65,7 +65,7 @@ end
 
 module Pk_locator = struct
   let name = "public key"
-  type t = pk_locator
+  type t = pk_uri
 
   let create ~scheme ~location =
     Pk_locator { scheme ; location }
@@ -125,12 +125,12 @@ module type SIGNER = sig
   val title : string
   val description : string
   val init : #Client_context.io_wallet -> unit tzresult Lwt.t
-  val sk_locator_of_human_input : #Client_context.io_wallet -> string list -> sk_locator tzresult Lwt.t
-  val pk_locator_of_human_input : #Client_context.io_wallet -> string list -> pk_locator tzresult Lwt.t
-  val sk_of_locator : sk_locator -> secret_key tzresult Lwt.t
-  val pk_of_locator : pk_locator -> public_key tzresult Lwt.t
-  val sk_to_locator : secret_key -> sk_locator Lwt.t
-  val pk_to_locator : public_key -> pk_locator Lwt.t
+  val sk_locator_of_human_input : #Client_context.io_wallet -> string list -> sk_uri tzresult Lwt.t
+  val pk_locator_of_human_input : #Client_context.io_wallet -> string list -> pk_uri tzresult Lwt.t
+  val sk_of_locator : sk_uri -> secret_key tzresult Lwt.t
+  val pk_of_locator : pk_uri -> public_key tzresult Lwt.t
+  val sk_to_locator : secret_key -> sk_uri Lwt.t
+  val pk_to_locator : public_key -> pk_uri Lwt.t
   val neuterize : secret_key -> public_key Lwt.t
   val public_key : public_key -> Signature.Public_key.t tzresult Lwt.t
   val public_key_hash : public_key -> Signature.Public_key_hash.t tzresult Lwt.t

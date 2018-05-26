@@ -53,7 +53,7 @@ val print_trace_result :
 val hash_and_sign :
   Michelson_v1_parser.parsed ->
   Michelson_v1_parser.parsed ->
-  Client_keys.sk_locator ->
+  Client_keys.sk_uri ->
   Block_services.block ->
   #Proto_alpha.full ->
   (string * string) tzresult Lwt.t

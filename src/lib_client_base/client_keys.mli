@@ -10,8 +10,8 @@
 (** {2 Location of keys using schemes} *)
 
 type location = string list
-type sk_locator = Sk_locator of { scheme : string ; location : location }
-type pk_locator = Pk_locator of { scheme : string ; location : location }
+type sk_uri = Sk_locator of { scheme : string ; location : location }
+type pk_uri = Pk_locator of { scheme : string ; location : location }
 
 module type LOCATOR = sig
   val name : string
@@ -24,17 +24,17 @@ module type LOCATOR = sig
   val pp : Format.formatter -> t -> unit
 end
 
-module Secret_key_locator : LOCATOR with type t = sk_locator
-module Public_key_locator : LOCATOR with type t = pk_locator
+module Secret_key_locator : LOCATOR with type t = sk_uri
+module Public_key_locator : LOCATOR with type t = pk_uri
 
 (** {2 Cryptographic keys tables } *)
 
 module Public_key_hash :
   Client_aliases.Alias with type t = Signature.Public_key_hash.t
 module Public_key :
-  Client_aliases.Alias with type t = pk_locator
+  Client_aliases.Alias with type t = pk_uri
 module Secret_key :
-  Client_aliases.Alias with type t = sk_locator
+  Client_aliases.Alias with type t = sk_uri
 
 (** {2 Interface for external signing modules.} *)
 
@@ -59,27 +59,27 @@ module type SIGNER = sig
       dependent). *)
 
   val sk_locator_of_human_input :
-    #Client_context.io_wallet -> string list -> sk_locator tzresult Lwt.t
+    #Client_context.io_wallet -> string list -> sk_uri tzresult Lwt.t
   (** [sk_locator_of_human_input wallet spec] is the [sk_locator]
       corresponding to the human readable specification [spec] (plugin
       dependent). *)
 
   val pk_locator_of_human_input :
-    #Client_context.io_wallet -> string list -> pk_locator tzresult Lwt.t
+    #Client_context.io_wallet -> string list -> pk_uri tzresult Lwt.t
   (** [pk_locator_of_human_input wallet spec] is the [pk_locator]
       corresponding to the human readable specification [spec] (plugin
       dependent). *)
 
-  val sk_of_locator : sk_locator -> secret_key tzresult Lwt.t
+  val sk_of_locator : sk_uri -> secret_key tzresult Lwt.t
   (** [sk_of_locator skloc] is the secret key at [skloc]. *)
 
-  val pk_of_locator : pk_locator -> public_key tzresult Lwt.t
+  val pk_of_locator : pk_uri -> public_key tzresult Lwt.t
   (** [pk_of_locator pkloc] is the public key at [pkloc]. *)
 
-  val sk_to_locator : secret_key -> sk_locator Lwt.t
+  val sk_to_locator : secret_key -> sk_uri Lwt.t
   (** [sk_to_locator sk] is the location of secret key [sk]. *)
 
-  val pk_to_locator : public_key -> pk_locator Lwt.t
+  val pk_to_locator : public_key -> pk_uri Lwt.t
   (** [pk_to_locator pk] is the location of public key [pk]. *)
 
   val neuterize : secret_key -> public_key Lwt.t
@@ -110,12 +110,12 @@ val find_signer_for_key :
 val sign :
   ?watermark:Signature.watermark ->
   #Client_context.io_wallet ->
-  sk_locator -> MBytes.t -> Signature.t tzresult Lwt.t
+  sk_uri -> MBytes.t -> Signature.t tzresult Lwt.t
 
 val append :
   ?watermark:Signature.watermark ->
   #Client_context.io_wallet ->
-  sk_locator -> MBytes.t -> MBytes.t tzresult Lwt.t
+  sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
 
 val gen_keys :
   ?force:bool ->
@@ -139,16 +139,16 @@ val gen_keys_containing :
 
 val list_keys :
   #Client_context.wallet ->
-  (string * Public_key_hash.t * pk_locator option * sk_locator option) list tzresult Lwt.t
+  (string * Public_key_hash.t * pk_uri option * sk_uri option) list tzresult Lwt.t
 
 val alias_keys :
   #Client_context.wallet -> string ->
-  (Public_key_hash.t * pk_locator option * sk_locator option) option tzresult Lwt.t
+  (Public_key_hash.t * pk_uri option * sk_uri option) option tzresult Lwt.t
 
 val get_key:
   #Client_context.io_wallet ->
   Public_key_hash.t ->
-  (string * Signature.Public_key.t * sk_locator) tzresult Lwt.t
+  (string * Signature.Public_key.t * sk_uri) tzresult Lwt.t
 
 val get_public_key:
   #Client_context.io_wallet ->
@@ -157,6 +157,6 @@ val get_public_key:
 
 val get_keys:
   #Client_context.io_wallet ->
-  (string * Public_key_hash.t * Signature.Public_key.t * sk_locator) list tzresult Lwt.t
+  (string * Public_key_hash.t * Signature.Public_key.t * sk_uri) list tzresult Lwt.t
 
 val force_switch : unit -> (bool, 'ctx) Clic.arg

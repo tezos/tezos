@@ -26,7 +26,7 @@ val get_manager :
   Block_services.block ->
   Contract.t ->
   (string * public_key_hash *
-   public_key * Client_keys.sk_locator) tzresult Lwt.t
+   public_key * Client_keys.sk_uri) tzresult Lwt.t
 
 val get_balance:
   #Proto_alpha.rpc_context ->
@@ -40,7 +40,7 @@ val set_delegate :
   fee:Tez.tez ->
   Contract.t ->
   src_pk:public_key ->
-  manager_sk:Client_keys.sk_locator ->
+  manager_sk:Client_keys.sk_uri ->
   public_key_hash option ->
   Operation_list_hash.elt tzresult Lwt.t
 
@@ -48,7 +48,7 @@ val register_as_delegate:
   #Proto_alpha.full ->
   Block_services.block ->
   fee:Tez.tez ->
-  manager_sk:Client_keys.sk_locator ->
+  manager_sk:Client_keys.sk_uri ->
   public_key -> Operation_list_hash.elt tzresult Lwt.t
 
 val operation_submitted_message :
@@ -60,13 +60,13 @@ val source_to_keys:
   #Proto_alpha.full ->
   Block_services.block ->
   Contract.t ->
-  (public_key * Client_keys.sk_locator) tzresult Lwt.t
+  (public_key * Client_keys.sk_uri) tzresult Lwt.t
 
 val originate_account :
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_locator ->
+  src_sk:Client_keys.sk_uri ->
   manager_pkh:public_key_hash ->
   ?delegatable:bool ->
   ?delegate:public_key_hash ->
@@ -99,7 +99,7 @@ val originate_contract:
   balance:Tez.t ->
   source:Contract.t ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_locator ->
+  src_sk:Client_keys.sk_uri ->
   code:Script.expr ->
   #Proto_alpha.full ->
   (Operation_hash.t * Contract.t) tzresult Lwt.t
@@ -110,7 +110,7 @@ val transfer :
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_locator ->
+  src_sk:Client_keys.sk_uri ->
   destination:Contract.t ->
   ?arg:string ->
   amount:Tez.t ->
@@ -124,7 +124,7 @@ val reveal :
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_locator ->
+  src_sk:Client_keys.sk_uri ->
   fee:Tez.t ->
   unit -> Operation_hash.t tzresult Lwt.t
 

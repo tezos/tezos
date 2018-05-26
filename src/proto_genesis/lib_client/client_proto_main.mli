@@ -14,6 +14,6 @@ val bake:
   ?timestamp: Time.t ->
   Block_services.block ->
   Data.Command.t ->
-  Client_keys.sk_locator ->
+  Client_keys.sk_uri ->
   Block_hash.t tzresult Lwt.t
 
