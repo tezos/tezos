@@ -38,10 +38,10 @@ let no_write_context ?(block = `Head 0) config : #Client_context.full = object
     a Data_encoding.encoding -> unit Error_monad.tzresult Lwt.t =
     fun _ _ _ -> return ()
   method block = block
-  method prompt : type a. (a, string) Client_context.lwt_format -> a =
-    Format.kasprintf (fun _ -> Lwt.return "")
-  method prompt_password : type a. (a, string) Client_context.lwt_format -> a =
-    Format.kasprintf (fun _ -> Lwt.return "")
+  method prompt : type a. (a, string tzresult) Client_context.lwt_format -> a =
+    Format.kasprintf (fun _ -> return "")
+  method prompt_password : type a. (a, MBytes.t tzresult) Client_context.lwt_format -> a =
+    Format.kasprintf (fun _ -> return (MBytes.of_string ""))
 end
 
 let sandbox_parameters =

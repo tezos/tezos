@@ -19,8 +19,8 @@ class type printer = object
 end
 
 class type prompter = object
-  method prompt : ('a, string) lwt_format -> 'a
-  method prompt_password : ('a, string) lwt_format -> 'a
+  method prompt : ('a, string tzresult) lwt_format -> 'a
+  method prompt_password : ('a, MBytes.t tzresult) lwt_format -> 'a
 end
 
 class type io = object

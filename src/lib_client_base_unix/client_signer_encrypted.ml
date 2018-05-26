@@ -60,21 +60,20 @@ module Encrypted_signer : SIGNER = struct
     to_bigarray salt, to_bigarray skenc
 
   let rec passwd_ask_loop (cctxt : #Client_context.io_wallet) ~name ~salt ~skenc =
-    cctxt#prompt_password "Enter password for encrypted key %s: " name >>= fun password ->
-    let password = MBytes.of_string password in
+    cctxt#prompt_password "Enter password for encrypted key %s: " name >>=? fun password ->
     let key = pbkdf ~salt ~password in
     let key = Crypto_box.Secretbox.unsafe_of_bytes key in
     match Crypto_box.Secretbox.box_open key skenc nonce with
     | None -> passwd_ask_loop cctxt ~name ~salt ~skenc
     | Some decrypted_sk ->
-        Lwt.return (password, (Data_encoding.Binary.of_bytes_exn
-                                 Signature.Secret_key.encoding
-                                 decrypted_sk))
+        return (password, (Data_encoding.Binary.of_bytes_exn
+                             Signature.Secret_key.encoding
+                             decrypted_sk))
 
   let ask_all_passwords (cctxt : #Client_context.io_wallet) sks =
-    Lwt_list.fold_left_s begin fun a (name, skloc) ->
+    fold_left_s begin fun a (name, skloc) ->
       if Secret_key_locator.scheme skloc <> scheme then
-        Lwt.return a
+        return a
       else
         match Secret_key_locator.location skloc with
         |location :: _ -> begin
@@ -86,12 +85,12 @@ module Encrypted_signer : SIGNER = struct
                 | Some sk ->
                     Hashtbl.replace decrypted_sks location
                       (Data_encoding.Binary.of_bytes_exn Signature.Secret_key.encoding sk);
-                    Lwt.return a
+                    return a
                 | None ->
                     passwd_ask_loop
-                      cctxt ~name ~salt ~skenc >>= fun (passwd, decrypted_sk) ->
+                      cctxt ~name ~salt ~skenc >>=? fun (passwd, decrypted_sk) ->
                     Hashtbl.replace decrypted_sks location decrypted_sk ;
-                    Lwt.return (passwd :: a)
+                    return (passwd :: a)
           end
         |_ -> Lwt.fail Exit
     end [] sks
@@ -104,15 +103,14 @@ module Encrypted_signer : SIGNER = struct
       (fun _ -> failwith "Corrupted secret key database. Aborting.")
 
   let input_new_passphrase (cctxt : #Client_context.io_wallet) =
-    cctxt#prompt_password "Enter passphrase to encrypt your key: " >>= fun password ->
-    cctxt#prompt_password "Confirm passphrase: " >>= fun confirm ->
+    cctxt#prompt_password "Enter passphrase to encrypt your key: " >>=? fun password ->
+    cctxt#prompt_password "Confirm passphrase: " >>=? fun confirm ->
     if password <> confirm then
       failwith "Passphrases do not match."
     else return password
 
   let encrypt_sk cctxt sk =
     input_new_passphrase cctxt >>=? fun password ->
-    let password = MBytes.of_string password in
     let salt = Rand.generate salt_len in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~password ~salt) in
     let msg = Data_encoding.Binary.to_bytes_exn Signature.Secret_key.encoding sk in
@@ -124,7 +122,7 @@ module Encrypted_signer : SIGNER = struct
 
   let rec get_boolean_answer (cctxt : #Client_context.io_wallet) ~default ~msg =
     let prompt = if default then "(Y/n/q)" else "(y/N/q)" in
-    cctxt#prompt "%s %s: " msg prompt >>= fun gen ->
+    cctxt#prompt "%s %s: " msg prompt >>=? fun gen ->
     match default, String.lowercase_ascii gen with
     | default, "" -> return default
     | _, "y" -> return true
@@ -133,21 +131,21 @@ module Encrypted_signer : SIGNER = struct
     | _ -> get_boolean_answer cctxt ~msg ~default
 
   let rec sk_of_mnemonic (cctxt : #Client_context.io_wallet) =
-    cctxt#prompt "Enter the e-mail used for the paper wallet: " >>= fun email ->
+    cctxt#prompt "Enter the e-mail used for the paper wallet: " >>=? fun email ->
     let rec loop_words acc i =
-      if i > 14 then Lwt.return (List.rev acc) else
-        cctxt#prompt_password "Enter word %d: " i >>= fun word ->
-        match Bip39.index_of_word word with
+      if i > 14 then return (List.rev acc) else
+        cctxt#prompt_password "Enter word %d: " i >>=? fun word ->
+        match Bip39.index_of_word (MBytes.to_string word) with
         | None -> loop_words acc i
         | Some wordidx -> loop_words (wordidx :: acc) (succ i) in
-    loop_words [] 0 >>= fun words ->
+    loop_words [] 0 >>=? fun words ->
     match Bip39.of_indices words with
     | None -> assert false
     | Some t ->
         cctxt#prompt_password
-          "Enter the password used for the paper wallet: " >>= fun password ->
+          "Enter the password used for the paper wallet: " >>=? fun password ->
         (* TODO: unicode normalization (NFKD)... *)
-        let sk = Bip39.to_seed ~passphrase:(email ^ password) t in
+        let sk = Bip39.to_seed ~passphrase:(email ^ MBytes.to_string password) t in
         let sk = Cstruct.(to_bigarray (sub sk 0 32)) in
         let sk : Signature.Secret_key.t =
           Ed25519

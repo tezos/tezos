@@ -19,8 +19,8 @@ class type printer = object
 end
 
 class type prompter = object
-  method prompt : ('a, string) lwt_format -> 'a
-  method prompt_password : ('a, string) lwt_format -> 'a
+  method prompt : ('a, string tzresult) lwt_format -> 'a
+  method prompt_password : ('a, MBytes.t tzresult) lwt_format -> 'a
 end
 
 class type io = object
@@ -97,6 +97,6 @@ class proxy_context (obj : full) = object
   method message : type a. (a, unit) lwt_format -> a = obj#message
   method warning : type a. (a, unit) lwt_format -> a  = obj#warning
   method write : type a. string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t = obj#write
-  method prompt : type a. (a, string) lwt_format -> a = obj#prompt
-  method prompt_password : type a. (a, string) lwt_format -> a = obj#prompt_password
+  method prompt : type a. (a, string tzresult) lwt_format -> a = obj#prompt
+  method prompt_password : type a. (a, MBytes.t tzresult) lwt_format -> a = obj#prompt_password
 end

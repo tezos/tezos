@@ -44,18 +44,18 @@ class unix_wallet ~base_dir : wallet = object (self)
 end
 
 class unix_prompter = object
-  method prompt : type a. (a, string) lwt_format -> a =
+  method prompt : type a. (a, string tzresult) lwt_format -> a =
     Format.kasprintf begin fun msg ->
       print_string msg ;
       let line = read_line () in
-      Lwt.return line
+      return line
     end
 
-  method prompt_password : type a. (a, string) lwt_format -> a =
+  method prompt_password : type a. (a, MBytes.t tzresult) lwt_format -> a =
     Format.kasprintf begin fun msg ->
       print_string msg ;
       let line = Lwt_utils_unix.getpass () in
-      Lwt.return line
+      return (MBytes.of_string line)
     end
 end
 
