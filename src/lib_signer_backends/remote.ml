@@ -166,5 +166,4 @@ module Remote_signer : SIGNER = struct
 
 end
 
-let () =
-  register_signer (module Remote_signer)
+include Remote_signer

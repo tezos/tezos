@@ -616,3 +616,7 @@ let display_level block =
 
 let endorsement_security_deposit block =
   Constants_services.endorsement_security_deposit !rpc_ctxt block
+
+let () =
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Unencrypted)

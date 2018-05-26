@@ -74,6 +74,12 @@ let main select_commands =
   ignore Clic.(setup_formatter Format.err_formatter
                  (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
   init_logger () >>= fun () ->
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Unencrypted) ;
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Encrypted) ;
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Remote) ;
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
         (new unix_full
