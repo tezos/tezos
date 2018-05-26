@@ -222,7 +222,7 @@ let commands () =
        @@ tez_param
          ~name: "qty" ~desc: "amount taken from source"
        @@ prefix "from"
-       @@ ContractAlias.alias_param
+       @@ ContractAlias.destination_param
          ~name: "src" ~desc: "name of the source contract"
        @@ prefix "to"
        @@ ContractAlias.destination_param

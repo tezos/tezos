@@ -141,23 +141,39 @@ let register_key cctxt ?(force=false) (public_key_hash, pk_uri, sk_uri) name =
   return ()
 
 let raw_get_key (cctxt : #Client_context.wallet) pkh =
-  Public_key_hash.rev_find cctxt pkh >>=? function
-  | None -> failwith "no keys for the source contract manager"
-  | Some n ->
-      Public_key.find_opt cctxt n >>=? fun pk_uri ->
-      Secret_key.find_opt cctxt n >>=? fun sk_uri ->
+  begin
+    Public_key_hash.rev_find cctxt pkh >>=? function
+    | None -> failwith "no keys for the source contract manager"
+    | Some n ->
+        Public_key.find_opt cctxt n >>=? fun pk_uri ->
+        Secret_key.find_opt cctxt n >>=? fun sk_uri ->
+        begin
+          Option.unopt_map
+            ~default:Lwt.return_none
+            ~f:(fun pkh ->
+                public_key pkh >>= function
+                | Error e ->
+                    Format.eprintf "PLOP: %a@." pp_print_error e ;
+                    Lwt.return_none
+                | Ok pk -> Lwt.return_some pk)
+            pk_uri
+        end >>= fun pk ->
+        return (n, pk, sk_uri)
+  end >>= function
+  | (Ok (_, None, None) | Error _) as initial_result -> begin
       begin
-        Option.unopt_map
-          ~default:Lwt.return_none
-          ~f:(fun pkh ->
-              public_key pkh >>= function
-              | Error e ->
-                  Format.eprintf "PLOP: %a@." pp_print_error e ;
-                  Lwt.return_none
-              | Ok pk -> Lwt.return_some pk)
-          pk_uri
-      end >>= fun pk ->
-      return (n, pk, sk_uri)
+        (* try to lookup for a remote key *)
+        find_signer_for_key ~scheme:"remote" >>=? fun signer ->
+        let module Signer = (val signer : SIGNER) in
+        let path = Signature.Public_key_hash.to_b58check pkh in
+        let uri = Uri.make ~scheme:Signer.scheme ~path () in
+        Signer.public_key uri >>=? fun pk ->
+        return (path, Some pk, Some uri)
+      end >>= function
+      | Error _ -> Lwt.return initial_result
+      | Ok _ as success -> Lwt.return success
+    end
+  | Ok _ as success -> Lwt.return success
 
 let get_key cctxt pkh =
   raw_get_key cctxt pkh >>=? function
