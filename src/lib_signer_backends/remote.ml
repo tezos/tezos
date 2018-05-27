@@ -19,18 +19,9 @@ module Make(S : sig val default : Uri.t end) = struct
     "Built-in tezos-signer using remote wallet."
 
   let description =
-    "Valid locators are one of these two forms:\n\
-    \  - unix [path to local signer socket] <remote key alias>\n\
-    \  - tcp [host] [port] <remote key alias>\n\
-    \  - https [host] [port] <remote key alias>\n\
-     All fields except the key can be of the form '$VAR', \
-     in which case their value is taken from environment variable \
-     VAR each time the key is accessed.\n\
-     Not specifiyng fields sets them to $TEZOS_SIGNER_UNIX_PATH, \
-     $TEZOS_SIGNER_TCP_HOST and $TEZOS_SIGNER_TCP_PORT, \
-     $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT, \
-     that get evaluated to default values '$HOME/.tezos-signer-socket', \
-     localhost and 6732, and can be set later on."
+    "Valid locators are of this form: remote://tz1...\n\
+     The key will be queried to current remote signer, which can be \
+     configured with the `--remote-signer` or `-R` options"
 
   let get_remote () =
     match Uri.scheme S.default with
@@ -42,10 +33,14 @@ module Make(S : sig val default : Uri.t end) = struct
   module Remote = (val get_remote () : SIGNER)
   let key =
     match Uri.scheme S.default with
-    | Some "unix" | Some "tcp" ->
+    | Some "unix" ->
         (fun uri ->
            let key = Uri.path uri in
-           Uri.add_query_param S.default ("key", [key]))
+           Uri.add_query_param' S.default ("pkh", key))
+    | Some "tcp" ->
+        (fun uri ->
+           let key = Uri.path uri in
+           Uri.with_path S.default key)
     | Some "https" ->
         (fun uri ->
            let key = Uri.path uri in
@@ -63,8 +58,7 @@ module Make(S : sig val default : Uri.t end) = struct
       (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
 
   let neuterize sk_uri =
-    Remote.neuterize
-      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
+    return (Client_keys.make_pk_uri (sk_uri : sk_uri :> Uri.t))
 
   let sign ?watermark sk_uri msg =
     Remote.sign

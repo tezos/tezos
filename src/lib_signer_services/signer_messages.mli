@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type error += Unknown_alias_key of string
-
 module Sign : sig
 
   module Request : sig
