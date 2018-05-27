@@ -8,10 +8,3 @@ src_dir="$(dirname "$script_dir")"
 . "$script_dir"/opam-remove.sh
 
 opam pin remove $packages
-
-### Temporary HACK
-
-## Should be in sync with `opam-pin.sh`
-opam pin remove --no-action leveldb
-
-### End of temporary HACK
