@@ -11,6 +11,7 @@ type t = private int32
 type roll = t
 
 val encoding: roll Data_encoding.t
+val rpc_arg: roll RPC_arg.t
 
 val random:
   Seed_repr.sequence -> bound:roll -> roll * Seed_repr.sequence

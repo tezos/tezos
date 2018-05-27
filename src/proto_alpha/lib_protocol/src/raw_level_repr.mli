@@ -13,7 +13,7 @@
 type t
 type raw_level = t
 val encoding: raw_level Data_encoding.t
-val arg: raw_level RPC_arg.arg
+val rpc_arg: raw_level RPC_arg.arg
 val pp: Format.formatter -> raw_level -> unit
 include Compare.S with type t := raw_level
 

@@ -12,7 +12,7 @@ type voting_period = t
 include (Compare.Int32 : Compare.S with type t := t)
 let encoding = Data_encoding.int32
 let pp ppf level = Format.fprintf ppf "%ld" level
-let arg =
+let rpc_arg =
   let construct voting_period = Int32.to_string voting_period in
   let destruct str =
     match Int32.of_string str with

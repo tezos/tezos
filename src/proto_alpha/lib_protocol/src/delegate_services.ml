@@ -314,8 +314,8 @@ module Baking_rights = struct
       let open RPC_query in
       query (fun levels cycles delegates max_priority all ->
           { levels ; cycles ; delegates ; max_priority ; all })
-      |+ multi_field "level" Raw_level.arg (fun t -> t.levels)
-      |+ multi_field "cycle" Cycle.arg (fun t -> t.cycles)
+      |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
+      |+ multi_field "cycle" Cycle.rpc_arg (fun t -> t.cycles)
       |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t -> t.delegates)
       |+ opt_field "max_priority" RPC_arg.int (fun t -> t.max_priority)
       |+ flag "all" (fun t -> t.all)
@@ -437,8 +437,8 @@ module Endorsing_rights = struct
       let open RPC_query in
       query (fun levels cycles delegates ->
           { levels ; cycles ; delegates })
-      |+ multi_field "level" Raw_level.arg (fun t -> t.levels)
-      |+ multi_field "cycle" Cycle.arg (fun t -> t.cycles)
+      |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
+      |+ multi_field "cycle" Cycle.rpc_arg (fun t -> t.cycles)
       |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t -> t.delegates)
       |> seal
 

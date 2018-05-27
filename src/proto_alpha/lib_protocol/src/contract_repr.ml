@@ -135,7 +135,7 @@ let incr_origination_nonce nonce =
   let origination_index = Int32.succ nonce.origination_index in
   { nonce with origination_index }
 
-let arg =
+let rpc_arg =
   let construct = to_b58check in
   let destruct hash =
     match of_b58check hash with

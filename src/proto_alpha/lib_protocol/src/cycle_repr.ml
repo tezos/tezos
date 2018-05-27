@@ -11,7 +11,7 @@ type t = int32
 type cycle = t
 
 let encoding = Data_encoding.int32
-let arg =
+let rpc_arg =
   let construct = Int32.to_string in
   let destruct str =
     match Int32.of_string str with

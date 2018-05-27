@@ -42,7 +42,7 @@ module Nonce = struct
         ~description: "Info about the nonce of a previous block."
         ~query: RPC_query.empty
         ~output: info_encoding
-        RPC_path.(custom_root / "context" / "nonces" /: Raw_level.arg)
+        RPC_path.(custom_root / "context" / "nonces" /: Raw_level.rpc_arg)
 
   end
 

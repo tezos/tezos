@@ -51,14 +51,14 @@ module S = struct
       ~description: "Access the balance of a contract."
       ~query: RPC_query.empty
       ~output: Tez.encoding
-      RPC_path.(custom_root /: Contract.arg / "balance")
+      RPC_path.(custom_root /: Contract.rpc_arg / "balance")
 
   let manager =
     RPC_service.get_service
       ~description: "Access the manager of a contract."
       ~query: RPC_query.empty
       ~output: Signature.Public_key_hash.encoding
-      RPC_path.(custom_root /: Contract.arg / "manager")
+      RPC_path.(custom_root /: Contract.rpc_arg / "manager")
 
   let manager_key =
     RPC_service.get_service
@@ -67,56 +67,56 @@ module S = struct
       ~output: (obj2
                   (req "manager" Signature.Public_key_hash.encoding)
                   (opt "key" Signature.Public_key.encoding))
-      RPC_path.(custom_root /: Contract.arg / "manager_key")
+      RPC_path.(custom_root /: Contract.rpc_arg / "manager_key")
 
   let delegate =
     RPC_service.get_service
       ~description: "Access the delegate of a contract, if any."
       ~query: RPC_query.empty
       ~output: Signature.Public_key_hash.encoding
-      RPC_path.(custom_root /: Contract.arg / "delegate")
+      RPC_path.(custom_root /: Contract.rpc_arg / "delegate")
 
   let counter =
     RPC_service.get_service
       ~description: "Access the counter of a contract, if any."
       ~query: RPC_query.empty
       ~output: int32
-      RPC_path.(custom_root /: Contract.arg / "counter")
+      RPC_path.(custom_root /: Contract.rpc_arg / "counter")
 
   let spendable =
     RPC_service.get_service
       ~description: "Tells if the contract tokens can be spent by the manager."
       ~query: RPC_query.empty
       ~output: bool
-      RPC_path.(custom_root /: Contract.arg / "spendable")
+      RPC_path.(custom_root /: Contract.rpc_arg / "spendable")
 
   let delegatable =
     RPC_service.get_service
       ~description: "Tells if the contract delegate can be changed."
       ~query: RPC_query.empty
       ~output: bool
-      RPC_path.(custom_root /: Contract.arg / "delegatable")
+      RPC_path.(custom_root /: Contract.rpc_arg / "delegatable")
 
   let script =
     RPC_service.get_service
       ~description: "Access the code and data of the contract."
       ~query: RPC_query.empty
       ~output: Script.encoding
-      RPC_path.(custom_root /: Contract.arg / "script")
+      RPC_path.(custom_root /: Contract.rpc_arg / "script")
 
   let storage =
     RPC_service.get_service
       ~description: "Access the data of the contract."
       ~query: RPC_query.empty
       ~output: Script.expr_encoding
-      RPC_path.(custom_root /: Contract.arg / "storage")
+      RPC_path.(custom_root /: Contract.rpc_arg / "storage")
 
   let info =
     RPC_service.get_service
       ~description: "Access the complete status of a contract."
       ~query: RPC_query.empty
       ~output: info_encoding
-      RPC_path.(custom_root /: Contract.arg)
+      RPC_path.(custom_root /: Contract.rpc_arg)
 
   let list =
     RPC_service.get_service
