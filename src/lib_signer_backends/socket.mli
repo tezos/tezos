@@ -9,3 +9,6 @@
 
 module Unix : Client_keys.SIGNER
 module Tcp : Client_keys.SIGNER
+
+val make_unix_base: string -> Uri.t
+val make_tcp_base: string -> int -> Uri.t

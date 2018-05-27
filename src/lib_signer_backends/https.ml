@@ -57,3 +57,6 @@ let sign ?watermark uri msg =
   RPC_client.call_service
     Media_type.all_media_types
     ~base Signer_services.sign ((), pkh) () msg
+
+let make_base host port =
+  Uri.make ~scheme ~host ~port ()

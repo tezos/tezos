@@ -109,3 +109,9 @@ module Tcp = struct
     sign ?watermark path pkh msg
 
 end
+
+let make_unix_base path =
+  Uri.make ~scheme:Unix.scheme ~path ()
+
+let make_tcp_base host port =
+  Uri.make ~scheme:Tcp.scheme ~host ~port ()

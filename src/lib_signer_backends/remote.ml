@@ -21,7 +21,11 @@ module Make(S : sig val default : Uri.t end) = struct
   let description =
     "Valid locators are of this form: remote://tz1...\n\
      The key will be queried to current remote signer, which can be \
-     configured with the `--remote-signer` or `-R` options"
+     configured with the `--remote-signer` or `-R` options, \
+     or by defining the following environment variables:\n \
+     - $TEZOS_SIGNER_UNIX_PATH,\n\
+     - $TEZOS_SIGNER_TCP_HOST and $TEZOS_SIGNER_TCP_PORT (default: 7732),\n\
+     - $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT (default: 443)."
 
   let get_remote () =
     match Uri.scheme S.default with
@@ -75,3 +79,65 @@ let make_sk sk =
 let make_pk pk =
   Client_keys.make_pk_uri
     (Uri.make ~scheme ~path:(Signature.Public_key.to_b58check pk) ())
+
+let read_base_uri_from_env () =
+  match Sys.getenv_opt "TEZOS_SIGNER_UNIX_PATH",
+        Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST",
+        Sys.getenv_opt "TEZOS_SIGNER_HTTPS_HOST" with
+  | None, None, None -> return None
+  | Some path, None, None ->
+      return (Some (Socket.make_unix_base path))
+  | None, Some host, None -> begin
+      try
+        let port =
+          match Sys.getenv_opt "TEZOS_SIGNER_TCP_PORT" with
+          | None -> 7732
+          | Some port -> int_of_string port in
+        return (Some (Socket.make_tcp_base host port))
+      with Invalid_argument _ ->
+        failwith "Failed to parse TEZOS_SIGNER_TCP_PORT.@."
+    end
+  | None, None, Some host -> begin
+      try
+        let port =
+          match Sys.getenv_opt "TEZOS_SIGNER_HTTPS_PORT" with
+          | None -> 443
+          | Some port -> int_of_string port in
+        return (Some (Https.make_base host port))
+      with Invalid_argument _ ->
+        failwith "Failed to parse TEZOS_SIGNER_HTTPS_PORT.@."
+    end
+  | _, _, _ ->
+      failwith
+        "Only one the following environment variable must be defined: \
+         TEZOS_SIGNER_UNIX_PATH, \
+         TEZOS_SIGNER_TCP_HOST, \
+         TEZOS_SIGNER_HTTPS_HOST@."
+
+type error += Invalid_remote_signer of string
+
+let () =
+  register_error_kind
+    `Branch
+    ~id: "invalid_remote_signer"
+    ~title: "Unexpected URI fot remote signer"
+    ~description: "The provided remote signer is invalid."
+    ~pp:
+      (fun ppf s ->
+         Format.fprintf ppf "Value '%s' is not a valid URI for a remote signer" s)
+    Data_encoding.(obj1 (req "uri" string))
+    (function Invalid_remote_signer s -> Some s | _ -> None)
+    (fun s -> Invalid_remote_signer s)
+
+let parse_base_uri s =
+  trace (Invalid_remote_signer s) @@
+  try
+    let uri = Uri.of_string s in
+    match Uri.scheme uri with
+    | Some "https" -> return uri
+    | Some "tcp" -> return uri
+    | Some "unix" -> return uri
+    | Some scheme -> failwith "Unknown scheme: %s" scheme
+    | None -> failwith "Unknown scheme: <empty>"
+  with Invalid_argument msg -> failwith "Malformed URI: %s" msg
+

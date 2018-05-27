@@ -281,10 +281,7 @@ let remote_signer_arg () =
     ~placeholder:"uri"
     ~doc:"URI of the remote signer"
     (parameter
-       (fun _ x ->
-          (* TODO check scheme = 'unix/tcp/https' *)
-          try return (Uri.of_string x)
-          with _ -> fail (Invalid_remote_signer_argument x)))
+       (fun _ x -> Tezos_signer_backends.Remote.parse_base_uri x))
 
 let read_config_file config_file =
   Lwt_utils_unix.Json.read_file config_file >>=? fun cfg_json ->
@@ -424,7 +421,10 @@ let parse_config_args (ctx : #Client_context.full) argv =
   let tls = cfg.tls || tls in
   let node_addr = Option.unopt ~default:cfg.node_addr node_addr in
   let node_port = Option.unopt ~default:cfg.node_port node_port in
-  let remote_signer = Option.first_some remote_signer cfg.remote_signer in
+  Tezos_signer_backends.Remote.read_base_uri_from_env () >>=? fun remote_signer_env ->
+  let remote_signer =
+    Option.first_some remote_signer
+      (Option.first_some remote_signer_env cfg.remote_signer) in
   let confirmations = Option.unopt ~default:cfg.confirmations confirmations in
   let cfg = { cfg with tls ; node_port ; node_addr ;
                        remote_signer ; confirmations } in
