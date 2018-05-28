@@ -11,18 +11,28 @@ open Client_keys
 
 let scheme = "https"
 
-let title = "..."
+let title =
+  "Built-in tezos-signer using remote signer through hardcoded https requests."
 
-let description = "..."
+let description =
+  "Valid locators are of this form:\n\
+  \ -  https://host/tz1...\n\
+  \ -  https://host:port/path/to/service/tz1...\n"
 
 let parse uri =
-  let path = String.split '/' (Uri.path uri) in
-  match List.rev path with
-  | [] -> invalid_arg "..."
-  | key :: rev_path ->
-      Lwt.return (Signature.Public_key_hash.of_b58check key) >>=? fun key ->
-      return (Uri.with_path uri (String.concat "/" (List.rev rev_path)),
-              key)
+  (* extract `tz1..` from the last component of the path *)
+  assert (Uri.scheme uri = Some scheme) ;
+  let path = Uri.path uri in
+  let base, pkh =
+    match String.rindex_opt path '/' with
+    | None ->
+        Uri.with_path uri "", path
+    | Some i ->
+        let pkh = String.sub path i (String.length path - i) in
+        let path = String.sub path 0 i in
+        Uri.with_path uri path, pkh in
+  Lwt.return (Signature.Public_key_hash.of_b58check pkh) >>=? fun pkh ->
+  return (base, pkh)
 
 let public_key uri =
   parse (uri : pk_uri :> Uri.t) >>=? fun (base, pkh) ->
@@ -47,3 +57,6 @@ let sign ?watermark uri msg =
   RPC_client.call_service
     Media_type.all_media_types
     ~base Signer_services.sign ((), pkh) () msg
+
+let make_base host port =
+  Uri.make ~scheme ~host ~port ()

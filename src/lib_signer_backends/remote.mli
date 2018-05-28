@@ -11,3 +11,6 @@ module Make(S : sig val default : Uri.t end) : Client_keys.SIGNER
 
 val make_pk: Signature.public_key -> Client_keys.pk_uri
 val make_sk: Signature.secret_key -> Client_keys.sk_uri
+
+val read_base_uri_from_env: unit -> Uri.t option tzresult Lwt.t
+val parse_base_uri: string -> Uri.t tzresult Lwt.t

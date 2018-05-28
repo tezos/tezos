@@ -8,3 +8,5 @@
 (**************************************************************************)
 
 include Client_keys.SIGNER
+
+val make_base: string -> int -> Uri.t

@@ -38,13 +38,17 @@ module Unix = struct
 
   let scheme = "unix"
 
-  let title = "..."
+  let title =
+    "Built-in tezos-signer using remote signer through hardcoded unix socket."
 
-  let description = "..."
+  let description =
+    "Valid locators are of this form: unix:///path/to/socket?pkh=tz1..."
 
   let parse uri =
-    match Uri.get_query_param uri "key" with
-    | None -> invalid_arg "... FIXME ... B"
+    assert (Uri.scheme uri = Some scheme) ;
+    trace (Invalid_uri uri) @@
+    match Uri.get_query_param uri "pkh" with
+    | None -> failwith "Missing the query parameter: 'pkh=tz1...'"
     | Some key ->
         Lwt.return (Signature.Public_key_hash.of_b58check key) >>=? fun key ->
         return (Lwt_utils_unix.Socket.Unix (Uri.path uri), key)
@@ -70,22 +74,24 @@ module Tcp = struct
 
   let scheme = "tcp"
 
-  let title = "..."
+  let title =
+    "Built-in tezos-signer using remote signer through hardcoded tcp socket."
 
-  let description = "..."
-
-  (* let init _cctxt = return () *)
+  let description =
+    "Valid locators are of this form: tcp://host:port/tz1..."
 
   let parse uri =
-    match Uri.get_query_param uri "key" with
-    | None -> invalid_arg "... FIXME ... C"
-    | Some key ->
-        Lwt.return (Signature.Public_key_hash.of_b58check key) >>=? fun key ->
-        match Uri.host uri, Uri.port uri with
-        | None, _ | _, None ->
-            invalid_arg "... FIXME ... C2"
-        | Some path, Some port ->
-            return (Lwt_utils_unix.Socket.Tcp (path, port), key)
+    assert (Uri.scheme uri = Some scheme) ;
+    trace (Invalid_uri uri) @@
+    match Uri.host uri, Uri.port uri with
+    | None, _ ->
+        failwith "Missing host address"
+    | _, None ->
+        failwith "Missing host port"
+    | Some path, Some port ->
+        Lwt.return
+          (Signature.Public_key_hash.of_b58check (Uri.path uri)) >>=? fun pkh ->
+        return (Lwt_utils_unix.Socket.Tcp (path, port), pkh)
 
   let public_key uri =
     parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) ->
@@ -103,3 +109,9 @@ module Tcp = struct
     sign ?watermark path pkh msg
 
 end
+
+let make_unix_base path =
+  Uri.make ~scheme:Unix.scheme ~path ()
+
+let make_tcp_base host port =
+  Uri.make ~scheme:Tcp.scheme ~host ~port ()

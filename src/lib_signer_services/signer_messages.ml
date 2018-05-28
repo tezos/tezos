@@ -7,19 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type error += Unknown_alias_key of string
-
-let () =
-  register_error_kind `Permanent
-    ~id: "signer.unknown_alias_key"
-    ~title: "Unkwnon_alias_key"
-    ~description: "A remote key does not exists"
-    ~pp: (fun ppf s ->
-        Format.fprintf ppf "The key %s does not is not known on the remote signer" s)
-    Data_encoding.(obj1 (req "value" string))
-    (function Unknown_alias_key s -> Some s | _ -> None)
-    (fun s -> Unknown_alias_key s)
-
 module Sign = struct
 
   module Request = struct

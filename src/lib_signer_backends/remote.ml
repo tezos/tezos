@@ -19,18 +19,13 @@ module Make(S : sig val default : Uri.t end) = struct
     "Built-in tezos-signer using remote wallet."
 
   let description =
-    "Valid locators are one of these two forms:\n\
-    \  - unix [path to local signer socket] <remote key alias>\n\
-    \  - tcp [host] [port] <remote key alias>\n\
-    \  - https [host] [port] <remote key alias>\n\
-     All fields except the key can be of the form '$VAR', \
-     in which case their value is taken from environment variable \
-     VAR each time the key is accessed.\n\
-     Not specifiyng fields sets them to $TEZOS_SIGNER_UNIX_PATH, \
-     $TEZOS_SIGNER_TCP_HOST and $TEZOS_SIGNER_TCP_PORT, \
-     $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT, \
-     that get evaluated to default values '$HOME/.tezos-signer-socket', \
-     localhost and 6732, and can be set later on."
+    "Valid locators are of this form: remote://tz1...\n\
+     The key will be queried to current remote signer, which can be \
+     configured with the `--remote-signer` or `-R` options, \
+     or by defining the following environment variables:\n \
+     - $TEZOS_SIGNER_UNIX_PATH,\n\
+     - $TEZOS_SIGNER_TCP_HOST and $TEZOS_SIGNER_TCP_PORT (default: 7732),\n\
+     - $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT (default: 443)."
 
   let get_remote () =
     match Uri.scheme S.default with
@@ -42,10 +37,14 @@ module Make(S : sig val default : Uri.t end) = struct
   module Remote = (val get_remote () : SIGNER)
   let key =
     match Uri.scheme S.default with
-    | Some "unix" | Some "tcp" ->
+    | Some "unix" ->
         (fun uri ->
            let key = Uri.path uri in
-           Uri.add_query_param S.default ("key", [key]))
+           Uri.add_query_param' S.default ("pkh", key))
+    | Some "tcp" ->
+        (fun uri ->
+           let key = Uri.path uri in
+           Uri.with_path S.default key)
     | Some "https" ->
         (fun uri ->
            let key = Uri.path uri in
@@ -63,8 +62,7 @@ module Make(S : sig val default : Uri.t end) = struct
       (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
 
   let neuterize sk_uri =
-    Remote.neuterize
-      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
+    return (Client_keys.make_pk_uri (sk_uri : sk_uri :> Uri.t))
 
   let sign ?watermark sk_uri msg =
     Remote.sign
@@ -81,3 +79,65 @@ let make_sk sk =
 let make_pk pk =
   Client_keys.make_pk_uri
     (Uri.make ~scheme ~path:(Signature.Public_key.to_b58check pk) ())
+
+let read_base_uri_from_env () =
+  match Sys.getenv_opt "TEZOS_SIGNER_UNIX_PATH",
+        Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST",
+        Sys.getenv_opt "TEZOS_SIGNER_HTTPS_HOST" with
+  | None, None, None -> return None
+  | Some path, None, None ->
+      return (Some (Socket.make_unix_base path))
+  | None, Some host, None -> begin
+      try
+        let port =
+          match Sys.getenv_opt "TEZOS_SIGNER_TCP_PORT" with
+          | None -> 7732
+          | Some port -> int_of_string port in
+        return (Some (Socket.make_tcp_base host port))
+      with Invalid_argument _ ->
+        failwith "Failed to parse TEZOS_SIGNER_TCP_PORT.@."
+    end
+  | None, None, Some host -> begin
+      try
+        let port =
+          match Sys.getenv_opt "TEZOS_SIGNER_HTTPS_PORT" with
+          | None -> 443
+          | Some port -> int_of_string port in
+        return (Some (Https.make_base host port))
+      with Invalid_argument _ ->
+        failwith "Failed to parse TEZOS_SIGNER_HTTPS_PORT.@."
+    end
+  | _, _, _ ->
+      failwith
+        "Only one the following environment variable must be defined: \
+         TEZOS_SIGNER_UNIX_PATH, \
+         TEZOS_SIGNER_TCP_HOST, \
+         TEZOS_SIGNER_HTTPS_HOST@."
+
+type error += Invalid_remote_signer of string
+
+let () =
+  register_error_kind
+    `Branch
+    ~id: "invalid_remote_signer"
+    ~title: "Unexpected URI fot remote signer"
+    ~description: "The provided remote signer is invalid."
+    ~pp:
+      (fun ppf s ->
+         Format.fprintf ppf "Value '%s' is not a valid URI for a remote signer" s)
+    Data_encoding.(obj1 (req "uri" string))
+    (function Invalid_remote_signer s -> Some s | _ -> None)
+    (fun s -> Invalid_remote_signer s)
+
+let parse_base_uri s =
+  trace (Invalid_remote_signer s) @@
+  try
+    let uri = Uri.of_string s in
+    match Uri.scheme uri with
+    | Some "https" -> return uri
+    | Some "tcp" -> return uri
+    | Some "unix" -> return uri
+    | Some scheme -> failwith "Unknown scheme: %s" scheme
+    | None -> failwith "Unknown scheme: <empty>"
+  with Invalid_argument msg -> failwith "Malformed URI: %s" msg
+

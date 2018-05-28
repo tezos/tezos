@@ -12,6 +12,9 @@
 type pk_uri = private Uri.t
 type sk_uri = private Uri.t
 
+type error += Unregistered_key_scheme of string
+type error += Invalid_uri of Uri.t
+
 module Public_key_hash :
   Client_aliases.Alias with type t = Signature.Public_key_hash.t
 module Public_key :

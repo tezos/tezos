@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 type error += Unregistered_key_scheme of string
+type error += Invalid_uri of Uri.t
 
 let () =
   register_error_kind `Permanent
@@ -20,7 +21,17 @@ let () =
          Format.fprintf ppf "No matching plugin for key scheme %s" s)
     Data_encoding.(obj1 (req "value" string))
     (function Unregistered_key_scheme s -> Some s | _ -> None)
-    (fun s -> Unregistered_key_scheme s)
+    (fun s -> Unregistered_key_scheme s) ;
+  register_error_kind `Permanent
+    ~id: "cli.key.invalid_uri"
+    ~title: "Invalid key uri"
+    ~description: "A key has been provided with an invalid uri."
+    ~pp:
+      (fun ppf s ->
+         Format.fprintf ppf "Cannot parse the key uri: %s" s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_uri s -> Some (Uri.to_string s) | _ -> None)
+    (fun s -> Invalid_uri (Uri.of_string s))
 
 module Public_key_hash = Client_aliases.Alias (struct
     type t =  Signature.Public_key_hash.t
