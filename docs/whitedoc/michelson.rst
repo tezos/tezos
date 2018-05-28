@@ -139,7 +139,7 @@ Code patterns are of one of the following syntactical forms.
 
 Stack patterns are of one of the following syntactical forms.
 
--  ``[FAIL]`` is the special failed state ;
+-  ``[FAILED]`` is the special failed state ;
 -  ``[]`` is the empty stack ;
 -  ``(top) : (rest)`` is a stack whose top element is matched by the
    data pattern ``(top)`` on the left, and whose remaining elements are
@@ -323,31 +323,6 @@ the program on an abstract stack representing the input type provided by
 the programmer, and checking that the resulting symbolic stack is
 consistent with the expected result, also provided by the programmer.
 
-Annotations
-~~~~~~~~~~~
-
-Most instructions in the language can optionally take an annotation.
-Annotations allow you to better track data, on the stack and within
-pairs and unions.
-
-If added on the components of a type, the annotation will be propagated
-by the typechecker throughout access instructions.
-
-Annotating an instruction that produces a value on the stack will
-rewrite the annotation on the toplevel of its type.
-
-Trying to annotate an instruction that does not produce a value will
-result in a typechecking error.
-
-At join points in the program (``IF``, ``IF_LEFT``, ``IF_CONS``,
-``IF_NONE``, ``LOOP``), annotations must be compatible. Annotations are
-compatible if both elements are annotated with the same annotation or if
-at least one of the values/types is unannotated.
-
-Stack visualization tools like the Michelson’s Emacs mode print
-annotations associated with each type in the program, as propagated by
-the typechecker. This is useful as a debugging aid.
-
 Side note
 ~~~~~~~~~
 
@@ -420,8 +395,8 @@ Control structures
 
 ::
 
-    > FAIL / _  =>  [FAIL]
-    > _ / [FAIL]  =>  [FAIL]
+    > FAIL / _  =>  [FAILED]
+    > _ / [FAILED]  =>  [FAILED]
 
 -  ``{ I ; C }``: Sequence.
 
@@ -1531,6 +1506,7 @@ combinators, and also for branching.
 
     > IFCMP(\op) / S  =>  COMPARE ; (\op) ; IF bt bf / S
 
+
 Assertion Macros
 ~~~~~~~~~~~~~~~~
 
@@ -1599,12 +1575,44 @@ operations.
 
     > DUU(\rest=U*)P / S  =>  DIP (DU(\rest)P) ; SWAP / S
 
--  ``P(A*AI)+R``: A syntactic sugar for building nested pairs in bulk.
+-  ``P(\left=A|P(\left)(\right))(\right=I|P(\left)(\right))R``: A syntactic sugar
+   for building nested pairs.
 
 ::
 
-    > P(\fst=A*)AI(\rest=(A*AI)+)R / S  =>  P(\fst)AIR ; P(\rest)R / S
-    > PA(\rest=A*)AIR / S  =>  DIP (P(\rest)AIR) / S
+    > PA(\right)R / S => DIP ((\right)R) ; PAIR / S
+    > P(\left)IR / S => PAIR ; (\left)R / S
+    > P(\left)(\right)R => (\right)R ; (\left)R ; PAIR / S
+
+A good way to quickly figure which macro to use is to mentally parse the
+macro as ``P`` for pair constructor, ``A`` for left leaf and ``I`` for
+right leaf. The macro takes as many elements on the stack as there are
+leaves and constructs a nested pair with the shape given by its name.
+
+Take the macro ``PAPPAIIR`` for instance:
+
+::
+
+    P A  P P A  I    I R
+    ( l, ( ( l, r ), r ))
+
+A typing rule can be inferred:
+
+::
+
+   PAPPAIIR
+   :: 'a : 'b : 'c : 'd : 'S  ->  (pair 'a (pair (pair 'b 'c) 'd))
+
+-  ``UNP(\left=A|P(\left)(\right))(\right=I|P(\left)(\right))R``: A syntactic sugar
+   for destructing nested pairs. These macros follow the same convention
+   as the previous one.
+
+::
+
+    > UNPAIR / S => DUP ; CAR ; DIP { CDR } / S
+    > UNPA(\right)R / S => UNPAIR ; DIP (UN(\right)R) / S
+    > UNP(\left)IR / S => UNPAIR ; UN(\left)R / S
+    > UNP(\left)(\right)R => UNPAIR ; UN(\left)R ; UN(\right)R / S
 
 -  ``C[AD]+R``: A syntactic sugar for accessing fields in nested pairs.
 
@@ -1650,7 +1658,7 @@ operations.
 
 ::
 
-    > MAP_CAR code  =>  DUP ; CDR ; SWAP ; code ; CAR ; PAIR
+    > MAP_CAR code  =>  DUP ; CDR ; DIP { CAR ; code } ; SWAP ; PAIR
 
 -  ``MAP_CDR`` code: Transform the first value of a pair.
 
@@ -1663,9 +1671,9 @@ operations.
 
 ::
 
-    > MAP_CA(\rest=[AD]+)R / S   =>
+    > MAP_CA(\rest=[AD]+)R code / S   =>
         { DUP ; DIP { CAR ; MAP_C(\rest)R code } ; CDR ; SWAP ; PAIR } / S
-    > MAP_CD(\rest=[AD]+)R / S   =>
+    > MAP_CD(\rest=[AD]+)R code / S   =>
         { DUP ; DIP { CDR ; MAP_C(\rest)R code } ; CAR ; PAIR } / S
 
 IX - Concrete syntax
@@ -1761,26 +1769,6 @@ indentation rules.
    -  All arguments in a sequence must be indented to the right of the
       primitive name by at least one column.
 
-.. _annotations-1:
-
-Annotations
-~~~~~~~~~~~
-
-Sequences and primitive applications can receive an annotation.
-
-An annotation is a lowercase identifier that starts with an ``@`` sign.
-It comes after the opening curly brace for sequence, and after the
-primitive name for primitive applications.
-
-::
-
-    { @annot
-      expr ;
-      expr ;
-      ... }
-
-    (prim @annot arg arg ...)
-
 Differences with the formal notation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1849,7 +1837,481 @@ example.
 Comments that span on multiple lines or that stop before the end of the
 line can also be written, using C-like delimiters (``/* ... */``).
 
-X - JSON syntax
+X - Annotations
+---------------
+
+The annotation mechanism of Michelson provides ways to better track
+data on the stack and withing data structures (pairs, unions and
+options), as well as to give additional type constraints.
+
+Stack visualization tools like the Michelson’s Emacs mode print
+annotations associated with each type in the program, as propagated by
+the typechecker as well as variable annotations on the types of elements
+in the stack. This is useful as a debugging aid.
+
+We distinguish four kinds of annotations:
+- type annotations, written ``:type_annot``,
+- field or constructors annotations, written ``%field_annot``,
+- variable annotations, written ``@var_annot``,
+- and binding annotations, written ``$bind_annot``.
+
+Type Annotations
+~~~~~~~~~~~~~~~~
+
+Each type can be annotated with at most one type annotation. They are
+used to give names to types. For types to be equal, their unnamed
+version must be equal and their names must be the same or at least one
+type must be unnamed.
+
+For instance, the following Michelson program which put its integer
+parameter in the storage is not well typed:
+
+::
+
+    parameter (int :p) ;
+    storage (int :s) ;
+    code { UNPAIR ; SWAP ; DROP ; NIL operation ; PAIR }
+
+Whereas this one is:
+
+::
+
+    parameter (int :p) ;
+    storage int ;
+    code { UNPAIR ; SWAP ; DROP ; NIL operation ; PAIR }
+
+Inner components of composed typed can also be named.
+
+::
+
+   (pair :point (int :x_pos) (int :y_pos))
+
+Push-like instructions, that act as constructors, can also be given a
+type annotation. The stack type will then have a correspondingly named
+type on top.
+
+::
+
+   UNIT :t
+   :: 'A -> (unit :t) : 'A
+
+   PAIR :t
+   :: 'a : 'b : 'S -> (pair :t 'a 'b) : 'S
+
+   SOME t:
+   :: 'a : 'S -> (option :t 'a) : 'S
+
+   NONE :t 'a
+   :: 'S -> (option :t 'a) : 'S
+
+   LEFT :t 'b
+   :: 'a : 'S -> (or :t 'a 'b) : 'S
+
+   RIGHT :t 'a
+   :: 'b : 'S -> (or :t 'a 'b) : 'S
+
+   NIL :t 'a
+   :: 'S -> (list :t 'a) : 'S
+
+   EMPTY_SET :t 'elt
+   :: 'S -> (set :t 'elt) : 'S
+
+   EMPTY_MAP :t 'key 'val
+   :: 'S -> (map :t 'key 'val) : 'S
+
+Variable Annotations
+~~~~~~~~~~~~~~~~~~~~
+
+Variable annotations can only be used on instructions that produce
+elements on the stack. An instruction that produces ``n`` elements on
+the stack can be given at most ``n`` variable annotations.
+
+The stack type contains both the types of each element in the stack, as
+well as an optional variable annotation for each element. In this
+sub-section we note:
+- ``[]`` for the empty stack ;
+- ``@annot (top) : (rest)`` for the stack whose first value has type
+  ``(top)`` and is annotated with variable annotation ``@annot`` and
+  whose queue has stack type ``(rest)``.
+
+The instructions which do not accept any variable annotations are:
+
+::
+
+   DROP
+   SWAP
+   IF_NONE
+   IF_LEFT
+   IF_CONS
+   ITER
+   IF
+   LOOP
+   LOOP_LEFT
+   DIP
+   FAIL
+
+The instructions which accept at most one variable annotation are:
+
+::
+
+   DUP
+   PUSH
+   UNIT
+   SOME
+   NONE
+   PAIR
+   CAR
+   CDR
+   LEFT
+   RIGHT
+   NIL
+   CONS
+   SIZE
+   MAP
+   MEM
+   EMPTY_SET
+   EMPTY_MAP
+   UPDATE
+   GET
+   LAMBDA
+   EXEC
+   ADD
+   SUB
+   CONCAT
+   MUL
+   OR
+   AND
+   XOR
+   NOT
+   ABS
+   IS_NAT
+   INT
+   NEG
+   EDIV
+   LSL
+   LSR
+   COMPARE
+   EQ
+   NEQ
+   LT
+   GT
+   LE
+   GE
+   ADDRESS
+   CONTRACT
+   MANAGER
+   SET_DELEGATE
+   IMPLICIT_ACCOUNT
+   NOW
+   AMOUNT
+   BALANCE
+   HASH_KEY
+   CHECK_SIGNATURE
+   H
+   STEPS_TO_QUOTA
+   SOURCE
+   SELF
+
+The instructions which accept at most two variable annotations are:
+
+::
+
+   CREATE_ACCOUNT
+   CREATE_CONTRACT
+
+Annotations on instructions that produce multiple elements on the stack
+will be used in order, where the first variable annotation is given to
+the top-most element on the resulting stack. Instructions that produce
+``n`` elements on the stack but are given less than ``n`` variable
+annotations will see only their top-most stack type elements annotated.
+
+::
+
+   CREATE_ACCOUNT @op @addr
+   :: key_hash : option key_hash : bool : tez : 'S
+      ->  @op operation : @addr address : 'S
+
+   CREATE_ACCOUNT @op
+   :: key_hash : option key_hash : bool : tez : 'S
+      ->  @op operation : address : 'S
+
+
+Field and Constructor Annotations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Components of pair types, option types and or types can be annotated
+with a field or constructor annotation. This feature is useful to encode
+records fields and constructors of sum types.
+
+::
+
+   (pair :point
+         (int %x)
+         (int %y))
+
+The previous Michelson type can be used as visual aid to represent the
+record type (given in OCaml-like syntax):
+
+::
+
+   type point = { x : int ; y : int }
+
+Similarly,
+
+::
+
+   (or :t
+       (int %A)
+       (or
+          (bool %B)
+          (pair %C
+                (nat %n1)
+                (nat %n2))))
+
+can be used to represent the algebraic data type (in OCaml-like syntax):
+
+::
+
+   type t =
+     | A of int
+     | B of bool
+     | C of { n1 : nat ; n2 : nat }
+
+
+Instructions that construct elements of composed types can also be
+annotated with one or multiple field annotations (in addition to type
+and variable annotations).
+
+::
+
+   PAIR %fst %snd
+   :: 'a : 'b : 'S -> (pair ('a %fst) ('b %fst)) : 'S
+
+   LEFT %left %right 'b
+   :: 'a : 'S -> (or ('a %left) ('b %right)) : 'S
+
+   RIGHT %left %right 'a
+   :: 'b : 'S -> (or ('a %left) ('b %right)) : 'S
+
+   NONE %some 'a
+   :: 'S -> (option ('a %some))
+
+   Some %some
+   :: 'a : 'S -> (option ('a %some))
+
+To improve readability and robustness, instructions ``CAR`` and ``CDR``
+accept one field annotation. For the contract to type check, the name of
+the accessed field in the destructed pair must match the one given here.
+
+::
+
+   CAR %fst
+   :: (pair ('a %fst) 'b) : S -> 'a : 'S
+
+   CDR %snd
+   :: (pair 'a ('b %snd)) : S -> 'b : 'S
+
+
+Binding Annotations
+~~~~~~~~~~~~~~~~~~~
+
+Michelson supports an extra kind of annotations which act as variable
+annotations for values bound by instructions inside code blocks.
+
+::
+
+   IF_NONE $some_value bt bf
+   :: option 'a : 'S   ->   'b : 'S
+      iff   bt :: [ 'S -> 'b : 'S]
+            bf :: [ @some_value 'a : 'S -> 'b : 'S]
+
+   IF_LEFT $left_value $right_value bt bf
+   :: or 'a 'b : 'S   ->   'c : 'S
+      iff   bt :: [ @left_value 'a : 'S -> 'c : 'S]
+            bf :: [ @right_value 'b : 'S -> 'c : 'S]
+
+   IF_CONS $head $tail bt bf
+   :: list 'a : 'S   ->   'b : 'S
+      iff   bt :: [ @head 'a : @tail list 'a : 'S -> 'b : 'S]
+            bf :: [ 'S -> 'b : 'S]
+
+   MAP $x body
+   :: (list 'elt) : 'A   ->  (list 'b) : 'A
+      iff   body :: [ @x 'elt : 'A -> 'b : 'A ]
+
+   MAP $x body
+   :: (set 'elt) : 'A   ->  (set 'b) : 'A
+      iff   body :: [ @x 'elt : 'A -> 'b : 'A ]
+
+   MAP $k $v body
+   :: (map 'key 'val) : 'A   ->  (map 'key 'b) : 'A
+      iff   body :: [ (pair ('key %k) ('val %v)) : 'A -> 'b : 'A ]
+
+   ITER $x body
+   :: (set 'elt) : 'A   ->  'A
+      iff body :: [ @x 'elt : 'A -> 'A ]
+
+   ITER $x body
+   :: (list 'elt) : 'A   ->  'A
+      iff body :: [ @x 'elt : 'A -> 'A ]
+
+   ITER $k $v body
+   :: (map 'elt 'val) : 'A   ->  'A
+      iff   body :: [ (pair ('elt %k) ('val %v)) : 'A -> 'A ]
+
+   LAMBDA $arg 'a 'b code
+   :: 'A ->  (lambda 'a 'b) : 'A
+      iff  code :: [ @arg 'a : []  -> 'b : [] ]
+
+   LOOP_LEFT $acc body
+   :: (or 'a 'b) : 'A   ->   'A
+      iff   body :: [ @acc 'a : 'A -> (or 'a 'b) : 'A ]
+
+Syntax
+~~~~~~
+
+Primitive applications can receive one or many annotations.
+
+An annotation is a sequence of characters that matches the regular
+expression ``[\@\:\%\$][0-9a-zA-Z\.]*``. They come after the primitive
+name and before its potential arguments for primitive applications.
+
+::
+
+    (prim @annot arg arg ...)
+
+
+Ordering between different kinds of annotations is not significant, but
+ordering among annotations of the same kind is.
+
+For instance these two annotated instructions are equivalent:
+
+::
+
+   PAIR :t @my_pair %x %y
+
+   PAIR %x :t %y @my_pair
+
+Annotations and Macros
+~~~~~~~~~~~~~~~~~~~~~~
+
+Macros also support annotations, which are propagated on their expanded
+forms. As with instructions, macros that produce ``n`` values on the
+stack accept ``n`` variable annotations.
+
+::
+
+   DUU+P @annot
+   > DUU(\rest=U*)P @annot / S  =>  DIP (DU(\rest)P @annot) ; SWAP / S
+
+   C[AD]+R @annot %field_name
+   > CA(\rest=[AD]+)R @annot %field_name / S  =>  CAR ; C(\rest)R @annot %field_name / S
+   > CD(\rest=[AD]+)R @annot %field_name / S  =>  CDR ; C(\rest)R @annot %field_name / S
+
+   ``CMP{EQ|NEQ|LT|GT|LE|GE}`` @annot
+   > CMP(\op) @annot / S  =>  COMPARE ; (\op) @annot / S
+
+The variable annotation on ``SET_C[AD]+R`` and ``MAP_C[AD]+R`` annotates
+the resulting toplevel pair while its field annotation is used to check
+that the modified field is the expected one.
+
+::
+
+   SET_C[AD]+R @var %field
+   > SET_CAR @var %field =>  CDR %field ; SWAP ; PAIR @var
+   > SET_CDR @var %field =>  CAR %field ; PAIR @var
+   > SET_CA(\rest=[AD]+)R @var %field / S   =>
+     { DUP ; DIP { CAR ; SET_C(\rest)R %field } ; CDR ; SWAP ; PAIR @var } / S
+   > SET_CD(\rest=[AD]+)R  @var %field/ S   =>
+     { DUP ; DIP { CDR ; SET_C(\rest)R %field } ; CAR ; PAIR @var } / S
+
+   MAP_C[AD]+R @var %field code
+   > MAP_CAR code  =>  DUP ; CDR ; DIP { CAR %field ; code } ; SWAP ; PAIR @var
+   > MAP_CDR code  =>  DUP ; CDR %field ; code ; SWAP ; CAR ; PAIR @var
+   > MAP_CA(\rest=[AD]+)R @var %field code / S   =>
+     { DUP ; DIP { CAR ; MAP_C(\rest)R %field code } ; CDR ; SWAP ; PAIR @var} / S
+   > MAP_CD(\rest=[AD]+)R @var %field code / S   =>
+    { DUP ; DIP { CDR ; MAP_C(\rest)R %field code } ; CAR ; PAIR @var} / S
+
+Macros for nested ``PAIR`` and ``UNPAIR`` accept multiple
+annotations. Field annotations for ``PAIR`` give names to leaves of the
+constructed nested pair, in order. Variable annotations for ``UNPAIR``
+give names to deconstructed components on the stack. This next snippet
+gives examples instead of generic rewrite rules for readability
+purposes.
+
+::
+
+   PAPPAIIR @p %x1 %x2 %x3 %x4
+   :: 'a : 'b : 'c : 'd : 'S
+      -> @p (pair ('a %x1) (pair (pair ('b %x) ('c %x3)) ('d %x4))) : 'S
+
+   PAPAIR @p %x1 %x2 %x3
+   :: 'a : 'b : 'c : 'S  ->  @p (pair ('a %x1) (pair ('b %x) ('c %x3))) : 'S
+
+   UNPAIR @x @y
+   :: (pair 'a 'b) : 'S -> @x 'a : @y 'b : 'S
+
+   UNPAPPAIIR @x1 @x2 @x3 @x4
+   :: (pair 'a (pair (pair 'b 'c) 'd )) : 'S
+      -> @x1 'a : @x2 'b : @x3 'c : @x4 'd : 'S
+
+Automatic Variable and Field Annotations Inferring
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When no annotation is provided by the Michelson programmer, the
+typechecker infers some annotations in specific cases. This greatly
+helps users track information in the stack for bare contracts.
+
+For unannotated accesses with ``CAR`` and ``CDR`` to fields that are
+named will be appended (with an additional ``.`` character) to the pair
+variable annotation. If the original pair is not named in the stack, no
+variable annotation will be inferred.
+
+::
+
+   CDAR
+   :: @p (pair ('a %foo) (pair %bar ('b %x) ('c %y))) : 'S ->  @p.bar.x 'b : 'S
+
+If fields are not named but the pair is still named in the stack then
+``.car`` or ``.cdr`` will be appended.
+
+::
+
+   CDAR
+   :: @p (pair 'a (pair 'b 'c)) : 'S ->  @p.cdr.car 'b : 'S
+
+
+A similar mechanism is used for context dependent instructions:
+
+::
+
+   ADDRESS  :: @c contract _ : 'S   ->   @c.address address : 'S
+
+   CONTRACT 'p  :: @a address : 'S   ->   @a.contract contract 'p : 'S
+
+   MANAGER
+   :: @a address : 'S   ->   @a.manager key_hash option : 'S
+   :: @c contract 'p : 'S   ->   @c.manager key_hash : 'S
+
+   BALANCE :: 'S   ->   @balance tez : 'S
+
+   SOURCE  :: 'S   ->   @source address : 'S
+
+   SELF  :: 'S   ->   @self contract 'p : 'S
+
+   AMOUNT  :: 'S   ->   @amount tez : 'S
+
+   STEPS_TO_QUOTA  :: 'S   ->  @steps nat : 'S
+
+   NOW  :: 'S   ->   @now timestamp : 'S
+
+If now binding annotation is provided for instruction with code blocks
+(that accept one), then the bound items on the stack will be given a
+default variable name annotation depending on the instruction and stack
+type.
+
+XI - JSON syntax
 ---------------
 
 Micheline expressions are encoded in JSON like this:
@@ -1870,16 +2332,17 @@ Micheline expressions are encoded in JSON like this:
 
 -  A primitive application is an object with two fields ``"prim"`` for
    the primitive name and ``"args"`` for the arguments (that must
-   contain an array). A third optional field ``"annot"`` may contains
-   an annotation, including the ``@`` sign.
+   contain an array). A third optional field ``"annots"`` contains
+   a list of annotations, including their leading ``@``, ``%``, ``%`` or
+   ``$`` sign.
 
-   { “prim”: “pair”, “args”: [ { “prim”: “nat”, args: [] }, { “prim”:
-   “nat”, args: [] } ], “annot”: “@numbers” }\`
+   ``{ "prim": "pair", "args": [ { "prim": "nat", "args": [] }, { "prim":
+     "nat", "args": [] } ], "annots": [":t"] }``
 
 As in the concrete syntax, all domain specific constants are encoded as
 strings.
 
-XI - Examples
+XII - Examples
 -------------
 
 Contracts in the system are stored as a piece of code and a global data
@@ -1902,7 +2365,7 @@ The simplest contract is the contract for which the ``parameter`` and
 ::
 
     code { CDR ;           # keep the storage
-           NIl operation ; # return no internal operation
+           NIL operation ; # return no internal operation
            PAIR };         # respect the calling convention
     storage unit;
     parameter unit;
@@ -1960,21 +2423,21 @@ The complete source ``reservoir.tz`` is:
     parameter unit ;
     storage
       (pair
-         (pair (timestamp @T) (tez @N)) # T N
-         (pair (contract @A unit) (contract @B  unit))) ; # A B
+         (pair (timestamp %T) (tez %N)) # T N
+         (pair (contract %A unit) (contract %B unit))) ; # A B
     code
-      { CDR ; DUP ; CAAR ; # T
+      { CDR ; DUP ; CAAR %T; # T
         NOW ; COMPARE ; LE ;
-        IF { DUP ; CADR ; # N
+        IF { DUP ; CADR %N; # N
              BALANCE ;
              COMPARE ; LE ;
              IF { NIL operation ; PAIR }
-                { DUP ; CDDR ; # B
+                { DUP ; CDDR %B; # B
                   BALANCE ; UNIT ;
                   TRANSFER_TOKENS ;
                   NIL operation ; SWAP ; CONS ;
                   PAIR } }
-           { DUP ; CDAR ; # A
+           { DUP ; CDAR %A; # A
              BALANCE ;
              UNIT ;
              TRANSFER_TOKENS ;
