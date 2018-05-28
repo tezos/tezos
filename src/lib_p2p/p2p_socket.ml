@@ -478,8 +478,9 @@ module Writer = struct
 
 end
 
-type 'msg t = {
+type ('msg, 'meta) t = {
   conn : connection ;
+  meta : 'meta ;
   reader : 'msg Reader.t ;
   writer : 'msg Writer.t ;
 }
@@ -488,6 +489,7 @@ let equal { conn = { id = id1 } } { conn = { id = id2 } } = id1 = id2
 
 let pp ppf { conn } = P2p_connection.Info.pp ppf conn.info
 let info { conn } = conn.info
+let meta { meta } = meta
 
 let accept
     ?incoming_message_queue_size ?outgoing_message_queue_size
@@ -505,7 +507,7 @@ let accept
     | [ P2p_errors.Decipher_error ] -> fail P2p_errors.Invalid_auth
     | err -> Lwt.return (Error err)
   end >>=? function
-  | Ack ack_cfg ->
+  | Ack meta ->
       let canceler = Lwt_canceler.create () in
       let conn = { id = next_conn_id () ; fd ; info ; cryptobox_data } in
       let reader =
@@ -515,12 +517,12 @@ let accept
           ?size:outgoing_message_queue_size ?binary_chunks_size
           conn encoding canceler
       in
-      let conn = { conn ; reader ; writer } in
+      let conn = { conn ; reader ; writer ; meta } in
       Lwt_canceler.on_cancel canceler begin fun () ->
         P2p_io_scheduler.close fd >>= fun _ ->
         Lwt.return_unit
       end ;
-      return (conn, ack_cfg)
+      return conn
   | Nack ->
       fail P2p_errors.Rejected_socket_connection
 

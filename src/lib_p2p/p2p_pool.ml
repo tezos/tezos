@@ -92,9 +92,9 @@ module Answerer = struct
     swap_ack: P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t ;
   }
 
-  type 'msg t = {
+  type ('msg, 'meta) t = {
     canceler: Lwt_canceler.t ;
-    conn: 'msg Message.t P2p_socket.t ;
+    conn: ('msg Message.t, 'meta) P2p_socket.t ;
     callback: 'msg callback ;
     mutable worker: unit Lwt.t ;
   }
@@ -248,12 +248,12 @@ and events = {
 and ('msg, 'peer_meta, 'conn_meta) connection = {
   canceler : Lwt_canceler.t ;
   messages : (int * 'msg) Lwt_pipe.t ;
-  conn : 'msg Message.t P2p_socket.t ;
+  conn : ('msg Message.t, 'conn_meta) P2p_socket.t ;
   peer_info :
     (('msg, 'peer_meta, 'conn_meta) connection, 'peer_meta, 'conn_meta) P2p_peer_state.Info.t ;
   point_info :
     ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t option ;
-  answerer : 'msg Answerer.t Lazy.t ;
+  answerer : ('msg, 'conn_meta) Answerer.t Lazy.t ;
   mutable last_sent_swap_request : (Time.t * P2p_peer.Id.t) option ;
   mutable wait_close : bool ;
 }
@@ -584,6 +584,9 @@ module Connection = struct
   let info { conn } =
     P2p_socket.info conn
 
+  let meta { conn } =
+    P2p_socket.meta conn
+
   let find_by_peer_id pool peer_id =
     Option.apply
       (Peers.info pool peer_id)
@@ -800,11 +803,11 @@ and authenticate pool ?point_info canceler fd point =
           ?binary_chunks_size:pool.config.binary_chunks_size
           auth_fd
           (pool.conn_meta_config.conn_meta_value info.peer_id)
-          pool.encoding >>=? fun (conn, ack_cfg) ->
+          pool.encoding >>=? fun conn ->
         lwt_debug "authenticate: %a -> Connected %a"
           P2p_point.Id.pp point
           P2p_connection.Info.pp info >>= fun () ->
-        return (conn, ack_cfg)
+        return conn
       end ~on_error: begin fun err ->
         if incoming then
           log pool
@@ -816,7 +819,7 @@ and authenticate pool ?point_info canceler fd point =
           ~f:P2p_point_state.set_disconnected ;
         P2p_peer_state.set_disconnected peer_info ;
         Lwt.return (Error err)
-      end >>=? fun (conn, ack_cfg) ->
+      end >>=? fun conn ->
       let id_point =
         match info.id_point, Option.map ~f:P2p_point_state.Info.point point_info with
         | (addr, _), Some (_, port) -> addr, Some port
@@ -824,7 +827,7 @@ and authenticate pool ?point_info canceler fd point =
       return
         (create_connection
            pool conn
-           id_point connection_point_info peer_info version ack_cfg)
+           id_point connection_point_info peer_info version)
     end
   | _ -> begin
       log pool (Rejecting_request (point, info.id_point, info.peer_id)) ;
@@ -840,7 +843,7 @@ and authenticate pool ?point_info canceler fd point =
       fail (P2p_errors.Rejected info.peer_id)
     end
 
-and create_connection pool p2p_conn id_point point_info peer_info _version ack_cfg =
+and create_connection pool p2p_conn id_point point_info peer_info _version =
   let peer_id = P2p_peer_state.Info.peer_id peer_info in
   let canceler = Lwt_canceler.create () in
   let size =
@@ -872,7 +875,7 @@ and create_connection pool p2p_conn id_point point_info peer_info _version ack_c
     P2p_point.Table.add pool.connected_points point point_info ;
   end ;
   log pool (Connection_established (id_point, peer_id)) ;
-  P2p_peer_state.set_running peer_info id_point conn ack_cfg ;
+  P2p_peer_state.set_running peer_info id_point conn (P2p_socket.meta conn.conn) ;
   P2p_peer.Table.add pool.connected_peer_ids peer_id peer_info ;
   Lwt_condition.broadcast pool.events.new_connection () ;
   Lwt_canceler.on_cancel canceler begin fun () ->

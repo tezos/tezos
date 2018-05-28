@@ -204,6 +204,8 @@ module Real = struct
     P2p_pool.disconnect ?wait conn
   let connection_info _net conn =
     P2p_pool.Connection.info conn
+  let connection_metadata _net conn =
+    P2p_pool.Connection.meta conn
   let connection_stat _net conn =
     P2p_pool.Connection.stat conn
   let global_stat { pool } () =
@@ -326,6 +328,8 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
     ?wait:bool -> ('msg, 'peer_meta, 'conn_meta) connection -> unit Lwt.t ;
   connection_info :
     ('msg, 'peer_meta, 'conn_meta) connection -> P2p_connection.Info.t ;
+  connection_metadata :
+    ('msg, 'peer_meta, 'conn_meta) connection -> 'conn_meta ;
   connection_stat : ('msg, 'peer_meta, 'conn_meta) connection -> P2p_stat.t ;
   global_stat : unit -> P2p_stat.t ;
   get_peer_metadata : P2p_peer.Id.t -> 'peer_meta ;
@@ -401,6 +405,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
     find_connection = Real.find_connection net ;
     disconnect = Real.disconnect ;
     connection_info = Real.connection_info net  ;
+    connection_metadata = Real.connection_metadata net  ;
     connection_stat = Real.connection_stat net ;
     global_stat = Real.global_stat net ;
     get_peer_metadata = Real.get_peer_metadata net ;
@@ -426,6 +431,7 @@ let faked_network peer_cfg = {
   find_connection = (fun _ -> None) ;
   disconnect = (fun ?wait:_ _ -> Lwt.return_unit) ;
   connection_info = (fun _ -> Fake.connection_info) ;
+  connection_metadata = (fun _ -> assert false) ;
   connection_stat = (fun _ -> Fake.empty_stat) ;
   global_stat = (fun () -> Fake.empty_stat) ;
   get_peer_metadata = (fun _ -> peer_cfg.peer_meta_initial) ;
@@ -449,6 +455,7 @@ let connections net = net.connections ()
 let disconnect net = net.disconnect
 let find_connection net = net.find_connection
 let connection_info net = net.connection_info
+let connection_metadata net = net.connection_metadata
 let connection_stat net = net.connection_stat
 let global_stat net = net.global_stat ()
 let get_peer_metadata net = net.get_peer_metadata

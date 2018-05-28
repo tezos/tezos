@@ -24,14 +24,15 @@ type 'conn_meta authenticated_fd
     phase, but has not been accepted yet. Parametrized by the type
     of expected parameter in the `ack` message. *)
 
-type 'msg t
+type ('msg, 'meta) t
 (** Type of an accepted connection, parametrized by the type of
     messages exchanged between peers. *)
 
-val equal: 'mst t -> 'msg t -> bool
+val equal: ('mst, 'meta) t -> ('msg, 'meta) t -> bool
 
-val pp: Format.formatter -> 'msg t -> unit
-val info: 'msg t -> P2p_connection.Info.t
+val pp: Format.formatter -> ('msg, 'meta) t -> unit
+val info: ('msg, 'meta) t -> P2p_connection.Info.t
+val meta: ('msg, 'meta) t -> 'meta
 
 (** {1 Low-level functions (do not use directly)} *)
 
@@ -58,7 +59,7 @@ val accept:
   ?outgoing_message_queue_size:int ->
   ?binary_chunks_size: int ->
   'conn_meta authenticated_fd -> 'conn_meta ->
-  'msg Data_encoding.t -> ('msg t * 'conn_meta) tzresult Lwt.t
+  'msg Data_encoding.t -> ('msg, 'conn_meta) t tzresult Lwt.t
 (** (Low-level) (Cancelable) Accepts a remote peer given an
     authenticated_fd. Used in [P2p_connection_pool], to promote an
     [authenticated_fd] to the status of an active peer. *)
@@ -70,47 +71,47 @@ val check_binary_chunks_size:  int -> unit tzresult Lwt.t
 
 (** {2 Output functions} *)
 
-val write: 'msg t -> 'msg -> unit tzresult Lwt.t
+val write: ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t
 (** [write conn msg] returns when [msg] has successfully been added to
     [conn]'s internal write queue or fails with a corresponding
     error. *)
 
-val write_now: 'msg t -> 'msg -> bool tzresult
+val write_now: ('msg, 'meta) t -> 'msg -> bool tzresult
 (** [write_now conn msg] is [Ok true] if [msg] has been added to
     [conn]'s internal write queue, [Ok false] if [msg] has been
     dropped, or fails with a correponding error otherwise. *)
 
-val write_sync: 'msg t -> 'msg -> unit tzresult Lwt.t
+val write_sync: ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t
 (** [write_sync conn msg] returns when [msg] has been successfully
     sent to the remote end of [conn], or fails accordingly. *)
 
 (** {2 Input functions} *)
 
-val is_readable: 'msg t -> bool
+val is_readable: ('msg, 'meta) t -> bool
 (** [is_readable conn] is [true] iff [conn] internal read queue is not
     empty. *)
 
-val wait_readable: 'msg t -> unit tzresult Lwt.t
+val wait_readable: ('msg, 'meta) t -> unit tzresult Lwt.t
 (** (Cancelable) [wait_readable conn] returns when [conn]'s internal
     read queue becomes readable (i.e. not empty). *)
 
-val read: 'msg t -> (int * 'msg) tzresult Lwt.t
+val read: ('msg, 'meta) t -> (int * 'msg) tzresult Lwt.t
 (** [read conn msg] returns when [msg] has successfully been popped
     from [conn]'s internal read queue or fails with a corresponding
     error. *)
 
-val read_now: 'msg t -> (int * 'msg) tzresult option
+val read_now: ('msg, 'meta) t -> (int * 'msg) tzresult option
 (** [read_now conn msg] is [Some msg] if [conn]'s internal read queue
     is not empty, [None] if it is empty, or fails with a correponding
     error otherwise. *)
 
-val stat: 'msg t -> P2p_stat.t
+val stat: ('msg, 'meta) t -> P2p_stat.t
 (** [stat conn] is a snapshot of current bandwidth usage for
     [conn]. *)
 
-val close: ?wait:bool -> 'msg t -> unit Lwt.t
+val close: ?wait:bool -> ('msg, 'meta) t -> unit Lwt.t
 
 (**/**)
 
 (** for testing only *)
-val raw_write_sync: 'msg t -> MBytes.t -> unit tzresult Lwt.t
+val raw_write_sync: ('msg, 'meta) t -> MBytes.t -> unit tzresult Lwt.t

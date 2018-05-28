@@ -181,6 +181,10 @@ val connection_info :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
   P2p_connection.Info.t
+val connection_metadata :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'conn_meta
 val connection_stat :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
