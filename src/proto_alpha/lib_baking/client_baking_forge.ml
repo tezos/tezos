@@ -294,8 +294,7 @@ end = struct
                (req "level" Raw_level.encoding)
                (req "blocks" (list Block_hash.encoding))))
 
-  let name =
-    "blocks"
+  let name = "blocks"
 
   let load (wallet : #Client_context.wallet) =
     wallet#load name ~default:LevelMap.empty encoding

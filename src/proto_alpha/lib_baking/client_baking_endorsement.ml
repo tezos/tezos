@@ -26,21 +26,18 @@ module State : sig
     unit tzresult Lwt.t
 
 end = struct
-
   type t = (string * Raw_level.t) list
 
   let encoding : t Data_encoding.t =
     Data_encoding.assoc Raw_level.encoding
 
-  let name =
-    "endorsements"
+  let name = "endorsements"
 
   let load (wallet : #Client_context.wallet) =
     wallet#load name encoding ~default:[]
 
   let save (wallet : #Client_context.wallet) list =
     wallet#write name list encoding
-
 
   let get_endorsement (wallet : #Client_context.wallet) (delegate_key:Signature.public_key_hash) =
     wallet#with_lock
@@ -96,6 +93,7 @@ let inject_endorsement
   Shell_services.Injection.operation cctxt ?async ~chain signed_bytes >>=? fun oph ->
   State.record_endorsement cctxt pkh level >>=? fun () ->
   return oph
+
 
 let check_endorsement cctxt level pkh =
   State.get_endorsement cctxt pkh >>=? function
@@ -172,7 +170,7 @@ let get_delegates cctxt state =
   match state.delegates with
   | [] ->
       Client_keys.get_keys cctxt >>=? fun keys ->
-      return (List.map (fun (_,pkh,_,_) -> pkh) keys)
+      return (List.map (fun (_, pkh, _, _) -> pkh) keys)
   | _ :: _ as delegates ->
       return delegates
 
@@ -233,49 +231,12 @@ let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:Time.t) state bis
               lwt_log_info "Ignore block %a: forged too far the past"
                 Block_hash.pp_short bi.hash >>= return
             else
+
               let time = Time.(add (now ()) state.delay) in
               may_endorse bi delegate time
          ) bis
     )
     delegates
-
-(* let endorse (cctxt : #Proto_alpha.full) ~(max_past:Time.t) state bis =
- *   let may_endorse (block: Client_baking_blocks.block_info) delegate =
- *     Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
- *     lwt_log_info "May endorse block %a for %s"
- *       Block_hash.pp_short block.hash name >>= fun () ->
- *     let b = `Hash (block.hash, 0) in
- *     let level = block.level.level in
- *     get_signing_slots cctxt b delegate level >>=? fun slots ->
- *     lwt_debug "Found %d slots for %a/%s"
- *       (List.length slots) Block_hash.pp_short block.hash name >>= fun () ->
- *     previously_endorsed_level cctxt delegate level >>=? function
- *     | true ->
- *         lwt_debug "Level %a : previously endorsed."
- *           Raw_level.pp level >>= fun () ->
- *         return []
- *     | false ->
- *         return slots
- *   in
- *   get_delegates cctxt state >>=? fun delegates ->
- *   iter_p
- *     (fun delegate ->
- *        iter_p
- *          (fun (bi : Client_baking_blocks.block_info) ->
- *             if Time.compare bi.timestamp (Time.now ()) > 0  then
- *               lwt_log_info "Ignore block %a: forged in the future"
- *                 Block_hash.pp_short bi.hash >>= return
- *             else if Time.(min (now ()) bi.timestamp > max_past) then
- *               lwt_log_info "Ignore block %a: forged too far the past"
- *                 Block_hash.pp_short bi.hash >>= return
- *             else
- *               may_endorse bi delegate  >>=? function
- *               | [] ->
- *                   return ()
- *               | slots ->
- *                   endorse_for cctxt delegate bi slots )
- *          bis)
- *     delegates *)
 
 let compute_timeout state =
   match state.to_endorse with
