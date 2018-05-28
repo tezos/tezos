@@ -1,4 +1,3 @@
 parameter string;
-storage (map string string);
-return (option string);
-code {DUP; CAR; DIP{CDR; DUP}; GET; PAIR};
+storage (pair (option string) (map string string));
+code {DUP; CAR; DIP{CDDR; DUP}; GET; PAIR; NIL operation; PAIR};

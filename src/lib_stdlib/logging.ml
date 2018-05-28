@@ -85,6 +85,7 @@ module Client = struct
   module Endorsement = Make(struct let name = "client.endorsement" end)
   module Revelation = Make(struct let name = "client.revealation" end)
   module Denunciation = Make(struct let name = "client.denunciation" end)
+  module Sign = Make(struct let name = "client.signer" end)
 end
 
 type level = Lwt_log_core.level =

@@ -114,7 +114,7 @@ let origination_nonce_encoding =
 
 let originated_contract nonce =
   let data =
-    Data_encoding.Binary.to_bytes origination_nonce_encoding nonce in
+    Data_encoding.Binary.to_bytes_exn origination_nonce_encoding nonce in
   Originated (Contract_hash.hash_bytes [data])
 
 let originated_contracts ({ origination_index } as origination_nonce) =

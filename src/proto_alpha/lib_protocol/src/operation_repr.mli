@@ -24,7 +24,7 @@ type operation = {
 
 and proto_operation =
   | Anonymous_operations of anonymous_operation list
-  | Sourced_operations of sourced_operations
+  | Sourced_operation of sourced_operation
 
 and anonymous_operation =
   | Seed_nonce_revelation of {
@@ -44,7 +44,7 @@ and anonymous_operation =
       secret: Blinded_public_key_hash.secret ;
     }
 
-and sourced_operations =
+and sourced_operation =
   | Consensus_operation of consensus_operation
   | Amendment_operation of {
       source: Signature.Public_key_hash.t ;
@@ -55,6 +55,8 @@ and sourced_operations =
       fee: Tez_repr.tez ;
       counter: counter ;
       operations: manager_operation list ;
+      gas_limit: Z.t ;
+      storage_limit: Int64.t;
     }
   | Dictator_operation of dictator_operation
 
@@ -80,7 +82,7 @@ and manager_operation =
   | Reveal of Signature.Public_key.t
   | Transaction of {
       amount: Tez_repr.tez ;
-      parameters: Script_repr.expr option ;
+      parameters: Script_repr.lazy_expr option ;
       destination: Contract_repr.contract ;
     }
   | Origination of {
@@ -90,6 +92,7 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
+      preorigination: Contract_repr.t option ;
     }
   | Delegation of Signature.Public_key_hash.t option
 
@@ -128,3 +131,12 @@ val proto_operation_encoding:
 
 val unsigned_operation_encoding:
   (Operation.shell_header * proto_operation) Data_encoding.t
+
+type internal_operation = {
+  source: Contract_repr.contract ;
+  operation: manager_operation ;
+  nonce: int ;
+}
+
+val internal_operation_encoding:
+  internal_operation Data_encoding.t

@@ -19,6 +19,11 @@ module Int32 = struct
   let encoding = Data_encoding.int32
 end
 
+module Int64 = struct
+  type t = Int64.t
+  let encoding = Data_encoding.int64
+end
+
 module Int_index = struct
   type t = int
   let path_length = 1
@@ -38,6 +43,12 @@ module String_index = struct
     | [ c ] -> Some c
     | [] | _ :: _ :: _ -> None
 end
+
+module Last_block_priority =
+  Make_single_data_storage
+    (Raw_context)
+    (struct let name = ["last_block_priority"] end)
+    (Make_value(Int))
 
 (** Contracts handling *)
 
@@ -127,43 +138,43 @@ module Contract = struct
       (Make_value(Int32))
 
   module Code =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
       (struct let name = ["code"] end)
-      (Make_value(struct
-         type t = Script_repr.expr
-         let encoding = Script_repr.expr_encoding
+      (Make_carbonated_value(struct
+         type t = Script_repr.lazy_expr
+         let encoding = Script_repr.lazy_expr_encoding
        end))
 
   module Storage =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
       (struct let name = ["storage"] end)
-      (Make_value(struct
-         type t = Script_repr.expr
-         let encoding = Script_repr.expr_encoding
+      (Make_carbonated_value(struct
+         type t = Script_repr.lazy_expr
+         let encoding = Script_repr.lazy_expr_encoding
        end))
 
   type bigmap_key = Raw_context.t * Contract_repr.t
 
   module Big_map =
-    Storage_functors.Make_indexed_data_storage
+    Storage_functors.Make_indexed_carbonated_data_storage
       (Make_subcontext
          (Indexed_context.Raw_context)
          (struct let name = ["big_map"] end))
       (String_index)
-      (Make_value (struct
+      (Make_carbonated_value (struct
          type t = Script_repr.expr
          let encoding = Script_repr.expr_encoding
        end))
 
-  module Code_fees =
+  module Paid_storage_space_fees =
     Indexed_context.Make_map
-      (struct let name = ["code_fees"] end)
+      (struct let name = ["paid_bytes"] end)
       (Make_value(Tez_repr))
 
-  module Storage_fees =
+  module Used_storage_space =
     Indexed_context.Make_map
-      (struct let name = ["storage_fees"] end)
-      (Make_value(Tez_repr))
+      (struct let name = ["used_bytes"] end)
+      (Make_value(Int64))
 
   module Roll_list =
     Indexed_context.Make_map
@@ -426,6 +437,30 @@ module Commitments =
     (Make_subcontext(Raw_context)(struct let name = ["commitments"] end))
     (Unclaimed_public_key_hash.Index)
     (Make_value(Commitment_repr))
+
+(** Ramp up security deposits... *)
+
+module Ramp_up = struct
+
+  module Rewards =
+    Make_indexed_data_storage
+      (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "rewards"] end))
+      (Cycle_repr.Index)
+      (Make_value(struct
+         type t = Tez_repr.t * Tez_repr.t
+         let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
+       end))
+
+  module Security_deposits =
+    Make_indexed_data_storage
+      (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "deposits"] end))
+      (Cycle_repr.Index)
+      (Make_value(struct
+         type t = Tez_repr.t * Tez_repr.t
+         let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
+       end))
+
+end
 
 (** Resolver *)
 

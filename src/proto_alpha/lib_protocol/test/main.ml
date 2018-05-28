@@ -12,7 +12,10 @@ let wrap (n, f) =
     f () >>= function
     | Ok () -> Lwt.return_unit
     | Error error ->
-        Format.kasprintf Pervasives.failwith "%a" pp_print_error error
+        Format.kasprintf Pervasives.failwith "%a"
+          (Format.pp_print_list
+             (fun ppf e -> Data_encoding.Json.pp ppf (Error_monad.json_of_error e)))
+          error
   end
 
 let () =

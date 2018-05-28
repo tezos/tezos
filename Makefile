@@ -14,11 +14,13 @@ all:
 		src/bin_node/main.exe \
 		src/bin_client/main_client.exe \
 		src/bin_client/main_admin.exe \
+		src/bin_signer/main_signer.exe \
 		src/lib_protocol_compiler/main_native.exe \
 		src/proto_alpha/bin_baker/main_baker_alpha.exe
 	@cp _build/default/src/bin_node/main.exe tezos-node
 	@cp _build/default/src/bin_client/main_client.exe tezos-client
 	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
+	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
 	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
 	@cp _build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe tezos-alpha-baker
 

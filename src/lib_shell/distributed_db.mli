@@ -15,9 +15,8 @@ type t
 type db = t
 
 module Message = Distributed_db_message
-module Metadata = Distributed_db_metadata
 
-type p2p = (Message.t, Metadata.t) P2p.net
+type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
 val create: State.t -> p2p -> t
 val state: db -> State.t

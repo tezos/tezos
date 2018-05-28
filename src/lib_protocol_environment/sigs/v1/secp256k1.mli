@@ -9,4 +9,4 @@
 
 (** Tezos - Secp256k1 cryptography *)
 
-include S.SIGNATURE
+include S.SIGNATURE with type watermark := MBytes.t

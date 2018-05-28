@@ -7,10 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let get_keys () =
-  let seed = Ed25519.Seed.generate () in
-  Ed25519.generate_seeded_key seed
-
 module type B58CHECK = sig
   type t
   val pp: Format.formatter -> t -> unit
@@ -29,7 +25,7 @@ let test_b58check_roundtrip
       input
 
 let test_b58check_roundtrips () =
-  let (pubkey_hash, pubkey, seckey) = get_keys () in
+  let pubkey_hash, pubkey, seckey = Ed25519.generate_key () in
   test_b58check_roundtrip (module Ed25519.Public_key_hash) pubkey_hash;
   test_b58check_roundtrip (module Ed25519.Public_key) pubkey;
   test_b58check_roundtrip (module Ed25519.Secret_key) seckey

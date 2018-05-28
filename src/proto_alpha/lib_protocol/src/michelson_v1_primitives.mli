@@ -13,7 +13,6 @@ type error += Invalid_primitive_name of string Micheline.canonical * Micheline.c
 
 type prim =
   | K_parameter
-  | K_return
   | K_storage
   | K_code
   | D_False
@@ -39,7 +38,7 @@ type prim =
   | I_CONS
   | I_CREATE_ACCOUNT
   | I_CREATE_CONTRACT
-  | I_DEFAULT_ACCOUNT
+  | I_IMPLICIT_ACCOUNT
   | I_DIP
   | I_DROP
   | I_DUP
@@ -78,7 +77,6 @@ type prim =
   | I_OR
   | I_PAIR
   | I_PUSH
-  | I_REDUCE
   | I_RIGHT
   | I_SIZE
   | I_SOME
@@ -88,11 +86,15 @@ type prim =
   | I_SUB
   | I_SWAP
   | I_TRANSFER_TOKENS
+  | I_SET_DELEGATE
   | I_UNIT
   | I_UPDATE
   | I_XOR
   | I_ITER
   | I_LOOP_LEFT
+  | I_ADDRESS
+  | I_CONTRACT
+  | I_ISNAT
   | T_bool
   | T_contract
   | T_int
@@ -109,9 +111,11 @@ type prim =
   | T_set
   | T_signature
   | T_string
-  | T_tez
+  | T_mutez
   | T_timestamp
   | T_unit
+  | T_operation
+  | T_address
 
 val prim_encoding : prim Data_encoding.encoding
 

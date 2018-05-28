@@ -8,6 +8,18 @@
 (**************************************************************************)
 
 let run (cctxt : #Proto_alpha.full) ?max_priority ~delay ?min_date delegates ~endorsement ~denunciation ~baking =
+  begin
+    match delegates with
+    | [] ->
+        Tezos_signer_backends.Encrypted.decrypt_all cctxt
+    | _ :: _ ->
+        iter_s
+          (fun k ->
+             Client_keys.get_key cctxt k >>=? fun (_, _, sk_uri) ->
+             Client_keys.neuterize sk_uri >>=? fun _ ->
+             return ())
+          delegates
+  end >>=? fun () ->
   (* TODO really detach... *)
   let endorsement =
     if endorsement then

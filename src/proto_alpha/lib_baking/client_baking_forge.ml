@@ -30,10 +30,8 @@ let forge_block_header
     let protocol_data : Block_header.protocol_data =
       { priority ; seed_nonce_hash ; proof_of_work_nonce } in
     if Baking.check_header_proof_of_work_stamp shell protocol_data stamp_threshold then
-      let unsigned_header =
-        Alpha_context.Block_header.forge_unsigned shell protocol_data in
-      Client_keys.append cctxt delegate_sk unsigned_header >>=? fun signed_header ->
-      return signed_header
+      let unsigned_header = Block_header.forge_unsigned shell protocol_data in
+      Client_keys.append delegate_sk ~watermark:Block_header unsigned_header
     else
       loop () in
   loop ()

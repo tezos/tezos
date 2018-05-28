@@ -19,11 +19,20 @@ type secret_key =
   | Ed25519 of Ed25519.Secret_key.t
   | Secp256k1 of Secp256k1.Secret_key.t
 
+type watermark =
+  | Block_header
+  | Endorsement
+  | Generic_operation
+  | Custom of MBytes.t
+
+val bytes_of_watermark: watermark -> MBytes.t
+
 include S.SIGNATURE with type Public_key_hash.t = public_key_hash
                      and type Public_key.t = public_key
                      and type Secret_key.t = secret_key
+                     and type watermark := watermark
 
-val append : secret_key -> MBytes.t -> MBytes.t
+val append : ?watermark:watermark -> secret_key -> MBytes.t -> MBytes.t
 (** [append sk buf] is the concatenation of [buf] and the
     serialization of the signature of [buf] signed by [sk]. *)
 
@@ -41,5 +50,5 @@ val algo_param: unit -> (algo, 'a) Clic.parameter
 
 val generate_key:
   ?algo:algo ->
-  ?seed:Ed25519.Seed.t ->
+  ?seed:MBytes.t ->
   unit -> public_key_hash * public_key * secret_key

@@ -16,10 +16,11 @@ module Make_value (V : ENCODED_VALUE) = struct
     | None -> generic_error "Cannot parse data" (* TODO personalize *)
     | Some v -> ok v
   let to_bytes v =
-    try Data_encoding.Binary.to_bytes V.encoding v
-    with exn ->
+    try Data_encoding.Binary.to_bytes_exn V.encoding v
+    with Data_encoding.Binary.Write_error error ->
       Logging.Node.State.log_error
-        "Exception while serializing value %a" pp_exn exn ;
+        "Exception while serializing value %a"
+        Data_encoding.Binary.pp_write_error error ;
       MBytes.create 0
 end
 

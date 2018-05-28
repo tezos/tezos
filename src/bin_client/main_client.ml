@@ -42,7 +42,10 @@ let get_commands_for_version ctxt block protocol =
 let select_commands ctxt { block ; protocol } =
   get_commands_for_version ctxt block protocol >>|? fun (_, commands_for_version)  ->
   Client_rpc_commands.commands @
-  Client_keys_commands.commands () @
+  List.map
+    (Clic.map_command
+       (fun (o : Client_context.full) -> (o :> Client_context.io_wallet)))
+    (Client_keys_commands.commands ()) @
   Client_helpers_commands.commands () @
   commands_for_version
 

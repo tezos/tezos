@@ -76,6 +76,9 @@ val to_int: t -> int
 val of_int: int -> t
 (** Converts from a base integer. *)
 
+val to_bits: ?pad_to:int -> t -> MBytes.t
+val of_bits: MBytes.t -> t
+
 val equal: t -> t -> bool
 val compare: t -> t -> int
 

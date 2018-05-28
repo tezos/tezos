@@ -55,3 +55,23 @@ module Protocol : sig
   val write_dir: string -> ?hash:Protocol_hash.t -> Protocol.t -> unit tzresult Lwt.t
 
 end
+
+module Socket : sig
+
+  type addr =
+    | Unix of string
+    | Tcp of string * int
+
+  val connect: addr -> Lwt_unix.file_descr tzresult Lwt.t
+  val bind: ?backlog:int -> addr -> Lwt_unix.file_descr tzresult Lwt.t
+
+  type error +=
+    | Encoding_error
+    | Decoding_error
+
+  val send:
+    Lwt_unix.file_descr -> 'a Data_encoding.t -> 'a -> unit tzresult Lwt.t
+  val recv:
+    Lwt_unix.file_descr -> 'a Data_encoding.t -> 'a tzresult Lwt.t
+
+end

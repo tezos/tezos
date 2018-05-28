@@ -12,15 +12,15 @@ open Alpha_context
 
 (** Functions building operations *)
 
-val sourced : sourced_operations -> proto_operation
+val sourced : sourced_operation -> proto_operation
 
 val manager :
   Helpers_account.t -> ?fee:Tez.tez -> manager_operation list ->
-  Alpha_environment.Context.t -> sourced_operations proto_tzresult Lwt.t
+  Alpha_environment.Context.t -> Z.t -> sourced_operation proto_tzresult Lwt.t
 
 val manager_full :
   Helpers_account.t -> ?fee:Tez.tez -> manager_operation list ->
-  Alpha_environment.Context.t -> proto_operation proto_tzresult Lwt.t
+  Alpha_environment.Context.t -> Z.t -> proto_operation proto_tzresult Lwt.t
 
 val transaction :
   ?parameters:Script.expr -> Tez.t -> Contract.contract ->
@@ -37,20 +37,20 @@ val delegation_full :
   proto_operation proto_tzresult Lwt.t
 
 val script_origination_full :
-  Script.t option -> Helpers_account.t -> Tez.t -> Alpha_environment.Context.t ->
+  Script.t option -> Helpers_account.t -> Tez.t -> Z.t -> Alpha_environment.Context.t ->
   proto_operation proto_tzresult  Lwt.t
 
 val origination_full :
   ?spendable:bool -> ?delegatable:bool -> ?fee:Tez.tez ->
-  Helpers_account.t -> Tez.t -> Alpha_environment.Context.t ->
+  Helpers_account.t -> Tez.t -> Z.t -> Alpha_environment.Context.t ->
   proto_operation proto_tzresult Lwt.t
 
 val transaction_full :
-  ?fee:Tez.tez -> ?parameters:Proto_alpha.Alpha_context.Script.expr -> Helpers_account.t -> Contract.contract -> Tez.t ->
+  ?fee:Tez.tez -> ?parameters:Proto_alpha.Alpha_context.Script.expr -> Helpers_account.t -> Contract.contract -> Tez.t -> Z.t ->
   Alpha_environment.Context.t -> proto_operation proto_tzresult Lwt.t
 
 val amendment_operation :
-  Helpers_account.t -> amendment_operation -> sourced_operations
+  Helpers_account.t -> amendment_operation -> sourced_operation
 
 val endorsements :
   ?slot:int -> Block_hash.t -> Raw_level.t -> consensus_operation

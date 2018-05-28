@@ -61,6 +61,15 @@ end
 
 module Voting_period = Voting_period_repr
 
+module Gas = struct
+  include Gas_limit_repr
+  type error += Gas_limit_too_high = Raw_context.Gas_limit_too_high
+  let set_limit = Raw_context.set_gas_limit
+  let set_unlimited = Raw_context.set_gas_unlimited
+  let consume = Raw_context.consume_gas
+  let level = Raw_context.gas_level
+  let block_level = Raw_context.block_gas_level
+end
 module Level = struct
   include Level_repr
   include Level_storage
@@ -68,6 +77,13 @@ end
 module Contract = struct
   include Contract_repr
   include Contract_storage
+  let init_origination_nonce = Raw_context.init_origination_nonce
+  let unset_origination_nonce = Raw_context.unset_origination_nonce
+  type error += Block_storage_quota_exceeded = Storage_limit_repr.Block_quota_exceeded
+  type error += Operation_storage_quota_exceeded = Storage_limit_repr.Operation_quota_exceeded
+  type error += Storage_limit_too_high = Raw_context.Storage_limit_too_high
+  let set_storage_limit = Raw_context.set_storage_limit
+  let set_storage_unlimited = Raw_context.set_storage_unlimited
 end
 module Delegate = Delegate_storage
 module Roll = struct
@@ -89,9 +105,16 @@ module Fitness = struct
 
 end
 
+module Bootstrap = Bootstrap_storage
+
 module Commitment = struct
   include Commitment_repr
   include Commitment_storage
+end
+
+module Global = struct
+  let get_last_block_priority = Storage.Last_block_priority.get
+  let set_last_block_priority = Storage.Last_block_priority.set
 end
 
 let prepare_first_block = Init_storage.prepare_first_block
@@ -112,6 +135,11 @@ let fork_test_chain = Raw_context.fork_test_chain
 
 let endorsement_already_recorded = Raw_context.endorsement_already_recorded
 let record_endorsement = Raw_context.record_endorsement
+
+let reset_internal_nonce = Raw_context.reset_internal_nonce
+let fresh_internal_nonce = Raw_context.fresh_internal_nonce
+let record_internal_nonce = Raw_context.record_internal_nonce
+let internal_nonce_already_recorded = Raw_context.internal_nonce_already_recorded
 
 let add_fees = Raw_context.add_fees
 let add_rewards = Raw_context.add_rewards

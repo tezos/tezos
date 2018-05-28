@@ -22,7 +22,7 @@ let inject_operation validator ?chain_id bytes =
 
 let inject_protocol state ?force:_ proto =
   let proto_bytes =
-    Data_encoding.Binary.to_bytes Protocol.encoding proto in
+    Data_encoding.Binary.to_bytes_exn Protocol.encoding proto in
   let hash = Protocol_hash.hash_bytes [proto_bytes] in
   let validation =
     Updater.compile hash proto >>= function
@@ -65,19 +65,31 @@ type t = {
   shutdown: unit -> unit Lwt.t ;
 }
 
+let peer_metadata_cfg : _ P2p.peer_meta_config = {
+  peer_meta_encoding = Peer_metadata.encoding ;
+  peer_meta_initial = () ;
+  score = fun _ -> 0. ;
+}
+
+let connection_metadata_cfg : _ P2p.conn_meta_config = {
+  conn_meta_encoding = Peer_metadata.encoding ;
+  conn_meta_value = fun _ -> () ;
+}
+
 let init_p2p p2p_params =
   match p2p_params with
   | None ->
       lwt_log_notice "P2P layer is disabled" >>= fun () ->
-      Error_monad.return (P2p.faked_network Distributed_db_metadata.cfg)
+      return (P2p.faked_network peer_metadata_cfg)
   | Some (config, limits) ->
       lwt_log_notice "bootstraping chain..." >>= fun () ->
       P2p.create
         ~config ~limits
-        Distributed_db_metadata.cfg
+        peer_metadata_cfg
+        connection_metadata_cfg
         Distributed_db_message.cfg >>=? fun p2p ->
       Lwt.async (fun () -> P2p.maintain p2p) ;
-      Error_monad.return p2p
+      return p2p
 
 type config = {
   genesis: State.Chain.genesis ;

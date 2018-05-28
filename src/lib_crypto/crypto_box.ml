@@ -9,26 +9,36 @@
 
 (** Tezos - X25519/XSalsa20-Poly1305 cryptography *)
 
-open Tweetnacl
+open Hacl
 
-type secret_key = Box.secret Box.key
-type public_key = Box.public Box.key
+type secret_key = secret Box.key
+type public_key = public Box.key
 type channel_key = Box.combined Box.key
-type nonce = Nonce.t
+type nonce = Bigstring.t
 type target = Z.t
 
 module Secretbox = struct
   include Secretbox
-
-  let box key msg nonce = box ~key ~msg ~nonce
-
-  let box_open key cmsg nonce = box_open ~key ~cmsg ~nonce
-
   let box_noalloc key nonce msg =
-    box_noalloc ~key ~nonce ~msg
+    box ~key ~nonce ~msg ~cmsg:msg
 
   let box_open_noalloc key nonce cmsg =
-    box_open_noalloc ~key ~nonce ~cmsg
+    box_open ~key ~nonce ~cmsg ~msg:cmsg
+
+  let box key msg nonce =
+    let msglen = MBytes.length msg in
+    let cmsg = MBytes.create (msglen + zerobytes) in
+    MBytes.fill cmsg '\x00' ;
+    MBytes.blit msg 0 cmsg zerobytes msglen ;
+    box ~key ~nonce ~msg:cmsg ~cmsg ;
+    cmsg
+
+  let box_open key cmsg nonce =
+    let cmsglen = MBytes.length cmsg in
+    let msg = MBytes.create cmsglen in
+    match box_open ~key ~nonce ~cmsg ~msg with
+    | false -> None
+    | true -> Some (MBytes.sub msg zerobytes (cmsglen - zerobytes))
 end
 
 module Public_key_hash = Blake2B.Make (Base58) (struct
@@ -42,7 +52,7 @@ let () =
   Base58.check_encoded_prefix Public_key_hash.b58check_encoding "id" 30
 
 let hash pk =
-  Public_key_hash.hash_bytes [Box.to_bytes pk]
+  Public_key_hash.hash_bytes [Box.unsafe_to_bytes pk]
 
 let zerobytes = Box.zerobytes
 let boxzerobytes = Box.boxzerobytes
@@ -51,33 +61,49 @@ let random_keypair () =
   let pk, sk = Box.keypair () in
   sk, pk, hash pk
 
-let zero_nonce = Tweetnacl.Nonce.(of_bytes_exn (MBytes.make bytes '\x00'))
+let zero_nonce = MBytes.make Nonce.bytes '\x00'
 let random_nonce = Nonce.gen
 let increment_nonce = Nonce.increment
+let generate_nonce mbytes =
+  let hash = Blake2B.hash_bytes mbytes in
+  Nonce.of_bytes_exn @@ (Bigstring.sub (Blake2B.to_bytes hash) 0 Nonce.bytes)
 
-let box sk pk msg nonce = Box.box ~sk ~pk ~msg ~nonce
+let init_to_resp_seed = MBytes.of_string "Init -> Resp"
+let resp_to_init_seed  = MBytes.of_string "Resp -> Init"
+let generate_nonces ~incoming ~sent_msg ~recv_msg =
+  let (init_msg, resp_msg, false)
+    | (resp_msg, init_msg, true) = (sent_msg, recv_msg, incoming) in
+  let nonce_init_to_resp =
+    generate_nonce [ init_msg ; resp_msg ; init_to_resp_seed ] in
+  let nonce_resp_to_init =
+    generate_nonce [ init_msg ; resp_msg ; resp_to_init_seed ] in
+  if incoming then
+    (nonce_init_to_resp, nonce_resp_to_init)
+  else
+    (nonce_resp_to_init, nonce_init_to_resp)
 
-let box_open sk pk cmsg nonce = Box.box_open ~sk ~pk ~cmsg ~nonce
-
-let box_noalloc sk pk nonce msg =
-  Box.box_noalloc ~sk ~pk ~nonce ~msg
-
-let box_open_noalloc sk pk nonce cmsg =
-  Box.box_open_noalloc ~sk ~pk ~nonce ~cmsg
-
-let precompute sk pk = Box.combine pk sk
-
-let fast_box k msg nonce =
-  Box.box_combined ~k ~msg ~nonce
-
-let fast_box_open k cmsg nonce =
-  Box.box_open_combined ~k ~cmsg ~nonce
+let precompute sk pk = Box.dh pk sk
 
 let fast_box_noalloc k nonce msg =
-  Box.box_combined_noalloc ~k ~nonce ~msg
+  Box.box ~k ~nonce ~msg ~cmsg:msg
 
 let fast_box_open_noalloc k nonce cmsg =
-  Box.box_open_combined_noalloc ~k ~nonce ~cmsg
+  Box.box_open ~k ~nonce ~cmsg ~msg:cmsg
+
+let fast_box k msg nonce =
+  let msglen = MBytes.length msg in
+  let cmsg = MBytes.create (msglen + zerobytes) in
+  MBytes.fill cmsg '\x00' ;
+  MBytes.blit msg 0 cmsg zerobytes msglen ;
+  Box.box ~k ~nonce ~msg:cmsg ~cmsg ;
+  cmsg
+
+let fast_box_open k cmsg nonce =
+  let cmsglen = MBytes.length cmsg in
+  let msg = MBytes.create cmsglen in
+  match Box.box_open ~k ~nonce ~cmsg ~msg with
+  | false -> None
+  | true -> Some (MBytes.sub msg zerobytes (cmsglen - zerobytes))
 
 let compare_target hash target =
   let hash = Z.of_bits (Blake2B.to_string hash) in
@@ -106,8 +132,8 @@ let default_target = make_target 24.
 let check_proof_of_work pk nonce target =
   let hash =
     Blake2B.hash_bytes [
-      Box.to_bytes pk ;
-      Nonce.to_bytes nonce ;
+      Box.unsafe_to_bytes pk ;
+      nonce ;
     ] in
   compare_target hash target
 
@@ -124,16 +150,28 @@ let generate_proof_of_work ?max pk target =
       loop (Nonce.increment nonce) (cpt + 1) in
   loop (random_nonce ()) 0
 
-let public_key_to_bigarray = Box.to_bytes
-let public_key_of_bigarray = Box.pk_of_bytes_exn
+let public_key_to_bigarray pk =
+  let buf = MBytes.create Box.pkbytes in
+  Box.blit_to_bytes pk buf ;
+  buf
+
+let public_key_of_bigarray buf =
+  let pk = MBytes.copy buf in
+  Box.unsafe_pk_of_bytes pk
+
 let public_key_size = Box.pkbytes
 
-let secret_key_to_bigarray = Box.to_bytes
-let secret_key_of_bigarray = Box.sk_of_bytes_exn
+let secret_key_to_bigarray sk =
+  let buf = MBytes.create Box.skbytes in
+  Box.blit_to_bytes sk buf ;
+  buf
+
+let secret_key_of_bigarray buf =
+  let sk = MBytes.copy buf in
+  Box.unsafe_sk_of_bytes sk
+
 let secret_key_size = Box.skbytes
 
-let nonce_to_bigarray = Nonce.to_bytes
-let nonce_of_bigarray = Nonce.of_bytes_exn
 let nonce_size = Nonce.bytes
 
 let public_key_encoding =
@@ -151,9 +189,4 @@ let secret_key_encoding =
     (Fixed.bytes secret_key_size)
 
 let nonce_encoding =
-  let open Data_encoding in
-  conv
-    nonce_to_bigarray
-    nonce_of_bigarray
-    (Fixed.bytes nonce_size)
-
+  Data_encoding.Fixed.bytes nonce_size

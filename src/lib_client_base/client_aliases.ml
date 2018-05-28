@@ -68,7 +68,7 @@ module type Alias = sig
     ('a, (< .. > as 'obj)) Clic.params ->
     (fresh_param -> 'a, 'obj) Clic.params
   val force_switch :
-    unit -> (bool, #Client_context.full) arg
+    unit -> (bool, _) arg
   val of_fresh :
     #Client_context.wallet ->
     bool ->

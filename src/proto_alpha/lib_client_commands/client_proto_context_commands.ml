@@ -16,6 +16,11 @@ open Client_proto_programs
 open Client_keys
 open Client_proto_args
 
+let encrypted_switch =
+  Clic.switch
+    ~long:"encrypted"
+    ~doc:("Encrypt the key on-disk") ()
+
 let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_context.printer) = function
   | Error errs ->
       cctxt#warning "%a"
@@ -47,12 +52,17 @@ let commands () =
   let open Clic in
   [
     command ~group ~desc: "Access the timestamp of the block."
-      no_options
+      (args1
+         (switch ~doc:"output time in seconds" ~short:'s' ~long:"seconds" ()))
       (fixed [ "get" ; "timestamp" ])
-      begin fun () (cctxt : Proto_alpha.full) ->
+      begin fun seconds (cctxt : Proto_alpha.full) ->
         Block_services.timestamp
           cctxt cctxt#block >>=? fun v ->
-        cctxt#message "%s" (Time.to_notation v) >>= fun () ->
+        begin
+          if seconds
+          then cctxt#message "%Ld" (Time.to_seconds v)
+          else cctxt#message "%s" (Time.to_notation v)
+        end >>= fun () ->
         return ()
       end ;
 
@@ -136,8 +146,23 @@ let commands () =
        @@ stop)
       begin fun fee (_, contract) (_, delegate) (cctxt : Proto_alpha.full) ->
         source_to_keys cctxt cctxt#block contract >>=? fun (src_pk, manager_sk) ->
-        set_delegate ~fee cctxt cctxt#block contract (Some delegate) ~src_pk ~manager_sk >>=? fun oph ->
-        operation_submitted_message cctxt oph
+        set_delegate
+          cctxt cctxt#block ?confirmations:cctxt#confirmations
+          contract (Some delegate) ~fee ~src_pk ~manager_sk >>=? fun _ ->
+        return ()
+      end ;
+
+    command ~group ~desc: "Withdraw the delegate from a contract."
+      (args1 fee_arg)
+      (prefixes [ "withdraw" ; "delegate" ; "from" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun fee (_, contract) (cctxt : Proto_alpha.full) ->
+        source_to_keys cctxt cctxt#block contract >>=? fun (src_pk, manager_sk) ->
+        set_delegate
+          cctxt cctxt#block ?confirmations:cctxt#confirmations
+          contract None ~fee ~src_pk ~manager_sk >>=? fun _ ->
+        return ()
       end ;
 
     command ~group ~desc:"Open a new account."
@@ -160,6 +185,9 @@ let commands () =
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
         originate_account
+          cctxt
+          cctxt#block
+          ?confirmations:cctxt#confirmations
           ~fee
           ?delegate
           ~delegatable
@@ -168,16 +196,14 @@ let commands () =
           ~source
           ~src_pk
           ~src_sk
-          cctxt#block
-          cctxt
-          () >>=? fun (oph, contract) ->
+          () >>=? fun (_res, contract) ->
         save_contract ~force cctxt alias_name contract >>=? fun () ->
-        operation_submitted_message ~contracts:[ contract ] cctxt oph
+        return ()
       end ;
 
     command ~group ~desc: "Launch a smart contract on the blockchain."
-      (args7
-         fee_arg delegate_arg (Client_keys.force_switch ())
+      (args9
+         fee_arg gas_limit_arg storage_limit_arg delegate_arg (Client_keys.force_switch ())
          delegatable_switch spendable_switch init_arg no_print_source_flag)
       (prefixes [ "originate" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
@@ -196,41 +222,41 @@ let commands () =
          ~name:"prg" ~desc: "script of the account\n\
                              Combine with -init if the storage type is not unit."
        @@ stop)
-      begin fun (fee, delegate, force, delegatable, spendable, initial_storage, no_print_source)
+      begin fun (fee, gas_limit, storage_limit, delegate, force, delegatable, spendable, initial_storage, no_print_source)
         alias_name manager balance (_, source) program (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
-        originate_contract ~fee ~delegate ~delegatable ~spendable ~initial_storage
-          ~manager ~balance ~source ~src_pk ~src_sk ~code cctxt >>= fun errors ->
+        originate_contract cctxt cctxt#block ?confirmations:cctxt#confirmations
+          ~fee ?gas_limit ?storage_limit ~delegate ~delegatable ~spendable ~initial_storage
+          ~manager ~balance ~source ~src_pk ~src_sk ~code () >>= fun errors ->
         report_michelson_errors ~no_print_source ~msg:"origination simulation failed" cctxt errors >>= function
         | None -> return ()
-        | Some (oph, contract) ->
+        | Some (_res, contract) ->
             save_contract ~force cctxt alias_name contract >>=? fun () ->
-            operation_submitted_message cctxt
-              ~contracts:[contract] oph
+            return ()
       end ;
 
     command ~group ~desc: "Transfer tokens / call a smart contract."
-      (args3 fee_arg arg_arg no_print_source_flag)
+      (args5 fee_arg gas_limit_arg storage_limit_arg arg_arg no_print_source_flag)
       (prefixes [ "transfer" ]
        @@ tez_param
          ~name: "qty" ~desc: "amount taken from source"
        @@ prefix "from"
-       @@ ContractAlias.alias_param
+       @@ ContractAlias.destination_param
          ~name: "src" ~desc: "name of the source contract"
        @@ prefix "to"
        @@ ContractAlias.destination_param
          ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
-      begin fun (fee, arg, no_print_source) amount (_, source) (_, destination) cctxt ->
+      begin fun (fee, gas_limit, storage_limit, arg, no_print_source) amount (_, source) (_, destination) cctxt ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
-        transfer cctxt ~fee cctxt#block
-          ~source ~src_pk ~src_sk ~destination ~arg ~amount () >>=
+        transfer cctxt cctxt#block ?confirmations:cctxt#confirmations
+          ~source ~fee ~src_pk ~src_sk ~destination ~arg ~amount ?gas_limit ?storage_limit () >>=
         report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
         | None -> return ()
-        | Some (oph, contracts) ->
-            operation_submitted_message cctxt ~contracts oph
+        | Some (_res, _contracts) ->
+            return ()
       end;
 
     command ~group ~desc: "Reveal the public key of the contract manager."
@@ -241,9 +267,9 @@ let commands () =
        @@ stop)
       begin fun fee (_, source) cctxt ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
-        reveal cctxt ~fee cctxt#block
-          ~source ~src_pk ~src_sk () >>=? fun oph ->
-        operation_submitted_message cctxt oph
+        reveal cctxt cctxt#block ?confirmations:cctxt#confirmations
+          ~source ~fee ~src_pk ~src_sk () >>=? fun _res ->
+        return ()
       end;
 
     command ~group ~desc: "Register the public key hash as a delegate."
@@ -255,13 +281,15 @@ let commands () =
        @@ stop)
       begin fun fee src_pkh cctxt ->
         Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
-        register_as_delegate cctxt
-          ~fee cctxt#block ~manager_sk:src_sk src_pk >>=? fun oph ->
-        operation_submitted_message cctxt oph
+        register_as_delegate cctxt ?confirmations:cctxt#confirmations
+          ~fee cctxt#block ~manager_sk:src_sk src_pk >>=? fun _res ->
+        return ()
       end;
 
     command ~group ~desc:"Register and activate a predefined account using the provided activation key."
-      (args2 (Secret_key.force_switch ()) (Client_proto_args.no_confirmation))
+      (args2
+         (Secret_key.force_switch ())
+         encrypted_switch)
       (prefixes [ "activate" ; "account" ]
        @@ Secret_key.fresh_alias_param
        @@ prefixes [ "with" ]
@@ -269,7 +297,7 @@ let commands () =
          ~desc:"Activation key (as JSON file) obtained from the Tezos foundation (or the Alphanet faucet)."
          file_parameter
        @@ stop)
-      (fun (force, no_confirmation) name activation_key_file cctxt ->
+      (fun (force, encrypted) name activation_key_file cctxt ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
          Lwt_utils_unix.Json.read_file activation_key_file >>=? fun json ->
          match Data_encoding.Json.destruct
@@ -281,9 +309,10 @@ let commands () =
                (fun ppf -> Data_encoding.Json.print_error ppf) exn
                Data_encoding.Json.pp json
          | key ->
-             let confirmations =
-               if no_confirmation then None else Some 0 in
-             claim_commitment cctxt cctxt#block ?confirmations ~force key name
+             claim_commitment
+               cctxt cctxt#block ?confirmations:cctxt#confirmations
+               ~encrypted ~force key name >>=? fun _res ->
+             return ()
       );
 
     command ~group:alphanet ~desc: "Activate a protocol (Alphanet dictator only)."
@@ -292,13 +321,13 @@ let commands () =
        @@ Protocol_hash.param ~name:"version"
          ~desc:"protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
-       @@ Signature.Secret_key.param
+       @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
         dictate cctxt cctxt#block
-          (Activate hash) seckey >>=? fun oph ->
-        operation_submitted_message cctxt oph
+          (Activate hash) seckey >>=? fun _ ->
+        return ()
       end ;
 
     command ~desc:"Wait until an operation is included in a block"
@@ -336,8 +365,9 @@ let commands () =
           (failure "confirmations cannot be negative") >>=? fun () ->
         fail_when (predecessors < 0)
           (failure "check-previous cannot be negative") >>=? fun () ->
-        wait_for_operation_inclusion ctxt
-          ~confirmations ~predecessors operation_hash
+        Client_confirmations.wait_for_operation_inclusion ctxt
+          ~confirmations ~predecessors operation_hash >>=? fun _ ->
+        return ()
       end ;
 
     command ~group:alphanet ~desc: "Fork a test protocol (Alphanet dictator only)."
@@ -346,13 +376,13 @@ let commands () =
        @@ Protocol_hash.param ~name:"version"
          ~desc:"protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
-       @@ Signature.Secret_key.param
+       @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
         dictate cctxt cctxt#block
-          (Activate_testchain hash) seckey >>=? fun oph ->
-        operation_submitted_message cctxt oph
+          (Activate_testchain hash) seckey >>=? fun _res ->
+        return ()
       end ;
 
   ]

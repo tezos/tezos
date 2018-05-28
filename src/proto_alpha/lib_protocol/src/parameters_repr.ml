@@ -16,6 +16,8 @@ type t = {
   bootstrap_accounts : bootstrap_account list ;
   commitments : (Unclaimed_public_key_hash.t * Commitment_repr.t) list ;
   constants : Constants_repr.parametric ;
+  security_deposit_ramp_up_cycles : int option ;
+  no_reward_cycles : int option ;
 }
 
 let bootstrap_account_encoding =
@@ -24,6 +26,7 @@ let bootstrap_account_encoding =
     (fun { public_key ; amount } -> (public_key, amount))
     (fun (public_key, amount) -> { public_key ; amount })
     (tup2 Signature.Public_key.encoding Tez_repr.encoding)
+
 
 (* This encoding is used to read configuration files (e.g. sandbox.json)
    where some fields can be missing, in that case they are replaced by
@@ -60,9 +63,12 @@ let constants_encoding =
        and endorsers_per_block =
          opt Compare.Int.(=)
            default.endorsers_per_block c.endorsers_per_block
-       and max_gas =
-         opt Compare.Int.(=)
-           default.max_gas c.max_gas
+       and hard_gas_limit_per_operation =
+         opt Compare.Z.(=)
+           default.hard_gas_limit_per_operation c.hard_gas_limit_per_operation
+       and hard_gas_limit_per_block =
+         opt Compare.Z.(=)
+           default.hard_gas_limit_per_block c.hard_gas_limit_per_block
        and proof_of_work_threshold =
          opt Compare.Int64.(=)
            default.proof_of_work_threshold c.proof_of_work_threshold
@@ -96,6 +102,15 @@ let constants_encoding =
        and endorsement_reward =
          opt Tez_repr.(=)
            default.endorsement_reward c.endorsement_reward
+       and cost_per_byte =
+         opt Tez_repr.(=)
+           default.cost_per_byte c.cost_per_byte
+       and hard_storage_limit_per_operation =
+         opt Compare.Int64.(=)
+           default.hard_storage_limit_per_operation c.hard_storage_limit_per_operation
+       and hard_storage_limit_per_block =
+         opt Compare.Int64.(=)
+           default.hard_storage_limit_per_block c.hard_storage_limit_per_block
        in
        (( preserved_cycles,
           blocks_per_cycle,
@@ -105,9 +120,10 @@ let constants_encoding =
           time_between_blocks,
           first_free_baking_slot,
           endorsers_per_block,
-          max_gas,
-          proof_of_work_threshold),
-        ( dictator_pubkey,
+          hard_gas_limit_per_operation,
+          hard_gas_limit_per_block),
+        ((proof_of_work_threshold,
+          dictator_pubkey,
           max_operation_data_length,
           tokens_per_roll,
           michelson_maximum_type_size,
@@ -115,8 +131,11 @@ let constants_encoding =
           origination_burn,
           block_security_deposit,
           endorsement_security_deposit,
-          block_reward,
-          endorsement_reward)))
+          block_reward),
+         (endorsement_reward,
+          cost_per_byte,
+          hard_storage_limit_per_operation,
+          hard_storage_limit_per_block))))
     (fun (( preserved_cycles,
             blocks_per_cycle,
             blocks_per_commitment,
@@ -125,9 +144,10 @@ let constants_encoding =
             time_between_blocks,
             first_free_baking_slot,
             endorsers_per_block,
-            max_gas,
-            proof_of_work_threshold),
-          ( dictator_pubkey,
+            hard_gas_limit_per_operation,
+            hard_gas_limit_per_block),
+          ((proof_of_work_threshold,
+            dictator_pubkey,
             max_operation_data_length,
             tokens_per_roll,
             michelson_maximum_type_size,
@@ -135,8 +155,11 @@ let constants_encoding =
             origination_burn,
             block_security_deposit,
             endorsement_security_deposit,
-            block_reward,
-            endorsement_reward)) ->
+            block_reward),
+           (endorsement_reward,
+            cost_per_byte,
+            hard_storage_limit_per_operation,
+            hard_storage_limit_per_block))) ->
       let unopt def = function None -> def | Some v -> v in
       let default = Constants_repr.default in
       { Constants_repr.preserved_cycles =
@@ -156,8 +179,10 @@ let constants_encoding =
           unopt default.first_free_baking_slot first_free_baking_slot ;
         endorsers_per_block =
           unopt default.endorsers_per_block endorsers_per_block ;
-        max_gas =
-          unopt default.max_gas max_gas ;
+        hard_gas_limit_per_operation =
+          unopt default.hard_gas_limit_per_operation hard_gas_limit_per_operation ;
+        hard_gas_limit_per_block =
+          unopt default.hard_gas_limit_per_block hard_gas_limit_per_block ;
         proof_of_work_threshold =
           unopt default.proof_of_work_threshold proof_of_work_threshold ;
         dictator_pubkey =
@@ -180,6 +205,12 @@ let constants_encoding =
           unopt default.block_reward block_reward ;
         endorsement_reward =
           unopt default.endorsement_reward endorsement_reward ;
+        cost_per_byte =
+          unopt default.cost_per_byte cost_per_byte ;
+        hard_storage_limit_per_operation =
+          unopt default.hard_storage_limit_per_operation hard_storage_limit_per_operation ;
+        hard_storage_limit_per_block =
+          unopt default.hard_storage_limit_per_block hard_storage_limit_per_block ;
       } )
     (merge_objs
        (obj10
@@ -191,32 +222,46 @@ let constants_encoding =
           (opt "time_between_blocks" (list Period_repr.encoding))
           (opt "first_free_baking_slot" uint16)
           (opt "endorsers_per_block" uint16)
-          (opt "instructions_per_transaction" int31)
-          (opt "proof_of_work_threshold" int64))
-       (obj10
-          (opt "dictator_pubkey" Signature.Public_key.encoding)
-          (opt "max_operation_data_length" int31)
-          (opt "tokens_per_roll" Tez_repr.encoding)
-          (opt "michelson_maximum_type_size" uint16)
-          (opt "seed_nonce_revelation_tip" Tez_repr.encoding)
-          (opt "origination_burn" Tez_repr.encoding)
-          (opt "block_security_deposit" Tez_repr.encoding)
-          (opt "endorsement_security_deposit" Tez_repr.encoding)
-          (opt "block_reward" Tez_repr.encoding)
-          (opt "endorsement_reward" Tez_repr.encoding)))
+          (opt "hard_gas_limit_per_operation" z)
+          (opt "hard_gas_limit_per_block" z))
+       (merge_objs
+          (obj10
+             (opt "proof_of_work_threshold" int64)
+             (opt "dictator_pubkey" Signature.Public_key.encoding)
+             (opt "max_operation_data_length" int31)
+             (opt "tokens_per_roll" Tez_repr.encoding)
+             (opt "michelson_maximum_type_size" uint16)
+             (opt "seed_nonce_revelation_tip" Tez_repr.encoding)
+             (opt "origination_burn" Tez_repr.encoding)
+             (opt "block_security_deposit" Tez_repr.encoding)
+             (opt "endorsement_security_deposit" Tez_repr.encoding)
+             (opt "block_reward" Tez_repr.encoding))
+          (obj4
+             (opt "endorsement_reward" Tez_repr.encoding)
+             (opt "cost_per_byte" Tez_repr.encoding)
+             (opt "hard_storage_limit_per_operation" int64)
+             (opt "hard_storage_limit_per_block" int64))))
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun { bootstrap_accounts ; commitments ; constants } ->
-       ((bootstrap_accounts, commitments), constants ))
-    (fun ( (bootstrap_accounts, commitments), constants ) ->
-       { bootstrap_accounts ; commitments ; constants })
+    (fun { bootstrap_accounts ; commitments ; constants ;
+           security_deposit_ramp_up_cycles ; no_reward_cycles } ->
+      ((bootstrap_accounts, commitments,
+        security_deposit_ramp_up_cycles, no_reward_cycles),
+       constants))
+    (fun ( (bootstrap_accounts, commitments,
+            security_deposit_ramp_up_cycles, no_reward_cycles),
+           constants) ->
+      { bootstrap_accounts ; commitments ; constants ;
+        security_deposit_ramp_up_cycles ; no_reward_cycles })
     (merge_objs
-       (obj2
+       (obj4
           (req "bootstrap_accounts" (list bootstrap_account_encoding))
           (dft "commitments"
              (list (merge_tups
                       (tup1 Unclaimed_public_key_hash.encoding)
-                      Commitment_repr.encoding)) []))
+                      Commitment_repr.encoding)) [])
+          (opt "security_deposit_ramp_up_cycles" int31)
+          (opt "no_reward_cycles" int31))
        constants_encoding)

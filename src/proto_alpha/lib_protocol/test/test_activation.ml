@@ -61,8 +61,7 @@ let test_simple_activation () =
   Proto_alpha.Apply.apply_anonymous_operation
     starting_block.tezos_context
     None
-    starting_block.hash
-    activation_operation >>=? fun (ctxt, _) ->
+    activation_operation >>=? fun ctxt ->
 
   let contract = Contract.implicit_contract pkh in
 

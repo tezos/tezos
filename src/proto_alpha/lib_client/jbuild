@@ -9,6 +9,7 @@
               tezos-shell-services
               tezos-client-base
               tezos-rpc
+              tezos-signer-backends
               bip39))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
@@ -20,5 +21,5 @@
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files *.ml*)))
+  (deps ((glob_files *.ml{,i})))
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

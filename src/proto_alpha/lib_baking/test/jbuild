@@ -15,6 +15,7 @@
               tezos-client-alpha
               tezos-baking-alpha
               tezos-client-base-unix
+              tezos-signer-backends
               alcotest-lwt))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
@@ -75,5 +76,5 @@
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files *.ml*)))
+  (deps ((glob_files *.ml{,i})))
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

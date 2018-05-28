@@ -13,13 +13,19 @@ type error +=
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
+  | Empty_implicit_contract of Signature.Public_key_hash.t (* `Temporary *)
   | Inconsistent_hash of Signature.Public_key.t * Signature.Public_key_hash.t * Signature.Public_key_hash.t (* `Permanent *)
   | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t (* `Permanent *)
-  | Missing_public_key of Signature.Public_key_hash.t (* `Permanent *)
   | Failure of string (* `Permanent *)
+  | Previously_revealed_key of Contract_repr.t (* `Permanent *)
+  | Unrevealed_manager_key of Contract_repr.t (* `Permanent *)
 
 val exists: Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 val must_exist: Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
+
+val allocated: Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+val must_be_allocated: Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
+
 
 val list: Raw_context.t -> Contract_repr.t list Lwt.t
 
@@ -37,17 +43,22 @@ val is_spendable: Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 val get_manager:
   Raw_context.t -> Contract_repr.t -> Signature.Public_key_hash.t tzresult Lwt.t
 
-val update_manager_key:
-  Raw_context.t -> Contract_repr.t -> Signature.Public_key.t option ->
-  (Raw_context.t * Signature.Public_key.t) tzresult Lwt.t
+val get_manager_key:
+  Raw_context.t -> Contract_repr.t -> Signature.Public_key.t tzresult Lwt.t
+val is_manager_key_revealed:
+  Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+
+val reveal_manager_key:
+  Raw_context.t -> Contract_repr.t -> Signature.Public_key.t  ->
+  Raw_context.t tzresult Lwt.t
 
 val get_balance: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 val get_counter: Raw_context.t -> Contract_repr.t -> int32 tzresult Lwt.t
 
 val get_script:
-  Raw_context.t -> Contract_repr.t -> Script_repr.t option tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.t option) tzresult Lwt.t
 val get_storage:
-  Raw_context.t -> Contract_repr.t -> Script_repr.expr option tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 
 type big_map_diff = (string * Script_repr.expr option) list
 
@@ -70,33 +81,32 @@ val spend_from_script:
   Raw_context.t -> Contract_repr.t -> Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
-val code_and_storage_fee:
-  Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
-
-val update_storage_fee:
-  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
-
 val originate:
   Raw_context.t ->
-  Contract_repr.origination_nonce ->
+  Contract_repr.t ->
   balance:Tez_repr.t ->
   manager:Signature.Public_key_hash.t ->
-  ?script:(Script_repr.t * (Tez_repr.t * Tez_repr.t)) ->
+  ?script:(Script_repr.t * big_map_diff option) ->
   delegate:Signature.Public_key_hash.t option ->
   spendable:bool ->
   delegatable:bool ->
-  (Raw_context.t * Contract_repr.t * Contract_repr.origination_nonce) tzresult Lwt.t
+  Raw_context.t tzresult Lwt.t
+
+val fresh_contract_from_current_nonce :
+  Raw_context.t -> (Raw_context.t * Contract_repr.t) tzresult Lwt.t
+val originated_from_current_nonce :
+  Raw_context.t -> Contract_repr.t list tzresult Lwt.t
 
 val init:
   Raw_context.t -> Raw_context.t tzresult Lwt.t
 
+val used_storage_space: Raw_context.t -> Contract_repr.t -> Int64.t tzresult Lwt.t
+val paid_storage_space_fees: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
+val pay_for_storage_space: Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
 module Big_map : sig
-  val set :
-    Raw_context.t -> Contract_repr.t ->
-    string -> Script_repr.expr -> Raw_context.t tzresult Lwt.t
-  val remove :
-    Raw_context.t -> Contract_repr.t -> string -> Raw_context.t tzresult Lwt.t
-  val mem : Raw_context.t -> Contract_repr.t -> string -> bool Lwt.t
+  val mem :
+    Raw_context.t -> Contract_repr.t -> string -> (Raw_context.t * bool) tzresult Lwt.t
   val get_opt :
-    Raw_context.t -> Contract_repr.t -> string -> Script_repr.expr option tzresult Lwt.t
+    Raw_context.t -> Contract_repr.t -> string -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 end

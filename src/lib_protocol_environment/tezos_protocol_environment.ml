@@ -109,6 +109,7 @@ module Make (Context : CONTEXT) = struct
     include Tezos_protocol_environment_sigs.V1.T
       with type Format.formatter = Format.formatter
        and type 'a Data_encoding.t = 'a Data_encoding.t
+       and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
        and type Block_hash.t = Block_hash.t
@@ -134,8 +135,10 @@ module Make (Context : CONTEXT) = struct
        and type Signature.public_key_hash = Signature.public_key_hash
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t
+       and type Signature.watermark = Signature.watermark
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
+       and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
        and type RPC_service.meth = RPC_service.meth
@@ -185,11 +188,25 @@ module Make (Context : CONTEXT) = struct
     module Buffer = Buffer
     module Format = Format
     module Option = Option
-    module Z = Z
+    module MBytes = MBytes
+    module Z = struct
+      include Z
+      let to_bits ?(pad_to = 0) z =
+        let bits = to_bits z in
+        let len = Pervasives.((numbits z + 7) / 8) in
+        let full_len = Compare.Int.max pad_to len in
+        if full_len = 0 then
+          MBytes.empty
+        else
+          let res = MBytes.make full_len '\000' in
+          MBytes.blit_of_string bits 0 res 0 len ;
+          res
+      let of_bits bytes =
+        of_bits (MBytes.to_string bytes)
+    end
     module Lwt_sequence = Lwt_sequence
     module Lwt = Lwt
     module Lwt_list = Lwt_list
-    module MBytes = MBytes
     module Uri = Uri
     module Data_encoding = Data_encoding
     module Time = Time
@@ -313,8 +330,10 @@ module Make (Context : CONTEXT) = struct
 
         val zero: t
 
+        type watermark
+
         (** Check a signature *)
-        val check: Public_key.t -> t -> MBytes.t -> bool
+        val check: ?watermark:watermark -> Public_key.t -> t -> MBytes.t -> bool
 
       end
 

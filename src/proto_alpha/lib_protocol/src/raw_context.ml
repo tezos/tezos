@@ -16,9 +16,16 @@ type t = {
   level: Level_repr.t ;
   timestamp: Time.t ;
   fitness: Int64.t ;
-  endorsements_received: Int_set.t;
+  endorsements_received: Int_set.t ;
   fees: Tez_repr.t ;
   rewards: Tez_repr.t ;
+  block_gas: Z.t ;
+  operation_gas: Gas_limit_repr.t ;
+  block_storage: Int64.t ;
+  operation_storage: Storage_limit_repr.t ;
+  origination_nonce: Contract_repr.origination_nonce option ;
+  internal_nonce: int ;
+  internal_nonces_used: Int_set.t ;
 }
 
 type context = t
@@ -34,6 +41,33 @@ let recover ctxt = ctxt.context
 let record_endorsement ctxt k = { ctxt with endorsements_received = Int_set.add k ctxt.endorsements_received }
 let endorsement_already_recorded ctxt k = Int_set.mem k ctxt.endorsements_received
 
+type error += Too_many_internal_operations (* `Permanent *)
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"too_many_internal_operations"
+    ~title: "Too many internal operations"
+    ~description:
+      "A transaction exceeded the hard limit \
+       of internal operations it can emit"
+    empty
+    (function Too_many_internal_operations -> Some () | _ -> None)
+    (fun () -> Too_many_internal_operations)
+
+let fresh_internal_nonce ctxt =
+  if Compare.Int.(ctxt.internal_nonce >= 65_535) then
+    error Too_many_internal_operations
+  else
+    ok ({ ctxt with internal_nonce = ctxt.internal_nonce + 1 }, ctxt.internal_nonce)
+let reset_internal_nonce ctxt =
+  { ctxt with internal_nonces_used = Int_set.empty ; internal_nonce = 0 }
+let record_internal_nonce ctxt k =
+  { ctxt with internal_nonces_used = Int_set.add k ctxt.internal_nonces_used }
+let internal_nonce_already_recorded ctxt k =
+  Int_set.mem k ctxt.internal_nonces_used
+
 let set_current_fitness ctxt fitness = { ctxt with fitness }
 
 let add_fees ctxt fees =
@@ -46,6 +80,95 @@ let add_rewards ctxt rewards =
 
 let get_rewards ctxt = ctxt.rewards
 let get_fees ctxt = ctxt.fees
+
+type error += Undefined_operation_nonce (* `Permanent *)
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"undefined_operation_nonce"
+    ~title: "Ill timed access to the origination nonce"
+    ~description:
+      "An origination was attemped out of the scope of a manager operation"
+    empty
+    (function Undefined_operation_nonce -> Some () | _ -> None)
+    (fun () -> Undefined_operation_nonce)
+
+let init_origination_nonce ctxt operation_hash =
+  let origination_nonce =
+    Some (Contract_repr.initial_origination_nonce operation_hash) in
+  { ctxt with origination_nonce }
+
+let origination_nonce ctxt =
+  match ctxt.origination_nonce with
+  | None -> error Undefined_operation_nonce
+  | Some origination_nonce -> ok origination_nonce
+
+let increment_origination_nonce ctxt =
+  match ctxt.origination_nonce with
+  | None -> error Undefined_operation_nonce
+  | Some cur_origination_nonce ->
+      let origination_nonce =
+        Some (Contract_repr.incr_origination_nonce cur_origination_nonce) in
+      ok ({ ctxt with origination_nonce }, cur_origination_nonce)
+
+let unset_origination_nonce ctxt =
+  { ctxt with origination_nonce = None }
+
+type error += Gas_limit_too_high (* `Permanent *)
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"gas_limit_too_high"
+    ~title: "Gas limit out of protocol hard bounds"
+    ~description:
+      "A transaction tried to exceed the hard limit on gas"
+    empty
+    (function Gas_limit_too_high -> Some () | _ -> None)
+    (fun () -> Gas_limit_too_high)
+
+let set_gas_limit ctxt remaining =
+  if Compare.Z.(remaining > ctxt.constants.hard_gas_limit_per_operation)
+  || Compare.Z.(remaining < Z.zero) then
+    error Gas_limit_too_high
+  else
+    ok { ctxt with operation_gas = Limited { remaining } }
+let set_gas_unlimited ctxt =
+  { ctxt with operation_gas = Unaccounted }
+let consume_gas ctxt cost =
+  Gas_limit_repr.consume ctxt.block_gas ctxt.operation_gas cost >>? fun (block_gas, operation_gas) ->
+  ok { ctxt with block_gas ; operation_gas }
+let gas_level ctxt = ctxt.operation_gas
+let block_gas_level ctxt = ctxt.block_gas
+
+type error += Storage_limit_too_high (* `Permanent *)
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"storage_limit_too_high"
+    ~title: "Storage limit out of protocol hard bounds"
+    ~description:
+      "A transaction tried to exceed the hard limit on storage"
+    empty
+    (function Storage_limit_too_high -> Some () | _ -> None)
+    (fun () -> Storage_limit_too_high)
+
+let set_storage_limit ctxt remaining =
+  if Compare.Int64.(remaining > ctxt.constants.hard_storage_limit_per_operation)
+  || Compare.Int64.(remaining < 0L)then
+    error Storage_limit_too_high
+  else
+    ok { ctxt with operation_storage = Limited { remaining } }
+let set_storage_unlimited ctxt =
+  { ctxt with operation_storage = Unaccounted }
+let record_bytes_stored ctxt bytes =
+  Storage_limit_repr.consume ctxt.block_storage ctxt.operation_storage ~bytes >>? fun (block_storage, operation_storage) ->
+  ok { ctxt with block_storage ; operation_storage }
 
 type storage_error =
   | Incompatible_protocol_version of string
@@ -150,7 +273,7 @@ let get_first_level ctxt =
 
 let set_first_level ctxt level =
   let bytes =
-    Data_encoding.Binary.to_bytes Raw_level_repr.encoding level in
+    Data_encoding.Binary.to_bytes_exn Raw_level_repr.encoding level in
   Context.set ctxt first_level_key bytes >>= fun ctxt ->
   return ctxt
 
@@ -212,7 +335,7 @@ let get_proto_param ctxt =
 
 let set_constants ctxt constants =
   let bytes =
-    Data_encoding.Binary.to_bytes
+    Data_encoding.Binary.to_bytes_exn
       Parameters_repr.constants_encoding constants in
   Context.set ctxt constants_key bytes
 
@@ -227,6 +350,11 @@ let get_constants ctxt =
       | None ->
           failwith "Internal error: cannot parse constants in context."
       | Some constants -> return constants
+
+let patch_constants ctxt f =
+  let constants = f ctxt.constants in
+  set_constants ctxt.context constants >>= fun context ->
+  Lwt.return { ctxt with context ; constants }
 
 let check_inited ctxt =
   Context.get ctxt version_key >>= function
@@ -258,6 +386,13 @@ let prepare ~level ~timestamp ~fitness ctxt =
     endorsements_received = Int_set.empty ;
     fees = Tez_repr.zero ;
     rewards = Tez_repr.zero ;
+    operation_gas = Unaccounted ;
+    block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
+    operation_storage = Unaccounted ;
+    block_storage = constants.Constants_repr.hard_storage_limit_per_block ;
+    origination_nonce = None ;
+    internal_nonce = 0 ;
+    internal_nonces_used = Int_set.empty ;
   }
 
 let check_first_block ctxt =
@@ -302,6 +437,13 @@ let register_resolvers enc resolve =
       endorsements_received = Int_set.empty ;
       fees = Tez_repr.zero ;
       rewards = Tez_repr.zero ;
+      block_gas = Constants_repr.default.hard_gas_limit_per_block ;
+      operation_gas = Unaccounted ;
+      block_storage = Constants_repr.default.hard_storage_limit_per_block ;
+      operation_storage = Unaccounted ;
+      origination_nonce = None ;
+      internal_nonce = 0 ;
+      internal_nonces_used = Int_set.empty ;
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve
@@ -341,6 +483,13 @@ module type T = sig
     context -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
   val project: context -> root_context
+
+  val absolute_key: context -> key -> key
+
+  val consume_gas: context -> Gas_limit_repr.cost -> context tzresult
+
+  val record_bytes_stored: context -> Int64.t -> context tzresult
+
 end
 
 let mem ctxt k = Context.mem ctxt.context k
@@ -412,3 +561,5 @@ let fold_keys ctxt k ~init ~f =
   Context.fold_keys ctxt.context k ~init ~f
 
 let project x = x
+
+let absolute_key _ k = k

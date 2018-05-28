@@ -20,12 +20,11 @@ open Helpers_block
 let (>>?=) = Assert.(>>?=)
 let (>>=??) = Assert.(>>=??)
 
-let originate root ?(tc=root.tezos_context) ?baker ?spendable ?fee ?delegatable src amount =
+let originate root ?(tc=root.tezos_context) ?spendable ?fee ?delegatable src amount =
   let delegatable = Option.unopt ~default:true delegatable in
   let spendable = Option.unopt ~default:true spendable in
   let fee = Option.unopt ~default:10 fee in
   Apply.origination_pred
-    ?baker
     ~tc
     ~pred: root
     (src, amount, spendable, delegatable, fee)
@@ -40,10 +39,9 @@ let test_simple_origination () =
   return ()
 
 
-let delegate root ?(tc=root.tezos_context) ?baker ?fee src delegate =
+let delegate root ?(tc=root.tezos_context) ?fee src delegate =
   let fee = Option.unopt ~default:10 fee in
   Apply.delegation_pred
-    ?baker
     ~tc
     ~pred: root
     (src, delegate, fee)
@@ -56,14 +54,14 @@ let test_delegation () =
 
   (* Delegatable should change delegate *)
   originate root ~delegatable: true account_a 200
-  >>=? fun ((contracts, _errs), tc) ->
+  >>=? fun (contracts, tc) ->
   let contract = List.hd contracts in
   let account_ac = {account_a with contract} in
   delegate root ~tc account_ac account_b.hpub >>= Assert.ok ~msg: __LOC__ >>= fun _ ->
 
   (* Not-Delegatable should not change delegate *)
   originate root ~delegatable: false account_a 200
-  >>=? fun ((contracts, _errs), tc) ->
+  >>=? fun (contracts, tc) ->
   let contract = List.hd contracts in
   let account_a = {account_a with contract} in
   delegate root ~tc account_a account_b.hpub >>= Assert.wrap >>= fun res ->

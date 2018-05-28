@@ -194,7 +194,7 @@ let get_test_chain v =
 
 let set_test_chain v id =
   raw_set v current_test_chain_key
-    (Data_encoding.Binary.to_bytes Test_chain_status.encoding id)
+    (Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding id)
 let del_test_chain v  = raw_del v current_test_chain_key
 
 let fork_test_chain v ~protocol ~expiration =

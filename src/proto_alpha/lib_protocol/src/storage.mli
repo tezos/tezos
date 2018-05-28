@@ -20,6 +20,12 @@
 
 open Storage_sigs
 
+module Last_block_priority : sig
+  val get : Raw_context.t -> int tzresult Lwt.t
+  val set : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
+  val init : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
+end
+
 module Roll : sig
 
   (** Storage from this submodule must only be accessed through the
@@ -156,29 +162,32 @@ module Contract : sig
      and type value = int32
      and type t := Raw_context.t
 
-  module Code : Indexed_data_storage
+  module Code : Indexed_carbonated_data_storage
     with type key = Contract_repr.t
-     and type value = Script_repr.expr
+     and type value = Script_repr.lazy_expr
      and type t := Raw_context.t
 
-  module Storage : Indexed_data_storage
+  module Storage : Indexed_carbonated_data_storage
     with type key = Contract_repr.t
-     and type value = Script_repr.expr
+     and type value = Script_repr.lazy_expr
      and type t := Raw_context.t
 
-  module Code_fees : Indexed_data_storage
+  (** Current storage space in bytes.
+      Includes code, global storage and big map elements. *)
+  module Used_storage_space : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Tez_repr.t
+     and type value = Int64.t
      and type t := Raw_context.t
 
-  module Storage_fees : Indexed_data_storage
+  (** Total fees burnt for storage space. *)
+  module Paid_storage_space_fees : Indexed_data_storage
     with type key = Contract_repr.t
      and type value = Tez_repr.t
      and type t := Raw_context.t
 
   type bigmap_key = Raw_context.t * Contract_repr.t
 
-  module Big_map : Indexed_data_storage
+  module Big_map : Indexed_carbonated_data_storage
     with type key = string
      and type value = Script_repr.expr
      and type t := bigmap_key
@@ -263,3 +272,21 @@ module Commitments : Indexed_data_storage
   with type key = Unclaimed_public_key_hash.t
    and type value = Commitment_repr.t
    and type t := Raw_context.t
+
+(** Ramp up security deposits... *)
+
+module Ramp_up : sig
+
+  module Rewards :
+    Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t * Tez_repr.t (* baking * endorsement *)
+     and type t := Raw_context.t
+
+  module Security_deposits :
+    Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t * Tez_repr.t (* baking * endorsement *)
+     and type t := Raw_context.t
+
+end

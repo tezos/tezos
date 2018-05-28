@@ -44,6 +44,24 @@ let int64_encoding =
       Int64.of_string
   ]
 
+let n_encoding =
+  let open Json_encoding in
+  def "positive_bignum" @@
+  describe
+    ~title: "Positive big number"
+    ~description: "Decimal representation of a positive big number" @@
+  conv
+    (fun z ->
+       if Z.sign z < 0 then
+         raise (Json_encoding.Cannot_destruct ([], Failure "negative natural")) ;
+       Z.to_string z)
+    (fun s ->
+       let n = Z.of_string s in
+       if Z.sign n < 0 then
+         raise (Json_encoding.Cannot_destruct ([], Failure "negative natural")) ;
+       n)
+    string
+
 let z_encoding =
   let open Json_encoding in
   def "bignum" @@
@@ -155,12 +173,33 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Int31 -> int
   | Int32 -> int32
   | Int64 -> int64_encoding
+  | N -> n_encoding
   | Z -> z_encoding
   | Bool -> bool
   | Float -> float
   | RangedFloat { minimum; maximum } -> ranged_float ~minimum ~maximum "rangedFloat"
-  | String _ -> string (* TODO: check length *)
-  | Bytes _ -> bytes_jsont (* TODO check length *)
+  | String (`Fixed expected) ->
+      let check s =
+        let found = String.length s in
+        if found <> expected then
+          raise (Cannot_destruct
+                   ([] ,
+                    Unexpected (Format.asprintf "string (len %d)" found,
+                                Format.asprintf "string (len %d)" expected))) ;
+        s in
+      conv check check string
+  | String _ -> string
+  | Bytes (`Fixed expected) ->
+      let check s =
+        let found = MBytes.length s in
+        if found <> expected then
+          raise (Cannot_destruct
+                   ([] ,
+                    Unexpected (Format.asprintf "string (len %d)" found,
+                                Format.asprintf "string (len %d)" expected))) ;
+        s in
+      conv check check bytes_jsont
+  | Bytes _ -> bytes_jsont
   | String_enum (tbl, _) -> string_enum (Hashtbl.fold (fun a (str, _) acc -> (str, a) :: acc) tbl [])
   | Array e -> array (get_json e)
   | List e -> list (get_json e)
@@ -178,7 +217,8 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
       mu name (fun json_encoding -> get_json @@ self (make ~json_encoding ty))
   | Union (_tag_size, _, cases) -> union (List.map case_json cases)
   | Splitted { json_encoding } -> json_encoding
-  | Dynamic_size e -> get_json e
+  | Dynamic_size { encoding = e } -> get_json e
+  | Check_size { encoding } -> get_json encoding
   | Delayed f -> get_json (f ())
 
 and field_json

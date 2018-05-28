@@ -411,7 +411,8 @@ let run ?(rpc_port=18731) () =
   let open Client_config in
   let {block; _}  = default_cli_args in
   let (cctxt : #Tezos_client_base.Client_context.full) =
-    new Client_context_unix.unix_full ~block ~base_dir: "/" ~rpc_config
+    new Client_context_unix.unix_full
+      ~block ~confirmations:None ~base_dir: "/" ~rpc_config
   in
 
   let print_header () =

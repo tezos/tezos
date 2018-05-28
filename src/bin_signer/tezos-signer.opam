@@ -1,0 +1,26 @@
+opam-version: "1.2"
+version: "dev"
+maintainer: "contact@tezos.com"
+authors: [ "Tezos devteam" ]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "https://gitlab.com/tezos/tezos.git"
+license: "unreleased"
+depends: [
+  "ocamlfind" { build }
+  "jbuilder" { build & = "1.0+beta19.1" }
+  "tezos-base"
+  "tezos-client-base"
+  "tezos-client-base-unix"
+  "tezos-client-commands"
+  "tezos-signer-services"
+  "tezos-rpc-http"
+  "tezos-stdlib-unix"
+  "tezos-signer-backends"
+]
+build: [
+  [ "jbuilder" "build" "-p" name "-j" jobs ]
+]
+build-test: [
+  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+]

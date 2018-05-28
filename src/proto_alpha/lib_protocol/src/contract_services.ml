@@ -19,17 +19,20 @@ type info = {
   delegate: bool * public_key_hash option ;
   counter: int32 ;
   script: Script.t option ;
-  storage: Script.expr option ;
 }
 
 let info_encoding =
   let open Data_encoding in
   conv
-    (fun {manager ; balance ; spendable ; delegate ; script ; counter ; storage } ->
-       (manager, balance, spendable, delegate, script, storage, counter))
-    (fun (manager, balance, spendable, delegate, script, storage, counter) ->
-       {manager ; balance ; spendable ; delegate ; script ; storage ; counter}) @@
-  obj7
+    (fun {manager ; balance ; spendable ; delegate ;
+          script ; counter } ->
+      (manager, balance, spendable, delegate,
+       script, counter))
+    (fun (manager, balance, spendable, delegate,
+          script, counter) ->
+      {manager ; balance ; spendable ; delegate ;
+       script ; counter}) @@
+  obj6
     (req "manager" Signature.Public_key_hash.encoding)
     (req "balance" Tez.encoding)
     (req "spendable" bool)
@@ -37,7 +40,6 @@ let info_encoding =
        (req "setable" bool)
        (opt "value" Signature.Public_key_hash.encoding))
     (opt "script" Script.encoding)
-    (opt "storage" Script.expr_encoding)
     (req "counter" int32)
 
 module S = struct
@@ -59,6 +61,16 @@ module S = struct
       ~input: empty
       ~output: (obj1 (req "manager" Signature.Public_key_hash.encoding))
       RPC_path.(custom_root /: Contract.arg / "manager")
+
+  let manager_key =
+    RPC_service.post_service
+      ~description: "Access the manager of a contract."
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj2
+                  (req "manager" Signature.Public_key_hash.encoding)
+                  (opt "key" Signature.Public_key.encoding))
+      RPC_path.(custom_root /: Contract.arg / "manager_key")
 
   let delegate =
     RPC_service.post_service
@@ -148,12 +160,31 @@ let () =
          | Some v -> return v) in
   register_field S.balance Contract.get_balance ;
   register_field S.manager Contract.get_manager ;
+  register_field S.manager_key
+    (fun ctxt c ->
+       Contract.get_manager ctxt c >>=? fun mgr ->
+       Contract.is_manager_key_revealed ctxt c >>=? fun revealed ->
+       if revealed then
+         Contract.get_manager_key ctxt c >>=? fun key ->
+         return (mgr, Some key)
+       else return (mgr, None)) ;
   register_opt_field S.delegate Delegate.get ;
   register_field S.counter Contract.get_counter ;
   register_field S.spendable Contract.is_spendable ;
   register_field S.delegatable Contract.is_delegatable ;
-  register_opt_field S.script Contract.get_script ;
-  register_opt_field S.storage Contract.get_storage ;
+  register_opt_field S.script
+    (fun c v -> Contract.get_script c v >>=? fun (_, v) -> return v) ;
+  register_opt_field S.storage (fun ctxt contract ->
+      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+      match script with
+      | None -> return None
+      | Some script ->
+          let ctxt = Gas.set_unlimited ctxt in
+          let open Script_ir_translator in
+          parse_script ctxt script >>=? fun (Ex_script script, ctxt) ->
+          unparse_script ctxt Readable script >>=? fun (script, _ctxt) ->
+          Lwt.return (Script.force_decode script.storage) >>=? fun storage ->
+          return (Some storage)) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Contract.get_manager ctxt contract >>=? fun manager ->
@@ -161,11 +192,19 @@ let () =
       Contract.get_counter ctxt contract >>=? fun counter ->
       Contract.is_delegatable ctxt contract >>=? fun delegatable ->
       Contract.is_spendable ctxt contract >>=? fun spendable ->
-      Contract.get_script ctxt contract >>=? fun script ->
-      Contract.get_storage ctxt contract >>=? fun storage ->
+      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+      begin match script with
+        | None -> return (None, ctxt)
+        | Some script ->
+            let ctxt = Gas.set_unlimited ctxt in
+            let open Script_ir_translator in
+            parse_script ctxt script >>=? fun (Ex_script script, ctxt) ->
+            unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
+            return (Some script, ctxt)
+      end >>=? fun (script, _ctxt) ->
       return { manager ; balance ;
                spendable ; delegate = (delegatable, delegate) ;
-               script ; counter ; storage})
+               script ; counter })
 
 let list ctxt block =
   RPC_context.make_call0 S.list ctxt block () ()
@@ -178,6 +217,9 @@ let balance ctxt block contract =
 
 let manager ctxt block contract =
   RPC_context.make_call1 S.manager ctxt block contract () ()
+
+let manager_key ctxt block contract =
+  RPC_context.make_call1 S.manager_key ctxt block contract () ()
 
 let delegate ctxt block contract =
   RPC_context.make_call1 S.delegate ctxt block contract () ()

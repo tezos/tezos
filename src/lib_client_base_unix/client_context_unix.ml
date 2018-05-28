@@ -44,18 +44,18 @@ class unix_wallet ~base_dir : wallet = object (self)
 end
 
 class unix_prompter = object
-  method prompt : type a. (a, string) lwt_format -> a =
+  method prompt : type a. (a, string tzresult) lwt_format -> a =
     Format.kasprintf begin fun msg ->
       print_string msg ;
       let line = read_line () in
-      Lwt.return line
+      return line
     end
 
-  method prompt_password : type a. (a, string) lwt_format -> a =
+  method prompt_password : type a. (a, MBytes.t tzresult) lwt_format -> a =
     Format.kasprintf begin fun msg ->
       print_string msg ;
       let line = Lwt_utils_unix.getpass () in
-      Lwt.return line
+      return (MBytes.of_string line)
     end
 end
 
@@ -83,11 +83,12 @@ class unix_logger ~base_dir =
     inherit Client_context.simple_printer log
   end
 
-class unix_full ~base_dir ~block ~rpc_config : Client_context.full =
+class unix_full ~base_dir ~block ~confirmations ~rpc_config : Client_context.full =
   object
     inherit unix_logger ~base_dir
     inherit unix_prompter
     inherit unix_wallet ~base_dir
     inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
     method block = block
+    method confirmations = confirmations
   end

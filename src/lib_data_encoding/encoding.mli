@@ -16,7 +16,7 @@ module Kind: sig
   type enum = [ `Dynamic | `Variable ]
   val combine: string -> t -> t -> t
   val merge : t -> t -> t
-  val merge_list: Size.tag_size -> t list -> t
+  val merge_list: Binary_size.tag_size -> t list -> t
 end
 
 type case_tag = Tag of int | Json_only
@@ -34,6 +34,7 @@ type 'a desc =
   | Int31 : int desc
   | Int32 : Int32.t desc
   | Int64 : Int64.t desc
+  | N : Z.t desc
   | Z : Z.t desc
   | RangedInt : { minimum : int ; maximum : int } -> int desc
   | RangedFloat : { minimum : float ; maximum : float } -> float desc
@@ -47,7 +48,7 @@ type 'a desc =
   | Objs : Kind.t * 'a t * 'b t -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
   | Tups : Kind.t * 'a t * 'b t -> ('a * 'b) desc
-  | Union : Kind.t * Size.tag_size * 'a case list -> 'a desc
+  | Union : Kind.t * Binary_size.tag_size * 'a case list -> 'a desc
   | Mu : Kind.enum * string * ('a t -> 'a t) -> 'a desc
   | Conv :
       { proj : ('a -> 'b) ;
@@ -64,7 +65,10 @@ type 'a desc =
       { encoding : 'a t ;
         json_encoding : 'a Json_encoding.encoding ;
         is_obj : bool ; is_tup : bool } -> 'a desc
-  | Dynamic_size : 'a t -> 'a desc
+  | Dynamic_size :
+      { kind : Binary_size.unsigned_integer ;
+        encoding : 'a t } -> 'a desc
+  | Check_size : { limit : int ; encoding : 'a t } -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
@@ -87,18 +91,6 @@ type 'a encoding = 'a t
 
 val make: ?json_encoding: 'a Json_encoding.encoding -> 'a desc -> 'a t
 
-
-exception No_case_matched
-exception Unexpected_tag of int
-exception Duplicated_tag of int
-exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
-exception Unexpected_enum of string * string list
-exception Parse_error of string
-exception Float_out_of_range of float * float * float
-exception Int_out_of_range of int * int * int
-exception Invalid_size of int
-
-
 val null : unit encoding
 val empty : unit encoding
 val unit : unit encoding
@@ -110,6 +102,7 @@ val uint16 : int encoding
 val int31 : int encoding
 val int32 : int32 encoding
 val int64 : int64 encoding
+val n : Z.t encoding
 val z : Z.t encoding
 val ranged_int : int -> int -> int encoding
 val ranged_float : float -> float -> float encoding
@@ -132,7 +125,9 @@ module Variable : sig
   val array : 'a encoding -> 'a array encoding
   val list : 'a encoding -> 'a list encoding
 end
-val dynamic_size : 'a encoding -> 'a encoding
+val dynamic_size :
+  ?kind:Binary_size.unsigned_integer -> 'a encoding -> 'a encoding
+val check_size : int -> 'a encoding -> 'a encoding
 val delayed : (unit -> 'a encoding) -> 'a encoding
 val req :
   ?title:string -> ?description:string ->

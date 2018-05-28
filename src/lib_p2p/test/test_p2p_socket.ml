@@ -95,7 +95,7 @@ let accept sched main_socket =
   raw_accept sched main_socket >>= fun (fd, point) ->
   P2p_socket.authenticate
     ~proof_of_work_target
-    ~incoming:true fd point id1 versions
+    ~incoming:true fd point id1 versions Data_encoding.unit
 
 let raw_connect sched addr port =
   let fd = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
@@ -109,7 +109,7 @@ let connect sched addr port id =
   raw_connect sched addr port >>= fun fd ->
   P2p_socket.authenticate
     ~proof_of_work_target
-    ~incoming:false fd (addr, port) id versions >>=? fun (info, auth_fd) ->
+    ~incoming:false fd (addr, port) id versions Data_encoding.unit >>=? fun (info, auth_fd) ->
   _assert (not info.incoming) __LOC__ "" >>=? fun () ->
   _assert (P2p_peer.Id.compare info.peer_id id1.peer_id = 0)
     __LOC__ "" >>=? fun () ->
@@ -172,7 +172,7 @@ module Kick = struct
 
   let client _ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept auth_fd encoding >>= fun conn ->
+    P2p_socket.accept auth_fd () encoding >>= fun conn ->
     _assert (is_rejected conn) __LOC__ "" >>=? fun () ->
     return ()
 
@@ -186,7 +186,7 @@ module Kicked = struct
 
   let server _ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept auth_fd encoding >>= fun conn ->
+    P2p_socket.accept auth_fd () encoding >>= fun conn ->
     _assert (Kick.is_rejected conn) __LOC__ "" >>=? fun () ->
     return ()
 
@@ -208,7 +208,7 @@ module Simple_message = struct
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept auth_fd encoding >>=? fun conn ->
+    P2p_socket.accept auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     P2p_socket.write_sync conn simple_msg >>=? fun () ->
     P2p_socket.read conn >>=? fun (_msg_size, msg) ->
     _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
@@ -218,7 +218,7 @@ module Simple_message = struct
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept auth_fd encoding >>=? fun conn ->
+    P2p_socket.accept auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     P2p_socket.write_sync conn simple_msg2 >>=? fun () ->
     P2p_socket.read conn >>=? fun (_msg_size, msg) ->
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
@@ -240,7 +240,7 @@ module Chunked_message = struct
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
     P2p_socket.accept
-      ~binary_chunks_size:21 auth_fd encoding >>=? fun conn ->
+      ~binary_chunks_size:21 auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     P2p_socket.write_sync conn simple_msg >>=? fun () ->
     P2p_socket.read conn >>=? fun (_msg_size, msg) ->
     _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
@@ -251,7 +251,7 @@ module Chunked_message = struct
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
     P2p_socket.accept
-      ~binary_chunks_size:21 auth_fd encoding >>=? fun conn ->
+      ~binary_chunks_size:21 auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     P2p_socket.write_sync conn simple_msg2 >>=? fun () ->
     P2p_socket.read conn >>=? fun (_msg_size, msg) ->
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
@@ -272,7 +272,7 @@ module Oversized_message = struct
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept auth_fd encoding >>=? fun conn ->
+    P2p_socket.accept auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     P2p_socket.write_sync conn simple_msg >>=? fun () ->
     P2p_socket.read conn >>=? fun (_msg_size, msg) ->
     _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
@@ -282,7 +282,7 @@ module Oversized_message = struct
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept auth_fd encoding >>=? fun conn ->
+    P2p_socket.accept auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     P2p_socket.write_sync conn simple_msg2 >>=? fun () ->
     P2p_socket.read conn >>=? fun (_msg_size, msg) ->
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
@@ -302,14 +302,14 @@ module Close_on_read = struct
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept auth_fd encoding >>=? fun conn ->
+    P2p_socket.accept auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
     return ()
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept auth_fd encoding >>=? fun conn ->
+    P2p_socket.accept auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     sync ch >>=? fun () ->
     P2p_socket.read conn >>= fun err ->
     _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
@@ -328,14 +328,14 @@ module Close_on_write = struct
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept auth_fd encoding >>=? fun conn ->
+    P2p_socket.accept auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     P2p_socket.close conn >>= fun _stat ->
     sync ch >>=? fun ()->
     return ()
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept auth_fd encoding >>=? fun conn ->
+    P2p_socket.accept auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     sync ch >>=? fun ()->
     Lwt_unix.sleep 0.1 >>= fun () ->
     P2p_socket.write_sync conn simple_msg >>= fun err ->
@@ -365,7 +365,7 @@ module Garbled_data = struct
 
   let server _ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept auth_fd encoding >>=? fun conn ->
+    P2p_socket.accept auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     P2p_socket.raw_write_sync conn garbled_msg >>=? fun () ->
     P2p_socket.read conn >>= fun err ->
     _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
@@ -374,7 +374,7 @@ module Garbled_data = struct
 
   let client _ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
-    P2p_socket.accept auth_fd encoding >>=? fun conn ->
+    P2p_socket.accept auth_fd () encoding >>=? fun (conn, _ack_cfg) ->
     P2p_socket.read conn >>= fun err ->
     _assert (is_decoding_error err) __LOC__ "" >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->

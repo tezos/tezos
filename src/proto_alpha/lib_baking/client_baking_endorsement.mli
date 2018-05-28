@@ -13,7 +13,7 @@ open Alpha_context
 val forge_endorsement:
   #Proto_alpha.full ->
   Block_services.block ->
-  src_sk:Client_keys.sk_locator ->
+  src_sk:Client_keys.sk_uri ->
   ?slots:int list ->
   ?max_priority:int ->
   public_key ->

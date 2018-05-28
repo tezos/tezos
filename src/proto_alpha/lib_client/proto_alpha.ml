@@ -17,6 +17,7 @@ class type rpc_context = object
 end
 
 class wrap_proto_context (t : RPC_context.json) : rpc_context = object
+  method base : Uri.t = t#base
   method generic_json_call = t#generic_json_call
   method call_service : 'm 'p 'q 'i 'o.
     ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->

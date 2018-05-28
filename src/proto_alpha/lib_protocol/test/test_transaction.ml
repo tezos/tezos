@@ -48,23 +48,23 @@ let test_basic (): unit tzresult Lwt.t =
 
   (* Send 10 tz to unknown account. *)
   transfer (account_a, account_unknown_foo, 10000) >>=
-  Assert.ok_contract >>=? fun (_, tc) ->
+  Assert.ok >>=? fun (_, tc) ->
   Assert.equal_cents_balance ~msg: __LOC__ ~tc (account_unknown_foo.contract, 10000) >>=? fun () ->
   debug "Reception" ;
 
   (* Unknown account transfers back tz. *)
   transfer ~tc (account_unknown_foo, account_a, 9990) >>=
-  Assert.ok_contract >>=? fun _ ->
+  Assert.ok >>=? fun _ ->
   debug "Transfer back" ;
 
   (* Check that a basic transfer originates no contracts. *)
-  transfer (account_a, account_b, 1000) >>=? fun ((contracts, _), _) ->
+  transfer (account_a, account_b, 1000) >>=? fun (contracts, _) ->
   Assert.equal_int ~msg: __LOC__ 0 (List.length contracts) ;
   debug "No contracts originated" ;
 
   (* Check sender/receiver balance post transaction *)
   transfer (account_a, account_b, 1000) >>=
-  Assert.ok_contract ~msg: __LOC__ >>=? fun (_,tc) ->
+  Assert.ok ~msg: __LOC__ >>=? fun (_,tc) ->
   Proto_alpha.Alpha_context.Contract.get_balance tc account_a.contract >>=? fun _balance ->
   Assert.equal_cents_balance ~msg: __LOC__ ~tc (account_a.contract, init_amount * 100 - 1000 - 10) >>=? fun () ->
   Assert.equal_cents_balance ~msg: __LOC__ ~tc (account_b.contract, 1001000) >>=? fun () ->
@@ -78,7 +78,7 @@ let test_basic (): unit tzresult Lwt.t =
   (* Check non-spendability of a non-spendable contract *)
   (* TODO: Unspecified economic error: should be more specific. *)
   originate (account_a, 1000, false, true, 0)
-  >>= Assert.ok_contract ~msg: __LOC__ >>=? fun ((contracts,_), tc) ->
+  >>= Assert.ok ~msg: __LOC__ >>=? fun (contracts, tc) ->
   Assert.equal_int (List.length contracts) 1 ;
   let non_spendable = List.hd contracts in
   let account = {account_a with contract = non_spendable} in
@@ -90,7 +90,7 @@ let test_basic (): unit tzresult Lwt.t =
 
   (* Check spendability of a spendable contract *)
   originate (account_a, 1000, true, true, 100)
-  >>= Assert.ok_contract ~msg: __LOC__ >>=? fun ((contracts, _), spendable_tc) ->
+  >>= Assert.ok ~msg: __LOC__ >>=? fun (contracts, spendable_tc) ->
   Assert.equal_int (List.length contracts) 1 ;
   let contract_spendable = List.hd contracts in
   let account_spendable = {account_a with contract = contract_spendable} in

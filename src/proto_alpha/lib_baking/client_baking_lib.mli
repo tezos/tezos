@@ -18,7 +18,7 @@ val bake_block:
   ?max_priority: int ->
   ?free_baking: bool ->
   ?minimal_timestamp: bool ->
-  ?src_sk:Client_keys.sk_locator ->
+  ?src_sk:Client_keys.sk_uri ->
   public_key_hash ->
   unit tzresult Lwt.t
 

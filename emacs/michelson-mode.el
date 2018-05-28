@@ -768,7 +768,7 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
    (michelson-suggest-reorderable '("ADD" "SUB" "MUL") 'tez 'nat)
    (michelson-suggest-literals "EDIV" 'tez 'nat)
    (michelson-suggest-literals "EDIV" 'tez 'tez)
-   (michelson-suggest-literals "DEFAULT_ACCOUNT" 'key)
+   (michelson-suggest-literals "IMPLICIT_ACCOUNT" 'key)
    (michelson-suggest-depth "SWAP" 2)
    (michelson-suggest-depth '("DROP" "H") 1)
    (michelson-suggest-literals "CHECK_SIGNATURE" 'key '(pair signature string))

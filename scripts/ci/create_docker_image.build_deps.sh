@@ -25,6 +25,7 @@ image_name="${1:-tezos_build_deps}"
 image_version="${2:-latest}"
 base_image="${3:-tezos_opam:alpine-${alpine_version}_ocaml-${ocaml_version}}"
 cached_image="${4:-}"
+test_deps="ocp-indent alcotest.0.8.3 alcotest-lwt crowbar"
 
 cat <<EOF > "$tmp_dir"/Dockerfile
 FROM $base_image
@@ -37,7 +38,13 @@ RUN opam exec -- ./tezos/scripts/install_build_deps.sh || \
       echo ; \
       opam remote add default https://opam.ocaml.org/2.0 && \
       opam exec -- ./tezos/scripts/install_build_deps.sh )
-RUN opam install --yes ocp-indent alcotest.0.8.3 alcotest-lwt
+RUN opam install --yes $test_deps || \
+    ( echo ; \
+      echo "### Failed to build with preloaded package" ; \
+      echo "### Retrying with the default opam repository" ; \
+      echo ; \
+      opam remote add default https://opam.ocaml.org/2.0 && \
+      opam install --yes $test_deps )
 EOF
 
 tar -c $dependencies | tar -C "$tmp_dir" -x

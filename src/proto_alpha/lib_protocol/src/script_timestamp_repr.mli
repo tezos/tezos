@@ -30,3 +30,4 @@ val add_delta : t -> z num -> t
 val sub_delta : t -> z num -> t
 
 val to_zint : t -> Z.t
+val of_zint : Z.t -> t

@@ -1,9 +1,8 @@
 parameter (list (pair string int)) ;
 storage (pair (big_map string int) unit) ;
-return unit ;
 code { UNPAAIAIR ;
        ITER { UNPAIR ; DUUUP ; DUUP; GET ;
               IF_NONE { PUSH int 0 } {} ;
               SWAP ; DIP { ADD ; SOME } ;
               UPDATE } ;
-       PAIR ; UNIT ; PAIR }
+       PAIR ; NIL operation ; PAIR }

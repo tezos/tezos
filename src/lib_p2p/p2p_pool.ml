@@ -192,10 +192,10 @@ type config = {
   binary_chunks_size : int option ;
 }
 
-type 'meta meta_config = {
-  encoding : 'meta Data_encoding.t;
-  initial : 'meta;
-  score : 'meta -> float;
+type 'peer_meta peer_meta_config = {
+  peer_meta_encoding : 'peer_meta Data_encoding.t ;
+  peer_meta_initial : 'peer_meta ;
+  score : 'peer_meta -> float ;
 }
 
 type 'msg message_config = {
@@ -203,17 +203,29 @@ type 'msg message_config = {
   versions : P2p_version.t list;
 }
 
-type ('msg, 'meta) t = {
+type 'conn_meta conn_meta_config = {
+  conn_meta_encoding : 'conn_meta Data_encoding.t ;
+  conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
+}
+
+type ('msg, 'peer_meta, 'conn_meta) t = {
   config : config ;
-  meta_config : 'meta meta_config ;
+  peer_meta_config : 'peer_meta peer_meta_config ;
+  conn_meta_config : 'conn_meta conn_meta_config ;
   message_config : 'msg message_config ;
   my_id_points : unit P2p_point.Table.t ;
   known_peer_ids :
-    (('msg, 'meta) connection, 'meta) P2p_peer_state.Info.t P2p_peer.Table.t ;
+    (('msg, 'peer_meta, 'conn_meta) connection,
+     'peer_meta,
+     'conn_meta) P2p_peer_state.Info.t P2p_peer.Table.t ;
   connected_peer_ids :
-    (('msg, 'meta) connection, 'meta) P2p_peer_state.Info.t P2p_peer.Table.t ;
-  known_points : ('msg, 'meta) connection P2p_point_state.Info.t P2p_point.Table.t ;
-  connected_points : ('msg, 'meta) connection P2p_point_state.Info.t P2p_point.Table.t ;
+    (('msg, 'peer_meta, 'conn_meta) connection,
+     'peer_meta,
+     'conn_meta) P2p_peer_state.Info.t P2p_peer.Table.t ;
+  known_points :
+    ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t P2p_point.Table.t ;
+  connected_points :
+    ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t P2p_point.Table.t ;
   incoming : Lwt_canceler.t P2p_point.Table.t ;
   io_sched : P2p_io_scheduler.t ;
   encoding : 'msg Message.t Data_encoding.t ;
@@ -221,7 +233,7 @@ type ('msg, 'meta) t = {
   watcher : P2p_connection.Pool_event.t Lwt_watcher.input ;
   acl : P2p_acl.t ;
   mutable new_connection_hook :
-    (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) list ;
+    (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) list ;
   mutable latest_accepted_swap : Time.t ;
   mutable latest_succesfull_swap : Time.t  ;
 }
@@ -233,18 +245,20 @@ and events = {
   new_connection : unit Lwt_condition.t ;
 }
 
-and ('msg, 'meta) connection = {
+and ('msg, 'peer_meta, 'conn_meta) connection = {
   canceler : Lwt_canceler.t ;
   messages : (int * 'msg) Lwt_pipe.t ;
   conn : 'msg Message.t P2p_socket.t ;
-  peer_info : (('msg, 'meta) connection, 'meta) P2p_peer_state.Info.t ;
-  point_info : ('msg, 'meta) connection P2p_point_state.Info.t option ;
+  peer_info :
+    (('msg, 'peer_meta, 'conn_meta) connection, 'peer_meta, 'conn_meta) P2p_peer_state.Info.t ;
+  point_info :
+    ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t option ;
   answerer : 'msg Answerer.t Lazy.t ;
   mutable last_sent_swap_request : (Time.t * P2p_peer.Id.t) option ;
   mutable wait_close : bool ;
 }
 
-type ('msg, 'meta) pool = ('msg, 'meta) t
+type ('msg, 'peer_meta, 'conn_meta) pool = ('msg, 'peer_meta, 'conn_meta) t
 
 module Pool_event = struct
   let wait_too_few_connections pool =
@@ -318,7 +332,7 @@ module Gc_peer_set = List.Bounded(struct
       if score_cmp = 0 then Time.compare t t' else - score_cmp
   end)
 
-let gc_peer_ids ({ meta_config = { score } ;
+let gc_peer_ids ({ peer_meta_config = { score } ;
                    config = { max_known_peer_ids } ;
                    known_peer_ids ; } as pool) =
   match max_known_peer_ids with
@@ -327,7 +341,7 @@ let gc_peer_ids ({ meta_config = { score } ;
       let table = Gc_peer_set.create target in
       P2p_peer.Table.iter (fun peer_id peer_info ->
           let created = P2p_peer_state.Info.created peer_info in
-          let score = score @@ P2p_peer_state.Info.metadata peer_info in
+          let score = score @@ P2p_peer_state.Info.peer_metadata peer_info in
           Gc_peer_set.insert (score, created, peer_id) table
         ) known_peer_ids ;
       let to_remove = Gc_peer_set.get table in
@@ -340,7 +354,9 @@ let register_peer pool peer_id =
   match P2p_peer.Table.find pool.known_peer_ids peer_id with
   | exception Not_found ->
       Lwt_condition.broadcast pool.events.new_peer () ;
-      let peer = P2p_peer_state.Info.create peer_id ~metadata:pool.meta_config.initial in
+      let peer =
+        P2p_peer_state.Info.create peer_id
+          ~peer_metadata:pool.peer_meta_config.peer_meta_initial in
       Option.iter pool.config.max_known_peer_ids ~f:begin fun (max, _) ->
         if P2p_peer.Table.length pool.known_peer_ids >= max then gc_peer_ids pool
       end ;
@@ -421,7 +437,8 @@ let get_addr pool peer_id =
 
 module Points = struct
 
-  type ('msg, 'meta) info = ('msg, 'meta) connection P2p_point_state.Info.t
+  type ('msg, 'peer_meta, 'conn_meta) info =
+    ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t
 
   let info { known_points } point =
     P2p_point.Table.find_opt known_points point
@@ -461,21 +478,22 @@ end
 
 module Peers = struct
 
-  type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) P2p_peer_state.Info.t
+  type ('msg, 'peer_meta, 'conn_meta) info =
+    (('msg, 'peer_meta, 'conn_meta) connection, 'peer_meta, 'conn_meta) P2p_peer_state.Info.t
 
   let info { known_peer_ids } peer_id =
     try Some (P2p_peer.Table.find known_peer_ids peer_id)
     with Not_found -> None
 
-  let get_metadata pool peer_id =
-    try P2p_peer_state.Info.metadata (P2p_peer.Table.find pool.known_peer_ids peer_id)
-    with Not_found -> pool.meta_config.initial
+  let get_peer_metadata pool peer_id =
+    try P2p_peer_state.Info.peer_metadata (P2p_peer.Table.find pool.known_peer_ids peer_id)
+    with Not_found -> pool.peer_meta_config.peer_meta_initial
 
   let get_score pool peer_id =
-    pool.meta_config.score (get_metadata pool peer_id)
+    pool.peer_meta_config.score (get_peer_metadata pool peer_id)
 
-  let set_metadata pool peer_id data =
-    P2p_peer_state.Info.set_metadata (register_peer pool peer_id) data
+  let set_peer_metadata pool peer_id data =
+    P2p_peer_state.Info.set_peer_metadata (register_peer pool peer_id) data
 
   let get_trusted pool peer_id =
     try P2p_peer_state.Info.trusted (P2p_peer.Table.find pool.known_peer_ids peer_id)
@@ -561,7 +579,7 @@ module Connection = struct
   let stat { conn } =
     P2p_socket.stat conn
 
-  let score { meta_config = { score }} meta = score meta
+  let score { peer_meta_config = { score }} meta = score meta
 
   let info { conn } =
     P2p_socket.info conn
@@ -688,6 +706,7 @@ and authenticate pool ?point_info canceler fd point =
       ~incoming (P2p_io_scheduler.register pool.io_sched fd) point
       ?listening_port:pool.config.listening_port
       pool.config.identity pool.message_config.versions
+      pool.conn_meta_config.conn_meta_encoding
   end ~on_error: begin fun err ->
     begin match err with
       | [ Canceled ] ->
@@ -779,11 +798,13 @@ and authenticate pool ?point_info canceler fd point =
           ?incoming_message_queue_size:pool.config.incoming_message_queue_size
           ?outgoing_message_queue_size:pool.config.outgoing_message_queue_size
           ?binary_chunks_size:pool.config.binary_chunks_size
-          auth_fd pool.encoding >>= fun conn ->
+          auth_fd
+          (pool.conn_meta_config.conn_meta_value info.peer_id)
+          pool.encoding >>=? fun (conn, ack_cfg) ->
         lwt_debug "authenticate: %a -> Connected %a"
           P2p_point.Id.pp point
           P2p_connection.Info.pp info >>= fun () ->
-        Lwt.return conn
+        return (conn, ack_cfg)
       end ~on_error: begin fun err ->
         if incoming then
           log pool
@@ -795,7 +816,7 @@ and authenticate pool ?point_info canceler fd point =
           ~f:P2p_point_state.set_disconnected ;
         P2p_peer_state.set_disconnected peer_info ;
         Lwt.return (Error err)
-      end >>=? fun conn ->
+      end >>=? fun (conn, ack_cfg) ->
       let id_point =
         match info.id_point, Option.map ~f:P2p_point_state.Info.point point_info with
         | (addr, _), Some (_, port) -> addr, Some port
@@ -803,7 +824,7 @@ and authenticate pool ?point_info canceler fd point =
       return
         (create_connection
            pool conn
-           id_point connection_point_info peer_info version)
+           id_point connection_point_info peer_info version ack_cfg)
     end
   | _ -> begin
       log pool (Rejecting_request (point, info.id_point, info.peer_id)) ;
@@ -819,7 +840,7 @@ and authenticate pool ?point_info canceler fd point =
       fail (P2p_errors.Rejected info.peer_id)
     end
 
-and create_connection pool p2p_conn id_point point_info peer_info _version =
+and create_connection pool p2p_conn id_point point_info peer_info _version ack_cfg =
   let peer_id = P2p_peer_state.Info.peer_id peer_info in
   let canceler = Lwt_canceler.create () in
   let size =
@@ -851,7 +872,7 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
     P2p_point.Table.add pool.connected_points point point_info ;
   end ;
   log pool (Connection_established (id_point, peer_id)) ;
-  P2p_peer_state.set_running peer_info id_point conn ;
+  P2p_peer_state.set_running peer_info id_point conn ack_cfg ;
   P2p_peer.Table.add pool.connected_peer_ids peer_id peer_info ;
   Lwt_condition.broadcast pool.events.new_connection () ;
   Lwt_canceler.on_cancel canceler begin fun () ->
@@ -1013,7 +1034,7 @@ let send_swap_request pool =
 
 (***************************************************************************)
 
-let create config meta_config message_config io_sched =
+let create config peer_meta_config conn_meta_config message_config io_sched =
   let events = {
     too_few_connections = Lwt_condition.create () ;
     too_many_connections = Lwt_condition.create () ;
@@ -1021,7 +1042,7 @@ let create config meta_config message_config io_sched =
     new_connection = Lwt_condition.create () ;
   } in
   let pool = {
-    config ; meta_config ; message_config ;
+    config ; peer_meta_config ; conn_meta_config; message_config ;
     my_id_points = P2p_point.Table.create 7 ;
     known_peer_ids = P2p_peer.Table.create 53 ;
     connected_peer_ids = P2p_peer.Table.create 53 ;
@@ -1038,7 +1059,9 @@ let create config meta_config message_config io_sched =
     latest_succesfull_swap = Time.epoch ;
   } in
   List.iter (Points.set_trusted pool) config.trusted_points ;
-  P2p_peer_state.Info.File.load config.peers_file meta_config.encoding >>= function
+  P2p_peer_state.Info.File.load
+    config.peers_file
+    peer_meta_config.peer_meta_encoding >>= function
   | Ok peer_ids ->
       List.iter
         (fun peer_info ->

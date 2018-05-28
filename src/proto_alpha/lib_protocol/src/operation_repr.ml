@@ -24,7 +24,7 @@ type operation = {
 
 and proto_operation =
   | Anonymous_operations of anonymous_operation list
-  | Sourced_operations of sourced_operations
+  | Sourced_operation of sourced_operation
 
 and anonymous_operation =
   | Seed_nonce_revelation of {
@@ -44,7 +44,7 @@ and anonymous_operation =
       secret: Blinded_public_key_hash.secret ;
     }
 
-and sourced_operations =
+and sourced_operation =
   | Consensus_operation of consensus_operation
   | Amendment_operation of {
       source: Signature.Public_key_hash.t ;
@@ -55,6 +55,8 @@ and sourced_operations =
       fee: Tez_repr.tez ;
       counter: counter ;
       operations: manager_operation list ;
+      gas_limit: Z.t;
+      storage_limit: Int64.t;
     }
   | Dictator_operation of dictator_operation
 
@@ -80,7 +82,7 @@ and manager_operation =
   | Reveal of Signature.Public_key.t
   | Transaction of {
       amount: Tez_repr.tez ;
-      parameters: Script_repr.expr option ;
+      parameters: Script_repr.lazy_expr option ;
       destination: Contract_repr.contract ;
     }
   | Origination of {
@@ -90,6 +92,7 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
+      preorigination: Contract_repr.t option ;
     }
   | Delegation of Signature.Public_key_hash.t option
 
@@ -98,6 +101,12 @@ and dictator_operation =
   | Activate_testchain of Protocol_hash.t
 
 and counter = Int32.t
+
+type internal_operation = {
+  source: Contract_repr.contract ;
+  operation: manager_operation ;
+  nonce: int ;
+}
 
 module Encoding = struct
 
@@ -122,7 +131,7 @@ module Encoding = struct
       (req "kind" (constant "transaction"))
       (req "amount" Tez_repr.encoding)
       (req "destination" Contract_repr.encoding)
-      (opt "parameters" Script_repr.expr_encoding)
+      (opt "parameters" Script_repr.lazy_expr_encoding)
 
   let transaction_case tag =
     case tag ~name:"Transaction" transaction_encoding
@@ -148,7 +157,11 @@ module Encoding = struct
     case tag ~name:"Origination" origination_encoding
       (function
         | Origination { manager ; credit ; spendable ;
-                        delegatable ; delegate ; script } ->
+                        delegatable ; delegate ; script ;
+                        preorigination = _
+                        (* the hash is only used internally
+                           when originating from smart
+                           contracts, don't serialize it *) } ->
             Some ((), manager, credit, Some spendable,
                   Some delegatable, delegate, script)
         | _ -> None)
@@ -158,7 +171,8 @@ module Encoding = struct
          let spendable =
            match spendable with None -> true | Some b -> b in
          Origination
-           {manager ; credit ; spendable ; delegatable ; delegate ; script })
+           {manager ; credit ; spendable ; delegatable ;
+            delegate ; script ; preorigination = None })
 
   let delegation_encoding =
     describe ~title:"Delegation operation" @@
@@ -173,7 +187,7 @@ module Encoding = struct
       (fun ((), key) -> Delegation key)
 
   let manager_kind_encoding =
-    obj5
+    obj7
       (req "kind" (constant "manager"))
       (req "source" Contract_repr.encoding)
       (req "fee" Tez_repr.encoding)
@@ -185,15 +199,17 @@ module Encoding = struct
               origination_case (Tag 2) ;
               delegation_case (Tag 3) ;
             ])))
+      (req "gas_limit" z)
+      (req "storage_limit" int64)
 
   let manager_kind_case tag =
     case tag ~name:"Manager operations" manager_kind_encoding
       (function
-        | Manager_operations { source; fee ; counter ;operations } ->
-            Some ((), source, fee, counter, operations)
+        | Manager_operations { source; fee ; counter ; operations ; gas_limit ; storage_limit } ->
+            Some ((), source, fee, counter, operations, gas_limit, storage_limit)
         | _ -> None)
-      (fun ((), source, fee, counter, operations) ->
-         Manager_operations { source; fee ; counter ; operations })
+      (fun ((), source, fee, counter, operations, gas_limit, storage_limit) ->
+         Manager_operations { source; fee ; counter ; operations ; gas_limit ; storage_limit })
 
   let endorsement_encoding =
     (* describe ~title:"Endorsement operation" @@ *)
@@ -303,8 +319,8 @@ module Encoding = struct
           manager_kind_case (Tag 2) ;
           dictator_kind_case (Tag 3) ;
         ])
-      (function Sourced_operations ops -> Some ops | _ -> None)
-      (fun ops -> Sourced_operations ops)
+      (function Sourced_operation op -> Some op | _ -> None)
+      (fun op -> Sourced_operation op)
 
   let seed_nonce_revelation_encoding =
     (obj3
@@ -412,6 +428,20 @@ module Encoding = struct
       Operation.shell_header_encoding
       proto_operation_encoding
 
+  let internal_operation_encoding =
+    conv
+      (fun { source ; operation ; nonce } -> ((source, nonce), operation))
+      (fun ((source, nonce), operation) -> { source ; operation ; nonce })
+      (merge_objs
+         (obj2
+            (req "source" Contract_repr.encoding)
+            (req "nonce" uint16))
+         (union ~tag_size:`Uint8 [
+             reveal_case (Tag 0) ;
+             transaction_case (Tag 1) ;
+             origination_case (Tag 2) ;
+             delegation_case (Tag 3) ;
+           ]))
 end
 
 type error += Cannot_parse_operation
@@ -441,10 +471,10 @@ let parse (op: Operation.t) =
 
 let acceptable_passes op =
   match op.contents with
-  | Sourced_operations (Consensus_operation _) -> [0]
-  | Sourced_operations (Amendment_operation _ | Dictator_operation _) -> [1]
+  | Sourced_operation (Consensus_operation _) -> [0]
+  | Sourced_operation (Amendment_operation _ | Dictator_operation _) -> [1]
   | Anonymous_operations _ -> [2]
-  | Sourced_operations (Manager_operations _) -> [3]
+  | Sourced_operation (Manager_operations _) -> [3]
 
 type error += Invalid_signature (* `Permanent *)
 type error += Missing_signature (* `Permanent *)
@@ -474,17 +504,29 @@ let () =
     (fun () -> Missing_signature)
 
 let forge shell proto =
-  Data_encoding.Binary.to_bytes
+  Data_encoding.Binary.to_bytes_exn
     Encoding.unsigned_operation_encoding (shell, proto)
 
 let check_signature key { shell ; contents ; signature } =
   match contents, signature with
   | Anonymous_operations _, _ -> return ()
-  | Sourced_operations _, None ->
+  | Sourced_operation _, None ->
       fail Missing_signature
-  | Sourced_operations _, Some signature ->
+  | Sourced_operation (Consensus_operation _), Some signature ->
+      (* Safe for baking *)
       let unsigned_operation = forge shell contents in
-      if Signature.check key signature unsigned_operation then
+      if Signature.check
+          ~watermark:Endorsement
+          key signature unsigned_operation then
+        return ()
+      else
+        fail Invalid_signature
+  | Sourced_operation _, Some signature ->
+      (* Unsafe for baking *)
+      let unsigned_operation = forge shell contents in
+      if Signature.check
+          ~watermark:Generic_operation
+          key signature unsigned_operation then
         return ()
       else
         fail Invalid_signature
@@ -499,7 +541,7 @@ let parse_proto bytes =
 let hash_raw = Operation.hash
 let hash o =
   let proto =
-    Data_encoding.Binary.to_bytes
+    Data_encoding.Binary.to_bytes_exn
       Encoding.signed_proto_operation_encoding
       (o.contents, o.signature) in
   Operation.hash { shell = o.shell ; proto }

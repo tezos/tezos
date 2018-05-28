@@ -27,6 +27,7 @@ type error += Invalid_kind of Script.location * kind list * kind
 type error += Missing_field of prim
 type error += Duplicate_field of Script.location * prim
 type error += Unexpected_big_map of Script.location
+type error += Unexpected_operation of Script.location
 
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
@@ -35,8 +36,6 @@ type error += Undefined_unop : Script.location * prim * _ ty -> error
 type error += Bad_return : Script.location * _ stack_ty * _ ty -> error
 type error += Bad_stack : Script.location * prim * int * _ stack_ty -> error
 type error += Unmatched_branches : Script.location * _ stack_ty * _ stack_ty -> error
-type error += Transfer_in_lambda of Script.location
-type error += Transfer_in_dip of Script.location
 type error += Self_in_lambda of Script.location
 type error += Bad_stack_length
 type error += Bad_stack_item of int

@@ -112,11 +112,9 @@ let raw_decode ?(alphabet=Alphabet.default) s =
 
 let checksum s =
   let hash =
-    Nocrypto.Hash.digest `SHA256 @@
-    Nocrypto.Hash.digest `SHA256 @@
-    Cstruct.of_string s in
+    Hacl.Hash.SHA256.(digest (digest (Bigstring.of_string s))) in
   let res = Bytes.make 4 '\000' in
-  Cstruct.blit_to_bytes hash 0 res 0 4 ;
+  Bigstring.blit_to_bytes hash 0 res 0 4 ;
   Bytes.to_string res
 
 (* Append a 4-bytes cryptographic checksum before encoding string s *)

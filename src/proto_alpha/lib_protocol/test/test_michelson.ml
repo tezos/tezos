@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Alpha_context
 
 let name = "Isolate Michelson"
 module Logger = Logging.Make(struct let name = name end)
@@ -31,26 +30,52 @@ let parse_param s : Proto_alpha.Alpha_context.Script.expr =
 
 
 let parse_script code_str storage_str : Proto_alpha.Alpha_context.Script.t =
-  let code = parse_param code_str in
-  let storage = parse_param storage_str in
+  let code = Script_repr.lazy_expr (parse_param code_str) in
+  let storage = Script_repr.lazy_expr (parse_param storage_str) in
   let return: Proto_alpha.Alpha_context.Script.t = {code ; storage} in
   return
 
 
-let program param ret st code =
+let program param st code =
   let storage s = "  storage " ^ s ^ " ; \n" in
   let parameter s = "  parameter " ^ s ^ " ; \n" in
-  let return s = "  return " ^ s ^ " ; \n" in
-  "{\n" ^ (storage st) ^ (parameter param) ^ (return ret) ^ "  " ^ code ^ "}"
+  "{\n" ^ (storage st) ^ (parameter param) ^ "  " ^ code ^ "}"
 
 let quote s = "\"" ^ s ^ "\""
+
+open Apply_operation_result
+
+let extract_result rs =
+  List.fold_left
+    (fun (acc, err) (_, r) ->
+       match r with
+       | Applied (Transaction_result { originated_contracts }
+                 | Origination_result { originated_contracts }) ->
+           (originated_contracts @ acc, err)
+       | Applied Reveal_result
+       | Applied Delegation_result
+       | Skipped -> (acc, err)
+       | Failed errs -> (acc, errs))
+    ([], []) rs
 
 let parse_execute sb ?tc code_str param_str storage_str =
   let param = parse_param param_str in
   let script = parse_script code_str storage_str in
-  Script.execute_code_pred ?tc sb script param >>=?? fun (ret, st, _, tc, nonce, bgm) ->
-  let contracts = Contract.originated_contracts nonce in
-  return (ret, st, tc, contracts, bgm)
+  Script.execute_code_pred ?tc sb script param
+  >>=?? fun (dst, { ctxt = tc ; operations = ops ; big_map_diff = bgm }) ->
+  let payer =
+    (List.hd Account.bootstrap_accounts).contract in
+  Proto_alpha.Apply.apply_internal_manager_operations tc Readable ~payer ops >>= function
+  | Error result ->
+      let _, err = extract_result result in
+      Lwt.return (Alpha_environment.wrap_error (Error_monad.error (List.hd err)))
+  | Ok (tc, _) ->
+      Proto_alpha.Alpha_context.Contract.originated_from_current_nonce tc >>=?? fun contracts ->
+      let tc = Proto_alpha.Alpha_context.Gas.set_unlimited tc in
+      Proto_alpha.Alpha_context.Contract.get_storage tc dst >>=?? begin function
+        | (_, None) -> assert false
+        | (tc, Some st) -> return (st, ops, tc, contracts, bgm)
+      end
 
 let test ctxt ?tc (file_name: string) (storage: string) (input: string) =
   let full_path = contract_path // file_name ^ ".tz" in
@@ -77,21 +102,10 @@ let string_of_canon output_prim =
   output
 
 let test_print ctxt fn s i =
-  test ctxt fn s i >>=? fun (sp, op, _, _, _bgm) ->
+  test ctxt fn s i >>=? fun (sp, _, _, _, _bgm) ->
   let ss = string_of_canon sp in
-  let os = string_of_canon op in
   debug "Storage : %s" ss ;
-  debug "Output : %s" os ;
   return ()
-
-
-let test_output ctxt ?location (file_name: string) (storage: string) (input: string) (expected_output: string) =
-  test ctxt file_name storage input >>=? fun (_storage_prim, output_prim, _tc, _contracts, _bgm) ->
-  let output = string_of_canon output_prim in
-  let msg = Option.unopt ~default:"strings aren't equal" location in
-  Assert.equal_string ~msg expected_output output ;
-  return ()
-
 
 let test_tc ctxt ?tc (file_name: string) (storage: string) (input: string) =
   test ctxt ?tc file_name storage input >>=? fun (_storage_prim, _output_prim, tc, _contracts, _bgm) ->
@@ -105,17 +119,24 @@ let test_contract ctxt ?tc (file_name: string) (storage: string) (input: string)
 
 
 let test_storage ctxt ?location (file_name: string) (storage: string) (input: string) (expected_storage: string) =
+  let msg = Option.unopt ~default:"strings aren't equal" location in
+  generic_trace "%s" msg @@
   test ctxt file_name storage input >>=? fun (storage_prim, _output_prim, _tc, _contracts, _bgm) ->
   let storage = string_of_canon storage_prim in
-  let msg = Option.unopt ~default:"strings aren't equal" location in
   Assert.equal_string ~msg expected_storage storage ;
+  return ()
+
+let test_success ctxt ?location (file_name: string) (storage: string) (input: string) =
+  let msg = Option.unopt ~default:"strings aren't equal" location in
+  generic_trace "%s" msg @@
+  test ctxt file_name storage input >>=? fun (_storage_prim, _output_prim, _tc, _contracts, _bgm) ->
   return ()
 
 
 let test_example () =
   Init.main () >>=?? fun sb ->
   let test_output ?location a b c d =
-    test_output sb ?location a b c d >>= function
+    test_storage sb ?location a b c d >>= function
     | Ok(x) -> return x
     | Error(errs) -> (
         match location with
@@ -124,194 +145,195 @@ let test_example () =
       ) ; Lwt.return (Error(errs))
   in
   let test_fails ?location = test_fails ?location sb in
+  let test_success ?location = test_success ?location sb in
   let test_tc ?tc = test_tc ?tc sb in
   let test_contract ?tc = test_contract ?tc sb in
   (*  let test_print ?location = test_print ?location sb in*)
   let test_storage ?location = test_storage ?location sb in
 
   (*  FORMAT: assert_output contract_file storage input expected_result *)
-  test_output ~location: __LOC__ "ret_int" "Unit" "Unit" "300" >>=? fun _ ->
+  test_output ~location: __LOC__ "ret_int" "None" "Unit" "(Some 300)" >>=? fun _ ->
 
   (*  Identity on strings *)
-  test_output ~location: __LOC__ "str_id" "Unit" "\"Hello\"" "\"Hello\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "str_id" "Unit" "\"abcd\"" "\"abcd\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "str_id" "None" "\"Hello\"" "(Some \"Hello\")" >>=? fun _ ->
+  test_output ~location: __LOC__ "str_id" "None" "\"abcd\"" "(Some \"abcd\")" >>=? fun _ ->
 
   (*  Identity on pairs *)
-  test_output ~location: __LOC__ "pair_id" "Unit" "(Pair True False)" "(Pair True False)" >>=? fun _ ->
-  test_output ~location: __LOC__ "pair_id" "Unit" "(Pair False True)" "(Pair False True)" >>=? fun _ ->
-  test_output ~location: __LOC__ "pair_id" "Unit" "(Pair True True)" "(Pair True True)" >>=? fun _ ->
-  test_output ~location: __LOC__ "pair_id" "Unit" "(Pair False False)" "(Pair False False)" >>=? fun _ ->
+  test_output ~location: __LOC__ "pair_id" "None" "(Pair True False)" "(Some (Pair True False))" >>=? fun _ ->
+  test_output ~location: __LOC__ "pair_id" "None" "(Pair False True)" "(Some (Pair False True))" >>=? fun _ ->
+  test_output ~location: __LOC__ "pair_id" "None" "(Pair True True)" "(Some (Pair True True))" >>=? fun _ ->
+  test_output ~location: __LOC__ "pair_id" "None" "(Pair False False)" "(Some (Pair False False))" >>=? fun _ ->
 
   (*  Logical not *)
-  test_output ~location: __LOC__ "not" "Unit" "True" "False" >>=? fun _ ->
-  test_output ~location: __LOC__ "not" "Unit" "False" "True" >>=? fun _ ->
+  test_output ~location: __LOC__ "not" "None" "True" "(Some False)" >>=? fun _ ->
+  test_output ~location: __LOC__ "not" "None" "False" "(Some True)" >>=? fun _ ->
 
   (*  Logical and *)
-  test_output ~location: __LOC__ "and" "Unit" "(Pair False False)" "False" >>=? fun _ ->
-  test_output ~location: __LOC__ "and" "Unit" "(Pair False True)" "False" >>=? fun _ ->
-  test_output ~location: __LOC__ "and" "Unit" "(Pair True False)" "False" >>=? fun _ ->
-  test_output ~location: __LOC__ "and" "Unit" "(Pair True True)" "True" >>=? fun _ ->
+  test_output ~location: __LOC__ "and" "None" "(Pair False False)" "(Some False)" >>=? fun _ ->
+  test_output ~location: __LOC__ "and" "None" "(Pair False True)" "(Some False)" >>=? fun _ ->
+  test_output ~location: __LOC__ "and" "None" "(Pair True False)" "(Some False)" >>=? fun _ ->
+  test_output ~location: __LOC__ "and" "None" "(Pair True True)" "(Some True)" >>=? fun _ ->
 
   (*  Logical or *)
-  test_output ~location: __LOC__ "or" "Unit" "(Pair False False)" "False" >>=? fun _ ->
-  test_output ~location: __LOC__ "or" "Unit" "(Pair False True)" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "or" "Unit" "(Pair True False)" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "or" "Unit" "(Pair True True)" "True" >>=? fun _ ->
+  test_output ~location: __LOC__ "or" "None" "(Pair False False)" "(Some False)" >>=? fun _ ->
+  test_output ~location: __LOC__ "or" "None" "(Pair False True)" "(Some True)" >>=? fun _ ->
+  test_output ~location: __LOC__ "or" "None" "(Pair True False)" "(Some True)" >>=? fun _ ->
+  test_output ~location: __LOC__ "or" "None" "(Pair True True)" "(Some True)" >>=? fun _ ->
 
   (*  XOR *)
-  test_output ~location: __LOC__ "xor" "Unit" "(Pair False False)" "False" >>=? fun _ ->
-  test_output ~location: __LOC__ "xor" "Unit" "(Pair False True)" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "xor" "Unit" "(Pair True False)" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "xor" "Unit" "(Pair True True)" "False" >>=? fun _ ->
+  test_output ~location: __LOC__ "xor" "None" "(Pair False False)" "(Some False)" >>=? fun _ ->
+  test_output ~location: __LOC__ "xor" "None" "(Pair False True)" "(Some True)" >>=? fun _ ->
+  test_output ~location: __LOC__ "xor" "None" "(Pair True False)" "(Some True)" >>=? fun _ ->
+  test_output ~location: __LOC__ "xor" "None" "(Pair True True)" "(Some False)" >>=? fun _ ->
 
 
   (*  Build list *)
-  test_output ~location: __LOC__ "build_list" "Unit" "0" "{ 0 }" >>=? fun _ ->
-  test_output ~location: __LOC__ "build_list" "Unit" "3" "{ 0 ; 1 ; 2 ; 3 }" >>=? fun _ ->
-  test_output ~location: __LOC__ "build_list" "Unit" "10" "{ 0 ; 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 ; 10 }" >>=? fun _ ->
+  test_output ~location: __LOC__ "build_list" "{111}" "0" "{ 0 }" >>=? fun _ ->
+  test_output ~location: __LOC__ "build_list" "{111}" "3" "{ 0 ; 1 ; 2 ; 3 }" >>=? fun _ ->
+  test_output ~location: __LOC__ "build_list" "{111}" "10" "{ 0 ; 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 ; 10 }" >>=? fun _ ->
 
   (*  Concatenate all strings of a list into one string *)
-  test_output ~location: __LOC__ "concat_list" "Unit" "{ \"a\" ; \"b\" ; \"c\" }" "\"abc\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "concat_list" "Unit" "{}" "\"\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "concat_list" "Unit" "{ \"Hello\" ; \" \" ; \"World\" ; \"!\" }" "\"Hello World!\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "concat_list" "\"?\"" "{ \"a\" ; \"b\" ; \"c\" }" "\"abc\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "concat_list" "\"?\"" "{}" "\"\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "concat_list" "\"?\"" "{ \"Hello\" ; \" \" ; \"World\" ; \"!\" }" "\"Hello World!\"" >>=? fun _ ->
 
   (*  Find maximum int in list -- returns None if not found *)
-  test_output ~location: __LOC__ "max_in_list" "Unit" "{}" "None" >>=? fun _ ->
-  test_output ~location: __LOC__ "max_in_list" "Unit" "{ 1 }" "(Some 1)" >>=? fun _ ->
-  test_output ~location: __LOC__ "max_in_list" "Unit" "{ -1 }" "(Some -1)" >>=? fun _ ->
-  test_output ~location: __LOC__ "max_in_list" "Unit" "{ 10 ; -1 ; -20 ; 100 ; 0 }" "(Some 100)" >>=? fun _ ->
-  test_output ~location: __LOC__ "max_in_list" "Unit" "{ 10 ; -1 ; -20 ; 100 ; 0 }" "(Some 100)" >>=? fun _ ->
-  test_output ~location: __LOC__ "max_in_list" "Unit" "{ -10 ; -1 ; -20 ; -100 }" "(Some -1)" >>=? fun _ ->
+  test_output ~location: __LOC__ "max_in_list" "None" "{}" "None" >>=? fun _ ->
+  test_output ~location: __LOC__ "max_in_list" "None" "{ 1 }" "(Some 1)" >>=? fun _ ->
+  test_output ~location: __LOC__ "max_in_list" "None" "{ -1 }" "(Some -1)" >>=? fun _ ->
+  test_output ~location: __LOC__ "max_in_list" "None" "{ 10 ; -1 ; -20 ; 100 ; 0 }" "(Some 100)" >>=? fun _ ->
+  test_output ~location: __LOC__ "max_in_list" "None" "{ 10 ; -1 ; -20 ; 100 ; 0 }" "(Some 100)" >>=? fun _ ->
+  test_output ~location: __LOC__ "max_in_list" "None" "{ -10 ; -1 ; -20 ; -100 }" "(Some -1)" >>=? fun _ ->
 
   (*  Identity on lists *)
-  test_output ~location: __LOC__ "list_id" "Unit" "{ \"1\" ; \"2\" ; \"3\" }" "{ \"1\" ; \"2\" ; \"3\" }" >>=? fun _ ->
-  test_output ~location: __LOC__ "list_id" "Unit" "{}" "{}" >>=? fun _ ->
-  test_output ~location: __LOC__ "list_id" "Unit" "{ \"a\" ; \"b\" ; \"c\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_id" "{\"?\"}" "{ \"1\" ; \"2\" ; \"3\" }" "{ \"1\" ; \"2\" ; \"3\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_id" "{\"?\"}" "{}" "{}" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_id" "{\"?\"}" "{ \"a\" ; \"b\" ; \"c\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
 
-  test_output ~location: __LOC__ "list_id_map" "Unit" "{ \"1\" ; \"2\" ; \"3\" }" "{ \"1\" ; \"2\" ; \"3\" }" >>=? fun _ ->
-  test_output ~location: __LOC__ "list_id_map" "Unit" "{}" "{}" >>=? fun _ ->
-  test_output ~location: __LOC__ "list_id_map" "Unit" "{ \"a\" ; \"b\" ; \"c\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_id_map" "{\"?\"}" "{ \"1\" ; \"2\" ; \"3\" }" "{ \"1\" ; \"2\" ; \"3\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_id_map" "{\"?\"}" "{}" "{}" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_id_map" "{\"?\"}" "{ \"a\" ; \"b\" ; \"c\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
 
 
   (*  Identity on maps *)
-  test_output ~location: __LOC__ "map_id" "Unit" "{ Elt 0 1 }" "{ Elt 0 1 }" >>=? fun _ ->
-  test_output ~location: __LOC__ "map_id" "Unit" "{ Elt 0 0 }" "{ Elt 0 0 }" >>=? fun _ ->
-  test_output ~location: __LOC__ "map_id" "Unit" "{ Elt 0 0 ; Elt 3 4 }" "{ Elt 0 0 ; Elt 3 4 }" >>=? fun _ ->
+  test_output ~location: __LOC__ "map_id" "{}" "{ Elt 0 1 }" "{ Elt 0 1 }" >>=? fun _ ->
+  test_output ~location: __LOC__ "map_id" "{}" "{ Elt 0 0 }" "{ Elt 0 0 }" >>=? fun _ ->
+  test_output ~location: __LOC__ "map_id" "{}" "{ Elt 0 0 ; Elt 3 4 }" "{ Elt 0 0 ; Elt 3 4 }" >>=? fun _ ->
 
   (*  Map block on lists *)
-  test_output ~location: __LOC__ "list_map_block" "Unit" "{}" "{}" >>=? fun _ ->
-  test_output ~location: __LOC__ "list_map_block" "Unit" "{ 1 ; 1 ; 1 ; 1 }" "{ 1 ; 2 ; 3 ; 4 }" >>=? fun _ ->
-  test_output ~location: __LOC__ "list_map_block" "Unit" "{ 1 ; 2 ; 3 ; 0 }" "{ 1 ; 3 ; 5 ; 3 }" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_map_block" "{111}" "{}" "{}" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_map_block" "{111}" "{ 1 ; 1 ; 1 ; 1 }" "{ 1 ; 2 ; 3 ; 4 }" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_map_block" "{111}" "{ 1 ; 2 ; 3 ; 0 }" "{ 1 ; 3 ; 5 ; 3 }" >>=? fun _ ->
 
   (*  List iter *)
-  test_output ~location: __LOC__ "list_iter" "Unit" "{ 10 ; 2 ; 1 }" "20" >>=? fun _ ->
-  test_output ~location: __LOC__ "list_iter" "Unit" "{ 3 ; 6 ; 9 }" "162" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_iter" "111" "{ 10 ; 2 ; 1 }" "20" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_iter" "111" "{ 3 ; 6 ; 9 }" "162" >>=? fun _ ->
 
-  test_output ~location: __LOC__ "list_iter2" "Unit" "{ \"a\" ; \"b\" ; \"c\" }" "\"cba\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "list_iter2" "Unit" "{}" "\"\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_iter2" "\"?\"" "{ \"a\" ; \"b\" ; \"c\" }" "\"cba\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "list_iter2" "\"?\"" "{}" "\"\"" >>=? fun _ ->
 
 
   (*  Identity on sets *)
-  test_output ~location: __LOC__ "set_id" "Unit" "{ \"a\" ; \"b\" ; \"c\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
-  test_output ~location: __LOC__ "set_id" "Unit" "{}" "{}" >>=? fun _ ->
-  test_output ~location: __LOC__ "set_id" "Unit" "{ \"asdf\" ; \"bcde\" }" "{ \"asdf\" ; \"bcde\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_id" "{\"?\"}" "{ \"a\" ; \"b\" ; \"c\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_id" "{\"?\"}" "{}" "{}" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_id" "{\"?\"}" "{ \"asdf\" ; \"bcde\" }" "{ \"asdf\" ; \"bcde\" }" >>=? fun _ ->
 
   (*  Set member -- set is in storage *)
-  test_output ~location: __LOC__ "set_member" "{}" "\"Hi\"" "False" >>=? fun _ ->
-  test_output ~location: __LOC__ "set_member" "{ \"Hi\" }" "\"Hi\"" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "set_member" "{ \"Hello\" ; \"World\" }" "\"\"" "False" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_member" "(Pair {} None)" "\"Hi\"" "(Pair {} (Some False))" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_member" "(Pair { \"Hi\" } None)" "\"Hi\"" "(Pair { \"Hi\" } (Some True))" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_member" "(Pair { \"Hello\" ; \"World\" } None)" "\"\"" "(Pair { \"Hello\" ; \"World\" } (Some False))" >>=? fun _ ->
 
   (*  Set size *)
-  test_output ~location: __LOC__ "set_size" "Unit" "{}" "0" >>=? fun _ ->
-  test_output ~location: __LOC__ "set_size" "Unit" "{ 1 }" "1" >>=? fun _ ->
-  test_output ~location: __LOC__ "set_size" "Unit" "{ 1 ; 2 ; 3 }" "3" >>=? fun _ ->
-  test_output ~location: __LOC__ "set_size" "Unit" "{ 1 ; 2 ; 3 ; 4 ; 5 ; 6 }" "6" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_size" "111" "{}" "0" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_size" "111" "{ 1 }" "1" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_size" "111" "{ 1 ; 2 ; 3 }" "3" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_size" "111" "{ 1 ; 2 ; 3 ; 4 ; 5 ; 6 }" "6" >>=? fun _ ->
 
   (*  Set iter *)
-  test_output ~location: __LOC__ "set_iter" "Unit" "{}" "0" >>=? fun _ ->
-  test_output ~location: __LOC__ "set_iter" "Unit" "{ 1 }" "1" >>=? fun _ ->
-  test_output ~location: __LOC__ "set_iter" "Unit" "{ -100 ; 1 ; 2 ; 3 }" "-94" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_iter" "111" "{}" "0" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_iter" "111" "{ 1 }" "1" >>=? fun _ ->
+  test_output ~location: __LOC__ "set_iter" "111" "{ -100 ; 1 ; 2 ; 3 }" "-94" >>=? fun _ ->
 
   (*  Map size *)
-  test_output ~location: __LOC__ "map_size" "Unit" "{}" "0" >>=? fun _ ->
-  test_output ~location: __LOC__ "map_size" "Unit" "{ Elt \"a\" 1 }" "1" >>=? fun _ ->
-  test_output ~location: __LOC__ "map_size" "Unit" "{ Elt \"a\" 1 ; Elt \"b\" 2 ; Elt \"c\" 3 }" "3" >>=? fun _ ->
-  test_output ~location: __LOC__ "map_size" "Unit" "{ Elt \"a\" 1 ; Elt \"b\" 2 ; Elt \"c\" 3 ; Elt \"d\" 4 ; Elt \"e\" 5 ; Elt \"f\" 6 }" "6" >>=? fun _ ->
+  test_output ~location: __LOC__ "map_size" "111" "{}" "0" >>=? fun _ ->
+  test_output ~location: __LOC__ "map_size" "111" "{ Elt \"a\" 1 }" "1" >>=? fun _ ->
+  test_output ~location: __LOC__ "map_size" "111" "{ Elt \"a\" 1 ; Elt \"b\" 2 ; Elt \"c\" 3 }" "3" >>=? fun _ ->
+  test_output ~location: __LOC__ "map_size" "111" "{ Elt \"a\" 1 ; Elt \"b\" 2 ; Elt \"c\" 3 ; Elt \"d\" 4 ; Elt \"e\" 5 ; Elt \"f\" 6 }" "6" >>=? fun _ ->
 
   (*  Contains all elements -- does the second list contain all of the same elements *)
   (*  as the first one? I'm ignoring element multiplicity *)
-  test_output ~location: __LOC__ "contains_all" "Unit" "(Pair {} {})" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "contains_all" "Unit" "(Pair { \"a\" } { \"B\" })" "False" >>=? fun _ ->
-  test_output ~location: __LOC__ "contains_all" "Unit" "(Pair { \"A\" } { \"B\" })" "False" >>=? fun _ ->
-  test_output ~location: __LOC__ "contains_all" "Unit" "(Pair { \"B\" } { \"B\" })" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "contains_all" "Unit" "(Pair { \"B\" ; \"C\" ; \"asdf\" } { \"B\" ; \"B\" ; \"asdf\" ; \"C\" })" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "contains_all" "Unit" "(Pair { \"B\" ; \"B\" ; \"asdf\" ; \"C\" } { \"B\" ; \"C\" ; \"asdf\" })" "True" >>=? fun _ ->
+  test_output ~location: __LOC__ "contains_all" "None" "(Pair {} {})" "(Some True)" >>=? fun _ ->
+  test_output ~location: __LOC__ "contains_all" "None" "(Pair { \"a\" } { \"B\" })" "(Some False)" >>=? fun _ ->
+  test_output ~location: __LOC__ "contains_all" "None" "(Pair { \"A\" } { \"B\" })" "(Some False)" >>=? fun _ ->
+  test_output ~location: __LOC__ "contains_all" "None" "(Pair { \"B\" } { \"B\" })" "(Some True)" >>=? fun _ ->
+  test_output ~location: __LOC__ "contains_all" "None" "(Pair { \"B\" ; \"C\" ; \"asdf\" } { \"B\" ; \"B\" ; \"asdf\" ; \"C\" })" "(Some True)" >>=? fun _ ->
+  test_output ~location: __LOC__ "contains_all" "None" "(Pair { \"B\" ; \"B\" ; \"asdf\" ; \"C\" } { \"B\" ; \"C\" ; \"asdf\" })" "(Some True)" >>=? fun _ ->
 
   (*  Concatenate the string in storage with all strings in the given list *)
-  test_output ~location: __LOC__ "concat_hello" "Unit" "{ \"World!\" }" "{ \"Hello World!\" }" >>=? fun _ ->
-  test_output ~location: __LOC__ "concat_hello" "Unit" "{}" "{}" >>=? fun _ ->
-  test_output ~location: __LOC__ "concat_hello" "Unit" "{ \"test1\" ; \"test2\" }" "{ \"Hello test1\" ; \"Hello test2\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "concat_hello" "{\"?\"}" "{ \"World!\" }" "{ \"Hello World!\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "concat_hello" "{\"?\"}" "{}" "{}" >>=? fun _ ->
+  test_output ~location: __LOC__ "concat_hello" "{\"?\"}" "{ \"test1\" ; \"test2\" }" "{ \"Hello test1\" ; \"Hello test2\" }" >>=? fun _ ->
 
   (*  Create an empty map and add a string to it *)
-  test_output ~location: __LOC__ "empty_map" "Unit" "Unit" "{ Elt \"hello\" \"world\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "empty_map" "{}" "Unit" "{ Elt \"hello\" \"world\" }" >>=? fun _ ->
 
   (*  Get the value stored at the given key in the map *)
-  test_output ~location: __LOC__ "get_map_value" "{ Elt \"hello\" \"hi\" }" "\"hello\"" "(Some \"hi\")" >>=? fun _ ->
-  test_output ~location: __LOC__ "get_map_value" "{ Elt \"hello\" \"hi\" }" "\"\"" "None" >>=? fun _ ->
-  test_output ~location: __LOC__ "get_map_value" "{ Elt \"1\" \"one\" ; Elt \"2\" \"two\" }" "\"1\"" "(Some \"one\")" >>=? fun _ ->
+  test_output ~location: __LOC__ "get_map_value" "(Pair None { Elt \"hello\" \"hi\" })" "\"hello\"" "(Pair (Some \"hi\") { Elt \"hello\" \"hi\" })" >>=? fun _ ->
+  test_output ~location: __LOC__ "get_map_value" "(Pair None { Elt \"hello\" \"hi\" }" "\"\"" "(Pair None { Elt \"hello\" \"hi\" })" >>=? fun _ ->
+  test_output ~location: __LOC__ "get_map_value" "(Pair None { Elt \"1\" \"one\" ; Elt \"2\" \"two\" })" "\"1\"" "(Pair (Some \"one\") { Elt \"1\" \"one\" ; Elt \"2\" \"two\" })" >>=? fun _ ->
 
   (*  Map iter *)
-  test_output ~location: __LOC__ "map_iter" "Unit" "{ Elt 0 100 ; Elt 2 100 }" "(Pair 2 200)" >>=? fun _ ->
-  test_output ~location: __LOC__ "map_iter" "Unit" "{ Elt 1 1 ; Elt 2 100 }" "(Pair 3 101)" >>=? fun _ ->
+  test_output ~location: __LOC__ "map_iter" "(Pair 3 3)" "{ Elt 0 100 ; Elt 2 100 }" "(Pair 2 200)" >>=? fun _ ->
+  test_output ~location: __LOC__ "map_iter" "(Pair 3 3)" "{ Elt 1 1 ; Elt 2 100 }" "(Pair 3 101)" >>=? fun _ ->
 
   (*  Return True if True branch of if was taken and False otherwise *)
-  test_output ~location: __LOC__ "if" "Unit" "True" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "if" "Unit" "False" "False" >>=? fun _ ->
+  test_output ~location: __LOC__ "if" "None" "True" "(Some True)" >>=? fun _ ->
+  test_output ~location: __LOC__ "if" "None" "False" "(Some False)" >>=? fun _ ->
 
   (*  Generate a pair of or types *)
-  test_output ~location: __LOC__ "swap_left_right" "Unit" "(Left True)" "(Right True)" >>=? fun _ ->
-  test_output ~location: __LOC__ "swap_left_right" "Unit" "(Right \"a\")" "(Left \"a\")" >>=? fun _ ->
+  test_output ~location: __LOC__ "swap_left_right" "(Left \"\")" "(Left True)" "(Right True)" >>=? fun _ ->
+  test_output ~location: __LOC__ "swap_left_right" "(Right False)" "(Right \"a\")" "(Left \"a\")" >>=? fun _ ->
 
   (*  Reverse a list *)
-  test_output ~location: __LOC__ "reverse" "Unit" "{}" "{}" >>=? fun _ ->
-  test_output ~location: __LOC__ "reverse" "Unit" "{ \"c\" ; \"b\" ; \"a\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
-  test_output ~location: __LOC__ "reverse_loop" "Unit" "{}" "{}" >>=? fun _ ->
-  test_output ~location: __LOC__ "reverse_loop" "Unit" "{ \"c\" ; \"b\" ; \"a\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "reverse" "{\"?\"}" "{}" "{}" >>=? fun _ ->
+  test_output ~location: __LOC__ "reverse" "{\"?\"}" "{ \"c\" ; \"b\" ; \"a\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "reverse_loop" "{\"?\"}" "{}" "{}" >>=? fun _ ->
+  test_output ~location: __LOC__ "reverse_loop" "{\"?\"}" "{ \"c\" ; \"b\" ; \"a\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
 
   (*  Reverse using LOOP_LEFT *)
-  test_output ~location: __LOC__ "loop_left" "Unit" "{}" "{}" >>=? fun _ ->
-  test_output ~location: __LOC__ "loop_left" "Unit" "{ \"c\" ; \"b\" ; \"a\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
+  test_output ~location: __LOC__ "loop_left" "{\"?\"}" "{}" "{}" >>=? fun _ ->
+  test_output ~location: __LOC__ "loop_left" "{\"?\"}" "{ \"c\" ; \"b\" ; \"a\" }" "{ \"a\" ; \"b\" ; \"c\" }" >>=? fun _ ->
 
   (*  Exec concat contract *)
-  test_output ~location: __LOC__ "exec_concat" "Unit" "\"\"" "\"_abc\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "exec_concat" "Unit" "\"test\"" "\"test_abc\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "exec_concat" "\"?\"" "\"\"" "\"_abc\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "exec_concat" "\"?\"" "\"test\"" "\"test_abc\"" >>=? fun _ ->
 
   (*  Get current steps to quota *)
-  test_output ~location: __LOC__ "steps_to_quota" "Unit" "Unit" "39991" >>=? fun _ ->
+  test_output ~location: __LOC__ "steps_to_quota" "111" "Unit" "399992" >>=? fun _ ->
 
   let bootstrap_0 = List.nth Account.bootstrap_accounts 0 in
   get_balance_res bootstrap_0 sb >>=?? fun _balance ->
-  let amount = Proto_alpha.Alpha_context.Tez.to_string @@ Cast.cents_of_int Script.init_amount in
+  let amount = string_of_int (Script.init_amount * 10000) in
   (*  Get the current balance of the contract *)
-  test_output ~location: __LOC__ "balance" "Unit" "Unit" ("\"" ^ amount ^ "\"") >>=? fun _ ->
+  test_output ~location: __LOC__ "balance" "111000000" "Unit" amount >>=? fun _ ->
 
   (*  Test comparisons on tez { EQ ; GT ; LT ; GE ; LE } *)
-  test_output ~location: __LOC__ "compare" "Unit" "(Pair \"1.00\" \"2.00\")" "{ False ; False ; True ; False ; True }" >>=? fun _ ->
-  test_output ~location: __LOC__ "compare" "Unit" "(Pair \"2.00\" \"1.00\")" "{ False ; True ; False ; True ; False }" >>=? fun _ ->
-  test_output ~location: __LOC__ "compare" "Unit" "(Pair \"2.37\" \"2.37\")" "{ True ; False ; False ; True ; True }" >>=? fun _ ->
+  test_output ~location: __LOC__ "compare" "{}" "(Pair 1000000 2000000)" "{ False ; False ; True ; False ; True }" >>=? fun _ ->
+  test_output ~location: __LOC__ "compare" "{}" "(Pair 2000000 1000000)" "{ False ; True ; False ; True ; False }" >>=? fun _ ->
+  test_output ~location: __LOC__ "compare" "{}" "(Pair 2370000 2370000)" "{ True ; False ; False ; True ; True }" >>=? fun _ ->
 
   (*  Test addition and subtraction on tez *)
-  test_output ~location: __LOC__ "tez_add_sub" "Unit" "(Pair \"2\" \"1\")" "(Pair \"3\" \"1\")" >>=? fun _ ->
-  test_output ~location: __LOC__ "tez_add_sub" "Unit" "(Pair \"2.31\" \"1.01\")" "(Pair \"3.32\" \"1.3\")" >>=? fun _ ->
+  test_output ~location: __LOC__ "tez_add_sub" "None" "(Pair 2000000 1000000)" "(Some (Pair 3000000 1000000))" >>=? fun _ ->
+  test_output ~location: __LOC__ "tez_add_sub" "None" "(Pair 2310000 1010000)" "(Some (Pair 3320000 1300000))" >>=? fun _ ->
 
   (*  Test get first element of list *)
-  test_output ~location: __LOC__ "first" "Unit" "{ 1 ; 2 ; 3 ; 4 }" "1" >>=? fun _ ->
-  test_output ~location: __LOC__ "first" "Unit" "{ 4 }" "4" >>=? fun _ ->
+  test_output ~location: __LOC__ "first" "111" "{ 1 ; 2 ; 3 ; 4 }" "1" >>=? fun _ ->
+  test_output ~location: __LOC__ "first" "111" "{ 4 }" "4" >>=? fun _ ->
 
   (*  Hash input string *)
   (*  Test assumed to be correct -- hash is based on encoding of AST *)
-  test_output ~location: __LOC__ "hash_string" "Unit" "\"abcdefg\"" "\"exprv3MnhXvjthGzZ7jDtXRRFremZyey9rsGtL7JRkeaQX1fThN7WF\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "hash_string" "Unit" "\"12345\"" "\"expru81QVHsW2qaWLNHnMHSxDNhqtat17ajadri6mKUvXyc2EWHZC3\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "hash_string" "\"?\"" "\"abcdefg\"" "\"exprv3MnhXvjthGzZ7jDtXRRFremZyey9rsGtL7JRkeaQX1fThN7WF\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "hash_string" "\"?\"" "\"12345\"" "\"expru81QVHsW2qaWLNHnMHSxDNhqtat17ajadri6mKUvXyc2EWHZC3\"" >>=? fun _ ->
 
   (*  Test ASSERT *)
   test_output ~location: __LOC__ "assert" "Unit" "True" "Unit" >>=? fun _ ->
@@ -370,8 +392,8 @@ let test_example () =
   test_fails ~location: __LOC__ "assert_cmpge" "Unit" "(Pair -1 0)" >>=? fun _ ->
 
   (*  IF_SOME *)
-  test_output ~location: __LOC__ "if_some" "Unit" "(Some \"hello\")" "\"hello\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "if_some" "Unit" "None" "\"\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "if_some" "\"?\"" "(Some \"hello\")" "\"hello\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "if_some" "\"?\"" "None" "\"\"" >>=? fun _ ->
 
   (*  Tests the SET_CAR and SET_CDR instructions *)
   test_output ~location: __LOC__ "set_car" "(Pair \"hello\" 0)" "\"world\"" "(Pair \"world\" 0)" >>=? fun _ ->
@@ -382,35 +404,39 @@ let test_example () =
   test_output ~location: __LOC__ "set_cdr" "(Pair \"hello\" 500)" "3" "(Pair \"hello\" 3)" >>=? fun _ ->
   test_output ~location: __LOC__ "set_cdr" "(Pair \"hello\" 7)" "100" "(Pair \"hello\" 100)" >>=? fun _ ->
 
-  test_storage ~location: __LOC__ "set_caddaadr" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 \"0\") 4) 5))) 6)" "\"3\"" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 \"3\") 4) 5))) 6)" >>=? fun _ ->
+  test_storage ~location: __LOC__ "set_caddaadr" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 0) 4) 5))) 6)" "3000000" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 3000000) 4) 5))) 6)" >>=? fun _ ->
 
-  test_storage ~location: __LOC__ "map_caddaadr" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 \"0\") 4) 5))) 6)" "Unit" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 \"1\") 4) 5))) 6)" >>=? fun _ ->
+  test_storage ~location: __LOC__ "map_caddaadr" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 0) 4) 5))) 6)" "Unit" "(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 1000000) 4) 5))) 6)" >>=? fun _ ->
 
   (*  Did the given key sign the string? (key is bootstrap1) *)
-  test_output ~location: __LOC__ "check_signature" "(Pair \"1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01\" \"hello\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "True" >>=? fun _ ->
-  test_output ~location: __LOC__ "check_signature" "(Pair \"1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01\" \"abcd\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "False" >>=? fun _ ->
+  test_success ~location: __LOC__ "check_signature" "(Pair \"edsigtbsm9RwhfQuJWSmZrvbDqDR9t1TJs34KrX4wkt9uUJ4PJG1aT6uLDiCqKz6vcGZAbNpoW7PvXUzdXo1E3c6ap6GoUU366J\" \"hello\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" >>=? fun _ ->
+
+  test_fails ~location: __LOC__ "check_signature" "(Pair \"edsigtbsm9RwhfQuJWSmZrvbDqDR9t1TJs34KrX4wkt9uUJ4PJG1aT6uLDiCqKz6vcGZAbNpoW7PvXUzdXo1E3c6ap6GoUU366J\" \"abcd\")" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\""  >>=? fun _ ->
 
   (*  Convert a public key to a public key hash *)
-  test_output ~location: __LOC__ "hash_key" "Unit" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "\"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "hash_key" "Unit" "\"edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES\"" "\"tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "hash_key" "None" "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"" "(Some \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\")" >>=? fun _ ->
+  test_output ~location: __LOC__ "hash_key" "None" "\"edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES\"" "(Some \"tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k\")" >>=? fun _ ->
 
   (*  Test timestamp operations *)
-  test_output ~location: __LOC__ "add_timestamp_delta" "Unit" "(Pair 100 100)" "\"1970-01-01T00:03:20Z\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "add_timestamp_delta" "Unit" "(Pair 100 -100)" "\"1970-01-01T00:00:00Z\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "add_timestamp_delta" "Unit" "(Pair \"1970-01-01T00:00:00Z\" 0)" "\"1970-01-01T00:00:00Z\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "add_timestamp_delta" "None" "(Pair 100 100)" "(Some \"1970-01-01T00:03:20Z\")" >>=? fun _ ->
+  test_output ~location: __LOC__ "add_timestamp_delta" "None" "(Pair 100 -100)" "(Some \"1970-01-01T00:00:00Z\")" >>=? fun _ ->
+  test_output ~location: __LOC__ "add_timestamp_delta" "None" "(Pair \"1970-01-01T00:00:00Z\" 0)" "(Some \"1970-01-01T00:00:00Z\")" >>=? fun _ ->
 
-  test_output ~location: __LOC__ "add_delta_timestamp" "Unit" "(Pair 100 100)" "\"1970-01-01T00:03:20Z\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "add_delta_timestamp" "Unit" "(Pair -100 100)" "\"1970-01-01T00:00:00Z\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "add_delta_timestamp" "Unit" "(Pair 0 \"1970-01-01T00:00:00Z\")" "\"1970-01-01T00:00:00Z\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "add_delta_timestamp" "None" "(Pair 100 100)" "(Some \"1970-01-01T00:03:20Z\")" >>=? fun _ ->
+  test_output ~location: __LOC__ "add_delta_timestamp" "None" "(Pair -100 100)" "(Some \"1970-01-01T00:00:00Z\")" >>=? fun _ ->
+  test_output ~location: __LOC__ "add_delta_timestamp" "None" "(Pair 0 \"1970-01-01T00:00:00Z\")" "(Some \"1970-01-01T00:00:00Z\")" >>=? fun _ ->
 
-  test_output ~location: __LOC__ "sub_timestamp_delta" "Unit" "(Pair 100 100)" "\"1970-01-01T00:00:00Z\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "sub_timestamp_delta" "Unit" "(Pair 100 -100)" "\"1970-01-01T00:03:20Z\"" >>=? fun _ ->
-  test_output ~location: __LOC__ "sub_timestamp_delta" "Unit" "(Pair 100 2000000000000000000)" "-1999999999999999900" >>=? fun _ ->
+  test_output ~location: __LOC__ "sub_timestamp_delta" "111" "(Pair 100 100)" "\"1970-01-01T00:00:00Z\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "sub_timestamp_delta" "111" "(Pair 100 -100)" "\"1970-01-01T00:03:20Z\"" >>=? fun _ ->
+  test_output ~location: __LOC__ "sub_timestamp_delta" "111" "(Pair 100 2000000000000000000)" "-1999999999999999900" >>=? fun _ ->
 
-  test_output ~location: __LOC__ "diff_timestamps" "Unit" "(Pair 0 0)" "0" >>=? fun _ ->
-  test_output ~location: __LOC__ "diff_timestamps" "Unit" "(Pair 0 1)" "-1" >>=? fun _ ->
-  test_output ~location: __LOC__ "diff_timestamps" "Unit" "(Pair 1 0)" "1" >>=? fun _ ->
-  test_output ~location: __LOC__ "diff_timestamps" "Unit" "(Pair \"1970-01-01T00:03:20Z\" \"1970-01-01T00:00:00Z\")" "200" >>=? fun _ ->
+  test_output ~location: __LOC__ "diff_timestamps" "111" "(Pair 0 0)" "0" >>=? fun _ ->
+  test_output ~location: __LOC__ "diff_timestamps" "111" "(Pair 0 1)" "-1" >>=? fun _ ->
+  test_output ~location: __LOC__ "diff_timestamps" "111" "(Pair 1 0)" "1" >>=? fun _ ->
+  test_output ~location: __LOC__ "diff_timestamps" "111" "(Pair \"1970-01-01T00:03:20Z\" \"1970-01-01T00:00:00Z\")" "200" >>=? fun _ ->
+
+  (* Test internal operations *)
+  test_output ~location: __LOC__ "cps_fact" "0" "4" "24" >>=? fun _ ->
 
   (* Test NOW *)
   let now = sb.tezos_header.shell.timestamp in
@@ -425,21 +451,20 @@ let test_example () =
   Assert.equal_cents_balance ~tc (account.contract, amount * 100) >>=?? fun _ ->
 
   (* Test CREATE_ACCOUNT *)
-  Account.make_account ~tc: sb.tezos_context >>=?? fun (account, tc) ->
-  let account_str = quote @@ Signature.Public_key_hash.to_b58check account.hpub in
-  test_contract ~tc "create_account" account_str account_str >>=? fun (cs, tc) ->
+  Account.make_account ~tc: sb.tezos_context >>=?? fun (_, tc) ->
+  test_contract ~tc "create_account" "None" ("(Left " ^ account_str ^ ")") >>=? fun (cs, tc) ->
   Assert.equal_int 1 @@ List.length cs ;
 
   (* Test CREATE_CONTRACT *)
-  test_contract ~tc "create_contract" account_str account_str >>=? fun (cs, tc) ->
+  test_contract ~tc "create_contract" "Unit" ("(Left " ^ account_str ^ ")") >>=? fun (cs, tc) ->
   Assert.equal_int 1 @@ List.length cs ;
   let contract = List.hd cs in
-  Proto_alpha.Alpha_context.Contract.get_script tc contract >>=?? fun res ->
+  Proto_alpha.Alpha_context.Contract.get_script tc contract >>=?? fun (_, res) ->
   let script = Option.unopt_exn (Failure "get_script") res in
-  Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun (_, ret, _, _, _, _) ->
-  Assert.equal_string ~msg: __LOC__ "\"abc\"" @@ string_of_canon ret ;
+  Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun (_, { storage }) ->
+  Assert.equal_string ~msg: __LOC__ "\"abc\"" @@ string_of_canon storage ;
 
-  (* Test DEFAULT_ACCOUNT *)
+  (* Test IMPLICIT_ACCOUNT *)
   let account = Account.new_account () in
   let b_str = quote @@ Signature.Public_key_hash.to_b58check account.hpub in
   test_contract ~tc "default_account" "Unit" b_str >>=? fun (_cs, tc) ->
@@ -450,30 +475,31 @@ let test_example () =
 let test_program () =
   Init.main () >>=?? fun sb ->
   let id_code = "code
-     { DUP ;
-       PAIR ;
-       CAR }" in
-  let id_int_program =
-    program "int" "int" "int" id_code in
-  let id_ill_param_program =
-    program "string" "int" "string" id_code in
-  let id_ill_return_program =
-    program "int" "string" "int" id_code in
-  let id_pbool_program =
-    program "(pair bool bool)" "(pair bool bool)" "unit" id_code in
-  let push_300_code = "code
      { CAR ;
+       NIL operation ;
+       PAIR }" in
+  let id_int_program =
+    program "int" "int" id_code in
+  let id_ill_param_program =
+    program "string" "string" id_code in
+  let id_ill_return_program =
+    program "int" "int" "code {}" in
+  let id_pbool_program =
+    program "(pair bool bool)" "(pair bool bool)" id_code in
+  let push_300_code = "code
+     { DROP ;
        PUSH nat 300 ;
+       NIL operation ;
        PAIR }" in
   let push_300 =
-    program "unit" "nat" "unit" push_300_code in
+    program "unit" "nat" push_300_code in
   parse_execute sb id_int_program "2" "3" >>=? fun _ ->
   parse_execute sb id_ill_param_program "2" "3" >>= fun x ->
   Assert.ill_typed_data_error ~msg: "Good data type" x ;
   parse_execute sb id_ill_return_program "2" "3" >>= fun x ->
   Assert.ill_typed_return_error ~msg: "Good return type" x ;
-  parse_execute sb push_300 "Unit" "Unit" >>=? fun _ ->
-  parse_execute sb id_pbool_program "(Pair True True)" "Unit" >>=? fun _ ->
+  parse_execute sb push_300 "Unit" "111" >>=? fun _ ->
+  parse_execute sb id_pbool_program "(Pair True True)" "(Pair False False)" >>=? fun _ ->
   return ()
 
 let tests = [

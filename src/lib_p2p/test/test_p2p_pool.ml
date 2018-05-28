@@ -27,10 +27,15 @@ let msg_config : message P2p_pool.message_config = {
 
 type metadata = unit
 
-let meta_config : metadata P2p_pool.meta_config = {
-  encoding = Data_encoding.empty ;
-  initial = () ;
+let peer_meta_config : metadata P2p_pool.peer_meta_config = {
+  peer_meta_encoding = Data_encoding.empty ;
+  peer_meta_initial = () ;
   score = fun () -> 0. ;
+}
+
+let conn_meta_config : metadata P2p_pool.conn_meta_config = {
+  conn_meta_encoding = Data_encoding.empty ;
+  conn_meta_value = (fun _ -> ()) ;
 }
 
 let sync ch =
@@ -87,7 +92,7 @@ let detach_node f points n =
     begin fun channel ->
       let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
       P2p_pool.create
-        config meta_config msg_config sched >>= fun pool ->
+        config peer_meta_config conn_meta_config msg_config sched >>= fun pool ->
       P2p_welcome.run ~backlog:10 pool ~addr port >>= fun welcome ->
       lwt_log_info "Node ready (port: %d)" port >>= fun () ->
       sync channel >>=? fun () ->

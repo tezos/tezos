@@ -130,4 +130,7 @@ if __name__ == '__main__':
                     [ (commitment['half_pkh'],
                        commitment['blinded_pkh'],
                        str(commitment['amount']))
-                      for commitment in commitments if commitment['amount'] > 0]}, f, indent=1)
+                      for commitment in commitments if commitment['amount'] > 0]
+                    "no_rewards_cycles": 7,
+                    "security_deposit_ramp_up_cycles": 64
+        }, f, indent=1)

@@ -1,5 +1,3 @@
-
 parameter unit;
 storage unit;
-return unit;
-code {}
+code {CDR; NIL operation; PAIR}

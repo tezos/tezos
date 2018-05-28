@@ -1,7 +1,5 @@
-
 parameter (pair (list int) (list int));
-return (list int);
-storage unit;
+storage (list int);
 code { CAR; DUP; DIP{CDR}; CAR; # Unpack lists
        NIL int; SWAP;           # Setup reverse accumulator
        LAMBDA (pair int (list int))
@@ -12,4 +10,4 @@ code { CAR; DUP; DIP{CDR}; CAR; # Unpack lists
               (list int)
               {DUP; CAR; DIP{CDR}; CONS};
        REDUCE;                  # Append reversed list
-       UNIT; SWAP; PAIR}        # Calling convention
+       NIL operation; PAIR}        # Calling convention

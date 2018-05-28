@@ -290,25 +290,25 @@ opam:07:blake2:
   variables:
     package: blake2
 
-opam:08:secp256k1:
+opam:08:hacl:
+  <<: *opam_definition
+  variables:
+    package: hacl
+
+opam:09:secp256k1:
   <<: *opam_definition
   variables:
     package: secp256k1
 
-opam:09:tezos-clic:
+opam:10:tezos-clic:
   <<: *opam_definition
   variables:
     package: tezos-clic
 
-opam:10:tezos-rpc:
+opam:11:tezos-rpc:
   <<: *opam_definition
   variables:
     package: tezos-rpc
-
-opam:11:tweetnacl:
-  <<: *opam_definition
-  variables:
-    package: tweetnacl
 
 opam:12:tezos-crypto:
   <<: *opam_definition
@@ -480,27 +480,42 @@ opam:45:tezos-client:
   variables:
     package: tezos-client
 
-opam:46:ocplib-ezresto-directory:
+opam:46:tezos-signer-services:
+  <<: *opam_definition
+  variables:
+    package: tezos-signer-services
+
+opam:47:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:47:tezos-baker-alpha:
+opam:48:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:48:tezos-protocol-demo:
+opam:49:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:49:tezos-node:
+opam:50:tezos-signer:
+  <<: *opam_definition
+  variables:
+    package: tezos-signer
+
+opam:51:tezos-signer-backends:
+  <<: *opam_definition
+  variables:
+    package: tezos-signer-backends
+
+opam:52:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:50:ocplib-json-typed-browser:
+opam:53:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser

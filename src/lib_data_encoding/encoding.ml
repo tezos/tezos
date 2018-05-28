@@ -7,17 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-exception No_case_matched
-exception Unexpected_tag of int
-exception Duplicated_tag of int
-exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
-exception Unexpected_enum of string * string list
-exception Invalid_size of int
-exception Int_out_of_range of int * int * int
-exception Float_out_of_range of float * float * float
-exception Parse_error of string
-
-
 module Kind = struct
 
   type t =
@@ -67,7 +56,7 @@ module Kind = struct
     | [] -> assert false (* should be rejected by Data_encoding.union *)
     | k :: ks ->
         match List.fold_left merge k ks with
-        | `Fixed n -> `Fixed (n + Size.tag_size sz)
+        | `Fixed n -> `Fixed (n + Binary_size.tag_size sz)
         | k -> k
 
 end
@@ -87,6 +76,7 @@ type 'a desc =
   | Int31 : int desc
   | Int32 : Int32.t desc
   | Int64 : Int64.t desc
+  | N : Z.t desc
   | Z : Z.t desc
   | RangedInt : { minimum : int ; maximum : int } -> int desc
   | RangedFloat : { minimum : float ; maximum : float } -> float desc
@@ -100,7 +90,7 @@ type 'a desc =
   | Objs : Kind.t * 'a t * 'b t -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
   | Tups : Kind.t * 'a t * 'b t -> ('a * 'b) desc
-  | Union : Kind.t * Size.tag_size * 'a case list -> 'a desc
+  | Union : Kind.t * Binary_size.tag_size * 'a case list -> 'a desc
   | Mu : Kind.enum * string * ('a t -> 'a t) -> 'a desc
   | Conv :
       { proj : ('a -> 'b) ;
@@ -117,7 +107,10 @@ type 'a desc =
       { encoding : 'a t ;
         json_encoding : 'a Json_encoding.encoding ;
         is_obj : bool ; is_tup : bool } -> 'a desc
-  | Dynamic_size : 'a t -> 'a desc
+  | Dynamic_size :
+      { kind : Binary_size.unsigned_integer ;
+        encoding : 'a t } -> 'a desc
+  | Check_size : { limit : int ; encoding : 'a t } -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
@@ -145,31 +138,32 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Null -> `Fixed 0
   | Empty -> `Fixed 0
   | Constant _ -> `Fixed 0
-  | Bool -> `Fixed Size.bool
-  | Int8 -> `Fixed Size.int8
-  | Uint8 -> `Fixed Size.uint8
-  | Int16 -> `Fixed Size.int16
-  | Uint16 -> `Fixed Size.uint16
-  | Int31 -> `Fixed Size.int31
-  | Int32 -> `Fixed Size.int32
-  | Int64 -> `Fixed Size.int64
+  | Bool -> `Fixed Binary_size.bool
+  | Int8 -> `Fixed Binary_size.int8
+  | Uint8 -> `Fixed Binary_size.uint8
+  | Int16 -> `Fixed Binary_size.int16
+  | Uint16 -> `Fixed Binary_size.uint16
+  | Int31 -> `Fixed Binary_size.int31
+  | Int32 -> `Fixed Binary_size.int32
+  | Int64 -> `Fixed Binary_size.int64
+  | N -> `Dynamic
   | Z -> `Dynamic
   | RangedInt { minimum ; maximum } ->
-      `Fixed Size.(integer_to_size @@ range_to_size ~minimum ~maximum)
-  | Float -> `Fixed Size.float
-  | RangedFloat _ -> `Fixed Size.float
+      `Fixed Binary_size.(integer_to_size @@ range_to_size ~minimum ~maximum)
+  | Float -> `Fixed Binary_size.float
+  | RangedFloat _ -> `Fixed Binary_size.float
   (* Tagged *)
   | Bytes kind -> (kind :> Kind.t)
   | String kind -> (kind :> Kind.t)
   | String_enum (_, cases) ->
-      `Fixed Size.(integer_to_size @@ enum_size cases)
+      `Fixed Binary_size.(integer_to_size @@ enum_size cases)
   | Obj (Opt (kind, _, _)) -> (kind :> Kind.t)
   | Objs (kind, _, _) -> kind
   | Tups (kind, _, _) -> kind
   | Union (kind, _, _) -> (kind :> Kind.t)
   | Mu (kind, _, _) -> (kind :> Kind.t)
   (* Variable *)
-  | Ignore -> `Variable
+  | Ignore -> `Fixed 0
   | Array _ -> `Variable
   | List _ -> `Variable
   (* Recursive *)
@@ -181,14 +175,75 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Def { encoding } -> classify encoding
   | Splitted { encoding } -> classify encoding
   | Dynamic_size _ -> `Dynamic
+  | Check_size { encoding } -> classify encoding
   | Delayed f -> classify (f ())
 
 let make ?json_encoding encoding = { encoding ; json_encoding }
 
 module Fixed = struct
-  let string n = make @@ String (`Fixed n)
-  let bytes n = make @@ Bytes (`Fixed n)
+  let string n =
+    if n <= 0 then
+      invalid_arg "Cannot create a string encoding fo negative or null fixed length."
+    else
+      make @@ String (`Fixed n)
+  let bytes n =
+    if n <= 0 then
+      invalid_arg "Cannot create a byte encoding fo negative or null fixed length."
+    else
+      make @@ Bytes (`Fixed n)
 end
+
+let rec is_zeroable: type t. t encoding -> bool = fun e ->
+  (* Whether an encoding can ever produce zero-byte of encoding. It is dnagerous
+     to place zero-size elements in a collection (list/array) because
+     they are indistinguishable from the abscence of elements. *)
+  match e.encoding with
+  (* trivially true *)
+  | Null -> true (* always true *)
+  | Empty -> true (* always true *)
+  | Ignore -> true (* always true *)
+  | Constant _ -> true (* always true *)
+  (* trivially false *)
+  | Bool -> false
+  | Int8 -> false
+  | Uint8 -> false
+  | Int16 -> false
+  | Uint16 -> false
+  | Int31 -> false
+  | Int32 -> false
+  | Int64 -> false
+  | N -> false
+  | Z -> false
+  | RangedInt _ -> false
+  | RangedFloat _ -> false
+  | Float -> false
+  | Bytes _ -> false
+  | String _ -> false
+  | String_enum _ -> false
+  (* true in some cases, but in practice always protected by Dynamic *)
+  | Array _ -> true (* 0-element array *)
+  | List _ -> true (* 0-element list *)
+  (* represented as whatever is inside: truth mostly propagates *)
+  | Obj (Req (_, e)) -> is_zeroable e (* represented as-is *)
+  | Obj (Opt (`Variable, _, _)) -> true (* optional field ommited *)
+  | Obj (Dft (_, e, _)) -> is_zeroable e (* represented as-is *)
+  | Obj _ -> false
+  | Objs (_, e1, e2) -> is_zeroable e1 && is_zeroable e2
+  | Tup e -> is_zeroable e
+  | Tups (_, e1, e2) -> is_zeroable e1 && is_zeroable e2
+  | Union (_, _, _) -> false (* includes a tag *)
+  (* other recursive cases: truth propagates *)
+  | Mu (`Dynamic, _, _) -> false (* size prefix *)
+  | Mu (`Variable, _, f) -> is_zeroable (f e)
+  | Conv { encoding } -> is_zeroable encoding
+  | Describe { encoding } -> is_zeroable encoding
+  | Def { encoding } -> is_zeroable encoding
+  | Splitted { encoding } -> is_zeroable encoding
+  | Check_size { encoding } -> is_zeroable encoding
+  (* Unscrutable: true by default *)
+  | Delayed f -> is_zeroable (f ())
+  (* Protected against zeroable *)
+  | Dynamic_size _ -> false (* always some data for size *)
 
 module Variable = struct
   let string = make @@ String `Variable
@@ -200,16 +255,27 @@ module Variable = struct
           "Cannot insert variable length element in %s. \
            You should wrap the contents using Data_encoding.dynamic_size." name
     | `Dynamic | `Fixed _ -> ()
+  let check_not_zeroable name e =
+    if is_zeroable e then
+      Printf.ksprintf invalid_arg
+        "Cannot insert potentially zero-sized element in %s." name
+    else
+      ()
   let array e =
     check_not_variable "an array" e ;
+    check_not_zeroable "an array" e ;
     make @@ Array e
   let list e =
     check_not_variable "a list" e ;
+    check_not_zeroable "a list" e ;
     make @@ List e
 end
 
-let dynamic_size e =
-  make @@ Dynamic_size e
+let dynamic_size ?(kind = `Uint30) e =
+  make @@ Dynamic_size { kind ; encoding = e }
+
+let check_size limit encoding =
+  make @@ Check_size { limit ; encoding }
 
 let delayed f =
   make @@ Delayed f
@@ -236,6 +302,7 @@ let ranged_float minimum maximum =
   and maximum = max minimum maximum in
   make @@ RangedFloat { minimum ; maximum }
 let int64 = make @@ Int64
+let n = make @@ N
 let z = make @@ Z
 let float = make @@ Float
 
@@ -287,7 +354,7 @@ let rec is_obj : type a. a t -> bool = fun e ->
   | Obj _ -> true
   | Objs _ (* by construction *) -> true
   | Conv { encoding = e } -> is_obj e
-  | Dynamic_size e  -> is_obj e
+  | Dynamic_size { encoding = e } -> is_obj e
   | Union (_,_,cases) ->
       List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
   | Empty -> true
@@ -304,7 +371,7 @@ let rec is_tup : type a. a t -> bool = fun e ->
   | Tup _ -> true
   | Tups _ (* by construction *) -> true
   | Conv { encoding = e } -> is_tup e
-  | Dynamic_size e  -> is_tup e
+  | Dynamic_size { encoding = e } -> is_tup e
   | Union (_,_,cases) ->
       List.for_all (function Case { encoding = e} -> is_tup e) cases
   | Mu (_,_,self) -> is_tup (self e)
@@ -453,9 +520,12 @@ let check_cases tag_size cases =
        match tag with
        | Json_only -> others
        | Tag tag ->
-           if List.mem tag others then raise (Duplicated_tag tag) ;
+           if List.mem tag others then
+             Format.kasprintf invalid_arg
+               "The tag %d appears twice in an union."
+               tag ;
            if tag < 0 || max_tag <= tag then
-             raise (Invalid_tag (tag, tag_size)) ;
+             Format.kasprintf invalid_arg "The tag %d is invalid." tag ;
            tag :: others
     )
     [] cases
@@ -467,14 +537,57 @@ let union ?(tag_size = `Uint8) cases =
   let kind = Kind.merge_list tag_size kinds in
   make @@ Union (kind, tag_size, cases)
 let case ?name tag encoding proj inj = Case { name ; encoding ; proj ; inj ; tag }
+
+let rec is_nullable: type t. t encoding -> bool = fun e ->
+  match e.encoding with
+  | Null -> true
+  | Empty -> false
+  | Ignore -> true
+  | Constant _ -> false
+  | Bool -> false
+  | Int8 -> false
+  | Uint8 -> false
+  | Int16 -> false
+  | Uint16 -> false
+  | Int31 -> false
+  | Int32 -> false
+  | Int64 -> false
+  | N -> false
+  | Z -> false
+  | RangedInt _ -> false
+  | RangedFloat _ -> false
+  | Float -> false
+  | Bytes _ -> false
+  | String _ -> false
+  | String_enum _ -> false
+  | Array _ -> false
+  | List _ -> false
+  | Obj _ -> false
+  | Objs _ -> false
+  | Tup _ -> false
+  | Tups _ -> false
+  | Union (_, _, cases) ->
+      List.exists (fun (Case { encoding = e }) -> is_nullable e) cases
+  | Mu (_, _, f) -> is_nullable (f e)
+  | Conv { encoding = e } -> is_nullable e
+  | Describe { encoding = e } -> is_nullable e
+  | Def { encoding = e } -> is_nullable e
+  | Splitted { json_encoding } -> Json_encoding.is_nullable json_encoding
+  | Dynamic_size { encoding = e } -> is_nullable e
+  | Check_size { encoding = e } -> is_nullable e
+  | Delayed _ -> true
+
 let option ty =
+  if is_nullable ty then
+    invalid_arg "Data_encoding.option: cannot nest nullable encodings" ;
+  (* TODO add a special construct `Option` in the GADT *)
   union
     ~tag_size:`Uint8
     [ case (Tag 1) ty
         ~name:"Some"
         (fun x -> x)
         (fun x -> Some x) ;
-      case (Tag 0) empty
+      case (Tag 0) null
         ~name:"None"
         (function None -> Some () | Some _ -> None)
         (fun () -> None) ;

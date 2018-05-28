@@ -1,3 +1,5 @@
+.. _proof-of-stake:
+
 Proof-of-stake in Tezos
 =======================
 
@@ -78,7 +80,7 @@ Delegates
 ~~~~~~~~~
 
 In tezos.alpha, tokens are controlled through a private key called the
-"manager key". Tezos.alpha accounts let the manager specify a public
+*manager key*. Tezos.alpha accounts let the manager specify a public
 delegate key. This key may be controlled by the manager themselves, or
 by another party. The responsibility of the delegate is to take part in
 the proof-of-stake consensus algorithm and in the governance of Tezos.
@@ -171,7 +173,7 @@ and resell them right after.
 Cycles
 ------
 
-Blocks in the Tezos.Alpha Blockchain are grouped into "cycles" of
+Blocks in the Tezos.Alpha Blockchain are grouped into *cycles* of
 ``BLOCKS_PER_CYCLE`` = 4,096 blocks. Since blocks are at least
 ``TIME_BETWEEN_BLOCKS`` = one minute apart, this means a cycle lasts *at
 least* 2 days, 20 hours, and 16 minutes. In the following description,
@@ -244,7 +246,7 @@ Endorsements
 ~~~~~~~~~~~~
 
 To each baking slot, we associate a list of ``ENDORSERS_PER_BLOCK`` = 32
-"endorsers". Endorsers are drawn from the set of delegates, by randomly
+*endorsers*. Endorsers are drawn from the set of delegates, by randomly
 selecting 32 rolls with replacement.
 
 Endorsers receive a reward (at the same time as block creators do). The
@@ -272,7 +274,7 @@ The commitment must be revealed by the original baker during cycle
 fees of the block that included the seed commitment (the associated
 security deposit is not forfeited).
 
-A "revelation" is an operation, and multiple revelations can thus be
+A *revelation* is an operation, and multiple revelations can thus be
 included in a block. The revelations are hashed together to generate a
 random seed at the very end of cycle ``(n-ALLOWED_FORK-1)``.
 
@@ -282,8 +284,8 @@ can be contained in any given block. Thus, 1 /
 (``MAX_REVELATIONS_PER_BLOCK`` \* ``BLOCKS_PER_COMMITMENT``) = 1/1024 of
 the blocks in the cycle are sufficient to include all revelations.
 
-Denounciations
---------------
+Denunciations
+-------------
 
 If two endorsements are made for the same slot or two blocks at the same
 height by a delegate, this can be denounced. The denunciation would be

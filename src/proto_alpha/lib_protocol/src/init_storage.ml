@@ -15,9 +15,13 @@ let prepare_first_block ctxt ~level ~timestamp ~fitness =
   Roll_storage.init ctxt >>=? fun ctxt ->
   Seed_storage.init ctxt >>=? fun ctxt ->
   Contract_storage.init ctxt >>=? fun ctxt ->
-  Bootstrap_storage.init ctxt param.bootstrap_accounts >>=? fun ctxt ->
+  Bootstrap_storage.init ctxt
+    ?ramp_up_cycles:param.security_deposit_ramp_up_cycles
+    ?no_reward_cycles:param.no_reward_cycles
+    param.bootstrap_accounts >>=? fun ctxt ->
   Roll_storage.init_first_cycles ctxt >>=? fun ctxt ->
   Vote_storage.init ctxt >>=? fun ctxt ->
+  Storage.Last_block_priority.init ctxt 0 >>=? fun ctxt ->
   return ctxt
 
 let prepare ctxt ~level ~timestamp ~fitness =

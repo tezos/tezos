@@ -1,4 +1,3 @@
 parameter unit;
-return nat;
-storage unit;
-code {DROP; UNIT; STEPS_TO_QUOTA; PAIR};
+storage nat;
+code {DROP; STEPS_TO_QUOTA; NIL operation; PAIR};

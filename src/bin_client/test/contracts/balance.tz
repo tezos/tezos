@@ -1,4 +1,3 @@
 parameter unit;
-storage unit;
-return tez;
-code {DROP; UNIT; BALANCE; PAIR};
+storage mutez;
+code {DROP; BALANCE; NIL operation; PAIR};

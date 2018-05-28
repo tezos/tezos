@@ -15,13 +15,12 @@
               tezos-rpc
               tezos-clic
               lwt
-              nocrypto
               blake2
-              tweetnacl
+              hacl
               secp256k1
               zarith))))
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files *.ml*)))
+  (deps ((glob_files *.ml{,i})))
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

@@ -124,7 +124,7 @@ module Make(Prefix : sig val id : string end) = struct
             (req "kind" (constant "generic"))
             (req "error" string)))
         from_error to_error in
-    let pp = Format.pp_print_string in
+    let pp ppf s = Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s in
     error_kinds :=
       Error_kind { id ; title ; description ;
                    from_error ; category ; encoding_case ; pp } :: !error_kinds
@@ -603,7 +603,7 @@ let () =
     ~id:"failure"
     ~title:"Generic error"
     ~description:"Unclassified error"
-    ~pp:Format.pp_print_string
+    ~pp:(fun ppf s -> Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s)
     Data_encoding.(obj1 (req "msg" string))
     (function
       | Exn (Failure msg) -> Some msg

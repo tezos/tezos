@@ -9,56 +9,57 @@
 
 open P2p_peer
 
-type 'conn t =
+type ('conn, 'conn_meta) t =
   | Accepted of { current_point: P2p_connection.Id.t ;
                   cancel: Lwt_canceler.t }
   (** We accepted a incoming connection, we greeted back and
       we are waiting for an acknowledgement. *)
   | Running of { data: 'conn ;
+                 conn_metadata: 'conn_meta ;
                  current_point: P2p_connection.Id.t }
   (** Successfully authentificated connection, normal business. *)
   | Disconnected
   (** No connection established currently. *)
-type 'conn state = 'conn t
+type ('conn, 'conn_meta) state = ('conn, 'conn_meta) t
 
-val pp : Format.formatter -> 'conn t -> unit
+val pp : Format.formatter -> ('conn, 'conn_meta) t -> unit
 
 module Info : sig
 
-  type ('conn, 'meta) t
-  type ('conn, 'meta) peer_info = ('conn, 'meta) t
+  type ('conn, 'peer_meta, 'conn_meta) t
+  type ('conn, 'peer_meta, 'conn_meta) peer_info = ('conn, 'peer_meta, 'conn_meta) t
 
-  val compare : ('conn, 'meta) t -> ('conn, 'meta) t -> int
+  val compare : ('conn, 'peer_meta, 'conn_meta) t -> ('conn, 'peer_meta, 'conn_meta) t -> int
 
   val create :
     ?created:Time.t ->
     ?trusted:bool ->
-    metadata:'meta ->
-    Id.t -> ('conn, 'meta) peer_info
+    peer_metadata:'peer_meta ->
+    Id.t -> ('conn, 'peer_meta, 'conn_meta) peer_info
   (** [create ~trusted ~meta peer_id] is a freshly minted peer_id info for
       [peer_id]. *)
 
-  val peer_id : ('conn, 'meta) peer_info -> Id.t
+  val peer_id : ('conn, 'peer_meta, 'conn_meta) peer_info -> Id.t
 
-  val created : ('conn, 'meta) peer_info -> Time.t
-  val metadata : ('conn, 'meta) peer_info -> 'meta
-  val set_metadata : ('conn, 'meta) peer_info -> 'meta -> unit
+  val created : ('conn, 'peer_meta, 'conn_meta) peer_info -> Time.t
+  val peer_metadata : ('conn, 'peer_meta, 'conn_meta) peer_info -> 'peer_meta
+  val set_peer_metadata : ('conn, 'peer_meta, 'conn_meta) peer_info -> 'peer_meta -> unit
 
-  val trusted : ('conn, 'meta) peer_info -> bool
-  val set_trusted : ('conn, 'meta) peer_info -> unit
-  val unset_trusted : ('conn, 'meta) peer_info -> unit
+  val trusted : ('conn, 'peer_meta, 'conn_meta) peer_info -> bool
+  val set_trusted : ('conn, 'peer_meta, 'conn_meta) peer_info -> unit
+  val unset_trusted : ('conn, 'peer_meta, 'conn_meta) peer_info -> unit
 
   val last_failed_connection :
-    ('conn, 'meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
   val last_rejected_connection :
-    ('conn, 'meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
   val last_established_connection :
-    ('conn, 'meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
   val last_disconnection :
-    ('conn, 'meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
 
   val last_seen :
-    ('conn, 'meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
   (** [last_seen gi] is the most recent of:
 
       * last established connection
@@ -67,7 +68,7 @@ module Info : sig
   *)
 
   val last_miss :
-    ('conn, 'meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
   (** [last_miss gi] is the most recent of:
 
       * last failed connection
@@ -77,39 +78,38 @@ module Info : sig
 
   val log_incoming_rejection :
     ?timestamp:Time.t ->
-    ('conn, 'meta) peer_info -> P2p_connection.Id.t -> unit
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> P2p_connection.Id.t -> unit
 
   module File : sig
     val load :
-      string -> 'meta Data_encoding.t ->
-      ('conn, 'meta) peer_info list tzresult Lwt.t
+      string -> 'peer_meta Data_encoding.t ->
+      ('conn, 'peer_meta, 'conn_meta) peer_info list tzresult Lwt.t
     val save :
-      string -> 'meta Data_encoding.t ->
-      ('conn, 'meta) peer_info list -> unit tzresult Lwt.t
+      string -> 'peer_meta Data_encoding.t ->
+      ('conn, 'peer_meta, 'conn_meta) peer_info list -> unit tzresult Lwt.t
   end
 
   val fold :
-    ('conn, 'meta) t -> init:'a -> f:('a -> Pool_event.t -> 'a) -> 'a
+    ('conn, 'peer_meta, 'conn_meta) t -> init:'a -> f:('a -> Pool_event.t -> 'a) -> 'a
 
   val watch :
-    ('conn, 'meta) t -> Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
+    ('conn, 'peer_meta, 'conn_meta) t -> Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
 
 end
 
+val get : ('conn, 'peer_meta, 'conn_meta) Info.t -> ('conn, 'conn_meta) state
 
-val get : ('conn, 'meta) Info.t -> 'conn state
-
-val is_disconnected : ('conn, 'meta) Info.t -> bool
+val is_disconnected : ('conn, 'peer_meta, 'conn_meta) Info.t -> bool
 
 val set_accepted :
   ?timestamp:Time.t ->
-  ('conn, 'meta) Info.t -> P2p_connection.Id.t -> Lwt_canceler.t -> unit
+  ('conn, 'peer_meta, 'conn_meta) Info.t -> P2p_connection.Id.t -> Lwt_canceler.t -> unit
 
 val set_running :
   ?timestamp:Time.t ->
-  ('conn, 'meta) Info.t -> P2p_connection.Id.t -> 'conn -> unit
+  ('conn, 'peer_meta, 'conn_meta) Info.t -> P2p_connection.Id.t -> 'conn -> 'conn_meta -> unit
 
 val set_disconnected :
   ?timestamp:Time.t ->
   ?requested:bool ->
-  ('conn, 'meta) Info.t -> unit
+  ('conn, 'peer_meta, 'conn_meta) Info.t -> unit

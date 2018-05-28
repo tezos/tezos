@@ -102,6 +102,7 @@ module Make (Context : CONTEXT) : sig
     include Tezos_protocol_environment_sigs.V1.T
       with type Format.formatter = Format.formatter
        and type 'a Data_encoding.t = 'a Data_encoding.t
+       and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
        and type Block_hash.t = Block_hash.t
@@ -127,7 +128,9 @@ module Make (Context : CONTEXT) : sig
        and type Signature.public_key_hash = Signature.public_key_hash
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t
+       and type Signature.watermark = Signature.watermark
        and type 'a Micheline.canonical = 'a Micheline.canonical
+       and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t

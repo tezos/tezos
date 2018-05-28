@@ -13,10 +13,13 @@ type error +=
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
+  | Empty_implicit_contract of Signature.Public_key_hash.t (* `Temporary *)
+  | Empty_transaction of Contract_repr.t (* `Temporary *)
   | Inconsistent_hash of Signature.Public_key.t * Signature.Public_key_hash.t * Signature.Public_key_hash.t (* `Permanent *)
   | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t (* `Permanent *)
-  | Missing_public_key of Signature.Public_key_hash.t (* `Permanent *)
   | Failure of string (* `Permanent *)
+  | Previously_revealed_key of Contract_repr.t (* `Permanent *)
+  | Unrevealed_manager_key of Contract_repr.t (* `Permanent *)
 
 let () =
   register_error_kind
@@ -120,26 +123,79 @@ let () =
     (fun (eh, ph) -> Inconsistent_public_key (eh, ph)) ;
   register_error_kind
     `Permanent
-    ~id:"contract.manager.missing_public_key"
-    ~title:"Missing public key"
-    ~description:"The manager public key must be provided to execute the current operation"
-    ~pp:(fun ppf k ->
-        Format.fprintf ppf "The manager public key ( with hash %a ) is missing"
-          Signature.Public_key_hash.pp k)
-    Data_encoding.(obj1 (req "hash" Signature.Public_key_hash.encoding))
-    (function Missing_public_key k -> Some k | _ -> None)
-    (fun k -> Missing_public_key k) ;
-  register_error_kind
-    `Permanent
     ~id:"contract.failure"
     ~title:"Contract storage failure"
     ~description:"Unexpected contract storage error"
     ~pp:(fun ppf s -> Format.fprintf ppf "Contract_storage.Failure %S" s)
     Data_encoding.(obj1 (req "message" string))
     (function Failure s -> Some s | _ -> None)
-    (fun s -> Failure s)
+    (fun s -> Failure s) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.unrevealed_key"
+    ~title:"Manager operation precedes key revelation"
+    ~description:
+      "One tried to apply a manager operation \
+       without revealing the manager public key"
+    ~pp:(fun ppf s ->
+        Format.fprintf ppf "Unrevealed manager key for contract %a."
+          Contract_repr.pp s)
+    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
+    (function Unrevealed_manager_key s -> Some s | _ -> None)
+    (fun s -> Unrevealed_manager_key s) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.previously_revealed_key"
+    ~title:"Manager operation already revealed"
+    ~description:
+      "One tried to revealed twice a manager public key"
+    ~pp:(fun ppf s ->
+        Format.fprintf ppf "Previously revealed manager key for contract %a."
+          Contract_repr.pp s)
+    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
+    (function Previously_revealed_key s -> Some s | _ -> None)
+    (fun s -> Previously_revealed_key s) ;
+  register_error_kind
+    `Branch
+    ~id:"implicit.empty_implicit_contract"
+    ~title:"Empty implicit contract"
+    ~description:"No manager operations are allowed on an empty implicit contract."
+    ~pp:(fun ppf implicit ->
+        Format.fprintf ppf
+          "Empty implicit contract (%a)"
+          Signature.Public_key_hash.pp implicit)
+    Data_encoding.(obj1 (req "implicit" Signature.Public_key_hash.encoding))
+    (function Empty_implicit_contract c -> Some c | _ -> None)
+    (fun c -> Empty_implicit_contract c) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.empty_transaction"
+    ~title:"Empty transaction"
+    ~description:"Forbidden to credit 0ꜩ to a contract without code."
+    ~pp:(fun ppf contract ->
+        Format.fprintf ppf
+          "Transaction of 0ꜩ towards a contract without code are forbidden (%a)."
+          Contract_repr.pp contract)
+    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
+    (function Empty_transaction c -> Some c | _ -> None)
+    (fun c -> Empty_transaction c)
 
 let failwith msg = fail (Failure msg)
+
+type big_map_diff = (string * Script_repr.expr option) list
+
+let update_script_big_map c contract = function
+  | None -> return (c, 0L)
+  | Some diff ->
+      fold_left_s (fun (c, total) (key, value) ->
+          match value with
+          | None ->
+              Storage.Contract.Big_map.remove (c, contract) key >>=? fun (c, freed) ->
+              return (c, Int64.sub total (Int64.of_int freed))
+          | Some v ->
+              Storage.Contract.Big_map.init_set (c, contract) key v >>=? fun (c, size_diff) ->
+              return (c, Int64.add total (Int64.of_int size_diff)))
+        (c, 0L) diff
 
 let create_base c contract
     ~balance ~manager ~delegate ?script ~spendable ~delegatable =
@@ -158,19 +214,20 @@ let create_base c contract
   Storage.Contract.Delegatable.set c contract delegatable >>= fun c ->
   Storage.Contract.Counter.init c contract counter >>=? fun c ->
   (match script with
-   | Some ({ Script_repr.code ; storage }, (code_fees, storage_fees)) ->
-       Storage.Contract.Code.init c contract code >>=? fun c ->
-       Storage.Contract.Storage.init c contract storage >>=? fun c ->
-       Storage.Contract.Code_fees.init c contract code_fees >>=? fun c ->
-       Storage.Contract.Storage_fees.init c contract storage_fees
+   | Some ({ Script_repr.code ; storage }, big_map_diff) ->
+       Storage.Contract.Code.init c contract code >>=? fun (c, code_size) ->
+       Storage.Contract.Storage.init c contract storage >>=? fun (c, storage_size) ->
+       update_script_big_map c contract big_map_diff >>=? fun (c, big_map_size) ->
+       let total_size = Int64.add (Int64.add (Int64.of_int code_size) (Int64.of_int storage_size)) big_map_size in
+       assert Compare.Int64.(total_size >= 0L) ;
+       Storage.Contract.Used_storage_space.init c contract total_size >>=? fun c ->
+       Storage.Contract.Paid_storage_space_fees.init c contract Tez_repr.zero
    | None ->
        return c) >>=? fun c ->
-  return (c, contract)
+  return c
 
-let originate c nonce ~balance ~manager ?script ~delegate ~spendable ~delegatable =
-  let contract = Contract_repr.originated_contract nonce in
-  create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable >>=? fun (ctxt, contract) ->
-  return (ctxt, contract, Contract_repr.incr_origination_nonce nonce)
+let originate c contract ~balance ~manager ?script ~delegate ~spendable ~delegatable =
+  create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable
 
 let create_implicit c manager ~balance =
   create_base c (Contract_repr.implicit_contract manager)
@@ -184,27 +241,49 @@ let delete c contract =
   Storage.Contract.Spendable.del c contract >>= fun c ->
   Storage.Contract.Delegatable.del c contract >>= fun c ->
   Storage.Contract.Counter.delete c contract >>=? fun c ->
-  Storage.Contract.Code.remove c contract >>= fun c ->
-  Storage.Contract.Storage.remove c contract >>= fun c ->
-  Storage.Contract.Code_fees.remove c contract >>= fun c ->
-  Storage.Contract.Storage_fees.remove c contract >>= fun c ->
-  Storage.Contract.Big_map.clear (c, contract) >>= fun c ->
+  Storage.Contract.Code.remove c contract >>=? fun (c, _) ->
+  Storage.Contract.Storage.remove c contract >>=? fun (c, _) ->
+  Storage.Contract.Paid_storage_space_fees.remove c contract >>= fun c ->
+  Storage.Contract.Used_storage_space.remove c contract >>= fun c ->
+  Storage.Contract.Big_map.clear (c, contract) >>=? fun (c, _) ->
   return c
+
+let allocated c contract =
+  Storage.Contract.Counter.get_option c contract >>=? function
+  | None -> return false
+  | Some _ -> return true
 
 let exists c contract =
   match Contract_repr.is_implicit contract with
   | Some _ -> return true
-  | None ->
-      Storage.Contract.Counter.get_option c contract >>=? function
-      | None -> return false
-      | Some _ -> return true
+  | None -> allocated c contract
 
 let must_exist c contract =
   exists c contract >>=? function
   | true -> return ()
   | false -> fail (Non_existing_contract contract)
 
+let must_be_allocated c contract =
+  allocated c contract >>=? function
+  | true -> return ()
+  | false ->
+      match Contract_repr.is_implicit contract with
+      | Some pkh -> fail (Empty_implicit_contract pkh)
+      | None -> fail (Non_existing_contract contract)
+
 let list c = Storage.Contract.list c
+
+let fresh_contract_from_current_nonce c =
+  Lwt.return (Raw_context.increment_origination_nonce c) >>=? fun (c, nonce) ->
+  return (c, Contract_repr.originated_contract nonce)
+
+let originated_from_current_nonce ctxt =
+  Lwt.return (Raw_context.origination_nonce ctxt) >>=? fun nonce ->
+  filter_map_s
+    (fun contract -> exists ctxt contract >>=? function
+       | true -> return (Some contract)
+       | false -> return None)
+    (Contract_repr.originated_contracts nonce)
 
 let check_counter_increment c contract counter =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
@@ -223,14 +302,19 @@ let increment_counter c contract =
   Storage.Contract.Counter.set c contract (Int32.succ contract_counter)
 
 let get_script c contract =
-  Storage.Contract.Code.get_option c contract >>=? fun code ->
-  Storage.Contract.Storage.get_option c contract >>=? fun storage ->
+  Storage.Contract.Code.get_option c contract >>=? fun (c, code) ->
+  Storage.Contract.Storage.get_option c contract >>=? fun (c, storage) ->
   match code, storage with
-  | None, None -> return None
-  | Some code, Some storage -> return (Some { Script_repr.code ; storage })
+  | None, None -> return (c, None)
+  | Some code, Some storage -> return (c, Some { Script_repr.code ; storage })
   | None, Some _ | Some _, None -> failwith "get_script"
 
-let get_storage = Storage.Contract.Storage.get_option
+let get_storage ctxt contract =
+  Storage.Contract.Storage.get_option ctxt contract >>=? function
+  | (ctxt, None) -> return (ctxt, None)
+  | (ctxt, Some storage) ->
+      Lwt.return (Script_repr.force_decode storage) >>=? fun storage ->
+      return (ctxt, Some storage)
 
 let get_counter c contract =
   Storage.Contract.Counter.get_option c contract >>=? function
@@ -251,25 +335,28 @@ let get_manager c contract =
   | Some (Manager_repr.Hash v) -> return v
   | Some (Manager_repr.Public_key v) -> return (Signature.Public_key.hash v)
 
-let update_manager_key c contract = function
-  | Some public_key ->
-      begin Storage.Contract.Manager.get c contract >>=? function
-        | Public_key v -> (* key revealed for the second time *)
-            if Signature.Public_key.(v = public_key) then return (c,v)
-            else fail (Inconsistent_public_key (v,public_key))
-        | Hash v ->
-            let actual_hash = Signature.Public_key.hash public_key in
-            if (Signature.Public_key_hash.equal actual_hash v) then
-              let v = (Manager_repr.Public_key public_key) in
-              Storage.Contract.Manager.set c contract v >>=? fun c ->
-              return (c,public_key) (* reveal and update key *)
-            else fail (Inconsistent_hash (public_key,v,actual_hash))
-      end
-  | None ->
-      begin Storage.Contract.Manager.get c contract >>=? function
-        | Public_key v -> return (c,v) (* already revealed *)
-        | Hash v -> fail (Missing_public_key (v))
-      end
+let get_manager_key c contract =
+  Storage.Contract.Manager.get_option c contract >>=? function
+  | None -> failwith "get_manager_key"
+  | Some (Manager_repr.Hash _) -> fail (Unrevealed_manager_key contract)
+  | Some (Manager_repr.Public_key v) -> return v
+
+let is_manager_key_revealed c contract =
+  Storage.Contract.Manager.get_option c contract >>=? function
+  | None -> return false
+  | Some (Manager_repr.Hash _) -> return false
+  | Some (Manager_repr.Public_key _) -> return true
+
+let reveal_manager_key c contract public_key =
+  Storage.Contract.Manager.get c contract >>=? function
+  | Public_key _ -> fail (Previously_revealed_key contract)
+  | Hash v ->
+      let actual_hash = Signature.Public_key.hash public_key in
+      if (Signature.Public_key_hash.equal actual_hash v) then
+        let v = (Manager_repr.Public_key public_key) in
+        Storage.Contract.Manager.set c contract v >>=? fun c ->
+        return c
+      else fail (Inconsistent_hash (public_key,v,actual_hash))
 
 let get_balance c contract =
   Storage.Contract.Balance.get_option c contract >>=? function
@@ -287,37 +374,13 @@ let is_spendable c contract =
   | None ->
       Storage.Contract.Spendable.mem c contract >>= return
 
-let code_and_storage_fee c contract =
-  Storage.Contract.Code_fees.get_option c contract >>=? fun code_fees ->
-  Storage.Contract.Storage_fees.get_option c contract >>=? fun storage_fees ->
-  match code_fees, storage_fees with
-  | (None, Some _) | (Some _, None) ->
-      failwith "contract_fee" (* Internal error *)
-  | None, None ->
-      return Tez_repr.zero
-  | Some code_fees, Some storage_fees ->
-      Lwt.return Tez_repr.(code_fees +? storage_fees)
-
-let update_storage_fee c contract storage_fees =
-  Storage.Contract.Storage_fees.set c contract storage_fees
-
-type big_map_diff = (string * Script_repr.expr option) list
-
-let update_script_storage c contract storage big_map  =
-  begin match big_map with
-    | None -> return c
-    | Some diff ->
-        fold_left_s (fun c (key, value) ->
-            match value with
-            | None ->
-                Storage.Contract.Big_map.remove (c, contract) key >>=
-                return
-            | Some v ->
-                Storage.Contract.Big_map.init_set (c, contract) key v >>=
-                return)
-          c diff
-  end >>=? fun c ->
-  Storage.Contract.Storage.set c contract storage
+let update_script_storage c contract storage big_map_diff =
+  let storage = Script_repr.lazy_expr storage in
+  update_script_big_map c contract big_map_diff >>=? fun (c, big_map_size_diff) ->
+  Storage.Contract.Storage.set c contract storage >>=? fun (c, size_diff) ->
+  Storage.Contract.Used_storage_space.get c contract >>=? fun previous_size ->
+  let new_size = Int64.add previous_size (Int64.add big_map_size_diff (Int64.of_int size_diff)) in
+  Storage.Contract.Used_storage_space.set c contract new_size
 
 let spend_from_script c contract amount =
   Storage.Contract.Balance.get c contract >>=? fun balance ->
@@ -342,13 +405,20 @@ let spend_from_script c contract amount =
                 delete c contract
 
 let credit c contract amount =
+  begin
+    if Tez_repr.(amount <> Tez_repr.zero) then
+      return c
+    else
+      Storage.Contract.Code.mem c contract >>=? fun (c, target_has_code) ->
+      fail_unless target_has_code (Empty_transaction contract) >>=? fun () ->
+      return c
+  end >>=? fun c ->
   Storage.Contract.Balance.get_option c contract >>=? function
   | None -> begin
       match Contract_repr.is_implicit contract with
       | None -> fail (Non_existing_contract contract)
       | Some manager ->
-          create_implicit c manager ~balance:amount >>=? fun (c, _) ->
-          return c
+          create_implicit c manager ~balance:amount
     end
   | Some balance ->
       Lwt.return Tez_repr.(amount +? balance) >>=? fun balance ->
@@ -377,10 +447,27 @@ let spend c contract amount =
 let init c =
   Storage.Contract.Global_counter.init c 0l
 
+let used_storage_space c contract =
+  Storage.Contract.Used_storage_space.get_option c contract >>=? function
+  | None -> return 0L
+  | Some fees -> return fees
+
+let paid_storage_space_fees c contract =
+  Storage.Contract.Paid_storage_space_fees.get_option c contract >>=? function
+  | None -> return Tez_repr.zero
+  | Some paid_fees -> return paid_fees
+
+let pay_for_storage_space c contract fees =
+  if Tez_repr.equal fees Tez_repr.zero then
+    return c
+  else
+    Storage.Contract.Paid_storage_space_fees.get c contract >>=? fun paid_fees ->
+    Lwt.return (Tez_repr.(paid_fees +? fees)) >>=? fun paid_fees ->
+    Storage.Contract.Paid_storage_space_fees.set c contract paid_fees
+
 module Big_map = struct
-  let set ctxt contract key value =
-    Storage.Contract.Big_map.init_set (ctxt, contract) key value >>= return
-  let remove ctxt contract = Storage.Contract.Big_map.delete (ctxt, contract)
-  let mem ctxt contract = Storage.Contract.Big_map.mem (ctxt, contract)
-  let get_opt ctxt contract = Storage.Contract.Big_map.get_option (ctxt, contract)
+  let mem ctxt contract key =
+    Storage.Contract.Big_map.mem (ctxt, contract) key
+  let get_opt ctxt contract key =
+    Storage.Contract.Big_map.get_option (ctxt, contract) key
 end

@@ -1,6 +1,5 @@
 parameter string;
-return string;
-storage unit;
+storage string;
 code {CAR;
       LAMBDA string string {PUSH string "_abc"; SWAP; CONCAT};
-      SWAP; EXEC; UNIT; SWAP; PAIR};
+      SWAP; EXEC; NIL operation; PAIR};

@@ -1,4 +1,3 @@
 parameter unit;
 storage unit;
-return unit;
-code { UNIT; UNIT; UNIT; UNIT; PAIAAIR; UNPAIAAIR; DROP; DROP; DROP; DROP }
+code { UNIT; UNIT; UNIT; UNIT; PAIAAIR; UNPAIAAIR; DROP; DROP; DROP; DROP; CAR; NIL operation; PAIR }

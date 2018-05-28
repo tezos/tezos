@@ -8,6 +8,8 @@ source $test_dir/test_lib.inc.sh "$@"
 start_node 1
 activate_alpha
 
+$client -w none config update
+
 sleep 2
 
 #tests for the rpc service raw_context
@@ -83,8 +85,8 @@ bake_after $client transfer 400,000 from bootstrap5 to bootstrap1 -fee 0
 bake_after $client transfer 400,000 from bootstrap1 to bootstrap5 -fee 0
 $client get balance for bootstrap5 | assert "4,000,000 ꜩ"
 
-bake_after $client activate account $key4 with king_commitment.json --no-confirmation
-bake_after $client activate account $key5 with queen_commitment.json --no-confirmation
+bake_after $client activate account $key4 with king_commitment.json
+bake_after $client activate account $key5 with queen_commitment.json
 
 $client get balance for $key4 | assert "23,932,454.669,343 ꜩ"
 $client get balance for $key5 | assert "72,954,577.464,032 ꜩ"

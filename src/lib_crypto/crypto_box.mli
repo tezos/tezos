@@ -9,26 +9,33 @@
 
 (** Tezos - X25519/XSalsa20-Poly1305 cryptography *)
 
-type nonce
+type nonce = Bigstring.t
+val nonce_size : int
 
 val zero_nonce : nonce
 val random_nonce : unit -> nonce
 val increment_nonce : ?step:int -> nonce -> nonce
 
+(** [generate_nonces ~incoming ~sent_msg ~recv_msg] generates two
+    nonces by hashing (Blake2B) the arguments. The nonces should be
+    used to initialize the encryption on the communication
+    channels. Because an attacker cannot control both messages,
+    it cannot determine the nonces that will be used to encrypt
+    the messages. The sent message should contains a random nonce,
+    and we should never send the exact same message twice. *)
+val generate_nonces :
+  incoming:bool -> sent_msg:MBytes.t -> recv_msg:MBytes.t -> nonce * nonce
+
 module Secretbox : sig
   type key
 
-  val zerobytes : int
-  val boxzerobytes : int
-
-  val of_bytes : MBytes.t -> key option
-  val of_bytes_exn : MBytes.t -> key
-
-  val box : key -> MBytes.t -> nonce -> MBytes.t
-  val box_open : key -> MBytes.t -> nonce -> MBytes.t option
+  val unsafe_of_bytes : MBytes.t -> key
 
   val box_noalloc : key -> nonce -> MBytes.t -> unit
   val box_open_noalloc : key -> nonce -> MBytes.t -> bool
+
+  val box : key -> MBytes.t -> nonce -> MBytes.t
+  val box_open : key -> MBytes.t -> nonce -> MBytes.t option
 end
 
 type target
@@ -46,12 +53,6 @@ val zerobytes : int
 val boxzerobytes : int
 
 val random_keypair : unit -> secret_key * public_key * Public_key_hash.t
-
-val box : secret_key -> public_key -> MBytes.t -> nonce -> MBytes.t
-val box_open : secret_key -> public_key -> MBytes.t -> nonce -> MBytes.t option
-
-val box_noalloc : secret_key -> public_key -> nonce -> MBytes.t -> unit
-val box_open_noalloc : secret_key -> public_key -> nonce -> MBytes.t -> bool
 
 val precompute : secret_key -> public_key -> channel_key
 
@@ -71,10 +72,6 @@ val public_key_size : int
 val secret_key_to_bigarray : secret_key -> Cstruct.buffer
 val secret_key_of_bigarray : Cstruct.buffer -> secret_key
 val secret_key_size : int
-
-val nonce_to_bigarray : nonce -> Cstruct.buffer
-val nonce_of_bigarray : Cstruct.buffer -> nonce
-val nonce_size : int
 
 val public_key_encoding : public_key Data_encoding.t
 val secret_key_encoding : secret_key Data_encoding.t

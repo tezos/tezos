@@ -30,9 +30,9 @@ let ex_ty_enc =
   Data_encoding.conv
     (fun (Ex_ty ty) -> strip_locations (unparse_ty None ty))
     (fun expr ->
-       match parse_ty true (root expr) with
+       match parse_ty ~allow_big_map:true ~allow_operation:true (root expr) with
        | Ok (Ex_ty ty, _) -> Ex_ty ty
-       | _ -> Ex_ty Unit_t (* FIXME: ? *))
+       | _ -> assert false)
     Script.expr_encoding
 
 (* main registration *)
@@ -176,6 +176,18 @@ let () =
        (req "loc" location_encoding))
     (function Unexpected_big_map loc -> Some loc | _ -> None)
     (fun loc -> Unexpected_big_map loc) ;
+  (* Unexpected operation *)
+  register_error_kind
+    `Permanent
+    ~id:"unexpectedOperation"
+    ~title: "Big map in unauthorized position (type error)"
+    ~description:
+      "When parsing script, a operation type was found \
+       in the storage or parameter field."
+    (obj1
+       (req "loc" location_encoding))
+    (function Unexpected_operation loc -> Some loc | _ -> None)
+    (fun loc -> Unexpected_operation loc) ;
   (* -- Value typing errors ---------------------- *)
   (* Unordered map keys *)
   register_error_kind
@@ -376,32 +388,6 @@ let () =
       | _ -> None)
     (fun n ->
        Bad_stack_item n) ;
-  (* TRANSFER_TOKENS in lambda *)
-  register_error_kind
-    `Permanent
-    ~id:"TransferInLambdaTypeError"
-    ~title: "Transfer in lambda (typechecking error)"
-    ~description:
-      "A TRANSFER_TOKENS instruction was encountered in a lambda expression."
-    (located empty)
-    (function
-      | Transfer_in_lambda loc -> Some (loc, ())
-      | _ -> None)
-    (fun (loc, ()) ->
-       Transfer_in_lambda loc) ;
-  (* TRANSFER_TOKENS in DIP *)
-  register_error_kind
-    `Permanent
-    ~id:"TransferInDipTypeError"
-    ~title: "Transfer in DIP (typechecking error)"
-    ~description:
-      "A TRANSFER_TOKENS instruction was encountered in a DIP instruction."
-    (located empty)
-    (function
-      | Transfer_in_dip loc -> Some (loc, ())
-      | _ -> None)
-    (fun (loc, ()) ->
-       Transfer_in_dip loc) ;
   (* SELF in lambda *)
   register_error_kind
     `Permanent

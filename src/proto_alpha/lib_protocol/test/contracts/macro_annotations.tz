@@ -1,6 +1,6 @@
-return unit;
 parameter unit;
-storage unit;
-code { PUSH unit Unit ;
+storage (pair @truc unit unit);
+code { DROP; UNIT ; UNIT ; PAIR ; UNIT ;
        DUUP @truc ;
-       DROP ; DROP }
+       DIP { DROP ; DROP } ;
+       NIL operation ; PAIR }

@@ -105,16 +105,16 @@ let parse_unsigned_protocol_data bytes =
   | Some proto -> Ok proto
 
 let forge_unsigned shell proto =
-  Data_encoding.Binary.to_bytes unsigned_header_encoding (shell, proto)
+  Data_encoding.Binary.to_bytes_exn unsigned_header_encoding (shell, proto)
 
 let forge_unsigned_protocol_data proto =
-  Data_encoding.Binary.to_bytes protocol_data_encoding proto
+  Data_encoding.Binary.to_bytes_exn protocol_data_encoding proto
 
 let hash_raw = Block_header.hash
 let hash { shell ; protocol_data ; signature } =
   Block_header.hash
     { shell ;
       protocol_data =
-        Data_encoding.Binary.to_bytes
+        Data_encoding.Binary.to_bytes_exn
           signed_protocol_data_encoding
           (protocol_data, signature ) }

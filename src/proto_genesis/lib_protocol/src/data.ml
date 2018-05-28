@@ -70,7 +70,7 @@ module Command = struct
       (req "signature" Signature.encoding)
 
   let forge shell command =
-    Data_encoding.Binary.to_bytes
+    Data_encoding.Binary.to_bytes_exn
       (Data_encoding.tup2 Block_header.shell_header_encoding encoding)
       (shell, command)
 
@@ -94,7 +94,7 @@ module Pubkey = struct
 
   let set_pubkey ctxt v =
     Context.set ctxt pubkey_key @@
-    Data_encoding.Binary.to_bytes Signature.Public_key.encoding v
+    Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding v
 
   let sandbox_encoding =
     let open Data_encoding in

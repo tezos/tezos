@@ -106,6 +106,41 @@ module Cycle : sig
 
 end
 
+module Gas : sig
+  type t = private
+    | Unaccounted
+    | Limited of { remaining : Z.t }
+
+  val encoding : t Data_encoding.encoding
+  val pp : Format.formatter -> t -> unit
+
+  type cost
+
+  val cost_encoding : cost Data_encoding.encoding
+  val pp_cost : Format.formatter -> cost -> unit
+
+  type error += Block_quota_exceeded (* `Temporary *)
+  type error += Operation_quota_exceeded (* `Temporary *)
+  type error += Gas_limit_too_high (* `Permanent *)
+
+  val free : cost
+  val step_cost : int -> cost
+  val alloc_cost : int -> cost
+  val alloc_bytes_cost : int -> cost
+  val alloc_bits_cost : int -> cost
+  val read_bytes_cost : Z.t -> cost
+  val write_bytes_cost : Z.t -> cost
+
+  val ( *@ ) : int -> cost -> cost
+  val ( +@ ) : cost -> cost -> cost
+
+  val set_limit: context -> Z.t -> context tzresult
+  val set_unlimited: context -> context
+  val consume: context -> cost -> context tzresult
+  val level: context -> t
+  val block_level: context -> Z.t
+end
+
 module Script_int : module type of Script_int_repr
 
 module Script_timestamp : sig
@@ -121,13 +156,13 @@ module Script_timestamp : sig
   val sub_delta: t -> z num -> t
   val now: context -> t
   val to_zint: t -> Z.t
+  val of_zint: Z.t -> t
 end
 
 module Script : sig
 
   type prim = Michelson_v1_primitives.prim =
     | K_parameter
-    | K_return
     | K_storage
     | K_code
     | D_False
@@ -153,7 +188,7 @@ module Script : sig
     | I_CONS
     | I_CREATE_ACCOUNT
     | I_CREATE_CONTRACT
-    | I_DEFAULT_ACCOUNT
+    | I_IMPLICIT_ACCOUNT
     | I_DIP
     | I_DROP
     | I_DUP
@@ -192,7 +227,6 @@ module Script : sig
     | I_OR
     | I_PAIR
     | I_PUSH
-    | I_REDUCE
     | I_RIGHT
     | I_SIZE
     | I_SOME
@@ -202,11 +236,15 @@ module Script : sig
     | I_SUB
     | I_SWAP
     | I_TRANSFER_TOKENS
+    | I_SET_DELEGATE
     | I_UNIT
     | I_UPDATE
     | I_XOR
     | I_ITER
     | I_LOOP_LEFT
+    | I_ADDRESS
+    | I_CONTRACT
+    | I_ISNAT
     | T_bool
     | T_contract
     | T_int
@@ -223,24 +261,33 @@ module Script : sig
     | T_set
     | T_signature
     | T_string
-    | T_tez
+    | T_mutez
     | T_timestamp
     | T_unit
+    | T_operation
+    | T_address
 
   type location = Micheline.canonical_location
 
   type expr = prim Micheline.canonical
 
+  type lazy_expr = expr Data_encoding.lazy_t
+
+  val force_decode : lazy_expr -> expr tzresult
+  val force_bytes : lazy_expr -> MBytes.t tzresult
+  val lazy_expr : expr -> lazy_expr
+
   type node = (location, prim) Micheline.node
 
   type t =
-    { code: expr ;
-      storage: expr }
+    { code: lazy_expr ;
+      storage: lazy_expr }
 
   val location_encoding: location Data_encoding.t
   val expr_encoding: expr Data_encoding.t
   val prim_encoding: prim Data_encoding.t
   val encoding: t Data_encoding.t
+  val lazy_expr_encoding: lazy_expr Data_encoding.t
 end
 
 module Constants : sig
@@ -269,7 +316,8 @@ module Constants : sig
     time_between_blocks: Period.t list ;
     first_free_baking_slot: int ;
     endorsers_per_block: int ;
-    max_gas: int ;
+    hard_gas_limit_per_operation: Z.t ;
+    hard_gas_limit_per_block: Z.t ;
     proof_of_work_threshold: int64 ;
     dictator_pubkey: Signature.Public_key.t ;
     max_operation_data_length: int ;
@@ -281,6 +329,9 @@ module Constants : sig
     endorsement_security_deposit: Tez.t ;
     block_reward: Tez.t ;
     endorsement_reward: Tez.t ;
+    cost_per_byte: Tez.t ;
+    hard_storage_limit_per_operation: Int64.t ;
+    hard_storage_limit_per_block: Int64.t ;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -293,7 +344,11 @@ module Constants : sig
   val time_between_blocks: context -> Period.t list
   val first_free_baking_slot: context -> int
   val endorsers_per_block: context -> int
-  val max_gas: context -> int
+  val hard_gas_limit_per_operation: context -> Z.t
+  val hard_gas_limit_per_block: context -> Z.t
+  val cost_per_byte: context -> Tez.t
+  val hard_storage_limit_per_operation: context -> Int64.t
+  val hard_storage_limit_per_block: context -> Int64.t
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Signature.Public_key.t
   val max_operation_data_length: context -> int
@@ -438,43 +493,50 @@ module Contract : sig
   val exists: context -> contract -> bool tzresult Lwt.t
   val must_exist: context -> contract -> unit tzresult Lwt.t
 
+  val allocated: context -> contract -> bool tzresult Lwt.t
+  val must_be_allocated: context -> contract -> unit tzresult Lwt.t
+
   val list: context -> contract list Lwt.t
-
-  type origination_nonce
-
-  val origination_nonce_encoding: origination_nonce Data_encoding.t
-  val originated_contract: origination_nonce -> contract
-  val originated_contracts: origination_nonce -> contract list
-
-  val initial_origination_nonce: Operation_hash.t -> origination_nonce
 
   val get_manager:
     context -> contract -> public_key_hash tzresult Lwt.t
-  val update_manager_key:
-    context -> contract -> public_key option -> (context * public_key) tzresult Lwt.t
+
+  val get_manager_key:
+    context -> contract -> public_key tzresult Lwt.t
+  val is_manager_key_revealed:
+    context -> contract -> bool tzresult Lwt.t
+
+  val reveal_manager_key:
+    context -> contract -> public_key -> context tzresult Lwt.t
 
   val is_delegatable:
     context -> contract -> bool tzresult Lwt.t
   val is_spendable:
     context -> contract -> bool tzresult Lwt.t
   val get_script:
-    context -> contract -> (Script.t option) tzresult Lwt.t
+    context -> contract -> (context * Script.t option) tzresult Lwt.t
   val get_storage:
-    context -> contract -> (Script.expr option) tzresult Lwt.t
+    context -> contract -> (context * Script.expr option) tzresult Lwt.t
 
   val get_counter: context -> contract -> int32 tzresult Lwt.t
   val get_balance:
     context -> contract -> Tez.t tzresult Lwt.t
 
+  val init_origination_nonce: context -> Operation_hash.t -> context
+  val unset_origination_nonce: context -> context
+  val fresh_contract_from_current_nonce : context -> (context * t) tzresult Lwt.t
+  val originated_from_current_nonce: context -> contract list tzresult Lwt.t
+
+  type big_map_diff = (string * Script.expr option) list
+
   val originate:
-    context ->
-    origination_nonce ->
+    context -> contract ->
     balance: Tez.t ->
     manager: public_key_hash ->
-    ?script: (Script.t * (Tez.t * Tez.t)) ->
+    ?script: (Script.t * big_map_diff option) ->
     delegate: public_key_hash option ->
     spendable: bool ->
-    delegatable: bool -> (context * contract * origination_nonce) tzresult Lwt.t
+    delegatable: bool -> context tzresult Lwt.t
 
   type error += Balance_too_low of contract * Tez.t * Tez.t
 
@@ -488,11 +550,19 @@ module Contract : sig
 
   val update_script_storage:
     context -> contract ->
-    Script.expr -> (string * Script.expr option) list option ->
+    Script.expr -> big_map_diff option ->
     context tzresult Lwt.t
 
-  val code_and_storage_fee: context -> contract -> Tez.t tzresult Lwt.t
-  val update_storage_fee: context -> contract -> Tez.t -> context tzresult Lwt.t
+  type error += Block_storage_quota_exceeded (* `Temporary *)
+  type error += Operation_storage_quota_exceeded (* `Temporary *)
+  type error += Storage_limit_too_high (* `Permanent *)
+
+  val set_storage_limit: context -> Int64.t -> context tzresult
+  val set_storage_unlimited: context -> context
+
+  val used_storage_space: context -> t -> Int64.t tzresult Lwt.t
+  val paid_storage_space_fees: context -> t -> Tez.t tzresult Lwt.t
+  val pay_for_storage_space: context -> t -> Tez.t -> context tzresult Lwt.t
 
   val increment_counter:
     context -> contract -> context tzresult Lwt.t
@@ -501,14 +571,10 @@ module Contract : sig
     context -> contract -> int32 -> unit tzresult Lwt.t
 
   module Big_map : sig
-    val set:
-      context -> contract ->
-      string -> Script.expr -> context tzresult Lwt.t
-    val remove:
-      context -> contract -> string -> context tzresult Lwt.t
-    val mem: context -> contract -> string -> bool Lwt.t
+    val mem:
+      context -> contract -> string -> (context * bool) tzresult Lwt.t
     val get_opt:
-      context -> contract -> string -> Script_repr.expr option tzresult Lwt.t
+      context -> contract -> string -> (context * Script_repr.expr option) tzresult Lwt.t
   end
 
 end
@@ -518,6 +584,9 @@ module Delegate : sig
   val get: context -> Contract.t -> public_key_hash option tzresult Lwt.t
 
   val set:
+    context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
+
+  val set_from_script:
     context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
 
   val fold:
@@ -667,7 +736,7 @@ type operation = {
 
 and proto_operation =
   | Anonymous_operations of anonymous_operation list
-  | Sourced_operations of sourced_operations
+  | Sourced_operation of sourced_operation
 
 and anonymous_operation =
   | Seed_nonce_revelation of {
@@ -687,7 +756,7 @@ and anonymous_operation =
       secret: Blinded_public_key_hash.secret ;
     }
 
-and sourced_operations =
+and sourced_operation =
   | Consensus_operation of consensus_operation
   | Amendment_operation of {
       source: Signature.Public_key_hash.t ;
@@ -698,6 +767,8 @@ and sourced_operations =
       fee: Tez.t ;
       counter: counter ;
       operations: manager_operation list ;
+      gas_limit: Z.t ;
+      storage_limit: Int64.t;
     }
   | Dictator_operation of dictator_operation
 
@@ -723,7 +794,7 @@ and manager_operation =
   | Reveal of Signature.Public_key.t
   | Transaction of {
       amount: Tez.t ;
-      parameters: Script.expr option ;
+      parameters: Script.lazy_expr option ;
       destination: Contract.contract ;
     }
   | Origination of {
@@ -733,6 +804,7 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez.t ;
+      preorigination: Contract.t option ;
     }
   | Delegation of public_key_hash option
 
@@ -741,6 +813,12 @@ and dictator_operation =
   | Activate_testchain of Protocol_hash.t
 
 and counter = Int32.t
+
+type internal_operation = {
+  source: Contract.contract ;
+  operation: manager_operation ;
+  nonce : int ;
+}
 
 module Operation : sig
 
@@ -775,6 +853,8 @@ module Operation : sig
   val unsigned_operation_encoding:
     (Operation.shell_header * proto_operation) Data_encoding.t
 
+  val internal_operation_encoding: internal_operation Data_encoding.t
+
 end
 
 module Roll : sig
@@ -806,6 +886,20 @@ module Commitment : sig
 
 end
 
+module Bootstrap : sig
+
+  val cycle_end:
+    context -> Cycle.t -> context tzresult Lwt.t
+
+end
+
+module Global : sig
+
+  val get_last_block_priority: context -> int tzresult Lwt.t
+  val set_last_block_priority: context -> int -> context tzresult Lwt.t
+
+end
+
 val prepare_first_block:
   Context.t ->
   level:Int32.t ->
@@ -827,6 +921,11 @@ val fork_test_chain: context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
 val endorsement_already_recorded: context -> int -> bool
 val record_endorsement: context -> int -> context
+
+val reset_internal_nonce: context -> context
+val fresh_internal_nonce: context -> (context * int) tzresult
+val record_internal_nonce: context -> int -> context
+val internal_nonce_already_recorded: context -> int -> bool
 
 val add_fees: context -> Tez.t -> context tzresult Lwt.t
 val add_rewards: context -> Tez.t -> context tzresult Lwt.t

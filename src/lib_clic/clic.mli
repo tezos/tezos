@@ -53,6 +53,8 @@ val parameter :
     ["lowercase short description\nOptional longer description."]. *)
 type ('a, 'ctx) arg
 
+val constant: 'a -> ('a, 'ctx) arg
+
 (** [arg ~doc ~long ?short converter] creates an argument to a command.
     The [~long] argument is the long format, without the double dashes.
     The [?short] argument is the optional one letter shortcut.
@@ -165,6 +167,12 @@ val args10 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) ar
   ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
   ('i, 'ctx) arg -> ('j, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j, 'ctx) options
+
+(** Include 11 optional parameters *)
+val args11 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
+  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
+  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k, 'ctx) options
 
 (** {2 Parameter based command lines} *)
 

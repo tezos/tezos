@@ -1,4 +1,3 @@
 parameter unit;
 storage timestamp;
-return unit;
-code {DROP; NOW; UNIT; PAIR};
+code {DROP; NOW; NIL operation; PAIR};

@@ -19,7 +19,6 @@ type info = {
   delegate: bool * public_key_hash option ;
   counter: int32 ;
   script: Script.t option ;
-  storage: Script.expr option ;
 }
 
 val info_encoding: info Data_encoding.t
@@ -32,6 +31,9 @@ val balance:
 
 val manager:
   'a #RPC_context.simple -> 'a -> Contract.t -> public_key_hash shell_tzresult Lwt.t
+
+val manager_key:
+  'a #RPC_context.simple -> 'a -> Contract.t -> (public_key_hash * public_key option) shell_tzresult Lwt.t
 
 val delegate:
   'a #RPC_context.simple -> 'a -> Contract.t -> public_key_hash shell_tzresult Lwt.t

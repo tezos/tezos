@@ -21,6 +21,12 @@ type secret_key =
   | Ed25519 of Ed25519.Secret_key.t
   | Secp256k1 of Secp256k1.Secret_key.t
 
+type watermark =
+  | Block_header
+  | Endorsement
+  | Generic_operation
+  | Custom of MBytes.t
+
 module Public_key_hash = struct
 
   type t = public_key_hash =
@@ -51,7 +57,7 @@ module Public_key_hash = struct
     ]
 
   let to_bytes s =
-    Data_encoding.Binary.to_bytes raw_encoding s
+    Data_encoding.Binary.to_bytes_exn raw_encoding s
   let of_bytes_opt s =
     Data_encoding.Binary.of_bytes raw_encoding s
   let to_string s = MBytes.to_string (to_bytes s)
@@ -432,37 +438,40 @@ let of_ed25519 s = Ed25519 s
 
 let zero = of_ed25519 Ed25519.zero
 
-let hash msg =
-  Blake2B.(to_bytes (hash_bytes [msg]))
+let bytes_of_watermark = function
+  | Block_header      -> MBytes.of_string "\x01"
+  | Endorsement       -> MBytes.of_string "\x02"
+  | Generic_operation -> MBytes.of_string "\x03"
+  | Custom bytes      -> bytes
 
-let sign secret_key message =
-  let message = hash message in
+let sign ?watermark secret_key message =
+  let watermark = Option.map ~f:bytes_of_watermark watermark in
   match secret_key with
-  | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign sk message)
-  | Secret_key.Secp256k1 sk -> of_secp256k1 (Secp256k1.sign sk message)
+  | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign ?watermark sk message)
+  | Secret_key.Secp256k1 sk -> of_secp256k1 (Secp256k1.sign ?watermark sk message)
 
-let check public_key signature message =
-  let message = hash message in
+let check ?watermark public_key signature message =
+  let watermark = Option.map ~f:bytes_of_watermark watermark in
   match public_key, signature with
   | Public_key.Ed25519 pk, Unknown signature -> begin
       match Ed25519.of_bytes_opt signature with
-      | Some s -> Ed25519.check pk s message
+      | Some s -> Ed25519.check ?watermark pk s message
       | None -> false
     end
   | Public_key.Secp256k1 pk, Unknown signature -> begin
       match Secp256k1.of_bytes_opt signature with
-      | Some s -> Secp256k1.check pk s message
+      | Some s -> Secp256k1.check ?watermark pk s message
       | None -> false
     end
   | Public_key.Ed25519 pk, Ed25519 signature ->
-      Ed25519.check pk signature message
+      Ed25519.check ?watermark pk signature message
   | Public_key.Secp256k1 pk, Secp256k1 signature ->
-      Secp256k1.check pk signature message
+      Secp256k1.check ?watermark pk signature message
   | Public_key.Ed25519 _, Secp256k1 _ -> false
   | Public_key.Secp256k1 _, Ed25519 _ -> false
 
-let append sk msg =
-  MBytes.concat "" [msg; (to_bytes (sign sk msg))]
+let append ?watermark sk msg =
+  MBytes.concat "" [msg; (to_bytes (sign ?watermark sk msg))]
 
 let concat msg signature =
   MBytes.concat "" [msg; (to_bytes signature)]
@@ -486,18 +495,12 @@ let algo_param () =
     end
 
 let generate_key ?(algo = Ed25519) ?seed () =
-  match algo, seed with
-  | Secp256k1, Some _ ->
-      invalid_arg "Signature.generate_key"
-  | Secp256k1, None ->
-      let (pkh, pk, sk) = Secp256k1.generate_key () in
+  match algo with
+  | Secp256k1 ->
+      let pkh, pk, sk = Secp256k1.generate_key ?seed () in
       (Public_key_hash.Secp256k1 pkh,
        Public_key.Secp256k1 pk, Secret_key.Secp256k1 sk)
-  | Ed25519, seed ->
-      let seed =
-        match seed with
-        | None -> Ed25519.Seed.generate ()
-        | Some seed -> seed in
-      let (pkh, pk, sk) = Ed25519.generate_seeded_key seed in
+  | Ed25519 ->
+      let pkh, pk, sk = Ed25519.generate_key ?seed () in
       (Public_key_hash.Ed25519 pkh,
        Public_key.Ed25519 pk, Secret_key.Ed25519 sk)

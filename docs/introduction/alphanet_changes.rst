@@ -1,10 +1,28 @@
-Alphanet changelog
-==================
+Changelog
+---------
 
-For the next reset
-------------------
+Reset 2018-05-03
+~~~~~~~~~~~~~~~~
 
 [Alpha]
+
+- New faucet : https://faucet.tzalpha.net
+
+- `secp256k1` as an alternative to `ed25519`
+
+- 32 endorsers per blocks (was 15)
+
+- Delegation rights are now frozen 5 cycles in advance (approx 15 days
+  in mainnet or 10 hours on zeronet);
+
+- Security deposits are recovered after 5 cycles;
+
+- Rewards and fees are earned after 5 cycles;
+
+- Pending deposits and fees count in the staking balance of a delegate;
+
+- Delegates will be tagged as "deactivated" after 5 cycles of
+  inactivity and they will lose their baking rights;
 
 - Do not allow revealing the same endorsement twice.
 
@@ -35,9 +53,16 @@ For the next reset
 
 - Split the code base into separate OPAM packages.
 
+Patch 2018-01-15
+~~~~~~~~~~~~~~~~
+
+[Node]
+
+- Fix a performance issue in block locator computation
+
 
 Reset 2017-11-20
-------------------
+~~~~~~~~~~~~~~~~
 
 [Alphanet]
 
@@ -107,7 +132,7 @@ Reset 2017-11-20
 - Add `SIZE` on lists.
 
 Reset 2017-11-17
-----------------
+~~~~~~~~~~~~~~~~
 
 [Node]
 
@@ -115,7 +140,7 @@ Reset 2017-11-17
 - Irmin: restore usage `git-repack`... (mistakenly removed)
 
 Reset 2017-10-13
-----------------
+~~~~~~~~~~~~~~~~
 
 [Client]
 
@@ -137,7 +162,7 @@ Reset 2017-10-13
    prevent an error raised when using an unrevealed key.
 
 Reset 2017-09-21
-----------------
+~~~~~~~~~~~~~~~~
 
 [Node]
 
@@ -159,7 +184,7 @@ Reset 2017-09-21
    prevent an error raised when using an unrevealed key.
 
 Reset 2017-08-10
-----------------
+~~~~~~~~~~~~~~~~
 
 This update includes changes in the on-disk state of the node and in
 the format of blocks and operations. It thus requires a chain reset.
@@ -194,7 +219,7 @@ Main changes includes:
 - minor language enhancements, mostly resulting from the feedback of
   Milo's daily challenge:
 
-    http://www.michelson-lang.com/
+    https://www.michelson-lang.com/
 
 - the alphanet scripts now understands a container: prefix wherever a
   file: prefix is accepted, temporarily copying the file into the

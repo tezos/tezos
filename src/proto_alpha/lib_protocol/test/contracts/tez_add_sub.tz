@@ -1,6 +1,5 @@
-parameter (pair tez tez);
-storage unit;
-return (pair tez tez);
+parameter (pair mutez mutez);
+storage (option (pair mutez mutez));
 code {CAR; DUP; DUP; CAR; DIP{CDR}; ADD;
       DIP{DUP; CAR; DIP{CDR}; SUB};
-      PAIR; UNIT; SWAP; PAIR};
+      PAIR; SOME; NIL operation; PAIR};

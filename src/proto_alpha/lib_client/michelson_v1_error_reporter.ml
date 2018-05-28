@@ -71,15 +71,14 @@ let collect_error_locations errs =
         | Invalid_kind (loc, _, _)
         | Duplicate_field (loc, _)
         | Unexpected_big_map loc
+        | Unexpected_operation loc
         | Fail_not_in_tail_position loc
         | Undefined_binop (loc, _, _, _)
         | Undefined_unop (loc, _, _)
         | Bad_return (loc, _, _)
         | Bad_stack (loc, _, _, _)
         | Unmatched_branches (loc, _, _)
-        | Transfer_in_lambda loc
         | Self_in_lambda loc
-        | Transfer_in_dip loc
         | Invalid_constant (loc, _, _)
         | Invalid_contract (loc, _)
         | Comparable_type_expected (loc, _)
@@ -194,6 +193,10 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         Format.fprintf ppf "%abig_map type only allowed on the left of the toplevel storage pair"
           print_loc loc ;
         print_trace locations rest
+    | Alpha_environment.Ecoproto_error (Unexpected_operation loc) :: rest ->
+        Format.fprintf ppf "%aoperation type forbidden in parameter, storage and constants"
+          print_loc loc ;
+        print_trace locations rest
     | Alpha_environment.Ecoproto_error (Runtime_contract_error (contract, expr)) :: rest ->
         let parsed =
           match parsed with
@@ -206,6 +209,42 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_source (parsed, hilights) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
+    | Alpha_environment.Ecoproto_error (Apply.Internal_operation_replay op) :: rest ->
+        Format.fprintf ppf
+          "@[<v 2>Internal operation replay attempt:@,%a@]"
+          Operation_result.pp_internal_operation op ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Gas.Gas_limit_too_high :: rest ->
+        Format.fprintf ppf
+          "Gas limit for the block is out of the protocol hard bounds." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Gas.Block_quota_exceeded :: rest ->
+        Format.fprintf ppf
+          "Gas limit for the block exceeded during typechecking or execution." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Gas.Operation_quota_exceeded :: rest ->
+        Format.fprintf ppf
+          "@[<v 0>Gas limit exceeded during typechecking or execution.@,Try again with a higher gas limit.@]" ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Contract.Storage_limit_too_high :: rest ->
+        Format.fprintf ppf
+          "Storage limit for the block is out of the protocol hard bounds." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Contract.Block_storage_quota_exceeded :: rest ->
+        Format.fprintf ppf
+          "Storage limit for the block exceeded during typechecking or execution." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Contract.Operation_storage_quota_exceeded :: rest ->
+        Format.fprintf ppf
+          "@[<v 0>Storage limit exceeded during typechecking or execution.@,Try again with a higher storage limit.@]" ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
     | Alpha_environment.Ecoproto_error err :: rest ->
         begin match err with
           | Apply.Bad_contract_parameter (c, None, _) ->
@@ -220,6 +259,10 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 Contract.pp c
                 print_expr expected
           | Apply.Bad_contract_parameter (c, Some expected, Some argument) ->
+              let argument =
+                Option.unopt_exn
+                  (Failure "ill-serialized argument")
+                  (Data_encoding.force_decode argument) in
               Format.fprintf ppf
                 "@[<v 0>Contract %a expected an argument of type@,  %a@,but received@,  %a@]"
                 Contract.pp c
@@ -347,14 +390,6 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 "@[<v 2>%atype size (%d) exceeded maximum type size (%d)."
                 print_loc loc
                 size maximum_size
-          | Transfer_in_lambda loc ->
-              Format.fprintf ppf
-                "%aThe TRANSFER_TOKENS instruction cannot appear in a lambda."
-                print_loc loc
-          | Transfer_in_dip loc ->
-              Format.fprintf ppf
-                "%aThe TRANSFER_TOKENS instruction cannot appear within a DIP."
-                print_loc loc
           | Self_in_lambda loc ->
               Format.fprintf ppf
                 "%aThe SELF instruction cannot appear in a lambda."

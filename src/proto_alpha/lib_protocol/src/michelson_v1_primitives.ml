@@ -15,7 +15,6 @@ type error += Invalid_primitive_name of string Micheline.canonical * Micheline.c
 
 type prim =
   | K_parameter
-  | K_return
   | K_storage
   | K_code
   | D_False
@@ -41,7 +40,7 @@ type prim =
   | I_CONS
   | I_CREATE_ACCOUNT
   | I_CREATE_CONTRACT
-  | I_DEFAULT_ACCOUNT
+  | I_IMPLICIT_ACCOUNT
   | I_DIP
   | I_DROP
   | I_DUP
@@ -80,7 +79,6 @@ type prim =
   | I_OR
   | I_PAIR
   | I_PUSH
-  | I_REDUCE
   | I_RIGHT
   | I_SIZE
   | I_SOME
@@ -90,11 +88,15 @@ type prim =
   | I_SUB
   | I_SWAP
   | I_TRANSFER_TOKENS
+  | I_SET_DELEGATE
   | I_UNIT
   | I_UPDATE
   | I_XOR
   | I_ITER
   | I_LOOP_LEFT
+  | I_ADDRESS
+  | I_CONTRACT
+  | I_ISNAT
   | T_bool
   | T_contract
   | T_int
@@ -111,9 +113,11 @@ type prim =
   | T_set
   | T_signature
   | T_string
-  | T_tez
+  | T_mutez
   | T_timestamp
   | T_unit
+  | T_operation
+  | T_address
 
 let valid_case name =
   let is_lower = function  '_' | 'a'..'z' -> true | _ -> false in
@@ -136,7 +140,6 @@ let valid_case name =
 
 let string_of_prim = function
   | K_parameter -> "parameter"
-  | K_return -> "return"
   | K_storage -> "storage"
   | K_code -> "code"
   | D_False -> "False"
@@ -162,7 +165,7 @@ let string_of_prim = function
   | I_CONS -> "CONS"
   | I_CREATE_ACCOUNT -> "CREATE_ACCOUNT"
   | I_CREATE_CONTRACT -> "CREATE_CONTRACT"
-  | I_DEFAULT_ACCOUNT -> "DEFAULT_ACCOUNT"
+  | I_IMPLICIT_ACCOUNT -> "IMPLICIT_ACCOUNT"
   | I_DIP -> "DIP"
   | I_DROP -> "DROP"
   | I_DUP -> "DUP"
@@ -201,7 +204,6 @@ let string_of_prim = function
   | I_OR -> "OR"
   | I_PAIR -> "PAIR"
   | I_PUSH -> "PUSH"
-  | I_REDUCE -> "REDUCE"
   | I_RIGHT -> "RIGHT"
   | I_SIZE -> "SIZE"
   | I_SOME -> "SOME"
@@ -211,11 +213,15 @@ let string_of_prim = function
   | I_SUB -> "SUB"
   | I_SWAP -> "SWAP"
   | I_TRANSFER_TOKENS -> "TRANSFER_TOKENS"
+  | I_SET_DELEGATE -> "SET_DELEGATE"
   | I_UNIT -> "UNIT"
   | I_UPDATE -> "UPDATE"
   | I_XOR -> "XOR"
   | I_ITER -> "ITER"
   | I_LOOP_LEFT -> "LOOP_LEFT"
+  | I_ADDRESS -> "ADDRESS"
+  | I_CONTRACT -> "CONTRACT"
+  | I_ISNAT -> "ISNAT"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -232,13 +238,14 @@ let string_of_prim = function
   | T_set -> "set"
   | T_signature -> "signature"
   | T_string -> "string"
-  | T_tez -> "tez"
+  | T_mutez -> "mutez"
   | T_timestamp -> "timestamp"
   | T_unit -> "unit"
+  | T_operation -> "operation"
+  | T_address -> "address"
 
 let prim_of_string = function
   | "parameter" -> ok K_parameter
-  | "return" -> ok K_return
   | "storage" -> ok K_storage
   | "code" -> ok K_code
   | "False" -> ok D_False
@@ -264,7 +271,7 @@ let prim_of_string = function
   | "CONS" -> ok I_CONS
   | "CREATE_ACCOUNT" -> ok I_CREATE_ACCOUNT
   | "CREATE_CONTRACT" -> ok I_CREATE_CONTRACT
-  | "DEFAULT_ACCOUNT" -> ok I_DEFAULT_ACCOUNT
+  | "IMPLICIT_ACCOUNT" -> ok I_IMPLICIT_ACCOUNT
   | "DIP" -> ok I_DIP
   | "DROP" -> ok I_DROP
   | "DUP" -> ok I_DUP
@@ -303,7 +310,6 @@ let prim_of_string = function
   | "OR" -> ok I_OR
   | "PAIR" -> ok I_PAIR
   | "PUSH" -> ok I_PUSH
-  | "REDUCE" -> ok I_REDUCE
   | "RIGHT" -> ok I_RIGHT
   | "SIZE" -> ok I_SIZE
   | "SOME" -> ok I_SOME
@@ -313,11 +319,15 @@ let prim_of_string = function
   | "SUB" -> ok I_SUB
   | "SWAP" -> ok I_SWAP
   | "TRANSFER_TOKENS" -> ok I_TRANSFER_TOKENS
+  | "SET_DELEGATE" -> ok I_SET_DELEGATE
   | "UNIT" -> ok I_UNIT
   | "UPDATE" -> ok I_UPDATE
   | "XOR" -> ok I_XOR
   | "ITER" -> ok I_ITER
   | "LOOP_LEFT" -> ok I_LOOP_LEFT
+  | "ADDRESS" -> ok I_ADDRESS
+  | "CONTRACT" -> ok I_CONTRACT
+  | "ISNAT" -> ok I_ISNAT
   | "bool" -> ok T_bool
   | "contract" -> ok T_contract
   | "int" -> ok T_int
@@ -334,9 +344,11 @@ let prim_of_string = function
   | "set" -> ok T_set
   | "signature" -> ok T_signature
   | "string" -> ok T_string
-  | "tez" -> ok T_tez
+  | "mutez" -> ok T_mutez
   | "timestamp" -> ok T_timestamp
   | "unit" -> ok T_unit
+  | "operation" -> ok T_operation
+  | "address" -> ok T_address
   | n ->
       if valid_case n then
         error (Unknown_primitive_name n)
@@ -384,7 +396,6 @@ let prim_encoding =
   let open Data_encoding in
   string_enum [
     ("parameter", K_parameter) ;
-    ("return", K_return) ;
     ("storage", K_storage) ;
     ("code", K_code) ;
     ("False", D_False) ;
@@ -410,7 +421,7 @@ let prim_encoding =
     ("CONS", I_CONS) ;
     ("CREATE_ACCOUNT", I_CREATE_ACCOUNT) ;
     ("CREATE_CONTRACT", I_CREATE_CONTRACT) ;
-    ("DEFAULT_ACCOUNT", I_DEFAULT_ACCOUNT) ;
+    ("IMPLICIT_ACCOUNT", I_IMPLICIT_ACCOUNT) ;
     ("DIP", I_DIP) ;
     ("DROP", I_DROP) ;
     ("DUP", I_DUP) ;
@@ -449,7 +460,6 @@ let prim_encoding =
     ("OR", I_OR) ;
     ("PAIR", I_PAIR) ;
     ("PUSH", I_PUSH) ;
-    ("REDUCE", I_REDUCE) ;
     ("RIGHT", I_RIGHT) ;
     ("SIZE", I_SIZE) ;
     ("SOME", I_SOME) ;
@@ -459,11 +469,15 @@ let prim_encoding =
     ("SUB", I_SUB) ;
     ("SWAP", I_SWAP) ;
     ("TRANSFER_TOKENS", I_TRANSFER_TOKENS) ;
+    ("SET_DELEGATE", I_SET_DELEGATE) ;
     ("UNIT", I_UNIT) ;
     ("UPDATE", I_UPDATE) ;
     ("XOR", I_XOR) ;
     ("ITER", I_ITER) ;
     ("LOOP_LEFT", I_LOOP_LEFT) ;
+    ("ADDRESS", I_ADDRESS) ;
+    ("CONTRACT", I_CONTRACT) ;
+    ("ISNAT", I_ISNAT) ;
     ("bool", T_bool) ;
     ("contract", T_contract) ;
     ("int", T_int) ;
@@ -480,9 +494,11 @@ let prim_encoding =
     ("set", T_set) ;
     ("signature", T_signature) ;
     ("string", T_string) ;
-    ("tez", T_tez) ;
+    ("mutez", T_mutez) ;
     ("timestamp", T_timestamp) ;
-    ("unit", T_unit) ]
+    ("unit", T_unit) ;
+    ("operation", T_operation) ;
+    ("address", T_address) ]
 
 let () =
   register_error_kind

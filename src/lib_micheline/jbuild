@@ -7,6 +7,7 @@
    (
     ;; External
     uutf
+    zarith
     ;; Internal
     tezos-error-monad
     tezos-data-encoding
@@ -18,5 +19,5 @@
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files *.ml*)))
+  (deps ((glob_files *.ml{,i})))
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

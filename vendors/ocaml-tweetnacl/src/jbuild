@@ -1,8 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name            tweetnacl)
-  (public_name     tweetnacl)
-  (libraries       (bigstring ocplib-endian.bigstring zarith))
-  (c_names         (tweetnacl_stubs))
-  (c_flags         (-O3))))

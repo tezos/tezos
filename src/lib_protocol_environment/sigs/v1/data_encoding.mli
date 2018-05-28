@@ -18,12 +18,6 @@ type json =
 
 type json_schema
 
-exception No_case_matched
-exception Unexpected_tag of int
-exception Duplicated_tag of int
-exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
-exception Unexpected_enum of string * string list
-
 type 'a t
 type 'a encoding = 'a t
 
@@ -42,6 +36,7 @@ val uint16 : int encoding
 val int31 : int encoding
 val int32 : int32 encoding
 val int64 : int64 encoding
+val n : Z.t encoding
 val z : Z.t encoding
 val bool : bool encoding
 val string : string encoding
@@ -62,7 +57,14 @@ module Variable : sig
   val list : 'a encoding -> 'a list encoding
 end
 
-val dynamic_size : 'a encoding -> 'a encoding
+module Bounded : sig
+  val string : int -> string encoding
+  val bytes : int -> MBytes.t encoding
+end
+
+val dynamic_size :
+  ?kind: [ `Uint30 | `Uint16 | `Uint8 ] ->
+  'a encoding -> 'a encoding
 
 val json : json encoding
 val json_schema : json_schema encoding
@@ -182,6 +184,13 @@ val conv :
 
 val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
 
+type 'a lazy_t
+
+val lazy_encoding : 'a encoding -> 'a lazy_t encoding
+val force_decode : 'a lazy_t -> 'a option
+val force_bytes : 'a lazy_t -> MBytes.t
+val make_lazy : 'a encoding -> 'a -> 'a lazy_t
+
 module Json : sig
 
   val schema : 'a encoding -> json_schema
@@ -237,8 +246,12 @@ module Binary : sig
   val length : 'a encoding -> 'a -> int
   val fixed_length : 'a encoding -> int option
   val read : 'a encoding -> MBytes.t -> int -> int -> (int * 'a) option
-  val write : 'a encoding -> 'a -> MBytes.t -> int -> int option
-  val to_bytes : 'a encoding -> 'a -> MBytes.t
+  val write : 'a encoding -> 'a -> MBytes.t -> int -> int -> int option
+  val to_bytes : 'a encoding -> 'a -> MBytes.t option
+  val to_bytes_exn : 'a encoding -> 'a -> MBytes.t
   val of_bytes : 'a encoding -> MBytes.t -> 'a option
+
+  type write_error
+  exception Write_error of write_error
 
 end

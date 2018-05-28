@@ -20,6 +20,8 @@
         "Cycle_repr",
         "Level_repr",
         "Seed_repr",
+        "Gas_limit_repr",
+        "Storage_limit_repr",
         "Script_int_repr",
         "Script_timestamp_repr",
         "Michelson_v1_primitives",
@@ -30,8 +32,8 @@
         "Block_header_repr",
         "Operation_repr",
         "Manager_repr",
-	"Commitment_repr",
-	"Parameters_repr",
+        "Commitment_repr",
+        "Parameters_repr",
 
         "Raw_context",
         "Storage_sigs",
@@ -55,14 +57,15 @@
 
         "Script_typed_ir",
         "Fees",
-        "Gas",
-	"Script_tc_errors",
+        "Script_tc_errors",
+        "Michelson_v1_gas",
         "Script_ir_translator",
-	"Script_tc_errors_registration",
+        "Script_tc_errors_registration",
         "Script_interpreter",
 
         "Baking",
         "Amendment",
+        "Apply_operation_result",
         "Apply",
 
         "Services_registration",

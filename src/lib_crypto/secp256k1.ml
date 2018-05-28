@@ -173,6 +173,8 @@ end
 
 type t = Sign.plain Sign.t
 
+type watermark = MBytes.t
+
 let name = "Secp256k1"
 let title = "A Secp256k1 signature"
 
@@ -239,15 +241,27 @@ let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
 let zero = of_bytes_exn (MBytes.make size '\000')
 
-let sign sk msg =
+let sign ?watermark sk msg =
+  let msg =
+    Blake2B.to_bytes @@
+    Blake2B.hash_bytes @@
+    match watermark with
+    | None -> [msg]
+    | Some prefix -> [ prefix ; msg ] in
   Sign.sign_exn context ~sk msg
 
-let check public_key signature msg =
+let check ?watermark public_key signature msg =
+  let msg =
+    Blake2B.to_bytes @@
+    Blake2B.hash_bytes @@
+    match watermark with
+    | None -> [msg]
+    | Some prefix -> [ prefix ; msg ] in
   Sign.verify_exn context ~pk:public_key ~msg ~signature
 
-let generate_key () =
-  let sk = Key.read_sk_exn context (Rand.generate 32) in
+let generate_key ?(seed=Rand.generate 32) () =
+  let sk = Key.read_sk_exn context seed in
   let pk = Key.neuterize_exn context sk in
   let pkh = Public_key.hash pk in
-  (pkh, pk, sk)
+  pkh, pk, sk
 

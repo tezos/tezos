@@ -7,4 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val commands: unit -> Client_commands.command list
+val commands: unit -> Client_context.io_wallet Clic.command list
+
+val encrypted_switch: unit -> (bool, 'a) Clic.arg

@@ -24,7 +24,9 @@ val storage_error: storage_error -> 'a tzresult Lwt.t
 
 (** {1 Abstract Context} **************************************************)
 
-(** Abstract view of the context *)
+(** Abstract view of the context.
+    Includes a handle to the functional key-value database
+    ({!Context.t}) along with some in-memory values (gas, etc.). *)
 type t
 type context = t
 type root_context = t
@@ -61,6 +63,10 @@ val current_fitness: context -> Int64.t
 val set_current_fitness: context -> Int64.t -> t
 
 val constants: context -> Constants_repr.parametric
+val patch_constants:
+  context ->
+  (Constants_repr.parametric -> Constants_repr.parametric) ->
+  context Lwt.t
 val first_level: context -> Raw_level_repr.t
 
 val add_fees: context -> Tez_repr.t -> context tzresult Lwt.t
@@ -69,12 +75,34 @@ val add_rewards: context -> Tez_repr.t -> context tzresult Lwt.t
 val get_fees: context -> Tez_repr.t
 val get_rewards: context -> Tez_repr.t
 
+type error += Gas_limit_too_high (* `Permanent *)
+
+val set_gas_limit: t -> Z.t -> t tzresult
+val set_gas_unlimited: t -> t
+val gas_level: t -> Gas_limit_repr.t
+val block_gas_level: t -> Z.t
+
+type error += Storage_limit_too_high (* `Permanent *)
+
+val set_storage_limit: t -> Int64.t -> t tzresult
+val set_storage_unlimited: t -> t
+
+type error += Undefined_operation_nonce (* `Permanent *)
+
+val init_origination_nonce: t -> Operation_hash.t -> t
+val origination_nonce: t -> Contract_repr.origination_nonce tzresult
+val increment_origination_nonce: t -> (t * Contract_repr.origination_nonce) tzresult
+val unset_origination_nonce: t -> t
+
 (** {1 Generic accessors} *************************************************)
 
 type key = string list
 
 type value = MBytes.t
 
+(** All context manipulation functions. This signature is included
+    as-is for direct context accesses, and used in {!Storage_functors}
+    to provide restricted views to the context. *)
 module type T = sig
 
   type t
@@ -139,7 +167,20 @@ module type T = sig
   val fold_keys:
     context -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
+  (** Internally used in {!Storage_functors} to escape from a view. *)
   val project: context -> root_context
+
+  (** Internally used in {!Storage_functors} to retrieve a full key
+      from partial key relative a view. *)
+  val absolute_key: context -> key -> key
+
+  (** Internally used in {!Storage_functors} to consume gas from
+      within a view. *)
+  val consume_gas: context -> Gas_limit_repr.cost -> context tzresult
+
+  (** Internally used in {!Storage_functors} to consume storage from
+      within a view. *)
+  val record_bytes_stored: context -> Int64.t -> context tzresult
 
 end
 
@@ -147,3 +188,16 @@ include T with type t := t and type context := context
 
 val record_endorsement: context -> int -> context
 val endorsement_already_recorded: context -> int -> bool
+
+(** Initialize the local nonce used for preventing a script to
+    duplicate an internal operation to replay it. *)
+val reset_internal_nonce: context -> context
+
+(** Increments the internal operation nonce. *)
+val fresh_internal_nonce: context -> (context * int) tzresult
+
+(** Mark an internal operation nonce as taken. *)
+val record_internal_nonce: context -> int -> context
+
+(** Check is the internal operation nonce has been taken. *)
+val internal_nonce_already_recorded: context -> int -> bool

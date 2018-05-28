@@ -16,7 +16,7 @@ let print_expr ppf expr =
     | None -> ()
     | Some annot -> Format.fprintf ppf " %s" annot in
   let rec print_expr ppf = function
-    | Int (_, value) -> Format.fprintf ppf "%s" value
+    | Int (_, value) -> Format.fprintf ppf "%s" (Z.to_string value)
     | String (_, value) -> Micheline_printer.print_string ppf value
     | Seq (_, items, annot) ->
         Format.fprintf ppf "(seq%a %a)"
@@ -81,8 +81,6 @@ let first_error_location errs =
       | Bad_return (loc, _, _)
       | Bad_stack (loc, _, _, _)
       | Unmatched_branches (loc, _, _)
-      | Transfer_in_lambda loc
-      | Transfer_in_dip loc
       | Invalid_constant (loc, _, _)
       | Invalid_contract (loc, _)
       | Comparable_type_expected (loc, _)

@@ -38,10 +38,11 @@ let no_write_context ?(block = `Head 0) config : #Client_context.full = object
     a Data_encoding.encoding -> unit Error_monad.tzresult Lwt.t =
     fun _ _ _ -> return ()
   method block = block
-  method prompt : type a. (a, string) Client_context.lwt_format -> a =
-    Format.kasprintf (fun _ -> Lwt.return "")
-  method prompt_password : type a. (a, string) Client_context.lwt_format -> a =
-    Format.kasprintf (fun _ -> Lwt.return "")
+  method confirmations = None
+  method prompt : type a. (a, string tzresult) Client_context.lwt_format -> a =
+    Format.kasprintf (fun _ -> return "")
+  method prompt_password : type a. (a, MBytes.t tzresult) Client_context.lwt_format -> a =
+    Format.kasprintf (fun _ -> return (MBytes.of_string ""))
 end
 
 let sandbox_parameters =
@@ -86,7 +87,7 @@ let protocol_parameters =
   match json_result with
   | Error err -> raise (Failure err)
   | Ok json ->
-      Data_encoding.Binary.to_bytes Data_encoding.json json
+      Data_encoding.Binary.to_bytes_exn Data_encoding.json json
 
 let vote_protocol_parameters =
   let json_result =
@@ -110,13 +111,14 @@ let vote_protocol_parameters =
   match json_result with
   | Error err -> raise (Failure err)
   | Ok json ->
-      Data_encoding.Binary.to_bytes Data_encoding.json json
+      Data_encoding.Binary.to_bytes_exn Data_encoding.json json
 
 let activate_alpha ?(vote = false) () =
   let fitness = Fitness_repr.from_int64 0L in
-  let dictator_sk = Client_keys.Secret_key_locator.create
-      ~scheme:"unencrypted"
-      ~location:"edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6" in
+  let dictator_sk =
+    Tezos_signer_backends.Unencrypted.make_sk
+      (Signature.Secret_key.of_b58check_exn
+         "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6") in
   let protocol_parameters =
     if vote then vote_protocol_parameters else protocol_parameters in
   Tezos_client_genesis.Client_proto_main.bake
@@ -248,9 +250,8 @@ module Account = struct
       ~(account:t)
       ~destination
       ~amount () =
-    let src_sk = Client_keys.Secret_key_locator.create
-        ~scheme:"unencrypted"
-        ~location:(Signature.Secret_key.to_b58check account.sk) in
+    let src_sk =
+      Tezos_signer_backends.Unencrypted.make_sk account.sk in
     Client_proto_context.transfer
       (new wrap_full (no_write_context !rpc_config ~block))
       block
@@ -259,7 +260,8 @@ module Account = struct
       ~src_sk
       ~destination
       ~amount
-      ~fee ()
+      ~fee () >>=? fun ((oph, _, _), contracts) ->
+    return (oph, contracts)
 
   let originate
       ?(block = `Head 0)
@@ -272,10 +274,11 @@ module Account = struct
     let delegatable, delegate = match delegate with
       | None -> false, None
       | Some delegate -> true, Some delegate in
-    let src_sk = Client_keys.Secret_key_locator.create
-        ~scheme:"unencrypted"
-        ~location:(Signature.Secret_key.to_b58check src.sk) in
+    let src_sk =
+      Tezos_signer_backends.Unencrypted.make_sk src.sk in
     Client_proto_context.originate_account
+      (new wrap_full (no_write_context !rpc_config))
+      block
       ~source:src.contract
       ~src_pk:src.pk
       ~src_sk
@@ -284,9 +287,8 @@ module Account = struct
       ~delegatable
       ?delegate
       ~fee
-      block
-      (new wrap_full (no_write_context !rpc_config))
-      ()
+      () >>=? fun ((oph, _, _), contracts) ->
+    return (oph, contracts)
 
   let set_delegate
       ?(block = `Head 0)
@@ -302,7 +304,8 @@ module Account = struct
       contract
       ~src_pk
       ~manager_sk
-      delegate_opt
+      delegate_opt >>=? fun (oph, _, _) ->
+    return oph
 
   let balance ?(block = `Head 0) (account : t) =
     Alpha_services.Contract.balance !rpc_ctxt
@@ -330,7 +333,7 @@ module Protocol = struct
       ~period:next_level.voting_period
       ~proposals
       () >>=? fun bytes ->
-    let signed_bytes = Signature.append sk bytes in
+    let signed_bytes = Signature.append ~watermark:Generic_operation sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
@@ -343,7 +346,7 @@ module Protocol = struct
       ~proposal
       ~ballot
       () >>=? fun bytes ->
-    let signed_bytes = Signature.append sk bytes in
+    let signed_bytes = Signature.append ~watermark:Generic_operation sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
 end
@@ -459,7 +462,7 @@ module Assert = struct
 
   let missing_public_key ~msg =
     contain_error ~msg ~f:begin ecoproto_error (function
-        | Contract_storage.Missing_public_key _ -> true
+        | Contract_storage.Unrevealed_manager_key _ -> true
         | _ -> false)
     end
 
@@ -506,9 +509,8 @@ module Baking = struct
         Some (Nonce.hash seed_nonce)
       else
         None in
-    let src_sk = Client_keys.Secret_key_locator.create
-        ~scheme:"unencrypted"
-        ~location:(Signature.Secret_key.to_b58check contract.sk) in
+    let src_sk =
+      Tezos_signer_backends.Unencrypted.make_sk contract.sk in
     Client_baking_forge.forge_block
       ctxt
       block
@@ -538,7 +540,7 @@ module Endorse = struct
       ~level:level.level
       ~slots:[slot]
       () >>=? fun bytes ->
-    let signed_bytes = Signature.append src_sk bytes in
+    let signed_bytes = Signature.append ~watermark:Endorsement src_sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let signing_slots
@@ -616,3 +618,7 @@ let display_level block =
 
 let endorsement_security_deposit block =
   Constants_services.endorsement_security_deposit !rpc_ctxt block
+
+let () =
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Unencrypted)

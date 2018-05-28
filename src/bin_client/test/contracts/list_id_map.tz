@@ -1,4 +1,3 @@
 parameter (list string);
-return (list string);
-storage unit;
-code {CAR; LAMBDA string string {}; MAP; UNIT; SWAP; PAIR}
+storage (list string);
+code {CAR; MAP {}; NIL operation; PAIR}

@@ -74,10 +74,23 @@ let main select_commands =
   ignore Clic.(setup_formatter Format.err_formatter
                  (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
   init_logger () >>= fun () ->
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Unencrypted) ;
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Encrypted.Make(struct
+         let cctxt = new Client_context_unix.unix_prompter
+       end)) ;
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Https) ;
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Socket.Unix) ;
+  Client_keys.register_signer
+    (module Tezos_signer_backends.Socket.Tcp) ;
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
         (new unix_full
           ~block:Client_config.default_block
+          ~confirmations:None
           ~base_dir:Client_config.default_base_dir
           ~rpc_config:RPC_client.default_config)
         original_args
@@ -108,8 +121,15 @@ let main select_commands =
       let client_config =
         new unix_full
           ~block:parsed_args.block
+          ~confirmations:parsed_args.confirmations
           ~base_dir:parsed_config_file.base_dir
           ~rpc_config:rpc_config in
+      Option.iter parsed_config_file.remote_signer ~f: begin fun signer ->
+        Client_keys.register_signer
+          (module Tezos_signer_backends.Remote.Make(struct
+               let default = signer
+             end))
+      end ;
       begin match autocomplete with
         | Some (prev_arg, cur_arg, script) ->
             Clic.autocompletion
@@ -143,10 +163,12 @@ let main select_commands =
         Format.eprintf "@{<error>@{<title>Fatal error@}@} unknown protocol version.@." ;
         Lwt.return 1
     | Failure message ->
-        Format.eprintf "@{<error>@{<title>Fatal error@}@} %s.@." message ;
+        Format.eprintf "@{<error>@{<title>Fatal error@}@} @[<hov 0>%a@]@."
+          Format.pp_print_text message ;
         Lwt.return 1
     | exn ->
-        Format.printf "@{<error>@{<title>Fatal error@}@} %s.@." (Printexc.to_string exn) ;
+        Format.printf "@{<error>@{<title>Fatal error@}@} @[<hov 0>%a@]@."
+          Format.pp_print_text (Printexc.to_string exn) ;
         Lwt.return 1
   end >>= fun retcode ->
   Format.pp_print_flush Format.err_formatter () ;

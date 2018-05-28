@@ -59,6 +59,7 @@ class type json = object
     Uri.t ->
     (Data_encoding.json, Data_encoding.json option)
       rest_result Lwt.t
+  method base : Uri.t
 end
 
 

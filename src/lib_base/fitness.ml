@@ -55,5 +55,5 @@ let encoding =
   describe ~title: "Tezos block fitness"
     (list bytes)
 
-let to_bytes v = Data_encoding.Binary.to_bytes encoding v
+let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v
 let of_bytes b = Data_encoding.Binary.of_bytes encoding b
