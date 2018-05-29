@@ -72,7 +72,9 @@ type _ encoding =
   | Describe : { title: string option ;
                  description: string option ;
                  encoding: 'a encoding } -> 'a encoding
-  | Mu : string * ('a encoding -> 'a encoding) -> 'a encoding
+  | Mu : { id: string ;
+           self: ('a encoding -> 'a encoding) ;
+         }-> 'a encoding
   | Union : 't case list -> 't encoding
 
 and 'a int_encoding =
@@ -143,7 +145,7 @@ module Make (Repr : Json_repr.Repr) = struct
         | Describe { encoding = t } -> construct t
         | Custom ({ write }, _) -> (fun (j : t) -> write (module Repr) j)
         | Conv (ffrom, _, t, _) -> (fun v -> construct t (ffrom v))
-        | Mu (name, self) -> construct (self (Mu (name, self)))
+        | Mu { self } as enc -> construct (self enc)
         | Array t ->
           let w v = construct t v in
           (fun arr -> Repr.repr (`A (Array.to_list (Array.map w arr))))
@@ -235,7 +237,7 @@ module Make (Repr : Json_repr.Repr) = struct
       | Describe { encoding = t } -> destruct t
       | Custom ({ read }, _) -> read (module Repr)
       | Conv (_, fto, t, _) -> (fun v -> fto (destruct t v))
-      | Mu (name, self) -> destruct (self (Mu (name, self)))
+      | Mu { self } as enc -> destruct (self enc)
       | Array t ->
         (fun v -> match Repr.view v with
            | `O [] ->
@@ -310,7 +312,7 @@ module Make (Repr : Json_repr.Repr) = struct
       | Conv (_, fto, t, _) ->
         let r, i = destruct_tup i t in
         (fun arr -> fto (r arr)), i
-      | Mu (_, self) as mu -> destruct_tup i (self mu)
+      | Mu { self } as enc -> destruct_tup i (self enc)
       | Describe { encoding } -> destruct_tup i encoding
       | _ -> invalid_arg "Json_encoding.destruct: consequence of bad merge_tups"
   and destruct_obj
@@ -363,7 +365,7 @@ module Make (Repr : Json_repr.Repr) = struct
         (fun fields ->
            let r, rest, ign = d fields in
            fto r, rest, ign)
-      | Mu (_, self) as mu -> destruct_obj (self mu)
+      | Mu { self } as enc -> destruct_obj (self enc)
       | Describe { encoding } -> destruct_obj encoding
       | Union cases ->
         (fun fields ->
@@ -428,7 +430,7 @@ let schema encoding =
           (List.map
              (fun (Case { encoding = o }) -> object_schema o)
              cases)
-      | Mu (_, self) as mu -> object_schema (self mu)
+      | Mu { self } as enc -> object_schema (self enc)
       | Describe { encoding = t } -> object_schema t
       | Conv (_, _, _, Some _) (* FIXME: We could do better *)
       | _ -> invalid_arg "Json_encoding.schema: consequence of bad merge_objs"
@@ -438,7 +440,7 @@ let schema encoding =
       | Conv (_, _, o, None) -> array_schema o
       | Tup t -> [ schema t ]
       | Tups (t1, t2) -> array_schema t1 @ array_schema t2
-      | Mu (_, self) as mu -> array_schema (self mu)
+      | Mu { self } as enc -> array_schema (self enc)
       | Describe { encoding = t } -> array_schema t
       | Conv (_, _, _, Some _) (* FIXME: We could do better *)
       | _ -> invalid_arg "Json_encoding.schema: consequence of bad merge_tups"
@@ -482,7 +484,7 @@ let schema encoding =
         sch := fst (merge_definitions (!sch, s)) ;
         root s
       | Conv (_, _, t, None) -> schema t
-      | Mu (name, f) ->
+      | Mu { id = name ; self = f } ->
         let fake_schema =
           if definition_exists name !sch then
             update (definition_ref name) !sch
@@ -544,7 +546,7 @@ let opt ?title ?description n t =
 let dft ?title ?description n t d =
   Dft { name = n ; encoding = t ; title ; description ; default = d }
 
-let mu name self = Mu (name, self)
+let mu name self = Mu { id = name ; self }
 let null = Null
 let int =
   Int { int_name = "int" ;
@@ -775,7 +777,7 @@ let rec is_nullable: type t. t encoding -> bool = function
   | Union cases ->
     List.exists (fun (Case { encoding = t }) -> is_nullable t) cases
   | Describe { encoding = t } -> is_nullable t
-  | Mu (_, f) as self -> is_nullable (f self)
+  | Mu { self } as enc -> is_nullable (self enc)
   | Custom (_, sch) -> Json_schema.is_nullable sch
 
 let option : type t. t encoding -> t option encoding = fun t ->
@@ -816,7 +818,7 @@ let merge_tups t1 t2 =
     | Tup _ -> true
     | Tups _ (* by construction *) -> true
     | Conv (_, _, t, None) -> is_tup t
-    | Mu (_name, self) as mu -> is_tup (self mu)
+    | Mu { self } as enc -> is_tup (self enc)
     | Describe { encoding = t } -> is_tup t
     | _ -> false in
   if is_tup t1 && is_tup t2 then
@@ -836,7 +838,7 @@ let merge_objs o1 o2 =
     | Empty -> true
     | Ignore -> true
     | Union cases -> List.for_all (fun (Case { encoding = o }) -> is_obj o) cases
-    | Mu (_name, self) as mu -> is_obj (self mu)
+    | Mu { self } as enc -> is_obj (self enc)
     | Describe { encoding = t } -> is_obj t
     | _ -> false in
   if is_obj o1 && is_obj o2 then
