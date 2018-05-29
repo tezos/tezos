@@ -94,10 +94,10 @@ let gen_access_annot
   : var_annot option -> ?default:field_annot option -> field_annot option -> var_annot option
   = fun value_annot ?(default=None) field_annot ->
     match value_annot, field_annot, default with
-    | None, None, _ | Some _, None, None -> None
+    | None, None, _ | Some _, None, None | None, Some `Field_annot "", _ -> None
     | None, Some `Field_annot f, _ ->
         Some (`Var_annot f)
-    | Some `Var_annot v, None, Some `Field_annot f ->
+    | Some `Var_annot v, (None | Some `Field_annot ""), Some `Field_annot f ->
         Some (`Var_annot (String.concat "." [v; f]))
     | Some `Var_annot v, Some `Field_annot f, _ ->
         Some (`Var_annot (String.concat "." [v; f]))
@@ -106,10 +106,10 @@ let gen_binding_access_annot
   : var_annot option -> ?default:binding_annot option -> binding_annot option -> binding_annot option
   = fun value_annot ?(default=None) binding_annot ->
     match value_annot, binding_annot, default with
-    | None, None, _ | Some _, None, None -> None
+    | None, None, _ | Some _, None, None | None, Some `Binding_annot "", _ -> None
     | None, Some `Binding_annot b, _ ->
         Some (`Binding_annot b)
-    | Some `Var_annot v, None, Some `Binding_annot b ->
+    | Some `Var_annot v, (None | Some `Binding_annot ""), Some `Binding_annot b ->
         Some (`Binding_annot (String.concat "." [v; b]))
     | Some `Var_annot v, Some `Binding_annot b, _ ->
         Some (`Binding_annot (String.concat "." [v; b]))

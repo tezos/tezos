@@ -2265,8 +2265,7 @@ helps users track information in the stack for bare contracts.
 
 For unannotated accesses with ``CAR`` and ``CDR`` to fields that are
 named will be appended (with an additional ``.`` character) to the pair
-variable annotation. If the original pair is not named in the stack, no
-variable annotation will be inferred.
+variable annotation.
 
 ::
 
@@ -2281,6 +2280,14 @@ If fields are not named but the pair is still named in the stack then
    CDAR
    :: @p (pair 'a (pair 'b 'c)) : 'S ->  @p.cdr.car 'b : 'S
 
+If the original pair is not named in the stack, but a field annotation
+is present in the pair type the accessed value will be annotated with a
+variable annotation corresponding to the field annotation alone.
+
+::
+
+   CDAR
+   :: (pair ('a %foo) (pair %bar ('b %x) ('c %y))) : 'S ->  @p.bar.x 'b : 'S
 
 A similar mechanism is used for context dependent instructions:
 

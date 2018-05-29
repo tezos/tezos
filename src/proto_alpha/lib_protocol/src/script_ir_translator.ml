@@ -1828,10 +1828,10 @@ and parse_instr
     | Prim (loc, I_LOOP_LEFT, [ body ], annot),
       (Item_t (Union_t ((tl, l_field), (tr, _), _), rest, union_annot) as stack) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        fail_unexpected_annot loc annot >>=? fun () ->
-        parse_var_field_annot loc annot >>=? fun (r_annot, l_annot) ->
-        let l_annot = default_annot (field_to_var_annot l_annot)
-            ~default:(gen_access_annot union_annot l_field) in
+        parse_binding_annot loc annot >>=? fun l_bind_annot ->
+        let l_bind_annot = default_annot l_bind_annot
+            ~default:(gen_binding_access_annot union_annot (field_to_binding_annot l_field)) in
+        let l_annot = binding_to_var_annot l_bind_annot in
         parse_instr ?type_logger tc_context ctxt body
           (Item_t (tl, rest, l_annot)) >>=? begin fun (judgement, ctxt) -> match judgement with
           | Typed ibody ->
@@ -1839,10 +1839,10 @@ and parse_instr
               trace unmatched_branches
                 (Lwt.return (stack_ty_eq 1 ibody.aft stack) >>=? fun Eq ->
                  Lwt.return (merge_stacks loc ibody.aft stack) >>=? fun _stack ->
-                 typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, r_annot)))
+                 typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, None)))
           | Failed { descr } ->
               let ibody = descr stack in
-              typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, r_annot))
+              typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, None))
         end
     | Prim (loc, I_LAMBDA, [ arg ; ret ; code ], annot),
       stack ->
