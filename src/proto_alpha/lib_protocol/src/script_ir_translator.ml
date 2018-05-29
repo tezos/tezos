@@ -1502,10 +1502,8 @@ and parse_instr
         return ctxt judgement
     (* pairs *)
     | Prim (loc, I_PAIR, [], annot),
-      Item_t (a, Item_t (b, rest, snd_annot), fst_annot) ->
+      Item_t (a, Item_t (b, rest, _snd_annot), _fst_annot) ->
         parse_constr_annot loc annot >>=? fun (annot, ty_name, l_field, r_field) ->
-        let l_field = default_annot l_field ~default:(var_to_field_annot fst_annot) in
-        let r_field = default_annot r_field ~default:(var_to_field_annot snd_annot) in
         typed ctxt loc Cons_pair
           (Item_t (Pair_t((a, l_field), (b, r_field), ty_name), rest, annot))
     | Prim (loc, I_CAR, [], annot),

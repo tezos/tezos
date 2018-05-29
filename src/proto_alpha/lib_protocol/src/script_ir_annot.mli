@@ -72,7 +72,9 @@ val gen_binding_access_annot :
 val merge_type_annot :
   type_annot option -> type_annot option -> type_annot option tzresult
 
-(** Merge field annotations, does not fail ([None] if different). *)
+(** Merge field annotations.
+    @returns an error {!Inconsistent_type_annotations} if they are both present
+    and different *)
 val merge_field_annot :
   field_annot option -> field_annot option -> field_annot option tzresult
 

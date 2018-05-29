@@ -1841,8 +1841,7 @@ X - Annotations
 ---------------
 
 The annotation mechanism of Michelson provides ways to better track
-data on the stack and withing data structures (pairs, unions and
-options), as well as to give additional type constraints.
+data on the stack and to give additional type constraints.
 
 Stack visualization tools like the Michelson’s Emacs mode print
 annotations associated with each type in the program, as propagated by
@@ -1851,8 +1850,8 @@ in the stack. This is useful as a debugging aid.
 
 We distinguish four kinds of annotations:
 - type annotations, written ``:type_annot``,
-- field or constructors annotations, written ``%field_annot``,
 - variable annotations, written ``@var_annot``,
+- field or constructors annotations, written ``%field_annot``,
 - and binding annotations, written ``$bind_annot``.
 
 Type Annotations
@@ -2077,6 +2076,10 @@ can be used to represent the algebraic data type (in OCaml-like syntax):
      | B of bool
      | C of { n1 : nat ; n2 : nat }
 
+
+Field annotations are part of the type (at the same level as type name
+annotations), and so types with differing field names (if present) are
+not considered equal.
 
 Instructions that construct elements of composed types can also be
 annotated with one or multiple field annotations (in addition to type

@@ -136,8 +136,7 @@ let merge_field_annot
     | Some `Field_annot a1, Some `Field_annot a2 ->
         if String.equal a1 a2
         then ok annot1
-        else ok None (* TODO check this, do we want typechecking here ?
-                        error (Inconsistent_annotations ("%" ^ a1, "%" ^ a2)) *)
+        else error (Inconsistent_annotations ("%" ^ a1, "%" ^ a2))
 
 let merge_var_annot
   : var_annot option -> var_annot option -> var_annot option
