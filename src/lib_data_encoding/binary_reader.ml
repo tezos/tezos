@@ -271,9 +271,8 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
         state.allowed_bytes <- allowed_bytes ;
         v
     | Describe { encoding = e } -> read_rec e state
-    | Def { encoding = e } -> read_rec e state
     | Splitted { encoding = e } -> read_rec e state
-    | Mu (_, _, self) -> read_rec (self e) state
+    | Mu (_, _, _, _, self) -> read_rec (self e) state
     | Delayed f -> read_rec (f ()) state
 
 

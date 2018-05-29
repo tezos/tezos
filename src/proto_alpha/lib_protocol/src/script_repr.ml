@@ -57,6 +57,7 @@ type t = {
 
 let encoding =
   let open Data_encoding in
+  def "scripted.contracts" @@
   conv
     (fun { code ; storage } -> (code, storage))
     (fun (code, storage) -> { code ; storage })

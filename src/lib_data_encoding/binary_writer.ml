@@ -272,9 +272,8 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
     | Check_size { limit ; encoding = e } ->
         write_with_limit limit e state value
     | Describe { encoding = e } -> write_rec e state value
-    | Def { encoding = e } -> write_rec e state value
     | Splitted { encoding = e } -> write_rec e state value
-    | Mu (_, _, self) -> write_rec (self e) state value
+    | Mu (_, _, _, _, self) -> write_rec (self e) state value
     | Delayed f -> write_rec (f ()) state value
 
 and write_with_limit : type a. int -> a Encoding.t -> state -> a -> unit =

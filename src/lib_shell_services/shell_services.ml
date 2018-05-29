@@ -36,24 +36,20 @@ module S = struct
       (obj5
          (req "data" bytes)
          (dft "blocking"
-            (describe
-               ~description:
-                 "Should the RPC wait for the block to be \
-                  validated before answering. (default: true)"
-               bool)
+            ~description:
+              "Should the RPC wait for the block to be \
+               validated before answering. (default: true)"
+            bool
             true)
          (dft "force"
-            (describe
-               ~description:
-                 "Should we inject the block when its fitness is below \
-                  the current head. (default: false)"
-               bool)
+            ~description:
+              "Should we inject the block when its fitness is below \
+               the current head. (default: false)"
+            bool
             false)
          (opt "chain_id" Chain_id.encoding)
          (req "operations"
-            (describe
-               ~description:"..."
-               (list (list (dynamic_size Operation.encoding))))))
+            (list (list (dynamic_size Operation.encoding)))))
 
   let inject_block =
     RPC_service.post_service
@@ -83,20 +79,17 @@ module S = struct
       ~input:
         (obj3
            (req "signedOperationContents"
-              (describe ~title: "Tezos signed operation (hex encoded)"
-                 bytes))
+              ~title: "Tezos signed operation (hex encoded)"
+              bytes)
            (dft "blocking"
-              (describe
-                 ~description:
-                   "Should the RPC wait for the operation to be \
-                    (pre-)validated before answering. (default: true)"
-                 bool)
+              ~description:
+                "Should the RPC wait for the operation to be \
+                 (pre-)validated before answering. (default: true)"
+              bool
               true)
            (opt "chain_id" Chain_id.encoding))
       ~output:
-        (describe
-           ~title: "Hash of the injected operation" @@
-         (obj1 (req "injectedOperation" Operation_hash.encoding)))
+        (obj1 (req "injectedOperation" Operation_hash.encoding))
       RPC_path.(root / "inject_operation")
 
   let inject_protocol =
@@ -106,24 +99,19 @@ module S = struct
       ~query: RPC_query.empty
       ~input:
         (obj3
-           (req "protocol"
-              (describe ~title: "Tezos protocol" Protocol.encoding))
+           (req "protocol" Protocol.encoding)
            (dft "blocking"
-              (describe
-                 ~description:
-                   "Should the RPC wait for the protocol to be \
-                    validated before answering. (default: true)"
-                 bool)
+              ~description:
+                "Should the RPC wait for the protocol to be \
+                 validated before answering. (default: true)"
+              bool
               true)
            (opt "force"
-              (describe
-                 ~description:
-                   "Should we inject protocol that is invalid. (default: false)"
-                 bool)))
+              ~description:
+                "Should we inject protocol that is invalid. (default: false)"
+              bool))
       ~output:
-        (describe
-           ~title: "Hash of the injected protocol" @@
-         (obj1 (req "injectedProtocol" Protocol_hash.encoding)))
+        (obj1 (req "injectedProtocol" Protocol_hash.encoding))
       RPC_path.(root / "inject_protocol")
 
   let bootstrapped =

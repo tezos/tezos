@@ -48,7 +48,7 @@ let pp_short ppf = function
 
 let encoding =
   let open Data_encoding in
-  describe
+  def "contract_id"
     ~title:
       "A contract handle"
     ~description:

@@ -22,7 +22,7 @@ type t =
 
 let encoding =
   let open Data_encoding in
-  describe ~title:"Test chain status" @@
+  def "test_chain_status" @@
   union [
     case (Tag 0) ~name:"Not_running"
       (obj1 (req "status" (constant "not_running")))

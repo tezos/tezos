@@ -123,10 +123,9 @@ module S = struct
       ~description: "Levels of a cycle"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (describe ~title: "levels of a cycle"
-                  (obj2
-                     (req "first" Raw_level.encoding)
-                     (req "last" Raw_level.encoding)))
+      ~output:  (obj2
+                   (req "first" Raw_level.encoding)
+                   (req "last" Raw_level.encoding))
       RPC_path.(custom_root / "levels" /: Cycle.arg)
 
 end
@@ -263,8 +262,7 @@ module Forge = struct
         ~input: Operation.unsigned_operation_encoding
         ~output:
           (obj1
-             (req "operation" @@
-              describe ~title: "hex encoded operation" bytes))
+             (req "operation" bytes))
         RPC_path.(custom_root / "operations" )
 
     let empty_proof_of_work_nonce =

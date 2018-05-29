@@ -52,7 +52,8 @@ let rec pp fmt = function
 
 let encoding =
   let open Data_encoding in
-  describe ~title: "Tezos block fitness"
+  def "fitness"
+    ~title: "Tezos block fitness"
     (list bytes)
 
 let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v

@@ -48,7 +48,6 @@ module Event = struct
 
   let encoding =
     let open Data_encoding in
-    describe ~title:"Event state" @@
     union
       [ case (Tag 0) ~name:"Debug"
           (obj1 (req "message" string))

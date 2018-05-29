@@ -69,10 +69,13 @@ type _ encoding =
   | Tups : 'a encoding * 'b encoding -> ('a * 'b) encoding
   | Custom : 't repr_agnostic_custom * Json_schema.schema -> 't encoding
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b encoding * Json_schema.schema option -> 'a encoding
-  | Describe : { title: string option ;
+  | Describe : { id: string ;
+                 title: string option ;
                  description: string option ;
                  encoding: 'a encoding } -> 'a encoding
   | Mu : { id: string ;
+           title: string option ;
+           description: string option ;
            self: ('a encoding -> 'a encoding) ;
          }-> 'a encoding
   | Union : 't case list -> 't encoding
@@ -466,17 +469,12 @@ let schema encoding =
                           minimum = Some (minimum, `Inclusive) ;
                           maximum = Some (maximum, `Inclusive) })
       | Float None -> element (Number numeric_specs)
-      | Describe { title = None ; description = None ;
-                   encoding = t } -> schema t
-      | Describe { title = Some _ as title ; description =  None ;
-                   encoding = t } ->
-        { (schema t) with title }
-      | Describe  { title = None ; description =  Some _ as description ;
-                    encoding = t } ->
-        { (schema t) with description }
-      | Describe { title = Some _ as title ; description = Some _ as description ;
-                   encoding = t } ->
-        { (schema t) with title ; description }
+      | Describe { id = name ; title ; description ; encoding } ->
+          let open Json_schema in
+          let schema = patch_description ?title ?description (schema encoding) in
+          let s, def = add_definition name schema !sch in
+          sch := fst (merge_definitions (!sch, s)) ;
+          def
       | Custom (_, s) ->
         sch := fst (merge_definitions (!sch, s)) ;
         root s
@@ -484,7 +482,7 @@ let schema encoding =
         sch := fst (merge_definitions (!sch, s)) ;
         root s
       | Conv (_, _, t, None) -> schema t
-      | Mu { id = name ; self = f } ->
+      | Mu { id = name ; title ; description ; self = f } ->
         let fake_schema =
           if definition_exists name !sch then
             update (definition_ref name) !sch
@@ -495,7 +493,10 @@ let schema encoding =
           Custom ({ write = (fun _ _ -> assert false) ;
                     read = (fun _ -> assert false) },
                   fake_schema) in
-        let root = schema (f fake_self) in
+        let root =
+          patch_description
+            ?title ?description
+            (schema (f fake_self)) in
         let nsch, def = add_definition name root !sch in
         sch := nsch ; def
       | Array t ->
@@ -546,7 +547,7 @@ let opt ?title ?description n t =
 let dft ?title ?description n t d =
   Dft { name = n ; encoding = t ; title ; description ; default = d }
 
-let mu name self = Mu { id = name ; self }
+let mu name ?title ?description self = Mu { id = name ; title ; description ; self }
 let null = Null
 let int =
   Int { int_name = "int" ;
@@ -701,8 +702,6 @@ let tup10 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 =
 let repr_agnostic_custom { write ; read } ~schema =
   Custom ({ write ; read }, schema)
 
-let describe ?title ?description t = Describe { title ; encoding = t ; description }
-
 let constant s = Constant s
 
 let string_enum cases =
@@ -737,13 +736,8 @@ let string_enum cases =
     ~schema
     string
 
-let def name encoding =
-  let schema =
-    let open Json_schema in
-    let sch = schema encoding in
-    let sch, def = add_definition name (root sch) sch in
-    update def sch in
-  conv (fun v -> v) (fun v -> v) ~schema encoding
+let def id ?title ?description encoding =
+  Describe { id ; title ; description ; encoding }
 
 let assoc : type t. t encoding -> (string * t) list encoding = fun t ->
   Ezjsonm_encoding.custom

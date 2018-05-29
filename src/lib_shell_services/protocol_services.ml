@@ -19,9 +19,7 @@ module S = struct
       ~query: RPC_query.empty
       ~input: empty
       ~output:
-        (obj1 (req "data"
-                 (describe ~title: "Tezos protocol"
-                    (Protocol.encoding))))
+        (obj1 (req "data" (Protocol.encoding)))
       RPC_path.(root / "protocols" /: protocols_arg)
 
   type list_param = {

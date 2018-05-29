@@ -381,7 +381,11 @@ val conv :
              case (obj2 (req "hd" itemencoding) (req "tl" self))
                (function hd :: tl -> Some (hd, tl) | [] -> None)
                (fun (hd, tl) -> hd :: tl) ]) ]} *)
-val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
+val mu :
+  string ->
+  ?title: string ->
+  ?description: string ->
+  ('a encoding -> 'a encoding) -> 'a encoding
 
 (** A raw JSON value in ezjsonm representation. *)
 val any_ezjson_value : Json_repr.ezjsonm encoding
@@ -398,17 +402,14 @@ val any_schema : Json_schema.schema encoding
     May raise {!Bad_schema}. *)
 val schema : 't encoding -> Json_schema.schema
 
-(** Annotate a type with a title and description for the JSON schema. *)
-val describe :
-  ?title:string ->
-  ?description:string ->
-  't encoding ->
-  't encoding
-
 (** Name a definition so its occurences can be shared in the JSON
     schema.  The first parameter is a path, that must be unique and
     respect the format of {!Json_schema.add_definition}. *)
-val def : string -> 't encoding -> 't encoding
+val def :
+  string ->
+  ?title:string ->
+  ?description:string ->
+  't encoding -> 't encoding
 
 (** {2 Errors} *) (************************************************************)
 

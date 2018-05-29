@@ -113,7 +113,6 @@ module Encoding = struct
   open Data_encoding
 
   let reveal_encoding =
-    describe ~title:"Reveal operation" @@
     (obj2
        (req "kind" (constant "reveal"))
        (req "public_key" Signature.Public_key.encoding))
@@ -126,7 +125,6 @@ module Encoding = struct
       (fun ((), pkh) -> Reveal pkh)
 
   let transaction_encoding =
-    describe ~title:"Transaction operation" @@
     obj4
       (req "kind" (constant "transaction"))
       (req "amount" Tez_repr.encoding)
@@ -143,7 +141,6 @@ module Encoding = struct
          Transaction { amount ; destination ; parameters })
 
   let origination_encoding =
-    describe ~title:"Origination operation" @@
     (obj7
        (req "kind" (constant "origination"))
        (req "managerPubkey" Signature.Public_key_hash.encoding)
@@ -175,7 +172,6 @@ module Encoding = struct
             delegate ; script ; preorigination = None })
 
   let delegation_encoding =
-    describe ~title:"Delegation operation" @@
     (obj2
        (req "kind" (constant "delegation"))
        (opt "delegate" Signature.Public_key_hash.encoding))
@@ -419,11 +415,10 @@ module Encoding = struct
     mu_proto_operation_encoding operation_encoding
 
   let signed_proto_operation_encoding =
-    describe ~title:"Signed alpha operation" @@
     mu_signed_proto_operation_encoding operation_encoding
 
   let unsigned_operation_encoding =
-    describe ~title:"Unsigned Alpha operation" @@
+    def "operation.alpha.unsigned_operation" @@
     merge_objs
       Operation.shell_header_encoding
       proto_operation_encoding

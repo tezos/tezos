@@ -447,17 +447,20 @@ module Encoding: sig
   val splitted : json:'a encoding -> binary:'a encoding -> 'a encoding
 
   (** Combinator for recursive encodings. *)
-  val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
+  val mu :
+    string ->
+    ?title: string ->
+    ?description: string ->
+    ('a encoding -> 'a encoding) -> 'a encoding
 
   (** {3 Documenting descriptors} *)
 
-  (** Add documentation to an encoding. *)
-  val describe :
+  (** Give a name to an encoding and optionnaly
+      add documentation to an encoding. *)
+  val def :
+    string ->
     ?title:string -> ?description:string ->
     't encoding ->'t encoding
-
-  (** Give a name to an encoding. *)
-  val def : string -> 'a encoding -> 'a encoding
 
   (** See {!lazy_encoding} below.*)
   type 'a lazy_t

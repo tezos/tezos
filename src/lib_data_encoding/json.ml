@@ -46,8 +46,7 @@ let int64_encoding =
 
 let n_encoding =
   let open Json_encoding in
-  def "positive_bignum" @@
-  describe
+  def "positive_bignum"
     ~title: "Positive big number"
     ~description: "Decimal representation of a positive big number" @@
   conv
@@ -64,8 +63,7 @@ let n_encoding =
 
 let z_encoding =
   let open Json_encoding in
-  def "bignum" @@
-  describe
+  def "bignum"
     ~title: "Big number"
     ~description: "Decimal representation of a big number" @@
   conv Z.to_string Z.of_string string
@@ -210,10 +208,9 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Tups (_, e1, e2) ->
       merge_tups (get_json e1) (get_json e2)
   | Conv { proj ; inj ; encoding = e ; schema } -> conv ?schema proj inj (get_json e)
-  | Describe { title ; description ; encoding = e } ->
-      describe ?title ?description (get_json e)
-  | Def { name ; encoding = e } -> def name (get_json e)
-  | Mu (_, name, self) as ty ->
+  | Describe { id ; title ; description ; encoding = e } ->
+      def id ?title ?description (get_json e)
+  | Mu (_, name, _, _, self) as ty ->
       mu name (fun json_encoding -> get_json @@ self (make ~json_encoding ty))
   | Union (_tag_size, _, cases) -> union (List.map case_json cases)
   | Splitted { json_encoding } -> json_encoding

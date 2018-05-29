@@ -20,8 +20,7 @@ type 'p canonical = Canonical of (canonical_location, 'p) node
 let canonical_location_encoding =
   let open Data_encoding in
   def
-    "micheline.location" @@
-  describe
+    "micheline.location"
     ~title:
       "Canonical location in a Micheline expression"
     ~description:
@@ -141,8 +140,6 @@ let canonical_encoding ~variant prim_encoding =
               | _ -> None)
       (fun (prim, args, annot) -> Prim (0, prim, args, annot)) in
   let node_encoding = mu ("micheline." ^ variant ^ ".expression") (fun expr_encoding ->
-      describe
-        ~title: ("Micheline expression (" ^ variant ^ " variant)") @@
       splitted
         ~json:(union ~tag_size:`Uint8
                  [ int_encoding Json_only;

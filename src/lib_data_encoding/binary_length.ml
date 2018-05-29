@@ -62,7 +62,7 @@ let rec length : type x. x Encoding.t -> x -> int =
                   let tag_size = Binary_size.tag_size sz in
                   tag_size + length e value in
         length_case cases
-    | Mu (`Dynamic, _name, self) ->
+    | Mu (`Dynamic, _name, _, _, self) ->
         length (self e) value
     | Obj (Opt { kind = `Dynamic ; encoding = e }) -> begin
         match value with
@@ -103,7 +103,7 @@ let rec length : type x. x Encoding.t -> x -> int =
                   let tag_size = Binary_size.tag_size sz in
                   tag_size + length e value in
         length_case cases
-    | Mu (`Variable, _name, self) ->
+    | Mu (`Variable, _name, _, _, self) ->
         length (self e) value
     (* Recursive*)
     | Obj (Req { encoding = e }) -> length e value
@@ -112,7 +112,6 @@ let rec length : type x. x Encoding.t -> x -> int =
     | Conv  { encoding = e ; proj } ->
         length e (proj value)
     | Describe { encoding = e } -> length e value
-    | Def { encoding = e } -> length e value
     | Splitted { encoding = e } -> length e value
     | Dynamic_size { kind ; encoding = e } ->
         let length = length e value in

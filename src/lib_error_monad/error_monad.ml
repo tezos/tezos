@@ -118,7 +118,7 @@ module Make(Prefix : sig val id : string end) = struct
     let encoding_case =
       let open Data_encoding in
       case Json_only
-        (describe ~title ~description @@
+        (def "generic_error" ~title ~description @@
          conv (fun x -> ((), x)) (fun ((), x) -> x) @@
          (obj2
             (req "kind" (constant "generic"))
@@ -186,7 +186,7 @@ module Make(Prefix : sig val id : string end) = struct
                  (req "id" (constant name)))
               encoding in
           case Json_only
-            (describe ~title ~description
+            (def name ~title ~description
                (conv (fun x -> (((), ()), x)) (fun (((),()), x) -> x)
                   with_id_and_kind_encoding))
             from_error to_error in
@@ -293,17 +293,17 @@ module Make(Prefix : sig val id : string end) = struct
   let result_encoding t_encoding =
     let open Data_encoding in
     let errors_encoding =
-      describe ~title: "An erroneous result" @@
       obj1 (req "error" (list error_encoding)) in
     let t_encoding =
-      describe ~title: "A successful result" @@
       obj1 (req "result" t_encoding) in
     union
       ~tag_size:`Uint8
       [ case (Tag 0) t_encoding
+          ~name:"A successful result"
           (function Ok x -> Some x | _ -> None)
           (function res -> Ok res) ;
         case (Tag 1) errors_encoding
+          ~name:"A erroneous result"
           (function Error x -> Some x | _ -> None)
           (fun errs -> Error errs) ]
 
@@ -552,7 +552,7 @@ module Make(Prefix : sig val id : string end) = struct
     let encoding_case =
       let open Data_encoding in
       case Json_only
-        (describe ~title ~description @@
+        (def "assertion" ~title ~description @@
          conv (fun (x, y) -> ((), x, y)) (fun ((), x, y) -> (x, y)) @@
          (obj3
             (req "kind" (constant "assertion"))

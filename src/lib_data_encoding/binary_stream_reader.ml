@@ -340,9 +340,8 @@ let rec read_rec
               Some (old_limit - read) in
         k (v, { state with allowed_bytes })
     | Describe { encoding = e } -> read_rec e state k
-    | Def { encoding = e } -> read_rec e state k
     | Splitted { encoding = e } -> read_rec e state k
-    | Mu (_, _, self) -> read_rec (self e) state k
+    | Mu (_, _, _, _, self) -> read_rec (self e) state k
     | Delayed f -> read_rec (f ()) state k
 
 and remaining_bytes { remaining_bytes } =

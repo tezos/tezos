@@ -47,6 +47,7 @@ module Public_key_hash = struct
 
   let raw_encoding =
     let open Data_encoding in
+    def "public_key_hash" ~description:title @@
     union [
       case (Tag 0) Ed25519.Public_key_hash.encoding
         (function Ed25519 x -> Some x | _ -> None)
@@ -230,6 +231,7 @@ module Public_key = struct
       let title = title
       let raw_encoding =
         let open Data_encoding in
+        def "public_key" ~description:title @@
         union [
           case (Tag 0) Ed25519.Public_key.encoding
             (function Ed25519 x -> Some x | _ -> None)
@@ -312,6 +314,7 @@ module Secret_key = struct
       let title = title
       let raw_encoding =
         let open Data_encoding in
+        def "secret_key" ~description:title @@
         union [
           case (Tag 0) Ed25519.Secret_key.encoding
             (function Ed25519 x -> Some x | _ -> None)

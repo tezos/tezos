@@ -49,18 +49,17 @@ type 'a desc =
   | Tup : 'a t -> 'a desc
   | Tups : Kind.t * 'a t * 'b t -> ('a * 'b) desc
   | Union : Kind.t * Binary_size.tag_size * 'a case list -> 'a desc
-  | Mu : Kind.enum * string * ('a t -> 'a t) -> 'a desc
+  | Mu : Kind.enum * string * string option * string option * ('a t -> 'a t) -> 'a desc
   | Conv :
       { proj : ('a -> 'b) ;
         inj : ('b -> 'a) ;
         encoding : 'b t ;
         schema : Json_schema.schema option } -> 'a desc
   | Describe :
-      { title : string option ;
+      { id : string ;
+        title : string option ;
         description : string option ;
         encoding : 'a t } -> 'a desc
-  | Def : { name : string ;
-            encoding : 'a t } -> 'a desc
   | Splitted :
       { encoding : 'a t ;
         json_encoding : 'a Json_encoding.encoding ;
@@ -74,15 +73,21 @@ type 'a desc =
 and _ field =
   | Req : { name: string ;
             encoding: 'a t ;
+            title: string option ;
+            description: string option ;
           } -> 'a field
   | Opt : { name: string ;
             kind: Kind.enum ;
             encoding: 'a t ;
+            title: string option ;
+            description: string option ;
           } -> 'a option field
   | Dft : { name: string ;
             encoding: 'a t ;
             default: 'a ;
-         } -> 'a field
+            title: string option ;
+            description: string option ;
+          } -> 'a field
 
 and 'a case =
   | Case : { name : string option ;
@@ -234,16 +239,20 @@ val case :
 val union :
   ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
 
-val describe :
+val def :
+  string ->
   ?title:string -> ?description:string ->
-  't encoding ->'t encoding
-val def : string -> 'a encoding -> 'a encoding
+  'a encoding -> 'a encoding
 
 val conv :
   ('a -> 'b) -> ('b -> 'a) ->
   ?schema:Json_schema.schema ->
   'b encoding -> 'a encoding
-val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
+val mu :
+  string ->
+  ?title:string ->
+  ?description: string ->
+  ('a encoding -> 'a encoding) -> 'a encoding
 
 val classify : 'a encoding -> [ `Fixed of int | `Dynamic | `Variable ]
 val raw_splitted : json:'a Json_encoding.encoding -> binary:'a encoding -> 'a encoding

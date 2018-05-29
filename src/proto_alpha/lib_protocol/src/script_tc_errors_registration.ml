@@ -45,8 +45,7 @@ let () =
   let arity_enc =
     int8 in
   let namespace_enc =
-    def "primitiveNamespace" @@
-    describe
+    def "primitiveNamespace"
       ~title: "Primitive namespace"
       ~description:
         "One of the three possible namespaces of primitive \
@@ -55,8 +54,7 @@ let () =
                   "constant", Constant_namespace ;
                   "instruction", Instr_namespace ] in
   let kind_enc =
-    def "expressionKind" @@
-    describe
+    def "expressionKind"
       ~title: "Expression kind"
       ~description:
         "One of the four possible kinds of expression \

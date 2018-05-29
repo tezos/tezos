@@ -91,18 +91,17 @@ type 'a desc =
   | Tup : 'a t -> 'a desc
   | Tups : Kind.t * 'a t * 'b t -> ('a * 'b) desc
   | Union : Kind.t * Binary_size.tag_size * 'a case list -> 'a desc
-  | Mu : Kind.enum * string * ('a t -> 'a t) -> 'a desc
+  | Mu : Kind.enum * string * string option * string option * ('a t -> 'a t) -> 'a desc
   | Conv :
       { proj : ('a -> 'b) ;
         inj : ('b -> 'a) ;
         encoding : 'b t ;
         schema : Json_schema.schema option } -> 'a desc
   | Describe :
-      { title : string option ;
+      { id : string ;
+        title : string option ;
         description : string option ;
         encoding : 'a t } -> 'a desc
-  | Def : { name : string ;
-            encoding : 'a t } -> 'a desc
   | Splitted :
       { encoding : 'a t ;
         json_encoding : 'a Json_encoding.encoding ;
@@ -116,15 +115,21 @@ type 'a desc =
 and _ field =
   | Req : { name: string ;
             encoding: 'a t ;
+            title: string option ;
+            description: string option ;
           } -> 'a field
   | Opt : { name: string ;
             kind: Kind.enum ;
             encoding: 'a t ;
+            title: string option ;
+            description: string option ;
           } -> 'a option field
   | Dft : { name: string ;
             encoding: 'a t ;
             default: 'a ;
-         } -> 'a field
+            title: string option ;
+            description: string option ;
+          } -> 'a field
 
 and 'a case =
   | Case : { name : string option ;
@@ -169,7 +174,7 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Objs (kind, _, _) -> kind
   | Tups (kind, _, _) -> kind
   | Union (kind, _, _) -> (kind :> Kind.t)
-  | Mu (kind, _, _) -> (kind :> Kind.t)
+  | Mu (kind, _, _, _ , _) -> (kind :> Kind.t)
   (* Variable *)
   | Ignore -> `Fixed 0
   | Array _ -> `Variable
@@ -180,7 +185,6 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Tup encoding -> classify encoding
   | Conv { encoding } -> classify encoding
   | Describe { encoding } -> classify encoding
-  | Def { encoding } -> classify encoding
   | Splitted { encoding } -> classify encoding
   | Dynamic_size _ -> `Dynamic
   | Check_size { encoding } -> classify encoding
@@ -241,11 +245,10 @@ let rec is_zeroable: type t. t encoding -> bool = fun e ->
   | Tups (_, e1, e2) -> is_zeroable e1 && is_zeroable e2
   | Union (_, _, _) -> false (* includes a tag *)
   (* other recursive cases: truth propagates *)
-  | Mu (`Dynamic, _, _) -> false (* size prefix *)
-  | Mu (`Variable, _, f) -> is_zeroable (f e)
+  | Mu (`Dynamic, _, _, _ ,_) -> false (* size prefix *)
+  | Mu (`Variable, _, _, _, f) -> is_zeroable (f e)
   | Conv { encoding } -> is_zeroable encoding
   | Describe { encoding } -> is_zeroable encoding
-  | Def { encoding } -> is_zeroable encoding
   | Splitted { encoding } -> is_zeroable encoding
   | Check_size { encoding } -> is_zeroable encoding
   (* Unscrutable: true by default *)
@@ -331,29 +334,21 @@ let string_enum = function
 let conv proj inj ?schema encoding =
   make @@ Conv { proj ; inj ; encoding ; schema }
 
-let describe ?title ?description encoding =
-  match title, description with
-  | None, None -> encoding
-  | _, _ -> make @@ Describe { title ; description ; encoding }
-
-let def name encoding = make @@ Def { name ; encoding }
+let def id ?title ?description encoding =
+  make @@ Describe { id ; title ; description ; encoding }
 
 let req ?title ?description n t =
-  Req { name = n ; encoding = describe ?title ?description t }
+  Req { name = n ; encoding = t ; title ; description }
 let opt ?title ?description n encoding =
   let kind =
     match classify encoding with
     | `Variable -> `Variable
     | `Fixed _ | `Dynamic -> `Dynamic in
-  Opt { name = n ; kind ;
-        encoding = make @@ Describe { title ; description ; encoding } }
+  Opt { name = n ; kind ; encoding ; title ; description }
 let varopt ?title ?description n encoding =
-  Opt { name = n ; kind = `Variable ;
-        encoding = make @@ Describe { title ; description ; encoding } }
+  Opt { name = n ; kind = `Variable ; encoding ; title ; description }
 let dft ?title ?description n t d =
-  Dft { name = n ;
-        encoding = describe ?title ?description t ;
-        default = d }
+  Dft { name = n ; encoding = t ; default = d ; title ; description }
 
 let raw_splitted ~json ~binary =
   make @@ Splitted { encoding = binary ;
@@ -371,11 +366,10 @@ let rec is_obj : type a. a t -> bool = fun e ->
       List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
   | Empty -> true
   | Ignore -> true
-  | Mu (_,_,self) -> is_obj (self e)
+  | Mu (_,_,_,_,self) -> is_obj (self e)
   | Splitted { is_obj } -> is_obj
   | Delayed f -> is_obj (f ())
   | Describe { encoding } -> is_obj encoding
-  | Def { encoding } -> is_obj encoding
   | _ -> false
 
 let rec is_tup : type a. a t -> bool = fun e ->
@@ -386,11 +380,10 @@ let rec is_tup : type a. a t -> bool = fun e ->
   | Dynamic_size { encoding = e } -> is_tup e
   | Union (_,_,cases) ->
       List.for_all (function Case { encoding = e} -> is_tup e) cases
-  | Mu (_,_,self) -> is_tup (self e)
+  | Mu (_,_,_,_,self) -> is_tup (self e)
   | Splitted { is_tup } -> is_tup
   | Delayed f -> is_tup (f ())
   | Describe { encoding } -> is_tup encoding
-  | Def { encoding } -> is_tup encoding
   | _ -> false
 
 let raw_merge_objs e1 e2 =
@@ -580,10 +573,9 @@ let rec is_nullable: type t. t encoding -> bool = fun e ->
   | Tups _ -> false
   | Union (_, _, cases) ->
       List.exists (fun (Case { encoding = e }) -> is_nullable e) cases
-  | Mu (_, _, f) -> is_nullable (f e)
+  | Mu (_, _, _, _, f) -> is_nullable (f e)
   | Conv { encoding = e } -> is_nullable e
   | Describe { encoding = e } -> is_nullable e
-  | Def { encoding = e } -> is_nullable e
   | Splitted { json_encoding } -> Json_encoding.is_nullable json_encoding
   | Dynamic_size { encoding = e } -> is_nullable e
   | Check_size { encoding = e } -> is_nullable e
@@ -604,16 +596,16 @@ let option ty =
         (function None -> Some () | Some _ -> None)
         (fun () -> None) ;
     ]
-let mu name self =
+let mu name ?title ?description self =
   let kind =
     try
-      match classify (self (make @@ Mu (`Dynamic, name, self))) with
+      match classify (self (make @@ Mu (`Dynamic, name, title, description, self))) with
       | `Fixed _ | `Dynamic -> `Dynamic
       | `Variable -> raise Exit
     with Exit | _ (* TODO variability error *) ->
-      ignore @@ classify (self (make @@ Mu (`Variable, name, self))) ;
+      ignore @@ classify (self (make @@ Mu (`Variable, name, title, description, self))) ;
       `Variable in
-  make @@ Mu (kind, name, self)
+  make @@ Mu (kind, name, title, description, self)
 
 let result ok_enc error_enc =
   union
