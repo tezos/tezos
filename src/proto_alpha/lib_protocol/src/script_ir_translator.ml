@@ -307,7 +307,9 @@ let namespace = function
   | I_LOOP_LEFT
   | I_ADDRESS
   | I_CONTRACT
-  | I_ISNAT -> Instr_namespace
+  | I_ISNAT
+  | I_CAST
+  | I_RENAME -> Instr_namespace
   | T_bool
   | T_contract
   | T_int
@@ -2214,6 +2216,19 @@ and parse_instr
         parse_var_annot loc annot >>=? fun annot ->
         typed ctxt loc Ge
           (Item_t (Bool_t None, rest, annot))
+    (* annotations *)
+    | Prim (loc, I_CAST, [ cast_t ], annot),
+      Item_t (t, stack, item_annot) ->
+        parse_var_annot loc annot ~default:item_annot >>=? fun annot ->
+        (Lwt.return (parse_ty ~allow_big_map:true ~allow_operation:true cast_t))
+        >>=? fun (Ex_ty cast_t) ->
+        Lwt.return @@ ty_eq cast_t t >>=? fun Eq ->
+        Lwt.return @@ merge_types loc cast_t t >>=? fun _ ->
+        typed ctxt loc Nop (Item_t (cast_t, stack, annot))
+    | Prim (loc, I_RENAME, [], annot),
+      Item_t (t, stack, _) ->
+        parse_var_annot loc annot >>=? fun annot -> (* can erase annot *)
+        typed ctxt loc Nop (Item_t (t, stack, annot))
     (* protocol *)
     | Prim (loc, I_ADDRESS, [], annot),
       Item_t (Contract_t _, rest, contract_annot) ->

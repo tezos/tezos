@@ -97,6 +97,8 @@ type prim =
   | I_ADDRESS
   | I_CONTRACT
   | I_ISNAT
+  | I_CAST
+  | I_RENAME
   | T_bool
   | T_contract
   | T_int
@@ -222,6 +224,8 @@ let string_of_prim = function
   | I_ADDRESS -> "ADDRESS"
   | I_CONTRACT -> "CONTRACT"
   | I_ISNAT -> "ISNAT"
+  | I_CAST -> "CAST"
+  | I_RENAME -> "RENAME"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -328,6 +332,8 @@ let prim_of_string = function
   | "ADDRESS" -> ok I_ADDRESS
   | "CONTRACT" -> ok I_CONTRACT
   | "ISNAT" -> ok I_ISNAT
+  | "CAST" -> ok I_CAST
+  | "RENAME" -> ok I_RENAME
   | "bool" -> ok T_bool
   | "contract" -> ok T_contract
   | "int" -> ok T_int
@@ -479,6 +485,8 @@ let prim_encoding =
     ("ADDRESS", I_ADDRESS) ;
     ("CONTRACT", I_CONTRACT) ;
     ("ISNAT", I_ISNAT) ;
+    ("CAST", I_CAST) ;
+    ("RENAME", I_RENAME) ;
     ("bool", T_bool) ;
     ("contract", T_contract) ;
     ("int", T_int) ;

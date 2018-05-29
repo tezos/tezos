@@ -1918,6 +1918,20 @@ type on top.
    EMPTY_MAP :t 'key 'val
    :: 'S -> (map :t 'key 'val) : 'S
 
+
+A no-op instruction ``CAST`` ensures the top of the stack has the
+specified type, and change its type if it is compatible. In particular,
+this allows to change or remove type names explicitly.
+
+::
+
+   CAST 'b
+   :: 'a : 'S   ->   'b : 'S
+      iff  'a = 'b
+
+   > CAST t / a : S  =>  a : S
+
+
 Variable Annotations
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -2010,6 +2024,8 @@ The instructions which accept at most one variable annotation are:
    STEPS_TO_QUOTA
    SOURCE
    SELF
+   CAST
+   RENAME
 
 The instructions which accept at most two variable annotations are:
 
@@ -2033,6 +2049,17 @@ annotations will see only their top-most stack type elements annotated.
    CREATE_ACCOUNT @op
    :: key_hash : option key_hash : bool : tez : 'S
       ->  @op operation : address : 'S
+
+A no-op instruction ``RENAME`` allows to rename variables in the stack
+or to erase variable annotations in the stack.
+
+::
+
+   RENAME @new
+   :: @old 'a ; 'S -> @new 'a : 'S
+
+   RENAME
+   :: @old 'a ; 'S -> 'a : 'S
 
 
 Field and Constructor Annotations

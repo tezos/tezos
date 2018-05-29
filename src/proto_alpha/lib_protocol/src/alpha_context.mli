@@ -248,6 +248,8 @@ module Script : sig
     | I_ADDRESS
     | I_CONTRACT
     | I_ISNAT
+    | I_CAST
+    | I_RENAME
     | T_bool
     | T_contract
     | T_int
