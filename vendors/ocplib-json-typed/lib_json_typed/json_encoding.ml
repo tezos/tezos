@@ -88,9 +88,22 @@ and bounds =
     maximum : float }
 
 and _ field =
-  | Req : { name: string ; encoding:  'a encoding } -> 'a field
-  | Opt : { name: string ; encoding:  'a encoding } -> 'a option field
-  | Dft : { name: string ; encoding:  'a encoding ; default: 'a } -> 'a field
+  | Req : { name: string ;
+            encoding:  'a encoding ;
+            title: string option ;
+            description: string option ;
+          } -> 'a field
+  | Opt : { name: string ;
+            encoding:  'a encoding ;
+            title: string option ;
+            description: string option ;
+          } -> 'a option field
+  | Dft : { name: string ;
+            encoding:  'a encoding ;
+            title: string option ;
+            description: string option ;
+            default: 'a ;
+          } -> 'a field
 
 and 't case =
   | Case : { encoding : 'a encoding ;
@@ -378,6 +391,13 @@ end
 
 module Ezjsonm_encoding = Make (Json_repr.Ezjsonm)
 
+let patch_description ?title ?description (elt : Json_schema.element) =
+  match title, description with
+  | None, None -> elt
+  | Some _, None -> { elt with title }
+  | None, Some _ -> { elt with description }
+  | Some _, Some _ -> { elt with title ; description }
+
 let schema encoding =
   let open Json_schema in
   let sch = ref any in
@@ -392,11 +412,13 @@ let schema encoding =
       | Conv (_, _, o, None) -> object_schema o
       | Empty -> [ [], false ]
       | Ignore -> [ [], true ]
-      | Obj (Req { name = n ; encoding = t }) -> [ [ n, schema t, true, None ], false ]
-      | Obj (Opt { name = n ; encoding = t }) -> [ [ n, schema t, false, None ], false ]
-      | Obj (Dft { name = n ; encoding = t ; default = d }) ->
+      | Obj (Req { name = n ; encoding = t ; title ; description }) ->
+          [ [ n, patch_description ?title ?description (schema t), true, None ], false ]
+      | Obj (Opt { name = n ; encoding = t ; title ; description }) ->
+          [ [ n, patch_description ?title ?description (schema t), false, None ], false ]
+      | Obj (Dft { name = n ; encoding = t ; title ; description ; default = d }) ->
         let d = Json_repr.repr_to_any (module Json_repr.Ezjsonm) (Ezjsonm_encoding.construct t d) in
-        [ [ n, schema t, false, Some d], false ]
+        [ [ n, patch_description ?title ?description (schema t), false, Some d], false ]
       | Objs (o1, o2) ->
         prod (object_schema o1) (object_schema o2)
       | Union [] ->
@@ -515,16 +537,12 @@ let schema encoding =
 
 (*-- utility wrappers over the GADT ------------------------------------------*)
 
-let req ?title ?description n t = Req { name = n ;
-                                        encoding =
-                                          Describe { title ; encoding = t ; description } }
-let opt ?title ?description n t = Opt { name = n ;
-                                        encoding =
-                                          Describe { title ; encoding = t; description } }
-let dft ?title ?description n t d = Dft  { name = n ;
-                                           encoding =
-                                             Describe { title ; encoding = t ; description } ;
-                                           default = d }
+let req ?title ?description n t =
+  Req { name = n ; encoding = t ; title ; description }
+let opt ?title ?description n t =
+  Opt { name = n ; encoding = t ; title ; description }
+let dft ?title ?description n t d =
+  Dft { name = n ; encoding = t ; title ; description ; default = d }
 
 let mu name self = Mu (name, self)
 let null = Null
