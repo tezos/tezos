@@ -69,15 +69,23 @@ type balance_update =
 
 let balance_update_encoding =
   def "operation_metadata.alpha.balance_update" @@
-  union
-    [ case (Tag 0)
-        (obj1 (req "credited" Tez.encoding))
-        (function Credited v -> Some v | Debited _ -> None)
-        (fun v -> Credited v) ;
-      case (Tag 1)
-        (obj1 (req "debited" Tez.encoding))
-        (function Debited v -> Some v | Credited _ -> None)
-        (fun v -> Debited v) ]
+  obj1
+    (req "change"
+       (conv
+          (function
+            | Credited v -> Tez.to_mutez v
+            | Debited v -> Int64.neg (Tez.to_mutez v))
+          (Json.wrap_error @@
+           fun v ->
+           if Compare.Int64.(v < 0L) then
+             match Tez.of_mutez (Int64.neg v) with
+             | Some v -> Debited v
+             | None -> failwith "Qty.of_mutez"
+           else
+             match Tez.of_mutez v with
+             | Some v -> Credited v
+             | None -> failwith "Qty.of_mutez")
+          int64))
 
 type balance_updates = (balance * balance_update) list
 
