@@ -88,9 +88,9 @@ and bounds =
     maximum : float }
 
 and _ field =
-  | Req : string * 'a encoding -> 'a field
-  | Opt : string * 'a encoding -> 'a option field
-  | Dft : string * 'a encoding * 'a -> 'a field
+  | Req : { name: string ; encoding:  'a encoding } -> 'a field
+  | Opt : { name: string ; encoding:  'a encoding } -> 'a option field
+  | Dft : { name: string ; encoding:  'a encoding ; default: 'a } -> 'a field
 
 and 't case =
   | Case : { encoding : 'a encoding ;
@@ -134,13 +134,13 @@ module Make (Repr : Json_repr.Repr) = struct
         | Array t ->
           let w v = construct t v in
           (fun arr -> Repr.repr (`A (Array.to_list (Array.map w arr))))
-        | Obj (Req (n, t)) ->
+        | Obj (Req { name = n ; encoding = t }) ->
           let w v = construct t v in
           (fun v -> Repr.repr (`O [ n, w v ]))
-        | Obj (Dft (n, t, d)) ->
+        | Obj (Dft { name = n ; encoding = t ; default = d }) ->
           let w v = construct t v in
           (fun v -> Repr.repr (`O (if v <> d then [ n, w v ] else [])))
-        | Obj (Opt (n, t)) ->
+        | Obj (Opt { name = n ; encoding = t }) ->
           let w v = construct t v in
           (function None -> Repr.repr (`O []) | Some v -> Repr.repr (`O [ n, w v ]))
         | Objs (o1, o2) ->
@@ -310,7 +310,7 @@ module Make (Repr : Json_repr.Repr) = struct
       match t with
       | Empty -> (fun fields -> (), fields, false)
       | Ignore -> (fun fields -> (), fields, true)
-      | Obj (Req (n, t)) ->
+      | Obj (Req { name = n ; encoding = t }) ->
         (fun fields ->
            try
              let v, rest = assoc [] n fields in
@@ -320,7 +320,7 @@ module Make (Repr : Json_repr.Repr) = struct
              raise (Cannot_destruct ([], Missing_field n))
            | Cannot_destruct (path, err) ->
              raise (Cannot_destruct (`Field n :: path, err)))
-      | Obj (Opt (n, t)) ->
+      | Obj (Opt { name = n ; encoding = t }) ->
         (fun fields ->
            try
              let v, rest = assoc [] n fields in
@@ -329,7 +329,7 @@ module Make (Repr : Json_repr.Repr) = struct
            | Not_found -> None, fields, false
            | Cannot_destruct (path, err) ->
              raise (Cannot_destruct (`Field n :: path, err)))
-      | Obj (Dft (n, t, d)) ->
+      | Obj (Dft { name = n ; encoding = t ; default = d }) ->
         (fun fields ->
            try
              let v, rest = assoc [] n fields in
@@ -392,9 +392,9 @@ let schema encoding =
       | Conv (_, _, o, None) -> object_schema o
       | Empty -> [ [], false ]
       | Ignore -> [ [], true ]
-      | Obj (Req (n, t)) -> [ [ n, schema t, true, None ], false ]
-      | Obj (Opt (n, t)) -> [ [ n, schema t, false, None ], false ]
-      | Obj (Dft (n, t, d)) ->
+      | Obj (Req { name = n ; encoding = t }) -> [ [ n, schema t, true, None ], false ]
+      | Obj (Opt { name = n ; encoding = t }) -> [ [ n, schema t, false, None ], false ]
+      | Obj (Dft { name = n ; encoding = t ; default = d }) ->
         let d = Json_repr.repr_to_any (module Json_repr.Ezjsonm) (Ezjsonm_encoding.construct t d) in
         [ [ n, schema t, false, Some d], false ]
       | Objs (o1, o2) ->
@@ -515,9 +515,16 @@ let schema encoding =
 
 (*-- utility wrappers over the GADT ------------------------------------------*)
 
-let req ?title ?description n t = Req (n, Describe { title ; encoding = t ; description })
-let opt ?title ?description n t = Opt (n, Describe { title ; encoding = t; description })
-let dft ?title ?description n t d = Dft (n, Describe { title ; encoding = t ; description }, d)
+let req ?title ?description n t = Req { name = n ;
+                                        encoding =
+                                          Describe { title ; encoding = t ; description } }
+let opt ?title ?description n t = Opt { name = n ;
+                                        encoding =
+                                          Describe { title ; encoding = t; description } }
+let dft ?title ?description n t d = Dft  { name = n ;
+                                           encoding =
+                                             Describe { title ; encoding = t ; description } ;
+                                           default = d }
 
 let mu name self = Mu (name, self)
 let null = Null
