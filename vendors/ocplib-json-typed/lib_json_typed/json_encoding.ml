@@ -69,7 +69,9 @@ type _ encoding =
   | Tups : 'a encoding * 'b encoding -> ('a * 'b) encoding
   | Custom : 't repr_agnostic_custom * Json_schema.schema -> 't encoding
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b encoding * Json_schema.schema option -> 'a encoding
-  | Describe : string option * string option * 'a encoding -> 'a encoding
+  | Describe : { title: string option ;
+                 description: string option ;
+                 encoding: 'a encoding } -> 'a encoding
   | Mu : string * ('a encoding -> 'a encoding) -> 'a encoding
   | Union : 't case list -> 't encoding
 
@@ -123,7 +125,7 @@ module Make (Repr : Json_repr.Repr) = struct
              if float < minimum || float > maximum then invalid_arg err ;
              Repr.repr (`Float float))
         | Float None -> (fun float -> Repr.repr (`Float float))
-        | Describe (_, _, t) -> construct t
+        | Describe { encoding = t } -> construct t
         | Custom ({ write }, _) -> (fun (j : t) -> write (module Repr) j)
         | Conv (ffrom, _, t, _) -> (fun v -> construct t (ffrom v))
         | Mu (name, self) -> construct (self (Mu (name, self)))
@@ -215,7 +217,7 @@ module Make (Repr : Json_repr.Repr) = struct
                raise (Cannot_destruct ([], exn))
              else f
            | k -> raise (unexpected k "float"))
-      | Describe (_, _, t) -> destruct t
+      | Describe { encoding = t } -> destruct t
       | Custom ({ read }, _) -> read (module Repr)
       | Conv (_, fto, t, _) -> (fun v -> fto (destruct t v))
       | Mu (name, self) -> destruct (self (Mu (name, self)))
@@ -294,7 +296,7 @@ module Make (Repr : Json_repr.Repr) = struct
         let r, i = destruct_tup i t in
         (fun arr -> fto (r arr)), i
       | Mu (_, self) as mu -> destruct_tup i (self mu)
-      | Describe (_, _, enc) -> destruct_tup i enc
+      | Describe { encoding } -> destruct_tup i encoding
       | _ -> invalid_arg "Json_encoding.destruct: consequence of bad merge_tups"
   and destruct_obj
     : type t. t encoding -> (string * Repr.value) list -> t * (string * Repr.value) list * bool
@@ -347,7 +349,7 @@ module Make (Repr : Json_repr.Repr) = struct
            let r, rest, ign = d fields in
            fto r, rest, ign)
       | Mu (_, self) as mu -> destruct_obj (self mu)
-      | Describe (_, _, enc) -> destruct_obj enc
+      | Describe { encoding } -> destruct_obj encoding
       | Union cases ->
         (fun fields ->
            let rec do_cases errs = function
@@ -403,7 +405,7 @@ let schema encoding =
              (fun (Case (o, _, _)) -> object_schema o)
              cases)
       | Mu (_, self) as mu -> object_schema (self mu)
-      | Describe (_, _, t) -> object_schema t
+      | Describe { encoding = t } -> object_schema t
       | Conv (_, _, _, Some _) (* FIXME: We could do better *)
       | _ -> invalid_arg "Json_encoding.schema: consequence of bad merge_objs"
   and array_schema
@@ -413,7 +415,7 @@ let schema encoding =
       | Tup t -> [ schema t ]
       | Tups (t1, t2) -> array_schema t1 @ array_schema t2
       | Mu (_, self) as mu -> array_schema (self mu)
-      | Describe (_, _, t) -> array_schema t
+      | Describe { encoding = t } -> array_schema t
       | Conv (_, _, _, Some _) (* FIXME: We could do better *)
       | _ -> invalid_arg "Json_encoding.schema: consequence of bad merge_tups"
   and schema
@@ -438,12 +440,16 @@ let schema encoding =
                           minimum = Some (minimum, `Inclusive) ;
                           maximum = Some (maximum, `Inclusive) })
       | Float None -> element (Number numeric_specs)
-      | Describe (None, None, t) -> schema t
-      | Describe (Some _ as title, None, t) ->
+      | Describe { title = None ; description = None ;
+                   encoding = t } -> schema t
+      | Describe { title = Some _ as title ; description =  None ;
+                   encoding = t } ->
         { (schema t) with title }
-      | Describe (None, (Some _ as description), t) ->
+      | Describe  { title = None ; description =  Some _ as description ;
+                    encoding = t } ->
         { (schema t) with description }
-      | Describe (Some _ as title, (Some _ as description), t) ->
+      | Describe { title = Some _ as title ; description = Some _ as description ;
+                   encoding = t } ->
         { (schema t) with title ; description }
       | Custom (_, s) ->
         sch := fst (merge_definitions (!sch, s)) ;
@@ -507,9 +513,9 @@ let schema encoding =
 
 (*-- utility wrappers over the GADT ------------------------------------------*)
 
-let req ?title ?description n t = Req (n, Describe (title, description, t))
-let opt ?title ?description n t = Opt (n, Describe (title, description, t))
-let dft ?title ?description n t d = Dft (n, Describe (title, description, t), d)
+let req ?title ?description n t = Req (n, Describe { title ; encoding = t ; description })
+let opt ?title ?description n t = Opt (n, Describe { title ; encoding = t; description })
+let dft ?title ?description n t d = Dft (n, Describe { title ; encoding = t ; description }, d)
 
 let mu name self = Mu (name, self)
 let null = Null
@@ -666,7 +672,7 @@ let tup10 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 =
 let repr_agnostic_custom { write ; read } ~schema =
   Custom ({ write ; read }, schema)
 
-let describe ?title ?description t = Describe (title, description, t)
+let describe ?title ?description t = Describe { title ; encoding = t ; description }
 
 let constant s = Constant s
 
@@ -741,7 +747,7 @@ let rec is_nullable: type t. t encoding -> bool = function
   | Conv (_, _, t, _) -> is_nullable t
   | Union cases ->
     List.exists (fun (Case (t, _, _)) -> is_nullable t) cases
-  | Describe (_, _, t) -> is_nullable t
+  | Describe { encoding = t } -> is_nullable t
   | Mu (_, f) as self -> is_nullable (f self)
   | Custom (_, sch) -> Json_schema.is_nullable sch
 
@@ -784,7 +790,7 @@ let merge_tups t1 t2 =
     | Tups _ (* by construction *) -> true
     | Conv (_, _, t, None) -> is_tup t
     | Mu (_name, self) as mu -> is_tup (self mu)
-    | Describe (_, _, t) -> is_tup t
+    | Describe { encoding = t } -> is_tup t
     | _ -> false in
   if is_tup t1 && is_tup t2 then
     Tups (t1, t2)
@@ -804,7 +810,7 @@ let merge_objs o1 o2 =
     | Ignore -> true
     | Union cases -> List.for_all (fun (Case (o, _, _)) -> is_obj o) cases
     | Mu (_name, self) as mu -> is_obj (self mu)
-    | Describe (_, _, t) -> is_obj t
+    | Describe { encoding = t } -> is_obj t
     | _ -> false in
   if is_obj o1 && is_obj o2 then
     Objs (o1, o2)
