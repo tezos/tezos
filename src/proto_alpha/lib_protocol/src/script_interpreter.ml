@@ -77,19 +77,24 @@ let unparse_stack ctxt (stack, stack_ty) =
   (* We drop the gas limit as this function is only used for debugging/errors. *)
   let ctxt = Gas.set_unlimited ctxt in
   let rec unparse_stack
-    : type a. a stack * a stack_ty -> Script.expr list tzresult Lwt.t
+    : type a. a stack * a stack_ty -> (Script.expr * string option) list tzresult Lwt.t
     = function
       | Empty, Empty_t -> return []
-      | Item (v, rest), Item_t (ty, rest_ty, _) ->
+      | Item (v, rest), Item_t (ty, rest_ty, annot) ->
           unparse_data ctxt Readable ty v >>=? fun (data, _ctxt) ->
           unparse_stack (rest, rest_ty) >>=? fun rest ->
-          return (Micheline.strip_locations data :: rest) in
+          let annot = match Script_ir_annot.unparse_var_annot annot with
+            | [] -> None
+            | [ a ] -> Some a
+            | _ -> assert false in
+          let data = Micheline.strip_locations data in
+          return ((data, annot) :: rest) in
   unparse_stack (stack, stack_ty)
 
 module Interp_costs = Michelson_v1_gas.Cost_of
 
 type execution_trace =
-  (Script.location * Gas.t * Script.expr list) list
+  (Script.location * Gas.t * (Script.expr * string option) list) list
 
 let rec interp
   : type p r.

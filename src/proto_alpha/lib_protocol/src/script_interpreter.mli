@@ -31,7 +31,7 @@ val execute:
   execution_result tzresult Lwt.t
 
 type execution_trace =
-  (Script.location * Gas.t * Script.expr list) list
+  (Script.location * Gas.t * (Script.expr * string option) list) list
 
 val trace:
   Alpha_context.t ->

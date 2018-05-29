@@ -76,7 +76,11 @@ module Scripts = struct
                        (list @@ obj3
                           (req "location" Script.location_encoding)
                           (req "gas" Gas.encoding)
-                          (req "stack" (list (Script.expr_encoding)))))
+                          (req "stack"
+                             (list
+                                (obj2
+                                   (req "item" (Script.expr_encoding))
+                                   (opt "annot" string))))))
                     (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
         RPC_path.(path / "trace_code")
 
@@ -172,7 +176,7 @@ module Scripts = struct
       begin match maybe_gas with
         | None -> return (Gas.set_unlimited ctxt)
         | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
-      Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ, _) ->
+      Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ) ->
       parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
       Script_ir_translator.hash_data ctxt typ data >>=? fun (hash, ctxt) ->
       return (hash, Gas.level ctxt)

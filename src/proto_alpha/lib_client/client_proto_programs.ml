@@ -79,7 +79,13 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
                 "- @[<v 0>location: %d (remaining gas: %a)@,\
                  [ @[<v 0>%a ]@]@]"
                 loc Gas.pp gas
-                (Format.pp_print_list print_expr)
+                (Format.pp_print_list
+                   (fun ppf (e, annot) ->
+                      Format.fprintf ppf
+                        "@[<v 0>%a  \t%s@]"
+                        print_expr e
+                        (match annot with None -> "" | Some a -> a)
+                   ))
                 stack))
         trace >>= fun () ->
       return ()
