@@ -72,9 +72,17 @@ type 'a desc =
   | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
-  | Req : string * 'a t -> 'a field
-  | Opt : Kind.enum * string * 'a t -> 'a option field
-  | Dft : string * 'a t * 'a -> 'a field
+  | Req : { name: string ;
+            encoding: 'a t ;
+          } -> 'a field
+  | Opt : { name: string ;
+            kind: Kind.enum ;
+            encoding: 'a t ;
+          } -> 'a option field
+  | Dft : { name: string ;
+            encoding: 'a t ;
+            default: 'a ;
+         } -> 'a field
 
 and 'a case =
   | Case : { name : string option ;

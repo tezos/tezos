@@ -252,16 +252,16 @@ let rec read_rec
         read_list e state @@ fun (l, state) ->
         k (Array.of_list l, state)
     | List e -> read_list e state k
-    | (Obj (Req (_, e))) -> read_rec e state k
-    | (Obj (Dft (_, e, _))) -> read_rec e state k
-    | (Obj (Opt (`Dynamic, _, e))) ->
+    | (Obj (Req { encoding = e })) -> read_rec e state k
+    | (Obj (Dft { encoding = e })) -> read_rec e state k
+    | (Obj (Opt { kind = `Dynamic ; encoding = e })) ->
         Atom.bool resume state @@ fun (present, state) ->
         if not present then
           k (None, state)
         else
           read_rec e state @@ fun (v, state) ->
           k (Some v, state)
-    | (Obj (Opt (`Variable, _, e))) ->
+    | (Obj (Opt { kind = `Variable ; encoding = e })) ->
         let size = remaining_bytes state in
         if size = 0 then
           k (None, state)

@@ -226,18 +226,18 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
         Array.iter (write_rec e state) value
     | List e ->
         List.iter (write_rec e state) value
-    | Obj (Req (_, e)) -> write_rec e state value
-    | Obj (Opt (`Dynamic, _, e)) -> begin
+    | Obj (Req { encoding = e }) -> write_rec e state value
+    | Obj (Opt { kind = `Dynamic ; encoding = e }) -> begin
         match value with
         | None -> Atom.bool state false
         | Some value -> Atom.bool state true ; write_rec e state value
       end
-    | Obj (Opt (`Variable, _, e)) -> begin
+    | Obj (Opt { kind = `Variable ; encoding = e }) -> begin
         match value with
         | None -> ()
         | Some value -> write_rec e state value
       end
-    | Obj (Dft (_, e, _)) -> write_rec e state value
+    | Obj (Dft { encoding = e }) -> write_rec e state value
     | Objs (_, e1, e2) ->
         let (v1, v2) = value in
         write_rec e1 state v1 ;

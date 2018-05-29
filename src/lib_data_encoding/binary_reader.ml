@@ -190,15 +190,15 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
         let l = read_list e state in
         Array.of_list l
     | List e -> read_list e state
-    | (Obj (Req (_, e))) -> read_rec e state
-    | (Obj (Dft (_, e, _))) -> read_rec e state
-    | (Obj (Opt (`Dynamic, _, e))) ->
+    | (Obj (Req { encoding = e })) -> read_rec e state
+    | (Obj (Dft { encoding = e })) -> read_rec e state
+    | (Obj (Opt { kind = `Dynamic ; encoding = e })) ->
         let present = Atom.bool state in
         if not present then
           None
         else
           Some (read_rec e state)
-    | (Obj (Opt (`Variable, _, e))) ->
+    | (Obj (Opt { kind = `Variable ; encoding = e })) ->
         if state.remaining_bytes = 0 then
           None
         else

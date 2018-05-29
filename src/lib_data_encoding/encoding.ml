@@ -114,9 +114,17 @@ type 'a desc =
   | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
-  | Req : string * 'a t -> 'a field
-  | Opt : Kind.enum * string * 'a t -> 'a option field
-  | Dft : string * 'a t * 'a -> 'a field
+  | Req : { name: string ;
+            encoding: 'a t ;
+          } -> 'a field
+  | Opt : { name: string ;
+            kind: Kind.enum ;
+            encoding: 'a t ;
+          } -> 'a option field
+  | Dft : { name: string ;
+            encoding: 'a t ;
+            default: 'a ;
+         } -> 'a field
 
 and 'a case =
   | Case : { name : string option ;
@@ -157,7 +165,7 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | String kind -> (kind :> Kind.t)
   | String_enum (_, cases) ->
       `Fixed Binary_size.(integer_to_size @@ enum_size cases)
-  | Obj (Opt (kind, _, _)) -> (kind :> Kind.t)
+  | Obj (Opt { kind }) -> (kind :> Kind.t)
   | Objs (kind, _, _) -> kind
   | Tups (kind, _, _) -> kind
   | Union (kind, _, _) -> (kind :> Kind.t)
@@ -167,8 +175,8 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Array _ -> `Variable
   | List _ -> `Variable
   (* Recursive *)
-  | Obj (Req (_, encoding)) -> classify encoding
-  | Obj (Dft (_, encoding, _)) -> classify encoding
+  | Obj (Req { encoding }) -> classify encoding
+  | Obj (Dft { encoding }) -> classify encoding
   | Tup encoding -> classify encoding
   | Conv { encoding } -> classify encoding
   | Describe { encoding } -> classify encoding
@@ -224,9 +232,9 @@ let rec is_zeroable: type t. t encoding -> bool = fun e ->
   | Array _ -> true (* 0-element array *)
   | List _ -> true (* 0-element list *)
   (* represented as whatever is inside: truth mostly propagates *)
-  | Obj (Req (_, e)) -> is_zeroable e (* represented as-is *)
-  | Obj (Opt (`Variable, _, _)) -> true (* optional field ommited *)
-  | Obj (Dft (_, e, _)) -> is_zeroable e (* represented as-is *)
+  | Obj (Req { encoding = e }) -> is_zeroable e (* represented as-is *)
+  | Obj (Opt { kind = `Variable }) -> true (* optional field ommited *)
+  | Obj (Dft { encoding = e }) -> is_zeroable e (* represented as-is *)
   | Obj _ -> false
   | Objs (_, e1, e2) -> is_zeroable e1 && is_zeroable e2
   | Tup e -> is_zeroable e
@@ -331,17 +339,21 @@ let describe ?title ?description encoding =
 let def name encoding = make @@ Def { name ; encoding }
 
 let req ?title ?description n t =
-  Req (n, describe ?title ?description t)
+  Req { name = n ; encoding = describe ?title ?description t }
 let opt ?title ?description n encoding =
   let kind =
     match classify encoding with
     | `Variable -> `Variable
     | `Fixed _ | `Dynamic -> `Dynamic in
-  Opt (kind, n, make @@ Describe { title ; description ; encoding })
+  Opt { name = n ; kind ;
+        encoding = make @@ Describe { title ; description ; encoding } }
 let varopt ?title ?description n encoding =
-  Opt (`Variable, n, make @@ Describe { title ; description ; encoding })
+  Opt { name = n ; kind = `Variable ;
+        encoding = make @@ Describe { title ; description ; encoding } }
 let dft ?title ?description n t d =
-  Dft (n, describe ?title ?description t, d)
+  Dft { name = n ;
+        encoding = describe ?title ?description t ;
+        default = d }
 
 let raw_splitted ~json ~binary =
   make @@ Splitted { encoding = binary ;

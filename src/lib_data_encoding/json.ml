@@ -225,9 +225,9 @@ and field_json
   : type a. a Encoding.field -> a Json_encoding.field =
   let open Json_encoding in
   function
-  | Encoding.Req (name, e) -> req name (get_json e)
-  | Encoding.Opt (_, name, e) -> opt name (get_json e)
-  | Encoding.Dft (name, e, d) -> dft name (get_json e) d
+  | Encoding.Req { name ; encoding = e } -> req name (get_json e)
+  | Encoding.Opt { name ; encoding = e } -> opt name (get_json e)
+  | Encoding.Dft { name ; encoding = e ; default = d} -> dft name (get_json e) d
 
 and case_json : type a. a Encoding.case -> a Json_encoding.case =
   let open Json_encoding in

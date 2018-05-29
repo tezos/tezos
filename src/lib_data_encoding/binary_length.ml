@@ -64,7 +64,7 @@ let rec length : type x. x Encoding.t -> x -> int =
         length_case cases
     | Mu (`Dynamic, _name, self) ->
         length (self e) value
-    | Obj (Opt (`Dynamic, _, e)) -> begin
+    | Obj (Opt { kind = `Dynamic ; encoding = e }) -> begin
         match value with
         | None -> 1
         | Some value -> 1 + length e value
@@ -87,7 +87,7 @@ let rec length : type x. x Encoding.t -> x -> int =
     | Tups (`Variable, e1, e2) ->
         let (v1, v2) = value in
         length e1 v1 + length e2 v2
-    | Obj (Opt (`Variable, _, e)) -> begin
+    | Obj (Opt { kind = `Variable ; encoding = e }) -> begin
         match value with
         | None -> 0
         | Some value -> length e value
@@ -106,8 +106,8 @@ let rec length : type x. x Encoding.t -> x -> int =
     | Mu (`Variable, _name, self) ->
         length (self e) value
     (* Recursive*)
-    | Obj (Req (_, e)) -> length e value
-    | Obj (Dft (_, e, _)) -> length e value
+    | Obj (Req { encoding = e }) -> length e value
+    | Obj (Dft { encoding = e }) -> length e value
     | Tup e -> length e value
     | Conv  { encoding = e ; proj } ->
         length e (proj value)
