@@ -120,78 +120,22 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
     #simple -> ?chain:chain -> ?block:block ->
     unit -> Block_hash.t tzresult Lwt.t
 
+  val header:
+    #simple -> ?chain:chain -> ?block:block ->
+    unit -> block_header tzresult Lwt.t
+
+  val metadata:
+    #simple -> ?chain:chain -> ?block:block ->
+    unit -> block_metadata tzresult Lwt.t
+
   module Header : sig
 
-    val header:
-      #simple -> ?chain:chain -> ?block:block ->
-      unit -> block_header tzresult Lwt.t
     val shell_header:
       #simple -> ?chain:chain -> ?block:block ->
       unit -> Block_header.shell_header tzresult Lwt.t
     val protocol_data:
       #simple -> ?chain:chain -> ?block:block ->
       unit -> Proto.block_header_data tzresult Lwt.t
-
-    module Shell : sig
-
-      val level:
-        #simple -> ?chain:chain -> ?block:block ->
-        unit -> Int32.t tzresult Lwt.t
-      val protocol_level:
-        #simple -> ?chain:chain -> ?block:block ->
-        unit -> int tzresult Lwt.t
-      val predecessor:
-        #simple -> ?chain:chain -> ?block:block ->
-        unit -> Block_hash.t tzresult Lwt.t
-      val timestamp:
-        #simple -> ?chain:chain -> ?block:block ->
-        unit -> Time.t tzresult Lwt.t
-      val validation_passes:
-        #simple -> ?chain:chain -> ?block:block ->
-        unit -> int tzresult Lwt.t
-      val operations_hash:
-        #simple -> ?chain:chain -> ?block:block ->
-        unit -> Operation_list_list_hash.t tzresult Lwt.t
-      val fitness:
-        #simple -> ?chain:chain -> ?block:block ->
-        unit -> Fitness.t tzresult Lwt.t
-      val context_hash:
-        #simple -> ?chain:chain -> ?block:block ->
-        unit -> Context_hash.t tzresult Lwt.t
-
-    end
-
-  end
-
-  module Metadata : sig
-
-    val metadata:
-      #simple -> ?chain:chain -> ?block:block ->
-      unit -> block_metadata tzresult Lwt.t
-    val protocol_data:
-      #simple -> ?chain:chain -> ?block:block ->
-      unit -> Proto.block_header_metadata tzresult Lwt.t
-    val protocol_hash:
-      #simple -> ?chain:chain -> ?block:block ->
-      unit -> Protocol_hash.t tzresult Lwt.t
-    val next_protocol_hash:
-      #simple -> ?chain:chain -> ?block:block ->
-      unit -> Protocol_hash.t tzresult Lwt.t
-    val test_chain_status:
-      #simple -> ?chain:chain -> ?block:block ->
-      unit -> Test_chain_status.t tzresult Lwt.t
-    val max_operations_ttl:
-      #simple -> ?chain:chain -> ?block:block ->
-      unit -> int tzresult Lwt.t
-    val max_operation_data_length:
-      #simple -> ?chain:chain -> ?block:block ->
-      unit -> int tzresult Lwt.t
-    val max_block_header_length:
-      #simple -> ?chain:chain -> ?block:block ->
-      unit -> int tzresult Lwt.t
-    val max_operation_list_length:
-      #simple -> ?chain:chain -> ?block:block ->
-      unit -> operation_list_quota list tzresult Lwt.t
 
   end
 
@@ -280,12 +224,17 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
        prefix, unit, unit,
        block_info)   RPC_service.t
 
-    module Header : sig
+    val header:
+      ([ `GET ], prefix,
+       prefix, unit, unit,
+       block_header) RPC_service.t
 
-      val header:
-        ([ `GET ], prefix,
-         prefix, unit, unit,
-         block_header) RPC_service.t
+    val metadata:
+      ([ `GET ], prefix,
+       prefix, unit, unit,
+       block_metadata) RPC_service.t
+
+    module Header : sig
 
       val shell_header:
         ([ `GET ], prefix,
@@ -296,99 +245,6 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
         ([ `GET ], prefix,
          prefix, unit, unit,
          Proto.block_header_data) RPC_service.t
-
-      module Shell : sig
-
-        val level:
-          ([ `GET ], prefix,
-           prefix, unit, unit,
-           Int32.t) RPC_service.t
-
-        val protocol_level:
-          ([ `GET ], prefix,
-           prefix, unit, unit,
-           int) RPC_service.t
-
-        val predecessor:
-          ([ `GET ], prefix,
-           prefix, unit, unit,
-           Block_hash.t) RPC_service.t
-
-        val timestamp:
-          ([ `GET ], prefix,
-           prefix, unit, unit,
-           Time.t) RPC_service.t
-
-        val validation_passes:
-          ([ `GET ], prefix,
-           prefix, unit, unit,
-           int) RPC_service.t
-
-        val operations_hash:
-          ([ `GET ], prefix,
-           prefix, unit, unit,
-           Operation_list_list_hash.t) RPC_service.t
-
-        val fitness:
-          ([ `GET ], prefix,
-           prefix, unit, unit,
-           Fitness.t) RPC_service.t
-
-        val context_hash:
-          ([ `GET ], prefix,
-           prefix, unit, unit,
-           Context_hash.t) RPC_service.t
-
-      end
-
-    end
-
-    module Metadata : sig
-
-      val metadata:
-        ([ `GET ], prefix,
-         prefix, unit, unit,
-         block_metadata) RPC_service.t
-
-      val protocol_data:
-        ([ `GET ], prefix,
-         prefix, unit, unit,
-         Proto.block_header_metadata) RPC_service.t
-
-      val protocol_hash:
-        ([ `GET ], prefix,
-         prefix, unit, unit,
-         Protocol_hash.t) RPC_service.t
-
-      val next_protocol_hash:
-        ([ `GET ], prefix,
-         prefix, unit, unit,
-         Protocol_hash.t) RPC_service.t
-
-      val test_chain_status:
-        ([ `GET ], prefix,
-         prefix, unit, unit,
-         Test_chain_status.t) RPC_service.t
-
-      val max_operations_ttl:
-        ([ `GET ], prefix,
-         prefix, unit, unit,
-         int) RPC_service.t
-
-      val max_operation_data_length:
-        ([ `GET ], prefix,
-         prefix, unit, unit,
-         int) RPC_service.t
-
-      val max_block_header_length:
-        ([ `GET ], prefix,
-         prefix, unit, unit,
-         int) RPC_service.t
-
-      val operation_list_quota:
-        ([ `GET ], prefix,
-         prefix, unit, unit,
-         operation_list_quota list) RPC_service.t
 
     end
 
@@ -482,3 +338,12 @@ end
 
 module Fake_protocol : PROTO
 module Empty : (module type of Make(Fake_protocol)(Fake_protocol))
+
+type protocols = {
+  current_protocol: Protocol_hash.t ;
+  next_protocol: Protocol_hash.t ;
+}
+
+val protocols:
+  #RPC_context.simple -> ?chain:chain -> ?block:block ->
+  unit -> protocols tzresult Lwt.t

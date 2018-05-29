@@ -25,11 +25,11 @@ let info cctxt ?(chain = `Main) block =
   Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   Shell_services.Blocks.Header.shell_header cctxt ~chain ~block () >>=? fun header ->
-  Shell_services.Blocks.Metadata.next_protocol_hash
-    cctxt ~chain ~block () >>=? fun next_protocol ->
-  Shell_services.Blocks.Metadata.protocol_hash
-    cctxt ~chain ~block () >>=? fun protocol ->
-  Alpha_block_services.Metadata.protocol_data cctxt ~chain ~block () >>=? fun { level } ->
+  Shell_services.Blocks.protocols
+    cctxt ~chain ~block () >>=? fun { current_protocol = protocol ;
+                                      next_protocol } ->
+  Alpha_block_services.metadata cctxt
+    ~chain ~block () >>=? fun { protocol_data = { level } } ->
   let { Tezos_base.Block_header.predecessor ; fitness ; timestamp ; _ } = header in
   return { hash ; chain_id ; predecessor ; fitness ;
            timestamp ; protocol ; next_protocol ; level }
@@ -50,8 +50,8 @@ let monitor_heads cctxt ?next_protocols chain =
 
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-  Alpha_block_services.Metadata.protocol_data
-    cctxt ~chain ~block () >>=? fun { level } ->
+  Alpha_block_services.metadata
+    cctxt ~chain ~block () >>=? fun { protocol_data = { level } } ->
   Alpha_services.Helpers.levels_in_current_cycle
     cctxt ~offset (chain, block) >>=? fun (first, last) ->
   let length = Int32.to_int (Raw_level.diff level.level first) in

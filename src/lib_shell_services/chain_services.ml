@@ -190,6 +190,13 @@ module Blocks = struct
 
   include Block_services.Empty
 
+  type protocols = Block_services.protocols = {
+    current_protocol: Protocol_hash.t ;
+    next_protocol: Protocol_hash.t ;
+  }
+
+  let protocols = Block_services.protocols
+
 end
 
 module Invalid_blocks = struct

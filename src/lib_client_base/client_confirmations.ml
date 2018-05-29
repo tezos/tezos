@@ -27,8 +27,8 @@ let wait_for_operation_inclusion
 
   let fetch_predecessors block =
     let rec loop acc block =
-      Block_services.Empty.Header.Shell.predecessor
-        ctxt ~chain ~block:(`Hash (block, 0)) () >>=? fun predecessor ->
+      Block_services.Empty.Header.shell_header
+        ctxt ~chain ~block:(`Hash (block, 0)) () >>=? fun { predecessor } ->
       if Block_hash.Table.mem blocks predecessor then
         return acc
       else
@@ -48,8 +48,8 @@ let wait_for_operation_inclusion
 
   let process block =
     Shell_services.Blocks.hash ctxt ~chain ~block () >>=? fun hash ->
-    Shell_services.Blocks.Header.Shell.predecessor
-      ctxt ~chain ~block () >>=? fun predecessor ->
+    Shell_services.Blocks.Header.shell_header
+      ctxt ~chain ~block () >>=? fun { predecessor } ->
     match Block_hash.Table.find blocks predecessor with
     | Some (block_with_op, n) ->
         ctxt#answer

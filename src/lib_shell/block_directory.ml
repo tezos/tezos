@@ -56,7 +56,7 @@ let build_raw_rpc_directory
 
   (* block header *)
 
-  register0 S.Header.header begin fun block () () ->
+  register0 S.header begin fun block () () ->
     let chain_id = State.Block.chain_id block in
     let hash = State.Block.hash block in
     let header = State.Block.header block in
@@ -69,30 +69,6 @@ let build_raw_rpc_directory
   end ;
   register0 S.Header.shell_header begin fun block () () ->
     return (State.Block.header block).shell
-  end ;
-  register0 S.Header.Shell.level begin fun block () () ->
-    return (State.Block.header block).shell.level
-  end ;
-  register0 S.Header.Shell.protocol_level begin fun block () () ->
-    return (State.Block.header block).shell.proto_level
-  end ;
-  register0 S.Header.Shell.predecessor begin fun block () () ->
-    return (State.Block.header block).shell.predecessor
-  end ;
-  register0 S.Header.Shell.timestamp begin fun block () () ->
-    return (State.Block.header block).shell.timestamp
-  end ;
-  register0 S.Header.Shell.validation_passes begin fun block () () ->
-    return (State.Block.header block).shell.validation_passes
-  end ;
-  register0 S.Header.Shell.operations_hash begin fun block () () ->
-    return (State.Block.header block).shell.operations_hash
-  end ;
-  register0 S.Header.Shell.fitness begin fun block () () ->
-    return (State.Block.header block).shell.fitness
-  end ;
-  register0 S.Header.Shell.context_hash begin fun block () () ->
-    return (State.Block.header block).shell.context
   end ;
   register0 S.Header.protocol_data begin fun block () () ->
     let header = State.Block.header block in
@@ -123,39 +99,8 @@ let build_raw_rpc_directory
           Next_proto.validation_passes ;
     } in
 
-  register0 S.Metadata.metadata begin fun block () () ->
+  register0 S.metadata begin fun block () () ->
     metadata block
-  end ;
-  register0 S.Metadata.protocol_data begin fun block () () ->
-    return
-      (Data_encoding.Binary.of_bytes_exn
-         Proto.block_header_metadata_encoding
-         (State.Block.metadata block))
-  end ;
-  register0 S.Metadata.protocol_hash begin fun _block () () ->
-    return Proto.hash
-  end ;
-  register0 S.Metadata.next_protocol_hash begin fun _block () () ->
-    return Next_proto.hash
-  end ;
-  register0 S.Metadata.test_chain_status begin fun block () () ->
-    State.Block.test_chain block >>= return
-  end ;
-  register0 S.Metadata.max_operations_ttl begin fun block () () ->
-    return (State.Block.max_operations_ttl block)
-  end ;
-  register0 S.Metadata.max_operation_data_length begin fun block () () ->
-    return (State.Block.max_operation_data_length block)
-  end ;
-  register0 S.Metadata.max_block_header_length begin fun _block () () ->
-    return (Next_proto.max_block_length) ;
-  end ;
-  register0 S.Metadata.operation_list_quota begin fun _block () () ->
-    return
-      (List.map
-         (fun { Tezos_protocol_environment_shell.max_size; max_op } ->
-            { Tezos_shell_services.Block_services.max_size ; max_op } )
-         Next_proto.validation_passes)
   end ;
 
   (* operations *)

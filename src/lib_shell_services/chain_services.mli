@@ -56,6 +56,15 @@ module Blocks : sig
 
   include (module type of Block_services.Empty)
 
+  type protocols = {
+    current_protocol: Protocol_hash.t ;
+    next_protocol: Protocol_hash.t ;
+  }
+
+  val protocols:
+    #RPC_context.simple -> ?chain:chain -> ?block:Block_services.block ->
+    unit -> protocols tzresult Lwt.t
+
 end
 
 module Invalid_blocks : sig

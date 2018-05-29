@@ -410,8 +410,8 @@ let get_unrevealed_nonces
       Client_baking_nonces.find cctxt hash >>=? function
       | None -> return None
       | Some nonce ->
-          Alpha_block_services.Metadata.protocol_data
-            cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { level } ->
+          Alpha_block_services.metadata
+            cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
           if force then
             return (Some (hash, (level.level, nonce)))
           else

@@ -158,6 +158,24 @@ module type PROTO = sig
     (operation_data * operation_receipt) Data_encoding.t
 end
 
+
+type protocols = {
+  current_protocol: Protocol_hash.t ;
+  next_protocol: Protocol_hash.t ;
+}
+
+let raw_protocol_encoding =
+  conv
+    (fun { current_protocol ; next_protocol } ->
+       ((current_protocol, next_protocol), ()))
+    (fun ((current_protocol, next_protocol), ()) ->
+       { current_protocol ; next_protocol })
+    (merge_objs
+       (obj2
+          (req "protocol" Protocol_hash.encoding)
+          (req "next_protocol" Protocol_hash.encoding))
+       unit)
+
 module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
   let protocol_hash = Protocol_hash.to_b58check Proto.hash
@@ -310,16 +328,31 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
         ~output: Block_hash.encoding
         RPC_path.(path / "hash")
 
+    let header =
+      RPC_service.get_service
+        ~description:"The whole block header."
+        ~query: RPC_query.empty
+        ~output: block_header_encoding
+        RPC_path.(path / "header")
+
+    let metadata =
+      RPC_service.get_service
+        ~description:"All the metadata associated to the block."
+        ~query: RPC_query.empty
+        ~output: block_metadata_encoding
+        RPC_path.(path / "metadata")
+
+    let protocols =
+      (* same endpoint than 'metadata' *)
+      RPC_service.get_service
+        ~description:".. unexported ..."
+        ~query: RPC_query.empty
+        ~output: raw_protocol_encoding
+        RPC_path.(path / "metadata")
+
     module Header = struct
 
       let path = RPC_path.(path / "header")
-
-      let header =
-        RPC_service.get_service
-          ~description:"The whole block header."
-          ~query: RPC_query.empty
-          ~output: block_header_encoding
-          path
 
       let shell_header =
         RPC_service.get_service
@@ -339,142 +372,6 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
                   (obj1 (req "protocol" (constant protocol_hash)))
                   Proto.block_header_data_encoding))
           RPC_path.(path / "protocol_data")
-
-      module Shell = struct
-
-        let path = RPC_path.(path / "shell")
-
-        let level =
-          RPC_service.get_service
-            ~description:"The block's level."
-            ~query: RPC_query.empty
-            ~output: int32
-            RPC_path.(path / "level")
-
-        let protocol_level =
-          RPC_service.get_service
-            ~description:"The block's protocol level (modulo 256)."
-            ~query: RPC_query.empty
-            ~output: uint8
-            RPC_path.(path / "proto_level")
-
-        let predecessor =
-          RPC_service.get_service
-            ~description:"The previous block's id."
-            ~query: RPC_query.empty
-            ~output: Block_hash.encoding
-            RPC_path.(path / "predecessor")
-
-        let timestamp =
-          RPC_service.get_service
-            ~description:"The block's timestamp."
-            ~query: RPC_query.empty
-            ~output: Time.encoding
-            RPC_path.(path / "timestamp")
-
-        let validation_passes =
-          RPC_service.get_service
-            ~description:"The number of validation passes for the block."
-            ~query: RPC_query.empty
-            ~output: uint8
-            RPC_path.(path / "validation_passes")
-
-        let operations_hash =
-          RPC_service.get_service
-            ~description:"The hash of merkle tree of the operations included in the block."
-            ~query: RPC_query.empty
-            ~output: Operation_list_list_hash.encoding
-            RPC_path.(path / "operations_hash")
-
-        let fitness =
-          RPC_service.get_service
-            ~description:"The block's fitness."
-            ~query: RPC_query.empty
-            ~output: Fitness.encoding
-            RPC_path.(path / "fitness")
-
-        let context_hash =
-          RPC_service.get_service
-            ~description:"The hash of the resulting validation context."
-            ~query: RPC_query.empty
-            ~output: Context_hash.encoding
-            RPC_path.(path / "context_hash")
-
-      end
-
-    end
-
-    module Metadata = struct
-
-      let path = RPC_path.(path / "metadata")
-
-      let metadata =
-        RPC_service.get_service
-          ~description:"All the metadata associated to the block."
-          ~query: RPC_query.empty
-          ~output: block_metadata_encoding
-          path
-
-      let protocol_data =
-        RPC_service.get_service
-          ~description:"The protocol-specific metadata associated to the block."
-          ~query: RPC_query.empty
-          ~output:
-            (conv
-               (fun h -> ((), h)) (fun ((), h) -> h)
-               (merge_objs
-                  (obj1 (req "protocol" (constant protocol_hash)))
-                  Proto.block_header_metadata_encoding))
-          RPC_path.(path / "protocol_data")
-
-      let protocol_hash =
-        RPC_service.get_service
-          ~description:"The protocol used to bake this block."
-          ~query: RPC_query.empty
-          ~output: Protocol_hash.encoding
-          RPC_path.(path / "protocol_hash")
-
-      let next_protocol_hash =
-        RPC_service.get_service
-          ~description:"The protocol required to bake the next block."
-          ~query: RPC_query.empty
-          ~output: Protocol_hash.encoding
-          RPC_path.(path / "next_protocol_hash")
-
-      let test_chain_status =
-        RPC_service.get_service
-          ~description:"The status of the associated test chain."
-          ~query: RPC_query.empty
-          ~output: Test_chain_status.encoding
-          RPC_path.(path / "test_chain_status")
-
-      let max_operations_ttl =
-        RPC_service.get_service
-          ~description:"... FIXME ..."
-          ~query: RPC_query.empty
-          ~output: int31
-          RPC_path.(path / "max_operations_ttl")
-
-      let max_operation_data_length =
-        RPC_service.get_service
-          ~description:"... FIXME ..."
-          ~query: RPC_query.empty
-          ~output: int31
-          RPC_path.(path / "max_operation_data_length")
-
-      let max_block_header_length =
-        RPC_service.get_service
-          ~description:"... FIXME ..."
-          ~query: RPC_query.empty
-          ~output: int31
-          RPC_path.(path / "max_block_header_length")
-
-      let operation_list_quota =
-        RPC_service.get_service
-          ~description:"... FIXME ..."
-          ~query: RPC_query.empty
-          ~output: (list operation_list_quota_encoding)
-          RPC_path.(path / "operation_list_quota")
 
     end
 
@@ -707,117 +604,31 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
       | `Hash (h, 0) -> return h
       | _ -> f chain block () ()
 
+  let header ctxt =
+    let f = make_call0 S.header ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
+
+  let metadata ctxt =
+    let f = make_call0 S.metadata ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
+
+  let protocols ctxt =
+    let f = make_call0 S.protocols ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
+
   module Header = struct
 
     module S = S.Header
 
-    let header ctxt =
-      let f = make_call0 S.header ctxt in
-      fun ?(chain = `Main) ?(block = `Head 0) () ->
-        f chain block () ()
     let shell_header ctxt =
       let f = make_call0 S.shell_header ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) () ->
         f chain block () ()
     let protocol_data ctxt =
       let f = make_call0 S.protocol_data ctxt in
-      fun ?(chain = `Main) ?(block = `Head 0) () ->
-        f chain block () ()
-
-    module Shell = struct
-
-      module S = S.Shell
-
-      let level ctxt =
-        let f = make_call0 S.level ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) () ->
-          f chain block () ()
-
-      let protocol_level ctxt =
-        let f = make_call0 S.protocol_level ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) () ->
-          f chain block () ()
-
-      let predecessor ctxt =
-        let f = make_call0 S.predecessor ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) () ->
-          f chain block () ()
-
-      let timestamp ctxt =
-        let f = make_call0 S.timestamp ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) () ->
-          f chain block () ()
-
-      let validation_passes ctxt =
-        let f = make_call0 S.validation_passes ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) () ->
-          f chain block () ()
-
-      let operations_hash ctxt =
-        let f = make_call0 S.operations_hash ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) () ->
-          f chain block () ()
-
-      let fitness ctxt =
-        let f = make_call0 S.fitness ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) () ->
-          f chain block () ()
-
-      let context_hash ctxt =
-        let f = make_call0 S.context_hash ctxt in
-        fun ?(chain = `Main) ?(block = `Head 0) () ->
-          f chain block () ()
-
-    end
-
-  end
-
-  module Metadata = struct
-
-    module S = S.Metadata
-
-    let metadata ctxt =
-      let f = make_call0 S.metadata ctxt in
-      fun ?(chain = `Main) ?(block = `Head 0) () ->
-        f chain block () ()
-
-    let protocol_data ctxt =
-      let f = make_call0 S.protocol_data ctxt in
-      fun ?(chain = `Main) ?(block = `Head 0) () ->
-        f chain block () ()
-
-    let protocol_hash ctxt =
-      let f = make_call0 S.protocol_hash ctxt in
-      fun ?(chain = `Main) ?(block = `Head 0) () ->
-        f chain block () ()
-
-    let next_protocol_hash ctxt =
-      let f = make_call0 S.next_protocol_hash ctxt in
-      fun ?(chain = `Main) ?(block = `Head 0) () ->
-        f chain block () ()
-
-    let test_chain_status ctxt =
-      let f = make_call0 S.test_chain_status ctxt in
-      fun ?(chain = `Main) ?(block = `Head 0) () ->
-        f chain block () ()
-
-    let max_operations_ttl ctxt =
-      let f = make_call0 S.max_operations_ttl ctxt in
-      fun ?(chain = `Main) ?(block = `Head 0) () ->
-        f chain block () ()
-
-    let max_operation_data_length ctxt =
-      let f = make_call0 S.max_operation_data_length ctxt in
-      fun ?(chain = `Main) ?(block = `Head 0) () ->
-        f chain block () ()
-
-    let max_block_header_length ctxt =
-      let f = make_call0 S.max_block_header_length ctxt in
-      fun ?(chain = `Main) ?(block = `Head 0) () ->
-        f chain block () ()
-
-    let max_operation_list_length ctxt =
-      let f = make_call0 S.operation_list_quota ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) () ->
         f chain block () ()
 
@@ -961,3 +772,5 @@ let () =
         | Json_schema.Duplicate_definition _ ) as exn ->
           Some (Format.asprintf "%a" (fun ppf -> Json_schema.print_error ppf) exn)
       | _ -> None)
+
+let protocols = Empty.protocols
