@@ -24,8 +24,10 @@ let generate_seed_nonce () =
 let forge_block_header
     (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block delegate_sk shell priority seed_nonce_hash =
-  Alpha_services.Constants.proof_of_work_threshold
-    cctxt (chain, block) >>=? fun stamp_threshold ->
+  Alpha_services.Constants.all cctxt
+    (chain, block) >>=? fun { parametric = {
+      proof_of_work_threshold = stamp_threshold ;
+    } } ->
   let rec loop () =
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
     let contents =
@@ -171,7 +173,11 @@ let forge_block cctxt ?(chain = `Main) block
         try
           begin
             if free_baking then
-              Alpha_services.Constants.first_free_baking_slot cctxt (chain, block)
+              Alpha_services.Constants.all cctxt
+                (chain, block) >>=? fun { parametric = {
+                  first_free_baking_slot ;
+                } } ->
+              return first_free_baking_slot
             else
               return 0
           end >>=? fun min_prio ->

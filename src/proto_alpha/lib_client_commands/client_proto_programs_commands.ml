@@ -55,8 +55,11 @@ let commands () =
            with _ -> failwith "invalid gas limit (must be a positive number)")) in
   let resolve_max_gas cctxt block = function
     | None ->
-        Alpha_services.Constants.hard_gas_limits cctxt (`Main, block) >>=? fun (_, gas) ->
-        return gas
+        Alpha_services.Constants.all cctxt
+          (`Main, block) >>=? fun { parametric = {
+            hard_gas_limit_per_operation
+          } } ->
+        return hard_gas_limit_per_operation
     | Some gas -> return gas in
   let data_parameter =
     Clic.parameter (fun _ data ->

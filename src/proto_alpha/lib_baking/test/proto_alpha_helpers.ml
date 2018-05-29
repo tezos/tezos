@@ -634,7 +634,8 @@ let display_level block =
   return ()
 
 let endorsement_security_deposit block =
-  Constants_services.endorsement_security_deposit !rpc_ctxt (`Main, block)
+  Constants_services.all !rpc_ctxt (`Main, block) >>=? fun c ->
+  return c.parametric.endorsement_security_deposit
 
 let () =
   Client_keys.register_signer
