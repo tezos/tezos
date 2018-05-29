@@ -93,7 +93,9 @@ and _ field =
   | Dft : string * 'a encoding * 'a -> 'a field
 
 and 't case =
-  | Case : 'a encoding * ('t -> 'a option) * ('a -> 't) -> 't case
+  | Case : { encoding : 'a encoding ;
+             proj : ('t -> 'a option) ;
+             inj : ('a -> 't) } -> 't case
 
 (*-- construct / destruct / schema over the main GADT forms ------------------*)
 
@@ -163,8 +165,8 @@ module Make (Repr : Json_repr.Repr) = struct
           (fun v ->
              let rec do_cases = function
                | [] -> invalid_arg "Json_encoding.construct: consequence of bad union"
-               | Case (encoding, fto, _) :: rest ->
-                 match fto v with
+               | Case { encoding ; proj } :: rest ->
+                 match proj v with
                  | Some v -> construct encoding v
                  | None -> do_cases rest in
              do_cases cases) in
@@ -277,8 +279,8 @@ module Make (Repr : Json_repr.Repr) = struct
         (fun v ->
            let rec do_cases errs = function
              | [] -> raise (Cannot_destruct ([], No_case_matched (List.rev errs)))
-             | Case (encoding, _, ffrom) :: rest ->
-               try ffrom (destruct encoding v) with
+             | Case { encoding ; inj } :: rest ->
+               try inj (destruct encoding v) with
                  err -> do_cases (err :: errs) rest in
            do_cases [] cases)
   and destruct_tup
@@ -354,10 +356,10 @@ module Make (Repr : Json_repr.Repr) = struct
         (fun fields ->
            let rec do_cases errs = function
              | [] -> raise (Cannot_destruct ([], No_case_matched (List.rev errs)))
-             | Case (encoding, _, ffrom) :: rest ->
+             | Case { encoding ; inj } :: rest ->
                try
                  let r, rest, ign = destruct_obj encoding fields in
-                 ffrom r, rest, ign
+                 inj r, rest, ign
                with err -> do_cases (err :: errs) rest in
            do_cases [] cases)
       | _ -> invalid_arg "Json_encoding.destruct: consequence of bad merge_objs"
@@ -402,7 +404,7 @@ let schema encoding =
       | Union cases ->
         List.flatten
           (List.map
-             (fun (Case (o, _, _)) -> object_schema o)
+             (fun (Case { encoding = o }) -> object_schema o)
              cases)
       | Mu (_, self) as mu -> object_schema (self mu)
       | Describe { encoding = t } -> object_schema t
@@ -506,7 +508,7 @@ let schema encoding =
       | Tups _ as t -> element (Array (array_schema t, array_specs))
       | Union cases -> (* FIXME: smarter merge *)
         let elements =
-          List.map (fun (Case (encoding, _, _)) -> schema encoding) cases in
+          List.map (fun (Case { encoding }) -> schema encoding) cases in
         element (Combine (One_of, elements)) in
   let schema = schema encoding in
   update schema !sch
@@ -746,7 +748,7 @@ let rec is_nullable: type t. t encoding -> bool = function
   | Option _ -> true
   | Conv (_, _, t, _) -> is_nullable t
   | Union cases ->
-    List.exists (fun (Case (t, _, _)) -> is_nullable t) cases
+    List.exists (fun (Case { encoding = t }) -> is_nullable t) cases
   | Describe { encoding = t } -> is_nullable t
   | Mu (_, f) as self -> is_nullable (f self)
   | Custom (_, sch) -> Json_schema.is_nullable sch
@@ -808,7 +810,7 @@ let merge_objs o1 o2 =
     | Conv (_, _, t, None) -> is_obj t
     | Empty -> true
     | Ignore -> true
-    | Union cases -> List.for_all (fun (Case (o, _, _)) -> is_obj o) cases
+    | Union cases -> List.for_all (fun (Case { encoding = o }) -> is_obj o) cases
     | Mu (_name, self) as mu -> is_obj (self mu)
     | Describe { encoding = t } -> is_obj t
     | _ -> false in
@@ -823,8 +825,8 @@ let empty =
 let unit =
   Ignore
 
-let case encoding fto ffrom =
-  Case (encoding, fto, ffrom)
+let case encoding proj inj  =
+  Case { encoding ; proj ; inj }
 
 let union = function
   | [] -> invalid_arg "Json_encoding.union"
