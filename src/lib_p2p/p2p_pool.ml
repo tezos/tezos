@@ -778,8 +778,14 @@ and authenticate pool ?point_info canceler fd point =
         match P2p_point_state.get connection_point_info with
         | Requested _ -> not incoming
         | Disconnected ->
-            not pool.config.private_mode
-            || P2p_point_state.Info.trusted connection_point_info
+            let unexpected =
+              pool.config.private_mode
+              && not (P2p_point_state.Info.trusted connection_point_info)
+            in
+            if unexpected then
+              warn "[private node] incoming connection from untrused \
+                    peer rejected!";
+            not unexpected
         | Accepted _ | Running _ -> false
       end
   in
