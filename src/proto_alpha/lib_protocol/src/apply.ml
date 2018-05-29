@@ -38,7 +38,6 @@ type error += Too_early_double_baking_evidence
 type error += Outdated_double_baking_evidence
   of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
 type error += Invalid_activation of { pkh : Ed25519.Public_key_hash.t }
-type error += Wrong_activation_secret
 type error += Multiple_revelation
 
 let () =
@@ -305,8 +304,8 @@ let () =
     `Permanent
     ~id:"operation.invalid_activation"
     ~title:"Invalid activation"
-    ~description:"The given key has already been activated or the given \
-                  key does not correspond to any preallocated contract"
+    ~description:"The given key and secret do not correspond to any \
+                  existing preallocated contract"
     ~pp:(fun ppf pkh ->
         Format.fprintf ppf "Invalid activation. The public key %a does \
                             not match any commitment."
@@ -315,17 +314,6 @@ let () =
     Data_encoding.(obj1 (req "pkh" Ed25519.Public_key_hash.encoding))
     (function Invalid_activation { pkh } -> Some pkh | _ -> None)
     (fun pkh -> Invalid_activation { pkh } ) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.wrong_activation_secret"
-    ~title:"Wrong activation secret"
-    ~description:"The submitted activation key does not match the \
-                  registered key."
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "Wrong activation secret.")
-    Data_encoding.unit
-    (function Wrong_activation_secret -> Some () | _ -> None)
-    (fun () -> Wrong_activation_secret) ;
   register_error_kind
     `Permanent
     ~id:"block.multiple_revelation"
@@ -703,15 +691,11 @@ let apply_anonymous_operation ctxt kind =
       add_rewards ctxt reward >>=? fun ctxt ->
       return (ctxt, Double_baking_evidence_result [(* FIXME *)])
   | Activation { id = pkh ; secret } ->
-      let h_pkh = Unclaimed_public_key_hash.of_ed25519_pkh pkh in
-      Commitment.get_opt ctxt h_pkh >>=? function
+      let blinded_pkh = Blinded_public_key_hash.of_ed25519_pkh secret pkh in
+      Commitment.get_opt ctxt blinded_pkh >>=? function
       | None -> fail (Invalid_activation { pkh })
-      | Some { blinded_public_key_hash = blinded_pkh ; amount } ->
-          let submitted_bpkh = Blinded_public_key_hash.of_ed25519_pkh secret pkh in
-          fail_unless
-            Blinded_public_key_hash.(blinded_pkh = submitted_bpkh)
-            Wrong_activation_secret >>=? fun () ->
-          Commitment.delete ctxt h_pkh >>=? fun ctxt ->
+      | Some amount ->
+          Commitment.delete ctxt blinded_pkh >>=? fun ctxt ->
           Contract.(credit ctxt (implicit_contract (Signature.Ed25519 pkh)) amount) >>=? fun ctxt ->
           return (ctxt, Activation_result [(* FIXME *)])
 

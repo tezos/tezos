@@ -435,8 +435,8 @@ end
 module Commitments =
   Make_indexed_data_storage
     (Make_subcontext(Raw_context)(struct let name = ["commitments"] end))
-    (Unclaimed_public_key_hash.Index)
-    (Make_value(Commitment_repr))
+    (Blinded_public_key_hash.Index)
+    (Make_value(Tez_repr))
 
 (** Ramp up security deposits... *)
 

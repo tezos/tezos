@@ -269,8 +269,8 @@ end
 (** Commitments *)
 
 module Commitments : Indexed_data_storage
-  with type key = Unclaimed_public_key_hash.t
-   and type value = Commitment_repr.t
+  with type key = Blinded_public_key_hash.t
+   and type value = Tez_repr.t
    and type t := Raw_context.t
 
 (** Ramp up security deposits... *)

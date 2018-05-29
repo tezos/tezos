@@ -14,7 +14,7 @@ type bootstrap_account = {
 
 type t = {
   bootstrap_accounts : bootstrap_account list ;
-  commitments : (Unclaimed_public_key_hash.t * Commitment_repr.t) list ;
+  commitments : Commitment_repr.t list ;
   constants : Constants_repr.parametric ;
   security_deposit_ramp_up_cycles : int option ;
   no_reward_cycles : int option ;

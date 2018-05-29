@@ -9,13 +9,13 @@
 
 val init:
   Raw_context.t ->
-  (Unclaimed_public_key_hash.t * Commitment_repr.t) list ->
+  Commitment_repr.t list ->
   Raw_context.t tzresult Lwt.t
 
 val get_opt:
-  Raw_context.t -> Unclaimed_public_key_hash.t ->
-  Commitment_repr.t option tzresult Lwt.t
+  Raw_context.t -> Blinded_public_key_hash.t ->
+  Tez_repr.t option tzresult Lwt.t
 
 val delete:
-  Raw_context.t -> Unclaimed_public_key_hash.t ->
+  Raw_context.t -> Blinded_public_key_hash.t ->
   Raw_context.t tzresult Lwt.t

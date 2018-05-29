@@ -870,9 +870,9 @@ module Commitment : sig
       amount : Tez.tez }
 
   val get_opt:
-    context ->  Unclaimed_public_key_hash.t -> t option tzresult Lwt.t
+    context -> Blinded_public_key_hash.t -> Tez.t option tzresult Lwt.t
   val delete:
-    context ->  Unclaimed_public_key_hash.t -> context tzresult Lwt.t
+    context ->  Blinded_public_key_hash.t -> context tzresult Lwt.t
 
 end
 

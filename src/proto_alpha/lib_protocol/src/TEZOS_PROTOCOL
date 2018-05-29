@@ -7,7 +7,6 @@
         "Script_expr_hash",
         "Contract_hash",
         "Blinded_public_key_hash",
-        "Unclaimed_public_key_hash",
 
         "Qty_repr",
         "Tez_repr",
