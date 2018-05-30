@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** The shell's notion of a level: an integer indicating the number of blocks
+    since genesis: genesis is 0, all other blocks have increasing levels from
+    there. *)
 type t
 type raw_level = t
 val encoding: raw_level Data_encoding.t
