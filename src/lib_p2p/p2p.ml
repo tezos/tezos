@@ -90,7 +90,7 @@ let create_scheduler limits =
     ?write_queue_size:limits.write_queue_size
     ()
 
-let create_connection_pool config limits meta_cfg msg_cfg io_sched =
+let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg io_sched =
   let pool_cfg = {
     P2p_pool.identity = config.identity ;
     proof_of_work_target = config.proof_of_work_target ;
@@ -116,7 +116,7 @@ let create_connection_pool config limits meta_cfg msg_cfg io_sched =
   }
   in
   let pool =
-    P2p_pool.create pool_cfg meta_cfg msg_cfg io_sched in
+    P2p_pool.create pool_cfg meta_cfg conn_meta_cfg msg_cfg io_sched in
   pool
 
 let bounds ~min ~expected ~max =
