@@ -465,57 +465,67 @@ opam:44:ocplib-ezresto:
   variables:
     package: ocplib-ezresto
 
-opam:45:tezos-embedded-protocol-alpha:
+opam:45:ledgerwallet:
+  <<: *opam_definition
+  variables:
+    package: ledgerwallet
+
+opam:46:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-alpha
 
-opam:46:tezos-embedded-protocol-demo:
+opam:47:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
 
-opam:47:tezos-embedded-protocol-genesis:
+opam:48:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
 
-opam:48:tezos-shell:
+opam:49:tezos-shell:
   <<: *opam_definition
   variables:
     package: tezos-shell
 
-opam:49:tezos-client:
+opam:50:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
 
-opam:50:ocplib-ezresto-directory:
+opam:51:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:51:tezos-baker-alpha:
+opam:52:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:52:tezos-protocol-demo:
+opam:53:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:53:tezos-signer:
+opam:54:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:54:tezos-node:
+opam:55:ledgerwallet-tezos:
+  <<: *opam_definition
+  variables:
+    package: ledgerwallet-tezos
+
+opam:56:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:55:ocplib-json-typed-browser:
+opam:57:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
