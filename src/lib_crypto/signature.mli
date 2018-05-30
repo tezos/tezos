@@ -45,6 +45,10 @@ val concat : MBytes.t -> t -> MBytes.t
 
 include S.RAW_DATA with type t := t
 
+val of_secp256k1 : Secp256k1.t -> t
+val of_ed25519 : Ed25519.t -> t
+val of_p256 : P256.t -> t
+
 type algo =
   | Ed25519
   | Secp256k1
