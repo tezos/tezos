@@ -68,6 +68,7 @@ let magic_bytes_arg =
 
 let commands base_dir require_auth =
   Client_keys_commands.commands () @
+  Tezos_signer_backends.Ledger.commands () @
   [ command ~group
       ~desc: "Launch a signer daemon over a TCP socket."
       (args3
@@ -265,6 +266,8 @@ let main () =
            end)) ;
       Client_keys.register_signer
         (module Tezos_signer_backends.Unencrypted) ;
+      Client_keys.register_signer
+        (module Tezos_signer_backends.Ledger) ;
       let commands =
         Clic.add_manual
           ~executable_name

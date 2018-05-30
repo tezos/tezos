@@ -45,7 +45,8 @@ let select_commands ctxt { block ; protocol } =
   List.map
     (Clic.map_command
        (fun (o : Client_context.full) -> (o :> Client_context.io_wallet)))
-    (Client_keys_commands.commands ()) @
+    (Tezos_signer_backends.Ledger.commands () @
+     Client_keys_commands.commands ()) @
   Client_helpers_commands.commands () @
   commands_for_version
 

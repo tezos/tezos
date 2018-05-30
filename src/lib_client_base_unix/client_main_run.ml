@@ -141,6 +141,7 @@ let main select_commands =
                include Remote_params
              end))
       end ;
+      Client_keys.register_signer (module Tezos_signer_backends.Ledger) ;
       select_commands ctxt parsed_args >>=? fun commands ->
       let commands =
         Clic.add_manual
