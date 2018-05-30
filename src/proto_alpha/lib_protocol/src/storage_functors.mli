@@ -21,11 +21,6 @@ module Make_single_data_storage
 
 module Make_carbonated_value (V : VALUE) : CARBONATED_VALUE with type t = V.t
 
-module Make_single_carbonated_data_storage
-    (C : Raw_context.T) (N : NAME) (V : CARBONATED_VALUE)
-  : Single_carbonated_data_storage with type t = C.t
-                                    and type value = V.t
-
 module type INDEX = sig
   type t
   val path_length: int
