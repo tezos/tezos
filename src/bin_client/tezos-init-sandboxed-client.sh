@@ -230,7 +230,7 @@ activate_alpha() {
         with fitness 1 \
         and key dictator \
 	and parameters "${parameters_file}" \
-        --timestamp $(date --utc --date="@$(($(date +%s) - 3600))" +"%FT%TZ")
+        --timestamp $(TZ='AAA+1' date +%FT%TZ)
 
 }
 
