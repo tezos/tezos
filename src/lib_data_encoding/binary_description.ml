@@ -72,9 +72,7 @@ let fixup_references uf =
         Named_field (name, kind, fixup_layout layout)
     | Anonymous_field (kind, layout) ->
         Anonymous_field (kind, fixup_layout layout)
-    | Dynamic_field i ->
-        Dynamic_field i
-    | (Option_indicator_field _) as field -> field in
+    | (Dynamic_size_field _ | Optional_field _) as field -> field in
   function
   | Obj { fields } -> Obj { fields = List.map field fields }
   | Cases ({ cases } as x) ->
@@ -141,31 +139,33 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
         uf_add_name name ;
         name in
   let rec extract_dynamic :
-    type x. string option -> x Encoding.desc -> bool * string option * pdesc =
+    type x. string option -> x Encoding.desc -> Binary_size.unsigned_integer option * string option * pdesc =
     fun ref_name -> function
       | Conv { encoding } -> extract_dynamic ref_name encoding.encoding
       | Describe { id = ref_name ; encoding } -> extract_dynamic (Some ref_name) encoding.encoding
       | Splitted { encoding } -> extract_dynamic ref_name encoding.encoding
       | Delayed f -> extract_dynamic ref_name (f ()).encoding
-      | Dynamic_size { encoding } -> (true, ref_name, P encoding.encoding)
-      | enc -> (false, ref_name, P enc) in
+      | Dynamic_size { kind ; encoding } -> (Some kind, ref_name, P encoding.encoding)
+      | enc -> (None, ref_name, P enc) in
   let rec field_descr :
     type a. recursives -> references ->
     a Encoding.field -> Binary_schema.field_descr list * references =
     fun recursives references -> function
       | Req { name ; encoding = { encoding } }
-      | Dft { name ; encoding = { encoding } } ->
+      | Dft { name ; encoding = { encoding } } -> begin
           let (dynamics, ref_name, P field) = extract_dynamic None encoding in
           let (layout, references) = layout ref_name recursives references field in
-          if layout = Zero_width && dynamics then
-            ([], references) (* FIXME what if (dynamic_size empty) ?? *)
+          if layout = Zero_width then
+            ([], references)
           else
             let field_descr =
               Binary_schema.Named_field (name, classify_desc field, layout) in
-            if dynamics then
-              ([ Dynamic_field 1 ; field_descr ], references)
-            else
-              ([ field_descr], references)
+            match dynamics with
+            | Some kind ->
+                ([ Dynamic_size_field (ref_name, 1, kind) ; field_descr ], references)
+            | None ->
+                ([ field_descr], references)
+        end
       | Opt { kind = `Variable ; name ; encoding = { encoding } } ->
           let (layout, references) =
             layout None recursives references encoding in
@@ -173,7 +173,7 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
       | Opt { kind = `Dynamic ; name ; encoding = { encoding } } ->
           let (layout, references) =
             layout None recursives references encoding in
-          ([Binary_schema.Option_indicator_field name ; Named_field (name, classify_desc encoding, layout) ], references)
+          ([Binary_schema.Optional_field name ; Named_field (name, classify_desc encoding, layout) ], references)
   and obj fields =
     Binary_schema.Obj { fields }
   and union :
@@ -241,10 +241,10 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
       | Empty -> ([ Anonymous_field (`Fixed 0, Zero_width) ], references)
       | Ignore -> ([ Anonymous_field (`Fixed 0, Zero_width) ], references)
       | Constant _ -> ([ Anonymous_field (`Fixed 0, Zero_width) ], references)
-      | Dynamic_size { encoding } ->
+      | Dynamic_size { kind ; encoding } ->
           let (fields, refs) =
             fields None recursives references encoding.encoding in
-          (Dynamic_field (List.length fields) :: fields, refs)
+          (Dynamic_size_field (None, List.length fields, kind) :: fields, refs)
       | Check_size { encoding } ->
           fields ref_name recursives references encoding.encoding
       | Conv { encoding } ->

@@ -14,8 +14,8 @@ type integer_extended = [ Binary_size.integer | `Int32 | `Int64 ]
 type field_descr =
   | Named_field of string * Kind.t * layout
   | Anonymous_field of Kind.t * layout
-  | Dynamic_field of int
-  | Option_indicator_field of string
+  | Dynamic_size_field of string option * int * Binary_size.unsigned_integer
+  | Optional_field of string
 
 and layout =
   | Zero_width
@@ -83,22 +83,22 @@ module Printer = struct
     | Int integer ->
         Format.fprintf ppf "%a" pp_int integer
     | Bool ->
-        Format.fprintf ppf "8 bit Signed Integer, with 0 for false and 255 for true"
+        Format.fprintf ppf "8 bit unsigned integer: 0 for false and 255 for true"
     | RangedInt (minimum, maximum) ->
         Format.fprintf ppf "%a in the range %d to %d"
           pp_int ((Binary_size.range_to_size ~minimum ~maximum) :> integer_extended) minimum maximum
     | RangedFloat (minimum, maximum) ->
         Format.fprintf ppf
-          "Double precision (8 byte) floating point number in the range %f to %f"
+          "Double precision (8 bytes) floating point number in the range %f to %f"
           minimum maximum
     | Float ->
-        Format.fprintf ppf "Double precision (8 byte) floating point number"
+        Format.fprintf ppf "Double precision (8 bytes) floating point number"
     | Bytes ->
         Format.fprintf ppf "Bytes"
     | String ->
         Format.fprintf ppf "String"
     | Ref reference ->
-        Format.fprintf ppf "%s" reference
+        Format.fprintf ppf "$%s" reference
     | Enum (size, reference) ->
         Format.fprintf ppf "%a encoding an enumeration (see %s)"
           pp_int (size :> integer_extended)
@@ -107,7 +107,7 @@ module Printer = struct
     | Seq data -> Format.fprintf ppf "Sequence of %a" pp_layout data
 
 
-  let binary_table_headers = [ "Name" ; "Kind" ; "Data" ]
+  let binary_table_headers = [ "Name" ; "Size" ; "Contents" ]
   let enum_headers = [ "Case number" ; "Encoded string" ]
 
   let pp_tag_size ppf tag =
@@ -126,17 +126,29 @@ module Printer = struct
     function
     | Named_field (name, kind, desc) ->
         [ name ; Format.asprintf "%a" pp_kind kind ; string_of_layout desc ]
-    | Dynamic_field i ->
-        [ Format.asprintf "Size of next %d fields" i ;
-          Format.asprintf "%a" pp_kind (`Fixed 4) ; string_of_layout (Int `Int32) ]
+    | Dynamic_size_field (Some name, 1, size) ->
+        [ Format.asprintf "# bytes in field \"%s\"" name ;
+          Format.asprintf "%a"
+            pp_kind (`Fixed (Binary_size.integer_to_size size)) ;
+          string_of_layout (Int (size :> integer_extended)) ]
+    | Dynamic_size_field (None, 1, size) ->
+        [ Format.asprintf "# bytes in next field" ;
+          Format.asprintf "%a"
+            pp_kind (`Fixed (Binary_size.integer_to_size size)) ;
+          string_of_layout (Int (size :> integer_extended)) ]
+    | Dynamic_size_field (_, i, size) ->
+        [ Format.asprintf "# bytes in next %d fields" i ;
+          Format.asprintf "%a"
+            pp_kind (`Fixed (Binary_size.integer_to_size size)) ;
+          string_of_layout (Int (size :> integer_extended)) ]
     | Anonymous_field (kind, desc) ->
         [ "Unnamed field " ^ anon_num () ;
           Format.asprintf "%a" pp_kind kind ;
           string_of_layout desc ]
-    | Option_indicator_field name ->
-        [ "Presence of " ^ name ;
+    | Optional_field name ->
+        [ Format.asprintf "? presence of field \"%s\"" name ;
           Format.asprintf "%a" pp_kind (`Fixed 1) ;
-          "0 if not present and 1 if present" ]
+          string_of_layout Bool ]
 
   let toplevel ({ name ; description }, encoding) =
     match encoding with
@@ -382,6 +394,12 @@ module Encoding = struct
                   | _ -> None)
           (fun (n, _) -> `Fixed n)) :: (kind_enum_cases ()))
 
+  let unsigned_integer_encoding =
+    string_enum
+      [("Uint30", `Uint30) ;
+       ("Uint16", `Uint16) ;
+       ("Uint8", `Uint8) ]
+
   let field_descr_encoding =
     let dynamic_layout_encoding = dynamic_size layout_encoding in
     def "schema.field" @@
@@ -407,20 +425,22 @@ module Encoding = struct
         (fun (kind, _, layout) -> Anonymous_field (layout, kind)) ;
       case ~name:"Dynamic_field"
         (Tag 2)
-        (obj2
+        (obj4
            (req "kind" (constant "dyn"))
-           (req "num_fields" int31))
-        (function Dynamic_field i -> Some ((), i)
+           (opt "name" string)
+           (req "num_fields" int31)
+           (req "size" unsigned_integer_encoding))
+        (function Dynamic_size_field (name, i, size) -> Some ((), name, i, size)
                 | _ -> None)
-        (fun ((), i) -> Dynamic_field i) ;
-      case ~name:"Option_indicator_field"
+        (fun ((), name, i, size) -> Dynamic_size_field (name, i, size)) ;
+      case ~name:"Optional_field"
         (Tag 3)
         (obj2
            (req "kind" (constant "option_indicator"))
            (req "name" string))
-        (function Option_indicator_field s -> Some ((), s)
+        (function Optional_field s -> Some ((), s)
                 | _ -> None)
-        (fun ((), s) -> Option_indicator_field s)
+        (fun ((), s) -> Optional_field s)
     ]
 
   let tag_size_encoding =

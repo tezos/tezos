@@ -14,8 +14,8 @@ type integer_extended = [ Binary_size.integer | `Int32 | `Int64 ]
 type field_descr =
   | Named_field of string * Encoding.Kind.t * layout
   | Anonymous_field of Encoding.Kind.t * layout
-  | Dynamic_field of int
-  | Option_indicator_field of string
+  | Dynamic_size_field of string option * int * Binary_size.unsigned_integer
+  | Optional_field of string
 
 and layout =
   | Zero_width
