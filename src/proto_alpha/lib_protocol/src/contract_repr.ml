@@ -63,7 +63,7 @@ let encoding =
             Signature.Public_key_hash.encoding
             (function Implicit k -> Some k | _ -> None)
             (fun k -> Implicit k) ;
-          case (Tag 1) Contract_hash.encoding
+          case (Tag 1) (Fixed.add_padding Contract_hash.encoding 1)
             ~title:"Originated"
             (function Originated k -> Some k | _ -> None)
             (fun k -> Originated k) ;
