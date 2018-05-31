@@ -33,6 +33,7 @@ val equal: ('mst, 'meta) t -> ('msg, 'meta) t -> bool
 val pp: Format.formatter -> ('msg, 'meta) t -> unit
 val info: ('msg, 'meta) t -> P2p_connection.Info.t
 val meta: ('msg, 'meta) t -> 'meta
+val private_node: ('msg, 'meta) t -> bool
 
 (** {1 Low-level functions (do not use directly)} *)
 
@@ -58,6 +59,7 @@ val accept:
   ?incoming_message_queue_size:int ->
   ?outgoing_message_queue_size:int ->
   ?binary_chunks_size: int ->
+  private_node:('conn_meta -> bool) ->
   'conn_meta authenticated_fd -> 'conn_meta ->
   'msg Data_encoding.t -> ('msg, 'conn_meta) t tzresult Lwt.t
 (** (Low-level) (Cancelable) Accepts a remote peer given an

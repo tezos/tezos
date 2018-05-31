@@ -815,6 +815,7 @@ and authenticate pool ?point_info canceler fd point =
           ?incoming_message_queue_size:pool.config.incoming_message_queue_size
           ?outgoing_message_queue_size:pool.config.outgoing_message_queue_size
           ?binary_chunks_size:pool.config.binary_chunks_size
+          ~private_node:pool.conn_meta_config.private_node
           auth_fd
           (pool.conn_meta_config.conn_meta_value info.peer_id)
           pool.encoding >>=? fun conn ->
@@ -927,7 +928,10 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
   ignore (Lazy.force answerer) ;
   Option.iter point_info ~f:begin fun point_info ->
     let point = P2p_point_state.Info.point point_info in
-    P2p_point_state.set_running point_info peer_id conn ;
+    let conn_meta = P2p_socket.meta p2p_conn in
+    P2p_point_state.set_running
+      ~known_private:(pool.conn_meta_config.private_node conn_meta)
+      point_info peer_id conn;
     P2p_point.Table.add pool.connected_points point point_info ;
   end ;
   log pool (Connection_established (id_point, peer_id)) ;
@@ -1102,7 +1106,7 @@ let create config peer_meta_config conn_meta_config message_config io_sched =
     new_connection = Lwt_condition.create () ;
   } in
   let pool = {
-    config ; peer_meta_config ; conn_meta_config; message_config ;
+    config ; peer_meta_config ; conn_meta_config ; message_config ;
     my_id_points = P2p_point.Table.create 7 ;
     known_peer_ids = P2p_peer.Table.create 53 ;
     connected_peer_ids = P2p_peer.Table.create 53 ;

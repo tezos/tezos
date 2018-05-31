@@ -33,9 +33,9 @@ type 'msg encoding = Encoding : {
 
 (** {1 Pool management} *)
 
-type ('msg, 'peer_meta,'conn_meta) t
+type ('msg, 'peer_meta, 'conn_meta) t
 
-type ('msg, 'peer_meta,'conn_meta) pool = ('msg, 'peer_meta,'conn_meta) t
+type ('msg, 'peer_meta, 'conn_meta) pool = ('msg, 'peer_meta, 'conn_meta) t
 (** The type of a pool of connections, parametrized by resp. the type
     of messages and the meta-informations associated to an identity and
     a connection. *)

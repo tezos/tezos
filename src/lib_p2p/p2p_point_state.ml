@@ -43,6 +43,7 @@ module Info = struct
     mutable last_failed_connection : Time.t option ;
     mutable last_rejected_connection : (P2p_peer.Id.t * Time.t) option ;
     mutable last_established_connection : (P2p_peer.Id.t * Time.t) option ;
+    mutable known_public : bool ;
     mutable last_disconnection : (P2p_peer.Id.t * Time.t) option ;
     greylisting : greylisting_config ;
     mutable greylisting_delay : float ;
@@ -72,6 +73,7 @@ module Info = struct
     last_rejected_connection = None ;
     last_established_connection = None ;
     last_disconnection = None ;
+    known_public = false ;
     events = Ring.create log_size ;
     greylisting = greylisting_config ;
     greylisting_delay = 1. ;
@@ -87,6 +89,7 @@ module Info = struct
   let last_disconnection s = s.last_disconnection
   let last_failed_connection s = s.last_failed_connection
   let last_rejected_connection s = s.last_rejected_connection
+  let known_public s = s.known_public
   let greylisted ?(now = Time.now ()) s =
     Time.compare now s.greylisting_end <= 0
   let greylisted_until s = s.greylisting_end
@@ -151,7 +154,7 @@ let set_accepted
 
 let set_running
     ?(timestamp = Time.now ())
-    point_info peer_id data =
+    ~known_private point_info peer_id data  =
   assert begin
     match point_info.Info.state with
     | Disconnected -> true (* request to unknown peer_id. *)
@@ -160,6 +163,7 @@ let set_running
     | Requested _ -> true
   end ;
   point_info.state <- Running { data ; current_peer_id = peer_id } ;
+  point_info.known_public <- not known_private ;
   point_info.last_established_connection <- Some (peer_id, timestamp) ;
   Info.log point_info ~timestamp (Connection_established peer_id)
 

@@ -251,7 +251,8 @@ let authenticate
   let info =
     { P2p_connection.Info.peer_id = remote_peer_id ;
       versions = msg.versions ; incoming ;
-      id_point ; remote_socket_port ;} in
+      id_point ; remote_socket_port ;
+    } in
   return (info, { fd ; info ; cryptobox_data ; ack_encoding })
 
 type connection = {
@@ -483,6 +484,7 @@ type ('msg, 'meta) t = {
   meta : 'meta ;
   reader : 'msg Reader.t ;
   writer : 'msg Writer.t ;
+  private_node : bool ;
 }
 
 let equal { conn = { id = id1 } } { conn = { id = id2 } } = id1 = id2
@@ -490,10 +492,12 @@ let equal { conn = { id = id1 } } { conn = { id = id2 } } = id1 = id2
 let pp ppf { conn } = P2p_connection.Info.pp ppf conn.info
 let info { conn } = conn.info
 let meta { meta } = meta
+let private_node { private_node } = private_node
 
 let accept
     ?incoming_message_queue_size ?outgoing_message_queue_size
     ?binary_chunks_size
+    ~private_node
     { fd ; info ; cryptobox_data ; ack_encoding }
     ack_param
     encoding =
@@ -517,7 +521,8 @@ let accept
           ?size:outgoing_message_queue_size ?binary_chunks_size
           conn encoding canceler
       in
-      let conn = { conn ; reader ; writer ; meta } in
+      let conn = { conn ; reader ; writer ; meta ;
+                   private_node = private_node meta } in
       Lwt_canceler.on_cancel canceler begin fun () ->
         P2p_io_scheduler.close fd >>= fun _ ->
         Lwt.return_unit
