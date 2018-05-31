@@ -151,32 +151,12 @@ let get_manager
   Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
   return (src_name, src_pkh, src_pk, src_sk)
 
-let activate_protocol rpc_config ~chain ~block ?confirmations hash src_sk =
-  Injection.inject_operation
-    rpc_config ~chain ~block ?confirmations
-    ~src_sk (Single (Activate_protocol hash)) >>=? fun (oph, op, result) ->
-  match Apply_operation_result.pack_contents_list op result with
-  | Apply_operation_result.Single_and_result
-      (Activate_protocol _ as op, result) ->
-      return (oph, op, result)
-  | _ -> .
-
-    let activate_test_protocol rpc_config ~chain ~block ?confirmations hash src_sk =
-      Injection.inject_operation
-        rpc_config ~chain ~block ?confirmations
-        ~src_sk (Single (Activate_test_protocol hash)) >>=? fun (oph, op, result) ->
-      match Apply_operation_result.pack_contents_list op result with
-      | Apply_operation_result.Single_and_result
-          (Activate_test_protocol _ as op, result) ->
-          return (oph, op, result)
-      | _ -> .
-
-        let set_delegate
-            cctxt ~chain ~block ?confirmations
-            ~fee contract ~src_pk ~manager_sk opt_delegate =
-          delegate_contract
-            cctxt ~chain ~block ?confirmations
-            ~source:contract ~src_pk ~src_sk:manager_sk ~fee opt_delegate
+let set_delegate
+    cctxt ~chain ~block ?confirmations
+    ~fee contract ~src_pk ~manager_sk opt_delegate =
+  delegate_contract
+    cctxt ~chain ~block ?confirmations
+    ~source:contract ~src_pk ~src_sk:manager_sk ~fee opt_delegate
 
 let register_as_delegate
     cctxt ~chain ~block ?confirmations

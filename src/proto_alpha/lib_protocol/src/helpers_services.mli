@@ -122,16 +122,6 @@ module Forge : sig
 
   end
 
-  val activate_protocol:
-    'a #RPC_context.simple -> 'a ->
-    branch:Block_hash.t ->
-    Protocol_hash.t -> MBytes.t shell_tzresult Lwt.t
-
-  val activate_test_protocol:
-    'a #RPC_context.simple -> 'a ->
-    branch:Block_hash.t ->
-    Protocol_hash.t -> MBytes.t shell_tzresult Lwt.t
-
   val endorsement:
     'a #RPC_context.simple -> 'a ->
     branch:Block_hash.t ->

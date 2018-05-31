@@ -26,8 +26,6 @@ module Kind = struct
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
-  type activate_protocol = Activate_protocol_kind
-  type activate_test_protocol = Activate_test_protocol_kind
 end
 
 type raw = Operation.t = {
@@ -93,10 +91,6 @@ and _ contents =
       gas_limit: Z.t;
       storage_limit: Int64.t;
     } -> 'kind Kind.manager contents
-  | Activate_protocol :
-      Protocol_hash.t -> Kind.activate_protocol contents
-  | Activate_test_protocol :
-      Protocol_hash.t -> Kind.activate_test_protocol contents
 
 and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
@@ -526,36 +520,6 @@ module Encoding = struct
   let origination_case = make_manager_case 9 Manager_operations.origination_case
   let delegation_case = make_manager_case 10 Manager_operations.delegation_case
 
-  let activate_protocol_case =
-    Case {
-      tag = 11 ;
-      name = "activate_protocol" ;
-      encoding =
-        (obj1
-           (req "hash" Protocol_hash.encoding)) ;
-      select =
-        (function
-          | Contents (Activate_protocol _ as op) -> Some op
-          | _ -> None) ;
-      proj = (fun (Activate_protocol hash) -> hash) ;
-      inj = (fun hash -> Activate_protocol hash) ;
-    }
-
-  let activate_test_protocol_case =
-    Case {
-      tag = 12 ;
-      name = "activate_test_protocol" ;
-      encoding =
-        (obj1
-           (req "hash" Protocol_hash.encoding)) ;
-      select =
-        (function
-          | Contents (Activate_test_protocol _ as op) -> Some op
-          | _ -> None) ;
-      proj = (fun (Activate_test_protocol hash) -> hash) ;
-      inj = (fun hash -> Activate_test_protocol hash) ;
-    }
-
   let contents_encoding =
     let make (Case { tag ; name ; encoding ; select ; proj ; inj }) =
       case (Tag tag) name encoding
@@ -574,8 +538,6 @@ module Encoding = struct
       make transaction_case ;
       make origination_case ;
       make delegation_case ;
-      make activate_protocol_case ;
-      make activate_test_protocol_case ;
     ]
 
   let contents_list_encoding =
@@ -644,8 +606,6 @@ let acceptable_passes (op : packed_operation) =
 
   | Single (Proposals _ ) -> [1]
   | Single (Ballot _ ) -> [1]
-  | Single (Activate_protocol _ ) -> [1]
-  | Single (Activate_test_protocol _ ) -> [1]
 
   | Single (Seed_nonce_revelation _) -> [2]
   | Single (Double_endorsement_evidence _) -> [2]
@@ -750,10 +710,6 @@ let equal_contents_kind
         | Some Eq -> Some Eq
       end
     | Manager_operation _, _ -> None
-    | Activate_protocol _, Activate_protocol _ -> Some Eq
-    | Activate_protocol _, _ -> None
-    | Activate_test_protocol _, Activate_test_protocol _ -> Some Eq
-    | Activate_test_protocol _, _ -> None
 
 let rec equal_contents_kind_list
   : type a b. a contents_list -> b contents_list -> (a, b) eq option

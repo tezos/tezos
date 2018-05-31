@@ -66,10 +66,6 @@ and 'kind contents_result =
         operation_result : 'kind manager_operation_result ;
         internal_operation_results : packed_internal_operation_result list ;
       } -> 'kind Kind.manager contents_result
-  | Activate_protocol_result :
-      Kind.activate_protocol contents_result
-  | Activate_test_protocol_result :
-      Kind.activate_test_protocol contents_result
 
 and packed_contents_result =
   | Contents_result : 'kind contents_result -> packed_contents_result

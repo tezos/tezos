@@ -743,18 +743,6 @@ let apply_contents_list
   | Cons (Manager_operation _, _) as op ->
       apply_manager_contents_list ctxt mode operation op >>= fun (ctxt, result) ->
       return (ctxt, result)
-  | Single (Activate_protocol hash) ->
-      let dictator_pubkey = Constants.dictator_pubkey ctxt in
-      Operation.check_signature dictator_pubkey operation >>=? fun () ->
-      activate ctxt hash >>= fun ctxt ->
-      return (ctxt, Single_result Activate_protocol_result)
-  | Single (Activate_test_protocol hash) ->
-      let dictator_pubkey = Constants.dictator_pubkey ctxt in
-      Operation.check_signature dictator_pubkey operation >>=? fun () ->
-      let expiration = (* in two days maximum... *)
-        Time.add (Timestamp.current ctxt) (Int64.mul 48L 3600L) in
-      fork_test_chain ctxt hash expiration >>= fun ctxt ->
-      return (ctxt, Single_result Activate_test_protocol_result)
 
 let apply_operation ctxt mode pred_block hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash in
@@ -875,14 +863,6 @@ let compare_operations op1 op2 =
   | Single (Ballot _), Single (Ballot _) -> 0
   | _, Single (Ballot _) -> 1
   | Single (Ballot _), _ -> -1
-
-  | Single (Activate_protocol _), Single (Activate_protocol _) -> 0
-  | _, Single (Activate_protocol _) -> 1
-  | Single (Activate_protocol _), _ -> -1
-
-  | Single (Activate_test_protocol _), Single (Activate_test_protocol _) -> 0
-  | _, Single (Activate_test_protocol _) -> 1
-  | Single (Activate_test_protocol _), _ -> -1
 
   (* Manager operations with smaller counter are pre-validated first. *)
   | Single (Manager_operation op1), Single (Manager_operation op2) ->

@@ -26,8 +26,6 @@ module Kind : sig
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
-  type activate_protocol = Activate_protocol_kind
-  type activate_test_protocol = Activate_test_protocol_kind
 
 end
 
@@ -94,10 +92,6 @@ and _ contents =
       gas_limit: Z.t;
       storage_limit: Int64.t;
     } -> 'kind Kind.manager contents
-  | Activate_protocol :
-      Protocol_hash.t -> Kind.activate_protocol contents
-  | Activate_test_protocol :
-      Protocol_hash.t -> Kind.activate_test_protocol contents
 
 and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
@@ -198,8 +192,6 @@ module Encoding : sig
   val transaction_case: Kind.transaction Kind.manager case
   val origination_case: Kind.origination Kind.manager case
   val delegation_case: Kind.delegation Kind.manager case
-  val activate_protocol_case: Kind.activate_protocol case
-  val activate_test_protocol_case: Kind.activate_test_protocol case
 
   module Manager_operations : sig
 

@@ -329,22 +329,6 @@ let commands () =
              return ()
       );
 
-    command ~group:alphanet ~desc: "Activate a protocol (Alphanet dictator only)."
-      no_options
-      (prefixes [ "activate" ; "protocol" ]
-       @@ Protocol_hash.param ~name:"version"
-         ~desc:"protocol version (b58check)"
-       @@ prefixes [ "with" ; "key" ]
-       @@ Client_keys.Secret_key.source_param
-         ~name:"password" ~desc:"dictator's key"
-       @@ stop)
-      begin fun () hash seckey cctxt ->
-        activate_protocol cctxt
-          ~chain:`Main ~block:cctxt#block
-          hash seckey >>=? fun _ ->
-        return ()
-      end ;
-
     command ~desc:"Wait until an operation is included in a block"
       (let int_param =
          parameter
@@ -382,22 +366,6 @@ let commands () =
           (failure "check-previous cannot be negative") >>=? fun () ->
         Client_confirmations.wait_for_operation_inclusion ctxt
           ~chain:`Main ~confirmations ~predecessors operation_hash >>=? fun _ ->
-        return ()
-      end ;
-
-    command ~group:alphanet ~desc: "Fork a test protocol (Alphanet dictator only)."
-      no_options
-      (prefixes [ "fork" ; "test" ; "protocol" ]
-       @@ Protocol_hash.param ~name:"version"
-         ~desc:"protocol version (b58check)"
-       @@ prefixes [ "with" ; "key" ]
-       @@ Client_keys.Secret_key.source_param
-         ~name:"password" ~desc:"dictator's key"
-       @@ stop)
-      begin fun () hash seckey cctxt ->
-        activate_test_protocol cctxt
-          ~chain:`Main ~block:cctxt#block
-          hash seckey >>=? fun _res ->
         return ()
       end ;
 

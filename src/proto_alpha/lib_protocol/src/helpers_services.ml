@@ -335,14 +335,6 @@ module Forge = struct
     operation ctxt b ~branch
       (Ballot { source ; period ; proposal ; ballot })
 
-  let activate_protocol ctxt
-      b ~branch hash =
-    operation ctxt b ~branch (Activate_protocol hash)
-
-  let activate_test_protocol ctxt
-      b ~branch hash =
-    operation ctxt b ~branch (Activate_test_protocol hash)
-
   let seed_nonce_revelation ctxt
       block ~branch ~level ~nonce () =
     operation ctxt block ~branch (Seed_nonce_revelation { level ; nonce })

@@ -340,20 +340,6 @@ let rec pp_contents_and_result_list :
           Voting_period.pp period
           Protocol_hash.pp proposal
           (match ballot with Yay -> "YAY" | Pass -> "PASS" | Nay -> "NAY")
-    | Single_and_result
-        (Activate_protocol protocol,
-         Activate_protocol_result) ->
-        Format.fprintf ppf
-          "@[<v 2>Dictator protocol activation:@,\
-           Protocol: %a@]"
-          Protocol_hash.pp protocol
-    | Single_and_result
-        (Activate_test_protocol protocol,
-         Activate_test_protocol_result) ->
-        Format.fprintf ppf
-          "@[<v 2>Dictator test protocol activation:@,\
-           Protocol: %a@]"
-          Protocol_hash.pp protocol
     | Single_and_result (Manager_operation _ as op,
                          (Manager_operation_result _ as res))->
         Format.fprintf ppf "%a"

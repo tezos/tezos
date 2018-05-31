@@ -327,10 +327,6 @@ type 'kind contents_result =
         operation_result : 'kind manager_operation_result ;
         internal_operation_results : packed_internal_operation_result list ;
       } -> 'kind Kind.manager contents_result
-  | Activate_protocol_result :
-      Kind.activate_protocol contents_result
-  | Activate_test_protocol_result :
-      Kind.activate_test_protocol contents_result
 
 type packed_contents_result =
   | Contents_result : 'kind contents_result -> packed_contents_result
@@ -569,38 +565,6 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
-  let activate_protocol_case =
-    Case {
-      op_case = Operation.Encoding.activate_protocol_case ;
-      encoding = Data_encoding.empty ;
-      select =
-        (function
-          | Contents_result (Activate_protocol_result as op) -> Some op
-          | _ -> None) ;
-      mselect =
-        (function
-          | Contents_and_result (Activate_protocol _ as op, res) -> Some (op, res)
-          | _ -> None) ;
-      proj = (fun Activate_protocol_result -> ()) ;
-      inj = (fun () -> Activate_protocol_result) ;
-    }
-
-  let activate_test_protocol_case =
-    Case {
-      op_case = Operation.Encoding.activate_test_protocol_case ;
-      encoding = Data_encoding.empty ;
-      select =
-        (function
-          | Contents_result (Activate_test_protocol_result as op) -> Some op
-          | _ -> None) ;
-      mselect =
-        (function
-          | Contents_and_result (Activate_test_protocol _ as op, res) -> Some (op, res)
-          | _ -> None) ;
-      proj = (fun Activate_test_protocol_result -> ()) ;
-      inj = (fun () -> Activate_test_protocol_result) ;
-    }
-
 end
 
 let contents_result_encoding =
@@ -626,8 +590,6 @@ let contents_result_encoding =
     make transaction_case ;
     make origination_case ;
     make delegation_case ;
-    make activate_protocol_case ;
-    make activate_test_protocol_case ;
   ]
 
 let contents_and_result_encoding =
@@ -659,8 +621,6 @@ let contents_and_result_encoding =
     make transaction_case ;
     make origination_case ;
     make delegation_case ;
-    make activate_protocol_case ;
-    make activate_test_protocol_case ;
   ]
 
 type 'kind contents_result_list =
@@ -753,10 +713,6 @@ let kind_equal
     | Proposals _, _ -> None
     | Ballot _, Ballot_result -> Some Eq
     | Ballot _, _ -> None
-    | Activate_protocol _, Activate_protocol_result -> Some Eq
-    | Activate_protocol _, _ -> None
-    | Activate_test_protocol _, Activate_test_protocol_result -> Some Eq
-    | Activate_test_protocol _, _ -> None
     | Manager_operation
         { operation = Reveal _ ; _ },
       Manager_operation_result

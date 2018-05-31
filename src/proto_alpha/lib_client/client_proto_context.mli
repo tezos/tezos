@@ -141,24 +141,6 @@ val reveal :
   fee:Tez.t ->
   unit -> Kind.reveal Kind.manager Injection.result tzresult Lwt.t
 
-val activate_protocol :
-  #Proto_alpha.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  Protocol_hash.t ->
-  Client_keys.sk_uri ->
-  Kind.activate_protocol Injection.result tzresult Lwt.t
-
-val activate_test_protocol :
-  #Proto_alpha.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  Protocol_hash.t ->
-  Client_keys.sk_uri ->
-  Kind.activate_test_protocol Injection.result tzresult Lwt.t
-
 type activation_key =
   { pkh : Ed25519.Public_key_hash.t ;
     amount : Tez.t ;
