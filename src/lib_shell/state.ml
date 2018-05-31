@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Logging.Node.State
+open State_logging
 open Validation_errors
 
 module Shared = struct

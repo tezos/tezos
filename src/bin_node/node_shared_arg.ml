@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Cmdliner
-open Logging.Node.Main
+open Node_logging
 
 let (//) = Filename.concat
 

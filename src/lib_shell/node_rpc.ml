@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Logging.RPC
+open RPC_logging
 
 let filter_bi operations (bi: Block_services.block_info)  =
   let bi = if operations then bi else { bi with operations = None } in

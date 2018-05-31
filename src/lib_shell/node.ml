@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Lwt.Infix
-open Logging.Node.Worker
+open Worker_logging
 
 let inject_operation validator ?chain_id bytes =
   let t =

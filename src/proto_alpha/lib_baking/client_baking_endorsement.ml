@@ -10,7 +10,7 @@
 open Proto_alpha
 open Alpha_context
 
-open Logging.Client.Endorsement
+include Logging.Make(struct let name = "client.endorsement" end)
 
 module State : sig
 

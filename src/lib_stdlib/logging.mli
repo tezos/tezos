@@ -26,26 +26,6 @@ module type LOG = sig
 end
 
 module Core : LOG
-module P2p : LOG
-module RPC : LOG
-module Db : LOG
-module Updater : LOG
-module Node : sig
-  module State : LOG
-  module Validator : LOG
-  module Prevalidator : LOG
-  module Discoverer : LOG
-  module Worker : LOG
-  module Main : LOG
-end
-module Client : sig
-  module Blocks : LOG
-  module Baking : LOG
-  module Endorsement : LOG
-  module Revelation : LOG
-  module Denunciation : LOG
-  module Sign : LOG
-end
 
 module Make(S: sig val name: string end) : LOG
 

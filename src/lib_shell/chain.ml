@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Logging.Node.State
+open State_logging
 
 let mempool_encoding = Mempool.encoding
 

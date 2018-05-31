@@ -10,7 +10,7 @@
 open Proto_alpha
 open Alpha_context
 
-open Logging.Client.Baking
+include Logging.Make(struct let name = "client.baking" end)
 
 let generate_proof_of_work_nonce () =
   Rand.generate Constants.proof_of_work_nonce_size

@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let log = Logging.Client.Sign.lwt_log_notice
+let log = Signer_logging.lwt_log_notice
 
 let run (cctxt : #Client_context.wallet) ~host ~port ~cert ~key =
   log "Accepting HTTPS requests on port %d" port >>= fun () ->

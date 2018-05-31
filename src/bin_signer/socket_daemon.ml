@@ -9,7 +9,7 @@
 
 open Signer_messages
 
-let log = Logging.Client.Sign.lwt_log_notice
+let log = Signer_logging.lwt_log_notice
 
 let run (cctxt : #Client_context.wallet) path =
   Lwt_utils_unix.Socket.bind path >>=? fun fd ->

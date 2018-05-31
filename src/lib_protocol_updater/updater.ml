@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Logging.Updater
+open Updater_logging
 
 let (//) = Filename.concat
 

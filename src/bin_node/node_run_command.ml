@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Logging.Node.Main
+open Node_logging
 
 let genesis : State.Chain.genesis = {
   time =
