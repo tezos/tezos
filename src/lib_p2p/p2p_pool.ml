@@ -415,7 +415,10 @@ let broadcast_bootstrap_msg pool =
       (fun _peer_id peer_info ->
          match P2p_peer_state.get peer_info with
          | Running { data = { conn } } ->
-             ignore (P2p_socket.write_now conn Bootstrap : bool tzresult )
+             (* should not ask private nodes for the list of their
+                known peers*)
+             if not (P2p_socket.private_node conn) then
+               ignore (P2p_socket.write_now conn Bootstrap : bool tzresult )
          | _ -> ())
       pool.connected_peer_ids
 
