@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val describe : ?toplevel_name:string -> 'a Encoding.t -> Binary_schema.t
+val describe: 'a Encoding.t -> Binary_schema.t

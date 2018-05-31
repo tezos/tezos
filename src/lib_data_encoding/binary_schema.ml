@@ -41,85 +41,86 @@ and toplevel_encoding =
                   cases : (int * string) list }
 
 and description =
-  { name : string ;
+  { title : string ;
     description : string option }
 
-
 type t = {
-  description: description ;
   toplevel: toplevel_encoding ;
   fields: (description * toplevel_encoding) list ;
 }
 
-module Printer = struct
+module Printer_ast = struct
 
   type table =
-    { title : string ;
-      description : string option ;
-      headers : string list ;
+    { headers : string list ;
       body : string list list }
 
-  type print_structure =
+  type t =
     | Table of table
-    | Union of string * string option * Binary_size.tag_size * table list
+    | Union of Binary_size.tag_size * (description * table) list
 
-  let pp_kind ppf = function
-    | `Fixed size -> Format.fprintf ppf  "%d byte%s" size (if size = 1 then "" else "s")
-    | `Variable -> Format.fprintf ppf "Variable size"
-    | `Dynamic -> Format.fprintf ppf "Determined from data"
+  let pp_size ppf = function
+    | `Fixed size ->
+        Format.fprintf ppf  "%d byte%s" size (if size = 1 then "" else "s")
+    | `Variable ->
+        Format.fprintf ppf "Variable"
+    | `Dynamic ->
+        Format.fprintf ppf "Determined from data"
 
   let pp_int ppf (int : integer_extended) =
     Format.fprintf ppf "%s"
       begin
         match int with
-        | `Int16 -> "16 bit Signed Integer"
-        | `Int31 -> "32 bit Signed Integer in the range [2^30, 2^30-1]"
-        | `Uint30 -> "32 bit Signed Integer in the range [0, 2^30-1]"
-        | `Int32 -> "32 bit Signed Integer"
-        | `Int64 -> "64 bit Signed Integer"
-        | `Int8 -> "8 bit Signed Integer"
-        | `Uint16 -> "16 bit Unsigned Integer"
-        | `Uint8 -> "8 bit Unsigned Integer"
+        | `Int16 -> "signed 16-bit integer"
+        | `Int31 -> "signed 31-bit integer"
+        | `Uint30 -> "unsigned 30-bit integer"
+        | `Int32 -> "signed 32-bit integer"
+        | `Int64 -> "signed 64-bit integer"
+        | `Int8 -> "signed 8-bit integer"
+        | `Uint16 -> "unsigned 16-bit integer"
+        | `Uint8 -> "unsigned 8-bit integer"
       end
 
   let rec pp_layout ppf = function
     | Zero_width ->
-        Format.fprintf ppf "Zero width data, not actually present in the encoding"
+        Format.fprintf ppf "placeholder (not actually present in the encoding)"
     | Int integer ->
         Format.fprintf ppf "%a" pp_int integer
     | Bool ->
-        Format.fprintf ppf "8 bit unsigned integer: 0 for false and 255 for true"
-    | RangedInt (minimum, maximum) ->
+        Format.fprintf ppf "boolean (0 for false, 255 for true)"
+    | RangedInt (minimum, maximum) when minimum <= 0 ->
         Format.fprintf ppf "%a in the range %d to %d"
-          pp_int ((Binary_size.range_to_size ~minimum ~maximum) :> integer_extended) minimum maximum
+          pp_int ((Binary_size.range_to_size ~minimum ~maximum) :> integer_extended)
+          minimum maximum
+    | RangedInt (minimum, maximum) (* when minimum > 0 *) ->
+        Format.fprintf ppf "%a in the range %d to %d (shifted by %d)"
+          pp_int ((Binary_size.range_to_size ~minimum ~maximum) :> integer_extended)
+          minimum maximum minimum
     | RangedFloat (minimum, maximum) ->
         Format.fprintf ppf
-          "Double precision (8 bytes) floating point number in the range %f to %f"
+          "double-precision floating-point number, in the range %f to %f"
           minimum maximum
     | Float ->
-        Format.fprintf ppf "Double precision (8 bytes) floating point number"
+        Format.fprintf ppf "double-precision floating-point number"
     | Bytes ->
-        Format.fprintf ppf "Bytes"
+        Format.fprintf ppf "bytes"
     | String ->
-        Format.fprintf ppf "String"
+        Format.fprintf ppf "bytes"
     | Ref reference ->
         Format.fprintf ppf "$%s" reference
     | Enum (size, reference) ->
         Format.fprintf ppf "%a encoding an enumeration (see %s)"
           pp_int (size :> integer_extended)
           reference
-    | Seq (Ref reference) -> Format.fprintf ppf "Sequence of %s" reference
-    | Seq data -> Format.fprintf ppf "Sequence of %a" pp_layout data
+    | Seq (Ref reference) -> Format.fprintf ppf "sequence of $%s" reference
+    | Seq data -> Format.fprintf ppf "sequence of %a" pp_layout data
 
-
-  let binary_table_headers = [ "Name" ; "Size" ; "Contents" ]
-  let enum_headers = [ "Case number" ; "Encoded string" ]
 
   let pp_tag_size ppf tag =
     Format.fprintf ppf "%s" @@
     match tag with
-    | `Uint8 -> "8 bit"
-    | `Uint16 -> "16 bit"
+    | `Uint8 -> "8-bit"
+    | `Uint16 -> "16-bit"
 
   let field_descr () =
     let reference = ref 0 in
@@ -130,41 +131,46 @@ module Printer = struct
       string_of_int value in
     function
     | Named_field (name, kind, desc) ->
-        [ name ; Format.asprintf "%a" pp_kind kind ; string_of_layout desc ]
+        [ name ; Format.asprintf "%a" pp_size kind ; string_of_layout desc ]
     | Dynamic_size_field (Some name, 1, size) ->
         [ Format.asprintf "# bytes in field \"%s\"" name ;
           Format.asprintf "%a"
-            pp_kind (`Fixed (Binary_size.integer_to_size size)) ;
+            pp_size (`Fixed (Binary_size.integer_to_size size)) ;
           string_of_layout (Int (size :> integer_extended)) ]
     | Dynamic_size_field (None, 1, size) ->
         [ Format.asprintf "# bytes in next field" ;
           Format.asprintf "%a"
-            pp_kind (`Fixed (Binary_size.integer_to_size size)) ;
+            pp_size (`Fixed (Binary_size.integer_to_size size)) ;
           string_of_layout (Int (size :> integer_extended)) ]
     | Dynamic_size_field (_, i, size) ->
         [ Format.asprintf "# bytes in next %d fields" i ;
           Format.asprintf "%a"
-            pp_kind (`Fixed (Binary_size.integer_to_size size)) ;
+            pp_size (`Fixed (Binary_size.integer_to_size size)) ;
           string_of_layout (Int (size :> integer_extended)) ]
     | Anonymous_field (kind, desc) ->
         [ "Unnamed field " ^ anon_num () ;
-          Format.asprintf "%a" pp_kind kind ;
+          Format.asprintf "%a" pp_size kind ;
           string_of_layout desc ]
     | Optional_field name ->
         [ Format.asprintf "? presence of field \"%s\"" name ;
-          Format.asprintf "%a" pp_kind (`Fixed 1) ;
+          Format.asprintf "%a" pp_size (`Fixed 1) ;
           string_of_layout Bool ]
 
-  let toplevel ({ name ; description }, encoding) =
+  let binary_table_headers = [ "Name" ; "Size" ; "Contents" ]
+  let enum_headers = [ "Case number" ; "Encoded string" ]
+
+  let toplevel (descr, encoding) =
     match encoding with
     | Obj { fields } ->
-        Table { title = Format.asprintf "%s" name ;
-                description ;
-                headers = binary_table_headers ;
+        descr,
+        Table { headers = binary_table_headers ;
                 body = List.map (field_descr ()) fields }
     | Cases { kind ; tag_size ; cases } ->
-        Union (Format.asprintf "%s (%a, %a tag)" name pp_kind kind pp_tag_size tag_size,
-               description, tag_size,
+        { title =
+            Format.asprintf "%s (%a, %a tag)"
+              descr.title pp_size kind pp_tag_size tag_size ;
+          description = descr.description},
+        Union (tag_size,
                List.map
                  (fun (tag, name, fields) ->
                     { title =
@@ -173,19 +179,22 @@ module Printer = struct
                           | Some name -> Format.asprintf "%s (tag %d)" name tag
                           | None -> Format.asprintf "Tag %d" tag
                         end;
-                      description = None ;
-                      headers = binary_table_headers ;
+                      description = None },
+                    { headers = binary_table_headers ;
                       body = List.map (field_descr ()) fields })
                  cases)
     | Int_enum { size ; cases } ->
+        { title =
+            Format.asprintf "%s (Enumeration: %a):"
+              descr.title pp_int (size :> integer_extended) ;
+          description = descr.description },
         Table
-          { title = Format.asprintf "Enum %s (%a):" name pp_int (size :> integer_extended) ;
-            description = None;
-            headers = enum_headers ;
+          { headers = enum_headers ;
             body = List.map (fun (num, str) -> [ string_of_int num ; str ]) cases }
 
-  let to_print_ast encodings =
-    List.map toplevel encodings
+end
+
+module Printer = struct
 
   let rec pad char ppf = function
     | 0 -> ()
@@ -199,9 +208,9 @@ module Printer = struct
       if level = 2 then '=' else
         '`' in
     let sub = String.map (fun _ -> char) title in
-    Format.fprintf ppf "@[<v 0>%s@ %s@ @ @]" title sub
+    Format.fprintf ppf "%s@ %s@\n@\n" title sub
 
-  let pp_table ppf (level, { title ; description ; headers ; body }) =
+  let pp_table ppf { Printer_ast.headers ; body } =
     let max_widths =
       List.fold_left (List.map2 (fun len str -> max (String.length str) len))
         (List.map String.length headers)
@@ -218,46 +227,52 @@ module Printer = struct
            List.iter2
              (fun width _str -> Format.fprintf ppf "%a+" (pad c) (width + 2))
              max_widths) in
-    let pp_option_nl ppf =
-      Option.iter ~f:(Format.fprintf ppf "%s@,@,") in
-    Format.fprintf ppf "@[<v 0>%a@,@,%a%a@,%a@,%a@,%a@,@]"
-      (pp_title level) title
-      pp_option_nl description
+    Format.fprintf ppf "%a@\n%a@\n%a@\n%a@\n@\n"
       (pp_line '-') headers
       (pp_row ' ') headers
       (pp_line '=') headers
       (Format.pp_print_list
-         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@\n")
          (fun ppf s ->
-            Format.fprintf ppf "%a@,%a"
+            Format.fprintf ppf "%a@\n%a"
               (pp_row ' ') s
               (pp_line '-') s))
       body
 
-  let pp_print_structure ?(initial_level=0) ppf = function
-    | Table table -> pp_table ppf (1 + initial_level, table)
-    | Union (name, description, _tag_size, tables) ->
-        Format.fprintf ppf "@[<v 0>%a@,@,%a@,%a@]"
-          (pp_title (initial_level + 1)) name
-          (fun ppf -> function
-             | None -> ()
-             | Some description ->
-                 Format.fprintf ppf "@,%s" description)
-          description
-          (fun ppf -> Format.pp_print_list
-              ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
-              pp_table
-              ppf)
-          (List.map (fun x -> (initial_level + 2, x)) tables)
+  let pp_option_nl ppf =
+    Option.iter ~f:(Format.fprintf ppf "%s@\n@\n")
 
-  let pp ppf { description ; toplevel = t; fields } =
-    let s = toplevel (description, t) in
-    Format.fprintf ppf "%a@,%a"
-      (pp_print_structure ~initial_level:0) s
+  let pp_toplevel ppf = function
+    | Printer_ast.Table table -> pp_table ppf table
+    | Union (_tag_size, tables) ->
+        Format.fprintf ppf
+          "%a"
+          (fun ppf ->
+             Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.fprintf ppf "@\n")
+               (fun ppf (descr, table) ->
+                  Format.fprintf ppf
+                    "%a%a%a"
+                    (pp_title 2) descr.title
+                    pp_option_nl descr.description
+                    pp_table table)
+               ppf)
+          tables
+
+  let pp ppf { toplevel; fields } =
+    let _, toplevel =
+      Printer_ast.toplevel ({ title = "" ; description = None}, toplevel) in
+    Format.fprintf ppf "%a@\n%a"
+      pp_toplevel toplevel
       (Format.pp_print_list
-         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
-         (pp_print_structure ~initial_level:0))
-      (to_print_ast fields)
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@\n")
+         (fun ppf (descr, toplevel) ->
+            Format.fprintf ppf
+              "%a%a%a"
+              (pp_title 1) descr.title
+              pp_option_nl descr.description
+              pp_toplevel toplevel))
+      (List.map Printer_ast.toplevel fields)
 
 end
 
@@ -265,10 +280,10 @@ module Encoding = struct
 
   let description_encoding =
     conv
-      (fun { name ; description } -> (name, description))
-      (fun (name, description) -> { name ; description })
+      (fun { title ; description } -> (title, description))
+      (fun (title, description) -> { title ; description })
       (obj2
-         (req "name" string)
+         (req "title" string)
          (opt "description" string))
 
 
@@ -514,12 +529,9 @@ module Encoding = struct
 
   let encoding =
     conv
-      (fun { description ; toplevel ; fields } ->
-         (description, toplevel, fields))
-      (fun (description, toplevel, fields) ->
-         { description ; toplevel ; fields }) @@
-    obj3
-      (req "description" description_encoding)
+      (fun { toplevel ; fields } -> (toplevel, fields))
+      (fun (toplevel, fields) -> { toplevel ; fields }) @@
+    obj2
       (req "toplevel" binary_description_encoding)
       (req "fields"
          (list

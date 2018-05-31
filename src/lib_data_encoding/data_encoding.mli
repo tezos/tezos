@@ -679,7 +679,7 @@ module Binary: sig
       it raises [Write_error] instead of return [None] in case of error. *)
   val to_bytes_exn : 'a Encoding.t -> 'a -> MBytes.t
 
-  val describe : ?toplevel_name:string -> 'a Encoding.t -> Binary_schema.t
+  val describe : 'a Encoding.t -> Binary_schema.t
 
 end
 

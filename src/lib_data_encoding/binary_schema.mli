@@ -41,18 +41,13 @@ and toplevel_encoding =
                   cases : (int * string) list }
 
 and description =
-  { name : string ;
+  { title : string ;
     description : string option }
 
 type t = {
-  description: description ;
   toplevel: toplevel_encoding ;
   fields: (description * toplevel_encoding) list ;
 }
-
-module Printer : sig
-  val pp_layout : Format.formatter -> layout -> unit
-end
 
 val pp: Format.formatter -> t -> unit
 val encoding: t Encoding.t

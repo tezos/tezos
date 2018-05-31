@@ -28,7 +28,7 @@ end = struct
   open Binary_schema
   type ele = Ref of string | Root of description
   type t = (string, ele) Hashtbl.t
-  let add t x = Hashtbl.replace t x.name (Root x)
+  let add t x = Hashtbl.replace t x.title (Root x)
   let rec find tbl key =
     match Hashtbl.find tbl key with
     | Ref s -> find tbl s
@@ -37,9 +37,9 @@ end = struct
   let union tbl ~new_cannonical ~existing =
     add tbl new_cannonical ;
     let root = find tbl existing in
-    if root.name = new_cannonical.name
+    if root.title = new_cannonical.title
     then ()
-    else Hashtbl.replace tbl root.name (Ref new_cannonical.name)
+    else Hashtbl.replace tbl root.title (Ref new_cannonical.title)
 
   let empty () = Hashtbl.create 128
 
@@ -49,15 +49,15 @@ end = struct
          (Hashtbl.iter (fun k v ->
               Format.fprintf ppf "'%s' ---> %a@,"
                 k (fun ppf -> function
-                    | Root { name } -> Format.fprintf ppf "Root '%s'" name
+                    | Root { title } -> Format.fprintf ppf "Root '%s'" title
                     | Ref s -> Format.fprintf ppf "Ref '%s'" s) v))) tbl
 end
 
 let fixup_references uf =
   let open Binary_schema in
   let rec fixup_layout = function
-    | Ref s -> Ref (UF.find uf s).name
-    | Enum (i, name) -> Enum (i, (UF.find uf name).name)
+    | Ref s -> Ref (UF.find uf s).title
+    | Enum (i, name) -> Enum (i, (UF.find uf name).title)
     | Seq layout -> Seq (fixup_layout layout)
     | (Zero_width
       | Int _
@@ -97,7 +97,7 @@ let z_encoding =
   Binary_schema.Obj { fields = [ Named_field ("Z.t", `Dynamic, Bytes) ] }
 
 let add_z_reference uf { descriptions } =
-  UF.add uf { name = z_reference_name ;
+  UF.add uf { title = z_reference_name ;
               description = Some z_reference_description } ;
   { descriptions = (z_reference_name, z_encoding) :: descriptions }
 
@@ -114,16 +114,54 @@ let n_encoding =
   Binary_schema.Obj { fields = [ Named_field ("N.t", `Dynamic, Bytes) ] }
 
 let add_n_reference uf { descriptions } =
-  UF.add uf { name = n_reference_name ;
+  UF.add uf { title = n_reference_name ;
               description = Some n_reference_description } ;
   { descriptions = (n_reference_name, n_encoding) :: descriptions }
 
+let dedup_canonicalize uf =
+  let tbl : (Binary_schema.toplevel_encoding, Binary_schema.description) Hashtbl.t = Hashtbl.create 100 in
+  let rec help prev_len acc = function
+    | [] ->
+        let fixedup =
+          List.map
+            (fun (desc, layout) -> (desc, fixup_references uf layout))
+            acc in
+        if List.length fixedup = prev_len
+        then
+          List.map
+            (fun (name, layout) ->
+               (UF.find uf name, layout))
+            fixedup
+        else
+          begin
+            Hashtbl.clear tbl ;
+            help (List.length fixedup) [] fixedup
+          end
+    | (name, layout) :: tl ->
+        match Hashtbl.find_opt tbl layout with
+        | None ->
+            let desc = UF.find uf name in
+            begin
+              Hashtbl.add tbl layout desc ;
+              help prev_len ((desc.title, layout) :: acc) tl
+            end
+        | Some original_desc ->
+            begin
+              UF.union uf
+                ~new_cannonical:original_desc
+                ~existing:name ;
+              help prev_len acc tl
+            end
+  in
+  help 0 []
+
+
 type pdesc = P : 'x Encoding.desc -> pdesc
-let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
+let describe (type x) (encoding : x Encoding.t) =
   let open Encoding in
   let uf = UF.empty () in
-  let uf_add_name name =
-    UF.add uf { name ; description = None } in
+  let uf_add_name title =
+    UF.add uf { title ; description = None } in
   let add_reference name description { descriptions } =
     { descriptions = (name, description) :: descriptions } in
   let new_reference =
@@ -203,10 +241,10 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
                    tag_size = size ;
                    cases }) references in
       (name, references)
-  and describe  : type b. ?description:string -> name:string ->
-    recursives -> references -> b desc -> string * references =
-    fun ?description ~name recursives references encoding ->
-      let new_cannonical = { Binary_schema.name ; description } in
+  and describe  : type b. ?description:string -> title:string ->
+    string -> recursives -> references -> b desc -> string * references =
+    fun ?description ~title name recursives references encoding ->
+      let new_cannonical = { Binary_schema.title ; description } in
       UF.add uf new_cannonical ;
       let layout, references = layout None recursives references encoding in
       begin
@@ -291,13 +329,14 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
       | Union { kind ; tag_size ; cases } ->
           let name, references = union recursives references kind tag_size cases in
           ([ Anonymous_field (kind, Ref name) ], references)
-      | (Mu { kind ; name ; title = _ ; description ; fix } as encoding) ->
+      | (Mu { kind ; name ; title ; description ; fix } as encoding) ->
           let kind = (kind :> Kind.t) in
+          let title = Option.unopt ~default:name title in
           if List.mem name recursives
           then ([ Anonymous_field (kind, Ref name) ], references)
           else
             let { encoding } = fix { encoding ; json_encoding = None } in
-            let (name, references) = describe ~name ?description (name :: recursives) references encoding in
+            let (name, references) = describe ~title ?description name (name :: recursives) references encoding in
             ([ Anonymous_field (kind, Ref name) ], references)
       | Bool as encoding ->
           let layout, references =
@@ -423,12 +462,13 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
           (* FIXMe ref_name ?? *)
           let name, references = union recursives references kind tag_size cases in
           (Ref name, references)
-      | Mu { name ; description ; fix } as encoding ->
+      | Mu { name ; title ; description ; fix } as encoding ->
+          let title = Option.unopt ~default:name title in
           if List.mem name recursives
           then (Ref name, references)
           else
             let { encoding } = fix { encoding ; json_encoding = None } in
-            let (name, references) = describe ~name ?description (name :: recursives) references encoding in
+            let (name, references) = describe name ~title ?description (name :: recursives) references encoding in
             (Ref name, references)
       | Conv { encoding } ->
           layout ref_name recursives references encoding.encoding
@@ -439,51 +479,16 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
       | (Dynamic_size _) as encoding ->
           let name = may_new_reference ref_name in
           let fields, references = fields None recursives references encoding in
-          UF.add uf { name ; description = None } ;
+          UF.add uf { title = name ; description = None } ;
           (Ref name, add_reference name (obj fields) references)
       | Check_size { encoding } ->
           layout ref_name recursives references encoding.encoding
       | Delayed func ->
           layout ref_name recursives references (func ()).encoding in
-  let toplevel_name = Option.unopt ~default:"Toplevel encoding" toplevel_name in
-  uf_add_name toplevel_name ;
-  let fields, references = fields None [] { descriptions = [] } encoding.encoding in
-  let rev_references = (toplevel_name, obj fields) :: references.descriptions in
-  let dedup_canonicalize =
-    let tbl : (Binary_schema.toplevel_encoding, Binary_schema.description) Hashtbl.t = Hashtbl.create 100 in
-    let rec help prev_len acc = function
-      | [] ->
-          let fixedup =
-            List.map
-              (fun (desc, layout) -> (desc, fixup_references uf layout))
-              acc in
-          if List.length fixedup = prev_len
-          then
-            List.map
-              (fun (name, layout) ->
-                 (UF.find uf name, layout))
-              fixedup
-          else
-            begin
-              Hashtbl.clear tbl ;
-              help (List.length fixedup) [] fixedup
-            end
-      | (name, layout) :: tl ->
-          match Hashtbl.find_opt tbl layout with
-          | None ->
-              let desc = UF.find uf name in
-              begin
-                Hashtbl.add tbl layout desc ;
-                help prev_len ((desc.name, layout) :: acc) tl
-              end
-          | Some original_desc ->
-              begin
-                UF.union uf
-                  ~new_cannonical:original_desc
-                  ~existing:name ;
-                help prev_len acc tl
-              end
-    in help 0 [] in
+  let fields, references =
+    fields None [] { descriptions = [] } encoding.encoding in
+  uf_add_name "" ;
+  let _, toplevel = List.hd (dedup_canonicalize uf ["", obj fields]) in
   let filtered =
     List.filter
       (fun (name, encoding) ->
@@ -492,10 +497,9 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
              UF.union uf ~new_cannonical:(UF.find uf name) ~existing:reference ;
              false
          | _ -> true)
-      rev_references in
-  let filtered = dedup_canonicalize filtered in
-  let is_top = (fun (Binary_schema.{ name }, _) -> name = toplevel_name) in
-  let description, toplevel  = List.find is_top filtered in
-  let fields = List.filter (fun d -> not (is_top d)) filtered in
-  { Binary_schema.description ; toplevel ; fields }
+      references.descriptions in
+  let fields = List.rev (dedup_canonicalize uf filtered) in
+  { Binary_schema.toplevel ; fields }
+
+
 
