@@ -44,7 +44,12 @@ and description =
   { name : string ;
     description : string option }
 
-type t = (description * toplevel_encoding) list
+
+type t = {
+  description: description ;
+  toplevel: toplevel_encoding ;
+  fields: (description * toplevel_encoding) list ;
+}
 
 module Printer = struct
 
@@ -188,6 +193,14 @@ module Printer = struct
         Format.pp_print_char ppf char ;
         pad char ppf (n - 1)
 
+  let pp_title level ppf title =
+    let char =
+      if level = 1 then '*' else
+      if level = 2 then '=' else
+        '`' in
+    let sub = String.map (fun _ -> char) title in
+    Format.fprintf ppf "@[<v 0>%s@ %s@ @ @]" title sub
+
   let pp_table ppf (level, { title ; description ; headers ; body }) =
     let max_widths =
       List.fold_left (List.map2 (fun len str -> max (String.length str) len))
@@ -199,25 +212,33 @@ module Printer = struct
            List.iter2
              (fun width str -> Format.fprintf ppf " %s%a |" str (pad pad_char) (width - (String.length str)))
              max_widths) in
+    let pp_line c ppf =
+      Format.fprintf ppf "+%a"
+        (fun ppf ->
+           List.iter2
+             (fun width _str -> Format.fprintf ppf "%a+" (pad c) (width + 2))
+             max_widths) in
     let pp_option_nl ppf =
-      Option.iter ~f:(Format.fprintf ppf "@,%s") in
-    Format.fprintf ppf "@[<v 0>%a %s%a@,@,%a@,%a@,%a@,@]"
-      (pad '#') level
-      title
+      Option.iter ~f:(Format.fprintf ppf "%s@,@,") in
+    Format.fprintf ppf "@[<v 0>%a@,@,%a%a@,%a@,%a@,%a@,@]"
+      (pp_title level) title
       pp_option_nl description
+      (pp_line '-') headers
       (pp_row ' ') headers
-      (pp_row '-') (List.map (fun _ -> "-") headers)
+      (pp_line '=') headers
       (Format.pp_print_list
          ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
-         (pp_row ' '))
+         (fun ppf s ->
+            Format.fprintf ppf "%a@,%a"
+              (pp_row ' ') s
+              (pp_line '-') s))
       body
 
   let pp_print_structure ?(initial_level=0) ppf = function
     | Table table -> pp_table ppf (1 + initial_level, table)
     | Union (name, description, _tag_size, tables) ->
-        Format.fprintf ppf "@[<v 0>%a %s:%a@,%a@]"
-          (pad '#') (initial_level + 1)
-          name
+        Format.fprintf ppf "@[<v 0>%a@,@,%a@,%a@]"
+          (pp_title (initial_level + 1)) name
           (fun ppf -> function
              | None -> ()
              | Some description ->
@@ -229,12 +250,14 @@ module Printer = struct
               ppf)
           (List.map (fun x -> (initial_level + 2, x)) tables)
 
-  let pp ppf descrs =
-    Format.pp_print_list
-      ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
-      (pp_print_structure ~initial_level:0)
-      ppf
-      (to_print_ast descrs)
+  let pp ppf { description ; toplevel = t; fields } =
+    let s = toplevel (description, t) in
+    Format.fprintf ppf "%a@,%a"
+      (pp_print_structure ~initial_level:0) s
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
+         (pp_print_structure ~initial_level:0))
+      (to_print_ast fields)
 
 end
 
@@ -490,10 +513,19 @@ module Encoding = struct
     ]
 
   let encoding =
-    list
-      (obj2
-         (req "description" description_encoding)
-         (req "encoding" binary_description_encoding))
+    conv
+      (fun { description ; toplevel ; fields } ->
+         (description, toplevel, fields))
+      (fun (description, toplevel, fields) ->
+         { description ; toplevel ; fields }) @@
+    obj3
+      (req "description" description_encoding)
+      (req "toplevel" binary_description_encoding)
+      (req "fields"
+         (list
+            (obj2
+               (req "description" description_encoding)
+               (req "encoding" binary_description_encoding))))
 
 end
 

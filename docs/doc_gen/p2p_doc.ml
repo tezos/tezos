@@ -11,10 +11,6 @@ let protocols = [
   "Alpha", "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" ;
 ]
 
-let pp_pre f ppf x =
-  Rst.pp_raw_html ppf
-    (Format.asprintf "<pre>@\n%a@\n</pre>" (fun ppf () -> f ppf x) ())
-
 let main _node =
   (* Style : hack *)
   Format.printf "%a@." Rst.pp_raw_html Rst.style ;
@@ -31,24 +27,24 @@ let main _node =
   Format.printf "@\n" ;
   (* Data *)
   Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Block header (shell)"
-    (pp_pre Data_encoding.Binary_schema.pp)
+    Rst.pp_h1 "Block header (shell)"
+    Data_encoding.Binary_schema.pp
     (Data_encoding.Binary.describe Block_header.encoding) ;
   Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Operation (shell)"
-    (pp_pre Data_encoding.Binary_schema.pp)
+    Rst.pp_h1 "Operation (shell)"
+    Data_encoding.Binary_schema.pp
     (Data_encoding.Binary.describe Operation.encoding) ;
   List.iter
     (fun (_name, hash) ->
        let hash = Protocol_hash.of_b58check_exn hash in
        let (module Proto) = Registered_protocol.get_exn hash in
        Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Operation (alpha-specific)"
-         (pp_pre Data_encoding.Binary_schema.pp)
+         Rst.pp_h1 "Block_header (alpha-specific)"
+         Data_encoding.Binary_schema.pp
          (Data_encoding.Binary.describe Proto.block_header_data_encoding) ;
        Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Operation (alpha-specific)"
-         (pp_pre Data_encoding.Binary_schema.pp)
+         Rst.pp_h1 "Operation (alpha-specific)"
+         Data_encoding.Binary_schema.pp
          (Data_encoding.Binary.describe Proto.operation_data_encoding) ;
     )
     protocols ;

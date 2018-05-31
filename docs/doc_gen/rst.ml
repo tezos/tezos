@@ -31,6 +31,9 @@ let pp_ref ppf name = Format.fprintf ppf ".. _%s :@\n@\n" name
 
 let style = {css|
 <style>
+   .wy-nav-content {
+      max-width: 100%;
+   }
   .tab {
     overflow: hidden;
     border: 1px solid #ccc;

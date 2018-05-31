@@ -44,7 +44,11 @@ and description =
   { name : string ;
     description : string option }
 
-type t = (description * toplevel_encoding) list
+type t = {
+  description: description ;
+  toplevel: toplevel_encoding ;
+  fields: (description * toplevel_encoding) list ;
+}
 
 module Printer : sig
   val pp_layout : Format.formatter -> layout -> unit

@@ -492,4 +492,9 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
              false
          | _ -> true)
       rev_references in
-  dedup_canonicalize filtered
+  let filtered = dedup_canonicalize filtered in
+  let is_top = (fun (Binary_schema.{ name }, _) -> name = toplevel_name) in
+  let description, toplevel  = List.find is_top filtered in
+  let fields = List.filter (fun d -> not (is_top d)) filtered in
+  { Binary_schema.description ; toplevel ; fields }
+
