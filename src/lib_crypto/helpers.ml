@@ -101,7 +101,7 @@ module MakeEncoder(H : sig
     let open Data_encoding in
     splitted
       ~binary:
-        H.raw_encoding
+        (obj1 (req H.name H.raw_encoding))
       ~json:
         (def H.name
            ~title: (H.title ^ " (Base58Check-encoded)") @@

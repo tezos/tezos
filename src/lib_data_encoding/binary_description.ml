@@ -215,8 +215,8 @@ let describe (type x) (encoding : x Encoding.t) =
   and obj fields =
     Binary_schema.Obj { fields }
   and union :
-    type a. recursives -> references -> Kind.t -> Binary_size.tag_size -> a case list -> string * references=
-    fun recursives references kind size cases ->
+    type a. string option -> recursives -> references -> Kind.t -> Binary_size.tag_size -> a case list -> string * references=
+    fun ref_name recursives references kind size cases ->
       let cases =
         List.sort (fun (t1, _) (t2, _) -> Compare.Int.compare t1 t2) @@
         TzList.filter_map
@@ -233,7 +233,7 @@ let describe (type x) (encoding : x Encoding.t) =
              ((tag, Some case.title, tag_field :: fields) :: cases, references))
           cases
           ([], references) in
-      let name = new_reference () in
+      let name = may_new_reference ref_name in
       let references =
         add_reference
           name
@@ -327,7 +327,7 @@ let describe (type x) (encoding : x Encoding.t) =
             fields None recursives references right.encoding in
           (fields1 @ fields2, references)
       | Union { kind ; tag_size ; cases } ->
-          let name, references = union recursives references kind tag_size cases in
+          let name, references = union None recursives references kind tag_size cases in
           ([ Anonymous_field (kind, Ref name) ], references)
       | (Mu { kind ; name ; title ; description ; fix } as encoding) ->
           let kind = (kind :> Kind.t) in
@@ -459,8 +459,7 @@ let describe (type x) (encoding : x Encoding.t) =
           let references = add_reference name (obj fields) references in
           (Ref name, references)
       | Union { kind ; tag_size ; cases } ->
-          (* FIXMe ref_name ?? *)
-          let name, references = union recursives references kind tag_size cases in
+          let name, references = union ref_name recursives references kind tag_size cases in
           (Ref name, references)
       | Mu { name ; title ; description ; fix } as encoding ->
           let title = Option.unopt ~default:name title in

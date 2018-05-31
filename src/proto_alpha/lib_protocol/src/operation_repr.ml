@@ -335,6 +335,7 @@ module Encoding = struct
       | Single o -> o in
     let of_list : Kind.endorsements contents -> _ = function
       | o -> Single o in
+    def "inlined.endorsement" @@
     conv
       (fun ({ shell ; protocol_data = { contents ; signature } } : _ operation)->
          (shell, (contents, signature)))
@@ -345,6 +346,7 @@ module Encoding = struct
          (obj2
             (req "operations"
                (conv to_list of_list  @@
+                def "inlined.endorsement.contents" @@
                 union [
                   make endorsement_case ;
                 ]))

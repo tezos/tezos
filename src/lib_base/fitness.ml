@@ -54,8 +54,11 @@ let encoding =
   let open Data_encoding in
   def "fitness"
     ~title: "Fitness"
-    ~description: "... FIXME ..."
-    (list (def "fitness.elem" bytes))
+    ~description: "... FIXME ..." @@
+  splitted
+    ~json: (list bytes)
+    ~binary:
+      (list (def "fitness.elem" bytes))
 
 let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v
 let of_bytes b = Data_encoding.Binary.of_bytes encoding b
