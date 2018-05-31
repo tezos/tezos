@@ -162,7 +162,9 @@ and 'a t = {
 type 'a encoding = 'a t
 
 let rec classify : type a. a t -> Kind.t = fun e ->
-  match e.encoding with
+  classify_desc e.encoding
+and classify_desc : type a. a desc -> Kind.t = fun e ->
+  match e with
   (* Fixed *)
   | Null -> `Fixed 0
   | Empty -> `Fixed 0

@@ -271,4 +271,5 @@ val mu :
   ('a encoding -> 'a encoding) -> 'a encoding
 
 val classify : 'a encoding -> [ `Fixed of int | `Dynamic | `Variable ]
+val classify_desc : 'a desc -> [ `Fixed of int | `Dynamic | `Variable ]
 val raw_splitted : json:'a Json_encoding.encoding -> binary:'a encoding -> 'a encoding
