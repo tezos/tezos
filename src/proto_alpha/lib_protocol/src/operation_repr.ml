@@ -240,8 +240,8 @@ module Encoding = struct
           (obj6
              (req "managerPubkey" Signature.Public_key_hash.encoding)
              (req "balance" Tez_repr.encoding)
-             (opt "spendable" bool)
-             (opt "delegatable" bool)
+             (dft "spendable" bool true)
+             (dft "delegatable" bool true)
              (opt "delegate" Signature.Public_key_hash.encoding)
              (opt "script" Script_repr.encoding)) ;
         select =
@@ -256,14 +256,10 @@ module Encoding = struct
                             (* the hash is only used internally
                                when originating from smart
                                contracts, don't serialize it *) } ->
-                (manager, credit, Some spendable,
-                 Some delegatable, delegate, script)) ;
+                (manager, credit, spendable,
+                 delegatable, delegate, script)) ;
         inj =
           (fun (manager, credit, spendable, delegatable, delegate, script) ->
-             let delegatable =
-               match delegatable with None -> true | Some b -> b in
-             let spendable =
-               match spendable with None -> true | Some b -> b in
              Origination
                {manager ; credit ; spendable ; delegatable ;
                 delegate ; script ; preorigination = None })
