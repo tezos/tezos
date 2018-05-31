@@ -33,12 +33,14 @@ let balance_encoding =
   def "operation_metadata.alpha.balance" @@
   union
     [ case (Tag 0)
+        ~title:"Contract"
         (obj2
            (req "kind" (constant "contract"))
            (req "contract" Contract.encoding))
         (function Contract c -> Some ((), c) | _ -> None )
         (fun ((), c) -> (Contract c)) ;
       case (Tag 1)
+        ~title:"Rewards"
         (obj4
            (req "kind" (constant "freezer"))
            (req "category" (constant "rewards"))
@@ -47,6 +49,7 @@ let balance_encoding =
         (function Rewards (d, l) -> Some ((), (), d, l) | _ -> None)
         (fun ((), (), d, l) -> Rewards (d, l)) ;
       case (Tag 2)
+        ~title:"Fees"
         (obj4
            (req "kind" (constant "freezer"))
            (req "category" (constant "fees"))
@@ -55,6 +58,7 @@ let balance_encoding =
         (function Fees (d, l) -> Some ((), (), d, l) | _ -> None)
         (fun ((), (), d, l) -> Fees (d, l)) ;
       case (Tag 3)
+        ~title:"Deposits"
         (obj4
            (req "kind" (constant "freezer"))
            (req "category" (constant "deposits"))
@@ -147,6 +151,7 @@ module Manager_result = struct
       def (Format.asprintf "operation.alpha.operation_result.%s" name) @@
       union ~tag_size:`Uint8 [
         case (Tag 0)
+          ~title:"Applied"
           (merge_objs
              (obj1
                 (req "status" (constant "applied")))
@@ -160,12 +165,14 @@ module Manager_result = struct
                  | Some o -> Some ((), proj o))
           (fun ((), x) ->  (Applied (inj x))) ;
         case (Tag 1)
+          ~title:"Failed"
           (obj2
              (req "status" (constant "failed"))
              (req "errors" (list error_encoding)))
           (function  (Failed (_, errs)) -> Some ((), errs) | _ -> None)
           (fun ((), errs) -> Failed (kind, errs)) ;
         case (Tag 2)
+          ~title:"Skipped"
           (obj1 (req "status" (constant "skipped")))
           (function Skipped _ -> Some () | _ -> None)
           (fun () -> Skipped kind)
@@ -292,6 +299,7 @@ let internal_operation_result_encoding :
       (Manager_result.MCase res_case : kind Manager_result.case) =
     let Operation.Encoding.Manager_operations.MCase op_case = res_case.op_case in
     case (Tag op_case.tag)
+      ~title:op_case.name
       (merge_objs
          (obj3
             (req "kind" (constant op_case.name))
@@ -357,6 +365,7 @@ module Encoding = struct
   let tagged_case tag name args proj inj =
     let open Data_encoding in
     case tag
+      ~title:(String.capitalize_ascii name)
       (merge_objs
          (obj1 (req "kind" (constant name)))
          args)

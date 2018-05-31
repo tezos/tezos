@@ -253,6 +253,7 @@ module Cycle = struct
     let open Data_encoding in
     union [
       case (Tag 0)
+        ~title:"Unrevealed"
         (tup4
            Nonce_hash.encoding
            Signature.Public_key_hash.encoding
@@ -265,6 +266,7 @@ module Cycle = struct
         (fun (nonce_hash, delegate, rewards, fees) ->
            Unrevealed { nonce_hash ; delegate ; rewards ; fees }) ;
       case (Tag 1)
+        ~title:"Revealed"
         Seed_repr.nonce_encoding
         (function
           | Revealed nonce -> Some nonce

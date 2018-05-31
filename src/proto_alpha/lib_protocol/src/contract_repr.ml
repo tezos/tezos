@@ -59,12 +59,12 @@ let encoding =
     ~binary:
       (union ~tag_size:`Uint8 [
           case (Tag 0)
-            ~name:"Implicit"
+            ~title:"Implicit"
             Signature.Public_key_hash.encoding
             (function Implicit k -> Some k | _ -> None)
             (fun k -> Implicit k) ;
           case (Tag 1) Contract_hash.encoding
-            ~name:"Originated"
+            ~title:"Originated"
             (function Originated k -> Some k | _ -> None)
             (fun k -> Originated k) ;
         ])

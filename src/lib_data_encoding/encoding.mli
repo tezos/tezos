@@ -105,7 +105,8 @@ and _ field =
           } -> 'a field
 
 and 'a case =
-  | Case : { name : string option ;
+  | Case : { title : string ;
+             description : string option ;
              encoding : 'a t ;
              proj : ('t -> 'a option) ;
              inj : ('a -> 't) ;
@@ -249,7 +250,8 @@ val array : 'a encoding -> 'a array encoding
 val list : 'a encoding -> 'a list encoding
 
 val case :
-  ?name:string ->
+  title:string ->
+  ?description: string ->
   case_tag ->
   'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 val union :

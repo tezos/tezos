@@ -20,8 +20,8 @@ let tests = [
   test "merge_non_objs" (fun () -> merge_objs int8 string) ;
   test "empty_union" (fun () -> union []) ;
   test "duplicated_tag" (fun () ->
-      union [ case (Tag 0) empty (fun () -> None) (fun () -> ()) ;
-              case (Tag 0) empty (fun () -> None) (fun () -> ()) ]) ;
+      union [ case (Tag 0) ~title:"" empty (fun () -> None) (fun () -> ()) ;
+              case (Tag 0) ~title:"" empty (fun () -> None) (fun () -> ()) ]) ;
   test "fixed_negative_size" (fun () -> Fixed.string (~- 1)) ;
   test "fixed_null_size" (fun () -> Fixed.bytes 0) ;
   test "array_null_size" (fun () -> Variable.list empty) ;

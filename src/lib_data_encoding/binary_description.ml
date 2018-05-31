@@ -192,7 +192,7 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
         List.fold_right
           (fun (tag, Case case) (cases, references) ->
              let fields, references = fields None recursives references case.encoding.encoding in
-             ((tag, case.name, tag_field :: fields) :: cases, references))
+             ((tag, Some case.title, tag_field :: fields) :: cases, references))
           cases
           ([], references) in
       let name = new_reference () in
@@ -235,7 +235,8 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
       | Objs { left ; right } ->
           let (left_fields, references) =
             fields None recursives references left.encoding in
-          let (right_fields, references) = fields None recursives references right.encoding in
+          let (right_fields, references) =
+            fields None recursives references right.encoding in
           (left_fields @ right_fields, references)
       | Null -> ([ Anonymous_field (`Fixed 0, Zero_width) ], references)
       | Empty -> ([ Anonymous_field (`Fixed 0, Zero_width) ], references)
@@ -290,7 +291,7 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
       | Union { kind ; tag_size ; cases } ->
           let name, references = union recursives references kind tag_size cases in
           ([ Anonymous_field (kind, Ref name) ], references)
-      | (Mu { kind ; name ; description ; fix } as encoding) ->
+      | (Mu { kind ; name ; title = _ ; description ; fix } as encoding) ->
           let kind = (kind :> Kind.t) in
           if List.mem name recursives
           then ([ Anonymous_field (kind, Ref name) ], references)

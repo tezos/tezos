@@ -44,18 +44,22 @@ let kind_encoding =
   let open Data_encoding in
   union ~tag_size:`Uint8 [
     case (Tag 0)
+      ~title:"Proposal"
       (constant "proposal")
       (function Proposal -> Some () | _ -> None)
       (fun () -> Proposal) ;
     case (Tag 1)
+      ~title:"Testing_vote"
       (constant "testing_vote")
       (function Testing_vote -> Some () | _ -> None)
       (fun () -> Testing_vote) ;
     case (Tag 2)
+      ~title:"Testing"
       (constant "testing")
       (function Testing -> Some () | _ -> None)
       (fun () -> Testing) ;
     case (Tag 3)
+      ~title:"Promotion_vote"
       (constant "promotion_vote")
       (function Promotion_vote -> Some () | _ -> None)
       (fun () -> Promotion_vote) ;

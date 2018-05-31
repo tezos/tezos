@@ -292,7 +292,7 @@ module Encoding = struct
       (fun layout ->
          union [
            case
-             ~name:"Zero_width"
+             ~title:"Zero_width"
              (Tag 0)
              (obj1
                 (req "kind" (constant "Zero_width")))
@@ -300,7 +300,7 @@ module Encoding = struct
                | Zero_width -> Some ()
                | _ -> None)
              (fun () -> Zero_width) ;
-           case ~name:"Int"
+           case ~title:"Int"
              (Tag 1)
              (obj2
                 (req "size" integer_extended_encoding)
@@ -309,14 +309,14 @@ module Encoding = struct
                | Int integer -> Some (integer, ())
                | _ -> None)
              (fun (integer, _)-> Int integer) ;
-           case ~name:"Bool"
+           case ~title:"Bool"
              (Tag 2)
              (obj1 (req "kind" (constant "Bool")))
              (function
                | Bool -> Some ()
                | _ -> None)
              (fun () -> Bool) ;
-           case ~name:"RangedInt"
+           case ~title:"RangedInt"
              (Tag 3)
              (obj3
                 (req "min" int31)
@@ -326,7 +326,7 @@ module Encoding = struct
                | RangedInt (min, max) -> Some (min, max, ())
                | _ -> None)
              (fun (min, max, _) -> RangedInt (min, max)) ;
-           case ~name:"RangedFloat"
+           case ~title:"RangedFloat"
              (Tag 4)
              (obj3
                 (req "min" float)
@@ -336,28 +336,28 @@ module Encoding = struct
                | RangedFloat (min, max) -> Some (min, max, ())
                | _ -> None)
              (fun (min, max, ()) -> RangedFloat (min, max)) ;
-           case ~name:"Float"
+           case ~title:"Float"
              (Tag 5)
              (obj1 (req "kind" (constant "Float")))
              (function
                | Float -> Some ()
                | _ -> None)
              (fun () -> Float) ;
-           case ~name:"Bytes"
+           case ~title:"Bytes"
              (Tag 6)
              (obj1 (req "kind" (constant "Bytes")))
              (function
                | Bytes -> Some ()
                | _ -> None)
              (fun () -> Bytes) ;
-           case ~name:"String"
+           case ~title:"String"
              (Tag 7)
              (obj1 (req "kind" (constant "String")))
              (function
                | String -> Some ()
                | _ -> None)
              (fun () -> String) ;
-           case ~name:"Enum"
+           case ~title:"Enum"
              (Tag 8)
              (obj3
                 (req "size" integer_encoding)
@@ -367,7 +367,7 @@ module Encoding = struct
                | Enum (size, cases) -> Some (size, cases, ())
                | _ -> None)
              (fun (size, cases, _) -> Enum (size, cases)) ;
-           case ~name:"Seq"
+           case ~title:"Seq"
              (Tag 9)
              (obj2
                 (req "layout" layout)
@@ -376,7 +376,7 @@ module Encoding = struct
                | Seq layout -> Some (layout, ())
                | _ -> None)
              (fun (layout, ()) -> Seq layout) ;
-           case ~name:"Ref"
+           case ~title:"Ref"
              (Tag 10)
              (obj2
                 (req "name" string)
@@ -389,13 +389,13 @@ module Encoding = struct
 
   let kind_enum_cases =
     (fun () ->
-       [ case ~name:"Dynamic"
+       [ case ~title:"Dynamic"
            (Tag 0)
            (obj1 (req "kind" (constant "Dynamic")))
            (function `Dynamic -> Some ()
                    | _ -> None)
            (fun () -> `Dynamic) ;
-         case ~name:"Variable"
+         case ~title:"Variable"
            (Tag 1)
            (obj1 (req "kind" (constant "Variable")))
            (function `Variable -> Some ()
@@ -408,7 +408,7 @@ module Encoding = struct
   let kind_t_encoding =
     def "schema.kind" @@
     union
-      ((case ~name:"Fixed"
+      ((case ~title:"Fixed"
           (Tag 2)
           (obj2
              (req "size" int31)
@@ -427,7 +427,7 @@ module Encoding = struct
     let dynamic_layout_encoding = dynamic_size layout_encoding in
     def "schema.field" @@
     union [
-      case ~name:"Named_field"
+      case ~title:"Named_field"
         (Tag 0)
         (obj4
            (req "name" string)
@@ -437,7 +437,7 @@ module Encoding = struct
         (function Named_field (name, kind, layout) -> Some (name, layout, kind, ())
                 | _ -> None)
         (fun (name, kind, layout, _) -> Named_field (name, layout, kind)) ;
-      case ~name:"Anonymous_field"
+      case ~title:"Anonymous_field"
         (Tag 1)
         (obj3
            (req "layout" dynamic_layout_encoding)
@@ -446,7 +446,7 @@ module Encoding = struct
         (function Anonymous_field (kind, layout) -> Some (layout, (), kind)
                 | _ -> None)
         (fun (kind, _, layout) -> Anonymous_field (layout, kind)) ;
-      case ~name:"Dynamic_field"
+      case ~title:"Dynamic_field"
         (Tag 2)
         (obj4
            (req "kind" (constant "dyn"))
@@ -456,7 +456,7 @@ module Encoding = struct
         (function Dynamic_size_field (name, i, size) -> Some ((), name, i, size)
                 | _ -> None)
         (fun ((), name, i, size) -> Dynamic_size_field (name, i, size)) ;
-      case ~name:"Optional_field"
+      case ~title:"Optional_field"
         (Tag 3)
         (obj2
            (req "kind" (constant "option_indicator"))
@@ -473,7 +473,7 @@ module Encoding = struct
 
   let binary_description_encoding =
     union [
-      case ~name:"Obj"
+      case ~title:"Obj"
         (Tag 0)
         (obj1
            (req "fields" (list (dynamic_size field_descr_encoding))))
@@ -481,7 +481,7 @@ module Encoding = struct
           | Obj { fields } -> Some (fields)
           | _ -> None)
         (fun (fields) -> Obj { fields }) ;
-      case ~name:"Cases"
+      case ~title:"Cases"
         (Tag 1)
         (obj3
            (req "tag_size" tag_size_encoding)
@@ -502,7 +502,7 @@ module Encoding = struct
           | _ -> None)
         (fun (tag_size, kind, cases) ->
            Cases { kind ; tag_size ; cases }) ;
-      case ~name:"Int_enum"
+      case ~title:"Int_enum"
         (Tag 2)
         (obj2
            (req "size" integer_encoding)

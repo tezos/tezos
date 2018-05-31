@@ -39,6 +39,7 @@ module Event = struct
     let open Data_encoding in
     union
       [ case (Tag 0)
+          ~title:"Processed_block"
           (obj4
              (req "request" Request.encoding)
              (req "status" Worker_types.request_status_encoding)
@@ -54,6 +55,7 @@ module Event = struct
           (fun (request, request_status, update, fitness) ->
              Processed_block { request ; request_status ; update ; fitness }) ;
         case (Tag 1)
+          ~title:"Could_not_switch_testchain"
           RPC_error.encoding
           (function
             | Could_not_switch_testchain err -> Some err

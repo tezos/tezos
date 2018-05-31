@@ -112,12 +112,15 @@ let raw_context_encoding =
     (fun encoding ->
        union [
          case (Tag 0) bytes
+           ~title:"Key"
            (function Key k -> Some k | _ -> None)
            (fun k -> Key k) ;
          case (Tag 1) (assoc encoding)
+           ~title:"Dir"
            (function Dir k -> Some k | _ -> None)
            (fun k -> Dir k) ;
          case (Tag 2) null
+           ~title:"Cut"
            (function Cut -> Some () | _ -> None)
            (fun () -> Cut) ;
        ])

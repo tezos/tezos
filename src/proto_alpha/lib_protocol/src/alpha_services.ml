@@ -22,14 +22,17 @@ module Nonce = struct
     let open Data_encoding in
     union [
       case (Tag 0)
+        ~title:"Revealed"
         (obj1 (req "nonce" Nonce.encoding))
         (function Revealed nonce -> Some nonce | _ -> None)
         (fun nonce -> Revealed nonce) ;
       case (Tag 1)
+        ~title:"Missing"
         (obj1 (req "hash" Nonce_hash.encoding))
         (function Missing nonce -> Some nonce | _ -> None)
         (fun nonce -> Missing nonce) ;
       case (Tag 2)
+        ~title:"Forgotten"
         empty
         (function Forgotten -> Some () | _ -> None)
         (fun () -> Forgotten) ;

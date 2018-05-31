@@ -29,6 +29,7 @@ type 'conn_meta conn_meta_config = {
 
 type 'msg app_message_encoding = Encoding : {
     tag: int ;
+    title: string ;
     encoding: 'a Data_encoding.t ;
     wrap: 'a -> 'msg ;
     unwrap: 'msg -> 'a option ;

@@ -25,6 +25,7 @@
 
 type 'msg encoding = Encoding : {
     tag: int ;
+    title: string ;
     encoding: 'a Data_encoding.t ;
     wrap: 'a -> 'msg ;
     unwrap: 'msg -> 'a option ;

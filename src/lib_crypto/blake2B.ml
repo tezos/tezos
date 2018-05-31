@@ -311,18 +311,21 @@ module Make_merkle_tree
       (fun path_encoding ->
          union [
            case (Tag 240)
+             ~title:"Left"
              (obj2
                 (req "path" path_encoding)
                 (req "right" encoding))
              (function Left (p, r) -> Some (p, r) | _ -> None)
              (fun (p, r) -> Left (p, r)) ;
            case (Tag 15)
+             ~title:"Right"
              (obj2
                 (req "left" encoding)
                 (req "path" path_encoding))
              (function Right (r, p) -> Some (r, p) | _ -> None)
              (fun (r, p) -> Right (r, p)) ;
            case (Tag 0)
+             ~title:"Op"
              unit
              (function Op -> Some () | _ -> None)
              (fun () -> Op)

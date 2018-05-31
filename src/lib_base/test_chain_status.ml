@@ -24,11 +24,11 @@ let encoding =
   let open Data_encoding in
   def "test_chain_status" @@
   union [
-    case (Tag 0) ~name:"Not_running"
+    case (Tag 0) ~title:"Not_running"
       (obj1 (req "status" (constant "not_running")))
       (function Not_running -> Some () | _ -> None)
       (fun () -> Not_running) ;
-    case (Tag 1) ~name:"Forking"
+    case (Tag 1) ~title:"Forking"
       (obj3
          (req "status" (constant "forking"))
          (req "protocol" Protocol_hash.encoding)
@@ -39,7 +39,7 @@ let encoding =
         | _ -> None)
       (fun ((), protocol, expiration) ->
          Forking { protocol ; expiration }) ;
-    case (Tag 2) ~name:"Running"
+    case (Tag 2) ~title:"Running"
       (obj5
          (req "status" (constant "running"))
          (req "chain_id" Chain_id.encoding)

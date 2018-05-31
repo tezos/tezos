@@ -24,6 +24,7 @@ type 'conn_meta conn_meta_config = 'conn_meta P2p_socket.metadata_config = {
 type 'msg app_message_encoding = 'msg P2p_pool.encoding =
     Encoding : {
       tag: int ;
+      title: string ;
       encoding: 'a Data_encoding.t ;
       wrap: 'a -> 'msg ;
       unwrap: 'msg -> 'a option ;

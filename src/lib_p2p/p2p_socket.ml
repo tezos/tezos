@@ -192,12 +192,14 @@ module Ack = struct
     let nack_encoding = obj1 (req "nack" empty) in
     let ack_case tag =
       case tag ack_encoding
+        ~title:"Ack"
         (function
           | Ack -> Some ()
           | _ -> None)
         (fun () -> Ack) in
     let nack_case tag =
       case tag nack_encoding
+        ~title:"Nack"
         (function
           | Nack -> Some ()
           | _ -> None

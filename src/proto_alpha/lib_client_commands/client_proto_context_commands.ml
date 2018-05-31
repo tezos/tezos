@@ -380,7 +380,6 @@ let commands () =
         cctxt#message "%a"
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
-             ~toplevel_name:"Unsigned block header"
              (Alpha_context.Block_header.unsigned_encoding)) >>= fun () ->
         return ()
       end ;
@@ -392,7 +391,6 @@ let commands () =
         cctxt#message "%a"
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
-             ~toplevel_name:"Unsigned operation"
              Alpha_context.Operation.unsigned_encoding) >>= fun () ->
         return ()
       end

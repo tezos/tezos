@@ -147,7 +147,8 @@ and _ field =
           } -> 'a field
 
 and 'a case =
-  | Case : { name : string option ;
+  | Case : { title : string ;
+             description : string option ;
              encoding : 'a t ;
              proj : ('t -> 'a option) ;
              inj : ('a -> 't) ;
@@ -559,7 +560,8 @@ let union ?(tag_size = `Uint8) cases =
     List.map (fun (Case { encoding }) -> classify encoding) cases in
   let kind = Kind.merge_list tag_size kinds in
   make @@ Union { kind ; tag_size ; cases }
-let case ?name tag encoding proj inj = Case { name ; encoding ; proj ; inj ; tag }
+let case ~title ?description tag encoding proj inj =
+  Case { title ; description ; encoding ; proj ; inj ; tag }
 
 let rec is_nullable: type t. t encoding -> bool = fun e ->
   match e.encoding with
@@ -605,12 +607,14 @@ let option ty =
   (* TODO add a special construct `Option` in the GADT *)
   union
     ~tag_size:`Uint8
-    [ case (Tag 1) ty
-        ~name:"Some"
+    [ case
+        (Tag 1) ty
+        ~title:"Some"
         (fun x -> x)
         (fun x -> Some x) ;
-      case (Tag 0) null
-        ~name:"None"
+      case
+        (Tag 0) null
+        ~title:"None"
         (function None -> Some () | Some _ -> None)
         (fun () -> None) ;
     ]
@@ -633,9 +637,11 @@ let result ok_enc error_enc =
   union
     ~tag_size:`Uint8
     [ case (Tag 1) ok_enc
+        ~title:"Ok"
         (function Ok x -> Some x | Error _ -> None)
         (fun x -> Ok x) ;
       case (Tag 0) error_enc
+        ~title:"Result"
         (function Ok _ -> None | Error x -> Some x)
         (fun x -> Error x) ;
     ]

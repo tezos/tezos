@@ -37,10 +37,11 @@ type t =
 
 let encoding =
   let open Data_encoding in
-  let case ?max_length ~tag encoding unwrap wrap =
-    P2p.Encoding { tag; encoding; wrap; unwrap; max_length } in
+  let case ?max_length ~tag ~title encoding unwrap wrap =
+    P2p.Encoding { tag ; title ; encoding ; wrap ; unwrap ; max_length } in
   [
     case ~tag:0x10
+      ~title:"Get_current_branch"
       (obj1
          (req "get_current_branch" Chain_id.encoding))
       (function
@@ -49,6 +50,7 @@ let encoding =
       (fun chain_id -> Get_current_branch chain_id) ;
 
     case ~tag:0x11
+      ~title:"Current_branch"
       (obj2
          (req "chain_id" Chain_id.encoding)
          (req "current_branch" Block_locator.encoding))
@@ -58,6 +60,7 @@ let encoding =
       (fun (chain_id, locator) -> Current_branch (chain_id, locator)) ;
 
     case ~tag:0x12
+      ~title:"Deactivate"
       (obj1
          (req "deactivate" Chain_id.encoding))
       (function
@@ -66,14 +69,16 @@ let encoding =
       (fun chain_id -> Deactivate chain_id) ;
 
     case ~tag:0x13
+      ~title:"Get_current_head"
       (obj1
          (req "get_current_head" Chain_id.encoding))
       (function
         | Get_current_head chain_id -> Some chain_id
         | _ -> None)
-      (fun chain_id -> Get_current_branch chain_id) ;
+      (fun chain_id -> Get_current_head chain_id) ;
 
     case ~tag:0x14
+      ~title:"Current_head"
       (obj3
          (req "chain_id" Chain_id.encoding)
          (req "current_block_header" (dynamic_size Block_header.encoding))
@@ -84,6 +89,7 @@ let encoding =
       (fun (chain_id, bh, mempool) -> Current_head (chain_id, bh, mempool)) ;
 
     case ~tag:0x20
+      ~title:"Get_block_headers"
       (obj1 (req "get_block_headers" (list Block_hash.encoding)))
       (function
         | Get_block_headers bhs -> Some bhs
@@ -91,6 +97,7 @@ let encoding =
       (fun bhs -> Get_block_headers bhs) ;
 
     case ~tag:0x21
+      ~title:"Block_header"
       (obj1 (req "block_header" Block_header.encoding))
       (function
         | Block_header bh -> Some bh
@@ -98,6 +105,7 @@ let encoding =
       (fun bh -> Block_header bh) ;
 
     case ~tag:0x30
+      ~title:"Get_operations"
       (obj1 (req "get_operations" (list Operation_hash.encoding)))
       (function
         | Get_operations bhs -> Some bhs
@@ -105,11 +113,13 @@ let encoding =
       (fun bhs -> Get_operations bhs) ;
 
     case ~tag:0x31
+      ~title:"Operation"
       (obj1 (req "operation" Operation.encoding))
       (function Operation o -> Some o | _ -> None)
       (fun o -> Operation o);
 
     case ~tag:0x40
+      ~title:"Get_protocols"
       (obj1
          (req "get_protocols" (list  Protocol_hash.encoding)))
       (function
@@ -118,11 +128,13 @@ let encoding =
       (fun protos -> Get_protocols protos);
 
     case ~tag:0x41
+      ~title:"Protocol"
       (obj1 (req "protocol" Protocol.encoding))
       (function Protocol proto -> Some proto  | _ -> None)
       (fun proto -> Protocol proto);
 
     case ~tag:0x50
+      ~title:"Get_operation_hashes_for_blocks"
       (obj1 (req "get_operation_hashes_for_blocks"
                (list (tup2 Block_hash.encoding int8))))
       (function
@@ -131,6 +143,7 @@ let encoding =
       (fun keys -> Get_operation_hashes_for_blocks keys);
 
     case ~tag:0x51
+      ~title:"Operation_hashes_for_blocks"
       (obj3
          (req "operation_hashes_for_block"
             (obj2
@@ -144,6 +157,7 @@ let encoding =
          Operation_hashes_for_block (block, ofs, ops, path)) ;
 
     case ~tag:0x60
+      ~title:"Get_operations_for_blocks"
       (obj1 (req "get_operations_for_blocks"
                (list (obj2
                         (req "hash" Block_hash.encoding)
@@ -154,6 +168,7 @@ let encoding =
       (fun keys -> Get_operations_for_blocks keys);
 
     case ~tag:0x61
+      ~title:"Operations_for_blocks"
       (obj3
          (req "operations_for_block"
             (obj2

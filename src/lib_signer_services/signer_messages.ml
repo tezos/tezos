@@ -72,12 +72,14 @@ module Request = struct
     let open Data_encoding in
     union [
       case (Tag 0)
+        ~title:"Sign"
         (merge_objs
            (obj1 (req "kind" (constant "sign")))
            Sign.Request.encoding)
         (function Sign req -> Some ((), req) | _ -> None)
         (fun ((), req) -> Sign req) ;
       case (Tag 1)
+        ~title:"Public_key"
         (merge_objs
            (obj1 (req "kind" (constant "public_key")))
            Public_key.Request.encoding)

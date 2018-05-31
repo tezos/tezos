@@ -92,16 +92,17 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t = fun e ->
   | Conv { proj ; inj ; encoding = e ; schema } -> begin
       match lift_union e with
       | { encoding = Union { kind ; tag_size ; cases } } ->
-          let cases =
-            List.map
-              (fun (Case { name ; encoding ; proj = proj' ; inj = inj' ; tag }) ->
-                 Case { encoding ;
-                        name ;
-                        proj = (fun x -> proj' (proj x)) ;
-                        inj = (fun x -> inj (inj' x)) ;
-                        tag })
-              cases in
-          make @@ Union { kind ; tag_size ; cases }
+          make @@
+          Union { kind ; tag_size ;
+                  cases = List.map
+                      (fun (Case { title ; description ; encoding ; proj = proj' ; inj = inj' ; tag }) ->
+                         Case { encoding ;
+                                title ;
+                                description ;
+                                proj = (fun x -> proj' (proj x));
+                                inj = (fun x -> inj (inj' x)) ;
+                                tag })
+                      cases }
       | e -> make @@ Conv { proj ; inj ; encoding = e ; schema }
     end
   | Objs { kind ; left ; right } ->
@@ -120,33 +121,37 @@ and lift_union_in_pair
     let open Encoding in
     match lift_union e1, lift_union e2 with
     | e1, { encoding = Union { tag_size ; cases } } ->
-        let cases =
-          List.map
-            (fun (Case { name ; encoding = e2 ; proj ; inj ; tag }) ->
-               Case { encoding = lift_union_in_pair b p e1 e2 ;
-                      name ;
-                      proj = (fun (x, y) ->
-                          match proj y with
-                          | None -> None
-                          | Some y -> Some (x, y)) ;
-                      inj = (fun (x, y) -> (x, inj y)) ;
-                      tag })
-            cases in
-        make @@ Union { kind = `Dynamic (* ignored *) ; tag_size ; cases }
+        make @@
+        Union { kind = `Dynamic (* ignored *) ; tag_size ;
+                cases =
+                  List.map
+                    (fun (Case { title ; description ; encoding = e2 ; proj ; inj ; tag }) ->
+                       Case { encoding = lift_union_in_pair b p e1 e2 ;
+                              title ;
+                              description ;
+                              proj = (fun (x, y) ->
+                                  match proj y with
+                                  | None -> None
+                                  | Some y -> Some (x, y)) ;
+                              inj = (fun (x, y) -> (x, inj y)) ;
+                              tag })
+                    cases }
     | { encoding = Union { tag_size ; cases } }, e2 ->
-        let cases =
-          List.map
-            (fun (Case { name ; encoding = e1 ; proj ; inj ; tag }) ->
-               Case { encoding = lift_union_in_pair b p e1 e2 ;
-                      name ;
-                      proj = (fun (x, y) ->
-                          match proj x with
-                          | None -> None
-                          | Some x -> Some (x, y)) ;
-                      inj = (fun (x, y) -> (inj x, y)) ;
-                      tag })
-            cases in
-        make @@ Union { kind = `Dynamic (* ignored *) ; tag_size ; cases }
+        make @@
+        Union { kind = `Dynamic (* ignored *) ; tag_size ;
+                cases =
+                  List.map
+                    (fun (Case { title ; description ; encoding = e1 ; proj ; inj ; tag }) ->
+                       Case { encoding = lift_union_in_pair b p e1 e2 ;
+                              title ;
+                              description ;
+                              proj = (fun (x, y) ->
+                                  match proj x with
+                                  | None -> None
+                                  | Some x -> Some (x, y)) ;
+                              inj = (fun (x, y) -> (inj x, y)) ;
+                              tag })
+                    cases }
     | e1, e2 -> b.build p e1 e2
 
 let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =

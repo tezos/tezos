@@ -44,18 +44,21 @@ let worker_status_encoding error_encoding =
   let open Data_encoding in
   union
     [ case (Tag 0)
+        ~title:"Launching"
         (obj2
            (req "phase" (constant "launching"))
            (req "since" Time.encoding))
         (function Launching t -> Some ((), t) | _ -> None)
         (fun ((), t) -> Launching t) ;
       case (Tag 1)
+        ~title:"Running"
         (obj2
            (req "phase" (constant "running"))
            (req "since" Time.encoding))
         (function Running t -> Some ((), t) | _ -> None)
         (fun ((), t) -> Running t) ;
       case (Tag 2)
+        ~title:"Closing"
         (obj3
            (req "phase" (constant "closing"))
            (req "birth" Time.encoding)
@@ -63,6 +66,7 @@ let worker_status_encoding error_encoding =
         (function Closing (t0, t) -> Some ((), t0, t) | _ -> None)
         (fun ((), t0, t) -> Closing (t0, t))  ;
       case (Tag 3)
+        ~title:"Closed"
         (obj3
            (req "phase" (constant "closed"))
            (req "birth" Time.encoding)
@@ -70,6 +74,7 @@ let worker_status_encoding error_encoding =
         (function Closed (t0, t, None) -> Some ((), t0, t) | _ -> None)
         (fun ((), t0, t) -> Closed (t0, t, None)) ;
       case (Tag 4)
+        ~title:"Crashed"
         (obj4
            (req "phase" (constant "crashed"))
            (req "birth" Time.encoding)

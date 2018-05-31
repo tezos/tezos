@@ -22,12 +22,14 @@ module Request = struct
     let open Data_encoding in
     union
       [ case (Tag 0)
+          ~title:"Flush"
           (obj2
              (req "request" (constant "flush"))
              (req "block" Block_hash.encoding))
           (function View (Flush hash) -> Some ((), hash) | _ -> None)
           (fun ((), hash) -> View (Flush hash)) ;
         case (Tag 1)
+          ~title:"Notify"
           (obj3
              (req "request" (constant "notify"))
              (req "peer" P2p_peer.Id.encoding)
@@ -35,12 +37,14 @@ module Request = struct
           (function View (Notify (peer, mempool)) -> Some ((), peer, mempool) | _ -> None)
           (fun ((), peer, mempool) -> View (Notify (peer, mempool))) ;
         case (Tag 2)
+          ~title:"Inject"
           (obj2
              (req "request" (constant "inject"))
              (req "operation" Operation.encoding))
           (function View (Inject op) -> Some ((), op) | _ -> None)
           (fun ((), op) -> View (Inject op)) ;
         case (Tag 3)
+          ~title:"Arrived"
           (obj3
              (req "request" (constant "arrived"))
              (req "operation_hash" Operation_hash.encoding)
@@ -48,6 +52,7 @@ module Request = struct
           (function View (Arrived (oph, op)) -> Some ((), oph, op) | _ -> None)
           (fun ((), oph, op) -> View (Arrived (oph, op))) ;
         case (Tag 4)
+          ~title:"Advertise"
           (obj1 (req "request" (constant "advertise")))
           (function View Advertise -> Some () | _ -> None)
           (fun () -> View Advertise) ]
@@ -99,16 +104,19 @@ module Event = struct
     let open Data_encoding in
     union
       [ case (Tag 0)
+          ~title:"Debug"
           (obj1 (req "message" string))
           (function Debug msg -> Some msg | _ -> None)
           (fun msg -> Debug msg) ;
         case (Tag 1)
+          ~title:"Request"
           (obj2
              (req "request" Request.encoding)
              (req "status" Worker_types.request_status_encoding))
           (function Request (req, t, None) -> Some (req, t) | _ -> None)
           (fun (req, t) -> Request (req, t, None)) ;
         case (Tag 2)
+          ~title:"Failed request"
           (obj3
              (req "error" RPC_error.encoding)
              (req "failed_request" Request.encoding)

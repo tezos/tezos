@@ -22,10 +22,14 @@ type cost =
 let encoding =
   let open Data_encoding in
   union
-    [ case (Tag 0) z
+    [ case (Tag 0)
+        ~title:"Limited"
+        z
         (function Limited { remaining } -> Some remaining | _ -> None)
         (fun remaining -> Limited { remaining }) ;
-      case (Tag 1) (constant "unaccounted")
+      case (Tag 1)
+        ~title:"Unaccounted"
+        (constant "unaccounted")
         (function Unaccounted -> Some () | _ -> None)
         (fun () -> Unaccounted) ]
 

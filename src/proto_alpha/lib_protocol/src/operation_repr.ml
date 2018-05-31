@@ -177,6 +177,7 @@ module Encoding = struct
   let case tag name args proj inj =
     let open Data_encoding in
     case tag
+      ~title:(String.capitalize_ascii name)
       (merge_objs
          (obj1 (req "kind" (constant name)))
          args)

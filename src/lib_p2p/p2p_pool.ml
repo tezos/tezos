@@ -19,6 +19,7 @@ include Logging.Make (struct let name = "p2p.connection-pool" end)
 
 type 'msg encoding = Encoding : {
     tag: int ;
+    title: string ;
     encoding: 'a Data_encoding.t ;
     wrap: 'a -> 'msg ;
     unwrap: 'msg -> 'a option ;
@@ -39,21 +40,21 @@ module Message = struct
     let open Data_encoding in
     dynamic_size @@
     union ~tag_size:`Uint16
-      ([ case (Tag 0x01) ~name:"Disconnect"
+      ([ case (Tag 0x01) ~title:"Disconnect"
            (obj1 (req "kind" (constant "Disconnect")))
            (function Disconnect -> Some () | _ -> None)
            (fun () -> Disconnect);
-         case (Tag 0x02) ~name:"Bootstrap"
+         case (Tag 0x02) ~title:"Bootstrap"
            (obj1 (req "kind" (constant "Bootstrap")))
            (function Bootstrap -> Some () | _ -> None)
            (fun () -> Bootstrap);
-         case (Tag 0x03) ~name:"Advertise"
+         case (Tag 0x03) ~title:"Advertise"
            (obj2
               (req "id" (Variable.list P2p_point.Id.encoding))
               (req "kind" (constant "Advertise")))
            (function Advertise points -> Some (points, ()) | _ -> None)
            (fun (points, ()) -> Advertise points);
-         case (Tag 0x04) ~name:"Swap_request"
+         case (Tag 0x04) ~title:"Swap_request"
            (obj3
               (req "point" P2p_point.Id.encoding)
               (req "peer_id" P2p_peer.Id.encoding)
@@ -63,7 +64,7 @@ module Message = struct
              | _ -> None)
            (fun (point, peer_id, ()) -> Swap_request (point, peer_id)) ;
          case (Tag 0x05)
-           ~name:"Swap_ack"
+           ~title:"Swap_ack"
            (obj3
               (req "point" P2p_point.Id.encoding)
               (req "peer_id" P2p_peer.Id.encoding)
@@ -74,8 +75,10 @@ module Message = struct
            (fun (point, peer_id, ()) -> Swap_ack (point, peer_id)) ;
        ] @
        ListLabels.map msg_encoding
-         ~f:(function Encoding { tag ; encoding ; wrap ; unwrap } ->
-             Data_encoding.case (Tag tag) encoding
+         ~f:(function Encoding { tag ; title ; encoding ; wrap ; unwrap } ->
+             Data_encoding.case (Tag tag)
+               ~title
+               encoding
                (function Message msg -> unwrap msg | _ -> None)
                (fun msg -> Message (wrap msg))))
 

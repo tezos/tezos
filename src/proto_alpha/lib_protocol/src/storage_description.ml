@@ -252,16 +252,15 @@ let build_directory : type key. key t -> key RPC_directory.t =
               let open Data_encoding in
               union [
                 case (Tag 0)
+                  ~title:"Leaf"
                   (dynamic_size arg_encoding)
                   (function (key, None) -> Some key | _ -> None)
                   (fun key -> (key, None)) ;
                 case (Tag 1)
+                  ~title:"Dir"
                   (tup2
                      (dynamic_size arg_encoding)
                      (dynamic_size handler.encoding))
-                  (* (obj2 *)
-                  (* (req "key" (dynamic_size arg_encoding)) *)
-                  (* (req "value" (dynamic_size handler.encoding))) *)
                   (function (key, Some value) -> Some (key, value) | _ -> None)
                   (fun (key, value) -> (key, Some value)) ;
               ] in

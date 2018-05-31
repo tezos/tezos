@@ -191,20 +191,24 @@ let storage_error_encoding =
   let open Data_encoding in
   union [
     case (Tag 0)
+      ~title:"Incompatible_protocol_version"
       (obj1 (req "incompatible_protocol_version" string))
       (function Incompatible_protocol_version arg -> Some arg | _ -> None)
       (fun arg -> Incompatible_protocol_version arg) ;
     case (Tag 1)
+      ~title:"Missing_key"
       (obj2
          (req "missing_key" (list string))
          (req "function" (string_enum ["get", `Get ; "set", `Set ; "del", `Del ; "copy", `Copy ])))
       (function Missing_key (key, f) -> Some (key, f) | _ -> None)
       (fun (key, f) -> Missing_key (key, f)) ;
     case (Tag 2)
+      ~title:"Existing_key"
       (obj1 (req "existing_key" (list string)))
       (function Existing_key key -> Some key | _ -> None)
       (fun key -> Existing_key key) ;
     case (Tag 3)
+      ~title:"Corrupted_data"
       (obj1 (req "corrupted_data" (list string)))
       (function Corrupted_data key -> Some key | _ -> None)
       (fun key -> Corrupted_data key) ;

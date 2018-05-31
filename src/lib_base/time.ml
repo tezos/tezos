@@ -98,10 +98,12 @@ module T = struct
       ~json:
         (union [
             case Json_only
+              ~title:"RFC encoding"
               rfc_encoding
               (fun i -> Some i)
               (fun i -> i) ;
             case Json_only
+              ~title:"Second since epoch"
               int64
               (fun _ -> None)
               (fun i -> i) ;

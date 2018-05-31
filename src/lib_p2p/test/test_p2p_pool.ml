@@ -16,6 +16,7 @@ let msg_config : message P2p_pool.message_config = {
   encoding = [
     P2p_pool.Encoding {
       tag = 0x10 ;
+      title = "Ping" ;
       encoding = Data_encoding.empty ;
       wrap = (function () -> Ping) ;
       unwrap = (function Ping -> Some ()) ;

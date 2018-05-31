@@ -15,13 +15,13 @@ module Request = struct
   let encoding =
     let open Data_encoding in
     union
-      [ case (Tag 0) ~name:"New_head"
+      [ case (Tag 0) ~title:"New_head"
           (obj2
              (req "request" (constant "new_head"))
              (req "block" Block_hash.encoding))
           (function New_head h -> Some ((), h) | _ -> None)
           (fun ((), h) -> New_head h) ;
-        case (Tag 1) ~name:"New_branch"
+        case (Tag 1) ~title:"New_branch"
           (obj3
              (req "request" (constant "new_branch"))
              (req "block" Block_hash.encoding)
@@ -51,16 +51,19 @@ module Event = struct
     let open Data_encoding in
     union
       [ case (Tag 0)
+          ~title:"Debug"
           (obj1 (req "message" string))
           (function Debug msg -> Some msg | _ -> None)
           (fun msg -> Debug msg) ;
         case (Tag 1)
+          ~title:"Request"
           (obj2
              (req "request" Request.encoding)
              (req "status" Worker_types.request_status_encoding))
           (function Request (req, t, None) -> Some (req, t) | _ -> None)
           (fun (req, t) -> Request (req, t, None)) ;
         case (Tag 2)
+          ~title:"Failed request"
           (obj3
              (req "error" RPC_error.encoding)
              (req "failed_request" Request.encoding)

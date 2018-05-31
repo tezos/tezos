@@ -358,7 +358,8 @@ module Encoding: sig
       An optional name for the case can be provided,
       which is used in the binary documentation. *)
   val case :
-    ?name:string ->
+    title:string ->
+    ?description:string ->
     case_tag ->
     'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 

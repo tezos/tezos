@@ -241,11 +241,15 @@ let activation_key_encoding =
     ~binary:raw_activation_key_encoding
     ~json:
       (union [
-          case Json_only
+          case
+            ~title:"Activation"
+            Json_only
             raw_activation_key_encoding
             (fun x -> Some x)
             (fun x -> x) ;
-          case Json_only
+          case
+            ~title:"Deprecated_activation"
+            Json_only
             (obj6
                (req "pkh" Ed25519.Public_key_hash.encoding)
                (req "amount" Tez.encoding)

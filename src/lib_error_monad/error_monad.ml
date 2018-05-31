@@ -118,6 +118,7 @@ module Make(Prefix : sig val id : string end) = struct
     let encoding_case =
       let open Data_encoding in
       case Json_only
+        ~title:"Generic error"
         (def "generic_error" ~title ~description @@
          conv (fun x -> ((), x)) (fun ((), x) -> x) @@
          (obj2
@@ -141,7 +142,9 @@ module Make(Prefix : sig val id : string end) = struct
       | _ -> None in
     let encoding_case =
       let open Data_encoding in
-      case Json_only json from_error to_error in
+      case Json_only
+        ~title:"Unregistred error"
+        json from_error to_error in
     let pp ppf json =
       Format.fprintf ppf "@[<v 2>Unregistred error:@ %a@]"
         Data_encoding.Json.pp json in
@@ -177,7 +180,9 @@ module Make(Prefix : sig val id : string end) = struct
             | WEM.Unregistred_error _ ->
                 failwith "ignore wrapped error when deserializing"
             | res -> WEM.wrap res in
-          case Json_only WEM.error_encoding unwrap wrap
+          case Json_only
+            ~title:name
+            WEM.error_encoding unwrap wrap
       | Main category ->
           let with_id_and_kind_encoding =
             merge_objs
@@ -186,9 +191,12 @@ module Make(Prefix : sig val id : string end) = struct
                  (req "id" (constant name)))
               encoding in
           case Json_only
-            (def name ~title ~description
-               (conv (fun x -> (((), ()), x)) (fun (((),()), x) -> x)
-                  with_id_and_kind_encoding))
+            ~title
+            ~description
+            (conv
+               (fun x -> (((), ()), x))
+               (fun (((),()), x) -> x)
+               with_id_and_kind_encoding)
             from_error to_error in
     !set_error_encoding_cache_dirty () ;
     error_kinds :=
@@ -299,11 +307,11 @@ module Make(Prefix : sig val id : string end) = struct
     union
       ~tag_size:`Uint8
       [ case (Tag 0) t_encoding
-          ~name:"A successful result"
+          ~title:"Ok"
           (function Ok x -> Some x | _ -> None)
           (function res -> Ok res) ;
         case (Tag 1) errors_encoding
-          ~name:"A erroneous result"
+          ~title:"Error"
           (function Error x -> Some x | _ -> None)
           (fun errs -> Error errs) ]
 
@@ -551,13 +559,12 @@ module Make(Prefix : sig val id : string end) = struct
     let description =  "An fatal assertion" in
     let encoding_case =
       let open Data_encoding in
-      case Json_only
-        (def "assertion" ~title ~description @@
-         conv (fun (x, y) -> ((), x, y)) (fun ((), x, y) -> (x, y)) @@
-         (obj3
-            (req "kind" (constant "assertion"))
-            (req "location" string)
-            (req "error" string)))
+      case Json_only ~title ~description
+        (conv (fun (x, y) -> ((), x, y)) (fun ((), x, y) -> (x, y))
+           ((obj3
+               (req "kind" (constant "assertion"))
+               (req "location" string)
+               (req "error" string))))
         from_error to_error in
     let pp ppf (loc, msg) =
       Format.fprintf ppf

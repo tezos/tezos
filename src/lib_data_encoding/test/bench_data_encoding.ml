@@ -59,27 +59,33 @@ let cases_encoding : t Data_encoding.t =
   mu "recursive"
     (fun recursive -> union [
          case (Tag 0)
+           ~title:"A"
            string
            (function A s -> Some s
                    | _ -> None)
            (fun s -> A s) ;
          case (Tag 1)
+           ~title:"B"
            bool
            (function B bool -> Some bool
                    | _ -> None)
            (fun bool -> B bool) ;
          case (Tag 2)
+           ~title:"I"
            int31
            (function I int -> Some int
                    | _ -> None)
            (fun int -> I int) ;
          case (Tag 3)
+           ~title:"F"
            float
            (function F float -> Some float
                    | _ -> None)
            (fun float -> F float) ;
          case (Tag 4)
-           (obj2 (req "field1" recursive)
+           ~title:"R"
+           (obj2
+              (req "field1" recursive)
               (req "field2" recursive))
            (function R (a, b) -> Some (a, b)
                    | _ -> None)
