@@ -41,6 +41,7 @@ type 'a desc =
   | Float : float desc
   | Bytes : Kind.length -> MBytes.t desc
   | String : Kind.length -> string desc
+  | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
   | Array : 'a t -> 'a array desc
   | List : 'a t -> 'a list desc
@@ -148,6 +149,7 @@ val is_tup : 'a encoding -> bool
 module Fixed : sig
   val string : int -> string encoding
   val bytes : int -> MBytes.t encoding
+  val add_padding : 'a encoding -> int -> 'a encoding
 end
 module Variable : sig
   val string : string encoding

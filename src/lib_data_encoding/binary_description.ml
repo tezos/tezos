@@ -66,7 +66,8 @@ let fixup_references uf =
       | RangedFloat (_, _)
       | Float
       | Bytes
-      | String) as enc -> enc in
+      | String
+      | Padding) as enc -> enc in
   let field = function
     | Named_field (name, kind, layout) ->
         Named_field (name, kind, fixup_layout layout)
@@ -308,6 +309,9 @@ let describe (type x) (encoding : x Encoding.t) =
           ([ Anonymous_field ((kind :> Kind.t), Bytes) ], references)
       | String kind ->
           ([ Anonymous_field ((kind :> Kind.t), String) ], references)
+      | Padded ({ encoding = e }, n) ->
+          let fields, references = fields ref_name recursives references e in
+          (fields @ [ Named_field ("padding", `Fixed n, Padding) ], references)
       | (String_enum (tbl, encoding_array) as encoding) ->
           let size, cases = enum tbl encoding_array in
           let name = may_new_reference ref_name in
@@ -422,6 +426,11 @@ let describe (type x) (encoding : x Encoding.t) =
           (Bytes, references)
       | String _kind ->
           (String, references)
+      | Padded _ as enc ->
+          let name = may_new_reference ref_name in
+          let fields, references = fields None recursives references enc in
+          let references = add_reference name (obj fields) references in
+          (Ref name, references)
       | String_enum (tbl, encoding_array) ->
           let name = may_new_reference ref_name in
           let size, cases = enum tbl encoding_array in

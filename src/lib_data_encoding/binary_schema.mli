@@ -29,6 +29,7 @@ and layout =
   | Enum of Binary_size.integer * string
   | Seq of layout (* For arrays and lists *)
   | Ref of string
+  | Padding
 
 and fields = field_descr list
 

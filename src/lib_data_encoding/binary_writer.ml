@@ -216,6 +216,9 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
     | String `Variable ->
         let length = String.length value in
         Atom.fixed_kind_string length state value
+    | Padded (e, n) ->
+        write_rec e state value ;
+        Atom.fixed_kind_string n state (String.make n '\000')
     | RangedInt { minimum ; maximum } ->
         Atom.ranged_int ~minimum ~maximum state value
     | RangedFloat { minimum ; maximum } ->

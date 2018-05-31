@@ -48,6 +48,7 @@ val string_enum : (string * 'a) list -> 'a encoding
 module Fixed : sig
   val string : int -> string encoding
   val bytes : int -> MBytes.t encoding
+  val add_padding : 'a encoding -> int -> 'a encoding
 end
 
 module Variable : sig

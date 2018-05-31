@@ -39,6 +39,7 @@ let rec length : type x. x Encoding.t -> x -> int =
     | RangedFloat _ -> Binary_size.float
     | Bytes `Fixed n -> n
     | String `Fixed n -> n
+    | Padded (e, n) -> length e value + n
     | String_enum (_, arr) ->
         Binary_size.integer_to_size @@ Binary_size.enum_size arr
     | Objs { kind = `Fixed n } -> n

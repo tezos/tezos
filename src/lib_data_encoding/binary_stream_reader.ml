@@ -207,6 +207,14 @@ module Atom = struct
 
 end
 
+let rec skip n state k =
+  let resume buffer =
+    let stream = Binary_stream.push buffer state.stream in
+    try skip n { state with stream } k
+    with Read_error err -> Error err in
+  Atom.fixed_length_string n resume state @@ fun (_, state : string * _) ->
+  k state
+
 (** Main recursive reading function, in continuation passing style. *)
 let rec read_rec
   : type next ret.
@@ -242,6 +250,9 @@ let rec read_rec
     | String `Variable ->
         let size = remaining_bytes state in
         Atom.fixed_length_string size resume state k
+    | Padded (e, n) ->
+        read_rec e state @@ fun (v, state) ->
+        skip n state @@ (fun state -> k (v, state))
     | RangedInt { minimum ; maximum }  ->
         Atom.ranged_int ~minimum ~maximum resume state k
     | RangedFloat { minimum ; maximum } ->

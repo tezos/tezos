@@ -186,6 +186,7 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
         s in
       conv check check string
   | String _ -> string
+  | Padded (e, _) -> get_json e
   | Bytes (`Fixed expected) ->
       let check s =
         let found = MBytes.length s in

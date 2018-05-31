@@ -29,6 +29,7 @@ and layout =
   | Enum of Binary_size.integer * string
   | Seq of layout (* For arrays and lists *)
   | Ref of string
+  | Padding
 
 and fields = field_descr list
 
@@ -108,6 +109,8 @@ module Printer_ast = struct
         Format.fprintf ppf "bytes"
     | Ref reference ->
         Format.fprintf ppf "$%s" reference
+    | Padding ->
+        Format.fprintf ppf "padding"
     | Enum (size, reference) ->
         Format.fprintf ppf "%a encoding an enumeration (see %s)"
           pp_int (size :> integer_extended)
@@ -395,11 +398,19 @@ module Encoding = struct
              (Tag 10)
              (obj2
                 (req "name" string)
-                (req "kind" (constant "Float")))
+                (req "kind" (constant "Ref")))
              (function
                | Ref layout -> Some (layout, ())
                | _ -> None)
-             (fun (name, ()) -> Ref name)
+             (fun (name, ()) -> Ref name) ;
+           case ~title:"Padding"
+             (Tag 11)
+             (obj1
+                (req "kind" (constant "Padding")))
+             (function
+               | Padding -> Some ()
+               | _ -> None)
+             (fun () -> Padding) ;
          ])
 
   let kind_enum_cases =

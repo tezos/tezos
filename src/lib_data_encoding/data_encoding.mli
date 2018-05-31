@@ -402,6 +402,7 @@ module Encoding: sig
   module Fixed : sig
     val string : int -> string encoding
     val bytes : int -> MBytes.t encoding
+    val add_padding : 'a encoding -> int -> 'a encoding
   end
 
   (** Create encodings that produce data of a variable length when binary encoded.

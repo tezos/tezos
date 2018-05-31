@@ -180,6 +180,10 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
     | String (`Fixed n) -> Atom.fixed_length_string n state
     | String `Variable ->
         Atom.fixed_length_string state.remaining_bytes state
+    | Padded (e, n) ->
+        let v = read_rec e state in
+        ignore (Atom.fixed_length_string n state : string) ;
+        v
     | RangedInt { minimum ; maximum }  ->
         Atom.ranged_int ~minimum ~maximum state
     | RangedFloat { minimum ; maximum } ->
