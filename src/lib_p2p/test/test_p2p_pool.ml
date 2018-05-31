@@ -36,6 +36,7 @@ let peer_meta_config : metadata P2p_pool.peer_meta_config = {
 let conn_meta_config : metadata P2p_pool.conn_meta_config = {
   conn_meta_encoding = Data_encoding.empty ;
   conn_meta_value = (fun _ -> ()) ;
+  private_node = (fun _ -> false) ;
 }
 
 let sync ch =

@@ -18,6 +18,7 @@ type 'peer_meta peer_meta_config = 'peer_meta P2p_pool.peer_meta_config = {
 type 'conn_meta conn_meta_config = 'conn_meta P2p_pool.conn_meta_config = {
   conn_meta_encoding : 'conn_meta Data_encoding.t ;
   conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
+  private_node : 'conn_meta -> bool ;
 }
 
 type 'msg app_message_encoding = 'msg P2p_pool.encoding =

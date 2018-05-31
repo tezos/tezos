@@ -65,6 +65,7 @@ type t = {
   shutdown: unit -> unit Lwt.t ;
 }
 
+
 let peer_metadata_cfg : _ P2p.peer_meta_config = {
   peer_meta_encoding = Peer_metadata.encoding ;
   peer_meta_initial = () ;
@@ -73,28 +74,32 @@ let peer_metadata_cfg : _ P2p.peer_meta_config = {
 
 let connection_metadata_cfg cfg : _ P2p.conn_meta_config = {
   conn_meta_encoding = Connection_metadata.encoding ;
+  private_node = (fun { private_node } -> private_node) ;
   conn_meta_value = fun _ -> cfg;
 }
+
+let init_connection_metadata opt =
+  let open Connection_metadata in
+  match opt with
+  | None ->
+      { disable_mempool = false ;
+        private_node = false }
+
+  | Some c ->
+      { disable_mempool = c.P2p.disable_mempool ;
+        private_node = c.P2p.private_mode }
 
 let init_p2p p2p_params =
   match p2p_params with
   | None ->
-      let conn_metadata_cfg =
-        connection_metadata_cfg {
-          Connection_metadata.
-          disable_mempool = false ;
-          private_node = false ;
-        } in
+      let c_meta = init_connection_metadata None in
+      let conn_metadata_cfg = connection_metadata_cfg c_meta in
       lwt_log_notice "P2P layer is disabled" >>= fun () ->
       return
         (P2p.faked_network peer_metadata_cfg, conn_metadata_cfg)
   | Some (config, limits) ->
-      let conn_metadata_cfg =
-        connection_metadata_cfg {
-          Connection_metadata.
-          disable_mempool = config.P2p.disable_mempool ;
-          private_node = false ;
-        } in
+      let c_meta = init_connection_metadata (Some config) in
+      let conn_metadata_cfg = connection_metadata_cfg c_meta in
       lwt_log_notice "bootstraping chain..." >>= fun () ->
       P2p.create
         ~config ~limits

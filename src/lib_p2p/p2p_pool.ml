@@ -210,6 +210,7 @@ type 'msg message_config = {
 type 'conn_meta conn_meta_config = {
   conn_meta_encoding : 'conn_meta Data_encoding.t ;
   conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
+  private_node : 'conn_meta -> bool ;
 }
 
 type ('msg, 'peer_meta, 'conn_meta) t = {
