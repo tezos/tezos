@@ -157,12 +157,15 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
       | Dft { name ; encoding = { encoding } } ->
           let (dynamics, ref_name, P field) = extract_dynamic None encoding in
           let (layout, references) = layout ref_name recursives references field in
-          let field_descr =
-            Binary_schema.Named_field (name, classify_desc field, layout) in
-          if dynamics then
-            ([ Dynamic_field 1 ; field_descr ], references)
+          if layout = Zero_width && dynamics then
+            ([], references) (* FIXME what if (dynamic_size empty) ?? *)
           else
-            ([ field_descr], references)
+            let field_descr =
+              Binary_schema.Named_field (name, classify_desc field, layout) in
+            if dynamics then
+              ([ Dynamic_field 1 ; field_descr ], references)
+            else
+              ([ field_descr], references)
       | Opt { kind = `Variable ; name ; encoding = { encoding } } ->
           let (layout, references) =
             layout None recursives references encoding in
@@ -274,7 +277,10 @@ let describe (type x) ?toplevel_name (encoding : x Encoding.t) =
       | Tup { encoding } ->
           let (layout, references) =
             layout ref_name recursives references encoding in
-          ([ Anonymous_field (classify_desc encoding, layout) ], references)
+          if layout = Zero_width then
+            ([], references)
+          else
+            ([ Anonymous_field (classify_desc encoding, layout) ], references)
       | Tups { left ; right } ->
           let (fields1, references) =
             fields None recursives references left.encoding in
