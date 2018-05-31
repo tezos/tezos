@@ -487,11 +487,10 @@ let apply_internal_manager_operations ctxt mode ~payer ops =
               (rest @ emitted) in
   apply ctxt [] ops
 
-let apply_manager_contents
-    (type kind) ctxt mode raw_operation (op : kind Kind.manager contents)
-  : (context * kind Kind.manager contents_result) tzresult Lwt.t =
-  let Manager_operation
-      { source ; fee ; counter ; operation ; gas_limit ; storage_limit } = op in
+let precheck_manager_contents
+    (type kind) ctxt raw_operation (op : kind Kind.manager contents)
+  : context tzresult Lwt.t =
+  let Manager_operation { source ; fee ; counter ; operation } = op in
   Contract.must_be_allocated ctxt source >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
   begin
@@ -505,6 +504,13 @@ let apply_manager_contents
   Contract.increment_counter ctxt source >>=? fun ctxt ->
   Contract.spend ctxt source fee >>=? fun ctxt ->
   add_fees ctxt fee >>=? fun ctxt ->
+  return ctxt
+
+let apply_manager_contents
+    (type kind) ctxt mode (op : kind Kind.manager contents)
+  : (context * kind Kind.manager contents_result) tzresult Lwt.t =
+  let Manager_operation
+      { source ; fee ; operation ; gas_limit ; storage_limit } = op in
   Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
   Lwt.return (Contract.set_storage_limit ctxt storage_limit) >>=? fun ctxt ->
   apply_manager_operation_content ctxt mode
@@ -550,14 +556,26 @@ let rec mark_skipped
             internal_operation_results = [] },
          mark_skipped rest)
 
+let rec precheck_manager_contents_list
+  : type kind.
+    Alpha_context.t -> _ Operation.t -> kind Kind.manager contents_list ->
+    context tzresult Lwt.t =
+  fun ctxt raw_operation contents_list ->
+    match contents_list with
+    | Single (Manager_operation _ as op) ->
+        precheck_manager_contents ctxt raw_operation op
+    | Cons (Manager_operation _ as op, rest) ->
+        precheck_manager_contents ctxt raw_operation op >>=? fun ctxt ->
+        precheck_manager_contents_list ctxt raw_operation rest
+
 let rec apply_manager_contents_list
   : type kind.
-    Alpha_context.t -> _ -> _ Operation.t -> kind Kind.manager contents_list ->
+    Alpha_context.t -> _ -> kind Kind.manager contents_list ->
     (context * kind Kind.manager contents_result_list) Lwt.t =
-  fun ctxt mode raw_operation contents_list ->
+  fun ctxt mode contents_list ->
     match contents_list with
     | Single (Manager_operation { operation ; _ } as op) -> begin
-        apply_manager_contents ctxt mode raw_operation op >>= function
+        apply_manager_contents ctxt mode op >>= function
         | Error errors ->
             let result =
               Manager_operation_result {
@@ -575,7 +593,7 @@ let rec apply_manager_contents_list
             Lwt.return (ctxt, Single_result (result))
       end
     | Cons (Manager_operation { operation ; _ } as op, rest) ->
-        apply_manager_contents ctxt mode raw_operation op >>= function
+        apply_manager_contents ctxt mode op >>= function
         | Error errors ->
             let result =
               Manager_operation_result {
@@ -586,8 +604,7 @@ let rec apply_manager_contents_list
             Lwt.return (ctxt, Cons_result (result, mark_skipped rest))
         | Ok (ctxt, (Manager_operation_result
                        { operation_result = Applied _ ; _ } as result)) ->
-            apply_manager_contents_list
-              ctxt mode raw_operation rest >>= fun (ctxt, results) ->
+            apply_manager_contents_list ctxt mode rest >>= fun (ctxt, results) ->
             Lwt.return (ctxt, Cons_result (result, results))
         | Ok (ctxt,
               (Manager_operation_result
@@ -738,10 +755,12 @@ let apply_contents_list
       Amendment.record_ballot ctxt source proposal ballot >>=? fun ctxt ->
       return (ctxt, Single_result Ballot_result)
   | Single (Manager_operation _) as op ->
-      apply_manager_contents_list ctxt mode operation op >>= fun (ctxt, result) ->
+      precheck_manager_contents_list ctxt operation op >>=? fun ctxt ->
+      apply_manager_contents_list ctxt mode op >>= fun (ctxt, result) ->
       return (ctxt, result)
   | Cons (Manager_operation _, _) as op ->
-      apply_manager_contents_list ctxt mode operation op >>= fun (ctxt, result) ->
+      precheck_manager_contents_list ctxt operation op >>=? fun ctxt ->
+      apply_manager_contents_list ctxt mode op >>= fun (ctxt, result) ->
       return (ctxt, result)
 
 let apply_operation ctxt mode pred_block hash operation =
