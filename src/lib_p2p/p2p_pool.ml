@@ -876,7 +876,7 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
       advertise =
         (fun points -> register_new_points pool conn points ) ;
       bootstrap =
-        (fun () -> list_known_points pool conn () ) ;
+        (fun () -> list_known_points ~ignore_private:true pool conn) ;
       swap_request =
         (fun point peer_id -> swap_request pool conn point peer_id ) ;
       swap_ack =
@@ -979,14 +979,22 @@ and register_new_point pool _source_peer_id point =
   if not (P2p_point.Table.mem pool.my_id_points point) then
     ignore (register_point pool _source_peer_id point)
 
-and list_known_points pool _conn () =
-  let knowns =
-    P2p_point.Table.fold
-      (fun _ point_info acc -> point_info :: acc)
-      pool.known_points [] in
-  let best_knowns =
-    List.take_n ~compare:compare_known_point_info 50 knowns in
-  Lwt.return (List.map P2p_point_state.Info.point best_knowns)
+and list_known_points ?(ignore_private = false) pool conn =
+  if P2p_socket.private_node conn.conn then
+    private_node_warn "Private peer (%a) asked other peers addresses"
+      P2p_peer.Id.pp (P2p_peer_state.Info.peer_id conn.peer_info) >>= fun () ->
+    Lwt.return []
+  else
+    let knowns =
+      P2p_point.Table.fold
+        (fun _ point_info acc ->
+           if ignore_private &&
+              not (P2p_point_state.Info.known_public point_info) then acc
+           else point_info :: acc)
+        pool.known_points [] in
+    let best_knowns =
+      List.take_n ~compare:compare_known_point_info 50 knowns in
+    Lwt.return (List.map P2p_point_state.Info.point best_knowns)
 
 and active_connections pool = P2p_peer.Table.length pool.connected_peer_ids
 
