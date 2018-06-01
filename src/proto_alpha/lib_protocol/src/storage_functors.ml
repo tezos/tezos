@@ -327,10 +327,6 @@ module Make_indexed_carbonated_data_storage
     I.to_path i []
   let len_name i =
     len_name (I.to_path i [])
-  let rec is_len_name = function
-    | [] | [ "" ] -> false
-    | [ last ] -> Compare.Char.(=) (String.get last (String.length last - 1)) '$'
-    | _ :: rest -> is_len_name rest
   let consume_mem_gas c =
     Lwt.return (C.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero))
   let existing_size c i =
@@ -423,58 +419,28 @@ module Make_indexed_carbonated_data_storage
     | None -> remove s i
     | Some v -> init_set s i v
 
+  let data_name = "TODO remove" (* This is some rebasing artefact and should be removed *)
   let fold_keys_unaccounted s ~init ~f =
-    let rec dig s i path acc =
+    let rec dig i path acc =
       if Compare.Int.(i <= 1) then
-        C.fold s path ~init:(ok (s, acc)) ~f:begin fun k acc ->
-          Lwt.return acc >>=? fun (s, acc) ->
+        C.fold s path ~init:acc ~f:begin fun k acc ->
           match k with
-          | `Dir _ -> return (s, acc)
+          | `Dir _ -> Lwt.return acc
           | `Key file ->
-              if is_len_name file then
-                return (s, acc)
-              else
-                match I.of_path file with
-                | None ->
-                    fail (Raw_context.Storage_error (Corrupted_data file))
-                | Some path ->
-                    f path (s, acc)
+              match I.of_path file with
+              | None -> assert false
+              | Some path -> f path acc
         end
       else
-        C.fold s path ~init:(ok (s, acc)) ~f:begin fun k acc ->
-          Lwt.return acc >>=? fun (s, acc) ->
+        C.fold s path ~init:acc ~f:begin fun k acc ->
           match k with
-          | `Dir k -> dig s (i-1) k acc
-          | `Key _ -> return (s, acc)
+          | `Dir k -> dig (i-1) k acc
+          | `Key _ -> Lwt.return acc
         end in
-    dig s I.path_length [] init >>=? fun (s, acc) ->
-    return (C.project s, acc)
+    dig I.path_length [data_name] init
 
-  let fold_keys s ~init ~f =
-    let f path (s, acc) =
-      consume_mem_gas s >>=? fun s ->
-      f path (s, acc) in
-    fold_keys_unaccounted s ~init ~f
-  let clear s =
-    let f path (s, total) =
-      consume_remove_gas C.delete s path >>=? fun s ->
-      existing_size s path >>=? fun prev_size ->
-      C.delete s (name path) >>=? fun s ->
-      Lwt.return (C.record_bytes_stored s (Int64.of_int ~-prev_size)) >>=? fun s ->
-      return (s, Z.add (Z.of_int prev_size) total) in
-    fold_keys_unaccounted s ~init:Z.zero ~f
-  let fold s ~init ~f =
-    let f path (s, acc) =
-      consume_read_gas C.get s path >>=? fun s ->
-      C.get s (name path) >>=? fun b ->
-      let key = C.absolute_key s (name path) in
-      Lwt.return (of_bytes ~key b) >>=? fun v ->
-      f path v (s, acc) in
-    fold_keys_unaccounted s ~init ~f
-  let bindings s =
-    fold s ~init:[] ~f:(fun p v (s, acc) -> return (s, (p, v) :: acc))
-  let keys s =
-    fold_keys s ~init:[] ~f:(fun p (s, acc) -> return (s, p :: acc))
+  let keys_unaccounted s =
+    fold_keys_unaccounted s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 
   let () =
     let open Storage_description in
@@ -486,7 +452,7 @@ module Make_indexed_carbonated_data_storage
           get_option c k >>=? fun (_, v) ->
           return v)
       (register_indexed_subcontext
-         ~list:(fun c -> keys c >>=? fun (_, l) -> return l)
+         ~list:(fun c -> keys_unaccounted c >>= return)
          C.description I.args)
       V.encoding
 
@@ -891,46 +857,6 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       match v with
       | None -> remove s i
       | Some v -> init_set s i v
-    let clear s =
-      fold_keys s ~init:(ok (s, Z.zero))
-        ~f:begin fun i s ->
-          Lwt.return s >>=? fun (s, total) ->
-          let remove c k = Raw_context.remove c k >>= return in
-          consume_remove_gas remove (pack s i) >>=? fun c ->
-          let (s, _) = unpack c in
-          existing_size (pack s i) >>=? fun prev_size ->
-          remove (pack s i) N.name >>=? fun c ->
-          let (s, _) = unpack c in
-          Lwt.return (Raw_context.record_bytes_stored (pack s i) (Int64.of_int ~-prev_size)) >>=? fun c ->
-          let (s, _) = unpack c in
-          return (s, Z.add total (Z.of_int prev_size))
-        end >>=? fun (s, total) ->
-      return (C.project s, total)
-    let fold s ~init ~f =
-      fold_keys s ~init:(ok (s, init))
-        ~f:(fun i acc ->
-            Lwt.return acc >>=? fun (s, acc) ->
-            consume_read_gas Raw_context.get (pack s i) >>=? fun c ->
-            let (s, _) = unpack c in
-            Raw_context.get (pack s i) N.name >>=? fun b ->
-            let key = Raw_context.absolute_key (pack s i) N.name in
-            Lwt.return (of_bytes ~key b) >>=? fun v ->
-            f i v (s, acc)) >>=? fun (s, v) ->
-      return (C.project s, v)
-    let bindings s =
-      fold s ~init:[] ~f:(fun p v (c, acc) -> return (c, (p,v) :: acc))
-    let fold_keys s ~init ~f =
-      fold_keys s ~init:(ok (s, init))
-        ~f:(fun i acc ->
-            Lwt.return acc >>=? fun (s, acc) ->
-            consume_mem_gas (pack s i) >>=? fun c ->
-            let (s, _) = unpack c in
-            Raw_context.mem (pack s i) N.name >>= function
-            | false -> return (s, acc)
-            | true -> f i (s, acc)) >>=? fun (s, v) ->
-      return (C.project s, v)
-    let keys s =
-      fold_keys s ~init:[] ~f:(fun p (s, acc) -> return (s, p :: acc))
 
     let () =
       let open Storage_description in
