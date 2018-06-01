@@ -79,10 +79,14 @@ module type PROTOCOL = sig
     protocol_data: block_header_data ;
   }
 
-  (** ... *)
+  (** Version-specific side information computed by the protocol
+      during the validation of a block. Should not include information
+      about the evaluation of operations which is handled separately by
+      {!operation_metadata}. To be used as an execution trace by tools
+      (client, indexer). Not necessary for validation. *)
   type block_header_metadata
 
-  (** ...  *)
+  (** Encoding for version-specific block metadata. *)
   val block_header_metadata_encoding: block_header_metadata Data_encoding.t
 
   (** The version specific type of operations. *)
@@ -97,10 +101,12 @@ module type PROTOCOL = sig
     protocol_data: operation_data ;
   }
 
-  (** ... *)
+  (** Version-specific side information computed by the protocol
+      during the validation of each operation, to be used conjointly
+      with {!block_header_metadata}. *)
   type operation_metadata
 
-  (** ...  *)
+  (** Encoding for version-specific operation metadata. *)
   val operation_metadata_encoding: operation_metadata Data_encoding.t
 
   (** The Validation passes in which an operation can appear.
