@@ -277,13 +277,6 @@ module type Indexed_data_storage = sig
 
 end
 
-(** Variant of {!Indexed_data_storage} with gas accounting. *)
-module type Indexed_carbonated_data_storage = sig
-
-  include Non_iterable_indexed_carbonated_data_storage
-
-end
-
 module type Indexed_data_snapshotable_storage = sig
   type snapshot
   type key
@@ -379,9 +372,9 @@ module type Indexed_raw_context = sig
                             and type value = V.t
 
   module Make_carbonated_map (N : NAME) (V : CARBONATED_VALUE)
-    : Indexed_carbonated_data_storage with type t = t
-                                       and type key = key
-                                       and type value = V.t
+    : Non_iterable_indexed_carbonated_data_storage with type t = t
+                                                    and type key = key
+                                                    and type value = V.t
 
   module Raw_context : Raw_context.T with type t = t ipath
 

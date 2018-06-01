@@ -315,9 +315,9 @@ end
 
 module Make_indexed_carbonated_data_storage
     (C : Raw_context.T) (I : INDEX) (V : CARBONATED_VALUE)
-  : Indexed_carbonated_data_storage with type t = C.t
-                                     and type key = I.t
-                                     and type value = V.t = struct
+  : Non_iterable_indexed_carbonated_data_storage with type t = C.t
+                                                  and type key = I.t
+                                                  and type value = V.t = struct
   type t = C.t
   type context = t
   type key = I.t
