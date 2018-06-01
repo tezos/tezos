@@ -235,18 +235,22 @@ let create_implicit c manager ~balance =
     ~spendable:true ~delegatable:false
 
 let delete c contract =
-  Delegate_storage.remove c contract >>=? fun c ->
-  Storage.Contract.Balance.delete c contract >>=? fun c ->
-  Storage.Contract.Manager.delete c contract >>=? fun c ->
-  Storage.Contract.Spendable.del c contract >>= fun c ->
-  Storage.Contract.Delegatable.del c contract >>= fun c ->
-  Storage.Contract.Counter.delete c contract >>=? fun c ->
-  Storage.Contract.Code.remove c contract >>=? fun (c, _) ->
-  Storage.Contract.Storage.remove c contract >>=? fun (c, _) ->
-  Storage.Contract.Paid_storage_space_fees.remove c contract >>= fun c ->
-  Storage.Contract.Used_storage_space.remove c contract >>= fun c ->
-  Storage.Contract.Big_map.clear (c, contract) >>=? fun (c, _) ->
-  return c
+  match Contract_repr.is_implicit contract with
+  | None ->
+      (* For non implicit contract Big_map should be cleared *)
+      failwith "Non implicit contracts cannot be removed"
+  | Some _ ->
+      Delegate_storage.remove c contract >>=? fun c ->
+      Storage.Contract.Balance.delete c contract >>=? fun c ->
+      Storage.Contract.Manager.delete c contract >>=? fun c ->
+      Storage.Contract.Spendable.del c contract >>= fun c ->
+      Storage.Contract.Delegatable.del c contract >>= fun c ->
+      Storage.Contract.Counter.delete c contract >>=? fun c ->
+      Storage.Contract.Code.remove c contract >>=? fun (c, _) ->
+      Storage.Contract.Storage.remove c contract >>=? fun (c, _) ->
+      Storage.Contract.Paid_storage_space_fees.remove c contract >>= fun c ->
+      Storage.Contract.Used_storage_space.remove c contract >>= fun c ->
+      return c
 
 let allocated c contract =
   Storage.Contract.Counter.get_option c contract >>=? function
