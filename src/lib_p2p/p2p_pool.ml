@@ -557,30 +557,36 @@ module Connection = struct
   let list pool =
     fold pool ~init:[] ~f:(fun peer_id c acc -> (peer_id, c) :: acc)
 
-  let random ?different_than pool =
+  let random ?different_than ~no_private pool =
     let candidates =
       fold pool ~init:[] ~f:begin fun _peer conn acc ->
-        match different_than with
-        | Some excluded_conn
-          when P2p_socket.equal conn.conn excluded_conn.conn -> acc
-        | Some _ | None -> conn :: acc
+        if no_private && (P2p_socket.private_node conn.conn) then
+          acc
+        else
+          match different_than with
+          | Some excluded_conn
+            when P2p_socket.equal conn.conn excluded_conn.conn -> acc
+          | Some _ | None -> conn :: acc
       end in
     match candidates with
     | [] -> None
     | _ :: _ ->
         Some (List.nth candidates (Random.int @@ List.length candidates))
 
-  let random_lowid ?different_than pool =
+  let random_lowid ?different_than ~no_private pool =
     let candidates =
       fold pool ~init:[] ~f:begin fun _peer conn acc ->
-        match different_than with
-        | Some excluded_conn
-          when P2p_socket.equal conn.conn excluded_conn.conn -> acc
-        | Some _ | None ->
-            let ci = P2p_socket.info conn.conn in
-            match ci.id_point with
-            | _, None -> acc
-            | addr, Some port -> ((addr, port), ci.peer_id, conn) :: acc
+        if no_private && (P2p_socket.private_node conn.conn) then
+          acc
+        else
+          match different_than with
+          | Some excluded_conn
+            when P2p_socket.equal conn.conn excluded_conn.conn -> acc
+          | Some _ | None ->
+              let ci = P2p_socket.info conn.conn in
+              match ci.id_point with
+              | _, None -> acc
+              | addr, Some port -> ((addr, port), ci.peer_id, conn) :: acc
       end in
     match candidates with
     | [] -> None
@@ -1016,7 +1022,7 @@ and swap_request pool conn new_point _new_peer_id =
     log pool (Swap_request_ignored { source = source_peer_id }) ;
     lwt_log_info "Ignoring swap request from %a" P2p_peer.Id.pp source_peer_id
   end else begin
-    match Connection.random_lowid pool with
+    match Connection.random_lowid pool ~no_private:true with
     | None ->
         lwt_log_info
           "No swap candidate for %a" P2p_peer.Id.pp source_peer_id
@@ -1093,10 +1099,14 @@ let accept pool fd point =
     end
 
 let send_swap_request pool =
-  match Connection.random pool with
+  match Connection.random ~no_private:true pool with
   | Some recipient when not pool.config.private_mode -> begin
       let recipient_peer_id = (Connection.info recipient).peer_id in
-      match Connection.random_lowid ~different_than:recipient pool with
+      match
+        Connection.random_lowid
+          ~different_than:recipient
+          ~no_private:true pool
+      with
       | None -> ()
       | Some (proposed_point, proposed_peer_id, _proposed_conn) ->
           log pool (Swap_request_sent { source = recipient_peer_id }) ;
