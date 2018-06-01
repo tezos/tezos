@@ -28,10 +28,8 @@ module Make_carbonated_value (V : VALUE) = struct
     | `Variable | `Dynamic -> Variable
 end
 
-let rec len_name = function
-  | [] -> assert false
-  | [ last ] ->  [ last ^ "$" ]
-  | first :: rest -> first :: len_name rest
+let len_name = "len"
+let data_name = "data"
 
 let encode_len_value bytes =
   let length = MBytes.length bytes in
@@ -40,7 +38,7 @@ let encode_len_value bytes =
 let decode_len_value key len =
   match Data_encoding.(Binary.of_bytes int31) len with
   | None ->
-      fail (Raw_context.Storage_error (Corrupted_data (len_name key)))
+      fail (Raw_context.Storage_error (Corrupted_data key))
   | Some len ->
       return len
 
@@ -324,9 +322,9 @@ module Make_indexed_carbonated_data_storage
   type value = V.t
   include Make_encoder(V)
   let name i =
-    I.to_path i []
+    I.to_path i [data_name]
   let len_name i =
-    len_name (I.to_path i [])
+    I.to_path i [len_name]
   let consume_mem_gas c =
     Lwt.return (C.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero))
   let existing_size c i =
@@ -337,14 +335,14 @@ module Make_indexed_carbonated_data_storage
     | Variable ->
         C.get_option c (len_name i) >>= function
         | None -> return 0
-        | Some len -> decode_len_value (name i) len
+        | Some len -> decode_len_value (len_name i) len
   let consume_read_gas get c i =
     match V.size with
     | Fixed len ->
         Lwt.return (C.consume_gas c (Gas_limit_repr.read_bytes_cost (Z.of_int len)))
     | Variable ->
         get c (len_name i) >>=? fun len ->
-        decode_len_value (name i) len >>=? fun len ->
+        decode_len_value (len_name i) len >>=? fun len ->
         Lwt.return (C.consume_gas c (Gas_limit_repr.read_bytes_cost (Z.of_int len)))
   let consume_write_gas set c i v =
     match V.size with
@@ -767,24 +765,26 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     type key = I.t
     type value = V.t
     include Make_encoder(V)
+    let len_name = len_name :: N.name
+    let data_name = data_name :: N.name
     let consume_mem_gas c =
       Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero))
     let existing_size c =
       match V.size with
       | Fixed len ->
-          Raw_context.mem c N.name >>= fun exists ->
+          Raw_context.mem c data_name >>= fun exists ->
           if exists then return len else return 0
       | Variable ->
-          Raw_context.get_option c (len_name N.name) >>= function
+          Raw_context.get_option c len_name >>= function
           | None -> return 0
-          | Some len -> decode_len_value N.name len
+          | Some len -> decode_len_value len_name len
     let consume_read_gas get c =
       match V.size with
       | Fixed len ->
           Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost (Z.of_int len)))
       | Variable ->
-          get c (len_name N.name) >>=? fun len ->
-          decode_len_value N.name len >>=? fun len ->
+          get c (len_name) >>=? fun len ->
+          decode_len_value len_name len >>=? fun len ->
           Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost (Z.of_int len)))
     let consume_write_gas set c v =
       match V.size with
@@ -795,7 +795,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
           let bytes = to_bytes v in
           let len = MBytes.length bytes in
           Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.write_bytes_cost (Z.of_int len))) >>=? fun c ->
-          set c (len_name N.name) (encode_len_value bytes) >>=? fun c ->
+          set c len_name (encode_len_value bytes) >>=? fun c ->
           return (c, bytes)
     let consume_remove_gas del c =
       match V.size with
@@ -803,21 +803,21 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
           Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.write_bytes_cost Z.zero))
       | Variable ->
           Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.write_bytes_cost Z.zero)) >>=? fun c ->
-          del c (len_name N.name)
+          del c len_name
     let mem s i =
       consume_mem_gas (pack s i) >>=? fun c ->
-      Raw_context.mem c N.name >>= fun res ->
+      Raw_context.mem c data_name >>= fun res ->
       return (Raw_context.project c, res)
     let get s i =
       consume_read_gas Raw_context.get (pack s i) >>=? fun c ->
-      Raw_context.get c N.name >>=? fun b ->
-      let key = Raw_context.absolute_key c N.name in
+      Raw_context.get c data_name >>=? fun b ->
+      let key = Raw_context.absolute_key c data_name in
       Lwt.return (of_bytes ~key b) >>=? fun v ->
       return (Raw_context.project c, v)
     let get_option s i =
       consume_mem_gas (pack s i) >>=? fun c ->
       let (s, _) = unpack c in
-      Raw_context.mem (pack s i) N.name >>= fun exists ->
+      Raw_context.mem (pack s i) data_name >>= fun exists ->
       if exists then
         get s i >>=? fun (s, v) ->
         return (s, Some v)
@@ -826,13 +826,13 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     let set s i v =
       existing_size (pack s i) >>=? fun prev_size ->
       consume_write_gas Raw_context.set (pack s i) v >>=? fun (c, bytes) ->
-      Raw_context.set c N.name bytes >>=? fun c ->
+      Raw_context.set c data_name bytes >>=? fun c ->
       let size_diff = MBytes.length bytes - prev_size in
       Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int size_diff)) >>=? fun c ->
       return (Raw_context.project c, size_diff)
     let init s i v =
       consume_write_gas Raw_context.init (pack s i) v >>=? fun (c, bytes) ->
-      Raw_context.init c N.name bytes >>=? fun c ->
+      Raw_context.init c data_name bytes >>=? fun c ->
       let size = MBytes.length bytes in
       Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int size)) >>=? fun c ->
       return (Raw_context.project c, size)
@@ -840,7 +840,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       let init_set c k v = Raw_context.init_set c k v >>= return in
       existing_size (pack s i) >>=? fun prev_size ->
       consume_write_gas init_set (pack s i) v >>=? fun (c, bytes) ->
-      init_set c N.name bytes >>=? fun c ->
+      init_set c data_name bytes >>=? fun c ->
       let size_diff = MBytes.length bytes - prev_size in
       Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int size_diff)) >>=? fun c ->
       return (Raw_context.project c, size_diff)
@@ -848,13 +848,13 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       let remove c k = Raw_context.remove c k >>= return in
       existing_size (pack s i) >>=? fun prev_size ->
       consume_remove_gas remove (pack s i) >>=? fun c ->
-      remove c N.name >>=? fun c ->
+      remove c data_name >>=? fun c ->
       Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int ~-prev_size)) >>=? fun c ->
       return (Raw_context.project c, prev_size)
     let delete s i =
       existing_size (pack s i) >>=? fun prev_size ->
       consume_remove_gas Raw_context.delete (pack s i) >>=? fun c ->
-      Raw_context.delete c N.name >>=? fun c ->
+      Raw_context.delete c data_name >>=? fun c ->
       Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int ~-prev_size)) >>=? fun c ->
       return (Raw_context.project c, prev_size)
     let set_option s i v =
