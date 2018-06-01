@@ -20,15 +20,6 @@ module Make_encoder (V : VALUE) = struct
     | None -> MBytes.create 0
 end
 
-module Make_carbonated_value (V : VALUE) = struct
-  include V
-  let size =
-    match Data_encoding.classify V.encoding with
-    | `Fixed _size ->
-        assert false
-    | `Variable | `Dynamic -> Variable
-end
-
 let len_name = "len"
 let data_name = "data"
 
@@ -313,7 +304,7 @@ module Make_indexed_data_storage
 end
 
 module Make_indexed_carbonated_data_storage
-    (C : Raw_context.T) (I : INDEX) (V : CARBONATED_VALUE)
+    (C : Raw_context.T) (I : INDEX) (V : VALUE)
   : Non_iterable_indexed_carbonated_data_storage with type t = C.t
                                                   and type key = I.t
                                                   and type value = V.t = struct
@@ -742,7 +733,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
 
   end
 
-  module Make_carbonated_map (N : NAME) (V : CARBONATED_VALUE) = struct
+  module Make_carbonated_map (N : NAME) (V : VALUE) = struct
     type t = C.t
     type context = t
     type key = I.t

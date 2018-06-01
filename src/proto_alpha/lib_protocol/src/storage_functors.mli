@@ -19,8 +19,6 @@ module Make_single_data_storage
   : Single_data_storage with type t = C.t
                          and type value = V.t
 
-module Make_carbonated_value (V : VALUE) : CARBONATED_VALUE with type t = V.t
-
 module type INDEX = sig
   type t
   val path_length: int
@@ -42,7 +40,7 @@ module Make_indexed_data_storage
                           and type value = V.t
 
 module Make_indexed_carbonated_data_storage
-    (C : Raw_context.T) (I : INDEX) (V : CARBONATED_VALUE)
+    (C : Raw_context.T) (I : INDEX) (V : VALUE)
   : Non_iterable_indexed_carbonated_data_storage with type t = C.t
                                                   and type key = I.t
                                                   and type value = V.t

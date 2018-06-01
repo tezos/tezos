@@ -338,15 +338,6 @@ module type VALUE = sig
   val encoding: t Data_encoding.t
 end
 
-type value_size =
-  | Fixed of int
-  | Variable
-
-module type CARBONATED_VALUE = sig
-  include VALUE
-  val size: value_size
-end
-
 module type Indexed_raw_context = sig
 
   type t
@@ -371,7 +362,7 @@ module type Indexed_raw_context = sig
                             and type key = key
                             and type value = V.t
 
-  module Make_carbonated_map (N : NAME) (V : CARBONATED_VALUE)
+  module Make_carbonated_map (N : NAME) (V : VALUE)
     : Non_iterable_indexed_carbonated_data_storage with type t = t
                                                     and type key = key
                                                     and type value = V.t
