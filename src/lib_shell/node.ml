@@ -72,8 +72,8 @@ let peer_metadata_cfg : _ P2p.peer_meta_config = {
 }
 
 let connection_metadata_cfg : _ P2p.conn_meta_config = {
-  conn_meta_encoding = Peer_metadata.encoding ;
-  conn_meta_value = fun _ -> () ;
+  conn_meta_encoding = Connection_metadata.encoding ;
+  conn_meta_value = fun _ -> { disable_mempool = false ; private_node = false} ;
 }
 
 let init_p2p p2p_params =
