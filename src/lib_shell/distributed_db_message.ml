@@ -7,6 +7,28 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Bounded_encoding = struct
+
+  open Data_encoding
+
+  let block_header_max_size = ref None
+  let block_header_cache = ref Block_header.encoding
+  let block_locator_cache = ref Block_locator.encoding
+
+  let update_block_header_encoding () =
+    block_header_cache :=
+      Block_header.bounded_encoding ?max_size:!block_header_max_size () ;
+    block_locator_cache :=
+      Block_locator.bounded_encoding ?max_header_size:!block_header_max_size ()
+
+  let set_block_header_max_size max =
+    block_header_max_size := max ;
+    update_block_header_encoding ()
+  let block_header = delayed (fun () -> !block_header_cache)
+  let block_locator = delayed (fun () -> !block_locator_cache)
+
+end
+
 type t =
 
   | Get_current_branch of Chain_id.t
@@ -53,7 +75,7 @@ let encoding =
       ~title:"Current_branch"
       (obj2
          (req "chain_id" Chain_id.encoding)
-         (req "current_branch" Block_locator.encoding))
+         (req "current_branch" Bounded_encoding.block_locator))
       (function
         | Current_branch (chain_id, locator) -> Some (chain_id, locator)
         | _ -> None)
@@ -81,7 +103,7 @@ let encoding =
       ~title:"Current_head"
       (obj3
          (req "chain_id" Chain_id.encoding)
-         (req "current_block_header" (dynamic_size Block_header.encoding))
+         (req "current_block_header" (dynamic_size Bounded_encoding.block_header))
          (req "current_mempool" Mempool.encoding))
       (function
         | Current_head (chain_id, bh, mempool) -> Some (chain_id, bh, mempool)
@@ -98,7 +120,7 @@ let encoding =
 
     case ~tag:0x21
       ~title:"Block_header"
-      (obj1 (req "block_header" Block_header.encoding))
+      (obj1 (req "block_header" Bounded_encoding.block_header))
       (function
         | Block_header bh -> Some bh
         | _ -> None)

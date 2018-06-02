@@ -40,3 +40,7 @@ type t =
 val cfg : t P2p.message_config
 
 val pp_json : Format.formatter -> t -> unit
+
+module Bounded_encoding : sig
+  val set_block_header_max_size: int option -> unit
+end

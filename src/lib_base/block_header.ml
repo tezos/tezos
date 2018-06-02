@@ -77,6 +77,11 @@ let encoding =
        shell_header_encoding
        (obj1 (req "protocol_data" Variable.bytes)))
 
+let bounded_encoding ?max_size () =
+  match max_size with
+  | None -> encoding
+  | Some max_size -> Data_encoding.check_size max_size encoding
+
 let pp ppf op =
   Data_encoding.Json.pp ppf
     (Data_encoding.Json.construct encoding op)
