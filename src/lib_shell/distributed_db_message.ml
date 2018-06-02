@@ -90,7 +90,7 @@ let encoding =
 
     case ~tag:0x20
       ~title:"Get_block_headers"
-      (obj1 (req "get_block_headers" (list Block_hash.encoding)))
+      (obj1 (req "get_block_headers" (list ~max_length:10 Block_hash.encoding)))
       (function
         | Get_block_headers bhs -> Some bhs
         | _ -> None)
@@ -106,7 +106,7 @@ let encoding =
 
     case ~tag:0x30
       ~title:"Get_operations"
-      (obj1 (req "get_operations" (list Operation_hash.encoding)))
+      (obj1 (req "get_operations" (list ~max_length:10 Operation_hash.encoding)))
       (function
         | Get_operations bhs -> Some bhs
         | _ -> None)
@@ -121,7 +121,7 @@ let encoding =
     case ~tag:0x40
       ~title:"Get_protocols"
       (obj1
-         (req "get_protocols" (list  Protocol_hash.encoding)))
+         (req "get_protocols" (list ~max_length:10 Protocol_hash.encoding)))
       (function
         | Get_protocols protos -> Some protos
         | _ -> None)
@@ -136,7 +136,7 @@ let encoding =
     case ~tag:0x50
       ~title:"Get_operation_hashes_for_blocks"
       (obj1 (req "get_operation_hashes_for_blocks"
-               (list (tup2 Block_hash.encoding int8))))
+               (list ~max_length:10 (tup2 Block_hash.encoding int8))))
       (function
         | Get_operation_hashes_for_blocks keys -> Some keys
         | _ -> None)
@@ -159,9 +159,10 @@ let encoding =
     case ~tag:0x60
       ~title:"Get_operations_for_blocks"
       (obj1 (req "get_operations_for_blocks"
-               (list (obj2
-                        (req "hash" Block_hash.encoding)
-                        (req "validation_pass" int8)))))
+               (list ~max_length:10
+                  (obj2
+                     (req "hash" Block_hash.encoding)
+                     (req "validation_pass" int8)))))
       (function
         | Get_operations_for_blocks keys -> Some keys
         | _ -> None)
