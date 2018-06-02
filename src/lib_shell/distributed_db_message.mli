@@ -43,4 +43,8 @@ val pp_json : Format.formatter -> t -> unit
 
 module Bounded_encoding : sig
   val set_block_header_max_size: int option -> unit
+  val set_operation_max_size: int option -> unit
+  val set_operation_list_max_size: int option -> unit
+  val set_operation_list_max_length: int option -> unit
+  val set_operation_max_pass: int option -> unit
 end

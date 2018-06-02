@@ -27,6 +27,62 @@ module Bounded_encoding = struct
   let block_header = delayed (fun () -> !block_header_cache)
   let block_locator = delayed (fun () -> !block_locator_cache)
 
+  let operation_max_size = ref None
+  let operation_list_max_size = ref None
+  let operation_list_max_length = ref None
+  let operation_max_pass = ref None
+
+  let operation_cache =
+    ref (Operation.bounded_encoding ?max_size:!operation_max_size ())
+  let operation_list_cache =
+    ref (Operation.bounded_list_encoding
+           ?max_length:!operation_list_max_length
+           ?max_size:!operation_list_max_size
+           ?max_operation_size:!operation_max_size
+           ?max_pass:!operation_max_pass ())
+  let operation_hash_list_cache =
+    ref (Operation.bounded_hash_list_encoding
+           ?max_length:!operation_list_max_length
+           ?max_pass:!operation_max_pass ())
+
+  let update_operation_list_encoding () =
+    operation_list_cache :=
+      Operation.bounded_list_encoding
+        ?max_length:!operation_list_max_length
+        ?max_size:!operation_list_max_size
+        ?max_operation_size:!operation_max_size
+        ?max_pass:!operation_max_pass
+        ()
+  let update_operation_hash_list_encoding () =
+    operation_list_cache :=
+      Operation.bounded_list_encoding
+        ?max_length:!operation_list_max_length
+        ?max_pass:!operation_max_pass
+        ()
+  let update_operation_encoding () =
+    operation_cache :=
+      Operation.bounded_encoding ?max_size:!operation_max_size ()
+
+  let set_operation_max_size max =
+    operation_max_size := max ;
+    update_operation_encoding () ;
+    update_operation_list_encoding ()
+  let set_operation_list_max_size max =
+    operation_list_max_size := max ;
+    update_operation_list_encoding ()
+  let set_operation_list_max_length max =
+    operation_list_max_length := max ;
+    update_operation_list_encoding () ;
+    update_operation_hash_list_encoding ()
+  let set_operation_max_pass max =
+    operation_max_pass := max ;
+    update_operation_list_encoding () ;
+    update_operation_hash_list_encoding ()
+
+  let operation = delayed (fun () -> !operation_cache)
+  let operation_list = delayed (fun () -> !operation_list_cache)
+  let operation_hash_list = delayed (fun () -> !operation_hash_list_cache)
+
 end
 
 type t =
@@ -136,7 +192,7 @@ let encoding =
 
     case ~tag:0x31
       ~title:"Operation"
-      (obj1 (req "operation" Operation.encoding))
+      (obj1 (req "operation" Bounded_encoding.operation))
       (function Operation o -> Some o | _ -> None)
       (fun o -> Operation o);
 
@@ -166,16 +222,16 @@ let encoding =
 
     case ~tag:0x51
       ~title:"Operation_hashes_for_blocks"
-      (obj3
-         (req "operation_hashes_for_block"
-            (obj2
-               (req "hash" Block_hash.encoding)
-               (req "validation_pass" int8)))
-         (req "operation_hashes" (list Operation_hash.encoding))
-         (req "operation_hashes_path" Operation_list_list_hash.path_encoding))
+      (merge_objs
+         (obj1
+            (req "operation_hashes_for_block"
+               (obj2
+                  (req "hash" Block_hash.encoding)
+                  (req "validation_pass" int8))))
+         Bounded_encoding.operation_hash_list)
       (function Operation_hashes_for_block (block, ofs, ops, path) ->
-         Some ((block, ofs), ops, path) | _ -> None)
-      (fun ((block, ofs), ops, path) ->
+         Some ((block, ofs), (path, ops)) | _ -> None)
+      (fun ((block, ofs), (path, ops)) ->
          Operation_hashes_for_block (block, ofs, ops, path)) ;
 
     case ~tag:0x60
@@ -192,16 +248,16 @@ let encoding =
 
     case ~tag:0x61
       ~title:"Operations_for_blocks"
-      (obj3
-         (req "operations_for_block"
-            (obj2
-               (req "hash" Block_hash.encoding)
-               (req "validation_pass" int8)))
-         (req "operations" (list (dynamic_size Operation.encoding)))
-         (req "operations_path" Operation_list_list_hash.path_encoding))
+      (merge_objs
+         (obj1
+            (req "operations_for_block"
+               (obj2
+                  (req "hash" Block_hash.encoding)
+                  (req "validation_pass" int8))))
+         Bounded_encoding.operation_list)
       (function Operations_for_block (block, ofs, ops, path) ->
-         Some ((block, ofs), ops, path) | _ -> None)
-      (fun ((block, ofs), ops, path) ->
+         Some ((block, ofs), (path, ops)) | _ -> None)
+      (fun ((block, ofs), (path, ops)) ->
          Operations_for_block (block, ofs, ops, path)) ;
 
   ]
