@@ -69,12 +69,14 @@ let rec remove nb = function
 
 let rec repeat n x = if n <= 0 then [] else x :: repeat (pred n) x
 
-let take_n_unsorted n l =
+let split_n n l =
   let rec loop acc n = function
-    | [] -> l
-    | _ when n <= 0 -> List.rev acc
+    | [] -> l, []
+    | rem when n <= 0 -> List.rev acc, rem
     | x :: xs -> loop (x :: acc) (pred n) xs in
   loop [] n l
+
+let take_n_unsorted n l = fst (split_n n l)
 
 module Bounded(E: Set.OrderedType) : sig
 
