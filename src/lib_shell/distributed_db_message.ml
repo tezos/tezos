@@ -93,6 +93,16 @@ module Bounded_encoding = struct
     protocol_max_size := max
   let protocol = delayed (fun () -> !protocol_cache)
 
+  let mempool_max_operations = ref None
+  let mempool_cache =
+    ref (Mempool.bounded_encoding ?max_operations:!mempool_max_operations ())
+  let update_mempool_encoding () =
+    mempool_cache :=
+      Mempool.bounded_encoding ?max_operations:!mempool_max_operations ()
+  let set_mempool_max_operations max =
+    mempool_max_operations := max
+  let mempool = delayed (fun () -> !mempool_cache)
+
 end
 
 type t =
@@ -170,7 +180,7 @@ let encoding =
       (obj3
          (req "chain_id" Chain_id.encoding)
          (req "current_block_header" (dynamic_size Bounded_encoding.block_header))
-         (req "current_mempool" Mempool.encoding))
+         (req "current_mempool" Bounded_encoding.mempool))
       (function
         | Current_head (chain_id, bh, mempool) -> Some (chain_id, bh, mempool)
         | _ -> None)
