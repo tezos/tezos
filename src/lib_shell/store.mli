@@ -88,7 +88,6 @@ module Block : sig
     header: Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
-    max_operation_data_length: int;
     context: Context_hash.t ;
     metadata: MBytes.t ;
   }

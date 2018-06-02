@@ -72,7 +72,6 @@ val genesis:
   ?hard_gas_limit_per_block:Z.t ->
   ?proof_of_work_threshold:int64 ->
   ?dictator_pubkey:public_key ->
-  ?max_operation_data_length:int ->
   ?tokens_per_roll:Tez_repr.tez ->
   ?michelson_maximum_type_size:int ->
   ?seed_nonce_revelation_tip:Tez_repr.tez ->

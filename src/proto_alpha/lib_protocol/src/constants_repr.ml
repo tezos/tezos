@@ -11,36 +11,43 @@ let version_number = "\000"
 let proof_of_work_nonce_size = 8
 let nonce_length = 32
 let max_revelations_per_block = 32
+let max_operation_data_length = 16 * 1024 ; (* 16kB *)
 
 type fixed = {
   proof_of_work_nonce_size : int ;
   nonce_length : int ;
   max_revelations_per_block : int ;
+  max_operation_data_length : int ;
 }
 
 let fixed_encoding =
   let open Data_encoding in
   conv
     (fun c ->
-       ( c.proof_of_work_nonce_size,
-         c.nonce_length,
-         c.max_revelations_per_block ))
-    (fun ( proof_of_work_nonce_size,
-           nonce_length,
-           max_revelations_per_block ) ->
+       (c.proof_of_work_nonce_size,
+        c.nonce_length,
+        c.max_revelations_per_block,
+        c.max_operation_data_length))
+    (fun (proof_of_work_nonce_size,
+          nonce_length,
+          max_revelations_per_block,
+          max_operation_data_length) ->
       { proof_of_work_nonce_size ;
         nonce_length ;
         max_revelations_per_block ;
+        max_operation_data_length ;
       } )
-    (obj3
+    (obj4
        (req "proof_of_work_nonce_size" uint8)
        (req "nonce_length" uint8)
-       (req "max_revelations_per_block" uint8))
+       (req "max_revelations_per_block" uint8)
+       (req "max_operation_data_length" int31))
 
 let fixed = {
   proof_of_work_nonce_size ;
   nonce_length ;
   max_revelations_per_block ;
+  max_operation_data_length ;
 }
 
 type parametric = {
@@ -55,7 +62,6 @@ type parametric = {
   hard_gas_limit_per_block: Z.t ;
   proof_of_work_threshold: int64 ;
   dictator_pubkey: Signature.Public_key.t ;
-  max_operation_data_length: int ;
   tokens_per_roll: Tez_repr.t ;
   michelson_maximum_type_size: int;
   seed_nonce_revelation_tip: Tez_repr.t ;
@@ -85,8 +91,6 @@ let default = {
   dictator_pubkey =
     Signature.Public_key.of_b58check_exn
       "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ;
-  max_operation_data_length =
-    16 * 1024 ; (* 16kB *)
   tokens_per_roll =
     Tez_repr.(mul_exn one 10_000) ;
   michelson_maximum_type_size = 1000 ;
@@ -122,7 +126,6 @@ let parametric_encoding =
           c.hard_gas_limit_per_block),
         ((c.proof_of_work_threshold,
           c.dictator_pubkey,
-          c.max_operation_data_length,
           c.tokens_per_roll,
           c.michelson_maximum_type_size,
           c.seed_nonce_revelation_tip,
@@ -145,7 +148,6 @@ let parametric_encoding =
             hard_gas_limit_per_block),
           ((proof_of_work_threshold,
             dictator_pubkey,
-            max_operation_data_length,
             tokens_per_roll,
             michelson_maximum_type_size,
             seed_nonce_revelation_tip,
@@ -168,7 +170,6 @@ let parametric_encoding =
         hard_gas_limit_per_block ;
         proof_of_work_threshold ;
         dictator_pubkey ;
-        max_operation_data_length ;
         tokens_per_roll ;
         michelson_maximum_type_size ;
         seed_nonce_revelation_tip ;
@@ -193,10 +194,9 @@ let parametric_encoding =
           (req "hard_gas_limit_per_operation" z)
           (req "hard_gas_limit_per_block" z))
        (merge_objs
-          (obj10
+          (obj9
              (req "proof_of_work_threshold" int64)
              (req "dictator_pubkey" Signature.Public_key.encoding)
-             (req "max_operation_data_length" int31)
              (req "tokens_per_roll" Tez_repr.encoding)
              (req "michelson_maximum_type_size" uint16)
              (req "seed_nonce_revelation_tip" Tez_repr.encoding)

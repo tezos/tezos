@@ -234,7 +234,6 @@ let genesis
     ?(hard_gas_limit_per_block = Constants_repr.default.hard_gas_limit_per_block)
     ?(proof_of_work_threshold = Int64.(neg one))
     ?(dictator_pubkey = Constants_repr.default.dictator_pubkey)
-    ?(max_operation_data_length = Constants_repr.default.max_operation_data_length)
     ?(tokens_per_roll = Constants_repr.default.tokens_per_roll)
     ?(michelson_maximum_type_size = Constants_repr.default.michelson_maximum_type_size)
     ?(seed_nonce_revelation_tip = Constants_repr.default.seed_nonce_revelation_tip)
@@ -280,7 +279,6 @@ let genesis
     hard_gas_limit_per_block ;
     proof_of_work_threshold ;
     dictator_pubkey ;
-    max_operation_data_length ;
     tokens_per_roll ;
     michelson_maximum_type_size ;
     seed_nonce_revelation_tip ;

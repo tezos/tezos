@@ -78,6 +78,8 @@ let max_block_length =
                           delay = 0L })
   + Signature.size
 
+let max_operation_data_length = 0
+
 let check_signature ctxt { shell ; protocol_data = { command ; signature } } =
   let bytes = Data.Command.forge shell command in
   Data.Pubkey.get_pubkey ctxt >>= fun public_key ->
@@ -107,7 +109,6 @@ let prepare_application ctxt command level timestamp fitness =
       Updater.activate ctxt hash >>= fun ctxt ->
       return { Updater.message ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
-               max_operation_data_length = 0 ;
                last_allowed_fork_level = level ;
              }
   | Activate_testchain { protocol = hash ; delay } ->
@@ -117,7 +118,6 @@ let prepare_application ctxt command level timestamp fitness =
       Updater.fork_test_chain ctxt ~protocol:hash ~expiration >>= fun ctxt ->
       return { Updater.message ; context = ctxt ; fitness ;
                max_operations_ttl = 0 ;
-               max_operation_data_length = 0 ;
                last_allowed_fork_level = Int32.succ level ;
              }
 
@@ -145,7 +145,6 @@ let begin_construction
       (* Dummy result. *)
       return { Updater.message = None ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
-               max_operation_data_length = 0 ;
                last_allowed_fork_level = 0l ;
              }
   | Some { command ; _ }->
@@ -183,6 +182,5 @@ let init ctxt block_header =
   return { Updater.message = None ; context = ctxt ;
            fitness = block_header.Block_header.fitness ;
            max_operations_ttl = 0 ;
-           max_operation_data_length = 0 ;
            last_allowed_fork_level = block_header.level ;
          }

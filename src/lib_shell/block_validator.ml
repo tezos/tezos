@@ -129,15 +129,14 @@ let apply_block
           invalid_block hash @@
           Too_many_operations
             { pass = i + 1 ; found = List.length ops ; max }) >>=? fun () ->
-       let max_size = State.Block.max_operation_data_length pred in
        iter_p (fun op ->
            let size = Data_encoding.Binary.length Operation.encoding op in
            fail_unless
-             (size <= max_size)
+             (size <= Proto.max_operation_data_length)
              (invalid_block hash @@
               Oversized_operation
                 { operation = Operation.hash op ;
-                  size ; max = max_size })) ops >>=? fun () ->
+                  size ; max = Proto.max_operation_data_length })) ops >>=? fun () ->
        return ())
     operations Proto.validation_passes >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in

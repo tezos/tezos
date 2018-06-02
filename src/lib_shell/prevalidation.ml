@@ -49,8 +49,7 @@ let rec apply_operations apply_operation state r max_ops ~sort ops =
 
 type prevalidation_state =
     State : { proto : 'a proto ; state : 'a ;
-              max_number_of_operations : int ;
-              max_operation_data_length : int }
+              max_number_of_operations : int }
     -> prevalidation_state
 
 and 'a proto =
@@ -64,8 +63,6 @@ let start_prevalidation
             timestamp = predecessor_timestamp ;
             level = predecessor_level } } =
     State.Block.header predecessor in
-  let max_operation_data_length =
-    State.Block.max_operation_data_length predecessor in
   State.Block.context predecessor >>= fun predecessor_context ->
   Context.get_protocol predecessor_context >>= fun protocol ->
   let predecessor = State.Block.hash predecessor in
@@ -107,12 +104,12 @@ let start_prevalidation
   (* FIXME arbitrary value, to be customisable *)
   let max_number_of_operations = 1000 in
   return (State { proto = (module Proto) ; state ;
-                  max_number_of_operations ; max_operation_data_length })
+                  max_number_of_operations })
 
 
 let prevalidate
     (State { proto = (module Proto) ; state ;
-             max_number_of_operations ; max_operation_data_length })
+             max_number_of_operations })
     ~sort (ops : (Operation_hash.t * Operation.t) list)=
   let ops =
     List.map
@@ -145,8 +142,8 @@ let prevalidate
     let size = Data_encoding.Binary.length Operation.encoding op in
     if max_ops <= 0 then
       fail Too_many_operations
-    else if size > max_operation_data_length then
-      fail (Oversized_operation { size ; max = max_operation_data_length })
+    else if size > Proto.max_operation_data_length then
+      fail (Oversized_operation { size ; max = Proto.max_operation_data_length })
     else
       Proto.apply_operation state parse_op >>=? fun (state, receipt) ->
       return (state, receipt) in
@@ -162,7 +159,7 @@ let prevalidate
           (fun map (h, op, err) -> Operation_hash.Map.add h (op, err) map)
           r.branch_refused invalid_ops } in
   Lwt.return (State { proto = (module Proto) ; state ;
-                      max_number_of_operations ; max_operation_data_length },
+                      max_number_of_operations },
               r)
 
 let end_prevalidation (State { proto = (module Proto) ; state }) =

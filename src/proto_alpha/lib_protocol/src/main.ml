@@ -43,6 +43,9 @@ let acceptable_passes = Alpha_context.Operation.acceptable_passes
 let max_block_length =
   Alpha_context.Block_header.max_header_length
 
+let max_operation_data_length =
+  Alpha_context.Constants.max_operation_data_length
+
 let validation_passes =
   Updater.[ { max_size = 32 * 1024 ; max_op = Some 32 } ; (* 32kB FIXME *)
             { max_size = 32 * 1024 ; max_op = None } ; (* 32kB FIXME *)

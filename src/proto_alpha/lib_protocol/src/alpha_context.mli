@@ -300,6 +300,7 @@ module Constants : sig
     proof_of_work_nonce_size : int ;
     nonce_length : int ;
     max_revelations_per_block : int ;
+    max_operation_data_length : int ;
   }
   val fixed_encoding: fixed Data_encoding.t
   val fixed: fixed
@@ -307,7 +308,7 @@ module Constants : sig
   val proof_of_work_nonce_size: int
   val nonce_length: int
   val max_revelations_per_block: int
-
+  val max_operation_data_length: int
 
   (** Constants parameterized by context *)
   type parametric = {
@@ -322,7 +323,6 @@ module Constants : sig
     hard_gas_limit_per_block: Z.t ;
     proof_of_work_threshold: int64 ;
     dictator_pubkey: Signature.Public_key.t ;
-    max_operation_data_length: int ;
     tokens_per_roll: Tez.t ;
     michelson_maximum_type_size: int;
     seed_nonce_revelation_tip: Tez.t ;
@@ -351,7 +351,6 @@ module Constants : sig
   val hard_storage_limit_per_block: context -> Int64.t
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Signature.Public_key.t
-  val max_operation_data_length: context -> int
   val tokens_per_roll: context -> Tez.t
   val michelson_maximum_type_size: context -> int
   val block_reward: context -> Tez.t

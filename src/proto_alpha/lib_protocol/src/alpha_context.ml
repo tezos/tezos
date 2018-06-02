@@ -129,9 +129,7 @@ let prepare = Init_storage.prepare
 let finalize ?commit_message:message c =
   let fitness = Fitness.from_int64 (Fitness.current c) in
   let context = Raw_context.recover c in
-  let constants = Raw_context.constants c in
   { Updater.context ; fitness ; message ; max_operations_ttl = 60 ;
-    max_operation_data_length = constants.max_operation_data_length ;
     last_allowed_fork_level =
       Raw_level.to_int32 @@ Level.last_allowed_fork_level c;
   }

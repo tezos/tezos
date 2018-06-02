@@ -35,7 +35,6 @@ module Make (Context : CONTEXT) = struct
     context: Context.t ;
     fitness: Fitness.t ;
     message: string option ;
-    max_operation_data_length: int ;
     max_operations_ttl: int ;
     last_allowed_fork_level: Int32.t ;
   }
@@ -58,6 +57,7 @@ module Make (Context : CONTEXT) = struct
     type rpc_context
     type 'a tzresult
     val max_block_length: int
+    val max_operation_data_length: int
     val validation_passes: quota list
     type block_header_data
     val block_header_data_encoding: block_header_data Data_encoding.t
@@ -578,7 +578,6 @@ module Make (Context : CONTEXT) = struct
         context: Context.t ;
         fitness: Fitness.t ;
         message: string option ;
-        max_operation_data_length: int ;
         max_operations_ttl: int ;
         last_allowed_fork_level: Int32.t ;
       }

@@ -24,9 +24,6 @@ type validation_result = {
   (** An optional informative message to be used as in the 'git
       commit' of the block's context. *)
 
-  max_operation_data_length: int ;
-  (** The maximum size of operations in bytes. *)
-
   max_operations_ttl: int ;
   (** The "time-to-live" of operation for the next block: any
       operations whose 'branch' is older than 'ttl' blocks in the
@@ -58,8 +55,11 @@ type rpc_context = {
     access to the standard library and the Environment module. *)
 module type PROTOCOL = sig
 
-  (** The maximum size of block headers in bytes. *)
+  (** The maximum size of a block header in bytes. *)
   val max_block_length: int
+
+  (** The maximum size of an operation in bytes. *)
+  val max_operation_data_length: int
 
   (** The number of validation passes (length of the list) and the
       operation's quota for each pass. *)

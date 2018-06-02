@@ -98,7 +98,7 @@ let build_raw_rpc_directory
       Block_services.protocol_data ;
       test_chain_status ;
       max_operations_ttl = State.Block.max_operations_ttl block ;
-      max_operation_data_length = State.Block.max_operation_data_length block ;
+      max_operation_data_length = Next_proto.max_operation_data_length ;
       max_block_header_length = Next_proto.max_block_length ;
       operation_list_quota =
         List.map

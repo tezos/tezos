@@ -84,7 +84,6 @@ module Block = struct
     header: Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
-    max_operation_data_length: int;
     context: Context_hash.t ;
     metadata: MBytes.t ;
   }
@@ -99,18 +98,16 @@ module Block = struct
            let open Data_encoding in
            conv
              (fun { header ; message ; max_operations_ttl ;
-                    max_operation_data_length ; context ; metadata } ->
+                    context ; metadata } ->
                (message, max_operations_ttl,
-                max_operation_data_length, context, metadata, header ))
+                context, metadata, header ))
              (fun (message, max_operations_ttl,
-                   max_operation_data_length, context, metadata, header ) ->
+                   context, metadata, header ) ->
                { header ; message ; max_operations_ttl ;
-                 max_operation_data_length ;
                  context ; metadata })
-             (obj6
+             (obj5
                 (opt "message" string)
                 (req "max_operations_ttl" uint16)
-                (req "max_operation_data_length" uint16)
                 (req "context" Context_hash.encoding)
                 (req "metadata" bytes)
                 (req "header" Block_header.encoding))
