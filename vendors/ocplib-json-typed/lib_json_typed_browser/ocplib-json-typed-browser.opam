@@ -12,7 +12,7 @@ available: [ ocaml-version >= "4.02.0" ]
 build: [ "jbuilder" "build" "-j" jobs "-p" name "@install" ]
 build-test: [ "jbuilder" "runtest" "-p" name "-j" jobs ]
 depends: [
-  "jbuilder" {build & >= "1.0+beta19.1"}
+  "jbuilder" {build & >= "1.0+beta20"}
   "ocplib-json-typed" {= "0.6" }
   "js_of_ocaml" {>= "3.1.0"}
 ]
