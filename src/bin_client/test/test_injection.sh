@@ -7,9 +7,26 @@ set -e
 test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
 source $test_dir/test_lib.inc.sh "$@"
 
-start_node 1
+expected_connections=2
+max_peer_id=3
+for i in $(seq 1 $max_peer_id); do
+    echo
+    echo "## Starting node $i."
+    echo
+    start_node $i
+    echo
+done
 
-show_logs="no"
+## waiting for the node to establish connections
+
+for client in "${client_instances[@]}"; do
+    echo
+    echo "### $client bootstrapped"
+    echo
+    $client -w none config update
+    $client bootstrapped
+    echo
+done
 
 sleep 2
 
@@ -18,13 +35,16 @@ protocol_version="PsgZ1PB2h82sTKznNbmZxtbsU432eKDv1W6cf1cJFhCFmGYSiJs"
 
 $admin_client inject protocol "$test_dir/demo"
 $admin_client list protocols
-$client activate protocol $protocol_version with fitness 1 and key dictator and parameters $parameters_file
-answ=$($client -p ProtoALphaALph rpc get /chains/main/blocks/head/metadata 2>/dev/null)
 
-if ! grep "\"next_protocol\": \"$protocol_version\"" <<< $answ ; then
-    exit 1
-fi
+$client activate protocol $protocol_version \
+        with fitness 1 \
+        and key dictator \
+        and parameters $parameters_file
+
+retry 2 15 assert_protocol "$protocol_version"
 
 echo
 echo End of test
 echo
+
+show_logs="no"

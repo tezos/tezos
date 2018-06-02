@@ -36,47 +36,8 @@ done
 
 activate_alpha
 
-assert_propagation_level() {
-    level=$1
-    printf "\n\nAsserting all nodes have reached level %s\n" "$level"
-    for client in "${client_instances[@]}"; do
-        ( $client rpc get /chains/main/blocks/head/header/shell \
-              | assert_in_output "\"level\": $level" ) \
-            || exit 2
-    done
-}
-
-
-assert_protocol() {
-    proto=$1
-    printf "\n\nAsserting protocol propagation\n"
-    for client in "${client_instances[@]}"; do
-        ( $client rpc get /chains/main/blocks/head/metadata | assert_in_output "\"next_protocol\": \"$proto\"" ) \
-              || exit 2
-    done
-}
-
 
 printf "\n\n"
-
-retry() {
-    local timeout=$1
-    local attempts=$2
-    shift 2
-    sleep $timeout
-    while ! ( "$@" ) ; do
-        echo
-        echo "Will retry after $timeout seconds..."
-        echo
-        sleep $timeout
-        attempts=$(($attempts-1))
-        if [ "$attempts" -eq 0 ] ; then
-            echo
-            echo "Failed after too many retries" 1>&2
-            exit 1
-        fi
-    done
-}
 
 retry 2 15 assert_protocol "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 
