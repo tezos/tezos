@@ -85,8 +85,8 @@ type 'a desc =
   | String : Kind.length -> string desc
   | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
-  | Array : 'a t -> 'a array desc
-  | List : 'a t -> 'a list desc
+  | Array : int option * 'a t -> 'a array desc
+  | List : int option * 'a t -> 'a list desc
   | Obj : 'a field -> 'a desc
   | Objs : { kind: Kind.t ; left: 'a t ; right: 'b t } -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
@@ -303,14 +303,24 @@ module Variable = struct
         "Cannot insert potentially zero-sized element in %s." name
     else
       ()
-  let array e =
+  let array ?max_length e =
     check_not_variable "an array" e ;
     check_not_zeroable "an array" e ;
-    make @@ Array e
-  let list e =
+    let encoding = make @@ Array (max_length, e) in
+    match classify e, max_length with
+    | `Fixed n, Some max_length ->
+        let limit = n * max_length in
+        make @@ Check_size { limit ; encoding }
+    | _, _ -> encoding
+  let list ?max_length e =
     check_not_variable "a list" e ;
     check_not_zeroable "a list" e ;
-    make @@ List e
+    let encoding = make @@ List (max_length, e) in
+    match classify e, max_length with
+    | `Fixed n, Some max_length ->
+        let limit = n * max_length in
+        make @@ Check_size { limit ; encoding }
+    | _, _ -> encoding
 end
 
 let dynamic_size ?(kind = `Uint30) e =
@@ -350,8 +360,8 @@ let float = make @@ Float
 
 let string = dynamic_size Variable.string
 let bytes = dynamic_size Variable.bytes
-let array e = dynamic_size (Variable.array e)
-let list e = dynamic_size (Variable.list e)
+let array ?max_length e = dynamic_size (Variable.array ?max_length e)
+let list ?max_length e = dynamic_size (Variable.list ?max_length e)
 
 let string_enum = function
   | [] -> invalid_arg "data_encoding.string_enum: cannot have zero cases"

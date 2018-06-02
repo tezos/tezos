@@ -20,6 +20,7 @@ type read_error =
   | Invalid_float of { min : float ; v : float ; max : float }
   | Trailing_zero
   | Size_limit_exceeded
+  | Oversized_list
 exception Read_error of read_error
 val pp_read_error: Format.formatter -> read_error -> unit
 
@@ -31,6 +32,7 @@ type write_error =
   | Invalid_bytes_length of { expected : int ; found : int }
   | Invalid_string_length of { expected : int ; found : int }
   | Invalid_natural
+  | Oversized_list
 
 val pp_write_error : Format.formatter -> write_error -> unit
 

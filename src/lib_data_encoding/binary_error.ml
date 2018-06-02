@@ -17,6 +17,7 @@ type read_error =
   | Invalid_float of { min : float ; v : float ; max : float }
   | Trailing_zero
   | Size_limit_exceeded
+  | Oversized_list
 
 let pp_read_error ppf = function
   | Not_enough_data ->
@@ -37,6 +38,8 @@ let pp_read_error ppf = function
       Format.fprintf ppf "Trailing zero in Z"
   | Size_limit_exceeded ->
       Format.fprintf ppf "Size limit exceeded"
+  | Oversized_list ->
+      Format.fprintf ppf "Size limit exceeded"
 
 exception Read_error of read_error
 
@@ -48,6 +51,7 @@ type write_error =
   | Invalid_bytes_length of { expected : int ; found : int }
   | Invalid_string_length of { expected : int ; found : int }
   | Invalid_natural
+  | Oversized_list
 
 let pp_write_error ppf = function
   | Size_limit_exceeded ->
@@ -68,5 +72,7 @@ let pp_write_error ppf = function
         expected found
   | Invalid_natural ->
       Format.fprintf ppf "Negative natural"
+  | Oversized_list ->
+      Format.fprintf ppf "Size limit exceeded"
 
 exception Write_error of write_error

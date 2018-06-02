@@ -295,12 +295,12 @@ let describe (type x) (encoding : x Encoding.t) =
           fields ref_name recursives references encoding.encoding
       | Delayed func ->
           fields ref_name recursives references (func ()).encoding
-      | List { encoding } ->
+      | List (_, { encoding }) ->
           let (layout, references) =
             layout None recursives references encoding in
           ([ Anonymous_field (`Variable, Seq layout) ],
            references)
-      | Array { encoding } ->
+      | Array (_, { encoding }) ->
           let (layout, references) =
             layout None recursives references encoding in
           ([ Anonymous_field (`Variable, Seq layout) ],
@@ -436,11 +436,11 @@ let describe (type x) (encoding : x Encoding.t) =
           let size, cases = enum tbl encoding_array in
           let references = add_reference name (Int_enum { size ; cases }) references in
           (Enum (size, name), references)
-      | Array data ->
+      | Array (_, data) ->
           let (descr, references) =
             layout None recursives references data.encoding in
           (Seq descr, references)
-      | List data ->
+      | List (_, data) ->
           let layout, references =
             layout None recursives references data.encoding in
           (Seq layout, references)

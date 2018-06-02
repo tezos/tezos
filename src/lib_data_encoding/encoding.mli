@@ -43,8 +43,8 @@ type 'a desc =
   | String : Kind.length -> string desc
   | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
-  | Array : 'a t -> 'a array desc
-  | List : 'a t -> 'a list desc
+  | Array : int option * 'a t -> 'a array desc
+  | List : int option * 'a t -> 'a list desc
   | Obj : 'a field -> 'a desc
   | Objs : { kind: Kind.t ; left: 'a t ; right: 'b t } -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
@@ -154,8 +154,8 @@ end
 module Variable : sig
   val string : string encoding
   val bytes : MBytes.t encoding
-  val array : 'a encoding -> 'a array encoding
-  val list : 'a encoding -> 'a list encoding
+  val array : ?max_length:int -> 'a encoding -> 'a array encoding
+  val list : ?max_length:int -> 'a encoding -> 'a list encoding
 end
 val dynamic_size :
   ?kind:Binary_size.unsigned_integer -> 'a encoding -> 'a encoding
@@ -248,8 +248,8 @@ val tup10 :
 
 val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
 val merge_tups : 'a1 encoding -> 'a2 encoding -> ('a1 * 'a2) encoding
-val array : 'a encoding -> 'a array encoding
-val list : 'a encoding -> 'a list encoding
+val array : ?max_length:int -> 'a encoding -> 'a array encoding
+val list : ?max_length:int -> 'a encoding -> 'a list encoding
 
 val case :
   title:string ->
