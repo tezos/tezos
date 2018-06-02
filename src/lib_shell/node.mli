@@ -16,6 +16,7 @@ type config = {
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
   test_chain_max_tll: int option ;
+  checkpoint: (Int32.t * Block_hash.t) option ;
 }
 
 and peer_validator_limits = {

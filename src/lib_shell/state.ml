@@ -643,6 +643,13 @@ module Block = struct
       else fail (Block_not_invalid block)
     end
 
+  let is_valid_for_checkpoint block checkpoint =
+    let chain_state = block.chain_state in
+    Shared.use chain_state.block_store begin fun store ->
+      Locked_block.is_valid_for_checkpoint
+        store block.hash block.contents.header checkpoint
+    end
+
   let known chain_state hash =
     Shared.use chain_state.block_store begin fun store ->
       Store.Block.Contents.known (store, hash) >>= fun known ->
@@ -981,6 +988,54 @@ let fork_testchain block protocol expiration =
       Lwt.return (Some { chain_data with test_chain = Some chain.chain_id }, ())
     end >>= fun () ->
     return chain
+  end
+
+let best_known_head_for_checkpoint chain_state (level, _ as checkpoint) =
+  Shared.use chain_state.block_store begin fun store ->
+    Shared.use chain_state.chain_data begin fun data ->
+      let head_hash = data.data.current_head.hash in
+      let head_header = data.data.current_head.contents.header in
+      Locked_block.is_valid_for_checkpoint
+        store head_hash head_header checkpoint >>= fun valid ->
+      if valid then
+        Lwt.return data.data.current_head
+      else
+        let find_valid_predecessor hash =
+          Store.Block.Contents.read_exn
+            (store, hash) >>= fun contents ->
+          if Compare.Int32.(contents.header.shell.level < level) then
+            Lwt.return { hash ; contents ; chain_state }
+          else
+            predecessor_n store hash
+              (1 + (Int32.to_int @@
+                    Int32.sub contents.header.shell.level level)) >>= function
+            | None -> assert false
+            | Some pred ->
+                Store.Block.Contents.read_exn
+                  (store, pred) >>= fun pred_contents ->
+                Lwt.return { hash = pred ; contents = pred_contents ;
+                             chain_state } in
+        Store.Chain_data.Known_heads.read_all
+          data.chain_data_store >>= fun heads ->
+        Store.Block.Contents.read_exn
+          (store, chain_state.genesis.block) >>= fun genesis_contents ->
+        let genesis =
+          { hash = chain_state.genesis.block ;
+            contents = genesis_contents ;
+            chain_state } in
+        Block_hash.Set.fold
+          (fun head best ->
+             let valid_predecessor = find_valid_predecessor head in
+             best >>= fun best ->
+             valid_predecessor >>= fun pred ->
+             if Fitness.(pred.contents.header.shell.fitness >
+                         best.contents.header.shell.fitness) then
+               Lwt.return pred
+             else
+               Lwt.return best)
+          heads
+          (Lwt.return genesis)
+    end
   end
 
 module Protocol = struct

@@ -146,6 +146,8 @@ module Block : sig
   val predecessor: t -> block option Lwt.t
   val predecessor_n: t -> int -> Block_hash.t option Lwt.t
 
+  val is_valid_for_checkpoint: t -> (Int32.t * Block_hash.t) -> bool Lwt.t
+
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
   val test_chain: t -> Test_chain_status.t Lwt.t
@@ -185,6 +187,13 @@ val read_block_exn:
   global_state -> ?pred:int -> Block_hash.t -> Block.t Lwt.t
 
 val watcher: t -> Block.t Lwt_stream.t * Lwt_watcher.stopper
+
+(** Computes the block with the best fitness amongst the known blocks
+    which are compatible with the given checkpoint. *)
+val best_known_head_for_checkpoint:
+  Chain.t ->
+  Int32.t * Block_hash.t ->
+  Block.t Lwt.t
 
 val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
