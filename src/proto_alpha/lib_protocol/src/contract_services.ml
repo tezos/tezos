@@ -128,14 +128,11 @@ module S = struct
 
 end
 
-let () =
+let register () =
   let open Services_registration in
   register0 S.list begin fun ctxt () () ->
     Contract.list ctxt >>= return
-  end
-
-let () =
-  let open Services_registration in
+  end ;
   let register_field s f =
     register1 s (fun ctxt contract () () ->
         Contract.exists ctxt contract >>=? function

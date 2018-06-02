@@ -49,7 +49,7 @@ module Nonce = struct
 
   end
 
-  let () =
+  let register () =
     let open Services_registration in
     register1 S.get begin fun ctxt raw_level () () ->
       let level = Level.from_raw ctxt raw_level in
@@ -71,3 +71,10 @@ module Delegate = Delegate_services
 module Helpers = Helpers_services
 module Forge = Helpers_services.Forge
 module Parse = Helpers_services.Parse
+
+let register () =
+  Contract.register () ;
+  Constants.register () ;
+  Delegate.register () ;
+  Helpers.register () ;
+  Nonce.register ()

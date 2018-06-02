@@ -32,7 +32,7 @@ module S = struct
 
 end
 
-let () =
+let register () =
   let open Services_registration in
   register0_noctxt S.errors begin fun () () ->
     return (Data_encoding.Json.(schema error_encoding))

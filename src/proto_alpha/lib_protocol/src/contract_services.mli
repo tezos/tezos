@@ -61,3 +61,6 @@ val storage:
 
 val storage_opt:
   'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr option shell_tzresult Lwt.t
+
+
+val register: unit -> unit

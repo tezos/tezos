@@ -176,3 +176,5 @@ module Parse : sig
     Block_header.protocol_data shell_tzresult Lwt.t
 
 end
+
+val register: unit -> unit

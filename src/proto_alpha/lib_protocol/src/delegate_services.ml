@@ -160,7 +160,7 @@ module S = struct
 
 end
 
-let () =
+let register () =
   let open Services_registration in
   register0 S.list_delegate begin fun ctxt q () ->
     Delegate.list ctxt >>= fun delegates ->
@@ -377,7 +377,7 @@ module Baking_rights = struct
       ([], Signature.Public_key_hash.Set.empty)
       rights
 
-  let () =
+  let register () =
     let open Services_registration in
     register0 S.baking_rights begin fun ctxt q () ->
       requested_levels
@@ -500,7 +500,7 @@ module Endorsing_rights = struct
         loop l map (slot+1) in
     loop contract_list Signature.Public_key_hash.Map.empty 0
 
-  let () =
+  let register () =
     let open Services_registration in
     register0 S.endorsing_rights begin fun ctxt q () ->
       requested_levels
@@ -523,6 +523,11 @@ module Endorsing_rights = struct
       ()
 
 end
+
+let register () =
+  register () ;
+  Baking_rights.register () ;
+  Endorsing_rights.register ()
 
 let endorsement_rights ctxt level =
   Endorsing_rights.endorsement_slots ctxt (level, None) >>=? fun l ->

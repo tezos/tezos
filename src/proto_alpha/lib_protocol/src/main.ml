@@ -50,7 +50,9 @@ let validation_passes =
               max_op = Some Alpha_context.Constants.max_revelations_per_block } ;
             { max_size = 512 * 1024 ; max_op = None } ] (* 512kB *)
 
-let rpc_services = Services_registration.get_rpc_services ()
+let rpc_services =
+  Alpha_services.register () ;
+  Services_registration.get_rpc_services ()
 
 type validation_mode =
   | Application of {

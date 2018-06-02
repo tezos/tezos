@@ -28,3 +28,5 @@ module Delegate = Delegate_services
 module Helpers = Helpers_services
 module Forge = Helpers_services.Forge
 module Parse = Helpers_services.Parse
+
+val register: unit -> unit

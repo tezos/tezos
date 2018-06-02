@@ -121,7 +121,7 @@ module Scripts = struct
 
   end
 
-  let () =
+  let register () =
     let open Services_registration in
     register0 S.run_code begin fun ctxt ()
       (code, storage, parameter, amount, contract) ->
@@ -234,7 +234,7 @@ module Forge = struct
 
   end
 
-  let () =
+  let register () =
     let open Services_registration in
     register0_noctxt S.operations begin fun () (shell, proto) ->
       return (Data_encoding.Binary.to_bytes_exn
@@ -391,7 +391,7 @@ module Parse = struct
     | None -> failwith "Cant_parse_protocol_data"
     | Some protocol_data -> return protocol_data
 
-  let () =
+  let register () =
     let open Services_registration in
     register0 S.operations begin fun _ctxt () (operations, check) ->
       map_s begin fun raw ->
@@ -452,7 +452,10 @@ module S = struct
 
 end
 
-let () =
+let register () =
+  Scripts.register () ;
+  Forge.register () ;
+  Parse.register () ;
   let open Services_registration in
   register0 S.current_level begin fun ctxt q () ->
     let level = Level.current ctxt in
