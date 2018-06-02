@@ -83,6 +83,16 @@ module Bounded_encoding = struct
   let operation_list = delayed (fun () -> !operation_list_cache)
   let operation_hash_list = delayed (fun () -> !operation_hash_list_cache)
 
+  let protocol_max_size = ref None
+  let protocol_cache =
+    ref (Protocol.bounded_encoding ?max_size:!protocol_max_size ())
+  let update_protocol_encoding () =
+    protocol_cache :=
+      Protocol.bounded_encoding ?max_size:!protocol_max_size ()
+  let set_protocol_max_size max =
+    protocol_max_size := max
+  let protocol = delayed (fun () -> !protocol_cache)
+
 end
 
 type t =
@@ -207,7 +217,7 @@ let encoding =
 
     case ~tag:0x41
       ~title:"Protocol"
-      (obj1 (req "protocol" Protocol.encoding))
+      (obj1 (req "protocol" Bounded_encoding.protocol))
       (function Protocol proto -> Some proto  | _ -> None)
       (fun proto -> Protocol proto);
 

@@ -47,4 +47,5 @@ module Bounded_encoding : sig
   val set_operation_list_max_size: int option -> unit
   val set_operation_list_max_length: int option -> unit
   val set_operation_max_pass: int option -> unit
+  val set_protocol_max_size: int option -> unit
 end
