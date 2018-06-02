@@ -548,11 +548,6 @@ let timestamp w =
   let pv = Worker.state w in
   pv.timestamp
 
-let context w =
-  let pv = Worker.state w in
-  Lwt.return pv.validation_state >>=? fun validation_state ->
-  Prevalidation.end_prevalidation validation_state
-
 let inject_operation w op =
   Worker.push_request_and_wait w (Inject op)
 

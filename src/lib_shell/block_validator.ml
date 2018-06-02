@@ -112,6 +112,16 @@ let check_liveness chain_state pred hash operations_hashes operations =
   assert_operation_liveness hash live_blocks operations >>=? fun () ->
   return ()
 
+let may_patch_protocol
+    ~level
+    (validation_result : Tezos_protocol_environment_shell.validation_result) =
+  match Block_header.get_forced_protocol_upgrade ~level with
+  | None ->
+      return validation_result
+  | Some hash ->
+      Context.set_protocol validation_result.context hash >>= fun context ->
+      return { validation_result with context }
+
 let apply_block
     chain_state
     pred (module Proto : Registered_protocol.T)
@@ -189,6 +199,8 @@ let apply_block
     (state, []) parsed_operations >>=? fun (state, ops_metadata) ->
   let ops_metadata = List.rev ops_metadata in
   Proto.finalize_block state >>=? fun (validation_result, block_data) ->
+  may_patch_protocol
+    ~level:header.shell.level validation_result >>=? fun validation_result ->
   Context.get_protocol validation_result.context >>= fun new_protocol ->
   let expected_proto_level =
     if Protocol_hash.equal new_protocol Proto.hash then

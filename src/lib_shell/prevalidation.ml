@@ -183,8 +183,11 @@ let preapply ~predecessor ~timestamp ~protocol_data ~sort_operations:sort ops =
             Operation_list_hash.compute
               (List.map fst r.Preapply_result.applied))
          rs) in
-  end_prevalidation validation_state >>=? fun { fitness ; context ; message } ->
+  end_prevalidation validation_state >>=? fun validation_result ->
   let pred_shell_header = State.Block.shell_header predecessor in
+  let level = Int32.succ pred_shell_header.level in
+  Block_validator.may_patch_protocol
+    ~level validation_result >>=? fun { fitness ; context ; message } ->
   State.Block.protocol_hash predecessor >>= fun pred_protocol ->
   Context.get_protocol context >>= fun protocol ->
   let proto_level =
@@ -193,7 +196,7 @@ let preapply ~predecessor ~timestamp ~protocol_data ~sort_operations:sort ops =
     else
       ((pred_shell_header.proto_level + 1) mod 256) in
   let shell_header : Block_header.shell_header = {
-    level = Int32.succ pred_shell_header.level ;
+    level ;
     proto_level ;
     predecessor = State.Block.hash predecessor ;
     timestamp ;
