@@ -65,7 +65,7 @@ module S = struct
   let list_delegate =
     RPC_service.get_service
       ~description:
-        "List all registred delegates."
+        "Lists all registered delegates."
       ~query: list_query
       ~output: (list Signature.Public_key_hash.encoding)
       path
@@ -110,8 +110,8 @@ module S = struct
   let staking_balance =
     RPC_service.get_service
       ~description:
-        "Returns the total amount of token delegated to a given delegate. \
-         This includes the balance of all the contracts that delegates \
+        "Returns the total amount of tokens delegated to a given delegate. \
+         This includes the balances of all the contracts that delegate \
          to it, but also the balance of the delegate itself and its frozen \
          fees and deposits. The rewards do not count in the delegated balance \
          until they are unfrozen."
@@ -122,7 +122,7 @@ module S = struct
   let delegated_contracts =
     RPC_service.get_service
       ~description:
-        "Returns the list of contract that delegates to a given delegate."
+        "Returns the list of contracts that delegate to a given delegate."
       ~query: RPC_query.empty
       ~output: (list Contract_hash.encoding)
       RPC_path.(path / "delegated_contracts")
@@ -130,9 +130,9 @@ module S = struct
   let delegated_balance =
     RPC_service.get_service
       ~description:
-        "The includes the balance of all the contracts that delegates \
-         to it. This excludes the delegate own balance and its frozen \
-         balances."
+        "Returns the balances of all the contracts that delegate to a \
+         given delegate. This excludes the delegate's own balance and \
+         its frozen balances."
       ~query: RPC_query.empty
       ~output: Tez.encoding
       RPC_path.(path / "delegated_balance")
@@ -140,7 +140,7 @@ module S = struct
   let deactivated =
     RPC_service.get_service
       ~description:
-        "Returns whether the delegate is currently tagged as deactivated or not."
+        "Tells whether the delegate is currently tagged as deactivated or not."
       ~query: RPC_query.empty
       ~output: bool
       RPC_path.(path / "deactivated")
@@ -149,11 +149,10 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the cycle by the end of which the delegate might be \
-         deactivated, whether should she failed to execute any delegate \
-         action until then. \
+         deactivated if she fails to execute any delegate action. \
          A deactivated delegate might be reactivated \
-         (without loosing any rolls) by simply re-register as a delegate. \
-         For deactivated delegate this value contains the cycle by which \
+         (without loosing any rolls) by simply re-registering as a delegate. \
+         For deactivated delegates, this value contains the cycle by which \
          they were deactivated."
       ~query: RPC_query.empty
       ~output: Cycle.encoding
@@ -255,8 +254,6 @@ let requested_levels ~default ctxt cycles levels =
   | levels, cycles ->
       (* explicitly fail when requested levels or cycle are in the past...
          or too far in the future... *)
-      (* check_levels levels >>=? fun () -> *)
-      (* check_cycles levels >>=? fun () -> *)
       let levels =
         List.sort_uniq
           Level.compare
@@ -293,7 +290,7 @@ module Baking_rights = struct
          (req "level" Raw_level.encoding)
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "priority" uint16)
-         (opt "timestamp" Timestamp.encoding))
+         (opt "estimated_time" Timestamp.encoding))
 
   module S = struct
 
@@ -323,7 +320,24 @@ module Baking_rights = struct
 
     let baking_rights =
       RPC_service.get_service
-        ~description: "...FIXME..."
+        ~description:
+          "Retrieves the list of delegates allowed to bake a block.\n\
+           By default, it gives the best baking priorities for bakers \
+           that have at least one opportunity below the 64th priority \
+           for the next block.\n\
+           Parameters `level` and `cycle` can be used to specify the \
+           (valid) level(s) in the past or future at which the baking \
+           rights have to be returned. Parameter `delegate` can be \
+           used to restrict the results to the given delegates. If \
+           parameter `all` is set, all the baking opportunities for \
+           each baker at each level are returned, instead of just the \
+           first one.\n\
+           Returns the list of baking slots. Also returns the minimal \
+           timestamps that correspond to these slots. The timestamps \
+           are omitted for levels in the past, and are only estimates \
+           for levels later that the next block, based on the \
+           hypothesis that all predecessor blocks were baked at the \
+           first priority."
         ~query: baking_rights_query
         ~output: (list encoding)
         custom_root
@@ -444,7 +458,21 @@ module Endorsing_rights = struct
 
     let endorsing_rights =
       RPC_service.get_service
-        ~description: "...FIXME..."
+        ~description:
+          "Retrieves the delegates allowed to endorse a block.\n\
+           By default, it gives the endorsement slots for bakers that \
+           have at least one in the next block.\n\
+           Parameters `level` and `cycle` can be used to specify the \
+           (valid) level(s) in the past or future at which the \
+           endorsement rights have to be returned. Parameter \
+           `delegate` can be used to restrict the results to the given \
+           delegates.\n\
+           Returns the list of endorsement slots. Also returns the \
+           minimal timestamps that correspond to these slots. The \
+           timestamps are omitted for levels in the past, and are only \
+           estimates for levels later that the next block, based on \
+           the hypothesis that all predecessor blocks were baked at \
+           the first priority."
         ~query: endorsing_rights_query
         ~output: (list encoding)
         custom_root

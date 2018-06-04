@@ -164,8 +164,8 @@ module Description = struct
     let pp_description ppf (service : _ RPC_description.service) =
       let open RPC_description in
       (* TODO collect and display arg description (in path and in query) *)
-      Format.fprintf ppf "%s%a"
-        (Option.unopt ~default:"" service.description)
+      Format.fprintf ppf "@[<h>%a@]%a"
+        Format.pp_print_text (Option.unopt ~default:"" service.description)
         Query.pp service.query
 
     let pp ppf prefix service =

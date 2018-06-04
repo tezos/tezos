@@ -433,7 +433,10 @@ module S = struct
 
   let current_level =
     RPC_service.get_service
-      ~description: "..."
+      ~description:
+        "Returns the level of the interrogated block, or the one of a \
+         block located `offset` blocks after in the chain (or before \
+         when negative). For instance, the next block if `offset` is 1."
       ~query: level_query
       ~output: Level.encoding
       RPC_path.(path / "current_level")

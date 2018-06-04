@@ -12,8 +12,10 @@ open Data_encoding
 
 let error_encoding =
   def "error"
-    (* FIXME RPC /chains/blocks/head/errors lint*)
-    ~description:"... FIXME ..." @@
+    ~description:
+      "The full list of RPC errors would be too long to include.\n\
+       It is available at RPC `/errors` (GET).\n\
+       Errors specific to protocol Alpha have an id that starts with `proto.alpha`." @@
   splitted
     ~json:(conv
              (fun err ->
@@ -655,7 +657,7 @@ let contents_result_list_encoding =
     | Contents_result_list (Cons_result (o, os)) ->
         Contents_result o :: to_list (Contents_result_list os) in
   let rec of_list = function
-    | [] -> assert false
+    | [] -> Pervasives.failwith "cannot decode empty operation result"
     | [Contents_result o] -> Contents_result_list (Single_result o)
     | (Contents_result o) :: os ->
         let Contents_result_list os = of_list os in
@@ -664,7 +666,7 @@ let contents_result_list_encoding =
             Contents_result_list (Cons_result (o, os))
         | Manager_operation_result _, Cons_result _ ->
             Contents_result_list (Cons_result (o, os))
-        | _ -> Pervasives.failwith "...FIXME..." in
+        | _ -> Pervasives.failwith "cannot decode ill-formed operation result" in
   def "operation.alpha.contents_list_result" @@
   conv to_list of_list (list contents_result_encoding)
 
@@ -683,7 +685,7 @@ let contents_and_result_list_encoding =
         Contents_and_result (op, res) ::
         to_list (Contents_and_result_list rest) in
   let rec of_list = function
-    | [] -> assert false (* FIXME error message *)
+    | [] -> Pervasives.failwith "cannot decode empty combined operation result"
     | [Contents_and_result (op, res)] ->
         Contents_and_result_list (Single_and_result (op, res))
     | (Contents_and_result (op, res)) :: rest ->
@@ -693,7 +695,7 @@ let contents_and_result_list_encoding =
             Contents_and_result_list (Cons_and_result (op, res, rest))
         | Manager_operation _, Cons_and_result (_, _, _) ->
             Contents_and_result_list (Cons_and_result (op, res, rest))
-        | _ -> Pervasives.failwith "...FIXME..." in
+        | _ -> Pervasives.failwith "cannot decode ill-formed combined operation result" in
   conv to_list of_list (list contents_and_result_encoding)
 
 type 'kind operation_metadata = {
@@ -845,7 +847,7 @@ let operation_data_and_metadata_encoding =
   conv
     (fun (Operation_data op, Operation_metadata res) ->
        match kind_equal_list op.contents res.contents with
-       | None -> assert false (* FIXME *)
+       | None -> Pervasives.failwith "cannot decode inconsistent combined operation result"
        | Some Eq ->
            (Contents_and_result_list
               (pack_contents_list op.contents res.contents),

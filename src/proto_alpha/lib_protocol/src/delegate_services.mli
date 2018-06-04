@@ -83,19 +83,24 @@ module Baking_rights : sig
     timestamp: Timestamp.t option ;
   }
 
-  (** Compute the baking rights. By default, it computes the baking
-      rights for the next block and only returns the first available
-      priority for bakers that appears in the 64 first priorities.
+  (** Retrieves the list of delegates allowed to bake a block.
 
-      The optional arguments [levels] and [cycles] allows to compute
-      baking for an explicit list of levels or for all the levels of the given
-      cycles.
+      By default, it gives the best baking priorities for bakers
+      that have at least one opportunity below the 64th priority for
+      the next block.
 
-      The optional argument [delegates] allows to filter
-      the non-explicitly listed delegates out of the resulting list.
+      Parameters [levels] and [cycles] can be used to specify the
+      (valid) level(s) in the past or future at which the baking rights
+      have to be returned. Parameter [delegates] can be used to
+      restrict the results to the given delegates. If parameter [all]
+      is [true], all the baking opportunities for each baker at each level
+      are returned, instead of just the first one.
 
-      When [all=false], the function only returns the minimal priority
-      for each delegates. When [all=true], all priorities are returned. *)
+      Returns the list of baking slots. Also returns the minimal
+      timestamps that correspond to these slots. The timestamps are
+      omitted for levels in the past, and are only estimates for levels
+      later that the next block, based on the hypothesis that all
+      predecessor blocks were baked at the first priority. *)
   val get:
     'a #RPC_context.simple ->
     ?levels: Raw_level.t list ->
@@ -116,15 +121,22 @@ module Endorsing_rights : sig
     estimated_time: Timestamp.t option ;
   }
 
-  (** Compute the endorsing rights. By default, it computes the
-      endorsing rights for the next block.
+  (** Retrieves the delegates allowed to endorse a block.
 
-      The optional arguments [levels] and [cycles] allows to compute
-      baking for an explicit list of levels or for all the levels of
-      the given cycles.
+      By default, it gives the endorsement slots for bakers that have
+      at least one in the next block.
 
-      The optional argument [delegates] allows to filter the
-      non-explicitly listed delegates out of the resulting list.. *)
+      Parameters [levels] and [cycles] can be used to specify the
+      (valid) level(s) in the past or future at which the endorsement
+      rights have to be returned. Parameter [delegates] can be used to
+      restrict the results to the given delegates.  Returns the list of
+      endorsement slots. Also returns the minimal timestamps that
+      correspond to these slots.
+
+      Timestamps are omitted for levels in the past, and are only
+      estimates for levels later that the next block, based on the
+      hypothesis that all predecessor blocks were baked at the first
+      priority. *)
   val get:
     'a #RPC_context.simple ->
     ?levels: Raw_level.t list ->
