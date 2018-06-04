@@ -194,14 +194,14 @@ let check_endorsements_rights c level slots =
 let paying_priorities c =
   0 --> (Constants.first_free_baking_slot c - 1)
 
-type error += Incorect_priority
+type error += Incorrect_priority
 
 let endorsement_reward ctxt ~block_priority:prio =
   if Compare.Int.(prio >= 0)
   then
     Lwt.return
       Tez.(Constants.endorsement_reward ctxt /? (Int64.(succ (of_int prio))))
-  else fail Incorect_priority
+  else fail Incorrect_priority
 
 let baking_priorities c level =
   let rec f priority =

@@ -451,6 +451,14 @@ let protocol_data_encoding = Encoding.protocol_data_encoding
 let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
 let internal_operation_encoding = Encoding.internal_operation_encoding
 
+let raw { shell ; protocol_data } =
+  let proto =
+    Data_encoding.Binary.to_bytes_exn
+      protocol_data_encoding
+      protocol_data in
+  { Operation.shell ; proto }
+
+
 let acceptable_passes op =
   match op.protocol_data.contents with
   | Sourced_operation (Consensus_operation _) -> [0]

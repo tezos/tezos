@@ -55,6 +55,13 @@ let protocol_data_encoding =
        contents_encoding
        (obj1 (req "signature" Signature.encoding)))
 
+let raw { shell ; protocol_data ; } =
+  let protocol_data =
+    Data_encoding.Binary.to_bytes_exn
+      protocol_data_encoding
+      protocol_data in
+  { Block_header.shell ; protocol_data }
+
 let unsigned_encoding =
   let open Data_encoding in
   merge_objs

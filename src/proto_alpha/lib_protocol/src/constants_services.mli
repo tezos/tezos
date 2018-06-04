@@ -66,5 +66,6 @@ val endorsement_reward:
 val errors:
   'a #RPC_context.simple -> 'a -> Data_encoding.json_schema shell_tzresult Lwt.t
 
+(** Returns all the constants of the protocol *)
 val all:
   'a #RPC_context.simple -> 'a -> Constants.t shell_tzresult Lwt.t

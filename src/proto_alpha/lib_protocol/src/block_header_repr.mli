@@ -28,6 +28,8 @@ type block_header = t
 type raw = Block_header.t
 type shell_header = Block_header.shell_header
 
+val raw: block_header -> raw
+
 val encoding: block_header Data_encoding.encoding
 val raw_encoding: raw Data_encoding.t
 val contents_encoding: contents Data_encoding.t

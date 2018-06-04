@@ -111,6 +111,8 @@ val contents_encoding: contents Data_encoding.t
 val protocol_data_encoding: protocol_data Data_encoding.t
 val unsigned_operation_encoding: (Operation.shell_header * contents) Data_encoding.t
 
+val raw: operation -> raw
+
 val hash_raw: raw -> Operation_hash.t
 val hash: operation -> Operation_hash.t
 

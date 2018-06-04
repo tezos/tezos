@@ -335,7 +335,6 @@ module Constants : sig
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
-
   val preserved_cycles: context -> int
   val blocks_per_cycle: context -> int32
   val blocks_per_commitment: context -> int32
@@ -361,6 +360,7 @@ module Constants : sig
   val block_security_deposit: context -> Tez.t
   val endorsement_security_deposit: context -> Tez.t
 
+  (** All constants: fixed and parametric *)
   type t = {
     fixed : fixed ;
     parametric : parametric ;
@@ -577,6 +577,12 @@ module Contract : sig
       context -> contract -> string -> (context * Script_repr.expr option) tzresult Lwt.t
   end
 
+  (**/**)
+  (* Only for testing *)
+  type origination_nonce
+  val initial_origination_nonce  : Operation_hash.t -> origination_nonce
+  val originated_contract : origination_nonce -> contract
+
 end
 
 module Delegate : sig
@@ -700,6 +706,8 @@ module Block_header : sig
 
   type raw = Block_header.t
   type shell_header = Block_header.shell_header
+
+  val raw: block_header -> raw
 
   val hash: block_header -> Block_hash.t
   val hash_raw: raw -> Block_hash.t
@@ -831,6 +839,7 @@ module Operation : sig
     shell: Operation.shell_header ;
     protocol_data: protocol_data ;
   }
+  val raw: operation -> raw
   val encoding: operation Data_encoding.t
 
   val hash: operation -> Operation_hash.t
