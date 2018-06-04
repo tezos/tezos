@@ -292,7 +292,7 @@ module Reader = struct
           end >>=? fun buf ->
           lwt_debug
             "reading %d bytes from %a"
-            (MBytes.length buf) P2p_connection.Info.pp st.conn.info >>= fun () ->
+            (MBytes.length buf) P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
           loop (decode_next_buf buf) in
     loop (Data_encoding.Binary.read_stream ?init st.encoding)
 
@@ -319,7 +319,7 @@ module Reader = struct
         Lwt.return_unit
     | Error [Canceled | Exn Lwt_pipe.Closed] ->
         lwt_debug "connection closed to %a"
-          P2p_connection.Info.pp st.conn.info >>= fun () ->
+          P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
         Lwt.return_unit
     | Error _ as err ->
         Lwt_pipe.safe_push_now st.messages err ;
@@ -372,7 +372,7 @@ module Writer = struct
             Crypto.write_chunk st.conn.fd st.conn.cryptobox_data buf
           end >>=? fun () ->
           lwt_debug "writing %d bytes to %a"
-            (MBytes.length buf) P2p_connection.Info.pp st.conn.info >>= fun () ->
+            (MBytes.length buf) P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
           loop l in
     loop buf
 
@@ -390,12 +390,12 @@ module Writer = struct
     end >>= function
     | Error [Canceled | Exn Lwt_pipe.Closed] ->
         lwt_debug "connection closed to %a"
-          P2p_connection.Info.pp st.conn.info >>= fun () ->
+          P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
         Lwt.return_unit
     | Error err ->
         lwt_log_error
           "@[<v 2>error writing to %a@ %a@]"
-          P2p_connection.Info.pp st.conn.info pp_print_error err >>= fun () ->
+          P2p_peer.Id.pp st.conn.info.peer_id pp_print_error err >>= fun () ->
         Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
     | Ok (buf, wakener) ->
@@ -412,17 +412,17 @@ module Writer = struct
             match err with
             | [ Canceled | Exn Lwt_pipe.Closed ] ->
                 lwt_debug "connection closed to %a"
-                  P2p_connection.Info.pp st.conn.info >>= fun () ->
+                  P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
                 Lwt.return_unit
             | [ P2p_errors.Connection_closed ] ->
                 lwt_debug "connection closed to %a"
-                  P2p_connection.Info.pp st.conn.info >>= fun () ->
+                  P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
                 Lwt_canceler.cancel st.canceler >>= fun () ->
                 Lwt.return_unit
             | err ->
                 lwt_log_error
                   "@[<v 2>error writing to %a@ %a@]"
-                  P2p_connection.Info.pp st.conn.info
+                  P2p_peer.Id.pp st.conn.info.peer_id
                   pp_print_error err >>= fun () ->
                 Lwt_canceler.cancel st.canceler >>= fun () ->
                 Lwt.return_unit

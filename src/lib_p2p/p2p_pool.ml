@@ -377,10 +377,11 @@ let register_peer pool peer_id =
 
 let read { messages ; conn } =
   Lwt.catch
-    (fun () -> Lwt_pipe.pop messages >>= fun (s, msg) ->
-      lwt_debug "%d bytes message popped from queue %a\027[0m"
-        s P2p_connection.Info.pp (P2p_socket.info conn) >>= fun () ->
-      return msg)
+    (fun () ->
+       Lwt_pipe.pop messages >>= fun (s, msg) ->
+       lwt_debug "%d bytes message popped from queue %a\027[0m"
+         s P2p_peer.Id.pp (P2p_socket.info conn).peer_id >>= fun () ->
+       return msg)
     (fun _ (* Closed *) -> fail P2p_errors.Connection_closed)
 
 let is_readable { messages } =
@@ -764,7 +765,7 @@ and authenticate pool ?point_info canceler fd point =
   (* Authentication correct! *)
   lwt_debug "authenticate: %a -> auth %a"
     P2p_point.Id.pp point
-    P2p_connection.Info.pp info >>= fun () ->
+    P2p_peer.Id.pp info.peer_id >>= fun () ->
   fail_when (Peers.banned pool info.peer_id)
     (P2p_errors.Peer_banned info.peer_id) >>=? fun () ->
   let remote_point_info =
@@ -818,7 +819,7 @@ and authenticate pool ?point_info canceler fd point =
       P2p_peer_state.set_accepted peer_info info.id_point canceler ;
       lwt_debug "authenticate: %a -> accept %a"
         P2p_point.Id.pp point
-        P2p_connection.Info.pp info >>= fun () ->
+        P2p_peer.Id.pp info.peer_id >>= fun () ->
       protect ~canceler begin fun () ->
         P2p_socket.accept
           ?incoming_message_queue_size:pool.config.incoming_message_queue_size
@@ -830,7 +831,7 @@ and authenticate pool ?point_info canceler fd point =
           pool.encoding >>=? fun conn ->
         lwt_debug "authenticate: %a -> Connected %a"
           P2p_point.Id.pp point
-          P2p_connection.Info.pp info >>= fun () ->
+          P2p_peer.Id.pp info.peer_id >>= fun () ->
         return conn
       end ~on_error: begin fun err ->
         if incoming then
@@ -838,7 +839,7 @@ and authenticate pool ?point_info canceler fd point =
             (Request_rejected (point, Some (info.id_point, info.peer_id))) ;
         lwt_debug "authenticate: %a -> rejected %a"
           P2p_point.Id.pp point
-          P2p_connection.Info.pp info >>= fun () ->
+          P2p_peer.Id.pp info.peer_id >>= fun () ->
         Option.iter connection_point_info
           ~f:P2p_point_state.set_disconnected ;
         P2p_peer_state.set_disconnected peer_info ;
@@ -857,7 +858,7 @@ and authenticate pool ?point_info canceler fd point =
       log pool (Rejecting_request (point, info.id_point, info.peer_id)) ;
       lwt_debug "authenticate: %a -> kick %a point: %B peer_id: %B"
         P2p_point.Id.pp point
-        P2p_connection.Info.pp info
+        P2p_peer.Id.pp info.peer_id
         acceptable_point acceptable_peer_id >>= fun () ->
       P2p_socket.kick auth_fd >>= fun () ->
       if not incoming then begin

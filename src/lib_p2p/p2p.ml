@@ -220,8 +220,8 @@ module Real = struct
   let recv _net conn =
     P2p_pool.read conn >>=? fun msg ->
     lwt_debug "message read from %a"
-      P2p_connection.Info.pp
-      (P2p_pool.Connection.info conn) >>= fun () ->
+      P2p_peer.Id.pp
+      (P2p_pool.Connection.info conn).peer_id >>= fun () ->
     return msg
 
   let rec recv_any net () =
@@ -242,13 +242,13 @@ module Real = struct
         P2p_pool.read conn >>= function
         | Ok msg ->
             lwt_debug "message read from %a"
-              P2p_connection.Info.pp
-              (P2p_pool.Connection.info conn) >>= fun () ->
+              P2p_peer.Id.pp
+              (P2p_pool.Connection.info conn).peer_id >>= fun () ->
             Lwt.return (conn, msg)
         | Error _ ->
             lwt_debug "error reading message from %a"
-              P2p_connection.Info.pp
-              (P2p_pool.Connection.info conn) >>= fun () ->
+              P2p_peer.Id.pp
+              (P2p_pool.Connection.info conn).peer_id >>= fun () ->
             Lwt_unix.yield () >>= fun () ->
             recv_any net ()
 
@@ -256,13 +256,13 @@ module Real = struct
     P2p_pool.write conn m >>= function
     | Ok () ->
         lwt_debug "message sent to %a"
-          P2p_connection.Info.pp
-          (P2p_pool.Connection.info conn) >>= fun () ->
+          P2p_peer.Id.pp
+          (P2p_pool.Connection.info conn).peer_id >>= fun () ->
         return ()
     | Error err ->
         lwt_debug "error sending message from %a: %a"
-          P2p_connection.Info.pp
-          (P2p_pool.Connection.info conn)
+          P2p_peer.Id.pp
+          (P2p_pool.Connection.info conn).peer_id
           pp_print_error err >>= fun () ->
         Lwt.return (Error err)
 
@@ -270,13 +270,13 @@ module Real = struct
     match P2p_pool.write_now conn v with
     | Ok v ->
         debug "message trysent to %a"
-          P2p_connection.Info.pp
-          (P2p_pool.Connection.info conn) ;
+          P2p_peer.Id.pp
+          (P2p_pool.Connection.info conn).peer_id ;
         v
     | Error err ->
         debug "error trysending message to %a@ %a"
-          P2p_connection.Info.pp
-          (P2p_pool.Connection.info conn)
+          P2p_peer.Id.pp
+          (P2p_pool.Connection.info conn).peer_id
           pp_print_error err ;
         false
 
