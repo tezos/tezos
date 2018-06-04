@@ -72,7 +72,7 @@ Delegation
 ----------
 
 Tezos.alpha uses a delegated proof-of-stake model. The acronym DPOS has come to
-designate a specific type of algorithm used, for instance in in Bitshares.
+designate a specific type of algorithm used, for instance in Bitshares.
 This is *not* the model used in Tezos.alpha, though there is a concept
 of delegation.
 
