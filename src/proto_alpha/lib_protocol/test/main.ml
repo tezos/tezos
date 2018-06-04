@@ -13,4 +13,6 @@ let () =
     "origination", Origination.tests ;
     "activation", Activation.tests ;
     "endorsement", Endorsement.tests ;
+    "double endorsement", Double_endorsement.tests ;
+    "double baking", Double_baking.tests ;
   ]
