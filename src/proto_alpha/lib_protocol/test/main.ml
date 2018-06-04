@@ -11,4 +11,6 @@ let () =
   Alcotest.run "protocol_alpha" [
     "transfer", Transfer.tests ;
     "origination", Origination.tests ;
+    "activation", Activation.tests ;
+    "endorsement", Endorsement.tests ;
   ]
