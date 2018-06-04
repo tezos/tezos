@@ -271,6 +271,7 @@ let pp_document ppf descriptions =
     descriptions ;
   (* Full description *)
   Rst.pp_h2 ppf "RPCs - Full description" ;
+  Format.pp_print_flush ppf () ;
   Format.pp_set_margin ppf 80 ;
   Format.pp_set_max_indent ppf 76 ;
   List.iter

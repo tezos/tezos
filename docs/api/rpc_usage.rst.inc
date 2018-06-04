@@ -1,6 +1,9 @@
 This document contains the list of RPC services provided by the Tezos
 node. It is generated from the OCaml source code (master branch).
 
+The changes made in June 2018 for pre-Betanet are recapitulated in
+:ref:`this page<rpc_changes_june_2018>`.
+
 Usage
 *****
 

@@ -77,12 +77,12 @@
   </script>
   
 
-  
-  
-RPC API changes (proposal)
-##########################
+.. _rpc_changes_june_2018:
 
-This document contains a proposed update to the list of RPC services provided by the Tezos node. It is based on experiment in branch `service-simplification` and this is work-in-progress. All feedbacks will be greatly appreciated, either on `Gitlab's merge-request #115 <https://gitlab.com/tezos/tezos/merge_requests/115>`__ or on the #tezos IRC channel on freenode.
+RPC API changes, pre-Betanet (June 2018)
+########################################
+
+This document describes the changes made to RPC services provided by the Tezos node in June 2018.
 
 Summary
 *******
