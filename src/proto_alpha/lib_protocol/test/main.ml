@@ -11,10 +11,4 @@ let () =
   Alcotest.run "protocol_alpha" [
     "transfer", Transfer.tests ;
     "origination", Origination.tests ;
-    "baking", Baking.tests ;
-    "activation", Activation.tests ;
-    "seed", Seed.tests ;
-    "endorsement", Endorsement.tests ;
-    "double endorsement", Double_endorsement.tests ;
-    "double baking", Double_baking.tests ;
   ]
