@@ -1,4 +1,0 @@
-parameter (list string);
-storage (list string);
-code{ CAR;
-      MAP { PUSH @hello string "Hello "; CONCAT }; NIL operation; PAIR};

@@ -1,3 +1,0 @@
-parameter unit;
-storage nat;
-code {DROP; STEPS_TO_QUOTA; NIL operation; PAIR};

@@ -7,12 +7,21 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Name = struct let name = "alpha" end
-module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
+open Proto_alpha
+open Alpha_context
+open Alpha_environment
 
-type alpha_error = Alpha_environment.Error_monad.error
-type 'a alpha_tzresult = 'a Alpha_environment.Error_monad.tzresult
+(* This module is mostly to wrap the errors from the protocol *)
+module Tez = struct
+  include Tez
 
-include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
+  let ( +? ) t1 t2 = (t1 +? t2) |> wrap_error
+  let ( -? ) t1 t2 = (t1 -? t2) |> wrap_error
+  let ( *? ) t1 t2 = (t1 *? t2) |> wrap_error
+  let ( /? ) t1 t2 = (t1 /? t2) |> wrap_error
 
-module M = Alpha_environment.Lift(Main)
+  let of_int x =
+    match Tez.of_mutez (Int64.mul (Int64.of_int x) 1_000_000L) with
+    | None -> invalid_arg "tez_of_int"
+    | Some x -> x
+end

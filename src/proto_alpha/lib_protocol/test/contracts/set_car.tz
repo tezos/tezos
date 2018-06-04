@@ -1,3 +1,0 @@
-parameter string;
-storage (pair string nat);
-code { DUP; CDR; DIP{CAR}; SET_CAR @hello; NIL operation; PAIR };

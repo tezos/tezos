@@ -1,3 +1,0 @@
-parameter (set int);
-storage nat;
-code {CAR; SIZE; NIL operation; PAIR}

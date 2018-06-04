@@ -1,5 +1,0 @@
-parameter (list string);
-storage (list string);
-code { CAR; NIL string; SWAP; PUSH bool True;
-       LOOP { IF_CONS {SWAP; DIP{CONS}; PUSH bool True} {NIL string; PUSH bool False}};
-       DROP; NIL operation; PAIR}

@@ -1,6 +1,0 @@
-parameter unit;
-storage mutez;                    # How much you have to send me
-code {CDR; DUP;                 # Get the amount required (once for comparison, once to save back in storage)
-      AMOUNT; CMPLT;            # Check to make sure no one is wasting my time
-      IF {FAIL}                 # Reject the person
-         {NIL operation;PAIR}}  # Finish the transaction

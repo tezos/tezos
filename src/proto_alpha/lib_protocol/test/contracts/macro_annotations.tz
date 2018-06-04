@@ -1,6 +1,0 @@
-parameter unit;
-storage (pair @truc unit unit);
-code { DROP; UNIT ; UNIT ; PAIR ; UNIT ;
-       DUUP @truc ;
-       DIP { DROP ; DROP } ;
-       NIL operation ; PAIR }

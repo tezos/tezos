@@ -1,4 +1,0 @@
-parameter nat;
-storage (pair nat bool);
-code { CAR; PUSH bool True; SWAP;
-       PAIR; NIL operation; PAIR}

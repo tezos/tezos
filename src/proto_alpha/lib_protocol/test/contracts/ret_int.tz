@@ -1,3 +1,0 @@
-parameter unit;
-storage (option nat);
-code {DROP; PUSH nat 300; SOME; NIL operation; PAIR};

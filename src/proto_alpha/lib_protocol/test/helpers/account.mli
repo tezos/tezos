@@ -7,12 +7,25 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Name = struct let name = "alpha" end
-module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
+open Proto_alpha
 
-type alpha_error = Alpha_environment.Error_monad.error
-type 'a alpha_tzresult = 'a Alpha_environment.Error_monad.tzresult
+type t = {
+  pkh : Signature.Public_key_hash.t ;
+  pk :  Signature.Public_key.t ;
+  sk :  Signature.Secret_key.t ;
+}
+type account = t
 
-include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
+val dictator_account: account
+val dummy_account: account
 
-module M = Alpha_environment.Lift(Main)
+val new_account: unit -> account
+
+val add_account : t -> unit
+
+val find: Signature.Public_key_hash.t -> t tzresult Lwt.t
+val find_alternate: Signature.Public_key_hash.t -> t
+
+(** [generate_accounts n] : generates [n] random accounts with
+    4.000.000.000 tz and add them to the global account state *)
+val generate_accounts : int -> (t * Tez_repr.t) list

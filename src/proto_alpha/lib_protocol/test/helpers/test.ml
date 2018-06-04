@@ -1,18 +1,19 @@
 (**************************************************************************)
 (*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
+(*    Copyright (c) 2014 - 2016.                                          *)
 (*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
 (*                                                                        *)
 (*    All rights reserved. No warranty, explicit or implicit, provided.   *)
 (*                                                                        *)
 (**************************************************************************)
 
-module Name = struct let name = "alpha" end
-module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
-
-type alpha_error = Alpha_environment.Error_monad.error
-type 'a alpha_tzresult = 'a Alpha_environment.Error_monad.tzresult
-
-include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
-
-module M = Alpha_environment.Lift(Main)
+(* Wraps an alcotest so that it prints correcly errors from the Error_monad. *)
+let tztest name speed f =
+  Alcotest_lwt.test_case name speed begin fun _sw () ->
+    f () >>= function
+    | Ok () -> Lwt.return_unit
+    | Error err ->
+        Tezos_stdlib_unix.Logging_unix.close () >>= fun () ->
+        Format.eprintf "WWW %a@." pp_print_error err ;
+        Lwt.fail Alcotest.Test_error
+  end

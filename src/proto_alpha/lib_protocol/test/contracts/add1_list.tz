@@ -1,6 +1,0 @@
-parameter (list int);
-storage (list int);
-code { CAR;                                # Get the parameter
-       MAP { PUSH int 1; ADD };            # Map over the list adding one
-       NIL operation;                      # No internal op
-       PAIR }                              # Match the calling convetion

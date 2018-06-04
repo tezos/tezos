@@ -1,7 +1,0 @@
-parameter unit;
-storage (pair (contract unit) (contract unit));
-code { CDR; DUP; CAR; PUSH mutez 5000000; UNIT;
-       TRANSFER_TOKENS;
-       DIP {DUP; CDR;
-            PUSH mutez 5000000; UNIT; TRANSFER_TOKENS};
-       DIIP{NIL operation};DIP{CONS};CONS;PAIR};

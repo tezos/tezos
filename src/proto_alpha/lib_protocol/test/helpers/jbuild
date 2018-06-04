@@ -1,18 +1,17 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_proto_alpha_isolate_helpers)
+ ((name tezos_alpha_test_helpers)
   (libraries (tezos-base
               tezos-stdlib-unix
               tezos-protocol-environment
               tezos-protocol-alpha
               alcotest-lwt))
-  (wrapped false)
   (flags (:standard -w -9-32 -safe-string
           -open Tezos_base__TzPervasives
           -open Tezos_stdlib_unix))))
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files *.ml{,i})))
+  (deps ((glob_files *.ml*)))
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

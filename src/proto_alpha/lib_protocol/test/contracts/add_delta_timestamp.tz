@@ -1,3 +1,0 @@
-parameter (pair int timestamp);
-storage (option timestamp);
-code { CAR; DUP; CAR; DIP{CDR}; ADD; SOME; NIL operation; PAIR}

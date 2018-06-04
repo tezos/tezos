@@ -1,3 +1,0 @@
-parameter (list nat);
-storage nat;
-code{CAR; IF_CONS {DIP{DROP}} {FAIL}; NIL operation; PAIR};

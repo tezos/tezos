@@ -1,6 +1,0 @@
-parameter (map int int);
-storage (pair int int);
-code { CAR; PUSH int 0; DUP; PAIR; SWAP;
-       ITER { DIP {DUP; CAR; DIP{CDR}}; DUP; # Last instr
-              DIP{CAR; ADD}; SWAP; DIP{CDR; ADD}; PAIR };
-       NIL operation; PAIR}

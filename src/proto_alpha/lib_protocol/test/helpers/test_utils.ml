@@ -7,12 +7,21 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Name = struct let name = "alpha" end
-module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
+(* This file should not depend on any other file from tests. *)
 
-type alpha_error = Alpha_environment.Error_monad.error
-type 'a alpha_tzresult = 'a Alpha_environment.Error_monad.tzresult
+let (>>?=) x y = match x with
+  | Ok(a) -> y a
+  | Error(b) -> fail @@ List.hd b
 
-include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
+(** Like List.find but returns the index of the found element *)
+let findi p =
+  let rec aux p i = function
+    | [] -> raise Not_found
+    | x :: l -> if p x then (x,i) else aux p (i+1) l
+  in
+  aux p 0
 
-module M = Alpha_environment.Lift(Main)
+exception Pair_of_list
+let pair_of_list = function
+  | [a;b] -> a,b
+  | _ -> raise Pair_of_list

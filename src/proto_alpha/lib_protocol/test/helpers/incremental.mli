@@ -7,12 +7,24 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Name = struct let name = "alpha" end
-module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
+open Proto_alpha
+open Alpha_context
 
-type alpha_error = Alpha_environment.Error_monad.error
-type 'a alpha_tzresult = 'a Alpha_environment.Error_monad.tzresult
+type t
+type incremental = t
 
-include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
+val predecessor: incremental -> Block.t
 
-module M = Alpha_environment.Lift(Main)
+val level: incremental -> int32
+
+val begin_construction:
+  ?priority:int ->
+  ?timestamp:Time.t ->
+  Block.t -> incremental tzresult Lwt.t
+
+val add_operation:
+  incremental -> Operation.t -> incremental tzresult Lwt.t
+
+val finalize_block: incremental -> Block.t tzresult Lwt.t
+
+val rpc_ctxt: incremental Alpha_environment.RPC_context.simple

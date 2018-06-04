@@ -1,4 +1,0 @@
-parameter unit;
-storage (pair (pair nat (pair nat (pair (pair (pair nat mutez) nat) nat))) nat);
-code { MAP_CDADDAADR { PUSH mutez 1000000 ; ADD } ;
-       NIL operation ; SWAP; SET_CAR };

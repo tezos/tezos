@@ -1,3 +1,0 @@
-parameter bool;
-storage unit;
-code {CAR; ASSERT; UNIT; NIL operation; PAIR}

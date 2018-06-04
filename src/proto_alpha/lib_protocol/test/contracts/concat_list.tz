@@ -1,5 +1,0 @@
-parameter (list string);
-storage string;
-code {CAR; PUSH string ""; SWAP;
-      ITER {SWAP; CONCAT};
-      NIL operation; PAIR};
