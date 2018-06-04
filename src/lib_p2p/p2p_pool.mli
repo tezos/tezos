@@ -131,12 +131,6 @@ type 'peer_meta peer_meta_config = {
   score : 'peer_meta -> float ;
 }
 
-type 'conn_meta conn_meta_config = {
-  conn_meta_encoding : 'conn_meta Data_encoding.t ;
-  conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
-  private_node : 'conn_meta -> bool ;
-}
-
 type 'msg message_config = {
   encoding : 'msg encoding list ;
   versions : P2p_version.t list;
@@ -145,7 +139,7 @@ type 'msg message_config = {
 val create:
   config ->
   'peer_meta peer_meta_config ->
-  'conn_meta conn_meta_config ->
+  'conn_meta P2p_socket.metadata_config ->
   'msg message_config ->
   P2p_io_scheduler.t ->
   ('msg, 'peer_meta,'conn_meta) pool Lwt.t
@@ -224,8 +218,8 @@ val disconnect:
 
 module Connection : sig
 
-  val info: ('msg, 'peer_meta,'conn_meta) connection -> P2p_connection.Info.t
-  val meta: ('msg, 'peer_meta,'conn_meta) connection -> 'conn_meta
+  val info: ('msg, 'peer_meta,'conn_meta) connection -> 'conn_meta P2p_connection.Info.t
+  val remote_metadata: ('msg, 'peer_meta,'conn_meta) connection -> 'conn_meta
 
   val stat:  ('msg, 'peer_meta,'conn_meta) connection -> P2p_stat.t
   (** [stat conn] is a snapshot of current bandwidth usage for

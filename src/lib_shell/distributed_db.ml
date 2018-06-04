@@ -499,7 +499,7 @@ module P2p_reader = struct
     | Get_current_head chain_id ->
         may_handle state chain_id @@ fun chain_db ->
         let { Connection_metadata.disable_mempool } =
-          P2p.connection_metadata chain_db.global_db.p2p state.conn in
+          P2p.connection_remote_metadata chain_db.global_db.p2p state.conn in
         begin
           if disable_mempool then
             Chain.head chain_db.chain_state >>= fun head ->
@@ -963,7 +963,7 @@ module Advertise = struct
         Message.Current_head (chain_id, State.Block.header head, Mempool.empty) in
       let send_mempool state =
         let { Connection_metadata.disable_mempool } =
-          P2p.connection_metadata chain_db.global_db.p2p state.conn in
+          P2p.connection_remote_metadata chain_db.global_db.p2p state.conn in
         let msg = if disable_mempool then msg_disable_mempool else msg_mempool in
         ignore @@ P2p.try_send chain_db.global_db.p2p state.conn msg
       in

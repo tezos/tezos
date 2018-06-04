@@ -96,7 +96,7 @@ let init_p2p p2p_params =
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
       lwt_log_notice "P2P layer is disabled" >>= fun () ->
       return
-        (P2p.faked_network peer_metadata_cfg, conn_metadata_cfg)
+        (P2p.faked_network peer_metadata_cfg c_meta, conn_metadata_cfg)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in

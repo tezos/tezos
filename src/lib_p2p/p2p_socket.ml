@@ -7,15 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* TODO patch Data_encoding for continuation-based binary writer/reader. *)
 (* TODO test `close ~wait:true`. *)
-(* TODO nothing in welcoming message proves that the incoming peer is
-        the owner of the public key... only the first message will
-        really proves it. Should this to be changed? Not really
-        important, but... an attacker might forge a random public key
-        with enough proof of work (hard task), open a connection, wait
-        infinitly. This would avoid the real peer to talk with us. And
-        this might also have an influence on its "score". *)
 
 include Logging.Make(struct let name = "p2p.connection" end)
 
@@ -150,20 +142,60 @@ module Connection_message = struct
 
 end
 
+type 'meta metadata_config = {
+  conn_meta_encoding : 'meta Data_encoding.t ;
+  conn_meta_value : P2p_peer.Id.t -> 'meta ;
+  private_node : 'meta -> bool ;
+}
+
+module Metadata = struct
+
+  let write metadata_config cryptobox_data fd message =
+    let encoded_message_len =
+      Data_encoding.Binary.length metadata_config.conn_meta_encoding message in
+    let buf = MBytes.create encoded_message_len in
+    match
+      Data_encoding.Binary.write
+        metadata_config.conn_meta_encoding message buf 0 encoded_message_len
+    with
+    | None ->
+        fail P2p_errors.Encoding_error
+    | Some last ->
+        fail_unless (last = encoded_message_len)
+          P2p_errors.Encoding_error >>=? fun () ->
+        Crypto.write_chunk cryptobox_data fd buf
+
+  let read metadata_config fd cryptobox_data =
+    Crypto.read_chunk fd cryptobox_data >>=? fun buf ->
+    let length = MBytes.length buf in
+    match
+      Data_encoding.Binary.read
+        metadata_config.conn_meta_encoding buf 0 length
+    with
+    | None ->
+        fail P2p_errors.Decoding_error
+    | Some (read_len, message) ->
+        if read_len <> length then
+          fail P2p_errors.Decoding_error
+        else
+          return message
+
+end
+
 module Ack = struct
 
-  type 'a t = Ack of 'a | Nack
+  type t = Ack | Nack
 
-  let encoding ack_encoding =
+  let encoding =
     let open Data_encoding in
-    let ack_encoding = obj1 (req "ack" ack_encoding) in
+    let ack_encoding = obj1 (req "ack" empty) in
     let nack_encoding = obj1 (req "nack" empty) in
     let ack_case tag =
       case tag ack_encoding
         (function
-          | Ack param -> Some param
+          | Ack -> Some ()
           | _ -> None)
-        (fun param -> Ack param) in
+        (fun () -> Ack) in
     let nack_case tag =
       case tag nack_encoding
         (function
@@ -173,11 +205,10 @@ module Ack = struct
         (fun _ -> Nack) in
     union [
       ack_case (Tag 0) ;
-      nack_case (Tag 1) ;
+      nack_case (Tag 255) ;
     ]
 
-  let write ack_encoding cryptobox_data fd message =
-    let encoding = encoding ack_encoding in
+  let write cryptobox_data fd message =
     let encoded_message_len =
       Data_encoding.Binary.length encoding message in
     let buf = MBytes.create encoded_message_len in
@@ -189,8 +220,7 @@ module Ack = struct
           P2p_errors.Encoding_error >>=? fun () ->
         Crypto.write_chunk cryptobox_data fd buf
 
-  let read ack_encoding fd cryptobox_data =
-    let encoding = encoding ack_encoding in
+  let read fd cryptobox_data =
     Crypto.read_chunk fd cryptobox_data >>=? fun buf ->
     let length = MBytes.length buf in
     match Data_encoding.Binary.read encoding buf 0 length with
@@ -206,13 +236,12 @@ end
 
 type 'conn_meta authenticated_fd = {
   fd: P2p_io_scheduler.connection ;
-  info: P2p_connection.Info.t ;
+  info: 'conn_meta P2p_connection.Info.t ;
   cryptobox_data: Crypto.data ;
-  ack_encoding: 'conn_meta Data_encoding.t ;
 }
 
-let kick { fd ; ack_encoding ; cryptobox_data ; _ } =
-  Ack.write ack_encoding fd cryptobox_data Nack >>= fun _ ->
+let kick { fd ; cryptobox_data ; _ } =
+  Ack.write fd cryptobox_data Nack >>= fun _ ->
   P2p_io_scheduler.close fd >>= fun _ ->
   Lwt.return_unit
 
@@ -222,7 +251,7 @@ let kick { fd ; ack_encoding ; cryptobox_data ; _ } =
 let authenticate
     ~proof_of_work_target
     ~incoming fd (remote_addr, remote_socket_port as point)
-    ?listening_port identity supported_versions ack_encoding =
+    ?listening_port identity supported_versions metadata_config =
   let local_nonce_seed = Crypto_box.random_nonce () in
   lwt_debug "Sending authenfication to %a" P2p_point.Id.pp point >>= fun () ->
   Connection_message.write fd
@@ -248,16 +277,21 @@ let authenticate
   let (local_nonce, remote_nonce) =
     Crypto_box.generate_nonces ~incoming ~sent_msg ~recv_msg in
   let cryptobox_data = { Crypto.channel_key ; local_nonce ; remote_nonce } in
+  let local_metadata = metadata_config.conn_meta_value remote_peer_id in
+  Metadata.write metadata_config fd cryptobox_data local_metadata >>=? fun () ->
+  Metadata.read metadata_config fd cryptobox_data >>=? fun remote_metadata ->
   let info =
     { P2p_connection.Info.peer_id = remote_peer_id ;
       versions = msg.versions ; incoming ;
       id_point ; remote_socket_port ;
+      private_node = metadata_config.private_node remote_metadata ;
+      remote_metadata ;
     } in
-  return (info, { fd ; info ; cryptobox_data ; ack_encoding })
+  return (info, { fd ; info ; cryptobox_data })
 
-type connection = {
+type 'meta connection = {
   id : int ;
-  info : P2p_connection.Info.t ;
+  info : 'meta P2p_connection.Info.t ;
   fd : P2p_io_scheduler.connection ;
   cryptobox_data : Crypto.data ;
 }
@@ -268,9 +302,9 @@ let next_conn_id =
 
 module Reader = struct
 
-  type 'msg t = {
+  type ('msg, 'meta) t = {
     canceler: Lwt_canceler.t ;
-    conn: connection ;
+    conn: 'meta connection ;
     encoding: 'msg Data_encoding.t ;
     messages: (int * 'msg) tzresult Lwt_pipe.t ;
     mutable worker: unit Lwt.t ;
@@ -355,9 +389,9 @@ end
 
 module Writer = struct
 
-  type 'msg t = {
+  type ('msg, 'meta) t = {
     canceler: Lwt_canceler.t ;
-    conn: connection ;
+    conn: 'meta connection ;
     encoding: 'msg Data_encoding.t ;
     messages: (MBytes.t list * unit tzresult Lwt.u option) Lwt_pipe.t ;
     mutable worker: unit Lwt.t ;
@@ -480,30 +514,26 @@ module Writer = struct
 end
 
 type ('msg, 'meta) t = {
-  conn : connection ;
-  meta : 'meta ;
-  reader : 'msg Reader.t ;
-  writer : 'msg Writer.t ;
-  private_node : bool ;
+  conn : 'meta connection ;
+  reader : ('msg, 'meta) Reader.t ;
+  writer : ('msg, 'meta) Writer.t ;
 }
 
 let equal { conn = { id = id1 } } { conn = { id = id2 } } = id1 = id2
 
-let pp ppf { conn } = P2p_connection.Info.pp ppf conn.info
+let pp ppf { conn } = P2p_connection.Info.pp (fun _ _ -> ()) ppf conn.info
 let info { conn } = conn.info
-let meta { meta } = meta
-let private_node { private_node } = private_node
+let remote_metadata { conn } = conn.info.remote_metadata
+let private_node { conn } = conn.info.private_node
 
 let accept
     ?incoming_message_queue_size ?outgoing_message_queue_size
     ?binary_chunks_size
-    ~private_node
-    { fd ; info ; cryptobox_data ; ack_encoding }
-    ack_param
+    ({ fd ; info ; cryptobox_data } : 'meta authenticated_fd)
     encoding =
   protect begin fun () ->
-    Ack.write ack_encoding fd cryptobox_data (Ack ack_param) >>=? fun () ->
-    Ack.read ack_encoding fd cryptobox_data
+    Ack.write fd cryptobox_data Ack >>=? fun () ->
+    Ack.read fd cryptobox_data
   end ~on_error:begin fun err ->
     P2p_io_scheduler.close fd >>= fun _ ->
     match err with
@@ -511,7 +541,7 @@ let accept
     | [ P2p_errors.Decipher_error ] -> fail P2p_errors.Invalid_auth
     | err -> Lwt.return (Error err)
   end >>=? function
-  | Ack meta ->
+  | Ack ->
       let canceler = Lwt_canceler.create () in
       let conn = { id = next_conn_id () ; fd ; info ; cryptobox_data } in
       let reader =
@@ -521,8 +551,7 @@ let accept
           ?size:outgoing_message_queue_size ?binary_chunks_size
           conn encoding canceler
       in
-      let conn = { conn ; reader ; writer ; meta ;
-                   private_node = private_node meta } in
+      let conn = { conn ; reader ; writer } in
       Lwt_canceler.on_cancel canceler begin fun () ->
         P2p_io_scheduler.close fd >>= fun _ ->
         Lwt.return_unit

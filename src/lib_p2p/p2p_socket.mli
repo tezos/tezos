@@ -19,7 +19,14 @@
 
 (** {1 Types} *)
 
-type 'conn_meta authenticated_fd
+type 'meta metadata_config = {
+  conn_meta_encoding : 'meta Data_encoding.t ;
+  conn_meta_value : P2p_peer.Id.t -> 'meta ;
+  private_node : 'meta -> bool ;
+}
+(** Type for the parameter negotiation mechanism. *)
+
+type 'meta authenticated_fd
 (** Type of a connection that successfully passed the authentication
     phase, but has not been accepted yet. Parametrized by the type
     of expected parameter in the `ack` message. *)
@@ -31,8 +38,8 @@ type ('msg, 'meta) t
 val equal: ('mst, 'meta) t -> ('msg, 'meta) t -> bool
 
 val pp: Format.formatter -> ('msg, 'meta) t -> unit
-val info: ('msg, 'meta) t -> P2p_connection.Info.t
-val meta: ('msg, 'meta) t -> 'meta
+val info: ('msg, 'meta) t -> 'meta P2p_connection.Info.t
+val remote_metadata: ('msg, 'meta) t -> 'meta
 val private_node: ('msg, 'meta) t -> bool
 
 (** {1 Low-level functions (do not use directly)} *)
@@ -42,14 +49,15 @@ val authenticate:
   incoming:bool ->
   P2p_io_scheduler.connection -> P2p_point.Id.t ->
   ?listening_port: int ->
-  P2p_identity.t -> P2p_version.t list -> 'conn_meta Data_encoding.t ->
-  (P2p_connection.Info.t * 'conn_meta authenticated_fd) tzresult Lwt.t
+  P2p_identity.t -> P2p_version.t list ->
+  'meta metadata_config ->
+  ('meta P2p_connection.Info.t * 'meta authenticated_fd) tzresult Lwt.t
 (** (Low-level) (Cancelable) Authentication function of a remote
     peer. Used in [P2p_connection_pool], to promote a
     [P2P_io_scheduler.connection] into an [authenticated_fd] (auth
     correct, acceptation undecided). *)
 
-val kick: 'conn_meta authenticated_fd -> unit Lwt.t
+val kick: 'meta authenticated_fd -> unit Lwt.t
 (** (Low-level) (Cancelable) [kick afd] notifies the remote peer that
     we refuse this connection and then closes [afd]. Used in
     [P2p_connection_pool] to reject an [aunthenticated_fd] which we do
@@ -59,9 +67,8 @@ val accept:
   ?incoming_message_queue_size:int ->
   ?outgoing_message_queue_size:int ->
   ?binary_chunks_size: int ->
-  private_node:('conn_meta -> bool) ->
-  'conn_meta authenticated_fd -> 'conn_meta ->
-  'msg Data_encoding.t -> ('msg, 'conn_meta) t tzresult Lwt.t
+  'meta authenticated_fd ->
+  'msg Data_encoding.t -> ('msg, 'meta) t tzresult Lwt.t
 (** (Low-level) (Cancelable) Accepts a remote peer given an
     authenticated_fd. Used in [P2p_connection_pool], to promote an
     [authenticated_fd] to the status of an active peer. *)

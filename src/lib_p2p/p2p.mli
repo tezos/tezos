@@ -147,6 +147,7 @@ type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
     nor open any listening socket *)
 val faked_network :
   'peer_meta peer_meta_config ->
+  'conn_meta ->
   ('msg, 'peer_meta, 'conn_meta) net
 
 (** Main network initialisation function *)
@@ -185,8 +186,8 @@ val find_connection :
 val connection_info :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
-  P2p_connection.Info.t
-val connection_metadata :
+  'conn_meta P2p_connection.Info.t
+val connection_remote_metadata :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
   'conn_meta

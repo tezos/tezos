@@ -24,6 +24,8 @@ let port_arg () =
          with Failure _ ->
            failwith "Invalid peer-to-peer port"))
 
+let pp_connection_info ppf conn = P2p_connection.Info.pp (fun _ _ -> ()) ppf conn
+
 let commands () =
   let open Clic in
   let addr_parameter =
@@ -44,10 +46,10 @@ let commands () =
       let incoming, outgoing =
         List.partition (fun c -> c.P2p_connection.Info.incoming) conns in
       Lwt_list.iter_s begin fun conn ->
-        cctxt#message "  %a" P2p_connection.Info.pp conn
+        cctxt#message "  %a" pp_connection_info conn
       end incoming >>= fun () ->
       Lwt_list.iter_s begin fun conn ->
-        cctxt#message "  %a" P2p_connection.Info.pp conn
+        cctxt#message "  %a" pp_connection_info conn
       end outgoing >>= fun () ->
       cctxt#message "KNOWN PEERS" >>= fun () ->
       Lwt_list.iter_s begin fun (p, pi) ->

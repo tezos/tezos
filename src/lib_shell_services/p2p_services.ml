@@ -54,6 +54,11 @@ let monitor_encoding = Data_encoding.(obj1 (dft "monitor" bool false))
 
 module Connections = struct
 
+  type connection_info = Connection_metadata.t P2p_connection.Info.t
+
+  let connection_info_encoding =
+    P2p_connection.Info.encoding Connection_metadata.encoding
+
   module S = struct
 
     let list =
@@ -61,14 +66,14 @@ module Connections = struct
         ~description:"List the running P2P connection."
         ~query: RPC_query.empty
         ~input: Data_encoding.empty
-        ~output: (Data_encoding.list P2p_connection.Info.encoding)
+        ~output: (Data_encoding.list connection_info_encoding)
         RPC_path.(root / "network" / "connections")
 
     let info =
       RPC_service.post_service
         ~query: RPC_query.empty
         ~input: Data_encoding.empty
-        ~output: P2p_connection.Info.encoding
+        ~output: connection_info_encoding
         ~description:"Details about the current P2P connection to the given peer."
         RPC_path.(root / "network" / "connections" /: P2p_peer.Id.rpc_arg)
 

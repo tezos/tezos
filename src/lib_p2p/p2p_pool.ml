@@ -207,16 +207,10 @@ type 'msg message_config = {
   versions : P2p_version.t list;
 }
 
-type 'conn_meta conn_meta_config = {
-  conn_meta_encoding : 'conn_meta Data_encoding.t ;
-  conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
-  private_node : 'conn_meta -> bool ;
-}
-
 type ('msg, 'peer_meta, 'conn_meta) t = {
   config : config ;
   peer_meta_config : 'peer_meta peer_meta_config ;
-  conn_meta_config : 'conn_meta conn_meta_config ;
+  conn_meta_config : 'conn_meta P2p_socket.metadata_config ;
   message_config : 'msg message_config ;
   my_id_points : unit P2p_point.Table.t ;
   known_peer_ids :
@@ -602,8 +596,8 @@ module Connection = struct
   let info { conn } =
     P2p_socket.info conn
 
-  let meta { conn } =
-    P2p_socket.meta conn
+  let remote_metadata { conn } =
+    P2p_socket.remote_metadata conn
 
   let find_by_peer_id pool peer_id =
     Option.apply
@@ -727,7 +721,7 @@ and authenticate pool ?point_info canceler fd point =
       ~incoming (P2p_io_scheduler.register pool.io_sched fd) point
       ?listening_port:pool.config.listening_port
       pool.config.identity pool.message_config.versions
-      pool.conn_meta_config.conn_meta_encoding
+      pool.conn_meta_config
   end ~on_error: begin fun err ->
     begin match err with
       | [ Canceled ] ->
@@ -825,10 +819,7 @@ and authenticate pool ?point_info canceler fd point =
           ?incoming_message_queue_size:pool.config.incoming_message_queue_size
           ?outgoing_message_queue_size:pool.config.outgoing_message_queue_size
           ?binary_chunks_size:pool.config.binary_chunks_size
-          ~private_node:pool.conn_meta_config.private_node
-          auth_fd
-          (pool.conn_meta_config.conn_meta_value info.peer_id)
-          pool.encoding >>=? fun conn ->
+          auth_fd pool.encoding >>=? fun conn ->
         lwt_debug "authenticate: %a -> Connected %a"
           P2p_point.Id.pp point
           P2p_peer.Id.pp info.peer_id >>= fun () ->
@@ -936,16 +927,16 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
       messages ; canceler ; answerer ; wait_close = false ;
       last_sent_swap_request = None } in
   ignore (Lazy.force answerer) ;
+  let conn_meta = P2p_socket.remote_metadata p2p_conn in
   Option.iter point_info ~f:begin fun point_info ->
     let point = P2p_point_state.Info.point point_info in
-    let conn_meta = P2p_socket.meta p2p_conn in
     P2p_point_state.set_running
       ~known_private:(pool.conn_meta_config.private_node conn_meta)
       point_info peer_id conn;
     P2p_point.Table.add pool.connected_points point point_info ;
   end ;
   log pool (Connection_established (id_point, peer_id)) ;
-  P2p_peer_state.set_running peer_info id_point conn (P2p_socket.meta conn.conn) ;
+  P2p_peer_state.set_running peer_info id_point conn conn_meta ;
   P2p_peer.Table.add pool.connected_peer_ids peer_id peer_info ;
   Lwt_condition.broadcast pool.events.new_connection () ;
   Lwt_canceler.on_cancel canceler begin fun () ->

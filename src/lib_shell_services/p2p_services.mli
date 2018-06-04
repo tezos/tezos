@@ -46,9 +46,11 @@ module Connections : sig
 
   open RPC_context
 
-  val list: #simple -> P2p_connection.Info.t list tzresult Lwt.t
+  type connection_info = Connection_metadata.t P2p_connection.Info.t
 
-  val info: #simple -> P2p_peer.Id.t -> P2p_connection.Info.t tzresult Lwt.t
+  val list: #simple -> connection_info list tzresult Lwt.t
+
+  val info: #simple -> P2p_peer.Id.t -> connection_info tzresult Lwt.t
 
   val kick: #simple -> ?wait:bool -> P2p_peer.Id.t -> unit tzresult Lwt.t
 
@@ -57,12 +59,12 @@ module Connections : sig
     val list :
       ([ `POST ], unit,
        unit, unit, unit,
-       P2p_connection.Info.t list) RPC_service.t
+       connection_info list) RPC_service.t
 
     val info :
       ([ `POST ], unit,
        unit * P2p_peer.Id.t, unit, unit,
-       P2p_connection.Info.t) RPC_service.t
+       connection_info) RPC_service.t
 
     val kick :
       ([ `POST ], unit,
