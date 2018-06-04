@@ -90,6 +90,22 @@ exec_docker() {
     else
         local interactive_flags="-t"
     fi
+    declare -a container_args=();
+    tmpdir="/tmp"
+    for arg in "$@"; do
+        if [[ "$arg" == 'container:'* ]]; then
+            local_path="${arg#container:}"
+            if [[ "$local_path" != '/'* ]]; then
+                local_path="$current_dir/$local_path"
+            fi
+            file_name=$(basename "${local_path}")
+            docker_path="$tmpdir/$file_name"
+            docker cp "${local_path}" "$docker_node_container:${docker_path}"
+            container_args+=("$docker_path");
+        else
+            container_args+=("${arg}");
+        fi
+    done
     docker exec "$interactive_flags" "$docker_node_container" "$@"
 }
 
@@ -349,26 +365,14 @@ stop_endorser() {
 
 ## Misc ####################################################################
 
-
 run_client() {
     assert_node_uptodate
-    declare -a container_args=();
-    tmpdir="/tmp"
-    for arg in "$@"; do
-        if [[ "$arg" == 'container:'* ]]; then
-            local_path="${arg#container:}"
-            if [[ "$local_path" != '/'* ]]; then
-                local_path="$current_dir/$local_path"
-            fi
-            file_name=$(basename "${local_path}")
-            docker_path="$tmpdir/$file_name"
-            docker cp "${local_path}" "$docker_node_container:${docker_path}"
-            container_args+=("$docker_path");
-        else
-            container_args+=("${arg}");
-        fi
-    done
-    exec_docker tezos-client "${container_args[@]}"
+    exec_docker "tezos-client" "$@"
+}
+
+run_admin_client() {
+    assert_node_uptodate
+    exec_docker "tezos-admin-client" "$@"
 }
 
 run_shell() {
@@ -647,6 +651,9 @@ case "$command" in
         ;;
     client)
         run_client "$@"
+        ;;
+    admin-client)
+        run_admin_client "$@"
         ;;
     check_script)
         warn_script_uptodate verbose
