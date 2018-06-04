@@ -16,4 +16,5 @@ let () =
     "double endorsement", Double_endorsement.tests ;
     "double baking", Double_baking.tests ;
     "seed", Seed.tests ;
+    "baking", Baking.tests ;
   ]
