@@ -45,28 +45,43 @@ type 'a desc =
   | Array : 'a t -> 'a array desc
   | List : 'a t -> 'a list desc
   | Obj : 'a field -> 'a desc
-  | Objs : Kind.t * 'a t * 'b t -> ('a * 'b) desc
+  | Objs : { kind: Kind.t ; left: 'a t ; right: 'b t } -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
-  | Tups : Kind.t * 'a t * 'b t -> ('a * 'b) desc
-  | Union : Kind.t * Binary_size.tag_size * 'a case list -> 'a desc
-  | Mu : Kind.enum * string * string option * string option * ('a t -> 'a t) -> 'a desc
+  | Tups : { kind: Kind.t ; left: 'a t ; right: 'b t } -> ('a * 'b) desc
+  | Union :
+      { kind: Kind.t ;
+        tag_size: Binary_size.tag_size ;
+        cases: 'a case list ;
+      } -> 'a desc
+  | Mu :
+      { kind: Kind.enum ;
+        name: string ;
+        title: string option ;
+        description: string option ;
+        fix: 'a t -> 'a t ;
+      } -> 'a desc
   | Conv :
       { proj : ('a -> 'b) ;
         inj : ('b -> 'a) ;
         encoding : 'b t ;
-        schema : Json_schema.schema option } -> 'a desc
+        schema : Json_schema.schema option ;
+      } -> 'a desc
   | Describe :
       { id : string ;
         title : string option ;
         description : string option ;
-        encoding : 'a t } -> 'a desc
+        encoding : 'a t ;
+      } -> 'a desc
   | Splitted :
       { encoding : 'a t ;
         json_encoding : 'a Json_encoding.encoding ;
-        is_obj : bool ; is_tup : bool } -> 'a desc
+        is_obj : bool ;
+        is_tup : bool ;
+      } -> 'a desc
   | Dynamic_size :
       { kind : Binary_size.unsigned_integer ;
-        encoding : 'a t } -> 'a desc
+        encoding : 'a t ;
+      } -> 'a desc
   | Check_size : { limit : int ; encoding : 'a t } -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
@@ -94,7 +109,8 @@ and 'a case =
              encoding : 'a t ;
              proj : ('t -> 'a option) ;
              inj : ('a -> 't) ;
-             tag : case_tag } -> 't case
+             tag : case_tag ;
+           } -> 't case
 
 and 'a t = {
   encoding: 'a desc ;

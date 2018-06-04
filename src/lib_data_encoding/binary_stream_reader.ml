@@ -268,36 +268,36 @@ let rec read_rec
         else
           read_rec e state @@ fun (v, state) ->
           k (Some v, state)
-    | Objs (`Fixed sz, e1, e2) ->
+    | Objs { kind = `Fixed sz ; left ; right } ->
         ignore (check_remaining_bytes state sz : int option) ;
         ignore (check_allowed_bytes state sz : int option) ;
-        read_rec e1 state @@ fun (left, state) ->
-        read_rec e2 state @@ fun (right, state) ->
+        read_rec left state @@ fun (left, state) ->
+        read_rec right state @@ fun (right, state) ->
         k ((left, right), state)
-    | Objs (`Dynamic, e1, e2) ->
-        read_rec e1 state @@ fun (left, state) ->
-        read_rec e2 state @@ fun (right, state) ->
+    | Objs { kind = `Dynamic ; left ; right } ->
+        read_rec left state @@ fun (left, state) ->
+        read_rec right state @@ fun (right, state) ->
         k ((left, right), state)
-    | (Objs (`Variable, e1, e2)) ->
-        read_variable_pair e1 e2 state k
+    | Objs { kind = `Variable ; left ; right } ->
+        read_variable_pair left right state k
     | Tup e -> read_rec e state k
-    | Tups (`Fixed sz, e1, e2) ->
+    | Tups { kind = `Fixed sz ; left ; right } ->
         ignore (check_remaining_bytes state sz : int option) ;
         ignore (check_allowed_bytes state sz : int option) ;
-        read_rec e1 state @@ fun (left, state) ->
-        read_rec e2 state @@ fun (right, state) ->
+        read_rec left state @@ fun (left, state) ->
+        read_rec right state @@ fun (right, state) ->
         k ((left, right), state)
-    | Tups (`Dynamic, e1, e2) ->
-        read_rec e1 state @@ fun (left, state) ->
-        read_rec e2 state @@ fun (right, state) ->
+    | Tups { kind = `Dynamic ; left ; right } ->
+        read_rec left state @@ fun (left, state) ->
+        read_rec right state @@ fun (right, state) ->
         k ((left, right), state)
-    | (Tups (`Variable, e1, e2)) ->
-        read_variable_pair e1 e2 state k
+    | Tups { kind = `Variable ; left ; right } ->
+        read_variable_pair left right state k
     | Conv { inj ; encoding } ->
         read_rec encoding state @@ fun (v, state) ->
         k (inj v, state)
-    | Union (_, sz, cases) -> begin
-        Atom.tag sz resume state @@ fun (ctag, state) ->
+    | Union { tag_size ; cases } -> begin
+        Atom.tag tag_size resume state @@ fun (ctag, state) ->
         match
           List.find
             (function
@@ -341,7 +341,7 @@ let rec read_rec
         k (v, { state with allowed_bytes })
     | Describe { encoding = e } -> read_rec e state k
     | Splitted { encoding = e } -> read_rec e state k
-    | Mu (_, _, _, _, self) -> read_rec (self e) state k
+    | Mu { fix } -> read_rec (fix e) state k
     | Delayed f -> read_rec (f ()) state k
 
 and remaining_bytes { remaining_bytes } =

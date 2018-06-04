@@ -238,18 +238,18 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
         | Some value -> write_rec e state value
       end
     | Obj (Dft { encoding = e }) -> write_rec e state value
-    | Objs (_, e1, e2) ->
+    | Objs { left ; right } ->
         let (v1, v2) = value in
-        write_rec e1 state v1 ;
-        write_rec e2 state v2
+        write_rec left state v1 ;
+        write_rec right state v2
     | Tup e -> write_rec e state value
-    | Tups (_, e1, e2) ->
+    | Tups { left ; right } ->
         let (v1, v2) = value in
-        write_rec e1 state v1 ;
-        write_rec e2 state v2
+        write_rec left state v1 ;
+        write_rec right state v2
     | Conv { encoding = e ; proj } ->
         write_rec e state (proj value)
-    | Union (_, sz, cases) ->
+    | Union { tag_size ; cases } ->
         let rec write_case = function
           | [] -> raise No_case_matched
           | Case { tag = Json_only } :: tl -> write_case tl
@@ -257,7 +257,7 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
               match proj value with
               | None -> write_case tl
               | Some value ->
-                  Atom.tag sz state tag ;
+                  Atom.tag tag_size state tag ;
                   write_rec e state value in
         write_case cases
     | Dynamic_size { kind ; encoding = e }  ->
@@ -273,7 +273,7 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
         write_with_limit limit e state value
     | Describe { encoding = e } -> write_rec e state value
     | Splitted { encoding = e } -> write_rec e state value
-    | Mu (_, _, _, _, self) -> write_rec (self e) state value
+    | Mu { fix } -> write_rec (fix e) state value
     | Delayed f -> write_rec (f ()) state value
 
 and write_with_limit : type a. int -> a Encoding.t -> state -> a -> unit =

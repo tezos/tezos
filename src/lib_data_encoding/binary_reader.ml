@@ -203,35 +203,35 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
           None
         else
           Some (read_rec e state)
-    | Objs (`Fixed sz, e1, e2) ->
+    | Objs { kind = `Fixed sz ; left ; right } ->
         ignore (check_remaining_bytes state sz : int) ;
         ignore (check_allowed_bytes state sz : int option) ;
-        let left = read_rec e1 state in
-        let right = read_rec e2 state in
+        let left = read_rec left state in
+        let right = read_rec right state in
         (left, right)
-    | Objs (`Dynamic, e1, e2) ->
-        let left = read_rec e1 state in
-        let right = read_rec e2 state in
+    | Objs { kind = `Dynamic ; left ; right } ->
+        let left = read_rec left state in
+        let right = read_rec right state in
         (left, right)
-    | (Objs (`Variable, e1, e2)) ->
-        read_variable_pair e1 e2 state
+    | Objs { kind = `Variable ; left ; right } ->
+        read_variable_pair left right state
     | Tup e -> read_rec e state
-    | Tups (`Fixed sz, e1, e2) ->
+    | Tups { kind = `Fixed sz ; left ; right } ->
         ignore (check_remaining_bytes state sz : int) ;
         ignore (check_allowed_bytes state sz : int option) ;
-        let left = read_rec e1 state in
-        let right = read_rec e2 state in
+        let left = read_rec left state in
+        let right = read_rec right state in
         (left, right)
-    | Tups (`Dynamic, e1, e2) ->
-        let left = read_rec e1 state in
-        let right = read_rec e2 state in
+    | Tups { kind = `Dynamic ; left ; right } ->
+        let left = read_rec left state in
+        let right = read_rec right state in
         (left, right)
-    | (Tups (`Variable, e1, e2)) ->
-        read_variable_pair e1 e2 state
+    | Tups { kind = `Variable ; left ; right } ->
+        read_variable_pair left right state
     | Conv { inj ; encoding } ->
         inj (read_rec encoding state)
-    | Union (_, sz, cases) ->
-        let ctag = Atom.tag sz state in
+    | Union { tag_size ; cases } ->
+        let ctag = Atom.tag tag_size state in
         let Case { encoding ; inj } =
           try
             List.find
@@ -272,7 +272,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
         v
     | Describe { encoding = e } -> read_rec e state
     | Splitted { encoding = e } -> read_rec e state
-    | Mu (_, _, _, _, self) -> read_rec (self e) state
+    | Mu { fix } -> read_rec (fix e) state
     | Delayed f -> read_rec (f ()) state
 
 

@@ -41,29 +41,26 @@ let rec length : type x. x Encoding.t -> x -> int =
     | String `Fixed n -> n
     | String_enum (_, arr) ->
         Binary_size.integer_to_size @@ Binary_size.enum_size arr
-    | Objs (`Fixed n, _, _) -> n
-    | Tups (`Fixed n, _, _) -> n
-    | Union (`Fixed n, _, _) -> n
+    | Objs { kind = `Fixed n } -> n
+    | Tups { kind = `Fixed n } -> n
+    | Union { kind = `Fixed n } -> n
     (* Dynamic *)
-    | Objs (`Dynamic, e1, e2) ->
+    | Objs { kind = `Dynamic ; left ; right } ->
         let (v1, v2) = value in
-        length e1 v1 + length e2 v2
-    | Tups (`Dynamic, e1, e2) ->
+        length left v1 + length right v2
+    | Tups { kind = `Dynamic ; left ; right } ->
         let (v1, v2) = value in
-        length e1 v1 + length e2 v2
-    | Union (`Dynamic, sz, cases) ->
+        length left v1 + length right v2
+    | Union { kind = `Dynamic ; tag_size ; cases } ->
         let rec length_case = function
           | [] -> raise (Write_error No_case_matched)
           | Case { tag = Json_only } :: tl -> length_case tl
           | Case { encoding = e ; proj ; _ } :: tl ->
               match proj value with
               | None -> length_case tl
-              | Some value ->
-                  let tag_size = Binary_size.tag_size sz in
-                  tag_size + length e value in
+              | Some value -> Binary_size.tag_size tag_size + length e value in
         length_case cases
-    | Mu (`Dynamic, _name, _, _, self) ->
-        length (self e) value
+    | Mu { kind = `Dynamic ; fix } -> length (fix e) value
     | Obj (Opt { kind = `Dynamic ; encoding = e }) -> begin
         match value with
         | None -> 1
@@ -81,30 +78,27 @@ let rec length : type x. x Encoding.t -> x -> int =
         List.fold_left
           (fun acc v -> length e v + acc)
           0 value
-    | Objs (`Variable, e1, e2) ->
+    | Objs { kind = `Variable ; left ; right } ->
         let (v1, v2) = value in
-        length e1 v1 + length e2 v2
-    | Tups (`Variable, e1, e2) ->
+        length left v1 + length right v2
+    | Tups { kind = `Variable ; left ; right } ->
         let (v1, v2) = value in
-        length e1 v1 + length e2 v2
+        length left v1 + length right v2
     | Obj (Opt { kind = `Variable ; encoding = e }) -> begin
         match value with
         | None -> 0
         | Some value -> length e value
       end
-    | Union (`Variable, sz, cases) ->
+    | Union { kind = `Variable ; tag_size ; cases } ->
         let rec length_case = function
           | [] -> raise (Write_error No_case_matched)
           | Case { tag = Json_only } :: tl -> length_case tl
           | Case { encoding = e ; proj ; _ } :: tl ->
               match proj value with
               | None -> length_case tl
-              | Some value ->
-                  let tag_size = Binary_size.tag_size sz in
-                  tag_size + length e value in
+              | Some value -> Binary_size.tag_size tag_size + length e value in
         length_case cases
-    | Mu (`Variable, _name, _, _, self) ->
-        length (self e) value
+    | Mu { kind = `Variable ; fix } -> length (fix e) value
     (* Recursive*)
     | Obj (Req { encoding = e }) -> length e value
     | Obj (Dft { encoding = e }) -> length e value

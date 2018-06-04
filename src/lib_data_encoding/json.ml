@@ -75,13 +75,13 @@ let bytes_jsont =
     create
       { title = None ;
         description = None ;
-        default = None;
-        enum = None;
+        default = None ;
+        enum = None ;
         kind = String {
-            pattern = Some "^[a-zA-Z0-9]+$";
-            min_length = 0;
-            max_length = None;
-          };
+            pattern = Some "^[a-zA-Z0-9]+$" ;
+            min_length = 0 ;
+            max_length = None ;
+          } ;
         format = None ;
         id = None } in
   conv ~schema
@@ -97,27 +97,27 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t = fun e ->
   match e.encoding with
   | Conv { proj ; inj ; encoding = e ; schema } -> begin
       match lift_union e with
-      | { encoding = Union (kind, tag, cases) } ->
-          make @@
-          Union (kind, tag,
-                 List.map
-                   (fun (Case { name ; encoding ; proj = proj' ; inj = inj' ; tag }) ->
-                      Case { encoding ;
-                             name ;
-                             proj = (fun x -> proj' (proj x));
-                             inj = (fun x -> inj (inj' x)) ;
-                             tag })
-                   cases)
+      | { encoding = Union { kind ; tag_size ; cases } } ->
+          let cases =
+            List.map
+              (fun (Case { name ; encoding ; proj = proj' ; inj = inj' ; tag }) ->
+                 Case { encoding ;
+                        name ;
+                        proj = (fun x -> proj' (proj x)) ;
+                        inj = (fun x -> inj (inj' x)) ;
+                        tag })
+              cases in
+          make @@ Union { kind ; tag_size ; cases }
       | e -> make @@ Conv { proj ; inj ; encoding = e ; schema }
     end
-  | Objs (p, e1, e2) ->
+  | Objs { kind ; left ; right } ->
       lift_union_in_pair
-        { build = fun p e1 e2 -> make @@ Objs (p, e1, e2) }
-        p e1 e2
-  | Tups (p, e1, e2) ->
+        { build = fun kind left right -> make @@ Objs { kind ; left ; right } }
+        kind left right
+  | Tups { kind ; left ; right } ->
       lift_union_in_pair
-        { build = fun p e1 e2 -> make @@ Tups (p, e1, e2) }
-        p e1 e2
+        { build = fun kind left right -> make @@ Tups { kind ; left ; right } }
+        kind left right
   | _ -> e
 
 and lift_union_in_pair
@@ -125,34 +125,34 @@ and lift_union_in_pair
   = fun b p e1 e2 ->
     let open Encoding in
     match lift_union e1, lift_union e2 with
-    | e1, { encoding = Union (_kind, tag, cases) } ->
-        make @@
-        Union (`Dynamic (* ignored *), tag,
-               List.map
-                 (fun (Case { name ; encoding = e2 ; proj ; inj ; tag }) ->
-                    Case { encoding = lift_union_in_pair b p e1 e2 ;
-                           name ;
-                           proj = (fun (x, y) ->
-                               match proj y with
-                               | None -> None
-                               | Some y -> Some (x, y)) ;
-                           inj = (fun (x, y) -> (x, inj y)) ;
-                           tag })
-                 cases)
-    | { encoding = Union (_kind, tag, cases) }, e2 ->
-        make @@
-        Union (`Dynamic (* ignored *), tag,
-               List.map
-                 (fun (Case { name ; encoding = e1 ; proj ; inj ; tag }) ->
-                    Case { encoding = lift_union_in_pair b p e1 e2 ;
-                           name ;
-                           proj = (fun (x, y) ->
-                               match proj x with
-                               | None -> None
-                               | Some x -> Some (x, y)) ;
-                           inj = (fun (x, y) -> (inj x, y)) ;
-                           tag })
-                 cases)
+    | e1, { encoding = Union { tag_size ; cases } } ->
+        let cases =
+          List.map
+            (fun (Case { name ; encoding = e2 ; proj ; inj ; tag }) ->
+               Case { encoding = lift_union_in_pair b p e1 e2 ;
+                      name ;
+                      proj = (fun (x, y) ->
+                          match proj y with
+                          | None -> None
+                          | Some y -> Some (x, y)) ;
+                      inj = (fun (x, y) -> (x, inj y)) ;
+                      tag })
+            cases in
+        make @@ Union { kind = `Dynamic (* ignored *) ; tag_size ; cases }
+    | { encoding = Union { tag_size ; cases } }, e2 ->
+        let cases =
+          List.map
+            (fun (Case { name ; encoding = e1 ; proj ; inj ; tag }) ->
+               Case { encoding = lift_union_in_pair b p e1 e2 ;
+                      name ;
+                      proj = (fun (x, y) ->
+                          match proj x with
+                          | None -> None
+                          | Some x -> Some (x, y)) ;
+                      inj = (fun (x, y) -> (inj x, y)) ;
+                      tag })
+            cases in
+        make @@ Union { kind = `Dynamic (* ignored *) ; tag_size ; cases }
     | e1, e2 -> b.build p e1 e2
 
 let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
@@ -175,7 +175,7 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Z -> z_encoding
   | Bool -> bool
   | Float -> float
-  | RangedFloat { minimum; maximum } -> ranged_float ~minimum ~maximum "rangedFloat"
+  | RangedFloat { minimum ; maximum } -> ranged_float ~minimum ~maximum "rangedFloat"
   | String (`Fixed expected) ->
       let check s =
         let found = String.length s in
@@ -202,17 +202,17 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Array e -> array (get_json e)
   | List e -> list (get_json e)
   | Obj f -> obj1 (field_json f)
-  | Objs (_, e1, e2) ->
-      merge_objs (get_json e1) (get_json e2)
+  | Objs { left ; right } ->
+      merge_objs (get_json left) (get_json right)
   | Tup e -> tup1 (get_json e)
-  | Tups (_, e1, e2) ->
-      merge_tups (get_json e1) (get_json e2)
+  | Tups { left ; right } ->
+      merge_tups (get_json left) (get_json right)
   | Conv { proj ; inj ; encoding = e ; schema } -> conv ?schema proj inj (get_json e)
   | Describe { id ; title ; description ; encoding = e } ->
       def id ?title ?description (get_json e)
-  | Mu (_, name, _, _, self) as ty ->
-      mu name (fun json_encoding -> get_json @@ self (make ~json_encoding ty))
-  | Union (_tag_size, _, cases) -> union (List.map case_json cases)
+  | Mu { name ; fix } as ty ->
+      mu name (fun json_encoding -> get_json @@ fix (make ~json_encoding ty))
+  | Union { cases } -> union (List.map case_json cases)
   | Splitted { json_encoding } -> json_encoding
   | Dynamic_size { encoding = e } -> get_json e
   | Check_size { encoding } -> get_json encoding
