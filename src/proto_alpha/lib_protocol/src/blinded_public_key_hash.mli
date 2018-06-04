@@ -9,12 +9,12 @@
 
 include S.HASH
 
-type secret
-val secret_encoding : secret Data_encoding.t
+type activation_code
+val activation_code_encoding : activation_code Data_encoding.t
 
-val of_ed25519_pkh : secret -> Ed25519.Public_key_hash.t -> t
+val of_ed25519_pkh : activation_code -> Ed25519.Public_key_hash.t -> t
 
-val secret_of_hex : string -> secret
+val activation_code_of_hex : string -> activation_code
 
 module Index : sig
   type nonrec t = t

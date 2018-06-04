@@ -104,7 +104,7 @@ if __name__ == '__main__':
                           "email" : email,
                           "password" : password,
                           "amount" : str(amount),
-                          "secret" : secret }
+                          "activation_code" : secret }
                         for pkh, (mnemonic, email, password, amount, secret) in secrets.iteritems()], f, indent=1)
     else:
         wallets = get_wallets( sys.argv[1] )

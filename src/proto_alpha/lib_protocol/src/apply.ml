@@ -690,8 +690,9 @@ let apply_anonymous_operation ctxt kind =
         | Error _ -> Tez.zero in
       add_rewards ctxt reward >>=? fun ctxt ->
       return (ctxt, Double_baking_evidence_result [(* FIXME *)])
-  | Activation { id = pkh ; secret } ->
-      let blinded_pkh = Blinded_public_key_hash.of_ed25519_pkh secret pkh in
+  | Activation { id = pkh ; activation_code } ->
+      let blinded_pkh =
+        Blinded_public_key_hash.of_ed25519_pkh activation_code pkh in
       Commitment.get_opt ctxt blinded_pkh >>=? function
       | None -> fail (Invalid_activation { pkh })
       | Some amount ->

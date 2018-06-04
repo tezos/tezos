@@ -237,26 +237,49 @@ let originate_contract
 type activation_key =
   { pkh : Ed25519.Public_key_hash.t ;
     amount : Tez.t ;
-    secret : Blinded_public_key_hash.secret ;
+    activation_code : Blinded_public_key_hash.activation_code ;
     mnemonic : string list ;
     password : string ;
     email : string ;
   }
 
+let raw_activation_key_encoding =
+  let open Data_encoding in
+  obj6
+    (req "pkh" Ed25519.Public_key_hash.encoding)
+    (req "amount" Tez.encoding)
+    (req "activation_code" Blinded_public_key_hash.activation_code_encoding)
+    (req "mnemonic" (list string))
+    (req "password" string)
+    (req "email" string)
+
 let activation_key_encoding =
+  (* Hack: allow compatibility with older encoding *)
   let open Data_encoding in
   conv
-    (fun { pkh ; amount ; secret ; mnemonic ; password ; email } ->
-       ( pkh, amount, secret, mnemonic, password, email ))
-    (fun ( pkh, amount, secret, mnemonic, password, email ) ->
-       { pkh ; amount ; secret ; mnemonic ; password ; email })
-    (obj6
-       (req "pkh" Ed25519.Public_key_hash.encoding)
-       (req "amount" Tez.encoding)
-       (req "secret" Blinded_public_key_hash.secret_encoding)
-       (req "mnemonic" (list string))
-       (req "password" string)
-       (req "email" string))
+    (fun { pkh ; amount ; activation_code ; mnemonic ; password ; email } ->
+       ( pkh, amount, activation_code, mnemonic, password, email ))
+    (fun ( pkh, amount, activation_code, mnemonic, password, email ) ->
+       { pkh ; amount ; activation_code ; mnemonic ; password ; email }) @@
+  splitted
+    ~binary:raw_activation_key_encoding
+    ~json:
+      (union [
+          case Json_only
+            raw_activation_key_encoding
+            (fun x -> Some x)
+            (fun x -> x) ;
+          case Json_only
+            (obj6
+               (req "pkh" Ed25519.Public_key_hash.encoding)
+               (req "amount" Tez.encoding)
+               (req "secret" Blinded_public_key_hash.activation_code_encoding)
+               (req "mnemonic" (list string))
+               (req "password" string)
+               (req "email" string))
+            (fun _ -> None)
+            (fun x -> x) ;
+        ])
 
 let read_key key =
   match Bip39.of_words key.mnemonic with
@@ -283,7 +306,7 @@ let claim_commitment (cctxt : #Proto_alpha.full)
        Ed25519.Public_key_hash.pp key.pkh) >>=? fun () ->
   let contents =
     Anonymous_operations
-      [ Activation { id = key.pkh ; secret = key.secret } ] in
+      [ Activation { id = key.pkh ; activation_code = key.activation_code } ] in
   Injection.inject_operation cctxt ?confirmations block contents >>=? fun (_oph, _op, _result as res) ->
   let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
   begin

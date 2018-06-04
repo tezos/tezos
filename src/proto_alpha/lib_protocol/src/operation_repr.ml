@@ -45,7 +45,7 @@ and anonymous_operation =
     }
   | Activation of {
       id: Ed25519.Public_key_hash.t ;
-      secret: Blinded_public_key_hash.secret ;
+      activation_code: Blinded_public_key_hash.activation_code ;
     }
 
 and sourced_operation =
@@ -368,15 +368,15 @@ module Encoding = struct
     (obj3
        (req "kind" (constant "activation"))
        (req "pkh" Ed25519.Public_key_hash.encoding)
-       (req "secret" Blinded_public_key_hash.secret_encoding))
+       (req "activation_code" Blinded_public_key_hash.activation_code_encoding))
 
   let activation_case tag =
     case tag activation_encoding
       (function
-        | Activation { id ; secret } -> Some ((), id, secret)
+        | Activation { id ; activation_code } -> Some ((), id, activation_code)
         | _ -> None
       )
-      (fun ((), id, secret) -> Activation { id ; secret })
+      (fun ((), id, activation_code) -> Activation { id ; activation_code })
 
   let anonymous_operations_case tag op_encoding =
     case tag

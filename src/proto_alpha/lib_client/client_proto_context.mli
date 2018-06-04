@@ -141,7 +141,7 @@ val dictate :
 type activation_key =
   { pkh : Ed25519.Public_key_hash.t ;
     amount : Tez.t ;
-    secret : Blinded_public_key_hash.secret ;
+    activation_code : Blinded_public_key_hash.activation_code ;
     mnemonic : string list ;
     password : string ;
     email : string ;

@@ -745,7 +745,7 @@ and anonymous_operation =
     }
   | Activation of {
       id: Ed25519.Public_key_hash.t ;
-      secret: Blinded_public_key_hash.secret ;
+      activation_code: Blinded_public_key_hash.activation_code ;
     }
 
 and sourced_operation =
