@@ -20,7 +20,11 @@ type block = t
 
 val rpc_ctxt: t Alpha_environment.RPC_context.simple
 
-(** Policies to select the next baker *)
+(** Policies to select the next baker:
+    - [By_priority p] selects the baker at priority [p]
+    - [By_account pkh] selects the first slot for baker [pkh]
+    - [Excluding pkhs] selects the first baker that doesn't belong to [pkhs]
+*)
 type baker_policy =
   | By_priority of int
   | By_account of public_key_hash
@@ -49,10 +53,19 @@ module Forge : sig
     ?operations: Operation.packed list ->
     t -> header tzresult Lwt.t
 
-  (** Sets seed_nonce_hash of a header *)
+  (** Sets uniquely seed_nonce_hash of a header *)
   val set_seed_nonce_hash:
-    Nonce_hash.t option ->
-    header -> header
+    Nonce_hash.t option -> header -> header
+
+  (** Sets the baker that will sign the header to an arbitrary pkh *)
+  val set_baker:
+    public_key_hash -> header -> header
+
+  (** Signs the header with the key of the baker configured in the header.
+      The header can no longer be modified, only applied. *)
+  val sign_header:
+    header ->
+    Block_header.block_header tzresult Lwt.t
 
 end
 
@@ -88,16 +101,20 @@ val genesis:
   ?no_reward_cycles: int option ->
   (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
 
-(** Applies a header and its operations to a block and obtains a new block *)
+(** Applies a signed header and its operations to a block and
+    obtains a new block *)
 val apply:
-  Forge.header ->
+  Block_header.block_header ->
   ?operations: Operation.packed list ->
   t -> t tzresult Lwt.t
 
 (**
    [bake b] returns a block [b'] which has as predecessor block [b].
    Optional parameter [policy] allows to pick the next baker in several ways.
-   This function bundles together [forge_header] and [apply].
+   This function bundles together [forge_header], [sign_header] and [apply].
+   These functions should be used instead of bake to craft unusual blocks for
+   testing together with setters for properties of the headers.
+   For examples see seed.ml or double_baking.ml
 *)
 val bake:
   ?policy: baker_policy ->

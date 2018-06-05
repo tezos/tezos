@@ -22,7 +22,8 @@ let no_commitment () =
 
   (* Forge a block with empty commitment and apply it *)
   Block.Forge.forge_header b >>=? fun header ->
-  let header = Block.Forge.set_seed_nonce_hash None header in
+  Block.Forge.set_seed_nonce_hash None header |>
+  Block.Forge.sign_header >>=? fun header ->
   Block.apply header b >>= fun e ->
 
   let invalid_commitment = function
