@@ -98,7 +98,6 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
   do_reveal cctxt cctxt#block blocks
 
 let reveal_nonces cctxt () =
-  let block = Block_services.last_baked_block cctxt#block in
   Client_baking_forge.get_unrevealed_nonces
     cctxt cctxt#block >>=? fun nonces ->
   do_reveal cctxt cctxt#block nonces
@@ -109,7 +108,7 @@ let run_daemon cctxt ?max_priority ~endorsement_delay delegates ~endorsement ~ba
       Client_daemon.Endorser.run cctxt
         ~delay:endorsement_delay
         ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
-        (List.map snd delegates) >>=? fun () -> return ()
+        delegates >>=? fun () -> return ()
     else return ()
   in
   let baker =
@@ -117,7 +116,7 @@ let run_daemon cctxt ?max_priority ~endorsement_delay delegates ~endorsement ~ba
       Client_daemon.Baker.run cctxt
         ?max_priority
         ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
-        (List.map snd delegates) >>=? fun () -> return ()
+        delegates >>=? fun () -> return ()
     else return ()
   in
   let accuser =

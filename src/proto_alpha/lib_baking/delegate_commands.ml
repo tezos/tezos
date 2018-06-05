@@ -11,16 +11,15 @@ open Client_proto_args
 open Client_baking_lib
 
 let group =
-  { Cli_entries.name = "delegate" ;
+  { Clic.name = "delegate" ;
     title = "Commands related to delegate operations." }
 
 let commands () =
   let open Clic in
   [
     command ~group ~desc: "Launch a daemon that handles delegate operations."
-      (args5 max_priority_arg endorsement_delay_arg
-         Daemon.baking_switch Daemon.endorsement_switch Daemon.denunciation_switch)
-      (prefixes [ "launch" ; "daemon" ]
+      (args1 max_priority_arg)
+      (prefixes [ "launch" ; "baker" ]
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun max_priority delegates cctxt ->
          Client_daemon.Baker.run cctxt
