@@ -28,10 +28,12 @@ key2=bar
 key3=boo
 key4=king
 key5=queen
+key6=p256
 
 $client gen keys $key1
 $client gen keys $key2 --sig secp256k1
 $client gen keys $key3 --sig ed25519
+$client gen keys $key6 --sig p256
 
 $client list known identities
 $client get balance for bootstrap1
@@ -39,10 +41,12 @@ $client get balance for bootstrap1
 bake_after $client transfer 1,000 from bootstrap1 to $key1
 bake_after $client transfer 2,000 from bootstrap1 to $key2
 bake_after $client transfer 3,000 from bootstrap1 to $key3
+bake_after $client transfer 4,000 from bootstrap1 to $key6
 
 $client get balance for $key1 | assert "1,000 ꜩ"
 $client get balance for $key2 | assert "2,000 ꜩ"
 $client get balance for $key3 | assert "3,000 ꜩ"
+$client get balance for $key6 | assert "4,000 ꜩ"
 
 bake_after $client transfer 1,000 from $key2 to $key1 -fee 0
 $client get balance for $key1 | assert "2,000 ꜩ"

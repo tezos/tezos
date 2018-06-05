@@ -18,6 +18,7 @@
               blake2
               hacl
               secp256k1
+              uecc
               zarith))))
 
 (alias

@@ -29,7 +29,7 @@ let sig_algo_arg =
     ~doc:"use custom signature algorithm"
     ~long:"sig"
     ~short:'s'
-    ~placeholder:"ed25519|secp256k1"
+    ~placeholder:"ed25519|secp256k1|p256"
     ~default: "ed25519"
     (Signature.algo_param ())
 

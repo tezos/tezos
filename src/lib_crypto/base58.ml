@@ -308,9 +308,8 @@ module Prefix = struct
 
   (* 20 *)
   let ed25519_public_key_hash = "\006\161\159" (* tz1(36) *)
-
-  (* 20 *)
   let secp256k1_public_key_hash = "\006\161\161" (* tz2(36) *)
+  let p256_public_key_hash = "\006\161\164" (* tz3(36) *)
 
   (* 16 *)
   let cryptobox_public_key_hash = "\153\103" (* id(30) *)
@@ -319,14 +318,17 @@ module Prefix = struct
   let ed25519_seed = "\013\015\058\007" (* edsk(54) *)
   let ed25519_public_key = "\013\015\037\217" (* edpk(54) *)
   let secp256k1_secret_key = "\017\162\224\201" (* spsk(54) *)
+  let p256_secret_key = "\016\081\238\189" (* p2sk(54) *)
 
   (* 33 *)
   let secp256k1_public_key = "\003\254\226\086" (* sppk(55) *)
+  let p256_public_key = "\003\178\139\127" (* p2pk(55) *)
 
   (* 64 *)
   let ed25519_secret_key = "\043\246\078\007" (* edsk(98) *)
   let ed25519_signature = "\009\245\205\134\018" (* edsig(99) *)
   let secp256k1_signature =  "\013\115\101\019\063" (* spsig1(99) *)
+  let p256_signature =  "\054\240\044\052" (* p2sig(98) *)
   let generic_signature = "\004\130\043" (* sig(96) *)
 
   (* 4 *)

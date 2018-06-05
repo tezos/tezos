@@ -536,4 +536,15 @@ let () =
            | Contract_repr.Implicit (Secp256k1 pkh) -> pkh
            | Contract_repr.Implicit _ -> assert false
            | Contract_repr.Originated _ -> assert false)
+         l) ;
+  Raw_context.register_resolvers
+    P256.Public_key_hash.b58check_encoding
+    (fun ctxt p ->
+       let p = Contract_repr.Index.pkh_prefix_p256 p in
+       Contract.Indexed_context.resolve ctxt p >|= fun l ->
+       List.map
+         (function
+           | Contract_repr.Implicit (P256 pkh) -> pkh
+           | Contract_repr.Implicit _ -> assert false
+           | Contract_repr.Originated _ -> assert false)
          l)

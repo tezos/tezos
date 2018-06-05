@@ -8,53 +8,45 @@
 (**************************************************************************)
 
 module Public_key_hash = Blake2B.Make(Base58)(struct
-    let name  = "Secp256k1.Public_key_hash"
-    let title = "A Secp256k1 public key hash"
-    let b58check_prefix = Base58.Prefix.secp256k1_public_key_hash
+    let name  = "P256.Public_key_hash"
+    let title = "A P256 public key hash"
+    let b58check_prefix = Base58.Prefix.p256_public_key_hash
     let size = Some 20
   end)
 
 let () =
-  Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz2" 36
+  Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz3" 36
 
-open Libsecp256k1.External
-
-let context =
-  let ctx = Context.create () in
-  match Context.randomize ctx (Rand.generate 32) with
-  | false -> failwith "Secp256k1 context randomization failed. Aborting."
-  | true -> ctx
+open Uecc
 
 module Public_key = struct
 
-  type t = Key.public Key.t
+  type t = (secp256r1, public) key
 
-  let name  = "Secp256k1.Public_key"
-  let title = "A Secp256k1 public key"
+  let name  = "P256.Public_key"
+  let title = "A P256 public key"
 
-  let to_bytes pk = Key.to_bytes context pk
-  let of_bytes_opt s =
-    try Some (Key.read_pk_exn context s)
-    with _ -> None
+  let to_bytes = to_bytes ~compress:true
+  let of_bytes_opt = pk_of_bytes secp256r1
 
   let to_string s = MBytes.to_string (to_bytes s)
   let of_string_opt s = of_bytes_opt (MBytes.of_string s)
 
-  let size = Key.compressed_pk_bytes
+  let size = compressed_size secp256r1
 
   type Base58.data +=
     | Data of t
 
   let b58check_encoding =
     Base58.register_encoding
-      ~prefix: Base58.Prefix.secp256k1_public_key
+      ~prefix: Base58.Prefix.p256_public_key
       ~length: size
       ~to_raw: to_string
       ~of_raw: of_string_opt
       ~wrap: (fun x -> Data x)
 
   let () =
-    Base58.check_encoded_prefix b58check_encoding "sppk" 55
+    Base58.check_encoded_prefix b58check_encoding "p2pk" 55
 
   let hash v =
     Public_key_hash.hash_bytes [to_bytes v]
@@ -100,42 +92,41 @@ end
 
 module Secret_key = struct
 
-  type t = Key.secret Key.t
+  type t = (secp256r1, secret) key
 
-  let name = "Secp256k1.Secret_key"
-  let title = "A Secp256k1 secret key"
+  let name = "P256.Secret_key"
+  let title = "A P256 secret key"
 
-  let size = Key.secret_bytes
+  let size = sk_size secp256r1
 
-  let of_bytes_opt s =
-    match Key.read_sk context s with
-    | Ok x -> Some x
-    | _ -> None
-  let to_bytes x = Key.to_bytes context x
+  let of_bytes_opt buf =
+    Option.map ~f:fst (sk_of_bytes secp256r1 buf)
+
+  let to_bytes = to_bytes ~compress:true
 
   let to_string s = MBytes.to_string (to_bytes s)
   let of_string_opt s = of_bytes_opt (MBytes.of_string s)
 
-  let to_public_key key = Key.neuterize_exn context key
+  let to_public_key = neuterize
 
   type Base58.data +=
     | Data of t
 
   let b58check_encoding =
     Base58.register_encoding
-      ~prefix: Base58.Prefix.secp256k1_secret_key
+      ~prefix: Base58.Prefix.p256_secret_key
       ~length: size
       ~to_raw: to_string
       ~of_raw: of_string_opt
       ~wrap: (fun x -> Data x)
 
   let () =
-    Base58.check_encoded_prefix b58check_encoding "spsk" 54
+    Base58.check_encoded_prefix b58check_encoding "p2sk" 54
 
   include Compare.Make(struct
       type nonrec t = t
       let compare a b =
-        MBytes.compare (Key.buffer a) (Key.buffer b)
+        MBytes.compare (to_bytes a) (to_bytes b)
     end)
 
   include Helpers.MakeRaw(struct
@@ -171,19 +162,19 @@ module Secret_key = struct
 
 end
 
-type t = Sign.plain Sign.t
+type t = MBytes.t
 
 type watermark = MBytes.t
 
-let name = "Secp256k1"
-let title = "A Secp256k1 signature"
+let name = "P256"
+let title = "A P256 signature"
 
-let size = Sign.plain_bytes
+let size = pk_size secp256r1
 
 let of_bytes_opt s =
-  match Sign.read context s with Ok s -> Some s | Error _ -> None
+  if MBytes.length s = size then Some s else None
 
-let to_bytes = Sign.to_bytes ~der:false context
+let to_bytes s = s
 
 let to_string s = MBytes.to_string (to_bytes s)
 let of_string_opt s = of_bytes_opt (MBytes.of_string s)
@@ -193,20 +184,14 @@ type Base58.data +=
 
 let b58check_encoding =
   Base58.register_encoding
-    ~prefix: Base58.Prefix.secp256k1_signature
+    ~prefix: Base58.Prefix.p256_signature
     ~length: size
     ~to_raw: to_string
     ~of_raw: of_string_opt
     ~wrap: (fun x -> Data x)
 
 let () =
-  Base58.check_encoded_prefix b58check_encoding "spsig1" 99
-
-include Compare.Make(struct
-    type nonrec t = t
-    let compare a b =
-      MBytes.compare (Sign.buffer a) (Sign.buffer b)
-  end)
+  Base58.check_encoded_prefix b58check_encoding "p2sig" 98
 
 include Helpers.MakeRaw(struct
     type nonrec t = t
@@ -248,7 +233,12 @@ let sign ?watermark sk msg =
     match watermark with
     | None -> [msg]
     | Some prefix -> [ prefix ; msg ] in
-  Sign.sign_exn context ~sk msg
+  match sign sk msg with
+  | None ->
+      (* Will never happen in practice. This can only happen in case
+         of RNG error. *)
+      invalid_arg "P256.sign: internal error"
+  | Some signature -> signature
 
 let check ?watermark public_key signature msg =
   let msg =
@@ -257,10 +247,20 @@ let check ?watermark public_key signature msg =
     match watermark with
     | None -> [msg]
     | Some prefix -> [ prefix ; msg ] in
-  Sign.verify_exn context ~pk:public_key ~msg ~signature
+  verify public_key ~msg ~signature
 
 let generate_key ?(seed=Rand.generate 32) () =
-  let sk = Key.read_sk_exn context seed in
-  let pk = Key.neuterize_exn context sk in
-  let pkh = Public_key.hash pk in
-  pkh, pk, sk
+  let seedlen = MBytes.length seed in
+  if seedlen < 32 then
+    invalid_arg (Printf.sprintf "P256.generate_key: seed must be at \
+                                 least 32 bytes long (was %d)" seedlen) ;
+  match sk_of_bytes secp256r1 seed with
+  | None -> invalid_arg "P256.generate_key: invalid seed (very rare!)"
+  | Some (sk, pk) ->
+      let pkh = Public_key.hash pk in
+      pkh, pk, sk
+
+include Compare.Make(struct
+    type nonrec t = t
+    let compare = MBytes.compare
+  end)

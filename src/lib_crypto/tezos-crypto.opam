@@ -19,6 +19,7 @@ depends: [
   "hacl"
   "zarith"
   "secp256k1"
+  "uecc"
   "alcotest" { test & >= "0.8.3" }
 ]
 build: [
