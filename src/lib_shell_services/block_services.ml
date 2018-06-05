@@ -127,7 +127,6 @@ let raw_context_encoding =
 
 type error +=
   | Invalid_depth_arg of (string list * int)
-  | Missing_key of string list
 
 let () =
   register_error_kind
