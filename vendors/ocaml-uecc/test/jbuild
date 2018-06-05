@@ -1,0 +1,15 @@
+(jbuild_version 1)
+
+(executable
+ ((name test)
+  (public_name test-uecc)
+  (libraries (alcotest uecc))))
+
+(alias
+ ((name    runtest-uecc)
+  (deps    (test.exe))
+  (action  (run ${<}))))
+
+(alias
+ ((name    runtest)
+  (deps    ((alias runtest-uecc)))))
