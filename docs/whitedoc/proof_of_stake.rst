@@ -183,7 +183,7 @@ before the current one, cycle ``(n-2)`` the one before, cycle ``(n+1)``
 the one after, etc.
 
 At any point, the tezos shell will not implicitly accept a branch whose
-fork point is in a cycle more than ``ALLOWED_FORK`` = 5 cycles in the
+fork point is in a cycle more than ``PRESERVED_CYCLES`` = 5 cycles in the
 past (that is *at least* 14 days, 5 hours, and 20 minutes).
 
 Security deposits
@@ -200,12 +200,12 @@ each endorsement signed increases the amount that is frozen.
 
 It is possible to deposit a bond just prior to creating a block
 requiring this deposit. Deposits for blocks and endorsements in cycle
-``n`` are "unfrozen" at the end of cycle ``n+ALLOWED_FORK``.
+``n`` are "unfrozen" at the end of cycle ``n+PRESERVED_CYCLES``.
 
-Since deposits are locked for a period of ``ALLOWED_FORK`` one can
+Since deposits are locked for a period of ``PRESERVED_CYCLES`` one can
 compute that at any given time, about ((``BLOCK_SECURITY_DEPOSIT`` +
 ``ENDORSEMENT_SECURITY_DEPOSIT`` \* ``ENDORSERS_PER_BLOCK``) \*
-(``ALLOWED_FORK`` + 1) \* ``BLOCKS_PER_CYCLE``) / ``763e6`` = 8.25% of
+(``PRESERVED_CYCLES`` + 1) \* ``BLOCKS_PER_CYCLE``) / ``763e6`` = 8.25% of
 all tokens should be held as security deposits. It also means that a
 delegate should own over 8.25% of the amount of token delegated to them
 in order to not miss out on creating any block.
@@ -217,7 +217,7 @@ Baking in tezos.alpha is the action of signing and publishing a block.
 In Bitcoin, the right to publish a block is associated with solving a
 proof-of-work puzzle. In tezos.alpha, the right to publish a block in
 cycle ``n`` is assigned to a randomly selected roll in a randomly
-selected roll snapshot from cycle ``n-ALLOWED_FORK-2``.
+selected roll snapshot from cycle ``n-PRESERVED_CYCLES-2``.
 
 We admit, for the time being, that the protocol generates a random seed
 for each cycle. From this random seed, we can seed a CSPRNG which is
@@ -265,18 +265,18 @@ Random seed
 ~~~~~~~~~~~
 
 Cycle ``n`` is associated with a random seed, a 256 bit number generated
-at the end of cycle ``(n-ALLOWED_FORK-1)`` using commitments made during
-cycle ``(n-ALLOWED_FORK-2)``, in one out of every
+at the end of cycle ``(n-PRESERVED_CYCLES-1)`` using commitments made during
+cycle ``(n-PRESERVED_CYCLES-2)``, in one out of every
 ``BLOCKS_PER_COMMITMENT`` = 32 blocks.
 
 The commitment must be revealed by the original baker during cycle
-``(n-ALLOWED_FORK-1)`` under penalty of forfeiting the rewards and
+``(n-PRESERVED_CYCLES-1)`` under penalty of forfeiting the rewards and
 fees of the block that included the seed commitment (the associated
 security deposit is not forfeited).
 
 A *revelation* is an operation, and multiple revelations can thus be
 included in a block. The revelations are hashed together to generate a
-random seed at the very end of cycle ``(n-ALLOWED_FORK-1)``.
+random seed at the very end of cycle ``(n-PRESERVED_CYCLES-1)``.
 
 Revelations are free operations which do not compete with transactions
 for block space. Up to ``MAX_REVELATIONS_PER_BLOCK`` = 32 revelations
