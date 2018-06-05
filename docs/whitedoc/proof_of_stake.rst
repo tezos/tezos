@@ -272,14 +272,16 @@ fees of the block that included the seed commitment (the associated
 security deposit is not forfeited).
 
 A *revelation* is an operation, and multiple revelations can thus be
-included in a block. The revelations are hashed together to generate a
-random seed at the very end of cycle ``(n-PRESERVED_CYCLES-1)``.
-
+included in a block. A baker receives a ``seed_nonce_revelation_tip`` =
+1/8 XTZ reward for including a revelation.
 Revelations are free operations which do not compete with transactions
 for block space. Up to ``MAX_REVELATIONS_PER_BLOCK`` = 32 revelations
 can be contained in any given block. Thus, 1 /
 (``MAX_REVELATIONS_PER_BLOCK`` \* ``BLOCKS_PER_COMMITMENT``) = 1/1024 of
 the blocks in the cycle are sufficient to include all revelations.
+
+The revelations are hashed together to generate a random seed at the
+very end of cycle ``(n-PRESERVED_CYCLES-1)``.
 
 Denunciations
 -------------
