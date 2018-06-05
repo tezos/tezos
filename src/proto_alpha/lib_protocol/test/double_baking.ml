@@ -28,6 +28,17 @@ let get_first_different_bakers ctxt =
   get_first_different_baker baker_1 (List.tl bakers) >>=? fun baker_2 ->
   return (baker_1, baker_2)
 
+let get_first_different_baker_priority baker bakers =
+  return @@ List.find (fun baker' ->
+      Signature.Public_key_hash.(<>) baker @@ fst baker')
+  @@ List.mapi (fun i x -> x, i) @@ bakers
+
+let get_first_different_bakers_priority ctxt =
+  Context.get_bakers ctxt >>=? fun bakers ->
+  let baker_1 = List.hd bakers in
+  get_first_different_baker_priority baker_1 bakers >>=? fun baker_2_p ->
+  return ((baker_1, 0), baker_2_p)
+
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt >>=? fun endorsers ->
   let endorser_1 = (List.hd endorsers).delegate in
@@ -66,7 +77,6 @@ let valid_double_baking_evidence () =
       let contract = Alpha_context.Contract.implicit_contract priority_0_baker in
       Assert.balance_is ~loc:__LOC__ (B blk) contract ~kind Tez.zero)
     [ Deposit ; Fees ; Rewards ]
-(* TODO : check also that the baker receive half of the bad baker's frozen balance *)
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)
@@ -142,9 +152,23 @@ let different_delegates () =
     | _ -> false end
 
 let wrong_delegate () =
-  (* TODO: change bake and forge_header "policy" so that it can force
-     a baker **and** a priority *)
-  return ()
+  (* Bakes a block with a correct priority and timestamp but
+     signed by an arbitrary baker *)
+  let header_custom_signer baker priority b =
+    Block.Forge.forge_header ~policy:(By_priority priority) b >>=? fun header ->
+    Block.Forge.set_baker baker header |>
+    Block.Forge.sign_header
+  in
+
+  Context.init 2 >>=? fun (b, _) ->
+  get_first_different_bakers_priority (B b) >>=? fun ((baker_1, _), (_, p_2)) ->
+  Block.bake ~policy:(By_account baker_1) b >>=? fun blk_a ->
+  header_custom_signer baker_1 p_2 b >>=? fun header_b ->
+  Op.double_baking (B blk_a) blk_a.header header_b >>=? fun operation ->
+  Block.bake ~operation blk_a >>= fun e ->
+  Assert.proto_error ~loc:__LOC__ e begin function
+    | Baking.Invalid_block_signature _ -> true
+    | _ -> false end
 
 let tests = [
   Test.tztest "valid double baking evidence" `Quick valid_double_baking_evidence ;
@@ -155,4 +179,5 @@ let tests = [
   Test.tztest "too early double baking evidence" `Quick too_early_double_baking_evidence ;
   Test.tztest "too late double baking evidence" `Quick too_late_double_baking_evidence ;
   Test.tztest "different delegates" `Quick different_delegates ;
+  Test.tztest "wrong delegate" `Quick wrong_delegate ;
 ]

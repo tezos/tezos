@@ -71,7 +71,6 @@ let valid_double_endorsement_evidence () =
       let contract = Alpha_context.Contract.implicit_contract delegate in
       Assert.balance_is ~loc:__LOC__ (B blk) contract ~kind Tez.zero)
     [ Deposit ; Fees ; Rewards ]
-(* TODO : check also that the baker receive half of the bad endorser's frozen balance *)
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)
