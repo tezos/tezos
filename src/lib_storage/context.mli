@@ -20,6 +20,7 @@ type context = t
 val init:
   ?patch_context:(context -> context Lwt.t) ->
   ?mapsize:int64 ->
+  ?readonly:bool ->
   string ->
   index Lwt.t
 

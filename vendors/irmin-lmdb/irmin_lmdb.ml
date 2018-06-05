@@ -56,20 +56,29 @@ let int64_of_string s =
   with Failure _ ->
     Error (`Msg (Printf.sprintf "%s is not the representation of an int64" s))
 
+let bool_of_string s =
+  try Ok (bool_of_string s)
+  with Failure _ ->
+    Error (`Msg (Printf.sprintf "%s is not the representation of a boolean" s))
+
 let int64_converter = int64_of_string, Fmt.uint64
+let bool_converter = bool_of_string, Fmt.bool
 
 module Conf = struct
 
   let root = Irmin.Private.Conf.root
   let mapsize =
     Irmin.Private.Conf.key "mapsize" int64_converter 40_960_000_000L
+  let readonly = 
+    Irmin.Private.Conf.key "readonly" bool_converter false 
 
 end
 
 let config
-    ?(config=Irmin.Private.Conf.empty) ?mapsize file =
+    ?(config=Irmin.Private.Conf.empty) ?mapsize ?(readonly=false) file =
   let module C = Irmin.Private.Conf in
   let config = C.add config Conf.root (Some file) in
+  let config = C.add config Conf.readonly readonly in
   Option.value_map mapsize ~default:config ~f:(C.add config Conf.mapsize)
 
 let mem db k =
@@ -613,6 +622,7 @@ module Make
       type config = {
         root   : string option ;
         mapsize : int64 ;
+	readonly : bool ;
         (* TODO *)
         (* ?write_buffer_size:int -> *)
         (* ?max_open_files:int -> *)
@@ -624,13 +634,15 @@ module Make
       let config c =
         let root = Irmin.Private.Conf.get c Conf.root in
         let mapsize = Irmin.Private.Conf.get c Conf.mapsize in
-        { root ; mapsize }
+        let readonly = Irmin.Private.Conf.get c Conf.readonly in
+        { root ; mapsize ; readonly }
 
       let v conf =
-        let { root ; mapsize } = config conf in
+        let { root ; mapsize ; readonly } = config conf in
         let root = match root with None -> "irmin.ldb" | Some root -> root in
         if not (Sys.file_exists root) then Unix.mkdir root 0o755 ;
-        match Lmdb.opendir ~mapsize ~flags:[NoTLS] root 0o644 with
+	let flags = Lmdb.NoTLS :: if readonly then [ Lmdb.RdOnly ] else [] in
+        match Lmdb.opendir ~mapsize ~flags root 0o644 with
         | Error err -> Lwt.fail_with (Lmdb.string_of_error err)
         | Ok db ->
             let db = { db ; root } in

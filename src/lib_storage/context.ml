@@ -202,9 +202,9 @@ let fork_test_chain v ~protocol ~expiration =
 
 (*-- Initialisation ----------------------------------------------------------*)
 
-let init ?patch_context ?mapsize root =
+let init ?patch_context ?mapsize ?readonly root =
   GitStore.Repo.v
-    (Irmin_lmdb.config ?mapsize root) >>= fun repo ->
+    (Irmin_lmdb.config ?mapsize ?readonly root) >>= fun repo ->
   Lwt.return {
     path = root ;
     repo ;

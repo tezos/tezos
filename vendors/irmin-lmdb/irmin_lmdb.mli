@@ -18,6 +18,6 @@
 (** Quick-and-dirty LevelDB backend for Irmin. *)
 
 val config:
-  ?config:Irmin.config -> ?mapsize:int64 -> string -> Irmin.config
+  ?config:Irmin.config -> ?mapsize:int64 -> ?readonly:bool -> string -> Irmin.config
 
 module Make : Irmin.S_MAKER
