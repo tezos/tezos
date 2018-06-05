@@ -20,6 +20,7 @@ cleanup () {
 trap cleanup EXIT INT
 
 "$ci_dir"/create_apk.leveldb.sh
+"$ci_dir"/create_apk.hidapi.sh
 "$ci_dir"/create_binary.opam.sh
 "$ci_dir"/create_opam_repository.tezos_deps.sh
 
@@ -32,6 +33,11 @@ image_version="${2:-alpine-${alpine_version}_ocaml-${ocaml_version}}"
 
 cp -a "$build_dir"/leveldb-$leveldb_version-r0.apk \
       "$build_dir"/leveldb-dev-$leveldb_version-r0.apk \
+      "$build_dir"/keys/ \
+      "$tmp_dir"
+
+cp -a "$build_dir"/hidapi-$hidapi_version-r0.apk \
+      "$build_dir"/hidapi-dev-$hidapi_version-r0.apk \
       "$build_dir"/keys/ \
       "$tmp_dir"
 
@@ -49,6 +55,9 @@ COPY opam-installer /usr/bin/opam-installer
 COPY keys /etc/apk/keys/
 COPY leveldb-$leveldb_version-r0.apk .
 COPY leveldb-dev-$leveldb_version-r0.apk .
+COPY hidapi-$hidapi_version-r0.apk .
+COPY hidapi-dev-$hidapi_version-r0.apk .
+
 
 RUN apk --no-cache add \
         build-base bash perl xz m4 git curl tar rsync patch sudo jq \
@@ -56,7 +65,9 @@ RUN apk --no-cache add \
         pcre-dev zlib-dev \
         snappy snappy-dev \
         leveldb-$leveldb_version-r0.apk \
-        leveldb-dev-$leveldb_version-r0.apk && \
+        leveldb-dev-$leveldb_version-r0.apk \
+        hidapi-$hidapi_version-r0.apk \
+        hidapi-dev-$hidapi_version-r0.apk && \
     adduser -S opam && \
     echo 'opam ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/opam && \
     chmod 440 /etc/sudoers.d/opam && \

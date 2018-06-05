@@ -25,8 +25,13 @@ cleanup () {
 trap cleanup EXIT INT
 
 "$ci_dir"/create_apk.leveldb.sh
+"$ci_dir"/create_apk.hidapi.sh
 
 cp -a "$build_dir"/leveldb-$leveldb_version-r0.apk \
+      "$build_dir"/keys/ \
+      "$tmp_dir"
+
+cp -a "$build_dir"/hidapi-$hidapi_version-r0.apk \
       "$build_dir"/keys/ \
       "$tmp_dir"
 
@@ -53,10 +58,12 @@ LABEL distro_style="apk" distro="alpine" distro_long="alpine-$alpine_version" ar
 
 COPY keys /etc/apk/keys/
 COPY leveldb-$leveldb_version-r0.apk .
+COPY hidapi-$hidapi_version-r0.apk .
 
 RUN apk --no-cache add \
-      libev gmp vim leveldb-1.18-r0.apk && \
-    rm leveldb-$leveldb_version-r0.apk
+      libev gmp vim leveldb-$leveldb_version-r0.apk hidapi-$hidapi_version-r0.apk && \
+    rm leveldb-$leveldb_version-r0.apk && \
+    rm hidapi-$hidapi_version-r0.apk
 
 COPY bin/* /usr/local/bin/
 
