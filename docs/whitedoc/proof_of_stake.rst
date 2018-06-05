@@ -193,14 +193,11 @@ The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 512 XTZ
 per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 64 XTZ per
 endorsement.
 
-Each delegate key has an attached security deposit account controlled by
-the same key. Delegates can withdraw and deposit in this account, but
-they cannot withdraw more than the "frozen" amount. Each blocks created,
-each endorsement signed increases the amount that is frozen.
-
-It is possible to deposit a bond just prior to creating a block
-requiring this deposit. Deposits for blocks and endorsements in cycle
-``n`` are "unfrozen" at the end of cycle ``n+PRESERVED_CYCLES``.
+Each delegate key has an associated security deposit account.
+When a delegate bakes or endorses a block the security deposit is
+automatically moved to the deposit account where it is frozen for
+``PRESERVED_CYCLES`` cycles, after which it is automatically moved
+back to the baker's main account.
 
 Since deposits are locked for a period of ``PRESERVED_CYCLES`` one can
 compute that at any given time, about ((``BLOCK_SECURITY_DEPOSIT`` +
