@@ -46,7 +46,7 @@ type raw_context =
 val pp_raw_context: Format.formatter -> raw_context -> unit
 
 type error +=
-  | Invalid_depth_arg of (string list * int)
+  | Invalid_depth_arg of int
 
 module type PROTO = sig
   val hash: Protocol_hash.t

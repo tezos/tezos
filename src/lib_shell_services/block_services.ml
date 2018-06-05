@@ -126,19 +126,19 @@ let raw_context_encoding =
        ])
 
 type error +=
-  | Invalid_depth_arg of (string list * int)
+  | Invalid_depth_arg of int
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"raw_context.missing_key"
-    ~title:"...FIXME..."
-    ~description:"...FIXME..."
-    ~pp:(fun ppf path ->
-        Format.fprintf ppf "Missing key: %s" (String.concat "/" path))
-    Data_encoding.(obj1 (req "path" (list string)))
-    (function Missing_key path -> Some path | _ -> None)
-    (fun path -> Missing_key path)
+    ~id:"raw_context.invalid_depth"
+    ~title:"Invalid depth argument"
+    ~description:"The raw context extraction depth argument must be positive."
+    ~pp:(fun ppf depth ->
+        Format.fprintf ppf "Extraction depth %d is invalid" depth)
+    Data_encoding.(obj1 (req "depth" int31))
+    (function Invalid_depth_arg depth -> Some depth | _ -> None)
+    (fun depth -> Invalid_depth_arg depth)
 
 module type PROTO = sig
   val hash: Protocol_hash.t
