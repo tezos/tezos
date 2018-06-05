@@ -219,6 +219,7 @@ val disconnect:
 module Connection : sig
 
   val info: ('msg, 'peer_meta,'conn_meta) connection -> 'conn_meta P2p_connection.Info.t
+  val local_metadata: ('msg, 'peer_meta,'conn_meta) connection -> 'conn_meta
   val remote_metadata: ('msg, 'peer_meta,'conn_meta) connection -> 'conn_meta
 
   val stat:  ('msg, 'peer_meta,'conn_meta) connection -> P2p_stat.t

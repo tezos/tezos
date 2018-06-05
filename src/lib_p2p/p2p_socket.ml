@@ -285,6 +285,7 @@ let authenticate
       versions = msg.versions ; incoming ;
       id_point ; remote_socket_port ;
       private_node = metadata_config.private_node remote_metadata ;
+      local_metadata ;
       remote_metadata ;
     } in
   return (info, { fd ; info ; cryptobox_data })
@@ -523,6 +524,7 @@ let equal { conn = { id = id1 } } { conn = { id = id2 } } = id1 = id2
 
 let pp ppf { conn } = P2p_connection.Info.pp (fun _ _ -> ()) ppf conn.info
 let info { conn } = conn.info
+let local_metadata { conn } = conn.info.local_metadata
 let remote_metadata { conn } = conn.info.remote_metadata
 let private_node { conn } = conn.info.private_node
 

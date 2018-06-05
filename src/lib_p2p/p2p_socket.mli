@@ -39,6 +39,7 @@ val equal: ('mst, 'meta) t -> ('msg, 'meta) t -> bool
 
 val pp: Format.formatter -> ('msg, 'meta) t -> unit
 val info: ('msg, 'meta) t -> 'meta P2p_connection.Info.t
+val local_metadata: ('msg, 'meta) t -> 'meta
 val remote_metadata: ('msg, 'meta) t -> 'meta
 val private_node: ('msg, 'meta) t -> bool
 

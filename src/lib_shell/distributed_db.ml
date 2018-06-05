@@ -305,7 +305,6 @@ type db = {
   protocol_db: Raw_protocol.t ;
   block_input: (Block_hash.t * Block_header.t) Lwt_watcher.input ;
   operation_input: (Operation_hash.t * Operation.t) Lwt_watcher.input ;
-  connection_metadata_value: (P2p_peer.Id.t -> Connection_metadata.t)
 }
 
 and chain_db = {
@@ -518,7 +517,7 @@ module P2p_reader = struct
         let head = Block_header.hash header in
         State.Block.known_invalid chain_db.chain_state head >>= fun known_invalid ->
         let { Connection_metadata.disable_mempool } =
-          chain_db.global_db.connection_metadata_value state.gid in
+          P2p.connection_local_metadata chain_db.global_db.p2p state.conn in
         let known_invalid =
           known_invalid ||
           (disable_mempool && mempool <> Mempool.empty)
@@ -708,7 +707,7 @@ let raw_try_send p2p peer_id msg =
   | Some conn -> ignore (P2p.try_send p2p conn msg : bool)
 
 
-let create disk p2p connection_metadata_value =
+let create disk p2p =
   let global_request =
     { data = () ;
       active = active_peer_ids p2p ;
@@ -723,7 +722,7 @@ let create disk p2p connection_metadata_value =
     { p2p ; p2p_readers ; disk ;
       active_chains ; protocol_db ;
       block_input ; operation_input ;
-      connection_metadata_value } in
+    } in
   P2p.on_new_connection p2p (P2p_reader.run db) ;
   P2p.iter_connections p2p (P2p_reader.run db) ;
   db

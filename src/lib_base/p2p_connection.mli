@@ -38,6 +38,7 @@ module Info : sig
     remote_socket_port : P2p_addr.port;
     versions : P2p_version.t list ;
     private_node : bool ;
+    local_metadata : 'meta ;
     remote_metadata : 'meta ;
   }
 

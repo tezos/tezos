@@ -596,6 +596,9 @@ module Connection = struct
   let info { conn } =
     P2p_socket.info conn
 
+  let local_metadata { conn } =
+    P2p_socket.local_metadata conn
+
   let remote_metadata { conn } =
     P2p_socket.remote_metadata conn
 

@@ -84,7 +84,6 @@ let init_connection_metadata opt =
   | None ->
       { disable_mempool = false ;
         private_node = false }
-
   | Some c ->
       { disable_mempool = c.P2p.disable_mempool ;
         private_node = c.P2p.private_mode }
@@ -93,10 +92,8 @@ let init_p2p p2p_params =
   match p2p_params with
   | None ->
       let c_meta = init_connection_metadata None in
-      let conn_metadata_cfg = connection_metadata_cfg c_meta in
       lwt_log_notice "P2P layer is disabled" >>= fun () ->
-      return
-        (P2p.faked_network peer_metadata_cfg c_meta, conn_metadata_cfg)
+      return (P2p.faked_network peer_metadata_cfg c_meta)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
@@ -107,7 +104,7 @@ let init_p2p p2p_params =
         conn_metadata_cfg
         Distributed_db_message.cfg >>=? fun p2p ->
       Lwt.async (fun () -> P2p.maintain p2p) ;
-      return (p2p, conn_metadata_cfg)
+      return p2p
 
 type config = {
   genesis: State.Chain.genesis ;
@@ -159,11 +156,10 @@ let create { genesis ; store_root ; context_root ;
     match p2p_params with
     | Some (config, _limits) -> not config.P2p.disable_mempool
     | None -> true in
-  init_p2p p2p_params >>=? fun (p2p, conn_metadata_cfg) ->
+  init_p2p p2p_params >>=? fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context genesis >>=? fun (state, mainchain_state) ->
-  let distributed_db =
-    Distributed_db.create state p2p conn_metadata_cfg.conn_meta_value in
+  let distributed_db = Distributed_db.create state p2p in
   Validator.create state distributed_db
     peer_validator_limits
     block_validator_limits

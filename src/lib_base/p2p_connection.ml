@@ -60,6 +60,7 @@ module Info = struct
     remote_socket_port : P2p_addr.port ;
     versions : P2p_version.t list ;
     private_node : bool ;
+    local_metadata : 'meta ;
     remote_metadata : 'meta ;
   }
 
@@ -67,25 +68,27 @@ module Info = struct
     let open Data_encoding in
     conv
       (fun { incoming ; peer_id ; id_point ; remote_socket_port ;
-             versions ; private_node ; remote_metadata } ->
+             versions ; private_node ; local_metadata ; remote_metadata } ->
         (incoming, peer_id, id_point, remote_socket_port,
-         versions, private_node, remote_metadata))
+         versions, private_node, local_metadata, remote_metadata))
       (fun (incoming, peer_id, id_point, remote_socket_port,
-            versions, private_node, remote_metadata) ->
+            versions, private_node, local_metadata, remote_metadata) ->
         { incoming ; peer_id ; id_point ; remote_socket_port ;
-          versions ; private_node ; remote_metadata })
-      (obj7
+          versions ; private_node ; local_metadata ; remote_metadata })
+      (obj8
          (req "incoming" bool)
          (req "peer_id" P2p_peer_id.encoding)
          (req "id_point" Id.encoding)
          (req "remote_socket_port" uint16)
          (req "versions" (list P2p_version.encoding))
          (req "private" bool)
+         (req "local_metadata" metadata_encoding)
          (req "remote_metadata" metadata_encoding))
 
   let pp pp_meta ppf
       { incoming ; id_point = (remote_addr, remote_port) ;
-        remote_socket_port ; peer_id ; versions ; private_node ; remote_metadata } =
+        remote_socket_port ; peer_id ; versions ; private_node ;
+        local_metadata = _ ; remote_metadata } =
     let version = List.hd versions in
     let point = match remote_port with
       | None -> remote_addr, remote_socket_port
