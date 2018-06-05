@@ -12,7 +12,9 @@ depends: [
   "tezos-base"
   "tezos-protocol-compiler"
   "alcotest-lwt" { test }
+  "tezos-stdlib-unix" { test }
   "tezos-protocol-environment" { test }
+  "bip39" { test }
 ]
 build: [
   [ "rm" "jbuild" "src/jbuild" ]
