@@ -53,8 +53,13 @@ let rec pp fmt = function
 let encoding =
   let open Data_encoding in
   def "fitness"
-    ~title: "Fitness"
-    ~description: "... FIXME ..." @@
+    ~title: "Block fitness"
+    ~description:
+      "The fitness, or score, of a block, that allow the Tezos to \
+       decide which chain is the best. A fitness value is a list of \
+       byte sequences. They are compared as follows: shortest lists \
+       are smaller; lists of the same length are compared according to \
+       the lexicographical order." @@
   splitted
     ~json: (list bytes)
     ~binary:

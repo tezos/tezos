@@ -15,7 +15,12 @@ module S = struct
 
   let bootstrapped =
     RPC_service.get_service
-      ~description:""
+      ~description:
+        "Wait for the node to have synchronized its chain with a few \
+         peers (configured by the node's administrator), streaming \
+         head updates that happen during the bootstrapping process, \
+         and closing the stream at the end. If the node was already \
+         bootstrapped, returns the current head immediately."
       ~query: RPC_query.empty
       ~output: (obj2
                   (req "block" Block_hash.encoding)
@@ -39,7 +44,9 @@ module S = struct
 
   let valid_blocks =
     RPC_service.get_service
-      ~description:""
+      ~description:"Monitor all blocks that are succesfully validated \
+                    by the node, disregarding whether they were \
+                    selected as the new head or not."
       ~query: valid_blocks_query
       ~output: (obj2
                   (req "chain_id" Chain_id.encoding)
@@ -57,14 +64,17 @@ module S = struct
 
   let heads =
     RPC_service.get_service
-      ~description:""
+      ~description:"Monitor all blocks that are succesfully validated \
+                    by the node and selected as the new head of the \
+                    given chain."
       ~query: heads_query
       ~output: Block_hash.encoding
       RPC_path.(path / "heads" /: Chain_services.chain_arg)
 
   let protocols =
     RPC_service.get_service
-      ~description:"...FIXME..."
+      ~description:"Monitor all economic protocols that are retrieved \
+                    and succesfully loaded and compiled by the node."
       ~query: RPC_query.empty
       ~output: Protocol_hash.encoding
       RPC_path.(path / "protocols")

@@ -392,7 +392,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
       let list_arg =
         let name = "list_offset" in
         let descr =
-          "..." in
+          "Index `n` of the requested validation pass." in
         let construct = string_of_int in
         let destruct s =
           try Ok (int_of_string s)
@@ -402,7 +402,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
       let offset_arg =
         let name = "operation_offset" in
         let descr =
-          "..." in
+          "Index `m` of the requested operation in its validation pass." in
         let construct = string_of_int in
         let destruct s =
           try Ok (int_of_string s)
