@@ -25,16 +25,17 @@ let wait_for_operation_inclusion
 
   (* Fetch _all_ the 'unknown' predecessors af a block. *)
 
-  let fetch_predecessors (block, _) =
-    let rec loop acc block =
-      Block_services.Empty.Header.shell_header
-        ctxt ~chain ~block:(`Hash (block, 0)) () >>=? fun { predecessor } ->
+  let fetch_predecessors (hash, header) =
+    let rec loop acc (_hash, header) =
+      let predecessor = header.Block_header.predecessor in
       if Block_hash.Table.mem blocks predecessor then
         return acc
       else
-        loop (predecessor :: acc) predecessor
-    in
-    loop [block] block >>= function
+        Chain_services.Blocks.Header.shell_header
+          ctxt ~chain ~block:(`Hash (predecessor, 0)) () >>=? fun shell ->
+        let block = (predecessor, shell) in
+        loop (block :: acc) block in
+    loop [hash, header.Block_header.shell] (hash, header.shell) >>= function
     | Ok blocks -> Lwt.return blocks
     | Error err ->
         ctxt#warning
@@ -46,10 +47,9 @@ let wait_for_operation_inclusion
   (* Check whether a block as enough confirmations. This function
      assumes that the block predecessor has been processed already. *)
 
-  let process block =
-    Shell_services.Blocks.hash ctxt ~chain ~block () >>=? fun hash ->
-    Shell_services.Blocks.Header.shell_header
-      ctxt ~chain ~block () >>=? fun { predecessor } ->
+  let process hash header =
+    let block = `Hash (hash, 0) in
+    let predecessor = header.Tezos_base.Block_header.predecessor in
     match Block_hash.Table.find blocks predecessor with
     | Some (block_with_op, n) ->
         ctxt#answer
@@ -96,7 +96,11 @@ let wait_for_operation_inclusion
   | Some (head, _) ->
       let rec loop n =
         if n >= 0 then
-          process (`Hash (head, n)) >>=? function
+          let block = `Hash (head, n) in
+          Shell_services.Blocks.hash ctxt ~chain ~block () >>=? fun hash ->
+          Shell_services.Blocks.Header.shell_header ctxt
+            ~chain ~block () >>=? fun shell ->
+          process hash shell >>=? function
           | Some block ->
               stop () ;
               return block
@@ -108,8 +112,8 @@ let wait_for_operation_inclusion
             (fun () ->
                let stream = Lwt_stream.map_list_s fetch_predecessors stream in
                Lwt_stream.find_s
-                 (fun block ->
-                    process (`Hash (block, 0)) >>= function
+                 (fun (hash, header) ->
+                    process hash header >>= function
                     | Ok None -> Lwt.return false
                     | Ok (Some _) -> Lwt.return true
                     | Error err ->
@@ -119,7 +123,7 @@ let wait_for_operation_inclusion
               | exn -> Lwt.fail exn) >>=? function
           | None ->
               failwith "..."
-          | Some hash ->
+          | Some (hash, _) ->
               stop () ;
               match Block_hash.Table.find_opt blocks hash with
               | None | Some None -> assert false
