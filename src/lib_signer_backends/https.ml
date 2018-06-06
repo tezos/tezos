@@ -23,14 +23,14 @@ let parse uri =
   (* extract `tz1..` from the last component of the path *)
   assert (Uri.scheme uri = Some scheme) ;
   let path = Uri.path uri in
-  let base, pkh =
-    match String.rindex_opt path '/' with
+  begin match String.rindex_opt path '/' with
     | None ->
-        Uri.with_path uri "", path
+        failwith "Invalid locator %a" Uri.pp_hum uri
     | Some i ->
-        let pkh = String.sub path i (String.length path - i) in
+        let pkh = String.sub path (i + 1) (String.length path - i - 1) in
         let path = String.sub path 0 i in
-        Uri.with_path uri path, pkh in
+        return (Uri.with_path uri path, pkh)
+  end >>=? fun (base, pkh) ->
   Lwt.return (Signature.Public_key_hash.of_b58check pkh) >>=? fun pkh ->
   return (base, pkh)
 
