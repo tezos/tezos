@@ -245,29 +245,17 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           "@[<v 0>Storage limit exceeded during typechecking or execution.@,Try again with a higher storage limit.@]" ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
+    | [ Alpha_environment.Ecoproto_error (Script_interpreter.Bad_contract_parameter c) ] ->
+        Format.fprintf ppf
+          "@[<v 0>Account %a is not a smart contract, it does not take arguments.@,\
+           The `-arg' flag should not be used when transferring to an account.@]"
+          Contract.pp c
     | Alpha_environment.Ecoproto_error err :: rest ->
         begin match err with
-          | Apply.Bad_contract_parameter (c, None, _) ->
+          | Script_interpreter.Bad_contract_parameter c ->
               Format.fprintf ppf
-                "@[<v 0>Account %a is not a smart contract, it does not take arguments.@,\
-                 The `-arg' flag cannot be used when transferring to an account.@]"
+                "Invalid argument passed to contract %a."
                 Contract.pp c
-          | Apply.Bad_contract_parameter (c, Some expected, None) ->
-              Format.fprintf ppf
-                "@[<v 0>Contract %a expected an argument of type@,  %a@,but no argument was provided.@,\
-                 The `-arg' flag can be used when transferring to a smart contract.@]"
-                Contract.pp c
-                print_expr expected
-          | Apply.Bad_contract_parameter (c, Some expected, Some argument) ->
-              let argument =
-                Option.unopt_exn
-                  (Failure "ill-serialized argument")
-                  (Data_encoding.force_decode argument) in
-              Format.fprintf ppf
-                "@[<v 0>Contract %a expected an argument of type@,  %a@,but received@,  %a@]"
-                Contract.pp c
-                print_expr expected
-                print_expr argument
           | Invalid_arity (loc, name, exp, got) ->
               Format.fprintf ppf
                 "%aprimitive %s expects %d arguments but is given %d."

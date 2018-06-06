@@ -12,6 +12,7 @@ open Alpha_context
 type error += Overflow of Script.location
 type error += Reject of Script.location
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
+type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
 type execution_result =
   { ctxt : context ;

@@ -14,7 +14,6 @@ open Alpha_context
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
 type error += Duplicate_endorsement of int (* `Branch *)
-type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.lazy_expr option (* `Permanent *)
 type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
 type error += Internal_operation_replay of packed_internal_operation
@@ -69,20 +68,6 @@ let () =
                      (req "provided" Voting_period.encoding))
     (function Wrong_voting_period (e, p) -> Some (e, p) | _ -> None)
     (fun (e, p) -> Wrong_voting_period (e, p));
-  register_error_kind
-    `Permanent
-    ~id:"badContractParameter"
-    ~title:"Contract supplied an invalid parameter"
-    ~description:"Either no parameter was supplied to a contract, \
-                  a parameter was passed to an account, \
-                  or a parameter was supplied of the wrong type"
-    Data_encoding.(obj3
-                     (req "contract" Contract.encoding)
-                     (opt "expectedType" Script.expr_encoding)
-                     (opt "providedArgument" Script.lazy_expr_encoding))
-    (function Bad_contract_parameter (c, expected, supplied) ->
-       Some (c, expected, supplied) | _ -> None)
-    (fun (c, expected, supplied) -> Bad_contract_parameter (c, expected, supplied)) ;
   register_error_kind
     `Branch
     ~id:"operation.duplicate_endorsement"
@@ -357,7 +342,7 @@ let apply_manager_operation_content :
                 match Micheline.root arg with
                 | Prim (_, D_Unit, [], _) ->
                     return ()
-                | _ -> fail (Bad_contract_parameter (destination, None, parameters))
+                | _ -> fail (Script_interpreter.Bad_contract_parameter destination)
           end >>=? fun () ->
             let result =
               Transaction_result
@@ -371,19 +356,13 @@ let apply_manager_operation_content :
                   storage_size_diff = 0L } in
             return (ctxt, result, [])
         | Some script ->
-            Lwt.return (Script.force_decode script.code) >>=? fun code ->
-            Lwt.return @@ Script_ir_translator.parse_toplevel code >>=? fun (arg_type, _, _) ->
-            let arg_type = Micheline.strip_locations arg_type in
-            begin match parameters, Micheline.root arg_type with
-              | None, Prim (_, T_unit, _, _) ->
-                  return (ctxt, (Micheline.strip_locations (Prim (0, Script.D_Unit, [], None))))
-              | Some parameters, _ ->
+            begin match parameters with
+              | None ->
+                  let unit = Micheline.strip_locations (Prim (0, Script.D_Unit, [], None)) in
+                  return (ctxt, unit)
+              | Some parameters ->
                   Lwt.return (Script.force_decode parameters) >>=? fun arg ->
-                  trace
-                    (Bad_contract_parameter (destination, Some arg_type, Some parameters))
-                    (Script_ir_translator.typecheck_data ctxt (arg, arg_type)) >>=? fun ctxt ->
                   return (ctxt, arg)
-              | None, _ -> fail (Bad_contract_parameter (destination, Some arg_type, None))
             end >>=? fun (ctxt, parameter) ->
             Script_interpreter.execute
               ctxt mode

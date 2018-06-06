@@ -17,6 +17,7 @@ open Script_ir_translator
 type error += Reject of Script.location
 type error += Overflow of Script.location
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
+type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
 let () =
   let open Data_encoding in
@@ -52,7 +53,19 @@ let () =
           Some (contract, expr)
       | _ -> None)
     (fun (contract, expr) ->
-       Runtime_contract_error (contract, expr))
+       Runtime_contract_error (contract, expr)) ;
+  (* Bad contract parameter *)
+  register_error_kind
+    `Permanent
+    ~id:"badContractParameter"
+    ~title:"Contract supplied an invalid parameter"
+    ~description:"Either no parameter was supplied to a contract with \
+                  a non-unit parameter type, a non-unit parameter was \
+                  passed to an account, or a parameter was supplied of \
+                  the wrong type"
+    Data_encoding.(obj1 (req "contract" Contract.encoding))
+    (function Bad_contract_parameter c -> Some c | _ -> None)
+    (fun c -> Bad_contract_parameter c)
 
 (* ---- interpreter ---------------------------------------------------------*)
 
@@ -697,7 +710,9 @@ and execute ?log ctxt mode ~source ~payer ~self script amount arg :
    Script_typed_ir.ex_big_map option) tzresult Lwt.t =
   parse_script ctxt script
   >>=? fun ((Ex_script { code ; arg_type ; storage ; storage_type }), ctxt) ->
-  parse_data ctxt arg_type arg >>=? fun (arg, ctxt) ->
+  trace
+    (Bad_contract_parameter self)
+    (parse_data ctxt arg_type arg) >>=? fun (arg, ctxt) ->
   Lwt.return (Script.force_decode script.code) >>=? fun script_code ->
   trace
     (Runtime_contract_error (self, script_code))
