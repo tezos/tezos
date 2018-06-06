@@ -144,7 +144,7 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
 
 type state = {
   delegates: public_key_hash list ;
-  delay: int64;
+  delay: int64 ;
   mutable to_endorse : endorsement option
 }
 and endorsement = {
@@ -155,16 +155,7 @@ and endorsement = {
 }
 
 let create_state delegates delay =
-  { delegates ;
-    delay ;
-    to_endorse = None ;
-  }
-
-let rec insert ({time} as e) = function
-  | [] -> [e]
-  | ({time = time'} :: _) as l when Time.compare time time' < 0 ->
-      e :: l
-  | e' :: l -> e' :: insert e l
+  { delegates ; delay ; to_endorse=None }
 
 let get_delegates cctxt state =
   match state.delegates with
@@ -231,7 +222,6 @@ let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:Time.t) state bis
               lwt_log_info "Ignore block %a: forged too far the past"
                 Block_hash.pp_short bi.hash >>= return
             else
-
               let time = Time.(add (now ()) state.delay) in
               may_endorse bi delegate time
          ) bis
@@ -256,6 +246,26 @@ let check_error f =
         pp_print_error
         errs >>= fun () ->
       Lwt.return_unit
+
+let compute_timeout state =
+  match state.to_endorse with
+  | None -> Lwt_utils.never_ending
+  | Some {time} ->
+      let delay = (Time.diff time (Time.now ())) in
+      if delay <= 0L then
+        Lwt.return_unit
+      else
+        Lwt_unix.sleep (Int64.to_float delay)
+
+let check_error f =
+  f >>= function
+  | Ok () -> Lwt.return_unit
+  | Error errs ->
+      lwt_log_error "Error while endorsing:@\n%a"
+        pp_print_error
+        errs >>= fun () ->
+      Lwt.return_unit
+
 
 let create (cctxt : #Proto_alpha.full) ?(max_past=(Time.of_seconds 110L)) ~delay contracts block_stream =
   lwt_log_info "Starting endorsement daemon" >>= fun () ->
