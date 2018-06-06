@@ -154,6 +154,10 @@ let consume_gas ctxt cost =
   ok { ctxt with block_gas ; operation_gas }
 let gas_level ctxt = ctxt.operation_gas
 let block_gas_level ctxt = ctxt.block_gas
+let gas_consumed ~since ~until =
+  match gas_level since, gas_level until with
+  | Limited { remaining = before }, Limited { remaining = after } -> Z.sub before after
+  | _, _ -> Z.zero
 
 type error += Storage_limit_too_high (* `Permanent *)
 

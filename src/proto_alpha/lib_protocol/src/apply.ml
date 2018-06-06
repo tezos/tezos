@@ -328,22 +328,6 @@ let () =
 
 open Apply_operation_result
 
-let gas_difference ctxt_before ctxt_after =
-  match Gas.level ctxt_before, Gas.level ctxt_after with
-  | Limited { remaining = before }, Limited { remaining = after } -> Z.sub before after
-  | _ -> Z.zero
-
-let new_contracts ctxt_before ctxt_after =
-  Contract.originated_from_current_nonce ctxt_before >>=? fun before ->
-  Contract.originated_from_current_nonce ctxt_after >>=? fun after ->
-  return (List.filter (fun c -> not (List.exists (Contract.equal c) before)) after)
-
-let cleanup_balance_updates balance_updates =
-  List.filter
-    (fun (_, (Credited update | Debited update)) ->
-       not (Tez.equal update Tez.zero))
-    balance_updates
-
 let apply_manager_operation_content :
   type kind.
   ( Alpha_context.t -> Script_ir_translator.unparsing_mode -> payer:Contract.t -> source:Contract.t ->
@@ -383,7 +367,7 @@ let apply_manager_operation_content :
                       [ Contract source, Debited amount ;
                         Contract destination, Credited amount ] ;
                   originated_contracts = [] ;
-                  consumed_gas = gas_difference before_operation ctxt ;
+                  consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
                   storage_size_diff = 0L } in
             return (ctxt, result, [])
         | Some script ->
@@ -410,7 +394,9 @@ let apply_manager_operation_content :
               ctxt destination storage big_map_diff >>=? fun ctxt ->
             Fees.update_script_storage
               ctxt ~payer destination >>=? fun (ctxt, new_size, fees) ->
-            new_contracts before_operation ctxt >>=? fun originated_contracts ->
+            Contract.originated_from_current_nonce
+              ~since: before_operation
+              ~until: ctxt >>=? fun originated_contracts ->
             let result =
               Transaction_result
                 { storage = Some storage ;
@@ -420,7 +406,7 @@ let apply_manager_operation_content :
                         Contract source, Debited amount ;
                         Contract destination, Credited amount ] ;
                   originated_contracts ;
-                  consumed_gas = gas_difference before_operation ctxt ;
+                  consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
                   storage_size_diff = Int64.sub new_size old_size } in
             return (ctxt, result, operations)
       end
@@ -451,7 +437,7 @@ let apply_manager_operation_content :
                     Contract source, Debited credit ;
                     Contract contract, Credited credit ] ;
               originated_contracts = [ contract ] ;
-              consumed_gas = gas_difference before_operation ctxt ;
+              consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
               storage_size_diff = size } in
         return (ctxt, result, [])
     | Delegation delegate ->
@@ -855,46 +841,3 @@ let finalize_application ctxt protocol_data delegate =
   may_start_new_cycle ctxt >>=? fun ctxt ->
   Amendment.may_start_new_voting_cycle ctxt >>=? fun ctxt ->
   return ctxt
-
-let compare_operations op1 op2 =
-  let Operation_data op1 = op1.protocol_data in
-  let Operation_data op2 = op2.protocol_data in
-  match op1.contents, op2.contents with
-  | Single (Endorsements _), Single (Endorsements _) -> 0
-  | _, Single (Endorsements _) -> 1
-  | Single (Endorsements _), _ -> -1
-
-  | Single (Seed_nonce_revelation _), Single (Seed_nonce_revelation _) -> 0
-  | _, Single (Seed_nonce_revelation _) -> 1
-  | Single (Seed_nonce_revelation _), _ -> -1
-
-  | Single (Double_endorsement_evidence _), Single (Double_endorsement_evidence _) -> 0
-  | _, Single (Double_endorsement_evidence _) -> 1
-  | Single (Double_endorsement_evidence _), _ -> -1
-
-  | Single (Double_baking_evidence _), Single (Double_baking_evidence _) -> 0
-  | _, Single (Double_baking_evidence _) -> 1
-  | Single (Double_baking_evidence _), _ -> -1
-
-  | Single (Activate_account _), Single (Activate_account _) -> 0
-  | _, Single (Activate_account _) -> 1
-  | Single (Activate_account _), _ -> -1
-
-  | Single (Proposals _), Single (Proposals _) -> 0
-  | _, Single (Proposals _) -> 1
-  | Single (Proposals _), _ -> -1
-
-  | Single (Ballot _), Single (Ballot _) -> 0
-  | _, Single (Ballot _) -> 1
-  | Single (Ballot _), _ -> -1
-
-  (* Manager operations with smaller counter are pre-validated first. *)
-  | Single (Manager_operation op1), Single (Manager_operation op2) ->
-      Int32.compare op1.counter op2.counter
-  | Cons (Manager_operation op1, _), Single (Manager_operation op2) ->
-      Int32.compare op1.counter op2.counter
-  | Single (Manager_operation op1), Cons (Manager_operation op2, _) ->
-      Int32.compare op1.counter op2.counter
-  | Cons (Manager_operation op1, _), Cons (Manager_operation op2, _) ->
-      Int32.compare op1.counter op2.counter
-

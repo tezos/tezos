@@ -140,6 +140,7 @@ module Gas : sig
   val set_unlimited: context -> context
   val consume: context -> cost -> context tzresult
   val level: context -> t
+  val consumed: since: context -> until: context -> Z.t
   val block_level: context -> Z.t
 end
 
@@ -526,7 +527,7 @@ module Contract : sig
   val init_origination_nonce: context -> Operation_hash.t -> context
   val unset_origination_nonce: context -> context
   val fresh_contract_from_current_nonce : context -> (context * t) tzresult Lwt.t
-  val originated_from_current_nonce: context -> contract list tzresult Lwt.t
+  val originated_from_current_nonce: since: context -> until:context -> contract list tzresult Lwt.t
 
   type big_map_diff = (string * Script.expr option) list
 

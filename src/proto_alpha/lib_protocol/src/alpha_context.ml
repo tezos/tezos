@@ -73,6 +73,7 @@ module Gas = struct
   let set_unlimited = Raw_context.set_gas_unlimited
   let consume = Raw_context.consume_gas
   let level = Raw_context.gas_level
+  let consumed = Raw_context.gas_consumed
   let block_level = Raw_context.block_gas_level
 end
 module Level = struct

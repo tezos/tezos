@@ -31,7 +31,7 @@ type origination_nonce
 
 val originated_contract : origination_nonce -> contract
 
-val originated_contracts : origination_nonce -> contract list
+val originated_contracts : since: origination_nonce -> until: origination_nonce -> contract list
 
 val initial_origination_nonce : Operation_hash.t -> origination_nonce
 

@@ -120,16 +120,19 @@ let originated_contract nonce =
     Data_encoding.Binary.to_bytes_exn origination_nonce_encoding nonce in
   Originated (Contract_hash.hash_bytes [data])
 
-let originated_contracts ({ origination_index } as origination_nonce) =
+let originated_contracts
+    ~since: { origination_index = first ; operation_hash = first_hash }
+    ~until: ({ origination_index = last ; operation_hash = last_hash } as origination_nonce) =
+  assert (Operation_hash.equal first_hash last_hash) ;
   let rec contracts acc origination_index =
-    if Compare.Int32.(origination_index < 0l) then
+    if Compare.Int32.(origination_index < first) then
       acc
     else
       let origination_nonce =
         { origination_nonce with origination_index } in
       let acc = originated_contract origination_nonce :: acc in
       contracts acc (Int32.pred origination_index) in
-  contracts [] (Int32.pred origination_index)
+  contracts [] (Int32.pred last)
 
 let initial_origination_nonce operation_hash =
   { operation_hash ; origination_index = 0l }

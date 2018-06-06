@@ -29,6 +29,9 @@ type balance_update =
 (** A list of balance updates. Duplicates may happen. *)
 type balance_updates = (balance * balance_update) list
 
+(** Remove zero-valued balances from a list of updates. *)
+val cleanup_balance_updates : balance_updates -> balance_updates
+
 (** Result of applying a {!Operation.t}. Follows the same structure. *)
 type 'kind operation_metadata = {
   contents: 'kind contents_result_list ;

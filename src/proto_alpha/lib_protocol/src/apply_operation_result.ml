@@ -95,6 +95,12 @@ let balance_update_encoding =
 
 type balance_updates = (balance * balance_update) list
 
+let cleanup_balance_updates balance_updates =
+  List.filter
+    (fun (_, (Credited update | Debited update)) ->
+       not (Tez.equal update Tez.zero))
+    balance_updates
+
 let balance_updates_encoding =
   def "operation_metadata.alpha.balance_updates" @@
   list (merge_objs balance_encoding balance_update_encoding)

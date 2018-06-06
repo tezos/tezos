@@ -174,7 +174,48 @@ let finalize_block { mode ; ctxt ; op_count } =
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
       return (ctxt, { Alpha_context.Block_header.baker ; level ; voting_period_kind })
 
-let compare_operations = Apply.compare_operations
+let compare_operations op1 op2 =
+  let open Alpha_context in
+  let Operation_data op1 = op1.protocol_data in
+  let Operation_data op2 = op2.protocol_data in
+  match op1.contents, op2.contents with
+  | Single (Endorsements _), Single (Endorsements _) -> 0
+  | _, Single (Endorsements _) -> 1
+  | Single (Endorsements _), _ -> -1
+
+  | Single (Seed_nonce_revelation _), Single (Seed_nonce_revelation _) -> 0
+  | _, Single (Seed_nonce_revelation _) -> 1
+  | Single (Seed_nonce_revelation _), _ -> -1
+
+  | Single (Double_endorsement_evidence _), Single (Double_endorsement_evidence _) -> 0
+  | _, Single (Double_endorsement_evidence _) -> 1
+  | Single (Double_endorsement_evidence _), _ -> -1
+
+  | Single (Double_baking_evidence _), Single (Double_baking_evidence _) -> 0
+  | _, Single (Double_baking_evidence _) -> 1
+  | Single (Double_baking_evidence _), _ -> -1
+
+  | Single (Activate_account _), Single (Activate_account _) -> 0
+  | _, Single (Activate_account _) -> 1
+  | Single (Activate_account _), _ -> -1
+
+  | Single (Proposals _), Single (Proposals _) -> 0
+  | _, Single (Proposals _) -> 1
+  | Single (Proposals _), _ -> -1
+
+  | Single (Ballot _), Single (Ballot _) -> 0
+  | _, Single (Ballot _) -> 1
+  | Single (Ballot _), _ -> -1
+
+  (* Manager operations with smaller counter are pre-validated first. *)
+  | Single (Manager_operation op1), Single (Manager_operation op2) ->
+      Int32.compare op1.counter op2.counter
+  | Cons (Manager_operation op1, _), Single (Manager_operation op2) ->
+      Int32.compare op1.counter op2.counter
+  | Single (Manager_operation op1), Cons (Manager_operation op2, _) ->
+      Int32.compare op1.counter op2.counter
+  | Cons (Manager_operation op1, _), Cons (Manager_operation op2, _) ->
+      Int32.compare op1.counter op2.counter
 
 let init ctxt block_header =
   let level = block_header.Block_header.level in
