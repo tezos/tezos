@@ -337,6 +337,13 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
         ~output: block_header_encoding
         RPC_path.(path / "header")
 
+    let raw_header =
+      RPC_service.get_service
+        ~description:"The whole block header (unparsed)."
+        ~query: RPC_query.empty
+        ~output: bytes
+        RPC_path.(path / "header" / "raw")
+
     let metadata =
       RPC_service.get_service
         ~description:"All the metadata associated to the block."
@@ -374,6 +381,13 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
                   (obj1 (req "protocol" (constant protocol_hash)))
                   Proto.block_header_data_encoding))
           RPC_path.(path / "protocol_data")
+
+      let raw_protocol_data =
+        RPC_service.get_service
+          ~description:"The version-specific fragment of the block header (unparsed)."
+          ~query: RPC_query.empty
+          ~output: bytes
+          RPC_path.(path / "protocol_data" / "raw")
 
     end
 
@@ -611,6 +625,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
     fun ?(chain = `Main) ?(block = `Head 0) () ->
       f chain block () ()
 
+  let raw_header ctxt =
+    let f = make_call0 S.raw_header ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
+
   let metadata ctxt =
     let f = make_call0 S.metadata ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () ->
@@ -631,6 +650,10 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
         f chain block () ()
     let protocol_data ctxt =
       let f = make_call0 S.protocol_data ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) () ->
+        f chain block () ()
+    let raw_protocol_data ctxt =
+      let f = make_call0 S.raw_protocol_data ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) () ->
         f chain block () ()
 

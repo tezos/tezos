@@ -119,6 +119,10 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
     #simple -> ?chain:chain -> ?block:block ->
     unit -> Block_hash.t tzresult Lwt.t
 
+  val raw_header:
+    #simple -> ?chain:chain -> ?block:block ->
+    unit -> MBytes.t tzresult Lwt.t
+
   val header:
     #simple -> ?chain:chain -> ?block:block ->
     unit -> block_header tzresult Lwt.t
@@ -135,6 +139,9 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
     val protocol_data:
       #simple -> ?chain:chain -> ?block:block ->
       unit -> Proto.block_header_data tzresult Lwt.t
+    val raw_protocol_data:
+      #simple -> ?chain:chain -> ?block:block ->
+      unit -> MBytes.t tzresult Lwt.t
 
   end
 
@@ -228,6 +235,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
        prefix, unit, unit,
        block_header) RPC_service.t
 
+    val raw_header:
+      ([ `GET ], prefix,
+       prefix, unit, unit,
+       MBytes.t) RPC_service.t
+
     val metadata:
       ([ `GET ], prefix,
        prefix, unit, unit,
@@ -244,6 +256,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
         ([ `GET ], prefix,
          prefix, unit, unit,
          Proto.block_header_data) RPC_service.t
+
+      val raw_protocol_data:
+        ([ `GET ], prefix,
+         prefix, unit, unit,
+         MBytes.t) RPC_service.t
 
     end
 

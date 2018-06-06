@@ -67,6 +67,10 @@ let build_raw_rpc_directory
     return { Block_services.hash ; chain_id ;
              shell = header.shell ; protocol_data }
   end ;
+  register0 S.raw_header begin fun block () () ->
+    let header = State.Block.header block in
+    return (Data_encoding.Binary.to_bytes_exn Block_header.encoding header)
+  end ;
   register0 S.Header.shell_header begin fun block () () ->
     return (State.Block.header block).shell
   end ;
@@ -76,6 +80,10 @@ let build_raw_rpc_directory
       (Data_encoding.Binary.of_bytes_exn
          Proto.block_header_data_encoding
          header.protocol_data)
+  end ;
+  register0 S.Header.raw_protocol_data begin fun block () () ->
+    let header = State.Block.header block in
+    return header.protocol_data
   end ;
 
   (* block metadata *)
@@ -197,7 +205,7 @@ let build_raw_rpc_directory
 
   (* helpers *)
 
-  register0 Shell_services.Blocks.S.Helpers.Forge.block_header begin fun _block () header ->
+  register0 S.Helpers.Forge.block_header begin fun _block () header ->
     return (Data_encoding.Binary.to_bytes_exn Block_header.encoding header)
   end ;
 
