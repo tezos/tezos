@@ -67,3 +67,11 @@ let add_headers headers cors origin_header =
     Cohttp.Header.add_multi headers
       "Access-Control-Allow-Headers" cors.allowed_headers in
   add_allow_origin cors_headers cors origin_header
+
+let check_host headers cors =
+  match Cohttp.Header.get headers "Host" with
+  | None -> List.mem "*" cors.allowed_origins
+  | Some host ->
+      match find_matching_origin cors.allowed_origins host with
+      | None -> false
+      | Some _ -> true

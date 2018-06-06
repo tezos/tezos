@@ -86,8 +86,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
     | Ok x -> f x
     | Error err -> Lwt.return_error err
 
-  let callback server (_io, con) req body =
-    (* FIXME: check inbound adress *)
+  let callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body =
     let uri = Request.uri req in
     let path = Uri.pct_decode (Uri.path uri) in
     lwt_log_info "(%s) receive request to %s"
@@ -96,6 +95,11 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
     let req_headers = Request.headers req in
     begin
       match Request.meth req with
+      | #Resto.meth when server.cors.allowed_origins <> [] &&
+                         not (Cors.check_host req_headers server.cors) ->
+          Lwt.return_ok
+            (Response.make ~status:`Forbidden (),
+             Cohttp_lwt.Body.empty)
       | #Resto.meth as meth -> begin
           Directory.lookup server.root ()
             meth path >>=? fun (Directory.Service s) ->
