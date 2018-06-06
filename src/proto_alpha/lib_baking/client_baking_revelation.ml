@@ -15,6 +15,7 @@ let inject_seed_nonce_revelation rpc_config ?(chain = `Main) block ?async nonces
     (fun (level, nonce) ->
        Alpha_services.Forge.seed_nonce_revelation rpc_config
          (chain, block) ~branch ~level ~nonce () >>=? fun bytes ->
+       let bytes = Signature.concat bytes Signature.zero in
        Shell_services.Injection.operation rpc_config ?async ~chain bytes)
     nonces >>=? fun ophs ->
   return ophs

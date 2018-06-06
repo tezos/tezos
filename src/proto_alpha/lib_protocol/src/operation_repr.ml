@@ -540,7 +540,13 @@ module Encoding = struct
     ]
 
   let contents_list_encoding =
-    conv to_list of_list (list contents_encoding)
+    conv to_list of_list (Variable.list contents_encoding)
+
+  let optional_signature_encoding =
+    conv
+      (function Some s -> s | None -> Signature.zero)
+      (fun s -> if Signature.equal s Signature.zero then None else Some s)
+      Signature.encoding
 
   let protocol_data_encoding =
     def "operation.alpha.contents_and_signature" @@
@@ -551,7 +557,7 @@ module Encoding = struct
          Operation_data { contents ; signature })
       (obj2
          (req "contents" contents_list_encoding)
-         (varopt "signature" Signature.encoding))
+         (req "signature" optional_signature_encoding))
 
   let operation_encoding =
     conv
