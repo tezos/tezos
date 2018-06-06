@@ -9,18 +9,26 @@
 
 let log = Signer_logging.lwt_log_notice
 
-let run (cctxt : #Client_context.wallet) ~host ~port ~cert ~key =
+let run (cctxt : #Client_context.wallet) ~host ~port ~cert ~key ~require_auth =
   log "Accepting HTTPS requests on port %d" port >>= fun () ->
   let mode : Conduit_lwt_unix.server =
     `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port) in
   let dir = RPC_directory.empty in
   let dir =
-    RPC_directory.register1 dir Signer_services.sign begin fun pkh () data ->
-      Handler.sign cctxt pkh data
+    RPC_directory.register1 dir Signer_services.sign begin fun pkh signature data ->
+      Handler.sign cctxt { pkh ; data ; signature } ~require_auth
     end in
   let dir =
     RPC_directory.register1 dir Signer_services.public_key begin fun pkh () () ->
       Handler.public_key cctxt pkh
+    end in
+  let dir =
+    RPC_directory.register0 dir Signer_services.authorized_keys begin fun () () ->
+      if require_auth then
+        return None
+      else
+        Handler.Authorized_key.load cctxt >>=? fun keys ->
+        return (Some (keys |> List.split |> snd |> List.map Signature.Public_key.hash))
     end in
   Lwt.catch
     (fun () ->

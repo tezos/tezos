@@ -9,4 +9,6 @@
 
 val run:
   #Client_context.io_wallet ->
-  host:string -> port:int -> cert:string -> key:string -> 'a tzresult Lwt.t
+  host:string -> port:int -> cert:string -> key:string ->
+  require_auth: bool ->
+  'a tzresult Lwt.t

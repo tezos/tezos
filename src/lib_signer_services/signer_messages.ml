@@ -14,18 +14,26 @@ module Sign = struct
     type t = {
       pkh: Signature.Public_key_hash.t ;
       data: MBytes.t ;
+      signature: Signature.t option ;
     }
+
+    let to_sign ~pkh ~data =
+      MBytes.concat ""
+        [ MBytes.of_hex (`Hex "04") ;
+          Signature.Public_key_hash.to_bytes pkh ;
+          data ]
 
     let encoding =
       let open Data_encoding in
       conv
-        (fun { pkh ; data } ->
-           (pkh, data))
-        (fun (pkh, data)  ->
-           { pkh ; data })
-        (obj2
+        (fun { pkh ; data ; signature } ->
+           (pkh, data, signature))
+        (fun (pkh, data, signature)  ->
+           { pkh ; data ; signature })
+        (obj3
            (req "pkh" Signature.Public_key_hash.encoding)
-           (req "data" bytes))
+           (req "data" bytes)
+           (opt "signature" Signature.encoding))
 
   end
 
@@ -62,11 +70,38 @@ module Public_key = struct
 
 end
 
+module Authorized_keys = struct
+
+  module Response = struct
+
+    type t =
+      | No_authentication
+      | Authorized_keys of Signature.Public_key_hash.t list
+
+    let encoding =
+      let open Data_encoding in
+      union
+        [ case (Tag 0)
+            ~title: "No_authentication"
+            (constant "no_authentication_required")
+            (function No_authentication -> Some () | _ -> None)
+            (fun () -> No_authentication) ;
+          case (Tag 1)
+            ~title: "Authorized_keys"
+            (list Signature.Public_key_hash.encoding)
+            (function Authorized_keys l -> Some l | _ -> None)
+            (fun l -> Authorized_keys l) ]
+
+  end
+
+end
+
 module Request = struct
 
   type t =
     | Sign of Sign.Request.t
     | Public_key of Public_key.Request.t
+    | Authorized_keys
 
   let encoding =
     let open Data_encoding in
@@ -85,6 +120,11 @@ module Request = struct
            Public_key.Request.encoding)
         (function Public_key req -> Some ((), req) | _ -> None)
         (fun ((), req) -> Public_key req) ;
+      case (Tag 2)
+        ~title:"Authorized_keys"
+        (obj1 (req "kind" (constant "authorized_keys")))
+        (function Authorized_keys -> Some () | _ -> None)
+        (fun () -> Authorized_keys) ;
     ]
 
 end

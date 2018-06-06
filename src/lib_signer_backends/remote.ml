@@ -11,7 +11,10 @@ open Client_keys
 
 let scheme = "remote"
 
-module Make(S : sig val default : Uri.t end) = struct
+module Make(S : sig
+    val default : Uri.t
+    val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
+  end) = struct
 
   let scheme = scheme
 
@@ -26,6 +29,9 @@ module Make(S : sig val default : Uri.t end) = struct
      - $TEZOS_SIGNER_UNIX_PATH,\n\
      - $TEZOS_SIGNER_TCP_HOST and $TEZOS_SIGNER_TCP_PORT (default: 7732),\n\
      - $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT (default: 443)."
+
+  module Socket = Socket.Make(S)
+  module Https = Https.Make(S)
 
   let get_remote () =
     match Uri.scheme S.default with

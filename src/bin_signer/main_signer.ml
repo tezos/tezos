@@ -38,7 +38,7 @@ let group =
   { Clic.name = "signer" ;
     title = "Commands specific to the signing daemon" }
 
-let commands =
+let commands base_dir require_auth =
   Client_keys_commands.commands () @
   [ command ~group
       ~desc: "Launch a signer daemon over a TCP socket."
@@ -63,7 +63,7 @@ let commands =
       (prefixes [ "launch" ; "socket" ; "signer" ] @@ stop)
       (fun (host, port) cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Socket_daemon.run cctxt (Tcp (host, port))) ;
+         Socket_daemon.run cctxt (Tcp (host, port)) ~require_auth) ;
     command ~group
       ~desc: "Launch a signer daemon over a local Unix socket."
       (args1
@@ -72,12 +72,12 @@ let commands =
             ~short: 's'
             ~long: "socket"
             ~placeholder: "path"
-            ~default: default_unix_path
+            ~default: (Filename.concat base_dir "socket")
             (parameter (fun _ s -> return s))))
       (prefixes [ "launch" ; "local" ; "signer" ] @@ stop)
       (fun path cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Socket_daemon.run cctxt (Unix path)) ;
+         Socket_daemon.run cctxt (Unix path) ~require_auth) ;
     command ~group
       ~desc: "Launch a signer daemon over HTTPS."
       (args2
@@ -109,8 +109,30 @@ let commands =
          (parameter (fun _ s -> return s)) @@ stop)
       (fun (host, port) cert key cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Https_daemon.run cctxt ~host ~port ~cert ~key) ;
+         Https_daemon.run cctxt ~host ~port ~cert ~key ~require_auth) ;
+    command ~group
+      ~desc: "Authorize a given public key to perform signing requests."
+      (args1
+         (arg
+            ~doc: "an optional name for the key (defaults to the hash)"
+            ~short: 'N'
+            ~long: "name"
+            ~placeholder: "name"
+            (parameter (fun _ s -> return s))))
+      (prefixes [ "add" ; "authorized" ; "key" ] @@
+       param
+         ~name:"pk"
+         ~desc: "full public key (Base58 encoded)"
+         (parameter (fun _ s -> Lwt.return (Signature.Public_key.of_b58check s))) @@
+       stop)
+      (fun name key cctxt ->
+         let pkh = Signature.Public_key.hash key in
+         let name = match name with
+           | Some name -> name
+           | None -> Signature.Public_key_hash.to_b58check pkh in
+         Handler.Authorized_key.add ~force:false cctxt name key)
   ]
+
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
@@ -132,9 +154,17 @@ let base_dir_arg () =
            By default: '" ^ default_base_dir ^"'.")
     (string_parameter ())
 
+let require_auth_arg () =
+  switch
+    ~long:"require-authentication"
+    ~short:'A'
+    ~doc:"Require a signature from the caller to sign."
+    ()
+
 let global_options () =
-  args1
+  args2
     (base_dir_arg ())
+    (require_auth_arg ())
 
 (* Main (lwt) entry *)
 let main () =
@@ -158,7 +188,7 @@ let main () =
   begin
     begin
       parse_global_options
-        (global_options ()) () original_args >>=? fun (base_dir, remaining) ->
+        (global_options ()) () original_args >>=? fun ((base_dir, require_auth), remaining) ->
       let base_dir = Option.unopt ~default:default_base_dir base_dir in
       let cctxt = object
         inherit Client_context_unix.unix_logger ~base_dir
@@ -177,7 +207,7 @@ let main () =
           ~global_options:(global_options ())
           (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
           Format.std_formatter
-          commands in
+          (commands base_dir require_auth) in
       begin match autocomplete with
         | Some (prev_arg, cur_arg, script) ->
             Clic.autocompletion

@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Client_keys.SIGNER
+module Make(P : sig
+    val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
+  end)
+  : Client_keys.SIGNER
 
 val make_base: string -> int -> Uri.t

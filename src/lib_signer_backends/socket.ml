@@ -10,108 +10,129 @@
 open Client_keys
 open Signer_messages
 
-let sign ?watermark path pkh msg =
-  let msg =
-    match watermark with
-    | None -> msg
-    | Some watermark ->
-        MBytes.concat "" [ Signature.bytes_of_watermark watermark ; msg ] in
-  let req = { Sign.Request.pkh ; data = msg } in
-  Lwt_utils_unix.Socket.connect path >>=? fun conn ->
-  Lwt_utils_unix.Socket.send
-    conn Request.encoding (Request.Sign req) >>=? fun () ->
-  let encoding = result_encoding Sign.Response.encoding in
-  Lwt_utils_unix.Socket.recv conn encoding >>=? fun res ->
-  Lwt_unix.close conn >>= fun () ->
-  Lwt.return res
+let tcp_scheme = "tcp"
+let unix_scheme = "unix"
 
-let public_key path pkh =
-  Lwt_utils_unix.Socket.connect path >>=? fun conn ->
-  Lwt_utils_unix.Socket.send
-    conn Request.encoding (Request.Public_key pkh) >>=? fun () ->
-  let encoding = result_encoding Public_key.Response.encoding in
-  Lwt_utils_unix.Socket.recv conn encoding >>=? fun res ->
-  Lwt_unix.close conn >>= fun () ->
-  Lwt.return res
+module Make(P : sig
+    val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
+  end) = struct
 
-module Unix = struct
+  let sign ?watermark path pkh msg =
+    let msg =
+      match watermark with
+      | None -> msg
+      | Some watermark ->
+          MBytes.concat "" [ Signature.bytes_of_watermark watermark ; msg ] in
+    Lwt_utils_unix.Socket.connect path >>=? fun conn ->
+    Lwt_utils_unix.Socket.send
+      conn Request.encoding Request.Authorized_keys >>=? fun () ->
+    Lwt_utils_unix.Socket.recv conn
+      Authorized_keys.Response.encoding >>=? fun authorized_keys ->
+    begin match authorized_keys with
+      | No_authentication -> return None
+      | Authorized_keys authorized_keys ->
+          P.authenticate authorized_keys
+            (Sign.Request.to_sign ~pkh ~data:msg) >>=? fun signature ->
+          return (Some signature)
+    end >>=? fun signature ->
+    let req = { Sign.Request.pkh ; data = msg ; signature } in
+    Lwt_utils_unix.Socket.send
+      conn Request.encoding (Request.Sign req) >>=? fun () ->
+    Lwt_utils_unix.Socket.recv conn
+      (result_encoding Sign.Response.encoding) >>=? fun res ->
+    Lwt_unix.close conn >>= fun () ->
+    Lwt.return res
 
-  let scheme = "unix"
+  let public_key path pkh =
+    Lwt_utils_unix.Socket.connect path >>=? fun conn ->
+    Lwt_utils_unix.Socket.send
+      conn Request.encoding (Request.Public_key pkh) >>=? fun () ->
+    let encoding = result_encoding Public_key.Response.encoding in
+    Lwt_utils_unix.Socket.recv conn encoding >>=? fun res ->
+    Lwt_unix.close conn >>= fun () ->
+    Lwt.return res
 
-  let title =
-    "Built-in tezos-signer using remote signer through hardcoded unix socket."
+  module Unix = struct
 
-  let description =
-    "Valid locators are of this form: unix:///path/to/socket?pkh=tz1..."
+    let scheme = unix_scheme
 
-  let parse uri =
-    assert (Uri.scheme uri = Some scheme) ;
-    trace (Invalid_uri uri) @@
-    match Uri.get_query_param uri "pkh" with
-    | None -> failwith "Missing the query parameter: 'pkh=tz1...'"
-    | Some key ->
-        Lwt.return (Signature.Public_key_hash.of_b58check key) >>=? fun key ->
-        return (Lwt_utils_unix.Socket.Unix (Uri.path uri), key)
+    let title =
+      "Built-in tezos-signer using remote signer through hardcoded unix socket."
 
-  let public_key uri =
-    parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) ->
-    public_key path pkh
+    let description =
+      "Valid locators are of this form: unix:///path/to/socket?pkh=tz1..."
 
-  let neuterize uri =
-    return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
+    let parse uri =
+      assert (Uri.scheme uri = Some scheme) ;
+      trace (Invalid_uri uri) @@
+      match Uri.get_query_param uri "pkh" with
+      | None -> failwith "Missing the query parameter: 'pkh=tz1...'"
+      | Some key ->
+          Lwt.return (Signature.Public_key_hash.of_b58check key) >>=? fun key ->
+          return (Lwt_utils_unix.Socket.Unix (Uri.path uri), key)
 
-  let public_key_hash uri =
-    public_key uri >>=? fun pk ->
-    return (Signature.Public_key.hash pk)
+    let public_key uri =
+      parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      public_key path pkh
 
-  let sign ?watermark uri msg =
-    parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
-    sign ?watermark path pkh msg
+    let neuterize uri =
+      return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
+
+    let public_key_hash uri =
+      public_key uri >>=? fun pk ->
+      return (Signature.Public_key.hash pk)
+
+    let sign ?watermark uri msg =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      sign ?watermark path pkh msg
+
+  end
+
+  module Tcp = struct
+
+    let scheme = tcp_scheme
+
+    let title =
+      "Built-in tezos-signer using remote signer through hardcoded tcp socket."
+
+    let description =
+      "Valid locators are of this form: tcp://host:port/tz1..."
+
+    let parse uri =
+      assert (Uri.scheme uri = Some scheme) ;
+      trace (Invalid_uri uri) @@
+      match Uri.host uri, Uri.port uri with
+      | None, _ ->
+          failwith "Missing host address"
+      | _, None ->
+          failwith "Missing host port"
+      | Some path, Some port ->
+          Lwt.return
+            (Signature.Public_key_hash.of_b58check (Uri.path uri)) >>=? fun pkh ->
+          return (Lwt_utils_unix.Socket.Tcp (path, port), pkh)
+
+    let public_key uri =
+      parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      public_key path pkh
+
+    let neuterize uri =
+      return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
+
+    let public_key_hash uri =
+      public_key uri >>=? fun pk ->
+      return (Signature.Public_key.hash pk)
+
+    let sign ?watermark uri msg =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      sign ?watermark path pkh msg
+
+  end
 
 end
 
-module Tcp = struct
-
-  let scheme = "tcp"
-
-  let title =
-    "Built-in tezos-signer using remote signer through hardcoded tcp socket."
-
-  let description =
-    "Valid locators are of this form: tcp://host:port/tz1..."
-
-  let parse uri =
-    assert (Uri.scheme uri = Some scheme) ;
-    trace (Invalid_uri uri) @@
-    match Uri.host uri, Uri.port uri with
-    | None, _ ->
-        failwith "Missing host address"
-    | _, None ->
-        failwith "Missing host port"
-    | Some path, Some port ->
-        Lwt.return
-          (Signature.Public_key_hash.of_b58check (Uri.path uri)) >>=? fun pkh ->
-        return (Lwt_utils_unix.Socket.Tcp (path, port), pkh)
-
-  let public_key uri =
-    parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) ->
-    public_key path pkh
-
-  let neuterize uri =
-    return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
-
-  let public_key_hash uri =
-    public_key uri >>=? fun pk ->
-    return (Signature.Public_key.hash pk)
-
-  let sign ?watermark uri msg =
-    parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
-    sign ?watermark path pkh msg
-
-end
 
 let make_unix_base path =
-  Uri.make ~scheme:Unix.scheme ~path ()
+  Uri.make ~scheme:unix_scheme ~path ()
 
 let make_tcp_base host port =
-  Uri.make ~scheme:Tcp.scheme ~host ~port ()
+  Uri.make ~scheme:tcp_scheme ~host ~port ()
