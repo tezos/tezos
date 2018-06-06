@@ -97,8 +97,10 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
       match Request.meth req with
       | #Resto.meth when server.cors.allowed_origins <> [] &&
                          not (Cors.check_host req_headers server.cors) ->
+          let headers =
+            Cohttp.Header.init_with "X-OCaml-Resto-CORS-Error" "invalid host" in
           Lwt.return_ok
-            (Response.make ~status:`Forbidden (),
+            (Response.make ~headers ~status:`Forbidden (),
              Cohttp_lwt.Body.empty)
       | #Resto.meth as meth -> begin
           Directory.lookup server.root ()
@@ -320,7 +322,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
       mode root =
     let default_media_type =
       match Media_type.first_complete_media media_types with
-      | None -> invalid_arg "RestoCohttp.launch(empty media type list)"
+      | None -> invalid_arg "Resto_directory_cohttp.launch(empty media type list)"
       | Some ((l, r), m) -> l^"/"^r, m in
     let stop, stopper = Lwt.wait () in
     let server = {
