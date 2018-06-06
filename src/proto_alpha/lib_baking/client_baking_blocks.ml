@@ -21,31 +21,40 @@ type block_info = {
   level: Level.t ;
 }
 
-let info cctxt ?(chain = `Main) block =
+let raw_info cctxt ?(chain = `Main) hash header =
+  let block = `Hash (hash, 0) in
   Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block () >>=? fun header ->
   Shell_services.Blocks.protocols
     cctxt ~chain ~block () >>=? fun { current_protocol = protocol ;
                                       next_protocol } ->
   Alpha_block_services.metadata cctxt
     ~chain ~block () >>=? fun { protocol_data = { level } } ->
-  let { Tezos_base.Block_header.predecessor ; fitness ; timestamp ; _ } = header in
+  let { Tezos_base.Block_header.predecessor ; fitness ; timestamp ; _ } =
+    header.Tezos_base.Block_header.shell in
   return { hash ; chain_id ; predecessor ; fitness ;
            timestamp ; protocol ; next_protocol ; level }
+
+let info cctxt ?(chain = `Main) block =
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
+  Shell_services.Blocks.Header.shell_header
+    cctxt ~chain ~block () >>=? fun shell  ->
+  Shell_services.Blocks.Header.raw_protocol_data
+    cctxt ~chain ~block () >>=? fun protocol_data ->
+  raw_info cctxt ~chain hash { shell ; protocol_data }
 
 let monitor_valid_blocks cctxt ?chains ?protocols ?next_protocols () =
   Shell_services.Monitor.valid_blocks cctxt
     ?chains ?protocols ?next_protocols () >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s
-            (fun (chain, block) ->
-               info cctxt ~chain:(`Hash chain) (`Hash (block, 0))) block_stream)
+            (fun ((chain, block), header) ->
+               raw_info cctxt ~chain:(`Hash chain) block header)
+            block_stream)
 
 let monitor_heads cctxt ?next_protocols chain =
   Monitor_services.heads
     cctxt ?next_protocols chain >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s
-            (fun block -> info cctxt ~chain (`Hash (block, 0)))
+            (fun (block, header) -> raw_info cctxt ~chain block header)
             block_stream)
 
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =

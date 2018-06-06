@@ -17,13 +17,13 @@ val valid_blocks:
   ?chains:Chain_services.chain list ->
   ?protocols:Protocol_hash.t list ->
   ?next_protocols:Protocol_hash.t list ->
-  unit -> ((Chain_id.t * Block_hash.t) Lwt_stream.t * stopper) tzresult Lwt.t
+  unit -> (((Chain_id.t * Block_hash.t) * Block_header.t) Lwt_stream.t * stopper) tzresult Lwt.t
 
 val heads:
   #streamed ->
   ?next_protocols:Protocol_hash.t list ->
   Chain_services.chain ->
-  (Block_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
+  ((Block_hash.t * Block_header.t) Lwt_stream.t * stopper) tzresult Lwt.t
 
 val protocols:
   #streamed ->
@@ -41,13 +41,13 @@ module S : sig
      unit, < chains : Chain_services.chain list;
              next_protocols : Protocol_hash.t list;
              protocols : Protocol_hash.t list >, unit,
-     Chain_id.t * Block_hash.t) RPC_service.t
+     (Chain_id.t * Block_hash.t) * Block_header.t) RPC_service.t
 
   val heads:
     ([ `GET ], unit,
      unit * Chain_services.chain,
      < next_protocols : Protocol_hash.t list >, unit,
-     Block_hash.t) RPC_service.t
+     Block_hash.t * Block_header.t) RPC_service.t
 
   val protocols:
     ([ `GET ], unit,

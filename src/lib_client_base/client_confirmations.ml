@@ -25,7 +25,7 @@ let wait_for_operation_inclusion
 
   (* Fetch _all_ the 'unknown' predecessors af a block. *)
 
-  let fetch_predecessors block =
+  let fetch_predecessors (block, _) =
     let rec loop acc block =
       Block_services.Empty.Header.shell_header
         ctxt ~chain ~block:(`Hash (block, 0)) () >>=? fun { predecessor } ->
@@ -93,7 +93,7 @@ let wait_for_operation_inclusion
   Shell_services.Monitor.heads ctxt chain >>=? fun (stream, stop) ->
   Lwt_stream.get stream >>= function
   | None -> assert false
-  | Some head ->
+  | Some (head, _) ->
       let rec loop n =
         if n >= 0 then
           process (`Hash (head, n)) >>=? function

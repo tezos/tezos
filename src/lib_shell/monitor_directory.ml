@@ -76,7 +76,8 @@ let build_rpc_directory validator mainchain_validator =
            in_protocols block >>= fun in_protocols ->
            if in_chains && in_protocols && in_next_protocols then
              Lwt.return_some
-               (State.Block.chain_id block, State.Block.hash block)
+               ((State.Block.chain_id block, State.Block.hash block),
+                State.Block.header block)
            else
              Lwt.return_none)
         block_stream in
@@ -104,14 +105,14 @@ let build_rpc_directory validator mainchain_validator =
         (fun block ->
            in_next_protocols block >>= fun in_next_protocols ->
            if in_next_protocols then
-             Lwt.return_some (State.Block.hash block)
+             Lwt.return_some (State.Block.hash block, State.Block.header block)
            else
              Lwt.return_none)
         block_stream in
     let first_call = ref true in
     let next () =
       if !first_call then begin
-        first_call := false ; Lwt.return_some (State.Block.hash head)
+        first_call := false ; Lwt.return_some (State.Block.hash head, State.Block.header head)
       end else
         Lwt_stream.get stream in
     RPC_answer.return_stream { next ; shutdown }

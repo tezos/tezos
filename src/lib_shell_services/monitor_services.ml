@@ -48,9 +48,11 @@ module S = struct
                     by the node, disregarding whether they were \
                     selected as the new head or not."
       ~query: valid_blocks_query
-      ~output: (obj2
-                  (req "chain_id" Chain_id.encoding)
-                  (req "hash" Block_hash.encoding))
+      ~output: (merge_objs
+                  (obj2
+                     (req "chain_id" Chain_id.encoding)
+                     (req "hash" Block_hash.encoding))
+                  Block_header.encoding)
       RPC_path.(path / "valid_blocks")
 
   let heads_query =
@@ -68,7 +70,10 @@ module S = struct
                     by the node and selected as the new head of the \
                     given chain."
       ~query: heads_query
-      ~output: Block_hash.encoding
+      ~output: (merge_objs
+                  (obj1
+                     (req "hash" Block_hash.encoding))
+                  Block_header.encoding)
       RPC_path.(path / "heads" /: Chain_services.chain_arg)
 
   let protocols =
