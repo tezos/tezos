@@ -642,11 +642,11 @@ let () =
     (fun () -> Missing_signature)
 
 let check_signature (type kind) key ({ shell ; protocol_data } : kind operation) =
-  let check ?watermark contents signature =
+  let check ~watermark contents signature =
     let unsigned_operation =
       Data_encoding.Binary.to_bytes_exn
         unsigned_operation_encoding (shell, contents) in
-    if Signature.check ?watermark key signature unsigned_operation then
+    if Signature.check ~watermark key signature unsigned_operation then
       return ()
     else
       fail Invalid_signature in
