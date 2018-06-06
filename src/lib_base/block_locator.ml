@@ -65,7 +65,7 @@ module Step : sig
 
 end = struct
 
-  type state = int * int * MBytes.t
+  type state = Int32.t * int * MBytes.t
 
   let init seed head =
     let open Hacl.Hash in
@@ -74,24 +74,24 @@ end = struct
       P2p_peer.Id.to_bytes seed.sender_id ;
       P2p_peer.Id.to_bytes seed.receiver_id ;
       Block_hash.to_bytes head ] ;
-    (1, 9, SHA256.finish st)
+    (1l, 9, SHA256.finish st)
 
   let draw seed n =
-    Int32.to_int (MBytes.get_int32 seed 0) mod n,
+    Int32.rem (MBytes.get_int32 seed 0) n,
     Hacl.Hash.SHA256.digest seed
 
   let next (step, counter, seed) =
     let random_gap, seed =
-      if step <= 1 then
-        0, seed
+      if step <= 1l then
+        0l, seed
       else
-        draw seed (1 + step/2) in
+        draw seed (Int32.succ (Int32.div step 2l)) in
     let new_state =
       if counter = 0 then
-        (step * 2, 9, seed)
+        (Int32.mul step 2l, 9, seed)
       else
         (step, counter - 1, seed) in
-    step - random_gap, new_state
+    Int32.to_int (Int32.sub step random_gap), new_state
 
 end
 
