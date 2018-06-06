@@ -11,6 +11,7 @@ depends: [
   "jbuilder" { build & = "1.0+beta19.1" }
   "tezos-base"
   "tezos-micheline"
+  "tezos-shell-services"
   "tezos-protocol-compiler"
   "tezos-protocol-environment-shell"
   "tezos-stdlib-unix"
