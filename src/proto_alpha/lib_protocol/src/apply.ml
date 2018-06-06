@@ -319,15 +319,20 @@ let apply_manager_operation_content :
     internal:bool -> kind manager_operation ->
     (context * kind successful_manager_operation_result * packed_internal_operation list) tzresult Lwt.t ) =
   fun ctxt mode ~payer ~source ~internal operation ->
-    let before_operation = ctxt in
+    let before_operation =
+      (* This context is not used for backtracking. Only to compute
+         gas consumption and originations for the operation result. *)
+      ctxt in
     Contract.must_exist ctxt source >>=? fun () ->
     let spend =
+      (* Ignore the spendable flag for smart contracts. *)
       if internal then Contract.spend_from_script else Contract.spend in
     let set_delegate =
+      (* Ignore the delegatable flag for smart contracts. *)
       if internal then Delegate.set_from_script else Delegate.set in
     match operation with
     | Reveal _ ->
-        return
+        return (* No-op: action already performed by `precheck_manager_contents`. *)
           (ctxt, (Reveal_result : kind successful_manager_operation_result), [])
     | Transaction { amount ; parameters ; destination } -> begin
         spend ctxt source amount >>=? fun ctxt ->
@@ -341,6 +346,7 @@ let apply_manager_operation_content :
                 Lwt.return (Script.force_decode arg) >>=? fun arg ->
                 match Micheline.root arg with
                 | Prim (_, D_Unit, [], _) ->
+                    (* Allow [Unit] parameter to non-scripted contracts. *)
                     return ()
                 | _ -> fail (Script_interpreter.Bad_contract_parameter destination)
           end >>=? fun () ->
@@ -358,6 +364,7 @@ let apply_manager_operation_content :
         | Some script ->
             begin match parameters with
               | None ->
+                  (* Forge a [Unit] parameter that will be checked by [execute]. *)
                   let unit = Micheline.strip_locations (Prim (0, Script.D_Unit, [], None)) in
                   return (ctxt, unit)
               | Some parameters ->
@@ -400,8 +407,14 @@ let apply_manager_operation_content :
         end >>=? fun (script, ctxt) ->
         spend ctxt source credit >>=? fun ctxt ->
         begin match preorigination with
-          | Some contract -> return (ctxt, contract)
-          | None -> Contract.fresh_contract_from_current_nonce ctxt
+          | Some contract ->
+              assert internal ;
+              (* The preorigination field is only used to early return
+                 the address of an originated contract in Michelson.
+                 It cannot come from the outside. *)
+              return (ctxt, contract)
+          | None ->
+              Contract.fresh_contract_from_current_nonce ctxt
         end >>=? fun (ctxt, contract) ->
         Contract.originate ctxt contract
           ~manager ~delegate ~balance:credit
@@ -465,6 +478,10 @@ let precheck_manager_contents
     | _ -> return ctxt
   end >>=? fun ctxt ->
   Contract.get_manager_key ctxt source >>=? fun public_key ->
+  (* Currently, the `raw_operation` only contains one signature, so
+     all operations are required to be from the same manager. This may
+     change in the future, allowing several managers to group-sign a
+     sequence of transactions.  *)
   Operation.check_signature public_key raw_operation >>=? fun () ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
   Contract.spend ctxt source fee >>=? fun ctxt ->
@@ -583,7 +600,7 @@ let apply_contents_list
   | Single (Endorsements { block ; level ; slots }) ->
       begin
         match Level.pred ctxt (Level.current ctxt) with
-        | None -> failwith ""
+        | None -> assert false (* absurd: (Level.current ctxt).raw_level > 0 *)
         | Some lvl -> return lvl
       end >>=? fun ({ level = current_level ;_ } as lvl) ->
       fail_unless
