@@ -49,7 +49,8 @@ module Make (Encoding : Resto.ENCODING) = struct
     | `Not_acceptable of string
     | `Unexpected_status_code of Cohttp.Code.status_code * content
     | `Connection_failed of string
-    | `OCaml_exception of string ]
+    | `OCaml_exception of string
+    | `Unauthorized_host of string option ]
 
   type ('o, 'e) service_result =
     [ ('o, 'e option) generic_rest_result
@@ -165,6 +166,15 @@ module Make (Encoding : Resto.ENCODING) = struct
       | None -> headers
       | Some ranges ->
           Header.add headers "accept" (Media_type.accept_header ranges) in
+    let host =
+      match Uri.host uri, Uri.port uri with
+      | None, _ -> None
+      | Some host, None -> Some host
+      | Some host, Some port -> Some (host ^ ":" ^ string_of_int port) in
+    let headers =
+      match host with
+      | None -> headers
+      | Some host -> Header.add headers "host" host in
     Lwt.catch begin fun () ->
       let rec call_and_retry_on_502 attempt delay =
         Cohttp_lwt_unix.Client.call
@@ -209,6 +219,8 @@ module Make (Encoding : Resto.ENCODING) = struct
           (* TODO handle redirection ?? *)
           failwith "Resto_cohttp_client.generic_json_call: unimplemented"
       | `Unauthorized -> Lwt.return (`Unauthorized (ansbody, media_name, media))
+      | `Forbidden when Cohttp.Header.mem headers "X-OCaml-Resto-CORS-Error" ->
+          Lwt.return (`Unauthorized_host host)
       | `Forbidden -> Lwt.return (`Forbidden (ansbody, media_name, media))
       | `Not_found -> Lwt.return (`Not_found (ansbody, media_name, media))
       | `Conflict -> Lwt.return (`Conflict (ansbody, media_name, media))
@@ -324,7 +336,8 @@ module Make (Encoding : Resto.ENCODING) = struct
       | `Not_acceptable _
       | `Unexpected_status_code _
       | `Connection_failed _
-      | `OCaml_exception _ as err -> Lwt.return err
+      | `OCaml_exception _
+      | `Unauthorized_host _ as err -> Lwt.return err
     end >>= fun ans ->
     Lwt.return (meth, uri, ans)
 
@@ -388,7 +401,8 @@ module Make (Encoding : Resto.ENCODING) = struct
       | `Not_acceptable _
       | `Unexpected_status_code _
       | `Connection_failed _
-      | `OCaml_exception _ as err -> Lwt.return err
+      | `OCaml_exception _
+      | `Unauthorized_host _ as err -> Lwt.return err
     end >>= fun ans ->
     Lwt.return (meth, uri, ans)
 

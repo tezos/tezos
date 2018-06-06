@@ -68,6 +68,7 @@ type rpc_error =
                             media_type: string ;
                             error: string }
   | OCaml_exception of string
+  | Unauthorized_host of string option
 
 type error +=
   | Request_failed of { meth: RPC_service.meth ;
