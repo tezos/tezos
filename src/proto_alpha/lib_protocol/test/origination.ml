@@ -8,13 +8,17 @@
 (**************************************************************************)
 
 open Proto_alpha
+open Test_utils
 open Test_tez
 
 let ten_tez = Tez.of_int 10
 
-(* create a source contract, use it to create an originate contract
-   with fee and credit as parameters (default to zero tez), this originated
-   contract can also be spendable and/or delegatable. *)
+(** [register_origination fee credit spendable delegatable] takes four
+    optional parameter: fee for the fee need to be paid if set to
+    create an originated contract; credit is the amount of tez that
+    send to this originated contract; spendable default is set to true
+    meaning that this contract is spendable; delegatable default is
+    set to true meaning that this contract is able to delegate. *)
 let register_origination ?(fee=Tez.zero) ?(credit=Tez.zero) ?spendable ?delegatable () =
   Context.init 1 >>=? fun (b, contracts) ->
   let source = List.hd contracts in
@@ -38,18 +42,17 @@ let register_origination ?(fee=Tez.zero) ?(credit=Tez.zero) ?spendable ?delegata
   return (b, source, originated)
 
 
-
-(* like register_origination but additionally tests that
+(* [test_origination_balances fee credit spendable delegatable]
+   takes four optional parameter: fee is the fee that pay if require to create an originated contract; credit is the amount of tez that will send to this contract; spendable default is set to true meaning that this contract is spendable; delegatable default is set to true meaning that this contract is able to delegate.
+   This function will create a contract, get the balance of this contract, call the origination operation to create a new originated contract from this contract with all the possible fees; and check the balance before/after originated operation valid.
    - the source contract has payed all the fees
    - the originated has been credited correctly *)
 let test_origination_balances ~loc ?(fee=Tez.zero) ?(credit=Tez.zero)
     ?spendable ?delegatable () =
   Context.init 1 >>=? fun (b, contracts) ->
   let contract = List.hd contracts in
-
   Context.Contract.balance (B b) contract >>=? fun balance ->
   Op.origination (B b) contract ~fee ~credit ?spendable ?delegatable >>=? fun (operation, new_contract) ->
-
   (* The possible fees are: a given credit, an origination burn fee
      (constants_repr.default.origination_burn = 257 mtez),
      a fee that is paid when creating an originate contract.
@@ -57,26 +60,27 @@ let test_origination_balances ~loc ?(fee=Tez.zero) ?(credit=Tez.zero)
      We also take into account a block security deposit. Note that it
      is not related to origination but to the baking done in the
      tests.*)
-  Context.get_constants (B b) >>=? fun {parametric = {origination_burn ;
-                                                      block_security_deposit}} ->
+  Context.get_constants (B b) >>=? fun
+    { parametric =
+        { origination_burn ;
+          block_security_deposit
+        }
+    } ->
   Lwt.return (
     Tez.(+?) credit block_security_deposit >>?
     Tez.(+?) fee >>?
     Tez.(+?) origination_burn ) >>=? fun total_fee ->
-
   Block.bake ~operation b >>=? fun b ->
-
   (* check that after the block has been baked the source contract
      was debited all the fees *)
   Assert.balance_was_debited ~loc (B b) contract balance total_fee
   >>=? fun _ ->
-
   (* check the balance of the originate contract is equal to credit *)
   Assert.balance_is ~loc (B b) new_contract credit
 
-
-(* transfer an amount of tez (with no fee) and check the source and
-   destination balances. *)
+(** [transfer_and_check_balances b source dest amount] takes a block,
+    a source contract, a destination and the amount that one wants to send
+    (with no fee) and check the source and destination balances. *)
 let transfer_and_check_balances b source dest amount =
   Context.Contract.balance (B b) source >>=? fun balance ->
   Op.transaction (B b) source dest amount >>=? fun operation ->
@@ -85,7 +89,20 @@ let transfer_and_check_balances b source dest amount =
   return b
 
 (******************************************************)
-(* Tests *)
+(** Tests *)
+(******************************************************)
+
+(** compute half of the balance and divided it by nth times *)
+
+let two_nth_of_balance incr contract nth =
+  Context.Contract.balance (I incr) contract >>=? fun balance ->
+  Tez.(/?) balance nth >>?= fun res ->
+  Tez.( *?) res 2L >>?= fun balance ->
+  return balance
+
+(*******************)
+(** Basic test *)
+(*******************)
 
 let balances_simple () = test_origination_balances ~loc:__LOC__ ()
 
@@ -101,10 +118,11 @@ let balances_credit_unspendable () =
 let balances_undelegatable () =
   test_origination_balances ~loc:__LOC__ ~delegatable:false ()
 
-
-(* create an originate contract with a credit, then use this contract to
-   transfer some tez back into the source contract, change the delegate
-   contract to the endorser account *)
+(*******************)
+(** create an originate contract with a credit, then use this contract to
+    transfer some tez back into the source contract, change the delegate
+    contract to the endorser account *)
+(*******************)
 
 let regular () =
   register_origination ~credit:ten_tez () >>=? fun (b, contract, new_contract) ->
@@ -116,7 +134,9 @@ let regular () =
   Block.bake ~operation b >>=? fun _ ->
   return ()
 
-(* ask source contract to pay a fee when originating a contract *)
+(*******************)
+(** ask source contract to pay a fee when originating a contract *)
+(*******************)
 
 let pay_fee () =
   register_origination ~credit:(Tez.of_int 2) ~fee:ten_tez () >>=? fun (b, contract, new_contract) ->
@@ -124,10 +144,13 @@ let pay_fee () =
   return ()
 
 (******************************************************)
-(* Errors *)
+(** Errors *)
+(******************************************************)
 
-(* the originate contract is marked as unspendable. Then ask this
-   contract to transfer, it will raise an error *)
+(*******************)
+(** The originate contract is marked as unspendable. Then ask this
+    contract to transfer, it will raise an error *)
+(*******************)
 
 let unspendable () =
   register_origination ~credit:Tez.one ~spendable:false () >>=? fun (b, contract, new_contract) ->
@@ -138,8 +161,10 @@ let unspendable () =
     | _ -> false in
   Assert.proto_error ~loc:__LOC__ e unspendable
 
-(* the originate contract is marked as undelegatable. Then do the delegation
-   for this contract, it will raise an error *)
+(*******************)
+(** The originate contract is marked as undelegatable. Then do the delegation
+    for this contract, it will raise an error *)
+(*******************)
 
 let undelegatable fee () =
   register_origination ~delegatable:false () >>=? fun (b, _, new_contract) ->
@@ -176,6 +201,10 @@ let undelegatable fee () =
       Assert.balance_was_debited ~loc:__LOC__ (I i) new_contract balance fee
     end
 
+(*******************)
+(** the credit is zero tez *)
+(*******************)
+
 let credit fee () =
   register_origination ~credit:Tez.zero () >>=? fun (b, contract, new_contract) ->
   Incremental.begin_construction b >>=? fun i ->
@@ -206,7 +235,10 @@ let credit fee () =
       Assert.balance_was_credited ~loc:__LOC__ (I i) contract balance Tez.zero
     end
 
-(* same as register_origination but for an incremental *)
+(*******************)
+(** same as register_origination but for an incremental *)
+(*******************)
+
 let register_origination_inc ~credit () =
   Context.init 1 >>=? fun (b, contracts) ->
   let source_contract = List.hd contracts in
@@ -215,8 +247,10 @@ let register_origination_inc ~credit () =
   Incremental.add_operation inc operation >>=? fun inc ->
   return (inc, source_contract, new_contract)
 
-(* Using the originate contract to create another
-   originate contract *)
+(*******************)
+(** Using the originate contract to create another
+    originate contract *)
+(*******************)
 
 let origination_contract_from_origination_contract_not_enough_fund fee () =
   let amount = Tez.one in
@@ -239,9 +273,11 @@ let origination_contract_from_origination_contract_not_enough_fund fee () =
     | RPC_context.Not_found _ -> true
     | _ -> false
   end
+(*******************)
+(** create an originate contract where the contract
+    does not have enough tez to pay for the fee *)
+(*******************)
 
-(* create an originate contract where the contract
-   does not have enough tez to pay for the fee *)
 let not_tez_in_contract_to_pay_fee () =
   Context.init 2 >>=? fun (b, contracts) ->
   let contract_1 = List.nth contracts 0 in
@@ -254,7 +290,6 @@ let not_tez_in_contract_to_pay_fee () =
   Incremental.add_operation inc operation >>=? fun inc ->
   Assert.balance_was_debited ~loc:__LOC__ (I inc) contract_1 balance amount
   >>=? fun _ ->
-
   (* use this source contract to create an originate contract where it requires
      to pay a fee and add an amount of credit into this new contract *)
   Op.origination (I inc) ~fee:ten_tez ~credit:Tez.one contract_1 >>=? fun (op, _) ->
@@ -264,9 +299,10 @@ let not_tez_in_contract_to_pay_fee () =
     | _ -> false
   end
 
-(******************************************************)
+(***************************************************)
 (* set the endorser of the block as manager/delegate of the originated
    account *)
+(***************************************************)
 
 let register_contract_get_endorser () =
   Context.init 1 >>=? fun (b, contracts) ->
@@ -293,9 +329,10 @@ let set_delegate () =
   Context.Contract.delegate (B b) orig_contract >>=? fun delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegate account_endorser
 
-(******************************************************)
-(* create a multiple originate contracts and
-   ask contract to pay the fee *)
+(*******************)
+(** create multiple originated contracts and
+    ask contract to pay the fee *)
+(*******************)
 
 let n_originations n ?credit ?fee ?spendable ?delegatable () =
   fold_left_s (fun new_contracts _ ->
@@ -309,8 +346,9 @@ let multiple_originations () =
   n_originations 100 ~credit:(Tez.of_int 2) ~fee:ten_tez () >>=? fun contracts ->
   Assert.equal_int ~loc:__LOC__ (List.length contracts) 100
 
-(******************************************************)
-(* cannot originate two contracts with the same context's counter *)
+(*******************)
+(** cannot originate two contracts with the same context's counter *)
+(*******************)
 
 let counter () =
   Context.init 1 >>=? fun (b, contracts) ->
@@ -325,8 +363,9 @@ let counter () =
     | _ -> false
   end
 
-(******************************************************)
+(*******************)
 (* create an originate contract from an originate contract *)
+(*******************)
 
 let origination_contract_from_origination_contract () =
   register_origination_inc ~credit:ten_tez () >>=? fun (inc, _source_contract, new_contract) ->
