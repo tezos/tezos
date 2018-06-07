@@ -15,7 +15,7 @@ open Alpha_context
 type t = {
   hash : Block_hash.t ;
   header : Block_header.t ;
-  operations : Operation.t list ;
+  operations : Operation.packed list ;
   context : Tezos_protocol_environment_memory.Context.t ;
 }
 type block = t
@@ -152,7 +152,7 @@ module Forge = struct
       | { expected_commitment = true } -> Some (fst (Proto_Nonce.generate ()))
       | { expected_commitment = false } -> None
     end >>=? fun seed_nonce_hash ->
-    let hashes = List.map Operation.hash operations in
+    let hashes = List.map Operation.hash_packed operations in
     let operations_hash = Operation_list_list_hash.compute
         [Operation_list_hash.compute hashes] in
     let header = make_header
@@ -229,7 +229,6 @@ let genesis
     ?(blocks_per_roll_snapshot = Constants_repr.default.blocks_per_roll_snapshot)
     ?(blocks_per_voting_period = Constants_repr.default.blocks_per_voting_period)
     ?(time_between_blocks = Constants_repr.default.time_between_blocks)
-    ?(first_free_baking_slot = Constants_repr.default.first_free_baking_slot)
     ?(endorsers_per_block = Constants_repr.default.endorsers_per_block)
     ?(hard_gas_limit_per_operation = Constants_repr.default.hard_gas_limit_per_operation)
     ?(hard_gas_limit_per_block = Constants_repr.default.hard_gas_limit_per_block)
@@ -276,7 +275,6 @@ let genesis
     blocks_per_roll_snapshot ;
     blocks_per_voting_period ;
     time_between_blocks ;
-    first_free_baking_slot ;
     endorsers_per_block ;
     hard_gas_limit_per_operation ;
     hard_gas_limit_per_block ;

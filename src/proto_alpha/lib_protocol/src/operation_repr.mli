@@ -156,6 +156,7 @@ val raw: _ operation -> raw
 
 val hash_raw: raw -> Operation_hash.t
 val hash: _ operation -> Operation_hash.t
+val hash_packed: packed_operation -> Operation_hash.t
 
 val acceptable_passes: packed_operation -> int list
 

@@ -910,6 +910,7 @@ module Operation : sig
 
   val hash: _ operation -> Operation_hash.t
   val hash_raw: raw -> Operation_hash.t
+  val hash_packed: packed_operation -> Operation_hash.t
 
   val acceptable_passes: packed_operation -> int list
 

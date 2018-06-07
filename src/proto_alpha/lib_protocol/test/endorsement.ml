@@ -68,7 +68,7 @@ let simple_endorsement () =
     (Contract.implicit_contract endorser) >>=? fun initial_balance ->
   Block.bake
     ~policy:(Excluding [endorser])
-    ~operations:[op]
+    ~operations:[Operation.pack op]
     b >>=? fun b2 ->
   assert_endorser_balance_consistency ~loc:__LOC__
     (B b2) ~nb_endorsement:1 endorser initial_balance
@@ -87,7 +87,7 @@ let max_endorsement () =
       let delegate = endorser.delegate in
       Context.Contract.balance (B b) (Contract.implicit_contract delegate) >>=? fun balance ->
       Op.endorsement ~delegate (B b) endorser.slots >>=? fun op ->
-      return (delegate :: delegates, op :: ops, (List.length endorser.slots, balance) :: balances)
+      return (delegate :: delegates, Operation.pack op :: ops, (List.length endorser.slots, balance) :: balances)
     )
     ([], [], [])
     endorsers >>=? fun (delegates, ops, previous_balances) ->
@@ -116,6 +116,7 @@ let consistent_priority () =
   Context.Contract.balance (B b) (Contract.implicit_contract endorser) >>=? fun balance ->
 
   Op.endorsement ~delegate:endorser (B b) [slot] >>=? fun operation ->
+  let operation = Operation.pack operation in
   Block.bake ~policy:( Excluding [ endorser ] ) ~operation b >>=? fun b ->
 
   assert_endorser_balance_consistency ~loc:__LOC__ ~priority:15
@@ -140,6 +141,7 @@ let consistent_priorities () =
 
       Context.Contract.balance (B b) (Contract.implicit_contract endorser) >>=? fun balance ->
       Op.endorsement ~delegate:endorser (B b) [slot] >>=? fun operation ->
+      let operation = Operation.pack operation in
       Block.bake ~policy:( Excluding [ endorser ] ) ~operation b >>=? fun b ->
 
       assert_endorser_balance_consistency ~loc:__LOC__ ~priority
@@ -156,6 +158,7 @@ let reward_retrieval () =
   Context.get_endorser (B b) slot >>=? fun endorser ->
   Context.Contract.balance (B b) (Contract.implicit_contract endorser) >>=? fun balance ->
   Op.endorsement ~delegate:endorser (B b) [slot] >>=? fun operation ->
+  let operation = Operation.pack operation in
   Block.bake ~policy:(Excluding [ endorser ]) ~operation b >>=? fun b ->
   (* Bake (preserved_cycles + 1) cycles *)
   fold_left_s (fun b _ ->
@@ -176,6 +179,7 @@ let wrong_endorsement_predecessor () =
   Context.get_endorser (B b) 0 >>=? fun genesis_endorser ->
   Block.bake b >>=? fun b' ->
   Op.endorsement ~delegate:genesis_endorser ~signing_context:(B b') (B b) [0]  >>=? fun operation ->
+  let operation = Operation.pack operation in
   Block.bake ~operation b' >>= fun res ->
 
   Assert.proto_error ~loc:__LOC__ res begin function
@@ -190,6 +194,7 @@ let invalid_endorsement_level () =
   Context.get_level (B b) >>=? fun genesis_level ->
   Block.bake b >>=? fun b ->
   Op.endorsement ~level:genesis_level (B b) [0] >>=? fun operation ->
+  let operation = Operation.pack operation in
   Block.bake ~operation b >>= fun res ->
 
   Assert.proto_error ~loc:__LOC__ res begin function
@@ -202,8 +207,10 @@ let duplicate_endorsement () =
   Context.init 5 >>=? fun (b, _) ->
   Incremental.begin_construction b >>=? fun inc ->
   Op.endorsement (B b) [0]  >>=? fun operation ->
+  let operation = Operation.pack operation in
   Incremental.add_operation inc operation >>=? fun inc ->
   Op.endorsement (B b) [0]  >>=? fun operation ->
+  let operation = Operation.pack operation in
   Incremental.add_operation inc operation >>= fun res ->
 
   Assert.proto_error ~loc:__LOC__ res begin function
@@ -219,6 +226,7 @@ let invalid_endorsement_slot () =
   Context.get_endorser (B b) 0 >>=? fun endorser ->
   Op.endorsement ~delegate:endorser (B b) [endorsers_per_block + 1]  >>=? fun operation ->
 
+  let operation = Operation.pack operation in
   Block.bake ~operation b >>= fun res ->
 
   Assert.proto_error ~loc:__LOC__ res begin function

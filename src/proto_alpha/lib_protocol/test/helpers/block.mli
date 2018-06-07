@@ -13,7 +13,7 @@ open Alpha_context
 type t = {
   hash : Block_hash.t ;
   header : Block_header.t ;
-  operations : Operation.t list ;
+  operations : Operation.packed list ;
   context : Tezos_protocol_environment_memory.Context.t ; (** Resulting context *)
 }
 type block = t
@@ -46,7 +46,7 @@ module Forge : sig
       The header can then be modified and applied with [apply]. *)
   val forge_header:
     ?policy:baker_policy ->
-    ?operations: Operation.t list ->
+    ?operations: Operation.packed list ->
     t -> header tzresult Lwt.t
 
   (** Sets seed_nonce_hash of a header *)
@@ -67,7 +67,6 @@ val genesis:
   ?blocks_per_roll_snapshot:int32 ->
   ?blocks_per_voting_period:int32 ->
   ?time_between_blocks:Period_repr.t list ->
-  ?first_free_baking_slot:int ->
   ?endorsers_per_block:int ->
   ?hard_gas_limit_per_operation:Z.t ->
   ?hard_gas_limit_per_block:Z.t ->
@@ -93,7 +92,7 @@ val genesis:
 (** Applies a header and its operations to a block and obtains a new block *)
 val apply:
   Forge.header ->
-  ?operations: Operation.t list ->
+  ?operations: Operation.packed list ->
   t -> t tzresult Lwt.t
 
 (**
@@ -103,8 +102,8 @@ val apply:
 *)
 val bake:
   ?policy: baker_policy ->
-  ?operation: Operation.t ->
-  ?operations: Operation.t list ->
+  ?operation: Operation.packed ->
+  ?operations: Operation.packed list ->
   t -> t tzresult Lwt.t
 
 (** Bakes [n] blocks. *)

@@ -675,6 +675,12 @@ let hash (o : _ operation) =
       protocol_data_encoding
       (Operation_data o.protocol_data) in
   Operation.hash { shell = o.shell ; proto }
+let hash_packed (o : packed_operation) =
+  let proto =
+    Data_encoding.Binary.to_bytes_exn
+      protocol_data_encoding
+      o.protocol_data in
+  Operation.hash { shell = o.shell ; proto }
 
 type ('a, 'b) eq = Eq : ('a, 'a) eq
 

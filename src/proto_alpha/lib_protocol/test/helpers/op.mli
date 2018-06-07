@@ -14,11 +14,11 @@ val endorsement:
   ?delegate:public_key_hash ->
   ?level:Raw_level.t ->
   Context.t -> ?signing_context:Context.t ->
-  int list -> Operation.t tzresult Lwt.t
+  int list -> Kind.endorsements Operation.t tzresult Lwt.t
 
 val miss_signed_endorsement:
   ?level:Raw_level.t ->
-  Context.t -> int -> Operation.t tzresult Lwt.t
+  Context.t -> int -> Kind.endorsements Operation.t tzresult Lwt.t
 
 val transaction:
   ?fee:Tez.tez ->
@@ -29,15 +29,15 @@ val transaction:
   Contract.t ->
   Contract.t ->
   Tez.t ->
-  Operation.t tzresult Lwt.t
+  Operation.packed tzresult Lwt.t
 
 val delegation:
   ?fee:Tez.tez -> Context.t ->
   Contract.t -> public_key_hash option ->
-  Operation.t tzresult Lwt.t
+  Operation.packed tzresult Lwt.t
 
 val revelation:
-  Context.t -> public_key -> Operation.t tzresult Lwt.t
+  Context.t -> public_key -> Operation.packed tzresult Lwt.t
 
 val origination:
   ?delegate:public_key_hash ->
@@ -53,20 +53,24 @@ val origination:
   ?storage_limit:int64 ->
   Context.t ->
   Contract.contract ->
-  (Operation.t * Contract.contract) tzresult Lwt.t
+  (Operation.packed * Contract.contract) tzresult Lwt.t
 
 val originated_contract:
-  Operation.t -> Contract.contract
+  Operation.packed -> Contract.contract
 
 val double_endorsement:
-  Context.t ->  Operation.t -> Operation.t
-  -> Operation.t tzresult Lwt.t
+  Context.t ->
+  Kind.endorsements Operation.t ->
+  Kind.endorsements Operation.t ->
+  Operation.packed tzresult Lwt.t
 
 val double_baking:
-  Context.t ->  Block_header.block_header -> Block_header.block_header
-  -> Operation.t tzresult Lwt.t
+  Context.t ->
+  Block_header.block_header ->
+  Block_header.block_header ->
+  Operation.packed tzresult Lwt.t
 
 val activation:
   Context.t ->
   Signature.Public_key_hash.t -> Blinded_public_key_hash.activation_code ->
-  Operation.t tzresult Lwt.t
+  Operation.packed tzresult Lwt.t

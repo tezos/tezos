@@ -55,7 +55,7 @@ let valid_double_endorsement_evidence () =
   Context.get_endorser (B blk_a) 0 >>=? fun delegate ->
   Op.endorsement ~delegate (B blk_a) [0] >>=? fun endorsement_a ->
   Op.endorsement ~delegate (B blk_b) [0] >>=? fun endorsement_b ->
-  Block.bake ~operations:[endorsement_a] blk_a >>=? fun blk_a ->
+  Block.bake ~operations:[Operation.pack endorsement_a] blk_a >>=? fun blk_a ->
   (* Block.bake ~operations:[endorsement_b] blk_b >>=? fun _ -> *)
 
   Op.double_endorsement (B blk_a) endorsement_a endorsement_b >>=? fun operation ->
@@ -84,7 +84,7 @@ let invalid_double_endorsement () =
   Block.bake b >>=? fun b ->
 
   Op.endorsement (B b) [0] >>=? fun endorsement ->
-  Block.bake ~operation:endorsement b >>=? fun b ->
+  Block.bake ~operation:(Operation.pack endorsement) b >>=? fun b ->
 
   Op.double_endorsement (B b) endorsement endorsement >>=? fun operation ->
   Block.bake ~operation b >>= fun res ->
