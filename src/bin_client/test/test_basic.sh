@@ -13,13 +13,13 @@ $client -w none config update
 sleep 2
 
 #tests for the rpc service raw_context
-$client rpc call '/blocks/head/raw_context/version' | assert '{ "content": "616c706861" }'
-$client rpc call '/blocks/head/raw_context/non-existent' | assert 'No service found at this URL'
-$client rpc call '/blocks/head/raw_context/delegates/?depth=2' | assert '{ "content":
-    { "ed25519":
-        { "02": null, "a9": null, "c5": null, "da": null, "e7": null } } }'
-$client rpc call '/blocks/head/raw_context/non-existent?depth=-1' | assert 'No service found at this URL'
-$client rpc call '/blocks/head/raw_context/non-existent?depth=0' | assert 'No service found at this URL'
+$client rpc get '/chains/main/blocks/head/context/raw/bytes/version' | assert '"616c706861"'
+$client rpc get '/chains/main/blocks/head/context/raw/bytes/non-existent' | assert 'No service found at this URL'
+$client rpc get '/chains/main/blocks/head/context/raw/bytes/delegates/?depth=3' | assert '{ "ed25519":
+    { "02": { "29": null }, "a9": { "ce": null }, "c5": { "5c": null },
+      "da": { "c9": null }, "e7": { "67": null } } }'
+$client rpc get '/chains/main/blocks/head/context/raw/bytes/non-existent?depth=-1' | assert 'Unexpected server answer'
+$client rpc get '/chains/main/blocks/head/context/raw/bytes/non-existent?depth=0' | assert 'No service found at this URL'
 
 bake
 

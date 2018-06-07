@@ -20,6 +20,7 @@ type shell_header = {
 
 let shell_header_encoding =
   let open Data_encoding in
+  def "block_header.shell" @@
   conv
     (fun { level ; proto_level ; predecessor ;
            timestamp ; validation_passes ; operations_hash ; fitness ;

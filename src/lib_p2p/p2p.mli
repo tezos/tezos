@@ -24,10 +24,12 @@ type 'peer_meta peer_meta_config = {
 type 'conn_meta conn_meta_config = {
   conn_meta_encoding : 'conn_meta Data_encoding.t;
   conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
+  private_node : 'conn_meta -> bool ;
 }
 
 type 'msg app_message_encoding = Encoding : {
     tag: int ;
+    title: string ;
     encoding: 'a Data_encoding.t ;
     wrap: 'a -> 'msg ;
     unwrap: 'msg -> 'a option ;
@@ -57,9 +59,11 @@ type config = {
   (** The path to the JSON file where the metadata associated to
       peer_ids are loaded / stored. *)
 
-  closed_network : bool ;
-  (** If [true], the only accepted connections are from peers whose
-      addresses are in [trusted_points]. *)
+  private_mode : bool ;
+  (** If [true], only open outgoing/accept incoming connections
+      to/from peers whose addresses are in [trusted_peers], and inform
+      these peers that the identity of this node should be revealed to
+      the rest of the network. *)
 
   identity : P2p_identity.t ;
   (** Cryptographic identity of the peer. *)
@@ -67,6 +71,8 @@ type config = {
   proof_of_work_target : Crypto_box.target ;
   (** Expected level of proof of work of peers' identity. *)
 
+  disable_mempool : bool ;
+  (** If [true], all non-empty mempools will be ignored. *)
 }
 
 (** Network capacities *)
@@ -142,6 +148,7 @@ type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
     nor open any listening socket *)
 val faked_network :
   'peer_meta peer_meta_config ->
+  'conn_meta ->
   ('msg, 'peer_meta, 'conn_meta) net
 
 (** Main network initialisation function *)
@@ -180,7 +187,15 @@ val find_connection :
 val connection_info :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
-  P2p_connection.Info.t
+  'conn_meta P2p_connection.Info.t
+val connection_local_metadata :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'conn_meta
+val connection_remote_metadata :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'conn_meta
 val connection_stat :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
@@ -245,7 +260,8 @@ val on_new_connection :
   ('msg, 'peer_meta, 'conn_meta) net ->
   (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
 
-val build_rpc_directory : _ t -> unit RPC_directory.t
+val build_rpc_directory :
+  (_, _, Connection_metadata.t) t -> unit RPC_directory.t
 
 val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
 val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit

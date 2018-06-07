@@ -19,11 +19,12 @@ val init :
     forked Tezos node and the block info of the block from where the
     tests will begin. *)
 
-val level : Block_services.block -> Alpha_context.Level.t tzresult Lwt.t
+val level:
+  Chain_services.chain * Block_services.block -> Alpha_context.Level.t tzresult Lwt.t
 
 (** Calls the rpc service raw_context using the right rpc context *)
 val rpc_raw_context : Block_services.block -> string list -> int ->
-  Block_services.raw_context_result tzresult Lwt.t
+  Block_services.raw_context tzresult Lwt.t
 
 module Account : sig
 
@@ -103,7 +104,7 @@ module Baking : sig
   val bake:
     Block_services.block ->
     Account.t ->
-    Operation.raw list ->
+    Operation.packed list ->
     Block_hash.t tzresult Lwt.t
 
 end
@@ -114,14 +115,13 @@ module Endorse : sig
     ?slot:int ->
     Account.t ->
     Block_services.block ->
-    Operation.raw tzresult Lwt.t
+    Operation.packed tzresult Lwt.t
 
   val endorsers_list :
     Block_services.block ->
     Account.t array tzresult Lwt.t
 
   val endorsement_rights :
-    ?max_priority:int ->
     Account.t ->
     Block_services.block ->
     (Raw_level.t * int) list tzresult Lwt.t
@@ -134,14 +134,14 @@ module Protocol : sig
     ?block:Block_services.block ->
     src:Account.t ->
     Protocol_hash.t list ->
-    Operation.raw tzresult Lwt.t
+    Operation.packed tzresult Lwt.t
 
   val ballot :
     ?block:Block_services.block ->
     src:Account.t ->
     proposal:Protocol_hash.t ->
     Vote.ballot ->
-    Operation.raw tzresult Lwt.t
+    Operation.packed tzresult Lwt.t
 
 end
 
@@ -166,7 +166,7 @@ module Assert : sig
 
   val failed_to_preapply:
     msg:string ->
-    ?op:Tezos_base.Operation.t ->
+    ?op:Operation.packed ->
     (Alpha_environment.Error_monad.error ->
      bool) ->
     'a tzresult -> unit

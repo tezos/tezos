@@ -25,6 +25,7 @@ val shutdown: t -> unit Lwt.t
 val activate:
   t ->
   ?max_child_ttl:int ->
+  start_prevalidator:bool ->
   State.Chain.t -> Chain_validator.t Lwt.t
 
 val get: t -> Chain_id.t -> Chain_validator.t tzresult Lwt.t
@@ -45,3 +46,5 @@ val inject_operation:
   t ->
   ?chain_id:Chain_id.t ->
   Operation.t -> unit tzresult Lwt.t
+
+val distributed_db: t -> Distributed_db.t

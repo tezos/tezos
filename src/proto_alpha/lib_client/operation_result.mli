@@ -11,7 +11,8 @@ open Proto_alpha
 open Alpha_context
 
 val pp_internal_operation:
-  Format.formatter -> internal_operation -> unit
+  Format.formatter -> packed_internal_operation -> unit
 
 val pp_operation_result:
-  Format.formatter -> (operation * Apply_operation_result.operation_result) -> unit
+  Format.formatter ->
+  ('kind contents_list * 'kind Apply_operation_result.contents_result_list) -> unit

@@ -10,7 +10,7 @@
 open Proto_alpha
 open Alpha_context
 
-open Logging.Client.Endorsement
+include Logging.Make(struct let name = "client.endorsement" end)
 
 module State : sig
 
@@ -49,33 +49,6 @@ end = struct
 
 end
 
-let get_signing_slots cctxt ?max_priority block delegate level =
-  Alpha_services.Delegate.Endorser.rights_for_delegate cctxt
-    ?max_priority ~first_level:level ~last_level:level
-    block delegate >>=? fun possibilities ->
-  let slots =
-    List.map (fun (_,slot) -> slot)
-    @@ List.filter (fun (l, _) -> l = level) possibilities in
-  return slots
-
-let inject_endorsement (cctxt : #Proto_alpha.full)
-    block level ?async
-    src_sk slots =
-  Block_services.info cctxt block >>=? fun bi ->
-  Alpha_services.Forge.Consensus.endorsement cctxt
-    block
-    ~branch:bi.hash
-    ~block:bi.hash
-    ~level:level
-    ~slots
-    () >>=? fun bytes ->
-  Client_keys.append
-    src_sk ~watermark:Endorsement bytes >>=? fun signed_bytes ->
-  Shell_services.inject_operation
-    cctxt ?async ~chain_id:bi.chain_id signed_bytes >>=? fun oph ->
-  State.record_endorsement cctxt level >>=? fun () ->
-  return oph
-
 let previously_endorsed_level cctxt level =
   State.get_endorsement cctxt >>=? fun last ->
   return Raw_level.(level <= last)
@@ -88,21 +61,53 @@ let check_endorsement cctxt level =
         "Already signed a block at level %a"
         Raw_level.pp level
 
+let get_signing_slots cctxt ?(chain = `Main) block delegate level =
+  Alpha_services.Delegate.Endorsing_rights.get cctxt
+    ~levels:[level]
+    ~delegates:[delegate]
+    (chain, block) >>=? fun possibilities ->
+  match possibilities with
+  | [{ slots }] -> return slots
+  | _ -> return []
+
+let inject_endorsement
+    (cctxt : #Proto_alpha.full)
+    ?(chain = `Main) block level ?async
+    src_sk slots =
+  check_endorsement cctxt level >>=? fun () ->
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
+  Alpha_services.Forge.endorsement cctxt
+    (chain, block)
+    ~branch:hash
+    ~block:hash
+    ~level:level
+    ~slots
+    () >>=? fun bytes ->
+  Client_keys.append
+    src_sk ~watermark:Endorsement bytes >>=? fun signed_bytes ->
+  Shell_services.Injection.operation cctxt
+    ?async ~chain signed_bytes >>=? fun oph ->
+  State.record_endorsement cctxt level >>=? fun () ->
+  return oph
+
 let forge_endorsement (cctxt : #Proto_alpha.full)
-    block
-    ~src_sk ?slots ?max_priority src_pk =
+    ?(chain = `Main) block
+    ~src_sk ?slots src_pk =
   let src_pkh = Signature.Public_key.hash src_pk in
-  Alpha_services.Context.level cctxt block >>=? fun { level } ->
+  Alpha_block_services.metadata cctxt
+    ~chain ~block () >>=? fun { protocol_data = { level = { level } } } ->
   begin
     match slots with
     | Some slots -> return slots
     | None ->
         get_signing_slots
-          cctxt ?max_priority block src_pkh level >>=? function
+          cctxt ~chain block src_pkh level >>=? function
         | [] -> cctxt#error "No slot found at level %a" Raw_level.pp level
         | slots -> return slots
   end >>=? fun slots ->
-  inject_endorsement cctxt block level src_sk slots
+  inject_endorsement cctxt
+    ~chain block level
+    src_sk slots
 
 
 (** Worker *)
@@ -236,9 +241,9 @@ let compute_timeout state =
 let create (cctxt : #Proto_alpha.full) ~delay contracts block_stream =
   lwt_log_info "Starting endorsement daemon" >>= fun () ->
   Lwt_stream.get block_stream >>= function
-  | None | Some (Ok []) | Some (Error _) ->
+  | None | Some (Error _) ->
       cctxt#error "Can't fetch the current block head."
-  | Some (Ok (bi :: _ as initial_heads)) ->
+  | Some (Ok head) ->
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with
@@ -247,17 +252,17 @@ let create (cctxt : #Proto_alpha.full) ~delay contracts block_stream =
             last_get_block := Some t ;
             t
         | Some t -> t in
-      let state = create_state contracts bi (Int64.of_int delay) in
+      let state = create_state contracts head (Int64.of_int delay) in
       let rec worker_loop () =
         let timeout = compute_timeout state in
         Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
                      (get_block () >|= fun b -> `Hash b) ] >>= function
         | `Hash (None | Some (Error _)) ->
             Lwt.return_unit
-        | `Hash (Some (Ok bis)) ->
+        | `Hash (Some (Ok bi)) ->
             Lwt.cancel timeout ;
             last_get_block := None ;
-            schedule_endorsements cctxt state bis >>= fun () ->
+            schedule_endorsements cctxt state [bi] >>= fun () ->
             worker_loop ()
         | `Timeout ->
             begin
@@ -270,5 +275,5 @@ let create (cctxt : #Proto_alpha.full) ~delay contracts block_stream =
                   Lwt.return_unit
             end >>= fun () ->
             worker_loop () in
-      schedule_endorsements cctxt state initial_heads >>= fun () ->
+      schedule_endorsements cctxt state [head] >>= fun () ->
       worker_loop ()

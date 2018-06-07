@@ -7,9 +7,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** [wait_for_operation_inclusion chain ~predecessors ~confirmations
+    oph] waits for `oph` to appears in the main chain with at least
+    `confirmations`. It returns the hash of the block that contains
+    the operation and the operation position in the block.
+
+    This functions also looks for the operations in the `predecessors`
+    of the intial chain head. *)
 val wait_for_operation_inclusion:
   #Client_context.full ->
+  chain:Chain_services.chain ->
   ?predecessors:int ->
   ?confirmations:int ->
   Operation_hash.t ->
-  unit tzresult Lwt.t
+  (Block_hash.t * int * int) tzresult Lwt.t

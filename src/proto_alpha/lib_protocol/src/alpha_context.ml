@@ -27,7 +27,12 @@ end
 
 include Operation_repr
 module Operation = struct
-  type t = operation
+  type 'kind t = 'kind operation = {
+    shell: Operation.shell_header ;
+    protocol_data: 'kind protocol_data ;
+  }
+  type packed = packed_operation
+  let unsigned_encoding = unsigned_operation_encoding
   include Operation_repr
 end
 module Block_header = Block_header_repr
@@ -68,6 +73,7 @@ module Gas = struct
   let set_unlimited = Raw_context.set_gas_unlimited
   let consume = Raw_context.consume_gas
   let level = Raw_context.gas_level
+  let consumed = Raw_context.gas_consumed
   let block_level = Raw_context.block_gas_level
 end
 module Level = struct
@@ -141,8 +147,12 @@ let fresh_internal_nonce = Raw_context.fresh_internal_nonce
 let record_internal_nonce = Raw_context.record_internal_nonce
 let internal_nonce_already_recorded = Raw_context.internal_nonce_already_recorded
 
+let add_deposit = Raw_context.add_deposit
 let add_fees = Raw_context.add_fees
 let add_rewards = Raw_context.add_rewards
 
+let get_deposits = Raw_context.get_deposits
 let get_fees = Raw_context.get_fees
 let get_rewards = Raw_context.get_rewards
+
+let description = Raw_context.description

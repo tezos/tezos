@@ -128,7 +128,8 @@ module Operation_hashes :
 val commit_block:
   chain_db ->
   Block_hash.t ->
-  Block_header.t -> Operation.t list list ->
+  Block_header.t -> MBytes.t ->
+  Operation.t list list -> MBytes.t list list ->
   Tezos_protocol_environment_shell.validation_result ->
   State.Block.t option tzresult Lwt.t
 

@@ -15,14 +15,16 @@ type 'peer_meta peer_meta_config = 'peer_meta P2p_pool.peer_meta_config = {
   score : 'peer_meta -> float ;
 }
 
-type 'conn_meta conn_meta_config = 'conn_meta P2p_pool.conn_meta_config = {
+type 'conn_meta conn_meta_config = 'conn_meta P2p_socket.metadata_config = {
   conn_meta_encoding : 'conn_meta Data_encoding.t ;
   conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
+  private_node : 'conn_meta -> bool ;
 }
 
 type 'msg app_message_encoding = 'msg P2p_pool.encoding =
     Encoding : {
       tag: int ;
+      title: string ;
       encoding: 'a Data_encoding.t ;
       wrap: 'a -> 'msg ;
       unwrap: 'msg -> 'a option ;
@@ -39,9 +41,10 @@ type config = {
   listening_addr : P2p_addr.t option;
   trusted_points : P2p_point.Id.t list ;
   peers_file : string ;
-  closed_network : bool ;
+  private_mode : bool ;
   identity : P2p_identity.t ;
   proof_of_work_target : Crypto_box.target ;
+  disable_mempool : bool ;
 }
 
 type limits = {
@@ -90,14 +93,14 @@ let create_scheduler limits =
     ?write_queue_size:limits.write_queue_size
     ()
 
-let create_connection_pool config limits meta_cfg msg_cfg io_sched =
+let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg io_sched =
   let pool_cfg = {
     P2p_pool.identity = config.identity ;
     proof_of_work_target = config.proof_of_work_target ;
     listening_port = config.listening_port ;
     trusted_points = config.trusted_points ;
     peers_file = config.peers_file ;
-    closed_network = config.closed_network ;
+    private_mode = config.private_mode ;
     min_connections = limits.min_connections ;
     max_connections = limits.max_connections ;
     max_incoming_connections = limits.max_incoming_connections ;
@@ -116,7 +119,7 @@ let create_connection_pool config limits meta_cfg msg_cfg io_sched =
   }
   in
   let pool =
-    P2p_pool.create pool_cfg meta_cfg msg_cfg io_sched in
+    P2p_pool.create pool_cfg meta_cfg conn_meta_cfg msg_cfg io_sched in
   pool
 
 let bounds ~min ~expected ~max =
@@ -204,6 +207,10 @@ module Real = struct
     P2p_pool.disconnect ?wait conn
   let connection_info _net conn =
     P2p_pool.Connection.info conn
+  let connection_local_metadata _net conn =
+    P2p_pool.Connection.local_metadata conn
+  let connection_remote_metadata _net conn =
+    P2p_pool.Connection.remote_metadata conn
   let connection_stat _net conn =
     P2p_pool.Connection.stat conn
   let global_stat { pool } () =
@@ -216,8 +223,8 @@ module Real = struct
   let recv _net conn =
     P2p_pool.read conn >>=? fun msg ->
     lwt_debug "message read from %a"
-      P2p_connection.Info.pp
-      (P2p_pool.Connection.info conn) >>= fun () ->
+      P2p_peer.Id.pp
+      (P2p_pool.Connection.info conn).peer_id >>= fun () ->
     return msg
 
   let rec recv_any net () =
@@ -238,13 +245,13 @@ module Real = struct
         P2p_pool.read conn >>= function
         | Ok msg ->
             lwt_debug "message read from %a"
-              P2p_connection.Info.pp
-              (P2p_pool.Connection.info conn) >>= fun () ->
+              P2p_peer.Id.pp
+              (P2p_pool.Connection.info conn).peer_id >>= fun () ->
             Lwt.return (conn, msg)
         | Error _ ->
             lwt_debug "error reading message from %a"
-              P2p_connection.Info.pp
-              (P2p_pool.Connection.info conn) >>= fun () ->
+              P2p_peer.Id.pp
+              (P2p_pool.Connection.info conn).peer_id >>= fun () ->
             Lwt_unix.yield () >>= fun () ->
             recv_any net ()
 
@@ -252,13 +259,13 @@ module Real = struct
     P2p_pool.write conn m >>= function
     | Ok () ->
         lwt_debug "message sent to %a"
-          P2p_connection.Info.pp
-          (P2p_pool.Connection.info conn) >>= fun () ->
+          P2p_peer.Id.pp
+          (P2p_pool.Connection.info conn).peer_id >>= fun () ->
         return ()
     | Error err ->
         lwt_debug "error sending message from %a: %a"
-          P2p_connection.Info.pp
-          (P2p_pool.Connection.info conn)
+          P2p_peer.Id.pp
+          (P2p_pool.Connection.info conn).peer_id
           pp_print_error err >>= fun () ->
         Lwt.return (Error err)
 
@@ -266,13 +273,13 @@ module Real = struct
     match P2p_pool.write_now conn v with
     | Ok v ->
         debug "message trysent to %a"
-          P2p_connection.Info.pp
-          (P2p_pool.Connection.info conn) ;
+          P2p_peer.Id.pp
+          (P2p_pool.Connection.info conn).peer_id ;
         v
     | Error err ->
         debug "error trysending message to %a@ %a"
-          P2p_connection.Info.pp
-          (P2p_pool.Connection.info conn)
+          P2p_peer.Id.pp
+          (P2p_pool.Connection.info conn).peer_id
           pp_print_error err ;
         false
 
@@ -303,12 +310,15 @@ module Fake = struct
     current_inflow = 0 ;
     current_outflow = 0 ;
   }
-  let connection_info = {
+  let connection_info faked_metadata = {
     P2p_connection.Info.incoming = false ;
     peer_id = id.peer_id ;
     id_point = (Ipaddr.V6.unspecified, None) ;
     remote_socket_port = 0 ;
     versions = [] ;
+    local_metadata = faked_metadata ;
+    remote_metadata = faked_metadata ;
+    private_node = false ;
   }
 
 end
@@ -325,7 +335,11 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   disconnect :
     ?wait:bool -> ('msg, 'peer_meta, 'conn_meta) connection -> unit Lwt.t ;
   connection_info :
-    ('msg, 'peer_meta, 'conn_meta) connection -> P2p_connection.Info.t ;
+    ('msg, 'peer_meta, 'conn_meta) connection -> 'conn_meta P2p_connection.Info.t ;
+  connection_local_metadata :
+    ('msg, 'peer_meta, 'conn_meta) connection -> 'conn_meta ;
+  connection_remote_metadata :
+    ('msg, 'peer_meta, 'conn_meta) connection -> 'conn_meta ;
   connection_stat : ('msg, 'peer_meta, 'conn_meta) connection -> P2p_stat.t ;
   global_stat : unit -> P2p_stat.t ;
   get_peer_metadata : P2p_peer.Id.t -> 'peer_meta ;
@@ -401,6 +415,8 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
     find_connection = Real.find_connection net ;
     disconnect = Real.disconnect ;
     connection_info = Real.connection_info net  ;
+    connection_local_metadata = Real.connection_local_metadata net  ;
+    connection_remote_metadata = Real.connection_remote_metadata net  ;
     connection_stat = Real.connection_stat net ;
     global_stat = Real.global_stat net ;
     get_peer_metadata = Real.get_peer_metadata net ;
@@ -416,7 +432,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
     on_new_connection = Real.on_new_connection net ;
   }
 
-let faked_network peer_cfg = {
+let faked_network peer_cfg faked_metadata = {
   versions = [] ;
   peer_id = Fake.id.peer_id ;
   maintain = Lwt.return ;
@@ -425,7 +441,9 @@ let faked_network peer_cfg = {
   connections = (fun () -> []) ;
   find_connection = (fun _ -> None) ;
   disconnect = (fun ?wait:_ _ -> Lwt.return_unit) ;
-  connection_info = (fun _ -> Fake.connection_info) ;
+  connection_info = (fun _ -> Fake.connection_info faked_metadata) ;
+  connection_local_metadata = (fun _ -> faked_metadata) ;
+  connection_remote_metadata = (fun _ -> faked_metadata) ;
   connection_stat = (fun _ -> Fake.empty_stat) ;
   global_stat = (fun () -> Fake.empty_stat) ;
   get_peer_metadata = (fun _ -> peer_cfg.peer_meta_initial) ;
@@ -449,6 +467,8 @@ let connections net = net.connections ()
 let disconnect net = net.disconnect
 let find_connection net = net.find_connection
 let connection_info net = net.connection_info
+let connection_local_metadata net = net.connection_local_metadata
+let connection_remote_metadata net = net.connection_remote_metadata
 let connection_stat net = net.connection_stat
 let global_stat net = net.global_stat ()
 let get_peer_metadata net = net.get_peer_metadata
@@ -507,13 +527,19 @@ let info_of_peer_info pool i =
     | Disconnected -> Disconnected, None in
   let peer_id = P2p_peer_state.Info.peer_id i in
   let score = P2p_pool.Peers.get_score pool peer_id in
+  let conn_opt = P2p_pool.Connection.find_by_peer_id pool peer_id in
   let stat =
-    match P2p_pool.Connection.find_by_peer_id pool peer_id with
+    match conn_opt with
     | None -> P2p_stat.empty
     | Some conn -> P2p_pool.Connection.stat conn in
+  let meta_opt =
+    match conn_opt with
+    | None -> None
+    | Some conn -> Some (P2p_pool.Connection.remote_metadata conn) in
   P2p_peer_state.Info.{
     score ;
     trusted = trusted i ;
+    conn_metadata = meta_opt ;
     state ;
     id_point ;
     stat ;
@@ -555,11 +581,11 @@ let build_rpc_directory net =
     end in
 
   let dir =
-    RPC_directory.register1 dir P2p_services.S.connect begin fun point () timeout ->
+    RPC_directory.register1 dir P2p_services.S.connect begin fun point q () ->
       match net.pool with
       | None -> failwith "The P2P layer is disabled."
       | Some pool ->
-          P2p_pool.connect ~timeout pool point >>=? fun _conn ->
+          P2p_pool.connect ~timeout:q#timeout pool point >>=? fun _conn ->
           return ()
     end in
 
@@ -577,13 +603,13 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.lwt_register1 dir P2p_services.Connections.S.kick
-      begin fun peer_id () wait ->
+      begin fun peer_id q () ->
         match net.pool with
         | None -> Lwt.return_unit
         | Some pool ->
             match P2p_pool.Connection.find_by_peer_id pool peer_id with
             | None -> Lwt.return_unit
-            | Some conn -> P2p_pool.disconnect ~wait conn
+            | Some conn -> P2p_pool.disconnect ~wait:q#wait conn
       end in
 
   let dir =
@@ -604,7 +630,7 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.register0 dir P2p_services.Peers.S.list
-      begin fun () restrict ->
+      begin fun q () ->
         match net.pool with
         | None -> return []
         | Some pool ->
@@ -613,9 +639,10 @@ let build_rpc_directory net =
               ~init:[]
               ~f:begin fun peer_id i a ->
                 let info = info_of_peer_info pool i in
-                match restrict with
+                match q#filters with
                 | [] -> (peer_id, info) :: a
-                | _ when List.mem info.state restrict -> (peer_id, info) :: a
+                | filters when P2p_peer.State.filter filters info.state ->
+                    (peer_id, info) :: a
                 | _ -> a
               end
       end in
@@ -633,7 +660,7 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.gen_register1 dir P2p_services.Peers.S.events
-      begin fun peer_id () monitor ->
+      begin fun peer_id q () ->
         match net.pool with
         | None -> RPC_answer.not_found
         | Some pool ->
@@ -645,7 +672,7 @@ let build_rpc_directory net =
                   P2p_peer_state.Info.fold gi ~init:[]
                     ~f:(fun a e -> e :: a) in
                 let evts = (if rev then List.rev_sub else List.sub) evts max in
-                if not monitor then
+                if not q#monitor then
                   RPC_answer.return evts
                 else
                   let stream, stopper = P2p_peer_state.Info.watch gi in
@@ -697,7 +724,7 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.register0 dir P2p_services.Points.S.list
-      begin fun () restrict ->
+      begin fun q () ->
         match net.pool with
         | None -> return []
         | Some pool ->
@@ -706,9 +733,10 @@ let build_rpc_directory net =
               pool ~init:[]
               ~f:begin fun point i a ->
                 let info = info_of_point_info i in
-                match restrict with
+                match q#filters with
                 | [] -> (point, info) :: a
-                | _ when List.mem info.state restrict -> (point, info) :: a
+                | filters when P2p_point.State.filter filters info.state ->
+                    (point, info) :: a
                 | _ -> a
               end
       end in
@@ -727,7 +755,7 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.gen_register1 dir P2p_services.Points.S.events
-      begin fun point_id () monitor ->
+      begin fun point_id q () ->
         match net.pool with
         | None -> RPC_answer.not_found
         | Some pool ->
@@ -739,7 +767,7 @@ let build_rpc_directory net =
                   P2p_point_state.Info.fold gi ~init:[]
                     ~f:(fun a e -> e :: a) in
                 let evts = (if rev then List.rev_sub else List.sub) evts max in
-                if not monitor then
+                if not q#monitor then
                   RPC_answer.return evts
                 else
                   let stream, stopper = P2p_point_state.Info.watch gi in

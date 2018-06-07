@@ -16,6 +16,7 @@ type limits = {
 
 val create:
   ?max_child_ttl:int ->
+  start_prevalidator:bool ->
   Peer_validator.limits ->
   Prevalidator.limits ->
   Block_validator.t ->
@@ -29,7 +30,7 @@ val bootstrapped: t -> unit Lwt.t
 
 val chain_id: t -> Chain_id.t
 val chain_state: t -> State.Chain.t
-val prevalidator: t -> Prevalidator.t
+val prevalidator: t -> Prevalidator.t option
 val chain_db: t -> Distributed_db.chain_db
 val child: t -> t option
 

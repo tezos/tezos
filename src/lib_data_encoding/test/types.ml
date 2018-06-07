@@ -101,24 +101,29 @@ type union = A of int | B of string | C of int | D of string | E
 let union_enc =
   union [
     case (Tag 1)
+      ~title:"A"
       int8
       (function A i -> Some i | _ -> None)
       (fun i -> A i) ;
     case (Tag 2)
+      ~title:"B"
       string
       (function B s -> Some s | _ -> None)
       (fun s -> B s) ;
     case (Tag 3)
+      ~title:"C"
       (obj1 (req "C" int8))
       (function C i -> Some i | _ -> None)
       (fun i -> C i) ;
     case (Tag 4)
+      ~title:"D"
       (obj2
          (req "kind" (constant "D"))
          (req "data" (string)))
       (function D s -> Some ((), s) | _ -> None)
       (fun ((), s) -> D s) ;
     case (Tag 5)
+      ~title:"E"
       empty
       (function E -> Some () | _ -> None)
       (fun () -> E) ;
@@ -127,6 +132,7 @@ let union_enc =
 let mini_union_enc =
   union [
     case (Tag 1)
+      ~title:"A"
       int8
       (function A i -> Some i | _ -> None)
       (fun i -> A i) ;
@@ -151,10 +157,12 @@ let mu_list_enc enc =
   mu "list" @@ fun mu_list_enc ->
   union [
     case (Tag 0)
+      ~title:"Nil"
       empty
       (function [] -> Some () | _ :: _ -> None)
       (fun () -> []) ;
     case (Tag 1)
+      ~title:"Cons"
       (obj2
          (req "value" enc)
          (req "next" mu_list_enc))

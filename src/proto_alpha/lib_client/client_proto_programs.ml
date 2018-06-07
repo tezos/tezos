@@ -86,51 +86,75 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
 
-let get_contract cctxt block contract =
+let get_contract cctxt ?(chain = `Main) block contract =
   match contract with
   | Some contract -> return contract
   | None ->
       (* TODO use local contract by default *)
-      Alpha_services.Contract.list cctxt block >>|? List.hd
+      Alpha_services.Contract.list cctxt (chain, block) >>|? List.hd
 
 let run
+    (cctxt : #Proto_alpha.rpc_context)
+    ?(chain = `Main)
+    block
     ?contract
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
-    block
-    (cctxt : #RPC_context.simple) =
-  get_contract cctxt block contract >>=? fun contract ->
-  Alpha_services.Helpers.run_code cctxt
-    block program.expanded (storage.expanded, input.expanded, amount, contract)
+    () =
+  get_contract cctxt ~chain block contract >>=? fun contract ->
+  Alpha_services.Helpers.Scripts.run_code cctxt
+    (chain, block)
+    program.expanded (storage.expanded, input.expanded, amount, contract)
 
 let trace
+    (cctxt : #Proto_alpha.rpc_context)
+    ?(chain = `Main)
+    block
     ?contract
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
-    block
-    (cctxt : #RPC_context.simple) =
-  get_contract cctxt block contract >>=? fun contract ->
-  Alpha_services.Helpers.trace_code cctxt
-    block program.expanded (storage.expanded, input.expanded, amount, contract)
+    () =
+  get_contract cctxt ~chain block contract >>=? fun contract ->
+  Alpha_services.Helpers.Scripts.trace_code cctxt
+    (chain, block)
+    program.expanded (storage.expanded, input.expanded, amount, contract)
 
-let hash_and_sign ?gas (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser.parsed) sk block cctxt =
-  Alpha_services.Helpers.hash_data cctxt block (data.expanded, typ.expanded, gas) >>=? fun (hash, gas) ->
+let hash_and_sign
+    cctxt
+    ?(chain = `Main)
+    block
+    ?gas
+    (data : Michelson_v1_parser.parsed)
+    (typ : Michelson_v1_parser.parsed)
+    sk =
+  Alpha_services.Helpers.Scripts.hash_data
+    cctxt (chain, block) (data.expanded, typ.expanded, gas) >>=? fun (hash, gas) ->
   Client_keys.sign sk (MBytes.of_string hash) >>=? fun signature ->
   return (hash, Signature.to_b58check signature, gas)
 
 let typecheck_data
+    cctxt
+    ?(chain = `Main)
+    block
     ?gas
     ~(data : Michelson_v1_parser.parsed)
     ~(ty : Michelson_v1_parser.parsed)
-    block cctxt =
-  Alpha_services.Helpers.typecheck_data cctxt block (data.expanded, ty.expanded, gas)
+    () =
+  Alpha_services.Helpers.Scripts.typecheck_data
+    cctxt (chain, block)
+    (data.expanded, ty.expanded, gas)
 
-let typecheck_program ?gas (program : Michelson_v1_parser.parsed) block cctxt =
-  Alpha_services.Helpers.typecheck_code cctxt block (program.expanded, gas)
+let typecheck_program
+    cctxt
+    ?(chain = `Main)
+    block
+    ?gas
+    (program : Michelson_v1_parser.parsed) =
+  Alpha_services.Helpers.Scripts.typecheck_code cctxt (chain, block) (program.expanded, gas)
 
 let print_typecheck_result
     ~emacs ~show_types ~print_source_on_error

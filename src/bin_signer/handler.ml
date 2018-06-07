@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let log = Logging.Client.Sign.lwt_log_notice
+let log = Signer_logging.lwt_log_notice
 
 let sign (cctxt : #Client_context.wallet) pkh data =
   log "Request for signing %d bytes of data for key %a, magic byte = %02X"

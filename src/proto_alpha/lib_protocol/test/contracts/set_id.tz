@@ -1,3 +1,0 @@
-parameter (set string);
-storage (set string);
-code { CAR ; NIL operation ; PAIR }

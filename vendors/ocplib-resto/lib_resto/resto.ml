@@ -28,13 +28,14 @@ let meth_of_string = function
 module MethMap = Map.Make(struct type t = meth let compare = compare end)
 module StringMap = Map.Make(String)
 
+type (_, _) eq = Eq : ('a, 'a) eq
+
 module Internal = struct
 
   module Ty = struct
 
     type 'a witness = ..
     exception Not_equal
-    type (_, _) eq = Eq : ('a, 'a) eq
     module type Ty = sig
       type t val witness : t witness
       val eq: 'a witness -> ('a, t) eq
@@ -217,6 +218,10 @@ module Arg = struct
   let string =
     make ~name:"string" ~destruct:(fun x -> Ok x) ~construct:(fun x -> x) ()
 
+  let eq a1 a2 =
+    try Some (Ty.eq a1.id a2.id)
+    with Internal.Ty.Not_equal -> None
+
 end
 
 module Path = struct
@@ -329,7 +334,7 @@ module Query = struct
       | F1 (Single field, fs) -> begin
           match StringMap.find field.name map with
           | Parsed (Single field', v) ->
-              let Ty.Eq = Ty.eq field.ty.id field'.ty.id in
+              let Eq = Ty.eq field.ty.id field'.ty.id in
               let v = match v with None -> field.default | Some v -> v in
               rebuild map fs (f v)
           | Parsed _ -> assert false
@@ -337,7 +342,7 @@ module Query = struct
       | F1 (Opt field, fs) -> begin
           match StringMap.find field.name map with
           | Parsed (Opt field', v) ->
-              let Ty.Eq = Ty.eq field.ty.id field'.ty.id in
+              let Eq = Ty.eq field.ty.id field'.ty.id in
               let v = match v with None -> None | Some v -> v in
               rebuild map fs (f v)
           | Parsed _ -> assert false
@@ -352,7 +357,7 @@ module Query = struct
       | F1 (Multi field, fs) -> begin
           match StringMap.find field.name map with
           | Parsed (Multi field', v) ->
-              let Ty.Eq = Ty.eq field.ty.id field'.ty.id in
+              let Eq = Ty.eq field.ty.id field'.ty.id in
               let v = match v with None -> [] | Some v -> v in
               rebuild map fs (f v)
           | Parsed _ -> assert false

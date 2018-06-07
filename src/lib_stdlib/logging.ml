@@ -67,26 +67,6 @@ module Make(S : sig val name: string end) : LOG = struct
 end
 
 module Core = Make(struct let name = "core" end)
-module P2p = Make(struct let name = "p2p" end)
-module RPC = Make(struct let name = "rpc" end)
-module Db = Make(struct let name = "db" end)
-module Updater = Make(struct let name = "updater" end)
-module Node = struct
-  module State = Make(struct let name = "node.state" end)
-  module Validator = Make(struct let name = "node.validator" end)
-  module Prevalidator = Make(struct let name = "node.prevalidator" end)
-  module Discoverer = Make(struct let name = "node.discoverer" end)
-  module Worker = Make(struct let name = "node.worker" end)
-  module Main = Make(struct let name = "node.main" end)
-end
-module Client = struct
-  module Blocks = Make(struct let name = "client.blocks" end)
-  module Baking = Make(struct let name = "client.baking" end)
-  module Endorsement = Make(struct let name = "client.endorsement" end)
-  module Revelation = Make(struct let name = "client.revealation" end)
-  module Denunciation = Make(struct let name = "client.denunciation" end)
-  module Sign = Make(struct let name = "client.signer" end)
-end
 
 type level = Lwt_log_core.level =
   | Debug

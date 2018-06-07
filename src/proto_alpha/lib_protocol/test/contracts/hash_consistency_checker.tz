@@ -1,3 +1,0 @@
-parameter (pair mutez (pair timestamp int)) ;
-storage string ;
-code { CAR ; H ; NIL operation ; PAIR }

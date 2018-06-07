@@ -1,7 +1,0 @@
-parameter (pair (list string) (list string));
-storage (option bool);
-code {CAR; DUP; CAR; DIP{CDR}; EMPTY_SET string; SWAP;
-      ITER {PAIR; DUP; CAR; DIP{CDR}; PUSH bool True; SWAP; UPDATE};
-      PUSH bool True; SWAP; PAIR; SWAP;
-      ITER {PAIR; DUP; DUP; CAR; DIP{CDAR; DIP{CDDR}; DUP}; MEM; DIP{SWAP}; AND; SWAP; PAIR};
-      CDR; SOME; NIL operation; PAIR};

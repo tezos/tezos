@@ -1,3 +1,0 @@
-parameter key;
-storage (option key_hash);
-code {CAR; HASH_KEY; SOME ;NIL operation; PAIR}

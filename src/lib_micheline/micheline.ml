@@ -20,8 +20,7 @@ type 'p canonical = Canonical of (canonical_location, 'p) node
 let canonical_location_encoding =
   let open Data_encoding in
   def
-    "micheline.location" @@
-  describe
+    "micheline.location"
     ~title:
       "Canonical location in a Micheline expression"
     ~description:
@@ -121,19 +120,23 @@ let canonical_encoding ~variant prim_encoding =
     obj1 (req "string" string) in
   let int_encoding tag =
     case tag int_encoding
+      ~title:"Int"
       (function Int (_, v) -> Some v | _ -> None)
       (fun v -> Int (0, v)) in
   let string_encoding tag =
     case tag string_encoding
+      ~title:"String"
       (function String (_, v) -> Some v | _ -> None)
       (fun v -> String (0, v)) in
   let seq_encoding tag expr_encoding =
     case tag (list expr_encoding)
+      ~title:"Sequence"
       (function Seq (_, v, _annot) -> Some v | _ -> None)
       (fun args -> Seq (0, args, None)) in
   let byte_string = Bounded.string 255 in
   let application_encoding tag expr_encoding =
     case tag
+      ~title:"Generic prim (any number of args with or without annot)"
       (obj3 (req "prim" prim_encoding)
          (req "args" (list expr_encoding))
          (opt "annot" byte_string))
@@ -141,8 +144,6 @@ let canonical_encoding ~variant prim_encoding =
               | _ -> None)
       (fun (prim, args, annot) -> Prim (0, prim, args, annot)) in
   let node_encoding = mu ("micheline." ^ variant ^ ".expression") (fun expr_encoding ->
-      describe
-        ~title: ("Micheline expression (" ^ variant ^ " variant)") @@
       splitted
         ~json:(union ~tag_size:`Uint8
                  [ int_encoding Json_only;
@@ -155,12 +156,14 @@ let canonical_encoding ~variant prim_encoding =
                      seq_encoding (Tag 2) expr_encoding ;
                      (* No args, no annot *)
                      case (Tag 3)
+                       ~title:"Prim (no args, annot)"
                        (obj1 (req "prim" prim_encoding))
                        (function Prim (_, v, [], None) -> Some v
                                | _ -> None)
                        (fun v -> Prim (0, v, [], None)) ;
                      (* No args, with annot *)
                      case (Tag 4)
+                       ~title:"Prim (no args + annot)"
                        (obj2 (req "prim" prim_encoding)
                           (req "annot" byte_string))
                        (function
@@ -169,6 +172,7 @@ let canonical_encoding ~variant prim_encoding =
                        (function (prim, annot) -> Prim (0, prim, [], Some annot)) ;
                      (* Single arg, no annot *)
                      case (Tag 5)
+                       ~title:"Prim (1 arg, no annot)"
                        (obj2 (req "prim" prim_encoding)
                           (req "arg" expr_encoding))
                        (function
@@ -177,6 +181,7 @@ let canonical_encoding ~variant prim_encoding =
                        (function (prim, arg) -> Prim (0, prim, [ arg ], None)) ;
                      (* Single arg, with annot *)
                      case (Tag 6)
+                       ~title:"Prim (1 arg + annot)"
                        (obj3 (req "prim" prim_encoding)
                           (req "arg" expr_encoding)
                           (req "annot" byte_string))
@@ -186,6 +191,7 @@ let canonical_encoding ~variant prim_encoding =
                        (fun (prim, arg, annot) -> Prim (0, prim, [ arg ], Some annot)) ;
                      (* Two args, no annot *)
                      case (Tag 7)
+                       ~title:"Prim (2 args, no annot)"
                        (obj3 (req "prim" prim_encoding)
                           (req "arg1" expr_encoding)
                           (req "arg2" expr_encoding))
@@ -195,6 +201,7 @@ let canonical_encoding ~variant prim_encoding =
                        (fun (prim, arg1, arg2) -> Prim (0, prim, [ arg1 ; arg2 ], None)) ;
                      (* Two args, with annot *)
                      case (Tag 8)
+                       ~title:"Prim (2 args + annot)"
                        (obj4 (req "prim" prim_encoding)
                           (req "arg1" expr_encoding)
                           (req "arg2" expr_encoding)

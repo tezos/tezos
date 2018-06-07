@@ -95,7 +95,9 @@ val originate:
 val fresh_contract_from_current_nonce :
   Raw_context.t -> (Raw_context.t * Contract_repr.t) tzresult Lwt.t
 val originated_from_current_nonce :
-  Raw_context.t -> Contract_repr.t list tzresult Lwt.t
+  since: Raw_context.t ->
+  until: Raw_context.t ->
+  Contract_repr.t list tzresult Lwt.t
 
 val init:
   Raw_context.t -> Raw_context.t tzresult Lwt.t

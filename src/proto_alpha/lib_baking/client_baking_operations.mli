@@ -12,7 +12,7 @@ open Alpha_context
 
 type operation = {
   hash: Operation_hash.t ;
-  content: Operation.t option ;
+  content: Operation.packed option ;
 }
 
 type valid_endorsement = {

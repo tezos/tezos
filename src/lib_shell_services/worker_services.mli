@@ -16,18 +16,18 @@ module Prevalidators : sig
   val list:
     #simple -> (Chain_id.t * Worker_types.worker_status) list tzresult Lwt.t
   val state:
-    #simple -> Chain_id.t -> (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
+    #simple -> Chain_services.chain -> (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
 
   module S : sig
 
     val list :
-      ([ `POST ],  unit,
+      ([ `GET ],  unit,
        unit, unit, unit,
        (Chain_id.t * Worker_types.worker_status) list) RPC_service.t
 
     val state :
-      ([ `POST ], unit,
-       unit * Chain_id.t, unit, unit,
+      ([ `GET ], unit,
+       unit * Chain_services.chain, unit, unit,
        (Request.view, Event.t) Worker_types.full_status) RPC_service.t
 
   end
@@ -44,7 +44,7 @@ module Block_validator : sig
   module S : sig
 
     val state :
-      ([ `POST ], unit,
+      ([ `GET ], unit,
        unit, unit, unit,
        (Request.view, Event.t) Worker_types.full_status) RPC_service.t
 
@@ -57,23 +57,23 @@ module Peer_validators : sig
   open Peer_validator_worker_state
 
   val list:
-    #simple -> Chain_id.t ->
+    #simple -> Chain_services.chain ->
     (P2p_peer.Id.t * Worker_types.worker_status) list tzresult Lwt.t
 
   val state:
     #simple ->
-    Chain_id.t -> P2p_peer.Id.t -> (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
+    Chain_services.chain -> P2p_peer.Id.t -> (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
 
   module S : sig
 
     val list :
-      ([ `POST ],  unit,
-       unit * Chain_id.t, unit, unit,
+      ([ `GET ],  unit,
+       unit * Chain_services.chain, unit, unit,
        (P2p_peer.Id.t * Worker_types.worker_status) list) RPC_service.t
 
     val state :
-      ([ `POST ], unit,
-       (unit * Chain_id.t) * P2p_peer.Id.t, unit, unit,
+      ([ `GET ], unit,
+       (unit * Chain_services.chain) * P2p_peer.Id.t, unit, unit,
        (Request.view, Event.t) Worker_types.full_status) RPC_service.t
 
   end
@@ -87,18 +87,18 @@ module Chain_validators : sig
   val list:
     #simple -> (Chain_id.t * Worker_types.worker_status) list tzresult Lwt.t
   val state:
-    #simple -> Chain_id.t -> (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
+    #simple -> Chain_services.chain -> (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
 
   module S : sig
 
     val list :
-      ([ `POST ],  unit,
+      ([ `GET ],  unit,
        unit, unit, unit,
        (Chain_id.t * Worker_types.worker_status) list) RPC_service.t
 
     val state :
-      ([ `POST ], unit,
-       unit * Chain_id.t, unit, unit,
+      ([ `GET ], unit,
+       unit * Chain_services.chain, unit, unit,
        (Request.view, Event.t) Worker_types.full_status) RPC_service.t
 
   end

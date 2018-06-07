@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Logging.Node.Main
+open Node_logging
 
 let genesis : State.Chain.genesis = {
   time =
@@ -165,10 +165,11 @@ let init_node ?sandbox (config : Node_config_file.t) =
             trusted_points ;
             peers_file =
               (config.data_dir // "peers.json") ;
-            closed_network = config.p2p.closed ;
+            private_mode = config.p2p.private_mode ;
             identity ;
             proof_of_work_target =
               Crypto_box.make_target config.p2p.expected_pow ;
+            disable_mempool = config.p2p.disable_mempool ;
           }
         in
         return (Some (p2p_config, config.p2p.limits))
@@ -206,7 +207,7 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
           failwith "Cannot resolve listening address: %S" addr
       | (addr, port) :: _ ->
           let host = Ipaddr.V6.to_string addr in
-          let dir = Node_rpc.build_rpc_directory node in
+          let dir = Node.build_rpc_directory node in
           let mode =
             match rpc_config.tls with
             | None -> `TCP (`Port port)

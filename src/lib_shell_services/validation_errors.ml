@@ -159,12 +159,14 @@ let protocol_error_encoding =
   union
     [
       case (Tag 0)
+        ~title:"Compilation failed"
         (obj1
            (req "error" (constant "compilation_failed")))
         (function Compilation_failed -> Some ()
                 | _ -> None)
         (fun () -> Compilation_failed) ;
       case (Tag 1)
+        ~title:"Dynlinking failed"
         (obj1
            (req "error" (constant "dynlinking_failed")))
         (function Dynlinking_failed -> Some ()

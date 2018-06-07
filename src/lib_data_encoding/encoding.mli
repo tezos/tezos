@@ -41,47 +41,78 @@ type 'a desc =
   | Float : float desc
   | Bytes : Kind.length -> MBytes.t desc
   | String : Kind.length -> string desc
+  | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
   | Array : 'a t -> 'a array desc
   | List : 'a t -> 'a list desc
   | Obj : 'a field -> 'a desc
-  | Objs : Kind.t * 'a t * 'b t -> ('a * 'b) desc
+  | Objs : { kind: Kind.t ; left: 'a t ; right: 'b t } -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
-  | Tups : Kind.t * 'a t * 'b t -> ('a * 'b) desc
-  | Union : Kind.t * Binary_size.tag_size * 'a case list -> 'a desc
-  | Mu : Kind.enum * string * ('a t -> 'a t) -> 'a desc
+  | Tups : { kind: Kind.t ; left: 'a t ; right: 'b t } -> ('a * 'b) desc
+  | Union :
+      { kind: Kind.t ;
+        tag_size: Binary_size.tag_size ;
+        cases: 'a case list ;
+      } -> 'a desc
+  | Mu :
+      { kind: Kind.enum ;
+        name: string ;
+        title: string option ;
+        description: string option ;
+        fix: 'a t -> 'a t ;
+      } -> 'a desc
   | Conv :
       { proj : ('a -> 'b) ;
         inj : ('b -> 'a) ;
         encoding : 'b t ;
-        schema : Json_schema.schema option } -> 'a desc
+        schema : Json_schema.schema option ;
+      } -> 'a desc
   | Describe :
-      { title : string option ;
+      { id : string ;
+        title : string option ;
         description : string option ;
-        encoding : 'a t } -> 'a desc
-  | Def : { name : string ;
-            encoding : 'a t } -> 'a desc
+        encoding : 'a t ;
+      } -> 'a desc
   | Splitted :
       { encoding : 'a t ;
         json_encoding : 'a Json_encoding.encoding ;
-        is_obj : bool ; is_tup : bool } -> 'a desc
+        is_obj : bool ;
+        is_tup : bool ;
+      } -> 'a desc
   | Dynamic_size :
       { kind : Binary_size.unsigned_integer ;
-        encoding : 'a t } -> 'a desc
+        encoding : 'a t ;
+      } -> 'a desc
   | Check_size : { limit : int ; encoding : 'a t } -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
-  | Req : string * 'a t -> 'a field
-  | Opt : Kind.enum * string * 'a t -> 'a option field
-  | Dft : string * 'a t * 'a -> 'a field
+  | Req : { name: string ;
+            encoding: 'a t ;
+            title: string option ;
+            description: string option ;
+          } -> 'a field
+  | Opt : { name: string ;
+            kind: Kind.enum ;
+            encoding: 'a t ;
+            title: string option ;
+            description: string option ;
+          } -> 'a option field
+  | Dft : { name: string ;
+            encoding: 'a t ;
+            default: 'a ;
+            title: string option ;
+            description: string option ;
+          } -> 'a field
 
 and 'a case =
-  | Case : { name : string option ;
+  | Case : { title : string ;
+             description : string option ;
              encoding : 'a t ;
              proj : ('t -> 'a option) ;
              inj : ('a -> 't) ;
-             tag : case_tag } -> 't case
+             tag : case_tag ;
+           } -> 't case
 
 and 'a t = {
   encoding: 'a desc ;
@@ -118,6 +149,7 @@ val is_tup : 'a encoding -> bool
 module Fixed : sig
   val string : int -> string encoding
   val bytes : int -> MBytes.t encoding
+  val add_padding : 'a encoding -> int -> 'a encoding
 end
 module Variable : sig
   val string : string encoding
@@ -220,22 +252,28 @@ val array : 'a encoding -> 'a array encoding
 val list : 'a encoding -> 'a list encoding
 
 val case :
-  ?name:string ->
+  title:string ->
+  ?description: string ->
   case_tag ->
   'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 val union :
   ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
 
-val describe :
+val def :
+  string ->
   ?title:string -> ?description:string ->
-  't encoding ->'t encoding
-val def : string -> 'a encoding -> 'a encoding
+  'a encoding -> 'a encoding
 
 val conv :
   ('a -> 'b) -> ('b -> 'a) ->
   ?schema:Json_schema.schema ->
   'b encoding -> 'a encoding
-val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
+val mu :
+  string ->
+  ?title:string ->
+  ?description: string ->
+  ('a encoding -> 'a encoding) -> 'a encoding
 
 val classify : 'a encoding -> [ `Fixed of int | `Dynamic | `Variable ]
+val classify_desc : 'a desc -> [ `Fixed of int | `Dynamic | `Variable ]
 val raw_splitted : json:'a Json_encoding.encoding -> binary:'a encoding -> 'a encoding

@@ -10,8 +10,9 @@
 open Proto_alpha
 open Alpha_context
 
-let bake_block (cctxt : #Proto_alpha.full) block
-    ?force ?max_priority ?(free_baking=false) ?(minimal_timestamp=false)
+let bake_block (cctxt : #Proto_alpha.full)
+    ?(chain = `Main) block
+    ?force ?max_priority ?(minimal_timestamp=false)
     ?src_sk delegate =
   begin
     match src_sk with
@@ -20,7 +21,8 @@ let bake_block (cctxt : #Proto_alpha.full) block
         return src_sk
     | Some sk -> return sk
   end >>=? fun src_sk ->
-  Alpha_services.Context.next_level cctxt block >>=? fun level ->
+  Alpha_services.Helpers.current_level
+    cctxt ~offset:1l (chain, block) >>=? fun level ->
   let seed_nonce, seed_nonce_hash =
     if level.expected_commitment then
       let seed_nonce = Client_baking_forge.generate_seed_nonce () in
@@ -32,7 +34,7 @@ let bake_block (cctxt : #Proto_alpha.full) block
     ?timestamp:(if minimal_timestamp then None else Some (Time.now ()))
     ?force
     ?seed_nonce_hash ~src_sk block
-    ~priority:(`Auto (delegate, max_priority, free_baking)) () >>=? fun block_hash ->
+    ~priority:(`Auto (delegate, max_priority)) () >>=? fun block_hash ->
   begin
     match seed_nonce with
     | None -> return ()
@@ -43,10 +45,10 @@ let bake_block (cctxt : #Proto_alpha.full) block
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return ()
 
-let endorse_block cctxt ?max_priority delegate =
+let endorse_block cctxt delegate =
   Client_keys.get_key cctxt delegate >>=? fun (_src_name, src_pk, src_sk) ->
   Client_baking_endorsement.forge_endorsement cctxt
-    cctxt#block ?max_priority ~src_sk src_pk >>=? fun oph ->
+    cctxt#block ~src_sk src_pk >>=? fun oph ->
   cctxt#answer "Operation successfully injected in the node." >>= fun () ->
   cctxt#answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return ()
@@ -104,6 +106,5 @@ let run_daemon cctxt ?max_priority ~endorsement_delay delegates ~endorsement ~ba
   Client_baking_daemon.run cctxt
     ?max_priority
     ~delay:endorsement_delay
-    ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
     ~endorsement ~baking ~denunciation
     delegates

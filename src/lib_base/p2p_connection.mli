@@ -31,16 +31,21 @@ module Table : Hashtbl.S with type key = Id.t
 (** Information about a connection *)
 module Info : sig
 
-  type t = {
+  type 'meta t = {
     incoming : bool;
     peer_id : P2p_peer_id.t;
     id_point : Id.t;
     remote_socket_port : P2p_addr.port;
     versions : P2p_version.t list ;
+    private_node : bool ;
+    local_metadata : 'meta ;
+    remote_metadata : 'meta ;
   }
 
-  val pp : Format.formatter -> t -> unit
-  val encoding : t Data_encoding.t
+  val pp :
+    (Format.formatter -> 'meta -> unit) ->
+    Format.formatter -> 'meta t -> unit
+  val encoding : 'meta Data_encoding.t -> 'meta t Data_encoding.t
 
 end
 

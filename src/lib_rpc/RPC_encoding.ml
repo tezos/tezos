@@ -8,11 +8,19 @@
 (**************************************************************************)
 
 type 'a t = 'a Data_encoding.t
-type schema = Data_encoding.json_schema
+type schema = Data_encoding.json_schema * Data_encoding.Binary_schema.t
 let unit = Data_encoding.empty
 let untyped = Data_encoding.(obj1 (req "untyped" string))
 let conv f g t = Data_encoding.conv ~schema:(Data_encoding.Json.schema t) f g t
-let schema = Data_encoding.Json.schema
+let schema t =
+  (Data_encoding.Json.schema t,
+   Data_encoding.Binary.describe t)
+
+let schema_encoding =
+  let open Data_encoding in
+  obj2
+    (req "json_schema" json_schema)
+    (req "binary_schema" Data_encoding.Binary_schema.encoding)
 
 module StringMap = Resto.StringMap
 
@@ -44,12 +52,15 @@ let path_item_encoding =
   let open Data_encoding in
   union [
     case (Tag 0) string
+      ~title:"PStatic"
       (function PStatic s -> Some s | _ -> None)
       (fun s -> PStatic s) ;
     case (Tag 1) arg_encoding
+      ~title:"PDynamic"
       (function PDynamic s -> Some s | _ -> None)
       (fun s -> PDynamic s) ;
     case (Tag 2) multi_arg_encoding
+      ~title:"PDynamicTail"
       (function PDynamicTail s -> Some s | _ -> None)
       (fun s -> PDynamicTail s) ;
   ]
@@ -58,18 +69,22 @@ let query_kind_encoding =
   let open Data_encoding in
   union [
     case (Tag 0)
+      ~title:"Single"
       (obj1 (req "single" arg_encoding))
       (function Single s -> Some s | _ -> None)
       (fun s -> Single s) ;
     case (Tag 1)
+      ~title:"Optional"
       (obj1 (req "optional" arg_encoding))
       (function Optional s -> Some s | _ -> None)
       (fun s -> Optional s) ;
     case (Tag 2)
+      ~title:"Flag"
       (obj1 (req "flag" empty))
       (function Flag -> Some () | _ -> None)
       (fun () -> Flag) ;
     case (Tag 3)
+      ~title:"Multi"
       (obj1 (req "multi" arg_encoding))
       (function Multi s -> Some s | _ -> None)
       (fun s -> Multi s) ;
@@ -97,27 +112,31 @@ let service_descr_encoding =
        (req "path" (list path_item_encoding))
        (opt "description" string)
        (req "query" (list query_item_encoding))
-       (opt "input" json_schema)
-       (req "output" json_schema)
-       (req "erro" json_schema))
+       (opt "input" schema_encoding)
+       (req "output" schema_encoding)
+       (req "error" schema_encoding))
 
 let directory_descr_encoding =
   let open Data_encoding in
   mu "service_tree" @@ fun directory_descr_encoding ->
   let static_subdirectories_descr_encoding =
     union [
-      case (Tag 0) (obj1 (req  "suffixes"
-                            (list (obj2 (req "name" string)
-                                     (req "tree" directory_descr_encoding)))))
+      case (Tag 0)
+        ~title:"Suffixes"
+        (obj1 (req  "suffixes"
+                 (list (obj2 (req "name" string)
+                          (req "tree" directory_descr_encoding)))))
         (function Suffixes map ->
            Some (StringMap.bindings map) | _ -> None)
         (fun m ->
            let add acc (n,t) =  StringMap.add n t acc in
            Suffixes (List.fold_left add StringMap.empty m)) ;
-      case (Tag 1) (obj1 (req "dynamic_dispatch"
-                            (obj2
-                               (req "arg" arg_encoding)
-                               (req "tree" directory_descr_encoding))))
+      case (Tag 1)
+        ~title:"Arg"
+        (obj1 (req "dynamic_dispatch"
+                 (obj2
+                    (req "arg" arg_encoding)
+                    (req "tree" directory_descr_encoding))))
         (function Arg (ty, tree) -> Some (ty, tree) | _ -> None)
         (fun (ty, tree) -> Arg (ty, tree))
     ] in
@@ -150,10 +169,14 @@ let directory_descr_encoding =
          (opt "patch_service" service_descr_encoding)
          (opt "subdirs" static_subdirectories_descr_encoding)) in
   union [
-    case (Tag 0) (obj1 (req "static" static_directory_descr_encoding))
+    case (Tag 0)
+      ~title:"Static"
+      (obj1 (req "static" static_directory_descr_encoding))
       (function Static descr -> Some descr | _ -> None)
       (fun descr -> Static descr) ;
-    case (Tag 1) (obj1 (req "dynamic" (option string)))
+    case (Tag 1)
+      ~title:"Dynamic"
+      (obj1 (req "dynamic" (option string)))
       (function Dynamic descr -> Some descr | _ -> None)
       (fun descr -> Dynamic descr) ;
   ]

@@ -25,8 +25,8 @@ let commands () =
       no_options
       (prefixes [ "list" ; "protocols" ] stop)
       (fun () (cctxt : #Client_context.full) ->
-         Protocol_services.list ~contents:false cctxt >>=? fun protos ->
-         Lwt_list.iter_s (fun (ph, _p) -> cctxt#message "%a" Protocol_hash.pp ph) protos >>= fun () ->
+         Shell_services.Protocol.list cctxt >>=? fun protos ->
+         Lwt_list.iter_s (fun ph -> cctxt#message "%a" Protocol_hash.pp ph) protos >>= fun () ->
          return ()
       );
 
@@ -39,7 +39,7 @@ let commands () =
          Lwt.catch
            (fun () ->
               Lwt_utils_unix.Protocol.read_dir dirname >>=? fun (_hash, proto) ->
-              Shell_services.inject_protocol cctxt proto >>= function
+              Shell_services.Injection.protocol cctxt proto >>= function
               | Ok hash ->
                   cctxt#message "Injected protocol %a successfully" Protocol_hash.pp_short hash >>= fun () ->
                   return ()
@@ -59,7 +59,7 @@ let commands () =
        @@ Protocol_hash.param ~name:"protocol hash" ~desc:""
        @@ stop)
       (fun () ph (cctxt : #Client_context.full) ->
-         Protocol_services.contents cctxt ph >>=? fun proto ->
+         Shell_services.Protocol.contents cctxt ph >>=? fun proto ->
          Lwt_utils_unix.Protocol.write_dir (Protocol_hash.to_short_b58check ph) ~hash:ph proto >>=? fun () ->
          cctxt#message "Extracted protocol %a" Protocol_hash.pp_short ph >>= fun () ->
          return ()

@@ -12,7 +12,7 @@ open Proto_genesis
 val bake:
   #Client_context.full ->
   ?timestamp: Time.t ->
-  Block_services.block ->
+  Shell_services.block ->
   Data.Command.t ->
   Client_keys.sk_uri ->
   Block_hash.t tzresult Lwt.t

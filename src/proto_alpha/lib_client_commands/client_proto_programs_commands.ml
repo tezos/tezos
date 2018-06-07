@@ -55,8 +55,11 @@ let commands () =
            with _ -> failwith "invalid gas limit (must be a positive number)")) in
   let resolve_max_gas cctxt block = function
     | None ->
-        Alpha_services.Constants.hard_gas_limits cctxt block >>=? fun (_, gas) ->
-        return gas
+        Alpha_services.Constants.all cctxt
+          (`Main, block) >>=? fun { parametric = {
+            hard_gas_limit_per_operation
+          } } ->
+        return hard_gas_limit_per_operation
     | Some gas -> return gas in
   let data_parameter =
     Clic.parameter (fun _ data ->
@@ -123,10 +126,10 @@ let commands () =
          Lwt.return @@ Micheline_parser.no_parsing_error program >>=? fun program ->
          let show_source = not no_print_source in
          (if trace_exec then
-            trace ~amount ~program ~storage ~input cctxt#block cctxt >>= fun res ->
+            trace cctxt cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
             print_trace_result cctxt ~show_source ~parsed:program res
           else
-            run ~amount ~program ~storage ~input cctxt#block cctxt >>= fun res ->
+            run cctxt cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
             print_run_result cctxt ~show_source ~parsed:program res)) ;
     command ~group ~desc: "Ask the node to typecheck a program."
       (args4 show_types_switch emacs_mode_switch no_print_source_flag custom_gas_flag)
@@ -137,7 +140,7 @@ let commands () =
          match program with
          | program, [] ->
              resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
-             typecheck_program ~gas:original_gas program cctxt#block cctxt >>= fun res ->
+             typecheck_program cctxt cctxt#block ~gas:original_gas program >>= fun res ->
              print_typecheck_result
                ~emacs:emacs_mode
                ~show_types
@@ -171,7 +174,8 @@ let commands () =
        @@ stop)
       (fun (no_print_source, custom_gas) data ty cctxt ->
          resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
-         Client_proto_programs.typecheck_data ~gas:original_gas ~data ~ty cctxt#block cctxt >>= function
+         Client_proto_programs.typecheck_data cctxt cctxt#block
+           ~gas:original_gas ~data ~ty () >>= function
          | Ok gas ->
              cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]"
                Proto_alpha.Alpha_context.Gas.pp gas >>= fun () ->
@@ -198,8 +202,8 @@ let commands () =
        @@ stop)
       (fun custom_gas data typ cctxt ->
          resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
-         Alpha_services.Helpers.hash_data cctxt
-           cctxt#block (data.expanded, typ.expanded, Some original_gas) >>= function
+         Alpha_services.Helpers.Scripts.hash_data cctxt (`Main, cctxt#block)
+           (data.expanded, typ.expanded, Some original_gas) >>= function
          | Ok (hash, remaining_gas) ->
              cctxt#message "%S@,Gas remaining: %a" hash
                Proto_alpha.Alpha_context.Gas.pp remaining_gas >>= fun () ->
@@ -231,7 +235,8 @@ let commands () =
        @@ stop)
       (fun gas data typ sk cctxt ->
          resolve_max_gas cctxt cctxt#block gas >>=? fun gas ->
-         Client_proto_programs.hash_and_sign ~gas data typ sk cctxt#block cctxt >>= begin function
+         Client_proto_programs.hash_and_sign cctxt cctxt#block
+           ~gas data typ sk >>= begin function
            | Ok (hash, signature, current_gas) ->
                cctxt#message "@[<v 0>Hash: %S@,Signature: %S@,Remaining gas: %a@]"
                  hash signature

@@ -1,8 +1,0 @@
-parameter string;
-storage string;
-code {DUP;                      # We're going to need both the storage and parameter
-      CAR;                      # Get the parameter
-      DIP{CDR};                 # Get the storage value
-      SWAP;                     # Get the order we want (this is optional)
-      CONCAT;                   # Concatenate the strings
-      NIL operation; PAIR}      # Match the calling convention

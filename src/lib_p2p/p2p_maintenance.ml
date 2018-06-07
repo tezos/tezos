@@ -31,7 +31,7 @@ type 'meta t = {
     It ignores points which are greylisted, or for which a connection
     failed after [start_time] and the pointes that are banned. It
     first selects points with the oldest last tentative.
-    Non-trusted points are also ignored if option --closed is set. *)
+    Non-trusted points are also ignored if option --private-mode is set. *)
 let connectable st start_time expected seen_points =
   let Pool pool = st.pool in
   let now = Time.now () in
@@ -46,7 +46,7 @@ let connectable st start_time expected seen_points =
         | Some t1, Some t2 -> Time.compare t2 t1
     end) in
   let acc = Bounded_point_info.create expected in
-  let closed = (P2p_pool.config pool).P2p_pool.closed_network in
+  let private_mode = (P2p_pool.config pool).P2p_pool.private_mode in
   let seen_points =
     P2p_pool.Points.fold_known pool ~init:seen_points
       ~f:begin fun point pi seen_points ->
@@ -57,7 +57,7 @@ let connectable st start_time expected seen_points =
         *)
         if P2p_point.Set.mem point seen_points ||
            P2p_pool.Points.banned pool point ||
-           (closed && not (P2p_point_state.Info.trusted pi))
+           (private_mode && not (P2p_point_state.Info.trusted pi))
         then
           seen_points
         else

@@ -1,3 +1,0 @@
-parameter string;
-storage (option string);
-code { CAR ; SOME ; NIL operation ; PAIR };

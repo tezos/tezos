@@ -50,6 +50,8 @@ module Info : sig
   (** [trusted pi] is [true] iff [pi] has is trusted,
       i.e. "whitelisted". *)
 
+  val known_public : 'conn point_info -> bool
+
   val set_trusted : 'conn point_info -> unit
   val unset_trusted : 'conn point_info -> unit
 
@@ -110,7 +112,9 @@ val set_accepted :
   'conn Info.t -> P2p_peer.Id.t -> Lwt_canceler.t -> unit
 
 val set_running :
-  ?timestamp:Time.t -> 'conn Info.t -> P2p_peer.Id.t -> 'conn -> unit
+  ?timestamp:Time.t ->
+  known_private: bool ->
+  'conn Info.t -> P2p_peer.Id.t -> 'conn -> unit
 
 val set_disconnected :
   ?timestamp:Time.t -> ?requested:bool -> 'conn Info.t -> unit

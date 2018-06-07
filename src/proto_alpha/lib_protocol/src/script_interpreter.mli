@@ -12,12 +12,13 @@ open Alpha_context
 type error += Overflow of Script.location
 type error += Reject of Script.location
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
+type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
 type execution_result =
   { ctxt : context ;
     storage : Script.expr ;
     big_map_diff : Contract.big_map_diff option ;
-    operations : internal_operation list }
+    operations : packed_internal_operation list }
 
 val execute:
   Alpha_context.t ->

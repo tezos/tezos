@@ -71,8 +71,8 @@ transactions for block space.
 Delegation
 ----------
 
-Tezos.alpha uses a delegated proof-of-stake model. DPOS has come to
-design a specific type of algorithm used, for instance in in Bitshares.
+Tezos.alpha uses a delegated proof-of-stake model. The acronym DPOS has come to
+designate a specific type of algorithm used, for instance in Bitshares.
 This is *not* the model used in Tezos.alpha, though there is a concept
 of delegation.
 

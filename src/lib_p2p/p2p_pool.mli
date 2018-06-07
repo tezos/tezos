@@ -25,6 +25,7 @@
 
 type 'msg encoding = Encoding : {
     tag: int ;
+    title: string ;
     encoding: 'a Data_encoding.t ;
     wrap: 'a -> 'msg ;
     unwrap: 'msg -> 'a option ;
@@ -33,9 +34,9 @@ type 'msg encoding = Encoding : {
 
 (** {1 Pool management} *)
 
-type ('msg, 'peer_meta,'conn_meta) t
+type ('msg, 'peer_meta, 'conn_meta) t
 
-type ('msg, 'peer_meta,'conn_meta) pool = ('msg, 'peer_meta,'conn_meta) t
+type ('msg, 'peer_meta, 'conn_meta) pool = ('msg, 'peer_meta, 'conn_meta) t
 (** The type of a pool of connections, parametrized by resp. the type
     of messages and the meta-informations associated to an identity and
     a connection. *)
@@ -55,9 +56,11 @@ type config = {
   (** The path to the JSON file where the metadata associated to
       peer_ids are loaded / stored. *)
 
-  closed_network : bool ;
-  (** If [true], the only accepted connections are from peers whose
-      addresses are in [trusted_peers]. *)
+  private_mode : bool ;
+  (** If [true], only open outgoing/accept incoming connections
+      to/from peers whose addresses are in [trusted_peers], and inform
+      these peers that the identity of this node should be revealed to
+      the rest of the network. *)
 
   listening_port : P2p_addr.port option ;
   (** If provided, it will be passed to [P2p_connection.authenticate]
@@ -129,11 +132,6 @@ type 'peer_meta peer_meta_config = {
   score : 'peer_meta -> float ;
 }
 
-type 'conn_meta conn_meta_config = {
-  conn_meta_encoding : 'conn_meta Data_encoding.t ;
-  conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
-}
-
 type 'msg message_config = {
   encoding : 'msg encoding list ;
   versions : P2p_version.t list;
@@ -142,7 +140,7 @@ type 'msg message_config = {
 val create:
   config ->
   'peer_meta peer_meta_config ->
-  'conn_meta conn_meta_config ->
+  'conn_meta P2p_socket.metadata_config ->
   'msg message_config ->
   P2p_io_scheduler.t ->
   ('msg, 'peer_meta,'conn_meta) pool Lwt.t
@@ -166,6 +164,9 @@ val config : _ pool -> config
     creation. *)
 
 val send_swap_request: ('msg, 'peer_meta,'conn_meta) pool -> unit
+(** [send_swap_request pool] given two connected peers pi and pj (pi
+    <> pj), suggest swap with pi for the peer pj. This behaviour is
+    disabled in private mode *)
 
 (** {2 Pool events} *)
 
@@ -218,7 +219,9 @@ val disconnect:
 
 module Connection : sig
 
-  val info: ('msg, 'peer_meta,'conn_meta) connection -> P2p_connection.Info.t
+  val info: ('msg, 'peer_meta,'conn_meta) connection -> 'conn_meta P2p_connection.Info.t
+  val local_metadata: ('msg, 'peer_meta,'conn_meta) connection -> 'conn_meta
+  val remote_metadata: ('msg, 'peer_meta,'conn_meta) connection -> 'conn_meta
 
   val stat:  ('msg, 'peer_meta,'conn_meta) connection -> P2p_stat.t
   (** [stat conn] is a snapshot of current bandwidth usage for
@@ -286,8 +289,9 @@ val write_all:  ('msg, 'peer_meta,'conn_meta) pool -> 'msg -> unit
     connections to [pool] in [Running] state. *)
 
 val broadcast_bootstrap_msg:  ('msg, 'peer_meta,'conn_meta) pool -> unit
-(** [write_all pool msg] is [P2P_connection.write_now conn Bootstrap]
-    for all member connections to [pool] in [Running] state. *)
+(** [broadcast_bootstrap_msg pool] is [P2P_connection.write_now conn Bootstrap]
+    for all member connections to [pool] in [Running] state.
+    This behavior is deactivated if the node is in private mode  *)
 
 val greylist_addr : ('msg, 'peer_meta,'conn_meta) pool -> P2p_addr.t -> unit
 (** [greylist_addr pool addr] adds [addr] to [pool]'s IP greylist. *)

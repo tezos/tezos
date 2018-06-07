@@ -54,7 +54,7 @@ class type wallet = object
 end
 
 class type block = object
-  method block : Block_services.block
+  method block : Shell_services.block
   method confirmations : int option
 end
 

@@ -14,7 +14,7 @@ type 'prefix directory = 'prefix t
 (** Empty list of dispatch trees *)
 val empty: 'prefix directory
 
-val map: ('a -> 'b) -> 'b directory -> 'a directory
+val map: ('a -> 'b Lwt.t) -> 'b directory -> 'a directory
 
 val prefix: ('pr, 'p) RPC_path.path -> 'p directory -> 'pr directory
 val merge: 'a directory -> 'a directory -> 'a directory
@@ -201,4 +201,11 @@ val lwt_register5:
   'prefix directory ->
   ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q , 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o Lwt.t) ->
+  'prefix directory
+
+(** Registring dynamic subtree. *)
+val register_dynamic_directory:
+  ?descr:string ->
+  'prefix directory ->
+  ('prefix, 'a) RPC_path.t -> ('a -> 'a directory Lwt.t) ->
   'prefix directory

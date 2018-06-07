@@ -48,7 +48,7 @@ let pp_short ppf = function
 
 let encoding =
   let open Data_encoding in
-  describe
+  def "contract_id"
     ~title:
       "A contract handle"
     ~description:
@@ -58,10 +58,13 @@ let encoding =
   splitted
     ~binary:
       (union ~tag_size:`Uint8 [
-          case (Tag 0) Signature.Public_key_hash.encoding
+          case (Tag 0)
+            ~title:"Implicit"
+            Signature.Public_key_hash.encoding
             (function Implicit k -> Some k | _ -> None)
             (fun k -> Implicit k) ;
-          case (Tag 1) Contract_hash.encoding
+          case (Tag 1) (Fixed.add_padding Contract_hash.encoding 1)
+            ~title:"Originated"
             (function Originated k -> Some k | _ -> None)
             (fun k -> Originated k) ;
         ])
@@ -117,16 +120,19 @@ let originated_contract nonce =
     Data_encoding.Binary.to_bytes_exn origination_nonce_encoding nonce in
   Originated (Contract_hash.hash_bytes [data])
 
-let originated_contracts ({ origination_index } as origination_nonce) =
+let originated_contracts
+    ~since: { origination_index = first ; operation_hash = first_hash }
+    ~until: ({ origination_index = last ; operation_hash = last_hash } as origination_nonce) =
+  assert (Operation_hash.equal first_hash last_hash) ;
   let rec contracts acc origination_index =
-    if Compare.Int32.(origination_index < 0l) then
+    if Compare.Int32.(origination_index < first) then
       acc
     else
       let origination_nonce =
         { origination_nonce with origination_index } in
       let acc = originated_contract origination_nonce :: acc in
       contracts acc (Int32.pred origination_index) in
-  contracts [] (Int32.pred origination_index)
+  contracts [] (Int32.pred last)
 
 let initial_origination_nonce operation_hash =
   { operation_hash ; origination_index = 0l }
@@ -135,7 +141,7 @@ let incr_origination_nonce nonce =
   let origination_index = Int32.succ nonce.origination_index in
   { nonce with origination_index }
 
-let arg =
+let rpc_arg =
   let construct = to_b58check in
   let destruct hash =
     match of_b58check hash with
@@ -178,4 +184,7 @@ module Index = struct
     Ed25519.Public_key_hash.prefix_path s
   let pkh_prefix_secp256k1 s =
     Secp256k1.Public_key_hash.prefix_path s
+  let rpc_arg = rpc_arg
+  let encoding = encoding
+  let compare = compare
 end

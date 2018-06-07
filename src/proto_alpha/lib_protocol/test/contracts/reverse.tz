@@ -1,5 +1,0 @@
-parameter (list string);
-storage (list string);
-code { CAR; NIL string; SWAP;
-       ITER {CONS};
-       NIL operation; PAIR};

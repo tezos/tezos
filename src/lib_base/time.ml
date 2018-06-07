@@ -78,8 +78,7 @@ module T = struct
   let rfc_encoding =
     let open Data_encoding in
     def
-      "timestamp" @@
-    describe
+      "timestamp.rfc"
       ~title:
         "RFC 3339 formatted timestamp"
       ~description:
@@ -93,16 +92,18 @@ module T = struct
 
   let encoding =
     let open Data_encoding in
-    describe ~title:"timestamp" @@
+    def "timestamp" @@
     splitted
       ~binary: int64
       ~json:
         (union [
             case Json_only
+              ~title:"RFC encoding"
               rfc_encoding
               (fun i -> Some i)
               (fun i -> i) ;
             case Json_only
+              ~title:"Second since epoch"
               int64
               (fun _ -> None)
               (fun i -> i) ;

@@ -1,5 +1,5 @@
 
-type t = Updater.rpc_context Lwt.t
+type t = Updater.rpc_context
 
 class type ['pr] simple = object
   method call_proto_service0 :

@@ -14,15 +14,13 @@ let protocol =
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
 let bake cctxt ?(timestamp = Time.now ()) block command sk =
-  let protocol_data = Data_encoding.Binary.to_bytes_exn Data.Command.encoding command in
-  Block_services.preapply
-    cctxt block ~timestamp ~protocol_data
-    [] >>=? fun { shell_header } ->
-  let blk =
-    Data_encoding.Binary.to_bytes_exn Block_header.encoding
-      { shell = shell_header ; protocol_data } in
+  let protocol_data = { command ; signature = Signature.zero } in
+  Genesis_block_services.Helpers.Preapply.block
+    cctxt ~block ~timestamp ~protocol_data
+    [] >>=? fun (shell_header, _) ->
+  let blk = Data.Command.forge shell_header command in
   Client_keys.append sk blk >>=? fun signed_blk ->
-  Shell_services.inject_block cctxt signed_blk []
+  Shell_services.Injection.block cctxt signed_blk []
 
 let int64_parameter =
   (Clic.parameter (fun _ p ->

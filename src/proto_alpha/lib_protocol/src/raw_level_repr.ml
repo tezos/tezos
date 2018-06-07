@@ -12,7 +12,7 @@ type raw_level = t
 include (Compare.Int32 : Compare.S with type t := t)
 let encoding = Data_encoding.int32
 let pp ppf level = Format.fprintf ppf "%ld" level
-let arg =
+let rpc_arg =
   let construct raw_level = Int32.to_string raw_level in
   let destruct str =
     match Int32.of_string str with
@@ -56,4 +56,7 @@ module Index = struct
         with _ -> None
       end
     | _ -> None
+  let rpc_arg = rpc_arg
+  let encoding = encoding
+  let compare = compare
 end

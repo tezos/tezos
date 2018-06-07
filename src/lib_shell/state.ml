@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Logging.Node.State
+open State_logging
 open Validation_errors
 
 module Shared = struct
@@ -24,6 +24,7 @@ type global_state = {
   global_data: global_data Shared.t ;
   protocol_store: Store.Protocol.store Shared.t ;
   main_chain: Chain_id.t ;
+  protocol_watcher: Protocol_hash.t Lwt_watcher.input ;
   block_watcher: block Lwt_watcher.input ;
 }
 
@@ -44,6 +45,8 @@ and chain_state = {
   context_index: Context.index Shared.t ;
   block_watcher: block Lwt_watcher.input ;
   chain_data: chain_data_state Shared.t ;
+  block_rpc_directories:
+    block RPC_directory.t Protocol_hash.Map.t Protocol_hash.Table.t  ;
 }
 
 and genesis = {
@@ -219,7 +222,8 @@ module Locked_block = struct
     Store.Block.Contents.store (store, genesis.block)
       { Store.Block.header ; message = Some "Genesis" ;
         max_operations_ttl = 0 ; context ;
-        max_operation_data_length = 0;
+        max_operation_data_length = 0 ;
+        metadata = MBytes.create 0 ;
       } >>= fun () ->
     Lwt.return header
 
@@ -281,6 +285,7 @@ module Chain = struct
       block_store = Shared.create block_store ;
       context_index = Shared.create context_index ;
       block_watcher = Lwt_watcher.create_input () ;
+      block_rpc_directories = Protocol_hash.Table.create 7 ;
     } in
     Lwt.return chain_state
 
@@ -426,6 +431,7 @@ module Block = struct
 
   let hash { hash } = hash
   let header { contents = { header } } = header
+  let metadata { contents = { metadata } } = metadata
   let chain_state { chain_state } = chain_state
   let chain_id { chain_state = { chain_id } } = chain_id
   let shell_header { contents = { header = { shell } } } = shell
@@ -534,11 +540,23 @@ module Block = struct
 
   let store
       ?(dont_enforce_context_hash = false)
-      chain_state block_header operations
+      chain_state block_header block_header_metadata
+      operations operations_metadata
       { Tezos_protocol_environment_shell.context ; message ;
         max_operations_ttl ; max_operation_data_length } =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
+    fail_unless
+      (block_header.shell.validation_passes = List.length operations)
+      (failure "State.Block.store: invalid operations length") >>=? fun () ->
+    fail_unless
+      (block_header.shell.validation_passes = List.length operations_metadata)
+      (failure "State.Block.store: invalid operations_data length") >>=? fun () ->
+    fail_unless
+      (List.for_all2
+         (fun l1 l2 -> List.length l1 = List.length l2)
+         operations operations_metadata)
+      (failure "State.Block.store: inconstent operations and operations_data") >>=? fun () ->
     (* let's the validator check the consistency... of fitness, level, ... *)
     Shared.use chain_state.block_store begin fun store ->
       Store.Block.Invalid_block.known store hash >>= fun known_invalid ->
@@ -564,6 +582,7 @@ module Block = struct
           max_operations_ttl ;
           max_operation_data_length ;
           context = commit ;
+          metadata = block_header_metadata ;
         } in
         Store.Block.Contents.store (store, hash) contents >>= fun () ->
         let hashes = List.map (List.map Operation.hash) operations in
@@ -576,8 +595,13 @@ module Block = struct
              Store.Block.Operation_path.store (store, hash) i path)
           hashes >>= fun () ->
         Lwt_list.iteri_p
-          (fun i ops -> Store.Block.Operations.store (store, hash) i ops)
+          (fun i ops ->
+             Store.Block.Operations.store (store, hash) i ops)
           operations >>= fun () ->
+        Lwt_list.iteri_p
+          (fun i ops ->
+             Store.Block.Operations_metadata.store (store, hash) i ops)
+          operations_metadata >>= fun () ->
         (* Store predecessors *)
         store_predecessors store hash >>= fun () ->
         (* Update the chain state. *)
@@ -637,10 +661,25 @@ module Block = struct
       Lwt.return (ops, path)
     end
 
+  let operations_metadata { chain_state ; hash ; contents } i =
+    if i < 0 || contents.header.shell.validation_passes <= i then
+      invalid_arg "State.Block.operations_metadata" ;
+    Shared.use chain_state.block_store begin fun store ->
+      Store.Block.Operations_metadata.read_exn (store, hash) i >>= fun ops ->
+      Lwt.return ops
+    end
+
   let all_operations { chain_state ; hash ; contents } =
     Shared.use chain_state.block_store begin fun store ->
       Lwt_list.map_p
         (fun i -> Store.Block.Operations.read_exn (store, hash) i)
+        (0 -- (contents.header.shell.validation_passes - 1))
+    end
+
+  let all_operations_metadata { chain_state ; hash ; contents } =
+    Shared.use chain_state.block_store begin fun store ->
+      Lwt_list.map_p
+        (fun i -> Store.Block.Operations_metadata.read_exn (store, hash) i)
         (0 -- (contents.header.shell.validation_passes - 1))
     end
 
@@ -686,6 +725,33 @@ module Block = struct
         else
           read_exn chain_state tail >>= fun block ->
           Lwt.return_some (block, locator)
+
+  let get_rpc_directory ({ chain_state ; _ } as block) =
+    read_opt chain_state block.contents.header.shell.predecessor >>= function
+    | None -> Lwt.return_none (* genesis *)
+    | Some pred ->
+        protocol_hash pred >>= fun protocol ->
+        match
+          Protocol_hash.Table.find_opt
+            chain_state.block_rpc_directories protocol
+        with
+        | None -> Lwt.return_none
+        | Some map ->
+            protocol_hash block >>= fun next_protocol ->
+            Lwt.return (Protocol_hash.Map.find_opt next_protocol map)
+
+  let set_rpc_directory ({ chain_state ; _ } as block) dir =
+    read_exn chain_state block.contents.header.shell.predecessor >>= fun pred ->
+    protocol_hash block >>= fun next_protocol ->
+    protocol_hash pred >>= fun protocol ->
+    let map =
+      Option.unopt ~default:Protocol_hash.Map.empty
+        (Protocol_hash.Table.find_opt chain_state.block_rpc_directories protocol)
+    in
+    Protocol_hash.Table.replace
+      chain_state.block_rpc_directories protocol
+      (Protocol_hash.Map.add next_protocol dir map) ;
+    Lwt.return_unit
 
 end
 
@@ -776,6 +842,7 @@ module Protocol = struct
         Lwt.return None
       else
         Store.Protocol.RawContents.store (store, hash) bytes >>= fun () ->
+        Lwt_watcher.notify global_state.protocol_watcher hash ;
         Lwt.return (Some hash)
     end
 
@@ -795,6 +862,9 @@ module Protocol = struct
         ~init:Protocol_hash.Set.empty
         ~f:(fun x acc -> Lwt.return (Protocol_hash.Set.add x acc))
     end
+
+  let watcher (state : global_state) =
+    Lwt_watcher.create_stream state.protocol_watcher
 
 end
 
@@ -838,6 +908,7 @@ let read
     global_data = Shared.create global_data ;
     protocol_store = Shared.create @@ Store.Protocol.get global_store ;
     main_chain ;
+    protocol_watcher = Lwt_watcher.create_input () ;
     block_watcher = Lwt_watcher.create_input () ;
   } in
   Chain.read_all state >>=? fun () ->

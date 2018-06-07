@@ -186,13 +186,6 @@ let max_priority_arg =
          try return (int_of_string s)
          with _ -> fail (Bad_max_priority s)))
 
-let free_baking_switch =
-  switch
-    ~long:"free-baking"
-    ?short:None
-    ~doc:"only consider free baking slots"
-    ()
-
 let endorsement_delay_arg =
   default_arg
     ~long:"endorsement-delay"

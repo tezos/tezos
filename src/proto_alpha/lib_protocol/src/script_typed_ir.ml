@@ -45,7 +45,7 @@ type ('key, 'value) map = (module Boxed_map with type key = 'key and type value 
 type annot = string option
 
 type ('arg, 'storage) script =
-  { code : (('arg, 'storage) pair, (internal_operation list, 'storage) pair) lambda ;
+  { code : (('arg, 'storage) pair, (packed_internal_operation list, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
     storage : 'storage ;
     storage_type : 'storage ty }
@@ -83,7 +83,7 @@ and 'ty ty =
   | Map_t : 'k comparable_ty * 'v ty -> ('k, 'v) map ty
   | Big_map_t : 'k comparable_ty * 'v ty -> ('k, 'v) big_map ty
   | Contract_t : 'arg ty -> 'arg typed_contract ty
-  | Operation_t : internal_operation ty
+  | Operation_t : packed_internal_operation ty
 
 and 'ty stack_ty =
   | Item_t : 'ty ty * 'rest stack_ty * annot -> ('ty * 'rest) stack_ty
@@ -316,17 +316,17 @@ and ('bef, 'aft) instr =
   | Address_manager :
       (Contract.t * 'rest, public_key_hash option * 'rest) instr
   | Transfer_tokens :
-      ('arg * (Tez.t * ('arg typed_contract * 'rest)), internal_operation * 'rest) instr
+      ('arg * (Tez.t * ('arg typed_contract * 'rest)), packed_internal_operation * 'rest) instr
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
-       internal_operation * (Contract.t * 'rest)) instr
+       packed_internal_operation * (Contract.t * 'rest)) instr
   | Implicit_account :
       (public_key_hash * 'rest, unit typed_contract * 'rest) instr
-  | Create_contract : 'g ty * 'p ty * ('p * 'g, internal_operation list * 'g) lambda  ->
+  | Create_contract : 'g ty * 'p ty * ('p * 'g, packed_internal_operation list * 'g) lambda  ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
-     internal_operation * (Contract.t * 'rest)) instr
+     packed_internal_operation * (Contract.t * 'rest)) instr
   | Set_delegate :
-      (public_key_hash option * 'rest, internal_operation * 'rest) instr
+      (public_key_hash option * 'rest, packed_internal_operation * 'rest) instr
   | Now :
       ('rest, Script_timestamp.t * 'rest) instr
   | Balance :

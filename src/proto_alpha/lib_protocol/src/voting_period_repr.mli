@@ -10,7 +10,7 @@
 type t
 type voting_period = t
 val encoding: voting_period Data_encoding.t
-val arg: voting_period RPC_arg.arg
+val rpc_arg: voting_period RPC_arg.arg
 val pp: Format.formatter -> voting_period -> unit
 include Compare.S with type t := voting_period
 

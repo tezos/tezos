@@ -9,4 +9,9 @@
 
 (** Tezos Protocol Implementation - Protocol Signature Instance *)
 
-include Updater.PROTOCOL
+type block_header_data = {
+  command: Data.Command.t ;
+  signature: Signature.t ;
+}
+
+include Updater.PROTOCOL with type block_header_data := block_header_data

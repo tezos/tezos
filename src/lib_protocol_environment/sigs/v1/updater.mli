@@ -50,9 +50,7 @@ type quota = {
 
 type rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: Block_header.t ;
-  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-  operations: unit -> Operation.t list list Lwt.t ;
+  block_header: Block_header.shell_header ;
   context: Context.t ;
 }
 
@@ -67,13 +65,51 @@ module type PROTOCOL = sig
       operation's quota for each pass. *)
   val validation_passes: quota list
 
-  (** The version specific type of operations. *)
-  type operation
+  (** The version specific type of blocks. *)
+  type block_header_data
 
-  (** The parsing / preliminary validation function for
-      operations. Similar to {!parse_block}. *)
-  val parse_operation:
-    Operation_hash.t -> Operation.t -> operation tzresult
+  (** Encoding for version specific part of block headers.  *)
+  val block_header_data_encoding: block_header_data Data_encoding.t
+
+  (** A fully parsed block header. *)
+  type block_header = {
+    shell: Block_header.shell_header ;
+    protocol_data: block_header_data ;
+  }
+
+  (** Version-specific side information computed by the protocol
+      during the validation of a block. Should not include information
+      about the evaluation of operations which is handled separately by
+      {!operation_metadata}. To be used as an execution trace by tools
+      (client, indexer). Not necessary for validation. *)
+  type block_header_metadata
+
+  (** Encoding for version-specific block metadata. *)
+  val block_header_metadata_encoding: block_header_metadata Data_encoding.t
+
+  (** The version specific type of operations. *)
+  type operation_data
+
+  (** Version-specific side information computed by the protocol
+      during the validation of each operation, to be used conjointly
+      with {!block_header_metadata}. *)
+  type operation_receipt
+
+  (** A fully parsed operation. *)
+  type operation = {
+    shell: Operation.shell_header ;
+    protocol_data: operation_data ;
+  }
+
+  (** Encoding for version-specific operation data. *)
+  val operation_data_encoding: operation_data Data_encoding.t
+
+  (** Encoding for version-specific operation receipts. *)
+  val operation_receipt_encoding: operation_receipt Data_encoding.t
+
+  (** Encoding that mixes an operation data and its receipt. *)
+  val operation_data_and_receipt_encoding:
+    (operation_data * operation_receipt) Data_encoding.t
 
   (** The Validation passes in which an operation can appear.
       For instance [[0]] if it only belongs to the first pass.
@@ -106,7 +142,7 @@ module type PROTOCOL = sig
   val precheck_block:
     ancestor_context: Context.t ->
     ancestor_timestamp: Time.t ->
-    Block_header.t ->
+    block_header ->
     unit tzresult Lwt.t
 
   (** The first step in a block validation sequence. Initializes a
@@ -119,7 +155,7 @@ module type PROTOCOL = sig
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_fitness: Fitness.t ->
-    Block_header.t ->
+    block_header ->
     validation_state tzresult Lwt.t
 
   (** Initializes a validation context for constructing a new block
@@ -138,22 +174,25 @@ module type PROTOCOL = sig
     predecessor_fitness: Fitness.t ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
-    ?protocol_data: MBytes.t ->
+    ?protocol_data: block_header_data ->
     unit -> validation_state tzresult Lwt.t
 
   (** Called after {!begin_application} (or {!begin_construction}) and
       before {!finalize_block}, with each operation in the block. *)
   val apply_operation:
-    validation_state -> operation -> validation_state tzresult Lwt.t
+    validation_state ->
+    operation ->
+    (validation_state * operation_receipt) tzresult Lwt.t
 
   (** The last step in a block validation sequence. It produces the
       context that will be used as input for the validation of its
       successor block candidates. *)
   val finalize_block:
-    validation_state -> validation_result tzresult Lwt.t
+    validation_state ->
+    (validation_result * block_header_metadata) tzresult Lwt.t
 
   (** The list of remote procedures exported by this implementation *)
-  val rpc_services: rpc_context Lwt.t RPC_directory.t
+  val rpc_services: rpc_context RPC_directory.t
 
   (** Initialize the context (or upgrade the context after a protocol
       amendment). This function receives the context resulting of the

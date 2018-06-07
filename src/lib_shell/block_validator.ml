@@ -142,15 +142,31 @@ let apply_block
     operations Proto.validation_passes >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
   check_liveness chain_state pred hash operation_hashes operations >>=? fun () ->
-  mapi2_s (fun pass -> map2_s begin fun op_hash raw ->
-      Lwt.return (Proto.parse_operation op_hash raw)
-      |> trace (invalid_block hash (Cannot_parse_operation op_hash)) >>=? fun op ->
-      let allowed_pass = Proto.acceptable_passes op in
-      fail_unless (List.mem pass allowed_pass)
-        (invalid_block hash
-           (Unallowed_pass { operation = op_hash ;
-                             pass ; allowed_pass } )) >>=? fun () ->
-      return op
+  begin
+    match
+      Data_encoding.Binary.of_bytes
+        Proto.block_header_data_encoding
+        header.protocol_data with
+    | None ->
+        fail (invalid_block hash Cannot_parse_block_header)
+    | Some protocol_data ->
+        return ({ shell = header.shell ; protocol_data } : Proto.block_header)
+  end >>=? fun header ->
+  mapi2_s (fun pass -> map2_s begin fun op_hash op ->
+      match
+        Data_encoding.Binary.of_bytes
+          Proto.operation_data_encoding
+          op.Operation.proto with
+      | None ->
+          fail (invalid_block hash (Cannot_parse_operation op_hash))
+      | Some protocol_data ->
+          let op = { Proto.shell = op.shell ; protocol_data } in
+          let allowed_pass = Proto.acceptable_passes op in
+          fail_unless (List.mem pass allowed_pass)
+            (invalid_block hash
+               (Unallowed_pass { operation = op_hash ;
+                                 pass ; allowed_pass } )) >>=? fun () ->
+          return op
     end)
     operation_hashes
     operations >>=? fun parsed_operations ->
@@ -163,11 +179,17 @@ let apply_block
     ~predecessor_timestamp:pred_header.shell.timestamp
     ~predecessor_fitness:pred_header.shell.fitness
     header >>=? fun state ->
-  fold_left_s (fold_left_s (fun state op ->
-      Proto.apply_operation state op >>=? fun state ->
-      return state))
-    state parsed_operations >>=? fun state ->
-  Proto.finalize_block state >>=? fun validation_result ->
+  fold_left_s
+    (fun (state, acc) ops ->
+       fold_left_s
+         (fun (state, acc) op ->
+            Proto.apply_operation state op >>=? fun (state, op_metadata) ->
+            return (state, op_metadata :: acc))
+         (state, []) ops >>=? fun (state, ops_metadata) ->
+       return (state, List.rev ops_metadata :: acc))
+    (state, []) parsed_operations >>=? fun (state, ops_metadata) ->
+  let ops_metadata = List.rev ops_metadata in
+  Proto.finalize_block state >>=? fun (validation_result, block_data) ->
   Context.get_protocol validation_result.context >>= fun new_protocol ->
   let expected_proto_level =
     if Protocol_hash.equal new_protocol Proto.hash then
@@ -203,7 +225,15 @@ let apply_block
          validation_result.max_operations_ttl) in
   let validation_result =
     { validation_result with max_operations_ttl } in
-  return validation_result
+  let block_data =
+    Data_encoding.Binary.to_bytes_exn Proto.block_header_metadata_encoding block_data in
+  let ops_metadata =
+    List.map
+      (List.map
+         (Data_encoding.Binary.to_bytes_exn
+            Proto.operation_receipt_encoding))
+      ops_metadata in
+  return (validation_result, block_data, ops_metadata)
 
 let check_chain_liveness chain_db hash (header: Block_header.t) =
   let chain_state = Distributed_db.chain_state chain_db in
@@ -255,9 +285,12 @@ let on_request
               protect ?canceler begin fun () ->
                 apply_block
                   (Distributed_db.chain_state chain_db)
-                  pred proto hash header operations >>=? fun result ->
+                  pred proto hash
+                  header operations >>=? fun (result, header_data, operations_data) ->
                 Distributed_db.commit_block
-                  chain_db hash header operations result >>=? function
+                  chain_db hash
+                  header header_data operations operations_data
+                  result >>=? function
                 | None -> assert false (* should not happen *)
                 | Some block -> return block
               end

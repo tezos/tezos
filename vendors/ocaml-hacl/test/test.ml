@@ -62,6 +62,19 @@ let sha256 () =
   print_endline "Direct hash done." ;
   Alcotest.(check bigstring "sha256" randresp d)
 
+let sha256_seq () =
+  let open Hash.SHA256 in
+  let bothresp = of_hex "97e13d5a675bf308eb52ce5eb7c4926940bcf9304668e08240f7c8c73f927953" in
+  let st = init () in
+  Printf.printf "Init done\n" ;
+  update st msg ;
+  update st randmsg ;
+  print_endline "Update done." ;
+  let d = finish st in
+  Printf.printf "Digest size %d\n" (Bigstring.length d) ;
+  print_endline "Finish done." ;
+  Alcotest.(check bigstring "sha256_seq" bothresp d)
+
 let sha512 () =
   let resp = of_hex "7941f442d956f124d77ee1d1f0ba3db100751090462cdce4aed5fcd240529097bc666bf9c424becde760910df652c7aefec50b02d7f6efe666f79e5242fb755b" in
   let digest = Hash.SHA512.digest msg in
@@ -78,6 +91,8 @@ let hash = [
   "hmac_sha256", `Quick, hmac_sha256 ;
 
   "sha256", `Quick, sha256 ;
+  "sha256_seq", `Quick, sha256_seq ;
+
   "sha512", `Quick, sha512 ;
 ]
 

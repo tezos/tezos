@@ -70,6 +70,11 @@ val delegate_pubkey:
   Raw_context.t -> Signature.Public_key_hash.t ->
   Signature.Public_key.t tzresult Lwt.t
 
+val get_rolls:
+  Raw_context.t -> Signature.Public_key_hash.t -> Roll_repr.t list tzresult Lwt.t
+val get_change:
+  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+
 (**/**)
 
 val get_contract_delegate:

@@ -1,9 +1,0 @@
-parameter (or string (pair string (lambda unit string)));
-storage (pair string (map string (lambda unit string)));
-code { DUP; DIP{CDDR}; CAR;      # Unpack stack
-       IF_LEFT { DIP{DUP}; GET; # Get lambda if it exists
-                 IF_NONE {FAIL} {}; # Fail if it doesn't
-                 UNIT; EXEC }        # Execute the lambda
-               { DUP; CAR; DIP {CDR; SOME}; UPDATE; PUSH string ""}; # Update the storage
-       PAIR;
-       NIL operation; PAIR} # Calling convention

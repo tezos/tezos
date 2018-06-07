@@ -1,5 +1,0 @@
-parameter key_hash;
-storage unit;
-code {DIP{UNIT}; CAR; IMPLICIT_ACCOUNT;
-      PUSH mutez 100000000; UNIT; TRANSFER_TOKENS;
-      NIL operation; SWAP; CONS; PAIR}

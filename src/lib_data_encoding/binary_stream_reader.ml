@@ -207,6 +207,14 @@ module Atom = struct
 
 end
 
+let rec skip n state k =
+  let resume buffer =
+    let stream = Binary_stream.push buffer state.stream in
+    try skip n { state with stream } k
+    with Read_error err -> Error err in
+  Atom.fixed_length_string n resume state @@ fun (_, state : string * _) ->
+  k state
+
 (** Main recursive reading function, in continuation passing style. *)
 let rec read_rec
   : type next ret.
@@ -242,6 +250,9 @@ let rec read_rec
     | String `Variable ->
         let size = remaining_bytes state in
         Atom.fixed_length_string size resume state k
+    | Padded (e, n) ->
+        read_rec e state @@ fun (v, state) ->
+        skip n state @@ (fun state -> k (v, state))
     | RangedInt { minimum ; maximum }  ->
         Atom.ranged_int ~minimum ~maximum resume state k
     | RangedFloat { minimum ; maximum } ->
@@ -252,52 +263,52 @@ let rec read_rec
         read_list e state @@ fun (l, state) ->
         k (Array.of_list l, state)
     | List e -> read_list e state k
-    | (Obj (Req (_, e))) -> read_rec e state k
-    | (Obj (Dft (_, e, _))) -> read_rec e state k
-    | (Obj (Opt (`Dynamic, _, e))) ->
+    | (Obj (Req { encoding = e })) -> read_rec e state k
+    | (Obj (Dft { encoding = e })) -> read_rec e state k
+    | (Obj (Opt { kind = `Dynamic ; encoding = e })) ->
         Atom.bool resume state @@ fun (present, state) ->
         if not present then
           k (None, state)
         else
           read_rec e state @@ fun (v, state) ->
           k (Some v, state)
-    | (Obj (Opt (`Variable, _, e))) ->
+    | (Obj (Opt { kind = `Variable ; encoding = e })) ->
         let size = remaining_bytes state in
         if size = 0 then
           k (None, state)
         else
           read_rec e state @@ fun (v, state) ->
           k (Some v, state)
-    | Objs (`Fixed sz, e1, e2) ->
+    | Objs { kind = `Fixed sz ; left ; right } ->
         ignore (check_remaining_bytes state sz : int option) ;
         ignore (check_allowed_bytes state sz : int option) ;
-        read_rec e1 state @@ fun (left, state) ->
-        read_rec e2 state @@ fun (right, state) ->
+        read_rec left state @@ fun (left, state) ->
+        read_rec right state @@ fun (right, state) ->
         k ((left, right), state)
-    | Objs (`Dynamic, e1, e2) ->
-        read_rec e1 state @@ fun (left, state) ->
-        read_rec e2 state @@ fun (right, state) ->
+    | Objs { kind = `Dynamic ; left ; right } ->
+        read_rec left state @@ fun (left, state) ->
+        read_rec right state @@ fun (right, state) ->
         k ((left, right), state)
-    | (Objs (`Variable, e1, e2)) ->
-        read_variable_pair e1 e2 state k
+    | Objs { kind = `Variable ; left ; right } ->
+        read_variable_pair left right state k
     | Tup e -> read_rec e state k
-    | Tups (`Fixed sz, e1, e2) ->
+    | Tups { kind = `Fixed sz ; left ; right } ->
         ignore (check_remaining_bytes state sz : int option) ;
         ignore (check_allowed_bytes state sz : int option) ;
-        read_rec e1 state @@ fun (left, state) ->
-        read_rec e2 state @@ fun (right, state) ->
+        read_rec left state @@ fun (left, state) ->
+        read_rec right state @@ fun (right, state) ->
         k ((left, right), state)
-    | Tups (`Dynamic, e1, e2) ->
-        read_rec e1 state @@ fun (left, state) ->
-        read_rec e2 state @@ fun (right, state) ->
+    | Tups { kind = `Dynamic ; left ; right } ->
+        read_rec left state @@ fun (left, state) ->
+        read_rec right state @@ fun (right, state) ->
         k ((left, right), state)
-    | (Tups (`Variable, e1, e2)) ->
-        read_variable_pair e1 e2 state k
+    | Tups { kind = `Variable ; left ; right } ->
+        read_variable_pair left right state k
     | Conv { inj ; encoding } ->
         read_rec encoding state @@ fun (v, state) ->
         k (inj v, state)
-    | Union (_, sz, cases) -> begin
-        Atom.tag sz resume state @@ fun (ctag, state) ->
+    | Union { tag_size ; cases } -> begin
+        Atom.tag tag_size resume state @@ fun (ctag, state) ->
         match
           List.find
             (function
@@ -340,9 +351,8 @@ let rec read_rec
               Some (old_limit - read) in
         k (v, { state with allowed_bytes })
     | Describe { encoding = e } -> read_rec e state k
-    | Def { encoding = e } -> read_rec e state k
     | Splitted { encoding = e } -> read_rec e state k
-    | Mu (_, _, self) -> read_rec (self e) state k
+    | Mu { fix } -> read_rec (fix e) state k
     | Delayed f -> read_rec (f ()) state k
 
 and remaining_bytes { remaining_bytes } =

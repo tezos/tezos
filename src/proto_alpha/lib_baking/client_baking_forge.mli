@@ -19,7 +19,7 @@ val generate_seed_nonce: unit -> Nonce.t
 val inject_block:
   #Proto_alpha.full ->
   ?force:bool ->
-  ?chain_id:Chain_id.t ->
+  ?chain:Chain_services.chain ->
   shell_header:Block_header.shell_header ->
   priority:int ->
   ?seed_nonce_hash:Nonce_hash.t ->
@@ -37,13 +37,14 @@ type error +=
 
 val forge_block:
   #Proto_alpha.full ->
+  ?chain:Chain_services.chain ->
   Block_services.block ->
   ?force:bool ->
-  ?operations:Operation.raw list ->
+  ?operations: Operation.packed list ->
   ?best_effort:bool ->
   ?sort:bool ->
   ?timestamp:Time.t ->
-  priority:[`Set of int | `Auto of (public_key_hash * int option * bool)] ->
+  priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
   ?seed_nonce_hash:Nonce_hash.t ->
   src_sk:Client_keys.sk_uri ->
   unit ->
@@ -79,12 +80,12 @@ val create:
   #Proto_alpha.full ->
   ?max_priority: int ->
   public_key_hash list ->
-  Client_baking_blocks.block_info list tzresult Lwt_stream.t ->
-  Client_baking_operations.valid_endorsement tzresult Lwt_stream.t ->
+  Client_baking_blocks.block_info tzresult Lwt_stream.t ->
   unit tzresult Lwt.t
 
 val get_unrevealed_nonces:
   #Proto_alpha.full ->
   ?force:bool ->
+  ?chain:Chain_services.chain ->
   Block_services.block ->
   (Block_hash.t * (Raw_level.t * Nonce.t)) list tzresult Lwt.t

@@ -47,9 +47,7 @@ module Make (Context : CONTEXT) = struct
 
   type rpc_context = {
     block_hash: Block_hash.t ;
-    block_header: Block_header.t ;
-    operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-    operations: unit -> Operation.t list list Lwt.t ;
+    block_header: Block_header.shell_header ;
     context: Context.t ;
   }
 
@@ -61,9 +59,24 @@ module Make (Context : CONTEXT) = struct
     type 'a tzresult
     val max_block_length: int
     val validation_passes: quota list
-    type operation
-    val parse_operation:
-      Operation_hash.t -> Operation.t -> operation tzresult
+    type block_header_data
+    val block_header_data_encoding: block_header_data Data_encoding.t
+    type block_header = {
+      shell: Block_header.shell_header ;
+      protocol_data: block_header_data ;
+    }
+    type block_header_metadata
+    val block_header_metadata_encoding: block_header_metadata Data_encoding.t
+    type operation_data
+    type operation_receipt
+    type operation = {
+      shell: Operation.shell_header ;
+      protocol_data: operation_data ;
+    }
+    val operation_data_encoding: operation_data Data_encoding.t
+    val operation_receipt_encoding: operation_receipt Data_encoding.t
+    val operation_data_and_receipt_encoding:
+      (operation_data * operation_receipt) Data_encoding.t
     val acceptable_passes: operation -> int list
     val compare_operations: operation -> operation -> int
     type validation_state
@@ -71,13 +84,13 @@ module Make (Context : CONTEXT) = struct
     val precheck_block:
       ancestor_context: context ->
       ancestor_timestamp: Time.t ->
-      Block_header.t ->
+      block_header ->
       unit tzresult Lwt.t
     val begin_application:
       predecessor_context: context ->
       predecessor_timestamp: Time.t ->
       predecessor_fitness: Fitness.t ->
-      Block_header.t ->
+      block_header ->
       validation_state tzresult Lwt.t
     val begin_construction:
       predecessor_context: context ->
@@ -86,13 +99,15 @@ module Make (Context : CONTEXT) = struct
       predecessor_fitness: Fitness.t ->
       predecessor: Block_hash.t ->
       timestamp: Time.t ->
-      ?protocol_data: MBytes.t ->
+      ?protocol_data: block_header_data ->
       unit -> validation_state tzresult Lwt.t
     val apply_operation:
-      validation_state -> operation -> validation_state tzresult Lwt.t
+      validation_state -> operation ->
+      (validation_state * operation_receipt) tzresult Lwt.t
     val finalize_block:
-      validation_state -> validation_result tzresult Lwt.t
-    val rpc_services: rpc_context Lwt.t RPC_directory.t
+      validation_state ->
+      (validation_result * block_header_metadata) tzresult Lwt.t
+    val rpc_services: rpc_context RPC_directory.t
     val init:
       context -> Block_header.shell_header -> validation_result tzresult Lwt.t
   end
@@ -150,12 +165,16 @@ module Make (Context : CONTEXT) = struct
     val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
 
     module Lift (P : Updater.PROTOCOL) : PROTOCOL
-      with type operation = P.operation
+      with type block_header_data = P.block_header_data
+       and type block_header = P.block_header
+       and type operation_data = P.operation_data
+       and type operation_receipt = P.operation_receipt
+       and type operation = P.operation
        and type validation_state = P.validation_state
 
-    class ['block] proto_rpc_context :
-      Tezos_rpc.RPC_context.t -> (unit, unit * 'block) RPC_path.t ->
-      ['block] RPC_context.simple
+    class ['chain, 'block] proto_rpc_context :
+      Tezos_rpc.RPC_context.t -> (unit, (unit * 'chain) * 'block) RPC_path.t ->
+      [('chain * 'block)] RPC_context.simple
 
     class ['block] proto_rpc_context_of_directory :
       ('block -> RPC_context.t) -> RPC_context.t RPC_directory.t ->
@@ -488,7 +507,7 @@ module Make (Context : CONTEXT) = struct
     end
     module RPC_context = struct
 
-      type t = rpc_context Lwt.t
+      type t = rpc_context
 
       class type ['pr] simple = object
         method call_proto_service0 :
@@ -571,9 +590,7 @@ module Make (Context : CONTEXT) = struct
 
       type nonrec rpc_context = rpc_context = {
         block_hash: Block_hash.t ;
-        block_header: Block_header.t ;
-        operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-        operations: unit -> Operation.t list list Lwt.t ;
+        block_header: Block_header.shell_header ;
         context: Context.t ;
       }
 
@@ -642,51 +659,50 @@ module Make (Context : CONTEXT) = struct
       let apply_operation c o =
         apply_operation c o >|= wrap_error
       let finalize_block c = finalize_block c >|= wrap_error
-      let parse_operation h b = parse_operation h b |> wrap_error
       let init c bh = init c bh >|= wrap_error
     end
 
-    class ['block] proto_rpc_context
+    class ['chain, 'block] proto_rpc_context
         (t : Tezos_rpc.RPC_context.t)
-        (prefix : (unit, unit * 'block) RPC_path.t) =
+        (prefix : (unit, (unit * 'chain) * 'block) RPC_path.t) =
       object
         method call_proto_service0
           : 'm 'q 'i 'o.
             ([< RPC_service.meth ] as 'm, RPC_context.t,
              RPC_context.t, 'q, 'i, 'o) RPC_service.t ->
-            'block -> 'q -> 'i -> 'o tzresult Lwt.t
-          = fun s block q i ->
+            ('chain * 'block) -> 'q -> 'i -> 'o tzresult Lwt.t
+          = fun s (chain, block) q i ->
             let s = RPC_service.subst0 s in
             let s = RPC_service.prefix prefix s in
-            t#call_service s ((), block) q i
+            t#call_service s (((), chain), block) q i
         method call_proto_service1
           : 'm 'a 'q 'i 'o.
             ([< RPC_service.meth ] as 'm, RPC_context.t,
              RPC_context.t * 'a, 'q, 'i, 'o) RPC_service.t ->
-            'block -> 'a -> 'q -> 'i -> 'o tzresult Lwt.t
-          = fun s block a1 q i ->
+            ('chain * 'block) -> 'a -> 'q -> 'i -> 'o tzresult Lwt.t
+          = fun s (chain, block) a1 q i ->
             let s = RPC_service.subst1 s in
             let s = RPC_service.prefix prefix s in
-            t#call_service s (((), block), a1) q i
+            t#call_service s ((((), chain), block), a1) q i
         method call_proto_service2
           : 'm 'a 'b 'q 'i 'o.
             ([< RPC_service.meth ] as 'm, RPC_context.t,
              (RPC_context.t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
-            'block -> 'a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t
-          = fun s block a1 a2 q i ->
+            ('chain * 'block) -> 'a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t
+          = fun s (chain, block) a1 a2 q i ->
             let s = RPC_service.subst2 s in
             let s = RPC_service.prefix prefix s in
-            t#call_service s ((((), block), a1), a2) q i
+            t#call_service s (((((), chain), block), a1), a2) q i
         method call_proto_service3
           : 'm 'a 'b 'c 'q 'i 'o.
             ([< RPC_service.meth ] as 'm, RPC_context.t,
              ((RPC_context.t * 'a) * 'b) * 'c,
              'q, 'i, 'o) RPC_service.t ->
-            'block -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t
-          = fun s block a1 a2 a3 q i ->
+            ('chain * 'block) -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t
+          = fun s (chain, block) a1 a2 a3 q i ->
             let s = RPC_service.subst3 s in
             let s = RPC_service.prefix prefix s in
-            t#call_service s (((((), block), a1), a2), a3) q i
+            t#call_service s ((((((), chain), block), a1), a2), a3) q i
       end
 
     class ['block] proto_rpc_context_of_directory conv dir : ['block] RPC_context.simple =

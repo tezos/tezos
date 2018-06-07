@@ -79,7 +79,7 @@ module Raw_level : sig
 
   include BASIC_DATA
   type raw_level = t
-  val arg: raw_level RPC_arg.arg
+  val rpc_arg: raw_level RPC_arg.arg
 
   val diff: raw_level -> raw_level -> int32
 
@@ -95,7 +95,7 @@ module Cycle : sig
 
   include BASIC_DATA
   type cycle = t
-  val arg: cycle RPC_arg.arg
+  val rpc_arg: cycle RPC_arg.arg
 
   val root: cycle
   val succ: cycle -> cycle
@@ -103,6 +103,8 @@ module Cycle : sig
   val add: cycle -> int -> cycle
   val sub: cycle -> int -> cycle option
   val to_int32: cycle -> int32
+
+  module Map : S.MAP with type key = cycle
 
 end
 
@@ -138,6 +140,7 @@ module Gas : sig
   val set_unlimited: context -> context
   val consume: context -> cost -> context tzresult
   val level: context -> t
+  val consumed: since: context -> until: context -> Z.t
   val block_level: context -> Z.t
 end
 
@@ -314,7 +317,6 @@ module Constants : sig
     blocks_per_roll_snapshot: int32 ;
     blocks_per_voting_period: int32 ;
     time_between_blocks: Period.t list ;
-    first_free_baking_slot: int ;
     endorsers_per_block: int ;
     hard_gas_limit_per_operation: Z.t ;
     hard_gas_limit_per_block: Z.t ;
@@ -335,14 +337,12 @@ module Constants : sig
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
-
   val preserved_cycles: context -> int
   val blocks_per_cycle: context -> int32
   val blocks_per_commitment: context -> int32
   val blocks_per_roll_snapshot: context -> int32
   val blocks_per_voting_period: context -> int32
   val time_between_blocks: context -> Period.t list
-  val first_free_baking_slot: context -> int
   val endorsers_per_block: context -> int
   val hard_gas_limit_per_operation: context -> Z.t
   val hard_gas_limit_per_block: context -> Z.t
@@ -361,6 +361,7 @@ module Constants : sig
   val block_security_deposit: context -> Tez.t
   val endorsement_security_deposit: context -> Tez.t
 
+  (** All constants: fixed and parametric *)
   type t = {
     fixed : fixed ;
     parametric : parametric ;
@@ -373,7 +374,7 @@ module Voting_period : sig
 
   include BASIC_DATA
   type voting_period = t
-  val arg: voting_period RPC_arg.arg
+  val rpc_arg: voting_period RPC_arg.arg
 
   val root: voting_period
   val succ: voting_period -> voting_period
@@ -416,6 +417,7 @@ module Level : sig
 
   val last_level_in_cycle: context -> Cycle.t -> level
   val levels_in_cycle: context -> Cycle.t -> level list
+  val levels_in_current_cycle: context -> ?offset:int32 -> unit -> level list
 
   val last_allowed_fork_level: context -> Raw_level.t
 
@@ -482,7 +484,7 @@ module Contract : sig
 
   include BASIC_DATA
   type contract = t
-  val arg: contract RPC_arg.arg
+  val rpc_arg: contract RPC_arg.arg
 
   val to_b58check: contract -> string
   val of_b58check: string -> contract tzresult
@@ -525,7 +527,7 @@ module Contract : sig
   val init_origination_nonce: context -> Operation_hash.t -> context
   val unset_origination_nonce: context -> context
   val fresh_contract_from_current_nonce : context -> (context * t) tzresult Lwt.t
-  val originated_from_current_nonce: context -> contract list tzresult Lwt.t
+  val originated_from_current_nonce: since: context -> until:context -> contract list tzresult Lwt.t
 
   type big_map_diff = (string * Script.expr option) list
 
@@ -577,6 +579,12 @@ module Contract : sig
       context -> contract -> string -> (context * Script_repr.expr option) tzresult Lwt.t
   end
 
+  (**/**)
+  (* Only for testing *)
+  type origination_nonce
+  val initial_origination_nonce  : Operation_hash.t -> origination_nonce
+  val originated_contract : origination_nonce -> contract
+
 end
 
 module Delegate : sig
@@ -611,6 +619,9 @@ module Delegate : sig
     context -> public_key_hash -> Cycle.t ->
     (context * Tez.t) tzresult Lwt.t
 
+  val full_balance:
+    context -> public_key_hash -> Tez.t tzresult Lwt.t
+
   val has_frozen_balance:
     context -> public_key_hash -> Cycle.t ->
     bool tzresult Lwt.t
@@ -618,17 +629,38 @@ module Delegate : sig
   val frozen_balance:
     context -> public_key_hash -> Tez.t tzresult Lwt.t
 
-  type frozen_balances = {
+  type frozen_balance = {
     deposit : Tez.t ;
     fees : Tez.t ;
     rewards : Tez.t ;
   }
 
-  val frozen_balances:
-    context -> public_key_hash -> frozen_balances tzresult Lwt.t
+  val frozen_balance_encoding: frozen_balance Data_encoding.t
+  val frozen_balance_by_cycle_encoding: frozen_balance Cycle.Map.t Data_encoding.t
 
-  val full_balance:
-    context -> public_key_hash -> Tez.t tzresult Lwt.t
+  val frozen_balance_by_cycle:
+    context -> Signature.Public_key_hash.t ->
+    frozen_balance Cycle.Map.t Lwt.t
+
+  val staking_balance:
+    context -> Signature.Public_key_hash.t ->
+    Tez.t tzresult Lwt.t
+
+  val delegated_contracts:
+    context -> Signature.Public_key_hash.t ->
+    Contract_hash.t list Lwt.t
+
+  val delegated_balance:
+    context -> Signature.Public_key_hash.t ->
+    Tez.t tzresult Lwt.t
+
+  val deactivated:
+    context -> Signature.Public_key_hash.t ->
+    bool Lwt.t
+
+  val grace_period:
+    context -> Signature.Public_key_hash.t ->
+    Cycle.t tzresult Lwt.t
 
 end
 
@@ -683,10 +715,14 @@ module Block_header : sig
   type t = {
     shell: Block_header.shell_header ;
     protocol_data: protocol_data ;
-    signature: Signature.t ;
   }
 
   and protocol_data = {
+    contents: contents ;
+    signature: Signature.t ;
+  }
+
+  and contents = {
     priority: int ;
     seed_nonce_hash: Nonce_hash.t option ;
     proof_of_work_nonce: MBytes.t ;
@@ -697,130 +733,165 @@ module Block_header : sig
   type raw = Block_header.t
   type shell_header = Block_header.shell_header
 
+  type metadata = {
+    baker: Signature.Public_key_hash.t ;
+    level: Level.t ;
+    voting_period_kind: Voting_period.kind ;
+  }
+
+  val raw: block_header -> raw
+
   val hash: block_header -> Block_hash.t
   val hash_raw: raw -> Block_hash.t
 
   val encoding: block_header Data_encoding.encoding
   val raw_encoding: raw Data_encoding.t
+  val contents_encoding: contents Data_encoding.t
+  val unsigned_encoding: (shell_header * contents) Data_encoding.t
   val protocol_data_encoding: protocol_data Data_encoding.encoding
   val shell_header_encoding: shell_header Data_encoding.encoding
+  val metadata_encoding: metadata Data_encoding.encoding
 
   val max_header_length: int
   (** The maximum size of block headers in bytes *)
 
-  val parse: Block_header.t -> block_header tzresult
-  (** Parse the protocol-specific part of a block header. *)
-
-  val parse_unsigned_protocol_data: MBytes.t -> protocol_data tzresult
-  (** Parse the (unsigned) protocol-specific part of a block header. *)
-
-  val forge_unsigned_protocol_data: protocol_data -> MBytes.t
-  (** [forge_header proto_hdr] is the binary serialization
-      (using [protocol_data_encoding]) of the protocol-specific part
-      of a block header, without the signature. *)
-
-  val forge_unsigned:
-    Block_header.shell_header -> protocol_data -> MBytes.t
-    (** [forge_header shell_hdr proto_hdr] is the binary serialization
-        (using [unsigned_header_encoding]) of a block header,
-        comprising both the shell and the protocol part of the header,
-        without the signature. *)
-
 end
 
-type operation = {
+module Kind : sig
+  type seed_nonce_revelation = Seed_nonce_revelation_kind
+  type double_endorsement_evidence = Double_endorsement_evidence_kind
+  type double_baking_evidence = Double_baking_evidence_kind
+  type activate_account = Activate_account_kind
+  type endorsements = Endorsements_kind
+  type proposals = Proposals_kind
+  type ballot = Ballot_kind
+  type reveal = Reveal_kind
+  type transaction = Transaction_kind
+  type origination = Origination_kind
+  type delegation = Delegation_kind
+  type 'a manager =
+    | Reveal_manager_kind : reveal manager
+    | Transaction_manager_kind : transaction manager
+    | Origination_manager_kind : origination manager
+    | Delegation_manager_kind : delegation manager
+end
+
+type 'kind operation = {
   shell: Operation.shell_header ;
-  contents: proto_operation ;
-  signature: signature option ;
+  protocol_data: 'kind protocol_data ;
 }
 
-and proto_operation =
-  | Anonymous_operations of anonymous_operation list
-  | Sourced_operation of sourced_operation
+and 'kind protocol_data = {
+  contents: 'kind contents_list ;
+  signature: Signature.t option ;
+}
 
-and anonymous_operation =
-  | Seed_nonce_revelation of {
-      level: Raw_level.t ;
-      nonce: Nonce.t ;
-    }
-  | Double_endorsement_evidence of {
-      op1: operation ;
-      op2: operation ;
-    }
-  | Double_baking_evidence of {
-      bh1: Block_header.t ;
-      bh2: Block_header.t ;
-    }
-  | Activation of {
-      id: Ed25519.Public_key_hash.t ;
-      secret: Blinded_public_key_hash.secret ;
-    }
+and _ contents_list =
+  | Single : 'kind contents -> 'kind contents_list
+  | Cons : 'kind Kind.manager contents * 'rest Kind.manager contents_list ->
+    (('kind * 'rest) Kind.manager ) contents_list
 
-and sourced_operation =
-  | Consensus_operation of consensus_operation
-  | Amendment_operation of {
-      source: Signature.Public_key_hash.t ;
-      operation: amendment_operation ;
-    }
-  | Manager_operations of {
-      source: Contract.contract ;
-      fee: Tez.t ;
-      counter: counter ;
-      operations: manager_operation list ;
-      gas_limit: Z.t ;
-      storage_limit: Int64.t;
-    }
-  | Dictator_operation of dictator_operation
-
-and consensus_operation =
-  | Endorsements of {
+and _ contents =
+  | Endorsements : {
       block: Block_hash.t ;
       level: Raw_level.t ;
       slots: int list ;
-    }
-
-and amendment_operation =
-  | Proposals of {
+    } -> Kind.endorsements contents
+  | Seed_nonce_revelation : {
+      level: Raw_level.t ;
+      nonce: Nonce.t ;
+    } -> Kind.seed_nonce_revelation contents
+  | Double_endorsement_evidence : {
+      op1: Kind.endorsements operation ;
+      op2: Kind.endorsements operation ;
+    } -> Kind.double_endorsement_evidence contents
+  | Double_baking_evidence : {
+      bh1: Block_header.t ;
+      bh2: Block_header.t ;
+    } -> Kind.double_baking_evidence contents
+  | Activate_account : {
+      id: Ed25519.Public_key_hash.t ;
+      activation_code: Blinded_public_key_hash.activation_code ;
+    } -> Kind.activate_account contents
+  | Proposals : {
+      source: Signature.Public_key_hash.t ;
       period: Voting_period.t ;
       proposals: Protocol_hash.t list ;
-    }
-  | Ballot of {
+    } -> Kind.proposals contents
+  | Ballot : {
+      source: Signature.Public_key_hash.t ;
       period: Voting_period.t ;
       proposal: Protocol_hash.t ;
       ballot: Vote.ballot ;
-    }
+    } -> Kind.ballot contents
+  | Manager_operation : {
+      source: Contract.contract ;
+      fee: Tez.tez ;
+      counter: counter ;
+      operation: 'kind manager_operation ;
+      gas_limit: Z.t;
+      storage_limit: Int64.t;
+    } -> 'kind Kind.manager contents
 
-and manager_operation =
-  | Reveal of Signature.Public_key.t
-  | Transaction of {
-      amount: Tez.t ;
+and _ manager_operation =
+  | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
+  | Transaction : {
+      amount: Tez.tez ;
       parameters: Script.lazy_expr option ;
       destination: Contract.contract ;
-    }
-  | Origination of {
-      manager: public_key_hash ;
-      delegate: public_key_hash option ;
+    } -> Kind.transaction manager_operation
+  | Origination : {
+      manager: Signature.Public_key_hash.t ;
+      delegate: Signature.Public_key_hash.t option ;
       script: Script.t option ;
       spendable: bool ;
       delegatable: bool ;
-      credit: Tez.t ;
+      credit: Tez.tez ;
       preorigination: Contract.t option ;
-    }
-  | Delegation of public_key_hash option
-
-and dictator_operation =
-  | Activate of Protocol_hash.t
-  | Activate_testchain of Protocol_hash.t
+    } -> Kind.origination manager_operation
+  | Delegation :
+      Signature.Public_key_hash.t option -> Kind.delegation manager_operation
 
 and counter = Int32.t
 
-type internal_operation = {
+type 'kind internal_operation = {
   source: Contract.contract ;
-  operation: manager_operation ;
-  nonce : int ;
+  operation: 'kind manager_operation ;
+  nonce: int ;
 }
 
+type packed_manager_operation =
+  | Manager : 'kind manager_operation -> packed_manager_operation
+
+type packed_contents =
+  | Contents : 'kind contents -> packed_contents
+
+type packed_contents_list =
+  | Contents_list : 'kind contents_list -> packed_contents_list
+
+type packed_protocol_data =
+  | Operation_data : 'kind protocol_data -> packed_protocol_data
+
+type packed_operation = {
+  shell: Operation.shell_header ;
+  protocol_data: packed_protocol_data ;
+}
+
+type packed_internal_operation =
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
+
+val manager_kind: 'kind manager_operation -> 'kind Kind.manager
+
 module Operation : sig
+
+  type nonrec 'kind contents = 'kind contents
+  type nonrec packed_contents = packed_contents
+  val contents_encoding: packed_contents Data_encoding.t
+
+  type nonrec 'kind protocol_data = 'kind protocol_data
+  type nonrec packed_protocol_data = packed_protocol_data
+  val protocol_data_encoding: packed_protocol_data Data_encoding.t
+  val unsigned_encoding: (Operation.shell_header * packed_contents_list) Data_encoding.t
 
   type raw = Operation.t = {
     shell: Operation.shell_header ;
@@ -828,36 +899,84 @@ module Operation : sig
   }
   val raw_encoding: raw Data_encoding.t
 
-  type t = operation
-  val encoding: operation Data_encoding.t
+  type 'kind t = 'kind operation = {
+    shell: Operation.shell_header ;
+    protocol_data: 'kind protocol_data ;
+  }
+  type nonrec packed = packed_operation
+  val encoding: packed Data_encoding.t
 
-  val hash: operation -> Operation_hash.t
+  val raw: _ operation -> raw
+
+  val hash: _ operation -> Operation_hash.t
   val hash_raw: raw -> Operation_hash.t
 
-  type error += Cannot_parse_operation (* `Branch *)
-  val parse: Operation.t -> operation tzresult
-  val acceptable_passes: operation -> int list
-
-  val parse_proto:
-    MBytes.t -> (proto_operation * signature option) tzresult Lwt.t
+  val acceptable_passes: packed_operation -> int list
 
   type error += Missing_signature (* `Permanent *)
   type error += Invalid_signature (* `Permanent *)
 
-  val check_signature: public_key -> operation -> unit tzresult Lwt.t
+  val check_signature: public_key -> _ operation -> unit tzresult Lwt.t
 
-  val forge: Operation.shell_header -> proto_operation -> MBytes.t
+  val internal_operation_encoding: packed_internal_operation Data_encoding.t
 
-  val proto_operation_encoding: proto_operation Data_encoding.t
+  val pack: 'kind operation -> packed_operation
 
-  val unsigned_operation_encoding:
-    (Operation.shell_header * proto_operation) Data_encoding.t
+  type ('a, 'b) eq = Eq : ('a, 'a) eq
+  val equal: 'a operation -> 'b operation -> ('a, 'b) eq option
 
-  val internal_operation_encoding: internal_operation Data_encoding.t
+  module Encoding : sig
+
+    type 'b case =
+        Case : { tag: int ;
+                 name: string ;
+                 encoding: 'a Data_encoding.t ;
+                 select: packed_contents -> 'b contents option ;
+                 proj: 'b contents -> 'a ;
+                 inj: 'a -> 'b contents } -> 'b case
+
+    val endorsement_case: Kind.endorsements case
+    val seed_nonce_revelation_case: Kind.seed_nonce_revelation case
+    val double_endorsement_evidence_case: Kind.double_endorsement_evidence case
+    val double_baking_evidence_case: Kind.double_baking_evidence case
+    val activate_account_case: Kind.activate_account case
+    val proposals_case: Kind.proposals case
+    val ballot_case: Kind.ballot case
+    val reveal_case: Kind.reveal Kind.manager case
+    val transaction_case: Kind.transaction Kind.manager case
+    val origination_case: Kind.origination Kind.manager case
+    val delegation_case: Kind.delegation Kind.manager case
+
+    module Manager_operations : sig
+
+      type 'b case =
+          MCase : { tag: int ;
+                    name: string ;
+                    encoding: 'a Data_encoding.t ;
+                    select: packed_manager_operation -> 'kind manager_operation option ;
+                    proj: 'kind manager_operation -> 'a ;
+                    inj: 'a -> 'kind manager_operation } -> 'kind case
+
+      val reveal_case: Kind.reveal case
+      val transaction_case: Kind.transaction case
+      val origination_case: Kind.origination case
+      val delegation_case: Kind.delegation case
+
+    end
+
+  end
+
+  val of_list: packed_contents list -> packed_contents_list
+  val to_list: packed_contents_list -> packed_contents list
 
 end
 
 module Roll : sig
+
+  type t = private int32
+  type roll = t
+
+  val encoding: roll Data_encoding.t
 
   val snapshot_rolls: context -> context tzresult Lwt.t
   val cycle_end: context -> Cycle.t -> context tzresult Lwt.t
@@ -871,6 +990,11 @@ module Roll : sig
   val delegate_pubkey:
     context -> public_key_hash -> public_key tzresult Lwt.t
 
+  val get_rolls:
+    context -> Signature.Public_key_hash.t -> roll list tzresult Lwt.t
+  val get_change:
+    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
+
 end
 
 module Commitment : sig
@@ -880,9 +1004,9 @@ module Commitment : sig
       amount : Tez.tez }
 
   val get_opt:
-    context ->  Unclaimed_public_key_hash.t -> t option tzresult Lwt.t
+    context -> Blinded_public_key_hash.t -> Tez.t option tzresult Lwt.t
   val delete:
-    context ->  Unclaimed_public_key_hash.t -> context tzresult Lwt.t
+    context ->  Blinded_public_key_hash.t -> context tzresult Lwt.t
 
 end
 
@@ -929,6 +1053,11 @@ val internal_nonce_already_recorded: context -> int -> bool
 
 val add_fees: context -> Tez.t -> context tzresult Lwt.t
 val add_rewards: context -> Tez.t -> context tzresult Lwt.t
+val add_deposit:
+  context -> Signature.Public_key_hash.t -> Tez.t -> context tzresult Lwt.t
 
 val get_fees: context -> Tez.t
 val get_rewards: context -> Tez.t
+val get_deposits: context -> Tez.t Signature.Public_key_hash.Map.t
+
+val description: context Storage_description.t

@@ -11,10 +11,12 @@ open Proto_alpha
 open Alpha_context
 open Apply_operation_result
 
-let pp_manager_operation_content ppf source operation internal pp_result result =
+let pp_manager_operation_content
+    (type kind) source internal pp_result
+    ppf (operation, result : kind manager_operation * _) =
   Format.fprintf ppf "@[<v 0>" ;
   begin match operation with
-    | Alpha_context.Transaction { destination ; amount ; parameters } ->
+    | Transaction { destination ; amount ; parameters } ->
         Format.fprintf ppf
           "@[<v 2>%s:@,\
            Amount: %s%a@,\
@@ -134,63 +136,172 @@ let pp_balance_updates ppf = function
       Format.fprintf ppf "@[<v 0>%a@]"
         (Format.pp_print_list pp_one) balance_updates
 
-let pp_operation_result ppf ({ contents ; _ }, operation_result) =
-  Format.fprintf ppf "@[<v 0>" ;
-  begin match contents, operation_result with
-    | Anonymous_operations ops, Anonymous_operations_result rs ->
-        let ops_rs = List.combine ops rs in
-        let pp_anonymous_operation_result ppf = function
-          | Seed_nonce_revelation { level ; nonce },
-            Seed_nonce_revelation_result bus ->
+let pp_manager_operation_contents_and_result ppf
+    (Manager_operation { source ; fee ; operation ; counter ; gas_limit ; storage_limit },
+     Manager_operation_result { balance_updates ; operation_result ;
+                                internal_operation_results }) =
+  let pp_result (type kind) ppf (result : kind manager_operation_result) =
+    Format.fprintf ppf "@," ;
+    match result with
+    | Skipped _ ->
+        Format.fprintf ppf
+          "This operation was skipped"
+    | Failed (_, _errs) ->
+        Format.fprintf ppf
+          "This operation FAILED."
+    | Applied Reveal_result ->
+        Format.fprintf ppf
+          "This revelation was successfully applied"
+    | Applied Delegation_result ->
+        Format.fprintf ppf
+          "This delegation was successfully applied"
+    | Applied (Transaction_result { balance_updates ; consumed_gas ;
+                                    storage ;
+                                    originated_contracts ; storage_size_diff }) ->
+        Format.fprintf ppf
+          "This transaction was successfully applied" ;
+        begin match originated_contracts with
+          | [] -> ()
+          | contracts ->
+              Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
+                (Format.pp_print_list Contract.pp) contracts
+        end ;
+        begin match storage with
+          | None -> ()
+          | Some expr ->
+              Format.fprintf ppf "@,@[<hv 2>Updated storage:@ %a@]"
+                Michelson_v1_printer.print_expr expr
+        end ;
+        begin if storage_size_diff <> 0L then
+            Format.fprintf ppf
+              "@,Storage size difference: %Ld bytes"
+              storage_size_diff
+        end ;
+        Format.fprintf ppf
+          "@,Consumed gas: %s"
+          (Z.to_string consumed_gas) ;
+        begin match balance_updates with
+          | [] -> ()
+          | balance_updates ->
               Format.fprintf ppf
-                "@[<v 2>Seed nonce revelation:@,\
-                 Level: %a@,\
-                 Nonce (hash): %a@,\
-                 Balance updates:@,\
-                \  %a@]"
-                Raw_level.pp level
-                Nonce_hash.pp (Nonce.hash nonce)
-                pp_balance_updates bus
-          | Double_baking_evidence { bh1 ; bh2 },
-            Double_baking_evidence_result bus ->
+                "@,Balance updates:@,  %a"
+                pp_balance_updates balance_updates
+        end
+    | Applied (Origination_result { balance_updates ; consumed_gas ;
+                                    originated_contracts ; storage_size_diff }) ->
+        Format.fprintf ppf
+          "This origination was successfully applied" ;
+        begin match originated_contracts with
+          | [] -> ()
+          | contracts ->
+              Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
+                (Format.pp_print_list Contract.pp) contracts
+        end ;
+        begin if storage_size_diff <> 0L then
+            Format.fprintf ppf
+              "@,Storage size used: %Ld bytes"
+              storage_size_diff
+        end ;
+        Format.fprintf ppf
+          "@,Consumed gas: %s"
+          (Z.to_string consumed_gas) ;
+        begin match balance_updates with
+          | [] -> ()
+          | balance_updates ->
               Format.fprintf ppf
-                "@[<v 2>Double baking evidence:@,\
-                 Exhibit A: %a@,\
-                 Exhibit B: %a@,\
-                 Balance updates:@,\
-                \  %a@]"
-                Block_hash.pp (Block_header.hash bh1)
-                Block_hash.pp (Block_header.hash bh2)
-                pp_balance_updates bus
-          | Double_endorsement_evidence { op1 ; op2},
-            Double_endorsement_evidence_result bus ->
-              Format.fprintf ppf
-                "@[<v 2>Double endorsement evidence:@,\
-                 Exhibit A: %a@,\
-                 Exhibit B: %a@,\
-                 Balance updates:@,\
-                \  %a@]"
-                Operation_hash.pp (Operation.hash op1)
-                Operation_hash.pp (Operation.hash op2)
-                pp_balance_updates bus
-          | Activation { id ; _ },
-            Activation_result bus ->
-              Format.fprintf ppf
-                "@[<v 2>Genesis account activation:@,\
-                 Account: %a@,\
-                 Balance updates:@,\
-                \  %a@]"
-                Ed25519.Public_key_hash.pp id
-                pp_balance_updates bus
-          | _, _ -> invalid_arg "Apply_operation_result.pp"
-        in
-        Format.pp_print_list pp_anonymous_operation_result ppf ops_rs
-    | Sourced_operation
-        (Consensus_operation
-           (Endorsements { block ; level ; slots })),
-      Sourced_operation_result
-        (Consensus_operation_result
-           (Endorsements_result (delegate, _slots))) ->
+                "@,Balance updates:@,  %a"
+                pp_balance_updates balance_updates
+        end in
+  Format.fprintf ppf
+    "@[<v 0>@[<v 2>Manager signed operations:@,\
+     From: %a@,\
+     Fee to the baker: %s%a@,\
+     Expected counter: %ld@,\
+     Gas limit: %s@,\
+     Storage limit: %Ld bytes"
+    Contract.pp source
+    Client_proto_args.tez_sym
+    Tez.pp fee
+    counter
+    (Z.to_string gas_limit)
+    storage_limit ;
+  begin match balance_updates with
+    | [] -> ()
+    | balance_updates ->
+        Format.fprintf ppf
+          "@,Balance updates:@,  %a"
+          pp_balance_updates balance_updates
+  end ;
+  Format.fprintf ppf
+    "@,%a"
+    (pp_manager_operation_content source false pp_result)
+    (operation, operation_result) ;
+  begin
+    match internal_operation_results with
+    | [] -> ()
+    | _ :: _ ->
+        Format.fprintf ppf
+          "@,@[<v 2>Internal operations:@ %a@]"
+          (Format.pp_print_list
+             (fun ppf (Internal_operation_result (op, res)) ->
+                pp_manager_operation_content op.source false pp_result
+                  ppf (op.operation, res)))
+          internal_operation_results
+  end ;
+  Format.fprintf ppf "@]"
+
+let rec pp_contents_and_result_list :
+  type kind. Format.formatter -> kind contents_and_result_list -> unit =
+  fun ppf -> function
+    | Single_and_result
+        (Seed_nonce_revelation { level ; nonce },
+         Seed_nonce_revelation_result bus) ->
+        Format.fprintf ppf
+          "@[<v 2>Seed nonce revelation:@,\
+           Level: %a@,\
+           Nonce (hash): %a@,\
+           Balance updates:@,\
+          \  %a@]"
+          Raw_level.pp level
+          Nonce_hash.pp (Nonce.hash nonce)
+          pp_balance_updates bus
+    | Single_and_result
+        (Double_baking_evidence { bh1 ; bh2 },
+         Double_baking_evidence_result bus) ->
+        Format.fprintf ppf
+          "@[<v 2>Double baking evidence:@,\
+           Exhibit A: %a@,\
+           Exhibit B: %a@,\
+           Balance updates:@,\
+          \  %a@]"
+          Block_hash.pp (Block_header.hash bh1)
+          Block_hash.pp (Block_header.hash bh2)
+          pp_balance_updates bus
+    | Single_and_result
+        (Double_endorsement_evidence { op1 ; op2 },
+         Double_endorsement_evidence_result bus) ->
+        Format.fprintf ppf
+          "@[<v 2>Double endorsement evidence:@,\
+           Exhibit A: %a@,\
+           Exhibit B: %a@,\
+           Balance updates:@,\
+          \  %a@]"
+          Operation_hash.pp (Operation.hash op1)
+          Operation_hash.pp (Operation.hash op2)
+          pp_balance_updates bus
+    | Single_and_result
+        (Activate_account { id ; _ },
+         Activate_account_result bus) ->
+        Format.fprintf ppf
+          "@[<v 2>Genesis account activation:@,\
+           Account: %a@,\
+           Balance updates:@,\
+          \  %a@]"
+          Ed25519.Public_key_hash.pp id
+          pp_balance_updates bus
+    | Single_and_result
+        (Endorsements { block ; level ; slots },
+         Endorsements_result (delegate, _slots)) ->
         Format.fprintf ppf
           "@[<v 2>Endorsement:@,\
            Block: %a@,\
@@ -204,9 +315,9 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
              ~pp_sep:Format.pp_print_space
              Format.pp_print_int)
           slots
-    | Sourced_operation
-        (Amendment_operation { source ; operation = Proposals { period ; proposals } }),
-      Sourced_operation_result Amendment_operation_result ->
+    | Single_and_result
+        (Proposals { source ; period ; proposals },
+         Proposals_result) ->
         Format.fprintf ppf
           "@[<v 2>Proposals:@,\
            From: %a@,\
@@ -216,9 +327,9 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
           Signature.Public_key_hash.pp source
           Voting_period.pp period
           (Format.pp_print_list Protocol_hash.pp) proposals
-    | Sourced_operation
-        (Amendment_operation { source ; operation = Ballot { period ; proposal ; ballot } }),
-      Sourced_operation_result Amendment_operation_result ->
+    | Single_and_result
+        (Ballot { source ;period ; proposal ; ballot },
+         Ballot_result) ->
         Format.fprintf ppf
           "@[<v 2>Ballot:@,\
            From: %a@,\
@@ -229,134 +340,25 @@ let pp_operation_result ppf ({ contents ; _ }, operation_result) =
           Voting_period.pp period
           Protocol_hash.pp proposal
           (match ballot with Yay -> "YAY" | Pass -> "PASS" | Nay -> "NAY")
-    | Sourced_operation (Dictator_operation (Activate protocol)),
-      Sourced_operation_result Dictator_operation_result ->
-        Format.fprintf ppf
-          "@[<v 2>Dictator protocol activation:@,\
-           Protocol: %a@]"
-          Protocol_hash.pp protocol
-    | Sourced_operation (Dictator_operation (Activate_testchain protocol)),
-      Sourced_operation_result Dictator_operation_result ->
-        Format.fprintf ppf
-          "@[<v 2>Dictator test protocol activation:@,\
-           Protocol: %a@]"
-          Protocol_hash.pp protocol
-    | Sourced_operation (Manager_operations { source ; fee ; counter ; operations ; gas_limit ; storage_limit }),
-      Sourced_operation_result (Manager_operations_result { balance_updates ; operation_results }) ->
-        let pp_result ppf result =
-          Format.fprintf ppf "@," ;
-          match result with
-          | Skipped ->
-              Format.fprintf ppf
-                "This operation was skipped"
-          | Failed _errs ->
-              Format.fprintf ppf
-                "This operation FAILED."
-          | Applied Reveal_result ->
-              Format.fprintf ppf
-                "This revelation was successfully applied"
-          | Applied Delegation_result ->
-              Format.fprintf ppf
-                "This delegation was successfully applied"
-          | Applied (Transaction_result { balance_updates ; consumed_gas ;
-                                          operations ; storage ;
-                                          originated_contracts ; storage_size_diff }) ->
-              Format.fprintf ppf
-                "This transaction was successfully applied" ;
-              begin match operations with
-                | [] -> ()
-                | ops -> Format.fprintf ppf "@,Internal operations: %d" (List.length ops)
-              end ;
-              begin match originated_contracts with
-                | [] -> ()
-                | contracts ->
-                    Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
-                      (Format.pp_print_list Contract.pp) contracts
-              end ;
-              begin match storage with
-                | None -> ()
-                | Some expr ->
-                    Format.fprintf ppf "@,@[<hv 2>Updated storage:@ %a@]"
-                      Michelson_v1_printer.print_expr expr
-              end ;
-              begin if storage_size_diff <> 0L then
-                  Format.fprintf ppf
-                    "@,Storage size difference: %Ld bytes"
-                    storage_size_diff
-              end ;
-              Format.fprintf ppf
-                "@,Consumed gas: %s"
-                (Z.to_string consumed_gas) ;
-              begin match balance_updates with
-                | [] -> ()
-                | balance_updates ->
-                    Format.fprintf ppf
-                      "@,Balance updates:@,  %a"
-                      pp_balance_updates balance_updates
-              end
-          | Applied (Origination_result { balance_updates ; consumed_gas ;
-                                          originated_contracts ; storage_size_diff }) ->
-              Format.fprintf ppf
-                "This origination was successfully applied" ;
-              begin match originated_contracts with
-                | [] -> ()
-                | contracts ->
-                    Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
-                      (Format.pp_print_list Contract.pp) contracts
-              end ;
-              begin if storage_size_diff <> 0L then
-                  Format.fprintf ppf
-                    "@,Storage size used: %Ld bytes"
-                    storage_size_diff
-              end ;
-              Format.fprintf ppf
-                "@,Consumed gas: %s"
-                (Z.to_string consumed_gas) ;
-              begin match balance_updates with
-                | [] -> ()
-                | balance_updates ->
-                    Format.fprintf ppf
-                      "@,Balance updates:@,  %a"
-                      pp_balance_updates balance_updates
-              end in
-        let rec pp_manager_operations_results ppf = function
-          | [], [] -> ()
-          | operation :: ops, (External, r) :: rs ->
-              Format.fprintf ppf "@," ;
-              pp_manager_operation_content ppf source operation false pp_result r ;
-              pp_manager_operations_results ppf (ops, rs)
-          | ops, (Internal { source ; operation }, r) :: rs ->
-              Format.fprintf ppf "@," ;
-              pp_manager_operation_content ppf source operation true pp_result r ;
-              pp_manager_operations_results ppf (ops, rs)
-          | [], _ :: _
-          | _ :: _, [] -> invalid_arg "Apply_operation_result.pp" in
-        Format.fprintf ppf
-          "@[<v 0>@[<v 2>Manager signed operations:@,\
-           From: %a@,\
-           Fee to the baker: %s%a@,\
-           Expected counter: %ld@,\
-           Gas limit: %s@,\
-           Storage limit: %Ld bytes"
-          Contract.pp source
-          Client_proto_args.tez_sym
-          Tez.pp fee
-          counter
-          (Z.to_string gas_limit)
-          storage_limit ;
-        begin match balance_updates with
-          | [] -> ()
-          | balance_updates ->
-              Format.fprintf ppf
-                "@,Balance updates:@,  %a"
-                pp_balance_updates balance_updates
-        end ;
-        Format.fprintf ppf
-          "@]%a@]"
-          pp_manager_operations_results (operations, operation_results)
-    | _, _ -> invalid_arg "Apply_operation_result.pp"
-  end ;
-  Format.fprintf ppf "@]"
+    | Single_and_result (Manager_operation _ as op,
+                         (Manager_operation_result _ as res))->
+        Format.fprintf ppf "%a"
+          pp_manager_operation_contents_and_result (op, res)
+    | Cons_and_result (Manager_operation _ as op,
+                       (Manager_operation_result _ as res),
+                       rest) ->
+        Format.fprintf ppf "%a@\n%a"
+          pp_manager_operation_contents_and_result (op, res)
+          pp_contents_and_result_list rest
 
-let pp_internal_operation ppf { source ; operation } =
-  pp_manager_operation_content ppf source operation true (fun _ppf () -> ()) ()
+let pp_operation_result ppf
+    (op, res : 'kind contents_list * 'kind contents_result_list) =
+  Format.fprintf ppf "@[<v 0>" ;
+  let contents_and_result_list =
+    Apply_operation_result.pack_contents_list op res in
+  pp_contents_and_result_list ppf contents_and_result_list ;
+  Format.fprintf ppf "@]@."
+
+let pp_internal_operation ppf (Internal_operation { source ; operation }) =
+  pp_manager_operation_content source true (fun _ppf () -> ())
+    ppf (operation, ())

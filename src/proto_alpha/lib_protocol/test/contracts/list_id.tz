@@ -1,3 +1,0 @@
-parameter (list string);
-storage (list string);
-code {CAR; NIL operation; PAIR}

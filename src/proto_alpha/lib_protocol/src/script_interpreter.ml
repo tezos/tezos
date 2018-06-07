@@ -17,6 +17,7 @@ open Script_ir_translator
 type error += Reject of Script.location
 type error += Overflow of Script.location
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
+type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
 let () =
   let open Data_encoding in
@@ -52,7 +53,19 @@ let () =
           Some (contract, expr)
       | _ -> None)
     (fun (contract, expr) ->
-       Runtime_contract_error (contract, expr))
+       Runtime_contract_error (contract, expr)) ;
+  (* Bad contract parameter *)
+  register_error_kind
+    `Permanent
+    ~id:"badContractParameter"
+    ~title:"Contract supplied an invalid parameter"
+    ~description:"Either no parameter was supplied to a contract with \
+                  a non-unit parameter type, a non-unit parameter was \
+                  passed to an account, or a parameter was supplied of \
+                  the wrong type"
+    Data_encoding.(obj1 (req "contract" Contract.encoding))
+    (function Bad_contract_parameter c -> Some c | _ -> None)
+    (fun c -> Bad_contract_parameter c)
 
 (* ---- interpreter ---------------------------------------------------------*)
 
@@ -595,7 +608,7 @@ let rec interp
                 { amount ; destination ;
                   parameters = Some (Script.lazy_expr (Micheline.strip_locations p)) } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
-            logged_return (Item ({ source = self ; operation ; nonce }, rest), ctxt)
+            logged_return (Item (Internal_operation { source = self ; operation ; nonce }, rest), ctxt)
         | Create_account,
           Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
@@ -605,7 +618,7 @@ let rec interp
                 { credit ; manager ; delegate ; preorigination = Some contract ;
                   delegatable ; script = None ; spendable = true } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
-            logged_return (Item ({ source = self ; operation ; nonce },
+            logged_return (Item (Internal_operation { source = self ; operation ; nonce },
                                  Item (contract, rest)), ctxt)
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
@@ -636,14 +649,14 @@ let rec interp
                                   storage = Script.lazy_expr storage } } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return
-              (Item ({ source = self ; operation ; nonce },
+              (Item (Internal_operation { source = self ; operation ; nonce },
                      Item (contract, rest)), ctxt)
         | Set_delegate,
           Item (delegate, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
             let operation = Delegation delegate in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
-            logged_return (Item ({ source = self ; operation ; nonce }, rest), ctxt)
+            logged_return (Item (Internal_operation { source = self ; operation ; nonce }, rest), ctxt)
         | Balance, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.balance) >>=? fun ctxt ->
             Contract.get_balance ctxt self >>=? fun balance ->
@@ -693,11 +706,13 @@ let rec interp
 (* ---- contract handling ---------------------------------------------------*)
 
 and execute ?log ctxt mode ~source ~payer ~self script amount arg :
-  (Script.expr * internal_operation list * context *
+  (Script.expr * packed_internal_operation list * context *
    Script_typed_ir.ex_big_map option) tzresult Lwt.t =
   parse_script ctxt script
   >>=? fun ((Ex_script { code ; arg_type ; storage ; storage_type }), ctxt) ->
-  parse_data ctxt arg_type arg >>=? fun (arg, ctxt) ->
+  trace
+    (Bad_contract_parameter self)
+    (parse_data ctxt arg_type arg) >>=? fun (arg, ctxt) ->
   Lwt.return (Script.force_decode script.code) >>=? fun script_code ->
   trace
     (Runtime_contract_error (self, script_code))
@@ -711,7 +726,7 @@ type execution_result =
   { ctxt : context ;
     storage : Script.expr ;
     big_map_diff : Contract.big_map_diff option ;
-    operations : internal_operation list }
+    operations : packed_internal_operation list }
 
 let trace ctxt mode ~source ~payer ~self:(self, script) ~parameter ~amount =
   let log = ref [] in

@@ -30,6 +30,7 @@ type block_error =
   | Unallowed_pass of { operation: Operation_hash.t ;
                         pass: int ;
                         allowed_pass: int list }
+  | Cannot_parse_block_header
 
 type error +=
   | Invalid_block of

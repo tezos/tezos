@@ -8,8 +8,8 @@
 (**************************************************************************)
 
 include Blake2B.Make (Base58) (struct
-    let name = "Block_hash"
-    let title = "A Tezos block ID"
+    let name = "block_hash"
+    let title = "A block identifier"
     let b58check_prefix = Base58.Prefix.block_hash
     let size = None
   end)

@@ -109,12 +109,14 @@ include Encoding
 
 module Json = Json
 module Bson = Bson
+module Binary_schema = Binary_schema
 module Binary = struct
   include Binary_error
   include Binary_length
   include Binary_writer
   include Binary_reader
   include Binary_stream_reader
+  let describe = Binary_description.describe
 end
 
 type json = Json.t

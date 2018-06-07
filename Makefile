@@ -1,6 +1,6 @@
 
 DEV ?= --dev
-PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find -name *.opam)))
+PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find . -name *.opam -print)))
 
 current_ocaml_version := $(shell ocamlc -version)
 include scripts/version.sh
@@ -26,11 +26,11 @@ all:
 
 all.pkg:
 	@jbuilder build ${DEV} \
-	    $(patsubst %.opam,%.install, $(shell find -name \*.opam))
+	    $(patsubst %.opam,%.install, $(shell find . -name \*.opam -print))
 
 $(addsuffix .pkg,${PACKAGES}): %.pkg:
 	@jbuilder build ${DEV} \
-	    $(patsubst %.opam,%.install, $(shell find -name $*.opam))
+	    $(patsubst %.opam,%.install, $(shell find . -name $*.opam -print))
 
 $(addsuffix .test,${PACKAGES}): %.test:
 	@jbuilder build ${DEV} \

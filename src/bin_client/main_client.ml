@@ -10,8 +10,8 @@
 open Client_config
 
 let get_commands_for_version ctxt block protocol =
-  Block_services.protocol ctxt block >>= function
-  | Ok version -> begin
+  Shell_services.Blocks.protocols ctxt ~block () >>= function
+  | Ok { next_protocol = version } -> begin
       match protocol with
       | None ->
           return (Some version, Client_commands.commands_for_version version)

@@ -15,5 +15,5 @@ val describe:
   #RPC_context.simple ->
   ?recurse:bool ->
   string list ->
-  Json_schema.schema directory tzresult Lwt.t
+  RPC_encoding.schema directory tzresult Lwt.t
 

@@ -1,3 +1,0 @@
-parameter bool;
-storage (pair bool nat);
-code { DUP; CAR; DIP{CDR}; SWAP; MAP_CAR { AND }; NIL operation; PAIR };

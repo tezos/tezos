@@ -1,8 +1,0 @@
-parameter key_hash;
-storage (pair timestamp (pair mutez key_hash));
-code { DUP; CDAR; DUP; NOW; CMPGT; IF {FAIL} {}; SWAP; # Check if auction has ended
-       DUP; CAR; DIP{CDDR}; AMOUNT; PAIR; SWAP; DIP{SWAP; PAIR}; # Setup replacement storage
-       DUP; CAR; AMOUNT; CMPLE; IF {FAIL} {};  # Check to make sure that the new amount is greater
-       DUP; CAR;                               # Get amount of refund
-       DIP{CDR; IMPLICIT_ACCOUNT}; UNIT; TRANSFER_TOKENS; # Make refund
-       NIL operation; SWAP; CONS; PAIR} # Calling convention

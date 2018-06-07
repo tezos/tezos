@@ -1688,14 +1688,14 @@ Constants
 
 There are two kinds of constants:
 
-1. Integers or naturals in decimal (no prefix), hexadecimal (0x prefix),
-   octal (0o prefix) or binary (0b prefix).
+1. Integers or naturals in decimal (no prefix), hexadecimal (``0x`` prefix),
+   octal (``0o`` prefix) or binary (``0b`` prefix).
 2. Strings, with usual escape sequences: ``\n``, ``\t``, ``\b``,
-   ``\r``, ``\\``, ``\"``. Unescaped line breaks (both ``\n`` and ``\r``)
+   ``\r``, ``\\``, ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``)
    cannot appear in the middle of a string.
 
 The current version of Michelson restricts strings to be the printable
-subset of 7-bit ASCII, plus the line break ``\n``.
+subset of 7-bit ASCII, plus the escaped characters mentioned above.
 
 Primitive applications
 ~~~~~~~~~~~~~~~~~~~~~~

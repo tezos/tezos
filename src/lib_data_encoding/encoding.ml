@@ -83,47 +83,78 @@ type 'a desc =
   | Float : float desc
   | Bytes : Kind.length -> MBytes.t desc
   | String : Kind.length -> string desc
+  | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
   | Array : 'a t -> 'a array desc
   | List : 'a t -> 'a list desc
   | Obj : 'a field -> 'a desc
-  | Objs : Kind.t * 'a t * 'b t -> ('a * 'b) desc
+  | Objs : { kind: Kind.t ; left: 'a t ; right: 'b t } -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
-  | Tups : Kind.t * 'a t * 'b t -> ('a * 'b) desc
-  | Union : Kind.t * Binary_size.tag_size * 'a case list -> 'a desc
-  | Mu : Kind.enum * string * ('a t -> 'a t) -> 'a desc
+  | Tups : { kind: Kind.t ; left: 'a t ; right: 'b t } -> ('a * 'b) desc
+  | Union :
+      { kind: Kind.t ;
+        tag_size: Binary_size.tag_size ;
+        cases: 'a case list ;
+      } -> 'a desc
+  | Mu :
+      { kind: Kind.enum ;
+        name: string ;
+        title: string option ;
+        description: string option ;
+        fix: 'a t -> 'a t ;
+      } -> 'a desc
   | Conv :
       { proj : ('a -> 'b) ;
         inj : ('b -> 'a) ;
         encoding : 'b t ;
-        schema : Json_schema.schema option } -> 'a desc
+        schema : Json_schema.schema option ;
+      } -> 'a desc
   | Describe :
-      { title : string option ;
+      { id : string ;
+        title : string option ;
         description : string option ;
-        encoding : 'a t } -> 'a desc
-  | Def : { name : string ;
-            encoding : 'a t } -> 'a desc
+        encoding : 'a t ;
+      } -> 'a desc
   | Splitted :
       { encoding : 'a t ;
         json_encoding : 'a Json_encoding.encoding ;
-        is_obj : bool ; is_tup : bool } -> 'a desc
+        is_obj : bool ;
+        is_tup : bool ;
+      } -> 'a desc
   | Dynamic_size :
       { kind : Binary_size.unsigned_integer ;
-        encoding : 'a t } -> 'a desc
+        encoding : 'a t ;
+      } -> 'a desc
   | Check_size : { limit : int ; encoding : 'a t } -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
-  | Req : string * 'a t -> 'a field
-  | Opt : Kind.enum * string * 'a t -> 'a option field
-  | Dft : string * 'a t * 'a -> 'a field
+  | Req : { name: string ;
+            encoding: 'a t ;
+            title: string option ;
+            description: string option ;
+          } -> 'a field
+  | Opt : { name: string ;
+            kind: Kind.enum ;
+            encoding: 'a t ;
+            title: string option ;
+            description: string option ;
+          } -> 'a option field
+  | Dft : { name: string ;
+            encoding: 'a t ;
+            default: 'a ;
+            title: string option ;
+            description: string option ;
+          } -> 'a field
 
 and 'a case =
-  | Case : { name : string option ;
+  | Case : { title : string ;
+             description : string option ;
              encoding : 'a t ;
              proj : ('t -> 'a option) ;
              inj : ('a -> 't) ;
-             tag : case_tag } -> 't case
+             tag : case_tag ;
+           } -> 't case
 
 and 'a t = {
   encoding: 'a desc ;
@@ -133,7 +164,9 @@ and 'a t = {
 type 'a encoding = 'a t
 
 let rec classify : type a. a t -> Kind.t = fun e ->
-  match e.encoding with
+  classify_desc e.encoding
+and classify_desc : type a. a desc -> Kind.t = fun e ->
+  match e with
   (* Fixed *)
   | Null -> `Fixed 0
   | Empty -> `Fixed 0
@@ -155,24 +188,28 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   (* Tagged *)
   | Bytes kind -> (kind :> Kind.t)
   | String kind -> (kind :> Kind.t)
+  | Padded ({ encoding }, n) -> begin
+      match classify_desc encoding with
+      | `Fixed m -> `Fixed (n+m)
+      | _ -> assert false (* by construction (see [Fixed.padded]) *)
+    end
   | String_enum (_, cases) ->
       `Fixed Binary_size.(integer_to_size @@ enum_size cases)
-  | Obj (Opt (kind, _, _)) -> (kind :> Kind.t)
-  | Objs (kind, _, _) -> kind
-  | Tups (kind, _, _) -> kind
-  | Union (kind, _, _) -> (kind :> Kind.t)
-  | Mu (kind, _, _) -> (kind :> Kind.t)
+  | Obj (Opt { kind }) -> (kind :> Kind.t)
+  | Objs { kind } -> kind
+  | Tups { kind } -> kind
+  | Union { kind } -> (kind :> Kind.t)
+  | Mu { kind } -> (kind :> Kind.t)
   (* Variable *)
   | Ignore -> `Fixed 0
   | Array _ -> `Variable
   | List _ -> `Variable
   (* Recursive *)
-  | Obj (Req (_, encoding)) -> classify encoding
-  | Obj (Dft (_, encoding, _)) -> classify encoding
+  | Obj (Req { encoding }) -> classify encoding
+  | Obj (Dft { encoding }) -> classify encoding
   | Tup encoding -> classify encoding
   | Conv { encoding } -> classify encoding
   | Describe { encoding } -> classify encoding
-  | Def { encoding } -> classify encoding
   | Splitted { encoding } -> classify encoding
   | Dynamic_size _ -> `Dynamic
   | Check_size { encoding } -> classify encoding
@@ -183,14 +220,19 @@ let make ?json_encoding encoding = { encoding ; json_encoding }
 module Fixed = struct
   let string n =
     if n <= 0 then
-      invalid_arg "Cannot create a string encoding fo negative or null fixed length."
-    else
-      make @@ String (`Fixed n)
+      invalid_arg "Cannot create a string encoding of negative or null fixed length." ;
+    make @@ String (`Fixed n)
   let bytes n =
     if n <= 0 then
-      invalid_arg "Cannot create a byte encoding fo negative or null fixed length."
-    else
-      make @@ Bytes (`Fixed n)
+      invalid_arg "Cannot create a byte encoding of negative or null fixed length." ;
+    make @@ Bytes (`Fixed n)
+  let add_padding e n =
+    if n <= 0 then
+      invalid_arg "Cannot create a padding of negative or null fixed length." ;
+    match classify e with
+    | `Fixed _ ->
+        make @@ Padded (e, n)
+    | _ -> invalid_arg "Cannot pad non-fixed size encoding"
 end
 
 let rec is_zeroable: type t. t encoding -> bool = fun e ->
@@ -219,25 +261,25 @@ let rec is_zeroable: type t. t encoding -> bool = fun e ->
   | Float -> false
   | Bytes _ -> false
   | String _ -> false
+  | Padded _ -> false
   | String_enum _ -> false
   (* true in some cases, but in practice always protected by Dynamic *)
   | Array _ -> true (* 0-element array *)
   | List _ -> true (* 0-element list *)
   (* represented as whatever is inside: truth mostly propagates *)
-  | Obj (Req (_, e)) -> is_zeroable e (* represented as-is *)
-  | Obj (Opt (`Variable, _, _)) -> true (* optional field ommited *)
-  | Obj (Dft (_, e, _)) -> is_zeroable e (* represented as-is *)
+  | Obj (Req { encoding = e }) -> is_zeroable e (* represented as-is *)
+  | Obj (Opt { kind = `Variable }) -> true (* optional field ommited *)
+  | Obj (Dft { encoding = e }) -> is_zeroable e (* represented as-is *)
   | Obj _ -> false
-  | Objs (_, e1, e2) -> is_zeroable e1 && is_zeroable e2
+  | Objs { left ; right } -> is_zeroable left && is_zeroable right
   | Tup e -> is_zeroable e
-  | Tups (_, e1, e2) -> is_zeroable e1 && is_zeroable e2
-  | Union (_, _, _) -> false (* includes a tag *)
+  | Tups { left ; right } -> is_zeroable left && is_zeroable right
+  | Union _ -> false (* includes a tag *)
   (* other recursive cases: truth propagates *)
-  | Mu (`Dynamic, _, _) -> false (* size prefix *)
-  | Mu (`Variable, _, f) -> is_zeroable (f e)
+  | Mu { kind = `Dynamic } -> false (* size prefix *)
+  | Mu { kind = `Variable ; fix } -> is_zeroable (fix e)
   | Conv { encoding } -> is_zeroable encoding
   | Describe { encoding } -> is_zeroable encoding
-  | Def { encoding } -> is_zeroable encoding
   | Splitted { encoding } -> is_zeroable encoding
   | Check_size { encoding } -> is_zeroable encoding
   (* Unscrutable: true by default *)
@@ -323,25 +365,21 @@ let string_enum = function
 let conv proj inj ?schema encoding =
   make @@ Conv { proj ; inj ; encoding ; schema }
 
-let describe ?title ?description encoding =
-  match title, description with
-  | None, None -> encoding
-  | _, _ -> make @@ Describe { title ; description ; encoding }
-
-let def name encoding = make @@ Def { name ; encoding }
+let def id ?title ?description encoding =
+  make @@ Describe { id ; title ; description ; encoding }
 
 let req ?title ?description n t =
-  Req (n, describe ?title ?description t)
+  Req { name = n ; encoding = t ; title ; description }
 let opt ?title ?description n encoding =
   let kind =
     match classify encoding with
     | `Variable -> `Variable
     | `Fixed _ | `Dynamic -> `Dynamic in
-  Opt (kind, n, make @@ Describe { title ; description ; encoding })
+  Opt { name = n ; kind ; encoding ; title ; description }
 let varopt ?title ?description n encoding =
-  Opt (`Variable, n, make @@ Describe { title ; description ; encoding })
+  Opt { name = n ; kind = `Variable ; encoding ; title ; description }
 let dft ?title ?description n t d =
-  Dft (n, describe ?title ?description t, d)
+  Dft { name = n ; encoding = t ; default = d ; title ; description }
 
 let raw_splitted ~json ~binary =
   make @@ Splitted { encoding = binary ;
@@ -355,15 +393,14 @@ let rec is_obj : type a. a t -> bool = fun e ->
   | Objs _ (* by construction *) -> true
   | Conv { encoding = e } -> is_obj e
   | Dynamic_size { encoding = e } -> is_obj e
-  | Union (_,_,cases) ->
+  | Union { cases } ->
       List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
   | Empty -> true
   | Ignore -> true
-  | Mu (_,_,self) -> is_obj (self e)
+  | Mu { fix } -> is_obj (fix e)
   | Splitted { is_obj } -> is_obj
   | Delayed f -> is_obj (f ())
   | Describe { encoding } -> is_obj encoding
-  | Def { encoding } -> is_obj encoding
   | _ -> false
 
 let rec is_tup : type a. a t -> bool = fun e ->
@@ -372,18 +409,17 @@ let rec is_tup : type a. a t -> bool = fun e ->
   | Tups _ (* by construction *) -> true
   | Conv { encoding = e } -> is_tup e
   | Dynamic_size { encoding = e } -> is_tup e
-  | Union (_,_,cases) ->
+  | Union { cases } ->
       List.for_all (function Case { encoding = e} -> is_tup e) cases
-  | Mu (_,_,self) -> is_tup (self e)
+  | Mu { fix } -> is_tup (fix e)
   | Splitted { is_tup } -> is_tup
   | Delayed f -> is_tup (f ())
   | Describe { encoding } -> is_tup encoding
-  | Def { encoding } -> is_tup encoding
   | _ -> false
 
-let raw_merge_objs e1 e2 =
-  let kind = Kind.combine "objects" (classify e1) (classify e2) in
-  make @@ Objs (kind, e1, e2)
+let raw_merge_objs left right =
+  let kind = Kind.combine "objects" (classify left) (classify right) in
+  make @@ Objs { kind ; left ; right }
 
 let obj1 f1 = make @@ Obj f1
 let obj2 f2 f1 =
@@ -411,9 +447,9 @@ let merge_objs o1 o2 =
   else
     invalid_arg "Json_encoding.merge_objs"
 
-let raw_merge_tups e1 e2 =
-  let kind = Kind.combine "tuples" (classify e1) (classify e2) in
-  make @@ Tups (kind, e1, e2)
+let raw_merge_tups left right =
+  let kind = Kind.combine "tuples" (classify left) (classify right) in
+  make @@ Tups { kind ; left ; right }
 
 let tup1 e1 = make @@ Tup e1
 let tup2 e2 e1 =
@@ -535,8 +571,9 @@ let union ?(tag_size = `Uint8) cases =
   let kinds =
     List.map (fun (Case { encoding }) -> classify encoding) cases in
   let kind = Kind.merge_list tag_size kinds in
-  make @@ Union (kind, tag_size, cases)
-let case ?name tag encoding proj inj = Case { name ; encoding ; proj ; inj ; tag }
+  make @@ Union { kind ; tag_size ; cases }
+let case ~title ?description tag encoding proj inj =
+  Case { title ; description ; encoding ; proj ; inj ; tag }
 
 let rec is_nullable: type t. t encoding -> bool = fun e ->
   match e.encoding with
@@ -559,6 +596,7 @@ let rec is_nullable: type t. t encoding -> bool = fun e ->
   | Float -> false
   | Bytes _ -> false
   | String _ -> false
+  | Padded (e, _) -> is_nullable e
   | String_enum _ -> false
   | Array _ -> false
   | List _ -> false
@@ -566,12 +604,11 @@ let rec is_nullable: type t. t encoding -> bool = fun e ->
   | Objs _ -> false
   | Tup _ -> false
   | Tups _ -> false
-  | Union (_, _, cases) ->
+  | Union { cases } ->
       List.exists (fun (Case { encoding = e }) -> is_nullable e) cases
-  | Mu (_, _, f) -> is_nullable (f e)
+  | Mu { fix } -> is_nullable (fix e)
   | Conv { encoding = e } -> is_nullable e
   | Describe { encoding = e } -> is_nullable e
-  | Def { encoding = e } -> is_nullable e
   | Splitted { json_encoding } -> Json_encoding.is_nullable json_encoding
   | Dynamic_size { encoding = e } -> is_nullable e
   | Check_size { encoding = e } -> is_nullable e
@@ -583,33 +620,41 @@ let option ty =
   (* TODO add a special construct `Option` in the GADT *)
   union
     ~tag_size:`Uint8
-    [ case (Tag 1) ty
-        ~name:"Some"
+    [ case
+        (Tag 1) ty
+        ~title:"Some"
         (fun x -> x)
         (fun x -> Some x) ;
-      case (Tag 0) null
-        ~name:"None"
+      case
+        (Tag 0) null
+        ~title:"None"
         (function None -> Some () | Some _ -> None)
         (fun () -> None) ;
     ]
-let mu name self =
+let mu name ?title ?description fix =
   let kind =
     try
-      match classify (self (make @@ Mu (`Dynamic, name, self))) with
+      let precursor =
+        make @@ Mu { kind = `Dynamic ; name ; title ; description ; fix } in
+      match classify @@ fix precursor with
       | `Fixed _ | `Dynamic -> `Dynamic
       | `Variable -> raise Exit
     with Exit | _ (* TODO variability error *) ->
-      ignore @@ classify (self (make @@ Mu (`Variable, name, self))) ;
+      let precursor =
+        make @@ Mu { kind = `Variable ; name ; title ; description ; fix } in
+      ignore (classify @@ fix precursor) ;
       `Variable in
-  make @@ Mu (kind, name, self)
+  make @@ Mu { kind ; name ; title ; description ; fix }
 
 let result ok_enc error_enc =
   union
     ~tag_size:`Uint8
     [ case (Tag 1) ok_enc
+        ~title:"Ok"
         (function Ok x -> Some x | Error _ -> None)
         (fun x -> Ok x) ;
       case (Tag 0) error_enc
+        ~title:"Result"
         (function Ok _ -> None | Error x -> Some x)
         (fun x -> Error x) ;
     ]

@@ -51,7 +51,7 @@
 
 (** {2 Module structure}
 
-    This [Data_encoding] module provides muliple submodules:
+    This [Data_encoding] module provides multiple submodules:
     - [Encoding] contains the necessary types and constructors for making the
     type descriptors.
     - [Json], [Bson], and [Binary] contain functions to serialize and
@@ -73,7 +73,7 @@ module Encoding: sig
   (** Empty object (not included in binary, encoded as empty object in JSON). *)
   val empty : unit encoding
 
-  (** Unit value, ommitted in binary.
+  (** Unit value, omitted in binary.
       Serialized as an empty object in JSON, accepts any object when deserializing. *)
   val unit : unit encoding
 
@@ -105,7 +105,7 @@ module Encoding: sig
   val int32 : int32 encoding
 
   (** Signed 64 bit integer
-      (data is encodedas a 64-bit int in binary and a decimal string in JSON). *)
+      (data is encoded as a 64-bit int in binary and a decimal string in JSON). *)
   val int64 : int64 encoding
 
   (** Integer with bounds in a given range. Both bounds are inclusive.
@@ -124,10 +124,10 @@ module Encoding: sig
       there is more to read (1). The second most significant bit of the
       first byte is reserved for the sign (positive if zero). Binary_size and
       sign bits ignored, data is then the binary representation of the
-      absolute value of the number in little endian order. *)
+      absolute value of the number in little-endian order. *)
   val z : Z.t encoding
 
-  (** Positive big number, sedd [z]. *)
+  (** Positive big number, see [z]. *)
   val n : Z.t encoding
 
   (** Encoding of floating point number
@@ -240,7 +240,7 @@ module Encoding: sig
       field are 'variable', the first ones should be wrapped with
       [dynamic_size].
 
-      @raise invalid_arg if more than one field is a variable one. *)
+      @raise [Invalid_argument] if more than one field is a variable one. *)
 
   val obj1 :
     'f1 field -> 'f1 encoding
@@ -276,7 +276,7 @@ module Encoding: sig
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) encoding
 
   (** Create a larger object from the encodings of two smaller ones.
-      @raise invalid_arg if both arguments are not objects  or if both
+      @raise [Invalid_argument] if both arguments are not objects  or if both
       tuples contains a variable field.. *)
   val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
 
@@ -290,7 +290,7 @@ module Encoding: sig
       are 'variable', the first ones should be wrapped with
       [dynamic_size].
 
-      @raise invalid_arg if more than one field is a variable one. *)
+      @raise [Invalid_argument] if more than one field is a variable one. *)
 
   val tup1 :
     'f1 encoding ->
@@ -333,7 +333,7 @@ module Encoding: sig
 
 
   (** Create a large tuple encoding from two smaller ones.
-      @raise invalid_arg if both values are not tuples or if both
+      @raise [Invalid_argument] if both values are not tuples or if both
       tuples contains a variable field. *)
   val merge_tups : 'a1 encoding -> 'a2 encoding -> ('a1 * 'a2) encoding
 
@@ -358,7 +358,8 @@ module Encoding: sig
       An optional name for the case can be provided,
       which is used in the binary documentation. *)
   val case :
-    ?name:string ->
+    title:string ->
+    ?description:string ->
     case_tag ->
     'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 
@@ -368,10 +369,10 @@ module Encoding: sig
       check for collisions.
 
       In binary, a prefix tag is added to discriminate quickly between
-      cases. The default is `Uint8 and you must use a `Uint16 if you are
+      cases. The default is [`Uint8] and you must use a [`Uint16] if you are
       going to have more than 256 cases.
 
-      @raise [Invalid_arg] if it is given the empty list
+      @raise [Invalid_argument] if it is given the empty list
       or if there are more cases than can fit in the tag size. *)
   val union :
     ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
@@ -385,7 +386,8 @@ module Encoding: sig
   (** Does the given encoding encode a tuple? *)
   val is_tup : 'a encoding -> bool
 
-  (** Classify an encoding wrt. its binary serialization as explained in the preamble. *)
+  (** Classify the binary serialization of an encoding as explained in the
+      preamble. *)
   val classify : 'a encoding -> [ `Fixed of int | `Dynamic | `Variable ]
 
   (** {3 Specialized descriptors} *)
@@ -399,8 +401,19 @@ module Encoding: sig
   (** Create encodings that produce data of a fixed length when binary encoded.
       See the preamble for an explanation. *)
   module Fixed : sig
+
+    (** @raises [Invalid_argument] if the argument is less or equal to zero. *)
     val string : int -> string encoding
+
+    (** @raises [Invalid_argument] if the argument is less or equal to zero. *)
     val bytes : int -> MBytes.t encoding
+
+    (** [add_padding e n] is a padded version of the encoding [e]. In Binary,
+        there are [n] null bytes ([\000]) added after the value encoded by [e].
+        In JSON, padding is ignored.
+
+        @raises [Invalid_argument] if [n <= 0]. *)
+    val add_padding : 'a encoding -> int -> 'a encoding
   end
 
   (** Create encodings that produce data of a variable length when binary encoded.
@@ -408,19 +421,27 @@ module Encoding: sig
   module Variable : sig
     val string : string encoding
     val bytes : MBytes.t encoding
+
+    (** @raises [Invalid_argument] if the encoding argument is variable length
+        or may lead to zero-width representation in binary. *)
     val array : 'a encoding -> 'a array encoding
+
+    (** @raises [Invalid_argument] if the encoding argument is variable length
+        or may lead to zero-width representation in binary. *)
     val list : 'a encoding -> 'a list encoding
   end
 
   module Bounded : sig
-    (** Encoding of a string whose length does not exceed the specified length
+    (** Encoding of a string whose length does not exceed the specified length.
+        The size field uses the smallest integer that can accommodate the
+        maximum size - e.g, [`Uint8] for very short strings, [`Uint16] for
+        longer strings, etc.
+
         Attempting to construct a string with a length that is too long causes
-        an invalid_argument exception, however the size field will use the minimum
-        integer that can accomidate the maximum size.
-        - default variable in width
-        - encoded as a byte sequence in binary
-        - encoded as a string in JSON. *)
+        an [Invalid_argument] exception. *)
     val string : int -> string encoding
+
+    (** See [string] above. *)
     val bytes : int -> MBytes.t encoding
   end
 
@@ -433,7 +454,7 @@ module Encoding: sig
     'a encoding -> 'a encoding
 
   (** [check_size size encoding] ensures that the binary encoding
-      of a value will not be allowed to exceed [size] bytes. The reader and
+      of a value will not be allowed to exceed [size] bytes. The reader
       and the writer fails otherwise. This function do not modify
       the JSON encoding. *)
   val check_size : int -> 'a encoding -> 'a encoding
@@ -447,17 +468,20 @@ module Encoding: sig
   val splitted : json:'a encoding -> binary:'a encoding -> 'a encoding
 
   (** Combinator for recursive encodings. *)
-  val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
+  val mu :
+    string ->
+    ?title: string ->
+    ?description: string ->
+    ('a encoding -> 'a encoding) -> 'a encoding
 
   (** {3 Documenting descriptors} *)
 
-  (** Add documentation to an encoding. *)
-  val describe :
+  (** Give a name to an encoding and optionally
+      add documentation to an encoding. *)
+  val def :
+    string ->
     ?title:string -> ?description:string ->
     't encoding ->'t encoding
-
-  (** Give a name to an encoding. *)
-  val def : string -> 'a encoding -> 'a encoding
 
   (** See {!lazy_encoding} below.*)
   type 'a lazy_t
@@ -535,13 +559,13 @@ module Json: sig
       JSON structure and the specific error. *)
   exception Cannot_destruct of (path * exn)
 
-  (** Unexpected kind of data encountered (w/ the expectation). *)
+  (** Unexpected kind of data encountered, with the expectation. *)
   exception Unexpected of string * string
 
-  (** Some {!union} couldn't be destructed, w/ the reasons for each {!case}. *)
+  (** Some {!union} couldn't be destructed, with the reasons for each {!case}. *)
   exception No_case_matched of exn list
 
-  (** Array of unexpected size encountered  (w/ the expectation). *)
+  (** Array of unexpected size encountered, with the expectation. *)
   exception Bad_array_size of int * int
 
   (** Missing field in an object. *)
@@ -568,7 +592,7 @@ module Json: sig
 
   (** Write a JSON document to a string. This goes via an intermediate
       buffer and so may be slow on large documents. *)
-  val to_string : ?minify:bool -> json -> string
+  val to_string : ?newline:bool -> ?minify:bool -> json -> string
 
   val pp : Format.formatter -> json -> unit
 
@@ -586,6 +610,12 @@ module Bson: sig
       Fail with an exception if the JSON object and encoding do not match.. *)
   val destruct : 't Encoding.t -> bson -> 't
 
+end
+
+module Binary_schema : sig
+  type t
+  val pp: Format.formatter -> t -> unit
+  val encoding: t Encoding.t
 end
 
 module Binary: sig
@@ -616,17 +646,17 @@ module Binary: sig
   val pp_write_error : Format.formatter -> write_error -> unit
   exception Write_error of write_error
 
-  (** Compute the expected length of the binary represention of a value *)
+  (** Compute the expected length of the binary representation of a value *)
   val length : 'a Encoding.t -> 'a -> int
 
-  (** Returns the sized of the binary represention that the given
-      encoding might produce, only when the size of the represention
+  (** Returns the size of the binary representation that the given
+      encoding might produce, only when the size of the representation
       does not depends of the value itself. *)
   val fixed_length : 'a Encoding.t -> int option
   val fixed_length_exn : 'a Encoding.t -> int
 
   (** [read enc buf ofs len] tries to reconstruct a value from the
-      bytes in [buf] starting ot offset [ofs] and reading at most
+      bytes in [buf] starting at offset [ofs] and reading at most
       [len] bytes. This function also returns the offset of the first
       unread bytes in the [buf]. *)
   val read : 'a Encoding.t -> MBytes.t -> int ->  int -> (int * 'a) option
@@ -645,11 +675,11 @@ module Binary: sig
       variable-size encodings. *)
   val read_stream : ?init:Binary_stream.t -> 'a Encoding.t -> 'a status
 
-  (** [write enc v buf ofs len] writes the binary represention of [v]
+  (** [write enc v buf ofs len] writes the binary representation of [v]
       as described by to [enc], in  [buf] starting at the offset [ofs]
       and writing at most [len] bytes. The function returns the offset
       of first unwritten bytes, or returns [None] in case of failure.
-      In the latter case, some data might have been written un the buffer. *)
+      In the latter case, some data might have been written on the buffer. *)
   val write : 'a Encoding.t -> 'a -> MBytes.t -> int -> int -> int option
 
   (** [of_bytes enc buf] is equivalent to [read enc buf 0 (length buf)].
@@ -668,6 +698,8 @@ module Binary: sig
   (** [to_bytes_exn enc v] is equivalent to [to_bytes enc v], except
       it raises [Write_error] instead of return [None] in case of error. *)
   val to_bytes_exn : 'a Encoding.t -> 'a -> MBytes.t
+
+  val describe : 'a Encoding.t -> Binary_schema.t
 
 end
 

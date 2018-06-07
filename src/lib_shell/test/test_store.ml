@@ -85,6 +85,7 @@ let lolblock ?(operations = []) header =
             context = Context_hash.zero } ;
         protocol_data = MBytes.of_string header ;
       } ;
+    metadata = MBytes.create 0 ;
     max_operations_ttl = 0 ;
     message = None ;
     context = Context_hash.zero ;

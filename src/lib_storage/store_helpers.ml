@@ -18,7 +18,7 @@ module Make_value (V : ENCODED_VALUE) = struct
   let to_bytes v =
     try Data_encoding.Binary.to_bytes_exn V.encoding v
     with Data_encoding.Binary.Write_error error ->
-      Logging.Node.State.log_error
+      Store_logging.log_error
         "Exception while serializing value %a"
         Data_encoding.Binary.pp_write_error error ;
       MBytes.create 0

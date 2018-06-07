@@ -277,7 +277,7 @@ preconfigured for communicating the same-numbered node. For instance:
 
 ::
 
-    $ tezos-client rpc call blocks/head/hash
+    $ tezos-client rpc get /chains/main/blocks/head/hash
     { "hash": "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z" }
 
 When you bootstrap a new network, the network is initialized with a
@@ -288,11 +288,11 @@ activating the whole network. For instance:
 
 ::
 
-    $ tezos-client rpc call blocks/head/protocol
+    $ tezos-client rpc get /chains/main/blocks/head/metadata/next_protocol_hash
     { "protocol": "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" }
     $ tezos-activate-alpha
     Injected BMBcK869jaHQDc
-    $ tezos-client rpc call blocks/head/protocol
+    $ tezos-client rpc get /chains/main/blocks/head/metadata/next_protocol_hash
     { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" }
 
 Tune protocol alpha parameters
@@ -338,10 +338,14 @@ writing your own configuration file if needed.
 
         "bootstrap-peers": ["::1:10732", "::ffff:192.168.1.3:9733", "mynode.tezos.com"],
 
-        /* Specify if the network is closed or not. A closed network
-        allows only peers listed in "bootstrap-peers". */
+        /* Specify if the node is in private mode or not. A node in
+        private mode only opens outgoing connections to peers whose
+        addresses are in [trusted_peers] and only accepts incoming
+        connections from trusted peers. In addition, it informs these
+        peers that the identity of the node should not be revealed to
+        the rest of the network. */
 
-        "closed": false,
+        "private-mode": false,
 
         /* Network limits */
 

@@ -22,20 +22,19 @@ run_preflight() {
          -H "Access-Control-Request-Method: $cors_method" \
          -H "Access-Control-Request-Headers: $header" \
          -X $method \
-         -I -s http://localhost:18731/blocks/head/protocol > CURL.$id 2>&1
+         -I -s http://localhost:18731/chains/main/blocks/head/header/shell > CURL.$id 2>&1
 }
 
 run_request() {
     local origin="$1"
     curl -H "Origin: $origin" \
          -H "Content-Type: application/json" \
-         --data-binary "{}" \
          -D CURL.$id \
-         -s http://localhost:18731/blocks/head/protocol 2>&1 > /dev/null
+         -s http://localhost:18731/chains/main/blocks/head/header/shell 2>&1 > /dev/null
 }
 
 # Preflight
-run_preflight "localhost" "OPTIONS" "POST" "Content-Type"
+run_preflight "localhost" "OPTIONS" "GET" "Content-Type"
 cat CURL.$id
 grep -q "access-control-allow-origin" CURL.$id
 grep -q "access-control-allow-methods" CURL.$id

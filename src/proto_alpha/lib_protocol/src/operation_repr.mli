@@ -9,6 +9,26 @@
 
 (* Tezos Protocol Implementation - Low level Repr. of Operations *)
 
+module Kind : sig
+  type seed_nonce_revelation = Seed_nonce_revelation_kind
+  type double_endorsement_evidence = Double_endorsement_evidence_kind
+  type double_baking_evidence = Double_baking_evidence_kind
+  type activate_account = Activate_account_kind
+  type endorsements = Endorsements_kind
+  type proposals = Proposals_kind
+  type ballot = Ballot_kind
+  type reveal = Reveal_kind
+  type transaction = Transaction_kind
+  type origination = Origination_kind
+  type delegation = Delegation_kind
+  type 'a manager =
+    | Reveal_manager_kind : reveal manager
+    | Transaction_manager_kind : transaction manager
+    | Origination_manager_kind : origination manager
+    | Delegation_manager_kind : delegation manager
+
+end
+
 type raw = Operation.t = {
   shell: Operation.shell_header ;
   proto: MBytes.t ;
@@ -16,76 +36,71 @@ type raw = Operation.t = {
 
 val raw_encoding: raw Data_encoding.t
 
-type operation = {
+type 'kind operation = {
   shell: Operation.shell_header ;
-  contents: proto_operation ;
+  protocol_data: 'kind protocol_data ;
+}
+
+and 'kind protocol_data = {
+  contents: 'kind contents_list ;
   signature: Signature.t option ;
 }
 
-and proto_operation =
-  | Anonymous_operations of anonymous_operation list
-  | Sourced_operation of sourced_operation
+and _ contents_list =
+  | Single : 'kind contents -> 'kind contents_list
+  | Cons : 'kind Kind.manager contents * 'rest Kind.manager contents_list ->
+    (('kind * 'rest) Kind.manager ) contents_list
 
-and anonymous_operation =
-  | Seed_nonce_revelation of {
-      level: Raw_level_repr.t ;
-      nonce: Seed_repr.nonce ;
-    }
-  | Double_endorsement_evidence of {
-      op1: operation ;
-      op2: operation ;
-    }
-  | Double_baking_evidence of {
-      bh1: Block_header_repr.t ;
-      bh2: Block_header_repr.t ;
-    }
-  | Activation of {
-      id: Ed25519.Public_key_hash.t ;
-      secret: Blinded_public_key_hash.secret ;
-    }
-
-and sourced_operation =
-  | Consensus_operation of consensus_operation
-  | Amendment_operation of {
-      source: Signature.Public_key_hash.t ;
-      operation: amendment_operation ;
-    }
-  | Manager_operations of {
-      source: Contract_repr.contract ;
-      fee: Tez_repr.tez ;
-      counter: counter ;
-      operations: manager_operation list ;
-      gas_limit: Z.t ;
-      storage_limit: Int64.t;
-    }
-  | Dictator_operation of dictator_operation
-
-and consensus_operation =
-  | Endorsements of {
+and _ contents =
+  | Endorsements : {
       block: Block_hash.t ;
       level: Raw_level_repr.t ;
       slots: int list ;
-    }
-
-and amendment_operation =
-  | Proposals of {
+    } -> Kind.endorsements contents
+  | Seed_nonce_revelation : {
+      level: Raw_level_repr.t ;
+      nonce: Seed_repr.nonce ;
+    } -> Kind.seed_nonce_revelation contents
+  | Double_endorsement_evidence : {
+      op1: Kind.endorsements operation ;
+      op2: Kind.endorsements operation ;
+    } -> Kind.double_endorsement_evidence contents
+  | Double_baking_evidence : {
+      bh1: Block_header_repr.t ;
+      bh2: Block_header_repr.t ;
+    } -> Kind.double_baking_evidence contents
+  | Activate_account : {
+      id: Ed25519.Public_key_hash.t ;
+      activation_code: Blinded_public_key_hash.activation_code ;
+    } -> Kind.activate_account contents
+  | Proposals : {
+      source: Signature.Public_key_hash.t ;
       period: Voting_period_repr.t ;
       proposals: Protocol_hash.t list ;
-    }
-  | Ballot of {
+    } -> Kind.proposals contents
+  | Ballot : {
+      source: Signature.Public_key_hash.t ;
       period: Voting_period_repr.t ;
       proposal: Protocol_hash.t ;
       ballot: Vote_repr.ballot ;
-    }
+    } -> Kind.ballot contents
+  | Manager_operation : {
+      source: Contract_repr.contract ;
+      fee: Tez_repr.tez ;
+      counter: counter ;
+      operation: 'kind manager_operation ;
+      gas_limit: Z.t;
+      storage_limit: Int64.t;
+    } -> 'kind Kind.manager contents
 
-and manager_operation =
-  | Reveal of Signature.Public_key.t
-  | Transaction of {
+and _ manager_operation =
+  | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
+  | Transaction : {
       amount: Tez_repr.tez ;
       parameters: Script_repr.lazy_expr option ;
       destination: Contract_repr.contract ;
-    }
-  | Origination of {
+    } -> Kind.transaction manager_operation
+  | Origination : {
       manager: Signature.Public_key_hash.t ;
       delegate: Signature.Public_key_hash.t option ;
       script: Script_repr.t option ;
@@ -93,50 +108,106 @@ and manager_operation =
       delegatable: bool ;
       credit: Tez_repr.tez ;
       preorigination: Contract_repr.t option ;
-    }
-  | Delegation of Signature.Public_key_hash.t option
-
-and dictator_operation =
-  | Activate of Protocol_hash.t
-  | Activate_testchain of Protocol_hash.t
+    } -> Kind.origination manager_operation
+  | Delegation :
+      Signature.Public_key_hash.t option -> Kind.delegation manager_operation
 
 and counter = Int32.t
 
-type error += Cannot_parse_operation (* `Branch *)
+type 'kind internal_operation = {
+  source: Contract_repr.contract ;
+  operation: 'kind manager_operation ;
+  nonce: int ;
+}
 
-val encoding: operation Data_encoding.t
+type packed_manager_operation =
+  | Manager : 'kind manager_operation -> packed_manager_operation
+
+type packed_contents =
+  | Contents : 'kind contents -> packed_contents
+
+type packed_contents_list =
+  | Contents_list : 'kind contents_list -> packed_contents_list
+
+val of_list: packed_contents list -> packed_contents_list
+val to_list: packed_contents_list -> packed_contents list
+
+type packed_protocol_data =
+  | Operation_data : 'kind protocol_data -> packed_protocol_data
+
+type packed_operation = {
+  shell: Operation.shell_header ;
+  protocol_data: packed_protocol_data ;
+}
+
+val pack: 'kind operation -> packed_operation
+
+type packed_internal_operation =
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
+
+val manager_kind: 'kind manager_operation -> 'kind Kind.manager
+
+val encoding: packed_operation Data_encoding.t
+val contents_encoding: packed_contents Data_encoding.t
+val protocol_data_encoding: packed_protocol_data Data_encoding.t
+val unsigned_operation_encoding: (Operation.shell_header * packed_contents_list) Data_encoding.t
+
+val raw: _ operation -> raw
 
 val hash_raw: raw -> Operation_hash.t
-val hash: operation -> Operation_hash.t
+val hash: _ operation -> Operation_hash.t
 
-val parse: Operation.t -> operation tzresult
-
-val acceptable_passes: operation -> int list
-
-val parse_proto:
-  MBytes.t ->
-  (proto_operation * Signature.t option) tzresult Lwt.t
+val acceptable_passes: packed_operation -> int list
 
 type error += Missing_signature (* `Permanent *)
 type error += Invalid_signature (* `Permanent *)
 
-
 val check_signature:
-  Signature.Public_key.t -> operation -> unit tzresult Lwt.t
-
-val forge: Operation.shell_header -> proto_operation -> MBytes.t
-
-val proto_operation_encoding:
-  proto_operation Data_encoding.t
-
-val unsigned_operation_encoding:
-  (Operation.shell_header * proto_operation) Data_encoding.t
-
-type internal_operation = {
-  source: Contract_repr.contract ;
-  operation: manager_operation ;
-  nonce: int ;
-}
+  Signature.Public_key.t -> _ operation -> unit tzresult Lwt.t
 
 val internal_operation_encoding:
-  internal_operation Data_encoding.t
+  packed_internal_operation Data_encoding.t
+
+type ('a, 'b) eq = Eq : ('a, 'a) eq
+val equal: 'a operation -> 'b operation -> ('a, 'b) eq option
+
+module Encoding : sig
+
+  type 'b case =
+      Case : { tag: int ;
+               name: string ;
+               encoding: 'a Data_encoding.t ;
+               select: packed_contents -> 'b contents option ;
+               proj: 'b contents -> 'a ;
+               inj: 'a -> 'b contents } -> 'b case
+
+  val endorsement_case: Kind.endorsements case
+  val seed_nonce_revelation_case: Kind.seed_nonce_revelation case
+  val double_endorsement_evidence_case: Kind.double_endorsement_evidence case
+  val double_baking_evidence_case: Kind.double_baking_evidence case
+  val activate_account_case: Kind.activate_account case
+  val proposals_case: Kind.proposals case
+  val ballot_case: Kind.ballot case
+  val reveal_case: Kind.reveal Kind.manager case
+  val transaction_case: Kind.transaction Kind.manager case
+  val origination_case: Kind.origination Kind.manager case
+  val delegation_case: Kind.delegation Kind.manager case
+
+  module Manager_operations : sig
+
+    type 'b case =
+        MCase : { tag: int ;
+                  name: string ;
+                  encoding: 'a Data_encoding.t ;
+                  select: packed_manager_operation -> 'kind manager_operation option ;
+                  proj: 'kind manager_operation -> 'a ;
+                  inj: 'a -> 'kind manager_operation } -> 'kind case
+
+    val reveal_case: Kind.reveal case
+    val transaction_case: Kind.transaction case
+    val origination_case: Kind.origination case
+    val delegation_case: Kind.delegation case
+
+  end
+
+end

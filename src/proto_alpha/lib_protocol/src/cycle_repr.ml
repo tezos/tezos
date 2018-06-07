@@ -11,7 +11,7 @@ type t = int32
 type cycle = t
 
 let encoding = Data_encoding.int32
-let arg =
+let rpc_arg =
   let construct = Int32.to_string in
   let destruct str =
     match Int32.of_string str with
@@ -27,6 +27,8 @@ let arg =
 let pp ppf cycle = Format.fprintf ppf "%ld" cycle
 
 include (Compare.Int32 : Compare.S with type t := t)
+
+module Map = Map.Make(Compare.Int32)
 
 let root = 0l
 let succ = Int32.succ
@@ -61,4 +63,7 @@ module Index = struct
         with _ -> None
       end
     | _ -> None
+  let rpc_arg = rpc_arg
+  let encoding = encoding
+  let compare = compare
 end

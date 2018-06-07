@@ -52,8 +52,18 @@ let rec pp fmt = function
 
 let encoding =
   let open Data_encoding in
-  describe ~title: "Tezos block fitness"
-    (list bytes)
+  def "fitness"
+    ~title: "Block fitness"
+    ~description:
+      "The fitness, or score, of a block, that allow the Tezos to \
+       decide which chain is the best. A fitness value is a list of \
+       byte sequences. They are compared as follows: shortest lists \
+       are smaller; lists of the same length are compared according to \
+       the lexicographical order." @@
+  splitted
+    ~json: (list bytes)
+    ~binary:
+      (list (def "fitness.elem" bytes))
 
 let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v
 let of_bytes b = Data_encoding.Binary.of_bytes encoding b

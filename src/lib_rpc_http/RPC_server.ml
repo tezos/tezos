@@ -12,4 +12,4 @@ type cors = Resto_cohttp.Cors.t = {
   allowed_origins : string list ;
 }
 
-include Resto_cohttp.Server.Make(RPC_encoding)(Logging.RPC)
+include Resto_cohttp.Server.Make(RPC_encoding)(RPC_logging)

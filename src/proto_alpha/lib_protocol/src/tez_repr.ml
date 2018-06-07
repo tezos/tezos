@@ -12,3 +12,6 @@ include Qty_repr.Make (struct let id = "tez" end)
 type t = qty
 type tez = qty
 
+let encoding =
+  Data_encoding.def "mutez" @@
+  encoding

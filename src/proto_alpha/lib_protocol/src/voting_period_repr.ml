@@ -12,7 +12,7 @@ type voting_period = t
 include (Compare.Int32 : Compare.S with type t := t)
 let encoding = Data_encoding.int32
 let pp ppf level = Format.fprintf ppf "%ld" level
-let arg =
+let rpc_arg =
   let construct voting_period = Int32.to_string voting_period in
   let destruct str =
     match Int32.of_string str with
@@ -44,18 +44,22 @@ let kind_encoding =
   let open Data_encoding in
   union ~tag_size:`Uint8 [
     case (Tag 0)
+      ~title:"Proposal"
       (constant "proposal")
       (function Proposal -> Some () | _ -> None)
       (fun () -> Proposal) ;
     case (Tag 1)
+      ~title:"Testing_vote"
       (constant "testing_vote")
       (function Testing_vote -> Some () | _ -> None)
       (fun () -> Testing_vote) ;
     case (Tag 2)
+      ~title:"Testing"
       (constant "testing")
       (function Testing -> Some () | _ -> None)
       (fun () -> Testing) ;
     case (Tag 3)
+      ~title:"Promotion_vote"
       (constant "promotion_vote")
       (function Promotion_vote -> Some () | _ -> None)
       (fun () -> Promotion_vote) ;

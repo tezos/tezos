@@ -1,3 +1,0 @@
-parameter unit;
-storage unit;
-code { DROP; PUSH bool True; LOOP {PUSH bool True}; UNIT; NIL operation; PAIR }

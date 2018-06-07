@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Logging.Client.Denunciation
+include Logging.Make(struct let name = "client.denunciation" end)
 
 let create cctxt endorsement_stream =
   let last_get_endorsement = ref None in

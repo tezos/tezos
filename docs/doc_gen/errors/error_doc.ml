@@ -38,11 +38,10 @@ let pp_rst_h2 = pp_rst_title ~char:'*'
 (* let pp_rst_h3 = pp_rst_title ~char:'='
  * let pp_rst_h4 = pp_rst_title ~char:'`' *)
 
-let string_of_err_category =
-  let open Error_monad in function
-    | `Branch -> "branch"
-    | `Temporary -> "temporary"
-    | `Permanent -> "permanent"
+let string_of_err_category = function
+  | `Branch -> "branch"
+  | `Temporary -> "temporary"
+  | `Permanent -> "permanent"
 
 let make_counter () =
   let i = ref 1 in

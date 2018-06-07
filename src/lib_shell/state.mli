@@ -94,8 +94,8 @@ module Block : sig
   val store:
     ?dont_enforce_context_hash:bool ->
     Chain.t ->
-    Block_header.t ->
-    Operation.t list list ->
+    Block_header.t -> MBytes.t ->
+    Operation.t list list -> MBytes.t list list ->
     Tezos_protocol_environment_shell.validation_result ->
     block option tzresult Lwt.t
 
@@ -120,6 +120,7 @@ module Block : sig
   val message: t -> string option
   val max_operations_ttl: t -> int
   val max_operation_data_length: t -> int
+  val metadata: t -> MBytes.t
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t
@@ -138,15 +139,22 @@ module Block : sig
     t -> int -> (Operation.t list * Operation_list_list_hash.path) Lwt.t
   val all_operations: t -> Operation.t list list Lwt.t
 
+  val operations_metadata:
+    t -> int -> MBytes.t list Lwt.t
+  val all_operations_metadata: t -> MBytes.t list list Lwt.t
+
   val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
   val known_ancestor:
     Chain.t -> Block_locator.t -> (block * Block_locator.t) option Lwt.t
-    (** [known_ancestor chain_state locator] computes the first block of
-        [locator] that is known to be a valid block. It also computes the
-        'prefix' of [locator] with end at the first valid block.  The
-        function returns [None] when no block in the locator are known or
-        if the first known block is invalid. *)
+  (** [known_ancestor chain_state locator] computes the first block of
+      [locator] that is known to be a valid block. It also computes the
+      'prefix' of [locator] with end at the first valid block.  The
+      function returns [None] when no block in the locator are known or
+      if the first known block is invalid. *)
+
+  val get_rpc_directory: block -> block RPC_directory.t option Lwt.t
+  val set_rpc_directory: block -> block RPC_directory.t -> unit Lwt.t
 
 end
 
@@ -206,6 +214,8 @@ module Protocol : sig
   val remove: global_state -> Protocol_hash.t -> bool Lwt.t
 
   val list: global_state -> Protocol_hash.Set.t Lwt.t
+
+  val watcher: global_state -> Protocol_hash.t Lwt_stream.t * Lwt_watcher.stopper
 
 end
 

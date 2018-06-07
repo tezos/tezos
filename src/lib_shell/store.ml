@@ -86,6 +86,7 @@ module Block = struct
     max_operations_ttl: int ;
     max_operation_data_length: int;
     context: Context_hash.t ;
+    metadata: MBytes.t ;
   }
 
   module Contents =
@@ -98,19 +99,20 @@ module Block = struct
            let open Data_encoding in
            conv
              (fun { header ; message ; max_operations_ttl ;
-                    max_operation_data_length ; context } ->
+                    max_operation_data_length ; context ; metadata } ->
                (message, max_operations_ttl,
-                max_operation_data_length, context, header))
+                max_operation_data_length, context, metadata, header ))
              (fun (message, max_operations_ttl,
-                   max_operation_data_length, context, header) ->
+                   max_operation_data_length, context, metadata, header ) ->
                { header ; message ; max_operations_ttl ;
                  max_operation_data_length ;
-                 context })
-             (obj5
+                 context ; metadata })
+             (obj6
                 (opt "message" string)
                 (req "max_operations_ttl" uint16)
                 (req "max_operation_data_length" uint16)
                 (req "context" Context_hash.encoding)
+                (req "metadata" bytes)
                 (req "header" Block_header.encoding))
        end))
 
@@ -143,6 +145,14 @@ module Block = struct
       (Store_helpers.Make_value(struct
          type t = Operation.t list
          let encoding = Data_encoding.(list (dynamic_size Operation.encoding))
+       end))
+
+  module Operations_metadata =
+    Operations_index.Make_map
+      (struct let name = ["metadata"] end)
+      (Store_helpers.Make_value(struct
+         type t = MBytes.t list
+         let encoding = Data_encoding.(list bytes)
        end))
 
   type invalid_block = {

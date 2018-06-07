@@ -48,6 +48,7 @@ val string_enum : (string * 'a) list -> 'a encoding
 module Fixed : sig
   val string : int -> string encoding
   val bytes : int -> MBytes.t encoding
+  val add_padding : 'a encoding -> int -> 'a encoding
 end
 
 module Variable : sig
@@ -167,22 +168,29 @@ type case_tag = Tag of int | Json_only
 
 type 't case
 val case :
-  ?name:string -> case_tag -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
+  title:string ->
+  ?description:string ->
+  case_tag -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
+
 val union :
   ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
 
-val describe :
-  ?title:string -> ?description:string ->
+val def :
+  string ->
+  ?title:string ->
+  ?description:string ->
   't encoding ->'t encoding
-
-val def : string -> 'a encoding -> 'a encoding
 
 val conv :
   ('a -> 'b) -> ('b -> 'a) ->
   ?schema:json_schema ->
   'b encoding -> 'a encoding
 
-val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
+val mu :
+  string ->
+  ?title:string ->
+  ?description:string ->
+  ('a encoding -> 'a encoding) -> 'a encoding
 
 type 'a lazy_t
 

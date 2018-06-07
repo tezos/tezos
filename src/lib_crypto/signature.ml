@@ -47,11 +47,14 @@ module Public_key_hash = struct
 
   let raw_encoding =
     let open Data_encoding in
+    def "public_key_hash" ~description:title @@
     union [
       case (Tag 0) Ed25519.Public_key_hash.encoding
+        ~title:"Ed25519"
         (function Ed25519 x -> Some x | _ -> None)
         (function x -> Ed25519 x);
       case (Tag 1) Secp256k1.Public_key_hash.encoding
+        ~title:"Secp256k1"
         (function Secp256k1 x -> Some x | _ -> None)
         (function x -> Secp256k1 x)
     ]
@@ -164,6 +167,12 @@ module Public_key_hash = struct
       let encoding = encoding
     end)
 
+  let rpc_arg =
+    RPC_arg.like
+      rpc_arg
+      ~descr:"A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)"
+      "pkh"
+
 end
 
 module Public_key = struct
@@ -230,11 +239,14 @@ module Public_key = struct
       let title = title
       let raw_encoding =
         let open Data_encoding in
+        def "public_key" ~description:title @@
         union [
           case (Tag 0) Ed25519.Public_key.encoding
+            ~title:"Ed25519"
             (function Ed25519 x -> Some x | _ -> None)
             (function x -> Ed25519 x);
           case (Tag 1) Secp256k1.Public_key.encoding
+            ~title:"Secp256k1"
             (function Secp256k1 x -> Some x | _ -> None)
             (function x -> Secp256k1 x)
         ]
@@ -312,11 +324,14 @@ module Secret_key = struct
       let title = title
       let raw_encoding =
         let open Data_encoding in
+        def "secret_key" ~description:title @@
         union [
           case (Tag 0) Ed25519.Secret_key.encoding
+            ~title:"Ed25519"
             (function Ed25519 x -> Some x | _ -> None)
             (function x -> Ed25519 x);
           case (Tag 1) Secp256k1.Secret_key.encoding
+            ~title:"Secp256k1"
             (function Secp256k1 x -> Some x | _ -> None)
             (function x -> Secp256k1 x)
         ]

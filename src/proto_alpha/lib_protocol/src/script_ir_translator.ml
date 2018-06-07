@@ -949,6 +949,11 @@ let signature_size =
   | None -> assert false
   | Some size -> size
 
+let address_size =
+  match Data_encoding.Binary.fixed_length Contract.encoding with
+  | None -> assert false
+  | Some size -> size
+
 let rec parse_data
   : type a.
     ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
@@ -1133,8 +1138,9 @@ let rec parse_data
     (* Addresses *)
     | Address_t, Int (_, z) (* As unparsed with [O[ptimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
-        bytes_of_padded_z z >>=? fun bytes ->
-        begin match Data_encoding.Binary.of_bytes Contract.encoding bytes with
+        begin
+          let bytes = Z.to_bits ~pad_to:address_size z in
+          match Data_encoding.Binary.of_bytes Contract.encoding bytes with
           | Some c -> return (c, ctxt)
           | None -> fail (error ())
         end
@@ -1147,8 +1153,9 @@ let rec parse_data
     (* Contracts *)
     | Contract_t ty, Int (loc, z) (* As unparsed with [Optimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
-        bytes_of_padded_z z >>=? fun bytes ->
-        begin match Data_encoding.Binary.of_bytes Contract.encoding bytes with
+        begin
+          let bytes = Z.to_bits ~pad_to:address_size z in
+          match Data_encoding.Binary.of_bytes Contract.encoding bytes with
           | Some c ->
               traced (parse_contract ctxt loc ty c) >>=? fun (ctxt, _) ->
               return ((ty, c), ctxt)
@@ -2328,7 +2335,7 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Contract.encoding c in
-              return (Int (-1, padded_z_of_bytes bytes), ctxt)
+              return (Int (-1, Z.of_bits bytes), ctxt)
           | Readable -> return (String (-1, Contract.to_b58check c), ctxt)
         end
     | Contract_t _, (_, c)  ->
@@ -2337,7 +2344,7 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Contract.encoding c in
-              return (Int (-1, padded_z_of_bytes bytes), ctxt)
+              return (Int (-1, Z.of_bits bytes), ctxt)
           | Readable -> return (String (-1, Contract.to_b58check c), ctxt)
         end
     | Signature_t, s ->

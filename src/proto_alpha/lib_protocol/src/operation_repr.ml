@@ -9,6 +9,25 @@
 
 (* Tezos Protocol Implementation - Low level Repr. of Operations *)
 
+module Kind = struct
+  type seed_nonce_revelation = Seed_nonce_revelation_kind
+  type double_endorsement_evidence = Double_endorsement_evidence_kind
+  type double_baking_evidence = Double_baking_evidence_kind
+  type activate_account = Activate_account_kind
+  type endorsements = Endorsements_kind
+  type proposals = Proposals_kind
+  type ballot = Ballot_kind
+  type reveal = Reveal_kind
+  type transaction = Transaction_kind
+  type origination = Origination_kind
+  type delegation = Delegation_kind
+  type 'a manager =
+    | Reveal_manager_kind : reveal manager
+    | Transaction_manager_kind : transaction manager
+    | Origination_manager_kind : origination manager
+    | Delegation_manager_kind : delegation manager
+end
+
 type raw = Operation.t = {
   shell: Operation.shell_header ;
   proto: MBytes.t ;
@@ -16,76 +35,71 @@ type raw = Operation.t = {
 
 let raw_encoding = Operation.encoding
 
-type operation = {
+type 'kind operation = {
   shell: Operation.shell_header ;
-  contents: proto_operation ;
+  protocol_data: 'kind protocol_data ;
+}
+
+and 'kind protocol_data = {
+  contents: 'kind contents_list ;
   signature: Signature.t option ;
 }
 
-and proto_operation =
-  | Anonymous_operations of anonymous_operation list
-  | Sourced_operation of sourced_operation
+and _ contents_list =
+  | Single : 'kind contents -> 'kind contents_list
+  | Cons : 'kind Kind.manager contents * 'rest Kind.manager contents_list ->
+    (('kind * 'rest) Kind.manager ) contents_list
 
-and anonymous_operation =
-  | Seed_nonce_revelation of {
-      level: Raw_level_repr.t ;
-      nonce: Seed_repr.nonce ;
-    }
-  | Double_endorsement_evidence of {
-      op1: operation ;
-      op2: operation ;
-    }
-  | Double_baking_evidence of {
-      bh1: Block_header_repr.t ;
-      bh2: Block_header_repr.t ;
-    }
-  | Activation of {
-      id: Ed25519.Public_key_hash.t ;
-      secret: Blinded_public_key_hash.secret ;
-    }
-
-and sourced_operation =
-  | Consensus_operation of consensus_operation
-  | Amendment_operation of {
-      source: Signature.Public_key_hash.t ;
-      operation: amendment_operation ;
-    }
-  | Manager_operations of {
-      source: Contract_repr.contract ;
-      fee: Tez_repr.tez ;
-      counter: counter ;
-      operations: manager_operation list ;
-      gas_limit: Z.t;
-      storage_limit: Int64.t;
-    }
-  | Dictator_operation of dictator_operation
-
-and consensus_operation =
-  | Endorsements of {
+and _ contents =
+  | Endorsements : {
       block: Block_hash.t ;
       level: Raw_level_repr.t ;
       slots: int list ;
-    }
-
-and amendment_operation =
-  | Proposals of {
+    } -> Kind.endorsements contents
+  | Seed_nonce_revelation : {
+      level: Raw_level_repr.t ;
+      nonce: Seed_repr.nonce ;
+    } -> Kind.seed_nonce_revelation contents
+  | Double_endorsement_evidence : {
+      op1: Kind.endorsements operation ;
+      op2: Kind.endorsements operation ;
+    } -> Kind.double_endorsement_evidence contents
+  | Double_baking_evidence : {
+      bh1: Block_header_repr.t ;
+      bh2: Block_header_repr.t ;
+    } -> Kind.double_baking_evidence contents
+  | Activate_account : {
+      id: Ed25519.Public_key_hash.t ;
+      activation_code: Blinded_public_key_hash.activation_code ;
+    } -> Kind.activate_account contents
+  | Proposals : {
+      source: Signature.Public_key_hash.t ;
       period: Voting_period_repr.t ;
       proposals: Protocol_hash.t list ;
-    }
-  | Ballot of {
+    } -> Kind.proposals contents
+  | Ballot : {
+      source: Signature.Public_key_hash.t ;
       period: Voting_period_repr.t ;
       proposal: Protocol_hash.t ;
       ballot: Vote_repr.ballot ;
-    }
+    } -> Kind.ballot contents
+  | Manager_operation : {
+      source: Contract_repr.contract ;
+      fee: Tez_repr.tez ;
+      counter: counter ;
+      operation: 'kind manager_operation ;
+      gas_limit: Z.t;
+      storage_limit: Int64.t;
+    } -> 'kind Kind.manager contents
 
-and manager_operation =
-  | Reveal of Signature.Public_key.t
-  | Transaction of {
+and _ manager_operation =
+  | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
+  | Transaction : {
       amount: Tez_repr.tez ;
       parameters: Script_repr.lazy_expr option ;
       destination: Contract_repr.contract ;
-    }
-  | Origination of {
+    } -> Kind.transaction manager_operation
+  | Origination : {
       manager: Signature.Public_key_hash.t ;
       delegate: Signature.Public_key_hash.t option ;
       script: Script_repr.t option ;
@@ -93,388 +107,518 @@ and manager_operation =
       delegatable: bool ;
       credit: Tez_repr.tez ;
       preorigination: Contract_repr.t option ;
-    }
-  | Delegation of Signature.Public_key_hash.t option
-
-and dictator_operation =
-  | Activate of Protocol_hash.t
-  | Activate_testchain of Protocol_hash.t
+    } -> Kind.origination manager_operation
+  | Delegation :
+      Signature.Public_key_hash.t option -> Kind.delegation manager_operation
 
 and counter = Int32.t
 
-type internal_operation = {
+let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
+  function
+  | Reveal _ -> Kind.Reveal_manager_kind
+  | Transaction _ -> Kind.Transaction_manager_kind
+  | Origination _ -> Kind.Origination_manager_kind
+  | Delegation _ -> Kind.Delegation_manager_kind
+
+type 'kind internal_operation = {
   source: Contract_repr.contract ;
-  operation: manager_operation ;
+  operation: 'kind manager_operation ;
   nonce: int ;
 }
+
+type packed_manager_operation =
+  | Manager : 'kind manager_operation -> packed_manager_operation
+
+type packed_contents =
+  | Contents : 'kind contents -> packed_contents
+
+type packed_contents_list =
+  | Contents_list : 'kind contents_list -> packed_contents_list
+
+type packed_protocol_data =
+  | Operation_data : 'kind protocol_data -> packed_protocol_data
+
+type packed_operation = {
+  shell: Operation.shell_header ;
+  protocol_data: packed_protocol_data ;
+}
+
+let pack ({ shell ; protocol_data} : _ operation) : packed_operation = {
+  shell ;
+  protocol_data = Operation_data protocol_data ;
+}
+
+type packed_internal_operation =
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
+
+let rec to_list = function
+  | Contents_list (Single o) -> [Contents o]
+  | Contents_list (Cons (o, os)) ->
+      Contents o :: to_list (Contents_list os)
+
+let rec of_list = function
+  | [] -> assert false
+  | [Contents o] -> Contents_list (Single o)
+  | (Contents o) :: os ->
+      let Contents_list os = of_list os in
+      match o, os with
+      | Manager_operation _, Single (Manager_operation _) ->
+          Contents_list (Cons (o, os))
+      | Manager_operation _, Cons _ ->
+          Contents_list (Cons (o, os))
+      | _ ->
+          Pervasives.failwith "Operation list of length > 1 \
+                               should only contains manager operations."
 
 module Encoding = struct
 
   open Data_encoding
 
-  let reveal_encoding =
-    describe ~title:"Reveal operation" @@
-    (obj2
-       (req "kind" (constant "reveal"))
-       (req "public_key" Signature.Public_key.encoding))
+  let case tag name args proj inj =
+    let open Data_encoding in
+    case tag
+      ~title:(String.capitalize_ascii name)
+      (merge_objs
+         (obj1 (req "kind" (constant name)))
+         args)
+      (fun x -> match proj x with None -> None | Some x -> Some ((), x))
+      (fun ((), x) -> inj x)
 
-  let reveal_case tag =
-    case tag ~name:"Reveal" reveal_encoding
-      (function
-        | Reveal pkh -> Some ((), pkh)
-        | _ -> None)
-      (fun ((), pkh) -> Reveal pkh)
+  module Manager_operations = struct
 
-  let transaction_encoding =
-    describe ~title:"Transaction operation" @@
-    obj4
-      (req "kind" (constant "transaction"))
-      (req "amount" Tez_repr.encoding)
-      (req "destination" Contract_repr.encoding)
-      (opt "parameters" Script_repr.lazy_expr_encoding)
+    type 'kind case =
+        MCase : { tag: int ;
+                  name: string ;
+                  encoding: 'a Data_encoding.t ;
+                  select: packed_manager_operation -> 'kind manager_operation option ;
+                  proj: 'kind manager_operation -> 'a ;
+                  inj: 'a -> 'kind manager_operation } -> 'kind case
 
-  let transaction_case tag =
-    case tag ~name:"Transaction" transaction_encoding
-      (function
-        | Transaction { amount ; destination ; parameters } ->
-            Some ((), amount, destination, parameters)
-        | _ -> None)
-      (fun ((), amount, destination, parameters) ->
-         Transaction { amount ; destination ; parameters })
+    let reveal_case =
+      MCase {
+        tag = 0 ;
+        name = "reveal" ;
+        encoding =
+          (obj1
+             (req "public_key" Signature.Public_key.encoding)) ;
+        select =
+          (function
+            | Manager (Reveal _ as op) -> Some op
+            | _ -> None) ;
+        proj =
+          (function Reveal pkh -> pkh) ;
+        inj =
+          (fun pkh -> Reveal pkh)
+      }
 
-  let origination_encoding =
-    describe ~title:"Origination operation" @@
-    (obj7
-       (req "kind" (constant "origination"))
-       (req "managerPubkey" Signature.Public_key_hash.encoding)
-       (req "balance" Tez_repr.encoding)
-       (opt "spendable" bool)
-       (opt "delegatable" bool)
-       (opt "delegate" Signature.Public_key_hash.encoding)
-       (opt "script" Script_repr.encoding))
+    let transaction_case =
+      MCase {
+        tag = 1 ;
+        name = "transaction" ;
+        encoding =
+          (obj3
+             (req "amount" Tez_repr.encoding)
+             (req "destination" Contract_repr.encoding)
+             (opt "parameters" Script_repr.lazy_expr_encoding)) ;
+        select =
+          (function
+            | Manager (Transaction _ as op) -> Some op
+            | _ -> None) ;
+        proj =
+          (function
+            | Transaction { amount ; destination ; parameters } ->
+                (amount, destination, parameters)) ;
+        inj =
+          (fun (amount, destination, parameters) ->
+             Transaction { amount ; destination ; parameters })
+      }
 
-  let origination_case tag =
-    case tag ~name:"Origination" origination_encoding
-      (function
-        | Origination { manager ; credit ; spendable ;
-                        delegatable ; delegate ; script ;
-                        preorigination = _
-                        (* the hash is only used internally
-                           when originating from smart
-                           contracts, don't serialize it *) } ->
-            Some ((), manager, credit, Some spendable,
-                  Some delegatable, delegate, script)
-        | _ -> None)
-      (fun ((), manager, credit, spendable, delegatable, delegate, script) ->
-         let delegatable =
-           match delegatable with None -> true | Some b -> b in
-         let spendable =
-           match spendable with None -> true | Some b -> b in
-         Origination
-           {manager ; credit ; spendable ; delegatable ;
-            delegate ; script ; preorigination = None })
+    let origination_case =
+      MCase {
+        tag = 2 ;
+        name = "origination" ;
+        encoding =
+          (obj6
+             (req "managerPubkey" Signature.Public_key_hash.encoding)
+             (req "balance" Tez_repr.encoding)
+             (dft "spendable" bool true)
+             (dft "delegatable" bool true)
+             (opt "delegate" Signature.Public_key_hash.encoding)
+             (opt "script" Script_repr.encoding)) ;
+        select =
+          (function
+            | Manager (Origination _ as op) -> Some op
+            | _ -> None) ;
+        proj =
+          (function
+            | Origination { manager ; credit ; spendable ;
+                            delegatable ; delegate ; script ;
+                            preorigination = _
+                            (* the hash is only used internally
+                               when originating from smart
+                               contracts, don't serialize it *) } ->
+                (manager, credit, spendable,
+                 delegatable, delegate, script)) ;
+        inj =
+          (fun (manager, credit, spendable, delegatable, delegate, script) ->
+             Origination
+               {manager ; credit ; spendable ; delegatable ;
+                delegate ; script ; preorigination = None })
+      }
 
-  let delegation_encoding =
-    describe ~title:"Delegation operation" @@
-    (obj2
-       (req "kind" (constant "delegation"))
-       (opt "delegate" Signature.Public_key_hash.encoding))
+    let delegation_case =
+      MCase {
+        tag = 3 ;
+        name = "delegation" ;
+        encoding =
+          (obj1
+             (opt "delegate" Signature.Public_key_hash.encoding)) ;
+        select =
+          (function
+            | Manager (Delegation _ as op) -> Some op
+            | _ -> None) ;
+        proj =
+          (function Delegation key -> key) ;
+        inj =
+          (fun key -> Delegation key)
+      }
 
+    let encoding =
+      let make (MCase { tag ; name ; encoding ; select ; proj ; inj }) =
+        case (Tag tag) name encoding
+          (fun o -> match select o with None -> None | Some o -> Some (proj o))
+          (fun x -> Manager (inj x)) in
+      union ~tag_size:`Uint8 [
+        make reveal_case ;
+        make transaction_case ;
+        make origination_case ;
+        make delegation_case ;
+      ]
 
-  let delegation_case tag =
-    case tag ~name:"Delegation" delegation_encoding
-      (function Delegation key -> Some ((), key) | _ -> None)
-      (fun ((), key) -> Delegation key)
+  end
 
-  let manager_kind_encoding =
-    obj7
-      (req "kind" (constant "manager"))
-      (req "source" Contract_repr.encoding)
-      (req "fee" Tez_repr.encoding)
-      (req "counter" int32)
-      (req "operations"
-         (list (union ~tag_size:`Uint8 [
-              reveal_case (Tag 0) ;
-              transaction_case (Tag 1) ;
-              origination_case (Tag 2) ;
-              delegation_case (Tag 3) ;
-            ])))
-      (req "gas_limit" z)
-      (req "storage_limit" int64)
+  type 'b case =
+      Case : { tag: int ;
+               name: string ;
+               encoding: 'a Data_encoding.t ;
+               select: packed_contents -> 'b contents option ;
+               proj: 'b contents -> 'a ;
+               inj: 'a -> 'b contents } -> 'b case
 
-  let manager_kind_case tag =
-    case tag ~name:"Manager operations" manager_kind_encoding
-      (function
-        | Manager_operations { source; fee ; counter ; operations ; gas_limit ; storage_limit } ->
-            Some ((), source, fee, counter, operations, gas_limit, storage_limit)
-        | _ -> None)
-      (fun ((), source, fee, counter, operations, gas_limit, storage_limit) ->
-         Manager_operations { source; fee ; counter ; operations ; gas_limit ; storage_limit })
-
-  let endorsement_encoding =
-    (* describe ~title:"Endorsement operation" @@ *)
-    obj4
-      (req "kind" (constant "endorsement"))
+  let endorsements_encoding =
+    obj3
       (req "block" Block_hash.encoding)
       (req "level" Raw_level_repr.encoding)
       (req "slots" (list int31))
 
-  let consensus_kind_encoding =
+  let endorsement_case =
+    Case {
+      tag = 0 ;
+      name = "endorsement" ;
+      encoding = endorsements_encoding ;
+      select =
+        (function
+          | Contents (Endorsements _ as op) -> Some op
+          | _ -> None) ;
+      proj =
+        (fun (Endorsements { block ; level ; slots }) -> (block, level, slots)) ;
+      inj =
+        (fun (block, level, slots) -> Endorsements { block ; level ; slots })
+    }
+
+  let endorsement_encoding =
+    let make (Case { tag ; name ; encoding ; select = _ ; proj ; inj }) =
+      case (Tag tag) name encoding
+        (fun o -> Some (proj o))
+        (fun x -> inj x) in
+    let to_list : Kind.endorsements contents_list -> _ = function
+      | Single o -> o in
+    let of_list : Kind.endorsements contents -> _ = function
+      | o -> Single o in
+    def "inlined.endorsement" @@
     conv
-      (function
-        | Endorsements { block ; level ; slots } ->
-            ((), block, level, slots))
-      (fun ((), block, level, slots) ->
-         Endorsements { block ; level ; slots })
-      endorsement_encoding
+      (fun ({ shell ; protocol_data = { contents ; signature } } : _ operation)->
+         (shell, (contents, signature)))
+      (fun (shell, (contents, signature)) ->
+         ({ shell ; protocol_data = { contents ; signature }} : _ operation))
+      (merge_objs
+         Operation.shell_header_encoding
+         (obj2
+            (req "operations"
+               (conv to_list of_list  @@
+                def "inlined.endorsement.contents" @@
+                union [
+                  make endorsement_case ;
+                ]))
+            (varopt "signature" Signature.encoding)))
 
-  let consensus_kind_case tag =
-    case tag consensus_kind_encoding
-      (function
-        | Consensus_operation op ->
-            Some op
-        | _ -> None)
-      (fun op -> Consensus_operation op)
+  let seed_nonce_revelation_case =
+    Case {
+      tag = 1;
+      name = "seed_nonce_revelation" ;
+      encoding =
+        (obj2
+           (req "level" Raw_level_repr.encoding)
+           (req "nonce" Seed_repr.nonce_encoding)) ;
+      select =
+        (function
+          | Contents (Seed_nonce_revelation _ as op) -> Some op
+          | _ -> None) ;
+      proj =
+        (fun (Seed_nonce_revelation { level ; nonce }) -> (level, nonce)) ;
+      inj =
+        (fun (level, nonce) -> Seed_nonce_revelation { level ; nonce })
+    }
 
-  let proposal_encoding =
-    (obj3
-       (req "kind" (constant "proposal"))
-       (req "period" Voting_period_repr.encoding)
-       (req "proposals" (list Protocol_hash.encoding)))
+  let double_endorsement_evidence_case : Kind.double_endorsement_evidence case =
+    Case {
+      tag = 2 ;
+      name = "double_endorsement_evidence" ;
+      encoding =
+        (obj2
+           (req "op1" (dynamic_size endorsement_encoding))
+           (req "op2" (dynamic_size endorsement_encoding))) ;
+      select =
+        (function
+          | Contents (Double_endorsement_evidence _ as op) -> Some op
+          | _ -> None) ;
+      proj =
+        (fun (Double_endorsement_evidence { op1 ; op2 }) -> (op1, op2)) ;
+      inj =
+        (fun (op1, op2) -> (Double_endorsement_evidence { op1 ; op2 }))
+    }
 
-  let proposal_case tag =
-    case tag proposal_encoding
-      (function
-        | Proposals { period ; proposals } ->
-            Some ((), period, proposals)
-        | _ -> None)
-      (fun ((), period, proposals) ->
-         Proposals { period ; proposals })
+  let double_baking_evidence_case =
+    Case {
+      tag = 3 ;
+      name = "double_baking_evidence" ;
+      encoding =
+        (obj2
+           (req "bh1" (dynamic_size Block_header_repr.encoding))
+           (req "bh2" (dynamic_size Block_header_repr.encoding))) ;
+      select =
+        (function
+          | Contents (Double_baking_evidence _ as op) -> Some op
+          | _ -> None) ;
+      proj =
+        (fun (Double_baking_evidence { bh1 ; bh2 }) -> (bh1, bh2)) ;
+      inj =
+        (fun (bh1, bh2) -> Double_baking_evidence { bh1 ; bh2 }) ;
+    }
 
-  let ballot_encoding =
-    (obj4
-       (req "kind" (constant "ballot"))
-       (req "period" Voting_period_repr.encoding)
-       (req "proposal" Protocol_hash.encoding)
-       (req "ballot" Vote_repr.ballot_encoding))
+  let activate_account_case =
+    Case {
+      tag = 4 ;
+      name = "activate_account" ;
+      encoding =
+        (obj2
+           (req "pkh" Ed25519.Public_key_hash.encoding)
+           (req "secret" Blinded_public_key_hash.activation_code_encoding)) ;
+      select =
+        (function
+          | Contents (Activate_account _ as op) -> Some op
+          | _ -> None) ;
+      proj =
+        (fun (Activate_account { id ; activation_code }) -> (id, activation_code)) ;
+      inj =
+        (fun (id, activation_code) -> Activate_account { id ; activation_code })
+    }
 
-  let ballot_case tag =
-    case tag ballot_encoding
-      (function
-        | Ballot { period ; proposal ; ballot } ->
-            Some ((), period, proposal, ballot)
-        | _ -> None)
-      (fun ((), period, proposal, ballot) ->
-         Ballot { period ; proposal ; ballot })
+  let proposals_case =
+    Case {
+      tag = 5 ;
+      name = "proposals" ;
+      encoding =
+        (obj3
+           (req "source" Signature.Public_key_hash.encoding)
+           (req "period" Voting_period_repr.encoding)
+           (req "proposals" (list Protocol_hash.encoding))) ;
+      select =
+        (function
+          | Contents (Proposals _ as op) -> Some op
+          | _ -> None) ;
+      proj =
+        (fun (Proposals { source ; period ; proposals }) ->
+           (source, period, proposals)) ;
+      inj =
+        (fun (source, period, proposals) ->
+           Proposals { source ; period ; proposals }) ;
+    }
 
-  let amendment_kind_encoding =
-    merge_objs
-      (obj1 (req "source" Signature.Public_key_hash.encoding))
-      (union [
-          proposal_case (Tag 0) ;
-          ballot_case (Tag 1) ;
-        ])
+  let ballot_case =
+    Case {
+      tag = 6 ;
+      name = "ballot" ;
+      encoding =
+        (obj4
+           (req "source" Signature.Public_key_hash.encoding)
+           (req "period" Voting_period_repr.encoding)
+           (req "proposal" Protocol_hash.encoding)
+           (req "ballot" Vote_repr.ballot_encoding)) ;
+      select =
+        (function
+          | Contents (Ballot _ as op) -> Some op
+          | _ -> None) ;
+      proj =
+        (function
+            (Ballot { source ; period ; proposal ; ballot }) ->
+              (source, period, proposal, ballot)) ;
+      inj =
+        (fun (source, period, proposal, ballot) ->
+           Ballot { source ; period ; proposal ; ballot }) ;
+    }
 
-  let amendment_kind_case tag =
-    case tag amendment_kind_encoding
-      (function
-        | Amendment_operation { source ; operation } ->
-            Some (source, operation)
-        | _ -> None)
-      (fun (source, operation) -> Amendment_operation { source ; operation })
+  let manager_encoding =
+    (obj5
+       (req "source" Contract_repr.encoding)
+       (req "fee" Tez_repr.encoding)
+       (req "counter" int32)
+       (req "gas_limit" z)
+       (req "storage_limit" int64))
 
-  let dictator_kind_encoding =
-    let mk_case name args =
-      let open Data_encoding in
-      conv
-        (fun o -> ((), o))
-        (fun ((), o) -> o)
-        (merge_objs
-           (obj1 (req "chain" (constant name)))
-           args) in
-    let open Data_encoding in
-    union ~tag_size:`Uint8 [
-      case (Tag 0)
-        (mk_case "activate"
-           (obj1 (req "hash" Protocol_hash.encoding)))
-        (function (Activate hash) -> Some hash | _ -> None)
-        (fun hash -> Activate hash) ;
-      case (Tag 1)
-        (mk_case "activate_testchain"
-           (obj1 (req "hash" Protocol_hash.encoding)))
-        (function (Activate_testchain hash) -> Some hash | _ -> None)
-        (fun hash -> Activate_testchain hash) ;
-    ]
+  let extract
+      (type kind)
+      (Manager_operation { source ; fee ; counter ;
+                           gas_limit ; storage_limit ; operation = _ } : kind Kind.manager contents) =
+    (source, fee, counter, gas_limit, storage_limit)
 
-  let dictator_kind_case tag =
-    case tag dictator_kind_encoding
-      (function Dictator_operation op -> Some op | _ -> None)
-      (fun op -> Dictator_operation op)
+  let rebuild (source, fee, counter, gas_limit, storage_limit) operation =
+    Manager_operation { source ; fee ; counter ;
+                        gas_limit ; storage_limit ; operation }
 
-  let signed_operations_case tag =
-    case tag
-      (union [
-          consensus_kind_case (Tag 0) ;
-          amendment_kind_case (Tag 1) ;
-          manager_kind_case (Tag 2) ;
-          dictator_kind_case (Tag 3) ;
-        ])
-      (function Sourced_operation op -> Some op | _ -> None)
-      (fun op -> Sourced_operation op)
+  let make_manager_case tag
+      (type kind)
+      (Manager_operations.MCase mcase : kind Manager_operations.case) =
+    Case {
+      tag ;
+      name = mcase.name ;
+      encoding =
+        merge_objs
+          manager_encoding
+          mcase.encoding ;
+      select =
+        (function
+          | Contents (Manager_operation ({ operation ; _ } as op)) -> begin
+              match mcase.select (Manager operation) with
+              | None -> None
+              | Some operation ->
+                  Some (Manager_operation { op with operation })
+            end
+          | _ -> None) ;
+      proj =
+        (function
+          | Manager_operation { operation ; _ } as op ->
+              (extract op, mcase.proj operation )) ;
+      inj =
+        (fun (op, contents) ->
+           (rebuild op (mcase.inj contents)))
+    }
 
-  let seed_nonce_revelation_encoding =
-    (obj3
-       (req "kind" (constant "seed_nonce_revelation"))
-       (req "level" Raw_level_repr.encoding)
-       (req "nonce" Seed_repr.nonce_encoding))
+  let reveal_case = make_manager_case 7 Manager_operations.reveal_case
+  let transaction_case = make_manager_case 8 Manager_operations.transaction_case
+  let origination_case = make_manager_case 9 Manager_operations.origination_case
+  let delegation_case = make_manager_case 10 Manager_operations.delegation_case
 
-  let seed_nonce_revelation_case tag =
-    case tag seed_nonce_revelation_encoding
-      (function
-        | Seed_nonce_revelation { level ; nonce } -> Some ((), level, nonce)
-        | _ -> None
-      )
-      (fun ((), level, nonce) -> Seed_nonce_revelation { level ; nonce })
-
-  let double_endorsement_evidence_encoding op_encoding =
-    (obj3
-       (req "kind" (constant "double_endorsement_evidence"))
-       (req "op1" (dynamic_size op_encoding))
-       (req "op2" (dynamic_size op_encoding)))
-
-  let double_endorsement_evidence_case tag op_encoding =
-    case tag (double_endorsement_evidence_encoding op_encoding)
-      (function
-        | Double_endorsement_evidence { op1 ; op2 } -> Some ((), op1, op2)
-        | _ -> None
-      )
-      (fun ((), op1, op2) -> Double_endorsement_evidence { op1 ; op2 })
-
-  let double_baking_evidence_encoding =
-    (obj3
-       (req "kind" (constant "double_baking_evidence"))
-       (req "op1" (dynamic_size Block_header_repr.encoding))
-       (req "op2" (dynamic_size Block_header_repr.encoding)))
-
-  let double_baking_evidence_case tag =
-    case tag double_baking_evidence_encoding
-      (function
-        | Double_baking_evidence { bh1 ; bh2 } -> Some ((), bh1, bh2)
-        | _ -> None
-      )
-      (fun ((), bh1, bh2) -> Double_baking_evidence { bh1 ; bh2 })
-
-  let activation_encoding =
-    (obj3
-       (req "kind" (constant "activation"))
-       (req "pkh" Ed25519.Public_key_hash.encoding)
-       (req "secret" Blinded_public_key_hash.secret_encoding))
-
-  let activation_case tag =
-    case tag activation_encoding
-      (function
-        | Activation { id ; secret } -> Some ((), id, secret)
-        | _ -> None
-      )
-      (fun ((), id, secret) -> Activation { id ; secret })
-
-  let unsigned_operation_case tag op_encoding =
-    case tag
-      (obj1
-         (req "operations"
-            (list
-               (union [
-                   seed_nonce_revelation_case (Tag 0) ;
-                   double_endorsement_evidence_case (Tag 1) op_encoding ;
-                   double_baking_evidence_case (Tag 2) ;
-                   activation_case (Tag 3) ;
-                 ]))))
-      (function Anonymous_operations ops -> Some ops | _ -> None)
-      (fun ops -> Anonymous_operations ops)
-
-  let mu_proto_operation_encoding op_encoding =
+  let contents_encoding =
+    let make (Case { tag ; name ; encoding ; select ; proj ; inj }) =
+      case (Tag tag) name encoding
+        (fun o -> match select o with None -> None | Some o -> Some (proj o))
+        (fun x -> Contents (inj x)) in
+    def "operation.alpha.contents" @@
     union [
-      signed_operations_case (Tag 0) ;
-      unsigned_operation_case (Tag 1) op_encoding ;
+      make endorsement_case ;
+      make seed_nonce_revelation_case ;
+      make double_endorsement_evidence_case ;
+      make double_baking_evidence_case ;
+      make activate_account_case ;
+      make proposals_case ;
+      make ballot_case ;
+      make reveal_case ;
+      make transaction_case ;
+      make origination_case ;
+      make delegation_case ;
     ]
 
-  let mu_signed_proto_operation_encoding op_encoding =
-    merge_objs
-      (mu_proto_operation_encoding op_encoding)
-      (obj1 (varopt "signature" Signature.encoding))
+  let contents_list_encoding =
+    conv to_list of_list (Variable.list contents_encoding)
+
+  let optional_signature_encoding =
+    conv
+      (function Some s -> s | None -> Signature.zero)
+      (fun s -> if Signature.equal s Signature.zero then None else Some s)
+      Signature.encoding
+
+  let protocol_data_encoding =
+    def "operation.alpha.contents_and_signature" @@
+    conv
+      (fun (Operation_data { contents ; signature }) ->
+         (Contents_list contents, signature))
+      (fun (Contents_list contents, signature) ->
+         Operation_data { contents ; signature })
+      (obj2
+         (req "contents" contents_list_encoding)
+         (req "signature" optional_signature_encoding))
 
   let operation_encoding =
-    mu "operation"
-      (fun encoding ->
-         conv
-           (fun { shell ; contents ; signature } ->
-              (shell, (contents, signature)))
-           (fun (shell, (contents, signature)) ->
-              { shell ; contents ; signature })
-           (merge_objs
-              Operation.shell_header_encoding
-              (mu_signed_proto_operation_encoding encoding)))
-
-  let proto_operation_encoding =
-    mu_proto_operation_encoding operation_encoding
-
-  let signed_proto_operation_encoding =
-    describe ~title:"Signed alpha operation" @@
-    mu_signed_proto_operation_encoding operation_encoding
+    conv
+      (fun ({ shell ; protocol_data }) ->
+         (shell, protocol_data))
+      (fun (shell, protocol_data) ->
+         { shell ; protocol_data })
+      (merge_objs
+         Operation.shell_header_encoding
+         protocol_data_encoding)
 
   let unsigned_operation_encoding =
-    describe ~title:"Unsigned Alpha operation" @@
+    def "operation.alpha.unsigned_operation" @@
     merge_objs
       Operation.shell_header_encoding
-      proto_operation_encoding
+      (obj1 (req "contents" contents_list_encoding))
 
   let internal_operation_encoding =
+    def "operation.alpha.internal_operation" @@
     conv
-      (fun { source ; operation ; nonce } -> ((source, nonce), operation))
-      (fun ((source, nonce), operation) -> { source ; operation ; nonce })
+      (fun (Internal_operation { source ; operation ; nonce }) ->
+         ((source, nonce), Manager operation))
+      (fun ((source, nonce), Manager operation) ->
+         Internal_operation { source ; operation ; nonce })
       (merge_objs
          (obj2
             (req "source" Contract_repr.encoding)
             (req "nonce" uint16))
-         (union ~tag_size:`Uint8 [
-             reveal_case (Tag 0) ;
-             transaction_case (Tag 1) ;
-             origination_case (Tag 2) ;
-             delegation_case (Tag 3) ;
-           ]))
+         Manager_operations.encoding)
+
 end
 
-type error += Cannot_parse_operation
-
 let encoding = Encoding.operation_encoding
+let contents_encoding = Encoding.contents_encoding
+let protocol_data_encoding = Encoding.protocol_data_encoding
+let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
+let internal_operation_encoding = Encoding.internal_operation_encoding
 
-let () =
-  register_error_kind
-    `Branch
-    ~id:"operation.cannot_parse"
-    ~title:"Cannot parse operation"
-    ~description:"The operation is ill-formed \
-                  or for another protocol version"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "The operation cannot be parsed")
-    Data_encoding.unit
-    (function Cannot_parse_operation -> Some () | _ -> None)
-    (fun () -> Cannot_parse_operation)
+let raw ({ shell ; protocol_data } : _ operation) =
+  let proto =
+    Data_encoding.Binary.to_bytes_exn
+      protocol_data_encoding
+      (Operation_data protocol_data) in
+  { Operation.shell ; proto }
 
-let parse (op: Operation.t) =
-  match Data_encoding.Binary.of_bytes
-          Encoding.signed_proto_operation_encoding
-          op.proto with
-  | Some (contents, signature) ->
-      ok { shell = op.shell ; contents ; signature }
-  | None -> error Cannot_parse_operation
+let acceptable_passes (op : packed_operation) =
+  let Operation_data protocol_data = op.protocol_data in
+  match protocol_data.contents with
 
-let acceptable_passes op =
-  match op.contents with
-  | Sourced_operation (Consensus_operation _) -> [0]
-  | Sourced_operation (Amendment_operation _ | Dictator_operation _) -> [1]
-  | Anonymous_operations _ -> [2]
-  | Sourced_operation (Manager_operations _) -> [3]
+  | Single (Endorsements _) -> [0]
+
+  | Single (Proposals _ ) -> [1]
+  | Single (Ballot _ ) -> [1]
+
+  | Single (Seed_nonce_revelation _) -> [2]
+  | Single (Double_endorsement_evidence _) -> [2]
+  | Single (Double_baking_evidence _) -> [2]
+  | Single (Activate_account _) -> [2]
+
+  | Single (Manager_operation _) -> [3]
+  | Cons _ -> [3]
 
 type error += Invalid_signature (* `Permanent *)
 type error += Missing_signature (* `Permanent *)
@@ -503,47 +647,97 @@ let () =
     (function Missing_signature -> Some () | _ -> None)
     (fun () -> Missing_signature)
 
-let forge shell proto =
-  Data_encoding.Binary.to_bytes_exn
-    Encoding.unsigned_operation_encoding (shell, proto)
-
-let check_signature key { shell ; contents ; signature } =
-  match contents, signature with
-  | Anonymous_operations _, _ -> return ()
-  | Sourced_operation _, None ->
+let check_signature (type kind) key ({ shell ; protocol_data } : kind operation) =
+  let check ~watermark contents signature =
+    let unsigned_operation =
+      Data_encoding.Binary.to_bytes_exn
+        unsigned_operation_encoding (shell, contents) in
+    if Signature.check ~watermark key signature unsigned_operation then
+      return ()
+    else
+      fail Invalid_signature in
+  match protocol_data.contents, protocol_data.signature with
+  | Single _, None ->
       fail Missing_signature
-  | Sourced_operation (Consensus_operation _), Some signature ->
-      (* Safe for baking *)
-      let unsigned_operation = forge shell contents in
-      if Signature.check
-          ~watermark:Endorsement
-          key signature unsigned_operation then
-        return ()
-      else
-        fail Invalid_signature
-  | Sourced_operation _, Some signature ->
-      (* Unsafe for baking *)
-      let unsigned_operation = forge shell contents in
-      if Signature.check
-          ~watermark:Generic_operation
-          key signature unsigned_operation then
-        return ()
-      else
-        fail Invalid_signature
-
-let parse_proto bytes =
-  match Data_encoding.Binary.of_bytes
-          Encoding.signed_proto_operation_encoding
-          bytes with
-  | Some (proto, signature) -> return (proto, signature)
-  | None -> fail Cannot_parse_operation
+  | Cons _, None ->
+      fail Missing_signature
+  | Single (Endorsements _) as contents, Some signature ->
+      check ~watermark:Endorsement (Contents_list contents) signature
+  | Single _ as contents, Some signature ->
+      check ~watermark:Generic_operation (Contents_list contents) signature
+  | Cons _ as contents, Some signature ->
+      check ~watermark:Generic_operation (Contents_list contents) signature
 
 let hash_raw = Operation.hash
-let hash o =
+let hash (o : _ operation) =
   let proto =
     Data_encoding.Binary.to_bytes_exn
-      Encoding.signed_proto_operation_encoding
-      (o.contents, o.signature) in
+      protocol_data_encoding
+      (Operation_data o.protocol_data) in
   Operation.hash { shell = o.shell ; proto }
 
-include Encoding
+type ('a, 'b) eq = Eq : ('a, 'a) eq
+
+let equal_manager_operation_kind
+  : type a b. a manager_operation -> b manager_operation -> (a, b) eq option
+  = fun op1 op2 ->
+    match op1, op2 with
+    | Reveal _, Reveal _ -> Some Eq
+    | Reveal _, _ -> None
+    | Transaction _, Transaction _ -> Some Eq
+    | Transaction _, _ -> None
+    | Origination _, Origination _ -> Some Eq
+    | Origination _, _ -> None
+    | Delegation _, Delegation _ -> Some Eq
+    | Delegation _, _ -> None
+
+let equal_contents_kind
+  : type a b. a contents -> b contents -> (a, b) eq option
+  = fun op1 op2 ->
+    match op1, op2 with
+    | Endorsements _, Endorsements _ -> Some Eq
+    | Endorsements _, _ -> None
+    | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
+    | Seed_nonce_revelation _, _ -> None
+    | Double_endorsement_evidence _, Double_endorsement_evidence _ -> Some Eq
+    | Double_endorsement_evidence _, _ -> None
+    | Double_baking_evidence _, Double_baking_evidence _ -> Some Eq
+    | Double_baking_evidence _, _ -> None
+    | Activate_account _, Activate_account _ -> Some Eq
+    | Activate_account _, _ -> None
+    | Proposals _, Proposals _ -> Some Eq
+    | Proposals _, _ -> None
+    | Ballot _, Ballot _ -> Some Eq
+    | Ballot _, _ -> None
+    | Manager_operation op1, Manager_operation op2 -> begin
+        match equal_manager_operation_kind op1.operation op2.operation with
+        | None -> None
+        | Some Eq -> Some Eq
+      end
+    | Manager_operation _, _ -> None
+
+let rec equal_contents_kind_list
+  : type a b. a contents_list -> b contents_list -> (a, b) eq option
+  = fun op1 op2 ->
+    match op1, op2 with
+    | Single op1, Single op2 ->
+        equal_contents_kind op1 op2
+    | Single _, Cons _ -> None
+    | Cons _, Single _ -> None
+    | Cons (op1, ops1), Cons (op2, ops2) -> begin
+        match equal_contents_kind op1 op2 with
+        | None -> None
+        | Some Eq ->
+            match equal_contents_kind_list ops1 ops2 with
+            | None -> None
+            | Some Eq -> Some Eq
+      end
+
+let equal
+  : type a b. a operation -> b operation -> (a, b) eq option
+  = fun op1 op2 ->
+    if not (Operation_hash.equal (hash op1) (hash op2)) then
+      None
+    else
+      equal_contents_kind_list
+        op1.protocol_data.contents op2.protocol_data.contents

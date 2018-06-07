@@ -18,14 +18,18 @@ type t = manager_key
 open Data_encoding
 
 let hash_case tag =
-  case tag Signature.Public_key_hash.encoding
+  case tag
+    ~title:"Public_key_hash"
+    Signature.Public_key_hash.encoding
     (function
       | Hash hash -> Some hash
       | _ -> None)
     (fun hash -> Hash hash)
 
 let pubkey_case tag =
-  case tag Signature.Public_key.encoding
+  case tag
+    ~title:"Public_key"
+    Signature.Public_key.encoding
     (function
       | Public_key hash -> Some hash
       | _ -> None)

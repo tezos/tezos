@@ -56,7 +56,7 @@ module Types = struct
 
     mutable child:
       (state * (unit -> unit Lwt.t (* shutdown *))) option ;
-    prevalidator: Prevalidator.t ;
+    prevalidator: Prevalidator.t option ;
     active_peers: Peer_validator.t Lwt.t P2p_peer.Table.t ;
     bootstrapped_peers: unit P2p_peer.Table.t ;
   }
@@ -235,7 +235,11 @@ let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
   else begin
     Chain.set_head nv.parameters.chain_state block >>= fun previous ->
     broadcast_head w ~previous block >>= fun () ->
-    Prevalidator.flush nv.prevalidator block_hash >>=? fun () ->
+    begin match nv.prevalidator with
+      | Some prevalidator ->
+          Prevalidator.flush prevalidator block_hash
+      | None -> return ()
+    end >>=? fun () ->
     may_switch_test_chain w spawn_child block >>= fun () ->
     Lwt_watcher.notify nv.new_head_input block ;
     if Block_hash.equal head_hash block_header.shell.predecessor then
@@ -255,17 +259,23 @@ let on_close w =
   let nv = Worker.state w in
   Distributed_db.deactivate nv.parameters.chain_db >>= fun () ->
   Lwt.join
-    (Prevalidator.shutdown nv.prevalidator ::
+    (begin match nv.prevalidator with
+       | Some prevalidator -> Prevalidator.shutdown prevalidator
+       | None -> Lwt.return_unit
+     end ::
      Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child ::
      P2p_peer.Table.fold
        (fun _ pv acc -> (pv >>= Peer_validator.shutdown) :: acc)
        nv.active_peers []) >>= fun () ->
   Lwt.return_unit
 
-let on_launch w _ parameters =
+let on_launch start_prevalidator w _ parameters =
   Chain.init_head parameters.chain_state >>= fun () ->
-  Prevalidator.create
-    parameters.prevalidator_limits parameters.chain_db >>= fun prevalidator ->
+  (if start_prevalidator then
+     Prevalidator.create
+       parameters.prevalidator_limits parameters.chain_db >>= fun prevalidator ->
+     Lwt.return_some prevalidator
+   else Lwt.return_none) >>= fun prevalidator ->
   let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let bootstrapped_waiter, bootstrapped_wakener = Lwt.wait () in
@@ -296,7 +306,11 @@ let on_launch w _ parameters =
         may_activate_peer_validator w peer_id >>= fun pv ->
         Peer_validator.notify_head pv block ;
         (* TODO notify prevalidator only if head is known ??? *)
-        Prevalidator.notify_operations nv.prevalidator peer_id ops ;
+        begin match nv.prevalidator with
+          | Some prevalidator ->
+              Prevalidator.notify_operations prevalidator peer_id ops
+          | None -> ()
+        end ;
         Lwt.return_unit
       end;
     end ;
@@ -311,15 +325,15 @@ let on_launch w _ parameters =
   Lwt.return nv
 
 let rec create
-    ?max_child_ttl ?parent
+    ?max_child_ttl ~start_prevalidator ?parent
     peer_validator_limits prevalidator_limits block_validator
     global_valid_block_input db chain_state limits =
   let spawn_child ~parent pvl pl bl gvbi db n l =
-    create ~parent pvl pl bl gvbi db n l >>= fun w ->
+    create ~start_prevalidator ~parent pvl pl bl gvbi db n l >>= fun w ->
     Lwt.return (Worker.state w, (fun () -> Worker.shutdown w)) in
   let module Handlers = struct
     type self = t
-    let on_launch = on_launch
+    let on_launch = on_launch start_prevalidator
     let on_request w = on_request w spawn_child
     let on_close = on_close
     let on_error _ _ _ errs = Lwt.return (Error errs)
@@ -347,11 +361,13 @@ let rec create
 
 let create
     ?max_child_ttl
+    ~start_prevalidator
     peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_db state limits =
   (* hide the optional ?parent *)
   create
     ?max_child_ttl
+    ~start_prevalidator
     peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_db state limits
 

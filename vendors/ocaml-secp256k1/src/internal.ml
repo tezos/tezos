@@ -75,7 +75,7 @@ module Scalar = struct
 
   external const :
     t -> int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> unit =
-    "ml_secp256k1_fe_const_bytecode" "ml_secp256k1_fe_const" [@@noalloc]
+    "ml_secp256k1_scalar_const_bytecode" "ml_secp256k1_scalar_const" [@@noalloc]
 
   let const ?(d7=0L) ?(d6=0L) ?(d5=0L) ?(d4=0L) ?(d3=0L) ?(d2=0L) ?(d1=0L) ?(d0=0L) () =
     let buf = Cstruct.create size in

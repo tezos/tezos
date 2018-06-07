@@ -14,7 +14,6 @@ val run:
   #Proto_alpha.full ->
   ?max_priority: int ->
   delay: int ->
-  ?min_date: Time.t ->
   public_key_hash list ->
   endorsement:bool ->
   denunciation:bool ->

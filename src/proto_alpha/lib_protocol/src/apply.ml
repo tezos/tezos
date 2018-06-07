@@ -14,10 +14,9 @@ open Alpha_context
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
 type error += Duplicate_endorsement of int (* `Branch *)
-type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.lazy_expr option (* `Permanent *)
 type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
-type error += Internal_operation_replay of internal_operation
+type error += Internal_operation_replay of packed_internal_operation
 
 type error += Invalid_double_endorsement_evidence (* `Permanent *)
 type error += Inconsistent_double_endorsement_evidence
@@ -41,7 +40,6 @@ type error += Too_early_double_baking_evidence
 type error += Outdated_double_baking_evidence
   of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
 type error += Invalid_activation of { pkh : Ed25519.Public_key_hash.t }
-type error += Wrong_activation_secret
 type error += Multiple_revelation
 
 let () =
@@ -73,20 +71,6 @@ let () =
                      (req "provided" Voting_period.encoding))
     (function Wrong_voting_period (e, p) -> Some (e, p) | _ -> None)
     (fun (e, p) -> Wrong_voting_period (e, p));
-  register_error_kind
-    `Permanent
-    ~id:"badContractParameter"
-    ~title:"Contract supplied an invalid parameter"
-    ~description:"Either no parameter was supplied to a contract, \
-                  a parameter was passed to an account, \
-                  or a parameter was supplied of the wrong type"
-    Data_encoding.(obj3
-                     (req "contract" Contract.encoding)
-                     (opt "expectedType" Script.expr_encoding)
-                     (opt "providedArgument" Script.lazy_expr_encoding))
-    (function Bad_contract_parameter (c, expected, supplied) ->
-       Some (c, expected, supplied) | _ -> None)
-    (fun (c, expected, supplied) -> Bad_contract_parameter (c, expected, supplied)) ;
   register_error_kind
     `Branch
     ~id:"operation.duplicate_endorsement"
@@ -126,7 +110,7 @@ let () =
     ~id:"internal_operation_replay"
     ~title:"Internal operation replay"
     ~description:"An internal operation was emitted twice by a script"
-    ~pp:(fun ppf { nonce } ->
+    ~pp:(fun ppf (Internal_operation { nonce ; _ }) ->
         Format.fprintf ppf "Internal operation %d was emitted twice by a script" nonce)
     Operation.internal_operation_encoding
     (function Internal_operation_replay op -> Some op | _ -> None)
@@ -313,8 +297,8 @@ let () =
     `Permanent
     ~id:"operation.invalid_activation"
     ~title:"Invalid activation"
-    ~description:"The given key has already been activated or the given \
-                  key does not correspond to any preallocated contract"
+    ~description:"The given key and secret do not correspond to any \
+                  existing preallocated contract"
     ~pp:(fun ppf pkh ->
         Format.fprintf ppf "Invalid activation. The public key %a does \
                             not match any commitment."
@@ -323,17 +307,6 @@ let () =
     Data_encoding.(obj1 (req "pkh" Ed25519.Public_key_hash.encoding))
     (function Invalid_activation { pkh } -> Some pkh | _ -> None)
     (fun pkh -> Invalid_activation { pkh } ) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.wrong_activation_secret"
-    ~title:"Wrong activation secret"
-    ~description:"The submitted activation key does not match the \
-                  registered key."
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "Wrong activation secret.")
-    Data_encoding.unit
-    (function Wrong_activation_secret -> Some () | _ -> None)
-    (fun () -> Wrong_activation_secret) ;
   register_error_kind
     `Permanent
     ~id:"block.multiple_revelation"
@@ -348,12 +321,294 @@ let () =
 
 open Apply_operation_result
 
-let apply_consensus_operation_content ctxt
-    pred_block operation = function
-  | Endorsements { block ; level ; slots } ->
+let apply_manager_operation_content :
+  type kind.
+  ( Alpha_context.t -> Script_ir_translator.unparsing_mode -> payer:Contract.t -> source:Contract.t ->
+    internal:bool -> kind manager_operation ->
+    (context * kind successful_manager_operation_result * packed_internal_operation list) tzresult Lwt.t ) =
+  fun ctxt mode ~payer ~source ~internal operation ->
+    let before_operation =
+      (* This context is not used for backtracking. Only to compute
+         gas consumption and originations for the operation result. *)
+      ctxt in
+    Contract.must_exist ctxt source >>=? fun () ->
+    let spend =
+      (* Ignore the spendable flag for smart contracts. *)
+      if internal then Contract.spend_from_script else Contract.spend in
+    let set_delegate =
+      (* Ignore the delegatable flag for smart contracts. *)
+      if internal then Delegate.set_from_script else Delegate.set in
+    match operation with
+    | Reveal _ ->
+        return (* No-op: action already performed by `precheck_manager_contents`. *)
+          (ctxt, (Reveal_result : kind successful_manager_operation_result), [])
+    | Transaction { amount ; parameters ; destination } -> begin
+        spend ctxt source amount >>=? fun ctxt ->
+        Contract.credit ctxt destination amount >>=? fun ctxt ->
+        Contract.get_script ctxt destination >>=? fun (ctxt, script) ->
+        match script with
+        | None -> begin
+            match parameters with
+            | None -> return ()
+            | Some arg ->
+                Lwt.return (Script.force_decode arg) >>=? fun arg ->
+                match Micheline.root arg with
+                | Prim (_, D_Unit, [], _) ->
+                    (* Allow [Unit] parameter to non-scripted contracts. *)
+                    return ()
+                | _ -> fail (Script_interpreter.Bad_contract_parameter destination)
+          end >>=? fun () ->
+            let result =
+              Transaction_result
+                { storage = None ;
+                  balance_updates =
+                    cleanup_balance_updates
+                      [ Contract source, Debited amount ;
+                        Contract destination, Credited amount ] ;
+                  originated_contracts = [] ;
+                  consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
+                  storage_size_diff = 0L } in
+            return (ctxt, result, [])
+        | Some script ->
+            begin match parameters with
+              | None ->
+                  (* Forge a [Unit] parameter that will be checked by [execute]. *)
+                  let unit = Micheline.strip_locations (Prim (0, Script.D_Unit, [], None)) in
+                  return (ctxt, unit)
+              | Some parameters ->
+                  Lwt.return (Script.force_decode parameters) >>=? fun arg ->
+                  return (ctxt, arg)
+            end >>=? fun (ctxt, parameter) ->
+            Script_interpreter.execute
+              ctxt mode
+              ~source ~payer ~self:(destination, script) ~amount ~parameter
+            >>=? fun { ctxt ; storage ; big_map_diff ; operations } ->
+            Contract.used_storage_space ctxt destination >>=? fun old_size ->
+            Contract.update_script_storage
+              ctxt destination storage big_map_diff >>=? fun ctxt ->
+            Fees.update_script_storage
+              ctxt ~payer destination >>=? fun (ctxt, new_size, fees) ->
+            Contract.originated_from_current_nonce
+              ~since: before_operation
+              ~until: ctxt >>=? fun originated_contracts ->
+            let result =
+              Transaction_result
+                { storage = Some storage ;
+                  balance_updates =
+                    cleanup_balance_updates
+                      [ Contract payer, Debited fees ;
+                        Contract source, Debited amount ;
+                        Contract destination, Credited amount ] ;
+                  originated_contracts ;
+                  consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
+                  storage_size_diff = Int64.sub new_size old_size } in
+            return (ctxt, result, operations)
+      end
+    | Origination { manager ; delegate ; script ; preorigination ;
+                    spendable ; delegatable ; credit } ->
+        begin match script with
+          | None -> return (None, ctxt)
+          | Some script ->
+              Script_ir_translator.parse_script ctxt script >>=? fun (_, ctxt) ->
+              Script_ir_translator.erase_big_map_initialization ctxt Optimized script >>=? fun (script, big_map_diff, ctxt) ->
+              return (Some (script, big_map_diff), ctxt)
+        end >>=? fun (script, ctxt) ->
+        spend ctxt source credit >>=? fun ctxt ->
+        begin match preorigination with
+          | Some contract ->
+              assert internal ;
+              (* The preorigination field is only used to early return
+                 the address of an originated contract in Michelson.
+                 It cannot come from the outside. *)
+              return (ctxt, contract)
+          | None ->
+              Contract.fresh_contract_from_current_nonce ctxt
+        end >>=? fun (ctxt, contract) ->
+        Contract.originate ctxt contract
+          ~manager ~delegate ~balance:credit
+          ?script
+          ~spendable ~delegatable >>=? fun ctxt ->
+        Fees.origination_burn ctxt ~payer contract >>=? fun (ctxt, size, fees) ->
+        let result =
+          Origination_result
+            { balance_updates =
+                cleanup_balance_updates
+                  [ Contract payer, Debited fees ;
+                    Contract source, Debited credit ;
+                    Contract contract, Credited credit ] ;
+              originated_contracts = [ contract ] ;
+              consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
+              storage_size_diff = size } in
+        return (ctxt, result, [])
+    | Delegation delegate ->
+        set_delegate ctxt source delegate >>=? fun ctxt ->
+        return (ctxt, Delegation_result, [])
+
+let apply_internal_manager_operations ctxt mode ~payer ops =
+  let rec apply ctxt applied worklist =
+    match worklist with
+    | [] -> Lwt.return (Ok (ctxt, List.rev applied))
+    | (Internal_operation
+         ({ source ; operation ; nonce } as op)) :: rest ->
+        begin
+          if internal_nonce_already_recorded ctxt nonce then
+            fail (Internal_operation_replay (Internal_operation op))
+          else
+            let ctxt = record_internal_nonce ctxt nonce in
+            apply_manager_operation_content
+              ctxt mode ~source ~payer ~internal:true operation
+        end >>= function
+        | Error errors ->
+            let result =
+              Internal_operation_result (op, Failed (manager_kind op.operation, errors)) in
+            let skipped =
+              List.rev_map
+                (fun (Internal_operation op) ->
+                   Internal_operation_result (op, Skipped (manager_kind op.operation)))
+                rest in
+            Lwt.return (Error (List.rev (skipped @ (result :: applied))))
+        | Ok (ctxt, result, emitted) ->
+            apply ctxt
+              (Internal_operation_result (op, Applied result) :: applied)
+              (rest @ emitted) in
+  apply ctxt [] ops
+
+let precheck_manager_contents
+    (type kind) ctxt raw_operation (op : kind Kind.manager contents)
+  : context tzresult Lwt.t =
+  let Manager_operation { source ; fee ; counter ; operation } = op in
+  Contract.must_be_allocated ctxt source >>=? fun () ->
+  Contract.check_counter_increment ctxt source counter >>=? fun () ->
+  begin
+    match operation with
+    | Reveal pk ->
+        Contract.reveal_manager_key ctxt source pk
+    | _ -> return ctxt
+  end >>=? fun ctxt ->
+  Contract.get_manager_key ctxt source >>=? fun public_key ->
+  (* Currently, the `raw_operation` only contains one signature, so
+     all operations are required to be from the same manager. This may
+     change in the future, allowing several managers to group-sign a
+     sequence of transactions.  *)
+  Operation.check_signature public_key raw_operation >>=? fun () ->
+  Contract.increment_counter ctxt source >>=? fun ctxt ->
+  Contract.spend ctxt source fee >>=? fun ctxt ->
+  add_fees ctxt fee >>=? fun ctxt ->
+  return ctxt
+
+let apply_manager_contents
+    (type kind) ctxt mode (op : kind Kind.manager contents)
+  : (context * kind Kind.manager contents_result) tzresult Lwt.t =
+  let Manager_operation
+      { source ; fee ; operation ; gas_limit ; storage_limit } = op in
+  Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
+  Lwt.return (Contract.set_storage_limit ctxt storage_limit) >>=? fun ctxt ->
+  apply_manager_operation_content ctxt mode
+    ~source ~payer:source ~internal:false operation >>= begin function
+    | Ok (ctxt, operation_results, internal_operations) -> begin
+        apply_internal_manager_operations
+          ctxt mode ~payer:source internal_operations >>= function
+        | Ok (ctxt, internal_operations_results) ->
+            return (ctxt,
+                    Applied operation_results, internal_operations_results)
+        | Error internal_operations_results ->
+            return (ctxt (* backtracked *),
+                    Applied operation_results, internal_operations_results)
+      end
+    | Error operation_results ->
+        return (ctxt (* backtracked *),
+                Failed (manager_kind operation, operation_results), [])
+  end >>=? fun (ctxt, operation_result, internal_operation_results) ->
+  return (ctxt,
+          Manager_operation_result
+            { balance_updates =
+                cleanup_balance_updates
+                  [ Contract source, Debited fee ;
+                    (* FIXME: add credit to the baker *) ] ;
+              operation_result ;
+              internal_operation_results })
+
+let rec mark_skipped
+  : type kind.
+    kind Kind.manager contents_list ->
+    kind Kind.manager contents_result_list = function
+  | Single (Manager_operation op) ->
+      Single_result
+        (Manager_operation_result
+           { balance_updates = [] ;
+             operation_result = Skipped (manager_kind op.operation) ;
+             internal_operation_results = [] })
+  | Cons (Manager_operation op, rest) ->
+      Cons_result
+        (Manager_operation_result {
+            balance_updates = [] ;
+            operation_result = Skipped (manager_kind op.operation) ;
+            internal_operation_results = [] },
+         mark_skipped rest)
+
+let rec precheck_manager_contents_list
+  : type kind.
+    Alpha_context.t -> _ Operation.t -> kind Kind.manager contents_list ->
+    context tzresult Lwt.t =
+  fun ctxt raw_operation contents_list ->
+    match contents_list with
+    | Single (Manager_operation _ as op) ->
+        precheck_manager_contents ctxt raw_operation op
+    | Cons (Manager_operation _ as op, rest) ->
+        precheck_manager_contents ctxt raw_operation op >>=? fun ctxt ->
+        precheck_manager_contents_list ctxt raw_operation rest
+
+let rec apply_manager_contents_list
+  : type kind.
+    Alpha_context.t -> _ -> kind Kind.manager contents_list ->
+    (context * kind Kind.manager contents_result_list) Lwt.t =
+  fun ctxt mode contents_list ->
+    match contents_list with
+    | Single (Manager_operation { operation ; _ } as op) -> begin
+        apply_manager_contents ctxt mode op >>= function
+        | Error errors ->
+            let result =
+              Manager_operation_result {
+                balance_updates = [] ;
+                operation_result = Failed (manager_kind operation, errors) ;
+                internal_operation_results = []
+              } in
+            Lwt.return (ctxt, Single_result (result))
+        | Ok (ctxt, (Manager_operation_result
+                       { operation_result = Applied _ ; _ } as result)) ->
+            Lwt.return (ctxt, Single_result (result))
+        | Ok (ctxt,
+              (Manager_operation_result
+                 { operation_result = (Skipped _ | Failed _) ; _ } as result)) ->
+            Lwt.return (ctxt, Single_result (result))
+      end
+    | Cons (Manager_operation { operation ; _ } as op, rest) ->
+        apply_manager_contents ctxt mode op >>= function
+        | Error errors ->
+            let result =
+              Manager_operation_result {
+                balance_updates = [] ;
+                operation_result = Failed (manager_kind operation, errors) ;
+                internal_operation_results = []
+              } in
+            Lwt.return (ctxt, Cons_result (result, mark_skipped rest))
+        | Ok (ctxt, (Manager_operation_result
+                       { operation_result = Applied _ ; _ } as result)) ->
+            apply_manager_contents_list ctxt mode rest >>= fun (ctxt, results) ->
+            Lwt.return (ctxt, Cons_result (result, results))
+        | Ok (ctxt,
+              (Manager_operation_result
+                 { operation_result = (Skipped _ | Failed _) ; _ } as result)) ->
+            Lwt.return (ctxt, Cons_result (result, mark_skipped rest))
+
+let apply_contents_list
+    (type kind) ctxt mode pred_block operation (contents_list : kind contents_list)
+  : (context * kind contents_result_list) tzresult Lwt.t =
+  match contents_list with
+  | Single (Endorsements { block ; level ; slots }) ->
       begin
         match Level.pred ctxt (Level.current ctxt) with
-        | None -> failwith ""
+        | None -> assert false (* absurd: (Level.current ctxt).raw_level > 0 *)
         | Some lvl -> return lvl
       end >>=? fun ({ level = current_level ;_ } as lvl) ->
       fail_unless
@@ -371,271 +626,27 @@ let apply_consensus_operation_content ctxt
       Baking.check_endorsements_rights ctxt lvl slots >>=? fun delegate ->
       Operation.check_signature delegate operation >>=? fun () ->
       let delegate = Signature.Public_key.hash delegate in
-      let ctxt = Fitness.increase ~gap:(List.length slots) ctxt in
-      Baking.freeze_endorsement_deposit ctxt delegate >>=? fun ctxt ->
+      let gap = List.length slots in
+      let ctxt = Fitness.increase ~gap ctxt in
+      Lwt.return
+        Tez.(Constants.endorsement_security_deposit ctxt *?
+             Int64.of_int gap) >>=? fun deposit ->
+      add_deposit ctxt delegate deposit >>=? fun ctxt ->
       Global.get_last_block_priority ctxt >>=? fun block_priority ->
-      Baking.endorsement_reward ctxt ~block_priority >>=? fun reward ->
+      Baking.endorsement_reward ctxt ~block_priority gap >>=? fun reward ->
       Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
-      return (ctxt, Endorsements_result (delegate, slots))
-
-let apply_amendment_operation_content ctxt delegate = function
-  | Proposals { period ; proposals } ->
-      let level = Level.current ctxt in
-      fail_unless Voting_period.(level.voting_period = period)
-        (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
-      Amendment.record_proposals ctxt delegate proposals
-  | Ballot { period ; proposal ; ballot } ->
-      let level = Level.current ctxt in
-      fail_unless Voting_period.(level.voting_period = period)
-        (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
-      Amendment.record_ballot ctxt delegate proposal ballot
-
-let gas_difference ctxt_before ctxt_after =
-  match Gas.level ctxt_before, Gas.level ctxt_after with
-  | Limited { remaining = before }, Limited { remaining = after } -> Z.sub before after
-  | _ -> Z.zero
-
-let new_contracts ctxt_before ctxt_after =
-  Contract.originated_from_current_nonce ctxt_before >>=? fun before ->
-  Contract.originated_from_current_nonce ctxt_after >>=? fun after ->
-  return (List.filter (fun c -> not (List.exists (Contract.equal c) before)) after)
-
-let cleanup_balance_updates balance_updates =
-  List.filter
-    (fun (_, (Credited update | Debited update)) ->
-       not (Tez.equal update Tez.zero))
-    balance_updates
-
-let apply_manager_operation_content ctxt mode ~payer ~source ~internal operation =
-  let before_operation = ctxt in
-  Contract.must_exist ctxt source >>=? fun () ->
-  let spend =
-    if internal then Contract.spend_from_script else Contract.spend in
-  let set_delegate =
-    if internal then Delegate.set_from_script else Delegate.set in
-  match operation with
-  | Reveal _ -> return (ctxt, Reveal_result)
-  | Transaction { amount ; parameters ; destination } -> begin
-      spend ctxt source amount >>=? fun ctxt ->
-      Contract.credit ctxt destination amount >>=? fun ctxt ->
-      Contract.get_script ctxt destination >>=? fun (ctxt, script) -> match script with
-      | None -> begin
-          match parameters with
-          | None -> return ()
-          | Some arg ->
-              Lwt.return (Script.force_decode arg) >>=? fun arg ->
-              match Micheline.root arg with
-              | Prim (_, D_Unit, [], _) ->
-                  return ()
-              | _ -> fail (Bad_contract_parameter (destination, None, parameters))
-        end >>=? fun () ->
-          let result =
-            Transaction_result
-              { operations = [] ;
-                storage = None ;
-                balance_updates =
-                  cleanup_balance_updates
-                    [ Contract source, Debited amount ;
-                      Contract destination, Credited amount ] ;
-                originated_contracts = [] ;
-                consumed_gas = gas_difference before_operation ctxt ;
-                storage_size_diff = 0L } in
-          return (ctxt, result)
-      | Some script ->
-          Lwt.return (Script.force_decode script.code) >>=? fun code ->
-          Lwt.return @@ Script_ir_translator.parse_toplevel code >>=? fun (arg_type, _, _) ->
-          let arg_type = Micheline.strip_locations arg_type in
-          begin match parameters, Micheline.root arg_type with
-            | None, Prim (_, T_unit, _, _) ->
-                return (ctxt, (Micheline.strip_locations (Prim (0, Script.D_Unit, [], None))))
-            | Some parameters, _ ->
-                Lwt.return (Script.force_decode parameters) >>=? fun arg ->
-                trace
-                  (Bad_contract_parameter (destination, Some arg_type, Some parameters))
-                  (Script_ir_translator.typecheck_data ctxt (arg, arg_type)) >>=? fun ctxt ->
-                return (ctxt, arg)
-            | None, _ -> fail (Bad_contract_parameter (destination, Some arg_type, None))
-          end >>=? fun (ctxt, parameter) ->
-          Script_interpreter.execute
-            ctxt mode ~source ~payer ~self:(destination, script) ~amount ~parameter
-          >>=? fun { ctxt ; storage ; big_map_diff ; operations } ->
-          Contract.used_storage_space ctxt destination >>=? fun old_size ->
-          Contract.update_script_storage
-            ctxt destination storage big_map_diff >>=? fun ctxt ->
-          Fees.update_script_storage
-            ctxt ~payer destination >>=? fun (ctxt, new_size, fees) ->
-          new_contracts before_operation ctxt >>=? fun originated_contracts ->
-          let result =
-            Transaction_result
-              { operations ;
-                storage = Some storage ;
-                balance_updates =
-                  cleanup_balance_updates
-                    [ Contract payer, Debited fees ;
-                      Contract source, Debited amount ;
-                      Contract destination, Credited amount ] ;
-                originated_contracts ;
-                consumed_gas = gas_difference before_operation ctxt ;
-                storage_size_diff = Int64.sub new_size old_size } in
-          return (ctxt, result)
-    end
-  | Origination { manager ; delegate ; script ; preorigination ;
-                  spendable ; delegatable ; credit } ->
-      begin match script with
-        | None -> return (None, ctxt)
-        | Some script ->
-            Script_ir_translator.parse_script ctxt script >>=? fun (_, ctxt) ->
-            Script_ir_translator.erase_big_map_initialization ctxt Optimized script >>=? fun (script, big_map_diff, ctxt) ->
-            return (Some (script, big_map_diff), ctxt)
-      end >>=? fun (script, ctxt) ->
-      spend ctxt source credit >>=? fun ctxt ->
-      begin match preorigination with
-        | Some contract -> return (ctxt, contract)
-        | None -> Contract.fresh_contract_from_current_nonce ctxt
-      end >>=? fun (ctxt, contract) ->
-      Contract.originate ctxt contract
-        ~manager ~delegate ~balance:credit
-        ?script
-        ~spendable ~delegatable >>=? fun ctxt ->
-      Fees.origination_burn ctxt ~payer contract >>=? fun (ctxt, size, fees) ->
-      let result =
-        Origination_result
-          { balance_updates =
-              cleanup_balance_updates
-                [ Contract payer, Debited fees ;
-                  Contract source, Debited credit ;
-                  Contract contract, Credited credit ] ;
-            originated_contracts = [ contract ] ;
-            consumed_gas = gas_difference before_operation ctxt ;
-            storage_size_diff = size } in
-      return (ctxt, result)
-  | Delegation delegate ->
-      set_delegate ctxt source delegate >>=? fun ctxt ->
-      return (ctxt, Delegation_result)
-
-let apply_internal_manager_operations ctxt mode ~payer ops =
-  let rec apply ctxt applied worklist =
-    match worklist with
-    | [] -> Lwt.return (Ok (ctxt, applied))
-    | { source ; operation ; nonce } as op :: rest ->
-        begin if internal_nonce_already_recorded ctxt nonce then
-            fail (Internal_operation_replay op)
-          else
-            let ctxt = record_internal_nonce ctxt nonce in
-            apply_manager_operation_content ctxt mode ~source ~payer ~internal:true operation
-        end >>= function
-        | Error errors ->
-            let result = Internal op, Failed errors in
-            let skipped = List.rev_map (fun op -> Internal op, Skipped) rest in
-            Lwt.return (Error (skipped @ (result :: applied)))
-        | Ok (ctxt, (Transaction_result { operations = emitted ; _ } as result)) ->
-            apply ctxt ((Internal op, Applied result) :: applied) (rest @ emitted)
-        | Ok (ctxt, result) ->
-            apply ctxt ((Internal op, Applied result) :: applied) rest in
-  apply ctxt [] ops
-
-let apply_manager_operations ctxt mode source ops =
-  let rec apply ctxt applied ops =
-    match ops with
-    | [] -> Lwt.return (Ok (ctxt, List.rev applied))
-    | operation :: rest ->
-        apply_manager_operation_content ctxt mode ~source ~payer:source ~internal:false operation
-        >>= function
-        | Error errors ->
-            let result = External, Failed errors in
-            let skipped = List.rev_map (fun _ -> External, Skipped) rest in
-            Lwt.return (Error (List.rev (skipped @ (result :: applied))))
-        | Ok (ctxt, result) ->
-            let emitted =
-              match result with
-              | Transaction_result { operations = emitted ; _ } -> emitted
-              | _ -> [] in
-            apply_internal_manager_operations ctxt mode ~payer:source emitted
-            >>= function
-            | Error (results) ->
-                let result = (External, Applied result) in
-                let skipped = List.map (fun _ -> External, Skipped) rest in
-                Lwt.return (Error (List.rev (skipped @ results @ (result :: applied))))
-            | Ok (ctxt, results) ->
-                let result = (External, Applied result) in
-                let applied = results @ (result :: applied) in
-                apply ctxt applied rest in
-  apply ctxt [] ops
-
-let apply_sourced_operation ctxt mode pred_block operation ops =
-  match ops with
-  | Manager_operations { source ; fee ; counter ; operations ; gas_limit ; storage_limit } ->
-      let revealed_public_keys =
-        List.fold_left (fun acc op ->
-            match op with
-            | Reveal pk -> pk :: acc
-            | _ -> acc) [] operations in
-      Contract.must_be_allocated ctxt source >>=? fun () ->
-      Contract.check_counter_increment ctxt source counter >>=? fun () ->
-      begin
-        match revealed_public_keys with
-        | [] -> return ctxt
-        | [pk] ->
-            Contract.reveal_manager_key ctxt source pk
-        | _ :: _ :: _ ->
-            fail Multiple_revelation
-      end >>=? fun ctxt ->
-      Contract.get_manager_key ctxt source >>=? fun public_key ->
-      Operation.check_signature public_key operation >>=? fun () ->
-      Contract.increment_counter ctxt source >>=? fun ctxt ->
-      Contract.spend ctxt source fee >>=? fun ctxt ->
-      add_fees ctxt fee >>=? fun ctxt ->
-      let ctxt = reset_internal_nonce ctxt in
-      Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
-      Lwt.return (Contract.set_storage_limit ctxt storage_limit) >>=? fun ctxt ->
-      apply_manager_operations ctxt mode source operations >>= begin function
-        | Ok (ctxt, operation_results) -> return (ctxt, operation_results)
-        | Error operation_results -> return (ctxt (* backtracked *), operation_results)
-      end >>=? fun (ctxt, operation_results) ->
-      return (ctxt,
-              Manager_operations_result
-                { balance_updates =
-                    cleanup_balance_updates
-                      [ Contract source, Debited fee ;
-                        (* FIXME: add credit to the baker *) ] ;
-                  operation_results })
-  | Consensus_operation content ->
-      apply_consensus_operation_content ctxt
-        pred_block operation content >>=? fun (ctxt, result) ->
-      return (ctxt, Consensus_operation_result result)
-  | Amendment_operation { source ; operation = content } ->
-      Roll.delegate_pubkey ctxt source >>=? fun delegate ->
-      Operation.check_signature delegate operation >>=? fun () ->
-      (* TODO, see how to extract the public key hash after this operation to
-         pass it to apply_delegate_operation_content *)
-      apply_amendment_operation_content ctxt source content >>=? fun ctxt ->
-      return (ctxt, Amendment_operation_result)
-  | Dictator_operation (Activate hash) ->
-      let dictator_pubkey = Constants.dictator_pubkey ctxt in
-      Operation.check_signature dictator_pubkey operation >>=? fun () ->
-      activate ctxt hash >>= fun ctxt ->
-      return (ctxt, Dictator_operation_result)
-  | Dictator_operation (Activate_testchain hash) ->
-      let dictator_pubkey = Constants.dictator_pubkey ctxt in
-      Operation.check_signature dictator_pubkey operation >>=? fun () ->
-      let expiration = (* in two days maximum... *)
-        Time.add (Timestamp.current ctxt) (Int64.mul 48L 3600L) in
-      fork_test_chain ctxt hash expiration >>= fun ctxt ->
-      return (ctxt, Dictator_operation_result)
-
-let apply_anonymous_operation ctxt kind =
-  match kind with
-  | Seed_nonce_revelation { level ; nonce } ->
+      return (ctxt, Single_result (Endorsements_result (delegate, slots)))
+  | Single (Seed_nonce_revelation { level ; nonce }) ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
       let seed_nonce_revelation_tip =
         Constants.seed_nonce_revelation_tip ctxt in
       add_rewards ctxt seed_nonce_revelation_tip >>=? fun ctxt ->
-      return (ctxt, Seed_nonce_revelation_result [(* FIXME *)])
-  | Double_endorsement_evidence { op1 ; op2 } -> begin
-      match op1.contents, op2.contents with
-      | Sourced_operation (Consensus_operation (Endorsements e1)),
-        Sourced_operation (Consensus_operation (Endorsements e2))
+      return (ctxt, Single_result (Seed_nonce_revelation_result [(* FIXME *)]))
+  | Single (Double_endorsement_evidence { op1 ; op2 }) -> begin
+      match op1.protocol_data.contents, op2.protocol_data.contents with
+      | Single (Endorsements e1),
+        Single (Endorsements e2)
         when Raw_level.(e1.level = e2.level) &&
              not (Block_hash.equal e1.block e2.block) ->
           let level = Level.from_raw ctxt e1.level in
@@ -670,10 +681,10 @@ let apply_anonymous_operation ctxt kind =
             | Ok v -> v
             | Error _ -> Tez.zero in
           add_rewards ctxt reward >>=? fun ctxt ->
-          return (ctxt, Double_endorsement_evidence_result [(* FIXME *)])
+          return (ctxt, Single_result (Double_endorsement_evidence_result [(* FIXME *)]))
       | _, _ -> fail Invalid_double_endorsement_evidence
     end
-  | Double_baking_evidence { bh1 ; bh2 } ->
+  | Single (Double_baking_evidence { bh1 ; bh2 }) ->
       let hash1 = Block_header.hash bh1 in
       let hash2 = Block_header.hash bh2 in
       fail_unless
@@ -697,10 +708,10 @@ let apply_anonymous_operation ctxt kind =
              last = oldest_level }) >>=? fun () ->
       let level = Level.from_raw ctxt raw_level in
       Roll.baking_rights_owner
-        ctxt level ~priority:bh1.protocol_data.priority >>=? fun delegate1 ->
+        ctxt level ~priority:bh1.protocol_data.contents.priority >>=? fun delegate1 ->
       Baking.check_signature bh1 delegate1 >>=? fun () ->
       Roll.baking_rights_owner
-        ctxt level ~priority:bh2.protocol_data.priority >>=? fun delegate2 ->
+        ctxt level ~priority:bh2.protocol_data.contents.priority >>=? fun delegate2 ->
       Baking.check_signature bh2 delegate2 >>=? fun () ->
       fail_unless
         (Signature.Public_key.equal delegate1 delegate2)
@@ -716,40 +727,51 @@ let apply_anonymous_operation ctxt kind =
         | Ok v -> v
         | Error _ -> Tez.zero in
       add_rewards ctxt reward >>=? fun ctxt ->
-      return (ctxt, Double_baking_evidence_result [(* FIXME *)])
-  | Activation { id = pkh ; secret } ->
-      let h_pkh = Unclaimed_public_key_hash.of_ed25519_pkh pkh in
-      Commitment.get_opt ctxt h_pkh >>=? function
+      return (ctxt, Single_result (Double_baking_evidence_result [(* FIXME *)]))
+  | Single (Activate_account { id = pkh ; activation_code }) -> begin
+      let blinded_pkh =
+        Blinded_public_key_hash.of_ed25519_pkh activation_code pkh in
+      Commitment.get_opt ctxt blinded_pkh >>=? function
       | None -> fail (Invalid_activation { pkh })
-      | Some { blinded_public_key_hash = blinded_pkh ; amount } ->
-          let submitted_bpkh = Blinded_public_key_hash.of_ed25519_pkh secret pkh in
-          fail_unless
-            Blinded_public_key_hash.(blinded_pkh = submitted_bpkh)
-            Wrong_activation_secret >>=? fun () ->
-          Commitment.delete ctxt h_pkh >>=? fun ctxt ->
+      | Some amount ->
+          Commitment.delete ctxt blinded_pkh >>=? fun ctxt ->
           Contract.(credit ctxt (implicit_contract (Signature.Ed25519 pkh)) amount) >>=? fun ctxt ->
-          return (ctxt, Activation_result [(* FIXME *)])
+          return (ctxt, Single_result (Activate_account_result [(* FIXME *)]))
+    end
+  | Single (Proposals { source ; period ; proposals }) ->
+      Roll.delegate_pubkey ctxt source >>=? fun delegate ->
+      Operation.check_signature delegate operation >>=? fun () ->
+      let level = Level.current ctxt in
+      fail_unless Voting_period.(level.voting_period = period)
+        (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
+      Amendment.record_proposals ctxt source proposals >>=? fun ctxt ->
+      return (ctxt, Single_result Proposals_result)
+  | Single (Ballot { source ; period ; proposal ; ballot }) ->
+      Roll.delegate_pubkey ctxt source >>=? fun delegate ->
+      Operation.check_signature delegate operation >>=? fun () ->
+      let level = Level.current ctxt in
+      fail_unless Voting_period.(level.voting_period = period)
+        (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
+      Amendment.record_ballot ctxt source proposal ballot >>=? fun ctxt ->
+      return (ctxt, Single_result Ballot_result)
+  | Single (Manager_operation _) as op ->
+      precheck_manager_contents_list ctxt operation op >>=? fun ctxt ->
+      apply_manager_contents_list ctxt mode op >>= fun (ctxt, result) ->
+      return (ctxt, result)
+  | Cons (Manager_operation _, _) as op ->
+      precheck_manager_contents_list ctxt operation op >>=? fun ctxt ->
+      apply_manager_contents_list ctxt mode op >>= fun (ctxt, result) ->
+      return (ctxt, result)
 
 let apply_operation ctxt mode pred_block hash operation =
-  let ctxt = Contract.init_origination_nonce ctxt hash  in
-  begin match operation.contents with
-    | Anonymous_operations ops ->
-        fold_left_s
-          (fun (ctxt, acc) op ->
-             apply_anonymous_operation ctxt op >>=? fun (ctxt, result) ->
-             return (ctxt, result :: acc))
-          (ctxt, []) ops
-        >>=? fun (ctxt, results) ->
-        return (ctxt, Anonymous_operations_result (List.rev results))
-    | Sourced_operation ops ->
-        apply_sourced_operation ctxt mode pred_block operation ops
-        >>=? fun (ctxt, result) ->
-        return (ctxt, Sourced_operation_result result)
-  end >>=? fun (ctxt, result) ->
+  let ctxt = Contract.init_origination_nonce ctxt hash in
+  apply_contents_list
+    ctxt mode pred_block operation
+    operation.protocol_data.contents >>=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
   let ctxt = Contract.set_storage_unlimited ctxt in
   let ctxt = Contract.unset_origination_nonce ctxt in
-  return (ctxt, result)
+  return (ctxt, { contents = result })
 
 let may_snapshot_roll ctxt =
   let level = Alpha_context.Level.current ctxt in
@@ -774,15 +796,10 @@ let may_start_new_cycle ctxt =
       return ctxt
 
 let begin_full_construction ctxt pred_timestamp protocol_data =
-  Lwt.return
-    (Block_header.parse_unsigned_protocol_data
-       protocol_data) >>=? fun protocol_data ->
   Baking.check_baking_rights
     ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
-  let delegate_pkh = Signature.Public_key.hash delegate_pk in
-  Baking.freeze_baking_deposit ctxt protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, protocol_data, delegate_pk, deposit)
+  return (ctxt, protocol_data, delegate_pk)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
@@ -793,25 +810,29 @@ let begin_application ctxt block_header pred_timestamp =
   Baking.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
   Baking.check_baking_rights
-    ctxt block_header.protocol_data pred_timestamp >>=? fun delegate_pk ->
+    ctxt block_header.protocol_data.contents pred_timestamp >>=? fun delegate_pk ->
   Baking.check_signature block_header delegate_pk >>=? fun () ->
   let has_commitment =
-    match block_header.protocol_data.seed_nonce_hash with
+    match block_header.protocol_data.contents.seed_nonce_hash with
     | None -> false
     | Some _ -> true in
   fail_unless
     Compare.Bool.(has_commitment = current_level.expected_commitment)
     (Invalid_commitment
        { expected = current_level.expected_commitment }) >>=? fun () ->
-  let delegate_pkh = Signature.Public_key.hash delegate_pk in
-  Baking.freeze_baking_deposit ctxt
-    block_header.protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, delegate_pk, deposit)
+  return (ctxt, delegate_pk)
 
 let finalize_application ctxt protocol_data delegate =
-  let block_reward = Constants.block_reward ctxt in
-  add_rewards ctxt block_reward >>=? fun ctxt ->
+  let deposit = Constants.block_security_deposit ctxt in
+  add_deposit ctxt delegate deposit >>=? fun ctxt ->
+  add_rewards ctxt (Constants.block_reward ctxt) >>=? fun ctxt ->
+  Signature.Public_key_hash.Map.fold
+    (fun delegate deposit ctxt ->
+       ctxt >>=? fun ctxt ->
+       Delegate.freeze_deposit ctxt delegate deposit)
+    (get_deposits ctxt)
+    (return ctxt) >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
   let fees = Alpha_context.get_fees ctxt in
   Delegate.freeze_fees ctxt delegate fees >>=? fun ctxt ->
@@ -831,23 +852,3 @@ let finalize_application ctxt protocol_data delegate =
   may_start_new_cycle ctxt >>=? fun ctxt ->
   Amendment.may_start_new_voting_cycle ctxt >>=? fun ctxt ->
   return ctxt
-
-let compare_operations op1 op2 =
-  match op1.contents, op2.contents with
-  | Anonymous_operations _, Anonymous_operations _ -> 0
-  | Anonymous_operations _, Sourced_operation _ -> -1
-  | Sourced_operation _, Anonymous_operations _ -> 1
-  | Sourced_operation op1, Sourced_operation op2 ->
-      match op1, op2 with
-      | Consensus_operation _, (Amendment_operation _ | Manager_operations _ | Dictator_operation _) -> -1
-      | (Amendment_operation _ | Manager_operations _ | Dictator_operation _), Consensus_operation _ -> 1
-      | Amendment_operation _, (Manager_operations _ | Dictator_operation _) -> -1
-      | (Manager_operations _ | Dictator_operation _), Amendment_operation _ -> 1
-      | Manager_operations _, Dictator_operation _ -> -1
-      | Dictator_operation _, Manager_operations _ -> 1
-      | Consensus_operation _, Consensus_operation _ -> 0
-      | Amendment_operation _, Amendment_operation _ -> 0
-      | Manager_operations op1, Manager_operations op2 ->
-          (* Manager operations with smaller counter are pre-validated first. *)
-          Int32.compare op1.counter op2.counter
-      | Dictator_operation _, Dictator_operation _ -> 0

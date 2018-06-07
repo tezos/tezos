@@ -216,6 +216,9 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
     | String `Variable ->
         let length = String.length value in
         Atom.fixed_kind_string length state value
+    | Padded (e, n) ->
+        write_rec e state value ;
+        Atom.fixed_kind_string n state (String.make n '\000')
     | RangedInt { minimum ; maximum } ->
         Atom.ranged_int ~minimum ~maximum state value
     | RangedFloat { minimum ; maximum } ->
@@ -226,30 +229,30 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
         Array.iter (write_rec e state) value
     | List e ->
         List.iter (write_rec e state) value
-    | Obj (Req (_, e)) -> write_rec e state value
-    | Obj (Opt (`Dynamic, _, e)) -> begin
+    | Obj (Req { encoding = e }) -> write_rec e state value
+    | Obj (Opt { kind = `Dynamic ; encoding = e }) -> begin
         match value with
         | None -> Atom.bool state false
         | Some value -> Atom.bool state true ; write_rec e state value
       end
-    | Obj (Opt (`Variable, _, e)) -> begin
+    | Obj (Opt { kind = `Variable ; encoding = e }) -> begin
         match value with
         | None -> ()
         | Some value -> write_rec e state value
       end
-    | Obj (Dft (_, e, _)) -> write_rec e state value
-    | Objs (_, e1, e2) ->
+    | Obj (Dft { encoding = e }) -> write_rec e state value
+    | Objs { left ; right } ->
         let (v1, v2) = value in
-        write_rec e1 state v1 ;
-        write_rec e2 state v2
+        write_rec left state v1 ;
+        write_rec right state v2
     | Tup e -> write_rec e state value
-    | Tups (_, e1, e2) ->
+    | Tups { left ; right } ->
         let (v1, v2) = value in
-        write_rec e1 state v1 ;
-        write_rec e2 state v2
+        write_rec left state v1 ;
+        write_rec right state v2
     | Conv { encoding = e ; proj } ->
         write_rec e state (proj value)
-    | Union (_, sz, cases) ->
+    | Union { tag_size ; cases } ->
         let rec write_case = function
           | [] -> raise No_case_matched
           | Case { tag = Json_only } :: tl -> write_case tl
@@ -257,7 +260,7 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
               match proj value with
               | None -> write_case tl
               | Some value ->
-                  Atom.tag sz state tag ;
+                  Atom.tag tag_size state tag ;
                   write_rec e state value in
         write_case cases
     | Dynamic_size { kind ; encoding = e }  ->
@@ -272,9 +275,8 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
     | Check_size { limit ; encoding = e } ->
         write_with_limit limit e state value
     | Describe { encoding = e } -> write_rec e state value
-    | Def { encoding = e } -> write_rec e state value
     | Splitted { encoding = e } -> write_rec e state value
-    | Mu (_, _, self) -> write_rec (self e) state value
+    | Mu { fix } -> write_rec (fix e) state value
     | Delayed f -> write_rec (f ()) state value
 
 and write_with_limit : type a. int -> a Encoding.t -> state -> a -> unit =

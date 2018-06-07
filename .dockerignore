@@ -25,6 +25,7 @@ scripts/create_genesis/src
 docs/introduction/readme.rst
 docs/api/errors.rst
 docs/api/rpc.rst
+docs/api/p2p.rst
 
 src/bin_client/test/LOG.*
 

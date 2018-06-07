@@ -24,6 +24,8 @@ let port_arg () =
          with Failure _ ->
            failwith "Invalid peer-to-peer port"))
 
+let pp_connection_info ppf conn = P2p_connection.Info.pp (fun _ _ -> ()) ppf conn
+
 let commands () =
   let open Clic in
   let addr_parameter =
@@ -34,20 +36,20 @@ let commands () =
     command ~group ~desc: "show global network status"
       no_options
       (prefixes ["p2p" ; "stat"] stop) begin fun () (cctxt : #Client_context.full) ->
-      P2p_services.stat cctxt >>=? fun stat ->
-      P2p_services.Connections.list cctxt >>=? fun conns ->
-      P2p_services.Peers.list cctxt >>=? fun peers ->
-      P2p_services.Points.list cctxt >>=? fun points ->
+      Shell_services.P2p.stat cctxt >>=? fun stat ->
+      Shell_services.P2p.Connections.list cctxt >>=? fun conns ->
+      Shell_services.P2p.Peers.list cctxt >>=? fun peers ->
+      Shell_services.P2p.Points.list cctxt >>=? fun points ->
       cctxt#message "GLOBAL STATS" >>= fun () ->
       cctxt#message "  %a" P2p_stat.pp stat >>= fun () ->
       cctxt#message "CONNECTIONS" >>= fun () ->
       let incoming, outgoing =
         List.partition (fun c -> c.P2p_connection.Info.incoming) conns in
       Lwt_list.iter_s begin fun conn ->
-        cctxt#message "  %a" P2p_connection.Info.pp conn
+        cctxt#message "  %a" pp_connection_info conn
       end incoming >>= fun () ->
       Lwt_list.iter_s begin fun conn ->
-        cctxt#message "  %a" P2p_connection.Info.pp conn
+        cctxt#message "  %a" pp_connection_info conn
       end outgoing >>= fun () ->
       cctxt#message "KNOWN PEERS" >>= fun () ->
       Lwt_list.iter_s begin fun (p, pi) ->

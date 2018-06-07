@@ -504,7 +504,15 @@ module P2p_reader = struct
 
     | Get_current_head chain_id ->
         may_handle state chain_id @@ fun chain_db ->
-        State.Current_mempool.get chain_db.chain_state >>= fun (head, mempool) ->
+        let { Connection_metadata.disable_mempool } =
+          P2p.connection_remote_metadata chain_db.global_db.p2p state.conn in
+        begin
+          if disable_mempool then
+            Chain.head chain_db.chain_state >>= fun head ->
+            Lwt.return (State.Block.header head, Mempool.empty)
+          else
+            State.Current_mempool.get chain_db.chain_state
+        end >>= fun (head, mempool) ->
         (* TODO bound the sent mempool size *)
         ignore
         @@ P2p.try_send global_db.p2p state.conn
@@ -515,7 +523,17 @@ module P2p_reader = struct
         may_handle state chain_id @@ fun chain_db ->
         let head = Block_header.hash header in
         State.Block.known_invalid chain_db.chain_state head >>= fun known_invalid ->
+        let { Connection_metadata.disable_mempool } =
+          P2p.connection_local_metadata chain_db.global_db.p2p state.conn in
+        let known_invalid =
+          known_invalid ||
+          (disable_mempool && mempool <> Mempool.empty)
+          (* A non-empty mempool was received while mempool is desactivated,
+               so the message is ignored.
+               This should probably warrant a reduction of the sender's score. *)
+        in
         if known_invalid then begin
+          (* Kickban *)
           P2p.greylist_peer global_db.p2p state.gid ;
           Lwt.return_unit (* TODO Kick *)
         end else if Time.(now () < header.shell.timestamp) then begin
@@ -718,7 +736,8 @@ let create disk p2p =
   let db =
     { p2p ; p2p_readers ; disk ;
       active_chains ; protocol_db ;
-      block_input ; operation_input } in
+      block_input ; operation_input ;
+    } in
   P2p.on_new_connection p2p (P2p_reader.run db) ;
   P2p.iter_connections p2p (P2p_reader.run db) ;
   db
@@ -810,10 +829,12 @@ let clear_block chain_db hash n =
   Raw_operation_hashes.clear_all chain_db.operation_hashes_db.table hash n ;
   Raw_block_header.Table.clear_or_cancel chain_db.block_header_db.table hash
 
-let commit_block chain_db hash header operations result =
+let commit_block chain_db hash
+    header header_data operations operations_data result =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
   assert (List.length operations = header.shell.validation_passes) ;
-  State.Block.store chain_db.chain_state header operations result >>=? fun res ->
+  State.Block.store chain_db.chain_state
+    header header_data operations operations_data result >>=? fun res ->
   clear_block chain_db hash header.shell.validation_passes ;
   return res
 
@@ -947,8 +968,26 @@ module Advertise = struct
   let current_head chain_db ?peer ?(mempool = Mempool.empty) head =
     let chain_id = State.Chain.id chain_db.chain_state in
     assert (Chain_id.equal chain_id (State.Block.chain_id head)) ;
-    send chain_db ?peer @@
-    Current_head (chain_id, State.Block.header head, mempool)
+    let msg_mempool =
+      Message.Current_head (chain_id, State.Block.header head, mempool) in
+    if mempool = Mempool.empty then
+      send chain_db ?peer msg_mempool
+    else
+      let msg_disable_mempool =
+        Message.Current_head (chain_id, State.Block.header head, Mempool.empty) in
+      let send_mempool state =
+        let { Connection_metadata.disable_mempool } =
+          P2p.connection_remote_metadata chain_db.global_db.p2p state.conn in
+        let msg = if disable_mempool then msg_disable_mempool else msg_mempool in
+        ignore @@ P2p.try_send chain_db.global_db.p2p state.conn msg
+      in
+      match peer with
+      | Some receiver_id ->
+          let state = P2p_peer.Table.find chain_db.active_connections receiver_id in
+          send_mempool state
+      | None ->
+          List.iter (fun (_receiver_id, state) -> send_mempool state)
+            (P2p_peer.Table.fold (fun k v acc -> (k,v)::acc) chain_db.active_connections [])
 
   let current_branch ?peer chain_db =
     let chain_id = State.Chain.id chain_db.chain_state in

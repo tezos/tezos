@@ -394,6 +394,7 @@ let strings_of_prims expr =
 
 let prim_encoding =
   let open Data_encoding in
+  def "michelson.v1.primitives" @@
   string_enum [
     ("parameter", K_parameter) ;
     ("storage", K_storage) ;

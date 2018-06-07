@@ -14,8 +14,6 @@ open Misc
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
-type error += Cannot_freeze_baking_deposit (* `Permanent *)
-type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Empty_endorsement
 type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
@@ -63,26 +61,6 @@ let () =
                      (req "provided" int16))
     (function Invalid_endorsement_slot (m, g)   -> Some (m, g) | _ -> None)
     (fun (m, g) -> Invalid_endorsement_slot (m, g)) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.cannot_freeze_baking_deposit"
-    ~title:"Cannot freeze baking deposit"
-    ~description:
-      "Impossible to debit the required tokens on the baker's contract"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot freeze the baking deposit")
-    Data_encoding.unit
-    (function Cannot_freeze_baking_deposit -> Some () | _ -> None)
-    (fun () -> Cannot_freeze_baking_deposit) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.cannot_freeze_endorsement_deposit"
-    ~title:"Cannot freeze endorsement deposit"
-    ~description:
-      "Impossible to debit the required tokens on the endorser's contract"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot freeze the endorsement deposit")
-    Data_encoding.unit
-    (function Cannot_freeze_endorsement_deposit -> Some () | _ -> None)
-    (fun () -> Cannot_freeze_endorsement_deposit) ;
   register_error_kind
     `Permanent
     ~id:"baking.inconsisten_endorsement"
@@ -151,19 +129,17 @@ let minimal_time c priority pred_timestamp =
     (cumsum_time_between_blocks
        pred_timestamp (Constants.time_between_blocks c) (Int32.succ priority))
 
-let freeze_baking_deposit ctxt { Block_header.priority ; _ } delegate =
-  if Compare.Int.(priority >= Constants.first_free_baking_slot ctxt)
-  then return (ctxt, Tez.zero)
+let earlier_predecessor_timestamp ctxt level =
+  let current = Level.current ctxt in
+  let current_timestamp = Timestamp.current ctxt in
+  let gap = Level.diff level current in
+  let step = List.hd (Constants.time_between_blocks ctxt) in
+  if Compare.Int32.(gap < 1l) then
+    failwith "Baking.earlier_block_timestamp: past block."
   else
-    let deposit = Constants.block_security_deposit ctxt in
-    Delegate.freeze_deposit ctxt delegate deposit
-    |> trace Cannot_freeze_baking_deposit >>=? fun ctxt ->
-    return (ctxt, deposit)
-
-let freeze_endorsement_deposit ctxt delegate =
-  let deposit = Constants.endorsement_security_deposit ctxt in
-  Delegate.freeze_deposit ctxt delegate deposit
-  |> trace Cannot_freeze_endorsement_deposit
+    Lwt.return (Period.mult (Int32.pred gap) step) >>=? fun delay ->
+    Lwt.return Timestamp.(current_timestamp +? delay) >>=? fun result ->
+    return result
 
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp >>=? fun minimal_time ->
@@ -191,17 +167,15 @@ let check_endorsements_rights c level slots =
         (Inconsistent_endorsement (List.map Signature.Public_key.hash all_delegates)) >>=? fun () ->
       return delegate
 
-let paying_priorities c =
-  0 --> (Constants.first_free_baking_slot c - 1)
+type error += Incorrect_priority
 
-type error += Incorect_priority
-
-let endorsement_reward ctxt ~block_priority:prio =
+let endorsement_reward ctxt ~block_priority:prio n =
   if Compare.Int.(prio >= 0)
   then
     Lwt.return
-      Tez.(Constants.endorsement_reward ctxt /? (Int64.(succ (of_int prio))))
-  else fail Incorect_priority
+      Tez.(Constants.endorsement_reward ctxt /? (Int64.(succ (of_int prio)))) >>=? fun tez ->
+    Lwt.return Tez.(tez *? Int64.of_int n)
+  else fail Incorrect_priority
 
 let baking_priorities c level =
   let rec f priority =
@@ -234,7 +208,7 @@ let select_delegate delegate delegate_list max_priority =
 
 let first_baking_priorities
     ctxt
-    ?(max_priority = Constants.first_free_baking_slot ctxt)
+    ?(max_priority = 32)
     delegate level =
   baking_priorities ctxt level >>=? fun delegate_list ->
   select_delegate delegate delegate_list max_priority
@@ -251,25 +225,29 @@ let check_hash hash stamp_threshold =
   let word = MBytes.get_int64 bytes 0 in
   Compare.Uint64.(word <= stamp_threshold)
 
-let check_header_proof_of_work_stamp shell protocol_data stamp_threshold =
+let check_header_proof_of_work_stamp shell contents stamp_threshold =
   let hash =
     Block_header.hash
-      { shell ; protocol_data ; signature = Signature.zero } in
+      { shell ; protocol_data = { contents ; signature = Signature.zero } } in
   check_hash hash stamp_threshold
 
 let check_proof_of_work_stamp ctxt block =
   let proof_of_work_threshold = Constants.proof_of_work_threshold ctxt in
   if check_header_proof_of_work_stamp
       block.Block_header.shell
-      block.protocol_data
+      block.protocol_data.contents
       proof_of_work_threshold then
     return ()
   else
     fail Invalid_stamp
 
 let check_signature block key =
-  let check_signature key { Block_header.protocol_data ; shell ; signature } =
-    let unsigned_header = Block_header.forge_unsigned shell protocol_data in
+  let check_signature key
+      { Block_header.shell ; protocol_data = { contents ; signature } } =
+    let unsigned_header =
+      Data_encoding.Binary.to_bytes_exn
+        Block_header.unsigned_encoding
+        (shell, contents) in
     Signature.check ~watermark:Block_header key signature unsigned_header in
   if check_signature key block then
     return ()

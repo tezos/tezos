@@ -37,11 +37,10 @@ init_sandboxed_client() {
   ],
   "dictator_pubkey":
     "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
-  "time_between_blocks" : [ 1, 0 ],
+  "time_between_blocks" : [ "1", "0" ],
   "blocks_per_roll_snapshot" : 4,
   "blocks_per_cycle" : 8,
-  "preserved_cycles" : 2,
-  "first_free_baking_slot" : 4
+  "preserved_cycles" : 2
 }
 EOF
     fi
@@ -57,10 +56,10 @@ cleanup_clients() {
 
 wait_for_the_node_to_be_ready() {
     local count=0
-    if $client rpc call blocks/head/hash >/dev/null 2>&1; then return; fi
+    if $client rpc get /chains/main/blocks/head/hash >/dev/null 2>&1; then return; fi
     printf "Waiting for the node to initialize..."
     sleep 1
-    while ! $client rpc call blocks/head/hash >/dev/null 2>&1
+    while ! $client rpc get /chains/main/blocks/head/hash >/dev/null 2>&1
     do
         count=$((count+1))
         if [ "$count" -ge 30 ]; then
@@ -230,7 +229,7 @@ activate_alpha() {
         with fitness 1 \
         and key dictator \
 	and parameters "${parameters_file}" \
-        --timestamp $(date --utc --date="@$(($(date +%s) - 3600))" +"%FT%TZ")
+        --timestamp $(TZ='AAA+1' date +%FT%TZ)
 
 }
 
@@ -288,7 +287,7 @@ main () {
     cat <<EOF
 if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias tezos-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key dictator and parameters $parameters_file --timestamp $(date +%FT%TZ --utc --date="1 hour ago")" ;
+alias tezos-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key dictator and parameters $parameters_file --timestamp $(TZ='AAA+1' date +%FT%TZ)" ;
 alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha tezos-client-reset" ;
 alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 trap tezos-client-reset EXIT ;
@@ -301,7 +300,7 @@ The client is now properly initialized. In the rest of this shell
 session, you might now run \`tezos-client\` to communicate with a
 tezos node launched with \`launch-sandboxed-node $1\`. For instance:
 
-  tezos-client rpc call blocks/head/protocol
+  tezos-client rpc get /chains/main/blocks/head/metadata/protocol_hash
 
 Note: if the current protocol version, as reported by the previous
 command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you

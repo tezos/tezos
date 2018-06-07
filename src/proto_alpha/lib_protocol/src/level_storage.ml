@@ -56,14 +56,23 @@ let last_level_in_cycle ctxt c =
   | None -> assert false
   | Some x -> x
 
-let levels_in_cycle ctxt c =
-  let first = first_level_in_cycle ctxt c in
+let levels_in_cycle ctxt cycle =
+  let first = first_level_in_cycle ctxt cycle in
   let rec loop n acc =
     if Cycle_repr.(n.cycle = first.cycle)
     then loop (succ ctxt n) (n :: acc)
     else acc
   in
   loop first []
+
+let levels_in_current_cycle ctxt ?(offset = 0l) () =
+  let current_cycle = Cycle_repr.to_int32 (current ctxt).cycle in
+  let cycle = Int32.add current_cycle offset in
+  if Compare.Int32.(cycle < 0l) then
+    []
+  else
+    let cycle = Cycle_repr.of_int32_exn cycle in
+    levels_in_cycle ctxt cycle
 
 let levels_with_commitments_in_cycle ctxt c =
   let first = first_level_in_cycle ctxt c in

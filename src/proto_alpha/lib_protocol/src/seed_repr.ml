@@ -14,7 +14,7 @@ type t = T of State_hash.t
 type sequence = S of State_hash.t
 type nonce = MBytes.t
 
-let nonce_encoding = Data_encoding.bytes
+let nonce_encoding = Data_encoding.Fixed.bytes Constants_repr.nonce_length
 
 let init = "1234567890123456789012"
 let zero_bytes = MBytes.of_string (String.make Nonce_hash.size '\000')

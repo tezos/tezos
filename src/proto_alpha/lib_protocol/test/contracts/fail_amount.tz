@@ -1,6 +1,0 @@
-# Fail if the amount transferred is less than 10
-parameter unit;
-storage unit;
-code { DROP;
-       AMOUNT; PUSH mutez 10000000; CMPGT; IF {FAIL} {};
-       UNIT; NIL operation; PAIR}

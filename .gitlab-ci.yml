@@ -217,16 +217,6 @@ test:inject.sh:
   script:
     - jbuilder build @src/bin_client/runtest_injection.sh
 
-test:inject_alpha.sh:
-  <<: *test_definition
-  script:
-    - jbuilder build @src/bin_client/runtest_injection_alpha.sh
-
-test:fork.sh:
-  <<: *test_definition
-  script:
-    - jbuilder build @src/bin_client/runtest_fork.sh
-
 test:proto:sandbox:
   <<: *test_definition
   script:

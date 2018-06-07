@@ -180,6 +180,10 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
     | String (`Fixed n) -> Atom.fixed_length_string n state
     | String `Variable ->
         Atom.fixed_length_string state.remaining_bytes state
+    | Padded (e, n) ->
+        let v = read_rec e state in
+        ignore (Atom.fixed_length_string n state : string) ;
+        v
     | RangedInt { minimum ; maximum }  ->
         Atom.ranged_int ~minimum ~maximum state
     | RangedFloat { minimum ; maximum } ->
@@ -190,48 +194,48 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
         let l = read_list e state in
         Array.of_list l
     | List e -> read_list e state
-    | (Obj (Req (_, e))) -> read_rec e state
-    | (Obj (Dft (_, e, _))) -> read_rec e state
-    | (Obj (Opt (`Dynamic, _, e))) ->
+    | (Obj (Req { encoding = e })) -> read_rec e state
+    | (Obj (Dft { encoding = e })) -> read_rec e state
+    | (Obj (Opt { kind = `Dynamic ; encoding = e })) ->
         let present = Atom.bool state in
         if not present then
           None
         else
           Some (read_rec e state)
-    | (Obj (Opt (`Variable, _, e))) ->
+    | (Obj (Opt { kind = `Variable ; encoding = e })) ->
         if state.remaining_bytes = 0 then
           None
         else
           Some (read_rec e state)
-    | Objs (`Fixed sz, e1, e2) ->
+    | Objs { kind = `Fixed sz ; left ; right } ->
         ignore (check_remaining_bytes state sz : int) ;
         ignore (check_allowed_bytes state sz : int option) ;
-        let left = read_rec e1 state in
-        let right = read_rec e2 state in
+        let left = read_rec left state in
+        let right = read_rec right state in
         (left, right)
-    | Objs (`Dynamic, e1, e2) ->
-        let left = read_rec e1 state in
-        let right = read_rec e2 state in
+    | Objs { kind = `Dynamic ; left ; right } ->
+        let left = read_rec left state in
+        let right = read_rec right state in
         (left, right)
-    | (Objs (`Variable, e1, e2)) ->
-        read_variable_pair e1 e2 state
+    | Objs { kind = `Variable ; left ; right } ->
+        read_variable_pair left right state
     | Tup e -> read_rec e state
-    | Tups (`Fixed sz, e1, e2) ->
+    | Tups { kind = `Fixed sz ; left ; right } ->
         ignore (check_remaining_bytes state sz : int) ;
         ignore (check_allowed_bytes state sz : int option) ;
-        let left = read_rec e1 state in
-        let right = read_rec e2 state in
+        let left = read_rec left state in
+        let right = read_rec right state in
         (left, right)
-    | Tups (`Dynamic, e1, e2) ->
-        let left = read_rec e1 state in
-        let right = read_rec e2 state in
+    | Tups { kind = `Dynamic ; left ; right } ->
+        let left = read_rec left state in
+        let right = read_rec right state in
         (left, right)
-    | (Tups (`Variable, e1, e2)) ->
-        read_variable_pair e1 e2 state
+    | Tups { kind = `Variable ; left ; right } ->
+        read_variable_pair left right state
     | Conv { inj ; encoding } ->
         inj (read_rec encoding state)
-    | Union (_, sz, cases) ->
-        let ctag = Atom.tag sz state in
+    | Union { tag_size ; cases } ->
+        let ctag = Atom.tag tag_size state in
         let Case { encoding ; inj } =
           try
             List.find
@@ -271,9 +275,8 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
         state.allowed_bytes <- allowed_bytes ;
         v
     | Describe { encoding = e } -> read_rec e state
-    | Def { encoding = e } -> read_rec e state
     | Splitted { encoding = e } -> read_rec e state
-    | Mu (_, _, self) -> read_rec (self e) state
+    | Mu { fix } -> read_rec (fix e) state
     | Delayed f -> read_rec (f ()) state
 
 

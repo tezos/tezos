@@ -7,14 +7,37 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type operation = Operation_hash.t
-let max_operation_data_length = 42
+type block_header_data = MBytes.t
+type block_header = {
+  shell : Block_header.shell_header ;
+  protocol_data : block_header_data ;
+}
+let block_header_data_encoding =
+  Data_encoding.(obj1 (req "random_data" Variable.bytes))
+
+type block_header_metadata = unit
+let block_header_metadata_encoding = Data_encoding.unit
+
+type operation_data = unit
+let operation_data_encoding = Data_encoding.unit
+
+type operation_receipt = unit
+let operation_receipt_encoding = Data_encoding.unit
+
+let operation_data_and_receipt_encoding =
+  Data_encoding.conv
+    (function ((), ()) -> ())
+    (fun () -> ((), ()))
+    Data_encoding.unit
+
+type operation = {
+  shell: Operation.shell_header ;
+  protocol_data: operation_data ;
+}
 
 let max_block_length = 42
 let validation_passes = []
 let acceptable_passes _op = []
-
-let parse_operation h _ = Ok h
 
 let compare_operations _ _ = 0
 
@@ -57,16 +80,15 @@ end
 let precheck_block
     ~ancestor_context:_
     ~ancestor_timestamp:_
-    raw_block =
-  Fitness.to_int64 raw_block.Block_header.shell.fitness >>=? fun _ ->
+    (_raw_block : block_header) =
   return ()
 
 let begin_application
     ~predecessor_context:context
     ~predecessor_timestamp:_
     ~predecessor_fitness:_
-    raw_block =
-  Fitness.to_int64 raw_block.Block_header.shell.fitness >>=? fun fitness ->
+    (raw_block : block_header) =
+  Fitness.to_int64 raw_block.shell.fitness >>=? fun fitness ->
   return { context ; fitness }
 
 let begin_construction
@@ -82,16 +104,16 @@ let begin_construction
   return { context ; fitness }
 
 let apply_operation ctxt _ =
-  return ctxt
+  return (ctxt, ())
 
 let finalize_block ctxt =
   let fitness = Fitness.get ctxt in
   let message = Some (Format.asprintf "fitness <- %Ld" fitness) in
   let fitness = Fitness.from_int64 fitness in
-  return { Updater.message ; context = ctxt.context ; fitness ;
-           max_operations_ttl = 0 ; max_operation_data_length = 0 ;
-           last_allowed_fork_level = 0l ;
-         }
+  return ({ Updater.message ; context = ctxt.context ; fitness ;
+            max_operations_ttl = 0 ; max_operation_data_length = 0 ;
+            last_allowed_fork_level = 0l ;
+          }, ())
 
 let rpc_services = RPC_directory.empty
 

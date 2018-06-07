@@ -20,7 +20,7 @@ let commands () =
       (fun () blocks (cctxt : #Client_context.full) ->
          iter_s
            (fun block ->
-              Block_services.unmark_invalid cctxt block >>=? fun () ->
+              Shell_services.Invalid_blocks.delete cctxt block >>=? fun () ->
               cctxt#message
                 "Block %a no longer marked invalid."
                 Block_hash.pp block >>= fun () ->

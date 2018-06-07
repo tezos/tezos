@@ -1,9 +1,0 @@
-parameter (list int);
-storage (option int);
-code {CAR; DIP{NONE int};
-      ITER {SWAP;
-            IF_NONE {SOME}
-                    {DIP {DUP}; DUP; DIP{SWAP};
-                     CMPLE; IF {DROP} {DIP {DROP}};
-                     SOME}};
-      NIL operation; PAIR};

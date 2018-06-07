@@ -71,15 +71,19 @@ val first_level: context -> Raw_level_repr.t
 
 val add_fees: context -> Tez_repr.t -> context tzresult Lwt.t
 val add_rewards: context -> Tez_repr.t -> context tzresult Lwt.t
+val add_deposit:
+  context -> Signature.Public_key_hash.t -> Tez_repr.t -> context tzresult Lwt.t
 
 val get_fees: context -> Tez_repr.t
 val get_rewards: context -> Tez_repr.t
+val get_deposits: context -> Tez_repr.t Signature.Public_key_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 
 val set_gas_limit: t -> Z.t -> t tzresult
 val set_gas_unlimited: t -> t
 val gas_level: t -> Gas_limit_repr.t
+val gas_consumed: since: t -> until: t -> Z.t
 val block_gas_level: t -> Z.t
 
 type error += Storage_limit_too_high (* `Permanent *)
@@ -181,6 +185,8 @@ module type T = sig
   (** Internally used in {!Storage_functors} to consume storage from
       within a view. *)
   val record_bytes_stored: context -> Int64.t -> context tzresult
+
+  val description: context Storage_description.t
 
 end
 

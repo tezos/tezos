@@ -7,10 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** The shell's notion of a level: an integer indicating the number of blocks
+    since genesis: genesis is 0, all other blocks have increasing levels from
+    there. *)
 type t
 type raw_level = t
 val encoding: raw_level Data_encoding.t
-val arg: raw_level RPC_arg.arg
+val rpc_arg: raw_level RPC_arg.arg
 val pp: Format.formatter -> raw_level -> unit
 include Compare.S with type t := raw_level
 
@@ -25,9 +28,4 @@ val root: raw_level
 val succ: raw_level -> raw_level
 val pred: raw_level -> raw_level option
 
-module Index : sig
-  type t = raw_level
-  val path_length: int
-  val to_path: t -> string list -> string list
-  val of_path: string list -> t option
-end
+module Index : Storage_description.INDEX with type t = raw_level

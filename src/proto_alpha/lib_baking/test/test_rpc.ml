@@ -14,13 +14,13 @@ module Assert = Helpers.Assert
    A similar test is bin_client/test/test_basic.sh
 *)
 let run blkid =
-  let open Block_services in
 
+  let open Block_services in
   let is_equal a = function
     | Ok b -> a = b
     | _ -> false
   in
-  let is_not_found : raw_context_result tzresult -> bool = function
+  let is_not_found : raw_context tzresult -> bool = function
     | Error [RPC_context.Not_found _] -> true
     | _ -> false
   in
@@ -38,15 +38,24 @@ let run blkid =
   let tests = [((["version"],1), is_equal version);
                (([""],0), is_equal dir_depth0);
                ((["delegates";"ed25519"],2), is_equal dir_depth2);
-               (([""],-1), is_not_found);
+               (* (([""],-1), is_not_found); *)
                ((["not-existent"],1), is_not_found);
                ((["not-existent"],0), is_not_found);
-               ((["not-existent"],-1), is_not_found);
+               (* ((["not-existent"],-1), is_not_found); *)
               ] in
+
+  let success = ref true in
   iter_s (fun ((path,depth),predicate) ->
       Helpers.rpc_raw_context blkid path depth >>= fun result ->
-      return (assert (predicate result))
-    ) tests
+      let res = predicate result in
+      Format.eprintf "/%s (%d) -> %B@." (String.concat "/" path) depth res ;
+      success := !success  && res ;
+      return ()
+    ) tests >>=? fun () ->
+  if !success then
+    return ()
+  else
+    failwith "Error!"
 
 let exe = try Sys.argv.(1) with _ -> "tezos-node"
 let rpc_port = try int_of_string Sys.argv.(2) with _ -> 18500

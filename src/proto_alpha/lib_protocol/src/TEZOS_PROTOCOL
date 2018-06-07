@@ -2,12 +2,12 @@
     "hash": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
     "modules": [
         "Misc",
+        "Storage_description",
         "State_hash",
         "Nonce_hash",
         "Script_expr_hash",
         "Contract_hash",
         "Blinded_public_key_hash",
-        "Unclaimed_public_key_hash",
 
         "Qty_repr",
         "Tez_repr",

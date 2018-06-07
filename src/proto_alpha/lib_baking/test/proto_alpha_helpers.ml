@@ -65,23 +65,22 @@ let protocol_parameters =
     [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
   ],
   "commitments": [
-    [ "tz1MawerETND6bqJqUe4cVBcDZn6Tiahrr2V", "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ],
-    [ "tz1X4maqF9tC1Yn4hzg1w5PLdeKm62qHS64V", "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ],
-    [ "tz1SWBY7rWMutEuWRziDhC72gTGdo29KZaRj", "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428348" ],
-    [ "tz1amUjiZaevaxQy5w26LSf64bs77eNTJ8uY", "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ],
-    [ "tz1Zaee3QBtD4ErY1CpjigTYtX3VxWB6Ft9a", "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ],
-    [ "tz1geDUUhfXK1EMj7LZdP9wfcoAxR3q2QExR", "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ],
-    [ "tz1h3nY7jcZciJgAvgNvzgTnjuejEyiEqFGQ", "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ],
-    [ "tz1VzL4Xrb3fL3ckuPqw8u4H7feMAkF4cesJ", "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ],
-    [ "tz1RUHg536oRKhPLFHi9hit3MKbve91jWjPC", "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ],
-    [ "tz1M1LFbgctcPWxstKs21wgvSYBLUpaRwdx8", "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ]
+    [ "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ],
+    [ "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ],
+    [ "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428348" ],
+    [ "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ],
+    [ "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ],
+    [ "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ],
+    [ "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ],
+    [ "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ],
+    [ "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ],
+    [ "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ]
   ],
-  "time_between_blocks" : [ 1, 0 ],
+  "time_between_blocks" : [ "1", "0" ],
   "blocks_per_cycle" : 4,
   "blocks_per_roll_snapshot" : 2,
   "preserved_cycles" : 1,
-  "first_free_baking_slot" : 4,
-  "proof_of_work_threshold": -1
+  "proof_of_work_threshold": "-1"
 }
 |json} in
   match json_result with
@@ -99,13 +98,12 @@ let vote_protocol_parameters =
     [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
     [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
   ],
-  "time_between_blocks" : [ 1, 0 ],
+  "time_between_blocks" : [ "1", "0" ],
   "blocks_per_cycle" : 4,
   "blocks_per_roll_snapshot" : 2,
   "preserved_cycles" : 1,
-  "first_free_baking_slot" : 4,
   "blocks_per_voting_period": 2,
-  "proof_of_work_threshold": -1
+  "proof_of_work_threshold": "-1"
 }
 |json} in
   match json_result with
@@ -146,11 +144,13 @@ let init ?exe ?vote ?rpc_port () =
   activate_alpha ?vote () >>=? fun hash ->
   return (pid, hash)
 
-let level block =
-  Alpha_services.Context.level !rpc_ctxt block
+let level (chain, block) =
+  Alpha_block_services.metadata
+    !rpc_ctxt ~chain ~block () >>=? fun { protocol_data = { level } } ->
+  return level
 
 let rpc_raw_context block path depth =
-  Block_services.raw_context !rpc_ctxt block path depth
+  Shell_services.Blocks.Context.read !rpc_ctxt ~block ~depth path
 
 module Account = struct
 
@@ -254,7 +254,8 @@ module Account = struct
       Tezos_signer_backends.Unencrypted.make_sk account.sk in
     Client_proto_context.transfer
       (new wrap_full (no_write_context !rpc_config ~block))
-      block
+      ~chain:`Main
+      ~block
       ~source:account.contract
       ~src_pk:account.pk
       ~src_sk
@@ -278,7 +279,8 @@ module Account = struct
       Tezos_signer_backends.Unencrypted.make_sk src.sk in
     Client_proto_context.originate_account
       (new wrap_full (no_write_context !rpc_config))
-      block
+      ~chain:`Main
+      ~block
       ~source:src.contract
       ~src_pk:src.pk
       ~src_sk
@@ -299,7 +301,8 @@ module Account = struct
       delegate_opt =
     Client_proto_context.set_delegate
       (new wrap_full (no_write_context ~block !rpc_config))
-      block
+      ~chain:`Main
+      ~block
       ~fee
       contract
       ~src_pk
@@ -309,45 +312,55 @@ module Account = struct
 
   let balance ?(block = `Head 0) (account : t) =
     Alpha_services.Contract.balance !rpc_ctxt
-      block account.contract
+      (`Main, block) account.contract
 
   (* TODO: gather contract related functions in a Contract module? *)
   let delegate ?(block = `Head 0) (contract : Contract.t) =
-    Alpha_services.Contract.delegate_opt !rpc_ctxt block contract
+    Alpha_services.Contract.delegate_opt !rpc_ctxt (`Main, block) contract
 
 end
+
+let sign ?watermark src_sk shell (Contents_list contents) =
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Operation.unsigned_encoding
+      (shell, (Contents_list contents)) in
+  let signature = Some (Signature.sign ?watermark src_sk bytes) in
+  let protocol_data = Operation_data { contents ; signature } in
+  return { shell ; protocol_data }
 
 module Protocol = struct
 
   open Account
 
   let voting_period_kind ?(block = `Head 0) () =
-    Alpha_services.Context.voting_period_kind !rpc_ctxt block
+    Alpha_block_services.metadata
+      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { voting_period_kind } } ->
+    return voting_period_kind
 
   let proposals ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) proposals =
-    Block_services.info !rpc_ctxt block >>=? fun block_info ->
-    Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
-    Alpha_services.Forge.Amendment.proposals !rpc_ctxt block
-      ~branch:block_info.hash
-      ~source:pkh
-      ~period:next_level.voting_period
-      ~proposals
-      () >>=? fun bytes ->
-    let signed_bytes = Signature.append ~watermark:Generic_operation sk bytes in
-    return (Tezos_base.Operation.of_bytes_exn signed_bytes)
+    Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
+    Alpha_services.Helpers.current_level
+      !rpc_ctxt ~offset:1l (`Main, block) >>=? fun next_level ->
+    let shell = { Tezos_base.Operation.branch = hash } in
+    let contents =
+      Proposals { source = pkh ;
+                  period = next_level.voting_period ;
+                  proposals } in
+    sign ~watermark:Generic_operation sk shell (Contents_list (Single contents))
 
   let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
-    Block_services.info !rpc_ctxt block >>=? fun block_info ->
-    Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
-    Alpha_services.Forge.Amendment.ballot !rpc_ctxt block
-      ~branch:block_info.hash
-      ~source:pkh
-      ~period:next_level.voting_period
-      ~proposal
-      ~ballot
-      () >>=? fun bytes ->
-    let signed_bytes = Signature.append ~watermark:Generic_operation sk bytes in
-    return (Tezos_base.Operation.of_bytes_exn signed_bytes)
+    Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
+    Alpha_services.Helpers.current_level
+      !rpc_ctxt ~offset:1l (`Main, block) >>=? fun next_level ->
+    let shell = { Tezos_base.Operation.branch = hash } in
+    let contents =
+      Single
+        (Ballot { source = pkh ;
+                  period = next_level.voting_period ;
+                  proposal ;
+                  ballot }) in
+    sign ~watermark:Generic_operation sk shell (Contents_list contents)
 
 end
 
@@ -414,8 +427,8 @@ module Assert = struct
           begin
             match op with
             | None -> true
-            | Some op ->
-                let h = hash op and h' = hash op' in
+            | Some { shell ; protocol_data = Operation_data protocol_data } ->
+                let h = Operation.hash { shell ; protocol_data } and h' = hash op' in
                 Operation_hash.equal h h'
           end && List.exists (ecoproto_error f) err
       | _ -> false
@@ -473,19 +486,21 @@ module Assert = struct
     end
 
   let check_protocol ?msg ~block h =
-    Block_services.protocol !rpc_ctxt block >>=? fun block_proto ->
+    Block_services.protocols
+      !rpc_ctxt ~block () >>=? fun { next_protocol } ->
     return @@ equal
       ?msg
       ~prn:Protocol_hash.to_b58check
       ~eq:Protocol_hash.equal
-      block_proto h
+      next_protocol h
 
   let check_voting_period_kind ?msg ~block kind =
-    Alpha_services.Context.voting_period_kind !rpc_ctxt block
-    >>=? fun current_kind ->
+    Alpha_block_services.metadata
+      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { voting_period_kind } } ->
     return @@ equal
       ?msg
-      current_kind kind
+      voting_period_kind
+      kind
 
   let is_none ?(msg="") x =
     if x <> None then fail "None" "Some _" msg
@@ -498,7 +513,8 @@ module Baking = struct
 
   let bake block (contract: Account.t) operations =
     let ctxt = (new wrap_full (no_write_context ~block !rpc_config)) in
-    Alpha_services.Context.next_level ctxt block >>=? fun level ->
+    Alpha_services.Helpers.current_level
+      ctxt ~offset:1l (`Main, block) >>=? fun level ->
     let seed_nonce_hash =
       if level.Level.expected_commitment then
         let seed_nonce =
@@ -518,7 +534,7 @@ module Baking = struct
       ~force:true
       ~best_effort:false
       ~sort:false
-      ~priority:(`Auto (contract.pkh, Some 1024, false))
+      ~priority:(`Auto (contract.pkh, Some 1024))
       ?seed_nonce_hash
       ~src_sk
       ()
@@ -531,36 +547,32 @@ module Endorse = struct
       block
       src_sk
       slot =
-    Block_services.info !rpc_ctxt block >>=? fun { hash ; _ } ->
-    Alpha_services.Context.level !rpc_ctxt (`Hash (hash, 0)) >>=? fun level ->
-    Alpha_services.Forge.Consensus.endorsement !rpc_ctxt
-      block
-      ~branch:hash
-      ~block:hash
-      ~level:level.level
-      ~slots:[slot]
-      () >>=? fun bytes ->
-    let signed_bytes = Signature.append ~watermark:Endorsement src_sk bytes in
-    return (Tezos_base.Operation.of_bytes_exn signed_bytes)
+    Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
+    Alpha_block_services.metadata
+      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
+    let level = level.level in
+    let shell = { Tezos_base.Operation.branch = hash } in
+    let contents =
+      Single (Endorsements { block = hash ; level ; slots = [ slot ]}) in
+    sign ~watermark:Endorsement src_sk shell (Contents_list contents)
 
   let signing_slots
-      ?(max_priority = 1024)
       block
       delegate
       level =
-    Alpha_services.Delegate.Endorser.rights_for_delegate
-      !rpc_ctxt ~max_priority ~first_level:level ~last_level:level
-      block delegate >>=? fun possibilities ->
-    let slots =
-      List.map (fun (_,slot) -> slot)
-      @@ List.filter (fun (l, _) -> l = level) possibilities in
-    return slots
+    Alpha_services.Delegate.Endorsing_rights.get
+      !rpc_ctxt ~delegates:[delegate] ~levels:[level]
+      (`Main, block) >>=? function
+    | [{ slots }] -> return slots
+    | _ -> return []
 
   let endorse
       ?slot
       (contract : Account.t)
       block =
-    Alpha_services.Context.level !rpc_ctxt block >>=? fun { level } ->
+    Alpha_block_services.metadata
+      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
+    let level = level.level in
     begin
       match slot with
       | Some slot -> return slot
@@ -578,16 +590,17 @@ module Endorse = struct
   (* FIXME @vb: I don't understand this function, copied from @cago. *)
   let endorsers_list block =
     let get_endorser_list result (account : Account.t) level block =
-      Alpha_services.Delegate.Endorser.rights_for_delegate
-        !rpc_ctxt block account.pkh
-        ~max_priority:16
-        ~first_level:level
-        ~last_level:level >>|? fun slots ->
-      List.iter (fun (_,slot) -> result.(slot) <- account) slots
-    in
+      Alpha_services.Delegate.Endorsing_rights.get
+        !rpc_ctxt (`Main, block)
+        ~delegates:[account.pkh]
+        ~levels:[level] >>|? function
+      | [{ slots }] ->
+          List.iter (fun s -> result.(s) <- account) slots
+      | _ -> () in
     let { Account.b1 ; b2 ; b3 ; b4 ; b5 } = Account.bootstrap_accounts in
-    let result = Array.make 16 b1 in
-    Alpha_services.Context.level !rpc_ctxt block >>=? fun level ->
+    let result = Array.make 32 b1 in
+    Alpha_block_services.metadata
+      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
     let level = level.level in
     get_endorser_list result b1 level block >>=? fun () ->
     get_endorser_list result b2 level block >>=? fun () ->
@@ -597,27 +610,30 @@ module Endorse = struct
     return result
 
   let endorsement_rights
-      ?(max_priority = 1024)
       (contract : Account.t) block =
-    Alpha_services.Context.level !rpc_ctxt block >>=? fun level ->
-    let delegate = contract.pkh in
+    Alpha_block_services.metadata
+      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
     let level = level.level in
-    Alpha_services.Delegate.Endorser.rights_for_delegate
+    let delegate = contract.pkh in
+    Alpha_services.Delegate.Endorsing_rights.get
       !rpc_ctxt
-      ~max_priority
-      ~first_level:level
-      ~last_level:level
-      block delegate
+      ~levels:[level]
+      ~delegates:[delegate]
+      (`Main, block) >>=? function
+    | [{ level ; slots }] -> return (List.map (fun s -> (level, s)) slots)
+    | _ -> return []
 
 end
 
 let display_level block =
-  Alpha_services.Context.level !rpc_ctxt block >>=? fun lvl ->
-  Format.eprintf "Level: %a@." Level.pp_full lvl ;
+  Alpha_block_services.metadata
+    !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
+  Format.eprintf "Level: %a@." Level.pp_full level ;
   return ()
 
 let endorsement_security_deposit block =
-  Constants_services.endorsement_security_deposit !rpc_ctxt block
+  Constants_services.all !rpc_ctxt (`Main, block) >>=? fun c ->
+  return c.parametric.endorsement_security_deposit
 
 let () =
   Client_keys.register_signer

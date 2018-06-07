@@ -1,9 +1,0 @@
-parameter nat;
-storage (list nat);
-code { DUP;                     # Duplicate the storage and parameter
-       CAR;                     # Extract the parameter
-       DIP{CDR};                # Extract the storage
-       DUP;                     # Duplicate the parameter
-       DIP{CONS};               # Add the first instance of the parameter to the list
-       CONS;                    # Add the second instance of the parameter to the list
-       NIL operation; PAIR}     # Finish the calling convention

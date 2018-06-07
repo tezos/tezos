@@ -1,7 +1,0 @@
-parameter (list string);
-storage (list string);
-code { CAR; NIL string; SWAP; PAIR; LEFT (list string);
-       LOOP_LEFT { DUP; CAR; DIP{CDR};
-                   IF_CONS { SWAP; DIP{CONS}; PAIR; LEFT (list string) }
-                           { RIGHT (pair (list string) (list string)) }; };
-       NIL operation; PAIR }

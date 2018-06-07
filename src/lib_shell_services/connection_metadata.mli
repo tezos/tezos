@@ -9,5 +9,10 @@
 
 (** All the metadata associated to a running connection. *)
 
-type t = unit (* TODO *)
+type t = {
+  disable_mempool : bool ;
+  private_node : bool ;
+}
+
 val encoding: t Data_encoding.t
+val pp: Format.formatter -> t -> unit

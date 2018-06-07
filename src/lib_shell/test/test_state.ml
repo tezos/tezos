@@ -76,6 +76,15 @@ let block _state ?(context = Context_hash.zero) ?(operations = []) (pred: State.
     protocol_data = MBytes.of_string name ;
   }
 
+let parsed_block ({ shell ; protocol_data } : Block_header.t) =
+  let protocol_data =
+    Data_encoding.Binary.of_bytes_exn
+      Proto.block_header_data_encoding
+      protocol_data in
+  ({ shell ; protocol_data } : Proto.block_header)
+
+let zero = MBytes.create 0
+
 let build_valid_chain state vtbl pred names =
   Lwt_list.fold_left_s
     (fun pred name ->
@@ -91,11 +100,12 @@ let build_valid_chain state vtbl pred names =
                ~predecessor_context
                ~predecessor_timestamp: pred_header.shell.timestamp
                ~predecessor_fitness: pred_header.shell.fitness
-               block >>=? fun vstate ->
+               (parsed_block block) >>=? fun vstate ->
              (* no operations *)
              Proto.finalize_block vstate
-           end >>=? fun ctxt ->
-           State.Block.store state block [[op]] ctxt >>=? fun _vblock ->
+           end >>=? fun (ctxt, _metadata) ->
+           State.Block.store state
+             block zero [[op]] [[zero]] ctxt >>=? fun _vblock ->
            State.Block.read state hash >>=? fun vblock ->
            Hashtbl.add vtbl name vblock ;
            return vblock
@@ -404,5 +414,5 @@ let wrap (n, f) =
     end
   end
 
-let tests =List.map wrap tests
+let tests = List.map wrap tests
 

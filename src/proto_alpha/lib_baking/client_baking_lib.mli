@@ -13,10 +13,10 @@ open Alpha_context
 (** Mine a block *)
 val bake_block:
   #Proto_alpha.full ->
+  ?chain:Chain_services.chain ->
   Block_services.block ->
   ?force:bool ->
   ?max_priority: int ->
-  ?free_baking: bool ->
   ?minimal_timestamp: bool ->
   ?src_sk:Client_keys.sk_uri ->
   public_key_hash ->
@@ -25,7 +25,6 @@ val bake_block:
 (** Endorse a block *)
 val endorse_block:
   #Proto_alpha.full ->
-  ?max_priority:int ->
   Client_keys.Public_key_hash.t ->
   unit Error_monad.tzresult Lwt.t
 

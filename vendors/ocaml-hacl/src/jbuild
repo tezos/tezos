@@ -22,5 +22,11 @@
                     Hacl_Salsa20
                     NaCl
                     Hacl_Unverified_Random))
-  (c_flags         (-O3 -Wall -Werror -Wfatal-errors))
+  (c_flags         (:include c_flags.sexp))
 ))
+
+; sets flags for 32/64 bits architectures
+(rule
+ ((targets (c_flags.sexp))
+  (deps    (config/discover.exe))
+  (action  (run ${<} -ocamlc ${OCAMLC}))))

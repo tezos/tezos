@@ -17,6 +17,7 @@ type t = {
   timestamp: Time.t ;
   fitness: Int64.t ;
   endorsements_received: Int_set.t ;
+  deposits: Tez_repr.t Signature.Public_key_hash.Map.t ;
   fees: Tez_repr.t ;
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
@@ -78,6 +79,16 @@ let add_rewards ctxt rewards =
   Lwt.return Tez_repr.(ctxt.rewards +? rewards) >>=? fun rewards ->
   return { ctxt with rewards}
 
+let add_deposit ctxt delegate deposit =
+  let previous =
+    try Signature.Public_key_hash.Map.find delegate ctxt.deposits
+    with Not_found -> Tez_repr.zero in
+  Lwt.return Tez_repr.(previous +? deposit) >>=? fun deposit ->
+  let deposits =
+    Signature.Public_key_hash.Map.add delegate deposit ctxt.deposits in
+  return { ctxt with deposits }
+
+let get_deposits ctxt = ctxt.deposits
 let get_rewards ctxt = ctxt.rewards
 let get_fees ctxt = ctxt.fees
 
@@ -143,6 +154,10 @@ let consume_gas ctxt cost =
   ok { ctxt with block_gas ; operation_gas }
 let gas_level ctxt = ctxt.operation_gas
 let block_gas_level ctxt = ctxt.block_gas
+let gas_consumed ~since ~until =
+  match gas_level since, gas_level until with
+  | Limited { remaining = before }, Limited { remaining = after } -> Z.sub before after
+  | _, _ -> Z.zero
 
 type error += Storage_limit_too_high (* `Permanent *)
 
@@ -180,20 +195,24 @@ let storage_error_encoding =
   let open Data_encoding in
   union [
     case (Tag 0)
+      ~title:"Incompatible_protocol_version"
       (obj1 (req "incompatible_protocol_version" string))
       (function Incompatible_protocol_version arg -> Some arg | _ -> None)
       (fun arg -> Incompatible_protocol_version arg) ;
     case (Tag 1)
+      ~title:"Missing_key"
       (obj2
          (req "missing_key" (list string))
          (req "function" (string_enum ["get", `Get ; "set", `Set ; "del", `Del ; "copy", `Copy ])))
       (function Missing_key (key, f) -> Some (key, f) | _ -> None)
       (fun (key, f) -> Missing_key (key, f)) ;
     case (Tag 2)
+      ~title:"Existing_key"
       (obj1 (req "existing_key" (list string)))
       (function Existing_key key -> Some key | _ -> None)
       (fun key -> Existing_key key) ;
     case (Tag 3)
+      ~title:"Corrupted_data"
       (obj1 (req "corrupted_data" (list string)))
       (function Corrupted_data key -> Some key | _ -> None)
       (fun key -> Corrupted_data key) ;
@@ -386,6 +405,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
     endorsements_received = Int_set.empty ;
     fees = Tez_repr.zero ;
     rewards = Tez_repr.zero ;
+    deposits = Signature.Public_key_hash.Map.empty ;
     operation_gas = Unaccounted ;
     block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
     operation_storage = Unaccounted ;
@@ -437,6 +457,7 @@ let register_resolvers enc resolve =
       endorsements_received = Int_set.empty ;
       fees = Tez_repr.zero ;
       rewards = Tez_repr.zero ;
+      deposits = Signature.Public_key_hash.Map.empty ;
       block_gas = Constants_repr.default.hard_gas_limit_per_block ;
       operation_gas = Unaccounted ;
       block_storage = Constants_repr.default.hard_storage_limit_per_block ;
@@ -489,6 +510,8 @@ module type T = sig
   val consume_gas: context -> Gas_limit_repr.cost -> context tzresult
 
   val record_bytes_stored: context -> Int64.t -> context tzresult
+
+  val description: context Storage_description.t
 
 end
 
@@ -563,3 +586,5 @@ let fold_keys ctxt k ~init ~f =
 let project x = x
 
 let absolute_key _ k = k
+
+let description = Storage_description.create ()

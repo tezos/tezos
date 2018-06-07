@@ -9,3 +9,9 @@
 
 include Crypto_box.Public_key_hash
 
+let rpc_arg =
+  RPC_arg.like
+    rpc_arg
+    ~descr:"A cryptographic node identity (Base58Check-encoded)"
+    "peer_id"
+

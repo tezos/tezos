@@ -90,6 +90,7 @@ module Block : sig
     max_operations_ttl: int ;
     max_operation_data_length: int;
     context: Context_hash.t ;
+    metadata: MBytes.t ;
   }
 
   module Contents : SINGLE_STORE
@@ -110,6 +111,11 @@ module Block : sig
     with type t = store * Block_hash.t
      and type key = int
      and type value = Operation.t list
+
+  module Operations_metadata : MAP_STORE
+    with type t = store * Block_hash.t
+     and type key = int
+     and type value = MBytes.t list
 
   type invalid_block = {
     level: int32 ;

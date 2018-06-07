@@ -13,32 +13,14 @@ let skip_line ppf =
   Format.pp_print_newline ppf ();
   return @@ Format.pp_print_newline ppf ()
 
-let print_heads ppf heads =
-  Format.pp_print_list ~pp_sep:Format.pp_print_newline
-    (fun ppf blocks ->
-       Format.pp_print_list
-         ~pp_sep:Format.pp_print_newline
-         Block_services.pp_block_info
-         ppf
-         blocks)
-    ppf heads
-
-let print_rejected ppf = function
-  | [] -> Format.fprintf ppf "No invalid blocks."
-  | invalid ->
-      Format.pp_print_list
-        (fun ppf (hash, level, errors) ->
-           Format.fprintf ppf
-             "@[<v 2>Hash: %a\
-              @ Level: %ld\
-              @ Errors: @[<v>%a@]@]"
-             Block_hash.pp hash
-             level
-             (Format.pp_print_list ~pp_sep:Format.pp_print_newline
-                Error_monad.pp)
-             errors)
-        ppf
-        invalid
+let print_invalid_blocks ppf (b: Shell_services.Chain.invalid_block) =
+  Format.fprintf ppf
+    "@[<v 2>Hash: %a\
+     @ Level: %ld\
+     @ %a@]"
+    Block_hash.pp b.hash
+    b.level
+    pp_print_error b.errors
 
 let commands () =
   let open Clic in
@@ -63,28 +45,22 @@ let commands () =
       (args1 output_arg)
       (fixed [ "list" ; "heads" ])
       (fun ppf cctxt ->
-         Block_services.list ~include_ops:true ~length:1 cctxt >>=? fun heads ->
-         Format.fprintf ppf "%a@." print_heads heads ;
+         Shell_services.Blocks.list cctxt () >>=? fun heads ->
+         Format.fprintf ppf "@[<v>%a@]@."
+           (Format.pp_print_list Block_hash.pp)
+           (List.concat heads) ;
          return ()) ;
     command ~group ~desc: "The blocks that have been marked invalid by the node."
       (args1 output_arg)
       (fixed [ "list" ; "rejected" ; "blocks" ])
       (fun ppf cctxt ->
-         Block_services.list_invalid cctxt >>=? fun invalid ->
-         Format.fprintf ppf "%a@." print_rejected invalid ;
-         return ()) ;
-    command ~group ~desc: "A full report of the node's state."
-      (args1 output_arg)
-      (fixed [ "full" ; "report" ])
-      (fun ppf cctxt ->
-         Block_services.list ~include_ops:true ~length:1 cctxt >>=? fun heads ->
-         Block_services.list_invalid cctxt >>=? fun invalid ->
-         Format.fprintf ppf
-           "@[<v 0>@{<title>Date@} %a@,\
-            @[<v 2>@{<title>Heads@}@,%a@]@,\
-            @[<v 2>@{<title>Rejected blocks@}@,%a@]@]"
-           Time.pp_hum (Time.now ())
-           print_heads heads
-           print_rejected invalid ;
-         return ()) ;
+         Shell_services.Invalid_blocks.list cctxt () >>=? function
+         | [] ->
+             Format.fprintf ppf "No invalid blocks." ;
+             return ()
+         | _ :: _ as invalid ->
+             Format.fprintf ppf "@[<v>%a@]@."
+               (Format.pp_print_list print_invalid_blocks)
+               invalid ;
+             return ()) ;
   ]

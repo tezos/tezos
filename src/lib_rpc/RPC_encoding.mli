@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type schema = Data_encoding.json_schema * Data_encoding.Binary_schema.t
+
 include Resto.ENCODING with type 'a t = 'a Data_encoding.t
-                        and type schema = Data_encoding.json_schema
+                        and type schema := schema
 

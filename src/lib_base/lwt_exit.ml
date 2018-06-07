@@ -18,7 +18,7 @@ let () =
       | Exit -> ()
       | exn ->
           let backtrace = Printexc.get_backtrace () in
-          Logging.Node.Main.fatal_error "@[<v 2>%a%a@]"
+          Base_logging.fatal_error "@[<v 2>%a%a@]"
             (fun ppf exn ->
                Format.fprintf ppf
                  "@[Uncaught (asynchronous) exception (%d):@ %a@]"
