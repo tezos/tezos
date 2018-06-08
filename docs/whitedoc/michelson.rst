@@ -1,3 +1,5 @@
+.. _michelson:
+
 Michelson: the language of Smart Contracts in Tezos
 ===================================================
 

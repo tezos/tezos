@@ -20,12 +20,13 @@ How to join the alphanet
 
 We provide two ways of joining the alphanet :
 
--  use ``docker`` and prebuilt binaries (recommended way, tested on
-   windows/mac/linux)
--  manual compilation and installation (linux and mac only)
+- an installation script that uses ``docker`` and prebuilt binaries
+  (recommended way, tested on windows/mac/linux, works on **x86_64**
+  architecture only),
+- manual compilation and installation (linux and mac only).
 
-The ``alphanet.sh`` script
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ``alphanet.sh`` script (x86_64 only)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The recommended way for running an up-to-date Tezos node connected to
 the alphanet is to use ``scripts/alphanet.sh``. Its only requirement is
@@ -138,17 +139,11 @@ Please drink carefully and don't abuse the faucet: it only contains
 How to play with smart-contracts
 --------------------------------
 
-An advanced documentation of the smart contract language is in
+An advanced documentation of the smart contract language is available :ref:`here<michelson>`.
 
-``/docs/language.md``
+Some test contracts can be found in directory :src:`src/bin_client/test/contracts/`.
 
-Some test contracts are in
-
-``/tests/contracts/``
-
-For details and examples, see:
-
-https://www.michelson-lang.com/
+For details and examples, see also https://www.michelson-lang.com/
 
 How to bake on the alphanet
 ---------------------------

@@ -23,7 +23,7 @@ You also need to **choose a branch**:
 
 ::
 
-   git clone git@gitlab.com:tezos/tezos.git
+   git clone https://gitlab.com/tezos/tezos.git
    git checkout alphanet
 
 Install OPAM
@@ -37,7 +37,7 @@ The simplest way to install all dependencies is by using `OPAM
 
 
 **IMPORTANT**: Please use `version 2
-<https://github.com/ocaml/opam/releases/tag/2.0.0-rc>`_ of OPAM. That
+<https://opam.ocaml.org/blog/opam-2-0-0-rc2/>`_ of OPAM. That
 is what the Tezos Core team uses. Most distribution probably ship
 **version 1** of OPAM out of the box, but installing version 2 is
 preferable for many reasons.
@@ -219,7 +219,7 @@ To interact with your node, read the doc of clients:
    ./tezos-admin-client man
    ./tezos-alpha-baker man
 
-And read :ref:`this page<alphanet>` to get alphanet tezzies.
+And read :ref:`this section<faucet>` to learn how to get alphanet tezzies.
 
 Use sandboxed mode
 ------------------
