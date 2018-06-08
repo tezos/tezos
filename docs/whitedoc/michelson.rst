@@ -435,7 +435,7 @@ Control structures
 
 ::
 
-    :: (or 'a 'b) : 'A   ->   'A
+    :: (or 'a 'b) : 'A   ->  'b : 'A
        iff   body :: [ 'a : 'A -> (or 'a 'b) : 'A ]
 
     > LOOP_LEFT body / (Left a) : S  =>  body ; LOOP_LEFT body / a : S
