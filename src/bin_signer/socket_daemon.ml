@@ -11,7 +11,7 @@ open Signer_messages
 
 let log = Signer_logging.lwt_log_notice
 
-let run (cctxt : #Client_context.wallet) path ~require_auth =
+let run (cctxt : #Client_context.wallet) path ?magic_bytes ~require_auth =
   Lwt_utils_unix.Socket.bind path >>=? fun fd ->
   let rec loop () =
     Lwt_unix.accept fd >>= fun (fd, _) ->
@@ -19,7 +19,7 @@ let run (cctxt : #Client_context.wallet) path ~require_auth =
       Lwt_utils_unix.Socket.recv fd Request.encoding >>=? function
       | Sign req ->
           let encoding = result_encoding Sign.Response.encoding in
-          Handler.sign cctxt req ~require_auth >>= fun res ->
+          Handler.sign cctxt req ?magic_bytes ~require_auth >>= fun res ->
           Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
           Lwt_unix.close fd >>= fun () ->
           return ()

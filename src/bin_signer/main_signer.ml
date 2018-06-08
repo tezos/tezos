@@ -38,11 +38,30 @@ let group =
   { Clic.name = "signer" ;
     title = "Commands specific to the signing daemon" }
 
+let magic_bytes_arg =
+  Clic.arg
+    ~doc: "values allowed for the magic bytes, defaults to any"
+    ~short: 'M'
+    ~long: "magic-bytes"
+    ~placeholder: "0xHH,0xHH,..."
+    (Clic.parameter (fun _ s ->
+         try
+           return
+             (List.map
+                (fun s ->
+                   let b = int_of_string s in
+                   if b < 0 || b > 255 then raise Exit else b)
+                (String.split ',' s))
+         with _ ->
+           failwith "Bad format for magic bytes, a series of numbers \
+                     is expected, separated by commas."))
+
 let commands base_dir require_auth =
   Client_keys_commands.commands () @
   [ command ~group
       ~desc: "Launch a signer daemon over a TCP socket."
-      (args2
+      (args3
+         magic_bytes_arg
          (default_arg
             ~doc: "listening address or host name"
             ~short: 'a'
@@ -61,12 +80,13 @@ let commands base_dir require_auth =
                   try return (int_of_string x)
                   with Failure _ -> failwith "Invalid port %s" x))))
       (prefixes [ "launch" ; "socket" ; "signer" ] @@ stop)
-      (fun (host, port) cctxt ->
+      (fun (magic_bytes, host, port) cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Socket_daemon.run cctxt (Tcp (host, port)) ~require_auth) ;
+         Socket_daemon.run cctxt (Tcp (host, port)) ?magic_bytes ~require_auth) ;
     command ~group
       ~desc: "Launch a signer daemon over a local Unix socket."
-      (args1
+      (args2
+         magic_bytes_arg
          (default_arg
             ~doc: "path to the local socket file"
             ~short: 's'
@@ -75,12 +95,13 @@ let commands base_dir require_auth =
             ~default: (Filename.concat base_dir "socket")
             (parameter (fun _ s -> return s))))
       (prefixes [ "launch" ; "local" ; "signer" ] @@ stop)
-      (fun path cctxt ->
+      (fun (magic_bytes, path) cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Socket_daemon.run cctxt (Unix path) ~require_auth) ;
+         Socket_daemon.run cctxt (Unix path) ?magic_bytes ~require_auth) ;
     command ~group
       ~desc: "Launch a signer daemon over HTTPS."
-      (args2
+      (args3
+         magic_bytes_arg
          (default_arg
             ~doc: "listening address or host name"
             ~short: 'a'
@@ -107,9 +128,9 @@ let commands base_dir require_auth =
          ~name:"key"
          ~desc: "path to th TLS key"
          (parameter (fun _ s -> return s)) @@ stop)
-      (fun (host, port) cert key cctxt ->
+      (fun (magic_bytes, host, port) cert key cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Https_daemon.run cctxt ~host ~port ~cert ~key ~require_auth) ;
+         Https_daemon.run cctxt ~host ~port ~cert ~key ?magic_bytes ~require_auth) ;
     command ~group
       ~desc: "Authorize a given public key to perform signing requests."
       (args1

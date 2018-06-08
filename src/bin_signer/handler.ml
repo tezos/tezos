@@ -17,13 +17,26 @@ module Authorized_key =
     let of_source t = Lwt.return (of_b58check t)
   end)
 
+let check_magic_byte magic_bytes data =
+  match magic_bytes with
+  | None -> return ()
+  | Some magic_bytes ->
+      let byte = MBytes.get_uint8 data 0 in
+      if MBytes.length data > 1
+      && (List.mem byte magic_bytes) then
+        return ()
+      else
+        failwith "magic byte 0x%02X not allowed" byte
+
 let sign
     (cctxt : #Client_context.wallet)
-    Signer_messages.Sign.Request.{ pkh ; data ; signature } ~require_auth =
+    Signer_messages.Sign.Request.{ pkh ; data ; signature }
+    ?magic_bytes ~require_auth =
   log "Request for signing %d bytes of data for key %a, magic byte = %02X"
     (MBytes.length data)
     Signature.Public_key_hash.pp pkh
     (MBytes.get_uint8 data 0) >>= fun () ->
+  check_magic_byte magic_bytes data >>=? fun () ->
   begin match require_auth, signature with
     | false, _ -> return ()
     | true, None -> failwith "missing authentication signature field"
