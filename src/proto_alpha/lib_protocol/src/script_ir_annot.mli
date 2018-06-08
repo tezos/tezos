@@ -18,6 +18,7 @@ val default_balance_annot : var_annot option
 val default_steps_annot : var_annot option
 val default_source_annot : var_annot option
 val default_self_annot : var_annot option
+val default_arg_annot : var_annot option
 
 val default_param_annot : field_annot option
 val default_storage_annot : field_annot option
@@ -27,28 +28,24 @@ val default_contract_annot : field_annot option
 val default_addr_annot : field_annot option
 val default_manager_annot : field_annot option
 
-val default_arg_annot : binding_annot option
-val default_elt_annot : binding_annot option
-val default_key_annot : binding_annot option
-val default_hd_annot : binding_annot option
-val default_some_annot : binding_annot option
-val default_left_annot : binding_annot option
-val default_right_annot : binding_annot option
+val default_elt_annot : field_annot option
+val default_key_annot : field_annot option
+val default_hd_annot : field_annot option
+val default_tl_annot : field_annot option
+val default_some_annot : field_annot option
+val default_left_annot : field_annot option
+val default_right_annot : field_annot option
+val default_binding_annot : field_annot option
 
 (** Unparse annotations to their string representation *)
 
 val unparse_type_annot : type_annot option -> string list
 val unparse_var_annot : var_annot option -> string list
 val unparse_field_annot : field_annot option -> string list
-val unparse_binding_annot : binding_annot option -> string list
 
 (** Convertions functions between different annotation kinds *)
 
 val field_to_var_annot : field_annot option -> var_annot option
-val field_to_binding_annot : field_annot option -> binding_annot option
-val binding_to_var_annot : binding_annot option -> var_annot option
-val binding_to_field_annot : binding_annot option -> field_annot option
-val var_to_binding_annot : var_annot option -> binding_annot option
 val type_to_field_annot : type_annot option -> field_annot option
 val var_to_field_annot : var_annot option -> field_annot option
 
@@ -59,12 +56,6 @@ val default_annot : default:'a option -> 'a option -> 'a option
 val gen_access_annot :
   var_annot option ->
   ?default:field_annot option -> field_annot option -> var_annot option
-
-(** Generate a binding annotation, of the form $var.some *)
-val gen_binding_access_annot :
-  var_annot option ->
-  ?default:binding_annot option ->
-  binding_annot option -> binding_annot option
 
 (** Merge type annotations.
     @returns an error {!Inconsistent_type_annotations} if they are both present
@@ -127,29 +118,11 @@ val parse_constr_annot :
   int -> string list ->
   (var_annot option * type_annot option * field_annot option * field_annot option) tzresult Lwt.t
 
-val parse_map_annot :
-  int -> string list ->
-  (var_annot option * type_annot option * binding_annot option * binding_annot option) tzresult Lwt.t
-
 val parse_two_var_annot :
   int -> string list -> (var_annot option * var_annot option) tzresult Lwt.t
-
-val parse_two_binding_annot :
-  int -> string list ->
-  (binding_annot option * binding_annot option) tzresult Lwt.t
 
 val parse_var_field_annot :
   int -> string list -> (var_annot option * field_annot option) tzresult Lwt.t
 
 val parse_var_type_annot :
   int -> string list -> (var_annot option * type_annot option) tzresult Lwt.t
-
-val parse_binding_annot :
-  int -> string list -> binding_annot option tzresult Lwt.t
-
-val parse_var_binding_annot :
-  int -> string list -> (var_annot option * binding_annot option) tzresult Lwt.t
-
-val parse_var_type_binding_annot :
-  int -> string list ->
-  (var_annot option * type_annot option * binding_annot option) tzresult Lwt.t

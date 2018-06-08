@@ -14,12 +14,12 @@ storage (map :stored_balance key_hash mutez);
 code { DUP; CAR;
        # Deposit into account
        IF_LEFT { DUP; DIIP{ CDR %stored_balance; DUP };
-                 DIP{ SWAP }; GET;
+                 DIP{ SWAP }; GET @opt_prev_balance;
                  # Create the account
-                 IF_SOME $previous_balance
-                         # Add to an existing account
-                         { AMOUNT; ADD; SOME; SWAP; UPDATE; NIL operation; PAIR }
-                         { DIP{ AMOUNT; SOME }; UPDATE; NIL operation; PAIR }}
+                 IF_SOME # Add to an existing account
+                   { RENAME @previous_balance;
+                     AMOUNT; ADD; SOME; SWAP; UPDATE; NIL operation; PAIR }
+                   { DIP{ AMOUNT; SOME }; UPDATE; NIL operation; PAIR }}
                # Withdrawl
                { DUP; DUP; DUP; DUP;
                  # Check signature on data
@@ -31,10 +31,10 @@ code { DUP; CAR;
                  DIIP{ CDR %stored_balance; DUP };
                  CAR %from; HASH_KEY @from_hash; DIP{ SWAP }; GET;
                  # Account does not exist
-                 IF_NONE $previous_balance
-                         { FAIL }
+                 IF_NONE { FAIL }
                          # Account exists
-                         { DUP; DIIP{ DUP; CDAR %withdraw_amount; DUP };
+                         { RENAME @previous_balance;
+                           DUP; DIIP{ DUP; CDAR %withdraw_amount; DUP };
                            # Ensure funds are available
                            DIP{ CMPLT @not_enough }; SWAP;
                            IF { FAIL }

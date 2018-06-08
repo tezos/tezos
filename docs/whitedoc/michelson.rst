@@ -726,7 +726,7 @@ Bitwise logical operators are also available on unsigned integers.
 
 -  ``NOT`` The return type of ``NOT`` is an ``int`` and not a ``nat``.
    This is because the sign is also negated. The resulting integer is
-   computed using two’s complement. For instance, the boolean negation
+   computed using two's complement. For instance, the boolean negation
    of ``0`` is ``-1``. To get a natural back, a possibility is to use
    ``AND`` with an unsigned mask afterwards.
 
@@ -801,7 +801,7 @@ constants as is, concatenate them and use them as keys.
 Operations on pairs
 ~~~~~~~~~~~~~~~~~~~
 
--  ``PAIR``: Build a pair from the stack’s top two elements.
+-  ``PAIR``: Build a pair from the stack's top two elements.
 
 ::
 
@@ -1282,7 +1282,7 @@ types by mistake. They are also mandatory checked for under/overflows.
 
 ::
 
-   :: tez : tez : ’S -> int : ’S
+   :: tez : tez : 'S -> int : 'S
 
    > COMPARE / x : y : S  =>  -1 : S
        iff x < y
@@ -1473,12 +1473,12 @@ VIII - Macros
 -------------
 
 In addition to the operations above, several extensions have been added
-to the language’s concrete syntax. If you are interacting with the node
+to the language's concrete syntax. If you are interacting with the node
 via RPC, bypassing the client, which expands away these macros, you will
 need to desugar them yourself.
 
 These macros are designed to be unambiguous and reversible, meaning that
-errors are reported in terms of desugared syntax. Below you’ll see
+errors are reported in terms of desugared syntax. Below you'll see
 these macros defined in terms of other syntactic forms. That is how
 these macros are seen by the node.
 
@@ -1840,19 +1840,20 @@ line can also be written, using C-like delimiters (``/* ... */``).
 X - Annotations
 ---------------
 
-The annotation mechanism of Michelson provides ways to better track
-data on the stack and to give additional type constraints.
+The annotation mechanism of Michelson provides ways to better track data
+on the stack and to give additional type constraints. Annotaions are
+only here to add constraints, *i.e.* they cannot turn an otherwise
+rejected program into an accepted one.
 
-Stack visualization tools like the Michelson’s Emacs mode print
+Stack visualization tools like the Michelson's Emacs mode print
 annotations associated with each type in the program, as propagated by
 the typechecker as well as variable annotations on the types of elements
 in the stack. This is useful as a debugging aid.
 
-We distinguish four kinds of annotations:
+We distinguish three kinds of annotations:
 - type annotations, written ``:type_annot``,
 - variable annotations, written ``@var_annot``,
-- field or constructors annotations, written ``%field_annot``,
-- and binding annotations, written ``$bind_annot``.
+- and field or constructors annotations, written ``%field_annot``.
 
 Type Annotations
 ~~~~~~~~~~~~~~~~
@@ -2142,73 +2143,18 @@ the accessed field in the destructed pair must match the one given here.
    :: (pair 'a ('b %snd)) : S -> 'b : 'S
 
 
-Binding Annotations
-~~~~~~~~~~~~~~~~~~~
-
-Michelson supports an extra kind of annotations which act as variable
-annotations for values bound by instructions inside code blocks.
-
-::
-
-   IF_NONE $some_value bt bf
-   :: option 'a : 'S   ->   'b : 'S
-      iff   bt :: [ 'S -> 'b : 'S]
-            bf :: [ @some_value 'a : 'S -> 'b : 'S]
-
-   IF_LEFT $left_value $right_value bt bf
-   :: or 'a 'b : 'S   ->   'c : 'S
-      iff   bt :: [ @left_value 'a : 'S -> 'c : 'S]
-            bf :: [ @right_value 'b : 'S -> 'c : 'S]
-
-   IF_CONS $head $tail bt bf
-   :: list 'a : 'S   ->   'b : 'S
-      iff   bt :: [ @head 'a : @tail list 'a : 'S -> 'b : 'S]
-            bf :: [ 'S -> 'b : 'S]
-
-   MAP $x body
-   :: (list 'elt) : 'A   ->  (list 'b) : 'A
-      iff   body :: [ @x 'elt : 'A -> 'b : 'A ]
-
-   MAP $x body
-   :: (set 'elt) : 'A   ->  (set 'b) : 'A
-      iff   body :: [ @x 'elt : 'A -> 'b : 'A ]
-
-   MAP $k $v body
-   :: (map 'key 'val) : 'A   ->  (map 'key 'b) : 'A
-      iff   body :: [ (pair ('key %k) ('val %v)) : 'A -> 'b : 'A ]
-
-   ITER $x body
-   :: (set 'elt) : 'A   ->  'A
-      iff body :: [ @x 'elt : 'A -> 'A ]
-
-   ITER $x body
-   :: (list 'elt) : 'A   ->  'A
-      iff body :: [ @x 'elt : 'A -> 'A ]
-
-   ITER $k $v body
-   :: (map 'elt 'val) : 'A   ->  'A
-      iff   body :: [ (pair ('elt %k) ('val %v)) : 'A -> 'A ]
-
-   LAMBDA $arg 'a 'b code
-   :: 'A ->  (lambda 'a 'b) : 'A
-      iff  code :: [ @arg 'a : []  -> 'b : [] ]
-
-   LOOP_LEFT $acc body
-   :: (or 'a 'b) : 'A   ->   'A
-      iff   body :: [ @acc 'a : 'A -> (or 'a 'b) : 'A ]
-
 Syntax
 ~~~~~~
 
 Primitive applications can receive one or many annotations.
 
 An annotation is a sequence of characters that matches the regular
-expression ``[\@\:\%\$][0-9a-zA-Z\.]*``. They come after the primitive
+expression ``[\@\:\%\$][_0-9a-zA-Z\.]*``. They come after the primitive
 name and before its potential arguments for primitive applications.
 
 ::
 
-    (prim @annot arg arg ...)
+    (prim @v :t %x arg1 arg2 ...)
 
 
 Ordering between different kinds of annotations is not significant, but
@@ -2343,10 +2289,16 @@ A similar mechanism is used for context dependent instructions:
 
    NOW  :: 'S   ->   @now timestamp : 'S
 
-If now binding annotation is provided for instruction with code blocks
-(that accept one), then the bound items on the stack will be given a
+Inside nested code blocks, bound items on the stack will be given a
 default variable name annotation depending on the instruction and stack
-type.
+type (which can be changed). For instance the annotated typing rule for
+``ITER`` on lists is:
+
+::
+
+   ITER body
+   :: @l (list 'e) : 'A  ->  'A
+      iff body :: [ @l.elt e' : 'A -> 'A ]
 
 XI - JSON syntax
 ---------------
@@ -2387,8 +2339,8 @@ storage. The type of the global data of the storage is fixed for each
 contract at origination time. This is ensured statically by checking on
 origination that the code preserves the type of the global data. For
 this, the code of the contract is checked to be of  type
-``lambda (pair ’arg ’global) -> (pair (list operation) ’global)`` where
-``’global`` is the type of the original global store given on origination.
+``lambda (pair 'arg 'global) -> (pair (list operation) 'global)`` where
+``'global`` is the type of the original global store given on origination.
 The contract also takes a parameter and returns a list of internal operations,
 hence the complete calling convention above. The internal operations are
 queued for execution when the contract returns.
@@ -2413,7 +2365,7 @@ Reservoir contract
 We want to create a contract that stores tez until a timestamp ``T`` or
 a maximum amount ``N`` is reached. Whenever ``N`` is reached before
 ``T``, all tokens are reversed to an account ``B`` (and the contract is
-automatically deleted). Any call to the contract’s code performed after
+automatically deleted). Any call to the contract's code performed after
 ``T`` will otherwise transfer the tokens to another account ``A``.
 
 We want to build this contract in a reusable manner, so we do not
@@ -2621,7 +2573,7 @@ After the first day, nothing cam happen until ``T``.
 During the 24 hours after ``T``, the buyer must pay ``(Q * K)`` to the
 contract, minus the amount already sent.
 
-After this day, if the buyer didn’t pay enough then any transaction will
+After this day, if the buyer didn't pay enough then any transaction will
 send all the tokens to the seller.
 
 Otherwise, the seller must deliver at least ``Q`` tons of dried peas to
@@ -2961,7 +2913,7 @@ The language is implemented in OCaml as follows:
 -  The lower internal representation is written as a GADT whose type
    parameters encode exactly the typing rules given in this
    specification. In other words, if a program written in this
-   representation is accepted by OCaml’s typechecker, it is guaranteed
+   representation is accepted by OCaml's typechecker, it is guaranteed
    type-safe. This of course also valid for programs not handwritten but
    generated by OCaml code, so we are sure that any manipulated code is
    type-safe.
@@ -2973,7 +2925,7 @@ The language is implemented in OCaml as follows:
 
 -  The interpreter is basically the direct transcription of the
    rewriting rules presented above. It takes an instruction, a stack and
-   transforms it. OCaml’s typechecker ensures that the transformation
+   transforms it. OCaml's typechecker ensures that the transformation
    respects the pre and post stack types declared by the GADT case for
    each instruction.
 

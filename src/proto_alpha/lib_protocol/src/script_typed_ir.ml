@@ -15,9 +15,8 @@ open Script_int
 type var_annot = [ `Var_annot of string ]
 type type_annot = [ `Type_annot of string ]
 type field_annot = [ `Field_annot of string ]
-type binding_annot = [ `Binding_annot of string ]
 
-type annot = [ var_annot | type_annot | field_annot | binding_annot ]
+type annot = [ var_annot | type_annot | field_annot ]
 
 type 'ty comparable_ty =
   | Int_key : type_annot option -> (z num) comparable_ty

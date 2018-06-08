@@ -572,15 +572,6 @@ let expand_if_right = function
       error (Invalid_arity ("IF_RIGHT", List.length args, 2))
   | _ -> ok @@ None
 
-let expand_rename = function
-  | Prim (loc, "RENAME", [], annot) ->
-      ok @@ Some (Seq (loc, [
-          Prim (loc, "DUP", [], annot) ;
-          Prim (loc, "SWAP", [], []) ;
-          Prim (loc, "DROP", [], []) ;
-        ]))
-  | _ -> ok @@ None
-
 let expand original =
   let rec try_expansions = function
     | [] -> ok @@ original
@@ -602,7 +593,6 @@ let expand original =
       expand_asserts ;
       expand_if_some ;
       expand_if_right ;
-      expand_rename ;
     ]
 
 let expand_rec expr =
@@ -1008,15 +998,6 @@ let unexpand_if_right = function
       Some (Prim (loc, "IF_RIGHT", [ right ; left ], annot))
   | _ -> None
 
-let unexpand_rename = function
-  | Seq (loc, [
-      Prim (_, "DUP", [], annot) ;
-      Prim (_, "SWAP", [], []) ;
-      Prim (_, "DROP", [], []) ;
-    ]) ->
-      Some (Prim (loc, "RENAME", [], annot))
-  | _ -> None
-
 let unexpand original =
   let try_unexpansions unexpanders =
     match
@@ -1039,8 +1020,7 @@ let unexpand original =
       unexpand_duuuuup ;
       unexpand_compare ;
       unexpand_if_some ;
-      unexpand_if_right ;
-      unexpand_rename ]
+      unexpand_if_right ]
 
 let rec unexpand_rec expr =
   match unexpand expr with

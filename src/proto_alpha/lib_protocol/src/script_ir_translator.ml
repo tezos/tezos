@@ -1491,11 +1491,8 @@ and parse_instr
       (Item_t (Option_t ((t, some_field), _none_field, _), rest, option_annot) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_binding_annot loc annot >>=? fun binding_annot ->
-        let binding_annot = default_annot binding_annot
-            ~default:(gen_binding_access_annot option_annot (field_to_binding_annot some_field)
-                        ~default:default_some_annot) in
-        let annot = binding_to_var_annot binding_annot in
+        fail_unexpected_annot loc annot >>=? fun () ->
+        let annot = gen_access_annot option_annot some_field ~default:default_some_annot in
         parse_instr ?type_logger tc_context ctxt bt rest >>=? fun (btr, ctxt) ->
         parse_instr ?type_logger tc_context ctxt bf (Item_t (t, rest, annot)) >>=? fun (bfr, ctxt) ->
         let branch ibt ibf =
@@ -1537,17 +1534,9 @@ and parse_instr
       (Item_t (Union_t ((tl, l_field), (tr, r_field), _), rest, union_annot) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_two_binding_annot loc annot >>=? fun (left_bind_annot, right_bind_annot) ->
-        let left_bind_annot = default_annot left_bind_annot
-            ~default:(gen_binding_access_annot union_annot
-                        (field_to_binding_annot l_field)
-                        ~default:default_left_annot) in
-        let left_annot = binding_to_var_annot left_bind_annot in
-        let right_bind_annot = default_annot right_bind_annot
-            ~default:(gen_binding_access_annot union_annot
-                        (field_to_binding_annot r_field)
-                        ~default:default_right_annot) in
-        let right_annot = binding_to_var_annot right_bind_annot in
+        fail_unexpected_annot loc annot >>=? fun () ->
+        let left_annot = gen_access_annot union_annot l_field ~default:default_left_annot in
+        let right_annot = gen_access_annot union_annot r_field ~default:default_right_annot in
         parse_instr ?type_logger tc_context ctxt bt (Item_t (tl, rest, left_annot)) >>=? fun (btr, ctxt) ->
         parse_instr ?type_logger tc_context ctxt bf (Item_t (tr, rest, right_annot)) >>=? fun (bfr, ctxt) ->
         let branch ibt ibf =
@@ -1566,15 +1555,15 @@ and parse_instr
         parse_var_annot loc annot >>=? fun annot ->
         typed ctxt loc Cons_list (Item_t (List_t (t, ty_name), rest, annot))
     | Prim (loc, I_IF_CONS, [ bt ; bf ], annot),
-      (Item_t (List_t (t, _), rest, list_annot) as bef) ->
+      (Item_t (List_t (t, ty_name), rest, list_annot) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_binding_annot loc annot >>=? fun hd_bind_annot ->
-        let hd_bind_annot = default_annot hd_bind_annot
-            ~default:(gen_binding_access_annot list_annot default_hd_annot) in
-        let hd_annot = binding_to_var_annot hd_bind_annot in
+        fail_unexpected_annot loc annot >>=? fun () ->
+        let hd_annot = gen_access_annot list_annot default_hd_annot in
+        let tl_annot = gen_access_annot list_annot default_tl_annot in
         parse_instr ?type_logger tc_context ctxt bt
-          (Item_t (t, bef, hd_annot)) >>=? fun (btr, ctxt) ->
+          (Item_t (t, Item_t (List_t (t, ty_name), rest, tl_annot), hd_annot))
+        >>=? fun (btr, ctxt) ->
         parse_instr ?type_logger tc_context ctxt bf
           rest >>=? fun (bfr, ctxt) ->
         let branch ibt ibf =
@@ -1588,11 +1577,9 @@ and parse_instr
     | Prim (loc, I_MAP, [ body ], annot),
       (Item_t (List_t (elt, _), starting_rest, list_annot)) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_var_type_binding_annot loc annot
-        >>=? fun (ret_annot, list_ty_name, elt_bind_annot) ->
-        let elt_bind_annot = default_annot elt_bind_annot
-            ~default:(gen_binding_access_annot list_annot default_elt_annot) in
-        let elt_annot = binding_to_var_annot elt_bind_annot in
+        parse_var_type_annot loc annot
+        >>=? fun (ret_annot, list_ty_name) ->
+        let elt_annot = gen_access_annot list_annot default_elt_annot in
         parse_instr ?type_logger tc_context ctxt
           body (Item_t (elt, starting_rest, elt_annot)) >>=? begin fun (judgement, ctxt) ->
           match judgement with
@@ -1609,10 +1596,8 @@ and parse_instr
     | Prim (loc, I_ITER, [ body ], annot),
       Item_t (List_t (elt, _), rest, list_annot) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_binding_annot loc annot >>=? fun elt_bind_annot ->
-        let elt_bind_annot = default_annot elt_bind_annot
-            ~default:(gen_binding_access_annot list_annot default_elt_annot) in
-        let elt_annot = binding_to_var_annot elt_bind_annot in
+        fail_unexpected_annot loc annot >>=? fun () ->
+        let elt_annot = gen_access_annot list_annot default_elt_annot in
         parse_instr ?type_logger tc_context ctxt
           body (Item_t (elt, rest, elt_annot)) >>=? begin fun (judgement, ctxt) ->
           match judgement with
@@ -1634,10 +1619,8 @@ and parse_instr
     | Prim (loc, I_ITER, [ body ], annot),
       Item_t (Set_t (comp_elt, _), rest, set_annot) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_binding_annot loc annot >>=? fun elt_bind_annot ->
-        let elt_bind_annot = default_annot elt_bind_annot
-            ~default:(gen_binding_access_annot set_annot default_elt_annot) in
-        let elt_annot = binding_to_var_annot elt_bind_annot in
+        fail_unexpected_annot loc annot >>=? fun () ->
+        let elt_annot = gen_access_annot set_annot default_elt_annot in
         let elt = ty_of_comparable_ty comp_elt in
         parse_instr ?type_logger tc_context ctxt
           body (Item_t (elt, rest, elt_annot)) >>=? begin fun (judgement, ctxt) ->
@@ -1675,14 +1658,14 @@ and parse_instr
         parse_var_type_annot loc annot >>=? fun (annot, ty_name) ->
         typed ctxt loc (Empty_map (tk, tv)) (Item_t (Map_t (tk, tv, ty_name), stack, annot))
     | Prim (loc, I_MAP, [ body ], annot),
-      Item_t (Map_t (ck, elt, _), starting_rest, _map_annot) ->
+      Item_t (Map_t (ck, elt, _), starting_rest, map_annot) ->
         let k = ty_of_comparable_ty ck in
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_map_annot loc annot >>=? fun (ret_annot, ty_name, key_bind_annot, elt_bind_annot) ->
-        let key_field = default_annot key_bind_annot ~default:default_key_annot |> binding_to_field_annot in
-        let elt_field = default_annot elt_bind_annot ~default:default_elt_annot |> binding_to_field_annot in
+        parse_var_type_annot loc annot >>=? fun (ret_annot, ty_name) ->
+        let binding_annot = gen_access_annot map_annot default_binding_annot in
         parse_instr ?type_logger tc_context ctxt
-          body (Item_t (Pair_t ((k, key_field), (elt, elt_field), None), starting_rest, None)) >>=? begin fun (judgement, ctxt) ->
+          body (Item_t (Pair_t ((k, default_key_annot), (elt, default_elt_annot), None),
+                        starting_rest, binding_annot)) >>=? begin fun (judgement, ctxt) ->
           match judgement with
           | Typed ({ aft = Item_t (ret, rest, _) ; _ } as ibody) ->
               let invalid_map_body = Invalid_map_body (loc, ibody.aft) in
@@ -1695,14 +1678,14 @@ and parse_instr
           | Failed _ -> fail (Invalid_map_block_fail loc)
         end
     | Prim (loc, I_ITER, [ body ], annot),
-      Item_t (Map_t (comp_elt, element_ty, _), rest, _) ->
+      Item_t (Map_t (comp_elt, element_ty, _), rest, map_annot) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_two_binding_annot loc annot >>=? fun (key_bind_annot, elt_bind_annot) ->
-        let key_field = default_annot key_bind_annot ~default:default_key_annot |> binding_to_field_annot in
-        let elt_field = default_annot elt_bind_annot ~default:default_elt_annot |> binding_to_field_annot in
+        fail_unexpected_annot loc annot >>=? fun () ->
+        let binding_annot = gen_access_annot map_annot default_binding_annot in
         let key = ty_of_comparable_ty comp_elt in
         parse_instr ?type_logger tc_context ctxt body
-          (Item_t (Pair_t ((key, key_field), (element_ty, elt_field), None), rest, None))
+          (Item_t (Pair_t ((key, default_key_annot), (element_ty, default_elt_annot), None),
+                   rest, binding_annot))
         >>=? begin fun (judgement, ctxt) -> match judgement with
           | Typed ({ aft ; _ } as ibody) ->
               let invalid_iter_body = Invalid_iter_body (loc, rest, ibody.aft) in
@@ -1828,10 +1811,8 @@ and parse_instr
     | Prim (loc, I_LOOP_LEFT, [ body ], annot),
       (Item_t (Union_t ((tl, l_field), (tr, _), _), rest, union_annot) as stack) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_binding_annot loc annot >>=? fun l_bind_annot ->
-        let l_bind_annot = default_annot l_bind_annot
-            ~default:(gen_binding_access_annot union_annot (field_to_binding_annot l_field)) in
-        let l_annot = binding_to_var_annot l_bind_annot in
+        parse_var_annot loc annot >>=? fun annot ->
+        let l_annot = gen_access_annot union_annot l_field ~default:default_left_annot in
         parse_instr ?type_logger tc_context ctxt body
           (Item_t (tl, rest, l_annot)) >>=? begin fun (judgement, ctxt) -> match judgement with
           | Typed ibody ->
@@ -1839,10 +1820,10 @@ and parse_instr
               trace unmatched_branches
                 (Lwt.return (stack_ty_eq 1 ibody.aft stack) >>=? fun Eq ->
                  Lwt.return (merge_stacks loc ibody.aft stack) >>=? fun _stack ->
-                 typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, None)))
+                 typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, annot)))
           | Failed { descr } ->
               let ibody = descr stack in
-              typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, None))
+              typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, annot))
         end
     | Prim (loc, I_LAMBDA, [ arg ; ret ; code ], annot),
       stack ->
@@ -1851,11 +1832,9 @@ and parse_instr
         (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:true ret))
         >>=? fun (Ex_ty ret) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
-        parse_var_binding_annot loc annot >>=? fun (annot, arg_bind_annot) ->
-        let arg_bind_annot = default_annot arg_bind_annot ~default:default_arg_annot in
-        let arg_annot = binding_to_var_annot arg_bind_annot in
+        parse_var_annot loc annot >>=? fun annot ->
         parse_returning Lambda ?type_logger ctxt
-          (arg, arg_annot) ret code >>=? fun (lambda, ctxt) ->
+          (arg, default_arg_annot) ret code >>=? fun (lambda, ctxt) ->
         typed ctxt loc (Lambda lambda) (Item_t (Lambda_t (arg, ret, None), stack, annot))
     | Prim (loc, I_EXEC, [], annot),
       Item_t (arg, Item_t (Lambda_t (param, ret, _), rest, _), _) ->

@@ -18,6 +18,7 @@ let default_balance_annot = Some (`Var_annot "balance")
 let default_steps_annot = Some (`Var_annot "steps")
 let default_source_annot = Some (`Var_annot "source")
 let default_self_annot = Some (`Var_annot "self")
+let default_arg_annot = Some (`Var_annot "arg")
 
 let default_param_annot = Some (`Field_annot "parameter")
 let default_storage_annot = Some (`Field_annot "storage")
@@ -27,13 +28,14 @@ let default_contract_annot = Some (`Field_annot "contract")
 let default_addr_annot = Some (`Field_annot "address")
 let default_manager_annot = Some (`Field_annot "manager")
 
-let default_arg_annot = Some (`Binding_annot "arg")
-let default_elt_annot = Some (`Binding_annot "elt")
-let default_key_annot = Some (`Binding_annot "key")
-let default_hd_annot = Some (`Binding_annot "hd")
-let default_some_annot = Some (`Binding_annot "some")
-let default_left_annot = Some (`Binding_annot "left")
-let default_right_annot = Some (`Binding_annot "right")
+let default_elt_annot = Some (`Field_annot "elt")
+let default_key_annot = Some (`Field_annot "key")
+let default_hd_annot = Some (`Field_annot "hd")
+let default_tl_annot = Some (`Field_annot "tl")
+let default_some_annot = Some (`Field_annot "some")
+let default_left_annot = Some (`Field_annot "left")
+let default_right_annot = Some (`Field_annot "right")
+let default_binding_annot = Some (`Field_annot "bnd")
 
 let unparse_type_annot : type_annot option -> string list = function
   | None -> []
@@ -47,34 +49,10 @@ let unparse_field_annot : field_annot option -> string list = function
   | None -> []
   | Some `Field_annot a -> [ "%" ^ a ]
 
-let unparse_binding_annot : binding_annot option -> string list = function
-  | None -> []
-  | Some `Binding_annot a -> [ "$" ^ a ]
-
 let field_to_var_annot : field_annot option -> var_annot option =
   function
   | None -> None
   | Some (`Field_annot s) -> Some (`Var_annot s)
-
-let field_to_binding_annot : field_annot option -> binding_annot option =
-  function
-  | None -> None
-  | Some (`Field_annot s) -> Some (`Binding_annot s)
-
-let binding_to_var_annot : binding_annot option -> var_annot option =
-  function
-  | None -> None
-  | Some (`Binding_annot s) -> Some (`Var_annot s)
-
-let binding_to_field_annot : binding_annot option -> field_annot option =
-  function
-  | None -> None
-  | Some (`Binding_annot s) -> Some (`Field_annot s)
-
-let var_to_binding_annot : var_annot option -> binding_annot option =
-  function
-  | None -> None
-  | Some (`Var_annot s) -> Some (`Binding_annot s)
 
 let type_to_field_annot : type_annot option -> field_annot option =
   function
@@ -101,18 +79,6 @@ let gen_access_annot
         Some (`Var_annot (String.concat "." [v; f]))
     | Some `Var_annot v, Some `Field_annot f, _ ->
         Some (`Var_annot (String.concat "." [v; f]))
-
-let gen_binding_access_annot
-  : var_annot option -> ?default:binding_annot option -> binding_annot option -> binding_annot option
-  = fun value_annot ?(default=None) binding_annot ->
-    match value_annot, binding_annot, default with
-    | None, None, _ | Some _, None, None | None, Some `Binding_annot "", _ -> None
-    | None, Some `Binding_annot b, _ ->
-        Some (`Binding_annot b)
-    | Some `Var_annot v, (None | Some `Binding_annot ""), Some `Binding_annot b ->
-        Some (`Binding_annot (String.concat "." [v; b]))
-    | Some `Var_annot v, Some `Binding_annot b, _ ->
-        Some (`Binding_annot (String.concat "." [v; b]))
 
 let merge_type_annot
   : type_annot option -> type_annot option -> type_annot option tzresult
@@ -164,7 +130,6 @@ let parse_annots loc l =
             | '@' -> ok (`Var_annot (String.sub s 1 @@ String.length s - 1) :: acc)
             | ':' -> ok (`Type_annot (String.sub s 1 @@ String.length s - 1) :: acc)
             | '%' -> ok (`Field_annot (String.sub s 1 @@ String.length s - 1) :: acc)
-            | '$' -> ok (`Binding_annot (String.sub s 1 @@ String.length s - 1) :: acc)
             | _ -> error (Unexpected_annotation loc)
             | exception Invalid_argument _ -> error (Unexpected_annotation loc)
           end
@@ -249,15 +214,14 @@ let parse_field_annot loc annot =
   Lwt.return (parse_field_annot loc annot)
 
 let classify_annot
-  : annot list -> var_annot list * type_annot list * field_annot list * binding_annot list
+  : annot list -> var_annot list * type_annot list * field_annot list
   = fun l ->
-    let rv, rt, rf, rb = List.fold_left (fun (rv, rt, rf, rb) -> function
-        | `Var_annot _ as a -> a :: rv, rt, rf, rb
-        | `Type_annot _ as a -> rv, a :: rt, rf, rb
-        | `Field_annot _ as a -> rv, rt, a :: rf, rb
-        | `Binding_annot _ as a -> rv, rt, rf, a :: rb
-      ) ([], [], [], []) l in
-    List.rev rv, List.rev rt, List.rev rf, List.rev rb
+    let rv, rt, rf = List.fold_left (fun (rv, rt, rf) -> function
+        | `Var_annot _ as a -> a :: rv, rt, rf
+        | `Type_annot _ as a -> rv, a :: rt, rf
+        | `Field_annot _ as a -> rv, rt, a :: rf
+      ) ([], [], []) l in
+    List.rev rv, List.rev rt, List.rev rf
 
 let get_one_annot loc = function
   | [] -> Lwt.return (ok None)
@@ -275,52 +239,27 @@ let parse_constr_annot
     (var_annot option * type_annot option * field_annot option * field_annot option) tzresult Lwt.t
   = fun loc annot ->
     Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields, bindings = classify_annot annot in
-    fail_unexpected_annot loc bindings >>=? fun () ->
+    let vars, types, fields = classify_annot annot in
     get_one_annot loc vars >>=? fun v ->
     get_one_annot loc types >>=? fun t ->
     get_two_annot loc fields >>|? fun (f1, f2) ->
     (v, t, f1, f2)
 
-let parse_map_annot
-  : int -> string list ->
-    (var_annot option * type_annot option * binding_annot option * binding_annot option) tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields, bindings = classify_annot annot in
-    fail_unexpected_annot loc fields >>=? fun () ->
-    get_one_annot loc vars >>=? fun v ->
-    get_one_annot loc types >>=? fun t ->
-    get_two_annot loc bindings >>|? fun (b1, b2) ->
-    (v, t, b1, b2)
-
 let parse_two_var_annot
   : int -> string list -> (var_annot option * var_annot option) tzresult Lwt.t
   = fun loc annot ->
     Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields, bindings = classify_annot annot in
-    fail_unexpected_annot loc bindings >>=? fun () ->
+    let vars, types, fields = classify_annot annot in
     fail_unexpected_annot loc types >>=? fun () ->
     fail_unexpected_annot loc fields >>=? fun () ->
     get_two_annot loc vars
-
-let parse_two_binding_annot
-  : int -> string list -> (binding_annot option * binding_annot option) tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields, bindings = classify_annot annot in
-    fail_unexpected_annot loc vars >>=? fun () ->
-    fail_unexpected_annot loc types >>=? fun () ->
-    fail_unexpected_annot loc fields >>=? fun () ->
-    get_two_annot loc bindings
 
 let parse_var_field_annot
   : int -> string list -> (var_annot option * field_annot option) tzresult Lwt.t
   = fun loc annot ->
     Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields, bindings = classify_annot annot in
+    let vars, types, fields = classify_annot annot in
     fail_unexpected_annot loc types >>=? fun () ->
-    fail_unexpected_annot loc bindings >>=? fun () ->
     get_one_annot loc vars >>=? fun v ->
     get_one_annot loc fields >>|? fun f ->
     (v, f)
@@ -329,42 +268,8 @@ let parse_var_type_annot
   : int -> string list -> (var_annot option * type_annot option) tzresult Lwt.t
   = fun loc annot ->
     Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields, bindings = classify_annot annot in
+    let vars, types, fields = classify_annot annot in
     fail_unexpected_annot loc fields >>=? fun () ->
-    fail_unexpected_annot loc bindings >>=? fun () ->
     get_one_annot loc vars >>=? fun v ->
     get_one_annot loc types >>|? fun t ->
     (v, t)
-
-let parse_binding_annot
-  : int -> string list -> binding_annot option tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields, bindings = classify_annot annot in
-    fail_unexpected_annot loc vars >>=? fun () ->
-    fail_unexpected_annot loc types >>=? fun () ->
-    fail_unexpected_annot loc fields >>=? fun () ->
-    get_one_annot loc bindings
-
-let parse_var_binding_annot
-  : int -> string list -> (var_annot option * binding_annot option) tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields, bindings = classify_annot annot in
-    fail_unexpected_annot loc types >>=? fun () ->
-    fail_unexpected_annot loc fields >>=? fun () ->
-    get_one_annot loc vars >>=? fun v ->
-    get_one_annot loc bindings >>|? fun b ->
-    (v, b)
-
-let parse_var_type_binding_annot
-  : int -> string list ->
-    (var_annot option * type_annot option * binding_annot option) tzresult Lwt.t
-  = fun loc annot ->
-    Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields, bindings = classify_annot annot in
-    fail_unexpected_annot loc fields >>=? fun () ->
-    get_one_annot loc vars >>=? fun v ->
-    get_one_annot loc types >>=? fun t ->
-    get_one_annot loc bindings >>|? fun b ->
-    (v, t, b)
