@@ -51,18 +51,28 @@ let trigger () : (unit -> unit) * (unit -> unit Lwt.t) =
 let worker name ~run ~cancel =
   let stop = LC.create () in
   let fail e =
-    log_error "%s worker failed with %s" name (Printexc.to_string e) ;
+    log_error Tag.DSL.(fun f ->
+        f "%s worker failed with %a"
+        -% t event "worker_failed"
+        -% s worker name
+        -% a exn e) ;
     cancel ()
   in
   let waiter = LC.wait stop in
-  log_info "%s worker started" name ;
+  log_info Tag.DSL.(fun f ->
+      f "%s worker started"
+      -% t event "worker_started"
+      -% s worker name) ;
   Lwt.async
     (fun () ->
        Lwt.catch run fail >>= fun () ->
        LC.signal stop ();
        Lwt.return_unit) ;
   waiter >>= fun () ->
-  log_info "%s worker ended" name ;
+  log_info Tag.DSL.(fun f ->
+      f "%s worker ended"
+      -% t event "worker_finished"
+      -% s worker name) ;
   Lwt.return_unit
 
 
