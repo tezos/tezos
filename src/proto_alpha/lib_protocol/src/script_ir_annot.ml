@@ -214,14 +214,33 @@ let parse_field_annot loc annot =
   Lwt.return (parse_field_annot loc annot)
 
 let classify_annot
-  : annot list -> var_annot list * type_annot list * field_annot list
-  = fun l ->
-    let rv, rt, rf = List.fold_left (fun (rv, rt, rf) -> function
-        | `Var_annot _ as a -> a :: rv, rt, rf
-        | `Type_annot _ as a -> rv, a :: rt, rf
-        | `Field_annot _ as a -> rv, rt, a :: rf
-      ) ([], [], []) l in
-    List.rev rv, List.rev rt, List.rev rf
+  : int -> annot list ->
+    (var_annot list * type_annot list * field_annot list) tzresult Lwt.t
+  = fun loc l ->
+    try
+      let _, rv, _, rt, _, rf =
+        List.fold_left
+          (fun (in_v, rv, in_t, rt, in_f, rf) a ->
+             match a, in_v, rv, in_t, rt, in_f, rf with
+             | (`Var_annot _ as a), true, _, _, _, _, _
+             | (`Var_annot _ as a), false, [], _, _, _, _ ->
+                 true, a :: rv,
+                 false, rt,
+                 false, rf
+             | (`Type_annot _ as a), _, _, true, _, _, _
+             | (`Type_annot _ as a), _, _, false, [], _, _ ->
+                 false, rv,
+                 true, a :: rt,
+                 false, rf
+             | (`Field_annot _ as a), _, _, _, _, true, _
+             | (`Field_annot _ as a), _, _, _, _, false, [] ->
+                 false, rv,
+                 false, rt,
+                 true, a :: rf
+             | _ -> raise Exit
+          ) (false, [], false, [], false, []) l in
+      Lwt.return (ok (List.rev rv, List.rev rt, List.rev rf))
+    with Exit -> Lwt.return (error (Ungrouped_annotations loc))
 
 let get_one_annot loc = function
   | [] -> Lwt.return (ok None)
@@ -239,7 +258,7 @@ let parse_constr_annot
     (var_annot option * type_annot option * field_annot option * field_annot option) tzresult Lwt.t
   = fun loc annot ->
     Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields = classify_annot annot in
+    classify_annot loc annot >>=? fun (vars, types, fields) ->
     get_one_annot loc vars >>=? fun v ->
     get_one_annot loc types >>=? fun t ->
     get_two_annot loc fields >>|? fun (f1, f2) ->
@@ -249,7 +268,7 @@ let parse_two_var_annot
   : int -> string list -> (var_annot option * var_annot option) tzresult Lwt.t
   = fun loc annot ->
     Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields = classify_annot annot in
+    classify_annot loc annot >>=? fun (vars, types, fields) ->
     fail_unexpected_annot loc types >>=? fun () ->
     fail_unexpected_annot loc fields >>=? fun () ->
     get_two_annot loc vars
@@ -258,7 +277,7 @@ let parse_var_field_annot
   : int -> string list -> (var_annot option * field_annot option) tzresult Lwt.t
   = fun loc annot ->
     Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields = classify_annot annot in
+    classify_annot loc annot >>=? fun (vars, types, fields) ->
     fail_unexpected_annot loc types >>=? fun () ->
     get_one_annot loc vars >>=? fun v ->
     get_one_annot loc fields >>|? fun f ->
@@ -268,7 +287,7 @@ let parse_var_type_annot
   : int -> string list -> (var_annot option * type_annot option) tzresult Lwt.t
   = fun loc annot ->
     Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    let vars, types, fields = classify_annot annot in
+    classify_annot loc annot >>=? fun (vars, types, fields) ->
     fail_unexpected_annot loc fields >>=? fun () ->
     get_one_annot loc vars >>=? fun v ->
     get_one_annot loc types >>|? fun t ->

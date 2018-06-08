@@ -2158,7 +2158,8 @@ name and before its potential arguments for primitive applications.
 
 
 Ordering between different kinds of annotations is not significant, but
-ordering among annotations of the same kind is.
+ordering among annotations of the same kind is. Annotations of a same
+kind must be grouped together.
 
 For instance these two annotated instructions are equivalent:
 
@@ -2166,7 +2167,7 @@ For instance these two annotated instructions are equivalent:
 
    PAIR :t @my_pair %x %y
 
-   PAIR %x :t %y @my_pair
+   PAIR %x %y :t @my_pair
 
 Annotations and Macros
 ~~~~~~~~~~~~~~~~~~~~~~

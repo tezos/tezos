@@ -72,6 +72,7 @@ let collect_error_locations errs =
         (Invalid_arity (loc, _, _, _)
         | Inconsistent_type_annotations (loc, _, _)
         | Unexpected_annotation loc
+        | Ungrouped_annotations loc
         | Type_too_large (loc, _, _)
         | Invalid_namespace (loc, _, _, _)
         | Invalid_primitive (loc, _, _)
@@ -387,6 +388,10 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           | Unexpected_annotation loc ->
               Format.fprintf ppf
                 "@[<v 2>%aunexpected annotation."
+                print_loc loc
+          | Ungrouped_annotations loc ->
+              Format.fprintf ppf
+                "@[<v 2>%aAnnotations of the same kind must be grouped."
                 print_loc loc
           | Type_too_large (loc, size, maximum_size) ->
               Format.fprintf ppf

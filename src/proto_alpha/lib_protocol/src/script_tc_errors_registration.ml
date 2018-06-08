@@ -370,6 +370,16 @@ let () =
     (function Unexpected_annotation loc -> Some (loc, ())
             | _ -> None)
     (fun (loc, ()) -> Unexpected_annotation loc);
+  (* Unexpected annotation *)
+  register_error_kind
+    `Permanent
+    ~id:"ungroupedAnnotations"
+    ~title:"Annotations of the same kind were found spread apart"
+    ~description:"Annotations of the same kind must be grouped"
+    (located empty)
+    (function Ungrouped_annotations loc -> Some (loc, ())
+            | _ -> None)
+    (fun (loc, ()) -> Ungrouped_annotations loc);
   (* Unmatched branches *)
   register_error_kind
     `Permanent
