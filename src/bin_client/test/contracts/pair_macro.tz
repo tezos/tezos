@@ -1,6 +1,6 @@
 parameter unit;
 storage unit;
 code { UNIT; UNIT; UNIT; UNIT; UNIT;
-       PAPAPAPAIR @name %1 %2 %3 %4 %5;
-       CDDDAR %4 @fourth;
+       PAPAPAPAIR @name %x1 %x2 %x3 %x4 %x5;
+       CDDDAR %x4 @fourth;
        DROP; CDR; NIL operation; PAIR}

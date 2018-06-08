@@ -79,11 +79,11 @@ val error_unexpected_annot : int -> 'a list -> unit tzresult
 (** Same as {!error_unexpected_annot} in Lwt. *)
 val fail_unexpected_annot : int -> 'a list -> unit tzresult Lwt.t
 
-(** Parse string annotations. *)
-val parse_annots : int -> string list -> annot list tzresult
-
 (** Parse a type annotation only. *)
 val parse_type_annot : int -> string list -> type_annot option tzresult
+
+val parse_field_annot :
+  int -> string list -> field_annot option tzresult
 
 (** Parse an annotation for composed types, of the form
     [:ty_name %field1 %field2] in any order. *)
@@ -109,20 +109,18 @@ val check_correct_field :
 val parse_var_annot :
   int ->
   ?default:var_annot option ->
-  string list -> var_annot option tzresult Lwt.t
-
-val parse_field_annot :
-  int -> string list -> field_annot option tzresult Lwt.t
+  string list -> var_annot option tzresult
 
 val parse_constr_annot :
   int -> string list ->
-  (var_annot option * type_annot option * field_annot option * field_annot option) tzresult Lwt.t
+  (var_annot option * type_annot option *
+   field_annot option * field_annot option) tzresult
 
 val parse_two_var_annot :
-  int -> string list -> (var_annot option * var_annot option) tzresult Lwt.t
+  int -> string list -> (var_annot option * var_annot option) tzresult
 
 val parse_var_field_annot :
-  int -> string list -> (var_annot option * field_annot option) tzresult Lwt.t
+  int -> string list -> (var_annot option * field_annot option) tzresult
 
 val parse_var_type_annot :
-  int -> string list -> (var_annot option * type_annot option) tzresult Lwt.t
+  int -> string list -> (var_annot option * type_annot option) tzresult

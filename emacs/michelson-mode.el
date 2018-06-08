@@ -172,8 +172,8 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 (defconst michelson-font-lock-defaults
   (list
    (list
-    '("\\<[\$@][A-Za-z-_0-9\.]*\\>" . michelson-face-var-annotation)
-    '("\\<[%:][A-Za-z-_0-9\.]*\\>" . michelson-face-type-annotation)
+    '("\\<[@]\\(\\|[A-Za-z-_][A-Za-z-_0-9\.]*\\)\\>" . michelson-face-var-annotation)
+    '("\\<[%:]\\(\\|[A-Za-z-_][A-Za-z-_0-9\.]*\\)\\>" . michelson-face-type-annotation)
     '("\\<[0-9]+\\>" . michelson-face-constant)
     '("\\<[A-Z][a-z_0-9]+\\>" . michelson-face-constant)
     '("\\<[A-Z][A-Z_0-9]*\\>" . michelson-face-instruction)

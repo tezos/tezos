@@ -350,7 +350,6 @@ let expand_pappaiir original =
                   match i, IntMap.find_opt i field_annots_pos with
                   | 0, None -> annot
                   | _, None -> []
-                  (* XXX Hackish, cannot annotate cdr only with PAIR *)
                   | 0, Some ([], cdr_annot) -> "%" :: cdr_annot @ annot
                   | _, Some ([], cdr_annot) -> "%" :: cdr_annot
                   | 0, Some (car_annot, cdr_annot) -> car_annot @ cdr_annot @ annot

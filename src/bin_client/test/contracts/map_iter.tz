@@ -1,7 +1,7 @@
 parameter (map (int :k) (int :e));
 storage (pair (int :k) (int :e));
-code { CAR; PUSH @acc_e (int :e) 0; PUSH @acc_k (int :k) 0; PAIR; SWAP;
+code { CAR; PUSH @acc_e (int :e) 0; PUSH @acc_k (int :k) 0; PAIR % %r; SWAP;
        ITER
          { DIP {DUP; CAR; DIP{CDR}}; DUP; # Last instr
-           DIP{CAR; ADD}; SWAP; DIP{CDR; ADD}; PAIR };
+           DIP{CAR; ADD}; SWAP; DIP{CDR; ADD}; PAIR % %r };
        NIL operation; PAIR}

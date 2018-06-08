@@ -2149,8 +2149,9 @@ Syntax
 Primitive applications can receive one or many annotations.
 
 An annotation is a sequence of characters that matches the regular
-expression ``[\@\:\%\$][_0-9a-zA-Z\.]*``. They come after the primitive
-name and before its potential arguments for primitive applications.
+expression ``[@:%](|[_a-ZA-Z][_0-9a-zA-Z\.]*)``. They come after the
+primitive name and before its potential arguments for primitive
+applications.
 
 ::
 
@@ -2168,6 +2169,12 @@ For instance these two annotated instructions are equivalent:
    PAIR :t @my_pair %x %y
 
    PAIR %x %y :t @my_pair
+
+An annotation can be empty, in this case is will mean *no annotation*
+and can be used as a wildcard. For instance, it is useful to annotate
+only the right field of a pair instruction ``PAIR % %right`` or to
+ignore field access constraints, *e.g.* in the macro ``UNPPAIPAIR %x1 %
+%x3 %x4``.
 
 Annotations and Macros
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -2320,11 +2327,11 @@ Micheline expressions are encoded in JSON like this:
 
    ``[ expr, ... ]``
 
--  A primitive application is an object with two fields ``"prim"`` for
+- A primitive application is an object with two fields ``"prim"`` for
    the primitive name and ``"args"`` for the arguments (that must
-   contain an array). A third optional field ``"annots"`` contains
-   a list of annotations, including their leading ``@``, ``%``, ``%`` or
-   ``$`` sign.
+   contain an array). A third optional field ``"annots"`` contains a
+   list of annotations, including their leading ``@``, ``%`` or ``%``
+   sign.
 
    ``{ "prim": "pair", "args": [ { "prim": "nat", "args": [] }, { "prim":
      "nat", "args": [] } ], "annots": [":t"] }``

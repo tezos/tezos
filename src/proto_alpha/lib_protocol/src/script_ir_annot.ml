@@ -123,13 +123,22 @@ let fail_unexpected_annot loc annot =
   Lwt.return (error_unexpected_annot loc annot)
 
 let parse_annots loc l =
+  (* allow emtpty annotations as wildcards but otherwise only accept
+     annotations that starto with [a-zA-Z_] *)
+  let sub_or_wildcard wrap s acc =
+    let len = String.length s in
+    if Compare.Int.(len = 1) then ok @@ wrap None :: acc
+    else match s.[1] with
+      | 'a' .. 'z' | 'A' .. 'Z' | '_' ->
+          ok @@ wrap (Some (String.sub s 1 (len - 1))) :: acc
+      | _ -> error (Unexpected_annotation loc) in
   List.fold_left (fun acc s ->
       match acc with
       | Ok acc ->
           begin match s.[0] with
-            | '@' -> ok (`Var_annot (String.sub s 1 @@ String.length s - 1) :: acc)
-            | ':' -> ok (`Type_annot (String.sub s 1 @@ String.length s - 1) :: acc)
-            | '%' -> ok (`Field_annot (String.sub s 1 @@ String.length s - 1) :: acc)
+            | '@' -> sub_or_wildcard (fun a -> `Var_annot a) s acc
+            | ':' -> sub_or_wildcard (fun a -> `Type_annot a) s acc
+            | '%' -> sub_or_wildcard (fun a -> `Field_annot a) s acc
             | _ -> error (Unexpected_annotation loc)
             | exception Invalid_argument _ -> error (Unexpected_annotation loc)
           end
@@ -137,28 +146,75 @@ let parse_annots loc l =
     ) (ok []) l
   >|? List.rev
 
+let opt_var_of_var_opt = function
+  | `Var_annot None -> None
+  | `Var_annot Some a -> Some (`Var_annot a)
+
+let opt_field_of_field_opt = function
+  | `Field_annot None -> None
+  | `Field_annot Some a -> Some (`Field_annot a)
+
+let opt_type_of_type_opt = function
+  | `Type_annot None -> None
+  | `Type_annot Some a -> Some (`Type_annot a)
+
+let classify_annot loc l
+  : (var_annot option list * type_annot option list * field_annot option list) tzresult
+  =
+  try
+    let _, rv, _, rt, _, rf =
+      List.fold_left
+        (fun (in_v, rv, in_t, rt, in_f, rf) a ->
+           match a, in_v, rv, in_t, rt, in_f, rf with
+           | (`Var_annot _ as a), true, _, _, _, _, _
+           | (`Var_annot _ as a), false, [], _, _, _, _ ->
+               true, opt_var_of_var_opt a :: rv,
+               false, rt,
+               false, rf
+           | (`Type_annot _ as a), _, _, true, _, _, _
+           | (`Type_annot _ as a), _, _, false, [], _, _ ->
+               false, rv,
+               true, opt_type_of_type_opt a :: rt,
+               false, rf
+           | (`Field_annot _ as a), _, _, _, _, true, _
+           | (`Field_annot _ as a), _, _, _, _, false, [] ->
+               false, rv,
+               false, rt,
+               true, opt_field_of_field_opt a :: rf
+           | _ -> raise Exit
+        ) (false, [], false, [], false, []) l in
+    ok (List.rev rv, List.rev rt, List.rev rf)
+  with Exit -> error (Ungrouped_annotations loc)
+
+let get_one_annot loc = function
+  | [] -> ok None
+  | [ a ] -> ok a
+  | _ -> error (Unexpected_annotation loc)
+
+let get_two_annot loc = function
+  | [] -> ok (None, None)
+  | [ a ] -> ok (a, None)
+  | [ a; b ] -> ok (a, b)
+  | _ -> error (Unexpected_annotation loc)
+
 let parse_type_annot
   : int -> string list -> type_annot option tzresult
   = fun loc annot ->
-    parse_annots loc annot >>? function
-    | [] -> ok None
-    | [ `Type_annot _ as a ] -> ok (Some a)
-    | _ -> error (Unexpected_annotation loc)
+    parse_annots loc annot >>?
+    classify_annot loc >>? fun (vars, types, fields) ->
+    error_unexpected_annot loc vars >>? fun () ->
+    error_unexpected_annot loc fields >>? fun () ->
+    get_one_annot loc types
 
 let parse_composed_type_annot
   : int -> string list -> (type_annot option * field_annot option * field_annot option) tzresult
   = fun loc annot ->
-    parse_annots loc annot >>? function
-    | [] -> ok (None, None, None)
-    | [ `Type_annot _ as a ] -> ok (Some a, None, None)
-    | [ `Type_annot _ as a ; `Field_annot _ as b] -> ok (Some a, Some b, None)
-    | [ `Type_annot _ as a ; `Field_annot _ as b; `Field_annot _ as c ] ->
-        ok (Some a, Some b, Some c)
-    | [ `Field_annot _ as b ] ->
-        ok (None, Some b, None)
-    | [ `Field_annot _ as b; `Field_annot _ as c ] ->
-        ok (None, Some b, Some c)
-    | _ -> error (Unexpected_annotation loc)
+    parse_annots loc annot >>?
+    classify_annot loc >>? fun (vars, types, fields) ->
+    error_unexpected_annot loc vars >>? fun () ->
+    get_one_annot loc types >>? fun t ->
+    get_two_annot loc fields >|? fun (f1, f2) ->
+    (t, f1, f2)
 
 let check_const_type_annot
   : int -> string list -> type_annot option -> unit tzresult Lwt.t
@@ -170,10 +226,10 @@ let parse_field_annot
   : int -> string list -> field_annot option tzresult
   = fun loc annot ->
     parse_annots loc annot >>?
-    function
-    | [] -> ok None
-    | [ `Field_annot _ as a ] -> ok (Some a)
-    | _ -> error (Unexpected_annotation loc)
+    classify_annot loc >>? fun (vars, types, fields) ->
+    error_unexpected_annot loc vars >>? fun () ->
+    error_unexpected_annot loc types >>? fun () ->
+    get_one_annot loc fields
 
 let extract_field_annot
   : Script.node -> (Script.node * field_annot option) tzresult
@@ -198,97 +254,57 @@ let check_correct_field
         if String.equal s1 s2 then ok ()
         else error (Inconsistent_field_annotations ("%" ^ s1, "%" ^ s2))
 
+
 let parse_var_annot
   : int -> ?default:var_annot option -> string list ->
-    var_annot option tzresult Lwt.t
+    var_annot option tzresult
   = fun loc ?default annot ->
-    Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    begin match annot, default with
-      | [], None -> ok None
-      | [], Some d -> ok d
-      | [ `Var_annot _ as a ], _ -> ok (Some a)
-      | _ -> error (Unexpected_annotation loc)
-    end |> Lwt.return
-
-let parse_field_annot loc annot =
-  Lwt.return (parse_field_annot loc annot)
-
-let classify_annot
-  : int -> annot list ->
-    (var_annot list * type_annot list * field_annot list) tzresult Lwt.t
-  = fun loc l ->
-    try
-      let _, rv, _, rt, _, rf =
-        List.fold_left
-          (fun (in_v, rv, in_t, rt, in_f, rf) a ->
-             match a, in_v, rv, in_t, rt, in_f, rf with
-             | (`Var_annot _ as a), true, _, _, _, _, _
-             | (`Var_annot _ as a), false, [], _, _, _, _ ->
-                 true, a :: rv,
-                 false, rt,
-                 false, rf
-             | (`Type_annot _ as a), _, _, true, _, _, _
-             | (`Type_annot _ as a), _, _, false, [], _, _ ->
-                 false, rv,
-                 true, a :: rt,
-                 false, rf
-             | (`Field_annot _ as a), _, _, _, _, true, _
-             | (`Field_annot _ as a), _, _, _, _, false, [] ->
-                 false, rv,
-                 false, rt,
-                 true, a :: rf
-             | _ -> raise Exit
-          ) (false, [], false, [], false, []) l in
-      Lwt.return (ok (List.rev rv, List.rev rt, List.rev rf))
-    with Exit -> Lwt.return (error (Ungrouped_annotations loc))
-
-let get_one_annot loc = function
-  | [] -> Lwt.return (ok None)
-  | [ a ] -> Lwt.return (ok (Some a))
-  | _ -> Lwt.return (error (Unexpected_annotation loc))
-
-let get_two_annot loc = function
-  | [] -> Lwt.return (ok (None, None))
-  | [ a ] -> Lwt.return (ok (Some a, None))
-  | [ a; b ] -> Lwt.return (ok (Some a, Some b))
-  | _ -> Lwt.return (error (Unexpected_annotation loc))
+    parse_annots loc annot >>?
+    classify_annot loc >>? fun (vars, types, fields) ->
+    error_unexpected_annot loc types >>? fun () ->
+    error_unexpected_annot loc fields >>? fun () ->
+    get_one_annot loc vars >|? function
+    | Some _ as a -> a
+    | None -> match default with
+      | Some a -> a
+      | None -> None
 
 let parse_constr_annot
   : int -> string list ->
-    (var_annot option * type_annot option * field_annot option * field_annot option) tzresult Lwt.t
+    (var_annot option * type_annot option * field_annot option * field_annot option) tzresult
   = fun loc annot ->
-    Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    classify_annot loc annot >>=? fun (vars, types, fields) ->
-    get_one_annot loc vars >>=? fun v ->
-    get_one_annot loc types >>=? fun t ->
-    get_two_annot loc fields >>|? fun (f1, f2) ->
+    parse_annots loc annot >>?
+    classify_annot loc >>? fun (vars, types, fields) ->
+    get_one_annot loc vars >>? fun v ->
+    get_one_annot loc types >>? fun t ->
+    get_two_annot loc fields >|? fun (f1, f2) ->
     (v, t, f1, f2)
 
 let parse_two_var_annot
-  : int -> string list -> (var_annot option * var_annot option) tzresult Lwt.t
+  : int -> string list -> (var_annot option * var_annot option) tzresult
   = fun loc annot ->
-    Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    classify_annot loc annot >>=? fun (vars, types, fields) ->
-    fail_unexpected_annot loc types >>=? fun () ->
-    fail_unexpected_annot loc fields >>=? fun () ->
+    parse_annots loc annot >>?
+    classify_annot loc >>? fun (vars, types, fields) ->
+    error_unexpected_annot loc types >>? fun () ->
+    error_unexpected_annot loc fields >>? fun () ->
     get_two_annot loc vars
 
 let parse_var_field_annot
-  : int -> string list -> (var_annot option * field_annot option) tzresult Lwt.t
+  : int -> string list -> (var_annot option * field_annot option) tzresult
   = fun loc annot ->
-    Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    classify_annot loc annot >>=? fun (vars, types, fields) ->
-    fail_unexpected_annot loc types >>=? fun () ->
-    get_one_annot loc vars >>=? fun v ->
-    get_one_annot loc fields >>|? fun f ->
+    parse_annots loc annot >>?
+    classify_annot loc >>? fun (vars, types, fields) ->
+    error_unexpected_annot loc types >>? fun () ->
+    get_one_annot loc vars >>? fun v ->
+    get_one_annot loc fields >|? fun f ->
     (v, f)
 
 let parse_var_type_annot
-  : int -> string list -> (var_annot option * type_annot option) tzresult Lwt.t
+  : int -> string list -> (var_annot option * type_annot option) tzresult
   = fun loc annot ->
-    Lwt.return (parse_annots loc annot) >>=? fun annot ->
-    classify_annot loc annot >>=? fun (vars, types, fields) ->
-    fail_unexpected_annot loc fields >>=? fun () ->
-    get_one_annot loc vars >>=? fun v ->
-    get_one_annot loc types >>|? fun t ->
+    parse_annots loc annot >>?
+    classify_annot loc >>? fun (vars, types, fields) ->
+    error_unexpected_annot loc fields >>? fun () ->
+    get_one_annot loc vars >>? fun v ->
+    get_one_annot loc types >|? fun t ->
     (v, t)

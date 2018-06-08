@@ -1068,6 +1068,18 @@ let address_size =
   | None -> assert false
   | Some size -> size
 
+(* Lwt versions *)
+let parse_var_annot loc ?default annot =
+  Lwt.return (parse_var_annot loc ?default annot)
+let parse_constr_annot loc annot =
+  Lwt.return (parse_constr_annot loc annot)
+let parse_two_var_annot loc annot =
+  Lwt.return (parse_two_var_annot loc annot)
+let parse_var_field_annot loc annot =
+  Lwt.return (parse_var_field_annot loc annot)
+let parse_var_type_annot loc annot =
+  Lwt.return (parse_var_type_annot loc annot)
+
 let rec parse_data
   : type a.
     ?type_logger: type_logger ->
@@ -1468,7 +1480,7 @@ and parse_instr
     | Prim (loc, I_PUSH, [ t ; d ], annot),
       stack ->
         parse_var_annot loc annot >>=? fun annot ->
-        (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false t)) >>=? fun (Ex_ty t) ->
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:false t >>=? fun (Ex_ty t) ->
         parse_data ?type_logger ctxt t d >>=? fun (v, ctxt) ->
         typed ctxt loc (Const v) (Item_t (t, stack, annot))
     | Prim (loc, I_UNIT, [], annot),
@@ -1483,7 +1495,7 @@ and parse_instr
           (Item_t (Option_t ((t, some_field), none_field, ty_name), rest, annot))
     | Prim (loc, I_NONE, [ t ], annot),
       stack ->
-        (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:true t)) >>=? fun (Ex_ty t) ->
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:true t >>=? fun (Ex_ty t) ->
         parse_constr_annot loc annot >>=? fun (annot, ty_name, some_field, none_field) ->
         typed ctxt loc (Cons_none t)
           (Item_t (Option_t ((t, some_field), none_field, ty_name), stack, annot))
@@ -1510,24 +1522,24 @@ and parse_instr
         parse_var_field_annot loc annot >>=? fun (annot, field_annot) ->
         let annot = default_annot annot
             ~default:(gen_access_annot pair_annot expected_field_annot ~default:default_car_annot) in
-        Lwt.return (check_correct_field field_annot expected_field_annot) >>=? fun () ->
+        Lwt.return @@ check_correct_field field_annot expected_field_annot >>=? fun () ->
         typed ctxt loc Car (Item_t (a, rest, annot))
     | Prim (loc, I_CDR, [], annot),
       Item_t (Pair_t (_, (b, expected_field_annot), _), rest, pair_annot) ->
         parse_var_field_annot loc annot >>=? fun (annot, field_annot) ->
         let annot = default_annot annot
             ~default:(gen_access_annot pair_annot expected_field_annot ~default:default_cdr_annot) in
-        Lwt.return (check_correct_field field_annot expected_field_annot) >>=? fun () ->
+        Lwt.return @@ check_correct_field field_annot expected_field_annot >>=? fun () ->
         typed ctxt loc Cdr (Item_t (b, rest, annot))
     (* unions *)
     | Prim (loc, I_LEFT, [ tr ], annot),
       Item_t (tl, rest, _stack_annot) ->
-        (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:true tr)) >>=? fun (Ex_ty tr) ->
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:true tr >>=? fun (Ex_ty tr) ->
         parse_constr_annot loc annot >>=? fun (annot, tname, l_field, r_field) ->
         typed ctxt loc Left (Item_t (Union_t ((tl, l_field), (tr, r_field), tname), rest, annot))
     | Prim (loc, I_RIGHT, [ tl ], annot),
       Item_t (tr, rest, _stack_annot) ->
-        (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:true tl)) >>=? fun (Ex_ty tl) ->
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:true tl >>=? fun (Ex_ty tl) ->
         parse_constr_annot loc annot >>=? fun (annot, tname, l_field, r_field) ->
         typed ctxt loc Right (Item_t (Union_t ((tl, l_field), (tr, r_field), tname), rest, annot))
     | Prim (loc, I_IF_LEFT, [ bt ; bf ], annot),
@@ -1546,7 +1558,7 @@ and parse_instr
     (* lists *)
     | Prim (loc, I_NIL, [ t ], annot),
       stack ->
-        (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:true t)) >>=? fun (Ex_ty t) ->
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:true t >>=? fun (Ex_ty t) ->
         parse_var_type_annot loc annot >>=? fun (annot, ty_name) ->
         typed ctxt loc Nil (Item_t (List_t (t, ty_name), stack, annot))
     | Prim (loc, I_CONS, [], annot),
@@ -1586,8 +1598,8 @@ and parse_instr
           | Typed ({ aft = Item_t (ret, rest, _) ; _ } as ibody) ->
               let invalid_map_body = Invalid_map_body (loc, ibody.aft) in
               trace invalid_map_body
-                (Lwt.return (stack_ty_eq 1 rest starting_rest) >>=? fun Eq ->
-                 Lwt.return (merge_stacks loc rest starting_rest) >>=? fun rest ->
+                (Lwt.return @@ stack_ty_eq 1 rest starting_rest >>=? fun Eq ->
+                 Lwt.return @@ merge_stacks loc rest starting_rest >>=? fun rest ->
                  typed ctxt loc (List_map ibody)
                    (Item_t (List_t (ret, list_ty_name), rest, ret_annot)))
           | Typed { aft ; _ } -> fail (Invalid_map_body (loc, aft))
@@ -1604,8 +1616,8 @@ and parse_instr
           | Typed ({ aft ; _ } as ibody) ->
               let invalid_iter_body = Invalid_iter_body (loc, rest, ibody.aft) in
               trace invalid_iter_body
-                (Lwt.return (stack_ty_eq 1 aft rest) >>=? fun Eq ->
-                 Lwt.return (merge_stacks loc aft rest) >>=? fun rest ->
+                (Lwt.return @@ stack_ty_eq 1 aft rest >>=? fun Eq ->
+                 Lwt.return @@ merge_stacks loc aft rest >>=? fun rest ->
                  typed ctxt loc (List_iter ibody) rest)
           | Failed { descr } ->
               typed ctxt loc (List_iter (descr rest)) rest
@@ -1613,7 +1625,7 @@ and parse_instr
     (* sets *)
     | Prim (loc, I_EMPTY_SET, [ t ], annot),
       rest ->
-        (Lwt.return (parse_comparable_ty t)) >>=? fun (Ex_comparable_ty t) ->
+        Lwt.return @@ parse_comparable_ty t >>=? fun (Ex_comparable_ty t) ->
         parse_var_type_annot loc annot >>=? fun (annot, tname) ->
         typed ctxt loc (Empty_set t) (Item_t (Set_t (t, tname), rest, annot))
     | Prim (loc, I_ITER, [ body ], annot),
@@ -1628,8 +1640,8 @@ and parse_instr
           | Typed ({ aft ; _ } as ibody) ->
               let invalid_iter_body = Invalid_iter_body (loc, rest, ibody.aft) in
               trace invalid_iter_body
-                (Lwt.return (stack_ty_eq 1 aft rest) >>=? fun Eq ->
-                 Lwt.return (merge_stacks loc aft rest) >>=? fun rest ->
+                (Lwt.return @@ stack_ty_eq 1 aft rest >>=? fun Eq ->
+                 Lwt.return @@ merge_stacks loc aft rest >>=? fun rest ->
                  typed ctxt loc (Set_iter ibody) rest)
           | Failed { descr } ->
               typed ctxt loc (Set_iter (descr rest)) rest
@@ -1653,8 +1665,8 @@ and parse_instr
     (* maps *)
     | Prim (loc, I_EMPTY_MAP, [ tk ; tv ], annot),
       stack ->
-        (Lwt.return (parse_comparable_ty tk)) >>=? fun (Ex_comparable_ty tk) ->
-        (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:true tv)) >>=? fun (Ex_ty tv) ->
+        Lwt.return @@ parse_comparable_ty tk >>=? fun (Ex_comparable_ty tk) ->
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:true tv >>=? fun (Ex_ty tv) ->
         parse_var_type_annot loc annot >>=? fun (annot, ty_name) ->
         typed ctxt loc (Empty_map (tk, tv)) (Item_t (Map_t (tk, tv, ty_name), stack, annot))
     | Prim (loc, I_MAP, [ body ], annot),
@@ -1670,8 +1682,8 @@ and parse_instr
           | Typed ({ aft = Item_t (ret, rest, _) ; _ } as ibody) ->
               let invalid_map_body = Invalid_map_body (loc, ibody.aft) in
               trace invalid_map_body
-                (Lwt.return (stack_ty_eq 1 rest starting_rest) >>=? fun Eq ->
-                 Lwt.return (merge_stacks loc rest starting_rest) >>=? fun rest ->
+                (Lwt.return @@ stack_ty_eq 1 rest starting_rest >>=? fun Eq ->
+                 Lwt.return @@ merge_stacks loc rest starting_rest >>=? fun rest ->
                  typed ctxt loc (Map_map ibody)
                    (Item_t (Map_t (ck, ret, ty_name), rest, ret_annot)))
           | Typed { aft ; _ } -> fail (Invalid_map_body (loc, aft))
@@ -1690,8 +1702,8 @@ and parse_instr
           | Typed ({ aft ; _ } as ibody) ->
               let invalid_iter_body = Invalid_iter_body (loc, rest, ibody.aft) in
               trace invalid_iter_body
-                (Lwt.return (stack_ty_eq 1 aft rest) >>=? fun Eq ->
-                 Lwt.return (merge_stacks loc aft rest) >>=? fun rest ->
+                (Lwt.return @@ stack_ty_eq 1 aft rest >>=? fun Eq ->
+                 Lwt.return @@ merge_stacks loc aft rest >>=? fun rest ->
                  typed ctxt loc (Map_iter ibody) rest)
           | Failed { descr } ->
               typed ctxt loc (Map_iter (descr rest)) rest
@@ -1801,8 +1813,8 @@ and parse_instr
           | Typed ibody ->
               let unmatched_branches = Unmatched_branches (loc, ibody.aft, stack) in
               trace unmatched_branches
-                (Lwt.return (stack_ty_eq 1 ibody.aft stack) >>=? fun Eq ->
-                 Lwt.return (merge_stacks loc ibody.aft stack) >>=? fun _stack ->
+                (Lwt.return @@ stack_ty_eq 1 ibody.aft stack >>=? fun Eq ->
+                 Lwt.return @@ merge_stacks loc ibody.aft stack >>=? fun _stack ->
                  typed ctxt loc (Loop ibody) rest)
           | Failed { descr } ->
               let ibody = descr stack in
@@ -1818,8 +1830,8 @@ and parse_instr
           | Typed ibody ->
               let unmatched_branches = Unmatched_branches (loc, ibody.aft, stack) in
               trace unmatched_branches
-                (Lwt.return (stack_ty_eq 1 ibody.aft stack) >>=? fun Eq ->
-                 Lwt.return (merge_stacks loc ibody.aft stack) >>=? fun _stack ->
+                (Lwt.return @@ stack_ty_eq 1 ibody.aft stack >>=? fun Eq ->
+                 Lwt.return @@ merge_stacks loc ibody.aft stack >>=? fun _stack ->
                  typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, annot)))
           | Failed { descr } ->
               let ibody = descr stack in
@@ -1827,9 +1839,9 @@ and parse_instr
         end
     | Prim (loc, I_LAMBDA, [ arg ; ret ; code ], annot),
       stack ->
-        (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:true arg))
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:true arg
         >>=? fun (Ex_ty arg) ->
-        (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:true ret))
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:true ret
         >>=? fun (Ex_ty ret) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
         parse_var_annot loc annot >>=? fun annot ->
@@ -1861,45 +1873,45 @@ and parse_instr
     | Prim (loc, I_ADD, [], annot),
       Item_t (Timestamp_t tn1, Item_t (Int_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Add_timestamp_to_seconds
           (Item_t (Timestamp_t tname, rest, annot))
     | Prim (loc, I_ADD, [], annot),
       Item_t (Int_t tn1, Item_t (Timestamp_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Add_seconds_to_timestamp
           (Item_t (Timestamp_t tname, rest, annot))
     | Prim (loc, I_SUB, [], annot),
       Item_t (Timestamp_t tn1, Item_t (Int_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Sub_timestamp_seconds
           (Item_t (Timestamp_t tname, rest, annot))
     | Prim (loc, I_SUB, [], annot),
       Item_t (Timestamp_t tn1, Item_t (Timestamp_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Diff_timestamps
           (Item_t (Int_t tname, rest, annot))
     (* string operations *)
     | Prim (loc, I_CONCAT, [], annot),
       Item_t (String_t tn1, Item_t (String_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Concat
           (Item_t (String_t tname, rest, annot))
     (* currency operations *)
     | Prim (loc, I_ADD, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Add_tez
           (Item_t (Mutez_t tname, rest, annot))
     | Prim (loc, I_SUB, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Sub_tez
           (Item_t (Mutez_t tname, rest, annot))
     | Prim (loc, I_MUL, [], annot),
@@ -1916,19 +1928,19 @@ and parse_instr
     | Prim (loc, I_OR, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Or
           (Item_t (Bool_t tname, rest, annot))
     | Prim (loc, I_AND, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc And
           (Item_t (Bool_t tname, rest, annot))
     | Prim (loc, I_XOR, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Xor
           (Item_t (Bool_t tname, rest, annot))
     | Prim (loc, I_NOT, [], annot),
@@ -1965,7 +1977,7 @@ and parse_instr
     | Prim (loc, I_ADD, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Add_intint
           (Item_t (Int_t tname, rest, annot))
     | Prim (loc, I_ADD, [], annot),
@@ -1981,13 +1993,13 @@ and parse_instr
     | Prim (loc, I_ADD, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Add_natnat
           (Item_t (Nat_t  tname, rest, annot))
     | Prim (loc, I_SUB, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Sub_int
           (Item_t (Int_t tname, rest, annot))
     | Prim (loc, I_SUB, [], annot),
@@ -2003,13 +2015,13 @@ and parse_instr
     | Prim (loc, I_SUB, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun _tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun _tname ->
         typed ctxt loc Sub_int
           (Item_t (Int_t None, rest, annot))
     | Prim (loc, I_MUL, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Mul_intint
           (Item_t (Int_t tname, rest, annot))
     | Prim (loc, I_MUL, [], annot),
@@ -2025,7 +2037,7 @@ and parse_instr
     | Prim (loc, I_MUL, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Mul_natnat
           (Item_t (Nat_t tname, rest, annot))
     | Prim (loc, I_EDIV, [], annot),
@@ -2038,14 +2050,14 @@ and parse_instr
     | Prim (loc, I_EDIV, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Ediv_tez
           (Item_t (Option_t ((Pair_t ((Nat_t None, None), (Mutez_t tname, None), None), None),
                              None, None), rest, annot))
     | Prim (loc, I_EDIV, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Ediv_intint
           (Item_t (Option_t
                      ((Pair_t ((Int_t tname, None), (Nat_t None, None), None), None),
@@ -2066,32 +2078,32 @@ and parse_instr
     | Prim (loc, I_EDIV, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Ediv_natnat
           (Item_t (Option_t ((Pair_t ((Nat_t tname, None), (Nat_t tname, None), None), None),
                              None, None), rest, annot))
     | Prim (loc, I_LSL, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Lsl_nat
           (Item_t (Nat_t tname, rest, annot))
     | Prim (loc, I_LSR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Lsr_nat
           (Item_t (Nat_t tname, rest, annot))
     | Prim (loc, I_OR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Or_nat
           (Item_t (Nat_t tname, rest, annot))
     | Prim (loc, I_AND, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc And_nat
           (Item_t (Nat_t tname, rest, annot))
     | Prim (loc, I_AND, [], annot),
@@ -2102,7 +2114,7 @@ and parse_instr
     | Prim (loc, I_XOR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc Xor_nat
           (Item_t (Nat_t tname, rest, annot))
     | Prim (loc, I_NOT, [], annot),
@@ -2119,49 +2131,49 @@ and parse_instr
     | Prim (loc, I_COMPARE, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc (Compare (Int_key tname))
           (Item_t (Int_t None, rest, annot))
     | Prim (loc, I_COMPARE, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc (Compare (Nat_key tname))
           (Item_t (Int_t None, rest, annot))
     | Prim (loc, I_COMPARE, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc (Compare (Bool_key tname))
           (Item_t (Int_t None, rest, annot))
     | Prim (loc, I_COMPARE, [], annot),
       Item_t (String_t tn1, Item_t (String_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc (Compare (String_key tname))
           (Item_t (Int_t None, rest, annot))
     | Prim (loc, I_COMPARE, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc (Compare (Mutez_key tname))
           (Item_t (Int_t None, rest, annot))
     | Prim (loc, I_COMPARE, [], annot),
       Item_t (Key_hash_t tn1, Item_t (Key_hash_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc (Compare (Key_hash_key tname))
           (Item_t (Int_t None, rest, annot))
     | Prim (loc, I_COMPARE, [], annot),
       Item_t (Timestamp_t tn1, Item_t (Timestamp_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc (Compare (Timestamp_key tname))
           (Item_t (Int_t None, rest, annot))
     | Prim (loc, I_COMPARE, [], annot),
       Item_t (Address_t tn1, Item_t (Address_t tn2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return (merge_type_annot tn1 tn2) >>=? fun tname ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc (Compare (Address_key tname))
           (Item_t (Int_t None, rest, annot))
     (* comparators *)
@@ -2199,7 +2211,7 @@ and parse_instr
     | Prim (loc, I_CAST, [ cast_t ], annot),
       Item_t (t, stack, item_annot) ->
         parse_var_annot loc annot ~default:item_annot >>=? fun annot ->
-        (Lwt.return (parse_ty ~allow_big_map:true ~allow_operation:true cast_t))
+        (Lwt.return @@ parse_ty ~allow_big_map:true ~allow_operation:true cast_t)
         >>=? fun (Ex_ty cast_t) ->
         Lwt.return @@ ty_eq cast_t t >>=? fun Eq ->
         Lwt.return @@ merge_types loc cast_t t >>=? fun _ ->
@@ -2217,7 +2229,7 @@ and parse_instr
           (Item_t (Address_t None, rest, annot))
     | Prim (loc, I_CONTRACT, [ ty ], annot),
       Item_t (Address_t _, rest, addr_annot) ->
-        Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false ty) >>=? fun (Ex_ty t) ->
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:false ty >>=? fun (Ex_ty t) ->
         parse_var_annot loc annot ~default:(gen_access_annot addr_annot default_contract_annot)
         >>=? fun annot ->
         typed ctxt loc (Contract t)
@@ -2269,14 +2281,14 @@ and parse_instr
                        (ginit, rest, _), _), _), _), _), _) ->
         parse_two_var_annot loc annot >>=? fun (op_annot, addr_annot) ->
         let cannonical_code = fst @@ Micheline.extract_locations code in
-        Lwt.return (parse_toplevel cannonical_code) >>=? fun (arg_type, storage_type, code_field) ->
+        Lwt.return @@ parse_toplevel cannonical_code >>=? fun (arg_type, storage_type, code_field) ->
         trace
           (Ill_formed_type (Some "parameter", cannonical_code, location arg_type))
-          (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false arg_type))
+          (Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:false arg_type)
         >>=? fun (Ex_ty arg_type) ->
         trace
           (Ill_formed_type (Some "storage", cannonical_code, location storage_type))
-          (Lwt.return (parse_ty ~allow_big_map:true ~allow_operation:false storage_type))
+          (Lwt.return @@ parse_ty ~allow_big_map:true ~allow_operation:false storage_type)
         >>=? fun (Ex_ty storage_type) ->
         let arg_field = default_annot (type_to_field_annot (name_of_ty arg_type))
             ~default:default_param_annot in
@@ -2442,11 +2454,11 @@ and parse_contract
   : type arg. context -> Script.location -> arg ty -> Contract.t ->
     (context * arg typed_contract) tzresult Lwt.t
   = fun ctxt loc arg contract ->
-    Lwt.return (Gas.consume ctxt Typecheck_costs.contract_exists) >>=? fun ctxt ->
+    Lwt.return @@ Gas.consume ctxt Typecheck_costs.contract_exists >>=? fun ctxt ->
     Contract.exists ctxt contract >>=? function
     | false -> fail (Invalid_contract (loc, contract))
     | true ->
-        Lwt.return (Gas.consume ctxt Typecheck_costs.get_script) >>=? fun ctxt ->
+        Lwt.return @@ Gas.consume ctxt Typecheck_costs.get_script >>=? fun ctxt ->
         trace
           (Invalid_contract (loc, contract)) @@
         Contract.get_script ctxt contract >>=? fun (ctxt, script) -> match script with
@@ -2511,9 +2523,9 @@ let parse_script
   : ?type_logger: type_logger ->
     context -> Script.t -> (ex_script * context) tzresult Lwt.t
   = fun ?type_logger ctxt { code ; storage } ->
-    Lwt.return (Script.force_decode code) >>=? fun code ->
-    Lwt.return (Script.force_decode storage) >>=? fun storage ->
-    Lwt.return (parse_toplevel code) >>=? fun (arg_type, storage_type, code_field) ->
+    Lwt.return @@ Script.force_decode code >>=? fun code ->
+    Lwt.return @@ Script.force_decode storage >>=? fun storage ->
+    Lwt.return @@ parse_toplevel code >>=? fun (arg_type, storage_type, code_field) ->
     trace
       (Ill_formed_type (Some "parameter", code, location arg_type))
       (Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false arg_type))
@@ -2541,7 +2553,7 @@ let parse_script
 let typecheck_code
   : context -> Script.expr -> (type_map * context) tzresult Lwt.t
   = fun ctxt code ->
-    Lwt.return (parse_toplevel code) >>=? fun (arg_type, storage_type, code_field) ->
+    Lwt.return @@ parse_toplevel code >>=? fun (arg_type, storage_type, code_field) ->
     let type_map = ref [] in
     (* TODO: annotation checking *)
     trace
@@ -2576,7 +2588,7 @@ let typecheck_data
   = fun ?type_logger ctxt (data, exp_ty) ->
     trace
       (Ill_formed_type (None, exp_ty, 0))
-      (Lwt.return (parse_ty ~allow_big_map:true ~allow_operation:false (root exp_ty)))
+      (Lwt.return @@ parse_ty ~allow_big_map:true ~allow_operation:false (root exp_ty))
     >>=? fun (Ex_ty exp_ty) ->
     trace
       (Ill_typed_data (None, data, exp_ty))
