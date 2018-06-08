@@ -19,9 +19,9 @@ val default_steps_annot : var_annot option
 val default_source_annot : var_annot option
 val default_self_annot : var_annot option
 val default_arg_annot : var_annot option
+val default_param_annot : var_annot option
+val default_storage_annot : var_annot option
 
-val default_param_annot : field_annot option
-val default_storage_annot : field_annot option
 val default_car_annot : field_annot option
 val default_cdr_annot : field_annot option
 val default_contract_annot : field_annot option
@@ -46,7 +46,7 @@ val unparse_field_annot : field_annot option -> string list
 (** Convertions functions between different annotation kinds *)
 
 val field_to_var_annot : field_annot option -> var_annot option
-val type_to_field_annot : type_annot option -> field_annot option
+val type_to_var_annot : type_annot option -> var_annot option
 val var_to_field_annot : var_annot option -> field_annot option
 
 (** Replace an annotation by its default value if it is [None] *)
@@ -82,8 +82,14 @@ val fail_unexpected_annot : int -> 'a list -> unit tzresult Lwt.t
 (** Parse a type annotation only. *)
 val parse_type_annot : int -> string list -> type_annot option tzresult
 
+(** Parse a field annotation only. *)
 val parse_field_annot :
   int -> string list -> field_annot option tzresult
+
+(** Parse an annotation for composed types, of the form
+    [:ty_name %field] in any order. *)
+val parse_type_field_annot :
+  int -> string list -> (type_annot option * field_annot option) tzresult
 
 (** Parse an annotation for composed types, of the form
     [:ty_name %field1 %field2] in any order. *)
@@ -91,9 +97,10 @@ val parse_composed_type_annot :
   int -> string list ->
   (type_annot option * field_annot option * field_annot option) tzresult
 
-(** Check that type annotations are consistent *)
+(** Check that type annotations on constants are consistent *)
 val check_const_type_annot :
-  int -> string list -> type_annot option -> unit tzresult Lwt.t
+  int -> string list -> type_annot option -> field_annot option list ->
+  unit tzresult Lwt.t
 
 (** Extract and remove a field annotation from a node *)
 val extract_field_annot :

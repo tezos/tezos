@@ -19,9 +19,9 @@ let default_steps_annot = Some (`Var_annot "steps")
 let default_source_annot = Some (`Var_annot "source")
 let default_self_annot = Some (`Var_annot "self")
 let default_arg_annot = Some (`Var_annot "arg")
+let default_param_annot = Some (`Var_annot "parameter")
+let default_storage_annot = Some (`Var_annot "storage")
 
-let default_param_annot = Some (`Field_annot "parameter")
-let default_storage_annot = Some (`Field_annot "storage")
 let default_car_annot = Some (`Field_annot "car")
 let default_cdr_annot = Some (`Field_annot "cdr")
 let default_contract_annot = Some (`Field_annot "contract")
@@ -54,10 +54,10 @@ let field_to_var_annot : field_annot option -> var_annot option =
   | None -> None
   | Some (`Field_annot s) -> Some (`Var_annot s)
 
-let type_to_field_annot : type_annot option -> field_annot option =
+let type_to_var_annot : type_annot option -> var_annot option =
   function
   | None -> None
-  | Some (`Type_annot s) -> Some (`Field_annot s)
+  | Some (`Type_annot s) -> Some (`Var_annot s)
 
 let var_to_field_annot : var_annot option -> field_annot option =
   function
@@ -206,6 +206,16 @@ let parse_type_annot
     error_unexpected_annot loc fields >>? fun () ->
     get_one_annot loc types
 
+let parse_type_field_annot
+  : int -> string list -> (type_annot option * field_annot option) tzresult
+  = fun loc annot ->
+    parse_annots loc annot >>?
+    classify_annot loc >>? fun (vars, types, fields) ->
+    error_unexpected_annot loc vars >>? fun () ->
+    get_one_annot loc types >>? fun t ->
+    get_one_annot loc fields >|? fun f ->
+    (t, f)
+
 let parse_composed_type_annot
   : int -> string list -> (type_annot option * field_annot option * field_annot option) tzresult
   = fun loc annot ->
@@ -217,10 +227,24 @@ let parse_composed_type_annot
     (t, f1, f2)
 
 let check_const_type_annot
-  : int -> string list -> type_annot option -> unit tzresult Lwt.t
-  = fun loc annot expected_annot ->
+  : int -> string list -> type_annot option -> field_annot option list -> unit tzresult Lwt.t
+  = fun loc annot expected_name expected_fields ->
     Lwt.return
-      (parse_type_annot loc annot >>? merge_type_annot expected_annot >|? fun _ -> ())
+      (parse_composed_type_annot loc annot >>? fun (ty_name, field1, field2) ->
+       merge_type_annot expected_name ty_name >>? fun _ ->
+       match expected_fields, field1, field2 with
+       | [], Some _, _ | [], _, Some _ | [_], Some _, Some _ ->
+           (* Too many annotations *)
+           error (Unexpected_annotation loc)
+       | _ :: _ :: _ :: _, _, _ | [_], None, Some _ ->
+           error (Unexpected_annotation loc)
+       | [], None, None -> ok ()
+       | [ f1; f2 ], _,  _ ->
+           merge_field_annot f1 field1 >>? fun _ ->
+           merge_field_annot f2 field2 >|? fun _ -> ()
+       | [ f1 ], _,  None ->
+           merge_field_annot f1 field1 >|? fun _ -> ()
+      )
 
 let parse_field_annot
   : int -> string list -> field_annot option tzresult

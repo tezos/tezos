@@ -78,7 +78,10 @@ and 'ty ty =
   | Timestamp_t : type_annot option -> Script_timestamp.t ty
   | Address_t : type_annot option -> Contract.t ty
   | Bool_t : type_annot option -> bool ty
-  | Pair_t :  ('a ty * field_annot option) * ('b ty * field_annot option) * type_annot option -> ('a, 'b) pair ty
+  | Pair_t :
+      ('a ty * field_annot option * var_annot option) *
+      ('b ty * field_annot option * var_annot option) *
+      type_annot option -> ('a, 'b) pair ty
   | Union_t : ('a ty * field_annot option) * ('b ty * field_annot option) * type_annot option  -> ('a, 'b) union ty
   | Lambda_t : 'arg ty * 'ret ty * type_annot option  -> ('arg, 'ret) lambda ty
   | Option_t : ('v ty * field_annot option) * field_annot option * type_annot option  -> 'v option ty

@@ -297,6 +297,7 @@ assert_storage $contract_dir/if_some.tz '"?"' 'None' '""'
 assert_storage  $contract_dir/set_car.tz '(Pair "hello" 0)' '"world"' '(Pair "world" 0)'
 assert_storage  $contract_dir/set_car.tz '(Pair "hello" 0)' '"abc"' '(Pair "abc" 0)'
 assert_storage  $contract_dir/set_car.tz '(Pair "hello" 0)' '""' '(Pair "" 0)'
+assert_fails $client run program $contract_dir/set_car.tz on storage '(Pair %wrong %field "hello" 0)' Unit and input '""'
 
 assert_storage  $contract_dir/set_cdr.tz '(Pair "hello" 0)' '1' '(Pair "hello" 1)'
 assert_storage  $contract_dir/set_cdr.tz '(Pair "hello" 500)' '3' '(Pair "hello" 3)'
