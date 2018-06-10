@@ -448,8 +448,6 @@ usage() {
     echo "    $0 start [--rpc-port <int>] [OPTIONS]"
     echo "       Launch a full Tezos alphanet node in a docker container"
     echo "       automatically generating a new network identity."
-    echo "       An account 'my_account' for a manager 'my_identity' is also"
-    echo "       created to be used via the client."
     echo "       OPTIONS (others than --rpc-port) are directly passed to the"
     echo "       Tezos node, see '$0 shell tezos-node config --help'"
     echo "       for more details."

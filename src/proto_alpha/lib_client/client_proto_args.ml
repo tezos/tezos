@@ -77,17 +77,17 @@ let arg_arg =
 let delegate_arg =
   Client_keys.Public_key_hash.source_arg
     ~long:"delegate"
-    ~placeholder:"identity"
+    ~placeholder:"address"
     ~doc:"delegate of the contract\n\
-          Must be a known identity."
+          Must be a known address."
     ()
 
 let source_arg =
   arg
     ~long:"source"
-    ~placeholder:"identity"
+    ~placeholder:"address"
     ~doc:"source of the deposits to be paid\n\
-          Must be a known identity."
+          Must be a known address."
     string_parameter
 
 let spendable_switch =

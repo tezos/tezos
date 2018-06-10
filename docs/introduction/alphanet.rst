@@ -311,8 +311,8 @@ the appropriate value:
 
 ::
 
-    $ ./alphanet.sh client list known identities
-    my_identity: tz1iFY8aDskx9QGbgBy68SNAGgkc7AE2iG9H (public key known) (secret key known)
+    $ ./alphanet.sh client list known addresses
+    my_account: tz1iFY8aDskx9QGbgBy68SNAGgkc7AE2iG9H (public key known) (secret key known)
     $ ./alphanet.sh client rpc post /chains/main/blocks/head/helpers/rights/baking/delegate/tz1iFY8aDskx9QGbgBy68SNAGgkc7AE2iG9H with {}
     { "ok":
         [ { "level": 1400.000000, "priority": 2.000000,

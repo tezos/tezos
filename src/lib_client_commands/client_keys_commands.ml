@@ -202,9 +202,9 @@ let commands () : Client_context.io_wallet Clic.command list =
            Signature.Public_key_hash.pp pkh >>= fun () ->
          Public_key.add ~force cctxt name (pk_uri, public_key)) ;
 
-    command ~group ~desc: "Add an identity to the wallet."
+    command ~group ~desc: "Add an address to the wallet."
       (args1 (Public_key.force_switch ()))
-      (prefixes [ "add" ; "identity" ]
+      (prefixes [ "add" ; "address" ]
        @@ Public_key_hash.fresh_alias_param
        @@ Public_key_hash.source_param
        @@ stop)
@@ -212,9 +212,9 @@ let commands () : Client_context.io_wallet Clic.command list =
          Public_key_hash.of_fresh cctxt force name >>=? fun name ->
          Public_key_hash.add ~force cctxt name hash) ;
 
-    command ~group ~desc: "List all identities and associated keys."
+    command ~group ~desc: "List all addresses and associated keys."
       no_options
-      (fixed [ "list" ; "known" ; "identities" ])
+      (fixed [ "list" ; "known" ; "addresses" ])
       (fun () (cctxt : #Client_context.io_wallet) ->
          list_keys cctxt >>=? fun l ->
          iter_s begin fun (name, pkh, pk, sk) ->
@@ -232,16 +232,16 @@ let commands () : Client_context.io_wallet Clic.command list =
            end >>= fun () -> return ()
          end l) ;
 
-    command ~group ~desc: "Show the keys associated with an identity."
+    command ~group ~desc: "Show the keys associated with an implicit account."
       (args1 show_private_switch)
-      (prefixes [ "show" ; "identity"]
+      (prefixes [ "show" ; "address"]
        @@ Public_key_hash.alias_param
        @@ stop)
       (fun show_private (name, _) (cctxt : #Client_context.io_wallet) ->
          alias_keys cctxt name >>=? fun key_info ->
          match key_info with
          | None ->
-             cctxt#message "No keys found for identity" >>= fun () ->
+             cctxt#message "No keys found for address" >>= fun () ->
              return ()
          | Some (pkh, pk, skloc) ->
              cctxt#message "Hash: %a"

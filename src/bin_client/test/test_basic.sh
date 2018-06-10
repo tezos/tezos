@@ -35,7 +35,7 @@ $client gen keys $key2 --sig secp256k1
 $client gen keys $key3 --sig ed25519
 # $client gen keys $key6 --sig p256
 
-$client list known identities
+$client list known addresses
 $client get balance for bootstrap1
 
 bake_after $client transfer 1,000 from bootstrap1 to $key1
