@@ -246,6 +246,12 @@ To each baking slot, we associate a list of ``ENDORSERS_PER_BLOCK`` = 32
 *endorsers*. Endorsers are drawn from the set of delegates, by randomly
 selecting 32 rolls with replacement.
 
+Each endorser verifies the last block that was baked, say at level
+``n``, and emits an endorsement operation. The endorsement operations
+are then baked in block ``n+1`` and will contribute to the `fitness`
+of block ``n``. Once block ``n+1`` is baked, no other endorsement for
+block ``n`` will be considered valid.
+
 Endorsers receive a reward (at the same time as block creators do). The
 reward is ``ENDORSEMENT_REWARD`` = 2 / ``BLOCK_PRIORITY`` where block
 priority starts at 1. So the endorsement reward is only half if the
