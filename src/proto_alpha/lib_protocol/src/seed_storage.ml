@@ -90,7 +90,7 @@ let init ctxt =
        Storage.Seed.For_cycle.init ctxt cycle seed)
     (return ctxt)
     (0 --> (preserved+1))
-    (Seed_repr.initial_seeds (preserved+1))
+    (Seed_repr.initial_seeds (preserved+2))
 
 let cycle_end ctxt last_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
@@ -105,4 +105,3 @@ let cycle_end ctxt last_cycle =
   | Some revealed ->
       let inited_seed_cycle = Cycle_repr.add last_cycle (preserved+1) in
       compute_for_cycle ctxt ~revealed inited_seed_cycle
-

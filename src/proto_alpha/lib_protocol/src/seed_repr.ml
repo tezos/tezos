@@ -99,7 +99,7 @@ let initial_nonce_hash_0 =
 
 let initial_seeds n =
   let rec loop acc elt i =
-    if Compare.Int.(i = 0) then
+    if Compare.Int.(i = 1) then
       List.rev (elt :: acc)
     else
       loop
