@@ -39,12 +39,8 @@ Protocol header (for tezos.alpha):
 
 -  ``signature``: a digital signature of the shell and protocol headers
    (excluding the signature itself).
--  ``priority``: every block height in tezos.alpha is associated with an
-   ordered list of bakers. The first baker in that list is the first one
-   who can bake a block at that height, one minute after the previous
-   block. The second baker in the list can do so, but only two minutes
-   after the previous block, etc., the third baker three minutes after.
-   This integer is the priority of the block.
+-  ``priority``: the position in the priority list of delegates at which
+   the block was baked.
 -  ``seed_nonce_hash``: a commitment to a random number, used to
    generate entropy on the chain. Present in only one out of
    (``BLOCKS_PER_COMMITMENT`` = 32) blocks.
@@ -220,12 +216,15 @@ We admit, for the time being, that the protocol generates a random seed
 for each cycle. From this random seed, we can seed a CSPRNG which is
 used to draw baking rights for a cycle.
 
-To each position, or slot, in the cycle, is associated a priority list
-of bakers. This is drawn randomly, with replacement, from the set of
-active rolls. Each roll is associated with the public key of a delegate,
-therefore, for each slot in the cycle, we have an ordered list of public
-keys which may create and sign a block. It is possible that the same
-public key appears multiple times in this list.
+To each position, in the cycle, is associated a priority list of
+delegates.
+This is drawn randomly, with replacement, from the set of active rolls
+so it is possible that the same public key appears multiple times in
+this list.
+The first baker in the list is the first one who can bake a block at
+that level.
+If a delegate is for some reason unable to bake, the next delegate in
+the list can step up and bake the block.
 
 The delegate with the highest priority can bake a block with a timestamp
 greater than ``timestamp_of_previous_block`` plus
