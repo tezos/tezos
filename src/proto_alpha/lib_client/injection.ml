@@ -322,7 +322,7 @@ let inject_operation
         cctxt#message "Waiting for the operation to be included..." >>= fun () ->
         Client_confirmations.wait_for_operation_inclusion
           ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
-        Alpha_block_services.Operation.operation
+        Alpha_block_services.Operations.operation
           cctxt ~block:(`Hash (h, 0)) i j >>=? fun op' ->
         match op'.receipt with
         | No_operation_metadata ->

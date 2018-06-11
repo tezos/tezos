@@ -135,18 +135,18 @@ let build_raw_rpc_directory
     let chain_id = State.Block.chain_id block in
     return (List.map2 (List.map2 (convert chain_id)) ops metadata) in
 
-  register0 S.Operation.operations begin fun block () () ->
+  register0 S.Operations.operations begin fun block () () ->
     operations block
   end ;
 
-  register1 S.Operation.operations_in_pass begin fun block i () () ->
+  register1 S.Operations.operations_in_pass begin fun block i () () ->
     State.Block.operations block i >>= fun (ops, _path) ->
     State.Block.operations_metadata block i >>= fun metadata ->
     let chain_id = State.Block.chain_id block in
     return (List.map2 (convert chain_id) ops metadata)
   end ;
 
-  register2 S.Operation.operation begin fun block i j () () ->
+  register2 S.Operations.operation begin fun block i j () () ->
     State.Block.operations block i >>= fun (ops, _path) ->
     State.Block.operations_metadata block i >>= fun metadata ->
     let chain_id = State.Block.chain_id block in
@@ -155,16 +155,16 @@ let build_raw_rpc_directory
 
   (* operation_hashes *)
 
-  register0 S.Operation_hash.operation_hashes begin fun block () () ->
+  register0 S.Operation_hashes.operation_hashes begin fun block () () ->
     State.Block.all_operation_hashes block >>= return
   end ;
 
-  register1 S.Operation_hash.operation_hashes_in_pass begin fun block i () () ->
+  register1 S.Operation_hashes.operation_hashes_in_pass begin fun block i () () ->
     State.Block.operation_hashes block i >>= fun (ops, _) ->
     return ops
   end ;
 
-  register2 S.Operation_hash.operation_hash begin fun block i j () () ->
+  register2 S.Operation_hashes.operation_hash begin fun block i j () () ->
     State.Block.operation_hashes block i >>= fun (ops, _) ->
     return (List.nth ops j)
   end ;

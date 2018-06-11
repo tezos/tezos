@@ -391,7 +391,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
     end
 
-    module Operation = struct
+    module Operations = struct
 
       let path = RPC_path.(path / "operations")
 
@@ -440,7 +440,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
     end
 
-    module Operation_hash = struct
+    module Operation_hashes = struct
 
       let path = RPC_path.(path / "operation_hashes")
 
@@ -457,7 +457,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
             "All the operations included in `n-th` validation pass of the block."
           ~query: RPC_query.empty
           ~output: (list Operation_hash.encoding)
-          RPC_path.(path /: Operation.list_arg)
+          RPC_path.(path /: Operations.list_arg)
 
       let operation_hash =
         RPC_service.get_service
@@ -465,7 +465,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
             "The hash of then `m-th` operation in the `n-th` validation pass of the block."
           ~query: RPC_query.empty
           ~output: Operation_hash.encoding
-          RPC_path.(path /: Operation.list_arg /: Operation.offset_arg)
+          RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
     end
 
     module Helpers = struct
@@ -659,9 +659,9 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
   end
 
-  module Operation = struct
+  module Operations = struct
 
-    module S = S.Operation
+    module S = S.Operations
 
     let operations ctxt =
       let f = make_call0 S.operations ctxt in
@@ -680,9 +680,9 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
   end
 
-  module Operation_hash = struct
+  module Operation_hashes = struct
 
-    module S = S.Operation_hash
+    module S = S.Operation_hashes
 
     let operation_hashes ctxt =
       let f = make_call0 S.operation_hashes ctxt in

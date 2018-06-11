@@ -145,7 +145,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
   end
 
-  module Operation : sig
+  module Operations : sig
 
     val operations:
       #simple -> ?chain:chain -> ?block:block ->
@@ -159,7 +159,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
   end
 
-  module Operation_hash : sig
+  module Operation_hashes : sig
 
     val operation_hashes:
       #simple -> ?chain:chain -> ?block:block ->
@@ -264,7 +264,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
     end
 
-    module Operation : sig
+    module Operations : sig
 
       val operations:
         ([ `GET ], prefix,
@@ -283,7 +283,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
     end
 
-    module Operation_hash : sig
+    module Operation_hashes : sig
 
       val operation_hashes:
         ([ `GET ], prefix,
