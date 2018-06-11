@@ -128,6 +128,13 @@ let forge (op : Operation.packed) : Operation.raw = {
       op.protocol_data
 }
 
+let all_operations (ops : Alpha_block_services.Mempool.t) =
+  List.map (fun (_, op) -> op) ops.applied @
+  Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.refused [] @
+  Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.branch_refused [] @
+  Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.branch_delayed [] @
+  Operation_hash.Map.fold (fun _ op acc -> op :: acc) ops.unprocessed []
+
 let forge_block cctxt ?(chain = `Main) block
     ?force
     ?operations ?(best_effort = operations = None) ?(sort = best_effort)
@@ -137,17 +144,9 @@ let forge_block cctxt ?(chain = `Main) block
   begin
     match operations with
     | None ->
-        Shell_services.Mempool.pending_operations
-          cctxt ~chain () >>=? fun (ops, pendings) ->
-        let ops =
-          List.map parse @@
-          List.map snd @@
-          Operation_hash.Map.bindings @@
-          Operation_hash.Map.fold
-            Operation_hash.Map.add
-            (Preapply_result.operations ops)
-            pendings in
-        return ops
+        Alpha_block_services.Mempool.pending_operations
+          cctxt ~chain () >>=? fun ops ->
+        return (all_operations ops)
     | Some operations ->
         return operations
   end >>=? fun operations ->
@@ -499,14 +498,9 @@ let bake (cctxt : #Proto_alpha.full) state =
        lwt_debug "Try baking after %a (slot %d) for %s (%a)"
          Block_hash.pp_short bi.hash
          priority name Time.pp_hum timestamp >>= fun () ->
-       Shell_services.Mempool.pending_operations
-         cctxt ~chain () >>=? fun (res, ops) ->
-       let operations =
-         List.map parse @@
-         List.map snd @@
-         Operation_hash.Map.bindings @@
-         Operation_hash.Map.(fold add)
-           ops (Preapply_result.operations res) in
+       Alpha_block_services.Mempool.pending_operations
+         cctxt ~chain () >>=? fun ops ->
+       let operations = all_operations ops in
        let request = List.length operations in
        let seed_nonce_hash =
          if next_level.expected_commitment then

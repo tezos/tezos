@@ -32,6 +32,7 @@ val to_string: block -> string
 type prefix = (unit * chain) * block
 val dir_path: (chain_prefix, chain_prefix) RPC_path.t
 val path: (chain_prefix, chain_prefix * block) RPC_path.t
+val mempool_path : ('a, 'b) RPC_path.t -> ('a, 'b) RPC_path.t
 
 type operation_list_quota = {
   max_size: int ;
@@ -218,6 +219,23 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
   end
 
+  module Mempool : sig
+
+    type t = {
+      applied: (Operation_hash.t * Next_proto.operation) list ;
+      refused: (Next_proto.operation * error list) Operation_hash.Map.t ;
+      branch_refused: (Next_proto.operation * error list) Operation_hash.Map.t ;
+      branch_delayed: (Next_proto.operation * error list) Operation_hash.Map.t ;
+      unprocessed: Next_proto.operation Operation_hash.Map.t ;
+    }
+
+    val pending_operations:
+      #simple ->
+      ?chain:chain ->
+      unit -> t tzresult Lwt.t
+
+  end
+
   module S : sig
 
     val hash:
@@ -345,6 +363,16 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
         ([ `GET ], prefix,
          prefix * string, unit, unit,
          string list) RPC_service.t
+
+    end
+
+    module Mempool : sig
+
+      val pending_operations:
+        ('a, 'b) RPC_path.t ->
+        ([ `GET ], 'a,
+         'b , unit, unit,
+         Mempool.t) RPC_service.t
 
     end
 

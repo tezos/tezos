@@ -48,38 +48,6 @@ module S = struct
       ~output: Chain_id.encoding
       RPC_path.(path / "chain_id")
 
-  module Mempool = struct
-
-    let operation_encoding =
-      merge_objs
-        (obj1 (req "hash" Operation_hash.encoding))
-        Operation.encoding
-
-    let pending_operations =
-      (* TODO: branch_delayed/... *)
-      RPC_service.get_service
-        ~description:
-          "List the not-yet-prevalidated operations."
-        ~query: RPC_query.empty
-        ~output:
-          (conv
-             (fun (preapplied, unprocessed) ->
-                ({ preapplied with
-                   Preapply_result.refused = Operation_hash.Map.empty },
-                 Operation_hash.Map.bindings unprocessed))
-             (fun (preapplied, unprocessed) ->
-                (preapplied,
-                 List.fold_right
-                   (fun (h, op) m -> Operation_hash.Map.add h op m)
-                   unprocessed Operation_hash.Map.empty))
-             (merge_objs
-                (dynamic_size
-                   (Preapply_result.encoding RPC_error.encoding))
-                (obj1 (req "unprocessed" (list (dynamic_size operation_encoding))))))
-        RPC_path.(path / "mempool")
-
-  end
-
   module Blocks = struct
 
     let list_query =
@@ -168,13 +136,6 @@ let chain_id ctxt =
     | `Hash h -> return h
     | _ -> f chain () ()
 
-module Mempool = struct
-
-  let pending_operations ctxt ?(chain = `Main) () =
-    make_call0 S.Mempool.pending_operations ctxt chain () ()
-
-end
-
 module Blocks = struct
 
   let list ctxt =
@@ -198,6 +159,8 @@ module Blocks = struct
   let protocols = Block_services.protocols
 
 end
+
+module Mempool = Block_services.Empty.Mempool
 
 module Invalid_blocks = struct
 

@@ -34,15 +34,7 @@ val chain_id:
   ?chain:chain ->
   unit -> Chain_id.t tzresult Lwt.t
 
-module Mempool : sig
-
-  val pending_operations:
-    #simple ->
-    ?chain:chain ->
-    unit ->
-    (error Preapply_result.t * Operation.t Operation_hash.Map.t) tzresult Lwt.t
-
-end
+module Mempool = Block_services.Empty.Mempool
 
 module Blocks : sig
 
@@ -92,15 +84,6 @@ module S : sig
     ([ `GET ], prefix,
      prefix, unit, unit,
      Chain_id.t) RPC_service.t
-
-  module Mempool : sig
-
-    val pending_operations:
-      ([ `GET ], prefix,
-       prefix , unit, unit,
-       error Preapply_result.t * Operation.t Operation_hash.Map.t) RPC_service.t
-
-  end
 
   module Blocks : sig
 

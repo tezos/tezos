@@ -142,21 +142,17 @@ let build_rpc_directory validator =
 
   (* Mempool *)
 
-  let register0 s f =
-    dir :=
-      RPC_directory.register !dir (RPC_service.subst0 s)
-        (fun chain p q -> f chain p q) in
-
-  register0 S.Mempool.pending_operations begin fun chain () () ->
-    Validator.get_exn validator (State.Chain.id chain) >>= fun chain_validator ->
-    let pv_opt = Chain_validator.prevalidator chain_validator in
-    match pv_opt with
-    | Some pv ->
-        return (Prevalidator.operations pv)
-    | None ->
-        return (Preapply_result.empty, Operation_hash.Map.empty)
-  end ;
+  let merge d = dir := RPC_directory.merge !dir d in
+  merge
+    (RPC_directory.map
+       (fun chain ->
+          Validator.get_exn validator
+            (State.Chain.id chain) >>= fun chain_validator ->
+          Lwt.return (Chain_validator.prevalidator chain_validator))
+       Prevalidator.rpc_directory) ;
 
   RPC_directory.prefix Chain_services.path @@
   RPC_directory.map (fun ((), chain) -> get_chain state chain) !dir
+
+
 

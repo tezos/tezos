@@ -45,6 +45,7 @@ module Types = struct
     mutable validation_result : error Preapply_result.t ;
     mutable validation_state : Prevalidation.prevalidation_state tzresult ;
     mutable advertisement : [ `Pending of Mempool.t | `None ] ;
+    mutable rpc_directory : state RPC_directory.t tzresult Lwt.t ;
   }
   type parameters = limits * Distributed_db.chain_db
 
@@ -79,6 +80,59 @@ type error += Closed = Worker.Closed
 
 let debug w =
   Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
+
+let empty_rpc_directory : unit RPC_directory.t =
+  RPC_directory.register
+    RPC_directory.empty
+    (Block_services.Empty.S.Mempool.pending_operations RPC_path.open_root)
+    (fun _pv () () ->
+       return {
+         Block_services.Empty.Mempool.applied = [] ;
+         refused = Operation_hash.Map.empty ;
+         branch_refused = Operation_hash.Map.empty ;
+         branch_delayed = Operation_hash.Map.empty ;
+         unprocessed = Operation_hash.Map.empty ;
+       })
+
+let rpc_directory block : Types.state RPC_directory.t tzresult Lwt.t =
+  State.Block.protocol_hash block >>= fun protocol ->
+  begin
+    match Registered_protocol.get protocol with
+    | None ->
+        (* FIXME. *)
+        (* This should not happen: it should be handled in the validator. *)
+        failwith "Prevalidation: missing protocol '%a' for the current block."
+          Protocol_hash.pp_short protocol
+    | Some protocol ->
+        return protocol
+  end >>=? fun (module Proto) ->
+  let module Proto_services = Block_services.Make(Proto)(Proto) in
+  return @@
+  RPC_directory.register
+    RPC_directory.empty
+    (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
+    (fun pv () () ->
+       let map_op op =
+         let protocol_data =
+           Data_encoding.Binary.of_bytes_exn
+             Proto.operation_data_encoding
+             op.Operation.proto in
+         { Proto.shell = op.shell ; protocol_data } in
+       let map_op_error (op, error) = (map_op op, error) in
+       return {
+         Proto_services.Mempool.applied =
+           List.map
+             (fun (hash, op) -> (hash, map_op op))
+             (List.rev pv.validation_result.applied) ;
+         refused =
+           Operation_hash.Map.map map_op_error pv.validation_result.refused ;
+         branch_refused =
+           Operation_hash.Map.map map_op_error pv.validation_result.branch_refused ;
+         branch_delayed =
+           Operation_hash.Map.map map_op_error pv.validation_result.branch_delayed ;
+         unprocessed =
+           Operation_hash.Map.map map_op pv.pending ;
+       })
 
 let list_pendings ?maintain_chain_db  ~from_block ~to_block old_mempool =
   let rec pop_blocks ancestor block mempool =
@@ -356,6 +410,7 @@ let on_flush w pv predecessor =
   pv.in_mempool <- Operation_hash.Set.empty ;
   pv.validation_result <- validation_result ;
   pv.validation_state <- validation_state ;
+  pv.rpc_directory <- rpc_directory predecessor ;
   return ()
 
 let on_advertise pv =
@@ -429,7 +484,9 @@ let on_launch w _ (limits, chain_db) =
       pending = Operation_hash.Map.empty ;
       in_mempool = Operation_hash.Set.empty ;
       validation_result ; validation_state ;
-      advertisement = `None } in
+      advertisement = `None ;
+      rpc_directory = rpc_directory predecessor ;
+    } in
   List.iter
     (fun oph -> Lwt.ignore_result (fetch_operation w pv oph))
     mempool.known_valid ;
@@ -508,3 +565,20 @@ let pending_requests t = Worker.pending_requests t
 let current_request t = Worker.current_request t
 
 let last_events = Worker.last_events
+
+let rpc_directory  : t option RPC_directory.t =
+  RPC_directory.register_dynamic_directory
+    RPC_directory.empty
+    (Block_services.mempool_path RPC_path.open_root)
+    (function
+      | None ->
+          Lwt.return
+            (RPC_directory.map (fun _ -> Lwt.return_unit) empty_rpc_directory)
+      | Some w ->
+          let pv = Worker.state w in
+          pv.rpc_directory >>= function
+          | Error _ ->
+              Lwt.return RPC_directory.empty
+          | Ok rpc_directory ->
+              Lwt.return
+                (RPC_directory.map (fun _ -> Lwt.return pv) rpc_directory))
