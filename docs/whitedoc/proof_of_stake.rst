@@ -229,11 +229,7 @@ the list can step up and bake the block.
 The delegate with the highest priority can bake a block with a timestamp
 greater than ``timestamp_of_previous_block`` plus
 ``TIME_BETWEEN_BLOCKS`` = one minute. The one with the kth highest
-priority, ``TIME_BETWEEN_BLOCKS + k * TIME_DELAY_FOR_PRIORITY`` = (1 +
-k) minutes.
-
-In future versions, ``TIME_DELAY_FOR_PRIORITY`` may be set to a lower
-value than ``TIME_BETWEEN_BLOCKS``.
+priority, ``k * TIME_BETWEEN_BLOCKS`` = k minutes.
 
 Baking a block gives a block reward of ``BLOCK_REWARD`` = 16 XTZ plus
 all fees paid by transactions inside the block.
