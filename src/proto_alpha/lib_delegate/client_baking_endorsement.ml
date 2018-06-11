@@ -187,7 +187,7 @@ let endorse_for cctxt = function
         name
         Operation_hash.pp_short oph >>= return
 
-let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:Time.t) state bis  =
+let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:Time.t) state bi  =
   let may_endorse (block: Client_baking_blocks.block_info) delegate time =
     Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
     lwt_log_info "May endorse block %a for %s"
@@ -213,18 +213,16 @@ let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:Time.t) state bis
   get_delegates cctxt state >>=? fun delegates ->
   iter_p
     (fun delegate ->
-       iter_p
-         (fun (bi : Client_baking_blocks.block_info) ->
-            if Time.compare bi.timestamp (Time.now ()) > 0  then
-              lwt_log_info "Ignore block %a: forged in the future"
-                Block_hash.pp_short bi.hash >>= return
-            else if Time.(min (now ()) bi.timestamp > max_past) then
-              lwt_log_info "Ignore block %a: forged too far the past"
-                Block_hash.pp_short bi.hash >>= return
-            else
-              let time = Time.(add (now ()) state.delay) in
-              may_endorse bi delegate time
-         ) bis
+       let open Client_baking_blocks in
+       if Time.compare bi.timestamp (Time.now ()) > 0  then
+         lwt_log_info "Ignore block %a: forged in the future"
+           Block_hash.pp_short bi.hash >>= return
+       else if Time.(min (now ()) bi.timestamp > max_past) then
+         lwt_log_info "Ignore block %a: forged too far the past"
+           Block_hash.pp_short bi.hash >>= return
+       else
+         let time = Time.(add (now ()) state.delay) in
+         may_endorse bi delegate time
     )
     delegates
 
@@ -266,13 +264,12 @@ let check_error f =
         errs >>= fun () ->
       Lwt.return_unit
 
-
-let create (cctxt : #Proto_alpha.full) ?(max_past=(Time.of_seconds 110L)) ~delay contracts block_stream =
+let create (cctxt : #Proto_alpha.full) ?(max_past=(Time.of_seconds 110L)) ~delay contracts (block_stream : Client_baking_blocks.block_info tzresult Lwt_stream.t) =
   lwt_log_info "Starting endorsement daemon" >>= fun () ->
   Lwt_stream.get block_stream >>= function
-  | None | Some (Ok []) | Some (Error _) ->
+  | None | Some (Error _) ->
       cctxt#error "Can't fetch the current block head."
-  | Some (Ok initial_heads) ->
+  | Some (Ok head) ->
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with
@@ -288,13 +285,13 @@ let create (cctxt : #Proto_alpha.full) ?(max_past=(Time.of_seconds 110L)) ~delay
                      (get_block () >|= fun b -> `Hash b) ] >>=  function
         | `Hash (None | Some (Error _)) ->
             Lwt.return_unit
-        |  `Hash (Some (Ok bis)) ->
+        |  `Hash (Some (Ok bi)) ->
             Lwt.cancel timeout;
             last_get_block := None ;
-            check_error (prepare_endorsement cctxt ~max_past state bis) >>= fun () ->
+            check_error (prepare_endorsement cctxt ~max_past state bi) >>= fun () ->
             worker_loop ()
         | `Timeout ->
             check_error (endorse_for cctxt state.to_endorse) >>= fun () ->
             worker_loop () in
-      check_error (prepare_endorsement cctxt ~max_past state initial_heads) >>= fun () ->
+      check_error (prepare_endorsement cctxt ~max_past state head) >>= fun () ->
       worker_loop ()
