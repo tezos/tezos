@@ -5,7 +5,7 @@ Proof-of-stake in Tezos
 
 This document provides an in-depth description of the Tezos
 proof-of-stake algorithm. **WORK IN PROGRESS, CONSTANTS STILL SUBJECT TO
-ADJUSTMENT.** **THIS DOES NOT CONTAIN CHANGES INTRODUCED BY PVSS.**
+ADJUSTMENT.**
 
 Blocks
 ------
