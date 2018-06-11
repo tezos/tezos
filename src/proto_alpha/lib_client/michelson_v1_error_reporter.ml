@@ -90,8 +90,8 @@ let collect_error_locations errs =
         | Invalid_constant (loc, _, _)
         | Invalid_contract (loc, _)
         | Comparable_type_expected (loc, _)
-        | Overflow loc
-        | Reject loc) :: rest ->
+        | Overflow (loc, _)
+        | Reject (loc, _)) :: rest ->
         collect (loc :: acc) rest
     | _ :: rest -> collect acc rest in
   collect [] errs
@@ -431,12 +431,26 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  @[<hov 2>is not compatible with type@ %a.@]@]"
                 print_ty tya
                 print_ty tyb
-          | Reject loc ->
-              Format.fprintf ppf "%ascript reached FAIL instruction"
+          | Reject (loc, trace) ->
+              Format.fprintf ppf
+                "%ascript reached FAIL instruction@ \
+                 %a"
                 print_loc loc
-          | Overflow loc ->
-              Format.fprintf ppf "%aunexpected arithmetic overflow"
+                (fun ppf -> function
+                   | None -> ()
+                   | Some trace ->
+                       Format.fprintf ppf "@,@[<v 2>trace@,%a@]"
+                         print_execution_trace trace)
+                trace
+          | Overflow (loc, trace) ->
+              Format.fprintf ppf "%aunexpected arithmetic overflow%a"
                 print_loc loc
+                (fun ppf -> function
+                   | None -> ()
+                   | Some trace ->
+                       Format.fprintf ppf "@,@[<v 2>trace@,%a@]"
+                         print_execution_trace trace)
+                trace
           | err -> Format.fprintf ppf "%a" Alpha_environment.Error_monad.pp err
         end ;
         if rest <> [] then Format.fprintf ppf "@," ;

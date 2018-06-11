@@ -73,21 +73,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         print_expr storage
         (Format.pp_print_list Operation_result.pp_internal_operation) operations
         print_big_map_diff maybe_big_map_diff
-        (Format.pp_print_list
-           (fun ppf (loc, gas, stack) ->
-              Format.fprintf ppf
-                "- @[<v 0>location: %d (remaining gas: %a)@,\
-                 [ @[<v 0>%a ]@]@]"
-                loc Gas.pp gas
-                (Format.pp_print_list
-                   (fun ppf (e, annot) ->
-                      Format.fprintf ppf
-                        "@[<v 0>%a  \t%s@]"
-                        print_expr e
-                        (match annot with None -> "" | Some a -> a)
-                   ))
-                stack))
-        trace >>= fun () ->
+        print_execution_trace trace >>= fun () ->
       return ()
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed

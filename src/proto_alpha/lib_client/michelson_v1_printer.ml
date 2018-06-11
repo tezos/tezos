@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
+open Alpha_context
 open Tezos_micheline
 open Micheline
 open Micheline_printer
@@ -42,6 +43,24 @@ let print_stack ppf = function
            ~pp_sep: (fun ppf () -> Format.fprintf ppf "@ : ")
            print_annot_expr_unwrapped)
         more
+
+let print_execution_trace ppf trace =
+  Format.pp_print_list
+    (fun ppf (loc, gas, stack) ->
+       Format.fprintf ppf
+         "- @[<v 0>location: %d (remaining gas: %a)@,\
+          [ @[<v 0>%a ]@]@]"
+         loc Gas.pp gas
+         (Format.pp_print_list
+            (fun ppf (e, annot) ->
+               Format.fprintf ppf
+                 "@[<v 0>%a  \t%s@]"
+                 print_expr e
+                 (match annot with None -> "" | Some a -> a)
+            ))
+         stack)
+    ppf
+    trace
 
 let inject_types type_map parsed =
   let rec inject_expr = function
