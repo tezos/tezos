@@ -110,8 +110,8 @@ code
                              NOW ; COMPARE ; LT ;
                              IF { # Between T + 24 and T + 48
                                   # We accept only delivery notifications, from W
-                                  DUP ; CDDDDDR ; MANAGER ; # W
-                                  SENDER ; MANAGER ; IF_NONE { FAIL } {} ;
+                                  DUP ; CDDDDDR ; ADDRESS ; # W
+                                  SENDER ;
                                   COMPARE ; NEQ ;
                                   IF { FAIL } {} ; # fail if not the warehouse
                                   DUP ; CAR ; # we must receive (Right amount)

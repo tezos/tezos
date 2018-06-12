@@ -103,7 +103,7 @@ Alternatives/Solutions
    unique. This counter should be per key so that users can find out
    what they need to approve. This should be paired with a signed hash
    of your contract to prevent cross-contract replays.
--  Use the ``SOURCE`` instruction to verify that the expected sender is
+-  Use the ``SENDER`` instruction to verify that the expected sender is
    the source of the message.
 
 Do not assume users will use a unique key for every smart contract
@@ -201,3 +201,46 @@ Alternatives/Solutions
 ~~~~~~~~~~~~~~~~~~~~~~
 
 -  Do not store funds in spendable contracts that you do not control.
+
+Do not use ``SENDER ; MANAGER`` for authentication
+-------------------------------------------------
+
+Each originated account has a manager. The manager may change the
+delegate of the account or issue transfers from it (depending on the
+'delegatable' and 'spendable' flags).
+
+When an account is originated, the originator can set the manager to
+any key hash. The originator also sets the code for contracts, and so
+could immediately transfer to the originated contract, causing it in
+turn to transfer to your contract. This means **an attacker may
+arrange for the manager of the source to be any arbitrary key hash**,
+without ever having access to the corresponding key.
+
+.. _possible-issues-6:
+
+Possible Issues
+~~~~~~~~~~~~~~~
+
+-  An attacker may trivially subvert your authentication code by
+   originating a contract with manager set to the key hash you are
+   looking for.
+-  A user may (voluntarily) manage contracts which execute transfers
+   without their approval. Contracts should not (and, given the above,
+   must not) be authorized to act on behalf of their managers.
+
+.. _alternativessolutions-6:
+
+Alternatives/Solutions
+~~~~~~~~~~~~~~~~~~~~~~
+
+-  Directly compare the ``SENDER`` address to the expected sender,
+   ideally an implicit account associated with some trusted key
+   hash. If you have a trusted ``key_hash`` rather than an
+   ``address``, you can obtain an address to compare against the
+   source using ``IMPLICIT_ACCOUNT ; ADDRESS``. If the expected sender
+   is a contract, you may want to understand its code -- it could
+   allow anyone to cause it to transfer to your contract.
+-  For more flexibility, require authorization via a signature of data
+   describing the operation you will perform, and use
+   ``CHECK_SIGNATURE`` to verify it. See above regarding replay
+   attacks.

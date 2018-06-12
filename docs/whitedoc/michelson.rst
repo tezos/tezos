@@ -1302,6 +1302,10 @@ Operations on contracts
     :: address : 'S   ->   key_hash option : 'S
     :: contract 'p : 'S   ->   key_hash : 'S
 
+Note that the originator of an account/contract may set the manager to
+**any** key hash. Thus, ``SENDER; MANAGER`` is not appropriate for
+authentication.
+
 -  ``CREATE_CONTRACT``: Forge a contract creation operation.
 
 ::
@@ -2801,8 +2805,8 @@ The complete source ``forward.tz`` is:
                                  NOW ; COMPARE ; LT ;
                                  IF { # Between T + 24 and T + 48
                                       # We accept only delivery notifications, from W
-                                      DUP ; CDDDDDR ; MANAGER ; # W
-                                      SENDER ; MANAGER ;
+                                      DUP ; CDDDDDR ; ADDRESS ; # W
+                                      SENDER ;
                                       COMPARE ; NEQ ;
                                       IF { FAIL } {} ; # fail if not the warehouse
                                       DUP ; CAR ; # we must receive (Right amount)
