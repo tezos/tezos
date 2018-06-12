@@ -169,6 +169,9 @@ module type SIGNATURE = sig
 
     val zero: t
 
+    module Logging : sig
+      val tag : t Tag.def
+    end
   end
 
   module Public_key : sig

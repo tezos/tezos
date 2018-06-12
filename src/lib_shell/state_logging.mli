@@ -7,4 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Tezos_stdlib.Logging.LOG
+include Tezos_stdlib.Logging.SEMLOG
+
+val chain_id: Chain_id.t Tag.def

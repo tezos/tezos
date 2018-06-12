@@ -10,7 +10,9 @@
 open Proto_alpha
 open Alpha_context
 
-include Logging.Make(struct let name = "client.endorsement" end)
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.endorsement" end)
+
+open Logging
 
 module State = Daemon_state.Make(struct let name = "endorsement" end)
 
@@ -104,51 +106,71 @@ let endorse_for_delegate cctxt block delegate =
   let { Client_baking_blocks.hash ; level } = block in
   let b = `Hash (hash, 0) in
   Client_keys.get_key cctxt delegate >>=? fun (name, _pk, sk) ->
-  lwt_debug "Endorsing %a for %s (level %a)!"
-    Block_hash.pp_short hash name
-    Raw_level.pp level >>= fun () ->
+  lwt_debug Tag.DSL.(fun f ->
+      f "Endorsing %a for %s (level %a)!"
+      -% t event "endorsing"
+      -% a Block_hash.Logging.tag hash
+      -% s Client_keys.Logging.tag name
+      -% a level_tag level) >>= fun () ->
   inject_endorsement cctxt
     b hash level
     sk delegate >>=? fun oph ->
-  lwt_log_notice
-    "Injected endorsement for block '%a' \
-     (level %a, contract %s) '%a'"
-    Block_hash.pp_short hash
-    Raw_level.pp level
-    name
-    Operation_hash.pp_short oph >>= fun () ->
+  lwt_log_notice Tag.DSL.(fun f ->
+      f "Injected endorsement for block '%a' \
+         (level %a, contract %s) '%a'"
+      -% t event "injected_endorsement"
+      -% a Block_hash.Logging.tag hash
+      -% a level_tag level
+      -% s Client_keys.Logging.tag name
+      -% a Operation_hash.Logging.tag oph) >>= fun () ->
   return_unit
 
 let allowed_to_endorse cctxt bi delegate  =
   Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-  lwt_debug "Checking if allowed to endorse block %a for %s"
-    Block_hash.pp_short bi.Client_baking_blocks.hash name >>= fun () ->
+  lwt_debug Tag.DSL.(fun f ->
+      f "Checking if allowed to endorse block %a for %s"
+      -% t event "check_endorsement_ok"
+      -% a Block_hash.Logging.tag bi.Client_baking_blocks.hash
+      -% s Client_keys.Logging.tag name) >>= fun () ->
   let b = `Hash (bi.hash, 0) in
   let level = bi.level in
   get_signing_slots cctxt b delegate level >>=? function
   | None | Some [] ->
-      lwt_debug "No slot found for %a/%s"
-        Block_hash.pp_short bi.hash name >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "No slot found for %a/%s"
+          -% t event "endorsement_no_slots_found"
+          -% a Block_hash.Logging.tag bi.hash
+          -% s Client_keys.Logging.tag name) >>= fun () ->
       return_false
   | Some (_ :: _ as slots) ->
-      lwt_debug "Found slots for %a/%s (%d)"
-        Block_hash.pp_short bi.hash name (List.length slots) >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "Found slots for %a/%s (%a)"
+          -% t event "endorsement_slots_found"
+          -% a Block_hash.Logging.tag bi.hash
+          -% s Client_keys.Logging.tag name
+          -% a endorsement_slots_tag slots) >>= fun () ->
       previously_endorsed_level cctxt delegate level >>=? function
       | true ->
-          lwt_debug "Level %a (or higher) previously endorsed: do not endorse."
-            Raw_level.pp level >>= fun () ->
+          lwt_debug Tag.DSL.(fun f ->
+              f "Level %a (or higher) previously endorsed: do not endorse."
+              -% t event "previously_endorsed"
+              -% a level_tag level) >>= fun () ->
           return_false
       | false ->
           return_true
 
 let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state bi =
   if Time.diff (Time.now ()) bi.Client_baking_blocks.timestamp > max_past then
-    lwt_log_info "Ignore block %a: forged too far the past"
-      Block_hash.pp_short bi.hash >>= fun () ->
+    lwt_log_info Tag.DSL.(fun f ->
+        f "Ignore block %a: forged too far the past"
+        -% t event "endorsement_stale_block"
+        -% a Block_hash.Logging.tag bi.hash) >>= fun () ->
     return_unit
   else
-    lwt_log_info "Received new block %a"
-      Block_hash.pp_short bi.hash >>= fun () ->
+    lwt_log_info Tag.DSL.(fun f ->
+        f "Received new block %a"
+        -% t event "endorsement_got_block"
+        -% a Block_hash.Logging.tag bi.hash) >>= fun () ->
     let time = Time.(add (now ()) state.delay) in
     let timeout = Lwt_unix.sleep (Int64.to_float state.delay) in
     get_delegates cctxt state >>=? fun delegates ->
@@ -167,11 +189,6 @@ let compute_timeout state =
   | Some { timeout ; block ; delegates } ->
       timeout >>= fun () ->
       Lwt.return (block, delegates)
-
-let check_error f =
-  f >>= function
-  | Ok () -> Lwt.return_unit
-  | Error errs -> lwt_log_error "Error while endorsing:@\n%a" pp_print_error errs
 
 let create
     (cctxt: #Proto_alpha.full)

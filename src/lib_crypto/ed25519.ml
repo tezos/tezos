@@ -9,13 +9,17 @@
 
 open Error_monad
 
-module Public_key_hash = Blake2B.Make(Base58)(struct
-    let name = "Ed25519.Public_key_hash"
-    let title = "An Ed25519 public key hash"
-    let b58check_prefix = Base58.Prefix.ed25519_public_key_hash
-    let size = Some 20
-  end)
-
+module Public_key_hash = struct
+  include Blake2B.Make(Base58)(struct
+      let name = "Ed25519.Public_key_hash"
+      let title = "An Ed25519 public key hash"
+      let b58check_prefix = Base58.Prefix.ed25519_public_key_hash
+      let size = Some 20
+    end)
+  module Logging = struct
+    let tag = Tag.def ~doc:title name pp
+  end
+end
 let () =
   Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz1" 36
 

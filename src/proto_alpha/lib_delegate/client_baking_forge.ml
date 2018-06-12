@@ -10,7 +10,8 @@
 open Proto_alpha
 open Alpha_context
 
-include Logging.Make(struct let name = "client.baking" end)
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.baking" end)
+open Logging
 
 
 (* The index of the different components of the protocol's validation passes *)
@@ -326,11 +327,13 @@ let forge_block cctxt ?(chain = `Main) block
     List.fold_left
       (fun acc r -> acc + List.length r.Preapply_result.applied)
       0 result in
-  lwt_log_info "Found %d valid operations (%d refused) for timestamp %a"
-    valid_op_count (total_op_count - valid_op_count)
-    Time.pp_hum timestamp >>= fun () ->
-  lwt_log_info "Computed fitness %a"
-    Fitness.pp shell_header.fitness >>= fun () ->
+  lwt_log_info Tag.DSL.(fun f ->
+      f "Found %d valid operations (%d refused) for timestamp %a@.Computed fitness %a"
+      -% t event "found_valid_operations"
+      -% s valid_ops valid_op_count
+      -% s refused_ops (total_op_count - valid_op_count)
+      -% a timestamp_tag timestamp
+      -% a fitness_tag shell_header.fitness) >>= fun () ->
 
   (* everything went well (or we don't care about errors): GO! *)
   if best_effort || all_ops_valid result then
@@ -359,6 +362,7 @@ let previously_baked_level cctxt pkh new_lvl  =
   | Some last_lvl ->
       return (Raw_level.(last_lvl >= new_lvl))
 
+
 let get_baking_slot cctxt
     ?max_priority (bi: Client_baking_blocks.block_info) delegates =
   let chain = `Hash bi.chain_id in
@@ -370,12 +374,16 @@ let get_baking_slot cctxt
     ~delegates
     (chain, block) >>= function
   | Error errs ->
-      lwt_log_error "Error while fetching baking possibilities:\n%a"
-        pp_print_error errs >>= fun () ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "Error while fetching baking possibilities:\n%a"
+          -% t event "baking_slot_fetch_errors"
+          -% a errs_tag errs) >>= fun () ->
       Lwt.return_nil
   | Ok [] ->
-      lwt_log_info "Found no baking rights for level %a"
-        Raw_level.pp level >>= fun () ->
+      lwt_log_info Tag.DSL.(fun f ->
+          f "Found no baking rights for level %a"
+          -% t event "no_baking_rights"
+          -% a level_tag level) >>= fun () ->
       Lwt.return_nil
   | Ok slots ->
       let slots =
@@ -447,7 +455,11 @@ let safe_get_unrevealed_nonces cctxt block =
   get_unrevealed_nonces cctxt block >>= function
   | Ok r -> Lwt.return r
   | Error err ->
-      lwt_warn "Cannot read nonces: %a@." pp_print_error err >>= fun () ->
+      lwt_warn Tag.DSL.(fun f ->
+          f "Cannot read nonces: %a@."
+          -% t event "read_nonce_fail"
+          -% a errs_tag err)
+      >>= fun () ->
       Lwt.return_nil
 
 let insert_block
@@ -470,16 +482,22 @@ let insert_block
   get_baking_slot cctxt ?max_priority bi delegates >>= function
   | [] ->
       lwt_debug
-        "Can't compute slots for %a" Block_hash.pp_short bi.hash >>= fun () ->
+        Tag.DSL.(fun f ->
+            f "Can't compute slots for %a"
+            -% t event "cannot_compute_slot"
+            -% a Block_hash.Logging.tag bi.hash) >>= fun () ->
       return_unit
   | (_ :: _) as slots ->
       iter_p
         (fun ((timestamp, (_, _, delegate)) as slot) ->
            Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-           lwt_log_info "New baking slot at %a for %s after %a"
-             Time.pp_hum timestamp
-             name
-             Block_hash.pp_short bi.hash >>= fun () ->
+           lwt_log_info Tag.DSL.(fun f ->
+               f "New baking slot at %a for %s after %a"
+               -% t event "have_baking_slot"
+               -% a timestamp_tag timestamp
+               -% s Client_keys.Logging.tag name
+               -% a Block_hash.Logging.tag bi.hash
+               -% t Signature.Public_key_hash.Logging.tag delegate) >>= fun () ->
            state.future_slots <- insert_baking_slot slot state.future_slots ;
            return_unit
         )
@@ -498,14 +516,18 @@ let pop_baking_slots state =
 
 let filter_invalid_operations (cctxt : #full) state block_info (operations : packed_operation list list) =
   let open Client_baking_simulator in
-  lwt_debug "Starting client-side validation %a"
-    Block_hash.pp block_info.Client_baking_blocks.hash >>= fun () ->
+  lwt_debug Tag.DSL.(fun f ->
+      f "Starting client-side validation %a"
+      -% t event "baking_local_validation_start"
+      -% a Block_hash.Logging.tag block_info.Client_baking_blocks.hash) >>= fun () ->
   begin begin_construction cctxt state.index block_info >>= function
     | Ok inc -> return inc
     | Error errs ->
-        lwt_log_error "Error while fetching current context : %a"
-          pp_print_error errs >>= fun () ->
-        lwt_log_notice "Retrying to open the context" >>= fun () ->
+        lwt_log_error Tag.DSL.(fun f ->
+            f "Error while fetching current context : %a"
+            -% t event "context_fetch_error"
+            -% a errs_tag errs) >>= fun () ->
+        lwt_log_notice Tag.DSL.(fun f -> f "Retrying to open the context" -% t event "reopen_context") >>= fun () ->
         Client_baking_simulator.load_context ~context_path:state.context_path >>= fun index ->
         begin_construction cctxt index block_info >>=? fun inc ->
         state.index <- index;
@@ -518,9 +540,11 @@ let filter_invalid_operations (cctxt : #full) state block_info (operations : pac
   let validate_operation inc op =
     add_operation inc op >>= function
     | Error errs ->
-        lwt_log_info "Client-side validation: invalid operation filtered %a\n%a"
-          Operation_hash.pp (Operation.hash_packed op)
-          pp_print_error errs
+        lwt_log_info Tag.DSL.(fun f ->
+            f "Client-side validation: invalid operation filtered %a\n%a"
+            -% t event "baking_rejected_invalid_operation"
+            -% a Operation_hash.Logging.tag (Operation.hash_packed op)
+            -% a errs_tag errs)
         >>= fun () ->
         return_none
     | Ok inc -> return_some inc
@@ -548,8 +572,10 @@ let filter_invalid_operations (cctxt : #full) state block_info (operations : pac
   filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
   finalize_construction inc >>= function
   | Error errs ->
-      lwt_log_error "Client-side validation: invalid block built. Building an empty block...\n%a"
-        pp_print_error errs >>= fun () ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "Client-side validation: invalid block built. Building an empty block...\n%a"
+          -% t event "built_invalid_block_error"
+          -% a errs_tag errs) >>= fun () ->
       return [ [] ; [] ; [] ; [] ]
   | Ok () ->
       let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
@@ -586,11 +612,13 @@ let bake_slot
     else
       timestamp in
   Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-  lwt_debug "Try baking after %a (slot %d) for %s (%a)"
-    Block_hash.pp_short bi.hash
-    priority
-    name
-    Time.pp_hum timestamp >>= fun () ->
+  lwt_debug Tag.DSL.(fun f ->
+      f "Try baking after %a (slot %d) for %s (%a)"
+      -% t event "try_baking"
+      -% a Block_hash.Logging.tag bi.hash
+      -% s bake_priorty_tag priority
+      -% s Client_keys.Logging.tag name
+      -% a timestamp_tag timestamp) >>= fun () ->
   (* get and process operations *)
   Alpha_block_services.Mempool.pending_operations cctxt ~chain () >>=? fun mpool ->
   let operations = ops_of_mempool mpool in
@@ -611,9 +639,10 @@ let bake_slot
       return operations
   end >>= function
   | Error errs ->
-      lwt_log_error "Client-side validation: error while filtering invalid operations :@\n%a"
-        pp_print_error
-        errs >>= fun () ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "Client-side validation: error while filtering invalid operations :@\n%a"
+          -% t event "client_side_validation_error"
+          -% a errs_tag errs) >>= fun () ->
       return_none
   | Ok operations ->
       Alpha_block_services.Helpers.Preapply.block
@@ -621,21 +650,20 @@ let bake_slot
         ~timestamp ~sort:true ~protocol_data operations
       >>= function
       | Error errs ->
-          lwt_log_error "Error while prevalidating operations:@\n%a"
-            pp_print_error
-            errs >>= fun () ->
+          lwt_log_error Tag.DSL.(fun f ->
+              f "Error while prevalidating operations:@\n%a"
+              -% t event "prevalidate_operations_error"
+              -% a errs_tag errs) >>= fun () ->
           return_none
       | Ok (shell_header, operations) ->
-          lwt_debug
-            "Computed candidate block after %a (slot %d): %a/%d fitness: %a"
-            Block_hash.pp_short bi.hash priority
-            (Format.pp_print_list
-               ~pp_sep:(fun ppf () -> Format.fprintf ppf "+")
-               (fun ppf operations -> Format.fprintf ppf "%d"
-                   (List.length operations.Preapply_result.applied)))
-            operations
-            total_op_count
-            Fitness.pp shell_header.fitness >>= fun () ->
+          lwt_debug Tag.DSL.(fun f ->
+              f "Computed candidate block after %a (slot %d): %a/%d fitness: %a"
+              -% t event "candidate_block"
+              -% a Block_hash.Logging.tag bi.hash
+              -% s bake_priorty_tag priority
+              -% a operations_tag operations
+              -% s bake_op_count_tag total_op_count
+              -% a fitness_tag shell_header.fitness) >>= fun () ->
           let operations =
             List.map (fun l -> List.map snd l.Preapply_result.applied) operations in
           return
@@ -674,9 +702,11 @@ let bake
     state
     () =
   let slots = pop_baking_slots state in
-  lwt_log_info "Found %d current slots and %d future slots."
-    (List.length slots)
-    (List.length state.future_slots) >>= fun () ->
+  lwt_log_info Tag.DSL.(fun f ->
+      f "Found %d current slots and %d future slots."
+      -% t event "pop_baking_slots"
+      -% s current_slots_tag (List.length slots)
+      -% s future_slots_tag (List.length state.future_slots)) >>= fun () ->
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
 
@@ -704,8 +734,10 @@ let bake
 
       (* avoid double baking *)
       previously_baked_level cctxt src_pkh level >>=? function
-      | true ->  lwt_log_error "Level %a : previously baked"
-                   Raw_level.pp level  >>= return
+      | true ->  lwt_log_error Tag.DSL.(fun f ->
+          f "Level %a : previously baked"
+          -% t event "double_bake_near_miss"
+          -% a level_tag level)  >>= return
       | false ->
           inject_block cctxt
             ~force:true ~chain
@@ -727,9 +759,9 @@ let bake
             pp_operation_list_list operations >>= fun () ->
           return_unit
     end
-
   | _ -> (* no candidates, or none fit-enough *)
-      lwt_debug "No valid candidates." >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "No valid candidates." -% t event "no_baking_candidates") >>= fun () ->
       return_unit
 
 

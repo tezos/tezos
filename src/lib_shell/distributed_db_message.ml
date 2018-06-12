@@ -302,3 +302,7 @@ let raw_encoding = P2p.Raw.encoding encoding
 let pp_json ppf msg =
   Data_encoding.Json.pp ppf
     (Data_encoding.Json.construct raw_encoding (Message msg))
+
+module Logging = struct
+  let tag = Tag.def ~doc:"Message" "message" pp_json
+end

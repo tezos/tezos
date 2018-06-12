@@ -7,4 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Tezos_stdlib.Logging.Make(struct let name = "node.state" end)
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "node.state" end)
+
+let chain_id = Tag.def ~doc:"Chain ID" "chain_id" Chain_id.pp

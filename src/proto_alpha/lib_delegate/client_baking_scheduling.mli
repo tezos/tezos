@@ -11,6 +11,7 @@
 val sleep_until: Time.t -> unit Lwt.t option
 
 val wait_for_first_event:
+  name:string ->
   'event tzresult Lwt_stream.t ->
   'event Lwt.t
 

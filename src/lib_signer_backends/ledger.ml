@@ -9,7 +9,7 @@
 
 open Client_keys
 
-include Logging.Make(struct let name = "client.signer.ledger" end)
+include Tezos_stdlib.Logging.Make(struct let name = "client.signer.ledger" end)
 
 let scheme = "ledger"
 

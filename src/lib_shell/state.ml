@@ -577,7 +577,10 @@ module Chain = struct
     end
 
   let destroy state chain =
-    lwt_debug "destroy %a" Chain_id.pp (id chain) >>= fun () ->
+    lwt_debug Tag.DSL.(fun f ->
+        f "destroy %a"
+        -% t event "destroy"
+        -% a chain_id (id chain)) >>= fun () ->
     Shared.use state.global_data begin fun { global_store ; chains } ->
       Chain_id.Table.remove chains (id chain) ;
       Store.Chain.destroy global_store (id chain) >>= fun () ->

@@ -46,12 +46,14 @@ let init_p2p p2p_params =
   match p2p_params with
   | None ->
       let c_meta = init_connection_metadata None in
-      lwt_log_notice "P2P layer is disabled" >>= fun () ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "P2P layer is disabled" -% t event "p2p_disabled") >>= fun () ->
       return (P2p.faked_network peer_metadata_cfg c_meta)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
-      lwt_log_notice "bootstrapping chain..." >>= fun () ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "bootstrapping chain..." -% t event "bootstrapping_chain") >>= fun () ->
       P2p.create
         ~config ~limits
         peer_metadata_cfg

@@ -7,7 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let log = Signer_logging.lwt_log_notice
+open Signer_logging
+
+let log = lwt_log_notice
+
 
 module Authorized_key =
   Client_aliases.Alias (struct
@@ -32,10 +35,12 @@ let sign
     (cctxt : #Client_context.wallet)
     Signer_messages.Sign.Request.{ pkh ; data ; signature }
     ?magic_bytes ~require_auth =
-  log "Request for signing %d bytes of data for key %a, magic byte = %02X"
-    (MBytes.length data)
-    Signature.Public_key_hash.pp pkh
-    (MBytes.get_uint8 data 0) >>= fun () ->
+  log Tag.DSL.(fun f ->
+      f "Request for signing %d bytes of data for key %a, magic byte = %02X"
+      -% t event "request_for_signing"
+      -% s num_bytes (MBytes.length data)
+      -% a Signature.Public_key_hash.Logging.tag pkh
+      -% s magic_byte (MBytes.get_uint8 data 0)) >>= fun () ->
   check_magic_byte magic_bytes data >>=? fun () ->
   begin match require_auth, signature with
     | false, _ -> return_unit
@@ -52,24 +57,36 @@ let sign
           failwith "invalid authentication signature"
   end >>=? fun () ->
   Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
-  log "Signing data for key %s" name >>= fun () ->
+  log Tag.DSL.(fun f ->
+      f "Signing data for key %s"
+      -% t event "signing_data"
+      -% s Client_keys.Logging.tag name) >>= fun () ->
   Client_keys.sign cctxt sk_uri data >>=? fun signature ->
   return signature
 
 let public_key (cctxt : #Client_context.wallet) pkh =
-  log "Request for public key %a"
-    Signature.Public_key_hash.pp pkh >>= fun () ->
+  log Tag.DSL.(fun f ->
+      f "Request for public key %a"
+      -% t event "request_for_public_key"
+      -% a Signature.Public_key_hash.Logging.tag pkh) >>= fun () ->
   Client_keys.list_keys cctxt >>=? fun all_keys ->
   match List.find (fun (_, h, _, _) -> Signature.Public_key_hash.equal h pkh) all_keys with
   | exception Not_found ->
-      log "No public key found for hash %a"
-        Signature.Public_key_hash.pp pkh >>= fun () ->
+      log Tag.DSL.(fun f ->
+          f "No public key found for hash %a"
+          -% t event "not_found_public_key"
+          -% a Signature.Public_key_hash.Logging.tag pkh) >>= fun () ->
       Lwt.fail Not_found
   | (_, _, None, _) ->
-      log "No public key found for hash %a"
-        Signature.Public_key_hash.pp pkh >>= fun () ->
+      log Tag.DSL.(fun f ->
+          f "No public key found for hash %a"
+          -% t event "not_found_public_key"
+          -% a Signature.Public_key_hash.Logging.tag pkh) >>= fun () ->
       Lwt.fail Not_found
   | (name, _, Some pk, _) ->
-      log "Found public key for hash %a (name: %s)"
-        Signature.Public_key_hash.pp pkh name >>= fun () ->
+      log Tag.DSL.(fun f ->
+          f "Found public key for hash %a (name: %s)"
+          -% t event "found_public_key"
+          -% a Signature.Public_key_hash.Logging.tag pkh
+          -% s Client_keys.Logging.tag name) >>= fun () ->
       return pk

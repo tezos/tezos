@@ -69,3 +69,5 @@ module Make(Prefix : sig val id : string end) : Error_monad_sig.S
 
 (**/**)
 val json_to_string : (Data_encoding.json -> string) ref
+
+val errs_tag : error list Tag.def

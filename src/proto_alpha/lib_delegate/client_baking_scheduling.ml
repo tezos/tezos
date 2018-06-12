@@ -7,7 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Logging.Make(struct let name = "client.scheduling" end)
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.scheduling" end)
+
+open Logging
 
 let sleep_until time =
   let delay = Time.diff time (Time.now ()) in
@@ -16,19 +18,26 @@ let sleep_until time =
   else
     Some (Lwt_unix.sleep (Int64.to_float delay))
 
-let rec wait_for_first_event stream =
+let rec wait_for_first_event ~name stream =
   Lwt_stream.get stream >>= function
   | None | Some (Error _) ->
-      lwt_log_info "Can't fetch the current event. Waiting for new event." >>= fun () ->
+      lwt_log_info Tag.DSL.(fun f ->
+          f "Can't fetch the current event. Waiting for new event."
+          -% t event "cannot_fetch_event"
+          -% t worker_tag name) >>= fun () ->
       (* NOTE: this is not a tight loop because of Lwt_stream.get *)
-      wait_for_first_event stream
+      wait_for_first_event ~name stream
   | Some (Ok bi) ->
       Lwt.return bi
 
-let log_errors_and_continue p =
+let log_errors_and_continue ~name p =
   p >>= function
   | Ok () -> Lwt.return_unit
-  | Error errs -> lwt_log_error "Error while baking:@\n%a" pp_print_error errs
+  | Error errs -> lwt_log_error Tag.DSL.(fun f ->
+      f "Error while baking:@\n%a"
+      -% t event "daemon_error"
+      -% t worker_tag name
+      -% a errs_tag errs)
 
 let main
     ~(name: string)
@@ -52,9 +61,12 @@ let main
                 unit tzresult Lwt.t))
   =
 
-  lwt_log_info "Setting up before the %s can start." name >>= fun () ->
+  lwt_log_info Tag.DSL.(fun f ->
+      f "Setting up before the %s can start."
+      -% t event "daemon_setup"
+      -% s worker_tag name) >>= fun () ->
 
-  wait_for_first_event stream >>= fun first_event ->
+  wait_for_first_event ~name stream >>= fun first_event ->
   Shell_services.Blocks.hash cctxt ~block:`Genesis () >>=? fun genesis_hash ->
 
   (* statefulness *)
@@ -68,7 +80,7 @@ let main
     | Some t -> t in
   state_maker genesis_hash first_event >>=? fun state ->
 
-  log_errors_and_continue @@ pre_loop cctxt state first_event >>= fun () ->
+  log_errors_and_continue ~name @@ pre_loop cctxt state first_event >>= fun () ->
 
   (* main loop *)
   let rec worker_loop () =
@@ -82,23 +94,32 @@ let main
       | `Event (None | Some (Error _)) ->
           (* exit when the node is unavailable *)
           last_get_event := None ;
-          lwt_log_error "Connection to node lost, %s exiting." name >>= fun () ->
+          lwt_log_error Tag.DSL.(fun f ->
+              f "Connection to node lost, %s exiting."
+              -% t event "daemon_connection_lost"
+              -% s worker_tag name) >>= fun () ->
           exit 1
       | `Event (Some (Ok event)) -> begin
           (* new event: cancel everything and execute callback *)
           last_get_event := None ;
           (* TODO: pretty-print events (requires passing a pp as argument) *)
-          log_errors_and_continue @@ event_k cctxt state event
+          log_errors_and_continue ~name @@ event_k cctxt state event
         end
       | `Timeout timesup ->
           (* main event: it's time *)
-          lwt_debug "Waking up for %s." name >>= fun () ->
+          lwt_debug Tag.DSL.(fun f ->
+              f "Waking up for %s."
+              -% t event "daemon_wakeup"
+              -% s worker_tag name) >>= fun () ->
           (* core functionality *)
-          log_errors_and_continue @@ timeout_k cctxt state timesup
+          log_errors_and_continue ~name @@ timeout_k cctxt state timesup
     end >>= fun () ->
     (* and restart *)
     worker_loop () in
 
   (* ignition *)
-  lwt_log_info "Starting %s daemon" name >>= fun () ->
+  lwt_log_info Tag.DSL.(fun f ->
+      f "Starting %s daemon"
+      -% t event "daemon_start"
+      -% s worker_tag name) >>= fun () ->
   worker_loop ()

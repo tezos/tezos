@@ -7,12 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Logging.Make(struct let name = "client.denunciation" end)
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.denunciation" end)
 
 open Proto_alpha
 open Alpha_context
 
 open Client_baking_blocks
+open Logging
 
 module HLevel = Hashtbl.Make(struct
     include Raw_level
@@ -55,7 +56,10 @@ let get_block_offset level =
          else
            `Head 5)
   | Error errs ->
-      lwt_log_error "Invalid level conversion : %a" pp_print_error errs >>= fun () ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "Invalid level conversion : %a"
+          -% t event "invalid_level_conversion"
+          -% a errs_tag errs) >>= fun () ->
       Lwt.return (`Head 0)
 
 let process_endorsements (cctxt : #Proto_alpha.full) state ~chain
@@ -83,17 +87,24 @@ let process_endorsements (cctxt : #Proto_alpha.full) state ~chain
                   ~op1:existing_endorsement
                   ~op2:new_endorsement () >>=? fun bytes ->
                 let bytes = Signature.concat bytes Signature.zero in
-                lwt_log_notice "Double endorsement detected" >>= fun () ->
+                lwt_log_notice Tag.DSL.(fun f ->
+                    f "Double endorsement detected"
+                    -% t event "double_endorsement_detected"
+                    -% t conflicting_endorsements_tag (existing_endorsement, new_endorsement)) >>= fun () ->
                 (* A denunciation may have already occured *)
                 Shell_services.Injection.operation cctxt ~chain bytes >>=? fun op_hash ->
-                lwt_log_notice "Double endorsement evidence injected %a"
-                  Operation_hash.pp op_hash >>= fun () ->
+                lwt_log_notice Tag.DSL.(fun f ->
+                    f "Double endorsement evidence injected %a"
+                    -% t event "double_endorsement_denounced"
+                    -% a Operation_hash.Logging.tag op_hash) >>= fun () ->
                 return @@ HLevel.replace state.endorsements_table level
                   (Delegate_Map.add delegate new_endorsement map)
           end
       | _ ->
-          lwt_log_error "Inconsistent endorsement found %a"
-            Operation_hash.pp hash >>= fun () ->
+          lwt_log_error Tag.DSL.(fun f ->
+              f "Inconsistent endorsement found %a"
+              -% t event "inconsistent_endorsement"
+              -% a Operation_hash.Logging.tag hash) >>= fun () ->
           return_unit
     ) endorsements >>=? fun () ->
   return_unit
@@ -108,7 +119,7 @@ let process_block (cctxt : #Proto_alpha.full) state ~chain (header : Alpha_block
           (Delegate_Map.add baker hash map)
     | Some existing_hash when Block_hash.(=) existing_hash hash ->
         (* This case should never happen *)
-        lwt_debug "Double baking detected but block hashes are equivalent. Skipping..." >>= fun () ->
+        lwt_debug Tag.DSL.(fun f -> f "Double baking detected but block hashes are equivalent. Skipping..." -% t event "double_baking_but_not") >>= fun () ->
         return @@ HLevel.replace state.blocks_table level
           (Delegate_Map.add baker hash map)
     | Some existing_hash ->
@@ -126,11 +137,15 @@ let process_block (cctxt : #Proto_alpha.full) state ~chain (header : Alpha_block
         Alpha_services.Forge.double_baking_evidence cctxt (`Main, block) ~branch:block_hash
           ~bh1 ~bh2 () >>=? fun bytes ->
         let bytes = Signature.concat bytes Signature.zero in
-        lwt_log_notice "Double baking detected" >>= fun () ->
+        lwt_log_notice Tag.DSL.(fun f ->
+            f "Double baking detected"
+            -% t event "double_baking_detected") >>= fun () ->
         (* A denunciation may have already occured *)
         Shell_services.Injection.operation cctxt ~chain bytes >>=? fun op_hash ->
-        lwt_log_notice "Double baking evidence injected %a"
-          Operation_hash.pp op_hash >>= fun () ->
+        lwt_log_notice Tag.DSL.(fun f ->
+            f "Double baking evidence injected %a"
+            -% t event "double_baking_denounced"
+            -% a Operation_hash.Logging.tag op_hash) >>= fun () ->
         return @@ HLevel.replace state.blocks_table level
           (Delegate_Map.add baker hash map)
   end
@@ -166,10 +181,18 @@ let endorsements_index = 0
 *)
 let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; level ; protocol ; next_protocol } =
   if Protocol_hash.(protocol <> next_protocol) then
-    lwt_log_error "Protocol changing detected. Skipping the block." >>= fun () ->
+    lwt_log_error Tag.DSL.(fun f ->
+        f "Protocol changing detected. Skipping the block."
+        -% t event "protocol_change_detected"
+        (* TODO which protocols -- in tag *)
+      ) >>= fun () ->
     return_unit
   else
-    lwt_debug "Block level : %a" Raw_level.pp level >>= fun () ->
+    lwt_debug Tag.DSL.(fun f ->
+        f "Block level : %a"
+        -% t event "accuser_saw_block"
+        -% a level_tag level
+        -% t Block_hash.Logging.tag hash) >>= fun () ->
     let chain = `Hash chain_id in
     let block = `Hash (hash, 0) in
     state.highest_level_encountered <- Raw_level.max level state.highest_level_encountered ;
@@ -179,9 +202,11 @@ let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; leve
       | Ok block_info ->
           process_block cctxt state ~chain block_info
       | Error errs ->
-          lwt_log_error "Error while fetching operations in block %a@\n%a"
-            Block_hash.pp_short hash
-            pp_print_error errs >>= fun () ->
+          lwt_log_error Tag.DSL.(fun f ->
+              f "Error while fetching operations in block %a@\n%a"
+              -% t event "fetch_operations_error"
+              -% a Block_hash.Logging.tag hash
+              -% a errs_tag errs) >>= fun () ->
           return_unit
     end >>=? fun () ->
     (* Processing endorsements *)
@@ -192,9 +217,11 @@ let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; leve
             process_endorsements cctxt state ~chain endorsements level
           else return_unit
       | Error errs ->
-          lwt_log_error "Error while fetching operations in block %a@\n%a"
-            Block_hash.pp_short hash
-            pp_print_error errs >>= fun () ->
+          lwt_log_error Tag.DSL.(fun f ->
+              f "Error while fetching operations in block %a@\n%a"
+              -% t event "fetch_operations_error"
+              -% a Block_hash.Logging.tag hash
+              -% a errs_tag errs) >>= fun () ->
           return_unit
     end >>=? fun () ->
     cleanup_old_operations state ;
@@ -205,14 +232,17 @@ let create (cctxt : #Proto_alpha.full) ~preserved_levels valid_blocks_stream =
   let process_block cctxt state bi =
     process_new_block cctxt state bi >>= function
     | Ok () ->
-        lwt_log_notice
-          "Block %a registered"
-          Block_hash.pp_short bi.Client_baking_blocks.hash
+        lwt_log_notice Tag.DSL.(fun f ->
+            f "Block %a registered"
+            -% t event "accuser_processed_block"
+            -% a Block_hash.Logging.tag bi.Client_baking_blocks.hash)
         >>= return
     | Error errs ->
-        lwt_log_error "Error while processing block %a@\n%a"
-          Block_hash.pp_short bi.hash
-          pp_print_error errs
+        lwt_log_error Tag.DSL.(fun f ->
+            f "Error while processing block %a@\n%a"
+            -% t event "accuser_block_error"
+            -% a Block_hash.Logging.tag bi.hash
+            -% a errs_tag errs)
         >>= return
   in
 

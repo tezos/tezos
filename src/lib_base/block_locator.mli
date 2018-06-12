@@ -50,6 +50,8 @@ type step = {
     locator, and the expected difference of level between the two
     blocks (or an upper bounds when [strict_step = false]). *)
 
+val pp_step: Format.formatter -> step -> unit
+
 val to_steps: seed -> t -> step list
 (** Build all the 'steps' composing the locator using a given seed,
     starting with the oldest one (typically the predecessor of the
