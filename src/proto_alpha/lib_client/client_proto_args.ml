@@ -120,10 +120,9 @@ let delegatable_switch =
     ()
 
 let tez_format =
-  "Text format: `D,DDD,DDD.DDD,DDD`.\n\
+  "Text format: `DDDDDDD.DDDDDD`.\n\
    Tez and mutez and separated by a period sign. Trailing and pending \
-   zeroes are allowed. Commas are optional, but if present they must \
-   be placed every 3 digits."
+   zeroes are allowed."
 
 let tez_parameter param =
   parameter

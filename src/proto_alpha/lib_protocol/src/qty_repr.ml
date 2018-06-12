@@ -128,7 +128,7 @@ module Make (T: QTY) : S = struct
     let rec left ppf amount =
       let d, r = Int64.(div amount 1000L), Int64.(rem amount 1000L) in
       if d > 0L then
-        Format.fprintf ppf "%a,%03Ld" left d r
+        Format.fprintf ppf "%a%03Ld" left d r
       else
         Format.fprintf ppf "%Ld" r in
     let right ppf amount =
@@ -143,7 +143,7 @@ module Make (T: QTY) : S = struct
       if Compare.Int.(lo = 0) then
         Format.fprintf ppf "%a" triplet hi
       else
-        Format.fprintf ppf "%03d,%a" hi triplet lo in
+        Format.fprintf ppf "%03d%a" hi triplet lo in
     let ints, decs =
       Int64.(div amount mult_int),
       Int64.(to_int (rem amount mult_int)) in
