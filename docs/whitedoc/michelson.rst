@@ -2149,9 +2149,8 @@ Syntax
 Primitive applications can receive one or many annotations.
 
 An annotation is a sequence of characters that matches the regular
-expression ``[@:%](|[_a-ZA-Z][_0-9a-zA-Z\.]*)``. They come after the
-primitive name and before its potential arguments for primitive
-applications.
+expression ``[@:%](|[@%]|[_a-ZA-Z][_0-9a-zA-Z\.]*)``. They come after
+the primitive name and before its potential arguments.
 
 ::
 
@@ -2307,6 +2306,27 @@ type (which can be changed). For instance the annotated typing rule for
    ITER body
    :: @l (list 'e) : 'A  ->  'A
       iff body :: [ @l.elt e' : 'A -> 'A ]
+
+Special Annotations
+~~~~~~~~~~~~~~~~~~~
+
+The special variable annotation ``@%`` can be used on instructions
+``CAR`` and ``CDR``. It means to use the accessed field name (if any) as
+a name for the value on the stack.
+
+::
+   CAR @%
+   :: (pair ('a %fst) ('b %snd)) : 'S   ->   @fst 'a : 'S
+
+
+The special variable annotation ``%@`` can be used on instructions
+``PAIR``, ``SOME``, ``LEFT``, ``RIGHT``. It means to use the variable
+name annotation in the stack as a field name for the constructed
+element. An example with ``PAIR`` follows,
+
+::
+   PAIR %@ %@
+   :: @x 'a : @y 'b : 'S   ->   (pair ('a %x) ('b %y)) : 'S
 
 XI - JSON syntax
 ---------------

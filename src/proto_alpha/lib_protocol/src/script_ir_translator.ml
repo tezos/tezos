@@ -1073,12 +1073,12 @@ let address_size =
 (* Lwt versions *)
 let parse_var_annot loc ?default annot =
   Lwt.return (parse_var_annot loc ?default annot)
-let parse_constr_annot loc annot =
-  Lwt.return (parse_constr_annot loc annot)
+let parse_constr_annot loc ?if_special_first ?if_special_second annot =
+  Lwt.return (parse_constr_annot loc ?if_special_first ?if_special_second annot)
 let parse_two_var_annot loc annot =
   Lwt.return (parse_two_var_annot loc annot)
-let parse_var_field_annot loc annot =
-  Lwt.return (parse_var_field_annot loc annot)
+let parse_var_field_annot loc ?if_special_var annot =
+  Lwt.return (parse_var_field_annot loc ?if_special_var annot)
 let parse_var_type_annot loc annot =
   Lwt.return (parse_var_type_annot loc annot)
 
@@ -1491,8 +1491,10 @@ and parse_instr
         typed ctxt loc (Const ()) (Item_t (Unit_t ty_name, stack, annot))
     (* options *)
     | Prim (loc, I_SOME, [], annot),
-      Item_t (t, rest, _) ->
-        parse_constr_annot loc annot >>=? fun (annot, ty_name, some_field, none_field) ->
+      Item_t (t, rest, stack_annot) ->
+        parse_constr_annot loc annot
+          ~if_special_first:(var_to_field_annot stack_annot)
+        >>=? fun (annot, ty_name, some_field, none_field) ->
         typed ctxt loc Cons_some
           (Item_t (Option_t ((t, some_field), none_field, ty_name), rest, annot))
     | Prim (loc, I_NONE, [ t ], annot),
@@ -1516,12 +1518,17 @@ and parse_instr
     (* pairs *)
     | Prim (loc, I_PAIR, [], annot),
       Item_t (a, Item_t (b, rest, snd_annot), fst_annot) ->
-        parse_constr_annot loc annot >>=? fun (annot, ty_name, l_field, r_field) ->
+        parse_constr_annot loc annot
+          ~if_special_first:(var_to_field_annot fst_annot)
+          ~if_special_second:(var_to_field_annot snd_annot)
+        >>=? fun (annot, ty_name, l_field, r_field) ->
         typed ctxt loc Cons_pair
           (Item_t (Pair_t((a, l_field, fst_annot), (b, r_field, snd_annot), ty_name), rest, annot))
     | Prim (loc, I_CAR, [], annot),
       Item_t (Pair_t ((a, expected_field_annot, a_annot), _, _), rest, pair_annot) ->
-        parse_var_field_annot loc annot >>=? fun (annot, field_annot) ->
+        parse_var_field_annot loc annot
+          ~if_special_var:(field_to_var_annot expected_field_annot)
+        >>=? fun (annot, field_annot) ->
         let annot = default_annot annot ~default:a_annot in
         let annot = default_annot annot
             ~default:(gen_access_annot pair_annot expected_field_annot ~default:default_car_annot) in
@@ -1529,7 +1536,9 @@ and parse_instr
         typed ctxt loc Car (Item_t (a, rest, annot))
     | Prim (loc, I_CDR, [], annot),
       Item_t (Pair_t (_, (b, expected_field_annot, b_annot), _), rest, pair_annot) ->
-        parse_var_field_annot loc annot >>=? fun (annot, field_annot) ->
+        parse_var_field_annot loc annot
+          ~if_special_var:(field_to_var_annot expected_field_annot)
+        >>=? fun (annot, field_annot) ->
         let annot = default_annot annot ~default:b_annot in
         let annot = default_annot annot
             ~default:(gen_access_annot pair_annot expected_field_annot ~default:default_cdr_annot) in
@@ -1537,14 +1546,18 @@ and parse_instr
         typed ctxt loc Cdr (Item_t (b, rest, annot))
     (* unions *)
     | Prim (loc, I_LEFT, [ tr ], annot),
-      Item_t (tl, rest, _stack_annot) ->
+      Item_t (tl, rest, stack_annot) ->
         Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:true tr >>=? fun (Ex_ty tr) ->
-        parse_constr_annot loc annot >>=? fun (annot, tname, l_field, r_field) ->
+        parse_constr_annot loc annot
+          ~if_special_first:(var_to_field_annot stack_annot)
+        >>=? fun (annot, tname, l_field, r_field) ->
         typed ctxt loc Left (Item_t (Union_t ((tl, l_field), (tr, r_field), tname), rest, annot))
     | Prim (loc, I_RIGHT, [ tl ], annot),
-      Item_t (tr, rest, _stack_annot) ->
+      Item_t (tr, rest, stack_annot) ->
         Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:true tl >>=? fun (Ex_ty tl) ->
-        parse_constr_annot loc annot >>=? fun (annot, tname, l_field, r_field) ->
+        parse_constr_annot loc annot
+          ~if_special_second:(var_to_field_annot stack_annot)
+        >>=? fun (annot, tname, l_field, r_field) ->
         typed ctxt loc Right (Item_t (Union_t ((tl, l_field), (tr, r_field), tname), rest, annot))
     | Prim (loc, I_IF_LEFT, [ bt ; bf ], annot),
       (Item_t (Union_t ((tl, l_field), (tr, r_field), _), rest, union_annot) as bef) ->

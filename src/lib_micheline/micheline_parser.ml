@@ -152,7 +152,7 @@ let tokenize source =
     | Some _ | None -> false in
   let allowed_annot_char c =
     match uchar_to_char c with
-    | Some ('a'..'z' | 'A'..'Z' | '_' | '.' | '0'..'9') -> true
+    | Some ('a'..'z' | 'A'..'Z' | '_' | '.' | '%' | '@' | '0'..'9') -> true
     | Some _ | None -> false in
   let rec skip acc =
     match next () with

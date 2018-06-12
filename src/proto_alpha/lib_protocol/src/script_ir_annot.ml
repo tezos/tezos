@@ -122,23 +122,30 @@ let error_unexpected_annot loc annot =
 let fail_unexpected_annot loc annot =
   Lwt.return (error_unexpected_annot loc annot)
 
-let parse_annots loc l =
+let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false) l =
   (* allow emtpty annotations as wildcards but otherwise only accept
-     annotations that starto with [a-zA-Z_] *)
-  let sub_or_wildcard wrap s acc =
+     annotations that start with [a-zA-Z_] *)
+  let sub_or_wildcard ~specials wrap s acc =
     let len = String.length s in
     if Compare.Int.(len = 1) then ok @@ wrap None :: acc
     else match s.[1] with
       | 'a' .. 'z' | 'A' .. 'Z' | '_' ->
+          ok @@ wrap (Some (String.sub s 1 (len - 1))) :: acc
+      | ('%' | '@' as c) when Compare.Int.(len = 2) && List.mem c specials ->
           ok @@ wrap (Some (String.sub s 1 (len - 1))) :: acc
       | _ -> error (Unexpected_annotation loc) in
   List.fold_left (fun acc s ->
       match acc with
       | Ok acc ->
           begin match s.[0] with
-            | '@' -> sub_or_wildcard (fun a -> `Var_annot a) s acc
-            | ':' -> sub_or_wildcard (fun a -> `Type_annot a) s acc
-            | '%' -> sub_or_wildcard (fun a -> `Field_annot a) s acc
+            | ':' -> sub_or_wildcard ~specials:[] (fun a -> `Type_annot a) s acc
+            | '@' ->
+                sub_or_wildcard
+                  ~specials:(if allow_special_var then ['%'] else [])
+                  (fun a -> `Var_annot a) s acc
+            | '%' -> sub_or_wildcard
+                       ~specials:(if allow_special_field then ['@'] else [])
+                       (fun a -> `Field_annot a) s acc
             | _ -> error (Unexpected_annotation loc)
             | exception Invalid_argument _ -> error (Unexpected_annotation loc)
           end
@@ -294,14 +301,27 @@ let parse_var_annot
       | None -> None
 
 let parse_constr_annot
-  : int -> string list ->
+  : int ->
+    ?if_special_first:field_annot option ->
+    ?if_special_second:field_annot option ->
+    string list ->
     (var_annot option * type_annot option * field_annot option * field_annot option) tzresult
-  = fun loc annot ->
-    parse_annots loc annot >>?
+  = fun loc ?if_special_first ?if_special_second annot ->
+    parse_annots ~allow_special_field:true loc annot >>?
     classify_annot loc >>? fun (vars, types, fields) ->
     get_one_annot loc vars >>? fun v ->
     get_one_annot loc types >>? fun t ->
-    get_two_annot loc fields >|? fun (f1, f2) ->
+    get_two_annot loc fields >>? fun (f1, f2) ->
+    begin match if_special_first, f1 with
+      | Some special_var, Some `Field_annot "@" -> ok special_var
+      | None, Some `Field_annot "@" -> error (Unexpected_annotation loc)
+      | _, _ -> ok f1
+    end >>? fun f1 ->
+    begin match if_special_second, f2 with
+      | Some special_var, Some `Field_annot "@" -> ok special_var
+      | None, Some `Field_annot "@" -> error (Unexpected_annotation loc)
+      | _, _ -> ok f2
+    end >|? fun f2 ->
     (v, t, f1, f2)
 
 let parse_two_var_annot
@@ -314,14 +334,18 @@ let parse_two_var_annot
     get_two_annot loc vars
 
 let parse_var_field_annot
-  : int -> string list -> (var_annot option * field_annot option) tzresult
-  = fun loc annot ->
-    parse_annots loc annot >>?
+  : int -> ?if_special_var:var_annot option -> string list ->
+    (var_annot option * field_annot option) tzresult
+  = fun loc ?if_special_var annot ->
+    parse_annots loc ~allow_special_var:true annot >>?
     classify_annot loc >>? fun (vars, types, fields) ->
     error_unexpected_annot loc types >>? fun () ->
     get_one_annot loc vars >>? fun v ->
-    get_one_annot loc fields >|? fun f ->
-    (v, f)
+    get_one_annot loc fields >>? fun f ->
+    match if_special_var, v with
+    | Some special_var, Some `Var_annot "%" -> ok (special_var, f)
+    | None, Some `Var_annot "%" -> error (Unexpected_annotation loc)
+    | _, _ -> ok (v, f)
 
 let parse_var_type_annot
   : int -> string list -> (var_annot option * type_annot option) tzresult
