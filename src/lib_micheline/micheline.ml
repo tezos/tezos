@@ -134,13 +134,25 @@ let canonical_encoding ~variant prim_encoding =
       ~title:"Sequence"
       (function Seq (_, v) -> Some v | _ -> None)
       (fun args -> Seq (0, args)) in
-  let byte_string = Bounded.string 255 in
+  let annots_encoding =
+    let split s =
+      let annots = String.split_on_char ' ' s in
+      List.iter (fun a ->
+          if String.length a > 255 then failwith "Oversized annotation"
+        ) annots;
+      if String.concat " " annots <> s then
+        failwith "Invalid annotation string, \
+                  must be a sequence of valid annotations with spaces" ;
+      annots in
+    splitted
+      ~json:(list (Bounded.string 255))
+      ~binary:(conv (String.concat " ") split string) in
   let application_encoding tag expr_encoding =
     case tag
       ~title:"Generic prim (any number of args with or without annot)"
       (obj3 (req "prim" prim_encoding)
          (dft "args" (list expr_encoding) [])
-         (dft "annots" (list byte_string) []))
+         (dft "annots" annots_encoding []))
       (function Prim (_, prim, args, annots) -> Some (prim, args, annots)
               | _ -> None)
       (fun (prim, args, annots) -> Prim (0, prim, args, annots)) in
@@ -166,7 +178,7 @@ let canonical_encoding ~variant prim_encoding =
                      case (Tag 4)
                        ~title:"Prim (no args + annot)"
                        (obj2 (req "prim" prim_encoding)
-                          (req "annots" (list byte_string)))
+                          (req "annots" annots_encoding))
                        (function
                          | Prim (_, v, [], annots) -> Some (v, annots)
                          | _ -> None)
@@ -185,7 +197,7 @@ let canonical_encoding ~variant prim_encoding =
                        ~title:"Prim (1 arg + annot)"
                        (obj3 (req "prim" prim_encoding)
                           (req "arg" expr_encoding)
-                          (req "annots" (list byte_string)))
+                          (req "annots" annots_encoding))
                        (function
                          | Prim (_, prim, [ arg ], annots) -> Some (prim, arg, annots)
                          | _ -> None)
@@ -206,7 +218,7 @@ let canonical_encoding ~variant prim_encoding =
                        (obj4 (req "prim" prim_encoding)
                           (req "arg1" expr_encoding)
                           (req "arg2" expr_encoding)
-                          (req "annots" (list byte_string)))
+                          (req "annots" annots_encoding))
                        (function
                          | Prim (_, prim, [ arg1 ; arg2 ], annots) -> Some (prim, arg1, arg2, annots)
                          | _ -> None)
