@@ -166,7 +166,7 @@ let get_delegates cctxt state =
 let endorse_for_delegate cctxt { delegate ; block ; slots ; } =
   let hash = block.hash in
   let b = `Hash (hash, 0) in
-  let level = block.level.level in
+  let level = block.level in
   Client_keys.get_key cctxt delegate >>=? fun (name, _pk, sk) ->
   lwt_debug "Endorsing %a for %s (level %a using %d slots)!"
     Block_hash.pp_short hash name
@@ -215,7 +215,7 @@ let allowed_to_endorse cctxt state (block: Client_baking_blocks.block_info) dele
   lwt_log_info "Checking if allowed to endorse block %a for %s"
     Block_hash.pp_short block.hash name >>= fun () ->
   let b = `Hash (block.hash, 0) in
-  let level = block.level.level in
+  let level = block.level in
   get_signing_slots cctxt b delegate level >>=? fun slots ->
   lwt_debug "Found slots for %a/%s (%d)"
     Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->

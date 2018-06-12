@@ -18,7 +18,7 @@ type block_info = {
   timestamp: Time.t ;
   protocol: Protocol_hash.t ;
   next_protocol: Protocol_hash.t ;
-  level: Level.t ;
+  level: Raw_level.t ;
 }
 
 val info:

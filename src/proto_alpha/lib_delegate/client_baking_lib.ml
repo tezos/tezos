@@ -93,7 +93,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
             Block_hash.pp_short bi.hash >>= fun () ->
           return None
       | Some nonce ->
-          return (Some (bi.hash, (bi.level.level, nonce))))
+          return (Some (bi.hash, (bi.level, nonce))))
     block_infos >>=? fun blocks ->
   do_reveal cctxt cctxt#block blocks
 

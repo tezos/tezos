@@ -532,9 +532,12 @@ let register () =
   end ;
   register0 S.levels_in_current_cycle begin fun ctxt q () ->
     let levels = Level.levels_in_current_cycle ctxt ~offset:q.offset () in
-    let first = List.hd (List.rev levels) in
-    let last = List.hd levels in
-    return (first.level, last.level)
+    match levels with
+    | [] -> raise Not_found
+    | _ ->
+        let first = List.hd (List.rev levels) in
+        let last = List.hd levels in
+        return (first.level, last.level)
   end
 
 let current_level ctxt ?(offset = 0l) block =
