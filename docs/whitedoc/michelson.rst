@@ -16,11 +16,11 @@ are immutable and garbage collected.
 
 A Michelson program receives as input a single element stack containing
 an input value and the contents of a storage space. It must return a
-single element stack containing an output value and the new contents of
-the storage space. Alternatively, a Michelson program can fail,
-explicitly using a specific opcode, or because something went wrong that
-could not be caught by the type system (e.g. division by zero, gas
-exhaustion).
+single element stack containing aa output value a list of internal
+operations, and the new contents of the storage space. Alternatively,
+a Michelson program can fail, explicitly using a specific opcode,
+or because something went wrong that could not be caught by the type
+system (e.g. division by zero, gas exhaustion).
 
 The types of the input, output and storage are fixed and monomorphic,
 and the program is typechecked before being introduced into the system.
@@ -1166,7 +1166,7 @@ VI - Domain specific data types
 
 -  ``timestamp``: Dates in the real world.
 
--  ``tez``: A specific type for manipulating tokens.
+-  ``mutez``: A specific type for manipulating tokens.
 
 -  ``contract 'param``: A contract, with the type of its code.
 
@@ -1230,19 +1230,20 @@ retrieved from script parameters or globals.
         iff t1 > t2
 
 
-Operations on Tez
+Operations on Mutez
 ~~~~~~~~~~~~~~~~~
 
-Tez are internally represented by a 64 bit signed integer. There are
-restrictions to prevent creating a negative amount of tez. Operations
-are limited to prevent overflow and mixing them with other numerical
-types by mistake. They are also mandatory checked for under/overflows.
+Mutez (micro-Tez) are internally represented by a 64 bit signed
+integers. There are restrictions to prevent creating a negative amount
+of mutez. Operations are limited to prevent overflow and mixing them
+with other numerical types by mistake. They are also mandatory checked
+for under/overflows.
 
 -  ``ADD``:
 
 ::
 
-    :: tez : tez : 'S   ->   tez : 'S
+    :: mutez : mutez : 'S   ->   mutez : 'S
 
     > ADD / x : y : S  =>  [FAILED]   on overflow
     > ADD / x : y : S  =>  (x + y) : S
@@ -1251,7 +1252,7 @@ types by mistake. They are also mandatory checked for under/overflows.
 
 ::
 
-    :: tez : tez : 'S   ->   tez : 'S
+    :: mutez : mutez : 'S   ->   mutez : 'S
 
     > SUB / x : y : S  =>  [FAILED]
         iff   x < y
@@ -1261,8 +1262,8 @@ types by mistake. They are also mandatory checked for under/overflows.
 
 ::
 
-    :: tez : nat : 'S   ->   tez : 'S
-    :: nat : tez : 'S   ->   tez : 'S
+    :: mutez : nat : 'S   ->   mutez : 'S
+    :: nat : mutez : 'S   ->   mutez : 'S
 
     > MUL / x : y : S  =>  [FAILED]   on overflow
     > MUL / x : y : S  =>  (x * y) : S
@@ -1271,8 +1272,8 @@ types by mistake. They are also mandatory checked for under/overflows.
 
 ::
 
-    :: tez : nat : 'S   ->   option (pair tez tez) : 'S
-    :: tez : tez : 'S   ->   option (pair nat tez) : 'S
+    :: mutez : nat : 'S   ->   option (pair mutez mutez) : 'S
+    :: mutez : mutez : 'S   ->   option (pair nat mutez) : 'S
 
     > EDIV / x : 0 : S  =>  None
     > EDIV / x : y : S  =>  Some (Pair (x / y) (x % y)) : S
@@ -1282,7 +1283,7 @@ types by mistake. They are also mandatory checked for under/overflows.
 
 ::
 
-   :: tez : tez : 'S -> int : 'S
+   :: mutez : mutez : 'S -> int : 'S
 
    > COMPARE / x : y : S  =>  -1 : S
        iff x < y
@@ -1305,7 +1306,7 @@ Operations on contracts
 
 ::
 
-    :: key_hash : option key_hash : bool : bool : tez : lambda (pair 'p 'g) (pair (list operation) 'g) : 'g : 'S
+    :: key_hash : option key_hash : bool : bool : mutez : lambda (pair 'p 'g) (pair (list operation) 'g) : 'g : 'S
        -> operation : address : 'S
 
 As with non code-emitted originations the contract code takes as
@@ -1325,7 +1326,7 @@ The ``CONTRACT 'p`` instruction will fail until it is actually originated.
 
 ::
 
-    :: key_hash : option key_hash : bool : bool : tez : 'g : 'S
+    :: key_hash : option key_hash : bool : bool : mutez : 'g : 'S
        -> operation : address : 'S
 
 Originate a contract based on a literal. This is currently the only way
@@ -1338,7 +1339,7 @@ currently executed contract.
 
 ::
 
-    :: key_hash : option key_hash : bool : tez : 'S
+    :: key_hash : option key_hash : bool : mutez : 'S
        ->   operation : contract unit : 'S
 
 Take as argument the manager, optional delegate, the delegatable flag
@@ -1349,7 +1350,7 @@ contract.
 
 ::
 
-    :: 'p : tez : contract 'p : 'S   ->   operation : S
+    :: 'p : mutez : contract 'p : 'S   ->   operation : S
 
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
@@ -1360,11 +1361,11 @@ contract, unit for an account.
 
     :: option key_hash : 'S   ->   operation : S
 
--  ``BALANCE``: Push the current amount of tez of the current contract.
+-  ``BALANCE``: Push the current amount of mutez of the current contract.
 
 ::
 
-    :: 'S   ->   tez : 'S
+    :: 'S   ->   mutez : 'S
 
 -  ``ADDRESS``: Push the untyped version of a contract.
 
@@ -1419,7 +1420,7 @@ contract, unit for an account.
 
 ::
 
-    :: 'S   ->   tez : 'S
+    :: 'S   ->   mutez : 'S
 
 -  ``IMPLICIT_ACCOUNT``: Return a default contract with the given
    public/private key pair. Any funds deposited in this contract can
@@ -1804,31 +1805,23 @@ specification: instructions are represented by uppercase identifiers,
 type constructors by lowercase identifiers, and constant constructors
 are Capitalized.
 
-All domain specific constants are Micheline strings with specific
-formats:
+All domain specific constants are Micheline constants with specific
+formats. Some have two representations accepted by the data type
+checker: a readable one in a string and an optimized one in a natural.
 
--  ``tez`` amounts are written using the same notation as JSON schemas
-   and the command line client: thousands are optionally separated by
-   commas, and so goes for mutez.
+-  ``mutez`` amounts are written as naturals.
+-  ``timestamp``\ s are written either using ``RFC 339`` notation
+   in a string (readable), or as the number of seconds since Epoch
+   in a natural (optimized).
+-  ``contract``\ s, ``address``\ es, ``key``\ s and ``signature``\ s
+   are written as strings, in their usual Base58 encoded versions
+   (readable), or as the little indian interpretation of their
+   bytes in a natural (optimized).
 
-   -  in regexp form: ``([0-9]{1,3}(,[0-9]{3})+)|[0-9]+(\.[0.9]{2})?``
-   -  ``"1234567"`` means 1234567 tez
-   -  ``"1,234,567"`` means 1234567 tez
-   -  ``"1234567.89"`` means 1234567890000 mutez
-   -  ``"1,234,567.0"`` means 123456789 tez
-   -  ``"10,123.456,789"`` means 10123456789 mutez
-   -  ``"1234,567"`` is invalid
-   -  ``"1,234,567.123456"`` is invalid
-
--  ``timestamp``\ s are written using ``RFC 339`` notation.
--  ``contract``\ s are the raw strings returned by JSON RPCs or the
-   command line interface and cannot be forged by hand so their format
-   is of no interest here.
--  ``key``\ s are ``Blake2B`` hashes of ``ed25519`` public keys encoded
-   in ``base58`` format with the following custom alphabet:
-   ``"eXMNE9qvHPQDdcFx5J86rT7VRm2atAypGhgLfbS3CKjnksB4"``.
--  ``signature``\ s are ``ed25519`` signatures as a series of
-   hex-encoded bytes.
+The optimized versions should not reach the RPCs, the protocol code
+will convert to optimized by itself when forging operations, storing
+to the database, and before hashing to get a canonical representation
+of a datum for a given type.
 
 To prevent errors, control flow primitives that take instructions as
 parameters require sequences in the concrete syntax.
@@ -1843,8 +1836,7 @@ Main program structure
 
 The toplevel of a smart contract file must be an un-delimited sequence
 of four primitive applications (in no particular order) that provide its
-``parameter``, ``return`` and ``storage`` types, as well as its
-``code``.
+``code``, ``parameter`` and ``storage`` fields.
 
 See the next section for a concrete example.
 
@@ -2525,11 +2517,6 @@ At the beginning of the transaction:
      A               via a CDDDDDAR
      B               via a CDDDDDDR
 
-For the contract to stay alive, we test that all least ``(Tez "1.00")``
-is still available after each transaction. This value is given as an
-example and must be updated according to the actual Tezos minimal value
-for contract balance.
-
 The complete source ``scrutable_reservoir.tz`` is:
 
 ::
@@ -2541,7 +2528,7 @@ The complete source ``scrutable_reservoir.tz`` is:
          (pair
             timestamp # T
             (pair
-               (pair tez tez) # P N
+               (pair mutez mutez) # P N
                (pair
                   (contract unit) # X
                   (pair (contract unit) (contract unit)))))) ; # A B
@@ -2554,8 +2541,8 @@ The complete source ``scrutable_reservoir.tz`` is:
              NOW ;
              COMPARE ; LT ;
              IF { # Before timeout
-                  # We compute ((1 + P) + N) tez for keeping the contract alive
-                  PUSH tez "1.00" ;
+                  # We compute (P + N) mutez
+                  PUSH mutez 0 ;
                   DIP { DUP ; CDDDAAR } ; ADD ; # P
                   DIP { DUP ; CDDDADR } ; ADD ; # N
                   # We compare to the cumulated amount
@@ -2581,17 +2568,17 @@ The complete source ``scrutable_reservoir.tz`` is:
                   # We update the global
                   CDDR ; PUSH string "timeout" ; PAIR ;
                   # We try to transfer the fee to the broker
-                  PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                  BALANCE ; # available
                   DIP { DUP ; CDDAAR } ; # P
                   COMPARE ; LT ; # available < P
-                  IF { PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                  IF { BALANCE ; # available
                        DIP { DUP ; CDDDAR } ; # X
                        UNIT ; TRANSFER_TOKENS }
                      { DUP ; CDDAAR ; # P
                        DIP { DUP ; CDDDAR } ; # X
                        UNIT ; TRANSFER_TOKENS } ;
                   # We transfer the rest to B
-                  DIP { PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                  DIP { BALANCE ; # available
                         DIP { DUP ; CDDDDDR } ; # B
                         UNIT ; TRANSFER_TOKENS } ;
                   NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
@@ -2698,9 +2685,6 @@ At the beginning of the transaction:
     the amount versed by the seller via a CDADDR
     the argument via a CAR
 
-The contract returns a unit value, and we assume that it is created with
-the minimum amount, set to ``(Tez "1.00")``.
-
 The complete source ``forward.tz`` is:
 
 ::
@@ -2747,13 +2731,12 @@ The complete source ``forward.tz`` is:
                { FAIL } } # (Right _)
            { # After Z + 24
              # if balance is emptied, just fail
-             BALANCE ; PUSH tez "0" ; IFCMPEQ { FAIL } {} ;
+             BALANCE ; PUSH mutez 0 ; IFCMPEQ { FAIL } {} ;
              # test if the required amount is reached
              DUP ; CDDAAR ; # Q
              DIP { DUP ; CDDDADR } ; MUL ; # C
              PUSH nat 2 ; MUL ;
-             PUSH tez "1.00" ; ADD ;
-             BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C) + 1
+             BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C)
              IF { # refund the parties
                   CDR ; DUP ; CADAR ; # amount versed by the buyer
                   DIP { DUP ; CDDDAAR } ; # B
@@ -2819,7 +2802,7 @@ The complete source ``forward.tz`` is:
                                  IF { # Between T + 24 and T + 48
                                       # We accept only delivery notifications, from W
                                       DUP ; CDDDDDR ; MANAGER ; # W
-                                      SOURCE ; MANAGER ;
+                                      SENDER ; MANAGER ;
                                       COMPARE ; NEQ ;
                                       IF { FAIL } {} ; # fail if not the warehouse
                                       DUP ; CAR ; # we must receive (Right amount)

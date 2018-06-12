@@ -45,8 +45,7 @@ code
          DUP ; CDDAAR ; # Q
          DIP { DUP ; CDDDADR } ; MUL ; # C
          PUSH nat 2 ; MUL ;
-         PUSH mutez 1000000 ; ADD ;
-         BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C) + 1
+         BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C)
          IF { # refund the parties
               CDR ; DUP ; CADAR ; # amount versed by the buyer
               DIP { DUP ; CDDDAAR } ; # B
