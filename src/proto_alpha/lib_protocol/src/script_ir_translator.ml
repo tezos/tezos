@@ -1077,8 +1077,8 @@ let parse_constr_annot loc ?if_special_first ?if_special_second annot =
   Lwt.return (parse_constr_annot loc ?if_special_first ?if_special_second annot)
 let parse_two_var_annot loc annot =
   Lwt.return (parse_two_var_annot loc annot)
-let parse_var_field_annot loc ?if_special_var annot =
-  Lwt.return (parse_var_field_annot loc ?if_special_var annot)
+let parse_destr_annot loc annot ~default_accessor ~field_name ~pair_annot ~value_annot =
+  Lwt.return (parse_destr_annot loc annot ~default_accessor ~field_name ~pair_annot ~value_annot)
 let parse_var_type_annot loc annot =
   Lwt.return (parse_var_type_annot loc annot)
 
@@ -1526,22 +1526,22 @@ and parse_instr
           (Item_t (Pair_t((a, l_field, fst_annot), (b, r_field, snd_annot), ty_name), rest, annot))
     | Prim (loc, I_CAR, [], annot),
       Item_t (Pair_t ((a, expected_field_annot, a_annot), _, _), rest, pair_annot) ->
-        parse_var_field_annot loc annot
-          ~if_special_var:(field_to_var_annot expected_field_annot)
+        parse_destr_annot loc annot
+          ~pair_annot
+          ~value_annot:a_annot
+          ~field_name:expected_field_annot
+          ~default_accessor:default_car_annot
         >>=? fun (annot, field_annot) ->
-        let annot = default_annot annot ~default:a_annot in
-        let annot = default_annot annot
-            ~default:(gen_access_annot pair_annot expected_field_annot ~default:default_car_annot) in
         Lwt.return @@ check_correct_field field_annot expected_field_annot >>=? fun () ->
         typed ctxt loc Car (Item_t (a, rest, annot))
     | Prim (loc, I_CDR, [], annot),
       Item_t (Pair_t (_, (b, expected_field_annot, b_annot), _), rest, pair_annot) ->
-        parse_var_field_annot loc annot
-          ~if_special_var:(field_to_var_annot expected_field_annot)
+        parse_destr_annot loc annot
+          ~pair_annot
+          ~value_annot:b_annot
+          ~field_name:expected_field_annot
+          ~default_accessor:default_cdr_annot
         >>=? fun (annot, field_annot) ->
-        let annot = default_annot annot ~default:b_annot in
-        let annot = default_annot annot
-            ~default:(gen_access_annot pair_annot expected_field_annot ~default:default_cdr_annot) in
         Lwt.return @@ check_correct_field field_annot expected_field_annot >>=? fun () ->
         typed ctxt loc Cdr (Item_t (b, rest, annot))
     (* unions *)

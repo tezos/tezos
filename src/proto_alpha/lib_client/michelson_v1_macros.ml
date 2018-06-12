@@ -61,7 +61,7 @@ let extract_first_annot annot char =
   extract_first_annot [] annot
 
 let extract_first_field_annot annot = extract_first_annot annot '%'
-let extract_first_bind_annot annot = extract_first_annot annot '$'
+let extract_first_var_annot annot = extract_first_annot annot '@'
 
 let extract_field_annots annot =
   List.partition (fun a ->
@@ -84,7 +84,11 @@ let expand_set_caddadr original =
           | [] -> ok ()
           | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
         end >>? fun () ->
-        let field_annot, annot = extract_first_field_annot annot in
+        begin match extract_field_annots annot with
+          | [], annot -> ok (None, annot)
+          | [f], annot -> ok (Some f, annot)
+          | _, _ -> error (Unexpected_macro_annotation str)
+        end >>? fun (field_annot, annot) ->
         let rec parse i acc =
           if i = 4 then
             acc
@@ -97,11 +101,11 @@ let expand_set_caddadr original =
                        [ Prim (loc, "DUP", [], []) ;
                          Prim (loc, "DIP",
                                [ Seq (loc,
-                                      [ Prim (loc, "CAR", [], []) ;
+                                      [ Prim (loc, "CAR", [], [ "@%%" ]) ;
                                         acc ]) ], []) ;
-                         Prim (loc, "CDR", [], []) ;
+                         Prim (loc, "CDR", [], [ "@%%" ]) ;
                          Prim (loc, "SWAP", [], []) ;
-                         Prim (loc, "PAIR", [], annot) ]) in
+                         Prim (loc, "PAIR", [], "%@" :: "%@" :: annot) ]) in
                 parse (i - 1) acc
             | 'D' ->
                 let acc =
@@ -109,10 +113,10 @@ let expand_set_caddadr original =
                        [ Prim (loc, "DUP", [], []) ;
                          Prim (loc, "DIP",
                                [ Seq (loc,
-                                      [ Prim (loc, "CDR", [], []) ;
+                                      [ Prim (loc, "CDR", [], [ "@%%" ]) ;
                                         acc ]) ], []) ;
-                         Prim (loc, "CAR", [], []) ;
-                         Prim (loc, "PAIR", [], annot) ]) in
+                         Prim (loc, "CAR", [], [ "@%%" ]) ;
+                         Prim (loc, "PAIR", [], "%@" :: "%@" :: annot) ]) in
                 parse (i - 1) acc
             | _ -> assert false in
         match String.get str (len - 2) with
@@ -123,9 +127,10 @@ let expand_set_caddadr original =
                             Prim (loc, "CAR", [], [ f ]) ;
                             Prim (loc, "DROP", [], []) ;
                           ] in
-            let encoding = [ Prim (loc, "CDR", [], []) ;
+            let encoding = [ Prim (loc, "CDR", [], [ "@%%" ]) ;
                              Prim (loc, "SWAP", [], []) ] in
-            let pair = [ Prim (loc, "PAIR", [], []) ] in
+            let pair = [ Prim (loc, "PAIR", [],
+                               [ Option.unopt field_annot ~default:"%" ; "%@" ]) ] in
             let init = Seq (loc, access_check @ encoding @ pair) in
             ok (Some (parse (len - 3) init))
         | 'D' ->
@@ -135,8 +140,9 @@ let expand_set_caddadr original =
                             Prim (loc, "CDR", [], [ f ]) ;
                             Prim (loc, "DROP", [], []) ;
                           ] in
-            let encoding = [ Prim (loc, "CAR", [], []) ] in
-            let pair = [ Prim (loc, "PAIR", [], []) ] in
+            let encoding = [ Prim (loc, "CAR", [], [ "@%%" ]) ] in
+            let pair = [ Prim (loc, "PAIR", [],
+                               [ "%@" ; Option.unopt field_annot ~default:"%" ]) ] in
             let init = Seq (loc, access_check @ encoding @ pair) in
             ok (Some (parse (len - 3) init))
         | _ -> assert false
@@ -158,8 +164,11 @@ let expand_map_caddadr original =
           | [ _ ] -> error (Sequence_expected str)
           | [] | _ :: _ :: _ -> error (Invalid_arity (str, List.length args, 1))
         end >>? fun code ->
-        let field_annot, annot = extract_first_field_annot annot in
-        let bind_annot, annot = extract_first_bind_annot annot in
+        begin match extract_field_annots annot with
+          | [], annot -> ok (None, annot)
+          | [f], annot -> ok (Some f, annot)
+          | _, _ -> error (Unexpected_macro_annotation str)
+        end >>? fun (field_annot, annot) ->
         let rec parse i acc =
           if i = 4 then
             acc
@@ -172,11 +181,11 @@ let expand_map_caddadr original =
                        [ Prim (loc, "DUP", [], []) ;
                          Prim (loc, "DIP",
                                [ Seq (loc,
-                                      [ Prim (loc, "CAR", [], []) ;
+                                      [ Prim (loc, "CAR", [], [ "@%%" ]) ;
                                         acc ]) ], []) ;
-                         Prim (loc, "CDR", [], []) ;
+                         Prim (loc, "CDR", [], [ "@%%" ]) ;
                          Prim (loc, "SWAP", [], []) ;
-                         Prim (loc, "PAIR", [], annot) ]) in
+                         Prim (loc, "PAIR", [], "%@" :: "%@" :: annot) ]) in
                 parse (i - 1) acc
             | 'D' ->
                 let acc =
@@ -184,30 +193,26 @@ let expand_map_caddadr original =
                        [ Prim (loc, "DUP", [], []) ;
                          Prim (loc, "DIP",
                                [ Seq (loc,
-                                      [ Prim (loc, "CDR", [], []) ;
+                                      [ Prim (loc, "CDR", [], [ "@%%" ]) ;
                                         acc ]) ], []) ;
-                         Prim (loc, "CAR", [], []) ;
-                         Prim (loc, "PAIR", [], annot) ]) in
+                         Prim (loc, "CAR", [], [ "@%%" ]) ;
+                         Prim (loc, "PAIR", [], "%@" :: "%@" :: annot) ]) in
                 parse (i - 1) acc
             | _ -> assert false in
-        let cr_annot =
-          let f = match field_annot with
-            | None -> []
-            | Some f -> [ f ] in
-          let b = match bind_annot with
-            | None -> []
-            | Some b -> [ "@" ^ String.sub b 1 (String.length b - 1) ] in
-          f @ b in
+        let cr_annot = match field_annot with
+          | None -> []
+          | Some f -> [ "@" ^ String.sub f 1 (String.length f - 1) ] in
         match String.get str (len - 2) with
         | 'A' ->
             let init =
               Seq (loc,
                    [ Prim (loc, "DUP", [], []) ;
-                     Prim (loc, "CDR", [], []) ;
+                     Prim (loc, "CDR", [], [ "@%%" ]) ;
                      Prim (loc, "DIP",
                            [ Seq (loc, [ Prim (loc, "CAR", [], cr_annot) ; code ]) ], []) ;
                      Prim (loc, "SWAP", [], []) ;
-                     Prim (loc, "PAIR", [], []) ]) in
+                     Prim (loc, "PAIR", [],
+                           [ Option.unopt field_annot ~default:"%" ; "%@"]) ]) in
             ok (Some (parse (len - 3) init))
         | 'D' ->
             let init =
@@ -216,8 +221,9 @@ let expand_map_caddadr original =
                      Prim (loc, "CDR", [], cr_annot) ;
                      code ;
                      Prim (loc, "SWAP", [], []) ;
-                     Prim (loc, "CAR", [], []) ;
-                     Prim (loc, "PAIR", [], []) ]) in
+                     Prim (loc, "CAR", [], [ "@%%" ]) ;
+                     Prim (loc, "PAIR", [],
+                           [ "%@" ; Option.unopt field_annot ~default:"%" ]) ]) in
             ok (Some (parse (len - 3) init))
         | _ -> assert false
       else
@@ -640,47 +646,49 @@ let unexpand_caddadr expanded =
 let unexpand_set_caddadr expanded =
   let rec steps acc annots = function
     | Seq (loc,
-           [ Prim (_, "CDR", [], []) ;
-             Prim (_, "SWAP", [], []) ;
-             Prim (_, "PAIR", [], []) ]) ->
+           [ Prim (_, "CDR", [], _) ;
+             Prim (_, "SWAP", [], _) ;
+             Prim (_, "PAIR", [], _) ]) ->
         Some (loc, "A" :: acc, annots)
     | Seq (loc,
            [ Prim (_, "DUP", [], []) ;
              Prim (_, "CAR", [], [ field_annot ]) ;
              Prim (_, "DROP", [], []) ;
-             Prim (_, "CDR", [], []) ;
+             Prim (_, "CDR", [], _) ;
              Prim (_, "SWAP", [], []) ;
-             Prim (_, "PAIR", [], []) ]) ->
+             Prim (_, "PAIR", [], _) ]) ->
         Some (loc, "A" :: acc, field_annot :: annots)
     | Seq (loc,
-           [ Prim (_, "CAR", [], []) ;
-             Prim (_, "PAIR", [], []) ]) ->
+           [ Prim (_, "CAR", [], _) ;
+             Prim (_, "PAIR", [], _) ]) ->
         Some (loc, "D" :: acc, annots)
     | Seq (loc,
            [ Prim (_, "DUP", [], []) ;
              Prim (_, "CDR", [], [ field_annot ]) ;
              Prim (_, "DROP", [], []) ;
-             Prim (_, "CAR", [], []) ;
-             Prim (_, "PAIR", [], []) ]) ->
+             Prim (_, "CAR", [], _) ;
+             Prim (_, "PAIR", [], _) ]) ->
         Some (loc, "D" :: acc, field_annot :: annots)
     | Seq (_,
            [ Prim (_, "DUP", [], []) ;
              Prim (_, "DIP",
                    [ Seq (_,
-                          [ Prim (_, "CAR", [], []) ;
+                          [ Prim (_, "CAR", [], _) ;
                             sub ]) ], []) ;
-             Prim (_, "CDR", [], []) ;
+             Prim (_, "CDR", [], _) ;
              Prim (_, "SWAP", [], []) ;
              Prim (_, "PAIR", [], pair_annots) ]) ->
+        let _, pair_annots = extract_field_annots pair_annots in
         steps ("A" :: acc) (List.rev_append pair_annots annots) sub
     | Seq (_,
            [ Prim (_, "DUP", [], []) ;
              Prim (_, "DIP",
                    [ Seq (_,
-                          [ Prim (_, "CDR", [], []) ;
+                          [ Prim (_, "CDR", [], _) ;
                             sub ]) ], []) ;
-             Prim (_, "CAR", [], []) ;
+             Prim (_, "CAR", [], _) ;
              Prim (_, "PAIR", [], pair_annots) ]) ->
+        let _, pair_annots = extract_field_annots pair_annots in
         steps ("D" :: acc) (List.rev_append pair_annots annots) sub
     | _ -> None in
   match steps [] [] expanded with
@@ -693,49 +701,50 @@ let unexpand_map_caddadr expanded =
   let rec steps acc annots = function
     | Seq (loc,
            [ Prim (_, "DUP", [], []) ;
-             Prim (_, "CDR", [], []) ;
+             Prim (_, "CDR", [], _) ;
              Prim (_, "SWAP", [], []) ;
              Prim (_, "DIP",
                    [ Seq (_,
                           [ Prim (_, "CAR", [], []) ;
                             code ]) ], []) ;
-             Prim (_, "PAIR", [], []) ]) ->
+             Prim (_, "PAIR", [], _) ]) ->
         Some (loc, "A" :: acc, annots, code)
     | Seq (loc,
            [ Prim (_, "DUP", [], []) ;
-             Prim (_, "CDR", [], []) ;
+             Prim (_, "CDR", [], _) ;
              Prim (_, "SWAP", [], []) ;
              Prim (_, "DIP",
                    [ Seq (_,
                           [ Prim (_, "CAR", [], [ field_annot ]) ;
                             code ]) ], []) ;
-             Prim (_, "PAIR", [], []) ]) ->
+             Prim (_, "PAIR", [], _) ]) ->
         Some (loc, "A" :: acc, field_annot :: annots, code)
     | Seq (loc,
            [ Prim (_, "DUP", [], []) ;
              Prim (_, "CDR", [], []) ;
              code ;
              Prim (_, "SWAP", [], []) ;
-             Prim (_, "CAR", [], []) ;
-             Prim (_, "PAIR", [], []) ]) ->
+             Prim (_, "CAR", [], _) ;
+             Prim (_, "PAIR", [], _) ]) ->
         Some (loc, "D" :: acc, annots, code)
     | Seq (loc,
            [ Prim (_, "DUP", [], []) ;
              Prim (_, "CDR", [], [ field_annot ]) ;
              code ;
              Prim (_, "SWAP", [], []) ;
-             Prim (_, "CAR", [], []) ;
-             Prim (_, "PAIR", [], []) ]) ->
+             Prim (_, "CAR", [], _) ;
+             Prim (_, "PAIR", [], _) ]) ->
         Some (loc, "D" :: acc, field_annot :: annots, code)
     | Seq (_,
            [ Prim (_, "DUP", [], []) ;
              Prim (_, "DIP",
                    [ Seq (_,
-                          [ Prim (_, "CAR", [], []) ;
+                          [ Prim (_, "CAR", [], _) ;
                             sub ]) ], []) ;
-             Prim (_, "CDR", [], []) ;
+             Prim (_, "CDR", [], _) ;
              Prim (_, "SWAP", [], []) ;
              Prim (_, "PAIR", [], pair_annots) ]) ->
+        let _, pair_annots = extract_field_annots pair_annots in
         steps ("A" :: acc) (List.rev_append pair_annots annots) sub
     | Seq (_,
            [ Prim (_, "DUP", [], []) ;
@@ -745,6 +754,7 @@ let unexpand_map_caddadr expanded =
                             sub ]) ], []) ;
              Prim (_, "CAR", [], []) ;
              Prim (_, "PAIR", [], pair_annots) ]) ->
+        let _, pair_annots = extract_field_annots pair_annots in
         steps ("D" :: acc) (List.rev_append pair_annots annots) sub
     | _ -> None in
   match steps [] [] expanded with

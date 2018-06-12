@@ -129,8 +129,12 @@ val parse_constr_annot :
 val parse_two_var_annot :
   int -> string list -> (var_annot option * var_annot option) tzresult
 
-val parse_var_field_annot :
-  int -> ?if_special_var:var_annot option -> string list ->
+val parse_destr_annot :
+  int -> string list ->
+  default_accessor:field_annot option ->
+  field_name:field_annot option ->
+  pair_annot:var_annot option ->
+  value_annot:var_annot option ->
   (var_annot option * field_annot option) tzresult
 
 val parse_var_type_annot :

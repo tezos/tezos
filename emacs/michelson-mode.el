@@ -172,7 +172,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 (defconst michelson-font-lock-defaults
   (list
    (list
-    '("\\<[@]\\(\\|%\\|[A-Za-z-_][A-Za-z-_0-9\.]*\\)\\>" . michelson-face-var-annotation)
+    '("\\<[@]\\(\\|%\\|%%\\|[A-Za-z-_][A-Za-z-_0-9\.]*\\)\\>" . michelson-face-var-annotation)
     '("\\<[%:]\\(\\|@\\|[A-Za-z-_][A-Za-z-_0-9\.]*\\)\\>" . michelson-face-type-annotation)
     '("\\<[0-9]+\\>" . michelson-face-constant)
     '("\\<[A-Z][a-z_0-9]+\\>" . michelson-face-constant)
@@ -501,7 +501,7 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
   (lexical-let*
       ((pp-no-trailing-newline
         (lambda (sexp)
-          (let* ((str (pp-to-string sexp))
+          (let* ((str (replace-regexp-in-string "\\\\\." "." (pp-to-string sexp)))
                  (len (length str)))
             (if (equal "\n" (substring str (- len 1) len))
                 (substring str 0 (- len 1))

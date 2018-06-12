@@ -131,8 +131,14 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
     else match s.[1] with
       | 'a' .. 'z' | 'A' .. 'Z' | '_' ->
           ok @@ wrap (Some (String.sub s 1 (len - 1))) :: acc
-      | ('%' | '@' as c) when Compare.Int.(len = 2) && List.mem c specials ->
-          ok @@ wrap (Some (String.sub s 1 (len - 1))) :: acc
+      | '@' when Compare.Int.(len = 2) && List.mem '@' specials ->
+          ok @@ wrap (Some "@") :: acc
+      | '%' when List.mem '%' specials ->
+          if Compare.Int.(len = 2)
+          then ok @@ wrap (Some "%") :: acc
+          else if Compare.Int.(len = 3) && Compare.Char.(s.[2] = '%')
+          then ok @@ wrap (Some "%%") :: acc
+          else error (Unexpected_annotation loc)
       | _ -> error (Unexpected_annotation loc) in
   List.fold_left (fun acc s ->
       match acc with
@@ -300,6 +306,27 @@ let parse_var_annot
       | Some a -> a
       | None -> None
 
+let split_last_dot = function
+  | None -> None, None
+  | Some `Field_annot s ->
+      try
+        let i = String.rindex s '.' in
+        let s1 = String.sub s 0 i in
+        let s2 = String.sub s (i + 1) (String.length s - i - 1) in
+        let f =
+          if Compare.String.equal s2 "car" || Compare.String.equal s2 "cdr"
+          then None
+          else Some (`Field_annot s2) in
+        Some (`Var_annot s1), f
+      with Not_found -> None, Some (`Field_annot s)
+
+let common_prefix v1 v2 =
+  match v1, v2 with
+  | Some (`Var_annot s1), Some (`Var_annot s2) when Compare.String.equal s1 s2 -> v1
+  | Some _, None -> v1
+  | None, Some _ -> v2
+  | _, _ -> None
+
 let parse_constr_annot
   : int ->
     ?if_special_first:field_annot option ->
@@ -313,15 +340,20 @@ let parse_constr_annot
     get_one_annot loc types >>? fun t ->
     get_two_annot loc fields >>? fun (f1, f2) ->
     begin match if_special_first, f1 with
-      | Some special_var, Some `Field_annot "@" -> ok special_var
+      | Some special_var, Some `Field_annot "@" ->
+          ok (split_last_dot special_var)
       | None, Some `Field_annot "@" -> error (Unexpected_annotation loc)
-      | _, _ -> ok f1
-    end >>? fun f1 ->
+      | _, _ -> ok (v, f1)
+    end >>? fun (v1, f1) ->
     begin match if_special_second, f2 with
-      | Some special_var, Some `Field_annot "@" -> ok special_var
+      | Some special_var, Some `Field_annot "@" ->
+          ok (split_last_dot special_var)
       | None, Some `Field_annot "@" -> error (Unexpected_annotation loc)
-      | _, _ -> ok f2
-    end >|? fun f2 ->
+      | _, _ -> ok (v, f2)
+    end >|? fun (v2, f2) ->
+    let v = match v with
+      | None -> common_prefix v1 v2
+      | Some _ -> v in
     (v, t, f1, f2)
 
 let parse_two_var_annot
@@ -333,19 +365,24 @@ let parse_two_var_annot
     error_unexpected_annot loc fields >>? fun () ->
     get_two_annot loc vars
 
-let parse_var_field_annot
-  : int -> ?if_special_var:var_annot option -> string list ->
-    (var_annot option * field_annot option) tzresult
-  = fun loc ?if_special_var annot ->
+let parse_destr_annot
+  : int -> string list -> default_accessor:field_annot option ->
+  field_name:field_annot option ->
+  pair_annot:var_annot option -> value_annot:var_annot option ->
+  (var_annot option * field_annot option) tzresult
+  = fun loc annot ~default_accessor ~field_name ~pair_annot ~value_annot ->
     parse_annots loc ~allow_special_var:true annot >>?
     classify_annot loc >>? fun (vars, types, fields) ->
     error_unexpected_annot loc types >>? fun () ->
     get_one_annot loc vars >>? fun v ->
-    get_one_annot loc fields >>? fun f ->
-    match if_special_var, v with
-    | Some special_var, Some `Var_annot "%" -> ok (special_var, f)
-    | None, Some `Var_annot "%" -> error (Unexpected_annotation loc)
-    | _, _ -> ok (v, f)
+    get_one_annot loc fields >|? fun f ->
+    let default = gen_access_annot pair_annot field_name ~default:default_accessor in
+    let v = match v with
+      | Some `Var_annot "%" -> field_to_var_annot field_name
+      | Some `Var_annot "%%" -> default
+      | Some _ -> v
+      | None -> value_annot in
+    (v, f)
 
 let parse_var_type_annot
   : int -> string list -> (var_annot option * type_annot option) tzresult

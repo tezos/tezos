@@ -2149,7 +2149,7 @@ Syntax
 Primitive applications can receive one or many annotations.
 
 An annotation is a sequence of characters that matches the regular
-expression ``[@:%](|[@%]|[_a-ZA-Z][_0-9a-zA-Z\.]*)``. They come after
+expression ``[@:%](|@|%|%%|[_a-ZA-Z][_0-9a-zA-Z\.]*)``. They come after
 the primitive name and before its potential arguments.
 
 ::
@@ -2310,23 +2310,31 @@ type (which can be changed). For instance the annotated typing rule for
 Special Annotations
 ~~~~~~~~~~~~~~~~~~~
 
-The special variable annotation ``@%`` can be used on instructions
+The special variable annotations ``@%%`` can be used on instructions
 ``CAR`` and ``CDR``. It means to use the accessed field name (if any) as
-a name for the value on the stack.
+a name for the value on the stack. The following typing rule
+demonstrates their use for instruction ``CAR``.
 
 ::
    CAR @%
-   :: (pair ('a %fst) ('b %snd)) : 'S   ->   @fst 'a : 'S
+   :: @p (pair ('a %fst) ('b %snd)) : 'S   ->   @fst 'a : 'S
 
+   CAR @%%
+   :: @p (pair ('a %fst) ('b %snd)) : 'S   ->   @p.fst 'a : 'S
 
 The special variable annotation ``%@`` can be used on instructions
 ``PAIR``, ``SOME``, ``LEFT``, ``RIGHT``. It means to use the variable
 name annotation in the stack as a field name for the constructed
-element. An example with ``PAIR`` follows,
+element. Two examples with ``PAIR`` follows, notice the special
+treatment of annotations with `.`.
 
 ::
    PAIR %@ %@
    :: @x 'a : @y 'b : 'S   ->   (pair ('a %x) ('b %y)) : 'S
+
+   PAIR %@ %@
+   :: @p.x 'a : @p.y 'b : 'S   ->  @p (pair ('a %x) ('b %y)) : 'S
+   :: @p.x 'a : @q.y 'b : 'S   ->  (pair ('a %x) ('b %y)) : 'S
 
 XI - JSON syntax
 ---------------
