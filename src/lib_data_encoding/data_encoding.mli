@@ -169,6 +169,9 @@ module Encoding: sig
       - encoded as the concatenation of all the element in binary
        prefixed its length in bytes
 
+      If [max_length] is passed and the encoding of elements has fixed
+      size, a {!check_size} is automatically added for earlier rejection.
+
       @raise [Invalid_argument] if the inner encoding is variable. *)
   val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
@@ -176,6 +179,9 @@ module Encoding: sig
       - encoded as an array in JSON
       - encoded as the concatenation of all the element in binary
        prefixed its length in bytes
+
+      If [max_length] is passed and the encoding of elements has fixed
+      size, a {!check_size} is automatically added for earlier rejection.
 
       @raise [Invalid_argument] if the inner encoding is also variable. *)
   val list : ?max_length:int -> 'a encoding -> 'a list encoding
@@ -633,7 +639,8 @@ module Binary: sig
     | Invalid_float of { min : float ; v : float ; max : float }
     | Trailing_zero
     | Size_limit_exceeded
-    | Oversized_list
+    | List_too_long
+    | Array_too_long
   exception Read_error of read_error
   val pp_read_error: Format.formatter -> read_error -> unit
 
@@ -646,7 +653,8 @@ module Binary: sig
     | Invalid_bytes_length of { expected : int ; found : int }
     | Invalid_string_length of { expected : int ; found : int }
     | Invalid_natural
-    | Oversized_list
+    | List_too_long
+    | Array_too_long
   val pp_write_error : Format.formatter -> write_error -> unit
   exception Write_error of write_error
 

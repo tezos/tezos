@@ -261,11 +261,11 @@ let rec read_rec
         Atom.string_enum arr resume state k
     | Array (max_length, e) ->
         let max_length = Option.unopt ~default:max_int max_length in
-        read_list max_length e state @@ fun (l, state) ->
+        read_list Array_too_long max_length e state @@ fun (l, state) ->
         k (Array.of_list l, state)
     | List (max_length, e) ->
         let max_length = Option.unopt ~default:max_int max_length in
-        read_list max_length e state k
+        read_list List_too_long max_length e state k
     | (Obj (Req { encoding = e })) -> read_rec whole e state k
     | (Obj (Dft { encoding = e })) -> read_rec whole e state k
     | (Obj (Opt { kind = `Dynamic ; encoding = e })) ->
@@ -398,14 +398,14 @@ and read_variable_pair
 
 and read_list
   : type a ret.
-    int -> a Encoding.t -> state -> ((a list * state) -> ret status) -> ret status
-  = fun max_length e state k ->
+    read_error -> int -> a Encoding.t -> state -> ((a list * state) -> ret status) -> ret status
+  = fun error max_length e state k ->
     let rec loop state acc max_length =
       let size = remaining_bytes state in
       if size = 0 then
         k (List.rev acc, state)
       else if max_length = 0 then
-        raise Oversized_list
+        raise error
       else
         read_rec false e state @@ fun (v, state) ->
         loop state (v :: acc) (max_length - 1) in

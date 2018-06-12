@@ -226,11 +226,11 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
     | String_enum (tbl, arr) ->
         Atom.string_enum tbl arr state value
     | Array (Some max_length, _e) when Array.length value > max_length ->
-        raise Oversized_list
+        raise Array_too_long
     | Array (_, e) ->
         Array.iter (write_rec e state) value
     | List (Some max_length, _e) when List.length value > max_length ->
-        raise Oversized_list
+        raise List_too_long
     | List (_, e) ->
         List.iter (write_rec e state) value
     | Obj (Req { encoding = e }) -> write_rec e state value

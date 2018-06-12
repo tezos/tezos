@@ -192,11 +192,11 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
         Atom.string_enum arr state
     | Array (max_length, e) ->
         let max_length = Option.unopt ~default:max_int max_length in
-        let l = read_list max_length e state in
+        let l = read_list List_too_long max_length e state in
         Array.of_list l
     | List (max_length, e) ->
         let max_length = Option.unopt ~default:max_int max_length in
-        read_list max_length e state
+        read_list Array_too_long max_length e state
     | (Obj (Req { encoding = e })) -> read_rec e state
     | (Obj (Dft { encoding = e })) -> read_rec e state
     | (Obj (Opt { kind = `Dynamic ; encoding = e })) ->
@@ -303,13 +303,13 @@ and read_variable_pair
         (left, right)
     | _ -> assert false (* Should be rejected by [Encoding.Kind.combine] *)
 
-and read_list : type a. int -> a Encoding.t -> state -> a list
-  = fun max_length e state ->
+and read_list : type a. read_error -> int -> a Encoding.t -> state -> a list
+  = fun error max_length e state ->
     let rec loop max_length acc =
       if state.remaining_bytes = 0 then
         List.rev acc
       else if max_length = 0 then
-        raise Oversized_list
+        raise error
       else
         let v = read_rec e state in
         loop (max_length - 1) (v :: acc) in

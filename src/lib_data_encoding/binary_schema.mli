@@ -27,7 +27,7 @@ and layout =
   | Bytes
   | String
   | Enum of Binary_size.integer * string
-  | Seq of layout (* For arrays and lists *)
+  | Seq of layout * int option (* For arrays and lists *)
   | Ref of string
   | Padding
 
