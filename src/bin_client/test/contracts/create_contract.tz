@@ -12,7 +12,7 @@ code { CAR;
            DIP { RIGHT key_hash ; DIP { SELF ; PUSH mutez 0 } ; TRANSFER_TOKENS ;
                  NIL operation ; SWAP ; CONS } ;
            CONS ; UNIT ; SWAP ; PAIR }
-         { SELF ; ADDRESS ; SOURCE ; IFCMPNEQ { FAIL } {} ;
+         { SELF ; ADDRESS ; SENDER ; IFCMPNEQ { FAIL } {} ;
            CONTRACT string ; IF_SOME {} { FAIL } ;
            PUSH mutez 0 ; PUSH string "abcdefg" ; TRANSFER_TOKENS ;
            NIL operation; SWAP; CONS ; UNIT ; SWAP ; PAIR } };

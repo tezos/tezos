@@ -206,6 +206,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | H _ -> 0
   | Steps_to_quota -> 0
   | Source -> 0
+  | Sender -> 0
   | Self _ -> 1
   | Amount -> 0
   | Set_delegate -> 0
@@ -294,6 +295,7 @@ let namespace = function
   | I_SIZE
   | I_SOME
   | I_SOURCE
+  | I_SENDER
   | I_SELF
   | I_STEPS_TO_QUOTA
   | I_SUB
@@ -2380,6 +2382,11 @@ and parse_instr
         parse_var_annot loc annot ~default:default_source_annot >>=? fun annot ->
         typed ctxt loc Source
           (Item_t (Address_t None, stack, annot))
+    | Prim (loc, I_SENDER, [], annot),
+      stack ->
+        parse_var_annot loc annot ~default:default_sender_annot >>=? fun annot ->
+        typed ctxt loc Sender
+          (Item_t (Address_t None, stack, annot))
     | Prim (loc, I_SELF, [], annot),
       stack ->
         parse_var_annot loc annot ~default:default_self_annot >>=? fun annot ->
@@ -2404,7 +2411,7 @@ and parse_instr
                  | I_MANAGER | I_TRANSFER_TOKENS | I_CREATE_ACCOUNT
                  | I_CREATE_CONTRACT | I_SET_DELEGATE | I_NOW
                  | I_IMPLICIT_ACCOUNT | I_AMOUNT | I_BALANCE
-                 | I_CHECK_SIGNATURE | I_HASH_KEY | I_SOURCE
+                 | I_CHECK_SIGNATURE | I_HASH_KEY | I_SOURCE | I_SENDER
                  | I_H | I_STEPS_TO_QUOTA | I_ADDRESS
                  as name), (_ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
@@ -2478,7 +2485,7 @@ and parse_instr
             I_PUSH ; I_NONE ; I_LEFT ; I_RIGHT ; I_NIL ;
             I_EMPTY_SET ; I_DIP ; I_LOOP ;
             I_IF_NONE ; I_IF_LEFT ; I_IF_CONS ;
-            I_EMPTY_MAP ; I_IF ; I_SOURCE ; I_SELF ; I_LAMBDA ]
+            I_EMPTY_MAP ; I_IF ; I_SOURCE ; I_SENDER ; I_SELF ; I_LAMBDA ]
 
 and parse_contract
   : type arg. context -> Script.location -> arg ty -> Contract.t ->

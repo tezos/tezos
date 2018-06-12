@@ -1385,8 +1385,24 @@ contract, unit for an account.
     > CONTRACT / addr : S  =>  None : S
         otherwise
 
--  ``SOURCE``: Push the source contract of the current
-   transaction.
+-  ``SOURCE``: Push the contract that initiated the current
+   transaction, i.e. the contract that paid the fees and
+   storage cost, and whose manager signed the operation
+   that was sent on the blockchain. Note that since
+   ``TRANSFER_TOKENS`` instructions can be chained,
+   ``SOURCE`` and ``SENDER`` are not necessarily the same.
+
+::
+
+    :: 'S   ->   address : 'S
+
+-  ``SENDER``: Push the contract that initiated the current
+   internal transaction. It may be the ``SOURCE``, but may
+   also not if the source sent an order to an intermediate
+   smart contract, which then called the current contract.
+   To make sure that ``SENDER`` is the ``SOURCE``, either
+   compare them, or make sure that ``SENDER`` is the implicit
+   account of its ``MANAGER``.
 
 ::
 
@@ -2035,6 +2051,7 @@ The instructions which accept at most one variable annotation are:
    H
    STEPS_TO_QUOTA
    SOURCE
+   SENDER
    SELF
    CAST
    RENAME
@@ -2298,6 +2315,8 @@ A similar mechanism is used for context dependent instructions:
    BALANCE :: 'S   ->   @balance tez : 'S
 
    SOURCE  :: 'S   ->   @source address : 'S
+
+   SENDER  :: 'S   ->   @sender address : 'S
 
    SELF  :: 'S   ->   @self contract 'p : 'S
 
@@ -2929,7 +2948,8 @@ XII - Full grammar
       | H
       | HASH_KEY
       | STEPS_TO_QUOTA
-      | SOURCE <type> <type>
+      | SOURCE
+      | SENDER
     <type> ::=
       | <comparable type>
       | key

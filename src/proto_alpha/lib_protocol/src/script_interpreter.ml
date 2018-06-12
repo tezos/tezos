@@ -708,6 +708,9 @@ let rec interp
             logged_return (Item (Script_int.(abs (of_zint steps)), rest), ctxt)
         | Source, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.source) >>=? fun ctxt ->
+            logged_return (Item (payer, rest), ctxt)
+        | Sender, rest ->
+            Lwt.return (Gas.consume ctxt Interp_costs.source) >>=? fun ctxt ->
             logged_return (Item (source, rest), ctxt)
         | Self t, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.self) >>=? fun ctxt ->

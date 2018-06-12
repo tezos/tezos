@@ -17,6 +17,7 @@ val default_amount_annot : var_annot option
 val default_balance_annot : var_annot option
 val default_steps_annot : var_annot option
 val default_source_annot : var_annot option
+val default_sender_annot : var_annot option
 val default_self_annot : var_annot option
 val default_arg_annot : var_annot option
 val default_param_annot : var_annot option

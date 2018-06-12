@@ -1,7 +1,7 @@
 storage nat ;
 parameter nat ;
 code { UNPAIR ;
-       DIP { SELF ; ADDRESS ; SOURCE;
+       DIP { SELF ; ADDRESS ; SENDER;
              IFCMPEQ {} { DROP ; PUSH @storage nat 1 } };
        DUP ;
        PUSH nat 1 ;

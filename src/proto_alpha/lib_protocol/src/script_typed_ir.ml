@@ -348,6 +348,8 @@ and ('bef, 'aft) instr =
       ('rest, n num * 'rest) instr
   | Source :
       ('rest, Contract.t * 'rest) instr
+  | Sender :
+      ('rest, Contract.t * 'rest) instr
   | Self : 'p ty ->
     ('rest, 'p typed_contract * 'rest) instr
   | Amount :
