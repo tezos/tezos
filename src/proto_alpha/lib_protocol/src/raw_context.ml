@@ -22,7 +22,7 @@ type t = {
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
   operation_gas: Gas_limit_repr.t ;
-  block_storage: Int64.t ;
+  block_storage: Z.t ;
   operation_storage: Storage_limit_repr.t ;
   origination_nonce: Contract_repr.origination_nonce option ;
   internal_nonce: int ;
@@ -174,8 +174,8 @@ let () =
     (fun () -> Storage_limit_too_high)
 
 let set_storage_limit ctxt remaining =
-  if Compare.Int64.(remaining > ctxt.constants.hard_storage_limit_per_operation)
-  || Compare.Int64.(remaining < 0L)then
+  if Compare.Z.(remaining > ctxt.constants.hard_storage_limit_per_operation)
+  || Compare.Z.(remaining < Z.zero)then
     error Storage_limit_too_high
   else
     ok { ctxt with operation_storage = Limited { remaining } }
@@ -509,7 +509,7 @@ module type T = sig
 
   val consume_gas: context -> Gas_limit_repr.cost -> context tzresult
 
-  val record_bytes_stored: context -> Int64.t -> context tzresult
+  val record_bytes_stored: context -> Z.t -> context tzresult
 
   val description: context Storage_description.t
 

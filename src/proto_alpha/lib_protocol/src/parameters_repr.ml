@@ -100,10 +100,10 @@ let constants_encoding =
          opt Tez_repr.(=)
            default.cost_per_byte c.cost_per_byte
        and hard_storage_limit_per_operation =
-         opt Compare.Int64.(=)
+         opt Compare.Z.(=)
            default.hard_storage_limit_per_operation c.hard_storage_limit_per_operation
        and hard_storage_limit_per_block =
-         opt Compare.Int64.(=)
+         opt Compare.Z.(=)
            default.hard_storage_limit_per_block c.hard_storage_limit_per_block
        in
        (( preserved_cycles,
@@ -223,8 +223,8 @@ let constants_encoding =
           (obj4
              (opt "endorsement_reward" Tez_repr.encoding)
              (opt "cost_per_byte" Tez_repr.encoding)
-             (opt "hard_storage_limit_per_operation" int64)
-             (opt "hard_storage_limit_per_block" int64))))
+             (opt "hard_storage_limit_per_operation" z)
+             (opt "hard_storage_limit_per_block" z))))
 
 let encoding =
   let open Data_encoding in

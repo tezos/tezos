@@ -88,7 +88,7 @@ val block_gas_level: t -> Z.t
 
 type error += Storage_limit_too_high (* `Permanent *)
 
-val set_storage_limit: t -> Int64.t -> t tzresult
+val set_storage_limit: t -> Z.t -> t tzresult
 val set_storage_unlimited: t -> t
 
 type error += Undefined_operation_nonce (* `Permanent *)
@@ -184,7 +184,7 @@ module type T = sig
 
   (** Internally used in {!Storage_functors} to consume storage from
       within a view. *)
-  val record_bytes_stored: context -> Int64.t -> context tzresult
+  val record_bytes_stored: context -> Z.t -> context tzresult
 
   val description: context Storage_description.t
 

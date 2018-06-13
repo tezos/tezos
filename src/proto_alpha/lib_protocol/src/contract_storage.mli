@@ -102,7 +102,7 @@ val originated_from_current_nonce :
 val init:
   Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-val used_storage_space: Raw_context.t -> Contract_repr.t -> Int64.t tzresult Lwt.t
+val used_storage_space: Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
 val paid_storage_space_fees: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 val pay_for_storage_space: Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 

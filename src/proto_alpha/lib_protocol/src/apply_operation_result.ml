@@ -112,13 +112,13 @@ type _ successful_manager_operation_result =
         balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Int64.t ;
+        storage_size_diff : Z.t ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
       { balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Int64.t ;
+        storage_size_diff : Z.t ;
       } -> Kind.origination successful_manager_operation_result
   | Delegation_result : Kind.delegation successful_manager_operation_result
 
@@ -214,7 +214,7 @@ module Manager_result = struct
            (dft "balance_updates" balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
-           (dft "storage_size_diff" int64 0L))
+           (dft "storage_size_diff" z Z.zero))
       ~iselect:
         (function
           | Internal_operation_result
@@ -251,7 +251,7 @@ module Manager_result = struct
            (dft "balance_updates" balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
-           (dft "storage_size_diff" int64 0L))
+           (dft "storage_size_diff" z Z.zero))
       ~iselect:
         (function
           | Internal_operation_result

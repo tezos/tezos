@@ -278,7 +278,7 @@ module Forge = struct
     let reveal ctxt
         block ~branch ~source ~sourcePubKey ~counter ~fee () =
       operations ctxt block ~branch ~source ~sourcePubKey ~counter ~fee
-        ~gas_limit:Z.zero ~storage_limit:0L []
+        ~gas_limit:Z.zero ~storage_limit:Z.zero []
 
     let transaction ctxt
         block ~branch ~source ?sourcePubKey ~counter
@@ -310,7 +310,7 @@ module Forge = struct
     let delegation ctxt
         block ~branch ~source ?sourcePubKey ~counter ~fee delegate =
       operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
-        ~gas_limit:Z.zero ~storage_limit:0L
+        ~gas_limit:Z.zero ~storage_limit:Z.zero
         [Manager (Delegation delegate)]
 
   end

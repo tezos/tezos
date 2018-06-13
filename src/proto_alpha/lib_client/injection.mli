@@ -50,7 +50,7 @@ val inject_manager_operation:
   src_sk:Client_keys.sk_uri ->
   fee:Tez.t ->
   ?gas_limit:Z.t ->
-  ?storage_limit:int64 ->
+  ?storage_limit:Z.t ->
   'kind manager_operation ->
   'kind Kind.manager result tzresult Lwt.t
 

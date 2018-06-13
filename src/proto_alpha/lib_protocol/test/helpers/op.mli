@@ -23,7 +23,7 @@ val miss_signed_endorsement:
 val transaction:
   ?fee:Tez.tez ->
   ?gas_limit:Z.t ->
-  ?storage_limit:int64 ->
+  ?storage_limit:Z.t ->
   ?parameters:Script.lazy_expr ->
   Context.t ->
   Contract.t ->
@@ -50,7 +50,7 @@ val origination:
   ?credit:Tez.tez ->
   ?fee:Tez.tez ->
   ?gas_limit:Z.t ->
-  ?storage_limit:int64 ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.contract ->
   (Operation.packed * Contract.contract) tzresult Lwt.t

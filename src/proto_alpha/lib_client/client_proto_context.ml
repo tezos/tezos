@@ -59,7 +59,7 @@ let reveal cctxt
       let contents =
         Single
           (Manager_operation { source ; fee ; counter ;
-                               gas_limit = Z.zero ; storage_limit = 0L ;
+                               gas_limit = Z.zero ; storage_limit = Z.zero ;
                                operation = Reveal src_pk }) in
       Injection.inject_operation cctxt ~chain ~block ?confirmations
         ?branch ~src_sk contents >>=? fun (oph, op, result) ->
@@ -109,7 +109,7 @@ let delegate_contract cctxt
   let operation = Delegation delegate_opt in
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
-    ?branch ~source ~fee ~gas_limit:Z.zero ~storage_limit:0L
+    ?branch ~source ~fee ~gas_limit:Z.zero ~storage_limit:Z.zero
     ~src_pk ~src_sk operation >>=? fun res ->
   return res
 

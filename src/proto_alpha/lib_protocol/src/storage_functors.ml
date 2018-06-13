@@ -359,13 +359,13 @@ module Make_indexed_carbonated_data_storage
     consume_write_gas C.set s i v >>=? fun (s, bytes) ->
     C.set s (name i) bytes >>=? fun t ->
     let size_diff = MBytes.length bytes - prev_size in
-    Lwt.return (C.record_bytes_stored t (Int64.of_int size_diff)) >>=? fun t ->
+    Lwt.return (C.record_bytes_stored t (Z.of_int size_diff)) >>=? fun t ->
     return (C.project t, size_diff)
   let init s i v =
     consume_write_gas C.init s i v >>=? fun (s, bytes) ->
     C.init s (name i) bytes >>=? fun t ->
     let size = MBytes.length bytes in
-    Lwt.return (C.record_bytes_stored t (Int64.of_int size)) >>=? fun t ->
+    Lwt.return (C.record_bytes_stored t (Z.of_int size)) >>=? fun t ->
     return (C.project t, size)
   let init_set s i v =
     let init_set s i v = C.init_set s i v >>= return in
@@ -373,20 +373,20 @@ module Make_indexed_carbonated_data_storage
     consume_write_gas init_set s i v >>=? fun (s, bytes) ->
     init_set s (name i) bytes >>=? fun t ->
     let size_diff = MBytes.length bytes - prev_size in
-    Lwt.return (C.record_bytes_stored t (Int64.of_int size_diff)) >>=? fun t ->
+    Lwt.return (C.record_bytes_stored t (Z.of_int size_diff)) >>=? fun t ->
     return (C.project t, size_diff)
   let remove s i =
     let remove s i = C.remove s i >>= return in
     existing_size s i >>=? fun prev_size ->
     consume_remove_gas remove s i >>=? fun s ->
     remove s (name i) >>=? fun t ->
-    Lwt.return (C.record_bytes_stored t (Int64.of_int ~-prev_size)) >>=? fun t ->
+    Lwt.return (C.record_bytes_stored t (Z.of_int ~-prev_size)) >>=? fun t ->
     return (C.project t, prev_size)
   let delete s i =
     existing_size s i >>=? fun prev_size ->
     consume_remove_gas C.delete s i >>=? fun s ->
     C.delete s (name i) >>=? fun t ->
-    Lwt.return (C.record_bytes_stored t (Int64.of_int ~-prev_size)) >>=? fun t ->
+    Lwt.return (C.record_bytes_stored t (Z.of_int ~-prev_size)) >>=? fun t ->
     return (C.project t, prev_size)
   let set_option s i v =
     match v with
@@ -784,13 +784,13 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       consume_write_gas Raw_context.set (pack s i) v >>=? fun (c, bytes) ->
       Raw_context.set c data_name bytes >>=? fun c ->
       let size_diff = MBytes.length bytes - prev_size in
-      Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int size_diff)) >>=? fun c ->
+      Lwt.return (Raw_context.record_bytes_stored c (Z.of_int size_diff)) >>=? fun c ->
       return (Raw_context.project c, size_diff)
     let init s i v =
       consume_write_gas Raw_context.init (pack s i) v >>=? fun (c, bytes) ->
       Raw_context.init c data_name bytes >>=? fun c ->
       let size = MBytes.length bytes in
-      Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int size)) >>=? fun c ->
+      Lwt.return (Raw_context.record_bytes_stored c (Z.of_int size)) >>=? fun c ->
       return (Raw_context.project c, size)
     let init_set s i v =
       let init_set c k v = Raw_context.init_set c k v >>= return in
@@ -798,20 +798,20 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       consume_write_gas init_set (pack s i) v >>=? fun (c, bytes) ->
       init_set c data_name bytes >>=? fun c ->
       let size_diff = MBytes.length bytes - prev_size in
-      Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int size_diff)) >>=? fun c ->
+      Lwt.return (Raw_context.record_bytes_stored c (Z.of_int size_diff)) >>=? fun c ->
       return (Raw_context.project c, size_diff)
     let remove s i =
       let remove c k = Raw_context.remove c k >>= return in
       existing_size (pack s i) >>=? fun prev_size ->
       consume_remove_gas remove (pack s i) >>=? fun c ->
       remove c data_name >>=? fun c ->
-      Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int ~-prev_size)) >>=? fun c ->
+      Lwt.return (Raw_context.record_bytes_stored c (Z.of_int ~-prev_size)) >>=? fun c ->
       return (Raw_context.project c, prev_size)
     let delete s i =
       existing_size (pack s i) >>=? fun prev_size ->
       consume_remove_gas Raw_context.delete (pack s i) >>=? fun c ->
       Raw_context.delete c data_name >>=? fun c ->
-      Lwt.return (Raw_context.record_bytes_stored c (Int64.of_int ~-prev_size)) >>=? fun c ->
+      Lwt.return (Raw_context.record_bytes_stored c (Z.of_int ~-prev_size)) >>=? fun c ->
       return (Raw_context.project c, prev_size)
     let set_option s i v =
       match v with

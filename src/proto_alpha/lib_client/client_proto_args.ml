@@ -172,8 +172,8 @@ let storage_limit_arg =
           of letting the client decide based on a simulation"
     (parameter (fun _ s ->
          try
-           let v = Int64.of_string s in
-           assert Compare.Int64.(v >= 0L) ;
+           let v = Z.of_string s in
+           assert Compare.Z.(v >= Z.zero) ;
            return v
          with _ -> failwith "invalid storage limit (must be a positive number of bytes)"))
 

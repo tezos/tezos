@@ -332,8 +332,8 @@ module Constants : sig
     block_reward: Tez.t ;
     endorsement_reward: Tez.t ;
     cost_per_byte: Tez.t ;
-    hard_storage_limit_per_operation: Int64.t ;
-    hard_storage_limit_per_block: Int64.t ;
+    hard_storage_limit_per_operation: Z.t ;
+    hard_storage_limit_per_block: Z.t ;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -347,8 +347,8 @@ module Constants : sig
   val hard_gas_limit_per_operation: context -> Z.t
   val hard_gas_limit_per_block: context -> Z.t
   val cost_per_byte: context -> Tez.t
-  val hard_storage_limit_per_operation: context -> Int64.t
-  val hard_storage_limit_per_block: context -> Int64.t
+  val hard_storage_limit_per_operation: context -> Z.t
+  val hard_storage_limit_per_block: context -> Z.t
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Signature.Public_key.t
   val tokens_per_roll: context -> Tez.t
@@ -558,10 +558,10 @@ module Contract : sig
   type error += Operation_storage_quota_exceeded (* `Temporary *)
   type error += Storage_limit_too_high (* `Permanent *)
 
-  val set_storage_limit: context -> Int64.t -> context tzresult
+  val set_storage_limit: context -> Z.t -> context tzresult
   val set_storage_unlimited: context -> context
 
-  val used_storage_space: context -> t -> Int64.t tzresult Lwt.t
+  val used_storage_space: context -> t -> Z.t tzresult Lwt.t
   val paid_storage_space_fees: context -> t -> Tez.t tzresult Lwt.t
   val pay_for_storage_space: context -> t -> Tez.t -> context tzresult Lwt.t
 
@@ -829,7 +829,7 @@ and _ contents =
       counter: counter ;
       operation: 'kind manager_operation ;
       gas_limit: Z.t;
-      storage_limit: Int64.t;
+      storage_limit: Z.t;
     } -> 'kind Kind.manager contents
 
 and _ manager_operation =

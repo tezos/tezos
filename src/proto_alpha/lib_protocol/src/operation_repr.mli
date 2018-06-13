@@ -90,7 +90,7 @@ and _ contents =
       counter: counter ;
       operation: 'kind manager_operation ;
       gas_limit: Z.t;
-      storage_limit: Int64.t;
+      storage_limit: Z.t;
     } -> 'kind Kind.manager contents
 
 and _ manager_operation =

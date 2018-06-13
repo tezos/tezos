@@ -28,7 +28,7 @@ let origination_burn c ~payer contract =
   Contract.spend_from_script c payer origination_burn >>=? fun c ->
   Contract.used_storage_space c contract >>=? fun size ->
   let cost_per_byte = Constants.cost_per_byte c in
-  Lwt.return (Tez.(cost_per_byte *? size)) >>=? fun fees ->
+  Lwt.return (Tez.(cost_per_byte *? (Z.to_int64 size))) >>=? fun fees ->
   trace Cannot_pay_storage_fee
     (Contract.spend_from_script c payer fees >>=? fun c ->
      Contract.pay_for_storage_space c contract fees) >>=? fun c ->
@@ -38,7 +38,7 @@ let update_script_storage c ~payer contract =
   Contract.paid_storage_space_fees c contract >>=? fun paid_fees ->
   Contract.used_storage_space c contract >>=? fun size ->
   let cost_per_byte = Constants.cost_per_byte c in
-  Lwt.return (Tez.(cost_per_byte *? size)) >>=? fun fees ->
+  Lwt.return (Tez.(cost_per_byte *? (Z.to_int64 size))) >>=? fun fees ->
   match Tez.(fees -? paid_fees) with
   | Error _ ->
       (* Previously paid fees are greater than required fees. *)

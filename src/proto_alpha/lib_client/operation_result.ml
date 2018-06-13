@@ -172,10 +172,10 @@ let pp_manager_operation_contents_and_result ppf
               Format.fprintf ppf "@,@[<hv 2>Updated storage:@ %a@]"
                 Michelson_v1_printer.print_expr expr
         end ;
-        begin if storage_size_diff <> 0L then
+        begin if storage_size_diff <> Z.zero then
             Format.fprintf ppf
-              "@,Storage size difference: %Ld bytes"
-              storage_size_diff
+              "@,Storage size difference: %s bytes"
+              (Z.to_string storage_size_diff)
         end ;
         Format.fprintf ppf
           "@,Consumed gas: %s"
@@ -197,10 +197,10 @@ let pp_manager_operation_contents_and_result ppf
               Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
                 (Format.pp_print_list Contract.pp) contracts
         end ;
-        begin if storage_size_diff <> 0L then
+        begin if storage_size_diff <> Z.zero then
             Format.fprintf ppf
-              "@,Storage size used: %Ld bytes"
-              storage_size_diff
+              "@,Storage size used: %s bytes"
+              (Z.to_string storage_size_diff)
         end ;
         Format.fprintf ppf
           "@,Consumed gas: %s"
@@ -218,13 +218,13 @@ let pp_manager_operation_contents_and_result ppf
      Fee to the baker: %s%a@,\
      Expected counter: %s@,\
      Gas limit: %s@,\
-     Storage limit: %Ld bytes"
+     Storage limit: %s bytes"
     Contract.pp source
     Client_proto_args.tez_sym
     Tez.pp fee
     (Z.to_string counter)
     (Z.to_string gas_limit)
-    storage_limit ;
+    (Z.to_string storage_limit) ;
   begin match balance_updates with
     | [] -> ()
     | balance_updates ->

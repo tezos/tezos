@@ -76,7 +76,7 @@ let manager_operation
           counter ;
           operation = Reveal public_key ;
           gas_limit = Z.of_int 20 ;
-          storage_limit = 0L ;
+          storage_limit = Z.zero ;
         } in
       let op =
         Manager_operation {
@@ -104,7 +104,7 @@ let revelation ctxt public_key =
              counter ;
              operation = Reveal public_key ;
              gas_limit = Z.of_int 20 ;
-             storage_limit = 0L ;
+             storage_limit = Z.zero ;
            })) in
   return @@ sign account.sk ctxt sop
 

@@ -106,15 +106,15 @@ let estimated_storage_single
     match result with
     | Applied (Transaction_result { storage_size_diff }) -> Ok storage_size_diff
     | Applied (Origination_result { storage_size_diff }) -> Ok storage_size_diff
-    | Applied Reveal_result -> Ok Int64.zero
-    | Applied Delegation_result -> Ok Int64.zero
+    | Applied Reveal_result -> Ok Z.zero
+    | Applied Delegation_result -> Ok Z.zero
     | Skipped _ -> assert false
     | Failed (_, errs) -> Alpha_environment.wrap_error (Error errs) in
   List.fold_left
     (fun acc (Internal_operation_result (_, r)) ->
        acc >>? fun acc ->
        storage_size_diff r >>? fun storage ->
-       Ok (Int64.add acc storage))
+       Ok (Z.add acc storage))
     (storage_size_diff operation_result) internal_operation_results
 
 let estimated_storage res =
@@ -125,9 +125,9 @@ let estimated_storage res =
     | Cons_result (res, rest) ->
         estimated_storage_single res >>? fun storage1 ->
         estimated_storage rest >>? fun storage2 ->
-        Ok (Int64.add storage1 storage2) in
+        Ok (Z.add storage1 storage2) in
   estimated_storage res >>? fun diff ->
-  Ok (max 0L diff)
+  Ok (max Z.zero diff)
 
 let originated_contracts_single
     (type kind)
@@ -207,14 +207,14 @@ let may_patch_limits
     : type kind. kind contents -> kind contents option = function
     | Manager_operation c
       when c.gas_limit < Z.zero || gas_limit < c.gas_limit
-           || c.storage_limit < 0L || storage_limit < c.storage_limit ->
+           || c.storage_limit < Z.zero || storage_limit < c.storage_limit ->
         let gas_limit =
           if c.gas_limit < Z.zero || gas_limit < c.gas_limit then
             gas_limit
           else
             c.gas_limit in
         let storage_limit =
-          if c.storage_limit < 0L || storage_limit < c.storage_limit then
+          if c.storage_limit < Z.zero || storage_limit < c.storage_limit then
             storage_limit
           else
             c.storage_limit in
@@ -256,17 +256,17 @@ let may_patch_limits
           else return c.gas_limit
         end >>=? fun gas_limit ->
         begin
-          if c.storage_limit < 0L || storage_limit < c.storage_limit then
+          if c.storage_limit < Z.zero || storage_limit < c.storage_limit then
             Lwt.return (estimated_storage_single result) >>=? fun storage ->
             begin
-              if Int64.equal storage 0L then
+              if Z.equal storage Z.zero then
                 cctxt#message "Estimated storage: no bytes added" >>= fun () ->
-                return 0L
+                return Z.zero
               else
                 cctxt#message
-                  "Estimated storage: %Ld bytes added (will add 20 for safety)"
-                  storage >>= fun () ->
-                return (Int64.add storage 20L)
+                  "Estimated storage: %s bytes added (will add 20 for safety)"
+                  (Z.to_string storage) >>= fun () ->
+                return (Z.add storage (Z.of_int 20))
             end
           else return c.storage_limit
         end >>=? fun storage_limit ->
@@ -349,7 +349,7 @@ let inject_operation
 
 let inject_manager_operation
     cctxt ~chain ~block ?branch ?confirmations
-    ~source ~src_pk ~src_sk ~fee ?(gas_limit = Z.minus_one) ?(storage_limit = -1L)
+    ~source ~src_pk ~src_sk ~fee ?(gas_limit = Z.minus_one) ?(storage_limit = (Z.of_int (-1)))
     (type kind) (operation : kind manager_operation)
   : (Operation_hash.t * kind Kind.manager contents *  kind Kind.manager contents_result) tzresult Lwt.t =
   Alpha_services.Contract.counter
@@ -365,7 +365,7 @@ let inject_manager_operation
       let contents =
         Cons
           (Manager_operation { source ; fee = Tez.zero ; counter ;
-                               gas_limit = Z.zero ; storage_limit = 0L ;
+                               gas_limit = Z.zero ; storage_limit = Z.zero ;
                                operation = Reveal src_pk },
            Single (Manager_operation { source ; fee ; counter = Z.succ counter ;
                                        gas_limit ; storage_limit ; operation })) in

@@ -176,7 +176,7 @@ module Contract : sig
       Includes code, global storage and big map elements. *)
   module Used_storage_space : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Int64.t
+     and type value = Z.t
      and type t := Raw_context.t
 
   (** Total fees burnt for storage space. *)

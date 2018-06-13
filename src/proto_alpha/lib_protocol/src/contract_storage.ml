@@ -189,17 +189,17 @@ let failwith msg = fail (Failure msg)
 type big_map_diff = (string * Script_repr.expr option) list
 
 let update_script_big_map c contract = function
-  | None -> return (c, 0L)
+  | None -> return (c, Z.zero)
   | Some diff ->
       fold_left_s (fun (c, total) (key, value) ->
           match value with
           | None ->
               Storage.Contract.Big_map.remove (c, contract) key >>=? fun (c, freed) ->
-              return (c, Int64.sub total (Int64.of_int freed))
+              return (c, Z.sub total (Z.of_int freed))
           | Some v ->
               Storage.Contract.Big_map.init_set (c, contract) key v >>=? fun (c, size_diff) ->
-              return (c, Int64.add total (Int64.of_int size_diff)))
-        (c, 0L) diff
+              return (c, Z.add total (Z.of_int size_diff)))
+        (c, Z.zero) diff
 
 let create_base c contract
     ~balance ~manager ~delegate ?script ~spendable ~delegatable =
@@ -222,8 +222,8 @@ let create_base c contract
        Storage.Contract.Code.init c contract code >>=? fun (c, code_size) ->
        Storage.Contract.Storage.init c contract storage >>=? fun (c, storage_size) ->
        update_script_big_map c contract big_map_diff >>=? fun (c, big_map_size) ->
-       let total_size = Int64.add (Int64.add (Int64.of_int code_size) (Int64.of_int storage_size)) big_map_size in
-       assert Compare.Int64.(total_size >= 0L) ;
+       let total_size = Z.add (Z.add (Z.of_int code_size) (Z.of_int storage_size)) big_map_size in
+       assert Compare.Z.(total_size >= Z.zero) ;
        Storage.Contract.Used_storage_space.init c contract total_size >>=? fun c ->
        Storage.Contract.Paid_storage_space_fees.init c contract Tez_repr.zero
    | None ->
@@ -388,7 +388,7 @@ let update_script_storage c contract storage big_map_diff =
   update_script_big_map c contract big_map_diff >>=? fun (c, big_map_size_diff) ->
   Storage.Contract.Storage.set c contract storage >>=? fun (c, size_diff) ->
   Storage.Contract.Used_storage_space.get c contract >>=? fun previous_size ->
-  let new_size = Int64.add previous_size (Int64.add big_map_size_diff (Int64.of_int size_diff)) in
+  let new_size = Z.add previous_size (Z.add big_map_size_diff (Z.of_int size_diff)) in
   Storage.Contract.Used_storage_space.set c contract new_size
 
 let spend_from_script c contract amount =
@@ -458,7 +458,7 @@ let init c =
 
 let used_storage_space c contract =
   Storage.Contract.Used_storage_space.get_option c contract >>=? function
-  | None -> return 0L
+  | None -> return Z.zero
   | Some fees -> return fees
 
 let paid_storage_space_fees c contract =

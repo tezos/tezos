@@ -81,8 +81,8 @@ val genesis:
   ?block_reward:Tez_repr.tez ->
   ?endorsement_reward:Tez_repr.tez ->
   ?cost_per_byte: Tez_repr.t ->
-  ?hard_storage_limit_per_operation: Int64.t ->
-  ?hard_storage_limit_per_block: Int64.t ->
+  ?hard_storage_limit_per_operation: Z.t ->
+  ?hard_storage_limit_per_block: Z.t ->
   ?commitments:Commitment_repr.t list ->
   ?security_deposit_ramp_up_cycles: int option ->
   ?no_reward_cycles: int option ->

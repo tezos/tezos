@@ -67,7 +67,7 @@ module Forge : sig
       counter:counter ->
       fee:Tez.t ->
       gas_limit:Z.t ->
-      storage_limit:Int64.t ->
+      storage_limit:Z.t ->
       packed_manager_operation list -> MBytes.t shell_tzresult Lwt.t
 
     val reveal:
@@ -89,7 +89,7 @@ module Forge : sig
       destination:Contract.t ->
       ?parameters:Script.expr ->
       gas_limit:Z.t ->
-      storage_limit:Int64.t ->
+      storage_limit:Z.t ->
       fee:Tez.t ->
       unit -> MBytes.t shell_tzresult Lwt.t
 
@@ -106,7 +106,7 @@ module Forge : sig
       ?delegatePubKey: public_key_hash ->
       ?script:Script.t ->
       gas_limit:Z.t ->
-      storage_limit:Int64.t ->
+      storage_limit:Z.t ->
       fee:Tez.t->
       unit -> MBytes.t shell_tzresult Lwt.t
 

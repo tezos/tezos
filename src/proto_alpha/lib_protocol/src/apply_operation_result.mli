@@ -90,13 +90,13 @@ and _ successful_manager_operation_result =
         balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Int64.t ;
+        storage_size_diff : Z.t ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
       { balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Int64.t ;
+        storage_size_diff : Z.t ;
       } -> Kind.origination successful_manager_operation_result
   | Delegation_result : Kind.delegation successful_manager_operation_result
 

@@ -24,11 +24,6 @@ module Z = struct
   let encoding = Data_encoding.z
 end
 
-module Int64 = struct
-  type t = Int64.t
-  let encoding = Data_encoding.int64
-end
-
 module Int_index = struct
   type t = int
   let path_length = 1
@@ -202,7 +197,7 @@ module Contract = struct
   module Used_storage_space =
     Indexed_context.Make_map
       (struct let name = ["used_bytes"] end)
-      (Int64)
+      (Z)
 
   module Roll_list =
     Indexed_context.Make_map

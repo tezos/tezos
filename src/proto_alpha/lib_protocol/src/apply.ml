@@ -359,7 +359,7 @@ let apply_manager_operation_content :
                         Contract destination, Credited amount ] ;
                   originated_contracts = [] ;
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
-                  storage_size_diff = 0L } in
+                  storage_size_diff = Z.zero } in
             return (ctxt, result, [])
         | Some script ->
             begin match parameters with
@@ -393,7 +393,7 @@ let apply_manager_operation_content :
                         Contract destination, Credited amount ] ;
                   originated_contracts ;
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
-                  storage_size_diff = Int64.sub new_size old_size } in
+                  storage_size_diff = Z.sub new_size old_size } in
             return (ctxt, result, operations)
       end
     | Origination { manager ; delegate ; script ; preorigination ;
