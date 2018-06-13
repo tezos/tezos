@@ -190,12 +190,12 @@ test:p2p:banned_peers:
 test:client_alpha:endorsement:
   <<: *test_definition
   script:
-    - jbuilder build @src/proto_alpha/lib_baking/runtest_endorsement
+    - jbuilder build @src/proto_alpha/lib_delegate/runtest_endorsement
 
 test:client_alpha:vote:
   <<: *test_definition
   script:
-    - jbuilder build @src/proto_alpha/lib_baking/runtest_vote
+    - jbuilder build @src/proto_alpha/lib_delegate/runtest_vote
 
 test:basic.sh:
   <<: *test_definition
