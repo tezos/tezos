@@ -49,7 +49,7 @@ class simple_printer log =
   end
 
 class type wallet = object
-  method with_lock : ( unit -> 'a Lwt.t) -> 'a Lwt.t
+  method with_lock : (unit -> 'a Lwt.t) -> 'a Lwt.t
   method load : string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
   method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
 end
@@ -96,7 +96,7 @@ class proxy_context (obj : full) = object
     'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t = obj#call_streamed_service
   method error : type a b. (a, b) lwt_format -> a = obj#error
   method generic_json_call = obj#generic_json_call
-  method with_lock : type a. ( unit -> a Lwt.t) -> a Lwt.t = obj#with_lock
+  method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = obj#with_lock
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t = obj#load
   method log : type a. string -> (a, unit) lwt_format -> a = obj#log
   method message : type a. (a, unit) lwt_format -> a = obj#message

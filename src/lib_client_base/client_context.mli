@@ -29,7 +29,7 @@ class type io = object
 end
 
 class type wallet = object
-  method with_lock : ( unit -> 'a Lwt.t) -> 'a  Lwt.t
+  method with_lock : (unit -> 'a Lwt.t) -> 'a  Lwt.t
   method load : string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
   method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
 end
