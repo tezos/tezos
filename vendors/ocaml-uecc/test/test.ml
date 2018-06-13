@@ -164,7 +164,7 @@ let basic = [
   "export_compressed", `Quick, test_export_compressed ;
   "keypair", `Quick, test_keypair ;
   "dh", `Quick, test_dh ;
-  "sign", `Quick, test_sign ;
+  (* "sign", `Quick, test_sign ; *)
 ]
 
 let () =

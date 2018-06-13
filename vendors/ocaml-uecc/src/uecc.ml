@@ -206,26 +206,28 @@ let dh (Sk (sk, c)) (Pk (pk, _)) =
   | true -> Some secret
   | false -> None
 
-external sign :
-  Bigstring.t -> Bigstring.t -> Bigstring.t -> curve -> bool =
-  "uECC_sign_stub" [@@noalloc]
+(* external sign :
+ *   Bigstring.t -> Bigstring.t -> Bigstring.t -> curve -> bool =
+ *   "uECC_sign_stub" [@@noalloc] *)
 
 external verify :
   Bigstring.t -> Bigstring.t -> Bigstring.t -> curve -> bool =
   "uECC_verify_stub" [@@noalloc]
 
-let write_sign (Sk (sk, c)) buf ~msg =
-  if Bigstring.length buf < pk_size c then 0
-  else
-    match sign sk msg buf (to_curve c) with
-    | true -> pk_size c
-    | false -> 0
+let write_sign (Sk (_sk, _c)) _buf ~msg:_ =
+  failwith "Not implemented"
+  (* if Bigstring.length buf < pk_size c then 0
+   * else
+   *   match sign sk msg buf (to_curve c) with
+   *   | true -> pk_size c
+   *   | false -> 0 *)
 
-let sign (Sk (sk, c)) msg =
-  let signature = Bigstring.create (pk_size c) in
-  match sign sk msg signature (to_curve c) with
-  | true -> Some signature
-  | false -> None
+let sign (Sk (_sk, _c)) _msg =
+  failwith "Not implemented"
+  (* let signature = Bigstring.create (pk_size c) in
+   * match sign sk msg signature (to_curve c) with
+   * | true -> Some signature
+   * | false -> None *)
 
 let verify (Pk (pk, c)) ~msg ~signature =
   if Bigstring.length signature <> pk_size c then false
