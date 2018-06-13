@@ -648,6 +648,8 @@ let create
         (* event matching *)
       | `Hash (None | Some (Error _)) ->
           (* return to restart *)
+          Lwt.cancel timeout ;
+          last_get_block := None ;
           Lwt.return_unit
 
       | `Hash (Some (Ok bi)) -> begin
