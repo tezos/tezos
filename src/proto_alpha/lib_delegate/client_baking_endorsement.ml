@@ -283,7 +283,9 @@ let create
           last_get_block := None;
           check_error (prepare_endorsement cctxt ~max_past state bi)
       | `Timeout ->
-          check_error (endorse_for cctxt state.to_endorse)
+          check_error (endorse_for cctxt state.to_endorse) >>= fun () ->
+          state.to_endorse <- None ;
+          Lwt.return_unit
     end >>= fun () ->
     worker_loop () in
 
