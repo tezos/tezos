@@ -180,12 +180,12 @@ test:p2p:banned_peers:
 # test:client_alpha:transaction:
   # <<: *test_definition
   # script:
-    # - jbuilder build @src/proto_alpha/lib_baking/runtest_transaction
+    # - jbuilder build @src/proto_alpha/lib_delegate/runtest_transaction
 
 # test:client_alpha:origination:
   # <<: *test_definition
   # script:
-    # - jbuilder build @src/proto_alpha/lib_baking/runtest_origination
+    # - jbuilder build @src/proto_alpha/lib_delegate/runtest_origination
 
 test:client_alpha:endorsement:
   <<: *test_definition
@@ -490,45 +490,70 @@ opam:49:tezos-shell:
   variables:
     package: tezos-shell
 
-opam:50:tezos-client:
+opam:50:tezos-endorser-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-alpha-commands
+
+opam:51:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
 
-opam:51:ocplib-ezresto-directory:
+opam:52:tezos-endorser-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-alpha
+
+opam:53:tezos-accuser-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-alpha-commands
+
+opam:54:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:52:tezos-baker-alpha:
+opam:55:tezos-accuser-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-alpha
+
+opam:56:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:53:tezos-protocol-demo:
+opam:57:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:54:tezos-signer:
+opam:58:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:55:ledgerwallet-tezos:
+opam:59:ledgerwallet-tezos:
   <<: *opam_definition
   variables:
     package: ledgerwallet-tezos
 
-opam:56:tezos-node:
+opam:60:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:57:ocplib-json-typed-browser:
+opam:59:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
+
+opam:60:tezos-baker-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-alpha-commands
 
 
 ##END_OPAM##

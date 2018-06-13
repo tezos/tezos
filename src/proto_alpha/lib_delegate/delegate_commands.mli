@@ -7,4 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val commands: unit -> Proto_alpha.full Clic.command list
+val delegate_commands : unit -> Proto_alpha.full Clic.command list
+
+val baker_commands : unit -> Proto_alpha.full Clic.command list
+val endorser_commands : unit -> Proto_alpha.full Clic.command list
+val accuser_commands : unit -> Proto_alpha.full Clic.command list

@@ -14,44 +14,9 @@ let group =
   { Clic.name = "delegate" ;
     title = "Commands related to delegate operations." }
 
-let commands () =
+let delegate_commands () =
   let open Clic in
   [
-    command ~group ~desc: "Launch a daemon that handles delegate operations."
-      (args1 max_priority_arg)
-      (prefixes [ "launch" ; "baker" ]
-       @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun max_priority delegates cctxt ->
-         Client_daemon.Baker.run cctxt
-           ?max_priority
-           ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
-           (List.map snd delegates)
-      ) ;
-
-    command ~group ~desc: "Launch the accuser daemon"
-      no_options
-      (prefixes [ "launch" ; "accuser" ]
-       @@ stop)
-      (fun () cctxt -> Client_daemon.Accuser.run cctxt) ;
-
-    command ~group ~desc: "Launch the endorser daemon"
-      (args1 endorsement_delay_arg )
-      (prefixes [ "launch" ; "endorser" ]
-       @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun endorsement_delay delegates cctxt ->
-         Client_daemon.Endorser.run cctxt
-           ~delay:endorsement_delay
-           ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
-           (List.map snd delegates)
-      ) ;
-
-    command ~group ~desc: "Forge and inject an endorsement operation."
-      no_options
-      (prefixes [ "endorse"; "for" ]
-       @@ Client_keys.Public_key_hash.source_param
-         ~name:"baker" ~desc: "name of the delegate owning the endorsement right"
-       @@ stop)
-      (fun () delegate cctxt -> endorse_block cctxt delegate) ;
     command ~group ~desc: "Forge and inject block using the delegate rights."
       (args3 max_priority_arg force_switch minimal_timestamp_switch)
       (prefixes [ "bake"; "for" ]
@@ -73,4 +38,63 @@ let commands () =
        @@ stop)
       (fun () cctxt ->
          reveal_nonces cctxt ()) ;
+    command ~group ~desc: "Forge and inject an endorsement operation."
+      no_options
+      (prefixes [ "endorse"; "for" ]
+       @@ Client_keys.Public_key_hash.source_param
+         ~name:"baker" ~desc: "name of the delegate owning the endorsement right"
+       @@ stop)
+      (fun () delegate cctxt -> endorse_block cctxt delegate) ;
+  ]
+
+let baker_commands () =
+  let open Clic in
+  let group =
+    { Clic.name = "delegate.baker" ;
+      title = "Commands related to the baker daemon." }
+  in
+  [
+    command ~group ~desc: "Launch a daemon that handles delegate operations."
+      (args1 max_priority_arg)
+      (prefixes [ "launch" ]
+       @@ seq_of_param Client_keys.Public_key_hash.alias_param)
+      (fun max_priority delegates cctxt ->
+         Client_daemon.Baker.run cctxt
+           ?max_priority
+           ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
+           (List.map snd delegates)
+      )
+  ]
+
+let endorser_commands () =
+  let open Clic in
+  let group =
+    { Clic.name = "delegate.endorser" ;
+      title = "Commands related to endorser daemon." }
+  in
+  [
+    command ~group ~desc: "Launch the endorser daemon"
+      (args1 endorsement_delay_arg )
+      (prefixes [ "launch" ]
+       @@ seq_of_param Client_keys.Public_key_hash.alias_param)
+      (fun endorsement_delay delegates cctxt ->
+         Client_daemon.Endorser.run cctxt
+           ~delay:endorsement_delay
+           ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
+           (List.map snd delegates)
+      )
+  ]
+
+let accuser_commands () =
+  let open Clic in
+  let group =
+    { Clic.name = "delegate.accuser" ;
+      title = "Commands related to the accuser daemon." }
+  in
+  [
+    command ~group ~desc: "Launch the accuser daemon"
+      no_options
+      (prefixes [ "launch" ]
+       @@ stop)
+      (fun () cctxt -> Client_daemon.Accuser.run cctxt) ;
   ]

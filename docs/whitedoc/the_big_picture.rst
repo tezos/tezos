@@ -318,6 +318,10 @@ The Final Executables
     environment to interact with a sandboxed node.
   - :package:`tezos-baker-alpha` provides the ``tezos-alpha-baker``
     binary.
+  - :package:`tezos-endorser-alpha` provides the ``tezos-alpha-endorser``
+    binary.
+  - :package:`tezos-accuser-alpha` provides the ``tezos-alpha-accuser``
+    binary.
   - :package:`tezos-protocol-compiler` provides the
     ``tezos-protocol-compiler`` binary that is used by the node to
     compile new protocols on the fly, and that can be used for

@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (executable
- ((name main_baker_alpha)
-  (public_name tezos-baker-alpha)
+ ((name main_endorser_alpha)
+  (public_name tezos-endorser-alpha)
   (libraries (tezos-client-base-unix
               tezos-client-commands
               tezos-baking-alpha-commands))
