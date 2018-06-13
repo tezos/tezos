@@ -187,7 +187,7 @@ let endorse_for cctxt = function
         name
         Operation_hash.pp_short oph >>= return
 
-let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:Time.t) state bi  =
+let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:int64) state bi  =
   let may_endorse (block: Client_baking_blocks.block_info) delegate time =
     Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
     lwt_log_info "May endorse block %a for %s"
@@ -217,7 +217,7 @@ let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:Time.t) state bi 
        if Time.compare bi.timestamp (Time.now ()) > 0  then
          lwt_log_info "Ignore block %a: forged in the future"
            Block_hash.pp_short bi.hash >>= return
-       else if Time.(min (now ()) bi.timestamp > max_past) then
+       else if Time.diff (Time.now ()) bi.timestamp > max_past then
          lwt_log_info "Ignore block %a: forged too far the past"
            Block_hash.pp_short bi.hash >>= return
        else
@@ -264,7 +264,7 @@ let check_error f =
         errs >>= fun () ->
       Lwt.return_unit
 
-let create (cctxt : #Proto_alpha.full) ?(max_past=(Time.of_seconds 110L)) ~delay contracts (block_stream : Client_baking_blocks.block_info tzresult Lwt_stream.t) =
+let create (cctxt : #Proto_alpha.full) ?(max_past=110L) ~delay contracts (block_stream : Client_baking_blocks.block_info tzresult Lwt_stream.t) =
   lwt_log_info "Starting endorsement daemon" >>= fun () ->
   Lwt_stream.get block_stream >>= function
   | None | Some (Error _) ->

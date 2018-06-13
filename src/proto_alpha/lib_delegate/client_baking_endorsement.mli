@@ -22,7 +22,7 @@ val forge_endorsement:
 
 val create :
   #Proto_alpha.full ->
-  ?max_past:Time.t ->
+  ?max_past:int64 (* number of seconds *) ->
   delay:int ->
   public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t -> unit Lwt.t
