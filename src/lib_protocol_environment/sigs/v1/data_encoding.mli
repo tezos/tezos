@@ -263,3 +263,9 @@ module Binary : sig
   exception Write_error of write_error
 
 end
+
+(** [check_size size encoding] ensures that the binary encoding
+    of a value will not be allowed to exceed [size] bytes. The reader
+    and the writer fails otherwise. This function do not modify
+    the JSON encoding. *)
+val check_size : int -> 'a encoding -> 'a encoding
