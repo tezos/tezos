@@ -172,15 +172,6 @@ static cmpresult_t uECC_vli_cmp_unsafe(const uECC_word_t *left,
                                        const uECC_word_t *right,
                                        wordcount_t num_words);
 
-#if (uECC_PLATFORM == uECC_arm || uECC_PLATFORM == uECC_arm_thumb || \
-        uECC_PLATFORM == uECC_arm_thumb2)
-    #include "asm_arm.h"
-#endif
-
-#if (uECC_PLATFORM == uECC_avr)
-    #include "asm_avr.h"
-#endif
-
 #if default_RNG_defined
 static uECC_RNG_Function g_rng_function = &default_RNG;
 #else
