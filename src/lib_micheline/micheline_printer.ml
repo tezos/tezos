@@ -55,6 +55,9 @@ let preformat root =
     | String (loc, value) ->
         let cml, csz = preformat_loc loc in
         String ((cml, String.length value + csz, loc), value)
+    | Bytes (loc, value) ->
+        let cml, csz = preformat_loc loc in
+        Bytes ((cml, MBytes.length value * 2 + 2 + csz, loc), value)
     | Prim (loc, name, items, annots) ->
         let cml, csz = preformat_loc loc in
         let asz = preformat_annots annots in
@@ -116,6 +119,11 @@ let rec print_expr_unwrapped ppf = function
       begin match comment with
         | None -> print_string ppf value
         | Some comment -> Format.fprintf ppf "%a@ %a" print_string value print_comment comment
+      end
+  | Bytes ((_, _, { comment }), value) ->
+      begin match comment with
+        | None -> Format.fprintf ppf "0x%a" MBytes.pp_hex value
+        | Some comment -> Format.fprintf ppf "0x%a@ %a" MBytes.pp_hex value print_comment comment
       end
   | Seq ((_, _, { comment = None }), []) ->
       Format.fprintf ppf "{}"

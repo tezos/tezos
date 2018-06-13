@@ -12,6 +12,7 @@ type annot = string list
 type ('l, 'p) node =
   | Int of 'l * Z.t
   | String of 'l * string
+  | Bytes of 'l * MBytes.t
   | Prim of 'l * 'p * ('l, 'p) node list * annot
   | Seq of 'l * ('l, 'p) node list
 
@@ -34,12 +35,14 @@ let canonical_location_encoding =
 let location = function
   | Int (loc, _) -> loc
   | String (loc, _) -> loc
+  | Bytes (loc, _) -> loc
   | Seq (loc, _) -> loc
   | Prim (loc, _, _, _) -> loc
 
 let annotations = function
   | Int (_, _) -> []
   | String (_, _) -> []
+  | Bytes (_, _) -> []
   | Seq (_, _) -> []
   | Prim (_, _, _, annots) -> annots
 
@@ -54,6 +57,8 @@ let strip_locations root =
         Int (id, v)
     | String (_, v) ->
         String (id, v)
+    | Bytes (_, v) ->
+        Bytes (id, v)
     | Seq (_, seq) ->
         Seq (id, List.map strip_locations seq)
     | Prim (_, name, seq, annots) ->
@@ -72,6 +77,9 @@ let extract_locations root =
     | String (loc, v) ->
         loc_table := (id, loc) :: !loc_table ;
         String (id, v)
+    | Bytes (loc, v) ->
+        loc_table := (id, loc) :: !loc_table ;
+        Bytes (id, v)
     | Seq (loc, seq) ->
         loc_table := (id, loc) :: !loc_table ;
         Seq (id, List.map strip_locations seq)
@@ -88,6 +96,8 @@ let inject_locations lookup (Canonical root) =
         Int (lookup loc, v)
     | String (loc, v) ->
         String (lookup loc, v)
+    | Bytes (loc, v) ->
+        Bytes (lookup loc, v)
     | Seq (loc, seq) ->
         Seq (lookup loc, List.map inject_locations seq)
     | Prim (loc, name, seq, annots) ->
@@ -96,7 +106,7 @@ let inject_locations lookup (Canonical root) =
 
 let map f (Canonical expr) =
   let rec map_node f = function
-    | Int _ | String _ as node -> node
+    | Int _ | String _ | Bytes _ as node -> node
     | Seq (loc, seq) ->
         Seq (loc, List.map (map_node f) seq)
     | Prim (loc, name, seq, annots) ->
@@ -108,6 +118,8 @@ let rec map_node fl fp = function
       Int (fl loc, v)
   | String (loc, v) ->
       String (fl loc, v)
+  | Bytes (loc, v) ->
+      Bytes (fl loc, v)
   | Seq (loc, seq) ->
       Seq (fl loc, List.map (map_node fl fp) seq)
   | Prim (loc, name, seq, annots) ->
@@ -119,6 +131,8 @@ let canonical_encoding ~variant prim_encoding =
     obj1 (req "int" z) in
   let string_encoding =
     obj1 (req "string" string) in
+  let bytes_encoding =
+    obj1 (req "bytes" bytes) in
   let int_encoding tag =
     case tag int_encoding
       ~title:"Int"
@@ -129,6 +143,11 @@ let canonical_encoding ~variant prim_encoding =
       ~title:"String"
       (function String (_, v) -> Some v | _ -> None)
       (fun v -> String (0, v)) in
+  let bytes_encoding tag =
+    case tag bytes_encoding
+      ~title:"Bytes"
+      (function Bytes (_, v) -> Some v | _ -> None)
+      (fun v -> Bytes (0, v)) in
   let seq_encoding tag expr_encoding =
     case tag (list expr_encoding)
       ~title:"Sequence"
@@ -224,7 +243,8 @@ let canonical_encoding ~variant prim_encoding =
                          | _ -> None)
                        (fun (prim, arg1, arg2, annots) -> Prim (0, prim, [ arg1 ; arg2 ], annots)) ;
                      (* General case *)
-                     application_encoding (Tag 9) expr_encoding ]))
+                     application_encoding (Tag 9) expr_encoding ;
+                     bytes_encoding (Tag 10) ]))
   in
   conv
     (function Canonical node -> node)

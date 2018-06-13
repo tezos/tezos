@@ -363,7 +363,7 @@ let prim_of_string = function
 
 let prims_of_strings expr =
   let rec convert = function
-    | Int _ | String _ as expr -> ok expr
+    | Int _ | String _ | Bytes _ as expr -> ok expr
     | Prim (loc, prim, args, annot) ->
         Error_monad.record_trace
           (Invalid_primitive_name (expr, loc))
@@ -388,7 +388,7 @@ let prims_of_strings expr =
 
 let strings_of_prims expr =
   let rec convert = function
-    | Int _ | String _ as expr -> expr
+    | Int _ | String _ | Bytes _ as expr -> expr
     | Prim (_, prim, args, annot) ->
         let prim = string_of_prim prim in
         let args = List.map convert args in

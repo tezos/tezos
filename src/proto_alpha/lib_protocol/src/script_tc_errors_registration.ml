@@ -62,6 +62,7 @@ let () =
          (integer, string, primitive application or sequence)." @@
     string_enum [ "integer", Int_kind ;
                   "string", String_kind ;
+                  "bytes", Bytes_kind ;
                   "primitiveApplication", Prim_kind ;
                   "sequence", Seq_kind ] in
   let var_annot_enc =

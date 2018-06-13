@@ -72,6 +72,8 @@ let inject_types type_map parsed =
         Int (inject_loc `after loc, value)
     | String (loc, value) ->
         String (inject_loc `after loc, value)
+    | Bytes (loc, value) ->
+        Bytes (inject_loc `after loc, value)
   and inject_loc which loc = try
       let stack =
         let locs =
@@ -104,6 +106,8 @@ let unparse ?type_map parse expanded =
               Int (inject_loc `after loc, value)
           | String (loc, value) ->
               String (inject_loc `after loc, value)
+          | Bytes (loc, value) ->
+              Bytes (inject_loc `after loc, value)
         and inject_loc which loc = try
             let stack =
               let (bef, aft) =

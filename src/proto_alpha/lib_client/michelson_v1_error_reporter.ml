@@ -292,7 +292,8 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 | Seq_kind -> ("a", "sequence")
                 | Prim_kind -> ("a", "primitive")
                 | Int_kind -> ("an", "int")
-                | String_kind -> ("a", "string") in
+                | String_kind -> ("a", "string")
+                | Bytes_kind -> ("a", "byte sequence") in
               Format.fprintf ppf
                 "@[%aunexpected %s, only@ %a@ can be used here."
                 print_loc loc

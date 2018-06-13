@@ -629,7 +629,7 @@ let expand_rec expr =
           | Prim (loc, name, args, annot) ->
               let args, errors = error_map expand_rec args in
               (Prim (loc, name, args, annot), errors)
-          | Int _ | String _ as atom -> (atom, []) end
+          | Int _ | String _ | Bytes _ as atom -> (atom, []) end
     | Error errors -> (expr, errors) in
   expand_rec expr
 
@@ -1072,7 +1072,7 @@ let rec unexpand_rec expr =
       Seq (loc, List.map unexpand_rec items)
   | Prim (loc, name, args, annot) ->
       Prim (loc, name, List.map unexpand_rec args, annot)
-  | Int _ | String _ as atom -> atom
+  | Int _ | String _ | Bytes _ as atom -> atom
 
 let () =
   let open Data_encoding in

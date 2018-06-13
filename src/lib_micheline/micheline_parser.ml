@@ -54,6 +54,7 @@ let location_encoding =
 
 type token_value =
   | String of string
+  | Bytes of string
   | Int of string
   | Ident of string
   | Annot of string
@@ -98,7 +99,12 @@ let token_value_encoding =
              "{", Open_brace ;
              "}", Close_brace ;
              ";", Semi ])))
-        (fun t -> Some t) (fun t -> t) ]
+        (fun t -> Some t) (fun t -> t) ;
+      case (Tag 5)
+        ~title:"Bytes"
+        (obj1 (req "bytes" string))
+        (function Bytes s -> Some s | _ -> None)
+        (fun s -> Bytes s) ]
 
 type token =
   { token : token_value ;
@@ -112,6 +118,7 @@ type error += Undefined_escape_sequence of point * string
 type error += Missing_break_after_number of point
 type error += Unterminated_string of location
 type error += Unterminated_integer of location
+type error += Odd_lengthed_bytes of location
 type error += Unterminated_comment of location
 type error += Annotation_length of location
 
@@ -174,7 +181,7 @@ let tokenize source =
                 | `Uchar c, stop as first ->
                     begin match uchar_to_char c with
                       | Some '0' -> base acc start
-                      | Some ('1'..'9') -> integer `dec acc start false
+                      | Some ('1'..'9') -> integer acc start
                       | Some _ | None ->
                           errors := Unterminated_integer { start ; stop } :: !errors ;
                           back first ;
@@ -182,7 +189,7 @@ let tokenize source =
                     end
               end
           | Some '0' -> base acc start
-          | Some ('1'..'9') -> integer `dec acc start false
+          | Some ('1'..'9') -> integer acc start
           | Some (' ' | '\n') -> skip acc
           | Some ';' -> skip (tok start (here ()) Semi :: acc)
           | Some '{' -> skip (tok start (here ()) Open_brace :: acc)
@@ -210,9 +217,8 @@ let tokenize source =
     match next () with
     | (`Uchar c, stop) as charloc ->
         begin match uchar_to_char c with
-          | Some ('0'.. '9') -> integer `dec acc start false
-          | Some 'x' -> integer `hex acc start true
-          | Some 'b' -> integer `bin acc start true
+          | Some ('0'.. '9') -> integer acc start
+          | Some 'x' -> bytes acc start
           | Some ('a' | 'c'..'w' | 'y' | 'z' | 'A'..'Z') ->
               errors := Missing_break_after_number stop :: !errors ;
               back charloc ;
@@ -224,7 +230,7 @@ let tokenize source =
     | (_, stop) as other ->
         back other ;
         skip (tok start stop (Int "0") :: acc)
-  and integer base acc start first =
+  and integer acc start =
     let tok stop =
       let value =
         String.sub source start.byte (stop.byte - start.byte) in
@@ -235,31 +241,39 @@ let tokenize source =
           errors := Missing_break_after_number stop :: !errors ;
           back charloc ;
           skip (tok stop :: acc) in
-        begin match base, Uchar.to_char c with
-          | `dec, ('0'.. '9') ->
-              integer `dec acc start false
-          | `dec, ('a'..'z' | 'A'..'Z') ->
+        begin match Uchar.to_char c with
+          | ('0'.. '9') ->
+              integer acc start
+          | ('a'..'z' | 'A'..'Z') ->
               missing_break ()
-          | `hex, ('0'..'9' | 'a'..'f' | 'A'..'F') ->
-              integer `hex acc start false
-          | `hex, ('g'..'z' | 'G'..'Z') ->
-              missing_break ()
-          | `bin, ('0' | '1') ->
-              integer `bin acc start false
-          | `bin, ('2'..'9' | 'a'..'z' | 'A'..'Z') ->
-              missing_break ()
-          | (`bin | `hex), _ when first ->
-              errors := Unterminated_integer { start ; stop } :: !errors ;
-              back charloc ;
-              skip (tok stop :: acc)
           | _ ->
               back charloc ;
               skip (tok stop :: acc)
         end
     | (`End, stop) as other ->
-        if first && (base = `bin || base = `hex) then begin
-          errors := Unterminated_integer { start ; stop } :: !errors
-        end ;
+        back other ;
+        skip (tok stop :: acc)
+  and bytes acc start =
+    let tok stop =
+      let value =
+        String.sub source start.byte (stop.byte - start.byte) in
+      tok start stop (Bytes value) in
+    match next () with
+    | (`Uchar c, stop) as charloc ->
+        let missing_break () =
+          errors := Missing_break_after_number stop :: !errors ;
+          back charloc ;
+          skip (tok stop :: acc) in
+        begin match Uchar.to_char c with
+          | ('0'..'9' | 'a'..'f' | 'A'..'F') ->
+              bytes acc start
+          | ('g'..'z' | 'G'..'Z') ->
+              missing_break ()
+          | _ ->
+              back charloc ;
+              skip (tok stop :: acc)
+        end
+    | (`End, stop) as other ->
         back other ;
         skip (tok stop :: acc)
   and string acc sacc start =
@@ -374,6 +388,7 @@ let min_point : node list -> point = function
   | [] -> point_zero
   | Int ({ start }, _) :: _
   | String ({ start }, _) :: _
+  | Bytes ({ start }, _) :: _
   | Prim ({ start }, _, _, _) :: _
   | Seq ({ start }, _) :: _ -> start
 
@@ -383,6 +398,7 @@ let rec max_point : node list -> point  = function
   | _ :: (_ :: _ as rest) -> max_point rest
   | Int ({ stop }, _) :: []
   | String ({ stop }, _) :: []
+  | Bytes ({ stop }, _) :: []
   | Prim ({ stop }, _, _, _) :: []
   | Seq ({ stop }, _) :: [] -> stop
 
@@ -483,7 +499,7 @@ let rec parse ?(check = true) errors tokens stack =
     { token = Eol_comment _ | Comment _ } :: rest ->
       parse ~check errors rest stack
   | (Expression None | Sequence _ | Toplevel _) :: _,
-    ({ token = Int _ | String _ } as token):: { token = Eol_comment _ | Comment _ } :: rest
+    ({ token = Int _ | String _ | Bytes _ } as token):: { token = Eol_comment _ | Comment _ } :: rest
   | (Wrapped _ | Unwrapped _) :: _,
     ({ token = Open_paren } as token)
     :: { token = Eol_comment _ | Comment _ } :: rest ->
@@ -504,9 +520,9 @@ let rec parse ?(check = true) errors tokens stack =
       parse ~check errors (valid (* skip *) :: rem) stack
   | (Wrapped _ | Unwrapped _) :: _ ,
     { token = Open_paren }
-    :: ({ token = Int _ | String _ | Annot _ | Close_paren } as token) :: rem
+    :: ({ token = Int _ | String _ | Bytes _ | Annot _ | Close_paren } as token) :: rem
   | (Expression None | Sequence _ | Toplevel _) :: _,
-    { token = Int _ | String _ } :: ({ token = Ident _ | Int _ | String _ | Annot _ | Close_paren | Open_paren | Open_brace } as token) :: rem
+    { token = Int _ | String _ | Bytes _ } :: ({ token = Ident _ | Int _ | String _ | Bytes _ | Annot _ | Close_paren | Open_paren | Open_brace } as token) :: rem
   | Unwrapped (_, _, _, _) :: Toplevel _ :: _,
     ({ token = Close_brace } as token) :: rem
   | Unwrapped (_, _, _, _) :: _,
@@ -559,6 +575,18 @@ let rec parse ?(check = true) errors tokens stack =
   | (Expression None | Sequence _ | Toplevel _) :: _,
     { token = String contents ; loc } :: ([] | { token = Semi | Close_brace} :: _ as rest) ->
       let expr : node = String (loc, contents) in
+      let errors = if check then do_check ~toplevel: false errors expr else errors in
+      parse ~check errors rest (fill_mode expr stack)
+  | (Unwrapped _ | Wrapped _) :: _,
+    { token = Bytes contents ; loc } :: rest
+  | (Expression None | Sequence _ | Toplevel _) :: _,
+    { token = Bytes contents ; loc } :: ([] | { token = Semi | Close_brace} :: _ as rest) ->
+      let errors, contents = if String.length contents mod 2 <> 0 then
+          Odd_lengthed_bytes loc :: errors, contents ^ "0"
+        else errors, contents in
+      let bytes =
+        MBytes.of_hex (`Hex (String.sub contents 2 (String.length contents - 2))) in
+      let expr : node = Bytes (loc, bytes) in
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr stack)
   | Sequence ({ loc = { start } }, exprs) :: _ ,
@@ -632,7 +660,7 @@ and do_check ?(toplevel = false) errors = function
                   errors in
               in_line_or_aligned start_line errors rest in
         in_line_or_aligned first_line errors rest
-  | Prim (_, _, [], _) | String _ | Int _ -> errors
+  | Prim (_, _, [], _) | String _ | Int _ | Bytes _ -> errors
 
 let parse_expression ?check tokens =
   let result = match tokens with
@@ -661,6 +689,7 @@ let print_token_kind ppf = function
   | Open_paren | Close_paren -> Format.fprintf ppf "parenthesis"
   | Open_brace | Close_brace -> Format.fprintf ppf "curly brace"
   | String _ -> Format.fprintf ppf "string constant"
+  | Bytes _ -> Format.fprintf ppf "bytes constant"
   | Int _ -> Format.fprintf ppf "integer constant"
   | Ident _ -> Format.fprintf ppf "identifier"
   | Annot _ -> Format.fprintf ppf "annotation"
@@ -744,6 +773,16 @@ let () =
     Data_encoding.(obj1 (req "location" location_encoding))
     (function Unterminated_integer loc -> Some loc | _ -> None)
     (fun loc -> Unterminated_integer loc) ;
+  register_error_kind `Permanent
+    ~id: "micheline.parse_error.odd_lengthed_bytes"
+    ~title: "Micheline parser error: odd lengthed bytes"
+    ~description: "While parsing a piece of Micheline source, the \
+                   length of a byte sequence (0x...) was not a \
+                   multiple of two, leaving a trailing half byte."
+    ~pp:(fun ppf loc -> Format.fprintf ppf "%a, odd_lengthed bytes" print_location loc)
+    Data_encoding.(obj1 (req "location" location_encoding))
+    (function Odd_lengthed_bytes loc -> Some loc | _ -> None)
+    (fun loc -> Odd_lengthed_bytes loc) ;
   register_error_kind `Permanent
     ~id: "micheline.parse_error.unterminated_comment"
     ~title: "Micheline parser error: unterminated comment"

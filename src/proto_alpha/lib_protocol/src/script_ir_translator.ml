@@ -215,11 +215,13 @@ let location = function
   | Prim (loc, _, _, _)
   | Int (loc, _)
   | String (loc, _)
+  | Bytes (loc, _)
   | Seq (loc, _) -> loc
 
 let kind = function
   | Int _ -> Int_kind
   | String _ -> String_kind
+  | Bytes _ -> Bytes_kind
   | Prim _ -> Prim_kind
   | Seq _ -> Seq_kind
 
@@ -336,6 +338,7 @@ let unexpected expr exp_kinds exp_ns exp_prims =
   match expr with
   | Int (loc, _) -> Invalid_kind (loc, Prim_kind :: exp_kinds, Int_kind)
   | String (loc, _ ) -> Invalid_kind (loc, Prim_kind :: exp_kinds, String_kind)
+  | Bytes (loc, _ ) -> Invalid_kind (loc, Prim_kind :: exp_kinds, Bytes_kind)
   | Seq (loc, _) -> Invalid_kind (loc, Prim_kind :: exp_kinds, Seq_kind)
   | Prim (loc, name, _, _) ->
       match namespace name, exp_ns with
@@ -721,6 +724,7 @@ let merge_comparable_types
 let rec strip_annotations = function
   | (Int (_,_) as i) -> i
   | (String (_,_) as s) -> s
+  | (Bytes (_,_) as s) -> s
   | Prim (loc, prim, args, _) -> Prim (loc, prim, List.map strip_annotations args, [])
   | Seq (loc, items) -> Seq (loc, List.map strip_annotations items)
 
@@ -1114,7 +1118,7 @@ let rec parse_data
                fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
            | Prim (loc, name, _, _) ->
                fail @@ Invalid_primitive (loc, [ D_Elt ], name)
-           | Int _ | String _ | Seq _ ->
+           | Int _ | String _ | Bytes _ | Seq _ ->
                fail (error ()))
         (None, empty_map key_type, ctxt) items |> traced >>|? fun (_, items, ctxt) ->
       (items, ctxt) in
@@ -1456,7 +1460,7 @@ and parse_instr
     let log_stack loc stack_ty aft =
       match type_logger, script_instr with
       | None, _
-      | Some _, (Seq (-1, _) | Int _ | String _) -> ()
+      | Some _, (Seq (-1, _) | Int _ | String _ | Bytes _) -> ()
       | Some log, (Prim _ | Seq _) ->
           log loc (unparse_stack stack_ty) (unparse_stack aft)
     in
@@ -2506,6 +2510,7 @@ and parse_toplevel
     match root toplevel with
     | Int (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], Int_kind))
     | String (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], String_kind))
+    | Bytes (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], Bytes_kind))
     | Prim (loc, _, _, _) -> error (Invalid_kind (loc, [ Seq_kind ], Prim_kind))
     | Seq (_, fields) ->
         let rec find_fields p s c fields =
@@ -2513,6 +2518,7 @@ and parse_toplevel
           | [] -> ok (p, s, c)
           | Int (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], Int_kind))
           | String (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], String_kind))
+          | Bytes (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], Bytes_kind))
           | Seq (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], Seq_kind))
           | Prim (loc, K_parameter, [ arg ], _) :: rest ->
               begin match p with
@@ -2792,7 +2798,7 @@ and unparse_code ctxt mode = function
            return (item :: l, ctxt))
         ([], ctxt) items >>=? fun (items, ctxt) ->
       return (Prim (loc, prim, List.rev items, annot), ctxt)
-  | Int _ | String _ as atom -> return (atom, ctxt)
+  | Int _ | String _ | Bytes _ as atom -> return (atom, ctxt)
 
 let unparse_script ctxt mode { code ; arg_type ; storage ; storage_type } =
   let Lam (_, original_code) = code in
