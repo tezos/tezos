@@ -579,6 +579,13 @@ let build_rpc_directory net =
     end in
 
   let dir =
+    RPC_directory.register0 dir P2p_services.S.identity begin fun () () ->
+      match net.pool with
+      | None -> failwith "The P2P layer is disabled."
+      | Some pool -> return (P2p_pool.config pool).identity.peer_id
+    end in
+
+  let dir =
     RPC_directory.register0 dir P2p_services.S.stat begin fun () () ->
       match net.pool with
       | None -> return P2p_stat.empty
