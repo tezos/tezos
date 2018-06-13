@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Unique tag for a logging module.
+    Match against, e.g. `Logging.Core.Section`.  *)
 type log_section = private ..
 
 type log_message = {
@@ -15,7 +17,16 @@ type log_message = {
   tags : Tag.set ;
 }
 
-val tap : (log_message -> unit) -> unit
+type tap_id
+
+(** Intercept events as they are logged.  All events will generate a call to
+    your tap function, but `text` will only be included for events that
+    actually print a message according to the active logging configuration.  *)
+val tap : (log_message -> unit) -> tap_id
+
+(** Remove a previously set tap by supplying its tap_id.  Does nothing if
+    the tap was removed already.  *)
+val untap : tap_id -> unit
 
 type ('a,'b) msgf = (('a, Format.formatter, unit, 'b) format4 -> ?tags:Tag.set -> 'a) -> ?tags:Tag.set -> 'b
 type ('a,'b) log = ('a,'b) msgf -> 'b

@@ -87,10 +87,30 @@ val map : (t -> t) -> set -> set
 val mapi : (t -> t) -> set -> set
 val pp_set : Format.formatter -> set -> unit
 
+(** DSL for logging messages.  Opening this locally makes it easy to supply a number
+    of semantic tags for a log event while using their values in the human-readable
+    text.  For example:
+
+    {[
+      lwt_log_info Tag.DSL.(fun f ->
+          f "request for operations %a:%d from peer %a timed out."
+          -% t event "request_operations_timeout"
+          -% a Block_hash.Logging.tag bh
+          -% s operations_index_tag n
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
+    ]} *)
 module DSL : sig
   type (_,_,_,_) arg
+
+  (** Use a semantic tag with a `%a` format, supplying the pretty printer from the tag. *)
   val a : 'v def -> 'v -> (('b -> 'v -> 'c) -> 'v -> 'd, 'b, 'c, 'd) arg
+
+  (** Use a semantic tag with ordinary formats such as `%s`, `%d`, and `%f`. *)
   val s : 'v def -> 'v -> ('v -> 'd, 'b, 'c, 'd) arg
+
+  (** Supply a semantic tag without formatting it. *)
   val t : 'v def -> 'v -> ('d, 'b, 'c, 'd) arg
+
+  (** Perform the actual application of a tag to a format. *)
   val (-%) : (?tags:set -> 'a) -> ('a,Format.formatter,unit,'d) arg -> (?tags:set -> 'd)
 end

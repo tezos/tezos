@@ -24,11 +24,26 @@ type log_message = {
   tags : Tag.set ;
 }
 
-let taps : (log_message -> unit) list ref = ref []
+type tap_id = int
+let next_tap : int ref = ref 0
 
-let tap f = taps := f :: !taps
+type tap = {
+  id : tap_id ;
+  process : log_message -> unit ;
+}
 
-let call_taps v = List.iter (fun f -> f v) !taps
+let taps : tap list ref = ref []
+
+let tap process = let id = !next_tap in
+  begin
+    next_tap := id + 1 ;
+    taps := { id ; process } :: !taps ;
+    id
+  end
+
+let untap x = taps := List.filter (fun tap -> tap.id <> x) !taps
+
+let call_taps v = List.iter (fun tap -> tap.process v) !taps
 
 module type SEMLOG = sig
 
