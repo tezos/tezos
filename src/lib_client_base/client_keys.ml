@@ -193,13 +193,13 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
 let get_key cctxt pkh =
   raw_get_key cctxt pkh >>=? function
   | (pkh, Some pk, Some sk) -> return (pkh, pk, sk)
-  | (_pkh, _pk, None) -> failwith "... FIXME ... E"
-  | (_pkh, None, _sk) -> failwith "... FIXME ... F"
+  | (_pkh, _pk, None) -> failwith "Unknown secret key for %a" Signature.Public_key_hash.pp pkh
+  | (_pkh, None, _sk) -> failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
 
 let get_public_key cctxt pkh =
   raw_get_key cctxt pkh >>=? function
   | (pkh, Some pk, _sk) -> return (pkh, pk)
-  | (_pkh, None, _sk) -> failwith "... FIXME ... G"
+  | (_pkh, None, _sk) -> failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
 
 let get_keys (cctxt : #Client_context.wallet) =
   Secret_key.load cctxt >>=? fun sks ->

@@ -41,7 +41,7 @@ module Raw = struct
     | None -> return None
     | Some bytes ->
         match Data_encoding.Binary.of_bytes Signature.Secret_key.encoding bytes with
-        | None -> failwith "... FIXME ... D" (* corrupted data *)
+        | None -> failwith "Corrupted wallet, deciphered key is invalid"
         | Some sk -> return (Some sk)
 
 end
@@ -77,7 +77,7 @@ let rec noninteractice_decrypt_loop ~encrypted_sk = function
 
 let decrypt_payload cctxt ?name encrypted_sk =
   match Base58.safe_decode encrypted_sk with
-  | None -> failwith "... FIXME ... A"
+  | None -> failwith "Not a Base58 encoded encrypted key"
   | Some encrypted_sk ->
       let encrypted_sk = MBytes.of_string encrypted_sk in
       noninteractice_decrypt_loop ~encrypted_sk !passwords >>=? function

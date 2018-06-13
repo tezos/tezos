@@ -59,7 +59,17 @@ let sign
 let public_key (cctxt : #Client_context.wallet) pkh =
   log "Request for public key %a"
     Signature.Public_key_hash.pp pkh >>= fun () ->
-  Client_keys.get_public_key cctxt pkh >>=? fun (name, pk) ->
-  log "Found public key for hash %a (name: %s)"
-    Signature.Public_key_hash.pp pkh name >>= fun () ->
-  return pk
+  Client_keys.list_keys cctxt >>=? fun all_keys ->
+  match List.find (fun (_, h, _, _) -> Signature.Public_key_hash.equal h pkh) all_keys with
+  | exception Not_found ->
+      log "No public key found for hash %a"
+        Signature.Public_key_hash.pp pkh >>= fun () ->
+      Lwt.fail Not_found
+  | (_, _, None, _) ->
+      log "No public key found for hash %a"
+        Signature.Public_key_hash.pp pkh >>= fun () ->
+      Lwt.fail Not_found
+  | (name, _, Some pk, _) ->
+      log "Found public key for hash %a (name: %s)"
+        Signature.Public_key_hash.pp pkh name >>= fun () ->
+      return pk

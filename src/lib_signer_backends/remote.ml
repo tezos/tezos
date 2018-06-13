@@ -14,6 +14,7 @@ let scheme = "remote"
 module Make(S : sig
     val default : Uri.t
     val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
+    val logger: RPC_client.logger
   end) = struct
 
   let scheme = scheme
@@ -25,18 +26,21 @@ module Make(S : sig
     "Valid locators are of this form: remote://tz1...\n\
      The key will be queried to current remote signer, which can be \
      configured with the `--remote-signer` or `-R` options, \
-     or by defining the following environment variables:\n \
-     - $TEZOS_SIGNER_UNIX_PATH,\n\
-     - $TEZOS_SIGNER_TCP_HOST and $TEZOS_SIGNER_TCP_PORT (default: 7732),\n\
-     - $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT (default: 443)."
+     or by defining the following environment variables:\n\
+    \ - $TEZOS_SIGNER_UNIX_PATH,\n\
+    \ - $TEZOS_SIGNER_TCP_HOST and $TEZOS_SIGNER_TCP_PORT (default: 7732),\n\
+    \ - $TEZOS_SIGNER_HTTP_HOST and $TEZOS_SIGNER_HTTP_PORT (default: 6732),\n\
+    \ - $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT (default: 443)."
 
   module Socket = Socket.Make(S)
+  module Http = Http.Make(S)
   module Https = Https.Make(S)
 
   let get_remote () =
     match Uri.scheme S.default with
     | Some "unix" -> (module Socket.Unix : SIGNER)
     | Some "tcp" -> (module Socket.Tcp : SIGNER)
+    | Some "http" -> (module Http : SIGNER)
     | Some "https" -> (module Https : SIGNER)
     | _ -> assert false
 
@@ -51,7 +55,7 @@ module Make(S : sig
         (fun uri ->
            let key = Uri.path uri in
            Uri.with_path S.default key)
-    | Some "https" ->
+    | Some ("https" | "http") ->
         (fun uri ->
            let key = Uri.path uri in
            match Uri.path S.default with
@@ -89,11 +93,12 @@ let make_pk pk =
 let read_base_uri_from_env () =
   match Sys.getenv_opt "TEZOS_SIGNER_UNIX_PATH",
         Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST",
+        Sys.getenv_opt "TEZOS_SIGNER_HTTP_HOST",
         Sys.getenv_opt "TEZOS_SIGNER_HTTPS_HOST" with
-  | None, None, None -> return None
-  | Some path, None, None ->
+  | None, None, None, None -> return None
+  | Some path, None, None, None ->
       return (Some (Socket.make_unix_base path))
-  | None, Some host, None -> begin
+  | None, Some host, None, None -> begin
       try
         let port =
           match Sys.getenv_opt "TEZOS_SIGNER_TCP_PORT" with
@@ -103,7 +108,17 @@ let read_base_uri_from_env () =
       with Invalid_argument _ ->
         failwith "Failed to parse TEZOS_SIGNER_TCP_PORT.@."
     end
-  | None, None, Some host -> begin
+  | None, None, Some host, None -> begin
+      try
+        let port =
+          match Sys.getenv_opt "TEZOS_SIGNER_HTTP_PORT" with
+          | None -> 6732
+          | Some port -> int_of_string port in
+        return (Some (Http.make_base host port))
+      with Invalid_argument _ ->
+        failwith "Failed to parse TEZOS_SIGNER_HTTP_PORT.@."
+    end
+  | None, None, None, Some host -> begin
       try
         let port =
           match Sys.getenv_opt "TEZOS_SIGNER_HTTPS_PORT" with
@@ -113,11 +128,12 @@ let read_base_uri_from_env () =
       with Invalid_argument _ ->
         failwith "Failed to parse TEZOS_SIGNER_HTTPS_PORT.@."
     end
-  | _, _, _ ->
+  | _, _, _, _ ->
       failwith
         "Only one the following environment variable must be defined: \
          TEZOS_SIGNER_UNIX_PATH, \
          TEZOS_SIGNER_TCP_HOST, \
+         TEZOS_SIGNER_HTTP_HOST, \
          TEZOS_SIGNER_HTTPS_HOST@."
 
 type error += Invalid_remote_signer of string
@@ -130,7 +146,13 @@ let () =
     ~description: "The provided remote signer is invalid."
     ~pp:
       (fun ppf s ->
-         Format.fprintf ppf "Value '%s' is not a valid URI for a remote signer" s)
+         Format.fprintf ppf
+           "@[<v 0>Value '%s' is not a valid URI for a remote signer.@,\
+            Supported URIs for remote signers are of the form:@,\
+           \ - unix:///path/to/socket/file@,\
+           \ - tcp://host:port@,\
+           \ - http://host[:port][/prefix]@,\
+           \ - https://host[:port][/prefix]@]" s)
     Data_encoding.(obj1 (req "uri" string))
     (function Invalid_remote_signer s -> Some s | _ -> None)
     (fun s -> Invalid_remote_signer s)
@@ -140,6 +162,7 @@ let parse_base_uri s =
   try
     let uri = Uri.of_string s in
     match Uri.scheme uri with
+    | Some "http" -> return uri
     | Some "https" -> return uri
     | Some "tcp" -> return uri
     | Some "unix" -> return uri

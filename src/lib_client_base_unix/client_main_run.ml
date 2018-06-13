@@ -110,7 +110,7 @@ let main select_commands =
         (module Tezos_signer_backends.Encrypted.Make(struct
              let cctxt = (client_config :> Client_context.prompter)
            end)) ;
-      let module Remote_authenticator = struct
+      let module Remote_params = struct
         let authenticate pkhs payload =
           Client_keys.list_keys client_config >>=? fun keys ->
           match List.filter_map
@@ -125,17 +125,20 @@ let main select_commands =
           | [] -> failwith
                     "remote signer expects authentication signature, \
                      but no authorized key was found in the wallet"
+        let logger = rpc_config.logger
       end in
-      let module Https = Tezos_signer_backends.Https.Make(Remote_authenticator) in
-      let module Socket = Tezos_signer_backends.Socket.Make(Remote_authenticator) in
+      let module Https = Tezos_signer_backends.Https.Make(Remote_params) in
+      let module Http = Tezos_signer_backends.Http.Make(Remote_params) in
+      let module Socket = Tezos_signer_backends.Socket.Make(Remote_params) in
       Client_keys.register_signer (module Https) ;
+      Client_keys.register_signer (module Http) ;
       Client_keys.register_signer (module Socket.Unix) ;
       Client_keys.register_signer (module Socket.Tcp) ;
       Option.iter parsed_config_file.remote_signer ~f: begin fun signer ->
         Client_keys.register_signer
           (module Tezos_signer_backends.Remote.Make(struct
                let default = signer
-               include Remote_authenticator
+               include Remote_params
              end))
       end ;
       select_commands ctxt parsed_args >>=? fun commands ->

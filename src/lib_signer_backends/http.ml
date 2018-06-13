@@ -7,9 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val run:
-  #Client_context.io_wallet ->
-  host:string -> port:int -> cert:string -> key:string ->
-  ?magic_bytes: int list ->
-  require_auth: bool ->
-  'a tzresult Lwt.t
+include Http_gen.Make(struct let scheme = "http" end)
