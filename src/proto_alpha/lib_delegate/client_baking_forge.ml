@@ -687,11 +687,16 @@ let create
     ?max_priority
     (delegates: public_key_hash list)
     (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t) =
-  Lwt_stream.get block_stream >>= function
-  | None | Some (Error _) ->
-      cctxt#error "Can't fetch the current block head."
-  | Some (Ok bi) ->
-      create
-        cctxt ?max_priority delegates
-        block_stream bi
+  let rec wait_for_first_block () =
+    Lwt_stream.get block_stream >>= function
+    | None | Some (Error _) ->
+        cctxt#message "Can't fetch the current block head. Retrying soon." >>= fun () ->
+        (* NOTE: this is not a tight loop because of Lwt_stream.get *)
+        wait_for_first_block ()
+    | Some (Ok bi) ->
+        create
+          cctxt ?max_priority delegates
+          block_stream bi
+  in
+  wait_for_first_block ()
 
