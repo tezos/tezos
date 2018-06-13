@@ -56,7 +56,7 @@ end = struct
             let rec remove_old acc = function
               | [] -> List.rev acc
               | ((_,lvl) as hd)::tl ->
-                  if Raw_level.diff new_lvl  lvl > 50l (*?*)  then
+                  if Raw_level.diff new_lvl lvl < 50l (*?*) then
                     remove_old (hd::acc) tl
                   else
                     List.rev acc
