@@ -181,7 +181,13 @@ let endorse_for cctxt = function
         Block_hash.pp_short hash
         Raw_level.pp level
         name
-        Operation_hash.pp_short oph >>= return
+        Operation_hash.pp_short oph >>= fun () ->
+      cctxt#message
+        "Injected endorsement level %a, contract %s '%a'"
+        Raw_level.pp level
+        name
+        Operation_hash.pp_short oph >>= fun () ->
+      return ()
 
 let allowed_to_endorse cctxt state (block: Client_baking_blocks.block_info) delegate time =
   Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
