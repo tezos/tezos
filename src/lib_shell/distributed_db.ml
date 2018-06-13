@@ -494,7 +494,7 @@ module P2p_reader = struct
           (* TODO Kick *)
           P2p.greylist_peer global_db.p2p state.gid ;
           Lwt.return_unit
-        end else if Time.(now () < head.shell.timestamp) then begin
+        end else if Time.(add (now ()) 15L < head.shell.timestamp) then begin
           (* TODO some penalty *)
           lwt_log_notice "Received future block %a from peer %a."
             Block_hash.pp_short (Block_header.hash head)
@@ -545,7 +545,7 @@ module P2p_reader = struct
           (* TODO Kick *)
           P2p.greylist_peer global_db.p2p state.gid ;
           Lwt.return_unit
-        end else if Time.(now () < header.shell.timestamp) then begin
+        end else if Time.(add (now ()) 15L < header.shell.timestamp) then begin
           (* TODO some penalty *)
           lwt_log_notice "Received future block %a from peer %a."
             Block_hash.pp_short head

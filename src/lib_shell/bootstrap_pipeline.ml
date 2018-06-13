@@ -35,7 +35,7 @@ let assert_acceptable_header pipeline
     ?(first = false) hash (header : Block_header.t) =
   let chain_state = Distributed_db.chain_state pipeline.chain_db in
   fail_unless
-    (Time.(now () >= header.shell.timestamp))
+    (Time.(add (now ()) 15L >= header.shell.timestamp))
     (Future_block_header hash) >>=? fun () ->
   State.Chain.checkpoint chain_state >>= fun (level, checkpoint) ->
   fail_when
