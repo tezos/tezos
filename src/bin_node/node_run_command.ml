@@ -292,13 +292,20 @@ let process sandbox verbosity checkpoint args =
               begin
                 match Int32.of_string_opt lvl with
                 | None ->
-                    failwith "... FIXME ..."
+                    failwith "%s isn't a 32bit integer" lvl
                 | Some lvl ->
                     return lvl
               end >>=? fun lvl ->
               return (Some (lvl, block))
+          | [] -> assert false
+          | [_] ->
+              failwith "Checkoints are expected to follow the format \
+                        \"<level>,<block_hash>\". \
+                        The character ',' is not present in %s" s
           | _ ->
-              failwith "... FIXME ..."
+              failwith "Checkoints are expected to follow the format \
+                        \"<level>,<block_hash>\". \
+                        The character ',' is present more than once in %s" s
     end >>=? fun checkpoint ->
     Lwt_lock_file.is_locked
       (lock_file config.data_dir) >>=? function
@@ -349,7 +356,9 @@ module Term = struct
   let checkpoint =
     let open Cmdliner in
     let doc =
-      "..."
+      "When asked to take a block hash as a checkpoint, the daemon \
+       will only accept the chains that contains that block and those \
+       that might reach it."
     in
     Arg.(value & opt (some string) None &
          info ~docs:Node_shared_arg.Manpage.misc_section
