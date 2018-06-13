@@ -9,8 +9,8 @@
 
 type error +=
   | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t (* `Temporary *)
-  | Counter_in_the_past of Contract_repr.contract * int32 * int32 (* `Branch *)
-  | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
+  | Counter_in_the_past of Contract_repr.contract * Z.t * Z.t (* `Branch *)
+  | Counter_in_the_future of Contract_repr.contract * Z.t * Z.t (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
   | Empty_implicit_contract of Signature.Public_key_hash.t (* `Temporary *)
@@ -54,13 +54,15 @@ let () =
     ~description:"An operation assumed a contract counter in the future"
     ~pp:(fun ppf (contract, exp, found) ->
         Format.fprintf ppf
-          "Counter %ld not yet reached for contract %a (expected %ld)"
-          found Contract_repr.pp contract exp)
+          "Counter %s not yet reached for contract %a (expected %s)"
+          (Z.to_string found)
+          Contract_repr.pp contract
+          (Z.to_string exp))
     Data_encoding.
       (obj3
          (req "contract" Contract_repr.encoding)
-         (req "expected" int32)
-         (req "found" int32))
+         (req "expected" z)
+         (req "found" z))
     (function Counter_in_the_future (c, x, y) -> Some (c, x, y) | _ -> None)
     (fun (c, x, y) -> Counter_in_the_future (c, x, y)) ;
   register_error_kind
@@ -70,13 +72,15 @@ let () =
     ~description:"An operation assumed a contract counter in the past"
     ~pp:(fun ppf (contract, exp, found) ->
         Format.fprintf ppf
-          "Counter %ld already used for contract %a (expected %ld)"
-          found Contract_repr.pp contract exp)
+          "Counter %s already used for contract %a (expected %s)"
+          (Z.to_string found)
+          Contract_repr.pp contract
+          (Z.to_string exp))
     Data_encoding.
       (obj3
          (req "contract" Contract_repr.encoding)
-         (req "expected" int32)
-         (req "found" int32))
+         (req "expected" z)
+         (req "found" z))
     (function Counter_in_the_past (c, x, y) -> Some (c, x, y) | _ -> None)
     (fun (c, x, y) -> Counter_in_the_past (c, x, y)) ;
   register_error_kind
@@ -200,7 +204,7 @@ let update_script_big_map c contract = function
 let create_base c contract
     ~balance ~manager ~delegate ?script ~spendable ~delegatable =
   (match Contract_repr.is_implicit contract with
-   | None -> return 0l
+   | None -> return Z.zero
    | Some _ -> Storage.Contract.Global_counter.get c) >>=? fun counter ->
   Storage.Contract.Balance.init c contract balance >>=? fun c ->
   Storage.Contract.Manager.init c contract (Manager_repr.Hash manager) >>=? fun c ->
@@ -292,19 +296,19 @@ let originated_from_current_nonce ~since: ctxt_since ~until: ctxt_until =
 
 let check_counter_increment c contract counter =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
-  let expected = Int32.succ contract_counter in
-  if Compare.Int32.(expected = counter)
+  let expected = Z.succ contract_counter in
+  if Compare.Z.(expected = counter)
   then return ()
-  else if Compare.Int32.(expected > counter) then
+  else if Compare.Z.(expected > counter) then
     fail (Counter_in_the_past (contract, expected, counter))
   else
     fail (Counter_in_the_future (contract, expected, counter))
 
 let increment_counter c contract =
   Storage.Contract.Global_counter.get c >>=? fun global_counter ->
-  Storage.Contract.Global_counter.set c (Int32.succ global_counter) >>=? fun c ->
+  Storage.Contract.Global_counter.set c (Z.succ global_counter) >>=? fun c ->
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
-  Storage.Contract.Counter.set c contract (Int32.succ contract_counter)
+  Storage.Contract.Counter.set c contract (Z.succ contract_counter)
 
 let get_script c contract =
   Storage.Contract.Code.get_option c contract >>=? fun (c, code) ->
@@ -450,7 +454,7 @@ let spend c contract amount =
   else spend_from_script c contract amount
 
 let init c =
-  Storage.Contract.Global_counter.init c 0l
+  Storage.Contract.Global_counter.init c Z.zero
 
 let used_storage_space c contract =
   Storage.Contract.Used_storage_space.get_option c contract >>=? function

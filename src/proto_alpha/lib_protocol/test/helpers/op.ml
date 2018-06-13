@@ -55,7 +55,7 @@ let manager_operation
   Context.Contract.counter ctxt source >>=? fun counter ->
   Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.unopt ~default:account.pk public_key in
-  let counter = Int32.succ counter in
+  let counter = Z.succ counter in
   Context.Contract.is_manager_key_revealed ctxt source >>=? function
   | true ->
       let op =
@@ -82,7 +82,7 @@ let manager_operation
         Manager_operation {
           source ;
           fee ;
-          counter = Int32.succ counter ;
+          counter = Z.succ counter ;
           operation ;
           gas_limit ;
           storage_limit ;
@@ -94,7 +94,7 @@ let revelation ctxt public_key =
   let source = Contract.implicit_contract pkh in
   Context.Contract.counter ctxt source >>=? fun counter ->
   Context.Contract.manager ctxt source >>=? fun account ->
-  let counter = Int32.succ counter in
+  let counter = Z.succ counter in
   let sop =
     Contents_list
       (Single

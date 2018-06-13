@@ -9,8 +9,8 @@
 
 type error +=
   | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t (* `Temporary *)
-  | Counter_in_the_past of Contract_repr.contract * int32 * int32 (* `Branch *)
-  | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
+  | Counter_in_the_past of Contract_repr.contract * Z.t * Z.t (* `Branch *)
+  | Counter_in_the_future of Contract_repr.contract * Z.t * Z.t (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
   | Empty_implicit_contract of Signature.Public_key_hash.t (* `Temporary *)
@@ -30,7 +30,7 @@ val must_be_allocated: Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 val list: Raw_context.t -> Contract_repr.t list Lwt.t
 
 val check_counter_increment:
-  Raw_context.t -> Contract_repr.t -> int32 -> unit tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> Z.t -> unit tzresult Lwt.t
 
 val increment_counter:
   Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
@@ -53,7 +53,7 @@ val reveal_manager_key:
   Raw_context.t tzresult Lwt.t
 
 val get_balance: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
-val get_counter: Raw_context.t -> Contract_repr.t -> int32 tzresult Lwt.t
+val get_counter: Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
 
 val get_script:
   Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.t option) tzresult Lwt.t

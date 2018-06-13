@@ -17,7 +17,7 @@ type info = {
   balance: Tez.t ;
   spendable: bool ;
   delegate: bool * public_key_hash option ;
-  counter: int32 ;
+  counter: counter ;
   script: Script.t option ;
 }
 
@@ -48,7 +48,7 @@ val is_spendable:
   'a #RPC_context.simple -> 'a -> Contract.t -> bool shell_tzresult Lwt.t
 
 val counter:
-  'a #RPC_context.simple -> 'a -> Contract.t -> int32 shell_tzresult Lwt.t
+  'a #RPC_context.simple -> 'a -> Contract.t -> counter shell_tzresult Lwt.t
 
 val script:
   'a #RPC_context.simple -> 'a -> Contract.t -> Script.t shell_tzresult Lwt.t

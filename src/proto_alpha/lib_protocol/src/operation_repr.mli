@@ -112,7 +112,7 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option -> Kind.delegation manager_operation
 
-and counter = Int32.t
+and counter = Z.t
 
 type 'kind internal_operation = {
   source: Contract_repr.contract ;

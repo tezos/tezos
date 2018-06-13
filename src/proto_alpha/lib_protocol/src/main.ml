@@ -245,13 +245,13 @@ let compare_operations op1 op2 =
 
   (* Manager operations with smaller counter are pre-validated first. *)
   | Single (Manager_operation op1), Single (Manager_operation op2) ->
-      Int32.compare op1.counter op2.counter
+      Z.compare op1.counter op2.counter
   | Cons (Manager_operation op1, _), Single (Manager_operation op2) ->
-      Int32.compare op1.counter op2.counter
+      Z.compare op1.counter op2.counter
   | Single (Manager_operation op1), Cons (Manager_operation op2, _) ->
-      Int32.compare op1.counter op2.counter
+      Z.compare op1.counter op2.counter
   | Cons (Manager_operation op1, _), Cons (Manager_operation op2, _) ->
-      Int32.compare op1.counter op2.counter
+      Z.compare op1.counter op2.counter
 
 let init ctxt block_header =
   let level = block_header.Block_header.level in

@@ -519,7 +519,7 @@ module Contract : sig
   val get_storage:
     context -> contract -> (context * Script.expr option) tzresult Lwt.t
 
-  val get_counter: context -> contract -> int32 tzresult Lwt.t
+  val get_counter: context -> contract -> Z.t tzresult Lwt.t
   val get_balance:
     context -> contract -> Tez.t tzresult Lwt.t
 
@@ -569,7 +569,7 @@ module Contract : sig
     context -> contract -> context tzresult Lwt.t
 
   val check_counter_increment:
-    context -> contract -> int32 -> unit tzresult Lwt.t
+    context -> contract -> Z.t -> unit tzresult Lwt.t
 
   module Big_map : sig
     val mem:
@@ -851,7 +851,7 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option -> Kind.delegation manager_operation
 
-and counter = Int32.t
+and counter = Z.t
 
 type 'kind internal_operation = {
   source: Contract.contract ;

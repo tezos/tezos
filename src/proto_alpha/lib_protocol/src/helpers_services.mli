@@ -64,7 +64,7 @@ module Forge : sig
       branch:Block_hash.t ->
       source:Contract.t ->
       ?sourcePubKey:public_key ->
-      counter:int32 ->
+      counter:counter ->
       fee:Tez.t ->
       gas_limit:Z.t ->
       storage_limit:Int64.t ->
@@ -75,7 +75,7 @@ module Forge : sig
       branch:Block_hash.t ->
       source:Contract.t ->
       sourcePubKey:public_key ->
-      counter:int32 ->
+      counter:counter ->
       fee:Tez.t ->
       unit -> MBytes.t shell_tzresult Lwt.t
 
@@ -84,7 +84,7 @@ module Forge : sig
       branch:Block_hash.t ->
       source:Contract.t ->
       ?sourcePubKey:public_key ->
-      counter:int32 ->
+      counter:counter ->
       amount:Tez.t ->
       destination:Contract.t ->
       ?parameters:Script.expr ->
@@ -98,7 +98,7 @@ module Forge : sig
       branch:Block_hash.t ->
       source:Contract.t ->
       ?sourcePubKey:public_key ->
-      counter:int32 ->
+      counter:counter ->
       managerPubKey:public_key_hash ->
       balance:Tez.t ->
       ?spendable:bool ->
@@ -115,7 +115,7 @@ module Forge : sig
       branch:Block_hash.t ->
       source:Contract.t ->
       ?sourcePubKey:public_key ->
-      counter:int32 ->
+      counter:counter ->
       fee:Tez.t ->
       public_key_hash option ->
       MBytes.t shell_tzresult Lwt.t

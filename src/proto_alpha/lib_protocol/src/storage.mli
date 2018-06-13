@@ -90,9 +90,9 @@ module Contract : sig
       module `Contract`. *)
 
   module Global_counter : sig
-    val get : Raw_context.t -> int32 tzresult Lwt.t
-    val set : Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
-    val init : Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
+    val get : Raw_context.t -> Z.t tzresult Lwt.t
+    val set : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
+    val init : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
   end
 
   (** The domain of alive contracts *)
@@ -159,7 +159,7 @@ module Contract : sig
 
   module Counter : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = int32
+     and type value = Z.t
      and type t := Raw_context.t
 
   module Code : Non_iterable_indexed_carbonated_data_storage

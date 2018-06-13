@@ -111,7 +111,7 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option -> Kind.delegation manager_operation
 
-and counter = Int32.t
+and counter = Z.t
 
 let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   function
@@ -472,7 +472,7 @@ module Encoding = struct
     (obj5
        (req "source" Contract_repr.encoding)
        (req "fee" Tez_repr.encoding)
-       (req "counter" int32)
+       (req "counter" z)
        (req "gas_limit" z)
        (req "storage_limit" int64))
 

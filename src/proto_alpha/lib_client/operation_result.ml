@@ -216,13 +216,13 @@ let pp_manager_operation_contents_and_result ppf
     "@[<v 0>@[<v 2>Manager signed operations:@,\
      From: %a@,\
      Fee to the baker: %s%a@,\
-     Expected counter: %ld@,\
+     Expected counter: %s@,\
      Gas limit: %s@,\
      Storage limit: %Ld bytes"
     Contract.pp source
     Client_proto_args.tez_sym
     Tez.pp fee
-    counter
+    (Z.to_string counter)
     (Z.to_string gas_limit)
     storage_limit ;
   begin match balance_updates with

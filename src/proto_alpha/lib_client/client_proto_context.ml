@@ -49,7 +49,7 @@ let reveal cctxt
     ?branch ~source ~src_pk ~src_sk ~fee () =
   Alpha_services.Contract.counter
     cctxt (chain, block) source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
+  let counter = Z.succ pcounter in
   Alpha_services.Contract.manager_key
     cctxt (chain, block) source >>=? fun (_, key) ->
   match key with
@@ -319,4 +319,3 @@ let activate_account
       (Activate_account _ as op, result) ->
       return (oph, op, result)
   | _ -> .
-

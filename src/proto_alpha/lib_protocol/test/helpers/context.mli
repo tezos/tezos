@@ -38,7 +38,7 @@ module Contract : sig
       deposit, fees ot rewards. *)
   val balance: ?kind:balance_kind -> t -> Contract.t -> Tez.t tzresult Lwt.t
 
-  val counter: t -> Contract.t -> int32 tzresult Lwt.t
+  val counter: t -> Contract.t -> Z.t tzresult Lwt.t
   val manager: t -> Contract.t -> Account.t tzresult Lwt.t
   val is_manager_key_revealed: t -> Contract.t -> bool tzresult Lwt.t
 

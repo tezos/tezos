@@ -19,6 +19,11 @@ module Int32 = struct
   let encoding = Data_encoding.int32
 end
 
+module Z = struct
+  type t = Z.t
+  let encoding = Data_encoding.z
+end
+
 module Int64 = struct
   type t = Int64.t
   let encoding = Data_encoding.int64
@@ -84,7 +89,7 @@ module Contract = struct
     Make_single_data_storage
       (Raw_context)
       (struct let name = ["global_counter"] end)
-      (Int32)
+      (Z)
 
   module Indexed_context =
     Make_indexed_subcontext
@@ -158,7 +163,7 @@ module Contract = struct
   module Counter =
     Indexed_context.Make_map
       (struct let name = ["counter"] end)
-      (Int32)
+      (Z)
 
   module Code =
     Indexed_context.Make_carbonated_map

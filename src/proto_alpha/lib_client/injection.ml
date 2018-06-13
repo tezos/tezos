@@ -354,7 +354,7 @@ let inject_manager_operation
   : (Operation_hash.t * kind Kind.manager contents *  kind Kind.manager contents_result) tzresult Lwt.t =
   Alpha_services.Contract.counter
     cctxt (chain, block) source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
+  let counter = Z.succ pcounter in
   Alpha_services.Contract.manager_key
     cctxt (chain, block) source >>=? fun (_, key) ->
   let is_reveal : type kind. kind manager_operation -> bool = function
@@ -367,7 +367,7 @@ let inject_manager_operation
           (Manager_operation { source ; fee = Tez.zero ; counter ;
                                gas_limit = Z.zero ; storage_limit = 0L ;
                                operation = Reveal src_pk },
-           Single (Manager_operation { source ; fee ; counter = Int32.succ counter ;
+           Single (Manager_operation { source ; fee ; counter = Z.succ counter ;
                                        gas_limit ; storage_limit ; operation })) in
       inject_operation cctxt ~chain ~block ?confirmations
         ?branch ~src_sk contents >>=? fun (oph, op, result) ->
@@ -387,4 +387,3 @@ let inject_manager_operation
       | Single_and_result (Manager_operation _ as op, result) ->
           return (oph, op, result)
       | _ -> assert false (* Grrr... *)
-
