@@ -141,21 +141,19 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
           else error (Unexpected_annotation loc)
       | _ -> error (Unexpected_annotation loc) in
   List.fold_left (fun acc s ->
-      match acc with
-      | Ok acc ->
-          begin match s.[0] with
-            | ':' -> sub_or_wildcard ~specials:[] (fun a -> `Type_annot a) s acc
-            | '@' ->
-                sub_or_wildcard
-                  ~specials:(if allow_special_var then ['%'] else [])
-                  (fun a -> `Var_annot a) s acc
-            | '%' -> sub_or_wildcard
-                       ~specials:(if allow_special_field then ['@'] else [])
-                       (fun a -> `Field_annot a) s acc
-            | _ -> error (Unexpected_annotation loc)
-            | exception Invalid_argument _ -> error (Unexpected_annotation loc)
-          end
-      | Error _ -> acc
+      acc >>? fun acc ->
+      if Compare.Int.(String.length s = 0) then
+        error (Unexpected_annotation loc)
+      else match s.[0] with
+        | ':' -> sub_or_wildcard ~specials:[] (fun a -> `Type_annot a) s acc
+        | '@' ->
+            sub_or_wildcard
+              ~specials:(if allow_special_var then ['%'] else [])
+              (fun a -> `Var_annot a) s acc
+        | '%' -> sub_or_wildcard
+                   ~specials:(if allow_special_field then ['@'] else [])
+                   (fun a -> `Field_annot a) s acc
+        | _ -> error (Unexpected_annotation loc)
     ) (ok []) l
   >|? List.rev
 
@@ -273,10 +271,8 @@ let extract_field_annot
   = function
     | Prim (loc, prim, args, annot) ->
         let field_annots, annot = List.partition (fun s ->
-            match s.[0] with
-            | '%' -> true
-            | _ -> false
-            | exception Invalid_argument _ -> false
+            Compare.Int.(String.length s > 0) &&
+            Compare.Char.(s.[0] = '%')
           ) annot in
         parse_field_annot loc field_annots >|? fun field_annot ->
         Prim (loc, prim, args, annot), field_annot
