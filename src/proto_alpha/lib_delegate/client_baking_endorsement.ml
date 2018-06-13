@@ -53,16 +53,13 @@ end = struct
             load wallet >>=? fun l  ->
             let delegate_key = Signature.Public_key_hash.to_short_b58check delegate
             in
-            let rec remove_old acc = function
-              | [] -> List.rev acc
-              | ((_,lvl) as hd)::tl ->
-                  if Raw_level.diff new_lvl lvl < 50l (*?*) then
-                    remove_old (hd::acc) tl
-                  else
-                    List.rev acc
+            let remove_old l =
+              List.filter
+                (fun (_, lvl) -> Raw_level.diff new_lvl lvl < 50l (* FIXME: magic constant*))
+                l
             in
             save wallet ((delegate_key, new_lvl)::
-                         List.remove_assoc delegate_key (remove_old [] l))
+                         List.remove_assoc delegate_key (remove_old l))
           end)
     end
 end
@@ -71,10 +68,9 @@ let get_signing_slots cctxt ?(chain = `Main) block delegate level =
   Alpha_services.Delegate.Endorsing_rights.get cctxt
     ~levels:[level]
     ~delegates:[delegate]
-    (chain, block) >>=? fun possibilities ->
-  match possibilities with
+    (chain, block) >>=? function
   | [{ slots }] -> return slots
-  | _ -> return []
+  | _ -> (* TODO? log this case *) return []
 
 let inject_endorsement
     (cctxt : #Proto_alpha.full)
@@ -108,7 +104,7 @@ let previously_endorsed_level cctxt pkh new_lvl  =
   State.get_endorsement cctxt pkh  >>=? function
   | None -> return false
   | Some last_lvl ->
-      return (not Raw_level.(last_lvl < new_lvl))
+      return (Raw_level.(last_lvl >= new_lvl))
 
 let forge_endorsement (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block ?async
@@ -187,29 +183,34 @@ let endorse_for cctxt = function
         name
         Operation_hash.pp_short oph >>= return
 
+let allowed_to_endorse cctxt state (block: Client_baking_blocks.block_info) delegate time =
+  Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
+  lwt_log_info "Checking if allowed to endorse block %a for %s"
+    Block_hash.pp_short block.hash name >>= fun () ->
+  let b = `Hash (block.hash, 0) in
+  let level = block.level.level in
+  get_signing_slots cctxt b delegate level >>=? fun slots ->
+  lwt_debug "Found slots for %a/%s (%d)"
+    Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->
+  previously_endorsed_level cctxt delegate level >>=? function
+  | true ->
+      lwt_debug "Level %a (or higher) previously endorsed: do not endorse."
+        Raw_level.pp level >>= return
+  | false ->
+      let neu = {time ; delegate ; block; slots} in
+      match state.to_endorse with
+      | None ->
+          state.to_endorse <- Some neu;
+          return ()
+      | Some old ->
+          if Fitness.compare old.block.fitness neu.block.fitness < 0 then begin
+            state.to_endorse <- Some neu;
+            return ()
+          end else
+            lwt_debug "Block %a is not the fittest: do not endorse."
+              Block_hash.pp_short neu.block.hash >>= return
+
 let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:int64) state bi  =
-  let may_endorse (block: Client_baking_blocks.block_info) delegate time =
-    Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-    lwt_log_info "May endorse block %a for %s"
-      Block_hash.pp_short block.hash name >>= fun () ->
-    let b = `Hash (block.hash, 0) in
-    let level = block.level.level in
-    get_signing_slots cctxt b delegate level >>=? fun slots ->
-    lwt_debug "Found slots for %a/%s (%d)"
-      Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->
-    previously_endorsed_level cctxt delegate level >>=? function
-    | true ->
-        lwt_debug "Level %a : previously endorsed."
-          Raw_level.pp level >>= return
-    | false ->
-        return
-          (match state.to_endorse with
-           | None ->
-               state.to_endorse <- Some {time ; delegate ; block; slots}
-           | Some old ->
-               if Fitness.compare old.block.fitness block.fitness < 0 then
-                 state.to_endorse <- Some {time ; delegate ; block; slots})
-  in
   get_delegates cctxt state >>=? fun delegates ->
   iter_p
     (fun delegate ->
@@ -222,7 +223,7 @@ let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:int64) state bi  
            Block_hash.pp_short bi.hash >>= return
        else
          let time = Time.(add (now ()) state.delay) in
-         may_endorse bi delegate time
+         allowed_to_endorse cctxt state bi delegate time
     )
     delegates
 
@@ -239,37 +240,15 @@ let compute_timeout state =
 let check_error f =
   f >>= function
   | Ok () -> Lwt.return_unit
-  | Error errs ->
-      lwt_log_error "Error while endorsing:@\n%a"
-        pp_print_error
-        errs >>= fun () ->
-      Lwt.return_unit
-
-let compute_timeout state =
-  match state.to_endorse with
-  | None -> Lwt_utils.never_ending
-  | Some {time} ->
-      let delay = (Time.diff time (Time.now ())) in
-      if delay <= 0L then
-        Lwt.return_unit
-      else
-        Lwt_unix.sleep (Int64.to_float delay)
-
-let check_error f =
-  f >>= function
-  | Ok () -> Lwt.return_unit
-  | Error errs ->
-      lwt_log_error "Error while endorsing:@\n%a"
-        pp_print_error
-        errs >>= fun () ->
-      Lwt.return_unit
+  | Error errs -> lwt_log_error "Error while endorsing:@\n%a" pp_print_error errs
 
 let create (cctxt : #Proto_alpha.full) ?(max_past=110L) ~delay contracts (block_stream : Client_baking_blocks.block_info tzresult Lwt_stream.t) =
-  lwt_log_info "Starting endorsement daemon" >>= fun () ->
+  lwt_log_info "Preparing endorsement daemon" >>= fun () ->
   Lwt_stream.get block_stream >>= function
   | None | Some (Error _) ->
       cctxt#error "Can't fetch the current block head."
   | Some (Ok head) ->
+
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with
@@ -279,19 +258,25 @@ let create (cctxt : #Proto_alpha.full) ?(max_past=110L) ~delay contracts (block_
             t
         | Some t -> t in
       let state = create_state contracts (Int64.of_int delay) in
+
       let rec worker_loop () =
-        let timeout = compute_timeout state in
-        Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
-                     (get_block () >|= fun b -> `Hash b) ] >>=  function
-        | `Hash (None | Some (Error _)) ->
-            Lwt.return_unit
-        |  `Hash (Some (Ok bi)) ->
-            Lwt.cancel timeout;
-            last_get_block := None ;
-            check_error (prepare_endorsement cctxt ~max_past state bi) >>= fun () ->
-            worker_loop ()
-        | `Timeout ->
-            check_error (endorse_for cctxt state.to_endorse) >>= fun () ->
-            worker_loop () in
+        begin
+          let timeout = compute_timeout state in
+          Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
+                       (get_block () >|= fun b -> `Hash b) ] >>=  function
+          | `Hash (None | Some (Error _)) ->
+              Lwt.cancel timeout;
+              last_get_block := None;
+              Lwt.return_unit
+          | `Hash (Some (Ok bi)) ->
+              Lwt.cancel timeout;
+              last_get_block := None;
+              check_error (prepare_endorsement cctxt ~max_past state bi)
+          | `Timeout ->
+              check_error (endorse_for cctxt state.to_endorse)
+        end >>= fun () ->
+        worker_loop () in
+
       check_error (prepare_endorsement cctxt ~max_past state head) >>= fun () ->
+      lwt_log_info "Starting endorsement daemon" >>= fun () ->
       worker_loop ()
