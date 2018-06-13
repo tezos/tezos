@@ -623,6 +623,7 @@ let create
     (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t)
     (bi: Client_baking_blocks.block_info) =
 
+  cctxt#message "Setting up before the baker can start." >>= fun () ->
   Shell_services.Blocks.hash cctxt ~block:`Genesis () >>=? fun genesis_hash ->
 
   (* statefulness *)
@@ -678,6 +679,7 @@ let create
 
   (* ignition *)
   lwt_log_info "Starting baking daemon" >>= fun () ->
+  cctxt#message "Starting the baker" >>= fun () ->
   worker_loop ()
 
 
