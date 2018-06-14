@@ -5,7 +5,7 @@ code { DUP; CAR; DIP{CDDR};       # Stack rangling
                  IF_NONE { PUSH bool False} # If not referenced, reject
                          { DUP; CAR; DIP{CDR}; AND};
                  PAIR}
-               { DUP; CAR; DIP{CDR; DUP; H}; PAIR; SWAP; # Create the signature pair
+               { DUP; CAR; DIP{CDR; DUP; BLAKE2B}; PAIR; SWAP; # Create the signature pair
                  DIP{ DIP{DUP; CDR; DIP{CAR}; DUP};
                       SWAP; CAR; DIP{DUP; UNPAIR}; CHECK_SIGNATURE }; # Check the first signature
                  SWAP;

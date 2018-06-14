@@ -177,7 +177,7 @@ module Script : sig
     | D_Some
     | D_True
     | D_Unit
-    | I_H
+    | I_BLAKE2B
     | I_ABS
     | I_ADD
     | I_AMOUNT

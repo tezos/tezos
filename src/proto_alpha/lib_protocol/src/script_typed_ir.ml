@@ -339,7 +339,7 @@ and ('bef, 'aft) instr =
       (public_key * (signature * (string * 'rest)), bool * 'rest) instr
   | Hash_key :
       (public_key * 'rest, public_key_hash * 'rest) instr
-  | H : 'a ty ->
+  | Blake2b : 'a ty ->
     ('a * 'rest, string * 'rest) instr
   | Steps_to_quota : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr

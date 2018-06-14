@@ -4,7 +4,7 @@ storage (pair (pair (contract %under_key unit)
                     (contract %over_key unit))
               (pair (nat :rain %rain_level) (key %weather_service_key)));
 code { DUP; DUP;
-       CAR; MAP_CDR{H};
+       CAR; MAP_CDR{BLAKE2B};
        SWAP; CDDDR %weather_service_key;
        DIP {UNPAIR} ; CHECK_SIGNATURE @sigok; # Check if the data has been correctly signed
        ASSERT; # If signature is not correct, end the execution

@@ -684,7 +684,7 @@ let rec interp
         | Hash_key, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.hash_key) >>=? fun ctxt ->
             logged_return (Item (Signature.Public_key.hash key, rest), ctxt)
-        | H ty, Item (v, rest) ->
+        | Blake2b ty, Item (v, rest) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.hash v)) >>=? fun ctxt ->
             hash_data ctxt ty v >>=? fun (hash, ctxt) ->
             logged_return (Item (hash, rest), ctxt)

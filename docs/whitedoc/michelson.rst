@@ -1451,7 +1451,7 @@ Cryptographic primitives
 
     :: key : 'S   ->   key_hash : 'S
 
--  ``H``: Compute a cryptographic hash of the value contents using the
+-  ``BLAKE2B``: Compute a cryptographic hash of the value contents using the
    Blake2B cryptographic hash function.
 
 ::
@@ -2030,7 +2030,7 @@ The instructions which accept at most one variable annotation are:
    BALANCE
    HASH_KEY
    CHECK_SIGNATURE
-   H
+   BLAKE2B
    STEPS_TO_QUOTA
    SOURCE
    SENDER
@@ -2913,7 +2913,7 @@ XII - Full grammar
       | AMOUNT
       | BALANCE
       | CHECK_SIGNATURE
-      | H
+      | BLAKE2B
       | HASH_KEY
       | STEPS_TO_QUOTA
       | SOURCE

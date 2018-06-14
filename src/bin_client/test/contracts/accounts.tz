@@ -24,7 +24,7 @@ code { DUP; CAR;
                { DUP; DUP; DUP; DUP;
                  # Check signature on data
                  CAR %from;
-                 DIIP{ CDAR %withdraw_amount; H @signed_amount };
+                 DIIP{ CDAR %withdraw_amount; BLAKE2B @signed_amount };
                  DIP{ CDDR %sig }; CHECK_SIGNATURE;
                  IF {} { PUSH string "Bad signature"; FAILWITH };
                  # Get user account information
