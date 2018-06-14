@@ -2872,6 +2872,7 @@ let pack_data ctxt typ data =
   unparse_data ctxt Optimized typ data >>=? fun (data, ctxt) ->
   let unparsed = strip_annotations @@ data in
   let bytes = Data_encoding.Binary.to_bytes_exn expr_encoding (Micheline.strip_locations unparsed) in
+  let bytes = MBytes.concat "" [ MBytes.of_string "\005" ; bytes ] in
   return (bytes, ctxt)
 
 let hash_data ctxt typ data =
