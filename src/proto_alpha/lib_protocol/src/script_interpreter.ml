@@ -598,6 +598,22 @@ let rec interp
             let cmpres = Compare.Int.(cmpres >= 0) in
             Lwt.return (Gas.consume ctxt Interp_costs.compare_res) >>=? fun ctxt ->
             logged_return (Item (cmpres, rest), ctxt)
+        (* packing *)
+        | Pack t, Item (value, rest) ->
+            unparse_data ctxt Optimized t value >>=? fun (expr, ctxt) ->
+            let expr = (Micheline.strip_locations expr) in
+            let bytes = Data_encoding.Binary.to_bytes_exn Script.expr_encoding expr in
+            Lwt.return (Gas.consume ctxt (Interp_costs.unpack bytes)) >>=? fun ctxt ->
+            logged_return (Item (bytes, rest), ctxt)
+        | Unpack t, Item (bytes, rest) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.pack bytes)) >>=? fun ctxt ->
+            begin match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
+              | None ->
+                  logged_return (Item (None, rest), ctxt)
+              | Some expr ->
+                  parse_data ctxt t (Micheline.root expr) >>=? fun (value, ctxt) ->
+                  logged_return (Item (Some value, rest), ctxt)
+            end
         (* protocol *)
         | Address, Item ((_, contract), rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.address) >>=? fun ctxt ->

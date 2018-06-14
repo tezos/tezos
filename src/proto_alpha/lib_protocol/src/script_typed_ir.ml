@@ -339,6 +339,10 @@ and ('bef, 'aft) instr =
       (public_key * (signature * (MBytes.t * 'rest)), bool * 'rest) instr
   | Hash_key :
       (public_key * 'rest, public_key_hash * 'rest) instr
+  | Pack : 'a ty ->
+    ('a * 'rest, MBytes.t * 'rest) instr
+  | Unpack : 'a ty ->
+    (MBytes.t * 'rest, 'a option * 'rest) instr
   | Blake2b : 'a ty ->
     ('a * 'rest, MBytes.t * 'rest) instr
   | Steps_to_quota : (* TODO: check that it always returns a nat *)

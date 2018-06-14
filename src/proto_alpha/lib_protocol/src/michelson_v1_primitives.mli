@@ -24,6 +24,8 @@ type prim =
   | D_Some
   | D_True
   | D_Unit
+  | I_PACK
+  | I_UNPACK
   | I_BLAKE2B
   | I_ABS
   | I_ADD

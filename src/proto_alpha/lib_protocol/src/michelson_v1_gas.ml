@@ -168,6 +168,9 @@ module Cost_of = struct
 
   let compare_res = step_cost 1
 
+  let unpack bytes = 10 *@ step_cost (MBytes.length bytes)
+  let pack bytes = alloc_bytes_cost (MBytes.length bytes)
+
   (* TODO: protocol operations *)
   let address = step_cost 3
   let contract = Gas.read_bytes_cost Z.zero +@ step_cost 3

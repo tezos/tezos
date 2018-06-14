@@ -26,6 +26,8 @@ type prim =
   | D_Some
   | D_True
   | D_Unit
+  | I_PACK
+  | I_UNPACK
   | I_BLAKE2B
   | I_ABS
   | I_ADD
@@ -154,6 +156,8 @@ let string_of_prim = function
   | D_Some -> "Some"
   | D_True -> "True"
   | D_Unit -> "Unit"
+  | I_PACK -> "PACK"
+  | I_UNPACK -> "UNPACK"
   | I_BLAKE2B -> "BLAKE2B"
   | I_ABS -> "ABS"
   | I_ADD -> "ADD"
@@ -263,6 +267,8 @@ let prim_of_string = function
   | "Some" -> ok D_Some
   | "True" -> ok D_True
   | "Unit" -> ok D_Unit
+  | "PACK" -> ok I_PACK
+  | "UNPACK" -> ok I_UNPACK
   | "BLAKE2B" -> ok I_BLAKE2B
   | "ABS" -> ok I_ABS
   | "ADD" -> ok I_ADD
@@ -417,6 +423,8 @@ let prim_encoding =
     ("Some", D_Some) ;
     ("True", D_True) ;
     ("Unit", D_Unit) ;
+    ("PACK", I_PACK) ;
+    ("UNPACK", I_UNPACK) ;
     ("BLAKE2B", I_BLAKE2B) ;
     ("ABS", I_ABS) ;
     ("ADD", I_ADD) ;

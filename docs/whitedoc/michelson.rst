@@ -1442,6 +1442,22 @@ Special operations
 
     :: 'S   ->   timestamp : 'S
 
+Serialization
+~~~~~~~~~~~~~
+
+-  ``PACK``: Serializes a piece of data to its optimized
+   binary representation.
+
+::
+
+     :: 'a : 'S   ->   bytes : 'S
+
+-  ``UNPACK 'a``: Deserializes a piece of data, is valid.
+
+::
+
+     :: bytes : 'S   ->   option 'a : 'S
+
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
 

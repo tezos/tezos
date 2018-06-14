@@ -209,6 +209,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Self _ -> 1
   | Amount -> 0
   | Set_delegate -> 0
+  | Pack _ -> 0
+  | Unpack _ -> 1
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -239,6 +241,8 @@ let namespace = function
   | D_Some
   | D_True
   | D_Unit -> Constant_namespace
+  | I_PACK
+  | I_UNPACK
   | I_BLAKE2B
   | I_ABS
   | I_ADD
@@ -1059,6 +1063,35 @@ and parse_ty :
             T_int ; T_nat ; T_operation ;
             T_string ; T_bytes ; T_mutez ; T_bool ;
             T_key ; T_key_hash ; T_timestamp ]
+
+let check_no_big_map_or_operation loc root =
+  let rec check : type t. t ty -> unit tzresult = function
+    | Big_map_t _ -> error (Unexpected_big_map loc)
+    | Operation_t _ -> error (Unexpected_operation loc)
+    | Unit_t _ -> ok ()
+    | Int_t _ -> ok ()
+    | Nat_t _ -> ok ()
+    | Signature_t _ -> ok ()
+    | String_t _ -> ok ()
+    | Bytes_t _ -> ok ()
+    | Mutez_t _ -> ok ()
+    | Key_hash_t _ -> ok ()
+    | Key_t _ -> ok ()
+    | Timestamp_t _ -> ok ()
+    | Address_t _ -> ok ()
+    | Bool_t _ -> ok ()
+    | Pair_t ((l_ty, _, _), (r_ty, _, _), _) ->
+        check l_ty >>? fun () -> check r_ty
+    | Union_t ((l_ty, _), (r_ty, _), _) ->
+        check l_ty >>? fun () -> check r_ty
+    | Lambda_t (l_ty, r_ty, _) ->
+        check l_ty >>? fun () -> check r_ty
+    | Option_t ((v_ty, _), _, _) -> check v_ty
+    | List_t (elt_ty, _) -> check elt_ty
+    | Set_t (_, _) -> ok ()
+    | Map_t (_, elt_ty, _) -> check elt_ty
+    | Contract_t (_, _) -> ok () in
+  check root
 
 let rec unparse_stack
   : type a. a stack_ty -> (Script.expr * Script.annot) list
@@ -2240,6 +2273,23 @@ and parse_instr
       Item_t (t, stack, _) ->
         parse_var_annot loc annot >>=? fun annot -> (* can erase annot *)
         typed ctxt loc Nop (Item_t (t, stack, annot))
+    (* packing *)
+    | Prim (loc, I_PACK, [], annot),
+      Item_t (t, rest, unpacked_annot) ->
+        Lwt.return (check_no_big_map_or_operation loc t) >>=? fun () ->
+        parse_var_annot loc annot ~default:(gen_access_annot unpacked_annot default_pack_annot)
+        >>=? fun annot ->
+        typed ctxt loc (Pack t)
+          (Item_t (Bytes_t None, rest, annot))
+    | Prim (loc, I_UNPACK, [ ty ], annot),
+      Item_t (Bytes_t _, rest, packed_annot) ->
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:false ty >>=? fun (Ex_ty t) ->
+        let stack_annot = gen_access_annot packed_annot default_unpack_annot in
+        parse_constr_annot loc annot
+          ~if_special_first:(var_to_field_annot stack_annot)
+        >>=? fun (annot, ty_name, some_field, none_field) ->
+        typed ctxt loc (Unpack t)
+          (Item_t (Option_t ((t, some_field), none_field, ty_name), rest, annot))
     (* protocol *)
     | Prim (loc, I_ADDRESS, [], annot),
       Item_t (Contract_t _, rest, contract_annot) ->
@@ -2802,10 +2852,14 @@ let unparse_script ctxt mode { code ; arg_type ; storage ; storage_type } =
   return ({ code = lazy_expr (strip_locations code) ;
             storage = lazy_expr (strip_locations storage) }, ctxt)
 
-let hash_data ctxt typ data =
+let pack_data ctxt typ data =
   unparse_data ctxt Optimized typ data >>=? fun (data, ctxt) ->
   let unparsed = strip_annotations @@ data in
   let bytes = Data_encoding.Binary.to_bytes_exn expr_encoding (Micheline.strip_locations unparsed) in
+  return (bytes, ctxt)
+
+let hash_data ctxt typ data =
+  pack_data ctxt typ data >>=? fun (bytes, ctxt) ->
   return (Script_expr_hash.(hash_bytes [ bytes ]), ctxt)
 
 (* ---------------- Big map -------------------------------------------------*)

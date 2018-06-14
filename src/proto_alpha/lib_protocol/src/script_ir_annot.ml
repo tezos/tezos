@@ -28,6 +28,8 @@ let default_cdr_annot = Some (`Field_annot "cdr")
 let default_contract_annot = Some (`Field_annot "contract")
 let default_addr_annot = Some (`Field_annot "address")
 let default_manager_annot = Some (`Field_annot "manager")
+let default_pack_annot = Some (`Field_annot "packed")
+let default_unpack_annot = Some (`Field_annot "unpacked")
 
 let default_elt_annot = Some (`Field_annot "elt")
 let default_key_annot = Some (`Field_annot "key")
