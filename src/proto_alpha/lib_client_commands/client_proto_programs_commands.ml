@@ -189,9 +189,11 @@ let commands () =
              cctxt#error "ill-typed data") ;
 
     command ~group
-      ~desc: "Ask the node to hash a data expression.\n\
+      ~desc: "Ask the node to pack a data expression.\n\
               The returned hash is the same as what Michelson \
-              instruction `H` would have produced."
+              instruction `PACK` would have produced.\n\
+              Also displays the result of hashing this packed data \
+              with `BLAKE2B`, `SHA256` or `SHA512` instruction."
       (args1 custom_gas_flag)
       (prefixes [ "hash" ; "data" ]
        @@ Clic.param ~name:"data" ~desc:"the data to hash"
@@ -202,12 +204,22 @@ let commands () =
        @@ stop)
       (fun custom_gas data typ cctxt ->
          resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
-         Alpha_services.Helpers.Scripts.hash_data cctxt (`Main, cctxt#block)
+         Alpha_services.Helpers.Scripts.pack_data cctxt (`Main, cctxt#block)
            (data.expanded, typ.expanded, Some original_gas) >>= function
-         | Ok (hash, remaining_gas) ->
-             cctxt#message "Hash: %a@,Raw hash bytes: 0x%a@,Gas remaining: %a"
+         | Ok (bytes, remaining_gas) ->
+             let hash = Script_expr_hash.hash_bytes [ bytes ] in
+             cctxt#message
+               "Raw packed data: 0x%a@,\
+                Hash: %a@,\
+                Raw Blake2b hash: 0x%a@,\
+                Raw Sha256 hash: 0x%a@,\
+                Raw Sha512 hash: 0x%a@,\
+                Gas remaining: %a"
+               MBytes.pp_hex bytes
                Script_expr_hash.pp hash
                MBytes.pp_hex (Script_expr_hash.to_bytes hash)
+               MBytes.pp_hex (Alpha_environment.Raw_hashes.sha256 bytes)
+               MBytes.pp_hex (Alpha_environment.Raw_hashes.sha512 bytes)
                Proto_alpha.Alpha_context.Gas.pp remaining_gas >>= fun () ->
              return ()
          | Error errs ->
@@ -220,40 +232,29 @@ let commands () =
              cctxt#error "ill-formed data") ;
 
     command ~group
-      ~desc: "Ask the node to hash a data expression.\n\
-              Uses the same algorithm as Michelson instruction `H` to \
-              produce the hash, signs it using a given secret key, and \
-              displays it using the format expected by Michelson \
-              instruction `CHECK_SIGNATURE`."
-      (args1 custom_gas_flag)
-      (prefixes [ "hash" ; "and" ; "sign" ; "data" ]
-       @@ Clic.param ~name:"data" ~desc:"the data to hash"
-         data_parameter
-       @@ prefixes [ "of" ; "type" ]
-       @@ Clic.param ~name:"type" ~desc:"type of the data"
-         data_parameter
+      ~desc: "Sign a raw sequence of bytes and display it using the \
+              format expected by Michelson instruction \
+              `CHECK_SIGNATURE`."
+      no_options
+      (prefixes [ "sign" ; "bytes" ]
+       @@ Clic.param ~name:"data" ~desc:"the raw data to sign"
+         (parameter (fun (_cctxt : full) s ->
+              try
+                if String.length s < 2
+                || s.[0] <> '0' || s.[1] <> 'x' then
+                  raise Exit
+                else
+                  return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
+              with _ ->
+                failwith "Invalid bytes, expecting hexadecimal \
+                          notation (e.g. 0x1234abcd)" ))
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.source_param
        @@ stop)
-      (fun gas data typ sk cctxt ->
-         resolve_max_gas cctxt cctxt#block gas >>=? fun gas ->
-         Client_proto_programs.hash_and_sign cctxt cctxt#block
-           ~gas data typ sk >>= begin function
-           | Ok (hash, signature, current_gas) ->
-               cctxt#message "@[<v 0>Hash: %a@,Raw hash bytes: 0x%a@,Signature: %a@,Remaining gas: %a@]"
-                 Script_expr_hash.pp hash
-                 MBytes.pp_hex (Script_expr_hash.to_bytes hash)
-                 Signature.pp signature
-                 Proto_alpha.Alpha_context.Gas.pp current_gas
-           | Error errs ->
-               cctxt#warning "%a"
-                 (Michelson_v1_error_reporter.report_errors
-                    ~details:false
-                    ~show_source:false
-                    ?parsed:None)
-                 errs >>= fun () ->
-               cctxt#error "ill-formed data"
-         end >>= return) ;
+      (fun () bytes sk cctxt ->
+         Client_keys.sign cctxt sk bytes >>=? fun signature ->
+         cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
+         return ()) ;
 
     command ~group
       ~desc: "Ask the node to check the signature of a hashed expression."

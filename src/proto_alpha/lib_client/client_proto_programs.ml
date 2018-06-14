@@ -115,19 +115,6 @@ let trace
     (chain, block)
     program.expanded (storage.expanded, input.expanded, amount, contract)
 
-let hash_and_sign
-    cctxt
-    ?(chain = `Main)
-    block
-    ?gas
-    (data : Michelson_v1_parser.parsed)
-    (typ : Michelson_v1_parser.parsed)
-    sk =
-  Alpha_services.Helpers.Scripts.hash_data
-    cctxt (chain, block) (data.expanded, typ.expanded, gas) >>=? fun (hash, gas) ->
-  Client_keys.sign cctxt sk (Script_expr_hash.to_bytes hash) >>=? fun signature ->
-  return (hash, signature, gas)
-
 let typecheck_data
     cctxt
     ?(chain = `Main)

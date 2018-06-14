@@ -61,16 +61,6 @@ val print_trace_result :
    Contract.big_map_diff option)
     tzresult -> unit tzresult Lwt.t
 
-val hash_and_sign :
-  #Proto_alpha.full ->
-  ?chain:Shell_services.chain ->
-  Shell_services.block ->
-  ?gas:Z.t ->
-  Michelson_v1_parser.parsed ->
-  Michelson_v1_parser.parsed ->
-  Client_keys.sk_uri ->
-  (Script_expr_hash.t * Signature.t * Gas.t) tzresult Lwt.t
-
 val typecheck_data :
   #Proto_alpha.rpc_context ->
   ?chain:Shell_services.chain ->

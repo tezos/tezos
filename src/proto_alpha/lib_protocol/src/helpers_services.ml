@@ -112,20 +112,20 @@ module Scripts = struct
         ~output: (obj1 (req "gas" Gas.encoding))
         RPC_path.(path / "typecheck_data")
 
-    let hash_data =
+    let pack_data =
       RPC_service.post_service
-        ~description: "Computes the hash of some data expression \
-                       using the same algorithm as script instruction H"
+        ~description: "Computes the serialized version of some data expression \
+                       using the same algorithm as script instruction PACK"
 
         ~input: (obj3
                    (req "data" Script.expr_encoding)
                    (req "type" Script.expr_encoding)
                    (opt "gas" z))
         ~output: (obj2
-                    (req "hash" Script_expr_hash.encoding)
+                    (req "packed" bytes)
                     (req "gas" Gas.encoding))
         ~query: RPC_query.empty
-        RPC_path.(path / "hash_data")
+        RPC_path.(path / "pack_data")
 
     let run_operation =
       RPC_service.post_service
@@ -184,15 +184,15 @@ module Scripts = struct
       Script_ir_translator.typecheck_data ctxt (data, ty) >>=? fun ctxt ->
       return (Gas.level ctxt)
     end ;
-    register0 S.hash_data begin fun ctxt () (expr, typ, maybe_gas) ->
+    register0 S.pack_data begin fun ctxt () (expr, typ, maybe_gas) ->
       let open Script_ir_translator in
       begin match maybe_gas with
         | None -> return (Gas.set_unlimited ctxt)
         | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
       Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ) ->
       parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
-      Script_ir_translator.hash_data ctxt typ data >>=? fun (hash, ctxt) ->
-      return (hash, Gas.level ctxt)
+      Script_ir_translator.pack_data ctxt typ data >>=? fun (bytes, ctxt) ->
+      return (bytes, Gas.level ctxt)
     end ;
     register0 S.run_operation begin fun ctxt ()
       { shell ; protocol_data = Operation_data protocol_data } ->
@@ -263,8 +263,8 @@ module Scripts = struct
   let typecheck_data ctxt block =
     RPC_context.make_call0 S.typecheck_data ctxt block ()
 
-  let hash_data ctxt block =
-    RPC_context.make_call0 S.hash_data ctxt block ()
+  let pack_data ctxt block =
+    RPC_context.make_call0 S.pack_data ctxt block ()
 
   let run_operation ctxt block =
     RPC_context.make_call0 S.run_operation ctxt block ()

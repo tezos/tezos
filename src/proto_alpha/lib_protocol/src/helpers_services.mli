@@ -48,9 +48,9 @@ module Scripts : sig
     'a #RPC_context.simple ->
     'a -> Script.expr * Script.expr * Z.t option -> Gas.t shell_tzresult Lwt.t
 
-  val hash_data:
+  val pack_data:
     'a #RPC_context.simple ->
-    'a -> Script.expr * Script.expr * Z.t option -> (Script_expr_hash.t * Gas.t) shell_tzresult Lwt.t
+    'a -> Script.expr * Script.expr * Z.t option -> (MBytes.t * Gas.t) shell_tzresult Lwt.t
 
   val run_operation:
     'a #RPC_context.simple ->
