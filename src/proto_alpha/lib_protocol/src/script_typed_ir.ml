@@ -345,6 +345,10 @@ and ('bef, 'aft) instr =
     (MBytes.t * 'rest, 'a option * 'rest) instr
   | Blake2b :
       (MBytes.t * 'rest, MBytes.t * 'rest) instr
+  | Sha256 :
+      (MBytes.t * 'rest, MBytes.t * 'rest) instr
+  | Sha512 :
+      (MBytes.t * 'rest, MBytes.t * 'rest) instr
   | Steps_to_quota : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr
   | Source :

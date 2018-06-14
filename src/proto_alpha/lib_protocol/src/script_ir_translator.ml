@@ -203,6 +203,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Check_signature -> 0
   | Hash_key -> 0
   | Blake2b -> 0
+  | Sha256 -> 0
+  | Sha512 -> 0
   | Steps_to_quota -> 0
   | Source -> 0
   | Sender -> 0
@@ -244,6 +246,8 @@ let namespace = function
   | I_PACK
   | I_UNPACK
   | I_BLAKE2B
+  | I_SHA256
+  | I_SHA512
   | I_ABS
   | I_ADD
   | I_AMOUNT
@@ -2400,6 +2404,16 @@ and parse_instr
         parse_var_annot loc annot >>=? fun annot ->
         typed ctxt loc Blake2b
           (Item_t (Bytes_t None, rest, annot))
+    | Prim (loc, I_SHA256, [], annot),
+      Item_t (Bytes_t _, rest, _) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        typed ctxt loc Sha256
+          (Item_t (Bytes_t None, rest, annot))
+    | Prim (loc, I_SHA512, [], annot),
+      Item_t (Bytes_t _, rest, _) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        typed ctxt loc Sha512
+          (Item_t (Bytes_t None, rest, annot))
     | Prim (loc, I_STEPS_TO_QUOTA, [], annot),
       stack ->
         parse_var_annot loc annot ~default:default_steps_annot >>=? fun annot ->
@@ -2440,7 +2454,7 @@ and parse_instr
                  | I_CREATE_CONTRACT | I_SET_DELEGATE | I_NOW
                  | I_IMPLICIT_ACCOUNT | I_AMOUNT | I_BALANCE
                  | I_CHECK_SIGNATURE | I_HASH_KEY | I_SOURCE | I_SENDER
-                 | I_BLAKE2B | I_STEPS_TO_QUOTA | I_ADDRESS
+                 | I_BLAKE2B | I_SHA256 | I_SHA512 | I_STEPS_TO_QUOTA | I_ADDRESS
                  as name), (_ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
     | Prim (loc, (I_NONE | I_LEFT | I_RIGHT | I_NIL | I_MAP | I_ITER
@@ -2479,7 +2493,8 @@ and parse_instr
     | Prim (loc, I_TRANSFER_TOKENS, [], _),
       stack ->
         fail (Bad_stack (loc, I_TRANSFER_TOKENS, 4, stack))
-    | Prim (loc, (I_DROP | I_DUP | I_CAR | I_CDR | I_SOME | I_BLAKE2B | I_DIP
+    | Prim (loc, (I_DROP | I_DUP | I_CAR | I_CDR | I_SOME
+                 | I_BLAKE2B | I_SHA256 | I_SHA512 | I_DIP
                  | I_IF_NONE | I_LEFT | I_RIGHT | I_IF_LEFT | I_IF
                  | I_LOOP | I_IF_CONS | I_IMPLICIT_ACCOUNT
                  | I_NEG | I_ABS | I_INT | I_NOT
@@ -2508,7 +2523,8 @@ and parse_instr
             I_LT ; I_GT ; I_LE ; I_GE ;
             I_TRANSFER_TOKENS ; I_CREATE_ACCOUNT ;
             I_CREATE_CONTRACT ; I_NOW ; I_AMOUNT ; I_BALANCE ;
-            I_IMPLICIT_ACCOUNT ; I_CHECK_SIGNATURE ; I_BLAKE2B ; I_HASH_KEY ;
+            I_IMPLICIT_ACCOUNT ; I_CHECK_SIGNATURE ;
+            I_BLAKE2B ; I_SHA256 ; I_SHA512 ; I_HASH_KEY ;
             I_STEPS_TO_QUOTA ;
             I_PUSH ; I_NONE ; I_LEFT ; I_RIGHT ; I_NIL ;
             I_EMPTY_SET ; I_DIP ; I_LOOP ;

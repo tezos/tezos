@@ -697,8 +697,16 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.hash_key) >>=? fun ctxt ->
             logged_return (Item (Signature.Public_key.hash key, rest), ctxt)
         | Blake2b, Item (bytes, rest) ->
-            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes)) >>=? fun ctxt ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes 32)) >>=? fun ctxt ->
             let hash = Raw_hashes.blake2b bytes in
+            logged_return (Item (hash, rest), ctxt)
+        | Sha256, Item (bytes, rest) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes 32)) >>=? fun ctxt ->
+            let hash = Raw_hashes.sha256 bytes in
+            logged_return (Item (hash, rest), ctxt)
+        | Sha512, Item (bytes, rest) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes 64)) >>=? fun ctxt ->
+            let hash = Raw_hashes.sha512 bytes in
             logged_return (Item (hash, rest), ctxt)
         | Steps_to_quota, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.steps_to_quota) >>=? fun ctxt ->

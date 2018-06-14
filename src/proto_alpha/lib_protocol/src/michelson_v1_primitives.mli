@@ -27,6 +27,8 @@ type prim =
   | I_PACK
   | I_UNPACK
   | I_BLAKE2B
+  | I_SHA256
+  | I_SHA512
   | I_ABS
   | I_ADD
   | I_AMOUNT

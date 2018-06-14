@@ -29,6 +29,8 @@ type prim =
   | I_PACK
   | I_UNPACK
   | I_BLAKE2B
+  | I_SHA256
+  | I_SHA512
   | I_ABS
   | I_ADD
   | I_AMOUNT
@@ -159,6 +161,8 @@ let string_of_prim = function
   | I_PACK -> "PACK"
   | I_UNPACK -> "UNPACK"
   | I_BLAKE2B -> "BLAKE2B"
+  | I_SHA256 -> "SHA256"
+  | I_SHA512 -> "SHA512"
   | I_ABS -> "ABS"
   | I_ADD -> "ADD"
   | I_AMOUNT -> "AMOUNT"
@@ -270,6 +274,8 @@ let prim_of_string = function
   | "PACK" -> ok I_PACK
   | "UNPACK" -> ok I_UNPACK
   | "BLAKE2B" -> ok I_BLAKE2B
+  | "SHA256" -> ok I_SHA256
+  | "SHA512" -> ok I_SHA512
   | "ABS" -> ok I_ABS
   | "ADD" -> ok I_ADD
   | "AMOUNT" -> ok I_AMOUNT
@@ -426,6 +432,8 @@ let prim_encoding =
     ("PACK", I_PACK) ;
     ("UNPACK", I_UNPACK) ;
     ("BLAKE2B", I_BLAKE2B) ;
+    ("SHA256", I_SHA256) ;
+    ("SHA512", I_SHA512) ;
     ("ABS", I_ABS) ;
     ("ADD", I_ADD) ;
     ("AMOUNT", I_AMOUNT) ;
