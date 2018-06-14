@@ -12,6 +12,13 @@
 type pk_uri = private Uri.t
 type sk_uri = private Uri.t
 
+val pk_uri_param :
+  ?name:string -> ?desc:string ->
+  ('a, 'b) Clic.params -> (pk_uri -> 'a, 'b) Clic.params
+val sk_uri_param :
+  ?name:string -> ?desc:string ->
+  ('a, 'b) Clic.params -> (sk_uri -> 'a, 'b) Clic.params
+
 type error += Unregistered_key_scheme of string
 type error += Invalid_uri of Uri.t
 

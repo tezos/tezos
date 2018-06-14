@@ -166,15 +166,7 @@ let commands () : Client_context.io_wallet Clic.command list =
       (prefix "import"
        @@ prefixes [ "secret" ; "key" ]
        @@ Secret_key.fresh_alias_param
-       @@ param
-         ~name:"uri"
-         ~desc:"secret key\n\
-                Varies from one scheme to the other.\n\
-                Use command `list signing schemes` for more \
-                information."
-         (parameter (fun _ s ->
-              try return (Client_keys.make_sk_uri @@ Uri.of_string s)
-              with Failure s -> failwith "Error while parsing uri: %s" s))
+       @@ Client_keys.sk_uri_param
        @@ stop)
       (fun force name sk_uri (cctxt : Client_context.io_wallet) ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
@@ -196,15 +188,7 @@ let commands () : Client_context.io_wallet Clic.command list =
       (prefix "import"
        @@ prefixes [ "public" ; "key" ]
        @@ Public_key.fresh_alias_param
-       @@ param
-         ~name:"uri"
-         ~desc:"public key\n\
-                Varies from one scheme to the other.\n\
-                Use command `list signing schemes` for more \
-                information."
-         (parameter (fun _ s ->
-              try return (Client_keys.make_pk_uri @@ Uri.of_string s)
-              with Failure s -> failwith "Error while parsing uri: %s" s))
+       @@ Client_keys.pk_uri_param
        @@ stop)
       (fun force name pk_uri (cctxt : Client_context.io_wallet) ->
          Public_key.of_fresh cctxt force name >>=? fun name ->
