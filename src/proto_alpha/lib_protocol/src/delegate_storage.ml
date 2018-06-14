@@ -13,6 +13,10 @@ type error +=
   | Active_delegate (* `Temporary *)
   | Current_delegate (* `Temporary *)
   | Empty_delegate_account of Signature.Public_key_hash.t (* `Temporary *)
+  | Balance_too_low_for_deposit of
+      { delegate : Signature.Public_key_hash.t ;
+        deposit : Tez_repr.t ;
+        balance : Tez_repr.t } (* `Temporary *)
 
 let () =
   register_error_kind
@@ -72,7 +76,26 @@ let () =
           Signature.Public_key_hash.pp delegate)
     Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
     (function Empty_delegate_account c -> Some c | _ -> None)
-    (fun c -> Empty_delegate_account c)
+    (fun c -> Empty_delegate_account c) ;
+  register_error_kind
+    `Temporary
+    ~id:"delegate.balance_too_low_for_deposit"
+    ~title:"Balance too low for deposit"
+    ~description:"Cannot freeze deposit when the balance is too low"
+    ~pp:(fun ppf (delegate, balance, deposit) ->
+        Format.fprintf ppf
+          "Delegate %a has a too low balance (%a) to deposit %a"
+          Signature.Public_key_hash.pp delegate
+          Tez_repr.pp balance
+          Tez_repr.pp deposit)
+    Data_encoding.
+      (obj3
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "balance" Tez_repr.encoding)
+         (req "deposit" Tez_repr.encoding))
+    (function Balance_too_low_for_deposit { delegate ; balance ; deposit } ->
+       Some (delegate, balance, deposit) | _ -> None)
+    (fun (delegate, balance, deposit) -> Balance_too_low_for_deposit { delegate ; balance ; deposit } )
 
 let is_delegatable c contract =
   match Contract_repr.is_implicit contract with
@@ -214,7 +237,9 @@ let freeze_deposit ctxt delegate amount =
   Roll_storage.Delegate.set_active ctxt delegate >>=? fun ctxt ->
   let contract = Contract_repr.implicit_contract delegate in
   Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
-  Lwt.return Tez_repr.(balance -? amount) >>=? fun new_balance ->
+  Lwt.return
+    (record_trace (Balance_too_low_for_deposit { delegate; deposit = amount; balance })
+       Tez_repr.(balance -? amount)) >>=? fun new_balance ->
   Storage.Contract.Balance.set ctxt contract new_balance >>=? fun ctxt ->
   credit_frozen_deposit ctxt contract cycle amount
 
