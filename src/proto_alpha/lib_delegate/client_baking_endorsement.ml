@@ -203,7 +203,10 @@ let endorse_for cctxt = function
           endorsements
       in
       iter_p (endorse_for_delegate cctxt) done_waiting >>=? fun () ->
-      ignore errored; (* TODO: log *)
+      Lwt_list.iter_p (fun {timeout} ->
+          match Lwt.state timeout with
+          | Lwt.Fail f -> lwt_log_error "Endorsement failure: %s" (Printexc.to_string f)
+          | _ -> Lwt.return_unit) errored >>= fun () ->
       return still_waiting
 
 
