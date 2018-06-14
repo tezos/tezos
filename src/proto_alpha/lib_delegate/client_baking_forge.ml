@@ -344,16 +344,23 @@ let get_baking_slot cctxt
   | Error errs ->
       log_error "Error while fetching baking possibilities:\n%a"
         pp_print_error errs ;
-      Lwt.return_none
+      Lwt.return []
   | Ok [] ->
-      Lwt.return_none
-  | Ok ((slot : Alpha_services.Delegate.Baking_rights.t) :: _) ->
-      match slot.timestamp with
-      | None -> Lwt.return_none
-      | Some timestamp ->
-          Lwt.return_some (timestamp, (bi, slot.priority, slot.delegate))
+      Lwt.return []
+  | Ok slots ->
+      let slots =
+        List.filter_map
+          (function
+            | { Alpha_services.Delegate.Baking_rights.timestamp = None } -> None
+            | { timestamp = Some timestamp ; priority ; delegate } ->
+                Some (timestamp, (bi, priority, delegate))
+          )
+          slots
+      in
+      Lwt.return slots
 
 let rec insert_baking_slot slot = function
+  (* This is just a sorted-insert *)
   | [] -> [slot]
   | ((timestamp,_) :: _) as slots when Time.(fst slot < timestamp) ->
       slot :: slots
@@ -380,20 +387,22 @@ let drop_old_slots ~before state =
       (fun (t, _slot) -> Time.compare before t <= 0)
       state.future_slots
 
+let compute_timeout time =
+  let delay = Time.diff time (Time.now ()) in
+  if delay < 0L then
+    None
+  else
+    Some (Lwt_unix.sleep (Int64.to_float delay))
+
 let compute_timeout { future_slots } =
   match future_slots with
   | [] ->
+      (* No slots, just wait for new blocks which will give more info *)
       Lwt_utils.never_ending
   | (timestamp, _) :: _ ->
-      let now = Time.now () in
-      let delay = Time.diff timestamp now in
-      if delay <= 0L then
-        if delay <= -1800L then
-          Lwt_unix.sleep 10.
-        else
-          Lwt.return_unit
-      else
-        Lwt_unix.sleep (Int64.to_float delay)
+      match compute_timeout timestamp with
+      | None -> Lwt_utils.never_ending
+      | Some timeout -> timeout
 
 let get_unrevealed_nonces
     (cctxt : #Proto_alpha.full) ?(force = false) ?(chain = `Main) block =
@@ -459,18 +468,26 @@ let insert_block
   end ;
   get_delegates cctxt state >>=? fun delegates ->
   get_baking_slot cctxt ?max_priority bi delegates >>= function
-  | None ->
+  | [] ->
       lwt_debug
-        "Can't compute slot for %a" Block_hash.pp_short bi.hash >>= fun () ->
+        "Can't compute slots for %a" Block_hash.pp_short bi.hash >>= fun () ->
       return ()
-  | Some ((timestamp, (_,_,delegate)) as slot) ->
-      Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-      lwt_log_info "New baking slot at %a for %s after %a"
-        Time.pp_hum timestamp
-        name
-        Block_hash.pp_short bi.hash >>= fun () ->
-      state.future_slots <- insert_baking_slot slot state.future_slots ;
-      return ()
+  | (_ :: _) as slots ->
+      iter_p
+        (fun ((timestamp, (_, _, delegate)) as slot) ->
+           Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
+           lwt_log_info "New baking slot at %a for %s after %a"
+             Time.pp_hum timestamp
+             name
+             Block_hash.pp_short bi.hash >>= fun () ->
+           (* FIXME: the timestamp returned by [get_baking_slot] is always now.
+              This needs a proper fix, but in the meantime, we artifically
+              increase this time to be able to work on the rest of the code. *)
+           let slot = (Time.(max (add (now ()) 60L) (fst slot)), snd slot) in
+           state.future_slots <- insert_baking_slot slot state.future_slots ;
+           return ()
+        )
+        slots
 
 let pop_baking_slots state =
   let now = Time.now () in
@@ -568,12 +585,16 @@ let pp_operation_list_list =
    information (e.g., slot) is available in the [state]. *)
 let bake (cctxt : #Proto_alpha.full) state =
   let slots = pop_baking_slots state in
+  lwt_log_info "Found %d current slots and %d future slots."
+    (List.length slots)
+    (List.length state.future_slots) >>= fun () ->
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
 
   (* baking for each slot *)
   filter_map_s (bake_slot cctxt state seed_nonce_hash) slots >>=? fun candidates ->
 
+  (* FIXME: pick one block per-delegate *)
   (* selecting the candidate baked block *)
   let candidates = List.sort fittest candidates in
   match candidates with
@@ -698,9 +719,6 @@ let create
         (* NOTE: this is not a tight loop because of Lwt_stream.get *)
         wait_for_first_block ()
     | Some (Ok bi) ->
-        create
-          cctxt ?max_priority delegates
-          block_stream bi
+        create cctxt ?max_priority delegates block_stream bi
   in
   wait_for_first_block ()
-
