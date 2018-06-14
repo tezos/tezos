@@ -342,10 +342,12 @@ let get_baking_slot cctxt
     ~delegates
     (chain, block) >>= function
   | Error errs ->
-      log_error "Error while fetching baking possibilities:\n%a"
-        pp_print_error errs ;
+      lwt_log_error "Error while fetching baking possibilities:\n%a"
+        pp_print_error errs >>= fun () ->
       Lwt.return []
   | Ok [] ->
+      lwt_log_info "Found no baking rights for level %a"
+        Raw_level.pp level >>= fun () ->
       Lwt.return []
   | Ok slots ->
       let slots =
@@ -387,13 +389,24 @@ let drop_old_slots ~before state =
       (fun (t, _slot) -> Time.compare before t <= 0)
       state.future_slots
 
+let compute_timeout time =
+  let delay = Time.diff time (Time.now ()) in
+  if delay < 0L then
+    None
+  else
+    Some (Lwt_unix.sleep (Int64.to_float delay))
+
 let compute_timeout { future_slots } =
   match future_slots with
   | [] ->
       (* No slots, just wait for new blocks which will give more info *)
       Lwt_utils.never_ending
   | (timestamp, _) :: _ ->
+<<<<<<< b5e65a0d6c1a7a6a1d78fa8c73a36fdda43fc8c1
       match Client_baking_scheduling.sleep_until timestamp with
+=======
+      match compute_timeout timestamp with
+>>>>>>> Alpha/Baker: keeping future slot for each delegate
       | None -> Lwt_utils.never_ending
       | Some timeout -> timeout
 
@@ -473,10 +486,13 @@ let insert_block
              Time.pp_hum timestamp
              name
              Block_hash.pp_short bi.hash >>= fun () ->
+<<<<<<< b5e65a0d6c1a7a6a1d78fa8c73a36fdda43fc8c1
            (* FIXME: the timestamp returned by [get_baking_slot] is always now.
               This needs a proper fix, but in the meantime, we artifically
               increase this time to be able to work on the rest of the code. *)
            let slot = (Time.(max (add (now ()) 60L) (fst slot)), snd slot) in
+=======
+>>>>>>> Alpha/Baker: keeping future slot for each delegate
            state.future_slots <- insert_baking_slot slot state.future_slots ;
            return ()
         )
@@ -705,7 +721,20 @@ let create
     ?max_priority
     (delegates: public_key_hash list)
     (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t) =
+<<<<<<< b5e65a0d6c1a7a6a1d78fa8c73a36fdda43fc8c1
   Client_baking_scheduling.wait_for_first_block
     ~info:cctxt#message
     block_stream
     (create cctxt ?max_priority delegates block_stream)
+=======
+  let rec wait_for_first_block () =
+    Lwt_stream.get block_stream >>= function
+    | None | Some (Error _) ->
+        cctxt#message "Can't fetch the current block head. Retrying soon." >>= fun () ->
+        (* NOTE: this is not a tight loop because of Lwt_stream.get *)
+        wait_for_first_block ()
+    | Some (Ok bi) ->
+        create cctxt ?max_priority delegates block_stream bi
+  in
+  wait_for_first_block ()
+>>>>>>> Alpha/Baker: keeping future slot for each delegate
