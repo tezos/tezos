@@ -202,7 +202,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Balance -> 0
   | Check_signature -> 0
   | Hash_key -> 0
-  | Blake2b _ -> 0
+  | Blake2b -> 0
   | Steps_to_quota -> 0
   | Source -> 0
   | Sender -> 0
@@ -2396,9 +2396,9 @@ and parse_instr
         typed ctxt loc Check_signature
           (Item_t (Bool_t None, rest, annot))
     | Prim (loc, I_BLAKE2B, [], annot),
-      Item_t (t, rest, _) ->
+      Item_t (Bytes_t _, rest, _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        typed ctxt loc (Blake2b t)
+        typed ctxt loc Blake2b
           (Item_t (Bytes_t None, rest, annot))
     | Prim (loc, I_STEPS_TO_QUOTA, [], annot),
       stack ->

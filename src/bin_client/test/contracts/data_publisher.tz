@@ -1,7 +1,7 @@
 parameter (pair signature (pair string nat));
 storage (pair (pair key nat) string);
 code { DUP; CAR; DIP{CDR; DUP};
-       SWAP; DIP{DUP}; CAAR; DIP{DUP; CAR; DIP{CDR; BLAKE2B}};
+       SWAP; DIP{DUP}; CAAR; DIP{DUP; CAR; DIP{CDR; PACK ; BLAKE2B}};
        CHECK_SIGNATURE;
        IF { CDR; DUP; DIP{CAR; DIP{CAAR}}; CDR; PUSH nat 1; ADD;
             DIP{SWAP}; SWAP; PAIR; PAIR; NIL operation; PAIR}

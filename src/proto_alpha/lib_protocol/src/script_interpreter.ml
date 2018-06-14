@@ -600,10 +600,7 @@ let rec interp
             logged_return (Item (cmpres, rest), ctxt)
         (* packing *)
         | Pack t, Item (value, rest) ->
-            unparse_data ctxt Optimized t value >>=? fun (expr, ctxt) ->
-            let expr = (Micheline.strip_locations expr) in
-            let bytes = Data_encoding.Binary.to_bytes_exn Script.expr_encoding expr in
-            Lwt.return (Gas.consume ctxt (Interp_costs.unpack bytes)) >>=? fun ctxt ->
+            Script_ir_translator.pack_data ctxt t value >>=? fun (bytes, ctxt) ->
             logged_return (Item (bytes, rest), ctxt)
         | Unpack t, Item (bytes, rest) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.pack bytes)) >>=? fun ctxt ->
@@ -699,10 +696,9 @@ let rec interp
         | Hash_key, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.hash_key) >>=? fun ctxt ->
             logged_return (Item (Signature.Public_key.hash key, rest), ctxt)
-        | Blake2b ty, Item (v, rest) ->
-            Lwt.return (Gas.consume ctxt (Interp_costs.hash v)) >>=? fun ctxt ->
-            hash_data ctxt ty v >>=? fun (hash, ctxt) ->
-            let hash = Script_expr_hash.to_bytes hash in
+        | Blake2b, Item (bytes, rest) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes)) >>=? fun ctxt ->
+            let hash = Raw_hashes.blake2b bytes in
             logged_return (Item (hash, rest), ctxt)
         | Steps_to_quota, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.steps_to_quota) >>=? fun ctxt ->

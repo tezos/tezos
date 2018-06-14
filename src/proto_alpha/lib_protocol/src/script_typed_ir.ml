@@ -343,8 +343,8 @@ and ('bef, 'aft) instr =
     ('a * 'rest, MBytes.t * 'rest) instr
   | Unpack : 'a ty ->
     (MBytes.t * 'rest, 'a option * 'rest) instr
-  | Blake2b : 'a ty ->
-    ('a * 'rest, MBytes.t * 'rest) instr
+  | Blake2b :
+      (MBytes.t * 'rest, MBytes.t * 'rest) instr
   | Steps_to_quota : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr
   | Source :

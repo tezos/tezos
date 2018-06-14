@@ -1,3 +1,3 @@
 parameter string;
 storage bytes;
-code {CAR; BLAKE2B; NIL operation; PAIR};
+code {CAR; PACK ; BLAKE2B; NIL operation; PAIR};

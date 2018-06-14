@@ -185,7 +185,7 @@ module Cost_of = struct
   let check_signature = step_cost 3
   let hash_key = step_cost 3
   (* TODO: This needs to be a function of the data being hashed *)
-  let hash _data = step_cost 3
+  let hash data = step_cost (MBytes.length data) +@ alloc_bytes_cost 32
   let steps_to_quota = step_cost 1
   let source = step_cost 3
   let self = step_cost 3
