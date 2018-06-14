@@ -206,6 +206,13 @@ let endorse_for cctxt = function
       ignore errored; (* TODO: log *)
       return still_waiting
 
+let compute_timeout time =
+  let delay = Time.diff time (Time.now ()) in
+  if delay < 0L then
+    None
+  else
+    Some (Lwt_unix.sleep (Int64.to_float delay))
+
 let allowed_to_endorse cctxt state (block: Client_baking_blocks.block_info) delegate time =
   Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
   lwt_log_info "Checking if allowed to endorse block %a for %s"
@@ -220,27 +227,26 @@ let allowed_to_endorse cctxt state (block: Client_baking_blocks.block_info) dele
       lwt_debug "Level %a (or higher) previously endorsed: do not endorse."
         Raw_level.pp level >>= return
   | false ->
-      let timeout =
-        let delay = (Time.diff time (Time.now ())) in
-        if delay <= 0L then
-          Lwt.return_unit
-        else
-          Lwt_unix.sleep (Int64.to_float delay)
-      in
-      let neu = { time ; timeout ; delegate ; block; slots } in
-      match List.find_opt (fun { delegate = d } -> delegate = d) state.to_endorse with
+      match compute_timeout time with
       | None ->
-          state.to_endorse <- neu :: state.to_endorse;
+          lwt_debug "Endorsment opportunity is passed." >>= fun () ->
           return ()
-      | Some old ->
-          if Fitness.compare old.block.fitness neu.block.fitness < 0 then begin
-            let without_old =
-              List.filter (fun to_end -> to_end <> old) state.to_endorse in
-            state.to_endorse <- neu :: without_old;
-            return ()
-          end else
-            lwt_debug "Block %a is not the fittest: do not endorse."
-              Block_hash.pp_short neu.block.hash >>= return
+      | Some timeout ->
+          let neu = { time ; timeout ; delegate ; block; slots } in
+          match List.find_opt (fun { delegate = d } -> delegate = d) state.to_endorse with
+          | None ->
+              state.to_endorse <- neu :: state.to_endorse;
+              return ()
+          | Some old ->
+              if Fitness.compare old.block.fitness neu.block.fitness < 0 then begin
+                let without_old =
+                  List.filter (fun to_end -> to_end <> old) state.to_endorse in
+                state.to_endorse <- neu :: without_old;
+                return ()
+              end else
+                lwt_debug "Block %a is not the fittest: do not endorse."
+                  Block_hash.pp_short neu.block.hash >>= fun () ->
+                return ()
 
 let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:int64) state bi  =
   get_delegates cctxt state >>=? fun delegates ->
