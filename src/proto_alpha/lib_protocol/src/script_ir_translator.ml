@@ -1058,21 +1058,6 @@ let rec unparse_stack
 
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
 
-let public_key_hash_size =
-  match Data_encoding.Binary.fixed_length Signature.Public_key_hash.encoding with
-  | None -> assert false
-  | Some size -> size
-
-let signature_size =
-  match Data_encoding.Binary.fixed_length Signature.encoding with
-  | None -> assert false
-  | Some size -> size
-
-let address_size =
-  match Data_encoding.Binary.fixed_length Contract.encoding with
-  | None -> assert false
-  | Some size -> size
-
 (* Lwt versions *)
 let parse_var_annot loc ?default annot =
   Lwt.return (parse_var_annot loc ?default annot)
@@ -1122,14 +1107,6 @@ let rec parse_data
                fail (error ()))
         (None, empty_map key_type, ctxt) items |> traced >>|? fun (_, items, ctxt) ->
       (items, ctxt) in
-    let bytes_of_padded_z z =
-      let bytes = Z.to_bits z in
-      let len = MBytes.length bytes in
-      if Compare.Int.(MBytes.length bytes = 0)
-      || Compare.Char.(MBytes.get_char bytes (MBytes.length bytes - 1) <> '\xFF') then
-        fail (error ())
-      else
-        return (MBytes.sub bytes 0 (len - 1)) in
     match ty, script_data with
     (* Unit *)
     | Unit_t ty_name, Prim (loc, D_Unit, [], annot) ->
@@ -1190,7 +1167,7 @@ let rec parse_data
             fail @@ error ()
         end
     | Mutez_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ Int_kind ], kind expr)))
     (* Timestamps *)
     | Timestamp_t _, (Int (_, v)) (* As unparsed with [Optimized] or out of bounds [Readable]. *) ->
         return (Script_timestamp.of_zint v, ctxt)
@@ -1205,9 +1182,8 @@ let rec parse_data
     | Timestamp_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ; Int_kind ], kind expr)))
     (* IDs *)
-    | Key_t _, Int (_, z) -> (* As unparsed with [Optimized]. *)
+    | Key_t _, Bytes (_, bytes) -> (* As unparsed with [Optimized]. *)
         Lwt.return (Gas.consume ctxt Typecheck_costs.key) >>=? fun ctxt ->
-        bytes_of_padded_z z >>=? fun bytes ->
         begin match Data_encoding.Binary.of_bytes Signature.Public_key.encoding bytes with
           | Some k -> return (k, ctxt)
           | None -> fail (error ())
@@ -1220,11 +1196,10 @@ let rec parse_data
           with _ -> fail (error ())
         end
     | Key_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
-    | Key_hash_t _, Int (_, z) -> (* As unparsed with [Optimized]. *)
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
+    | Key_hash_t _, Bytes (_, bytes) -> (* As unparsed with [Optimized]. *)
         Lwt.return (Gas.consume ctxt Typecheck_costs.key_hash) >>=? fun ctxt ->
         begin
-          let bytes = Z.to_bits ~pad_to:public_key_hash_size z in
           match Data_encoding.Binary.of_bytes Signature.Public_key_hash.encoding bytes with
           | Some k -> return (k, ctxt)
           | None -> fail (error ())
@@ -1237,12 +1212,11 @@ let rec parse_data
           with _ -> fail (error ())
         end
     | Key_hash_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Signatures *)
-    | Signature_t _, Int (_, z) (* As unparsed with [Optimized]. *) ->
+    | Signature_t _, Bytes (_, bytes) (* As unparsed with [Optimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.signature) >>=? fun ctxt ->
         begin
-          let bytes = Z.to_bits ~pad_to:signature_size z in
           match Data_encoding.Binary.of_bytes Signature.encoding bytes with
           | Some k -> return (k, ctxt)
           | None -> fail (error ())
@@ -1255,25 +1229,24 @@ let rec parse_data
           with _ -> fail (error ())
         end
     | Signature_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Operations *)
-    | Operation_t _, String (_, s) -> begin try
-          Lwt.return (Gas.consume ctxt (Typecheck_costs.operation s)) >>=? fun ctxt ->
+    | Operation_t _, Bytes (_, bytes) -> begin try
+          Lwt.return (Gas.consume ctxt (Typecheck_costs.operation bytes)) >>=? fun ctxt ->
           match Data_encoding.Binary.of_bytes
                   Operation.internal_operation_encoding
-                  (MBytes.of_hex (`Hex s)) with
+                  bytes with
           | Some op -> return (op, ctxt)
           | None -> raise Not_found
         with _ ->
           fail (error ())
       end
     | Operation_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ Bytes_kind ], kind expr)))
     (* Addresses *)
-    | Address_t _, Int (_, z) (* As unparsed with [O[ptimized]. *) ->
+    | Address_t _, Bytes (_, bytes) (* As unparsed with [O[ptimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
         begin
-          let bytes = Z.to_bits ~pad_to:address_size z in
           match Data_encoding.Binary.of_bytes Contract.encoding bytes with
           | Some c -> return (c, ctxt)
           | None -> fail (error ())
@@ -1283,12 +1256,11 @@ let rec parse_data
         traced (Lwt.return (Contract.of_b58check s)) >>=? fun c ->
         return (c, ctxt)
     | Address_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Contracts *)
-    | Contract_t (ty, _), Int (loc, z) (* As unparsed with [Optimized]. *) ->
+    | Contract_t (ty, _), Bytes (loc, bytes) (* As unparsed with [Optimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
         begin
-          let bytes = Z.to_bits ~pad_to:address_size z in
           match Data_encoding.Binary.of_bytes Contract.encoding bytes with
           | Some c ->
               traced (parse_contract ctxt loc ty c) >>=? fun (ctxt, _) ->
@@ -1302,7 +1274,7 @@ let rec parse_data
         parse_contract ctxt loc ty c >>=? fun (ctxt, _) ->
         return ((ty, c), ctxt)
     | Contract_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Pairs *)
     | Pair_t ((ta, af, _), (tb, bf, _), ty_name), Prim (loc, D_Pair, [ va; vb ], annot) ->
         check_const_type_annot loc annot ty_name [af; bf] >>=? fun () ->
@@ -2634,9 +2606,6 @@ module Unparse_costs = Michelson_v1_gas.Cost_of.Unparse
 let rec unparse_data
   : type a. context -> unparsing_mode -> a ty -> a -> (Script.node * context) tzresult Lwt.t
   = fun ctxt mode ty a ->
-    let padded_z_of_bytes bytes =
-      let bytes = MBytes.concat "" [ bytes ; MBytes.of_string "\xFF" ] in
-      Z.of_bits bytes in
     Lwt.return (Gas.consume ctxt Unparse_costs.cycle) >>=? fun ctxt ->
     match ty, a with
     | Unit_t _, () ->
@@ -2673,7 +2642,7 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Contract.encoding c in
-              return (Int (-1, Z.of_bits bytes), ctxt)
+              return (Bytes (-1, bytes), ctxt)
           | Readable -> return (String (-1, Contract.to_b58check c), ctxt)
         end
     | Contract_t _, (_, c)  ->
@@ -2682,7 +2651,7 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Contract.encoding c in
-              return (Int (-1, Z.of_bits bytes), ctxt)
+              return (Bytes (-1, bytes), ctxt)
           | Readable -> return (String (-1, Contract.to_b58check c), ctxt)
         end
     | Signature_t _, s ->
@@ -2691,7 +2660,7 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Signature.encoding s in
-              return (Int (-1, Z.of_bits bytes), ctxt)
+              return (Bytes (-1, bytes), ctxt)
           | Readable ->
               return (String (-1, Signature.to_b58check s), ctxt)
         end
@@ -2704,7 +2673,7 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k in
-              return (Int (-1, padded_z_of_bytes bytes), ctxt)
+              return (Bytes (-1, bytes), ctxt)
           | Readable ->
               return (String (-1, Signature.Public_key.to_b58check k), ctxt)
         end
@@ -2714,15 +2683,14 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding k in
-              return (Int (-1, Z.of_bits bytes), ctxt)
+              return (Bytes (-1, bytes), ctxt)
           | Readable ->
               return (String (-1, Signature.Public_key_hash.to_b58check k), ctxt)
         end
     | Operation_t _, op ->
         let bytes = Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op in
-        let `Hex text = MBytes.to_hex bytes in
         Lwt.return (Gas.consume ctxt (Unparse_costs.operation bytes)) >>=? fun ctxt ->
-        return (String (-1, text), ctxt)
+        return (Bytes (-1, bytes), ctxt)
     | Pair_t ((tl, _, _), (tr, _, _), _), (l, r) ->
         Lwt.return (Gas.consume ctxt Unparse_costs.pair) >>=? fun ctxt ->
         unparse_data ctxt mode tl l >>=? fun (l, ctxt) ->

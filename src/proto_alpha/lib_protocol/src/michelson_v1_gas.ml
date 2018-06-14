@@ -224,9 +224,9 @@ module Cost_of = struct
     let primitive_type = alloc_cost 1
     let one_arg_type = alloc_cost 2
     let two_arg_type = alloc_cost 3
-    let operation s =
+    let operation b =
       (* TODO: proper handling of (de)serialization costs *)
-      let len = String.length s in
+      let len = MBytes.length b in
       alloc_cost len +@ step_cost (len * 10)
   end
 

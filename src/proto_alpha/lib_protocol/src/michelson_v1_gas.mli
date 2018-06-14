@@ -128,7 +128,7 @@ module Cost_of : sig
     val one_arg_type : Gas.cost
     val two_arg_type : Gas.cost
 
-    val operation : string -> Gas.cost
+    val operation : MBytes.t -> Gas.cost
   end
 
   module Unparse : sig

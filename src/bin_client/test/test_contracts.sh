@@ -314,13 +314,13 @@ assert_storage  $contract_dir/map_caddaadr.tz \
 '(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 1000000) 4) 5))) 6)'
 
 # Did the given key sign the string? (key is bootstrap1)
-#assert_success $client run script $contract_dir/check_signature.tz \
-#               on storage '(Pair 0x011eb640b67c1859228a72730fae1a006bb94a999395dfb569e2776e9c1ae546376247f001343a1042f92082690f6aa#2e6ed230df319b09767d9807ef3f8191f "hello")' \
-#               and input '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
+assert_success $client run script $contract_dir/check_signature.tz \
+               on storage '(Pair 0x1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01 "hello")' \
+               and input '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
 
-#assert_fails $client run script $contract_dir/check_signature.tz \
-#             on storage '(Pair 0x011eb640b67c1859228a72730fae1a006bb94a999395dfb569e2776e9c1ae546376247f001343a1042f92082690f6aa2e#6ed230df319b09767d9807ef3f8191f "abcd")' \
-#             and input '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
+assert_fails $client run script $contract_dir/check_signature.tz \
+             on storage '(Pair 0x1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01 "abcd")' \
+             and input '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
 
 
 # Convert a public key to a public key hash

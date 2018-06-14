@@ -180,6 +180,7 @@ let canonical_encoding ~variant prim_encoding =
         ~json:(union ~tag_size:`Uint8
                  [ int_encoding Json_only;
                    string_encoding Json_only ;
+                   bytes_encoding Json_only ;
                    seq_encoding Json_only expr_encoding ;
                    application_encoding Json_only expr_encoding ])
         ~binary:(union ~tag_size:`Uint8
