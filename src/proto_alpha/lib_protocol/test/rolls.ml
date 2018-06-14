@@ -39,6 +39,14 @@ let check_rolls b (account:Account.t) =
   get_rolls ctxt account.pkh >>=? fun rolls ->
   Assert.equal_int ~loc:__LOC__ (List.length rolls) (Int64.to_int expected_rolls)
 
+let check_no_rolls (b : Block.t) (account:Account.t) =
+  Raw_context.prepare b.context
+    ~level:b.header.shell.level
+    ~timestamp:b.header.shell.timestamp
+    ~fitness:b.header.shell.fitness >>= wrap >>=? fun ctxt ->
+  get_rolls ctxt account.pkh >>=? fun rolls ->
+  Assert.equal_int ~loc:__LOC__ (List.length rolls) 0
+
 let simple_staking_rights () =
   Context.init 2 >>=? fun (b,accounts) ->
   let (a1, a2) = account_pair accounts in
@@ -121,9 +129,56 @@ let deactivation_then_self_delegation () =
   Assert.equal_tez ~loc:__LOC__ start_balance balance >>=? fun () ->
   check_rolls b deactivated_account
 
+
+let delegation () =
+  Context.init 2 >>=? fun (b,accounts) ->
+  let (a1, a2) = account_pair accounts in
+  let m3 = Account.new_account () in
+  Account.add_account m3;
+
+  Context.Contract.balance (B b) a1 >>=? fun balance ->
+  Context.Contract.manager (B b) a1 >>=? fun m1 ->
+  Context.Contract.manager (B b) a2 >>=? fun m2 ->
+  let a3 = Contract.implicit_contract m3.pkh in
+
+  Context.Contract.delegate_opt (B b) a1 >>=? fun delegate ->
+  begin
+    match delegate with
+    | None -> assert false
+    | Some pkh ->
+        assert (Signature.Public_key_hash.equal pkh m1.pkh)
+  end;
+
+  Op.transaction (B b) a1 a3 balance >>=? fun transact ->
+
+  Block.bake ~policy:(By_account m2.pkh) b ~operation:transact >>=? fun b ->
+
+  Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
+  begin
+    match delegate with
+    | None -> ()
+    | Some _ -> assert false
+  end;
+  check_no_rolls b m3 >>=? fun () ->
+
+  Op.delegation (B b) a3 (Some m3.pkh) >>=? fun delegation ->
+  Block.bake ~policy:(By_account m2.pkh) b ~operation:delegation >>=? fun b ->
+
+  Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
+  begin
+    match delegate with
+    | None -> assert false
+    | Some pkh ->
+        assert (Signature.Public_key_hash.equal pkh m3.pkh)
+  end;
+  check_activate_staking_balance ~loc:__LOC__ ~deactivated:false b (a3,m3) >>=? fun () ->
+  check_rolls b m3 >>=? fun () ->
+  check_rolls b m1
+
 let tests = [
   Test.tztest "simple staking rights" `Quick (simple_staking_rights) ;
   Test.tztest "simple staking rights after baking" `Quick (simple_staking_rights_after_baking) ;
   Test.tztest "deactivation then bake" `Quick (deactivation_then_bake) ;
   Test.tztest "deactivation then self delegation" `Quick (deactivation_then_self_delegation) ;
+  Test.tztest "delegation" `Quick (delegation) ;
 ]
