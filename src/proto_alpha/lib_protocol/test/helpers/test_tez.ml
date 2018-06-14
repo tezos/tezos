@@ -23,7 +23,7 @@ module Tez = struct
   let ( + ) t1 t2 =
     match t1 +? t2 with
     | Ok r -> r
-    | Error r ->
+    | Error _ ->
         Pervasives.failwith "adding tez"
 
   let of_int x =
