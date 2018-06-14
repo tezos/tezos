@@ -20,6 +20,12 @@ module Tez = struct
   let ( *? ) t1 t2 = (t1 *? t2) |> wrap_error
   let ( /? ) t1 t2 = (t1 /? t2) |> wrap_error
 
+  let ( + ) t1 t2 =
+    match t1 +? t2 with
+    | Ok r -> r
+    | Error r ->
+        Pervasives.failwith "adding tez"
+
   let of_int x =
     match Tez.of_mutez (Int64.mul (Int64.of_int x) 1_000_000L) with
     | None -> invalid_arg "tez_of_int"

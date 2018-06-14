@@ -131,8 +131,27 @@ module Contract = struct
 
 end
 
+module Delegate = struct
+
+  type info = Delegate_services.info = {
+    balance: Tez.t ;
+    frozen_balance: Tez.t ;
+    frozen_balance_by_cycle: Delegate.frozen_balance Cycle.Map.t ;
+    staking_balance: Tez.t ;
+    delegated_contracts: Contract_hash.t list ;
+    delegated_balance: Tez.t ;
+    deactivated: bool ;
+    grace_period: Cycle.t ;
+  }
+
+  let info ctxt pkh =
+    Alpha_services.Delegate.info rpc_ctxt ctxt pkh
+
+end
+
 let init
     ?(slow=false)
+    ?preserved_cycles
     ?endorsers_per_block
     ?commitments
     n =
@@ -142,11 +161,13 @@ let init
   begin
     if slow then
       Block.genesis
+        ?preserved_cycles
         ?endorsers_per_block
         ?commitments
         accounts
     else
       Block.genesis
+        ?preserved_cycles
         ~blocks_per_cycle:32l
         ~blocks_per_commitment:4l
         ~blocks_per_roll_snapshot:8l

@@ -44,10 +44,28 @@ module Contract : sig
 
 end
 
+module Delegate : sig
+
+  type info = Delegate_services.info = {
+    balance: Tez.t ;
+    frozen_balance: Tez.t ;
+    frozen_balance_by_cycle: Delegate.frozen_balance Cycle.Map.t ;
+    staking_balance: Tez.t ;
+    delegated_contracts: Contract_hash.t list ;
+    delegated_balance: Tez.t ;
+    deactivated: bool ;
+    grace_period: Cycle.t ;
+  }
+
+  val info: t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
+
+end
+
 (** [init n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)
 val init:
   ?slow: bool ->
+  ?preserved_cycles:int ->
   ?endorsers_per_block:int ->
   ?commitments:Commitment_repr.t list ->
   int -> (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t

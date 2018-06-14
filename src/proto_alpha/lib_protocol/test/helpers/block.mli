@@ -128,3 +128,9 @@ val bake_n : ?policy:baker_policy -> int -> t -> block tzresult Lwt.t
 (** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
     that is [blocks_per_cycle - (l % blocks_per_cycle)]. *)
 val bake_until_cycle_end : ?policy:baker_policy -> t -> t tzresult Lwt.t
+
+(** Bakes enough blocks to end [n] cycles. *)
+val bake_until_n_cycle_end : ?policy:baker_policy -> int -> t -> t tzresult Lwt.t
+
+(** Bakes enough blocks to reach the cycle. *)
+val bake_until_cycle : ?policy:baker_policy -> Cycle.t -> t -> t tzresult Lwt.t

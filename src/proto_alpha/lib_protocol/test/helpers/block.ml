@@ -364,3 +364,23 @@ let bake_until_cycle_end ?policy b =
   let current_level = Int32.rem current_level blocks_per_cycle in
   let delta = Int32.sub blocks_per_cycle current_level in
   bake_n ?policy (Int32.to_int delta) b
+
+let bake_until_n_cycle_end ?policy n b =
+  Error_monad.fold_left_s
+    (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
+
+let bake_until_cycle ?policy cycle (b:t) =
+  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle } } ->
+  let rec loop (b:t) =
+    let current_cycle =
+      let current_level = b.header.shell.level in
+      let current_cycle = Int32.div current_level blocks_per_cycle in
+      current_cycle
+    in
+    if Int32.equal (Cycle.to_int32 cycle) current_cycle then
+      return b
+    else
+      bake_until_cycle_end ?policy b >>=? fun b ->
+      loop b
+  in
+  loop b
