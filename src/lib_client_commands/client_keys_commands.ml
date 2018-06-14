@@ -265,7 +265,7 @@ let commands () : Client_context.io_wallet Clic.command list =
                fail_unless (pk_uri = pk_uri_found || force)
                  (failure
                     "public and secret keys '%s' don't correspond, \
-                     please don't use -force" name)
+                     please don't use --force" name)
          end >>=? fun () ->
          Client_keys.public_key_hash pk_uri >>=? fun (pkh, _public_key) ->
          register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;

@@ -304,7 +304,7 @@ let commands () =
         return ()
       end;
 
-    command ~group ~desc:"Register and activate a predefined account using the provided activation key."
+    command ~group ~desc:"Register and activate an Alphanet/Zeronet faucet account."
       (args2
          (Secret_key.force_switch ())
          encrypted_switch)
@@ -312,7 +312,7 @@ let commands () =
        @@ Secret_key.fresh_alias_param
        @@ prefixes [ "with" ]
        @@ param ~name:"activation_key"
-         ~desc:"Activation key (as JSON file) obtained from the Tezos foundation (or the Alphanet faucet)."
+         ~desc:"Activate an Alphanet/Zeronet faucet account from the doanloaded JSON file."
          file_parameter
        @@ stop)
       (fun (force, encrypted) name activation_key_file cctxt ->
@@ -331,6 +331,24 @@ let commands () =
                ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
                ~encrypted ~force key name >>=? fun _res ->
              return ()
+      );
+
+    command ~group ~desc:"Activate a fundraiser account."
+      no_options
+      (prefixes [ "activate" ; "fundraiser" ; "account" ]
+       @@ Public_key_hash.alias_param
+       @@ prefixes [ "with" ]
+       @@ param ~name:"code"
+         (Clic.parameter (fun _ctx code ->
+              protect (fun () ->
+                  return (Blinded_public_key_hash.activation_code_of_hex code))))
+         ~desc:"Activation code obtained from the Tezos foundation."
+       @@ stop)
+      (fun () (name, _pkh) code cctxt ->
+         activate_existing_account cctxt ~chain:`Main
+           ~block:cctxt#block ?confirmations:cctxt#confirmations
+           name code >>=? fun _res ->
+         return ()
       );
 
     command ~desc:"Wait until an operation is included in a block"
