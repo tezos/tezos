@@ -138,6 +138,7 @@ module Cost_of : sig
     val int : 'a Script_int.num -> Gas.cost
     val tez : Gas.cost
     val string : string -> Gas.cost
+    val bytes : MBytes.t -> Gas.cost
     val timestamp : Script_timestamp.t -> Gas.cost
     val key : Gas.cost
     val key_hash : Gas.cost

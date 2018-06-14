@@ -238,7 +238,10 @@ module Cost_of = struct
     let cycle = step_cost 1
     let bool = prim_cost
     let unit = prim_cost
+    (* FIXME: not sure we should count the length of strings and bytes
+       as they are shared *)
     let string s = string_cost (String.length s)
+    let bytes s = alloc_bytes_cost (MBytes.length s)
     (* Approximates log10(x) *)
     let int i =
       let decimal_digits = (Z.numbits (Z.abs (Script_int.to_zint i))) / 4 in

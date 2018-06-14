@@ -113,6 +113,7 @@ type prim =
   | T_set
   | T_signature
   | T_string
+  | T_bytes
   | T_mutez
   | T_timestamp
   | T_unit

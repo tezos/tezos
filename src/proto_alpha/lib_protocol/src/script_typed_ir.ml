@@ -72,6 +72,7 @@ and 'ty ty =
   | Nat_t : type_annot option -> n num ty
   | Signature_t : type_annot option -> signature ty
   | String_t : type_annot option -> string ty
+  | Bytes_t : type_annot option -> MBytes.t ty
   | Mutez_t : type_annot option -> Tez.t ty
   | Key_hash_t : type_annot option -> public_key_hash ty
   | Key_t : type_annot option -> public_key ty

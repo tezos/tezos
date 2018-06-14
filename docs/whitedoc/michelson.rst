@@ -153,6 +153,7 @@ Data patterns are of one of the following syntactical forms.
 
 -  integer/natural number literals, (e.g. ``3``) ;
 -  string literals, (e.g. ``"contents"``) ;
+-  raw byte sequence literals (e.g. ``0xABCDEF42``)
 -  ``Tag`` (capitalized) is a symbolic constant, (e.g. ``Unit``,
    ``True``, ``False``) ;
 -  ``(Tag (arg) ...)`` tagged constructed data, (e.g. ``(Pair 3 4)``) ;
@@ -338,7 +339,8 @@ polymorphism.
 III - Core data types and notations
 -----------------------------------
 
--  ``string``, ``nat``, ``int``: The core primitive constant types.
+-  ``string``, ``nat``, ``int`` and ``bytes``: The core primitive
+   constant types.
 
 -  ``bool``: The type for booleans whose values are ``True`` and
    ``False``
@@ -1714,13 +1716,13 @@ characters can only appear in comments and strings.
 Constants
 ~~~~~~~~~
 
-There are two kinds of constants:
+There are three kinds of constants:
 
-1. Integers or naturals in decimal (no prefix), hexadecimal (``0x`` prefix),
-   octal (``0o`` prefix) or binary (``0b`` prefix).
+1. Integers or naturals in decimal notation.
 2. Strings, with usual escape sequences: ``\n``, ``\t``, ``\b``,
    ``\r``, ``\\``, ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``)
    cannot appear in the middle of a string.
+3. Byte sequences in hexadecimal notation, prefixed with ``0x``.
 
 The current version of Michelson restricts strings to be the printable
 subset of 7-bit ASCII, plus the escaped characters mentioned above.
@@ -1796,8 +1798,8 @@ type constructors by lowercase identifiers, and constant constructors
 are Capitalized.
 
 All domain specific constants are Micheline constants with specific
-formats. Some have two representations accepted by the data type
-checker: a readable one in a string and an optimized one in a natural.
+formats. Some have two variants accepted by the data type checker: a
+readable one in a string and an optimized.
 
 -  ``mutez`` amounts are written as naturals.
 -  ``timestamp``\ s are written either using ``RFC 339`` notation
@@ -1805,8 +1807,7 @@ checker: a readable one in a string and an optimized one in a natural.
    in a natural (optimized).
 -  ``contract``\ s, ``address``\ es, ``key``\ s and ``signature``\ s
    are written as strings, in their usual Base58 encoded versions
-   (readable), or as the little indian interpretation of their
-   bytes in a natural (optimized).
+   (readable), or as their raw bytes (optimized).
 
 The optimized versions should not reach the RPCs, the protocol code
 will convert to optimized by itself when forging operations, storing

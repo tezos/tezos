@@ -55,6 +55,7 @@ let rec type_size : type t. t ty -> int =
     | Int_t _ -> 1
     | Nat_t _ -> 1
     | Signature_t _ -> 1
+    | Bytes_t _ -> 1
     | String_t _ -> 1
     | Mutez_t _ -> 1
     | Key_hash_t _ -> 1
@@ -327,6 +328,7 @@ let namespace = function
   | T_set
   | T_signature
   | T_string
+  | T_bytes
   | T_mutez
   | T_timestamp
   | T_unit
@@ -531,6 +533,7 @@ let rec unparse_ty
     | Int_t tname -> Prim (-1, T_int, [], unparse_type_annot tname)
     | Nat_t tname -> Prim (-1, T_nat, [], unparse_type_annot tname)
     | String_t tname -> Prim (-1, T_string, [], unparse_type_annot tname)
+    | Bytes_t tname -> Prim (-1, T_bytes, [], unparse_type_annot tname)
     | Mutez_t tname -> Prim (-1, T_mutez, [], unparse_type_annot tname)
     | Bool_t tname -> Prim (-1, T_bool, [], unparse_type_annot tname)
     | Key_hash_t tname -> Prim (-1, T_key_hash, [], unparse_type_annot tname)
@@ -582,6 +585,7 @@ let name_of_ty
     | Int_t tname -> tname
     | Nat_t tname -> tname
     | String_t tname -> tname
+    | Bytes_t tname -> tname
     | Mutez_t tname -> tname
     | Bool_t tname -> tname
     | Key_hash_t tname -> tname
@@ -629,6 +633,7 @@ let rec ty_eq
     | Key_t _, Key_t _ -> Ok Eq
     | Key_hash_t _, Key_hash_t _ -> Ok Eq
     | String_t _, String_t _ -> Ok Eq
+    | Bytes_t _, Bytes_t _ -> Ok Eq
     | Signature_t _, Signature_t _ -> Ok Eq
     | Mutez_t _, Mutez_t _ -> Ok Eq
     | Timestamp_t _, Timestamp_t _ -> Ok Eq
@@ -751,6 +756,9 @@ let merge_types :
       | String_t tn1, String_t tn2 ->
           merge_type_annot tn1 tn2 >|? fun tname ->
           String_t tname
+      | Bytes_t tn1, Bytes_t tn2 ->
+          merge_type_annot tn1 tn2 >|? fun tname ->
+          Bytes_t tname
       | Signature_t tn1, Signature_t tn2 ->
           merge_type_annot tn1 tn2 >|? fun tname ->
           Signature_t tname
@@ -960,6 +968,9 @@ and parse_ty :
     | Prim (loc, T_string, [], annot) ->
         parse_type_annot loc annot >|? fun ty_name ->
         Ex_ty (String_t ty_name)
+    | Prim (loc, T_bytes, [], annot) ->
+        parse_type_annot loc annot >|? fun ty_name ->
+        Ex_ty (Bytes_t ty_name)
     | Prim (loc, T_mutez, [], annot) ->
         parse_type_annot loc annot >|? fun ty_name ->
         Ex_ty (Mutez_t ty_name)
@@ -1032,7 +1043,7 @@ and parse_ty :
         error (Unexpected_big_map loc)
     | Prim (loc, (T_unit | T_signature
                  | T_int | T_nat
-                 | T_string | T_mutez | T_bool
+                 | T_string | T_bytes | T_mutez | T_bool
                  | T_key | T_key_hash
                  | T_timestamp | T_address as prim), l, _) ->
         error (Invalid_arity (loc, prim, 0, List.length l))
@@ -1046,7 +1057,7 @@ and parse_ty :
             T_list ; T_option  ; T_lambda ;
             T_unit ; T_signature  ; T_contract ;
             T_int ; T_nat ; T_operation ;
-            T_string ; T_mutez ; T_bool ;
+            T_string ; T_bytes ; T_mutez ; T_bool ;
             T_key ; T_key_hash ; T_timestamp ]
 
 let rec unparse_stack
@@ -1144,6 +1155,12 @@ let rec parse_data
           fail (error ())
     | String_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+    (* Byte sequences *)
+    | Bytes_t _, Bytes (_, v) ->
+        Lwt.return (Gas.consume ctxt (Typecheck_costs.string (MBytes.length v))) >>=? fun ctxt ->
+        return (v, ctxt)
+    | Bytes_t _, expr ->
+        traced (fail (Invalid_kind (location expr, [ Bytes_kind ], kind expr)))
     (* Integers *)
     | Int_t _, Int (_, v) ->
         return (Script_int.of_zint v, ctxt)
@@ -2620,6 +2637,9 @@ let rec unparse_data
     | String_t _, s ->
         Lwt.return (Gas.consume ctxt (Unparse_costs.string s)) >>=? fun ctxt ->
         return (String (-1, s), ctxt)
+    | Bytes_t _, s ->
+        Lwt.return (Gas.consume ctxt (Unparse_costs.bytes s)) >>=? fun ctxt ->
+        return (Bytes (-1, s), ctxt)
     | Bool_t _, true ->
         Lwt.return (Gas.consume ctxt Unparse_costs.bool) >>=? fun ctxt ->
         return (Prim (-1, D_True, [], []), ctxt)
