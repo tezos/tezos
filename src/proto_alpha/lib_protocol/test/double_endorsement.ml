@@ -135,14 +135,20 @@ let different_delegates () =
   Context.init 2 >>=? fun (b, _) ->
 
   Block.bake b >>=? fun b ->
-  Block.bake b >>=? fun blk_a ->
-  Block.bake b >>=? fun blk_b ->
-  get_first_different_endorsers (B blk_a) >>=? fun (endorser_a, endorser_b) ->
+  block_fork b >>=? fun (blk_a, blk_b) ->
+  Context.get_endorser (B blk_a) >>=? fun (endorser_a, _a_slots) ->
+  get_first_different_endorsers (B blk_b) >>=? fun (endorser_b1c, endorser_b2c) ->
+  let endorser_b =
+    if Signature.Public_key_hash.(=) endorser_a endorser_b1c.delegate
+    then endorser_b2c.delegate
+    else endorser_b1c.delegate
+  in
 
-  Op.endorsement ~delegate:endorser_a.delegate (B blk_a) () >>=? fun e_a ->
-  Op.endorsement ~delegate:endorser_b.delegate (B blk_b) () >>=? fun e_b ->
-  Op.double_endorsement (B blk_a) e_a e_b >>=? fun operation ->
-  Block.bake ~operation blk_a >>= fun res ->
+  Op.endorsement ~delegate:endorser_a (B blk_a) () >>=? fun e_a ->
+  Op.endorsement ~delegate:endorser_b (B blk_b) () >>=? fun e_b ->
+  Block.bake ~operation:(Operation.pack e_b) blk_b >>=? fun _ ->
+  Op.double_endorsement (B blk_b) e_a e_b >>=? fun operation ->
+  Block.bake ~operation blk_b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res begin function
     | Apply.Inconsistent_double_endorsement_evidence _ -> true
     | _ -> false end
@@ -150,28 +156,33 @@ let different_delegates () =
 (** Check that a double endorsement evidence that exposes a ill-formed
     endorsement fails. *)
 let wrong_delegate () =
-  Context.init 2 >>=? fun (b, _) ->
+  Context.init ~endorsers_per_block:1 2 >>=? fun (b, contracts) ->
+  Error_monad.map_s (Context.Contract.manager (B b)) contracts >>=? fun accounts ->
+  let pkh1 = (List.nth accounts 0).Account.pkh in
+  let pkh2 = (List.nth accounts 1).Account.pkh in
 
   block_fork b >>=? fun (blk_a, blk_b) ->
-  get_first_different_endorsers (B blk_a)
-  >>=? fun (_endorser_a, endorser_b) ->
+  Context.get_endorser (B blk_a) >>=? fun (endorser_a, _) ->
+  Op.endorsement ~delegate:endorser_a (B blk_a) () >>=? fun endorsement_a ->
+  Context.get_endorser (B blk_b) >>=? fun (endorser_b, _) ->
+  let delegate =
+    if Signature.Public_key_hash.equal pkh1 endorser_b
+    then pkh2
+    else pkh1
+  in
+  Op.endorsement ~delegate (B blk_b) () >>=? fun endorsement_b ->
 
-  Op.endorsement ~delegate:endorser_b.delegate (B blk_a) () >>=? fun endorsement_a ->
-  Op.endorsement ~delegate:endorser_b.delegate (B blk_b) () >>=? fun endorsement_b ->
-
-  Op.double_endorsement (B blk_a) endorsement_a endorsement_b >>=? fun operation ->
-  Block.bake ~operation blk_a >>= fun e ->
+  Op.double_endorsement (B blk_b) endorsement_a endorsement_b >>=? fun operation ->
+  Block.bake ~operation blk_b >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e begin function
-    | Operation_repr.Invalid_signature -> true
+    | Baking.Unexpected_endorsement -> true
     | _ -> false end
 
 let tests = [
   Test.tztest "valid double endorsement evidence" `Quick valid_double_endorsement_evidence ;
-
   Test.tztest "invalid double endorsement evidence" `Quick invalid_double_endorsement ;
   Test.tztest "too early double endorsement evidence" `Quick too_early_double_endorsement_evidence ;
   Test.tztest "too late double endorsement evidence" `Quick too_late_double_endorsement_evidence ;
   Test.tztest "different delegates" `Quick different_delegates ;
   Test.tztest "wrong delegate" `Quick wrong_delegate ;
 ]
-

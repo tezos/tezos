@@ -101,7 +101,7 @@ let max_endorsement () =
         (B b) ~nb_endorsement endorser_account previous_balance
     ) (List.combine delegates previous_balances)
 
-(** Check that an endorser balance is consistent with a different piority *)
+(** Check that an endorser balance is consistent with a different priority *)
 let consistent_priority () =
   Context.init 32 >>=? fun (b, _) ->
   Block.get_next_baker ~policy:(By_priority 15) b >>=? fun (baker_account, _, _) ->
@@ -122,7 +122,7 @@ let consistent_priority () =
   assert_endorser_balance_consistency ~loc:__LOC__ ~priority:15
     (B b) ~nb_endorsement:(List.length endorser.slots) endorser.delegate balance
 
-(** Check every 32 endorser's balances are consistent with a different piority *)
+(** Check every 32 endorser's balances are consistent with a different priority *)
 let consistent_priorities () =
   let priorities = 15 -- 31 in
   Context.init 64 >>=? fun (b, _) ->
@@ -178,7 +178,7 @@ let wrong_endorsement_predecessor () =
 
   Context.get_endorser (B b) >>=? fun (genesis_endorser, _slots) ->
   Block.bake b >>=? fun b' ->
-  Op.endorsement ~delegate:genesis_endorser ~signing_context:(B b') (B b) () >>=? fun operation ->
+  Op.endorsement ~delegate:genesis_endorser ~signing_context:(B b) (B b') () >>=? fun operation ->
   let operation = Operation.pack operation in
   Block.bake ~operation b' >>= fun res ->
 
@@ -214,7 +214,7 @@ let duplicate_endorsement () =
   Incremental.add_operation inc operation >>= fun res ->
 
   Assert.proto_error ~loc:__LOC__ res begin function
-    | Baking.Unexpected_endorsement -> true
+    | Apply.Duplicate_endorsement _ -> true
     | _ -> false
   end
 
@@ -224,8 +224,7 @@ let no_enough_for_deposit () =
   Error_monad.map_s (fun c ->
       Context.Contract.manager (B b) c >>=? fun m -> return (m, c)) contracts >>=?
   fun managers ->
-  let slot = 0 in
-  Context.get_endorser (B b) slot >>=? fun endorser ->
+  Context.get_endorser (B b) >>=? fun (endorser,_) ->
   let _, contract_other_than_endorser =
     List.find (fun (c, _) -> not (Signature.Public_key_hash.equal c.Account.pkh endorser))
       managers
@@ -234,7 +233,7 @@ let no_enough_for_deposit () =
     List.find (fun (c, _) -> (Signature.Public_key_hash.equal c.Account.pkh endorser))
       managers
   in
-  Op.endorsement ~delegate:endorser (B b) [slot] >>=? fun op_endo ->
+  Op.endorsement ~delegate:endorser (B b) () >>=? fun op_endo ->
   Context.Contract.balance (B b)
     (Contract.implicit_contract endorser) >>=? fun initial_balance ->
   Op.transaction (B b) contract_of_endorser contract_other_than_endorser initial_balance >>=? fun op_trans ->
