@@ -678,7 +678,6 @@ let rec interp
             logged_return (Item (now, rest), ctxt)
         | Check_signature, Item (key, Item (signature, Item (message, rest))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.check_signature) >>=? fun ctxt ->
-            let message = MBytes.of_string message in
             let res = Signature.check key signature message in
             logged_return (Item (res, rest), ctxt)
         | Hash_key, Item (key, rest) ->
@@ -687,6 +686,7 @@ let rec interp
         | Blake2b ty, Item (v, rest) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.hash v)) >>=? fun ctxt ->
             hash_data ctxt ty v >>=? fun (hash, ctxt) ->
+            let hash = Script_expr_hash.to_bytes hash in
             logged_return (Item (hash, rest), ctxt)
         | Steps_to_quota, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.steps_to_quota) >>=? fun ctxt ->

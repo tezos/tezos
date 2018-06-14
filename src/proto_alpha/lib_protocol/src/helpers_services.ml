@@ -60,7 +60,9 @@ module Scripts = struct
         ~output: (obj3
                     (req "storage" Script.expr_encoding)
                     (req "operations" (list Operation.internal_operation_encoding))
-                    (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
+                    (opt "big_map_diff" (list (tup2
+                                                 Script_expr_hash.encoding
+                                                 (option Script.expr_encoding)))))
         RPC_path.(path / "run_code")
 
     let trace_code =
@@ -81,7 +83,9 @@ module Scripts = struct
                                 (obj2
                                    (req "item" (Script.expr_encoding))
                                    (opt "annot" string))))))
-                    (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
+                    (opt "big_map_diff" (list (tup2
+                                                 Script_expr_hash.encoding
+                                                 (option Script.expr_encoding)))))
         RPC_path.(path / "trace_code")
 
     let typecheck_code =
@@ -118,7 +122,7 @@ module Scripts = struct
                    (req "type" Script.expr_encoding)
                    (opt "gas" z))
         ~output: (obj2
-                    (req "hash" string)
+                    (req "hash" Script_expr_hash.encoding)
                     (req "gas" Gas.encoding))
         ~query: RPC_query.empty
         RPC_path.(path / "hash_data")

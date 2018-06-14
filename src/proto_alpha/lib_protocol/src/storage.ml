@@ -41,21 +41,6 @@ module Int_index = struct
     }
 end
 
-module String_index = struct
-  type t = string
-  let path_length = 1
-  let to_path c l = c :: l
-  let of_path = function
-    | [ c ] -> Some c
-    | [] | _ :: _ :: _ -> None
-  type 'a ipath = 'a * t
-  let args = Storage_description.One {
-      rpc_arg = RPC_arg.string ;
-      encoding = Data_encoding.string ;
-      compare = Compare.String.compare ;
-    }
-end
-
 module Make_index(H : Storage_description.INDEX)
   : INDEX with type t = H.t and type 'a ipath = 'a * H.t = struct
   include H
@@ -183,7 +168,7 @@ module Contract = struct
       (Make_subcontext
          (Indexed_context.Raw_context)
          (struct let name = ["big_map"] end))
-      (String_index)
+      (Make_index(Script_expr_hash))
       (struct
         type t = Script_repr.expr
         let encoding = Script_repr.expr_encoding

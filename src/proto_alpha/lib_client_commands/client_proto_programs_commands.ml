@@ -205,7 +205,9 @@ let commands () =
          Alpha_services.Helpers.Scripts.hash_data cctxt (`Main, cctxt#block)
            (data.expanded, typ.expanded, Some original_gas) >>= function
          | Ok (hash, remaining_gas) ->
-             cctxt#message "%S@,Gas remaining: %a" hash
+             cctxt#message "Hash: %a@,Raw hash bytes: 0x%a@,Gas remaining: %a"
+               Script_expr_hash.pp hash
+               MBytes.pp_hex (Script_expr_hash.to_bytes hash)
                Proto_alpha.Alpha_context.Gas.pp remaining_gas >>= fun () ->
              return ()
          | Error errs ->
@@ -238,8 +240,10 @@ let commands () =
          Client_proto_programs.hash_and_sign cctxt cctxt#block
            ~gas data typ sk >>= begin function
            | Ok (hash, signature, current_gas) ->
-               cctxt#message "@[<v 0>Hash: %S@,Signature: %S@,Remaining gas: %a@]"
-                 hash signature
+               cctxt#message "@[<v 0>Hash: %a@,Raw hash bytes: 0x%a@,Signature: %a@,Remaining gas: %a@]"
+                 Script_expr_hash.pp hash
+                 MBytes.pp_hex (Script_expr_hash.to_bytes hash)
+                 Signature.pp signature
                  Proto_alpha.Alpha_context.Gas.pp current_gas
            | Error errs ->
                cctxt#warning "%a"

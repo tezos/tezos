@@ -2341,7 +2341,7 @@ and parse_instr
         typed ctxt loc Hash_key
           (Item_t (Key_hash_t None, rest, annot))
     | Prim (loc, I_CHECK_SIGNATURE, [], annot),
-      Item_t (Key_t _, Item_t (Signature_t _, Item_t (String_t _, rest, _), _), _) ->
+      Item_t (Key_t _, Item_t (Signature_t _, Item_t (Bytes_t _, rest, _), _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
         typed ctxt loc Check_signature
           (Item_t (Bool_t None, rest, annot))
@@ -2349,7 +2349,7 @@ and parse_instr
       Item_t (t, rest, _) ->
         parse_var_annot loc annot >>=? fun annot ->
         typed ctxt loc (Blake2b t)
-          (Item_t (String_t None, rest, annot))
+          (Item_t (Bytes_t None, rest, annot))
     | Prim (loc, I_STEPS_TO_QUOTA, [], annot),
       stack ->
         parse_var_annot loc annot ~default:default_steps_annot >>=? fun annot ->
@@ -2806,7 +2806,7 @@ let hash_data ctxt typ data =
   unparse_data ctxt Optimized typ data >>=? fun (data, ctxt) ->
   let unparsed = strip_annotations @@ data in
   let bytes = Data_encoding.Binary.to_bytes_exn expr_encoding (Micheline.strip_locations unparsed) in
-  return (Script_expr_hash.(hash_bytes [ bytes ] |> to_b58check), ctxt)
+  return (Script_expr_hash.(hash_bytes [ bytes ]), ctxt)
 
 (* ---------------- Big map -------------------------------------------------*)
 

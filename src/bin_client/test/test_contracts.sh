@@ -230,8 +230,8 @@ assert_storage $contract_dir/first.tz '111' '{ 4 }' '4'
 
 # Hash input string
 # Test assumed to be correct -- hash is based on encoding of AST
-assert_storage $contract_dir/hash_string.tz '"?"' '"abcdefg"' '"exprv3MnhXvjthGzZ7jDtXRRFremZyey9rsGtL7JRkeaQX1fThN7WF"'
-assert_storage $contract_dir/hash_string.tz '"?"' '"12345"' '"expru81QVHsW2qaWLNHnMHSxDNhqtat17ajadri6mKUvXyc2EWHZC3"'
+assert_storage $contract_dir/hash_string.tz '0x00' '"abcdefg"' '0xc8e816fa5921f08d25ead933aedc189a7b0abfa97c649a8d2eb9e0f323f7909e'
+assert_storage $contract_dir/hash_string.tz '0x00' '"12345"' '0x4fc401c158dad6482d96f45bb2dc10bc445b1ff127a485814d735e5c3dcb36ec'
 
 # Test ASSERT
 assert_storage $contract_dir/assert.tz Unit True Unit
@@ -315,11 +315,11 @@ assert_storage  $contract_dir/map_caddaadr.tz \
 
 # Did the given key sign the string? (key is bootstrap1)
 assert_success $client run script $contract_dir/check_signature.tz \
-               on storage '(Pair 0x1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01 "hello")' \
+               on storage '(Pair "edsigtursTM9zynxFfyiLyTLuVh369H7Cd1nkH63dyc3jKBoujWeQRE9hZFRhqgTrY3BzdZenDc3D6v7gZEShpdPDMQ7YswgEL3" "hello")' \
                and input '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
 
 assert_fails $client run script $contract_dir/check_signature.tz \
-             on storage '(Pair 0x1f19f8f37e80d96797b019f30d23ede6a26a0f698220f942103a3401f047623746e51a9c6e77e269b5df9593994ab96b001aae0f73728a2259187cb640b61e01 "abcd")' \
+             on storage '(Pair "edsigtursTM9zynxFfyiLyTLuVh369H7Cd1nkH63dyc3jKBoujWeQRE9hZFRhqgTrY3BzdZenDc3D6v7gZEShpdPDMQ7YswgEL3" "abcd")' \
              and input '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
 
 
@@ -449,12 +449,12 @@ assert_fails $client typecheck data '{ "A" ; "B" ; "B" }' against type '(set str
 
 # Test hash consistency between Michelson and the CLI
 hash_result=`$client hash data '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))' \
-                     of type '(pair mutez (pair timestamp int))' | grep expr`
+                     of type '(pair mutez (pair timestamp int))' | grep 0x | sed 's/.*: *//'`
 
-assert_storage $contract_dir/hash_consistency_checker.tz '"?"' \
+assert_storage $contract_dir/hash_consistency_checker.tz '0x00' \
               '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))' "$hash_result"
 
-assert_storage $contract_dir/hash_consistency_checker.tz '"?"' \
+assert_storage $contract_dir/hash_consistency_checker.tz '0x00' \
               '(Pair 22220000000 (Pair "2017-12-13T04:49:00+00:00" 34))' "$hash_result"
 
 # Test for big maps

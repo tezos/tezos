@@ -50,7 +50,7 @@ module Scripts : sig
 
   val hash_data:
     'a #RPC_context.simple ->
-    'a -> Script.expr * Script.expr * Z.t option -> (string * Gas.t) shell_tzresult Lwt.t
+    'a -> Script.expr * Script.expr * Z.t option -> (Script_expr_hash.t * Gas.t) shell_tzresult Lwt.t
 
   val run_operation:
     'a #RPC_context.simple ->

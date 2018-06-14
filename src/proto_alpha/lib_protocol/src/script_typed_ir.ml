@@ -336,11 +336,11 @@ and ('bef, 'aft) instr =
   | Balance :
       ('rest, Tez.t * 'rest) instr
   | Check_signature :
-      (public_key * (signature * (string * 'rest)), bool * 'rest) instr
+      (public_key * (signature * (MBytes.t * 'rest)), bool * 'rest) instr
   | Hash_key :
       (public_key * 'rest, public_key_hash * 'rest) instr
   | Blake2b : 'a ty ->
-    ('a * 'rest, string * 'rest) instr
+    ('a * 'rest, MBytes.t * 'rest) instr
   | Steps_to_quota : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr
   | Source :

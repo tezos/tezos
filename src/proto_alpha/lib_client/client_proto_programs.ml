@@ -43,11 +43,11 @@ let print_big_map_diff ppf = function
         (Format.pp_print_list
            ~pp_sep:Format.pp_print_space
            (fun ppf (key, value) ->
-              Format.fprintf ppf "%s %s%a"
+              Format.fprintf ppf "%s %a%a"
                 (match value with
                  | None -> "-"
                  | Some _ -> "+")
-                key
+                Script_expr_hash.pp key
                 (fun ppf -> function
                    | None -> ()
                    | Some x -> Format.fprintf ppf "-> %a" print_expr x)
@@ -125,8 +125,8 @@ let hash_and_sign
     sk =
   Alpha_services.Helpers.Scripts.hash_data
     cctxt (chain, block) (data.expanded, typ.expanded, gas) >>=? fun (hash, gas) ->
-  Client_keys.sign cctxt sk (MBytes.of_string hash) >>=? fun signature ->
-  return (hash, Signature.to_b58check signature, gas)
+  Client_keys.sign cctxt sk (Script_expr_hash.to_bytes hash) >>=? fun signature ->
+  return (hash, signature, gas)
 
 let typecheck_data
     cctxt

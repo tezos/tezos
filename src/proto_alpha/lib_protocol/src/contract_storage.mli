@@ -60,7 +60,7 @@ val get_script:
 val get_storage:
   Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 
-type big_map_diff = (string * Script_repr.expr option) list
+type big_map_diff = (Script_expr_hash.t * Script_repr.expr option) list
 
 val update_script_storage:
   Raw_context.t -> Contract_repr.t ->
@@ -108,7 +108,7 @@ val pay_for_storage_space: Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw
 
 module Big_map : sig
   val mem :
-    Raw_context.t -> Contract_repr.t -> string -> (Raw_context.t * bool) tzresult Lwt.t
+    Raw_context.t -> Contract_repr.t -> Script_expr_hash.t -> (Raw_context.t * bool) tzresult Lwt.t
   val get_opt :
-    Raw_context.t -> Contract_repr.t -> string -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
+    Raw_context.t -> Contract_repr.t -> Script_expr_hash.t -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 end

@@ -540,7 +540,7 @@ module Contract : sig
   val fresh_contract_from_current_nonce : context -> (context * t) tzresult Lwt.t
   val originated_from_current_nonce: since: context -> until:context -> contract list tzresult Lwt.t
 
-  type big_map_diff = (string * Script.expr option) list
+  type big_map_diff = (Script_expr_hash.t * Script.expr option) list
 
   val originate:
     context -> contract ->
@@ -585,9 +585,9 @@ module Contract : sig
 
   module Big_map : sig
     val mem:
-      context -> contract -> string -> (context * bool) tzresult Lwt.t
+      context -> contract -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
     val get_opt:
-      context -> contract -> string -> (context * Script_repr.expr option) tzresult Lwt.t
+      context -> contract -> Script_expr_hash.t -> (context * Script_repr.expr option) tzresult Lwt.t
   end
 
   (**/**)

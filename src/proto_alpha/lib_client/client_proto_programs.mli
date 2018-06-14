@@ -69,7 +69,7 @@ val hash_and_sign :
   Michelson_v1_parser.parsed ->
   Michelson_v1_parser.parsed ->
   Client_keys.sk_uri ->
-  (string * string * Gas.t) tzresult Lwt.t
+  (Script_expr_hash.t * Signature.t * Gas.t) tzresult Lwt.t
 
 val typecheck_data :
   #Proto_alpha.rpc_context ->

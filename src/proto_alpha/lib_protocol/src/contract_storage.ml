@@ -186,7 +186,7 @@ let () =
 
 let failwith msg = fail (Failure msg)
 
-type big_map_diff = (string * Script_repr.expr option) list
+type big_map_diff = (Script_expr_hash.t * Script_repr.expr option) list
 
 let update_script_big_map c contract = function
   | None -> return (c, Z.zero)
