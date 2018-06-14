@@ -74,9 +74,8 @@ let get_signing_slots cctxt ?(chain = `Main) block delegate level =
 
 let inject_endorsement
     (cctxt : #Proto_alpha.full)
-    ?(chain = `Main) block level ?async
+    ?(chain = `Main) block hash level ?async
     src_sk slots pkh =
-  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   Alpha_services.Forge.endorsement cctxt
     (chain, block)
     ~branch:hash
@@ -127,7 +126,8 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
             | [] -> cctxt#error "No slot found at level %a" Raw_level.pp level
             | slots -> return slots
       end >>=? fun slots ->
-      inject_endorsement cctxt ~chain ?async block level src_sk slots src_pkh >>=? fun oph ->
+      Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
+      inject_endorsement cctxt ~chain ?async block hash level src_sk slots src_pkh >>=? fun oph ->
       Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
       cctxt#message
         "Injected endorsement level %a, contract %s '%a'"
@@ -173,7 +173,7 @@ let endorse_for_delegate cctxt { delegate ; block ; slots ; } =
     Raw_level.pp level
     (List.length slots) >>= fun () ->
   inject_endorsement cctxt
-    b level
+    b hash level
     sk slots delegate >>=? fun oph ->
   lwt_log_info
     "Injected endorsement for block '%a' \
@@ -182,7 +182,7 @@ let endorse_for_delegate cctxt { delegate ; block ; slots ; } =
     Raw_level.pp level
     name
     Operation_hash.pp_short oph >>= fun () ->
-  cctxt#message
+  lwt_log_info
     "Injected endorsement level %a, contract %s '%a'"
     Raw_level.pp level
     name
