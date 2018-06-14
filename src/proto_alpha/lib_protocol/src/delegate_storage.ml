@@ -117,10 +117,10 @@ let unlink c contract balance =
   Storage.Contract.Delegate.get_option c contract >>=? function
   | None -> return c
   | Some delegate ->
+      Roll_storage.Delegate.remove_amount c delegate balance >>=? fun c ->
       match Contract_repr.is_originated contract with
       | None -> return c
       | Some h ->
-          Roll_storage.Delegate.remove_amount c delegate balance >>=? fun c ->
           Storage.Contract.Delegated.del
             (c, Contract_repr.implicit_contract delegate) h >>= fun c ->
           return c
