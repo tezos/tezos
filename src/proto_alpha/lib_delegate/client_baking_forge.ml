@@ -438,6 +438,8 @@ let get_delegates cctxt state =
       return (List.map (fun (_,pkh,_,_) -> pkh) keys)
   | _ :: _ as delegates -> return delegates
 
+
+
 let insert_block
     (cctxt : #Proto_alpha.full) ?max_priority state (bi: Client_baking_blocks.block_info) =
   begin
@@ -475,13 +477,6 @@ let pop_baking_slots state =
   let slots, future_slots = pop [] state.future_slots in
   state.future_slots <- future_slots ;
   slots
-
-let insert_blocks cctxt ?max_priority state bi =
-  insert_block cctxt ?max_priority state bi >>= function
-  | Ok () ->
-      Lwt.return_unit
-  | Error err ->
-      lwt_log_error "Error: %a" pp_print_error err
 
 let bake_slot
     cctxt
@@ -612,6 +607,10 @@ let bake (cctxt : #Proto_alpha.full) state =
       lwt_debug "No valid candidates." >>= fun () ->
       return ()
 
+let check_error p =
+  p >>= function
+  | Ok () -> Lwt.return_unit
+  | Error errs -> lwt_log_error "Error while baking:@\n%a" pp_print_error errs
 
 (* [create] starts the main loop of the baker. The loop monitors new blocks and
    starts individual baking operations when baking-slots are available to any of
@@ -636,7 +635,7 @@ let create
         t
     | Some t -> t in
   let state = create_state genesis_hash delegates bi in
-  insert_blocks cctxt ?max_priority state bi >>= fun () ->
+  check_error @@ insert_block cctxt ?max_priority state bi >>= fun () ->
 
   (* main loop *)
   let rec worker_loop () =
@@ -660,18 +659,14 @@ let create
           lwt_debug
             "Discoverered block: %a"
             Block_hash.pp_short bi.Client_baking_blocks.hash >>= fun () ->
-          insert_blocks cctxt ?max_priority state bi
+          check_error @@ insert_block cctxt ?max_priority state bi
         end
 
       | `Timeout ->
           (* main event: it's baking time *)
           lwt_debug "Waking up for baking..." >>= fun () ->
-          begin
-            (* core functionality *)
-            bake cctxt state >>= function
-            | Ok () -> Lwt.return_unit
-            | Error errs -> lwt_log_error "Error while baking:@\n%a" pp_print_error errs
-          end
+          (* core functionality *)
+          check_error @@ bake cctxt state
 
     end >>= fun () ->
     (* and restart *)

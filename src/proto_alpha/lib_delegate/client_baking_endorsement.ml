@@ -304,7 +304,7 @@ let create
       | `Hash (Some (Ok bi)) ->
           Lwt.cancel timeout;
           last_get_block := None;
-          check_error (prepare_endorsement cctxt ~max_past state bi)
+          check_error @@ prepare_endorsement cctxt ~max_past state bi
       | `Timeout ->
           begin
             endorse_for cctxt state.to_endorse >>= function
