@@ -234,6 +234,36 @@ let invalid_endorsement_slot () =
     | _ -> false
   end
 
+(** Apply a single endorsement from the slot 0 endorser *)
+let no_enough_for_deposit () =
+  Context.init 5 ~endorsers_per_block:1 >>=? fun (b, contracts) ->
+  Error_monad.map_s (fun c ->
+      Context.Contract.manager (B b) c >>=? fun m -> return (m, c)) contracts >>=?
+  fun managers ->
+  let slot = 0 in
+  Context.get_endorser (B b) slot >>=? fun endorser ->
+  let _, contract_other_than_endorser =
+    List.find (fun (c, _) -> not (Signature.Public_key_hash.equal c.Account.pkh endorser))
+      managers
+  in
+  let _, contract_of_endorser =
+    List.find (fun (c, _) -> (Signature.Public_key_hash.equal c.Account.pkh endorser))
+      managers
+  in
+  Op.endorsement ~delegate:endorser (B b) [slot] >>=? fun op_endo ->
+  Context.Contract.balance (B b)
+    (Contract.implicit_contract endorser) >>=? fun initial_balance ->
+  Op.transaction (B b) contract_of_endorser contract_other_than_endorser initial_balance >>=? fun op_trans ->
+  Block.bake
+    ~policy:(Excluding [endorser])
+    ~operations:[Operation.pack op_endo; op_trans]
+    b >>= fun res ->
+
+  Assert.proto_error ~loc:__LOC__ res begin function
+    | Delegate_storage.Balance_too_low_for_deposit _ -> true
+    | _ -> false
+  end
+
 let tests = [
   Test.tztest "Simple endorsement" `Quick simple_endorsement ;
   Test.tztest "Maximum endorsement" `Quick max_endorsement ;
@@ -248,4 +278,5 @@ let tests = [
   Test.tztest "Duplicate endorsement" `Quick duplicate_endorsement ;
 
   Test.tztest "Invalid endorsement slot" `Quick invalid_endorsement_slot ;
+  Test.tztest "Not enough for deposit" `Quick no_enough_for_deposit ;
 ]
