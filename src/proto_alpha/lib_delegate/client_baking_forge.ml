@@ -361,7 +361,7 @@ let rec insert_baking_slot slot = function
 
 type state = {
   genesis: Block_hash.t ;
-  delegates: public_key_hash list ;
+  mutable delegates: public_key_hash list ;
   mutable best: Client_baking_blocks.block_info ;
   mutable future_slots:
     (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) list ;
@@ -435,13 +435,18 @@ let get_delegates cctxt state =
   match state.delegates with
   | [] ->
       Client_keys.get_keys cctxt >>=? fun keys ->
-      return (List.map (fun (_,pkh,_,_) -> pkh) keys)
+      let delegates = List.map (fun (_,pkh,_,_) -> pkh) keys in
+      state.delegates <- delegates;
+      return delegates
   | _ :: _ as delegates -> return delegates
 
 
 
 let insert_block
-    (cctxt : #Proto_alpha.full) ?max_priority state (bi: Client_baking_blocks.block_info) =
+    (cctxt: #Proto_alpha.full)
+    ?max_priority
+    state
+    (bi: Client_baking_blocks.block_info) =
   begin
     safe_get_unrevealed_nonces cctxt (`Hash (bi.hash, 0)) >>= fun nonces ->
     Client_baking_revelation.forge_seed_nonce_revelation
