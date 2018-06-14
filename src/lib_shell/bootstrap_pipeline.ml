@@ -34,9 +34,11 @@ type t = {
 let assert_acceptable_header pipeline
     ?(first = false) hash (header : Block_header.t) =
   let chain_state = Distributed_db.chain_state pipeline.chain_db in
+  let time_now = Time.now () in
   fail_unless
-    (Time.(add (now ()) 15L >= header.shell.timestamp))
-    (Future_block_header hash) >>=? fun () ->
+    (Time.(add time_now 15L >= header.shell.timestamp))
+    (Future_block_header { block = hash; time = time_now;
+                           block_time = header.shell.timestamp }) >>=? fun () ->
   State.Chain.checkpoint chain_state >>= fun (level, checkpoint) ->
   fail_when
     (Int32.equal header.shell.level level &&
@@ -122,9 +124,12 @@ let headers_fetch_worker_loop pipeline =
         P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
-  | Error [ Future_block_header bh ] ->
-      lwt_log_notice "Block locator %a from peer %a contains future blocks."
-        Block_hash.pp_short bh
+  | Error [ Future_block_header { block; block_time; time } ] ->
+      lwt_log_notice "Block locator %a from peer %a contains future blocks. \
+                      local time: %a, block time: %a"
+        Block_hash.pp_short block
+        Time.pp_hum time
+        Time.pp_hum block_time
         P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
