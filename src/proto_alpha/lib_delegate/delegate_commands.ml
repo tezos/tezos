@@ -14,6 +14,13 @@ let group =
   { Clic.name = "delegate" ;
     title = "Commands related to delegate operations." }
 
+let directory_parameter =
+  Clic.parameter (fun _ p ->
+      if not (Sys.file_exists p && Sys.is_directory p) then
+        failwith "Directory doesn't exist: '%s'" p
+      else
+        return p)
+
 let delegate_commands () =
   let open Clic in
   [
@@ -57,9 +64,10 @@ let baker_commands () =
     command ~group ~desc: "Launch the baker daemon."
       (args1 max_priority_arg)
       (prefixes [ "launch" ; "with" ; "context" ]
-       @@ string
-         ~name:"Context path"
-         ~desc:"Path to the shell context"
+       @@ param
+         ~name:"context_path"
+         ~desc:"Path to the shell context (e.g. tezos-node.XXXXX/context/)"
+         directory_parameter
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun max_priority context_path delegates cctxt ->
          Client_daemon.Baker.run cctxt

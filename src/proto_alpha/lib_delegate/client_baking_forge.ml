@@ -12,6 +12,25 @@ open Alpha_context
 
 include Logging.Make(struct let name = "client.baking" end)
 
+type state = {
+  genesis: Block_hash.t ;
+  index : Context.index ;
+  mutable delegates: public_key_hash list ;
+  constants : Constants.t ;
+  mutable best: Client_baking_blocks.block_info ;
+  mutable future_slots:
+    (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) list ;
+}
+
+let create_state genesis index delegates constants best =
+  { genesis ;
+    index ;
+    delegates ;
+    constants ;
+    best ;
+    future_slots = [] ;
+  }
+
 let generate_proof_of_work_nonce () =
   Rand.generate Constants.proof_of_work_nonce_size
 
@@ -55,11 +74,9 @@ let forge_block_header
       loop () in
   loop ()
 
-
 let empty_proof_of_work_nonce =
   MBytes.of_string
     (String.make Constants_repr.proof_of_work_nonce_size  '\000')
-
 
 let forge_faked_protocol_data ~priority ~seed_nonce_hash =
   Alpha_context.Block_header.{
@@ -67,7 +84,6 @@ let forge_faked_protocol_data ~priority ~seed_nonce_hash =
                  proof_of_work_nonce = empty_proof_of_work_nonce } ;
     signature = Signature.zero
   }
-
 
 let assert_valid_operations_hash shell_header operations =
   let operations_hash =
@@ -115,6 +131,43 @@ let () =
       | _ -> None)
     (fun (hash, err) -> Failed_to_preapply (hash, err))
 
+let get_operation_fee op =
+  let { protocol_data = Operation_data { contents } ; _ } = op in
+  let open Operation in
+  let l = to_list (Contents_list contents) in
+  fold_left_s (fun total_fee -> function
+      | Contents (Manager_operation { fee ; _ })
+        when Tez.(fee > zero) ->
+          Lwt.return @@ Alpha_environment.wrap_error @@
+          Tez.(total_fee +? fee)
+      | _ -> return total_fee) Tez.zero l
+
+let sort_operations_by_fee (operations : Proto_alpha.operation list) =
+  (* There is no sort_s, so : *)
+  map_s (fun op -> get_operation_fee op >>=? fun fee -> return (op, fee))
+    operations >>=? fun operations ->
+  let compare_fee (_, fee1) (_, fee2) =
+    Tez.compare fee1 fee2 * -1
+  in
+  (* Should we keep operations without fee ? *)
+  return @@ List.map fst (List.sort compare_fee operations)
+
+let retain_operations_up_to_quota operations max_quota =
+  let exception Full of packed_operation list in
+  let operations = try
+      List.fold_left (fun (ops, size) op ->
+          let operation_size =
+            Data_encoding.Binary.length Alpha_context.Operation.encoding op
+          in
+          let new_size = size + operation_size in
+          if new_size > max_quota then
+            raise (Full ops)
+          else
+            (op :: ops, new_size)
+        ) ([], 0) operations |> fst
+    with
+    | Full ops -> ops in
+  List.rev operations
 
 let classify_operations (ops: Proto_alpha.operation list) =
   let t = Array.make (List.length Proto_alpha.Main.validation_passes) [] in
@@ -124,26 +177,33 @@ let classify_operations (ops: Proto_alpha.operation list) =
          (fun pass -> t.(pass) <- op :: t.(pass))
          (Proto_alpha.Main.acceptable_passes op))
     ops ;
-  Array.fold_right (fun ops acc -> List.rev ops :: acc) t []
-
+  let t = Array.map List.rev t in
+  (* Retrieve the maximum paying manager operations *)
+  let manager_operations = t.(3) in
+  let { Alpha_environment.Updater.max_size } = List.nth Proto_alpha.Main.validation_passes 3 in
+  sort_operations_by_fee manager_operations >>=? fun ordered_operations ->
+  let max_operations =
+    retain_operations_up_to_quota ordered_operations max_size
+  in
+  (* TODO ? : should preserve mempool order  *)
+  t.(3) <- max_operations;
+  return @@ Array.fold_right (fun ops acc -> ops :: acc) t []
 
 let parse (op : Operation.raw) : Operation.packed =
   let protocol_data =
     Data_encoding.Binary.of_bytes_exn
       Alpha_context.Operation.protocol_data_encoding
       op.proto in
-  {
-    shell = op.shell ;
+  { shell = op.shell ;
     protocol_data ;
   }
 
-let forge (op : Operation.packed) : Operation.raw = {
-  shell = op.shell ;
-  proto =
-    Data_encoding.Binary.to_bytes_exn
-      Alpha_context.Operation.protocol_data_encoding
-      op.protocol_data
-}
+let forge (op : Operation.packed) : Operation.raw =
+  { shell = op.shell ;
+    proto = Data_encoding.Binary.to_bytes_exn
+        Alpha_context.Operation.protocol_data_encoding
+        op.protocol_data
+  }
 
 let ops_of_mempool (ops : Alpha_block_services.Mempool.t) =
   List.map (fun (_, op) -> op) ops.applied @
@@ -233,7 +293,6 @@ let error_of_op (result: error Preapply_result.t) op =
   try Some (Failed_to_preapply (op, snd @@ Operation_hash.Map.find h result.branch_delayed))
   with Not_found -> None
 
-
 let forge_block cctxt ?(chain = `Main) block
     ?force
     ?operations ?(best_effort = operations = None) ?(sort = best_effort)
@@ -248,7 +307,7 @@ let forge_block cctxt ?(chain = `Main) block
 
   (* get basic building blocks *)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
-  let operations = classify_operations operations_arg in
+  classify_operations operations_arg >>=? fun operations ->
   Alpha_block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, result) ->
 
@@ -380,23 +439,6 @@ let rec insert_baking_slot slot = function
       slot :: slots
   | slot' :: slots -> slot' :: insert_baking_slot slot slots
 
-type state = {
-  genesis: Block_hash.t ;
-  index : Context.index ;
-  mutable delegates: public_key_hash list ;
-  mutable best: Client_baking_blocks.block_info ;
-  mutable future_slots:
-    (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) list ;
-}
-
-let create_state genesis index delegates best =
-  { genesis ;
-    index ;
-    delegates ;
-    best ;
-    future_slots = [] ;
-  }
-
 let drop_old_slots ~before state =
   state.future_slots <-
     List.filter
@@ -514,32 +556,54 @@ let filter_invalid_operations (cctxt : #full) state block_info (operations : pac
   let votes = List.nth operations 1 in
   let anonymous = List.nth operations 2 in
   let managers = List.nth operations 3 in
-  (* TODO log *)
   let validate_operation inc op =
     add_operation inc op >>= function
-    | Error _ -> return None
+    | Error errs ->
+        lwt_log_info "Client-side validation: invalid operation filtered %a\n%a"
+          Operation_hash.pp (Operation.hash_packed op)
+          pp_print_error errs
+        >>= fun () ->
+        return None
     | Ok inc -> return (Some inc)
   in
   let filter_valid_operations inc ops =
     fold_left_s (fun (inc, acc) op ->
         validate_operation inc op >>=? function
         | None -> return (inc, acc)
-        | Some inc -> return (inc, op :: acc)
+        | Some inc' -> return (inc', op :: acc)
       ) (inc, []) ops
   in
-  let is_valid_endorsement endorsement =
-    validate_operation initial_inc endorsement >>=? function
+  (* Invalid endorsements are detected during block finalization *)
+  let is_valid_endorsement inc endorsement =
+    validate_operation inc endorsement >>=? function
     | None -> return None
-    | Some inc -> finalize_construction inc >>= begin function
+    | Some inc' -> finalize_construction inc' >>= begin function
         | Ok _ -> return (Some endorsement)
         | Error _ -> return None
       end
   in
-  filter_map_s is_valid_endorsement endorsements >>=? fun _endorsements ->
   filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
   filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
-  filter_valid_operations inc managers >>=? fun (_, managers) ->
-  return @@ List.map List.rev [ endorsements ; votes ; anonymous ; managers ]
+  filter_valid_operations inc managers >>=? fun (inc, managers) ->
+  (* Gives a chance to the endorser to fund their deposit in the current block *)
+  filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
+  finalize_construction inc >>= function
+  | Error errs ->
+      lwt_log_error "Client-side validation: invalid block built. Building an empty block...\n%a"
+        pp_print_error errs >>= fun () ->
+      return [ [] ; [] ; [] ; [] ]
+  | Ok () ->
+      let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
+      (* This shouldn't happen *)
+      let endorsements =
+        List.sub (List.rev endorsements) state.constants.Constants.parametric.endorsers_per_block
+      in
+      let votes =
+        retain_operations_up_to_quota (List.rev votes) (List.nth quota 1).max_size in
+      let anonymous =
+        retain_operations_up_to_quota (List.rev anonymous) (List.nth quota 2).max_size in
+      (* manager operations size check already occured in classify operations *)
+      return @@ List.map List.rev [ endorsements ; votes ; anonymous ; managers ]
 
 let bake_slot
     cctxt
@@ -562,7 +626,6 @@ let bake_slot
     priority
     name
     Time.pp_hum timestamp >>= fun () ->
-
   (* get and process operations *)
   Alpha_block_services.Mempool.pending_operations cctxt ~chain () >>=? fun mpool ->
   let operations = ops_of_mempool mpool in
@@ -574,17 +637,16 @@ let bake_slot
       None in
   let protocol_data =
     forge_faked_protocol_data ~priority ~seed_nonce_hash in
-  let operations = classify_operations operations in
-  (* Don't validate if current block is genesis *)
+  classify_operations operations >>=? fun operations ->
   begin
-    (* Don't load an alpha context if still in genesis *)
+    (* Don't load an alpha context if the chain is still in genesis *)
     if Protocol_hash.(bi.protocol = bi.next_protocol) then
       filter_invalid_operations cctxt state bi operations
     else
       return operations
   end >>= function
   | Error errs ->
-      lwt_log_error "Error while filtering invalid operations (client-side) :@\n%a"
+      lwt_log_error "Client-side validation: error while filtering invalid operations :@\n%a"
         pp_print_error
         errs >>= fun () ->
       return None
@@ -607,7 +669,8 @@ let bake_slot
             Block_hash.pp_short bi.hash priority
             (Format.pp_print_list
                ~pp_sep:(fun ppf () -> Format.fprintf ppf "+")
-               (fun ppf operations -> Format.fprintf ppf "%d" (List.length operations.Preapply_result.applied)))
+               (fun ppf operations -> Format.fprintf ppf "%d"
+                   (List.length operations.Preapply_result.applied)))
             operations
             total_op_count
             Fitness.pp shell_header.fitness >>= fun () ->
@@ -722,7 +785,8 @@ let create
     | Some t -> t in
   lwt_debug "Opening shell context" >>= fun () ->
   Client_baking_simulator.load_context ~context_path >>= fun index ->
-  let state = create_state genesis_hash index delegates bi in
+  Alpha_services.Constants.all cctxt (`Main, `Head 0) >>=? fun constants ->
+  let state = create_state genesis_hash index delegates constants bi in
   check_error @@ insert_block cctxt ?max_priority state bi >>= fun () ->
 
   (* main loop *)

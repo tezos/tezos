@@ -28,15 +28,13 @@ let begin_construction (_cctxt : #Proto_alpha.full) index predecessor =
   Context.checkout_exn index context >>= fun context ->
   let timestamp = Time.now () in
   let predecessor_hash = predecessor.hash in
-  (* Shell_services.Blocks.header cctxt ~chain:`Main ~block:(`Hash (predecessor_hash, 0)) ()
-   * >>=? fun { shell ; _ } -> *)
   let header : Tezos_base.Block_header.shell_header = Tezos_base.Block_header.{
       predecessor = predecessor_hash ;
-      proto_level = 0 (* shell.proto_level *) ;
-      validation_passes = 0 (* shell.validation_passes *) ;
-      fitness = predecessor.fitness (* shell.fitness *) ;
+      proto_level = 0 ;
+      validation_passes = 0 ;
+      fitness = predecessor.fitness ;
       timestamp ;
-      level = 0l (* shell.level *) ;
+      level = Raw_level.to_int32 predecessor.level ;
       context = Context_hash.zero ;
       operations_hash = Operation_list_list_hash.zero ;
     } in
