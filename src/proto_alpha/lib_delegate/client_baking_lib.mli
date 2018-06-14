@@ -45,14 +45,3 @@ val reveal_nonces :
   #Proto_alpha.full ->
   unit ->
   unit Error_monad.tzresult Lwt.t
-
-(** Initialize the baking daemon *)
-val run_daemon:
-  #Proto_alpha.full ->
-  ?max_priority:int ->
-  endorsement_delay:int ->
-  public_key_hash list ->
-  endorsement:bool ->
-  baking:bool ->
-  denunciation:bool ->
-  unit Error_monad.tzresult Lwt.t

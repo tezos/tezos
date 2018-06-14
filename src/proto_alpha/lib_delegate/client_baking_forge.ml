@@ -18,9 +18,21 @@ let generate_proof_of_work_nonce () =
 let generate_seed_nonce () =
   match Nonce.of_bytes @@
     Rand.generate Constants.nonce_length with
-  | Error _ -> assert false
+  | Error _errs -> assert false
   | Ok nonce -> nonce
 
+let rec retry_call f ?(msg="Call error") ?(n=5) () =
+  f () >>= function
+  | Ok r -> return r
+  | (Error errs) as x ->
+      if n > 0 then
+        begin
+          lwt_log_error "%s\n%a\nRetrying..."
+            msg pp_print_error errs >>= fun () ->
+          Lwt_unix.sleep 1. >>= retry_call f ~msg ~n:(n-1)
+        end
+      else
+        Lwt.return x
 
 let forge_block_header
     (cctxt : #Proto_alpha.full)
@@ -370,14 +382,16 @@ let rec insert_baking_slot slot = function
 
 type state = {
   genesis: Block_hash.t ;
+  index : Context.index ;
   mutable delegates: public_key_hash list ;
   mutable best: Client_baking_blocks.block_info ;
   mutable future_slots:
     (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) list ;
 }
 
-let create_state genesis delegates best =
+let create_state genesis index delegates best =
   { genesis ;
+    index ;
     delegates ;
     best ;
     future_slots = [] ;
@@ -491,6 +505,42 @@ let pop_baking_slots state =
   state.future_slots <- future_slots ;
   slots
 
+
+let filter_invalid_operations (cctxt : #full) state block_info (operations : packed_operation list list) =
+  let open Client_baking_simulator in
+  lwt_debug "Starting client-side validation" >>= fun () ->
+  begin_construction cctxt state.index block_info >>=? fun initial_inc ->
+  let endorsements = List.nth operations 0 in
+  let votes = List.nth operations 1 in
+  let anonymous = List.nth operations 2 in
+  let managers = List.nth operations 3 in
+  (* TODO log *)
+  let validate_operation inc op =
+    add_operation inc op >>= function
+    | Error _ -> return None
+    | Ok inc -> return (Some inc)
+  in
+  let filter_valid_operations inc ops =
+    fold_left_s (fun (inc, acc) op ->
+        validate_operation inc op >>=? function
+        | None -> return (inc, acc)
+        | Some inc -> return (inc, op :: acc)
+      ) (inc, []) ops
+  in
+  let is_valid_endorsement endorsement =
+    validate_operation initial_inc endorsement >>=? function
+    | None -> return None
+    | Some inc -> finalize_construction inc >>= begin function
+        | Ok _ -> return (Some endorsement)
+        | Error _ -> return None
+      end
+  in
+  filter_map_s is_valid_endorsement endorsements >>=? fun _endorsements ->
+  filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
+  filter_valid_operations inc managers >>=? fun (_, managers) ->
+  return @@ List.map List.rev [ endorsements ; votes ; anonymous ; managers ]
+
 let bake_slot
     cctxt
     state
@@ -525,28 +575,46 @@ let bake_slot
   let protocol_data =
     forge_faked_protocol_data ~priority ~seed_nonce_hash in
   let operations = classify_operations operations in
-  Alpha_block_services.Helpers.Preapply.block
-    cctxt ~chain ~block
-    ~timestamp ~sort:true ~protocol_data operations >>= function
+  (* Don't validate if current block is genesis *)
+  begin
+    (* Don't load an alpha context if still in genesis *)
+    if Protocol_hash.(bi.protocol = bi.next_protocol) then
+      filter_invalid_operations cctxt state bi operations
+    else
+      return operations
+  end >>= function
   | Error errs ->
-      lwt_log_error "Error while prevalidating operations:@\n%a"
+      lwt_log_error "Error while filtering invalid operations (client-side) :@\n%a"
         pp_print_error
         errs >>= fun () ->
       return None
-  | Ok (shell_header, operations) ->
-      lwt_debug
-        "Computed candidate block after %a (slot %d): %a/%d fitness: %a"
-        Block_hash.pp_short bi.hash priority
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.fprintf ppf "+")
-           (fun ppf operations -> Format.fprintf ppf "%d" (List.length operations.Preapply_result.applied)))
-        operations
-        total_op_count
-        Fitness.pp shell_header.fitness >>= fun () ->
-      let operations =
-        List.map (fun l -> List.map snd l.Preapply_result.applied) operations in
-      return
-        (Some (bi, priority, shell_header, operations, delegate, seed_nonce_hash))
+  | Ok operations ->
+      retry_call
+        (fun () ->
+           Alpha_block_services.Helpers.Preapply.block
+             cctxt ~chain ~block
+             ~timestamp ~sort:true ~protocol_data operations)
+        ~msg:"Error while prevalidating operations" ()
+      >>= function
+      | Error errs ->
+          lwt_log_error "Error while prevalidating operations:@\n%a"
+            pp_print_error
+            errs >>= fun () ->
+          return None
+      | Ok (shell_header, operations) ->
+          lwt_debug
+            "Computed candidate block after %a (slot %d): %a/%d fitness: %a"
+            Block_hash.pp_short bi.hash priority
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.fprintf ppf "+")
+               (fun ppf operations -> Format.fprintf ppf "%d" (List.length operations.Preapply_result.applied)))
+            operations
+            total_op_count
+            Fitness.pp shell_header.fitness >>= fun () ->
+          let operations =
+            List.map (fun l -> List.map snd l.Preapply_result.applied) operations in
+          return
+            (Some (bi, priority, shell_header, operations, delegate, seed_nonce_hash))
 
 let fittest
     (_, _, (h1: Block_header.shell_header), _, _, _)
@@ -635,6 +703,7 @@ let check_error p =
 let create
     (cctxt : #Proto_alpha.full)
     ?max_priority
+    ~(context_path: string)
     (delegates: public_key_hash list)
     (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t)
     (bi: Client_baking_blocks.block_info) =
@@ -651,7 +720,9 @@ let create
         last_get_block := Some t ;
         t
     | Some t -> t in
-  let state = create_state genesis_hash delegates bi in
+  lwt_debug "Opening shell context" >>= fun () ->
+  Client_baking_simulator.load_context ~context_path >>= fun index ->
+  let state = create_state genesis_hash index delegates bi in
   check_error @@ insert_block cctxt ?max_priority state bi >>= fun () ->
 
   (* main loop *)
@@ -694,16 +765,15 @@ let create
   cctxt#message "Starting the baker" >>= fun () ->
   worker_loop ()
 
-
-
 (* Wrapper around previous [create] function that handles the case of
    unavailable blocks (empty block chain). *)
 let create
     (cctxt : #Proto_alpha.full)
     ?max_priority
+    ~(context_path: string)
     (delegates: public_key_hash list)
     (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t) =
   Client_baking_scheduling.wait_for_first_block
     ~info:cctxt#message
     block_stream
-    (create cctxt ?max_priority delegates block_stream)
+    (create cctxt ?max_priority ~context_path delegates block_stream)

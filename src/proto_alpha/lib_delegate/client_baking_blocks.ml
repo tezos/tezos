@@ -19,6 +19,7 @@ type block_info = {
   protocol: Protocol_hash.t ;
   next_protocol: Protocol_hash.t ;
   level: Raw_level.t ;
+  context : Context_hash.t ;
 }
 
 let raw_info cctxt ?(chain = `Main) hash shell_header =
@@ -27,12 +28,13 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
   Shell_services.Blocks.protocols
     cctxt ~chain ~block () >>=? fun { current_protocol = protocol ;
                                       next_protocol } ->
-  let { Tezos_base.Block_header.predecessor ; fitness ; timestamp ; level ; _ } =
+  let { Tezos_base.Block_header.predecessor ; fitness ;
+        timestamp ; level ; context ; _ } =
     shell_header in
   match Raw_level.of_int32 level with
   | Ok level ->
       return { hash ; chain_id ; predecessor ; fitness ;
-               timestamp ; protocol ; next_protocol ; level }
+               timestamp ; protocol ; next_protocol ; level ; context }
   | Error _ ->
       failwith "Cannot convert level into int32"
 

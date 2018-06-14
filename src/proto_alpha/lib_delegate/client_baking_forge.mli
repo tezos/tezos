@@ -79,6 +79,7 @@ end
 val create:
   #Proto_alpha.full ->
   ?max_priority: int ->
+  context_path: string ->
   public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->
   unit tzresult Lwt.t

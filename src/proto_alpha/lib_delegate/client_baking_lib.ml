@@ -101,31 +101,3 @@ let reveal_nonces cctxt () =
   Client_baking_forge.get_unrevealed_nonces
     cctxt cctxt#block >>=? fun nonces ->
   do_reveal cctxt cctxt#block nonces
-
-let run_daemon cctxt ?max_priority ~endorsement_delay delegates ~endorsement ~baking ~denunciation =
-  let endorser =
-    if endorsement then
-      Client_daemon.Endorser.run cctxt
-        ~delay:endorsement_delay
-        ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
-        delegates >>=? fun () -> return ()
-    else return ()
-  in
-  let baker =
-    if baking then
-      Client_daemon.Baker.run cctxt
-        ?max_priority
-        ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
-        delegates >>=? fun () -> return ()
-    else return ()
-  in
-  let accuser =
-    if denunciation then
-      Client_daemon.Accuser.run cctxt >>=? fun () -> return ()
-    else
-      return ()
-  in
-  endorser >>=? fun () ->
-  baker >>=? fun () ->
-  accuser >>=? fun () ->
-  return ()

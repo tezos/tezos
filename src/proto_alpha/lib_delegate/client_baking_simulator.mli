@@ -10,24 +10,18 @@
 open Proto_alpha
 open Alpha_context
 
-module Endorser : sig
-  val run:
-    #Proto_alpha.full ->
-    delay: int ->
-    ?min_date: Time.t ->
-    public_key_hash list -> unit tzresult Lwt.t
-end
+type incremental = {
+  predecessor: Client_baking_blocks.block_info ;
+  context : Context.t ;
+  state: Main.validation_state ;
+  rev_operations: Operation.packed list ;
+  header: Tezos_base.Block_header.shell_header ;
+}
 
-module Baker : sig
-  val run:
-    #Proto_alpha.full ->
-    ?max_priority: int ->
-    ?min_date: Time.t ->
-    context_path: string ->
-    public_key_hash list -> unit tzresult Lwt.t
-end
+val load_context : context_path:string -> Context.index Lwt.t
 
-module Accuser : sig
-  val run:
-    #Proto_alpha.full -> unit tzresult Lwt.t
-end
+val begin_construction : #Proto_alpha.full -> Context.index -> Client_baking_blocks.block_info -> incremental tzresult Lwt.t
+
+val add_operation : incremental -> Operation.packed -> incremental tzresult Lwt.t
+
+val finalize_construction : incremental -> unit tzresult Lwt.t

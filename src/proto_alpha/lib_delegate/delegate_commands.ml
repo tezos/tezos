@@ -54,14 +54,18 @@ let baker_commands () =
       title = "Commands related to the baker daemon." }
   in
   [
-    command ~group ~desc: "Launch a daemon that handles delegate operations."
+    command ~group ~desc: "Launch the baker daemon."
       (args1 max_priority_arg)
-      (prefixes [ "launch" ]
+      (prefixes [ "launch" ; "with" ; "context" ]
+       @@ string
+         ~name:"Context path"
+         ~desc:"Path to the shell context"
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun max_priority delegates cctxt ->
+      (fun max_priority context_path delegates cctxt ->
          Client_daemon.Baker.run cctxt
            ?max_priority
            ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
+           ~context_path
            (List.map snd delegates)
       )
   ]

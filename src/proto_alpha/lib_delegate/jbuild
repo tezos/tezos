@@ -10,6 +10,7 @@
               tezos-client-base
               tezos-client-alpha
               tezos-client-commands
+              tezos-storage
               tezos-rpc))
   (library_flags (:standard -linkall))
   (modules (:standard \
@@ -22,6 +23,7 @@
                     -open Tezos_client_base
                     -open Tezos_client_alpha
                     -open Tezos_client_commands
+                    -open Tezos_storage
                     -open Tezos_rpc))))
 
 (library

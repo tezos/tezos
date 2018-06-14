@@ -19,6 +19,7 @@ type block_info = {
   protocol: Protocol_hash.t ;
   next_protocol: Protocol_hash.t ;
   level: Raw_level.t ;
+  context : Context_hash.t ;
 }
 
 val info:
