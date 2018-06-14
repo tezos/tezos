@@ -191,16 +191,16 @@ let endorse_for_delegate cctxt { delegate ; block ; slots ; } =
 
 let endorse_for cctxt = function
   | [] -> return []
-  | endorsments ->
+  | endorsements ->
       let done_waiting, still_waiting, errored =
         List.fold_left
-          (fun (r, s, f) ({ timeout } as endorsment) -> match Lwt.state timeout with
-             | Lwt.Return () -> (endorsment :: r, s, f)
-             | Lwt.Sleep -> (r, endorsment :: s, f)
-             | Lwt.Fail _ -> (r, s, endorsment :: f)
+          (fun (r, s, f) ({ timeout } as endorsement) -> match Lwt.state timeout with
+             | Lwt.Return () -> (endorsement :: r, s, f)
+             | Lwt.Sleep -> (r, endorsement :: s, f)
+             | Lwt.Fail _ -> (r, s, endorsement :: f)
           )
           ([], [], [])
-          endorsments
+          endorsements
       in
       iter_p (endorse_for_delegate cctxt) done_waiting >>=? fun () ->
       ignore errored; (* TODO: log *)
