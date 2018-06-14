@@ -117,6 +117,45 @@ let gen_keys_containing
               return ()
             end
 
+let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
+  let rec get_boolean_answer (cctxt : #Client_context.io_wallet) ~default ~msg =
+    let prompt = if default then "(Y/n/q)" else "(y/N/q)" in
+    cctxt#prompt "%s %s: " msg prompt >>=? fun gen ->
+    match default, String.lowercase_ascii gen with
+    | default, "" -> return default
+    | _, "y" -> return true
+    | _, "n" -> return false
+    | _, "q" -> failwith "Exit by user request."
+    | _ -> get_boolean_answer cctxt ~msg ~default in
+  cctxt#prompt "Enter the e-mail used for the paper wallet: " >>=? fun email ->
+  let rec loop_words acc i =
+    if i > 14 then return (List.rev acc) else
+      cctxt#prompt_password "Enter word %d: " i >>=? fun word ->
+      match Bip39.index_of_word (MBytes.to_string word) with
+      | None -> loop_words acc i
+      | Some wordidx -> loop_words (wordidx :: acc) (succ i) in
+  loop_words [] 0 >>=? fun words ->
+  match Bip39.of_indices words with
+  | None -> assert false
+  | Some t ->
+      cctxt#prompt_password
+        "Enter the password used for the paper wallet: " >>=? fun password ->
+      (* TODO: unicode normalization (NFKD)... *)
+      let sk =
+        Bip39.to_seed ~passphrase:(email ^ MBytes.to_string password) t in
+      let sk = Cstruct.(to_bigarray (sub sk 0 32)) in
+      let sk : Signature.Secret_key.t =
+        Ed25519
+          (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk) in
+      let pk = Signature.Secret_key.to_public_key sk in
+      let pkh = Signature.Public_key.hash pk in
+      let msg = Format.asprintf
+          "Your public Tezos address is %a is that correct?"
+          Signature.Public_key_hash.pp pkh in
+      get_boolean_answer cctxt ~msg ~default:true >>=? function
+      | true -> return sk
+      | false -> input_fundraiser_params cctxt
+
 let commands () : Client_context.io_wallet Clic.command list =
   let open Clic in
   let show_private_switch =
@@ -207,6 +246,29 @@ let commands () : Client_context.io_wallet Clic.command list =
            "Tezos address added: %a"
            Signature.Public_key_hash.pp pkh >>= fun () ->
          register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name) ;
+
+    command ~group ~desc: "Add a fundraiser secret key to the wallet."
+      (args1 (Secret_key.force_switch ()))
+      (prefix "import"
+       @@ prefixes [ "fundraiser" ; "secret" ; "key" ]
+       @@ Secret_key.fresh_alias_param
+       @@ stop)
+      (fun force name (cctxt : Client_context.io_wallet) ->
+         Secret_key.of_fresh cctxt force name >>=? fun name ->
+         input_fundraiser_params cctxt >>=? fun sk ->
+         Tezos_signer_backends.Encrypted.encrypt cctxt sk >>=? fun sk_uri ->
+         Client_keys.neuterize sk_uri >>=? fun pk_uri ->
+         begin
+           Public_key.find_opt cctxt name >>=? function
+           | None -> return ()
+           | Some (pk_uri_found, _) ->
+               fail_unless (pk_uri = pk_uri_found || force)
+                 (failure
+                    "public and secret keys '%s' don't correspond, \
+                     please don't use -force" name)
+         end >>=? fun () ->
+         Client_keys.public_key_hash pk_uri >>=? fun (pkh, _public_key) ->
+         register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
 
     command ~group ~desc: "Add a public key to the wallet."
       (args1 (Public_key.force_switch ()))
