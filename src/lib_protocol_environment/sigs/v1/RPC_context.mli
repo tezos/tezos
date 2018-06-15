@@ -1,3 +1,11 @@
+(**************************************************************************)
+(*                                                                        *)
+(*    Copyright (c) 2014 - 2018.                                          *)
+(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
+(*                                                                        *)
+(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
+(*                                                                        *)
+(**************************************************************************)
 
 type t = Updater.rpc_context
 
@@ -52,4 +60,3 @@ val make_opt_call2:
 val make_opt_call3:
   ([< RPC_service.meth ], t, ((t * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
   'pr #simple -> 'pr -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o option shell_tzresult Lwt.t
-
