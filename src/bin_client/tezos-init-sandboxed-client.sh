@@ -12,16 +12,15 @@ init_sandboxed_client() {
     rpc=$((18730 + id))
     client_dir="$(mktemp -d -t tezos-tmp-client.XXXXXXXX)"
     client_dirs+=("$client_dir")
+    signer="$local_signer -d $client_dir"
     if [ -n "$USE_TLS" ]; then
         client="$local_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         admin_client="$local_admin_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         alpha_baker="$local_alpha_baker -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-        signer="$local_signer -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
     else
         client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         alpha_baker="$local_alpha_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-        signer="$local_signer -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
     fi
     parameters_file="${parameters_file:-$client_dir/protocol_parameters.json}"
 
@@ -247,7 +246,7 @@ main () {
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
         local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
         local_alpha_baker="${local_alpha_baker:-$bin_dir/../../_build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe}"
-        local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_client/main_signer.exe}"
+        local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_signer/main_signer.exe}"
         parameters_file="${parameters_file:-$bin_dir/../../scripts/protocol_parameters.json}"
     else
 	# we assume a clean install with tezos-(admin-)client in the path
