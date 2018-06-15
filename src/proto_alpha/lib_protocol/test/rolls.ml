@@ -49,7 +49,7 @@ let check_no_rolls (b : Block.t) (account:Account.t) =
 
 let simple_staking_rights () =
   Context.init 2 >>=? fun (b,accounts) ->
-  let (a1, a2) = account_pair accounts in
+  let (a1, _a2) = account_pair accounts in
 
   Context.Contract.balance (B b) a1 >>=? fun balance ->
   Context.Contract.manager (B b) a1 >>=? fun m1 ->
@@ -107,8 +107,8 @@ let run_until_deactivation () =
 
 let deactivation_then_bake () =
   run_until_deactivation () >>=?
-  fun (b, ((deactivated_contract, deactivated_account) as deactivated, _start_balance),
-       (a2, m2)) ->
+  fun (b, ((_deactivated_contract, deactivated_account) as deactivated, _start_balance),
+       (_a2, _m2)) ->
 
   Block.bake ~policy:(By_account deactivated_account.pkh) b >>=? fun b ->
 
@@ -118,7 +118,7 @@ let deactivation_then_bake () =
 let deactivation_then_self_delegation () =
   run_until_deactivation () >>=?
   fun (b, ((deactivated_contract, deactivated_account) as deactivated, start_balance),
-       (a2, m2)) ->
+       (_a2, m2)) ->
 
   Op.delegation (B b) deactivated_contract (Some deactivated_account.pkh) >>=? fun self_delegation ->
 
