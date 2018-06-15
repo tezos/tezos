@@ -88,7 +88,7 @@ stack pattern. Finally, some rules add extra conditions over the values
 in the stack that follow the ``iff`` keyword. Sometimes, several rules
 may apply in a given context. In this case, the one that appears first
 in this specification is to be selected. If no rule applies, the result
-is equivalent to the one for the explicit ``FAIL`` instruction. This
+is equivalent to the one for the explicit ``FAILWITH`` instruction. This
 case does not happen on well-typed programs, as explained in the next
 section.
 
@@ -118,7 +118,7 @@ identify parts that can be used to build the result stack of the rule.
 
 If the partial result pattern does not actually match the result of the
 interpretation, then the result of the whole rule is equivalent to the
-one for the explicit ``FAIL`` instruction. Again, this case does not
+one for the explicit ``FAILWITH`` instruction. Again, this case does not
 happen on well-typed programs, as explained in the next section.
 
 Format of patterns
@@ -383,19 +383,19 @@ IV - Core instructions
 Control structures
 ~~~~~~~~~~~~~~~~~~
 
--  ``FAIL``: Explicitly abort the current program.
+-  ``FAILWITH``: Explicitly abort the current program.
 
-   :: \_ -> \_
+   'a :: \_ -> \_
 
-   This special instruction is callable in any context, since it does
-   not use its input stack (first rule below), and makes the output
-   useless since all subsequent instruction will simply ignore their
-   usual semantics to propagate the failure up to the main result
+   This special instruction aborts the current program exposing the top
+   of the stack in its error message (first rule below). It makes the
+   output useless since all subsequent instructions will simply ignore
+   their usual semantics to propagate the failure up to the main result
    (second rule below). Its type is thus completely generic.
 
 ::
 
-    > FAIL / _  =>  [FAILED]
+    > FAILWITH / a : _  =>  [FAILED]
     > _ / [FAILED]  =>  [FAILED]
 
 -  ``{ I ; C }``: Sequence.
@@ -745,7 +745,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     > LSL / x : s : S  =>  (x << s) : S
         iff   s <= 256
-    > LSL / x : s : S  =>  [FAIL]
+    > LSL / x : s : S  =>  [FAILED]
         iff   s > 256
 
 -  ``LSR``
@@ -1244,7 +1244,7 @@ types by mistake. They are also mandatory checked for under/overflows.
 
     :: tez : tez : 'S   ->   tez : 'S
 
-    > ADD / x : y : S  =>  [FAIL]   on overflow
+    > ADD / x : y : S  =>  [FAILED]   on overflow
     > ADD / x : y : S  =>  (x + y) : S
 
 -  ``SUB``:
@@ -1253,7 +1253,7 @@ types by mistake. They are also mandatory checked for under/overflows.
 
     :: tez : tez : 'S   ->   tez : 'S
 
-    > SUB / x : y : S  =>  [FAIL]
+    > SUB / x : y : S  =>  [FAILED]
         iff   x < y
     > SUB / x : y : S  =>  (x - y) : S
 
@@ -1264,7 +1264,7 @@ types by mistake. They are also mandatory checked for under/overflows.
     :: tez : nat : 'S   ->   tez : 'S
     :: nat : tez : 'S   ->   tez : 'S
 
-    > MUL / x : y : S  =>  [FAIL]   on overflow
+    > MUL / x : y : S  =>  [FAILED]   on overflow
     > MUL / x : y : S  =>  (x * y) : S
 
 -  ``EDIV``
@@ -1506,6 +1506,17 @@ combinators, and also for branching.
 
     > IFCMP(\op) / S  =>  COMPARE ; (\op) ; IF bt bf / S
 
+Fail
+~~~~
+
+The ``FAIL`` macros is equivalent to ``UNIT; FAILWITH`` and is callable
+in any context since it does not use its input stack.
+
+-  ``FAIL``
+
+::
+
+    > FAIL / S  =>  UNIT; FAILWITH / S
 
 Assertion Macros
 ~~~~~~~~~~~~~~~~
@@ -1962,7 +1973,7 @@ The instructions which do not accept any variable annotations are:
    LOOP
    LOOP_LEFT
    DIP
-   FAIL
+   FAILWITH
 
 The instructions which accept at most one variable annotation are:
 
@@ -2879,7 +2890,9 @@ XII - Full grammar
       | LAMBDA <type> <type> { <instruction> ... }
       | EXEC
       | DIP { <instruction> ... }
-      | FAIL
+      | FAILWITH
+      | CAST
+      | RENAME
       | CONCAT
       | ADD
       | SUB
