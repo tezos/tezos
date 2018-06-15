@@ -7,6 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type frozen_balance = {
+  deposit : Tez_repr.t ;
+  fees : Tez_repr.t ;
+  rewards : Tez_repr.t ;
+}
+
 (** Is the contract eligible to delegation ? *)
 val is_delegatable:
   Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
@@ -91,7 +97,7 @@ val cycle_end:
     cycle. Returns the burned amount. *)
 val punish:
   Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t ->
-  (Raw_context.t * Tez_repr.t) tzresult Lwt.t
+  (Raw_context.t * frozen_balance) tzresult Lwt.t
 
 (** Has the given key some frozen tokens in its implicit contract? *)
 val has_frozen_balance:
@@ -103,12 +109,6 @@ val has_frozen_balance:
 val frozen_balance:
   Raw_context.t -> Signature.Public_key_hash.t ->
   Tez_repr.t tzresult Lwt.t
-
-type frozen_balance = {
-  deposit : Tez_repr.t ;
-  fees : Tez_repr.t ;
-  rewards : Tez_repr.t ;
-}
 
 val frozen_balance_encoding: frozen_balance Data_encoding.t
 val frozen_balance_by_cycle_encoding:

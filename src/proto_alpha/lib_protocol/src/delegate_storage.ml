@@ -7,6 +7,22 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type frozen_balance = {
+  deposit : Tez_repr.t ;
+  fees : Tez_repr.t ;
+  rewards : Tez_repr.t ;
+}
+
+let frozen_balance_encoding =
+  let open Data_encoding in
+  conv
+    (fun { deposit ; fees ; rewards } -> (deposit, fees, rewards))
+    (fun (deposit, fees, rewards) -> { deposit ; fees ; rewards })
+    (obj3
+       (req "deposit" Tez_repr.encoding)
+       (req "fees" Tez_repr.encoding)
+       (req "rewards" Tez_repr.encoding))
+
 type error +=
   | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
   | No_deletion of Signature.Public_key_hash.t (* `Permanent *)
@@ -357,13 +373,14 @@ let punish ctxt delegate cycle =
   let contract = Contract_repr.implicit_contract delegate in
   get_frozen_deposit ctxt contract cycle >>=? fun deposit ->
   get_frozen_fees ctxt contract cycle >>=? fun fees ->
+  get_frozen_rewards ctxt contract cycle >>=? fun rewards ->
   Roll_storage.Delegate.remove_amount ctxt delegate deposit >>=? fun ctxt ->
   Roll_storage.Delegate.remove_amount ctxt delegate fees >>=? fun ctxt ->
+  (* Rewards are not in the delegate balnace yet... *)
   Storage.Contract.Frozen_deposits.remove (ctxt, contract) cycle >>= fun ctxt ->
   Storage.Contract.Frozen_fees.remove (ctxt, contract) cycle >>= fun ctxt ->
   Storage.Contract.Frozen_rewards.remove (ctxt, contract) cycle >>= fun ctxt ->
-  Lwt.return Tez_repr.(deposit +? fees) >>=? fun burned ->
-  return (ctxt, burned)
+  return (ctxt, { deposit ; fees ; rewards })
 
 
 let has_frozen_balance ctxt delegate cycle =
@@ -376,22 +393,6 @@ let has_frozen_balance ctxt delegate cycle =
     else
       get_frozen_rewards ctxt contract cycle >>=? fun rewards ->
       return Tez_repr.(rewards <> zero)
-
-type frozen_balance = {
-  deposit : Tez_repr.t ;
-  fees : Tez_repr.t ;
-  rewards : Tez_repr.t ;
-}
-
-let frozen_balance_encoding =
-  let open Data_encoding in
-  conv
-    (fun { deposit ; fees ; rewards } -> (deposit, fees, rewards))
-    (fun (deposit, fees, rewards) -> { deposit ; fees ; rewards })
-    (obj3
-       (req "deposit" Tez_repr.encoding)
-       (req "fees" Tez_repr.encoding)
-       (req "rewards" Tez_repr.encoding))
 
 let frozen_balance_by_cycle_encoding =
   let open Data_encoding in

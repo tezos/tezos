@@ -162,12 +162,21 @@ let apply_operation
         match mode with
         | Partial_application
             { block_header = { shell = { predecessor ; _ } ; _ } ; _ }
-        | Partial_construction { predecessor }
         | Application
             { block_header = { shell = { predecessor ; _ } ; _ } ; _ }
         | Full_construction { predecessor ; _ } ->
+            predecessor
+        | Partial_construction { predecessor } ->
             predecessor in
-      Apply.apply_operation ctxt Optimized predecessor
+      let baker =
+        match mode with
+        | Partial_application { baker ; _ }
+        | Application { baker ; _ }
+        | Full_construction { baker ; _ } ->
+            baker
+        | Partial_construction _ ->
+            Signature.Public_key_hash.zero in
+      Apply.apply_operation ctxt Optimized predecessor baker
         (Alpha_context.Operation.hash operation)
         operation >>=? fun (ctxt, result) ->
       let op_count = op_count + 1 in

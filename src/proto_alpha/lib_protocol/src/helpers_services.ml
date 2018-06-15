@@ -227,18 +227,19 @@ module Scripts = struct
       let operation : _ operation = { shell ; protocol_data } in
       let hash = Operation.hash { shell ; protocol_data } in
       let ctxt = Contract.init_origination_nonce ctxt hash in
+      let baker = Signature.Public_key_hash.zero in
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Readable op >>= fun (_ctxt, result) ->
+          Apply.apply_manager_contents_list ctxt Readable baker op >>= fun (_ctxt, result) ->
           return result
       | Cons (Manager_operation _, _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Readable op >>= fun (_ctxt, result) ->
+          Apply.apply_manager_contents_list ctxt Readable baker op >>= fun (_ctxt, result) ->
           return result
       | _ ->
           Apply.apply_contents_list
-            ctxt Readable shell.branch operation
+            ctxt Readable shell.branch baker operation
             operation.protocol_data.contents >>=? fun (_ctxt, result) ->
           return result
 

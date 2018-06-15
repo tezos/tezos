@@ -625,9 +625,15 @@ module Delegate : sig
   val cycle_end:
     context -> Cycle.t -> Nonce.unrevealed list -> context tzresult Lwt.t
 
+  type frozen_balance = {
+    deposit : Tez.t ;
+    fees : Tez.t ;
+    rewards : Tez.t ;
+  }
+
   val punish:
     context -> public_key_hash -> Cycle.t ->
-    (context * Tez.t) tzresult Lwt.t
+    (context * frozen_balance) tzresult Lwt.t
 
   val full_balance:
     context -> public_key_hash -> Tez.t tzresult Lwt.t
@@ -638,12 +644,6 @@ module Delegate : sig
 
   val frozen_balance:
     context -> public_key_hash -> Tez.t tzresult Lwt.t
-
-  type frozen_balance = {
-    deposit : Tez.t ;
-    fees : Tez.t ;
-    rewards : Tez.t ;
-  }
 
   val frozen_balance_encoding: frozen_balance Data_encoding.t
   val frozen_balance_by_cycle_encoding: frozen_balance Cycle.Map.t Data_encoding.t

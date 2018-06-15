@@ -322,6 +322,17 @@ let () =
 
 open Apply_operation_result
 
+(**
+   Transaction: source/payer A -> destination B
+   - payer: is the signer of the operation, the one that pays the storage fee.
+   This fee is not going to the baker but it will be burned.
+   - source: is the one who will pay for the fees: space and gas consumption.
+   This amount will go to the baker.
+   - internal: set to true in the case of transaction between smart contracts.
+   Where there is a new storage cost for each smart contract may occurs. The
+   source may not be the same A any more.
+*)
+
 let apply_manager_operation_content :
   type kind.
   ( Alpha_context.t -> Script_ir_translator.unparsing_mode -> payer:Contract.t -> source:Contract.t ->
@@ -498,12 +509,13 @@ let precheck_manager_contents
   return ctxt
 
 let apply_manager_contents
-    (type kind) ctxt mode (op : kind Kind.manager contents)
+    (type kind) ctxt mode baker (op : kind Kind.manager contents)
   : (context * kind Kind.manager contents_result) tzresult Lwt.t =
   let Manager_operation
       { source ; fee ; operation ; gas_limit ; storage_limit } = op in
   Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
   Lwt.return (Contract.set_storage_limit ctxt storage_limit) >>=? fun ctxt ->
+  let level = Level.current ctxt in
   apply_manager_operation_content ctxt mode
     ~source ~payer:source ~internal:false operation >>= begin function
     | Ok (ctxt, operation_results, internal_operations) -> begin
@@ -524,8 +536,10 @@ let apply_manager_contents
           Manager_operation_result
             { balance_updates =
                 cleanup_balance_updates
-                  [ Contract source, Debited fee ;
-                    (* FIXME: add credit to the baker *) ] ;
+                  [
+                    Contract source, Debited fee ;
+                    Rewards (baker, level.cycle), Credited fee
+                  ] ;
               operation_result ;
               internal_operation_results })
 
@@ -561,12 +575,12 @@ let rec precheck_manager_contents_list
 
 let rec apply_manager_contents_list
   : type kind.
-    Alpha_context.t -> _ -> kind Kind.manager contents_list ->
+    Alpha_context.t -> _ -> _ -> kind Kind.manager contents_list ->
     (context * kind Kind.manager contents_result_list) Lwt.t =
-  fun ctxt mode contents_list ->
+  fun ctxt mode baker contents_list ->
     match contents_list with
     | Single (Manager_operation { operation ; _ } as op) -> begin
-        apply_manager_contents ctxt mode op >>= function
+        apply_manager_contents ctxt mode baker op >>= function
         | Error errors ->
             let result =
               Manager_operation_result {
@@ -584,7 +598,7 @@ let rec apply_manager_contents_list
             Lwt.return (ctxt, Single_result (result))
       end
     | Cons (Manager_operation { operation ; _ } as op, rest) ->
-        apply_manager_contents ctxt mode op >>= function
+        apply_manager_contents ctxt mode baker op >>= function
         | Error errors ->
             let result =
               Manager_operation_result {
@@ -595,7 +609,7 @@ let rec apply_manager_contents_list
             Lwt.return (ctxt, Cons_result (result, mark_skipped rest))
         | Ok (ctxt, (Manager_operation_result
                        { operation_result = Applied _ ; _ } as result)) ->
-            apply_manager_contents_list ctxt mode rest >>= fun (ctxt, results) ->
+            apply_manager_contents_list ctxt mode baker rest >>= fun (ctxt, results) ->
             Lwt.return (ctxt, Cons_result (result, results))
         | Ok (ctxt,
               (Manager_operation_result
@@ -603,7 +617,7 @@ let rec apply_manager_contents_list
             Lwt.return (ctxt, Cons_result (result, mark_skipped rest))
 
 let apply_contents_list
-    (type kind) ctxt mode pred_block
+    (type kind) ctxt mode pred_block baker
     (operation : kind operation)
     (contents_list : kind contents_list)
   : (context * kind contents_result_list) tzresult Lwt.t =
@@ -637,7 +651,11 @@ let apply_contents_list
       let seed_nonce_revelation_tip =
         Constants.seed_nonce_revelation_tip ctxt in
       add_rewards ctxt seed_nonce_revelation_tip >>=? fun ctxt ->
-      return (ctxt, Single_result (Seed_nonce_revelation_result [(* FIXME *)]))
+      return (ctxt, Single_result
+                (Seed_nonce_revelation_result
+                   [
+                     Rewards (baker, level.cycle), Credited seed_nonce_revelation_tip
+                   ]))
   | Single (Double_endorsement_evidence { op1 ; op2 }) -> begin
       match op1.protocol_data.contents, op2.protocol_data.contents with
       | Single (Endorsement e1),
@@ -662,13 +680,22 @@ let apply_contents_list
                { delegate1 ; delegate2 }) >>=? fun () ->
           Delegate.has_frozen_balance ctxt delegate1 level.cycle >>=? fun valid ->
           fail_unless valid Unrequired_double_endorsement_evidence >>=? fun () ->
-          Delegate.punish ctxt delegate1 level.cycle >>=? fun (ctxt, burned) ->
+          Delegate.punish ctxt delegate1 level.cycle >>=? fun (ctxt, balance) ->
+          Lwt.return Tez.(balance.deposit +? balance.fees) >>=? fun burned ->
           let reward =
             match Tez.(burned /? 2L) with
             | Ok v -> v
             | Error _ -> Tez.zero in
           add_rewards ctxt reward >>=? fun ctxt ->
-          return (ctxt, Single_result (Double_endorsement_evidence_result [(* FIXME *)]))
+          return
+            (ctxt,
+             Single_result
+               (Double_endorsement_evidence_result [
+                   Rewards (baker, level.cycle), Credited reward;
+                   Rewards (delegate1, level.cycle), Debited balance.rewards;
+                   Deposits (delegate1, level.cycle), Debited balance.deposit;
+                   Fees (delegate1, level.cycle), Debited balance.fees
+                 ]))
       | _, _ -> fail Invalid_double_endorsement_evidence
     end
   | Single (Double_baking_evidence { bh1 ; bh2 }) ->
@@ -708,13 +735,22 @@ let apply_contents_list
       let delegate = Signature.Public_key.hash delegate1 in
       Delegate.has_frozen_balance ctxt delegate level.cycle >>=? fun valid ->
       fail_unless valid Unrequired_double_baking_evidence >>=? fun () ->
-      Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, burned) ->
+      Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, balance) ->
+      Lwt.return Tez.(balance.deposit +? balance.fees) >>=? fun burned ->
       let reward =
         match Tez.(burned /? 2L) with
         | Ok v -> v
         | Error _ -> Tez.zero in
       add_rewards ctxt reward >>=? fun ctxt ->
-      return (ctxt, Single_result (Double_baking_evidence_result [(* FIXME *)]))
+      return
+        (ctxt,
+         Single_result
+           (Double_baking_evidence_result [
+               Rewards (baker, level.cycle), Credited reward ;
+               Rewards (delegate, level.cycle), Debited balance.rewards ;
+               Deposits (delegate, level.cycle), Debited balance.deposit ;
+               Fees (delegate, level.cycle), Debited balance.fees ;
+             ]))
   | Single (Activate_account { id = pkh ; activation_code }) -> begin
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh in
@@ -722,8 +758,13 @@ let apply_contents_list
       | None -> fail (Invalid_activation { pkh })
       | Some amount ->
           Commitment.delete ctxt blinded_pkh >>=? fun ctxt ->
-          Contract.(credit ctxt (implicit_contract (Signature.Ed25519 pkh)) amount) >>=? fun ctxt ->
-          return (ctxt, Single_result (Activate_account_result [(* FIXME *)]))
+          let contract = Contract.implicit_contract (Signature.Ed25519 pkh) in
+          Contract.(credit ctxt contract amount) >>=? fun ctxt ->
+          return (ctxt, Single_result (
+              Activate_account_result
+                [
+                  Contract contract, Credited amount
+                ]))
     end
   | Single (Proposals { source ; period ; proposals }) ->
       Roll.delegate_pubkey ctxt source >>=? fun delegate ->
@@ -743,17 +784,17 @@ let apply_contents_list
       return (ctxt, Single_result Ballot_result)
   | Single (Manager_operation _) as op ->
       precheck_manager_contents_list ctxt operation op >>=? fun ctxt ->
-      apply_manager_contents_list ctxt mode op >>= fun (ctxt, result) ->
+      apply_manager_contents_list ctxt mode baker op >>= fun (ctxt, result) ->
       return (ctxt, result)
   | Cons (Manager_operation _, _) as op ->
       precheck_manager_contents_list ctxt operation op >>=? fun ctxt ->
-      apply_manager_contents_list ctxt mode op >>= fun (ctxt, result) ->
+      apply_manager_contents_list ctxt mode baker op >>= fun (ctxt, result) ->
       return (ctxt, result)
 
-let apply_operation ctxt mode pred_block hash operation =
+let apply_operation ctxt mode pred_block baker hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash in
   apply_contents_list
-    ctxt mode pred_block operation
+    ctxt mode pred_block baker operation
     operation.protocol_data.contents >>=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
   let ctxt = Contract.set_storage_unlimited ctxt in
