@@ -315,6 +315,7 @@ let may_patch_limits
 let inject_operation
     (type kind) cctxt ~chain ~block
     ?confirmations ?branch ?src_sk (contents: kind contents_list)  =
+  Client_confirmations.wait_for_bootstrapped cctxt >>=? fun () ->
   may_patch_limits
     cctxt ~chain ~block ?branch contents >>=? fun contents ->
   preapply cctxt ~chain ~block
