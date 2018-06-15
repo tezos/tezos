@@ -532,7 +532,23 @@ module Encoding = struct
                           { op with operation_result = Applied res })
               | None -> None
             end
-          | _ -> None) ;
+          | Contents_result
+              (Manager_operation_result
+                 ({ operation_result = Skipped _ ; _ } as op)) ->
+                  Some (Manager_operation_result
+                          { op with operation_result = Skipped res_case.kind })
+          | Contents_result
+              (Manager_operation_result
+                 ({ operation_result = Failed (_, errs) ; _ } as op)) ->
+                  Some (Manager_operation_result
+                          { op with operation_result = Failed (res_case.kind, errs) })
+          | Contents_result Ballot_result -> None
+          | Contents_result (Endorsements_result _) -> None
+          | Contents_result (Seed_nonce_revelation_result _) -> None
+          | Contents_result (Double_endorsement_evidence_result _) -> None
+          | Contents_result (Double_baking_evidence_result _) -> None
+          | Contents_result (Activate_account_result _) -> None
+          | Contents_result Proposals_result -> None) ;
       mselect ;
       proj =
         (fun (Manager_operation_result
