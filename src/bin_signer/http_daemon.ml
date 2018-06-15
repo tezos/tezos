@@ -22,10 +22,10 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~require_auth mode 
   let dir =
     RPC_directory.register0 dir Signer_services.authorized_keys begin fun () () ->
       if require_auth then
-        return None
-      else
         Handler.Authorized_key.load cctxt >>=? fun keys ->
         return (Some (keys |> List.split |> snd |> List.map Signature.Public_key.hash))
+      else
+        return None
     end in
   Lwt.catch
     (fun () ->
