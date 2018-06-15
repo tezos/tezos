@@ -7,12 +7,29 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type level = Lwt_log_core.level =
+  | Debug
+  (** Debugging message. They can be automatically removed by the
+      syntax extension. *)
+  | Info
+  (** Informational message. Suitable to be displayed when the
+      program is in verbose mode. *)
+  | Notice
+  (** Same as {!Info}, but is displayed by default. *)
+  | Warning
+  (** Something strange happend *)
+  | Error
+  (** An error message, which should not means the end of the
+      program. *)
+  | Fatal
+
 (** Unique tag for a logging module.
     Match against, e.g. `Logging.Core.Section`.  *)
 type log_section = private ..
 
 type log_message = {
   section : log_section ;
+  level : level ;
   text : string ;
   tags : Tag.set ;
 }
@@ -90,22 +107,6 @@ module Make(S: sig val name: string end) : LOG
 module Make_unregistered(S: sig val name: string end) : LOG
 
 module Make_semantic(S: MESSAGE) : SEMLOG
-
-type level = Lwt_log_core.level =
-  | Debug
-  (** Debugging message. They can be automatically removed by the
-      syntax extension. *)
-  | Info
-  (** Informational message. Suitable to be displayed when the
-      program is in verbose mode. *)
-  | Notice
-  (** Same as {!Info}, but is displayed by default. *)
-  | Warning
-  (** Something strange happend *)
-  | Error
-  (** An error message, which should not means the end of the
-      program. *)
-  | Fatal
 
 type template = Lwt_log.template
 val default_template : template

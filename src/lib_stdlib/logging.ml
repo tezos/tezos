@@ -16,10 +16,27 @@ module type MESSAGE = sig
   val name: string
 end
 
+type level = Lwt_log_core.level =
+  | Debug
+  (** Debugging message. They can be automatically removed by the
+      syntax extension. *)
+  | Info
+  (** Informational message. Suitable to be displayed when the
+      program is in verbose mode. *)
+  | Notice
+  (** Same as {!Info}, but is displayed by default. *)
+  | Warning
+  (** Something strange happend *)
+  | Error
+  (** An error message, which should not means the end of the
+      program. *)
+  | Fatal
+
 type log_section = ..
 
 type log_message = {
   section : log_section ;
+  level : level ;
   text : string ;
   tags : Tag.set ;
 }
@@ -92,13 +109,13 @@ module Make_semantic(S : MESSAGE) : SEMLOG = struct
       fun format ?(tags=Tag.empty) ->
         Format.kasprintf
           (fun text ->
-             call_taps { section = Section ; text ; tags };
+             call_taps { section = Section ; level ; text ; tags };
              Lwt_log_core.log ~section ~level text)
           format
     else
       fun format ?(tags=Tag.empty) ->
         Format.ikfprintf
-          (fun _ -> call_taps { section = Section ; text = "" ; tags }; Lwt.return_unit)
+          (fun _ -> call_taps { section = Section ; level ; text = "" ; tags }; Lwt.return_unit)
           Format.std_formatter
           format
 
@@ -107,13 +124,13 @@ module Make_semantic(S : MESSAGE) : SEMLOG = struct
       fun format ?(tags=Tag.empty) ->
         Format.kasprintf
           (fun text ->
-             call_taps { section = Section ; text ; tags };
+             call_taps { section = Section ; level ; text ; tags };
              Lwt_log_core.ign_log ~section ~level text)
           format
     else
       fun format ?(tags=Tag.empty) ->
         Format.ikfprintf
-          (fun _ -> call_taps { section = Section ; text = "" ; tags })
+          (fun _ -> call_taps { section = Section ; level ; text = "" ; tags })
           Format.std_formatter
           format
 
@@ -170,7 +187,7 @@ module Make_unregistered(S : sig val name: string end) : LOG = struct
     else
       Format.kasprintf
         (fun msg ->
-           call_taps { section = Section ; text = msg ; tags = Tag.empty };
+           call_taps { section = Section ; level ; text = msg ; tags = Tag.empty };
            Lwt_log_core.log ?exn ~section ?location ?logger ~level msg)
         format
 
@@ -181,7 +198,7 @@ module Make_unregistered(S : sig val name: string end) : LOG = struct
     else
       Format.kasprintf
         (fun msg ->
-           call_taps { section = Section ; text = msg ; tags = Tag.empty };
+           call_taps { section = Section ; level ; text = msg ; tags = Tag.empty };
            Lwt_log_core.ign_log ?exn ~section ?location ?logger ~level msg)
         format
 
@@ -213,22 +230,6 @@ module Core = struct
 
   let worker = Tag.def ~doc:"Name of affected worker" "worker" Format.pp_print_text
 end
-
-type level = Lwt_log_core.level =
-  | Debug
-  (** Debugging message. They can be automatically removed by the
-      syntax extension. *)
-  | Info
-  (** Informational message. Suitable to be displayed when the
-      program is in verbose mode. *)
-  | Notice
-  (** Same as {!Info}, but is displayed by default. *)
-  | Warning
-  (** Something strange happend *)
-  | Error
-  (** An error message, which should not means the end of the
-      program. *)
-  | Fatal
 
 type template = Lwt_log_core.template
 let default_template = "$(date) - $(section): $(message)"
