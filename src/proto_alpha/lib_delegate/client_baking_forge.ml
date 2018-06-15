@@ -150,6 +150,12 @@ let inject_block
     src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
   Shell_services.Injection.block cctxt
     ?force ~chain signed_header operations >>=? fun block_hash ->
+  lwt_log_info Tag.DSL.(fun f ->
+      f "Client_baking_forge.inject_block: inject %a"
+      -% t event "inject_baked_block"
+      -% a Block_hash.Logging.tag block_hash
+      -% t signed_header_tag signed_header
+      -% t operations_tag operations) >>= fun () ->
   return block_hash
 
 type error += Failed_to_preapply of Tezos_base.Operation.t * error list

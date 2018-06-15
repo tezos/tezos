@@ -137,6 +137,7 @@ let endorse_for_delegate cctxt block delegate =
       -% a Block_hash.Logging.tag hash
       -% a level_tag level
       -% s Client_keys.Logging.tag name
+      -% t Signature.Public_key_hash.Logging.tag delegate
       -% a Operation_hash.Logging.tag oph) >>= fun () ->
   return_unit
 
