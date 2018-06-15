@@ -130,9 +130,12 @@ let max_binding_opt s = option_map snd @@ TagSet.max_binding_opt s
 let choose s = snd @@ TagSet.choose s
 let choose_opt s = option_map snd @@ TagSet.choose_opt s
 let split tag s = (fun (l,m,r) -> (l,unveil tag m,r)) @@ TagSet.split (Key.V tag) s
-(* XXX find should be different from find_opt but Logs has find_opt called find *)
+(* In order to match the usual interface for maps, `find` should be different from
+   `find_opt` but `Logs` has `find_opt` called `find` so we favor that. *)
 let find tag s = option_bind (reveal tag) @@ TagSet.find_opt (Key.V tag) s
 let find_opt tag s = option_bind (reveal tag) @@ TagSet.find_opt (Key.V tag) s
+(* This would usually be called `find` but `Logs` has it with this name.  We can't
+   have it at both named because `Logs` has `find_opt` as `find`. *)
 let get tag s = find_opt tag s |> function
   | None -> invalid_arg (Format.asprintf "tag named %s not found in set" (name tag))
   | Some v -> v

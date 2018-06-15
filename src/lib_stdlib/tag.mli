@@ -77,6 +77,7 @@ val max_binding_opt : set -> t option
 val choose : set -> t
 val choose_opt : set -> t option
 val split : 'a def -> set -> set * 'a option * set
+val find_opt : 'a def -> set -> 'a option
 val find : 'a def -> set -> 'a option
 val get : 'a def -> set -> 'a
 val find_first : (Key.t -> bool) -> set -> t
