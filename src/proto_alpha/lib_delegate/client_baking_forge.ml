@@ -15,8 +15,12 @@ include Logging.Make(struct let name = "client.baking" end)
 type state = {
   genesis: Block_hash.t ;
   index : Context.index ;
+
+  (* Only mutated once for caching/lazy initialisation *)
   mutable delegates: public_key_hash list ;
-  constants : Constants.t ;
+  mutable constants : Constants.t option ;
+
+  (* truly mutable *)
   mutable best: Client_baking_blocks.block_info ;
   mutable future_slots:
     (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) list ;
@@ -500,6 +504,14 @@ let get_delegates cctxt state =
       return delegates
   | _ :: _ as delegates -> return delegates
 
+let get_constants cctxt state =
+  match state.constants with
+  | None ->
+      Alpha_services.Constants.all cctxt (`Main, `Head 0) >>=? fun constants ->
+      state.constants <- Some constants;
+      return constants
+  | Some constants -> return constants
+
 
 
 let insert_block
@@ -595,8 +607,9 @@ let filter_invalid_operations (cctxt : #full) state block_info (operations : pac
   | Ok () ->
       let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
       (* This shouldn't happen *)
+      get_constants cctxt state >>=? fun constants ->
       let endorsements =
-        List.sub (List.rev endorsements) state.constants.Constants.parametric.endorsers_per_block
+        List.sub (List.rev endorsements) constants.Constants.parametric.endorsers_per_block
       in
       let votes =
         retain_operations_up_to_quota (List.rev votes) (List.nth quota 1).max_size in
@@ -785,8 +798,7 @@ let create
     | Some t -> t in
   lwt_debug "Opening shell context" >>= fun () ->
   Client_baking_simulator.load_context ~context_path >>= fun index ->
-  Alpha_services.Constants.all cctxt (`Main, `Head 0) >>=? fun constants ->
-  let state = create_state genesis_hash index delegates constants bi in
+  let state = create_state genesis_hash index delegates None bi in
   check_error @@ insert_block cctxt ?max_priority state bi >>= fun () ->
 
   (* main loop *)
