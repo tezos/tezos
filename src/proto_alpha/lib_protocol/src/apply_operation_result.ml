@@ -535,13 +535,13 @@ module Encoding = struct
           | Contents_result
               (Manager_operation_result
                  ({ operation_result = Skipped _ ; _ } as op)) ->
-                  Some (Manager_operation_result
-                          { op with operation_result = Skipped res_case.kind })
+              Some (Manager_operation_result
+                      { op with operation_result = Skipped res_case.kind })
           | Contents_result
               (Manager_operation_result
                  ({ operation_result = Failed (_, errs) ; _ } as op)) ->
-                  Some (Manager_operation_result
-                          { op with operation_result = Failed (res_case.kind, errs) })
+              Some (Manager_operation_result
+                      { op with operation_result = Failed (res_case.kind, errs) })
           | Contents_result Ballot_result -> None
           | Contents_result (Endorsements_result _) -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
