@@ -48,7 +48,7 @@ let preapply (type t)
     match src_sk with
     | None -> return None
     | Some src_sk ->
-        Client_keys.sign
+        Client_keys.sign cctxt
           ~watermark src_sk bytes >>=? fun signature ->
         return (Some signature)
   end >>=? fun signature ->

@@ -37,7 +37,7 @@ let forge_block_header
         Data_encoding.Binary.to_bytes_exn
           Alpha_context.Block_header.unsigned_encoding
           (shell, contents) in
-      Client_keys.append delegate_sk ~watermark:Block_header unsigned_header
+      Client_keys.append cctxt delegate_sk ~watermark:Block_header unsigned_header
     else
       loop () in
   loop ()

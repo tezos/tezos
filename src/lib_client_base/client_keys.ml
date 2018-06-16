@@ -176,20 +176,30 @@ let public_key_hash pk_uri =
   public_key pk_uri >>=? fun pk ->
   return (Signature.Public_key.hash pk, Some pk)
 
-let sign ?watermark sk_uri buf =
+let sign cctxt ?watermark sk_uri buf =
   let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
   find_signer_for_key ~scheme >>=? fun signer ->
   let module Signer = (val signer : SIGNER) in
   Signer.sign ?watermark sk_uri buf >>=? fun signature ->
   Signer.neuterize sk_uri >>=? fun pk_uri ->
-  public_key pk_uri >>=? fun pubkey ->
+  Secret_key.rev_find cctxt sk_uri >>=? begin function
+    | None ->
+        public_key pk_uri
+    | Some name ->
+        Public_key.find cctxt name >>=? function
+        | (_, None) ->
+            public_key pk_uri >>=? fun pk ->
+            Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
+            return pk
+        | (_, Some pubkey) -> return pubkey
+  end >>=? fun pubkey ->
   fail_unless
     (Signature.check ?watermark pubkey signature buf)
     (Signature_mismatch sk_uri) >>=? fun () ->
   return signature
 
-let append ?watermark loc buf =
-  sign ?watermark loc buf >>|? fun signature ->
+let append cctxt ?watermark loc buf =
+  sign cctxt ?watermark loc buf >>|? fun signature ->
   Signature.concat buf signature
 
 let check ?watermark pk_uri signature buf =

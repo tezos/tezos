@@ -125,7 +125,7 @@ let hash_and_sign
     sk =
   Alpha_services.Helpers.Scripts.hash_data
     cctxt (chain, block) (data.expanded, typ.expanded, gas) >>=? fun (hash, gas) ->
-  Client_keys.sign sk (MBytes.of_string hash) >>=? fun signature ->
+  Client_keys.sign cctxt sk (MBytes.of_string hash) >>=? fun signature ->
   return (hash, Signature.to_b58check signature, gas)
 
 let typecheck_data

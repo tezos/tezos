@@ -76,10 +76,12 @@ val public_key_hash : pk_uri -> (Signature.Public_key_hash.t * Signature.Public_
 val neuterize : sk_uri -> pk_uri tzresult Lwt.t
 
 val sign :
+  #Client_context.wallet ->
   ?watermark:Signature.watermark ->
   sk_uri -> MBytes.t -> Signature.t tzresult Lwt.t
 
 val append :
+  #Client_context.wallet ->
   ?watermark:Signature.watermark ->
   sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
 

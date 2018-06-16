@@ -121,7 +121,7 @@ let main select_commands =
                     | _ -> None)
                   keys with
           | sk_uri :: _ ->
-              Client_keys.sign sk_uri payload
+              Client_keys.sign client_config sk_uri payload
           | [] -> failwith
                     "remote signer expects authentication signature, \
                      but no authorized key was found in the wallet"
