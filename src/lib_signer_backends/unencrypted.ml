@@ -15,12 +15,13 @@ let title =
   "Built-in signer using raw unencrypted keys."
 
 let description =
-  "Do not use this signer except for playing on the test chain.\n\
-   The format for importing secret keys is either no argument (will \
-   generate a key) or the raw Base58-encoded key (starting with \
-   'edsk').\n\
-   The format for importing public keys is the raw Base58-encoded \
-   key (starting with 'edpk')."
+  "Please DO NOT USE this signer outside of test environments.\n\
+   Valid secret key URIs are of the form\n\
+  \ - unencrypted:<key>\n\
+   where <key> is the secret key in Base58.\n\
+   Valid public key URIs are of the form\n\
+  \ - unencrypted:<public_key>\n\
+   where <public_key> is the public key in Base58."
 
 let secret_key sk_uri =
   Lwt.return

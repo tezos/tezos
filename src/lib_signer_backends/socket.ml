@@ -60,7 +60,8 @@ module Make(P : sig
       "Built-in tezos-signer using remote signer through hardcoded unix socket."
 
     let description =
-      "Valid locators are of this form: unix:///path/to/socket?pkh=tz1..."
+      "Valid locators are of the form\n\
+      \ - unix:///path/to/socket?pkh=tz1..."
 
     let parse uri =
       assert (Uri.scheme uri = Some scheme) ;
@@ -96,7 +97,8 @@ module Make(P : sig
       "Built-in tezos-signer using remote signer through hardcoded tcp socket."
 
     let description =
-      "Valid locators are of this form: tcp://host:port/tz1..."
+      "Valid locators are of the form\n\
+      \ - tcp://host:port/tz1..."
 
     let parse uri =
       assert (Uri.scheme uri = Some scheme) ;

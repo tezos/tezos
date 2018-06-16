@@ -16,11 +16,14 @@ let title =
   "Built-in signer using Ledger Nano S."
 
 let description =
-  "The format for importing secret and public keys is \
-   <root_pkh>/<path> where <root_pkh> is the Base58-encoded public key \
-   hash of the key at m/44'/1729' and <path> is a BIP32 path anchored \
-   at m/44'/1729'. Ledger does not yet support non-hardened path so \
-   each node of the path must be hardened."
+  "Valid URIs are of the form\n\
+  \ - ledger://<root_pkh>[/<path>]\n\
+   where <root_pkh> is the Base58-encoded public key hash of the key \
+   at m/44'/1729' and <path> is a BIP32 path anchored at \
+   m/44'/1729'. Ledger does not yet support non-hardened path so each \
+   node of the path must be hardened.\n\
+   Use `tezos-client list connected ledgers` to get the <root_pkh> of \
+   all connected devices."
 
 let hard = Int32.logor 0x8000_0000l
 let tezos_root = [hard 44l ; hard 1729l]

@@ -23,7 +23,8 @@ module Make(S : sig
     "Built-in tezos-signer using remote wallet."
 
   let description =
-    "Valid locators are of this form: remote://tz1...\n\
+    "Valid locators are of the form\n\
+    \ - remote://tz1...\n\
      The key will be queried to current remote signer, which can be \
      configured with the `--remote-signer` or `-R` options, \
      or by defining the following environment variables:\n\

@@ -127,13 +127,14 @@ module Make(C : sig val cctxt: Client_context.prompter end) = struct
     "Built-in signer using encrypted keys."
 
   let description =
-    "If you try to import a secret key without additional argument, you will \
-     be asked to either generate a new key, or to import the elements \
-     from your fundraiser paper wallet.\n\
-     If you add an argument when importing a secret key, \
-     the format is the raw Base58-encoded key (starting with 'edsk').\n\
-     The format for importing public keys is the raw Base58-encoded \
-     key (starting with 'edpk')."
+    "Valid secret key URIs are of the form\n\
+    \ - encrypted:<encrypted_key>\n\
+     where <encrypted_key> is the encrypted (passphrase protected \
+     using Nacl's cryptobox and pbkdf) secret key, formatted in \
+     unprefixed Base58.\n\
+     Valid public key URIs are of the form\n\
+    \ - encrypted:<public_key>\n\
+     where <public_key> is the public key in Base58."
 
   let public_key = Unencrypted.public_key
   let public_key_hash = Unencrypted.public_key_hash
