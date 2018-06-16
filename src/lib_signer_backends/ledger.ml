@@ -239,20 +239,61 @@ let commands =
         no_options
         (fixed [ "list" ; "connected" ; "ledgers" ])
         (fun () (cctxt : Client_context.io_wallet) ->
-           find_ledgers () >>=? fun ledgers ->
-           iter_s begin fun { Ledger.device_info = { Hidapi.path ;
-                                                     manufacturer_string ;
-                                                     product_string ; _ } ;
-                              of_curve ; _ } ->
-             let manufacturer = Option.unopt ~default:"(none)" manufacturer_string in
-             let product = Option.unopt ~default:"(none)" product_string in
-             cctxt#message "Found a valid Tezos application running on %s %s at %s"
-               manufacturer product path >>= fun () ->
-             Lwt_list.iter_s (fun (_curve, (_pk, pkh)) ->
-                 cctxt#message "  %a" Signature.Public_key_hash.pp pkh
-               ) of_curve >>= fun () ->
-             return ()
-           end ledgers) ;
+           find_ledgers () >>=? function
+           | [] ->
+               cctxt#message "No device found." >>= fun () ->
+               cctxt#message "Make sure a Ledger Nano S is connected and in the Tezos Wallet app." >>= fun () ->
+               return ()
+           | ledgers ->
+               iter_s begin fun { Ledger.device_info = { Hidapi.path ;
+                                                         manufacturer_string ;
+                                                         product_string ; _ } ;
+                                  of_curve ; _ } ->
+                 let manufacturer = Option.unopt ~default:"(none)" manufacturer_string in
+                 let product = Option.unopt ~default:"(none)" product_string in
+                 cctxt#message "Found a valid Tezos application running on %s %s at [%s]."
+                   manufacturer product path >>= fun () ->
+                 let of_curve = List.rev of_curve in
+                 cctxt#message
+                   "@[<v 0>@,To add the root key of this ledger, use one of@,\
+                   \  @[<v 0>%a@]@,\
+                    Each of these tz* is a valid Tezos address.@,\
+                    @,\
+                    To use a derived address, add a hardened BIP32 path suffix \
+                    at the end of the URI.@,\
+                    For instance, to use keys at BIP32 path m/44'/1729'/0'/0', use one of@,\
+                   \  @[<v 0>%a@]@,\
+                    In this case, your Tezos address will be a derived tz*.@,\
+                    It will be displayed when you do the import, \
+                    or using command `show ledger path`.@]"
+                   (Format.pp_print_list
+                      (fun ppf (curve, (_pk, pkh)) ->
+                         Format.fprintf ppf
+                           "tezos-client import secret key ledger_%s_%s ledger://%a # %s signature"
+                           (Sys.getenv "USER")
+                           (match curve with
+                            | Ledgerwallet_tezos.Ed25519 -> "ed"
+                            | Ledgerwallet_tezos.Secp256k1 -> "secp"
+                            | Ledgerwallet_tezos.Secp256r1 -> "p2")
+                           Signature.Public_key_hash.pp pkh
+                           (match curve with
+                            | Ledgerwallet_tezos.Ed25519 -> "Ed25519"
+                            | Ledgerwallet_tezos.Secp256k1 -> "Secp256k1"
+                            | Ledgerwallet_tezos.Secp256r1 -> "P-256")))
+                   of_curve
+                   (Format.pp_print_list
+                      (fun ppf (curve, (_pk, pkh)) ->
+                         Format.fprintf ppf
+                           "tezos-client import secret key ledger_%s_%s_0_0 \"ledger://%a/0'/0'\""
+                           (Sys.getenv "USER")
+                           (match curve with
+                            | Ledgerwallet_tezos.Ed25519 -> "ed"
+                            | Ledgerwallet_tezos.Secp256k1 -> "secp"
+                            | Ledgerwallet_tezos.Secp256r1 -> "p2")
+                           Signature.Public_key_hash.pp pkh))
+                   of_curve >>= fun () ->
+                 return ()
+               end ledgers) ;
 
       Clic.command ~group
         ~desc: "Show BIP32 derivation at path for Ledger"
@@ -271,7 +312,7 @@ let commands =
                  Option.unopt ~default:"(none)" device_info.manufacturer_string in
                let product =
                  Option.unopt ~default:"(none)" device_info.product_string in
-               cctxt#message "Found a valid Tezos application running on %s %s at %s"
+               cctxt#message "Found a valid Tezos application running on %s %s at [%s]."
                  manufacturer product device_info.path >>= fun () ->
                public_key pk_uri >>=? fun pk ->
                public_key_hash pk_uri >>=? fun pkh ->
@@ -284,7 +325,9 @@ let commands =
                    failwith "Fatal: Ledger cannot sign with %a"
                      Signature.Public_key_hash.pp pkh
                | true ->
-                   cctxt#message "%a@.%a"
+                   cctxt#message
+                     "@[<v 0>Tezos address at this path: %a@,\
+                      Corresponding full public key: %a@]"
                      Signature.Public_key_hash.pp pkh
                      Signature.Public_key.pp pk >>= fun () ->
                    return ()
