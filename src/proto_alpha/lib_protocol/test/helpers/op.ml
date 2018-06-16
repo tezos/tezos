@@ -39,10 +39,7 @@ let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
     | None -> Context.get_level ctxt
     | Some level -> return level
   end >>=? fun level ->
-  let op =
-    Single
-      (Endorsement
-         { block = Context.branch ctxt ; level }) in
+  let op = Single (Endorsement { level }) in
   return (sign ~watermark:Signature.Endorsement delegate.sk signing_context op)
 
 let sign ?watermark sk ctxt (Contents_list contents) =

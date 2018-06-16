@@ -803,7 +803,6 @@ and _ contents_list =
 
 and _ contents =
   | Endorsement : {
-      block: Block_hash.t ;
       level: Raw_level.t ;
     } -> Kind.endorsement contents
   | Seed_nonce_revelation : {

@@ -554,7 +554,7 @@ module Endorse = struct
     let level = level.level in
     let shell = { Tezos_base.Operation.branch = hash } in
     let contents =
-      Single (Endorsement { block = hash ; level }) in
+      Single (Endorsement { level }) in
     sign ~watermark:Endorsement src_sk shell (Contents_list contents)
 
   let signing_slots

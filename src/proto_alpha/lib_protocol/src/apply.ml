@@ -608,10 +608,7 @@ let apply_contents_list
     (contents_list : kind contents_list)
   : (context * kind contents_result_list) tzresult Lwt.t =
   match contents_list with
-  | Single (Endorsement { block ; level }) ->
-      fail_unless
-        (Block_hash.equal block pred_block)
-        (Wrong_endorsement_predecessor (pred_block, block)) >>=? fun () ->
+  | Single (Endorsement { level }) ->
       let block = operation.shell.branch in
       fail_unless
         (Block_hash.equal block pred_block)
@@ -646,7 +643,7 @@ let apply_contents_list
       | Single (Endorsement e1),
         Single (Endorsement e2)
         when Raw_level.(e1.level = e2.level) &&
-             not (Block_hash.equal e1.block e2.block) ->
+             not (Block_hash.equal op1.shell.branch op2.shell.branch) ->
           let level = Level.from_raw ctxt e1.level in
           let oldest_level = Level.last_allowed_fork_level ctxt in
           fail_unless Level.(level < Level.current ctxt)

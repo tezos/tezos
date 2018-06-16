@@ -52,7 +52,6 @@ and _ contents_list =
 
 and _ contents =
   | Endorsement : {
-      block: Block_hash.t ;
       level: Raw_level_repr.t ;
     } -> Kind.endorsement contents
   | Seed_nonce_revelation : {
@@ -305,8 +304,7 @@ module Encoding = struct
                inj: 'a -> 'b contents } -> 'b case
 
   let endorsement_encoding =
-    obj2
-      (req "block" Block_hash.encoding)
+    obj1
       (req "level" Raw_level_repr.encoding)
 
   let endorsement_case =
@@ -319,9 +317,9 @@ module Encoding = struct
           | Contents (Endorsement _ as op) -> Some op
           | _ -> None) ;
       proj =
-        (fun (Endorsement { block ; level }) -> (block, level)) ;
+        (fun (Endorsement { level }) -> level) ;
       inj =
-        (fun (block, level) -> Endorsement { block ; level })
+        (fun level -> Endorsement { level })
     }
 
   let endorsement_encoding =
