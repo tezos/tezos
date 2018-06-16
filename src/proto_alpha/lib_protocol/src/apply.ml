@@ -13,6 +13,7 @@ open Alpha_context
 
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
+type error += Duplicate_endorsement of Signature.Public_key_hash.t (* `Branch *)
 type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
 type error += Internal_operation_replay of packed_internal_operation
@@ -70,6 +71,17 @@ let () =
                      (req "provided" Voting_period.encoding))
     (function Wrong_voting_period (e, p) -> Some (e, p) | _ -> None)
     (fun (e, p) -> Wrong_voting_period (e, p));
+  register_error_kind
+    `Branch
+    ~id:"operation.duplicate_endorsement"
+    ~title:"Duplicate endorsement"
+    ~description:"Two endorsements received from same delegate"
+    ~pp:(fun ppf k ->
+        Format.fprintf ppf "Duplicate endorsement from delegate %a (possible replay attack)."
+          Signature.Public_key_hash.pp_short k)
+    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+    (function Duplicate_endorsement k -> Some k | _ -> None)
+    (fun k -> Duplicate_endorsement k);
   register_error_kind
     `Temporary
     ~id:"operation.invalid_endorsement_level"
@@ -597,25 +609,31 @@ let apply_contents_list
   : (context * kind contents_result_list) tzresult Lwt.t =
   match contents_list with
   | Single (Endorsement { block ; level }) ->
-      let current_level = (Level.current ctxt).level in
       fail_unless
         (Block_hash.equal block pred_block)
         (Wrong_endorsement_predecessor (pred_block, block)) >>=? fun () ->
+      let block = operation.shell.branch in
+      fail_unless
+        (Block_hash.equal block pred_block)
+        (Wrong_endorsement_predecessor (pred_block, block)) >>=? fun () ->
+      let current_level = (Level.current ctxt).level in
       fail_unless
         Raw_level.(succ level = current_level)
         Invalid_endorsement_level >>=? fun () ->
-      Baking.check_endorsement_rights ctxt operation >>=? fun (delegate, slots) ->
-      let ctxt = record_endorsement ctxt delegate in
-      let gap = List.length slots in
-      let ctxt = Fitness.increase ~gap ctxt in
-      Lwt.return
-        Tez.(Constants.endorsement_security_deposit ctxt *?
-             Int64.of_int gap) >>=? fun deposit ->
-      add_deposit ctxt delegate deposit >>=? fun ctxt ->
-      Global.get_last_block_priority ctxt >>=? fun block_priority ->
-      Baking.endorsement_reward ctxt ~block_priority gap >>=? fun reward ->
-      Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
-      return (ctxt, Single_result (Endorsement_result (delegate, slots)))
+      Baking.check_endorsement_rights ctxt operation >>=? fun (delegate, slots, used) ->
+      if used then fail (Duplicate_endorsement delegate)
+      else
+        let ctxt = record_endorsement ctxt delegate in
+        let gap = List.length slots in
+        let ctxt = Fitness.increase ~gap ctxt in
+        Lwt.return
+          Tez.(Constants.endorsement_security_deposit ctxt *?
+               Int64.of_int gap) >>=? fun deposit ->
+        add_deposit ctxt delegate deposit >>=? fun ctxt ->
+        Global.get_last_block_priority ctxt >>=? fun block_priority ->
+        Baking.endorsement_reward ctxt ~block_priority gap >>=? fun reward ->
+        Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
+        return (ctxt, Single_result (Endorsement_result (delegate, slots)))
   | Single (Seed_nonce_revelation { level ; nonce }) ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
@@ -639,8 +657,8 @@ let apply_contents_list
             (Outdated_double_endorsement_evidence
                { level = level.level ;
                  last = oldest_level }) >>=? fun () ->
-          Baking.check_endorsement_rights ctxt op1 >>=? fun (delegate1, _) ->
-          Baking.check_endorsement_rights ctxt op2 >>=? fun (delegate2, _) ->
+          Baking.check_endorsement_rights ctxt op1 >>=? fun (delegate1, _, _) ->
+          Baking.check_endorsement_rights ctxt op2 >>=? fun (delegate2, _, _) ->
           fail_unless
             (Signature.Public_key_hash.equal delegate1 delegate2)
             (Inconsistent_double_endorsement_evidence

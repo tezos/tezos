@@ -13,7 +13,7 @@ open Misc
 
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
-type error += Unexpected_endorsement
+type error += Unexpected_endorsement (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
 type error += Invalid_signature  (* `Permanent *)
 type error += Invalid_stamp  (* `Permanent *)
@@ -158,11 +158,11 @@ let endorsement_rights c level =
     (fun acc slot ->
        Roll.endorsement_rights_owner c level ~slot >>=? fun pk ->
        let pkh = Signature.Public_key.hash pk in
-       let slots =
+       let right =
          match Signature.Public_key_hash.Map.find_opt pkh acc with
-         | None -> (pk, [slot])
-         | Some (pk, slots) -> (pk, slot :: slots) in
-       return (Signature.Public_key_hash.Map.add pkh slots acc))
+         | None -> (pk, [slot], false)
+         | Some (pk, slots, used) -> (pk, slot :: slots, used) in
+       return (Signature.Public_key_hash.Map.add pkh right acc))
     Signature.Public_key_hash.Map.empty
     (0 --> (Constants.endorsers_per_block c - 1))
 
@@ -174,20 +174,17 @@ let check_endorsement_rights ctxt (op : Kind.endorsement Operation.t) =
       return (Alpha_context.allowed_endorsements ctxt)
     else
       endorsement_rights ctxt (Level.from_raw ctxt level)
-  end >>=? fun map ->
+  end >>=? fun endorsements ->
   match
-    Signature.Public_key_hash.Map.find_first_opt
-      (fun pkh ->
-         let pk, _ = Signature.Public_key_hash.Map.find pkh map in
-         match Operation.raw_check_signature pk op with
-         | Error _ -> false
-         | Ok () -> true)
-      map
+    Signature.Public_key_hash.Map.fold (* no find_first *)
+      (fun pkh (pk, slots, used) acc ->
+         match Operation.check_signature_sync pk op with
+         | Error _ -> acc
+         | Ok () -> Some (pkh, slots, used))
+      endorsements None
   with
-  | None ->
-      fail Unexpected_endorsement
-  | Some (pkh, (_pk, slots)) ->
-      return (pkh, slots)
+  | None -> fail Unexpected_endorsement
+  | Some v -> return v
 
 let select_delegate delegate delegate_list max_priority =
   let rec loop acc l n =

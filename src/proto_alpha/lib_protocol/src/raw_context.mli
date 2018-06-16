@@ -205,12 +205,19 @@ val record_internal_nonce: context -> int -> context
 (** Check is the internal operation nonce has been taken. *)
 val internal_nonce_already_recorded: context -> int -> bool
 
-val record_endorsement:
-  context -> Signature.Public_key_hash.t -> context
+(** Returns a map where to each endorser's pkh is associated the list of its
+    endorsing slots (in decreasing order) for a given level. *)
 val allowed_endorsements:
   context ->
-  (Signature.Public_key.t * int list) Signature.Public_key_hash.Map.t
+  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
+
+(** Initializes the map of allowed endorsements, this function must only be
+    called once. *)
 val init_endorsements:
   context ->
-  (Signature.Public_key.t * int list) Signature.Public_key_hash.Map.t ->
+  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
   context
+
+(** Marks an endorsment in the map as used. *)
+val record_endorsement:
+  context -> Signature.Public_key_hash.t -> context

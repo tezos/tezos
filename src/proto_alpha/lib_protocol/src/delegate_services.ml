@@ -460,7 +460,7 @@ module Endorsing_rights = struct
       RPC_service.get_service
         ~description:
           "Retrieves the delegates allowed to endorse a block.\n\
-           By default, it gives the endorsement slots for bakers that \
+           By default, it gives the endorsement slots for delegates that \
            have at least one in the next block.\n\
            Parameters `level` and `cycle` can be used to specify the \
            (valid) level(s) in the past or future at which the \
@@ -483,7 +483,7 @@ module Endorsing_rights = struct
     Baking.endorsement_rights ctxt level >>=? fun rights ->
     return
       (Signature.Public_key_hash.Map.fold
-         (fun delegate (_, slots) acc -> {
+         (fun delegate (_, slots, _) acc -> {
               level = level.level ; delegate ; slots ; estimated_time
             } :: acc)
          rights [])
@@ -529,4 +529,3 @@ let baking_rights ctxt max_priority =
           List.map
             (fun { Baking_rights.delegate ; timestamp ; _ } ->
                (delegate, timestamp)) l)
-

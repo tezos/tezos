@@ -165,7 +165,7 @@ type error += Invalid_signature (* `Permanent *)
 
 val check_signature:
   Signature.Public_key.t -> _ operation -> unit tzresult Lwt.t
-val raw_check_signature:
+val check_signature_sync:
   Signature.Public_key.t -> _ operation -> unit tzresult
 
 

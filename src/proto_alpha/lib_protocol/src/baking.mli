@@ -31,18 +31,19 @@ val check_baking_rights:
   context -> Block_header.contents -> Time.t ->
   public_key tzresult Lwt.t
 
-(** [check_endorsements_rights c slots]:
-    * verifies that the endorsement slots are valid ;
-    * verifies that the endorsement slots correspond to the same delegate at the current level;
-*)
-val check_endorsement_rights:
-  context -> Kind.endorsement Operation.t ->
-  (public_key_hash * int list) tzresult Lwt.t
-
+(** For a given level computes who has the right to
+    include an endorsement in the next block.
+    The result can be stored in Alpha_context.allowed_endorsements *)
 val endorsement_rights:
   context ->
   Level.t ->
-  (public_key * int list) Signature.Public_key_hash.Map.t tzresult Lwt.t
+  (public_key * int list * bool) Signature.Public_key_hash.Map.t tzresult Lwt.t
+
+(** Check that the operation was signed by a delegate allowed
+    to endorse at the level specified by the endorsement. *)
+val check_endorsement_rights:
+  context -> Kind.endorsement Operation.t ->
+  (public_key_hash * int list * bool) tzresult Lwt.t
 
 (** Returns the endorsement reward calculated w.r.t a given priotiry.  *)
 val endorsement_reward: context -> block_priority:int -> int -> Tez.t tzresult Lwt.t

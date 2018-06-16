@@ -18,7 +18,7 @@ type t = {
   fitness: Int64.t ;
   deposits: Tez_repr.t Signature.Public_key_hash.Map.t ;
   allowed_endorsements:
-    (Signature.Public_key.t * int list) Signature.Public_key_hash.Map.t ;
+    (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ;
   fees: Tez_repr.t ;
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
@@ -41,11 +41,23 @@ let constants ctxt = ctxt.constants
 let recover ctxt = ctxt.context
 
 let record_endorsement ctxt k =
-  { ctxt with
-    allowed_endorsements =
-      Signature.Public_key_hash.Map.remove k ctxt.allowed_endorsements }
+  match Signature.Public_key_hash.Map.find_opt k ctxt.allowed_endorsements with
+  | None -> assert false
+  | Some (_, _, true) -> assert false (* right already used *)
+  | Some (d, s, false) ->
+      { ctxt with
+        allowed_endorsements =
+          Signature.Public_key_hash.Map.add k (d,s,true) ctxt.allowed_endorsements }
+
 let init_endorsements ctxt allowed_endorsements =
-  { ctxt with allowed_endorsements }
+  if Signature.Public_key_hash.Map.is_empty allowed_endorsements
+  then assert false (* can't initialize to empty *)
+  else begin
+    if Signature.Public_key_hash.Map.is_empty ctxt.allowed_endorsements
+    then { ctxt with allowed_endorsements }
+    else assert false (* can't initialize twice *)
+  end
+
 let allowed_endorsements ctxt =
   ctxt.allowed_endorsements
 

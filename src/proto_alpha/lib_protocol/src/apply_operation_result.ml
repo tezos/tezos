@@ -386,7 +386,7 @@ module Encoding = struct
       encoding =
         (obj2
            (req "delegate" Signature.Public_key_hash.encoding)
-           (req "slots" (list uint8))) ;
+           (req "slots" (list uint8)));
       select =
         (function
           | Contents_result (Endorsement_result _ as op) -> Some op
