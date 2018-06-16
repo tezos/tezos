@@ -50,15 +50,6 @@ end
 let uri_encoding =
   Data_encoding.(conv Uri.to_string Uri.of_string string)
 
-module Entity (Name : sig val name: string end) = struct
-  include Name
-  type t = Uri.t
-  let pp = Uri.pp_hum
-  let of_source s =  return (Uri.of_string s)
-  let to_source t = return (Uri.to_string t)
-  let encoding = uri_encoding
-end
-
 type pk_uri = Uri.t
 let make_pk_uri x = x
 
@@ -93,9 +84,38 @@ let sk_uri_param ?name ?desc params =
     params
 
 module Secret_key =
-  Client_aliases.Alias (Entity(struct let name = "secret_key" end))
+  Client_aliases.Alias (struct
+    let name = "secret_key"
+    type t = Uri.t
+    let pp = Uri.pp_hum
+    let of_source s = return (Uri.of_string s)
+    let to_source t = return (Uri.to_string t)
+    let encoding = uri_encoding
+  end)
+
 module Public_key =
-  Client_aliases.Alias (Entity(struct let name = "public_key" end))
+  Client_aliases.Alias (struct
+    let name = "public_key"
+    type t = Uri.t * Signature.Public_key.t option
+    let pp ppf (loc, _) = Uri.pp_hum ppf loc
+    let of_source s = return (Uri.of_string s, None)
+    let to_source (t, _) = return (Uri.to_string t)
+    let encoding =
+      let open Data_encoding in
+      union
+        [ case Json_only
+            ~title: "Locator_only"
+            uri_encoding
+            (function (uri, None) -> Some uri | (_, Some _) -> None)
+            (fun uri -> (uri, None)) ;
+          case Json_only
+            ~title: "Locator_and_full_key"
+            (obj2
+               (req "locator" uri_encoding)
+               (req "key" Signature.Public_key.encoding))
+            (function (uri, Some key) -> Some (uri, key) | (_, None) -> None)
+            (fun (uri, key) -> (uri, Some key)) ]
+  end)
 
 module type SIGNER = sig
   val scheme : string
@@ -103,7 +123,7 @@ module type SIGNER = sig
   val description : string
   val neuterize : sk_uri -> pk_uri tzresult Lwt.t
   val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
-  val public_key_hash : pk_uri -> Signature.Public_key_hash.t tzresult Lwt.t
+  val public_key_hash : pk_uri -> (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
   val sign :
     ?watermark: Signature.watermark ->
     sk_uri -> MBytes.t -> Signature.t tzresult Lwt.t
@@ -154,7 +174,7 @@ let public_key pk_uri =
 
 let public_key_hash pk_uri =
   public_key pk_uri >>=? fun pk ->
-  return (Signature.Public_key.hash pk)
+  return (Signature.Public_key.hash pk, Some pk)
 
 let sign ?watermark sk_uri buf =
   let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
@@ -176,8 +196,8 @@ let check ?watermark pk_uri signature buf =
   public_key pk_uri >>=? fun pk ->
   return (Signature.check ?watermark pk signature buf)
 
-let register_key cctxt ?(force=false) (public_key_hash, pk_uri, sk_uri) name =
-  Public_key.add ~force cctxt name pk_uri >>=? fun () ->
+let register_key cctxt ?(force=false) (public_key_hash, pk_uri, sk_uri) ?public_key name =
+  Public_key.add ~force cctxt name (pk_uri, public_key) >>=? fun () ->
   Secret_key.add ~force cctxt name sk_uri >>=? fun () ->
   Public_key_hash.add ~force cctxt name public_key_hash >>=? fun () ->
   return ()
@@ -187,19 +207,15 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
     Public_key_hash.rev_find cctxt pkh >>=? function
     | None -> failwith "no keys for the source contract manager"
     | Some n ->
-        Public_key.find_opt cctxt n >>=? fun pk_uri ->
         Secret_key.find_opt cctxt n >>=? fun sk_uri ->
-        begin
-          Option.unopt_map
-            ~default:Lwt.return_none
-            ~f:(fun pkh ->
-                public_key pkh >>= function
-                | Error e ->
-                    Format.eprintf "PLOP: %a@." pp_print_error e ;
-                    Lwt.return_none
-                | Ok pk -> Lwt.return_some pk)
-            pk_uri
-        end >>= fun pk ->
+        Public_key.find_opt cctxt n >>=? begin function
+          | None -> return None
+          | Some (_, Some pk) -> return (Some pk)
+          | Some (pk_uri, None) ->
+              public_key pk_uri >>=? fun pk ->
+              Public_key.update cctxt n (pk_uri, Some pk) >>=? fun () ->
+              return (Some pk)
+        end >>=? fun pk ->
         return (n, pk, sk_uri)
   end >>= function
   | (Ok (_, None, None) | Error _) as initial_result -> begin
@@ -232,9 +248,14 @@ let get_keys (cctxt : #Client_context.wallet) =
   Secret_key.load cctxt >>=? fun sks ->
   Lwt_list.filter_map_s begin fun (name, sk_uri) ->
     begin
-      Public_key.find cctxt name >>=? fun pk_uri ->
       Public_key_hash.find cctxt name >>=? fun pkh ->
-      public_key pk_uri >>=? fun pk ->
+      Public_key.find cctxt name >>=? begin function
+        | _, Some pk -> return pk
+        | pk_uri, None ->
+            public_key pk_uri >>=? fun pk ->
+            Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
+            return pk
+      end >>=? fun pk ->
       return (name, pkh, pk, sk_uri)
     end >>= function
     | Ok r -> Lwt.return (Some r)

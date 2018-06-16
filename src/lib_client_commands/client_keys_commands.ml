@@ -174,17 +174,17 @@ let commands () : Client_context.io_wallet Clic.command list =
          begin
            Public_key.find_opt cctxt name >>=? function
            | None -> return ()
-           | Some pk ->
-               fail_unless (pk_uri = pk || force)
+           | Some (pk_uri_found, _) ->
+               fail_unless (pk_uri = pk_uri_found || force)
                  (failure
                     "public and secret keys '%s' don't correspond, \
                      please don't use -force" name)
          end >>=? fun () ->
-         Client_keys.public_key_hash pk_uri >>=? fun pkh ->
+         Client_keys.public_key_hash pk_uri >>=? fun (pkh, public_key) ->
          cctxt#message
            "Tezos address added: %a"
            Signature.Public_key_hash.pp pkh >>= fun () ->
-         register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
+         register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name) ;
 
     command ~group ~desc: "Add a public key to the wallet."
       (args1 (Public_key.force_switch ()))
@@ -195,12 +195,12 @@ let commands () : Client_context.io_wallet Clic.command list =
        @@ stop)
       (fun force name pk_uri (cctxt : Client_context.io_wallet) ->
          Public_key.of_fresh cctxt force name >>=? fun name ->
-         Client_keys.public_key_hash pk_uri >>=? fun pkh ->
+         Client_keys.public_key_hash pk_uri >>=? fun (pkh, public_key) ->
          Public_key_hash.add ~force cctxt name pkh >>=? fun () ->
          cctxt#message
            "Tezos address added: %a"
            Signature.Public_key_hash.pp pkh >>= fun () ->
-         Public_key.add ~force cctxt name pk_uri) ;
+         Public_key.add ~force cctxt name (pk_uri, public_key)) ;
 
     command ~group ~desc: "Add an identity to the wallet."
       (args1 (Public_key.force_switch ()))

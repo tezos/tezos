@@ -188,10 +188,10 @@ let public_key (pk_uri : pk_uri) =
 
 let public_key_hash pk_uri =
   match Hashtbl.find_opt pkhs pk_uri with
-  | Some pkh -> return pkh
+  | Some pkh -> return (pkh, None)
   | None ->
-      public_key pk_uri >>=? fun _pk ->
-      return (Hashtbl.find pkhs pk_uri)
+      public_key pk_uri >>=? fun pk ->
+      return (Hashtbl.find pkhs pk_uri, Some pk)
 
 let sign ?watermark sk_uri msg =
   pkh_of_sk_uri sk_uri >>=? fun pkh ->
@@ -318,7 +318,7 @@ let commands =
                cctxt#message "Found a valid Tezos application running on %s %s at [%s]."
                  manufacturer product device_info.path >>= fun () ->
                public_key pk_uri >>=? fun pk ->
-               public_key_hash pk_uri >>=? fun pkh ->
+               public_key_hash pk_uri >>=? fun (pkh, _) ->
                let pkh_bytes = Signature.Public_key_hash.to_bytes pkh in
                sign ~watermark:Generic_operation
                  sk_uri pkh_bytes >>=? fun signature ->

@@ -45,7 +45,7 @@ let neuterize sk_uri =
 
 let public_key_hash pk_uri =
   public_key pk_uri >>=? fun pk ->
-  return (Signature.Public_key.hash pk)
+  return (Signature.Public_key.hash pk, Some pk)
 
 let sign ?watermark sk_uri buf =
   secret_key sk_uri >>=? fun sk ->

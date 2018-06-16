@@ -55,7 +55,7 @@ module Make(N : sig val scheme : string end) = struct
 
     let public_key_hash uri =
       public_key uri >>=? fun pk ->
-      return (Signature.Public_key.hash pk)
+      return (Signature.Public_key.hash pk, Some pk)
 
     let sign ?watermark uri msg =
       parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
