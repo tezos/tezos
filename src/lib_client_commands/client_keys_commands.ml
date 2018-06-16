@@ -181,6 +181,9 @@ let commands () : Client_context.io_wallet Clic.command list =
                      please don't use -force" name)
          end >>=? fun () ->
          Client_keys.public_key_hash pk_uri >>=? fun pkh ->
+         cctxt#message
+           "Tezos address added: %a"
+           Signature.Public_key_hash.pp pkh >>= fun () ->
          register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
 
     command ~group ~desc: "Add a public key to the wallet."
@@ -194,6 +197,9 @@ let commands () : Client_context.io_wallet Clic.command list =
          Public_key.of_fresh cctxt force name >>=? fun name ->
          Client_keys.public_key_hash pk_uri >>=? fun pkh ->
          Public_key_hash.add ~force cctxt name pkh >>=? fun () ->
+         cctxt#message
+           "Tezos address added: %a"
+           Signature.Public_key_hash.pp pkh >>= fun () ->
          Public_key.add ~force cctxt name pk_uri) ;
 
     command ~group ~desc: "Add an identity to the wallet."
