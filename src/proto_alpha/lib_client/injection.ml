@@ -206,15 +206,15 @@ let may_patch_limits
   let may_need_patching_single
     : type kind. kind contents -> kind contents option = function
     | Manager_operation c
-      when c.gas_limit < Z.zero || gas_limit < c.gas_limit
-           || c.storage_limit < Z.zero || storage_limit < c.storage_limit ->
+      when c.gas_limit < Z.zero || gas_limit <= c.gas_limit
+           || c.storage_limit < Z.zero || storage_limit <= c.storage_limit ->
         let gas_limit =
-          if c.gas_limit < Z.zero || gas_limit < c.gas_limit then
+          if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
             gas_limit
           else
             c.gas_limit in
         let storage_limit =
-          if c.storage_limit < Z.zero || storage_limit < c.storage_limit then
+          if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
             storage_limit
           else
             c.storage_limit in
@@ -241,7 +241,7 @@ let may_patch_limits
     type kind. kind contents * kind contents_result -> kind contents tzresult Lwt.t = function
     | Manager_operation c, (Manager_operation_result _ as result) ->
         begin
-          if c.gas_limit < Z.zero || gas_limit < c.gas_limit then
+          if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
             Lwt.return (estimated_gas_single result) >>=? fun gas ->
             begin
               if Z.equal gas Z.zero then
@@ -256,7 +256,7 @@ let may_patch_limits
           else return c.gas_limit
         end >>=? fun gas_limit ->
         begin
-          if c.storage_limit < Z.zero || storage_limit < c.storage_limit then
+          if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
             Lwt.return (estimated_storage_single result) >>=? fun storage ->
             begin
               if Z.equal storage Z.zero then
