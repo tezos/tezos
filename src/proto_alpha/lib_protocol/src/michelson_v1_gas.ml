@@ -193,6 +193,8 @@ module Cost_of = struct
   let compare_bool _ _ = step_cost 1
   let compare_string s1 s2 =
     step_cost (Compare.Int.max (String.length s1) (String.length s2) / 8) +@ step_cost 1
+  let compare_bytes s1 s2 =
+    step_cost (Compare.Int.max (MBytes.length s1) (MBytes.length s2) / 8) +@ step_cost 1
   let compare_tez _ _ = step_cost 1
   let compare_zint n1 n2 = step_cost (Compare.Int.max (Z.numbits n1) (Z.numbits n2) / 8) +@ step_cost 1
   let compare_int n1 n2 = compare_zint (Script_int.to_zint n1) (Script_int.to_zint n2)

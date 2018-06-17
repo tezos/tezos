@@ -42,6 +42,7 @@ let comparable_type_size : type t. t comparable_ty -> int = fun ty ->
   | Int_key _ -> 1
   | Nat_key _ -> 1
   | String_key _ -> 1
+  | Bytes_key _ -> 1
   | Mutez_key _ -> 1
   | Bool_key _ -> 1
   | Key_hash_key _ -> 1
@@ -388,6 +389,7 @@ let compare_comparable
         else -1
     | Timestamp_key _ -> Script_timestamp.compare x y
     | Address_key _ -> Contract.compare x y
+    | Bytes_key _ -> MBytes.compare x y
 
 let empty_set
   : type a. a comparable_ty -> a set
@@ -511,6 +513,7 @@ let ty_of_comparable_ty
     | Int_key tname -> Int_t tname
     | Nat_key tname -> Nat_t tname
     | String_key tname -> String_t tname
+    | Bytes_key tname -> Bytes_t tname
     | Mutez_key tname -> Mutez_t tname
     | Bool_key tname -> Bool_t tname
     | Key_hash_key tname -> Key_hash_t tname
@@ -523,6 +526,7 @@ let unparse_comparable_ty
     | Int_key tname -> Prim (-1, T_int, [], unparse_type_annot tname)
     | Nat_key tname -> Prim (-1, T_nat, [], unparse_type_annot tname)
     | String_key tname -> Prim (-1, T_string, [], unparse_type_annot tname)
+    | Bytes_key tname -> Prim (-1, T_bytes, [], unparse_type_annot tname)
     | Mutez_key tname -> Prim (-1, T_mutez, [], unparse_type_annot tname)
     | Bool_key tname -> Prim (-1, T_bool, [], unparse_type_annot tname)
     | Key_hash_key tname -> Prim (-1, T_key_hash, [], unparse_type_annot tname)
@@ -2232,6 +2236,12 @@ and parse_instr
         parse_var_annot loc annot >>=? fun annot ->
         Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc (Compare (Address_key tname))
+          (Item_t (Int_t None, rest, annot))
+    | Prim (loc, I_COMPARE, [], annot),
+      Item_t (Bytes_t tn1, Item_t (Bytes_t tn2, rest, _), _) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
+        typed ctxt loc (Compare (Bytes_key tname))
           (Item_t (Int_t None, rest, annot))
     (* comparators *)
     | Prim (loc, I_EQ, [], annot),

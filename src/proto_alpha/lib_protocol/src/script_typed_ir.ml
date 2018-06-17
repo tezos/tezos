@@ -22,6 +22,7 @@ type 'ty comparable_ty =
   | Int_key : type_annot option -> (z num) comparable_ty
   | Nat_key : type_annot option -> (n num) comparable_ty
   | String_key : type_annot option -> string comparable_ty
+  | Bytes_key : type_annot option -> MBytes.t comparable_ty
   | Mutez_key : type_annot option -> Tez.t comparable_ty
   | Bool_key : type_annot option -> bool comparable_ty
   | Key_hash_key : type_annot option -> public_key_hash comparable_ty

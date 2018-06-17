@@ -86,6 +86,7 @@ module Cost_of : sig
   val wrap : Gas.cost
   val compare_bool : 'a -> 'b -> Gas.cost
   val compare_string : string -> string -> Gas.cost
+  val compare_bytes : MBytes.t -> MBytes.t -> Gas.cost
   val compare_tez : 'a -> 'b -> Gas.cost
   val compare_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
   val compare_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost

@@ -554,6 +554,8 @@ let rec interp
             consume_gaz_comparison descr Compare.Bool.compare Interp_costs.compare_bool a b rest
         | Compare (String_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Compare.String.compare Interp_costs.compare_string a b rest
+        | Compare (Bytes_key _), Item (a, Item (b, rest)) ->
+            consume_gaz_comparison descr MBytes.compare Interp_costs.compare_bytes a b rest
         | Compare (Mutez_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Tez.compare Interp_costs.compare_tez a b rest
         | Compare (Int_key _), Item (a, Item (b, rest)) ->
