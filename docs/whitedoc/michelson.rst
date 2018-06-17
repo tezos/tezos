@@ -1442,8 +1442,12 @@ Special operations
 
     :: 'S   ->   timestamp : 'S
 
-Serialization
-~~~~~~~~~~~~~
+Operations on bytes
+~~~~~~~~~~~~~~~~~~~~~
+
+Bytes are used for serializing data, in order to check signatures and
+compute hashes on them. They can also be used to incorporate data from
+the wild and untyped outside world.
 
 -  ``PACK``: Serializes a piece of data to its optimized
    binary representation.
@@ -1452,11 +1456,25 @@ Serialization
 
      :: 'a : 'S   ->   bytes : 'S
 
--  ``UNPACK 'a``: Deserializes a piece of data, is valid.
+-  ``UNPACK 'a``: Deserializes a piece of data, if valid.
 
 ::
 
      :: bytes : 'S   ->   option 'a : 'S
+
+-  ``COMPARE``: Lexicographic comparison.
+
+::
+
+    :: bytes : bytes : 'S   ->   int : 'S
+
+    > COMPARE / s : t : S  =>  -1 : S
+        iff s < t
+    > COMPARE / s : t : S  =>  0 : S
+        iff s = t
+    > COMPARE / s : t : S  =>  1 : S
+        iff s > t
+
 
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1472,14 +1490,28 @@ Cryptographic primitives
 
 ::
 
-    :: 'a : 'S   ->   string : 'S
+    :: bytes : 'S   ->   bytes : 'S
+
+-  ``SHA256``: Compute a cryptographic hash of the value contents using the
+   Sha256 cryptographic hash function.
+
+::
+
+    :: bytes : 'S   ->   bytes : 'S
+
+-  ``SHA512``: Compute a cryptographic hash of the value contents using the
+   Sha512 cryptographic hash function.
+
+::
+
+    :: bytes : 'S   ->   bytes : 'S
 
 -  ``CHECK_SIGNATURE``: Check that a sequence of bytes has been signed
    with a given key.
 
 ::
 
-    :: key : signature : string : 'S   ->   bool : 'S
+    :: key : signature : bytes : 'S   ->   bool : 'S
 
 -  ``COMPARE``:
 
