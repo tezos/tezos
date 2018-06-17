@@ -52,6 +52,10 @@ module Scripts : sig
     'a #RPC_context.simple ->
     'a -> Script.expr * Script.expr * Z.t option -> (string * Gas.t) shell_tzresult Lwt.t
 
+  val run_operation:
+    'a #RPC_context.simple ->
+    'a -> packed_operation ->
+    (packed_protocol_data * Apply_operation_result.packed_operation_metadata) shell_tzresult Lwt.t
 
 end
 

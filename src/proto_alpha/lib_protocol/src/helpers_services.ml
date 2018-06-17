@@ -123,6 +123,15 @@ module Scripts = struct
         ~query: RPC_query.empty
         RPC_path.(path / "hash_data")
 
+    let run_operation =
+      RPC_service.post_service
+        ~description:
+          "Run an operation without signature checks"
+        ~query: RPC_query.empty
+        ~input: Operation.encoding
+        ~output: Apply_operation_result.operation_data_and_metadata_encoding
+        RPC_path.(path / "run_operation")
+
   end
 
   let register () =
@@ -180,6 +189,59 @@ module Scripts = struct
       parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
       Script_ir_translator.hash_data ctxt typ data >>=? fun (hash, ctxt) ->
       return (hash, Gas.level ctxt)
+    end ;
+    register0 S.run_operation begin fun ctxt ()
+      { shell ; protocol_data = Operation_data protocol_data } ->
+      (* this code is a duplicate of Apply without signature check *)
+      let partial_precheck_manager_contents
+          (type kind) ctxt (op : kind Kind.manager contents)
+        : context tzresult Lwt.t =
+        let Manager_operation { source ; fee ; counter ; operation } = op in
+        Contract.must_be_allocated ctxt source >>=? fun () ->
+        Contract.check_counter_increment ctxt source counter >>=? fun () ->
+        begin
+          match operation with
+          | Reveal pk ->
+              Contract.reveal_manager_key ctxt source pk
+          | _ -> return ctxt
+        end >>=? fun ctxt ->
+        Contract.get_manager_key ctxt source >>=? fun _public_key ->
+        (* signature check unplugged from here *)
+        Contract.increment_counter ctxt source >>=? fun ctxt ->
+        Contract.spend ctxt source fee >>=? fun ctxt ->
+        return ctxt in
+      let rec partial_precheck_manager_contents_list
+        : type kind.
+          Alpha_context.t -> kind Kind.manager contents_list ->
+          context tzresult Lwt.t =
+        fun ctxt contents_list ->
+          match contents_list with
+          | Single (Manager_operation _ as op) ->
+              partial_precheck_manager_contents ctxt op
+          | Cons (Manager_operation _ as op, rest) ->
+              partial_precheck_manager_contents ctxt op >>=? fun ctxt ->
+              partial_precheck_manager_contents_list ctxt rest in
+      let return contents =
+        return (Operation_data protocol_data,
+                Apply_operation_result.Operation_metadata { contents }) in
+      let operation : _ operation = { shell ; protocol_data } in
+      let hash = Operation.hash { shell ; protocol_data } in
+      let ctxt = Contract.init_origination_nonce ctxt hash in
+      match protocol_data.contents with
+      | Single (Manager_operation _) as op ->
+          partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
+          Apply.apply_manager_contents_list ctxt Readable op >>= fun (_ctxt, result) ->
+          return result
+      | Cons (Manager_operation _, _) as op ->
+          partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
+          Apply.apply_manager_contents_list ctxt Readable op >>= fun (_ctxt, result) ->
+          return result
+      | _ ->
+          Apply.apply_contents_list
+            ctxt Readable shell.branch operation
+            operation.protocol_data.contents >>=? fun (_ctxt, result) ->
+          return result
+
     end
 
   let run_code ctxt block code (storage, input, amount, contract) =
@@ -198,6 +260,9 @@ module Scripts = struct
 
   let hash_data ctxt block =
     RPC_context.make_call0 S.hash_data ctxt block ()
+
+  let run_operation ctxt block =
+    RPC_context.make_call0 S.run_operation ctxt block ()
 
 end
 

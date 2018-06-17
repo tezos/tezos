@@ -68,6 +68,26 @@ let preapply (type t)
     end
   | _ -> failwith "Unexpected result"
 
+let simulate (type t)
+    (cctxt: #Proto_alpha.full) ~chain ~block
+    ?branch (contents : t contents_list) =
+  get_branch cctxt ~chain ~block branch >>=? fun branch ->
+  let op : _ Operation.t =
+    { shell = { branch } ;
+      protocol_data = { contents ; signature = None } } in
+  let oph = Operation.hash op in
+  Alpha_services.Helpers.Scripts.run_operation
+    cctxt (chain, block) (Operation.pack op) >>=? function
+  | (Operation_data op', Operation_metadata result) -> begin
+      match Operation.equal
+              op { shell = { branch } ; protocol_data = op' },
+            Apply_operation_result.kind_equal_list contents result.contents with
+      | Some Operation.Eq, Some Apply_operation_result.Eq ->
+          return ((oph, op, result) : t preapply_result)
+      | _ -> failwith "Unexpected result"
+    end
+  | _ -> failwith "Unexpected result"
+
 let estimated_gas_single
     (type kind)
     (Manager_operation_result { operation_result ;
@@ -197,7 +217,7 @@ let detect_script_failure :
 
 let may_patch_limits
     (type kind) (cctxt : #Proto_alpha.full) ~chain ~block ?branch
-    ?src_sk (contents: kind contents_list) : kind contents_list tzresult Lwt.t =
+    (contents: kind contents_list) : kind contents_list tzresult Lwt.t =
   Alpha_services.Constants.all cctxt
     (chain, block) >>=? fun { parametric = {
       hard_gas_limit_per_operation = gas_limit ;
@@ -287,8 +307,7 @@ let may_patch_limits
       end in
   match may_need_patching contents with
   | Some contents ->
-      preapply cctxt ~chain ~block
-        ?branch ?src_sk contents >>=? fun (_, _, result) ->
+      simulate cctxt ~chain ~block ?branch contents >>=? fun (_, _, result) ->
       let res = pack_contents_list contents result.contents in
       patch_list res
   | None -> return contents
@@ -297,7 +316,7 @@ let inject_operation
     (type kind) cctxt ~chain ~block
     ?confirmations ?branch ?src_sk (contents: kind contents_list)  =
   may_patch_limits
-    cctxt ~chain ~block ?branch ?src_sk contents >>=? fun contents ->
+    cctxt ~chain ~block ?branch contents >>=? fun contents ->
   preapply cctxt ~chain ~block
     ?branch ?src_sk contents >>=? fun (_oph, op, result) ->
   begin match detect_script_failure result with
