@@ -2497,7 +2497,7 @@ and parse_instr
                  | I_BLAKE2B | I_SHA256 | I_SHA512 | I_DIP
                  | I_IF_NONE | I_LEFT | I_RIGHT | I_IF_LEFT | I_IF
                  | I_LOOP | I_IF_CONS | I_IMPLICIT_ACCOUNT
-                 | I_NEG | I_ABS | I_INT | I_NOT
+                 | I_NEG | I_ABS | I_INT | I_NOT | I_HASH_KEY
                  | I_EQ | I_NEQ | I_LT | I_GT | I_LE | I_GE as name), _, _),
       stack ->
         fail (Bad_stack (loc, name, 1, stack))
