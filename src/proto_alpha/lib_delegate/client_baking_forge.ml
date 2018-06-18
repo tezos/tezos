@@ -406,8 +406,10 @@ let compute_timeout { future_slots } =
       Lwt_utils.never_ending
   | (timestamp, _) :: _ ->
       match Client_baking_scheduling.sleep_until timestamp with
-      | None -> Lwt_utils.never_ending
-      | Some timeout -> timeout
+      | None ->
+          Lwt.return ()
+      | Some timeout ->
+          timeout
 
 let get_unrevealed_nonces
     (cctxt : #Proto_alpha.full) ?(force = false) ?(chain = `Main) block =
