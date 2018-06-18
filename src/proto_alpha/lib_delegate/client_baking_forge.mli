@@ -68,12 +68,17 @@ val forge_block:
 *)
 
 module State : sig
-  val get_block:
-    #Proto_alpha.full ->
-    Raw_level.t -> Block_hash.t list tzresult Lwt.t
-  val record_block:
-    #Proto_alpha.full ->
-    Raw_level.t -> Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
+  val get:
+    #Client_context.wallet ->
+    Signature.Public_key_hash.t ->
+    Raw_level.t option tzresult Lwt.t
+
+  val record:
+    #Client_context.wallet ->
+    Signature.Public_key_hash.t ->
+    Raw_level.t ->
+    unit tzresult Lwt.t
+
 end
 
 val create:

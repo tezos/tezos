@@ -297,6 +297,7 @@ let error_of_op (result: error Preapply_result.t) op =
   try Some (Failed_to_preapply (op, snd @@ Operation_hash.Map.find h result.branch_delayed))
   with Not_found -> None
 
+
 let forge_block cctxt ?(chain = `Main) block
     ?force
     ?operations ?(best_effort = operations = None) ?(sort = best_effort)
@@ -308,6 +309,7 @@ let forge_block cctxt ?(chain = `Main) block
   unopt_operations cctxt chain operations >>=? fun operations_arg ->
   decode_priority cctxt chain block priority >>=? fun (priority, minimal_timestamp) ->
   unopt_timestamp timestamp minimal_timestamp >>=? fun timestamp ->
+
 
   (* get basic building blocks *)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
@@ -346,65 +348,13 @@ let forge_block cctxt ?(chain = `Main) block
 
 (** Worker *)
 
-module State : sig
-  (* TODO: only [record_block] is ever used, and only once. Simplify. *)
+module State = Daemon_state.Make(struct let name = "baking" end)
 
-  val get_block:
-    #Client_context.wallet ->
-    Raw_level.t -> Block_hash.t list tzresult Lwt.t
-
-  val record_block:
-    #Client_context.wallet ->
-    Raw_level.t -> Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
-
-end = struct
-
-  module LevelMap = Map.Make(Raw_level)
-
-  type t = Block_hash.t list LevelMap.t
-  let encoding : t Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun x -> LevelMap.bindings x)
-      (fun l ->
-         List.fold_left
-           (fun x (y, z) -> LevelMap.add y z x)
-           LevelMap.empty l)
-      (list (obj2
-               (req "level" Raw_level.encoding)
-               (req "blocks" (list Block_hash.encoding))))
-
-  let name = "blocks"
-
-  let load (wallet : #Client_context.wallet) =
-    wallet#load name ~default:LevelMap.empty encoding
-
-  let save (wallet : #Client_context.wallet) map =
-    wallet#write name map encoding
-
-  let lock = Lwt_mutex.create ()
-
-  let get_block (cctxt : #Client_context.wallet) level =
-    Lwt_mutex.with_lock lock
-      (fun () ->
-         load cctxt >>=? fun map ->
-         try
-           let blocks = LevelMap.find level map in
-           return blocks
-         with Not_found -> return [])
-
-  let record_block cctxt level hash nonce =
-    Lwt_mutex.with_lock lock
-      (fun () ->
-         load cctxt >>=? fun map ->
-         let previous =
-           try LevelMap.find level map
-           with Not_found -> [] in
-         save cctxt
-           (LevelMap.add level (hash :: previous) map)) >>=? fun () ->
-    Client_baking_nonces.add cctxt hash nonce
-
-end
+let previously_baked_level cctxt pkh new_lvl  =
+  State.get cctxt pkh  >>=? function
+  | None -> return false
+  | Some last_lvl ->
+      return (Raw_level.(last_lvl >= new_lvl))
 
 let get_baking_slot cctxt
     ?max_priority (bi: Client_baking_blocks.block_info) delegates =
@@ -704,9 +654,10 @@ let fit_enough (state: state) (shell_header: Block_header.shell_header) =
   || (Fitness.compare state.best.fitness shell_header.fitness = 0
       && Time.compare shell_header.timestamp state.best.timestamp < 0)
 
-let record_nonce_hash cctxt level block_hash seed_nonce seed_nonce_hash =
+let record_nonce_hash cctxt level block_hash seed_nonce seed_nonce_hash pkh =
   if seed_nonce_hash <> None then
-    State.record_block cctxt level block_hash seed_nonce
+    State.record cctxt pkh level  >>=? fun () ->
+    Client_baking_nonces.add cctxt block_hash seed_nonce
     |> trace_exn (Failure "Error while recording block")
   else
     return ()
@@ -742,26 +693,34 @@ let bake (cctxt : #Proto_alpha.full) state =
         Fitness.pp shell_header.fitness >>= fun () ->
 
       (* core function *)
-      Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
+      Client_keys.get_key cctxt delegate >>=? fun (_,src_pk,src_sk) ->
+      let src_pkh = Signature.Public_key.hash src_pk in
       let chain = `Hash bi.Client_baking_blocks.chain_id in
-      inject_block cctxt
-        ~force:true ~chain
-        ~shell_header ~priority ?seed_nonce_hash ~src_sk
-        operations
-      (* /core function; back to logging and info *)
 
-      |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
-      record_nonce_hash cctxt level block_hash seed_nonce seed_nonce_hash >>=? fun () ->
-      Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-      cctxt#message
-        "Injected block %a for %s after %a (level %a, slot %d, fitness %a, operations %a)"
-        Block_hash.pp_short block_hash
-        name
-        Block_hash.pp_short bi.hash
-        Raw_level.pp level priority
-        Fitness.pp shell_header.fitness
-        pp_operation_list_list operations >>= fun () ->
-      return ()
+      (* avoid double baking *)
+      previously_baked_level cctxt src_pkh level >>=? function
+      | true ->  lwt_log_error "Level %a : previously baked"
+                   Raw_level.pp level  >>= return
+      | false ->
+
+          inject_block cctxt
+            ~force:true ~chain
+            ~shell_header ~priority ?seed_nonce_hash ~src_sk
+            operations
+          (* /core function; back to logging and info *)
+
+          |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
+          record_nonce_hash cctxt level block_hash seed_nonce seed_nonce_hash src_pkh >>=? fun () ->
+          Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
+          cctxt#message
+            "Injected block %a for %s after %a (level %a, slot %d, fitness %a, operations %a)"
+            Block_hash.pp_short block_hash
+            name
+            Block_hash.pp_short bi.hash
+            Raw_level.pp level priority
+            Fitness.pp shell_header.fitness
+            pp_operation_list_list operations >>= fun () ->
+          return ()
     end
 
   | _ ->

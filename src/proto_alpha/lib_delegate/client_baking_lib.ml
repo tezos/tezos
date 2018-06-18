@@ -13,7 +13,7 @@ open Alpha_context
 let bake_block (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block
     ?force ?max_priority ?(minimal_timestamp=false)
-    ?src_sk delegate =
+    ?src_sk ?src_pk delegate =
   begin
     match src_sk with
     | None ->
@@ -21,6 +21,13 @@ let bake_block (cctxt : #Proto_alpha.full)
         return src_sk
     | Some sk -> return sk
   end >>=? fun src_sk ->
+  begin
+    match src_pk with
+    | None ->
+        Client_keys.get_key cctxt delegate >>=? fun (_, src_pk, _) ->
+        return src_pk
+    | Some pk -> return pk
+  end >>=? fun src_pk ->
   Alpha_services.Helpers.current_level
     cctxt ~offset:1l (chain, block) >>=? fun level ->
   let seed_nonce, seed_nonce_hash =
@@ -36,10 +43,13 @@ let bake_block (cctxt : #Proto_alpha.full)
     ?seed_nonce_hash ~src_sk block
     ~priority:(`Auto (delegate, max_priority)) () >>=? fun block_hash ->
   begin
+    let src_pkh = Signature.Public_key.hash src_pk in
     match seed_nonce with
     | None -> return ()
     | Some seed_nonce ->
-        Client_baking_forge.State.record_block cctxt level.level block_hash seed_nonce
+        Client_baking_forge.State.record cctxt src_pkh level.level 
+        >>=? fun () ->
+        Client_baking_nonces.add cctxt block_hash seed_nonce
         |> trace_exn (Failure "Error while recording block")
   end >>=? fun () ->
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
