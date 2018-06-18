@@ -746,7 +746,7 @@ let create
     (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t)
     (bi: Client_baking_blocks.block_info) =
 
-  cctxt#message "Setting up before the baker can start." >>= fun () ->
+  lwt_log_info "Setting up before the baker can start." >>= fun () ->
   Shell_services.Blocks.hash cctxt ~block:`Genesis () >>=? fun genesis_hash ->
 
   (* statefulness *)
@@ -774,33 +774,28 @@ let create
         (* event matching *)
       | `Hash (None | Some (Error _)) ->
           (* return to restart *)
-          Lwt.cancel timeout ;
           last_get_block := None ;
-          Lwt.return_unit
-
+          lwt_log_error "Connection to node lost, exiting." >>= fun () ->
+          exit 1
       | `Hash (Some (Ok bi)) -> begin
           (* new block: cancel everything and bake on the new head *)
-          Lwt.cancel timeout ;
           last_get_block := None ;
           lwt_debug
             "Discoverered block: %a"
             Block_hash.pp_short bi.Client_baking_blocks.hash >>= fun () ->
           check_error @@ insert_block cctxt ?max_priority state bi
         end
-
       | `Timeout ->
           (* main event: it's baking time *)
           lwt_debug "Waking up for baking..." >>= fun () ->
           (* core functionality *)
           check_error @@ bake cctxt state
-
     end >>= fun () ->
     (* and restart *)
     worker_loop () in
 
   (* ignition *)
   lwt_log_info "Starting baking daemon" >>= fun () ->
-  cctxt#message "Starting the baker" >>= fun () ->
   worker_loop ()
 
 (* Wrapper around previous [create] function that handles the case of
@@ -812,6 +807,6 @@ let create
     (delegates: public_key_hash list)
     (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t) =
   Client_baking_scheduling.wait_for_first_block
-    ~info:cctxt#message
+    ~info:lwt_log_info
     block_stream
     (create cctxt ?max_priority ~context_path delegates block_stream)

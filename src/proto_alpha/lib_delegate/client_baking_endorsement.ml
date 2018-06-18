@@ -238,7 +238,6 @@ let create
     block_stream
     bi =
   lwt_log_info "Preparing endorsement daemon" >>= fun () ->
-
   (* statefulness setup *)
   let last_get_block = ref None in
   let get_block () =
@@ -256,12 +255,14 @@ let create
       let timeout = compute_timeout state in
       Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
                    (get_block () >|= fun b -> `Hash b) ] >>=  function
-      | `Hash (None | Some (Error _)) ->
-          Lwt.cancel timeout;
+      | `Hash None ->
+          last_get_block := None;
+          lwt_log_error "Connection to node lost, exiting." >>= fun () ->
+          exit 1
+      | `Hash (Some (Error _)) ->
           last_get_block := None;
           Lwt.return_unit
       | `Hash (Some (Ok bi)) ->
-          Lwt.cancel timeout;
           last_get_block := None;
           check_error @@ prepare_endorsement cctxt ~max_past state bi
       | `Timeout ->
@@ -290,6 +291,6 @@ let create
     contracts
     (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t) =
   Client_baking_scheduling.wait_for_first_block
-    ~info:cctxt#message
+    ~info:lwt_log_info
     block_stream
     (create cctxt ~max_past ~delay contracts block_stream)
