@@ -114,8 +114,8 @@ assert_storage $contract_dir/list_map_block.tz '{0}' '{ 1 ; 2 ; 3 ; 0 }' '{ 1 ; 
 assert_storage $contract_dir/list_iter.tz 0 '{ 10 ; 2 ; 1 }' 20
 assert_storage $contract_dir/list_iter.tz 0 '{ 3 ; 6 ; 9 }' 162
 
-assert_storage $contract_dir/list_iter2.tz '"?"' '{ "a" ; "b" ; "c" }' '"cba"'
-assert_storage $contract_dir/list_iter2.tz '"?"' '{}' '""'
+assert_storage $contract_dir/list_iter2.tz '"abc"' '{ "d" ; "e" ; "f" }' '"abcdef"'
+assert_storage $contract_dir/list_iter2.tz '"abc"' '{}' '"abc"'
 
 
 # Identity on sets

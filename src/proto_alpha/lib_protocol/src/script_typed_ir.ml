@@ -203,7 +203,7 @@ and ('bef, 'aft) instr =
       ('key * ('value option * (('key, 'value) big_map * 'rest)), ('key, 'value) big_map * 'rest) instr
   (* string operations *)
   | Concat :
-      (string * (string * 'rest), string * 'rest) instr
+      (string list * 'rest, string * 'rest) instr
   (* timestamp operations *)
   | Add_seconds_to_timestamp :
       (z num * (Script_timestamp.t * 'rest),
