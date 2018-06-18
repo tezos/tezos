@@ -42,13 +42,11 @@ let bake_block (cctxt : #Proto_alpha.full)
     ?force
     ?seed_nonce_hash ~src_sk block
     ~priority:(`Auto (delegate, max_priority)) () >>=? fun block_hash ->
-  begin
-    let src_pkh = Signature.Public_key.hash src_pk in
-    match seed_nonce with
+  let src_pkh = Signature.Public_key.hash src_pk in
+  Client_baking_forge.State.record cctxt src_pkh level.level >>=? fun () ->
+  begin match seed_nonce with
     | None -> return ()
     | Some seed_nonce ->
-        Client_baking_forge.State.record cctxt src_pkh level.level 
-        >>=? fun () ->
         Client_baking_nonces.add cctxt block_hash seed_nonce
         |> trace_exn (Failure "Error while recording block")
   end >>=? fun () ->
