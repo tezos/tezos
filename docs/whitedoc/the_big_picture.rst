@@ -164,7 +164,7 @@ protocols.
     used for the chain data, and the raw versioned key-value store
     used for storing the ledger's context (one version per
     block). This is implemented using :opam:`irmin` and currently
-    :opam:`leveldb`.
+    :opam:`lmdb`.
   - :package:`tezos-protocol-updater` maintains the table of available
     protocol versions, embedded or dynamically linked.
   - :package:`tezos-shell` implements the scheduling of block

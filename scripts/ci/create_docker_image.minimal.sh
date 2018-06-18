@@ -55,7 +55,7 @@ COPY keys /etc/apk/keys/
 COPY hidapi-$hidapi_version-r0.apk .
 
 RUN apk --no-cache add \
-      libev gmp vim leveldb-$leveldb_version-r0.apk hidapi-$hidapi_version-r0.apk && \
+      libev gmp vim hidapi-$hidapi_version-r0.apk && \
     rm hidapi-$hidapi_version-r0.apk
 
 COPY bin/* /usr/local/bin/

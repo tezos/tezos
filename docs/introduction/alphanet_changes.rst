@@ -91,7 +91,7 @@ Reset 2017-11-20
 
 - P2p: fix issue with data greater than 2^16 bytes
 
-- Irmin: use an experimental LevelDB backend
+- Irmin: use an experimental LMDB backend
 
 [Build]
 
@@ -252,4 +252,3 @@ Main changes includes:
 - This is not directly visible in the alphanet, but our CI
   infrastructure is now ready for open development.
   More about that soon (or later).
-
