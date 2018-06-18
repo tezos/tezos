@@ -24,8 +24,9 @@ module Context = struct
     match k, m with
     | [], m -> Some m
     | n :: k, Dir m -> begin
-        try raw_get (StringMap.find n m) k
-        with Not_found -> None
+        match StringMap.find_opt n m with
+        | Some res -> raw_get res k
+        | None -> None
       end
     | _ :: _, Key _ -> None
 
