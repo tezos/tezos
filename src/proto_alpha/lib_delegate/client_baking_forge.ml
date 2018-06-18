@@ -514,7 +514,8 @@ let pop_baking_slots state =
 
 let filter_invalid_operations (cctxt : #full) state block_info (operations : packed_operation list list) =
   let open Client_baking_simulator in
-  lwt_debug "Starting client-side validation" >>= fun () ->
+  lwt_debug "Starting client-side validation %a"
+    Block_hash.pp block_info.Client_baking_blocks.hash >>= fun () ->
   begin_construction cctxt state.index block_info >>=? fun initial_inc ->
   let endorsements = List.nth operations 0 in
   let votes = List.nth operations 1 in
@@ -656,9 +657,8 @@ let fit_enough (state: state) (shell_header: Block_header.shell_header) =
   || (Fitness.compare state.best.fitness shell_header.fitness = 0
       && Time.compare shell_header.timestamp state.best.timestamp < 0)
 
-let record_nonce_hash cctxt level block_hash seed_nonce seed_nonce_hash pkh =
+let record_nonce_hash cctxt block_hash seed_nonce seed_nonce_hash =
   if seed_nonce_hash <> None then
-    State.record cctxt pkh level  >>=? fun () ->
     Client_baking_nonces.add cctxt block_hash seed_nonce
     |> trace_exn (Failure "Error while recording block")
   else
@@ -712,7 +712,8 @@ let bake (cctxt : #Proto_alpha.full) state =
           (* /core function; back to logging and info *)
 
           |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
-          record_nonce_hash cctxt level block_hash seed_nonce seed_nonce_hash src_pkh >>=? fun () ->
+          State.record cctxt src_pkh level >>=? fun () ->
+          record_nonce_hash cctxt block_hash seed_nonce seed_nonce_hash >>=? fun () ->
           Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
           cctxt#message
             "Injected block %a for %s after %a (level %a, slot %d, fitness %a, operations %a)"

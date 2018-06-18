@@ -19,8 +19,8 @@ let get_signing_slots cctxt ?(chain = `Main) block delegate level =
     ~levels:[level]
     ~delegates:[delegate]
     (chain, block) >>=? function
-  | [{ slots }] -> return slots
-  | _ -> (* TODO? log this case *) return []
+  | [{ slots }] -> return (Some slots)
+  | _ -> return None
 
 let inject_endorsement
     (cctxt : #Proto_alpha.full)
@@ -73,8 +73,8 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
         | None ->
             get_signing_slots
               cctxt ~chain block src_pkh level >>=? function
-            | [] -> cctxt#error "No slot found at level %a" Raw_level.pp level
-            | slots -> return slots
+            | None -> cctxt#error "No slot found at level %a" Raw_level.pp level
+            | Some slots -> return slots
       end >>=? fun slots ->
       Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
       inject_endorsement cctxt ~chain ?async block hash level src_sk slots src_pkh >>=? fun oph ->
@@ -167,33 +167,39 @@ let allowed_to_endorse cctxt state (block: Client_baking_blocks.block_info) dele
   let b = `Hash (block.hash, 0) in
   let level = block.level in
   get_signing_slots cctxt b delegate level >>=? fun slots ->
-  lwt_debug "Found slots for %a/%s (%d)"
-    Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->
-  previously_endorsed_level cctxt delegate level >>=? function
-  | true ->
-      lwt_debug "Level %a (or higher) previously endorsed: do not endorse."
-        Raw_level.pp level >>= return
-  | false ->
-      match Client_baking_scheduling.sleep_until time with
-      | None ->
-          lwt_debug "Endorsment opportunity is passed." >>= fun () ->
-          return ()
-      | Some timeout ->
-          let neu = { time ; timeout ; delegate ; block; slots } in
-          match List.find_opt (fun { delegate = d } -> delegate = d) state.to_endorse with
+  match slots with
+  | None ->
+      lwt_debug "No slot found for %a/%s"
+        Block_hash.pp_short block.hash name >>= fun () ->
+      return ()
+  | Some slots ->
+      lwt_debug "Found slots for %a/%s (%d)"
+        Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->
+      previously_endorsed_level cctxt delegate level >>=? function
+      | true ->
+          lwt_debug "Level %a (or higher) previously endorsed: do not endorse."
+            Raw_level.pp level >>= return
+      | false ->
+          match Client_baking_scheduling.sleep_until time with
           | None ->
-              state.to_endorse <- neu :: state.to_endorse;
+              lwt_debug "Endorsment opportunity is passed." >>= fun () ->
               return ()
-          | Some old ->
-              if Fitness.compare old.block.fitness neu.block.fitness < 0 then begin
-                let without_old =
-                  List.filter (fun to_end -> to_end <> old) state.to_endorse in
-                state.to_endorse <- neu :: without_old;
-                return ()
-              end else
-                lwt_debug "Block %a is not the fittest: do not endorse."
-                  Block_hash.pp_short neu.block.hash >>= fun () ->
-                return ()
+          | Some timeout ->
+              let neu = { time ; timeout ; delegate ; block; slots } in
+              match List.find_opt (fun { delegate = d } -> delegate = d) state.to_endorse with
+              | None ->
+                  state.to_endorse <- neu :: state.to_endorse;
+                  return ()
+              | Some old ->
+                  if Fitness.compare old.block.fitness neu.block.fitness < 0 then begin
+                    let without_old =
+                      List.filter (fun to_end -> to_end <> old) state.to_endorse in
+                    state.to_endorse <- neu :: without_old;
+                    return ()
+                  end else
+                    lwt_debug "Block %a is not the fittest: do not endorse."
+                      Block_hash.pp_short neu.block.hash >>= fun () ->
+                    return ()
 
 let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:int64) state bi  =
   get_delegates cctxt state >>=? fun delegates ->
