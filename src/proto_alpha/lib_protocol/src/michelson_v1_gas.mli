@@ -38,7 +38,7 @@ module Cost_of : sig
   val cons : Gas.cost
   val variant_no_data : Gas.cost
   val branch : Gas.cost
-  val concat : string -> string -> Gas.cost
+  val concat_string : string list -> Gas.cost
   val map_mem :
     'a -> ('b, 'c) Script_typed_ir.map -> Gas.cost
   val map_to_list :

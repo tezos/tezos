@@ -2111,9 +2111,8 @@ and parse_instr
           (Item_t (Int_t tname, rest, annot))
     (* string operations *)
     | Prim (loc, I_CONCAT, [], annot),
-      Item_t (String_t tn1, Item_t (String_t tn2, rest, _), _) ->
-        parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
+      Item_t (List_t (String_t tname, _), rest, list_annot) ->
+        parse_var_annot ~default:list_annot loc annot >>=? fun annot ->
         typed ctxt loc Concat
           (Item_t (String_t tname, rest, annot))
     (* currency operations *)
@@ -2611,10 +2610,10 @@ and parse_instr
         get_toplevel_type tc_context
     (* Primitive parsing errors *)
     | Prim (loc, (I_DROP | I_DUP | I_SWAP | I_SOME | I_UNIT
-                 | I_PAIR | I_CAR | I_CDR | I_CONS
+                 | I_PAIR | I_CAR | I_CDR | I_CONS | I_CONCAT
                  | I_MEM | I_UPDATE | I_MAP
                  | I_GET | I_EXEC | I_FAILWITH | I_SIZE
-                 | I_CONCAT | I_ADD | I_SUB
+                 | I_ADD | I_SUB
                  | I_MUL | I_EDIV | I_OR | I_AND | I_XOR
                  | I_NOT
                  | I_ABS | I_NEG | I_LSL | I_LSR
@@ -2643,12 +2642,12 @@ and parse_instr
     (* Stack errors *)
     | Prim (loc, (I_ADD | I_SUB | I_MUL | I_EDIV
                  | I_AND | I_OR | I_XOR | I_LSL | I_LSR
-                 | I_CONCAT | I_COMPARE as name), [], _),
+                 | I_COMPARE as name), [], _),
       Item_t (ta, Item_t (tb, _, _), _) ->
         Lwt.return @@ serialize_ty_for_error ctxt ta >>=? fun (ta, ctxt) ->
         Lwt.return @@ serialize_ty_for_error ctxt tb >>=? fun (tb, _ctxt) ->
         fail (Undefined_binop (loc, name, ta, tb))
-    | Prim (loc, (I_NEG | I_ABS | I_NOT
+    | Prim (loc, (I_NEG | I_ABS | I_NOT | I_CONCAT
                  | I_EQ | I_NEQ | I_LT | I_GT | I_LE | I_GE as name),
             [], _),
       Item_t (t, _, _) ->
@@ -2683,7 +2682,7 @@ and parse_instr
                  | I_GET | I_MEM | I_EXEC
                  | I_CHECK_SIGNATURE | I_ADD | I_SUB | I_MUL
                  | I_EDIV | I_AND | I_OR | I_XOR
-                 | I_LSL | I_LSR | I_CONCAT as name), _, _),
+                 | I_LSL | I_LSR as name), _, _),
       stack ->
         serialize_stack_for_error ctxt stack >>=? fun (stack, _ctxt) ->
         fail (Bad_stack (loc, name, 2, stack))

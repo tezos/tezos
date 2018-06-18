@@ -53,8 +53,13 @@ module Cost_of = struct
   let zint z =
     alloc_bits_cost (Z.numbits z)
 
-  let concat s1 s2 =
-    string (String.length s1 + String.length s2)
+  let concat cost length ss =
+    let rec cum acc = function
+      | [] -> acc
+      | s :: ss -> cum (cost (length s) +@ acc) ss in
+    cum free ss
+
+  let concat_string ss = concat string String.length ss
 
   (* Cost per cycle of a loop, fold, etc *)
   let loop_cycle = step_cost 2
