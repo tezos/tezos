@@ -32,7 +32,7 @@ type t = {
 }
 
 let assert_acceptable_header pipeline
-    ?(first = false) hash (header : Block_header.t) =
+    hash (header : Block_header.t) =
   let chain_state = Distributed_db.chain_state pipeline.chain_db in
   let time_now = Time.now () in
   fail_unless
@@ -44,21 +44,26 @@ let assert_acceptable_header pipeline
     (Int32.equal header.shell.level level &&
      not (Block_hash.equal checkpoint hash))
     (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
-  (* Early detection of fork point before the current checkpoint. *)
   Chain.head chain_state >>= fun head ->
-  let bootstraping = (State.Block.header head).shell.level < level in
-  fail_when (first && not bootstraping && header.shell.level < level)
-    (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
-  return ()
+  let checkpoint_reached = (State.Block.header head).shell.level >= level in
+  if checkpoint_reached then
+    (* If reached the checkpoint, every block before the checkpoint
+       must be part of the chain. *)
+    Chain.mem chain_state hash >>= fun in_chain ->
+    fail_unless in_chain
+      (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
+    return ()
+  else
+    return ()
 
-let fetch_step pipeline ?first (step : Block_locator.step)  =
+let fetch_step pipeline (step : Block_locator.step)  =
   lwt_log_info "fetching step %a -> %a (%d%s) from peer %a."
     Block_hash.pp_short step.block
     Block_hash.pp_short step.predecessor
     step.step
     (if step.strict_step then "" else " max")
     P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
-  let rec fetch_loop ?first acc hash cpt =
+  let rec fetch_loop acc hash cpt =
     Lwt_unix.yield () >>= fun () ->
     if cpt < 0 then
       lwt_log_info "invalid step from peer %a (too long)."
@@ -81,13 +86,13 @@ let fetch_step pipeline ?first (step : Block_locator.step)  =
           pipeline.chain_db ~peer:pipeline.peer_id
           hash ()
       end >>=? fun header ->
-      assert_acceptable_header ?first pipeline hash header >>=? fun () ->
+      assert_acceptable_header pipeline hash header >>=? fun () ->
       lwt_debug "fetched block header %a from peer %a."
         Block_hash.pp_short hash
         P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       fetch_loop ((hash, header) :: acc) header.shell.predecessor (cpt - 1)
   in
-  fetch_loop ?first [] step.block step.step >>=? fun headers ->
+  fetch_loop [] step.block step.step >>=? fun headers ->
   iter_s
     begin fun header ->
       protect ~canceler:pipeline.canceler begin fun () ->
@@ -104,12 +109,8 @@ let headers_fetch_worker_loop pipeline =
        the point of view of the node sending the locator *)
     let seed = {Block_locator.sender_id=pipeline.peer_id; receiver_id=sender_id } in
     let steps = Block_locator.to_steps seed pipeline.locator in
-    match steps with
-    | [] -> return ()
-    | step :: steps ->
-        fetch_step pipeline ~first:true step >>=? fun () ->
-        iter_s (fetch_step pipeline) steps >>=? fun () ->
-        return ()
+    iter_s (fetch_step pipeline) steps >>=? fun () ->
+    return ()
   end >>= function
   | Ok () ->
       lwt_log_info "fetched all step from peer %a."
