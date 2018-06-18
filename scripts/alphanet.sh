@@ -59,6 +59,7 @@ services:
     links:
       - node
     volumes:
+      - node_data:/var/run/tezos/node:ro
       - client_data:/var/run/tezos/client
     restart: on-failure
 

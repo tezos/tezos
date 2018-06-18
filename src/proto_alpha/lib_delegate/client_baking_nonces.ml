@@ -21,7 +21,7 @@ let encoding : t Data_encoding.t =
        (req "block" Block_hash.encoding)
        (req "nonce" Nonce.encoding))
 
-let name = "nonces"
+let name = "nonce"
 
 let load (wallet : #Client_context.wallet) =
   wallet#load ~default:[] name encoding

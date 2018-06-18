@@ -43,18 +43,18 @@ wait_for_the_node_to_be_bootstraped() {
 
 launch_node() {
 
-    mkdir -p "$node_dir"
+    mkdir -p "$node_data_dir"
 
-    if [ ! -f "$node_dir/config.json" ]; then
+    if [ ! -f "$node_data_dir/config.json" ]; then
         echo "Configuring the node..."
         "$node" config init \
-                --data-dir "$node_dir" \
+                --data-dir "$node_data_dir" \
                 --rpc-addr ":$NODE_RPC_PORT" \
                 "$@"
     else
         echo "Updating the node configuration..."
         "$node" config update \
-                --data-dir "$node_dir" \
+                --data-dir "$node_data_dir" \
                 --rpc-addr ":$NODE_RPC_PORT" \
                 "$@"
     fi
@@ -76,16 +76,15 @@ launch_node() {
     fi
     if [ "$local_data_version" != "$image_version" ]; then
         echo "Removing outdated chain data..."
-        if [ -f "$node_dir/identities.json" ]; then \
-            mv "$node_dir/identities.json" /tmp
+        if [ -f "$node_data_dir/identities.json" ]; then \
+            mv "$node_data_dir/identities.json" /tmp
         fi
         rm -rf "$node_dir"/*
-        rm -rf "$client_dir/blockss"
-        rm -rf "$client_dir/noncess"
-        rm -rf "$client_dir/endorsementss"
-        rm -rf "$client_dir/endorsed_levels"
+        rm -rf "$client_dir/baking"
+        rm -rf "$client_dir/nonces"
+        rm -rf "$client_dir/endorsements"
         if [ -f "/tmp/identities.json" ]; then \
-            mv /tmp/identities.json "$node_dir/"
+            mv /tmp/identities.json "$node_data_dir/"
         fi
         cp "/usr/local/share/tezos/alphanet_version" \
            "$node_dir/alphanet_version"
@@ -94,28 +93,32 @@ launch_node() {
 
     # Generate a new identity if not present
 
-    if [ ! -f "$node_dir/identity.json" ]; then
+    if [ ! -f "$node_data_dir/identity.json" ]; then
         echo "Generating a new node identity..."
         "$node" identity generate 24. \
-                --data-dir "$node_dir"
+                --data-dir "$node_data_dir"
     fi
 
     configure_client
 
     # Launching the node
 
-    exec "$node" run --data-dir "$node_dir"
+    exec "$node" run --data-dir "$node_data_dir"
 
 }
 
 launch_baker() {
     configure_client
     wait_for_the_node_to_be_bootstraped
-    exec "$client" launch daemon --baking "$@"
+    exec "$baker" --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 launch with context "$node_data_dir/context/"
 }
 
 launch_endorser() {
     configure_client
     wait_for_the_node_to_be_bootstraped
-    exec "$client" launch daemon --endorsement "$@"
+    exec "$endorser" --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 launch
 }

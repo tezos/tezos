@@ -12,7 +12,7 @@ open Alpha_context
 
 include Logging.Make(struct let name = "client.endorsement" end)
 
-module State = Daemon_state.Make(struct let name = "endorsements" end)
+module State = Daemon_state.Make(struct let name = "endorsement" end)
 
 let get_signing_slots cctxt ?(chain = `Main) block delegate level =
   Alpha_services.Delegate.Endorsing_rights.get cctxt

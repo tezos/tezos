@@ -12,9 +12,12 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 node="/usr/local/bin/tezos-node"
 client="/usr/local/bin/tezos-client"
 admin_client="/usr/local/bin/tezos-admin-client"
+baker="/usr/local/bin/tezos-alpha-baker"
+endorser="/usr/local/bin/tezos-alpha-endorser"
 
 client_dir="$DATA_DIR/client"
 node_dir="$DATA_DIR/node"
+node_data_dir="$node_dir/data"
 
 . "$bin_dir/entrypoint.inc.sh"
 
@@ -49,4 +52,3 @@ Available commands:
 EOF
         ;;
 esac
-

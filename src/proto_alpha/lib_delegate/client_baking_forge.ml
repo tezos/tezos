@@ -348,7 +348,7 @@ let forge_block cctxt ?(chain = `Main) block
 
 (** Worker *)
 
-module State = Daemon_state.Make(struct let name = "baking" end)
+module State = Daemon_state.Make(struct let name = "block" end)
 
 let previously_baked_level cctxt pkh new_lvl  =
   State.get cctxt pkh  >>=? function

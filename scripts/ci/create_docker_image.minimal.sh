@@ -33,7 +33,8 @@ cp -a "$build_dir"/hidapi-$hidapi_version-r0.apk \
 mkdir -p "$tmp_dir"/bin
 mkdir -p "$tmp_dir"/scripts
 container=$(docker create $build_image_name)
-for bin in tezos-client tezos-admin-client tezos-node; do
+for bin in tezos-client tezos-admin-client tezos-node \
+	   tezos-alpha-baker tezos-alpha-endorser tezos-alpha-accuser; do
     docker cp -L $container:/home/opam/tezos/$bin "$tmp_dir"/bin
 done
 cp -a "$script_dir"/docker/entrypoint.sh "$tmp_dir"/bin/
