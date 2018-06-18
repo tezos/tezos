@@ -220,7 +220,7 @@ let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:int64) state bi  
 
 let compute_timeout state =
   match state.to_endorse with
-  | [] -> Lwt_utils.never_ending
+  | [] -> Lwt_utils.never_ending ()
   | to_ends ->
       Lwt.choose (List.map (fun to_end -> to_end.timeout) to_ends)
 

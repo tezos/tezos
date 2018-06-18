@@ -623,7 +623,7 @@ type error += Canceled
 let protect ?on_error ?canceler t =
   let cancelation =
     match canceler with
-    | None -> Lwt_utils.never_ending
+    | None -> Lwt_utils.never_ending ()
     | Some canceler ->
         (Lwt_canceler.cancelation canceler >>= fun () ->
          fail Canceled ) in

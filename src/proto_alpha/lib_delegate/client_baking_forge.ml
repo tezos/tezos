@@ -403,7 +403,7 @@ let compute_timeout { future_slots } =
   match future_slots with
   | [] ->
       (* No slots, just wait for new blocks which will give more info *)
-      Lwt_utils.never_ending
+      Lwt_utils.never_ending ()
   | (timestamp, _) :: _ ->
       match Client_baking_scheduling.sleep_until timestamp with
       | None ->

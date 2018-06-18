@@ -16,7 +16,7 @@ let may ~f = function
   | None -> Lwt.return_unit
   | Some x -> f x
 
-let never_ending = fst (Lwt.wait ())
+let never_ending () = fst (Lwt.wait ())
 
 type trigger =
   | Absent
