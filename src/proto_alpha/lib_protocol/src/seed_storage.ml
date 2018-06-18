@@ -56,7 +56,8 @@ let compute_for_cycle c ~revealed cycle =
             Storage.Seed.Nonce.delete c level >>=? fun c ->
             return (c, random_seed, u :: unrevealed)
       in
-      Storage.Seed.For_cycle.get c previous_cycle >>=? fun seed ->
+      Storage.Seed.For_cycle.get c previous_cycle >>=? fun prev_seed ->
+      let seed = Seed_repr.deterministic_seed prev_seed in
       fold_left_s combine (c, seed, []) levels >>=? fun (c, seed, unrevealed) ->
       Storage.Seed.For_cycle.init c cycle seed >>=? fun c ->
       return (c, unrevealed)
@@ -102,6 +103,6 @@ let cycle_end ctxt last_cycle =
   end >>=? fun ctxt ->
   match Cycle_repr.pred last_cycle with
   | None -> return (ctxt, [])
-  | Some revealed ->
+  | Some revealed -> (* cycle with revelations *)
       let inited_seed_cycle = Cycle_repr.add last_cycle (preserved+1) in
       compute_for_cycle ctxt ~revealed inited_seed_cycle

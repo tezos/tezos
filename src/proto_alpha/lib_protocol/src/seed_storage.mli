@@ -12,6 +12,8 @@ type error +=
                  cycle : Cycle_repr.t ;
                  latest : Cycle_repr.t } (* `Permanent *)
 
+(** Generates the first [preserved_cycles+2] seeds for which
+    there are no nonces. *)
 val init:
   Raw_context.t -> Raw_context.t tzresult Lwt.t
 
