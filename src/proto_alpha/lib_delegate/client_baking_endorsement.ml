@@ -193,7 +193,9 @@ let allowed_to_endorse cctxt state (block: Client_baking_blocks.block_info) dele
               | Some old ->
                   if Fitness.compare old.block.fitness neu.block.fitness < 0 then begin
                     let without_old =
-                      List.filter (fun to_end -> to_end <> old) state.to_endorse in
+                      List.filter (fun to_end ->
+                          to_end.block.hash <> old.block.hash)
+                        state.to_endorse in
                     state.to_endorse <- neu :: without_old;
                     return ()
                   end else
