@@ -6,7 +6,6 @@
    (
     ;; Part of OCaml stdlib
     v1/pervasives.mli
-    v1/array.mli
     v1/list.mli
     v1/string.mli
     v1/int32.mli
