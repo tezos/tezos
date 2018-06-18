@@ -177,21 +177,6 @@ test:p2p:banned_peers:
   script:
     - jbuilder build @src/lib_p2p/runtest_p2p_banned_peers
 
-# test:client_alpha:transaction:
-  # <<: *test_definition
-  # script:
-    # - jbuilder build @src/proto_alpha/lib_delegate/runtest_transaction
-
-# test:client_alpha:origination:
-  # <<: *test_definition
-  # script:
-    # - jbuilder build @src/proto_alpha/lib_delegate/runtest_origination
-
-# test:client_alpha:endorsement:
-#   <<: *test_definition
-#   script:
-#     - jbuilder build @src/proto_alpha/lib_baking/runtest_endorsement
-
 test:client_alpha:vote:
   <<: *test_definition
   script:

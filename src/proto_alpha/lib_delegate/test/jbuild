@@ -2,8 +2,6 @@
 
 (executables
  ((names (test_michelson_parser
-          test_origination
-          test_transaction
           test_rpc
           test_vote))
   (libraries (tezos-base
@@ -29,24 +27,12 @@
 (alias
  ((name buildtest)
   (deps (test_michelson_parser.exe
-         ;test_origination.exe
-         ;test_transaction.exe
          test_rpc.exe
          test_vote.exe))))
 
 (alias
  ((name runtest_michelson_parser)
   (action (run ${exe:test_michelson_parser.exe}))))
-
-(alias
- ((name runtest_origination)
-  (locks  (/tcp-port/18200))
-  (action (chdir ${ROOT} (run ${exe:test_origination.exe} ${bin:tezos-node} 18200)))))
-
-(alias
- ((name runtest_transaction)
-  (locks  (/tcp-port/18300))
-  (action (chdir ${ROOT} (run ${exe:test_transaction.exe} ${bin:tezos-node} 18300)))))
 
 (alias
  ((name runtest_vote)
@@ -61,8 +47,6 @@
 (alias
  ((name runtest)
   (deps ((alias runtest_michelson_parser)
-         ;(alias runtest_origination)
-         ;(alias runtest_transaction)
          (alias runtest_rpc)
          (alias runtest_vote)))))
 
