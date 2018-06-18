@@ -460,7 +460,7 @@ module Make_indexed_data_snapshotable_storage (C : Raw_context.T)
     return (C.project t)
 
   let delete_snapshot s id =
-    C.remove_rec s (Snapshot_index.to_path id snapshot_name) >>= fun t ->
+    C.remove_rec s (snapshot_path id) >>= fun t ->
     Lwt.return (C.project t)
 
 end
