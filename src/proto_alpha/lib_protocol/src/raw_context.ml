@@ -100,8 +100,9 @@ let add_rewards ctxt rewards =
 
 let add_deposit ctxt delegate deposit =
   let previous =
-    try Signature.Public_key_hash.Map.find delegate ctxt.deposits
-    with Not_found -> Tez_repr.zero in
+    match Signature.Public_key_hash.Map.find_opt delegate ctxt.deposits with
+    | Some tz -> tz
+    | None -> Tez_repr.zero in
   Lwt.return Tez_repr.(previous +? deposit) >>=? fun deposit ->
   let deposits =
     Signature.Public_key_hash.Map.add delegate deposit ctxt.deposits in
