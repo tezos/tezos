@@ -776,16 +776,37 @@ Operations on strings
 ~~~~~~~~~~~~~~~~~~~~~
 
 Strings are mostly used for naming things without having to rely on
-external ID databases. So what can be done is basically use string
-constants as is, concatenate them and use them as keys.
+external ID databases. They are restricted to the printable subset of
+7-bit ASCII, plus some escaped characters (see section on
+constants). So what can be done is basically use string constants as
+is, concatenate or splice them, and use them as keys.
+
 
 -  ``CONCAT``: String concatenation.
 
 ::
 
-    :: string : string : 'S   -> string : 'S
+    :: string list : 'S   -> string : 'S
 
-    > CONCAT / s : t : S  =>  (s ^ t) : S
+    > CONCAT / {} : S  =>  "" : S
+    > CONCAT / { s ; <ss> } : S  =>  (s ^ r) : S
+       where CONCAT / { <ss> } : S  =>  r : S
+
+-  ``SIZE``: number of characters in a string.
+
+::
+
+     :: string : 'S   ->   nat : 'S
+
+-  ``SLICE``: String access.
+
+    :: nat : nat : string : 'S   ->  string : 'S
+
+    > SLICE / offset : length : s : S  =>  ss : S
+       where ss is the substring of s at the given offset and of the given length
+         iff offset and (offset + length) are in bounds
+    > SLICE / offset : length : s : S  =>  "" : S
+         iff offset or (offset + length) are out of bounds
 
 -  ``COMPARE``: Lexicographic comparison.
 
@@ -1461,6 +1482,32 @@ the wild and untyped outside world.
 ::
 
      :: bytes : 'S   ->   option 'a : 'S
+
+-  ``CONCAT``: Byte sequence concatenation.
+
+::
+
+    :: bytes list : 'S   -> bytes : 'S
+
+    > CONCAT / {} : S  =>  0x : S
+    > CONCAT / { s ; <ss> } : S  =>  (s ^ r) : S
+       where CONCAT / { <ss> } : S  =>  r : S
+
+-  ``SIZE``: size of a sequence of bytes.
+
+::
+
+     :: bytes : 'S   ->   nat : 'S
+
+-  ``SLICE``: Bytes access.
+
+    :: nat : nat : bytes : 'S   -> string : 'S
+
+    > SLICE / offset : length : s : S  =>  ss : S
+       where ss is the substring of s at the given offset and of the given length
+         iff offset and (offset + length) are in bounds
+    > SLICE / offset : length : s : S  =>  0x : S
+         iff offset or (offset + length) are out of bounds
 
 -  ``COMPARE``: Lexicographic comparison.
 
