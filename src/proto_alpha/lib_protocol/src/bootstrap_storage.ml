@@ -9,13 +9,24 @@
 
 open Misc
 
-let init_account ctxt (account: Parameters_repr.bootstrap_account) =
-  let public_key_hash = Signature.Public_key.hash account.public_key in
-  let contract = Contract_repr.implicit_contract public_key_hash in
-  Contract_storage.credit ctxt contract account.amount >>=? fun ctxt ->
-  Contract_storage.reveal_manager_key ctxt contract account.public_key >>=? fun ctxt ->
-  Delegate_storage.set ctxt contract (Some public_key_hash) >>=? fun ctxt ->
-  return ctxt
+let init_account ctxt ({ public_key; amount; script }: Parameters_repr.bootstrap_account) =
+  let public_key_hash = Signature.Public_key.hash public_key in
+  match script with
+  | None ->
+      let contract = Contract_repr.implicit_contract public_key_hash in
+      Contract_storage.credit ctxt contract amount >>=? fun ctxt ->
+      Contract_storage.reveal_manager_key ctxt contract public_key >>=? fun ctxt ->
+      Delegate_storage.set ctxt contract (Some public_key_hash) >>=? fun ctxt ->
+      return ctxt
+  | Some (contract, script) ->
+      Contract_storage.originate ctxt contract
+        ~balance:amount
+        ~manager:Signature.Public_key_hash.zero
+        ~script:(script, None)
+        ~delegate:(Some public_key_hash)
+        ~spendable:false
+        ~delegatable:false >>=? fun ctxt ->
+      return ctxt
 
 let init ctxt ?ramp_up_cycles ?no_reward_cycles accounts =
   fold_left_s init_account ctxt accounts >>=? fun ctxt ->

@@ -185,7 +185,7 @@ let initial_context
   =
   let bootstrap_accounts =
     List.map (fun (Account.{ pk = public_key ; _ }, amount) ->
-        Parameters_repr.{ public_key ; amount }
+        Parameters_repr.{ public_key ; amount; script = None }
       ) initial_accounts
   in
   let json =

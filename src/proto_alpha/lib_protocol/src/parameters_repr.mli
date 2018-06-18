@@ -10,6 +10,7 @@
 type bootstrap_account = {
   public_key : Signature.Public_key.t ;
   amount : Tez_repr.t ;
+  script : (Contract_repr.t * Script_repr.t) option ;
 }
 
 type t = {

@@ -10,6 +10,7 @@
 type bootstrap_account = {
   public_key : Signature.Public_key.t ;
   amount : Tez_repr.t ;
+  script : (Contract_repr.t * Script_repr.t) option ;
 }
 
 type t = {
@@ -22,11 +23,30 @@ type t = {
 
 let bootstrap_account_encoding =
   let open Data_encoding in
-  conv
-    (fun { public_key ; amount } -> (public_key, amount))
-    (fun (public_key, amount) -> { public_key ; amount })
-    (tup2 Signature.Public_key.encoding Tez_repr.encoding)
-
+  union
+    [ case (Tag 0) ~title:"Non_scripted"
+        (tup2
+           Signature.Public_key.encoding
+           Tez_repr.encoding)
+        (function
+          | { public_key ; amount ; script = None } ->
+              Some (public_key, amount)
+          | { script = Some _ }  -> None)
+        (fun (public_key, amount) ->
+           { public_key ; amount ; script = None }) ;
+      case (Tag 1) ~title:"Scripted"
+        (tup3
+           Signature.Public_key.encoding
+           Tez_repr.encoding
+           (obj2
+              (req "address" Contract_repr.encoding)
+              (req "script" Script_repr.encoding)))
+        (function
+          | { public_key ; amount ; script = Some script } ->
+              Some (public_key, amount, script)
+          | { script = None }  -> None)
+        (fun (public_key, amount, script) ->
+           { public_key ; amount ; script = Some script }) ]
 
 (* This encoding is used to read configuration files (e.g. sandbox.json)
    where some fields can be missing, in that case they are replaced by
