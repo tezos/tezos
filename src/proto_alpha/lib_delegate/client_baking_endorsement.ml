@@ -110,7 +110,7 @@ let endorse_for_delegate cctxt block delegate =
   inject_endorsement cctxt
     b hash level
     sk delegate >>=? fun oph ->
-  lwt_log_info
+  lwt_log_notice
     "Injected endorsement for block '%a' \
      (level %a, contract %s) '%a'"
     Block_hash.pp_short hash
@@ -221,7 +221,7 @@ let create
 
   (* ignition *)
   check_error (prepare_endorsement cctxt ~max_past state bi) >>= fun () ->
-  lwt_log_info "Starting endorsement daemon" >>= fun () ->
+  lwt_log_notice "Starting endorsement daemon" >>= fun () ->
   worker_loop ()
 
 (* A wrapper around the main create function (above) to wait for the initial
