@@ -15,7 +15,7 @@ open Alpha_context
 type t = {
   hash : Block_hash.t ;
   header : Block_header.t ;
-  operations : Operation.t list ;
+  operations : Operation.packed list ;
   context : Tezos_protocol_environment_memory.Context.t ;
 }
 type block = t
@@ -78,6 +78,7 @@ let get_next_baker ?(policy = By_priority 0) = dispatch_policy policy
 module Forge = struct
 
   type header = {
+    baker : public_key_hash ;   (* the signer of the block *)
     shell : Block_header.shell_header ;
     contents : Block_header.contents ;
   }
@@ -85,48 +86,34 @@ module Forge = struct
   let default_proof_of_work_nonce =
     MBytes.create Constants.proof_of_work_nonce_size
 
-  let make_header
+  let make_contents
       ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ~priority ~seed_nonce_hash
-      ~level ~predecessor ~timestamp ~fitness ~operations_hash () =
-    let contents = Block_header.{
-        priority ;
-        proof_of_work_nonce ;
-        seed_nonce_hash ;
-      }
-    in
-    let shell = Tezos_base.Block_header.{
-        level ;
-        predecessor ;
-        timestamp ;
-        fitness ;
-        operations_hash ;
-        (* We don't care of the following values, only the shell validates them. *)
-        proto_level = 0 ;
-        validation_passes = 0 ;
-        context = Context_hash.zero ;
-      }
-    in
-    { shell ; contents }
+      ~priority ~seed_nonce_hash () =
+    Block_header.{ priority ;
+                   proof_of_work_nonce ;
+                   seed_nonce_hash }
 
-  let set_seed_nonce_hash seed_nonce_hash { shell ; contents } =
-    { shell ; contents = { contents with seed_nonce_hash } }
+  let make_shell
+      ~level ~predecessor ~timestamp ~fitness ~operations_hash =
+    Tezos_base.Block_header.{
+      level ;
+      predecessor ;
+      timestamp ;
+      fitness ;
+      operations_hash ;
+      (* We don't care of the following values, only the shell validates them. *)
+      proto_level = 0 ;
+      validation_passes = 0 ;
+      context = Context_hash.zero ;
+    }
 
-  let sign_header { shell ; contents } pred =
-    (* Finds the baker that should sign from the header *)
-    let baker_of_a_block header =
-      let priority = header.contents.priority in
-      Alpha_services.Delegate.Baking_rights.get rpc_ctxt
-        ~all:true
-        ~max_priority:(priority+1)
-        pred >>=? fun bakers ->
-      let { Alpha_services.Delegate.Baking_rights.delegate = pkh } =
-        List.find
-          (fun { Alpha_services.Delegate.Baking_rights.priority = p } -> p = priority)
-          bakers in
-      Account.find pkh
-    in
-    baker_of_a_block { shell ; contents } >>=? fun delegate ->
+  let set_seed_nonce_hash seed_nonce_hash { baker ; shell ; contents } =
+    { baker ; shell ; contents = { contents with seed_nonce_hash } }
+
+  let set_baker baker header = { header with baker }
+
+  let sign_header { baker ; shell ; contents } =
+    Account.find baker >>=? fun delegate ->
     let unsigned_bytes =
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding
@@ -138,7 +125,7 @@ module Forge = struct
   let forge_header
       ?(policy = By_priority 0)
       ?(operations = []) pred =
-    dispatch_policy policy pred >>=? fun (_, priority, timestamp) ->
+    dispatch_policy policy pred >>=? fun (pkh, priority, timestamp) ->
     let level = Int32.succ pred.header.shell.level in
     begin
       match Fitness_repr.to_int64 pred.header.shell.fitness with
@@ -152,13 +139,13 @@ module Forge = struct
       | { expected_commitment = true } -> Some (fst (Proto_Nonce.generate ()))
       | { expected_commitment = false } -> None
     end >>=? fun seed_nonce_hash ->
-    let hashes = List.map Operation.hash operations in
+    let hashes = List.map Operation.hash_packed operations in
     let operations_hash = Operation_list_list_hash.compute
         [Operation_list_hash.compute hashes] in
-    let header = make_header
-        ~priority ~level ~predecessor:pred.hash ~timestamp ~fitness
-        ~seed_nonce_hash ~operations_hash () in
-    return header
+    let shell = make_shell ~level ~predecessor:pred.hash
+        ~timestamp ~fitness ~operations_hash in
+    let contents = make_contents ~priority ~seed_nonce_hash () in
+    return { baker = pkh ; shell ; contents }
 
   (* compatibility only, needed by incremental *)
   let contents
@@ -229,13 +216,11 @@ let genesis
     ?(blocks_per_roll_snapshot = Constants_repr.default.blocks_per_roll_snapshot)
     ?(blocks_per_voting_period = Constants_repr.default.blocks_per_voting_period)
     ?(time_between_blocks = Constants_repr.default.time_between_blocks)
-    ?(first_free_baking_slot = Constants_repr.default.first_free_baking_slot)
     ?(endorsers_per_block = Constants_repr.default.endorsers_per_block)
     ?(hard_gas_limit_per_operation = Constants_repr.default.hard_gas_limit_per_operation)
     ?(hard_gas_limit_per_block = Constants_repr.default.hard_gas_limit_per_block)
     ?(proof_of_work_threshold = Int64.(neg one))
     ?(dictator_pubkey = Constants_repr.default.dictator_pubkey)
-    ?(max_operation_data_length = Constants_repr.default.max_operation_data_length)
     ?(tokens_per_roll = Constants_repr.default.tokens_per_roll)
     ?(michelson_maximum_type_size = Constants_repr.default.michelson_maximum_type_size)
     ?(seed_nonce_revelation_tip = Constants_repr.default.seed_nonce_revelation_tip)
@@ -276,13 +261,11 @@ let genesis
     blocks_per_roll_snapshot ;
     blocks_per_voting_period ;
     time_between_blocks ;
-    first_free_baking_slot ;
     endorsers_per_block ;
     hard_gas_limit_per_operation ;
     hard_gas_limit_per_block ;
     proof_of_work_threshold ;
     dictator_pubkey ;
-    max_operation_data_length ;
     tokens_per_roll ;
     michelson_maximum_type_size ;
     seed_nonce_revelation_tip ;
@@ -300,20 +283,18 @@ let genesis
   let hash =
     Block_hash.of_b58check_exn "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
-  let header =
-    Forge.make_header
+  let shell = Forge.make_shell
       ~level:0l
       ~predecessor:hash
       ~timestamp:Time.epoch
       ~fitness: (Fitness_repr.from_int64 0L)
-      ~priority: 0
-      ~seed_nonce_hash:None
-      ~operations_hash: Operation_list_list_hash.zero
-      ()
-  in
+      ~operations_hash: Operation_list_list_hash.zero in
+  let contents = Forge.make_contents
+      ~priority:0
+      ~seed_nonce_hash:None () in
   initial_context
     constants
-    header.shell
+    shell
     commitments
     initial_accounts
     security_deposit_ramp_up_cycles
@@ -322,9 +303,9 @@ let genesis
   let block =
     { hash ;
       header = {
-        shell = header.shell ;
+        shell = shell ;
         protocol_data = {
-          contents = header.contents ;
+          contents = contents ;
           signature = Signature.zero ;
         } ;
       };
@@ -336,8 +317,7 @@ let genesis
 
 (********* Baking *************)
 
-let apply (header:Forge.header) ?(operations = []) pred =
-  Forge.sign_header header pred >>=? fun header ->
+let apply header ?(operations = []) pred =
   begin
     let open Alpha_environment.Error_monad in
     Proto_alpha.Main.begin_application
@@ -365,6 +345,7 @@ let bake ?policy ?operation ?operations pred =
     | None, None -> None
   in
   Forge.forge_header ?policy ?operations pred >>=? fun header ->
+  Forge.sign_header header >>=? fun header ->
   apply header ?operations pred
 
 (* This function is duplicated from Context to avoid a cyclic dependency *)
@@ -383,3 +364,23 @@ let bake_until_cycle_end ?policy b =
   let current_level = Int32.rem current_level blocks_per_cycle in
   let delta = Int32.sub blocks_per_cycle current_level in
   bake_n ?policy (Int32.to_int delta) b
+
+let bake_until_n_cycle_end ?policy n b =
+  Error_monad.fold_left_s
+    (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
+
+let bake_until_cycle ?policy cycle (b:t) =
+  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle } } ->
+  let rec loop (b:t) =
+    let current_cycle =
+      let current_level = b.header.shell.level in
+      let current_cycle = Int32.div current_level blocks_per_cycle in
+      current_cycle
+    in
+    if Int32.equal (Cycle.to_int32 cycle) current_cycle then
+      return b
+    else
+      bake_until_cycle_end ?policy b >>=? fun b ->
+      loop b
+  in
+  loop b

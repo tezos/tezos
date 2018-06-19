@@ -87,7 +87,7 @@ type t = {
 let wrap_context_init f _ () =
   Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir ->
     let root = base_dir // "context" in
-    Context.init ~root ?patch_context:None >>= fun idx ->
+    Context.init ~mapsize:4_096_000L root >>= fun idx ->
     Context.commit_genesis idx
       ~chain_id
       ~time:genesis_time

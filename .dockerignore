@@ -17,6 +17,8 @@ tezos-protocol-compiler
 tezos-client
 tezos-admin-client
 tezos-alpha-baker
+tezos-alpha-endorser
+tezos-alpha-accuser
 tezos-signer
 
 scripts/opam-test-all.sh.DONE

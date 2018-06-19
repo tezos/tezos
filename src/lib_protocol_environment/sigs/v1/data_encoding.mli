@@ -54,8 +54,8 @@ end
 module Variable : sig
   val string : string encoding
   val bytes : MBytes.t encoding
-  val array : 'a encoding -> 'a array encoding
-  val list : 'a encoding -> 'a list encoding
+  val array : ?max_length: int -> 'a encoding -> 'a array encoding
+  val list : ?max_length: int -> 'a encoding -> 'a list encoding
 end
 
 module Bounded : sig
@@ -159,8 +159,8 @@ val tup10 :
 val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
 val merge_tups : 'a1 encoding -> 'a2 encoding -> ('a1 * 'a2) encoding
 
-val array : 'a encoding -> 'a array encoding
-val list : 'a encoding -> 'a list encoding
+val array : ?max_length: int -> 'a encoding -> 'a array encoding
+val list : ?max_length: int -> 'a encoding -> 'a list encoding
 
 val assoc : 'a encoding -> (string * 'a) list encoding
 
@@ -263,3 +263,9 @@ module Binary : sig
   exception Write_error of write_error
 
 end
+
+(** [check_size size encoding] ensures that the binary encoding
+    of a value will not be allowed to exceed [size] bytes. The reader
+    and the writer fails otherwise. This function do not modify
+    the JSON encoding. *)
+val check_size : int -> 'a encoding -> 'a encoding

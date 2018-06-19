@@ -74,18 +74,6 @@ let main select_commands =
   ignore Clic.(setup_formatter Format.err_formatter
                  (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
   init_logger () >>= fun () ->
-  Client_keys.register_signer
-    (module Tezos_signer_backends.Unencrypted) ;
-  Client_keys.register_signer
-    (module Tezos_signer_backends.Encrypted.Make(struct
-         let cctxt = new Client_context_unix.unix_prompter
-       end)) ;
-  Client_keys.register_signer
-    (module Tezos_signer_backends.Https) ;
-  Client_keys.register_signer
-    (module Tezos_signer_backends.Socket.Unix) ;
-  Client_keys.register_signer
-    (module Tezos_signer_backends.Socket.Tcp) ;
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
         (new unix_full
@@ -102,14 +90,6 @@ let main select_commands =
         tls = parsed_config_file.tls ;
       } in
       let ctxt = new RPC_client.http_ctxt rpc_config Media_type.all_media_types in
-      select_commands ctxt parsed_args >>=? fun commands ->
-      let commands =
-        Clic.add_manual
-          ~executable_name
-          ~global_options
-          (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
-          Format.std_formatter
-          (config_commands @ builtin_commands @ commands) in
       let rpc_config =
         if parsed_args.print_timings then
           { rpc_config with
@@ -124,12 +104,52 @@ let main select_commands =
           ~confirmations:parsed_args.confirmations
           ~base_dir:parsed_config_file.base_dir
           ~rpc_config:rpc_config in
+      Client_keys.register_signer
+        (module Tezos_signer_backends.Unencrypted) ;
+      Client_keys.register_signer
+        (module Tezos_signer_backends.Encrypted.Make(struct
+             let cctxt = (client_config :> Client_context.prompter)
+           end)) ;
+      let module Remote_params = struct
+        let authenticate pkhs payload =
+          Client_keys.list_keys client_config >>=? fun keys ->
+          match List.filter_map
+                  (function
+                    | (_, known_pkh, _, Some known_sk_uri)
+                      when List.exists (fun pkh -> Signature.Public_key_hash.equal pkh known_pkh) pkhs ->
+                        Some known_sk_uri
+                    | _ -> None)
+                  keys with
+          | sk_uri :: _ ->
+              Client_keys.sign client_config sk_uri payload
+          | [] -> failwith
+                    "remote signer expects authentication signature, \
+                     but no authorized key was found in the wallet"
+        let logger = rpc_config.logger
+      end in
+      let module Https = Tezos_signer_backends.Https.Make(Remote_params) in
+      let module Http = Tezos_signer_backends.Http.Make(Remote_params) in
+      let module Socket = Tezos_signer_backends.Socket.Make(Remote_params) in
+      Client_keys.register_signer (module Https) ;
+      Client_keys.register_signer (module Http) ;
+      Client_keys.register_signer (module Socket.Unix) ;
+      Client_keys.register_signer (module Socket.Tcp) ;
       Option.iter parsed_config_file.remote_signer ~f: begin fun signer ->
         Client_keys.register_signer
           (module Tezos_signer_backends.Remote.Make(struct
                let default = signer
+               include Remote_params
              end))
       end ;
+      Client_keys.register_signer (module Tezos_signer_backends.Ledger) ;
+      select_commands ctxt parsed_args >>=? fun commands ->
+      let commands =
+        Clic.add_manual
+          ~executable_name
+          ~global_options
+          (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
+          Format.std_formatter
+          (config_commands @ builtin_commands @ commands) in
       begin match autocomplete with
         | Some (prev_arg, cur_arg, script) ->
             Clic.autocompletion

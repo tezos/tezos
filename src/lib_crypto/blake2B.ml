@@ -274,6 +274,8 @@ module Generic_Merkle_tree (H : sig
 
 end
 
+let rec log2 x = if x <= 1 then 0 else 1 + log2 ((x+1) / 2)
+
 module Make_merkle_tree
     (R : sig
        val register_encoding:
@@ -330,6 +332,13 @@ module Make_merkle_tree
              (function Op -> Some () | _ -> None)
              (fun () -> Op)
          ])
+
+  let bounded_path_encoding ?max_length () =
+    match max_length with
+    | None -> path_encoding
+    | Some max_length ->
+        let max_depth = log2 max_length in
+        Data_encoding.check_size (max_depth * (size + 1) + 1) path_encoding
 
 end
 

@@ -13,13 +13,14 @@ open Alpha_context
 type t = {
   predecessor: Block.t ;
   state: M.validation_state ;
-  rev_operations: Operation.t list ;
+  rev_operations: Operation.packed list ;
   header: Block_header.t ;
   delegate: Account.t ;
 }
 type incremental = t
 
 let predecessor { predecessor ; _ } = predecessor
+let header st = st.header
 
 let level st = st.header.shell.level
 
@@ -88,7 +89,7 @@ let finalize_block st =
   let operations = List.rev st.rev_operations in
   let operations_hash =
     Operation_list_list_hash.compute [
-      Operation_list_hash.compute (List.map Operation.hash operations)
+      Operation_list_hash.compute (List.map Operation.hash_packed operations)
     ] in
   let header =
     { st.header with

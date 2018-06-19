@@ -248,6 +248,8 @@ module Script : sig
     | I_ADDRESS
     | I_CONTRACT
     | I_ISNAT
+    | I_CAST
+    | I_RENAME
     | T_bool
     | T_contract
     | T_int
@@ -271,6 +273,8 @@ module Script : sig
     | T_address
 
   type location = Micheline.canonical_location
+
+  type annot = Micheline.annot
 
   type expr = prim Micheline.canonical
 
@@ -300,6 +304,7 @@ module Constants : sig
     proof_of_work_nonce_size : int ;
     nonce_length : int ;
     max_revelations_per_block : int ;
+    max_operation_data_length : int ;
   }
   val fixed_encoding: fixed Data_encoding.t
   val fixed: fixed
@@ -307,7 +312,7 @@ module Constants : sig
   val proof_of_work_nonce_size: int
   val nonce_length: int
   val max_revelations_per_block: int
-
+  val max_operation_data_length: int
 
   (** Constants parameterized by context *)
   type parametric = {
@@ -322,7 +327,6 @@ module Constants : sig
     hard_gas_limit_per_block: Z.t ;
     proof_of_work_threshold: int64 ;
     dictator_pubkey: Signature.Public_key.t ;
-    max_operation_data_length: int ;
     tokens_per_roll: Tez.t ;
     michelson_maximum_type_size: int;
     seed_nonce_revelation_tip: Tez.t ;
@@ -332,8 +336,8 @@ module Constants : sig
     block_reward: Tez.t ;
     endorsement_reward: Tez.t ;
     cost_per_byte: Tez.t ;
-    hard_storage_limit_per_operation: Int64.t ;
-    hard_storage_limit_per_block: Int64.t ;
+    hard_storage_limit_per_operation: Z.t ;
+    hard_storage_limit_per_block: Z.t ;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -347,11 +351,10 @@ module Constants : sig
   val hard_gas_limit_per_operation: context -> Z.t
   val hard_gas_limit_per_block: context -> Z.t
   val cost_per_byte: context -> Tez.t
-  val hard_storage_limit_per_operation: context -> Int64.t
-  val hard_storage_limit_per_block: context -> Int64.t
+  val hard_storage_limit_per_operation: context -> Z.t
+  val hard_storage_limit_per_block: context -> Z.t
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Signature.Public_key.t
-  val max_operation_data_length: context -> int
   val tokens_per_roll: context -> Tez.t
   val michelson_maximum_type_size: context -> int
   val block_reward: context -> Tez.t
@@ -470,13 +473,20 @@ end
 
 module Seed : sig
 
+  type seed
+
   type error +=
     | Unknown of { oldest : Cycle.t ;
                    cycle : Cycle.t ;
                    latest : Cycle.t }
 
+  val for_cycle:
+    context -> Cycle.t -> seed tzresult Lwt.t
+
   val cycle_end:
     context -> Cycle.t -> (context * Nonce.unrevealed list) tzresult Lwt.t
+
+  val seed_encoding : seed Data_encoding.t
 
 end
 
@@ -520,7 +530,7 @@ module Contract : sig
   val get_storage:
     context -> contract -> (context * Script.expr option) tzresult Lwt.t
 
-  val get_counter: context -> contract -> int32 tzresult Lwt.t
+  val get_counter: context -> contract -> Z.t tzresult Lwt.t
   val get_balance:
     context -> contract -> Tez.t tzresult Lwt.t
 
@@ -559,10 +569,10 @@ module Contract : sig
   type error += Operation_storage_quota_exceeded (* `Temporary *)
   type error += Storage_limit_too_high (* `Permanent *)
 
-  val set_storage_limit: context -> Int64.t -> context tzresult
+  val set_storage_limit: context -> Z.t -> context tzresult
   val set_storage_unlimited: context -> context
 
-  val used_storage_space: context -> t -> Int64.t tzresult Lwt.t
+  val used_storage_space: context -> t -> Z.t tzresult Lwt.t
   val paid_storage_space_fees: context -> t -> Tez.t tzresult Lwt.t
   val pay_for_storage_space: context -> t -> Tez.t -> context tzresult Lwt.t
 
@@ -570,7 +580,7 @@ module Contract : sig
     context -> contract -> context tzresult Lwt.t
 
   val check_counter_increment:
-    context -> contract -> int32 -> unit tzresult Lwt.t
+    context -> contract -> Z.t -> unit tzresult Lwt.t
 
   module Big_map : sig
     val mem:
@@ -762,7 +772,7 @@ module Kind : sig
   type double_endorsement_evidence = Double_endorsement_evidence_kind
   type double_baking_evidence = Double_baking_evidence_kind
   type activate_account = Activate_account_kind
-  type endorsements = Endorsements_kind
+  type endorsement = Endorsement_kind
   type proposals = Proposals_kind
   type ballot = Ballot_kind
   type reveal = Reveal_kind
@@ -792,18 +802,16 @@ and _ contents_list =
     (('kind * 'rest) Kind.manager ) contents_list
 
 and _ contents =
-  | Endorsements : {
-      block: Block_hash.t ;
+  | Endorsement : {
       level: Raw_level.t ;
-      slots: int list ;
-    } -> Kind.endorsements contents
+    } -> Kind.endorsement contents
   | Seed_nonce_revelation : {
       level: Raw_level.t ;
       nonce: Nonce.t ;
     } -> Kind.seed_nonce_revelation contents
   | Double_endorsement_evidence : {
-      op1: Kind.endorsements operation ;
-      op2: Kind.endorsements operation ;
+      op1: Kind.endorsement operation ;
+      op2: Kind.endorsement operation ;
     } -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
       bh1: Block_header.t ;
@@ -830,7 +838,7 @@ and _ contents =
       counter: counter ;
       operation: 'kind manager_operation ;
       gas_limit: Z.t;
-      storage_limit: Int64.t;
+      storage_limit: Z.t;
     } -> 'kind Kind.manager contents
 
 and _ manager_operation =
@@ -852,7 +860,7 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option -> Kind.delegation manager_operation
 
-and counter = Int32.t
+and counter = Z.t
 
 type 'kind internal_operation = {
   source: Contract.contract ;
@@ -898,6 +906,7 @@ module Operation : sig
     proto: MBytes.t ;
   }
   val raw_encoding: raw Data_encoding.t
+  val contents_list_encoding: packed_contents_list Data_encoding.t
 
   type 'kind t = 'kind operation = {
     shell: Operation.shell_header ;
@@ -910,6 +919,7 @@ module Operation : sig
 
   val hash: _ operation -> Operation_hash.t
   val hash_raw: raw -> Operation_hash.t
+  val hash_packed: packed_operation -> Operation_hash.t
 
   val acceptable_passes: packed_operation -> int list
 
@@ -917,6 +927,7 @@ module Operation : sig
   type error += Invalid_signature (* `Permanent *)
 
   val check_signature: public_key -> _ operation -> unit tzresult Lwt.t
+  val check_signature_sync: public_key -> _ operation -> unit tzresult
 
   val internal_operation_encoding: packed_internal_operation Data_encoding.t
 
@@ -935,7 +946,7 @@ module Operation : sig
                  proj: 'b contents -> 'a ;
                  inj: 'a -> 'b contents } -> 'b case
 
-    val endorsement_case: Kind.endorsements case
+    val endorsement_case: Kind.endorsement case
     val seed_nonce_revelation_case: Kind.seed_nonce_revelation case
     val double_endorsement_evidence_case: Kind.double_endorsement_evidence case
     val double_baking_evidence_case: Kind.double_baking_evidence case
@@ -1043,8 +1054,15 @@ val finalize: ?commit_message:string -> context -> Updater.validation_result
 val activate: context -> Protocol_hash.t -> context Lwt.t
 val fork_test_chain: context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
-val endorsement_already_recorded: context -> int -> bool
-val record_endorsement: context -> int -> context
+val record_endorsement:
+  context -> Signature.Public_key_hash.t -> context
+val allowed_endorsements:
+  context ->
+  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
+val init_endorsements:
+  context ->
+  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
+  context
 
 val reset_internal_nonce: context -> context
 val fresh_internal_nonce: context -> (context * int) tzresult

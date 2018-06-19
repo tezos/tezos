@@ -16,13 +16,17 @@ all:
 		src/bin_client/main_admin.exe \
 		src/bin_signer/main_signer.exe \
 		src/lib_protocol_compiler/main_native.exe \
-		src/proto_alpha/bin_baker/main_baker_alpha.exe
+		src/proto_alpha/bin_baker/main_baker_alpha.exe \
+		src/proto_alpha/bin_endorser/main_endorser_alpha.exe \
+		src/proto_alpha/bin_accuser/main_accuser_alpha.exe
 	@cp _build/default/src/bin_node/main.exe tezos-node
 	@cp _build/default/src/bin_client/main_client.exe tezos-client
 	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
 	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
 	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
 	@cp _build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe tezos-alpha-baker
+	@cp _build/default/src/proto_alpha/bin_endorser/main_endorser_alpha.exe tezos-alpha-endorser
+	@cp _build/default/src/proto_alpha/bin_accuser/main_accuser_alpha.exe tezos-alpha-accuser
 
 all.pkg:
 	@jbuilder build ${DEV} \
@@ -78,7 +82,9 @@ clean:
 		tezos-client \
 		tezos-admin-client \
 		tezos-protocol-compiler \
-		tezos-alpha-baker
+		tezos-alpha-baker \
+		tezos-alpha-endorser \
+		tezos-alpha-accuser
 	@-${MAKE} -C docs clean
 
 .PHONY: all test build-deps docker-image clean

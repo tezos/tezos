@@ -129,9 +129,7 @@ let prepare = Init_storage.prepare
 let finalize ?commit_message:message c =
   let fitness = Fitness.from_int64 (Fitness.current c) in
   let context = Raw_context.recover c in
-  let constants = Raw_context.constants c in
   { Updater.context ; fitness ; message ; max_operations_ttl = 60 ;
-    max_operation_data_length = constants.max_operation_data_length ;
     last_allowed_fork_level =
       Raw_level.to_int32 @@ Level.last_allowed_fork_level c;
   }
@@ -139,8 +137,9 @@ let finalize ?commit_message:message c =
 let activate = Raw_context.activate
 let fork_test_chain = Raw_context.fork_test_chain
 
-let endorsement_already_recorded = Raw_context.endorsement_already_recorded
 let record_endorsement = Raw_context.record_endorsement
+let allowed_endorsements = Raw_context.allowed_endorsements
+let init_endorsements = Raw_context.init_endorsements
 
 let reset_internal_nonce = Raw_context.reset_internal_nonce
 let fresh_internal_nonce = Raw_context.fresh_internal_nonce

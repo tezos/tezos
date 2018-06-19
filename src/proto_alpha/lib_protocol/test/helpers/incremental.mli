@@ -14,6 +14,7 @@ type t
 type incremental = t
 
 val predecessor: incremental -> Block.t
+val header: incremental -> Block_header.t
 
 val level: incremental -> int32
 
@@ -23,7 +24,7 @@ val begin_construction:
   Block.t -> incremental tzresult Lwt.t
 
 val add_operation:
-  incremental -> Operation.t -> incremental tzresult Lwt.t
+  incremental -> Operation.packed -> incremental tzresult Lwt.t
 
 val finalize_block: incremental -> Block.t tzresult Lwt.t
 

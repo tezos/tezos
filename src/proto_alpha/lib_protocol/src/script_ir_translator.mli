@@ -19,6 +19,9 @@ type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
 
 type unparsing_mode = Optimized | Readable
 
+type type_logger =
+  int -> (Script.expr * Script.annot) list -> (Script.expr * Script.annot)  list -> unit
+
 (* ---- Sets and Maps -------------------------------------------------------*)
 
 val empty_set : 'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.set
@@ -58,20 +61,18 @@ val ty_eq :
   ('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq tzresult
 
 val parse_data :
-  ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
+  ?type_logger: type_logger ->
   context ->
   'a Script_typed_ir.ty -> Script.node -> ('a * context) tzresult Lwt.t
 val unparse_data :
-  context -> unparsing_mode ->
-  'a Script_typed_ir.ty -> 'a -> (Script.node * context) tzresult Lwt.t
+  context -> unparsing_mode -> 'a Script_typed_ir.ty -> 'a ->
+  (Script.node * context) tzresult Lwt.t
 
 val parse_ty :
   allow_big_map: bool ->
   allow_operation: bool ->
-  Script.node ->
-  (ex_ty * Script_typed_ir.annot) tzresult
-val unparse_ty :
-  string option -> 'a Script_typed_ir.ty -> Script.node
+  Script.node -> ex_ty tzresult
+val unparse_ty : 'a Script_typed_ir.ty -> Script.node
 
 val parse_toplevel
   : Script.expr -> (Script.node * Script.node * Script.node) tzresult
@@ -80,11 +81,11 @@ val typecheck_code :
   context -> Script.expr -> (type_map * context) tzresult Lwt.t
 
 val typecheck_data :
-  ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
+  ?type_logger: type_logger ->
   context -> Script.expr * Script.expr -> context tzresult Lwt.t
 
 val parse_script :
-  ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
+  ?type_logger: type_logger ->
   context -> Script.t -> (ex_script * context) tzresult Lwt.t
 val unparse_script :
   context -> unparsing_mode ->

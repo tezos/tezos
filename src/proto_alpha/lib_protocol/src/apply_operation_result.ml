@@ -112,13 +112,13 @@ type _ successful_manager_operation_result =
         balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Int64.t ;
+        storage_size_diff : Z.t ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
       { balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Int64.t ;
+        storage_size_diff : Z.t ;
       } -> Kind.origination successful_manager_operation_result
   | Delegation_result : Kind.delegation successful_manager_operation_result
 
@@ -214,7 +214,7 @@ module Manager_result = struct
            (dft "balance_updates" balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
-           (dft "storage_size_diff" int64 0L))
+           (dft "storage_size_diff" z Z.zero))
       ~iselect:
         (function
           | Internal_operation_result
@@ -251,7 +251,7 @@ module Manager_result = struct
            (dft "balance_updates" balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
-           (dft "storage_size_diff" int64 0L))
+           (dft "storage_size_diff" z Z.zero))
       ~iselect:
         (function
           | Internal_operation_result
@@ -334,8 +334,8 @@ let internal_operation_result_encoding :
   ]
 
 type 'kind contents_result =
-  | Endorsements_result :
-      Signature.Public_key_hash.t * int list -> Kind.endorsements contents_result
+  | Endorsement_result :
+      Signature.Public_key_hash.t * int list -> Kind.endorsement contents_result
   | Seed_nonce_revelation_result :
       balance_updates -> Kind.seed_nonce_revelation contents_result
   | Double_endorsement_evidence_result :
@@ -386,20 +386,20 @@ module Encoding = struct
       encoding =
         (obj2
            (req "delegate" Signature.Public_key_hash.encoding)
-           (req "slots" (list uint8))) ;
+           (req "slots" (list uint8)));
       select =
         (function
-          | Contents_result (Endorsements_result _ as op) -> Some op
+          | Contents_result (Endorsement_result _ as op) -> Some op
           | _ -> None) ;
       mselect =
         (function
-          | Contents_and_result (Endorsements _ as op, res) -> Some (op, res)
+          | Contents_and_result (Endorsement _ as op, res) -> Some (op, res)
           | _ -> None) ;
       proj =
         (function
-          | Endorsements_result (d, s) -> (d, s)) ;
+          | Endorsement_result (d, s) -> (d, s)) ;
       inj =
-        (fun (d, s) -> Endorsements_result (d, s))
+        (fun (d, s) -> Endorsement_result (d, s))
     }
 
   let seed_nonce_revelation_case =
@@ -532,7 +532,23 @@ module Encoding = struct
                           { op with operation_result = Applied res })
               | None -> None
             end
-          | _ -> None) ;
+          | Contents_result
+              (Manager_operation_result
+                 ({ operation_result = Skipped _ ; _ } as op)) ->
+              Some (Manager_operation_result
+                      { op with operation_result = Skipped res_case.kind })
+          | Contents_result
+              (Manager_operation_result
+                 ({ operation_result = Failed (_, errs) ; _ } as op)) ->
+              Some (Manager_operation_result
+                      { op with operation_result = Failed (res_case.kind, errs) })
+          | Contents_result Ballot_result -> None
+          | Contents_result (Endorsement_result _) -> None
+          | Contents_result (Seed_nonce_revelation_result _) -> None
+          | Contents_result (Double_endorsement_evidence_result _) -> None
+          | Contents_result (Double_baking_evidence_result _) -> None
+          | Contents_result (Activate_account_result _) -> None
+          | Contents_result Proposals_result -> None) ;
       mselect ;
       proj =
         (fun (Manager_operation_result
@@ -702,7 +718,7 @@ let contents_and_result_list_encoding =
         | Manager_operation _, Cons_and_result (_, _, _) ->
             Contents_and_result_list (Cons_and_result (op, res, rest))
         | _ -> Pervasives.failwith "cannot decode ill-formed combined operation result" in
-  conv to_list of_list (list contents_and_result_encoding)
+  conv to_list of_list (Variable.list contents_and_result_encoding)
 
 type 'kind operation_metadata = {
   contents: 'kind contents_result_list ;
@@ -710,13 +726,27 @@ type 'kind operation_metadata = {
 
 type packed_operation_metadata =
   | Operation_metadata : 'kind operation_metadata -> packed_operation_metadata
+  | No_operation_metadata : packed_operation_metadata
 
 let operation_metadata_encoding =
   def "operation.alpha.result" @@
-  conv
-    (fun (Operation_metadata { contents }) -> Contents_result_list contents)
-    (fun (Contents_result_list contents) -> Operation_metadata { contents })
-    contents_result_list_encoding
+  union [
+    case (Tag 0)
+      ~title:"Operation_metadata"
+      contents_result_list_encoding
+      (function
+        | Operation_metadata { contents } ->
+            Some (Contents_result_list contents)
+        | _ -> None)
+      (fun (Contents_result_list contents) -> Operation_metadata { contents }) ;
+    case (Tag 1)
+      ~title:"No_operation_metadata"
+      empty
+      (function
+        | No_operation_metadata -> Some ()
+        | _ -> None)
+      (fun () -> No_operation_metadata) ;
+  ]
 
 type ('a, 'b) eq = Eq : ('a, 'a) eq
 
@@ -724,8 +754,8 @@ let kind_equal
   : type kind kind2. kind contents -> kind2 contents_result -> (kind, kind2) eq option =
   fun op res ->
     match op, res with
-    | Endorsements _, Endorsements_result _ -> Some Eq
-    | Endorsements _, _ -> None
+    | Endorsement _, Endorsement_result _ -> Some Eq
+    | Endorsement _, _ -> None
     | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq
     | Seed_nonce_revelation _, _ -> None
     | Double_endorsement_evidence _, Double_endorsement_evidence_result _ -> Some Eq
@@ -850,18 +880,36 @@ let rec unpack_contents_list :
 
 let operation_data_and_metadata_encoding =
   def "operation.alpha.operation_with_metadata" @@
-  conv
-    (fun (Operation_data op, Operation_metadata res) ->
-       match kind_equal_list op.contents res.contents with
-       | None -> Pervasives.failwith "cannot decode inconsistent combined operation result"
-       | Some Eq ->
-           (Contents_and_result_list
-              (pack_contents_list op.contents res.contents),
-            op.signature))
-    (fun (Contents_and_result_list contents, signature) ->
-       let op_contents, res_contents = unpack_contents_list contents in
-       (Operation_data { contents = op_contents ; signature },
-        Operation_metadata { contents = res_contents }))
-    (obj2
-       (req "contents" contents_and_result_list_encoding)
-       (varopt "signature" Signature.encoding))
+  union [
+    case (Tag 0)
+      ~title:"Operation_with_metadata"
+      (obj2
+         (req "contents" (dynamic_size contents_and_result_list_encoding))
+         (opt "signature" Signature.encoding))
+      (function
+        | (Operation_data _, No_operation_metadata) -> None
+        | (Operation_data op, Operation_metadata res) ->
+            match kind_equal_list op.contents res.contents with
+            | None -> Pervasives.failwith "cannot decode inconsistent combined operation result"
+            | Some Eq ->
+                Some
+                  (Contents_and_result_list
+                     (pack_contents_list op.contents res.contents),
+                   op.signature))
+      (fun (Contents_and_result_list contents, signature) ->
+         let op_contents, res_contents = unpack_contents_list contents in
+         (Operation_data { contents = op_contents ; signature },
+          Operation_metadata { contents = res_contents })) ;
+    case (Tag 1)
+      ~title:"Operation_without_metadata"
+      (obj2
+         (req "contents" (dynamic_size Operation.contents_list_encoding))
+         (opt "signature" Signature.encoding))
+      (function
+        | (Operation_data op, No_operation_metadata) ->
+            Some (Contents_list op.contents, op.signature)
+        | (Operation_data _, Operation_metadata _) ->
+            None)
+      (fun (Contents_list contents, signature) ->
+         (Operation_data { contents ; signature }, No_operation_metadata))
+  ]

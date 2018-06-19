@@ -9,9 +9,9 @@
 
 type t =
   | Unaccounted
-  | Limited of { remaining : Int64.t }
+  | Limited of { remaining : Z.t }
 
 type error += Block_quota_exceeded (* `Temporary *)
 type error += Operation_quota_exceeded (* `Temporary *)
 
-val consume : Int64.t -> t -> bytes:Int64.t -> (Int64.t * t) tzresult
+val consume : Z.t -> t -> bytes:Z.t -> (Z.t * t) tzresult

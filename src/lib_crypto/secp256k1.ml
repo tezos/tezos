@@ -62,7 +62,7 @@ module Public_key = struct
   include Compare.Make(struct
       type nonrec t = t
       let compare a b =
-        MBytes.compare (Key.buffer a) (Key.buffer b)
+        MBytes.compare (to_bytes a) (to_bytes b)
     end)
 
   include Helpers.MakeRaw(struct
@@ -264,4 +264,3 @@ let generate_key ?(seed=Rand.generate 32) () =
   let pk = Key.neuterize_exn context sk in
   let pkh = Public_key.hash pk in
   pkh, pk, sk
-

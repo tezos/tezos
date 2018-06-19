@@ -8,7 +8,7 @@ dev-repo: "https://gitlab.com/tezos/tezos.git"
 license: "unreleased"
 depends: [
   "ocamlfind" { build }
-  "jbuilder" { build & = "1.0+beta19.1" }
+  "jbuilder" { build & = "1.0+beta20" }
   "tezos-stdlib" { test }
 ]
 build: [

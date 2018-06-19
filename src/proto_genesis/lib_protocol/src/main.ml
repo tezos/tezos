@@ -78,6 +78,8 @@ let max_block_length =
                           delay = 0L })
   + Signature.size
 
+let max_operation_data_length = 0
+
 let check_signature ctxt { shell ; protocol_data = { command ; signature } } =
   let bytes = Data.Command.forge shell command in
   Data.Pubkey.get_pubkey ctxt >>= fun public_key ->
@@ -90,14 +92,9 @@ type validation_state = Updater.validation_result
 let current_context ({ context ; _ } : validation_state) =
   return context
 
-let precheck_block
-    ~ancestor_context:_
-    ~ancestor_timestamp:_
-    _block_header =
-  return ()
-
 (* temporary hardcoded key to be removed... *)
 let protocol_parameters_key = [ "protocol_parameters" ]
+
 let prepare_application ctxt command level timestamp fitness =
   match command with
   | Data.Command.Activate { protocol = hash ; fitness ; protocol_parameters } ->
@@ -107,7 +104,6 @@ let prepare_application ctxt command level timestamp fitness =
       Updater.activate ctxt hash >>= fun ctxt ->
       return { Updater.message ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
-               max_operation_data_length = 0 ;
                last_allowed_fork_level = level ;
              }
   | Activate_testchain { protocol = hash ; delay } ->
@@ -117,7 +113,6 @@ let prepare_application ctxt command level timestamp fitness =
       Updater.fork_test_chain ctxt ~protocol:hash ~expiration >>= fun ctxt ->
       return { Updater.message ; context = ctxt ; fitness ;
                max_operations_ttl = 0 ;
-               max_operation_data_length = 0 ;
                last_allowed_fork_level = Int32.succ level ;
              }
 
@@ -130,6 +125,17 @@ let begin_application
   check_signature ctxt block_header >>=? fun () ->
   prepare_application ctxt block_header.protocol_data.command
     block_header.shell.level block_header.shell.timestamp block_header.shell.fitness
+
+let begin_partial_application
+    ~ancestor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    block_header =
+  begin_application
+    ~predecessor_context:ancestor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    block_header
 
 let begin_construction
     ~predecessor_context:ctxt
@@ -145,7 +151,6 @@ let begin_construction
       (* Dummy result. *)
       return { Updater.message = None ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
-               max_operation_data_length = 0 ;
                last_allowed_fork_level = 0l ;
              }
   | Some { command ; _ }->
@@ -183,6 +188,5 @@ let init ctxt block_header =
   return { Updater.message = None ; context = ctxt ;
            fitness = block_header.Block_header.fitness ;
            max_operations_ttl = 0 ;
-           max_operation_data_length = 0 ;
            last_allowed_fork_level = block_header.level ;
          }

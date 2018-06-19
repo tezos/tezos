@@ -9,8 +9,11 @@
 
 open Alpha_context
 
-type error += Overflow of Script.location
-type error += Reject of Script.location
+type execution_trace =
+  (Script.location * Gas.t * (Script.expr * string option) list) list
+
+type error += Reject of Script.location * execution_trace option
+type error += Overflow of Script.location * execution_trace option
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
@@ -29,9 +32,6 @@ val execute:
   parameter: Script.expr ->
   amount: Tez.t ->
   execution_result tzresult Lwt.t
-
-type execution_trace =
-  (Script.location * Gas.t * Script.expr list) list
 
 val trace:
   Alpha_context.t ->

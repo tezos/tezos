@@ -17,7 +17,7 @@ type info = {
   balance: Tez.t ;
   spendable: bool ;
   delegate: bool * public_key_hash option ;
-  counter: int32 ;
+  counter: counter ;
   script: Script.t option ;
 }
 
@@ -40,7 +40,7 @@ let info_encoding =
        (req "setable" bool)
        (opt "value" Signature.Public_key_hash.encoding))
     (opt "script" Script.encoding)
-    (req "counter" int32)
+    (req "counter" n)
 
 module S = struct
 
@@ -80,7 +80,7 @@ module S = struct
     RPC_service.get_service
       ~description: "Access the counter of a contract, if any."
       ~query: RPC_query.empty
-      ~output: int32
+      ~output: z
       RPC_path.(custom_root /: Contract.rpc_arg / "counter")
 
   let spendable =
@@ -128,14 +128,11 @@ module S = struct
 
 end
 
-let () =
+let register () =
   let open Services_registration in
   register0 S.list begin fun ctxt () () ->
     Contract.list ctxt >>= return
-  end
-
-let () =
-  let open Services_registration in
+  end ;
   let register_field s f =
     register1 s (fun ctxt contract () () ->
         Contract.exists ctxt contract >>=? function

@@ -70,7 +70,7 @@ let rec take dropbox =
       if dropbox.closed then
         Lwt.fail Closed
       else
-        wait_put ~timeout:Lwt_utils.never_ending dropbox >>= fun () ->
+        wait_put ~timeout:(Lwt_utils.never_ending ()) dropbox >>= fun () ->
         take dropbox
 
 let rec take_with_timeout timeout dropbox =

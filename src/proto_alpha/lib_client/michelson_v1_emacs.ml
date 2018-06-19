@@ -13,17 +13,16 @@ open Micheline
 
 let print_expr ppf expr =
   let print_annot ppf = function
-    | None -> ()
-    | Some annot -> Format.fprintf ppf " %s" annot in
+    | [] -> ()
+    | annots -> Format.fprintf ppf " %s" (String.concat " " annots) in
   let rec print_expr ppf = function
     | Int (_, value) -> Format.fprintf ppf "%s" (Z.to_string value)
     | String (_, value) -> Micheline_printer.print_string ppf value
-    | Seq (_, items, annot) ->
-        Format.fprintf ppf "(seq%a %a)"
-          print_annot annot
+    | Seq (_, items) ->
+        Format.fprintf ppf "(seq %a)"
           (Format.pp_print_list ~pp_sep:Format.pp_print_space print_expr)
           items
-    | Prim (_, name, [], None) ->
+    | Prim (_, name, [], []) ->
         Format.fprintf ppf "%s" name
     | Prim (_, name, items, annot) ->
         Format.fprintf ppf "(%s%a%s%a)"
@@ -34,23 +33,31 @@ let print_expr ppf expr =
   let root = root (Michelson_v1_primitives.strings_of_prims expr) in
   Format.fprintf ppf "@[<h>%a@]" print_expr root
 
+let print_var_annots ppf =
+  List.iter (Format.fprintf ppf "%s ")
+
+let print_annot_expr ppf (expr, annot) =
+  Format.fprintf ppf "(%a%a)"
+    print_var_annots annot
+    print_expr expr
+
 open Micheline_parser
 open Script_tc_errors
 
 let print_type_map ppf (parsed, type_map) =
   let rec print_expr_types ppf = function
-    | Seq (loc, [], _)
+    | Seq (loc, [])
     | Prim (loc, _, [], _)
     | Int (loc, _)
     | String (loc, _) ->
         print_item ppf loc
-    | Seq (loc, items, _)
+    | Seq (loc, items)
     | Prim (loc, _, items, _) ->
         print_item ppf loc ;
         List.iter (print_expr_types ppf) items
   and print_stack ppf items =
     Format.fprintf ppf "(%a)"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space print_expr)
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space print_annot_expr)
       items
   and print_item ppf loc = try
       let { start = { point = s } ; stop = { point = e } }, locs =

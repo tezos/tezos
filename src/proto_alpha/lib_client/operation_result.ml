@@ -172,10 +172,10 @@ let pp_manager_operation_contents_and_result ppf
               Format.fprintf ppf "@,@[<hv 2>Updated storage:@ %a@]"
                 Michelson_v1_printer.print_expr expr
         end ;
-        begin if storage_size_diff <> 0L then
+        begin if storage_size_diff <> Z.zero then
             Format.fprintf ppf
-              "@,Storage size difference: %Ld bytes"
-              storage_size_diff
+              "@,Storage size difference: %s bytes"
+              (Z.to_string storage_size_diff)
         end ;
         Format.fprintf ppf
           "@,Consumed gas: %s"
@@ -197,10 +197,10 @@ let pp_manager_operation_contents_and_result ppf
               Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
                 (Format.pp_print_list Contract.pp) contracts
         end ;
-        begin if storage_size_diff <> 0L then
+        begin if storage_size_diff <> Z.zero then
             Format.fprintf ppf
-              "@,Storage size used: %Ld bytes"
-              storage_size_diff
+              "@,Storage size used: %s bytes"
+              (Z.to_string storage_size_diff)
         end ;
         Format.fprintf ppf
           "@,Consumed gas: %s"
@@ -216,15 +216,15 @@ let pp_manager_operation_contents_and_result ppf
     "@[<v 0>@[<v 2>Manager signed operations:@,\
      From: %a@,\
      Fee to the baker: %s%a@,\
-     Expected counter: %ld@,\
+     Expected counter: %s@,\
      Gas limit: %s@,\
-     Storage limit: %Ld bytes"
+     Storage limit: %s bytes"
     Contract.pp source
     Client_proto_args.tez_sym
     Tez.pp fee
-    counter
+    (Z.to_string counter)
     (Z.to_string gas_limit)
-    storage_limit ;
+    (Z.to_string storage_limit) ;
   begin match balance_updates with
     | [] -> ()
     | balance_updates ->
@@ -300,15 +300,13 @@ let rec pp_contents_and_result_list :
           Ed25519.Public_key_hash.pp id
           pp_balance_updates bus
     | Single_and_result
-        (Endorsements { block ; level ; slots },
-         Endorsements_result (delegate, _slots)) ->
+        (Endorsement { level },
+         Endorsement_result (delegate, slots)) ->
         Format.fprintf ppf
           "@[<v 2>Endorsement:@,\
-           Block: %a@,\
            Level: %a@,\
            Delegate: %a@,\
            Slots: %a@]"
-          Block_hash.pp block
           Raw_level.pp level
           Signature.Public_key_hash.pp delegate
           (Format.pp_print_list

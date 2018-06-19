@@ -10,10 +10,12 @@
 type public_key_hash =
   | Ed25519 of Ed25519.Public_key_hash.t
   | Secp256k1 of Secp256k1.Public_key_hash.t
+  | P256 of P256.Public_key_hash.t
 
 type public_key =
   | Ed25519 of Ed25519.Public_key.t
   | Secp256k1 of Secp256k1.Public_key.t
+  | P256 of P256.Public_key.t
 
 type watermark =
   | Block_header

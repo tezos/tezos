@@ -9,4 +9,7 @@
 
 val run:
   #Client_context.io_wallet ->
-  Lwt_utils_unix.Socket.addr -> 'a tzresult Lwt.t
+  Lwt_utils_unix.Socket.addr ->
+  ?magic_bytes: int list ->
+  require_auth: bool ->
+  'a tzresult Lwt.t

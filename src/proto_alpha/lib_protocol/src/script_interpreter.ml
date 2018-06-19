@@ -14,31 +14,47 @@ open Script_ir_translator
 
 (* ---- Run-time errors -----------------------------------------------------*)
 
-type error += Reject of Script.location
-type error += Overflow of Script.location
+type execution_trace =
+  (Script.location * Gas.t * (Script.expr * string option) list) list
+
+type error += Reject of Script.location * execution_trace option
+type error += Overflow of Script.location * execution_trace option
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
 let () =
   let open Data_encoding in
+  let trace_encoding =
+    (list @@ obj3
+       (req "location" Script.location_encoding)
+       (req "gas" Gas.encoding)
+       (req "stack"
+          (list
+             (obj2
+                (req "item" (Script.expr_encoding))
+                (opt "annot" string))))) in
   (* Reject *)
   register_error_kind
     `Temporary
     ~id:"scriptRejectedRuntimeError"
     ~title: "Script failed (runtime script error)"
     ~description: "A FAIL instruction was reached"
-    (obj1 (req "location" Script.location_encoding))
-    (function Reject loc -> Some loc | _ -> None)
-    (fun loc -> Reject loc);
+    (obj2
+       (req "location" Script.location_encoding)
+       (opt "trace" trace_encoding))
+    (function Reject (loc, trace) -> Some (loc, trace) | _ -> None)
+    (fun (loc, trace) -> Reject (loc, trace));
   (* Overflow *)
   register_error_kind
     `Temporary
     ~id:"scriptOverflowRuntimeError"
     ~title: "Script failed (overflow error)"
     ~description: "A FAIL instruction was reached due to the detection of an overflow"
-    (obj1 (req "location" Script.location_encoding))
-    (function Overflow loc -> Some loc | _ -> None)
-    (fun loc -> Overflow loc);
+    (obj2
+       (req "location" Script.location_encoding)
+       (opt "trace" trace_encoding))
+    (function Overflow (loc, trace) -> Some (loc, trace) | _ -> None)
+    (fun (loc, trace) -> Overflow (loc, trace));
   (* Runtime contract error *)
   register_error_kind
     `Temporary
@@ -77,19 +93,21 @@ let unparse_stack ctxt (stack, stack_ty) =
   (* We drop the gas limit as this function is only used for debugging/errors. *)
   let ctxt = Gas.set_unlimited ctxt in
   let rec unparse_stack
-    : type a. a stack * a stack_ty -> Script.expr list tzresult Lwt.t
+    : type a. a stack * a stack_ty -> (Script.expr * string option) list tzresult Lwt.t
     = function
       | Empty, Empty_t -> return []
-      | Item (v, rest), Item_t (ty, rest_ty, _) ->
+      | Item (v, rest), Item_t (ty, rest_ty, annot) ->
           unparse_data ctxt Readable ty v >>=? fun (data, _ctxt) ->
           unparse_stack (rest, rest_ty) >>=? fun rest ->
-          return (Micheline.strip_locations data :: rest) in
+          let annot = match Script_ir_annot.unparse_var_annot annot with
+            | [] -> None
+            | [ a ] -> Some a
+            | _ -> assert false in
+          let data = Micheline.strip_locations data in
+          return ((data, annot) :: rest) in
   unparse_stack (stack, stack_ty)
 
 module Interp_costs = Michelson_v1_gas.Cost_of
-
-type execution_trace =
-  (Script.location * Gas.t * Script.expr list) list
 
 let rec interp
   : type p r.
@@ -116,6 +134,8 @@ let rec interp
                 unparse_stack ctxt (ret, descr.aft) >>=? fun stack ->
                 log := (descr.loc, Gas.level ctxt, stack) :: !log ;
                 return (ret, ctxt) in
+        let get_log (log : execution_trace ref option) =
+          Option.map ~f:(!) log in
         let consume_gas_terop : type ret arg1 arg2 arg3 rest.
           (_ * (_ * (_ * rest)), ret * rest) descr ->
           ((arg1 -> arg2 -> arg3 -> ret) * arg1 * arg2 * arg3) ->
@@ -359,7 +379,7 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.z_to_int64) >>=? fun ctxt ->
             begin
               match Script_int.to_int64 y with
-              | None -> fail (Overflow loc)
+              | None -> fail (Overflow (loc, get_log log))
               | Some y ->
                   Lwt.return Tez.(x *? y) >>=? fun res ->
                   logged_return (Item (res, rest), ctxt)
@@ -369,7 +389,7 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.z_to_int64) >>=? fun ctxt ->
             begin
               match Script_int.to_int64 y with
-              | None -> fail (Overflow loc)
+              | None -> fail (Overflow (loc, get_log log))
               | Some y ->
                   Lwt.return Tez.(x *? y) >>=? fun res ->
                   logged_return (Item (res, rest), ctxt)
@@ -466,14 +486,14 @@ let rec interp
             Lwt.return (Gas.consume ctxt (Interp_costs.shift_left x y)) >>=? fun ctxt ->
             begin
               match Script_int.shift_left_n x y with
-              | None -> fail (Overflow loc)
+              | None -> fail (Overflow (loc, get_log log))
               | Some x -> logged_return (Item (x, rest), ctxt)
             end
         | Lsr_nat, Item (x, Item (y, rest)) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.shift_right x y)) >>=? fun ctxt ->
             begin
               match Script_int.shift_right_n x y with
-              | None -> fail (Overflow loc)
+              | None -> fail (Overflow (loc, get_log log))
               | Some r -> logged_return (Item (r, rest), ctxt)
             end
         | Or_nat, Item (x, Item (y, rest)) ->
@@ -523,26 +543,26 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.push) >>=? fun ctxt ->
             logged_return (Item (lam, rest), ctxt)
         | Fail, _ ->
-            fail (Reject loc)
+            fail (Reject (loc, get_log log))
         | Nop, stack ->
             logged_return (stack, ctxt)
         (* comparison *)
-        | Compare Bool_key, Item (a, Item (b, rest)) ->
+        | Compare (Bool_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Compare.Bool.compare Interp_costs.compare_bool a b rest
-        | Compare String_key, Item (a, Item (b, rest)) ->
+        | Compare (String_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Compare.String.compare Interp_costs.compare_string a b rest
-        | Compare Mutez_key, Item (a, Item (b, rest)) ->
+        | Compare (Mutez_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Tez.compare Interp_costs.compare_tez a b rest
-        | Compare Int_key, Item (a, Item (b, rest)) ->
+        | Compare (Int_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Script_int.compare Interp_costs.compare_int a b rest
-        | Compare Nat_key, Item (a, Item (b, rest)) ->
+        | Compare (Nat_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Script_int.compare Interp_costs.compare_nat a b rest
-        | Compare Key_hash_key, Item (a, Item (b, rest)) ->
+        | Compare (Key_hash_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Signature.Public_key_hash.compare
               Interp_costs.compare_key_hash a b rest
-        | Compare Timestamp_key, Item (a, Item (b, rest)) ->
+        | Compare (Timestamp_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Script_timestamp.compare Interp_costs.compare_timestamp a b rest
-        | Compare Address_key, Item (a, Item (b, rest)) ->
+        | Compare (Address_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Contract.compare Interp_costs.compare_address a b rest
         (* comparators *)
         | Eq, Item (cmpres, rest) ->
@@ -623,7 +643,7 @@ let rec interp
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
             let contract = Contract.implicit_contract key in
-            logged_return (Item ((Unit_t, contract), rest), ctxt)
+            logged_return (Item ((Unit_t None, contract), rest), ctxt)
         | Create_contract (storage_type, param_type, Lam (_, code)),
           Item (manager, Item
                   (delegate, Item
@@ -634,9 +654,9 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.create_contract) >>=? fun ctxt ->
             let code =
               Micheline.strip_locations
-                (Seq (0, [ Prim (0, K_parameter, [ unparse_ty None param_type ], None) ;
-                           Prim (0, K_storage, [ unparse_ty None storage_type ], None) ;
-                           Prim (0, K_code, [ Micheline.root code ], None) ], None)) in
+                (Seq (0, [ Prim (0, K_parameter, [ unparse_ty param_type ], []) ;
+                           Prim (0, K_storage, [ unparse_ty storage_type ], []) ;
+                           Prim (0, K_code, [ Micheline.root code ], []) ])) in
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
             let storage = Micheline.strip_locations storage in
             Contract.spend_from_script ctxt self credit >>=? fun ctxt ->

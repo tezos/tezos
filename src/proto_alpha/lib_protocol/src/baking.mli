@@ -12,10 +12,9 @@ open Alpha_context
 open Misc
 
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
-type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
-type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
+type error += Unexpected_endorsement
 
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
     time, given the predecessor block timestamp [pred_block_time],
@@ -32,12 +31,19 @@ val check_baking_rights:
   context -> Block_header.contents -> Time.t ->
   public_key tzresult Lwt.t
 
-(** [check_endorsements_rights c slots]:
-    * verifies that the endorsement slots are valid ;
-    * verifies that the endorsement slots correspond to the same delegate at the current level;
-*)
-val check_endorsements_rights:
-  context -> Level.t -> int list -> public_key tzresult Lwt.t
+(** For a given level computes who has the right to
+    include an endorsement in the next block.
+    The result can be stored in Alpha_context.allowed_endorsements *)
+val endorsement_rights:
+  context ->
+  Level.t ->
+  (public_key * int list * bool) Signature.Public_key_hash.Map.t tzresult Lwt.t
+
+(** Check that the operation was signed by a delegate allowed
+    to endorse at the level specified by the endorsement. *)
+val check_endorsement_rights:
+  context -> Kind.endorsement Operation.t ->
+  (public_key_hash * int list * bool) tzresult Lwt.t
 
 (** Returns the endorsement reward calculated w.r.t a given priotiry.  *)
 val endorsement_reward: context -> block_priority:int -> int -> Tez.t tzresult Lwt.t
@@ -45,11 +51,6 @@ val endorsement_reward: context -> block_priority:int -> int -> Tez.t tzresult L
 (** [baking_priorities ctxt level] is the lazy list of contract's
     public key hashes that are allowed to bake for [level]. *)
 val baking_priorities:
-  context -> Level.t -> public_key lazy_list
-
-(** [endorsement_priorities ctxt level] is the lazy list of contract's
-    public key hashes that are allowed to endorse for [level]. *)
-val endorsement_priorities:
   context -> Level.t -> public_key lazy_list
 
 (** [first_baking_priorities ctxt ?max_priority contract_hash level]
@@ -63,12 +64,6 @@ val first_baking_priorities:
   public_key_hash ->
   Level.t ->
   int list tzresult Lwt.t
-
-val first_endorsement_slots:
-  context ->
-  ?max_priority:int ->
-  public_key_hash ->
-  Level.t -> int list tzresult Lwt.t
 
 (** [check_signature ctxt block id] check if the block is signed with
     the given key *)

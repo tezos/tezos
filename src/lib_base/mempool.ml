@@ -19,8 +19,16 @@ let encoding =
     (fun { known_valid ; pending } -> (known_valid, pending))
     (fun (known_valid, pending) -> { known_valid ; pending })
     (obj2
-       (req "known_valid" (dynamic_size (list Operation_hash.encoding)))
+       (req "known_valid" (list Operation_hash.encoding))
        (req "pending" (dynamic_size Operation_hash.Set.encoding)))
+
+let bounded_encoding ?max_operations () =
+  match max_operations with
+  | None -> encoding
+  | Some max_operations ->
+      Data_encoding.check_size
+        (8 + max_operations * Operation_hash.size)
+        encoding
 
 let empty = {
   known_valid = [] ;

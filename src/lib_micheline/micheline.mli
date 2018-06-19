@@ -7,14 +7,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type annot = string list
+
 (** The abstract syntax tree of Micheline expressions. The first
     parameter is used to conatin locations, but can also embed custom
     data. The second parameter is the type of primitive names. *)
 type ('l, 'p) node =
   | Int of 'l * Z.t
   | String of 'l * string
-  | Prim of 'l * 'p * ('l, 'p) node list * string option
-  | Seq of 'l * ('l, 'p) node list * string option
+  | Prim of 'l * 'p * ('l, 'p) node list * annot
+  | Seq of 'l * ('l, 'p) node list
 
 (** Encoding for expressions, as their {!canonical} encoding.
     Locations are stored in a side table.
@@ -33,8 +35,8 @@ val erased_encoding : variant:string ->
 (** Extract the location of the node. *)
 val location : ('l, 'p) node -> 'l
 
-(** Extract the annotation of the node. *)
-val annotation : ('l, 'p) node -> string option
+(** Extract the annotations of the node. *)
+val annotations : ('l, 'p) node -> string list
 
 (** Expression form using canonical integer numbering as
     locations. The root has number zero, and each node adds one in the

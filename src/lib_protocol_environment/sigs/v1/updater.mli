@@ -24,9 +24,6 @@ type validation_result = {
   (** An optional informative message to be used as in the 'git
       commit' of the block's context. *)
 
-  max_operation_data_length: int ;
-  (** The maximum size of operations in bytes. *)
-
   max_operations_ttl: int ;
   (** The "time-to-live" of operation for the next block: any
       operations whose 'branch' is older than 'ttl' blocks in the
@@ -58,8 +55,11 @@ type rpc_context = {
     access to the standard library and the Environment module. *)
 module type PROTOCOL = sig
 
-  (** The maximum size of block headers in bytes. *)
+  (** The maximum size of a block header in bytes. *)
   val max_block_length: int
+
+  (** The maximum size of an operation in bytes. *)
+  val max_operation_data_length: int
 
   (** The number of validation passes (length of the list) and the
       operation's quota for each pass. *)
@@ -138,12 +138,17 @@ module type PROTOCOL = sig
       function should run quickly, as its main use is to reject bad
       blocks from the chain as early as possible. The input context
       is the one resulting of an ancestor block of same protocol
-      version, not necessarily the one of its predecessor. *)
-  val precheck_block:
+      version. This ancestor of the current head is guaranteed to be
+      more recent than `last_allowed_fork_level`.
+
+      The resulting `validation_state` will be used for multi-pass
+      validation. *)
+  val begin_partial_application:
     ancestor_context: Context.t ->
-    ancestor_timestamp: Time.t ->
+    predecessor_timestamp: Time.t ->
+    predecessor_fitness: Fitness.t ->
     block_header ->
-    unit tzresult Lwt.t
+    validation_state tzresult Lwt.t
 
   (** The first step in a block validation sequence. Initializes a
       validation context for validating a block. Takes as argument the

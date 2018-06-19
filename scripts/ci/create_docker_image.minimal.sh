@@ -24,12 +24,7 @@ cleanup () {
 }
 trap cleanup EXIT INT
 
-"$ci_dir"/create_apk.leveldb.sh
 "$ci_dir"/create_apk.hidapi.sh
-
-cp -a "$build_dir"/leveldb-$leveldb_version-r0.apk \
-      "$build_dir"/keys/ \
-      "$tmp_dir"
 
 cp -a "$build_dir"/hidapi-$hidapi_version-r0.apk \
       "$build_dir"/keys/ \
@@ -38,7 +33,8 @@ cp -a "$build_dir"/hidapi-$hidapi_version-r0.apk \
 mkdir -p "$tmp_dir"/bin
 mkdir -p "$tmp_dir"/scripts
 container=$(docker create $build_image_name)
-for bin in tezos-client tezos-admin-client tezos-node; do
+for bin in tezos-client tezos-admin-client tezos-node \
+	   tezos-alpha-baker tezos-alpha-endorser tezos-alpha-accuser; do
     docker cp -L $container:/home/opam/tezos/$bin "$tmp_dir"/bin
 done
 cp -a "$script_dir"/docker/entrypoint.sh "$tmp_dir"/bin/
@@ -57,12 +53,10 @@ FROM alpine:$alpine_version
 LABEL distro_style="apk" distro="alpine" distro_long="alpine-$alpine_version" arch="x86_64" operatingsystem="linux"
 
 COPY keys /etc/apk/keys/
-COPY leveldb-$leveldb_version-r0.apk .
 COPY hidapi-$hidapi_version-r0.apk .
 
 RUN apk --no-cache add \
-      libev gmp vim leveldb-$leveldb_version-r0.apk hidapi-$hidapi_version-r0.apk && \
-    rm leveldb-$leveldb_version-r0.apk && \
+      libev gmp vim hidapi-$hidapi_version-r0.apk && \
     rm hidapi-$hidapi_version-r0.apk
 
 COPY bin/* /usr/local/bin/

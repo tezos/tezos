@@ -1,14 +1,14 @@
 parameter (option key_hash) ;
 storage (pair
-           (pair (address @mgr1) (option key_hash))
-           (pair (address @mgr2) (option key_hash))) ;
+           (pair %mgr1 (address %addr) (option %key key_hash))
+           (pair %mgr2 (address %addr) (option %key key_hash))) ;
 code { # Update the storage
-       DUP ; CDAAR ; SOURCE ;
+       DUP ; CDAAR %addr @%; SOURCE ; PAIR %@ %@; UNPAIR;
        IFCMPEQ
-         { UNPAIR ; SWAP ; SET_CADR }
+         { UNPAIR ; SWAP ; SET_CADR %key @changed_mgr1_key }
          { DUP ; CDDAR ; SOURCE ;
            IFCMPEQ
-             { UNPAIR ; SWAP ; SET_CDDR }
+             { UNPAIR ; SWAP ; SET_CDDR %key }
              { FAIL } } ;
        # Now compare the proposals
        DUP ; CADR ;

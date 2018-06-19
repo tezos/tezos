@@ -40,6 +40,34 @@ let encoding =
        shell_header_encoding
        (obj1 (req "data" Variable.bytes)))
 
+let bounded_encoding ?max_size () =
+  match max_size with
+  | None -> encoding
+  | Some max_size -> Data_encoding.check_size max_size encoding
+
+let bounded_list_encoding
+    ?max_length ?max_size ?max_operation_size ?max_pass () =
+  let open Data_encoding in
+  let op_encoding = bounded_encoding ?max_size:max_operation_size () in
+  let op_list_encoding =
+    match max_size with
+    | None ->
+        Variable.list ?max_length (dynamic_size op_encoding)
+    | Some max_size ->
+        check_size max_size
+          (Variable.list ?max_length (dynamic_size op_encoding)) in
+  obj2
+    (req "operation_hashes_path"
+       (Operation_list_list_hash.bounded_path_encoding ?max_length:max_pass ()))
+    (req "operations" op_list_encoding)
+
+let bounded_hash_list_encoding ?max_length ?max_pass () =
+  let open Data_encoding in
+  obj2
+    (req "operation_hashes_path"
+       (Operation_list_list_hash.bounded_path_encoding ?max_length:max_pass ()))
+    (req "operation_hashes" (Variable.list ?max_length Operation_hash.encoding))
+
 let pp fmt op =
   Data_encoding.Json.pp fmt
     (Data_encoding.Json.construct encoding op)

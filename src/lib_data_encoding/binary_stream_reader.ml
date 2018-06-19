@@ -218,11 +218,11 @@ let rec skip n state k =
 (** Main recursive reading function, in continuation passing style. *)
 let rec read_rec
   : type next ret.
-    next Encoding.t -> state -> ((next * state) -> ret status) -> ret status
-  = fun e state k ->
+    bool -> next Encoding.t -> state -> ((next * state) -> ret status) -> ret status
+  = fun whole e state k ->
     let resume buffer =
       let stream = Binary_stream.push buffer state.stream in
-      try read_rec e { state with stream }k
+      try read_rec whole e { state with stream }k
       with Read_error err -> Error err in
     let open Encoding in
     assert (Encoding.classify e <> `Variable || state.remaining_bytes <> None) ;
@@ -251,7 +251,7 @@ let rec read_rec
         let size = remaining_bytes state in
         Atom.fixed_length_string size resume state k
     | Padded (e, n) ->
-        read_rec e state @@ fun (v, state) ->
+        read_rec false e state @@ fun (v, state) ->
         skip n state @@ (fun state -> k (v, state))
     | RangedInt { minimum ; maximum }  ->
         Atom.ranged_int ~minimum ~maximum resume state k
@@ -259,53 +259,56 @@ let rec read_rec
         Atom.ranged_float ~minimum ~maximum resume state k
     | String_enum (_, arr) ->
         Atom.string_enum arr resume state k
-    | Array e ->
-        read_list e state @@ fun (l, state) ->
+    | Array (max_length, e) ->
+        let max_length = Option.unopt ~default:max_int max_length in
+        read_list Array_too_long max_length e state @@ fun (l, state) ->
         k (Array.of_list l, state)
-    | List e -> read_list e state k
-    | (Obj (Req { encoding = e })) -> read_rec e state k
-    | (Obj (Dft { encoding = e })) -> read_rec e state k
+    | List (max_length, e) ->
+        let max_length = Option.unopt ~default:max_int max_length in
+        read_list List_too_long max_length e state k
+    | (Obj (Req { encoding = e })) -> read_rec whole e state k
+    | (Obj (Dft { encoding = e })) -> read_rec whole e state k
     | (Obj (Opt { kind = `Dynamic ; encoding = e })) ->
         Atom.bool resume state @@ fun (present, state) ->
         if not present then
           k (None, state)
         else
-          read_rec e state @@ fun (v, state) ->
+          read_rec whole e state @@ fun (v, state) ->
           k (Some v, state)
     | (Obj (Opt { kind = `Variable ; encoding = e })) ->
         let size = remaining_bytes state in
         if size = 0 then
           k (None, state)
         else
-          read_rec e state @@ fun (v, state) ->
+          read_rec whole e state @@ fun (v, state) ->
           k (Some v, state)
     | Objs { kind = `Fixed sz ; left ; right } ->
         ignore (check_remaining_bytes state sz : int option) ;
         ignore (check_allowed_bytes state sz : int option) ;
-        read_rec left state @@ fun (left, state) ->
-        read_rec right state @@ fun (right, state) ->
+        read_rec false left state @@ fun (left, state) ->
+        read_rec whole right state @@ fun (right, state) ->
         k ((left, right), state)
     | Objs { kind = `Dynamic ; left ; right } ->
-        read_rec left state @@ fun (left, state) ->
-        read_rec right state @@ fun (right, state) ->
+        read_rec false left state @@ fun (left, state) ->
+        read_rec whole right state @@ fun (right, state) ->
         k ((left, right), state)
     | Objs { kind = `Variable ; left ; right } ->
         read_variable_pair left right state k
-    | Tup e -> read_rec e state k
+    | Tup e -> read_rec whole e state k
     | Tups { kind = `Fixed sz ; left ; right } ->
         ignore (check_remaining_bytes state sz : int option) ;
         ignore (check_allowed_bytes state sz : int option) ;
-        read_rec left state @@ fun (left, state) ->
-        read_rec right state @@ fun (right, state) ->
+        read_rec false left state @@ fun (left, state) ->
+        read_rec whole right state @@ fun (right, state) ->
         k ((left, right), state)
     | Tups { kind = `Dynamic ; left ; right } ->
-        read_rec left state @@ fun (left, state) ->
-        read_rec right state @@ fun (right, state) ->
+        read_rec false left state @@ fun (left, state) ->
+        read_rec whole right state @@ fun (right, state) ->
         k ((left, right), state)
     | Tups { kind = `Variable ; left ; right } ->
         read_variable_pair left right state k
     | Conv { inj ; encoding } ->
-        read_rec encoding state @@ fun (v, state) ->
+        read_rec whole encoding state @@ fun (v, state) ->
         k (inj v, state)
     | Union { tag_size ; cases } -> begin
         Atom.tag tag_size resume state @@ fun (ctag, state) ->
@@ -318,7 +321,7 @@ let rec read_rec
         with
         | exception Not_found -> Error (Unexpected_tag ctag)
         | Case { encoding ; inj } ->
-            read_rec encoding state @@ fun (v, state) ->
+            read_rec whole encoding state @@ fun (v, state) ->
             k (inj v, state)
       end
     | Dynamic_size { kind ; encoding = e } ->
@@ -326,7 +329,7 @@ let rec read_rec
         let remaining = check_remaining_bytes state sz in
         let state = { state with remaining_bytes = Some sz } in
         ignore (check_allowed_bytes state sz : int option) ;
-        read_rec e state @@ fun (v, state) ->
+        read_rec true e state @@ fun (v, state) ->
         if state.remaining_bytes <> Some 0 then
           Error Extra_bytes
         else
@@ -337,8 +340,14 @@ let rec read_rec
           match state.allowed_bytes with
           | None -> limit
           | Some current_limit -> min current_limit limit in
+        begin
+          match state.remaining_bytes with
+          | Some remaining when whole && limit < remaining ->
+              raise Size_limit_exceeded
+          | _ -> ()
+        end ;
         let state = { state with allowed_bytes = Some limit } in
-        read_rec e state @@ fun (v, state) ->
+        read_rec whole e state @@ fun (v, state) ->
         let allowed_bytes =
           match old_allowed_bytes with
           | None -> None
@@ -350,10 +359,10 @@ let rec read_rec
               let read = limit - remaining in
               Some (old_limit - read) in
         k (v, { state with allowed_bytes })
-    | Describe { encoding = e } -> read_rec e state k
-    | Splitted { encoding = e } -> read_rec e state k
-    | Mu { fix } -> read_rec (fix e) state k
-    | Delayed f -> read_rec (f ()) state k
+    | Describe { encoding = e } -> read_rec whole e state k
+    | Splitted { encoding = e } -> read_rec whole e state k
+    | Mu { fix } -> read_rec whole (fix e) state k
+    | Delayed f -> read_rec whole (f ()) state k
 
 and remaining_bytes { remaining_bytes } =
   match remaining_bytes with
@@ -371,37 +380,39 @@ and read_variable_pair
     let size = remaining_bytes state in
     match Encoding.classify e1, Encoding.classify e2 with
     | (`Dynamic | `Fixed _), `Variable ->
-        read_rec e1 state @@ fun (left, state) ->
-        read_rec e2 state @@ fun (right, state) ->
+        read_rec false e1 state @@ fun (left, state) ->
+        read_rec true e2 state @@ fun (right, state) ->
         k ((left, right), state)
     | `Variable, `Fixed n ->
         if n > size then
           Error Not_enough_data
         else
           let state = { state with remaining_bytes = Some (size - n) } in
-          read_rec e1 state @@ fun (left, state) ->
+          read_rec true e1 state @@ fun (left, state) ->
           assert (state.remaining_bytes = Some 0) ;
           let state = { state with remaining_bytes = Some n } in
-          read_rec e2 state @@ fun (right, state) ->
+          read_rec true e2 state @@ fun (right, state) ->
           assert (state.remaining_bytes = Some 0) ;
           k ((left, right), state)
     | _ -> assert false (* Should be rejected by [Encoding.Kind.combine] *)
 
 and read_list
   : type a ret.
-    a Encoding.t -> state -> ((a list * state) -> ret status) -> ret status
-  = fun e state k ->
-    let rec loop state acc =
+    read_error -> int -> a Encoding.t -> state -> ((a list * state) -> ret status) -> ret status
+  = fun error max_length e state k ->
+    let rec loop state acc max_length =
       let size = remaining_bytes state in
       if size = 0 then
         k (List.rev acc, state)
+      else if max_length = 0 then
+        raise error
       else
-        read_rec e state @@ fun (v, state) ->
-        loop state (v :: acc) in
-    loop state []
+        read_rec false e state @@ fun (v, state) ->
+        loop state (v :: acc) (max_length - 1) in
+    loop state [] max_length
 
 let read_rec e state k =
-  try read_rec e state k
+  try read_rec false e state k
   with Read_error err -> Error err
 
 

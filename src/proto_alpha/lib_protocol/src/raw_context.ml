@@ -16,13 +16,14 @@ type t = {
   level: Level_repr.t ;
   timestamp: Time.t ;
   fitness: Int64.t ;
-  endorsements_received: Int_set.t ;
   deposits: Tez_repr.t Signature.Public_key_hash.Map.t ;
+  allowed_endorsements:
+    (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ;
   fees: Tez_repr.t ;
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
   operation_gas: Gas_limit_repr.t ;
-  block_storage: Int64.t ;
+  block_storage: Z.t ;
   operation_storage: Storage_limit_repr.t ;
   origination_nonce: Contract_repr.origination_nonce option ;
   internal_nonce: int ;
@@ -39,8 +40,26 @@ let first_level ctxt = ctxt.first_level
 let constants ctxt = ctxt.constants
 let recover ctxt = ctxt.context
 
-let record_endorsement ctxt k = { ctxt with endorsements_received = Int_set.add k ctxt.endorsements_received }
-let endorsement_already_recorded ctxt k = Int_set.mem k ctxt.endorsements_received
+let record_endorsement ctxt k =
+  match Signature.Public_key_hash.Map.find_opt k ctxt.allowed_endorsements with
+  | None -> assert false
+  | Some (_, _, true) -> assert false (* right already used *)
+  | Some (d, s, false) ->
+      { ctxt with
+        allowed_endorsements =
+          Signature.Public_key_hash.Map.add k (d,s,true) ctxt.allowed_endorsements }
+
+let init_endorsements ctxt allowed_endorsements =
+  if Signature.Public_key_hash.Map.is_empty allowed_endorsements
+  then assert false (* can't initialize to empty *)
+  else begin
+    if Signature.Public_key_hash.Map.is_empty ctxt.allowed_endorsements
+    then { ctxt with allowed_endorsements }
+    else assert false (* can't initialize twice *)
+  end
+
+let allowed_endorsements ctxt =
+  ctxt.allowed_endorsements
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -174,8 +193,8 @@ let () =
     (fun () -> Storage_limit_too_high)
 
 let set_storage_limit ctxt remaining =
-  if Compare.Int64.(remaining > ctxt.constants.hard_storage_limit_per_operation)
-  || Compare.Int64.(remaining < 0L)then
+  if Compare.Z.(remaining > ctxt.constants.hard_storage_limit_per_operation)
+  || Compare.Z.(remaining < Z.zero)then
     error Storage_limit_too_high
   else
     ok { ctxt with operation_storage = Limited { remaining } }
@@ -402,7 +421,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
   return {
     context = ctxt ; constants ; level ;
     timestamp ; fitness ; first_level ;
-    endorsements_received = Int_set.empty ;
+    allowed_endorsements = Signature.Public_key_hash.Map.empty ;
     fees = Tez_repr.zero ;
     rewards = Tez_repr.zero ;
     deposits = Signature.Public_key_hash.Map.empty ;
@@ -454,7 +473,7 @@ let register_resolvers enc resolve =
       level =  Level_repr.root Raw_level_repr.root ;
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
-      endorsements_received = Int_set.empty ;
+      allowed_endorsements = Signature.Public_key_hash.Map.empty ;
       fees = Tez_repr.zero ;
       rewards = Tez_repr.zero ;
       deposits = Signature.Public_key_hash.Map.empty ;
@@ -509,7 +528,7 @@ module type T = sig
 
   val consume_gas: context -> Gas_limit_repr.cost -> context tzresult
 
-  val record_bytes_stored: context -> Int64.t -> context tzresult
+  val record_bytes_stored: context -> Z.t -> context tzresult
 
   val description: context Storage_description.t
 

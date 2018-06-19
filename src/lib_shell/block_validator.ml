@@ -112,6 +112,16 @@ let check_liveness chain_state pred hash operations_hashes operations =
   assert_operation_liveness hash live_blocks operations >>=? fun () ->
   return ()
 
+let may_patch_protocol
+    ~level
+    (validation_result : Tezos_protocol_environment_shell.validation_result) =
+  match Block_header.get_forced_protocol_upgrade ~level with
+  | None ->
+      return validation_result
+  | Some hash ->
+      Context.set_protocol validation_result.context hash >>= fun context ->
+      return { validation_result with context }
+
 let apply_block
     chain_state
     pred (module Proto : Registered_protocol.T)
@@ -129,15 +139,14 @@ let apply_block
           invalid_block hash @@
           Too_many_operations
             { pass = i + 1 ; found = List.length ops ; max }) >>=? fun () ->
-       let max_size = State.Block.max_operation_data_length pred in
        iter_p (fun op ->
            let size = Data_encoding.Binary.length Operation.encoding op in
            fail_unless
-             (size <= max_size)
+             (size <= Proto.max_operation_data_length)
              (invalid_block hash @@
               Oversized_operation
                 { operation = Operation.hash op ;
-                  size ; max = max_size })) ops >>=? fun () ->
+                  size ; max = Proto.max_operation_data_length })) ops >>=? fun () ->
        return ())
     operations Proto.validation_passes >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
@@ -190,6 +199,8 @@ let apply_block
     (state, []) parsed_operations >>=? fun (state, ops_metadata) ->
   let ops_metadata = List.rev ops_metadata in
   Proto.finalize_block state >>=? fun (validation_result, block_data) ->
+  may_patch_protocol
+    ~level:header.shell.level validation_result >>=? fun validation_result ->
   Context.get_protocol validation_result.context >>= fun new_protocol ->
   let expected_proto_level =
     if Protocol_hash.equal new_protocol Proto.hash then

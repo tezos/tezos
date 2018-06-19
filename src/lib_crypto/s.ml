@@ -146,6 +146,7 @@ module type MERKLE_TREE = sig
     | Op
 
   val path_encoding: path Data_encoding.t
+  val bounded_path_encoding: ?max_length:int -> unit -> path Data_encoding.t
 
   val compute_path: elt list -> int -> path
   val check_path: path -> elt -> t * int

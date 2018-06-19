@@ -36,15 +36,18 @@ let print_string ppf text =
     text ;
   Format.fprintf ppf "\""
 
+let print_annotations =
+  Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_string
+
 let preformat root =
   let preformat_loc = function
     | { comment = None } ->
         (false, 0)
     | { comment = Some text } ->
         (String.contains text '\n', String.length text + 1) in
-  let preformat_annot = function
-    | None -> 0
-    | Some annot -> String.length annot + 2 in
+  let preformat_annots = function
+    | [] -> 0
+    | annots -> String.length (String.concat " " annots) + 2 in
   let rec preformat_expr = function
     | Int (loc, value) ->
         let cml, csz = preformat_loc loc in
@@ -52,9 +55,9 @@ let preformat root =
     | String (loc, value) ->
         let cml, csz = preformat_loc loc in
         String ((cml, String.length value + csz, loc), value)
-    | Prim (loc, name, items, annot) ->
+    | Prim (loc, name, items, annots) ->
         let cml, csz = preformat_loc loc in
-        let asz = preformat_annot annot in
+        let asz = preformat_annots annots in
         let items = List.map preformat_expr items in
         let ml, sz =
           List.fold_left
@@ -63,26 +66,26 @@ let preformat root =
                (tml || ml, tsz + 1 + sz))
             (cml, String.length name + csz + asz)
             items in
-        Prim ((ml, sz, loc), name, items, annot)
-    | Seq (loc, items, annot) ->
+        Prim ((ml, sz, loc), name, items, annots)
+    | Seq (loc, items) ->
         let cml, csz = preformat_loc loc in
-        let asz = preformat_annot annot in
         let items = List.map preformat_expr items in
         let ml, sz =
           List.fold_left
             (fun (tml, tsz) e ->
                let (ml, sz, _) = location e in
                (tml || ml, tsz + 3 + sz))
-            (cml, 4 + csz + asz)
+            (cml, 4 + csz)
             items in
-        Seq ((ml, sz, loc), items, annot) in
+        Seq ((ml, sz, loc), items) in
   preformat_expr root
 
 let rec print_expr_unwrapped ppf = function
   | Prim ((ml, s, { comment }), name, args, annot) ->
       let name = match annot with
-        | None -> name
-        | Some annot -> Format.asprintf "%s %s" name annot in
+        | [] -> name
+        | annots ->
+            Format.asprintf "%s @[<h>%a@]" name print_annotations annots in
       if not ml && s < 80 then begin
         if args = [] then
           Format.fprintf ppf "%s" name
@@ -114,18 +117,13 @@ let rec print_expr_unwrapped ppf = function
         | None -> print_string ppf value
         | Some comment -> Format.fprintf ppf "%a@ %a" print_string value print_comment comment
       end
-  | Seq ((_, _, { comment = None }), [], None) ->
+  | Seq ((_, _, { comment = None }), []) ->
       Format.fprintf ppf "{}"
-  | Seq ((ml, s, { comment }), items, annot) ->
+  | Seq ((ml, s, { comment }), items) ->
       if not ml && s < 80 then
         Format.fprintf ppf "{ @[<h 0>"
       else
         Format.fprintf ppf "{ @[<v 0>" ;
-      begin match annot, comment, items with
-        | None, _, _ -> ()
-        | Some annot, None, [] -> Format.fprintf ppf "%s" annot
-        | Some annot, _, _ -> Format.fprintf ppf "%s@ " annot
-      end ;
       begin match comment, items with
         | None, _ -> ()
         | Some comment, [] -> Format.fprintf ppf "%a" print_comment comment
@@ -139,7 +137,7 @@ let rec print_expr_unwrapped ppf = function
 
 and print_expr ppf = function
   | Prim (_, _, _ :: _, _)
-  | Prim (_, _, [], Some _) as expr ->
+  | Prim (_, _, [], _ :: _) as expr ->
       Format.fprintf ppf "(%a)" print_expr_unwrapped expr
   | expr -> print_expr_unwrapped ppf expr
 

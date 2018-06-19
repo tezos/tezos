@@ -7,9 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module List = ListLabels
+open Rresult
 
-type t = LevelDB.db
+type t = {
+  dir : Lmdb.t ;
+  parent : (Lmdb.rw Lmdb.txn * Lmdb.db * Lmdb.rw Lmdb.cursor) Lwt.key ;
+}
+
 type key = string list
 type value = MBytes.t
 
@@ -32,60 +36,128 @@ let () =
 let concat = String.concat "/"
 let split = String.split_on_char '/'
 
-let init path =
-  try
-    return (LevelDB.open_db path)
-  with exn ->
-    Lwt.return (error_exn exn)
+let lwt_fail_error err =
+  Lwt.fail_with (Lmdb.string_of_error err)
 
-let close t = LevelDB.close t
+let of_result = function
+  | Ok res -> Lwt.return res
+  | Error err -> lwt_fail_error err
 
-let known t key =
-  Lwt.return (LevelDB.mem t (concat key))
+let (>>=?) v f =
+  match v with
+  | Error err -> lwt_fail_error err
+  | Ok v -> f v
 
-let read_opt t key =
-  Lwt.return (Option.map ~f:MBytes.of_string (LevelDB.get t (concat key)))
+let init ?mapsize path =
+  if not (Sys.file_exists path) then Unix.mkdir path 0o755 ;
+  match Lmdb.opendir ?mapsize ~flags:[NoTLS] path 0o644 with
+  | Ok dir -> return { dir ; parent = Lwt.new_key () }
+  | Error err -> failwith "%a" Lmdb.pp_error err
 
-let read t key =
-  match LevelDB.get t (concat key) with
-  | None -> fail (Unknown key)
-  | Some k -> return (MBytes.of_string k)
+let close { dir } = Lmdb.closedir dir
 
-let read_exn t key =
-  Lwt.wrap2 LevelDB.get_exn t (concat key) >|= MBytes.of_string
+let known { dir ; parent } key =
+  begin match Lwt.get parent with
+    | Some (txn, db, _cursor) -> Lmdb.mem txn db (concat key)
+    | None ->
+        Lmdb.with_ro_db dir ~f:begin fun txn db ->
+          Lmdb.mem txn db (concat key)
+        end
+  end |> of_result
 
-let store t k v =
-  LevelDB.put t (concat k) (MBytes.to_string v) ;
-  Lwt.return_unit
+let read_opt { dir ; parent } key =
+  begin match Lwt.get parent with
+    | Some (txn, db, _cursor) -> Lmdb.get txn db (concat key) >>| MBytes.copy
+    | None ->
+        Lmdb.with_ro_db dir ~f:begin fun txn db ->
+          Lmdb.get txn db (concat key) >>| MBytes.copy
+        end
+  end |> function
+  | Ok v -> Lwt.return_some v
+  | Error KeyNotFound -> Lwt.return_none
+  | Error err -> lwt_fail_error err
 
-let remove t k =
-  LevelDB.delete t (concat k) ;
-  Lwt.return_unit
+let read { dir ; parent } key =
+  begin match Lwt.get parent with
+    | Some (txn, db, _cursor) -> Lmdb.get txn db (concat key) >>| MBytes.copy
+    | None ->
+        Lmdb.with_ro_db dir ~f:begin fun txn db ->
+          Lmdb.get txn db (concat key) >>| MBytes.copy
+        end
+  end |> function
+  | Ok v -> return v
+  | Error _err -> fail (Unknown key)
+
+let read_exn { dir ; parent } key =
+  begin match Lwt.get parent with
+    | Some (txn, db, _cursor) -> Lmdb.get txn db (concat key) >>| MBytes.copy
+    | None ->
+        Lmdb.with_ro_db dir ~f:begin fun txn db ->
+          Lmdb.get txn db (concat key) >>| MBytes.copy
+        end
+  end |> of_result
+
+let store { dir ; parent } k v =
+  begin match Lwt.get parent with
+    | Some (txn, db, _cursor) -> Lmdb.put txn db (concat k) v
+    | None ->
+        Lmdb.with_rw_db dir ~f:begin fun txn db ->
+          Lmdb.put txn db (concat k) v
+        end
+  end |> of_result
+
+let remove { dir ; parent } k =
+  let remove txn db =
+    match Lmdb.del txn db (concat k) with
+    | Ok () -> Ok ()
+    | Error KeyNotFound -> Ok ()
+    | Error err -> Error err in
+  begin match Lwt.get parent with
+    | Some (txn, db, _cursor) -> remove txn db
+    | None -> Lmdb.with_rw_db dir ~f:remove
+  end |> of_result
 
 let is_prefix s s' =
   String.(length s <= length s' && compare s (sub s' 0 (length s)) = 0)
 
-let known_dir t k =
-  let ret = ref false in
+let known_dir { dir ; parent } k =
   let k = concat k in
-  LevelDB.iter_from begin fun kk _ ->
-    if is_prefix k kk then ret := true ;
-    false
-  end t k ;
-  Lwt.return !ret
+  let cursor_fun cursor =
+    Lmdb.cursor_at cursor k >>= fun () ->
+    Lmdb.cursor_get cursor >>| fun (first_k, _v) ->
+    (is_prefix k (MBytes.to_string first_k))
+  in
+  begin match Lwt.get parent with
+    | Some (txn, db, _cursor) ->
+        Lmdb.with_cursor txn db ~f:cursor_fun
+    | None ->
+        Lmdb.with_ro_db dir ~f:begin fun txn db ->
+          Lmdb.with_cursor txn db ~f:cursor_fun
+        end
+  end |> of_result
 
-let remove_dir t k =
+let remove_dir { dir ; parent } k =
   let k = concat k in
-  let batch = LevelDB.Batch.make () in
-  LevelDB.iter_from begin fun kk _ ->
-    if is_prefix k kk then begin
-      LevelDB.Batch.delete batch kk ;
-      true
-    end
-    else false
-  end t k ;
-  LevelDB.Batch.write t batch ;
-  Lwt.return_unit
+  let cursor_fun cursor =
+    Lmdb.cursor_at cursor k >>= fun () ->
+    Lmdb.cursor_iter cursor ~f:begin fun (kk, _v) ->
+      let kk_string = MBytes.to_string kk in
+      if is_prefix k kk_string then begin
+        Lmdb.cursor_del cursor
+      end
+      else Error KeyNotFound
+    end in
+  begin match Lwt.get parent with
+    | Some (txn, db, _cursor) ->
+        Lmdb.with_cursor txn db ~f:cursor_fun
+    | None ->
+        Lmdb.with_rw_db dir ~f:begin fun txn db ->
+          Lmdb.with_cursor txn db ~f:cursor_fun
+        end
+  end |> function
+  | Error KeyNotFound
+  | Ok () -> Lwt.return_unit
+  | Error err -> lwt_fail_error err
 
 let list_equal l1 l2 len =
   if len < 0 || len > List.length l1 || len > List.length l2
@@ -116,45 +188,81 @@ let list_sub l pos len =
         else inner (h :: acc, pred n) t in
   inner ([], len) l
 
+let with_rw_cursor_lwt ?sync ?metasync ?flags ?name { dir ; parent } ~f =
+  let local_parent =
+    match Lwt.get parent with
+    | None -> None
+    | Some (txn, _db, _cursor) -> Some txn in
+  Lmdb.create_rw_txn
+    ?sync ?metasync ?parent:local_parent dir >>=? fun txn ->
+  Lmdb.opendb ?flags ?name txn >>=? fun db ->
+  Lmdb.opencursor txn db >>=? fun cursor ->
+  Lwt.with_value parent (Some (txn, db, cursor)) begin fun () ->
+    Lwt.try_bind (fun () -> f cursor)
+      begin fun res ->
+        Lmdb.cursor_close cursor ;
+        Lmdb.commit_txn txn >>=? fun () ->
+        Lwt.return res
+      end
+      begin fun exn ->
+        Lmdb.cursor_close cursor ;
+        Lmdb.abort_txn txn ;
+        Lwt.fail exn
+      end
+  end
+
+let cursor_next_lwt cursor acc f =
+  match Lmdb.cursor_next cursor with
+  | Error KeyNotFound -> acc
+  | Error err -> lwt_fail_error err
+  | Ok () -> Lwt.bind acc f
+
 let fold t k ~init ~f =
-  let k_concat = concat k in
   let base_len = List.length k in
-  let i = LevelDB.Iterator.make t in
-  LevelDB.Iterator.seek i k_concat 0 (String.length k_concat) ;
-  let returned = Hashtbl.create 31 in
-  let rec inner acc =
-    match LevelDB.Iterator.valid i with
+  let rec inner ht cursor acc =
+    Lmdb.cursor_get cursor >>=? fun (kk, _v) ->
+    let kk = MBytes.to_string kk in
+    let kk_split = split kk in
+    match is_child ~child:kk_split ~parent:k with
     | false -> Lwt.return acc
     | true ->
-        let kk = LevelDB.Iterator.get_key i in
-        let kk_split = split kk in
-        match is_child ~child:kk_split ~parent:k with
-        | false -> Lwt.return acc
-        | true ->
-            let cur_len = List.length kk_split in
-            LevelDB.Iterator.next i ;
-            if cur_len = succ base_len then begin
-              (f (`Key kk_split) acc) >>= inner
-            end
-            else begin
-              let dir = list_sub kk_split 0 (succ base_len) in
-              if Hashtbl.mem returned dir then
-                inner acc
-              else begin
-                Hashtbl.add returned dir () ;
-                (f (`Dir dir) acc) >>= inner
-              end
-            end ;
-  in
-  inner init
+        let cur_len = List.length kk_split in
+        if cur_len = succ base_len then begin
+          cursor_next_lwt cursor (f (`Key kk_split) acc) (inner ht cursor)
+        end
+        else begin
+          let dir = list_sub kk_split 0 (succ base_len) in
+          if Hashtbl.mem ht dir then
+            cursor_next_lwt cursor (Lwt.return acc) (inner ht cursor)
+          else begin
+            Hashtbl.add ht dir () ;
+            cursor_next_lwt cursor (f (`Dir dir) acc) (inner ht cursor)
+          end
+        end in
+  with_rw_cursor_lwt t ~f:begin fun cursor ->
+    match Lmdb.cursor_at cursor (concat k) with
+    | Error KeyNotFound -> Lwt.return init
+    | Error err -> lwt_fail_error err
+    | Ok () ->
+        let ht = Hashtbl.create 31 in
+        inner ht cursor init
+  end
 
-let fold_keys s k ~init ~f =
-  let rec loop k acc =
-    fold s k ~init:acc
-      ~f:(fun file acc ->
-          match file with
-          | `Key k -> f k acc
-          | `Dir k -> loop k acc) in
-  loop k init
+let fold_keys t k ~init ~f =
+  with_rw_cursor_lwt t ~f:begin fun cursor ->
+    match Lmdb.cursor_at cursor (concat k) with
+    | Error KeyNotFound -> Lwt.return init
+    | Error err -> lwt_fail_error err
+    | Ok () ->
+        let rec inner acc =
+          Lmdb.cursor_get cursor >>=? fun (kk, _v) ->
+          let kk = MBytes.to_string kk in
+          let kk_split = split kk in
+          match is_child ~child:kk_split ~parent:k with
+          | false -> Lwt.return acc
+          | true -> cursor_next_lwt cursor (f kk_split acc) inner
+        in inner init
+  end
 
-let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+let keys t =
+  fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))

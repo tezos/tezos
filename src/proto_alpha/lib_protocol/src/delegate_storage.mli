@@ -49,6 +49,10 @@ type error +=
   | Active_delegate (* `Temporary *)
   | Current_delegate (* `Temporary *)
   | Empty_delegate_account of Signature.Public_key_hash.t (* `Temporary *)
+  | Balance_too_low_for_deposit of
+      { delegate : Signature.Public_key_hash.t ;
+        deposit : Tez_repr.t ;
+        balance : Tez_repr.t } (* `Temporary *)
 
 (** Iterate on all registered delegates. *)
 val fold:

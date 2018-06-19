@@ -9,6 +9,7 @@
               tezos-shell-services
               tezos-client-base
               tezos-rpc
+              tezos-storage
               tezos-signer-backends
               bip39))
   (library_flags (:standard -linkall))
@@ -17,6 +18,7 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell_services
                     -open Tezos_client_base
+                    -open Tezos_storage
                     -open Tezos_rpc))))
 
 (alias

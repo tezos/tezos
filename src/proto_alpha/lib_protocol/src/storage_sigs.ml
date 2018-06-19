@@ -277,43 +277,6 @@ module type Indexed_data_storage = sig
 
 end
 
-(** Variant of {!Indexed_data_storage} with gas accounting. *)
-module type Indexed_carbonated_data_storage = sig
-
-  include Non_iterable_indexed_carbonated_data_storage
-
-  (** Empties all the keys and associated data.
-      Consumes [Gas_repr.read_bytes_cost Z.zero] per deleted key.
-      Returns the total freed size. *)
-  val clear: context -> (Raw_context.t * Z.t) tzresult Lwt.t
-
-  (** Lists all the keys.
-      Consumes [Gas_repr.read_bytes_cost Z.zero] per returned key. *)
-  val keys: context -> (Raw_context.t * key list) tzresult Lwt.t
-
-  (** Lists all the keys and associated data.
-      Consumes [Gas_repr.read_bytes_cost <size of the value>] per returned key. *)
-  val bindings: context -> (Raw_context.t * (key * value) list) tzresult Lwt.t
-
-  (** Iterates over all the keys and associated data present in the
-      initial context (keys added or removed during the iteration are
-      not taken into account).
-      Consumes [Gas_repr.read_bytes_cost <size of the value>] per iterated key. *)
-  val fold:
-    context -> init:'a ->
-    f:(key -> value -> (context * 'a) -> (context * 'a) tzresult Lwt.t) ->
-    (Raw_context.t * 'a) tzresult Lwt.t
-
-  (** Iterate over all the keys present in the initial context
-      (keys added or removed during the iteration are not taken into account).
-      Consumes [Gas_repr.read_bytes_cost Z.zero] per iterated key. *)
-  val fold_keys:
-    context -> init:'a ->
-    f:(key -> (context * 'a) -> (context * 'a) tzresult Lwt.t) ->
-    (Raw_context.t * 'a) tzresult Lwt.t
-
-end
-
 module type Indexed_data_snapshotable_storage = sig
   type snapshot
   type key
@@ -375,15 +338,6 @@ module type VALUE = sig
   val encoding: t Data_encoding.t
 end
 
-type value_size =
-  | Fixed of int
-  | Variable
-
-module type CARBONATED_VALUE = sig
-  include VALUE
-  val size: value_size
-end
-
 module type Indexed_raw_context = sig
 
   type t
@@ -408,10 +362,10 @@ module type Indexed_raw_context = sig
                             and type key = key
                             and type value = V.t
 
-  module Make_carbonated_map (N : NAME) (V : CARBONATED_VALUE)
-    : Indexed_carbonated_data_storage with type t = t
-                                       and type key = key
-                                       and type value = V.t
+  module Make_carbonated_map (N : NAME) (V : VALUE)
+    : Non_iterable_indexed_carbonated_data_storage with type t = t
+                                                    and type key = key
+                                                    and type value = V.t
 
   module Raw_context : Raw_context.T with type t = t ipath
 

@@ -97,6 +97,8 @@ type prim =
   | I_ADDRESS
   | I_CONTRACT
   | I_ISNAT
+  | I_CAST
+  | I_RENAME
   | T_bool
   | T_contract
   | T_int
@@ -222,6 +224,8 @@ let string_of_prim = function
   | I_ADDRESS -> "ADDRESS"
   | I_CONTRACT -> "CONTRACT"
   | I_ISNAT -> "ISNAT"
+  | I_CAST -> "CAST"
+  | I_RENAME -> "RENAME"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -328,6 +332,8 @@ let prim_of_string = function
   | "ADDRESS" -> ok I_ADDRESS
   | "CONTRACT" -> ok I_CONTRACT
   | "ISNAT" -> ok I_ISNAT
+  | "CAST" -> ok I_CAST
+  | "RENAME" -> ok I_RENAME
   | "bool" -> ok T_bool
   | "contract" -> ok T_contract
   | "int" -> ok T_int
@@ -369,14 +375,14 @@ let prims_of_strings expr =
              ok (arg :: args))
           (ok []) args >>? fun args ->
         ok (Prim (0, prim, List.rev args, annot))
-    | Seq (_, args, annot) ->
+    | Seq (_, args) ->
         List.fold_left
           (fun acc arg ->
              acc >>? fun args ->
              convert arg >>? fun arg ->
              ok (arg :: args))
           (ok []) args >>? fun args ->
-        ok (Seq (0, List.rev args, annot)) in
+        ok (Seq (0, List.rev args)) in
   convert (root expr) >>? fun expr ->
   ok (strip_locations expr)
 
@@ -387,9 +393,9 @@ let strings_of_prims expr =
         let prim = string_of_prim prim in
         let args = List.map convert args in
         Prim (0, prim, args, annot)
-    | Seq (_, args, annot) ->
+    | Seq (_, args) ->
         let args = List.map convert args in
-        Seq (0, args, annot) in
+        Seq (0, args) in
   strip_locations (convert (root expr))
 
 let prim_encoding =
@@ -479,6 +485,8 @@ let prim_encoding =
     ("ADDRESS", I_ADDRESS) ;
     ("CONTRACT", I_CONTRACT) ;
     ("ISNAT", I_ISNAT) ;
+    ("CAST", I_CAST) ;
+    ("RENAME", I_RENAME) ;
     ("bool", T_bool) ;
     ("contract", T_contract) ;
     ("int", T_int) ;

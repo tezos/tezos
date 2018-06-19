@@ -10,18 +10,24 @@
 open Alpha_context
 open Script_int
 
-
 (* ---- Auxiliary types -----------------------------------------------------*)
 
+type var_annot = [ `Var_annot of string ]
+type type_annot = [ `Type_annot of string ]
+type field_annot = [ `Field_annot of string ]
+
+type annot = [ var_annot | type_annot | field_annot ]
+
 type 'ty comparable_ty =
-  | Int_key : (z num) comparable_ty
-  | Nat_key : (n num) comparable_ty
-  | String_key : string comparable_ty
-  | Mutez_key : Tez.t comparable_ty
-  | Bool_key : bool comparable_ty
-  | Key_hash_key : public_key_hash comparable_ty
-  | Timestamp_key : Script_timestamp.t comparable_ty
-  | Address_key : Contract.t comparable_ty
+  | Int_key : type_annot option -> (z num) comparable_ty
+  | Nat_key : type_annot option -> (n num) comparable_ty
+  | String_key : type_annot option -> string comparable_ty
+  | Mutez_key : type_annot option -> Tez.t comparable_ty
+  | Bool_key : type_annot option -> bool comparable_ty
+  | Key_hash_key : type_annot option -> public_key_hash comparable_ty
+  | Timestamp_key : type_annot option -> Script_timestamp.t comparable_ty
+  | Address_key : type_annot option -> Contract.t comparable_ty
+
 
 module type Boxed_set = sig
   type elt
@@ -42,8 +48,6 @@ end
 
 type ('key, 'value) map = (module Boxed_map with type key = 'key and type value = 'value)
 
-type annot = string option
-
 type ('arg, 'storage) script =
   { code : (('arg, 'storage) pair, (packed_internal_operation list, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
@@ -63,30 +67,33 @@ and 'arg typed_contract =
   'arg ty * Contract.t
 
 and 'ty ty =
-  | Unit_t : unit ty
-  | Int_t : z num ty
-  | Nat_t : n num ty
-  | Signature_t : signature ty
-  | String_t : string ty
-  | Mutez_t : Tez.t ty
-  | Key_hash_t : public_key_hash ty
-  | Key_t : public_key ty
-  | Timestamp_t : Script_timestamp.t ty
-  | Address_t : Contract.t ty
-  | Bool_t : bool ty
-  | Pair_t : ('a ty * annot) * ('b ty * annot) -> ('a, 'b) pair ty
-  | Union_t : ('a ty * annot) * ('b ty * annot) -> ('a, 'b) union ty
-  | Lambda_t : 'arg ty * 'ret ty -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty -> 'v option ty
-  | List_t : 'v ty -> 'v list ty
-  | Set_t : 'v comparable_ty -> 'v set ty
-  | Map_t : 'k comparable_ty * 'v ty -> ('k, 'v) map ty
-  | Big_map_t : 'k comparable_ty * 'v ty -> ('k, 'v) big_map ty
-  | Contract_t : 'arg ty -> 'arg typed_contract ty
-  | Operation_t : packed_internal_operation ty
+  | Unit_t : type_annot option -> unit ty
+  | Int_t : type_annot option -> z num ty
+  | Nat_t : type_annot option -> n num ty
+  | Signature_t : type_annot option -> signature ty
+  | String_t : type_annot option -> string ty
+  | Mutez_t : type_annot option -> Tez.t ty
+  | Key_hash_t : type_annot option -> public_key_hash ty
+  | Key_t : type_annot option -> public_key ty
+  | Timestamp_t : type_annot option -> Script_timestamp.t ty
+  | Address_t : type_annot option -> Contract.t ty
+  | Bool_t : type_annot option -> bool ty
+  | Pair_t :
+      ('a ty * field_annot option * var_annot option) *
+      ('b ty * field_annot option * var_annot option) *
+      type_annot option -> ('a, 'b) pair ty
+  | Union_t : ('a ty * field_annot option) * ('b ty * field_annot option) * type_annot option  -> ('a, 'b) union ty
+  | Lambda_t : 'arg ty * 'ret ty * type_annot option  -> ('arg, 'ret) lambda ty
+  | Option_t : ('v ty * field_annot option) * field_annot option * type_annot option  -> 'v option ty
+  | List_t : 'v ty * type_annot option -> 'v list ty
+  | Set_t : 'v comparable_ty * type_annot option -> 'v set ty
+  | Map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) map ty
+  | Big_map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) big_map ty
+  | Contract_t : 'arg ty * type_annot option -> 'arg typed_contract ty
+  | Operation_t : type_annot option -> packed_internal_operation ty
 
 and 'ty stack_ty =
-  | Item_t : 'ty ty * 'rest stack_ty * annot -> ('ty * 'rest) stack_ty
+  | Item_t : 'ty ty * 'rest stack_ty * var_annot option -> ('ty * 'rest) stack_ty
   | Empty_t : end_of_stack stack_ty
 
 and ('key, 'value) big_map = { diff : ('key, 'value option) map ;

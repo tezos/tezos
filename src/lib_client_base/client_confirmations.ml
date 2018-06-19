@@ -61,7 +61,7 @@ let wait_for_operation_inclusion
         end else
           return (Some block_with_op)
     | None ->
-        Shell_services.Blocks.Operation_hash.operation_hashes
+        Shell_services.Blocks.Operation_hashes.operation_hashes
           ctxt ~chain ~block () >>=? fun operations ->
         let in_block =
           let exception Found of int * int in

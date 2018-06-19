@@ -75,6 +75,7 @@ let blocks_arg =
 type chain_prefix = unit * chain
 type prefix = chain_prefix * block
 let chain_path = RPC_path.(root / "chains" /: chain_arg)
+let mempool_path p = RPC_path.(p / "mempool")
 let dir_path : (chain_prefix, chain_prefix) RPC_path.t =
   RPC_path.(open_root / "blocks")
 let path = RPC_path.(dir_path /: blocks_arg)
@@ -391,7 +392,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
     end
 
-    module Operation = struct
+    module Operations = struct
 
       let path = RPC_path.(path / "operations")
 
@@ -440,7 +441,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
     end
 
-    module Operation_hash = struct
+    module Operation_hashes = struct
 
       let path = RPC_path.(path / "operation_hashes")
 
@@ -457,7 +458,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
             "All the operations included in `n-th` validation pass of the block."
           ~query: RPC_query.empty
           ~output: (list Operation_hash.encoding)
-          RPC_path.(path /: Operation.list_arg)
+          RPC_path.(path /: Operations.list_arg)
 
       let operation_hash =
         RPC_service.get_service
@@ -465,7 +466,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
             "The hash of then `m-th` operation in the `n-th` validation pass of the block."
           ~query: RPC_query.empty
           ~output: Operation_hash.encoding
-          RPC_path.(path /: Operation.list_arg /: Operation.offset_arg)
+          RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
     end
 
     module Helpers = struct
@@ -597,6 +598,72 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
         ~output: block_info_encoding
         path
 
+    module Mempool = struct
+
+      type t = {
+        applied: (Operation_hash.t * Next_proto.operation) list ;
+        refused: (Next_proto.operation * error list) Operation_hash.Map.t ;
+        branch_refused: (Next_proto.operation * error list) Operation_hash.Map.t ;
+        branch_delayed: (Next_proto.operation * error list) Operation_hash.Map.t ;
+        unprocessed: Next_proto.operation Operation_hash.Map.t ;
+      }
+
+      let encoding =
+        conv
+          (fun
+            { applied ;
+              refused ; branch_refused ; branch_delayed ;
+              unprocessed } ->
+            (applied, refused, branch_refused, branch_delayed, unprocessed))
+          (fun
+            (applied, refused, branch_refused, branch_delayed, unprocessed) ->
+            { applied ;
+              refused ; branch_refused ; branch_delayed ;
+              unprocessed })
+          (obj5
+             (req "applied"
+                (list
+                   (conv
+                      (fun (hash, (op : Next_proto.operation)) ->
+                         ((hash, op.shell), (op.protocol_data)))
+                      (fun ((hash, shell), (protocol_data)) ->
+                         (hash, { shell ; protocol_data }))
+                      (merge_objs
+                         (merge_objs
+                            (obj1 (req "hash" Operation_hash.encoding))
+                            (dynamic_size Operation.shell_header_encoding))
+                         (dynamic_size Next_proto.operation_data_encoding)
+                      ))))
+             (req "refused"
+                (Operation_hash.Map.encoding
+                   (merge_objs
+                      (dynamic_size next_operation_encoding)
+                      (obj1 (req "error" RPC_error.encoding)))))
+             (req "branch_refused"
+                (Operation_hash.Map.encoding
+                   (merge_objs
+                      (dynamic_size next_operation_encoding)
+                      (obj1 (req "error" RPC_error.encoding)))))
+             (req "branch_delayed"
+                (Operation_hash.Map.encoding
+                   (merge_objs
+                      (dynamic_size next_operation_encoding)
+                      (obj1 (req "error" RPC_error.encoding)))))
+             (req "unprocessed"
+                (Operation_hash.Map.encoding
+                   (dynamic_size next_operation_encoding))))
+
+      let pending_operations path =
+        (* TODO: branch_delayed/... *)
+        RPC_service.get_service
+          ~description:
+            "List the not-yet-prevalidated operations."
+          ~query: RPC_query.empty
+          ~output: encoding
+          path
+
+    end
+
   end
 
   let path = RPC_path.prefix chain_path path
@@ -659,9 +726,9 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
   end
 
-  module Operation = struct
+  module Operations = struct
 
-    module S = S.Operation
+    module S = S.Operations
 
     let operations ctxt =
       let f = make_call0 S.operations ctxt in
@@ -680,9 +747,9 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
   end
 
-  module Operation_hash = struct
+  module Operation_hashes = struct
 
-    module S = S.Operation_hash
+    module S = S.Operation_hashes
 
     let operation_hashes ctxt =
       let f = make_call0 S.operation_hashes ctxt in
@@ -761,6 +828,22 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
     let f = make_call0 S.info ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () ->
       f chain block () ()
+
+  module Mempool = struct
+
+    type t = S.Mempool.t = {
+      applied: (Operation_hash.t * Next_proto.operation) list ;
+      refused: (Next_proto.operation * error list) Operation_hash.Map.t ;
+      branch_refused: (Next_proto.operation * error list) Operation_hash.Map.t ;
+      branch_delayed: (Next_proto.operation * error list) Operation_hash.Map.t ;
+      unprocessed: Next_proto.operation Operation_hash.Map.t ;
+    }
+
+    let pending_operations ctxt ?(chain = `Main) () =
+      let s = S.Mempool.pending_operations (mempool_path chain_path) in
+      RPC_context.make_call1 s ctxt chain () ()
+
+  end
 
 end
 

@@ -17,7 +17,7 @@ open Script_typed_ir
 (* Auxiliary types for error documentation *)
 type namespace = Type_namespace | Constant_namespace | Instr_namespace | Keyword_namespace
 type kind = Int_kind | String_kind | Prim_kind | Seq_kind
-type type_map = (int * (Script.expr list * Script.expr list)) list
+type type_map = (int * ((Script.expr * Script.annot) list * (Script.expr * Script.annot) list)) list
 
 (* Structure errors *)
 type error += Invalid_arity of Script.location * prim * int * int
@@ -41,7 +41,9 @@ type error += Bad_stack_length
 type error += Bad_stack_item of int
 type error += Inconsistent_annotations of string * string
 type error += Inconsistent_type_annotations : Script.location * _ ty * _ ty -> error
+type error += Inconsistent_field_annotations of string * string
 type error += Unexpected_annotation of Script.location
+type error += Ungrouped_annotations of Script.location
 type error += Invalid_map_body : Script.location * _ stack_ty -> error
 type error += Invalid_map_block_fail of Script.location
 type error += Invalid_iter_body : Script.location * _ stack_ty * _ stack_ty -> error

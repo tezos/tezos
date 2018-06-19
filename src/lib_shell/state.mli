@@ -119,7 +119,6 @@ module Block : sig
   val level: t -> Int32.t
   val message: t -> string option
   val max_operations_ttl: t -> int
-  val max_operation_data_length: t -> int
   val metadata: t -> MBytes.t
 
   val is_genesis: t -> bool
@@ -234,6 +233,8 @@ end
     the databases. *)
 val read:
   ?patch_context:(Context.t -> Context.t Lwt.t) ->
+  ?store_mapsize:int64 ->
+  ?context_mapsize:int64 ->
   store_root:string ->
   context_root:string ->
   Chain.genesis ->

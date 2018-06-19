@@ -119,8 +119,14 @@ let fetch_and_compile_protocol pv ?peer ?timeout hash =
         Distributed_db.Protocol.read_opt pv.db hash >>= function
         | Some protocol -> return protocol
         | None ->
-            lwt_log_notice "Fetching protocol %a from peer "
-              Protocol_hash.pp_short hash >>= fun () ->
+            let may_print_peer ppf = function
+              | None -> ()
+              | Some peer ->
+                  Format.fprintf ppf " from peer %a"
+                    P2p_peer.Id.pp peer in
+            lwt_log_notice "Fetching protocol %a%a"
+              Protocol_hash.pp_short hash
+              may_print_peer peer >>= fun () ->
             Distributed_db.Protocol.fetch pv.db ?peer ?timeout hash ()
       end >>=? fun protocol ->
       validate pv hash protocol >>=? fun proto ->

@@ -9,6 +9,12 @@
 
 open Alpha_context
 
+module Seed : sig
+
+  val get: 'a #RPC_context.simple -> 'a -> Seed.seed shell_tzresult Lwt.t
+
+end
+
 module Nonce : sig
 
   type info =
@@ -28,3 +34,5 @@ module Delegate = Delegate_services
 module Helpers = Helpers_services
 module Forge = Helpers_services.Forge
 module Parse = Helpers_services.Parse
+
+val register: unit -> unit

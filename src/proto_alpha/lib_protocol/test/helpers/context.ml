@@ -66,13 +66,10 @@ end
 let get_endorsers ctxt =
   Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt
 
-let get_endorser ctxt slot =
-  Alpha_services.Delegate.Endorsing_rights.get
-    rpc_ctxt ctxt >>=? fun endorsers ->
-  try return (List.find (fun {Alpha_services.Delegate.Endorsing_rights.slots} -> List.mem slot slots) endorsers).delegate
-  with _ ->
-    failwith "Failed to lookup endorsers for ctxt %a, slot %d."
-      Block_hash.pp_short (branch ctxt) slot
+let get_endorser ctxt =
+  Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt >>=? fun endorsers ->
+  let endorser = List.hd endorsers in
+  return (endorser.delegate, endorser.slots)
 
 let get_bakers ctxt =
   Alpha_services.Delegate.Baking_rights.get
@@ -81,6 +78,17 @@ let get_bakers ctxt =
   return (List.map
             (fun p -> p.Alpha_services.Delegate.Baking_rights.delegate)
             bakers)
+
+let get_seed_nonce_hash ctxt =
+  let header =
+    match ctxt with
+    | B { header } -> header
+    | I i -> Incremental.header i in
+  match header.protocol_data.contents.seed_nonce_hash with
+  | None -> failwith "Ne committed nonce"
+  | Some hash -> return hash
+
+let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
 
 let get_constants b =
   Alpha_services.Constants.all rpc_ctxt b
@@ -129,10 +137,32 @@ module Contract = struct
     Alpha_services.Contract.manager_key rpc_ctxt ctxt contract >>=? fun (_, res) ->
     return (res <> None)
 
+  let delegate_opt ctxt contract =
+    Alpha_services.Contract.delegate_opt rpc_ctxt ctxt contract
+
+end
+
+module Delegate = struct
+
+  type info = Delegate_services.info = {
+    balance: Tez.t ;
+    frozen_balance: Tez.t ;
+    frozen_balance_by_cycle: Delegate.frozen_balance Cycle.Map.t ;
+    staking_balance: Tez.t ;
+    delegated_contracts: Contract_hash.t list ;
+    delegated_balance: Tez.t ;
+    deactivated: bool ;
+    grace_period: Cycle.t ;
+  }
+
+  let info ctxt pkh =
+    Alpha_services.Delegate.info rpc_ctxt ctxt pkh
+
 end
 
 let init
     ?(slow=false)
+    ?preserved_cycles
     ?endorsers_per_block
     ?commitments
     n =
@@ -142,11 +172,13 @@ let init
   begin
     if slow then
       Block.genesis
+        ?preserved_cycles
         ?endorsers_per_block
         ?commitments
         accounts
     else
       Block.genesis
+        ?preserved_cycles
         ~blocks_per_cycle:32l
         ~blocks_per_commitment:4l
         ~blocks_per_roll_snapshot:8l

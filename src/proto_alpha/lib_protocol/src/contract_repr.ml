@@ -35,6 +35,7 @@ let of_b58check s =
   match Base58.decode s with
   | Some (Ed25519.Public_key_hash.Data h) -> ok (Implicit (Signature.Ed25519 h))
   | Some (Secp256k1.Public_key_hash.Data h) -> ok (Implicit (Signature.Secp256k1 h))
+  | Some (P256.Public_key_hash.Data h) -> ok (Implicit (Signature.P256 h))
   | Some (Contract_hash.Data h) -> ok (Originated h)
   | _ -> error (Invalid_contract_notation s)
 
@@ -184,6 +185,9 @@ module Index = struct
     Ed25519.Public_key_hash.prefix_path s
   let pkh_prefix_secp256k1 s =
     Secp256k1.Public_key_hash.prefix_path s
+  let pkh_prefix_p256 s =
+    P256.Public_key_hash.prefix_path s
+
   let rpc_arg = rpc_arg
   let encoding = encoding
   let compare = compare

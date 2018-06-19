@@ -38,6 +38,7 @@ type operation = {
 }
 
 let max_block_length = 42
+let max_operation_data_length = 0
 let validation_passes = []
 let acceptable_passes _op = []
 
@@ -79,13 +80,6 @@ module Fitness = struct
 
 end
 
-let precheck_block
-    ~ancestor_context:_
-    ~ancestor_timestamp:_
-    (raw_block: block_header) =
-  Fitness.to_int64 raw_block.shell.fitness >>=? fun _ ->
-  return ()
-
 let begin_application
     ~predecessor_context:context
     ~predecessor_timestamp:_
@@ -93,6 +87,17 @@ let begin_application
     (raw_block: block_header) =
   Fitness.to_int64 raw_block.shell.fitness >>=? fun fitness ->
   return { context ; fitness }
+
+let begin_partial_application
+    ~ancestor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    block_header =
+  begin_application
+    ~predecessor_context:ancestor_context
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    block_header
 
 let begin_construction
     ~predecessor_context:context
@@ -114,8 +119,7 @@ let finalize_block ctxt =
   let message = Some (Format.asprintf "fitness <- %Ld" fitness) in
   let fitness = Fitness.from_int64 fitness in
   return ({ Updater.message ; context = ctxt.context ; fitness ;
-            max_operations_ttl = 0 ; max_operation_data_length = 0 ;
-            last_allowed_fork_level = 0l ;
+            max_operations_ttl = 0 ; last_allowed_fork_level = 0l ;
           }, ())
 
 let rpc_services = Services.rpc_services
@@ -124,6 +128,5 @@ let init context block_header =
   return { Updater.message = None ; context ;
            fitness = block_header.Block_header.fitness ;
            max_operations_ttl = 0 ;
-           max_operation_data_length = 0 ;
            last_allowed_fork_level = block_header.level ;
          }

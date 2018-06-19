@@ -66,7 +66,7 @@ module IrminBlake2B : Irmin.Hash.S with type t = Context_hash.t = struct
 end
 
 module GitStore =
-  Irmin_leveldb.Make
+  Irmin_lmdb.Make
     (Metadata)
     (MBytesContent)
     (Irmin.Path.String_list)
@@ -202,9 +202,9 @@ let fork_test_chain v ~protocol ~expiration =
 
 (*-- Initialisation ----------------------------------------------------------*)
 
-let init ?patch_context ~root =
+let init ?patch_context ?mapsize ?readonly root =
   GitStore.Repo.v
-    (Irmin_leveldb.config root) >>= fun repo ->
+    (Irmin_lmdb.config ?mapsize ?readonly root) >>= fun repo ->
   Lwt.return {
     path = root ;
     repo ;

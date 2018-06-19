@@ -161,11 +161,11 @@ let test_bounded_string_list =
   test "a" ~total:0 ~elements:0 [""] 4 4 @
   test "b1" ~total:3 ~elements:4 [""] 4 4 @
   test "b2" ~total:4 ~elements:3 [""] 4 4 @
-  test "c1" ~total:19 ~elements:4 ["";"";"";"";""] 20 4 @
+  test "c1" ~total:19 ~elements:4 ["";"";"";"";""] 4 4 @
   test "c2" ~total:20 ~elements:3 ["";"";"";"";""] 4 4 @
-  test "d1" ~total:20 ~elements:5 ["";"";"";"";"a"] 24 4 @
+  test "d1" ~total:20 ~elements:5 ["";"";"";"";"a"] 4 4 @
   test "d2" ~total:21 ~elements:4 ["";"";"";"";"a"] 24 24 @
-  test "e" ~total:30 ~elements:10 ["ab";"c";"def";"gh";"ijk"] 32 4
+  test "e" ~total:30 ~elements:10 ["ab";"c";"def";"gh";"ijk"] 4 4
 
 let tests =
   all_ranged_int 100 400 @

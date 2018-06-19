@@ -27,7 +27,7 @@ and layout =
   | Bytes
   | String
   | Enum of Binary_size.integer * string
-  | Seq of layout (* For arrays and lists *)
+  | Seq of layout * int option (* For arrays and lists *)
   | Ref of string
   | Padding
 
@@ -115,8 +115,16 @@ module Printer_ast = struct
         Format.fprintf ppf "%a encoding an enumeration (see %s)"
           pp_int (size :> integer_extended)
           reference
-    | Seq (Ref reference) -> Format.fprintf ppf "sequence of $%s" reference
-    | Seq data -> Format.fprintf ppf "sequence of %a" pp_layout data
+    | Seq (data, len) ->
+        Format.fprintf ppf "sequence of " ;
+        begin match len with
+          | None -> ()
+          | Some len -> Format.fprintf ppf "at most %d " len
+        end ;
+        begin match data with
+          | Ref reference -> Format.fprintf ppf "$%s" reference
+          | _ -> pp_layout ppf data
+        end
 
 
   let pp_tag_size ppf tag =
@@ -387,13 +395,14 @@ module Encoding = struct
              (fun (size, cases, _) -> Enum (size, cases)) ;
            case ~title:"Seq"
              (Tag 9)
-             (obj2
+             (obj3
                 (req "layout" layout)
-                (req "kind" (constant "Seq")))
+                (req "kind" (constant "Seq"))
+                (opt "max_length" int31))
              (function
-               | Seq layout -> Some (layout, ())
+               | Seq (layout, len) -> Some (layout, (), len)
                | _ -> None)
-             (fun (layout, ()) -> Seq layout) ;
+             (fun (layout, (), len) -> Seq (layout, len)) ;
            case ~title:"Ref"
              (Tag 10)
              (obj2

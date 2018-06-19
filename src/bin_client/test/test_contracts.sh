@@ -297,6 +297,7 @@ assert_storage $contract_dir/if_some.tz '"?"' 'None' '""'
 assert_storage  $contract_dir/set_car.tz '(Pair "hello" 0)' '"world"' '(Pair "world" 0)'
 assert_storage  $contract_dir/set_car.tz '(Pair "hello" 0)' '"abc"' '(Pair "abc" 0)'
 assert_storage  $contract_dir/set_car.tz '(Pair "hello" 0)' '""' '(Pair "" 0)'
+assert_fails $client run program $contract_dir/set_car.tz on storage '(Pair %wrong %field "hello" 0)' Unit and input '""'
 
 assert_storage  $contract_dir/set_cdr.tz '(Pair "hello" 0)' '1' '(Pair "hello" 1)'
 assert_storage  $contract_dir/set_cdr.tz '(Pair "hello" 500)' '3' '(Pair "hello" 3)'
@@ -332,8 +333,8 @@ assert_storage $contract_dir/hash_key.tz None '"edpkuJqtDcA2m2muMxViSM47MPsGQzmy
 bake_after $client transfer 1,000 from bootstrap1 to $key1
 bake_after $client transfer 2,000 from bootstrap1 to $key2
 
-assert_balance $key1 "1,000 ꜩ"
-assert_balance $key2 "2,000 ꜩ"
+assert_balance $key1 "1000 ꜩ"
+assert_balance $key2 "2000 ꜩ"
 
 # Create a contract and transfer 100 ꜩ to it
 init_with_transfer $contract_dir/store_input.tz $key1 '""' 100 bootstrap1
@@ -409,7 +410,7 @@ assert_storage_contains $created_contract '"abcdefg"'
 init_with_transfer $contract_dir/default_account.tz $key1 \
 				   Unit 1,000 bootstrap1
 bake_after $client transfer 0 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\""
-assert_balance $BOOTSTRAP4_IDENTITY "4,000,100 ꜩ"
+assert_balance $BOOTSTRAP4_IDENTITY "4000100 ꜩ"
 account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
 bake_after $client transfer 0 from bootstrap1 to default_account  -arg "\"$account\""
 assert_balance $account "100 ꜩ"

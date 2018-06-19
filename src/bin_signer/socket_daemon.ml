@@ -11,7 +11,7 @@ open Signer_messages
 
 let log = Signer_logging.lwt_log_notice
 
-let run (cctxt : #Client_context.wallet) path =
+let run (cctxt : #Client_context.wallet) path ?magic_bytes ~require_auth =
   Lwt_utils_unix.Socket.bind path >>=? fun fd ->
   let rec loop () =
     Lwt_unix.accept fd >>= fun (fd, _) ->
@@ -19,13 +19,24 @@ let run (cctxt : #Client_context.wallet) path =
       Lwt_utils_unix.Socket.recv fd Request.encoding >>=? function
       | Sign req ->
           let encoding = result_encoding Sign.Response.encoding in
-          Handler.sign cctxt req.pkh req.data >>= fun res ->
+          Handler.sign cctxt req ?magic_bytes ~require_auth >>= fun res ->
           Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
           Lwt_unix.close fd >>= fun () ->
           return ()
       | Public_key pkh ->
           let encoding = result_encoding Public_key.Response.encoding in
           Handler.public_key cctxt pkh >>= fun res ->
+          Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
+          Lwt_unix.close fd >>= fun () ->
+          return ()
+      | Authorized_keys ->
+          let encoding = result_encoding Authorized_keys.Response.encoding in
+          begin if require_auth then
+              Handler.Authorized_key.load cctxt >>=? fun keys ->
+              return (Authorized_keys.Response.Authorized_keys
+                        (keys |> List.split |> snd |> List.map Signature.Public_key.hash))
+            else return Authorized_keys.Response.No_authentication
+          end >>= fun res ->
           Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
           Lwt_unix.close fd >>= fun () ->
           return ()

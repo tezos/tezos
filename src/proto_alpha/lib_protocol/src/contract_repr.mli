@@ -65,4 +65,5 @@ module Index : sig
   val contract_prefix: string -> string list
   val pkh_prefix_ed25519: string -> string list
   val pkh_prefix_secp256k1: string -> string list
+  val pkh_prefix_p256: string -> string list
 end

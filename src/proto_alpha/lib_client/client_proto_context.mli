@@ -98,7 +98,7 @@ val originate_contract:
   ?branch:int ->
   fee:Tez.t ->
   ?gas_limit:Z.t ->
-  ?storage_limit:Int64.t ->
+  ?storage_limit:Z.t ->
   delegate:public_key_hash option ->
   ?delegatable:bool ->
   ?spendable:bool ->
@@ -125,7 +125,7 @@ val transfer :
   amount:Tez.t ->
   fee:Tez.t ->
   ?gas_limit:Z.t ->
-  ?storage_limit:Int64.t ->
+  ?storage_limit:Z.t ->
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
 
@@ -162,4 +162,3 @@ val activate_account:
   activation_key ->
   string ->
   Kind.activate_account Injection.result tzresult Lwt.t
-

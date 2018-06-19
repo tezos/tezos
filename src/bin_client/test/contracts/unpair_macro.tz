@@ -1,3 +1,9 @@
-parameter unit;
-storage unit;
-code { UNIT; UNIT; UNIT; UNIT; PAIAAIR; UNPAIAAIR; DROP; DROP; DROP; DROP; CAR; NIL operation; PAIR }
+parameter (unit :param_unit);
+storage (unit :u1);
+code { DROP ;
+       UNIT :u4 @a4; UNIT :u3 @a3; UNIT :u2 @a2; UNIT :u1 @a1;
+       PAIR; UNPAIR @x1 @x2;
+       PPAIPAIR @p1 %x1 %x2 %x3 %x4; UNPPAIPAIR %x1 % %x3 %x4 @uno @due @tre @quattro;
+       PAPAPAIR @p2 %x1 %x2 %x3 %x4; UNPAPAPAIR @un @deux @trois @quatre;
+       PAPPAIIR @p3 %x1 %x2 %x3 %x4; UNPAPPAIIR @one @two @three @four;
+       DIP { DROP; DROP; DROP }; NIL operation; PAIR }

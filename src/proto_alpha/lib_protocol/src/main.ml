@@ -26,6 +26,7 @@ let operation_data_encoding = Alpha_context.Operation.protocol_data_encoding
 
 type operation_receipt = Apply_operation_result.packed_operation_metadata =
   | Operation_metadata : 'kind Apply_operation_result.operation_metadata -> operation_receipt
+  | No_operation_metadata: operation_receipt
 let operation_receipt_encoding =
   Apply_operation_result.operation_metadata_encoding
 
@@ -43,6 +44,9 @@ let acceptable_passes = Alpha_context.Operation.acceptable_passes
 let max_block_length =
   Alpha_context.Block_header.max_header_length
 
+let max_operation_data_length =
+  Alpha_context.Constants.max_operation_data_length
+
 let validation_passes =
   Updater.[ { max_size = 32 * 1024 ; max_op = Some 32 } ; (* 32kB FIXME *)
             { max_size = 32 * 1024 ; max_op = None } ; (* 32kB FIXME *)
@@ -50,10 +54,16 @@ let validation_passes =
               max_op = Some Alpha_context.Constants.max_revelations_per_block } ;
             { max_size = 512 * 1024 ; max_op = None } ] (* 512kB *)
 
-let rpc_services = Services_registration.get_rpc_services ()
+let rpc_services =
+  Alpha_services.register () ;
+  Services_registration.get_rpc_services ()
 
 type validation_mode =
   | Application of {
+      block_header : Alpha_context.Block_header.t ;
+      baker : Alpha_context.public_key_hash ;
+    }
+  | Partial_application of {
       block_header : Alpha_context.Block_header.t ;
       baker : Alpha_context.public_key_hash ;
     }
@@ -75,24 +85,33 @@ type validation_state =
 let current_context { ctxt ; _ } =
   return (Alpha_context.finalize ctxt).context
 
-let precheck_block
-    ~ancestor_context:_
-    ~ancestor_timestamp:_
-    _block_header =
-  (* TODO: decide what properties should be checked *)
-  return ()
-
-let begin_application
-    ~predecessor_context:ctxt
-    ~predecessor_timestamp:pred_timestamp
-    ~predecessor_fitness:pred_fitness
+let begin_partial_application
+    ~ancestor_context:ctxt
+    ~predecessor_timestamp
+    ~predecessor_fitness
     (block_header : Alpha_context.Block_header.t) =
   let level = block_header.shell.level in
-  let fitness = pred_fitness in
+  let fitness = predecessor_fitness in
   let timestamp = block_header.shell.timestamp in
   Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
-    ctxt block_header pred_timestamp >>=? fun (ctxt, baker) ->
+    ctxt block_header predecessor_timestamp >>=? fun (ctxt, baker) ->
+  let mode =
+    Partial_application
+      { block_header ; baker = Signature.Public_key.hash baker } in
+  return { mode ; ctxt ; op_count = 0 }
+
+let begin_application
+    ~predecessor_context:ctxt
+    ~predecessor_timestamp
+    ~predecessor_fitness
+    (block_header : Alpha_context.Block_header.t) =
+  let level = block_header.shell.level in
+  let fitness = predecessor_fitness in
+  let timestamp = block_header.shell.timestamp in
+  Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
+  Apply.begin_application
+    ctxt block_header predecessor_timestamp >>=? fun (ctxt, baker) ->
   let mode = Application { block_header ; baker = Signature.Public_key.hash baker } in
   return { mode ; ctxt ; op_count = 0 }
 
@@ -128,20 +147,31 @@ let begin_construction
 let apply_operation
     ({ mode ; ctxt ; op_count ; _ } as data)
     (operation : Alpha_context.packed_operation) =
-  let { shell ; protocol_data = Operation_data protocol_data } = operation in
-  let operation : _ Alpha_context.operation = { shell ; protocol_data } in
-  let predecessor =
-    match mode with
-    | Partial_construction { predecessor }
-    | Application
-        { block_header = { shell = { predecessor ; _ } ; _ } ; _ }
-    | Full_construction { predecessor ; _ } ->
-        predecessor in
-  Apply.apply_operation ctxt Optimized predecessor
-    (Alpha_context.Operation.hash operation)
-    operation >>=? fun (ctxt, result) ->
-  let op_count = op_count + 1 in
-  return ({ data with ctxt ; op_count }, Operation_metadata result)
+  match mode with
+  | Partial_application _ when
+      not (List.exists
+             (Compare.Int.equal 0)
+             (Alpha_context.Operation.acceptable_passes operation)) ->
+      (* Multipass validation only considers operations in pass 0. *)
+      let op_count = op_count + 1 in
+      return ({ data with ctxt ; op_count }, No_operation_metadata)
+  | _ ->
+      let { shell ; protocol_data = Operation_data protocol_data } = operation in
+      let operation : _ Alpha_context.operation = { shell ; protocol_data } in
+      let predecessor =
+        match mode with
+        | Partial_application
+            { block_header = { shell = { predecessor ; _ } ; _ } ; _ }
+        | Partial_construction { predecessor }
+        | Application
+            { block_header = { shell = { predecessor ; _ } ; _ } ; _ }
+        | Full_construction { predecessor ; _ } ->
+            predecessor in
+      Apply.apply_operation ctxt Optimized predecessor
+        (Alpha_context.Operation.hash operation)
+        operation >>=? fun (ctxt, result) ->
+      let op_count = op_count + 1 in
+      return ({ data with ctxt ; op_count }, Operation_metadata result)
 
 let finalize_block { mode ; ctxt ; op_count } =
   match mode with
@@ -155,6 +185,12 @@ let finalize_block { mode ; ctxt ; op_count } =
            Alpha_context.Delegate.freeze_deposit ctxt delegate deposit)
         (Alpha_context.get_deposits ctxt)
         (return ctxt) >>=? fun ctxt ->
+      let ctxt = Alpha_context.finalize ctxt in
+      return (ctxt, { Alpha_context.Block_header.baker ; level ;
+                      voting_period_kind })
+  | Partial_application { baker ; _ } ->
+      let level = Alpha_context. Level.current ctxt in
+      Alpha_context.Vote.get_current_period_kind ctxt >>=? fun voting_period_kind ->
       let ctxt = Alpha_context.finalize ctxt in
       return (ctxt, { Alpha_context.Block_header.baker ; level ;
                       voting_period_kind })
@@ -179,9 +215,9 @@ let compare_operations op1 op2 =
   let Operation_data op1 = op1.protocol_data in
   let Operation_data op2 = op2.protocol_data in
   match op1.contents, op2.contents with
-  | Single (Endorsements _), Single (Endorsements _) -> 0
-  | _, Single (Endorsements _) -> 1
-  | Single (Endorsements _), _ -> -1
+  | Single (Endorsement _), Single (Endorsement _) -> 0
+  | _, Single (Endorsement _) -> 1
+  | Single (Endorsement _), _ -> -1
 
   | Single (Seed_nonce_revelation _), Single (Seed_nonce_revelation _) -> 0
   | _, Single (Seed_nonce_revelation _) -> 1
@@ -209,13 +245,13 @@ let compare_operations op1 op2 =
 
   (* Manager operations with smaller counter are pre-validated first. *)
   | Single (Manager_operation op1), Single (Manager_operation op2) ->
-      Int32.compare op1.counter op2.counter
+      Z.compare op1.counter op2.counter
   | Cons (Manager_operation op1, _), Single (Manager_operation op2) ->
-      Int32.compare op1.counter op2.counter
+      Z.compare op1.counter op2.counter
   | Single (Manager_operation op1), Cons (Manager_operation op2, _) ->
-      Int32.compare op1.counter op2.counter
+      Z.compare op1.counter op2.counter
   | Cons (Manager_operation op1, _), Cons (Manager_operation op2, _) ->
-      Int32.compare op1.counter op2.counter
+      Z.compare op1.counter op2.counter
 
 let init ctxt block_header =
   let level = block_header.Block_header.level in

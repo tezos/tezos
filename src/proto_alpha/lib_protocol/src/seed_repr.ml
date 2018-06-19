@@ -91,20 +91,20 @@ let check_hash nonce hash =
 
 let nonce_hash_key_part = Nonce_hash.to_path
 
-let initial_nonce_0 =
-  MBytes.of_string (String.make Constants_repr.nonce_length '\000')
+let initial_nonce_0 = zero_bytes
 
 let initial_nonce_hash_0 =
   hash initial_nonce_0
 
+let deterministic_seed seed = nonce seed zero_bytes
+
 let initial_seeds n =
   let rec loop acc elt i =
-    if Compare.Int.(i = 0) then
+    if Compare.Int.(i = 1) then
       List.rev (elt :: acc)
     else
       loop
         (elt :: acc)
-        (nonce elt
-           (MBytes.of_string (String.make Constants_repr.nonce_length '\000')))
+        (deterministic_seed elt)
         (i-1) in
   loop [] (B (State_hash.hash_bytes [])) n

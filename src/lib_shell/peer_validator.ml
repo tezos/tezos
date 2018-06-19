@@ -265,7 +265,10 @@ let on_error w r st errs =
         ~peer:pv.peer_id
         ~timeout:pv.parameters.limits.protocol_timeout
         protocol >>= function
-      | Ok _ -> return ()
+      | Ok _ ->
+          Distributed_db.Request.current_head
+            pv.parameters.chain_db ~peer:pv.peer_id () ;
+          return ()
       | Error _ ->
           (* TODO: punish *)
           debug w

@@ -9,7 +9,7 @@
 
 type t =
   | Unaccounted
-  | Limited of { remaining : Int64.t }
+  | Limited of { remaining : Z.t }
 
 type error += Block_quota_exceeded (* `Temporary *)
 type error += Operation_quota_exceeded (* `Temporary *)
@@ -41,11 +41,11 @@ let consume block_storage operation_storage ~bytes = match operation_storage wit
   | Unaccounted -> ok (block_storage, Unaccounted)
   | Limited { remaining } ->
       let remaining =
-        Int64.sub remaining bytes in
+        Z.sub remaining bytes in
       let block_remaining =
-        Int64.sub block_storage bytes in
-      if Compare.Int64.(remaining < 0L)
+        Z.sub block_storage bytes in
+      if Compare.Z.(remaining < Z.zero)
       then error Operation_quota_exceeded
-      else if Compare.Int64.(block_remaining < 0L)
+      else if Compare.Z.(block_remaining < Z.zero)
       then error Block_quota_exceeded
       else ok (block_remaining, Limited { remaining })

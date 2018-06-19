@@ -14,7 +14,7 @@ module Kind : sig
   type double_endorsement_evidence = Double_endorsement_evidence_kind
   type double_baking_evidence = Double_baking_evidence_kind
   type activate_account = Activate_account_kind
-  type endorsements = Endorsements_kind
+  type endorsement = Endorsement_kind
   type proposals = Proposals_kind
   type ballot = Ballot_kind
   type reveal = Reveal_kind
@@ -52,18 +52,16 @@ and _ contents_list =
     (('kind * 'rest) Kind.manager ) contents_list
 
 and _ contents =
-  | Endorsements : {
-      block: Block_hash.t ;
+  | Endorsement : {
       level: Raw_level_repr.t ;
-      slots: int list ;
-    } -> Kind.endorsements contents
+    } -> Kind.endorsement contents
   | Seed_nonce_revelation : {
       level: Raw_level_repr.t ;
       nonce: Seed_repr.nonce ;
     } -> Kind.seed_nonce_revelation contents
   | Double_endorsement_evidence : {
-      op1: Kind.endorsements operation ;
-      op2: Kind.endorsements operation ;
+      op1: Kind.endorsement operation ;
+      op2: Kind.endorsement operation ;
     } -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
       bh1: Block_header_repr.t ;
@@ -90,7 +88,7 @@ and _ contents =
       counter: counter ;
       operation: 'kind manager_operation ;
       gas_limit: Z.t;
-      storage_limit: Int64.t;
+      storage_limit: Z.t;
     } -> 'kind Kind.manager contents
 
 and _ manager_operation =
@@ -112,7 +110,7 @@ and _ manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option -> Kind.delegation manager_operation
 
-and counter = Int32.t
+and counter = Z.t
 
 type 'kind internal_operation = {
   source: Contract_repr.contract ;
@@ -149,6 +147,7 @@ val manager_kind: 'kind manager_operation -> 'kind Kind.manager
 
 val encoding: packed_operation Data_encoding.t
 val contents_encoding: packed_contents Data_encoding.t
+val contents_list_encoding: packed_contents_list Data_encoding.t
 val protocol_data_encoding: packed_protocol_data Data_encoding.t
 val unsigned_operation_encoding: (Operation.shell_header * packed_contents_list) Data_encoding.t
 
@@ -156,6 +155,7 @@ val raw: _ operation -> raw
 
 val hash_raw: raw -> Operation_hash.t
 val hash: _ operation -> Operation_hash.t
+val hash_packed: packed_operation -> Operation_hash.t
 
 val acceptable_passes: packed_operation -> int list
 
@@ -164,6 +164,9 @@ type error += Invalid_signature (* `Permanent *)
 
 val check_signature:
   Signature.Public_key.t -> _ operation -> unit tzresult Lwt.t
+val check_signature_sync:
+  Signature.Public_key.t -> _ operation -> unit tzresult
+
 
 val internal_operation_encoding:
   packed_internal_operation Data_encoding.t
@@ -181,7 +184,7 @@ module Encoding : sig
                proj: 'b contents -> 'a ;
                inj: 'a -> 'b contents } -> 'b case
 
-  val endorsement_case: Kind.endorsements case
+  val endorsement_case: Kind.endorsement case
   val seed_nonce_revelation_case: Kind.seed_nonce_revelation case
   val double_endorsement_evidence_case: Kind.double_endorsement_evidence case
   val double_baking_evidence_case: Kind.double_baking_evidence case

@@ -58,7 +58,7 @@ let fixup_references uf =
   let rec fixup_layout = function
     | Ref s -> Ref (UF.find uf s).title
     | Enum (i, name) -> Enum (i, (UF.find uf name).title)
-    | Seq layout -> Seq (fixup_layout layout)
+    | Seq (layout, len) -> Seq (fixup_layout layout, len)
     | (Zero_width
       | Int _
       | Bool
@@ -295,15 +295,15 @@ let describe (type x) (encoding : x Encoding.t) =
           fields ref_name recursives references encoding.encoding
       | Delayed func ->
           fields ref_name recursives references (func ()).encoding
-      | List { encoding } ->
+      | List (len, { encoding }) ->
           let (layout, references) =
             layout None recursives references encoding in
-          ([ Anonymous_field (`Variable, Seq layout) ],
+          ([ Anonymous_field (`Variable, Seq (layout, len)) ],
            references)
-      | Array { encoding } ->
+      | Array (len, { encoding }) ->
           let (layout, references) =
             layout None recursives references encoding in
-          ([ Anonymous_field (`Variable, Seq layout) ],
+          ([ Anonymous_field (`Variable, Seq (layout, len)) ],
            references)
       | Bytes kind ->
           ([ Anonymous_field ((kind :> Kind.t), Bytes) ], references)
@@ -436,14 +436,14 @@ let describe (type x) (encoding : x Encoding.t) =
           let size, cases = enum tbl encoding_array in
           let references = add_reference name (Int_enum { size ; cases }) references in
           (Enum (size, name), references)
-      | Array data ->
+      | Array (len, data) ->
           let (descr, references) =
             layout None recursives references data.encoding in
-          (Seq descr, references)
-      | List data ->
+          (Seq (descr, len), references)
+      | List (len, data) ->
           let layout, references =
             layout None recursives references data.encoding in
-          (Seq layout, references)
+          (Seq (layout, len), references)
       | Obj (Req { encoding =  { encoding } })
       | Obj (Dft { encoding =  { encoding } }) ->
           layout ref_name recursives references encoding

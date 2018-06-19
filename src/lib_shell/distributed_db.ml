@@ -31,6 +31,7 @@ module Make_raw
        Distributed_db_functors.MEMORY_TABLE with type key := Hash.t)
     (Request_message : sig
        type param
+       val max_length : int
        val forge : param -> Hash.t list -> Message.t
      end)
     (Precheck : Distributed_db_functors.PRECHECK
@@ -40,8 +41,10 @@ module Make_raw
   module Request = struct
     type param = Request_message.param request_param
     let active { active } = active ()
-    let send { data ; send } gid keys =
-      send gid (Request_message.forge data keys)
+    let rec send state gid keys =
+      let first_keys, keys = List.split_n Request_message.max_length keys in
+      state.send gid (Request_message.forge state.data first_keys) ;
+      if keys <> [] then send state gid keys
   end
 
   module Scheduler =
@@ -82,6 +85,7 @@ module Raw_operation =
     (Operation_hash.Table)
     (struct
       type param = unit
+      let max_length = 10
       let forge () keys = Message.Get_operations keys
     end)
     (struct
@@ -112,6 +116,7 @@ module Raw_block_header =
     (Block_hash.Table)
     (struct
       type param = unit
+      let max_length = 10
       let forge () keys = Message.Get_block_headers keys
     end)
     (struct
@@ -164,6 +169,7 @@ module Raw_operation_hashes = struct
       (Operations_table)
       (struct
         type param = unit
+        let max_length = 10
         let forge () keys =
           Message.Get_operation_hashes_for_blocks keys
       end)
@@ -232,6 +238,7 @@ module Raw_operations = struct
       (Operations_table)
       (struct
         type param = unit
+        let max_length = 10
         let forge () keys =
           Message.Get_operations_for_blocks keys
       end)
@@ -281,6 +288,7 @@ module Raw_protocol =
     (Protocol_hash.Table)
     (struct
       type param = unit
+      let max_length = 10
       let forge () keys = Message.Get_protocols keys
     end)
     (struct

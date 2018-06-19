@@ -12,13 +12,20 @@
 type pk_uri = private Uri.t
 type sk_uri = private Uri.t
 
+val pk_uri_param :
+  ?name:string -> ?desc:string ->
+  ('a, 'b) Clic.params -> (pk_uri -> 'a, 'b) Clic.params
+val sk_uri_param :
+  ?name:string -> ?desc:string ->
+  ('a, 'b) Clic.params -> (sk_uri -> 'a, 'b) Clic.params
+
 type error += Unregistered_key_scheme of string
 type error += Invalid_uri of Uri.t
 
 module Public_key_hash :
   Client_aliases.Alias with type t = Signature.Public_key_hash.t
 module Public_key :
-  Client_aliases.Alias with type t = pk_uri
+  Client_aliases.Alias with type t = pk_uri * Signature.Public_key.t option
 module Secret_key :
   Client_aliases.Alias with type t = sk_uri
 
@@ -43,8 +50,10 @@ module type SIGNER = sig
   val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
   (** [public_key pk] is the Ed25519 version of [pk]. *)
 
-  val public_key_hash : pk_uri -> Signature.Public_key_hash.t tzresult Lwt.t
-  (** [public_key_hash pk] is the hash of [pk]. *)
+  val public_key_hash : pk_uri -> (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
+  (** [public_key_hash pk] is the hash of [pk].
+      As some signers will query the full public key to obtain the hash,
+      it can be optionally returned to reduce the amount of queries. *)
 
   val sign :
     ?watermark: Signature.watermark ->
@@ -62,15 +71,17 @@ val registered_signers : unit -> (string * (module SIGNER)) list
 
 val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
 
-val public_key_hash : pk_uri -> Signature.Public_key_hash.t tzresult Lwt.t
+val public_key_hash : pk_uri -> (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
 
 val neuterize : sk_uri -> pk_uri tzresult Lwt.t
 
 val sign :
+  #Client_context.wallet ->
   ?watermark:Signature.watermark ->
   sk_uri -> MBytes.t -> Signature.t tzresult Lwt.t
 
 val append :
+  #Client_context.wallet ->
   ?watermark:Signature.watermark ->
   sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
 
@@ -81,7 +92,9 @@ val check :
 val register_key :
   #Client_context.wallet ->
   ?force:bool ->
-  (Signature.Public_key_hash.t * pk_uri * sk_uri) -> string -> unit tzresult Lwt.t
+  (Signature.Public_key_hash.t * pk_uri * sk_uri) ->
+  ?public_key: Signature.Public_key.t ->
+  string -> unit tzresult Lwt.t
 
 val list_keys :
   #Client_context.wallet ->

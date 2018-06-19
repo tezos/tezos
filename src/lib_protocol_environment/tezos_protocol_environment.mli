@@ -28,7 +28,6 @@ module Make (Context : CONTEXT) : sig
     context: Context.t ;
     fitness: Fitness.t ;
     message: string option ;
-    max_operation_data_length: int ;
     max_operations_ttl: int ;
     last_allowed_fork_level: Int32.t ;
   }
@@ -51,6 +50,7 @@ module Make (Context : CONTEXT) : sig
     type rpc_context
     type 'a tzresult
     val max_block_length: int
+    val max_operation_data_length: int
     val validation_passes: quota list
     type block_header_data
     val block_header_data_encoding: block_header_data Data_encoding.t
@@ -74,11 +74,12 @@ module Make (Context : CONTEXT) : sig
     val compare_operations: operation -> operation -> int
     type validation_state
     val current_context: validation_state -> context tzresult Lwt.t
-    val precheck_block:
+    val begin_partial_application:
       ancestor_context: context ->
-      ancestor_timestamp: Time.t ->
+      predecessor_timestamp: Time.t ->
+      predecessor_fitness: Fitness.t ->
       block_header ->
-      unit tzresult Lwt.t
+      validation_state tzresult Lwt.t
     val begin_application:
       predecessor_context: context ->
       predecessor_timestamp: Time.t ->
@@ -140,6 +141,9 @@ module Make (Context : CONTEXT) : sig
        and type Secp256k1.Public_key_hash.t = Secp256k1.Public_key_hash.t
        and type Secp256k1.Public_key.t = Secp256k1.Public_key.t
        and type Secp256k1.t = Secp256k1.t
+       and type P256.Public_key_hash.t = P256.Public_key_hash.t
+       and type P256.Public_key.t = P256.Public_key.t
+       and type P256.t = P256.t
        and type Signature.public_key_hash = Signature.public_key_hash
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t

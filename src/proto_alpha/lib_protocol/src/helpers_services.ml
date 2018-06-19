@@ -76,7 +76,11 @@ module Scripts = struct
                        (list @@ obj3
                           (req "location" Script.location_encoding)
                           (req "gas" Gas.encoding)
-                          (req "stack" (list (Script.expr_encoding)))))
+                          (req "stack"
+                             (list
+                                (obj2
+                                   (req "item" (Script.expr_encoding))
+                                   (opt "annot" string))))))
                     (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
         RPC_path.(path / "trace_code")
 
@@ -119,9 +123,18 @@ module Scripts = struct
         ~query: RPC_query.empty
         RPC_path.(path / "hash_data")
 
+    let run_operation =
+      RPC_service.post_service
+        ~description:
+          "Run an operation without signature checks"
+        ~query: RPC_query.empty
+        ~input: Operation.encoding
+        ~output: Apply_operation_result.operation_data_and_metadata_encoding
+        RPC_path.(path / "run_operation")
+
   end
 
-  let () =
+  let register () =
     let open Services_registration in
     register0 S.run_code begin fun ctxt ()
       (code, storage, parameter, amount, contract) ->
@@ -172,10 +185,63 @@ module Scripts = struct
       begin match maybe_gas with
         | None -> return (Gas.set_unlimited ctxt)
         | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
-      Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ, _) ->
+      Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ) ->
       parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
       Script_ir_translator.hash_data ctxt typ data >>=? fun (hash, ctxt) ->
       return (hash, Gas.level ctxt)
+    end ;
+    register0 S.run_operation begin fun ctxt ()
+      { shell ; protocol_data = Operation_data protocol_data } ->
+      (* this code is a duplicate of Apply without signature check *)
+      let partial_precheck_manager_contents
+          (type kind) ctxt (op : kind Kind.manager contents)
+        : context tzresult Lwt.t =
+        let Manager_operation { source ; fee ; counter ; operation } = op in
+        Contract.must_be_allocated ctxt source >>=? fun () ->
+        Contract.check_counter_increment ctxt source counter >>=? fun () ->
+        begin
+          match operation with
+          | Reveal pk ->
+              Contract.reveal_manager_key ctxt source pk
+          | _ -> return ctxt
+        end >>=? fun ctxt ->
+        Contract.get_manager_key ctxt source >>=? fun _public_key ->
+        (* signature check unplugged from here *)
+        Contract.increment_counter ctxt source >>=? fun ctxt ->
+        Contract.spend ctxt source fee >>=? fun ctxt ->
+        return ctxt in
+      let rec partial_precheck_manager_contents_list
+        : type kind.
+          Alpha_context.t -> kind Kind.manager contents_list ->
+          context tzresult Lwt.t =
+        fun ctxt contents_list ->
+          match contents_list with
+          | Single (Manager_operation _ as op) ->
+              partial_precheck_manager_contents ctxt op
+          | Cons (Manager_operation _ as op, rest) ->
+              partial_precheck_manager_contents ctxt op >>=? fun ctxt ->
+              partial_precheck_manager_contents_list ctxt rest in
+      let return contents =
+        return (Operation_data protocol_data,
+                Apply_operation_result.Operation_metadata { contents }) in
+      let operation : _ operation = { shell ; protocol_data } in
+      let hash = Operation.hash { shell ; protocol_data } in
+      let ctxt = Contract.init_origination_nonce ctxt hash in
+      match protocol_data.contents with
+      | Single (Manager_operation _) as op ->
+          partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
+          Apply.apply_manager_contents_list ctxt Readable op >>= fun (_ctxt, result) ->
+          return result
+      | Cons (Manager_operation _, _) as op ->
+          partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
+          Apply.apply_manager_contents_list ctxt Readable op >>= fun (_ctxt, result) ->
+          return result
+      | _ ->
+          Apply.apply_contents_list
+            ctxt Readable shell.branch operation
+            operation.protocol_data.contents >>=? fun (_ctxt, result) ->
+          return result
+
     end
 
   let run_code ctxt block code (storage, input, amount, contract) =
@@ -194,6 +260,9 @@ module Scripts = struct
 
   let hash_data ctxt block =
     RPC_context.make_call0 S.hash_data ctxt block ()
+
+  let run_operation ctxt block =
+    RPC_context.make_call0 S.run_operation ctxt block ()
 
 end
 
@@ -234,7 +303,7 @@ module Forge = struct
 
   end
 
-  let () =
+  let register () =
     let open Services_registration in
     register0_noctxt S.operations begin fun () (shell, proto) ->
       return (Data_encoding.Binary.to_bytes_exn
@@ -278,7 +347,7 @@ module Forge = struct
     let reveal ctxt
         block ~branch ~source ~sourcePubKey ~counter ~fee () =
       operations ctxt block ~branch ~source ~sourcePubKey ~counter ~fee
-        ~gas_limit:Z.zero ~storage_limit:0L []
+        ~gas_limit:Z.zero ~storage_limit:Z.zero []
 
     let transaction ctxt
         block ~branch ~source ?sourcePubKey ~counter
@@ -310,7 +379,7 @@ module Forge = struct
     let delegation ctxt
         block ~branch ~source ?sourcePubKey ~counter ~fee delegate =
       operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
-        ~gas_limit:Z.zero ~storage_limit:0L
+        ~gas_limit:Z.zero ~storage_limit:Z.zero
         [Manager (Delegation delegate)]
 
   end
@@ -321,9 +390,9 @@ module Forge = struct
       () ({ branch }, Contents_list (Single operation))
 
   let endorsement ctxt
-      b ~branch ~block ~level ~slots () =
+      b ~branch ~level () =
     operation ctxt b ~branch
-      (Endorsements { block ; level ; slots })
+      (Endorsement { level })
 
   let proposals ctxt
       b ~branch ~source ~period ~proposals () =
@@ -391,7 +460,7 @@ module Parse = struct
     | None -> failwith "Cant_parse_protocol_data"
     | Some protocol_data -> return protocol_data
 
-  let () =
+  let register () =
     let open Services_registration in
     register0 S.operations begin fun _ctxt () (operations, check) ->
       map_s begin fun raw ->
@@ -452,7 +521,10 @@ module S = struct
 
 end
 
-let () =
+let register () =
+  Scripts.register () ;
+  Forge.register () ;
+  Parse.register () ;
   let open Services_registration in
   register0 S.current_level begin fun ctxt q () ->
     let level = Level.current ctxt in

@@ -12,14 +12,18 @@ open Alpha_context
 open Tezos_micheline
 open Script_typed_ir
 open Script_tc_errors
+open Script_ir_annot
 open Script_ir_translator
 open Script_interpreter
 open Michelson_v1_printer
 
-let print_ty (type t) ppf (annot, (ty : t ty)) =
-  unparse_ty annot ty
+let print_ty (type t) ppf (ty : t ty) =
+  unparse_ty ty
   |> Micheline.strip_locations
   |> Michelson_v1_printer.print_expr_unwrapped ppf
+
+let print_var_annot ppf annot =
+  List.iter (Format.fprintf ppf "@ %s") (unparse_var_annot annot)
 
 let print_stack_ty (type t) ?(depth = max_int) ppf (s : t stack_ty) =
   let rec loop
@@ -29,11 +33,14 @@ let print_stack_ty (type t) ?(depth = max_int) ppf (s : t stack_ty) =
       | _ when depth <= 0 ->
           Format.fprintf ppf "..."
       | Item_t (last, Empty_t, annot) ->
-          Format.fprintf ppf "%a"
-            print_ty (annot, last)
+          Format.fprintf ppf "%a%a"
+            print_ty last
+            print_var_annot annot
       | Item_t (last, rest, annot) ->
-          Format.fprintf ppf "%a :@ %a"
-            print_ty (annot, last) (loop (depth - 1)) rest in
+          Format.fprintf ppf "%a%a@ :@ %a"
+            print_ty last
+            print_var_annot annot
+            (loop (depth - 1)) rest in
   match s with
   | Empty_t ->
       Format.fprintf ppf "[]"
@@ -65,6 +72,7 @@ let collect_error_locations errs =
         (Invalid_arity (loc, _, _, _)
         | Inconsistent_type_annotations (loc, _, _)
         | Unexpected_annotation loc
+        | Ungrouped_annotations loc
         | Type_too_large (loc, _, _)
         | Invalid_namespace (loc, _, _, _)
         | Invalid_primitive (loc, _, _)
@@ -82,8 +90,8 @@ let collect_error_locations errs =
         | Invalid_constant (loc, _, _)
         | Invalid_contract (loc, _)
         | Comparable_type_expected (loc, _)
-        | Overflow loc
-        | Reject loc) :: rest ->
+        | Overflow (loc, _)
+        | Reject (loc, _)) :: rest ->
         collect (loc :: acc) rest
     | _ :: rest -> collect acc rest in
   collect [] errs
@@ -148,7 +156,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
              | Some s -> Format.fprintf ppf "%s " s)
           name
           print_source (parsed, hilights)
-          print_ty (None, ty) ;
+          print_ty ty ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
     | Alpha_environment.Ecoproto_error (Ill_formed_type (_, expr, loc)) :: rest ->
@@ -325,14 +333,14 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  @[<hov 2>and@ %a.@]@]"
                 print_loc loc
                 (Michelson_v1_primitives.string_of_prim name)
-                print_ty (None, tya)
-                print_ty (None, tyb)
+                print_ty tya
+                print_ty tyb
           | Undefined_unop (loc, name, ty) ->
               Format.fprintf ppf
                 "@[<hov 0>@[<hov 2>%aoperator %s is undefined on@ %a@]@]"
                 print_loc loc
                 (Michelson_v1_primitives.string_of_prim name)
-                print_ty (None, ty)
+                print_ty ty
           | Bad_return (loc, got, exp) ->
               Format.fprintf ppf
                 "@[<v 2>%awrong stack type at end of body:@,\
@@ -358,20 +366,32 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           | Inconsistent_annotations (annot1, annot2) ->
               Format.fprintf ppf
                 "@[<v 2>The two annotations do not match:@,\
-                 - @[<hov>%s@]@,\
-                 - @[<hov>%s@]"
-                annot1 annot2
+                 - @[<v>%s@]@,\
+                 - @[<v>%s@]@]"
+                annot1
+                annot2
+          | Inconsistent_field_annotations (annot1, annot2) ->
+              Format.fprintf ppf
+                "@[<v 2>The field access annotation does not match:@,\
+                 - @[<v>%s@]@,\
+                 - @[<v>%s@]@]"
+                annot1
+                annot2
           | Inconsistent_type_annotations (loc, ty1, ty2) ->
               Format.fprintf ppf
                 "@[<v 2>%athe two types contain incompatible annotations:@,\
                  - @[<hov>%a@]@,\
-                 - @[<hov>%a@]"
+                 - @[<hov>%a@]@]"
                 print_loc loc
-                print_ty (None, ty1)
-                print_ty (None, ty2)
+                print_ty ty1
+                print_ty ty2
           | Unexpected_annotation loc ->
               Format.fprintf ppf
                 "@[<v 2>%aunexpected annotation."
+                print_loc loc
+          | Ungrouped_annotations loc ->
+              Format.fprintf ppf
+                "@[<v 2>%aAnnotations of the same kind must be grouped."
                 print_loc loc
           | Type_too_large (loc, size, maximum_size) ->
               Format.fprintf ppf
@@ -395,7 +415,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  @[<hov 2>is invalid for type@ %a.@]@]"
                 print_loc loc
                 print_expr got
-                print_ty (None, exp)
+                print_ty exp
           | Invalid_contract (loc, contract) ->
               Format.fprintf ppf
                 "%ainvalid contract %a."
@@ -404,19 +424,33 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               Format.fprintf ppf "%acomparable type expected."
                 print_loc loc ;
               Format.fprintf ppf "@[<hov 0>@[<hov 2>Type@ %a@]@ is not comparable.@]"
-                print_ty (None, ty)
+                print_ty ty
           | Inconsistent_types (tya, tyb) ->
               Format.fprintf ppf
                 "@[<hov 0>@[<hov 2>Type@ %a@]@ \
                  @[<hov 2>is not compatible with type@ %a.@]@]"
-                print_ty (None, tya)
-                print_ty (None, tyb)
-          | Reject loc ->
-              Format.fprintf ppf "%ascript reached FAIL instruction"
+                print_ty tya
+                print_ty tyb
+          | Reject (loc, trace) ->
+              Format.fprintf ppf
+                "%ascript reached FAIL instruction@ \
+                 %a"
                 print_loc loc
-          | Overflow loc ->
-              Format.fprintf ppf "%aunexpected arithmetic overflow"
+                (fun ppf -> function
+                   | None -> ()
+                   | Some trace ->
+                       Format.fprintf ppf "@,@[<v 2>trace@,%a@]"
+                         print_execution_trace trace)
+                trace
+          | Overflow (loc, trace) ->
+              Format.fprintf ppf "%aunexpected arithmetic overflow%a"
                 print_loc loc
+                (fun ppf -> function
+                   | None -> ()
+                   | Some trace ->
+                       Format.fprintf ppf "@,@[<v 2>trace@,%a@]"
+                         print_execution_trace trace)
+                trace
           | err -> Format.fprintf ppf "%a" Alpha_environment.Error_monad.pp err
         end ;
         if rest <> [] then Format.fprintf ppf "@," ;

@@ -12,8 +12,9 @@ open Store_sigs
 type t
 type global_store = t
 
-(** Open or initialize a store at a given path. *)
-val init: string -> t tzresult Lwt.t
+(** [init ~mapsize path] returns an initialized store at [path] of
+    maximum capacity [mapsize] bytes. *)
+val init: ?mapsize:int64 -> string -> t tzresult Lwt.t
 val close : t -> unit
 
 
@@ -88,7 +89,6 @@ module Block : sig
     header: Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
-    max_operation_data_length: int;
     context: Context_hash.t ;
     metadata: MBytes.t ;
   }

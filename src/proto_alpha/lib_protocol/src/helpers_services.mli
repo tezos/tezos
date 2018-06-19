@@ -52,6 +52,10 @@ module Scripts : sig
     'a #RPC_context.simple ->
     'a -> Script.expr * Script.expr * Z.t option -> (string * Gas.t) shell_tzresult Lwt.t
 
+  val run_operation:
+    'a #RPC_context.simple ->
+    'a -> packed_operation ->
+    (packed_protocol_data * Apply_operation_result.packed_operation_metadata) shell_tzresult Lwt.t
 
 end
 
@@ -64,10 +68,10 @@ module Forge : sig
       branch:Block_hash.t ->
       source:Contract.t ->
       ?sourcePubKey:public_key ->
-      counter:int32 ->
+      counter:counter ->
       fee:Tez.t ->
       gas_limit:Z.t ->
-      storage_limit:Int64.t ->
+      storage_limit:Z.t ->
       packed_manager_operation list -> MBytes.t shell_tzresult Lwt.t
 
     val reveal:
@@ -75,7 +79,7 @@ module Forge : sig
       branch:Block_hash.t ->
       source:Contract.t ->
       sourcePubKey:public_key ->
-      counter:int32 ->
+      counter:counter ->
       fee:Tez.t ->
       unit -> MBytes.t shell_tzresult Lwt.t
 
@@ -84,12 +88,12 @@ module Forge : sig
       branch:Block_hash.t ->
       source:Contract.t ->
       ?sourcePubKey:public_key ->
-      counter:int32 ->
+      counter:counter ->
       amount:Tez.t ->
       destination:Contract.t ->
       ?parameters:Script.expr ->
       gas_limit:Z.t ->
-      storage_limit:Int64.t ->
+      storage_limit:Z.t ->
       fee:Tez.t ->
       unit -> MBytes.t shell_tzresult Lwt.t
 
@@ -98,7 +102,7 @@ module Forge : sig
       branch:Block_hash.t ->
       source:Contract.t ->
       ?sourcePubKey:public_key ->
-      counter:int32 ->
+      counter:counter ->
       managerPubKey:public_key_hash ->
       balance:Tez.t ->
       ?spendable:bool ->
@@ -106,7 +110,7 @@ module Forge : sig
       ?delegatePubKey: public_key_hash ->
       ?script:Script.t ->
       gas_limit:Z.t ->
-      storage_limit:Int64.t ->
+      storage_limit:Z.t ->
       fee:Tez.t->
       unit -> MBytes.t shell_tzresult Lwt.t
 
@@ -115,7 +119,7 @@ module Forge : sig
       branch:Block_hash.t ->
       source:Contract.t ->
       ?sourcePubKey:public_key ->
-      counter:int32 ->
+      counter:counter ->
       fee:Tez.t ->
       public_key_hash option ->
       MBytes.t shell_tzresult Lwt.t
@@ -125,9 +129,7 @@ module Forge : sig
   val endorsement:
     'a #RPC_context.simple -> 'a ->
     branch:Block_hash.t ->
-    block:Block_hash.t ->
     level:Raw_level.t ->
-    slots:int list ->
     unit -> MBytes.t shell_tzresult Lwt.t
 
   val proposals:
@@ -176,3 +178,5 @@ module Parse : sig
     Block_header.protocol_data shell_tzresult Lwt.t
 
 end
+
+val register: unit -> unit

@@ -11,6 +11,35 @@ open Alpha_context
 
 let custom_root = RPC_path.open_root
 
+module Seed = struct
+
+  module S = struct
+
+    open Data_encoding
+
+    let seed =
+      RPC_service.post_service
+        ~description: "Seed of the cycle to which the block belongs."
+        ~query: RPC_query.empty
+        ~input: empty
+        ~output: Seed.seed_encoding
+        RPC_path.(custom_root / "context" / "seed")
+
+  end
+
+  let () =
+    let open Services_registration in
+    register0 S.seed begin fun ctxt () () ->
+      let l = Level.current ctxt in
+      Seed.for_cycle ctxt l.cycle
+    end
+
+
+  let get ctxt block =
+    RPC_context.make_call0 S.seed ctxt block () ()
+
+end
+
 module Nonce = struct
 
   type info =
@@ -49,7 +78,7 @@ module Nonce = struct
 
   end
 
-  let () =
+  let register () =
     let open Services_registration in
     register1 S.get begin fun ctxt raw_level () () ->
       let level = Level.from_raw ctxt raw_level in
@@ -71,3 +100,10 @@ module Delegate = Delegate_services
 module Helpers = Helpers_services
 module Forge = Helpers_services.Forge
 module Parse = Helpers_services.Parse
+
+let register () =
+  Contract.register () ;
+  Constants.register () ;
+  Delegate.register () ;
+  Helpers.register () ;
+  Nonce.register ()

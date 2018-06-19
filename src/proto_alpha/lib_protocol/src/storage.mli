@@ -90,9 +90,9 @@ module Contract : sig
       module `Contract`. *)
 
   module Global_counter : sig
-    val get : Raw_context.t -> int32 tzresult Lwt.t
-    val set : Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
-    val init : Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
+    val get : Raw_context.t -> Z.t tzresult Lwt.t
+    val set : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
+    val init : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
   end
 
   (** The domain of alive contracts *)
@@ -159,15 +159,15 @@ module Contract : sig
 
   module Counter : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = int32
+     and type value = Z.t
      and type t := Raw_context.t
 
-  module Code : Indexed_carbonated_data_storage
+  module Code : Non_iterable_indexed_carbonated_data_storage
     with type key = Contract_repr.t
      and type value = Script_repr.lazy_expr
      and type t := Raw_context.t
 
-  module Storage : Indexed_carbonated_data_storage
+  module Storage : Non_iterable_indexed_carbonated_data_storage
     with type key = Contract_repr.t
      and type value = Script_repr.lazy_expr
      and type t := Raw_context.t
@@ -176,7 +176,7 @@ module Contract : sig
       Includes code, global storage and big map elements. *)
   module Used_storage_space : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Int64.t
+     and type value = Z.t
      and type t := Raw_context.t
 
   (** Total fees burnt for storage space. *)
@@ -187,7 +187,7 @@ module Contract : sig
 
   type bigmap_key = Raw_context.t * Contract_repr.t
 
-  module Big_map : Indexed_carbonated_data_storage
+  module Big_map : Non_iterable_indexed_carbonated_data_storage
     with type key = string
      and type value = Script_repr.expr
      and type t := bigmap_key

@@ -152,6 +152,8 @@ let wrap_state_init f base_dir =
     let store_root = base_dir // "store" in
     let context_root = base_dir // "context" in
     State.read
+      ~store_mapsize:4_096_000_000L
+      ~context_mapsize:4_096_000_000L
       ~store_root
       ~context_root
       genesis >>=? fun (state, chain) ->

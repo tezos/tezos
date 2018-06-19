@@ -164,7 +164,7 @@ protocols.
     used for the chain data, and the raw versioned key-value store
     used for storing the ledger's context (one version per
     block). This is implemented using :opam:`irmin` and currently
-    :opam:`leveldb`.
+    :opam:`lmdb`.
   - :package:`tezos-protocol-updater` maintains the table of available
     protocol versions, embedded or dynamically linked.
   - :package:`tezos-shell` implements the scheduling of block
@@ -317,6 +317,10 @@ The Final Executables
     node. It also provides a shell script that configures a shell
     environment to interact with a sandboxed node.
   - :package:`tezos-baker-alpha` provides the ``tezos-alpha-baker``
+    binary.
+  - :package:`tezos-endorser-alpha` provides the ``tezos-alpha-endorser``
+    binary.
+  - :package:`tezos-accuser-alpha` provides the ``tezos-alpha-accuser``
     binary.
   - :package:`tezos-protocol-compiler` provides the
     ``tezos-protocol-compiler`` binary that is used by the node to

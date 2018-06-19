@@ -264,7 +264,7 @@ let commands () =
        @@ Clic.param ~name:"signature" ~desc:"the signature to check"
          signature_parameter
        @@ stop)
-      (fun quiet hashed (_, key_locator) signature (cctxt : #Proto_alpha.full) ->
+      (fun quiet hashed (_, (key_locator, _)) signature (cctxt : #Proto_alpha.full) ->
          Client_keys.check key_locator signature hashed >>=? fun res ->
          begin
            if quiet

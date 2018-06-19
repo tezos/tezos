@@ -120,10 +120,9 @@ let delegatable_switch =
     ()
 
 let tez_format =
-  "Text format: `D,DDD,DDD.DDD,DDD`.\n\
+  "Text format: `DDDDDDD.DDDDDD`.\n\
    Tez and mutez and separated by a period sign. Trailing and pending \
-   zeroes are allowed. Commas are optional, but if present they must \
-   be placed every 3 digits."
+   zeroes are allowed."
 
 let tez_parameter param =
   parameter
@@ -172,8 +171,8 @@ let storage_limit_arg =
           of letting the client decide based on a simulation"
     (parameter (fun _ s ->
          try
-           let v = Int64.of_string s in
-           assert Compare.Int64.(v >= 0L) ;
+           let v = Z.of_string s in
+           assert Compare.Z.(v >= Z.zero) ;
            return v
          with _ -> failwith "invalid storage limit (must be a positive number of bytes)"))
 

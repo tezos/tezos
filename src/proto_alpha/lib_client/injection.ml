@@ -42,13 +42,13 @@ let preapply (type t)
       ({ branch }, Contents_list contents) in
   let watermark =
     match contents with
-    | Single (Endorsements _) -> Signature.Endorsement
+    | Single (Endorsement _) -> Signature.Endorsement
     | _ -> Signature.Generic_operation in
   begin
     match src_sk with
     | None -> return None
     | Some src_sk ->
-        Client_keys.sign
+        Client_keys.sign cctxt
           ~watermark src_sk bytes >>=? fun signature ->
         return (Some signature)
   end >>=? fun signature ->
@@ -59,6 +59,26 @@ let preapply (type t)
   Alpha_block_services.Helpers.Preapply.operations
     cctxt ~chain ~block [Operation.pack op] >>=? function
   | [(Operation_data op', Operation_metadata result)] -> begin
+      match Operation.equal
+              op { shell = { branch } ; protocol_data = op' },
+            Apply_operation_result.kind_equal_list contents result.contents with
+      | Some Operation.Eq, Some Apply_operation_result.Eq ->
+          return ((oph, op, result) : t preapply_result)
+      | _ -> failwith "Unexpected result"
+    end
+  | _ -> failwith "Unexpected result"
+
+let simulate (type t)
+    (cctxt: #Proto_alpha.full) ~chain ~block
+    ?branch (contents : t contents_list) =
+  get_branch cctxt ~chain ~block branch >>=? fun branch ->
+  let op : _ Operation.t =
+    { shell = { branch } ;
+      protocol_data = { contents ; signature = None } } in
+  let oph = Operation.hash op in
+  Alpha_services.Helpers.Scripts.run_operation
+    cctxt (chain, block) (Operation.pack op) >>=? function
+  | (Operation_data op', Operation_metadata result) -> begin
       match Operation.equal
               op { shell = { branch } ; protocol_data = op' },
             Apply_operation_result.kind_equal_list contents result.contents with
@@ -106,15 +126,15 @@ let estimated_storage_single
     match result with
     | Applied (Transaction_result { storage_size_diff }) -> Ok storage_size_diff
     | Applied (Origination_result { storage_size_diff }) -> Ok storage_size_diff
-    | Applied Reveal_result -> Ok Int64.zero
-    | Applied Delegation_result -> Ok Int64.zero
+    | Applied Reveal_result -> Ok Z.zero
+    | Applied Delegation_result -> Ok Z.zero
     | Skipped _ -> assert false
     | Failed (_, errs) -> Alpha_environment.wrap_error (Error errs) in
   List.fold_left
     (fun acc (Internal_operation_result (_, r)) ->
        acc >>? fun acc ->
        storage_size_diff r >>? fun storage ->
-       Ok (Int64.add acc storage))
+       Ok (Z.add acc storage))
     (storage_size_diff operation_result) internal_operation_results
 
 let estimated_storage res =
@@ -125,9 +145,9 @@ let estimated_storage res =
     | Cons_result (res, rest) ->
         estimated_storage_single res >>? fun storage1 ->
         estimated_storage rest >>? fun storage2 ->
-        Ok (Int64.add storage1 storage2) in
+        Ok (Z.add storage1 storage2) in
   estimated_storage res >>? fun diff ->
-  Ok (max 0L diff)
+  Ok (max Z.zero diff)
 
 let originated_contracts_single
     (type kind)
@@ -197,7 +217,7 @@ let detect_script_failure :
 
 let may_patch_limits
     (type kind) (cctxt : #Proto_alpha.full) ~chain ~block ?branch
-    ?src_sk (contents: kind contents_list) : kind contents_list tzresult Lwt.t =
+    (contents: kind contents_list) : kind contents_list tzresult Lwt.t =
   Alpha_services.Constants.all cctxt
     (chain, block) >>=? fun { parametric = {
       hard_gas_limit_per_operation = gas_limit ;
@@ -206,15 +226,15 @@ let may_patch_limits
   let may_need_patching_single
     : type kind. kind contents -> kind contents option = function
     | Manager_operation c
-      when c.gas_limit < Z.zero || gas_limit < c.gas_limit
-           || c.storage_limit < 0L || storage_limit < c.storage_limit ->
+      when c.gas_limit < Z.zero || gas_limit <= c.gas_limit
+           || c.storage_limit < Z.zero || storage_limit <= c.storage_limit ->
         let gas_limit =
-          if c.gas_limit < Z.zero || gas_limit < c.gas_limit then
+          if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
             gas_limit
           else
             c.gas_limit in
         let storage_limit =
-          if c.storage_limit < 0L || storage_limit < c.storage_limit then
+          if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
             storage_limit
           else
             c.storage_limit in
@@ -241,7 +261,7 @@ let may_patch_limits
     type kind. kind contents * kind contents_result -> kind contents tzresult Lwt.t = function
     | Manager_operation c, (Manager_operation_result _ as result) ->
         begin
-          if c.gas_limit < Z.zero || gas_limit < c.gas_limit then
+          if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
             Lwt.return (estimated_gas_single result) >>=? fun gas ->
             begin
               if Z.equal gas Z.zero then
@@ -256,17 +276,17 @@ let may_patch_limits
           else return c.gas_limit
         end >>=? fun gas_limit ->
         begin
-          if c.storage_limit < 0L || storage_limit < c.storage_limit then
+          if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
             Lwt.return (estimated_storage_single result) >>=? fun storage ->
             begin
-              if Int64.equal storage 0L then
+              if Z.equal storage Z.zero then
                 cctxt#message "Estimated storage: no bytes added" >>= fun () ->
-                return 0L
+                return Z.zero
               else
                 cctxt#message
-                  "Estimated storage: %Ld bytes added (will add 20 for safety)"
-                  storage >>= fun () ->
-                return (Int64.add storage 20L)
+                  "Estimated storage: %s bytes added (will add 20 for safety)"
+                  (Z.to_string storage) >>= fun () ->
+                return (Z.add storage (Z.of_int 20))
             end
           else return c.storage_limit
         end >>=? fun storage_limit ->
@@ -287,8 +307,7 @@ let may_patch_limits
       end in
   match may_need_patching contents with
   | Some contents ->
-      preapply cctxt ~chain ~block
-        ?branch ?src_sk contents >>=? fun (_, _, result) ->
+      simulate cctxt ~chain ~block ?branch contents >>=? fun (_, _, result) ->
       let res = pack_contents_list contents result.contents in
       patch_list res
   | None -> return contents
@@ -297,7 +316,7 @@ let inject_operation
     (type kind) cctxt ~chain ~block
     ?confirmations ?branch ?src_sk (contents: kind contents_list)  =
   may_patch_limits
-    cctxt ~chain ~block ?branch ?src_sk contents >>=? fun contents ->
+    cctxt ~chain ~block ?branch contents >>=? fun contents ->
   preapply cctxt ~chain ~block
     ?branch ?src_sk contents >>=? fun (_oph, op, result) ->
   begin match detect_script_failure result with
@@ -322,14 +341,17 @@ let inject_operation
         cctxt#message "Waiting for the operation to be included..." >>= fun () ->
         Client_confirmations.wait_for_operation_inclusion
           ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
-        Alpha_block_services.Operation.operation
+        Alpha_block_services.Operations.operation
           cctxt ~block:(`Hash (h, 0)) i j >>=? fun op' ->
-        let Operation_metadata receipt = op'.receipt in
-        match Apply_operation_result.kind_equal_list contents receipt.contents
-        with
-        | Some Apply_operation_result.Eq ->
-            return (receipt : kind operation_metadata)
-        | None -> failwith "Internal error: unexpected receipt."
+        match op'.receipt with
+        | No_operation_metadata ->
+            failwith "Internal error: unexpected receipt."
+        | Operation_metadata receipt ->
+            match Apply_operation_result.kind_equal_list contents receipt.contents
+            with
+            | Some Apply_operation_result.Eq ->
+                return (receipt : kind operation_metadata)
+            | None -> failwith "Internal error: unexpected receipt."
   end >>=? fun result ->
   cctxt#message
     "@[<v 2>This sequence of operations was run:@,%a@]"
@@ -346,12 +368,12 @@ let inject_operation
 
 let inject_manager_operation
     cctxt ~chain ~block ?branch ?confirmations
-    ~source ~src_pk ~src_sk ~fee ?(gas_limit = Z.minus_one) ?(storage_limit = -1L)
+    ~source ~src_pk ~src_sk ~fee ?(gas_limit = Z.minus_one) ?(storage_limit = (Z.of_int (-1)))
     (type kind) (operation : kind manager_operation)
   : (Operation_hash.t * kind Kind.manager contents *  kind Kind.manager contents_result) tzresult Lwt.t =
   Alpha_services.Contract.counter
     cctxt (chain, block) source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
+  let counter = Z.succ pcounter in
   Alpha_services.Contract.manager_key
     cctxt (chain, block) source >>=? fun (_, key) ->
   let is_reveal : type kind. kind manager_operation -> bool = function
@@ -362,9 +384,9 @@ let inject_manager_operation
       let contents =
         Cons
           (Manager_operation { source ; fee = Tez.zero ; counter ;
-                               gas_limit = Z.zero ; storage_limit = 0L ;
+                               gas_limit = Z.zero ; storage_limit = Z.zero ;
                                operation = Reveal src_pk },
-           Single (Manager_operation { source ; fee ; counter = Int32.succ counter ;
+           Single (Manager_operation { source ; fee ; counter = Z.succ counter ;
                                        gas_limit ; storage_limit ; operation })) in
       inject_operation cctxt ~chain ~block ?confirmations
         ?branch ~src_sk contents >>=? fun (oph, op, result) ->
@@ -384,4 +406,3 @@ let inject_manager_operation
       | Single_and_result (Manager_operation _ as op, result) ->
           return (oph, op, result)
       | _ -> assert false (* Grrr... *)
-

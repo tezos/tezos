@@ -19,6 +19,7 @@ module Prefix : sig
   val context_hash: string
   val ed25519_public_key_hash: string
   val secp256k1_public_key_hash: string
+  val p256_public_key_hash: string
   val cryptobox_public_key_hash: string
   val ed25519_seed: string
   val ed25519_public_key: string
@@ -27,6 +28,9 @@ module Prefix : sig
   val secp256k1_public_key: string
   val secp256k1_secret_key: string
   val secp256k1_signature: string
+  val p256_public_key: string
+  val p256_secret_key: string
+  val p256_signature: string
   val generic_signature: string
   val chain_id: string
 

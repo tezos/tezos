@@ -91,7 +91,7 @@ let regular () =
   transfer_and_check_balances b new_contract contract Tez.one_cent >>=? fun _ ->
 
   (* Delegatable *)
-  Context.get_endorser (B b) 0 >>=? fun account ->
+  Context.get_endorser (B b) >>=? fun (account, _slots) ->
   Op.delegation (B b) new_contract (Some account) >>=? fun operation ->
   Block.bake ~operation b >>=? fun _ ->
   return ()
@@ -123,7 +123,7 @@ let unspendable () =
 
 let undelegatable fee () =
   register_origination ~delegatable:false () >>=? fun (b, _, new_contract) ->
-  Context.get_endorser (B b) 0 >>=? fun account ->
+  Context.get_endorser (B b) >>=? fun (account, _slots) ->
   Incremental.begin_construction b >>=? fun i ->
   Context.Contract.balance (I i) new_contract >>=? fun balance ->
   (* FIXME need Context.Contract.delegate: cf. delegation tests
@@ -233,22 +233,22 @@ let not_tez_in_contract_to_pay_fee () =
 (* change the manager/delegate of this account to the account
    of endorser *)
 
-let register_contract_get_ownership slot () =
+let register_contract_get_ownership () =
   Context.init 1 >>=? fun (b, contracts) ->
   let contract = List.hd contracts in
   Incremental.begin_construction b >>=? fun inc ->
-  Context.get_endorser (I inc) slot >>=? fun account_endorser ->
+  Context.get_endorser (I inc) >>=? fun (account_endorser, _slots) ->
   return (inc, contract, account_endorser)
 
 let change_manager () =
-  register_contract_get_ownership 0 () >>=? fun (inc, contract, account_endorser) ->
+  register_contract_get_ownership () >>=? fun (inc, contract, account_endorser) ->
   Op.origination ~manager:account_endorser (I inc) ~credit:Tez.one contract >>=? fun (op, _) ->
   Incremental.add_operation inc op >>=? fun inc ->
   Incremental.finalize_block inc >>=? fun _ ->
   return ()
 
 let change_delegate () =
-  register_contract_get_ownership 0 () >>=? fun (inc, contract, account_endorser) ->
+  register_contract_get_ownership () >>=? fun (inc, contract, account_endorser) ->
   Op.origination ~delegate:account_endorser (I inc) ~credit:Tez.one contract >>=? fun (op, _) ->
   Incremental.add_operation inc op >>=? fun inc ->
   Incremental.finalize_block inc >>=? fun _ ->

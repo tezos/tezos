@@ -23,6 +23,8 @@ val product : 'a list -> 'b list -> ('a * 'b) list
     is provided, it returns the [n] greatest element of [l]. *)
 val take_n: ?compare:('a -> 'a -> int) -> int -> 'a list -> 'a list
 
+val split_n: int -> 'a list -> 'a list * 'a list
+
 (** Bounded sequence: keep only the [n] greatest elements. *)
 module Bounded(E: Set.OrderedType) : sig
   type t

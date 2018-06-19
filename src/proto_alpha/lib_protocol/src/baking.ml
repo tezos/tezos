@@ -12,10 +12,8 @@ open Alpha_context
 open Misc
 
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
-type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
-type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
-type error += Empty_endorsement
+type error += Unexpected_endorsement (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
 type error += Invalid_signature  (* `Permanent *)
 type error += Invalid_stamp  (* `Permanent *)
@@ -50,32 +48,6 @@ let () =
     (fun (m, g) -> Invalid_fitness_gap (m, g)) ;
   register_error_kind
     `Permanent
-    ~id:"baking.invalid_slot"
-    ~title:"Invalid slot"
-    ~description:"The baking slot is out of bounds"
-    ~pp:(fun ppf (m, g) ->
-        Format.fprintf ppf
-          "The baking slot %d is not between 0 and %d" g m)
-    Data_encoding.(obj2
-                     (req "maximum" int16)
-                     (req "provided" int16))
-    (function Invalid_endorsement_slot (m, g)   -> Some (m, g) | _ -> None)
-    (fun (m, g) -> Invalid_endorsement_slot (m, g)) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.inconsisten_endorsement"
-    ~title:"Multiple delegates for a single endorsement"
-    ~description:"The operation tries to endorse slots with distinct delegates"
-    ~pp:(fun ppf l ->
-        Format.fprintf ppf
-          "@[<v 2>The endorsement is inconsistent. Delegates:@ %a@]"
-          (Format.pp_print_list Signature.Public_key_hash.pp) l)
-    Data_encoding.(obj1
-                     (req "delegates" (list Signature.Public_key_hash.encoding)))
-    (function Inconsistent_endorsement l -> Some l | _ -> None)
-    (fun l -> Inconsistent_endorsement l) ;
-  register_error_kind
-    `Permanent
     ~id:"baking.invalid_block_signature"
     ~title:"Invalid block signature"
     ~description:
@@ -108,8 +80,18 @@ let () =
         Format.fprintf ppf "Insufficient proof-of-work stamp")
     Data_encoding.empty
     (function Invalid_stamp -> Some () | _ -> None)
-    (fun () -> Invalid_stamp)
-
+    (fun () -> Invalid_stamp) ;
+  register_error_kind
+    `Permanent
+    ~id:"baking.unexpected_endorsement"
+    ~title:"Endorsement from unexpected delegate"
+    ~description:"The operation is signed by a delegate without endorsement rights."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf
+          "The endorsement is signed by a delegate without endorsement rights.")
+    Data_encoding.unit
+    (function Unexpected_endorsement -> Some () | _ -> None)
+    (fun () -> Unexpected_endorsement)
 
 let minimal_time c priority pred_timestamp =
   let priority = Int32.of_int priority in
@@ -154,19 +136,6 @@ let check_baking_rights c { Block_header.priority ; _ }
   check_timestamp c priority pred_timestamp >>=? fun () ->
   return delegate
 
-let check_endorsements_rights c level slots =
-  map_p (fun slot ->
-      fail_unless Compare.Int.(0 <= slot && slot <= Constants.endorsers_per_block c)
-        (Invalid_endorsement_slot (Constants.endorsers_per_block c, slot)) >>=? fun () ->
-      Roll.endorsement_rights_owner c level ~slot)
-    slots >>=? function
-  | [] -> fail Empty_endorsement
-  | delegate :: delegates as all_delegates ->
-      fail_unless
-        (List.for_all (fun d -> Signature.Public_key.equal d delegate) delegates)
-        (Inconsistent_endorsement (List.map Signature.Public_key.hash all_delegates)) >>=? fun () ->
-      return delegate
-
 type error += Incorrect_priority
 
 let endorsement_reward ctxt ~block_priority:prio n =
@@ -184,12 +153,38 @@ let baking_priorities c level =
   in
   f 0
 
-let endorsement_priorities c level =
-  let rec f slot =
-    Roll.endorsement_rights_owner c level ~slot >>=? fun delegate ->
-    return (LCons (delegate, (fun () -> f (succ slot))))
-  in
-  f 0
+let endorsement_rights c level =
+  fold_left_s
+    (fun acc slot ->
+       Roll.endorsement_rights_owner c level ~slot >>=? fun pk ->
+       let pkh = Signature.Public_key.hash pk in
+       let right =
+         match Signature.Public_key_hash.Map.find_opt pkh acc with
+         | None -> (pk, [slot], false)
+         | Some (pk, slots, used) -> (pk, slot :: slots, used) in
+       return (Signature.Public_key_hash.Map.add pkh right acc))
+    Signature.Public_key_hash.Map.empty
+    (0 --> (Constants.endorsers_per_block c - 1))
+
+let check_endorsement_rights ctxt (op : Kind.endorsement Operation.t) =
+  let current_level = Level.current ctxt in
+  let Single (Endorsement { level ; _ }) = op.protocol_data.contents in
+  begin
+    if Raw_level.(succ level = current_level.level) then
+      return (Alpha_context.allowed_endorsements ctxt)
+    else
+      endorsement_rights ctxt (Level.from_raw ctxt level)
+  end >>=? fun endorsements ->
+  match
+    Signature.Public_key_hash.Map.fold (* no find_first *)
+      (fun pkh (pk, slots, used) acc ->
+         match Operation.check_signature_sync pk op with
+         | Error _ -> acc
+         | Ok () -> Some (pkh, slots, used))
+      endorsements None
+  with
+  | None -> fail Unexpected_endorsement
+  | Some v -> return v
 
 let select_delegate delegate delegate_list max_priority =
   let rec loop acc l n =
@@ -211,13 +206,6 @@ let first_baking_priorities
     ?(max_priority = 32)
     delegate level =
   baking_priorities ctxt level >>=? fun delegate_list ->
-  select_delegate delegate delegate_list max_priority
-
-let first_endorsement_slots
-    ctxt
-    ?(max_priority = Constants.endorsers_per_block ctxt)
-    delegate level =
-  endorsement_priorities ctxt level >>=? fun delegate_list ->
   select_delegate delegate delegate_list max_priority
 
 let check_hash hash stamp_threshold =

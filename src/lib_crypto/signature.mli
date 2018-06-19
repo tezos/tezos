@@ -10,14 +10,17 @@
 type public_key_hash =
   | Ed25519 of Ed25519.Public_key_hash.t
   | Secp256k1 of Secp256k1.Public_key_hash.t
+  | P256 of P256.Public_key_hash.t
 
 type public_key =
   | Ed25519 of Ed25519.Public_key.t
   | Secp256k1 of Secp256k1.Public_key.t
+  | P256 of P256.Public_key.t
 
 type secret_key =
   | Ed25519 of Ed25519.Secret_key.t
   | Secp256k1 of Secp256k1.Secret_key.t
+  | P256 of P256.Secret_key.t
 
 type watermark =
   | Block_header
@@ -42,9 +45,14 @@ val concat : MBytes.t -> t -> MBytes.t
 
 include S.RAW_DATA with type t := t
 
+val of_secp256k1 : Secp256k1.t -> t
+val of_ed25519 : Ed25519.t -> t
+val of_p256 : P256.t -> t
+
 type algo =
   | Ed25519
   | Secp256k1
+  | P256
 
 val algo_param: unit -> (algo, 'a) Clic.parameter
 

@@ -156,3 +156,5 @@ val baking_rights:
   Alpha_context.t ->
   int option ->
   (Raw_level.t * (public_key_hash * Time.t option) list) tzresult Lwt.t
+
+val register: unit -> unit

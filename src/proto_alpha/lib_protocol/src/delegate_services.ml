@@ -160,7 +160,7 @@ module S = struct
 
 end
 
-let () =
+let register () =
   let open Services_registration in
   register0 S.list_delegate begin fun ctxt q () ->
     Delegate.list ctxt >>= fun delegates ->
@@ -377,7 +377,7 @@ module Baking_rights = struct
       ([], Signature.Public_key_hash.Set.empty)
       rights
 
-  let () =
+  let register () =
     let open Services_registration in
     register0 S.baking_rights begin fun ctxt q () ->
       requested_levels
@@ -460,7 +460,7 @@ module Endorsing_rights = struct
       RPC_service.get_service
         ~description:
           "Retrieves the delegates allowed to endorse a block.\n\
-           By default, it gives the endorsement slots for bakers that \
+           By default, it gives the endorsement slots for delegates that \
            have at least one in the next block.\n\
            Parameters `level` and `cycle` can be used to specify the \
            (valid) level(s) in the past or future at which the \
@@ -480,27 +480,15 @@ module Endorsing_rights = struct
   end
 
   let endorsement_slots ctxt (level, estimated_time) =
-    let max_slot = Constants.endorsers_per_block ctxt in
-    Baking.endorsement_priorities ctxt level >>=? fun contract_list ->
-    let build (delegate, slots) = {
-      level = level.level ; delegate ; slots ; estimated_time
-    } in
-    let rec loop l map slot =
-      if Compare.Int.(slot >= max_slot) then
-        return (List.map build (Signature.Public_key_hash.Map.bindings map))
-      else
-        let Misc.LCons (pk, next) = l in
-        let delegate = Signature.Public_key.hash pk in
-        let slots =
-          match Signature.Public_key_hash.Map.find_opt delegate map with
-          | None -> [slot]
-          | Some slots -> slot :: slots in
-        let map = Signature.Public_key_hash.Map.add delegate slots map in
-        next () >>=? fun l ->
-        loop l map (slot+1) in
-    loop contract_list Signature.Public_key_hash.Map.empty 0
+    Baking.endorsement_rights ctxt level >>=? fun rights ->
+    return
+      (Signature.Public_key_hash.Map.fold
+         (fun delegate (_, slots, _) acc -> {
+              level = level.level ; delegate ; slots ; estimated_time
+            } :: acc)
+         rights [])
 
-  let () =
+  let register () =
     let open Services_registration in
     register0 S.endorsing_rights begin fun ctxt q () ->
       requested_levels
@@ -524,6 +512,11 @@ module Endorsing_rights = struct
 
 end
 
+let register () =
+  register () ;
+  Baking_rights.register () ;
+  Endorsing_rights.register ()
+
 let endorsement_rights ctxt level =
   Endorsing_rights.endorsement_slots ctxt (level, None) >>=? fun l ->
   return (List.map (fun { Endorsing_rights.delegate ; _ } -> delegate) l)
@@ -536,4 +529,3 @@ let baking_rights ctxt max_priority =
           List.map
             (fun { Baking_rights.delegate ; timestamp ; _ } ->
                (delegate, timestamp)) l)
-

@@ -43,6 +43,13 @@ val take_int32 : sequence -> int32 -> int32 * sequence
 (** {2 Predefined seeds} *****************************************************)
 
 val empty : seed
+
+(** Returns a new seed by hashing the one passed with a constant. *)
+val deterministic_seed : seed -> seed
+
+(** [intial_seeds n] generates the first [n] seeds for which there are no nonces.
+    The first seed is a constant value. The kth seed is the hash of seed (k-1)
+    concatenated with a constant. *)
 val initial_seeds : int -> seed list
 
 (** {2 Entropy} **************************************************************)

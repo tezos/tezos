@@ -234,7 +234,7 @@ module Real = struct
         ~f:begin fun _peer_id conn acc ->
           (P2p_pool.is_readable conn >>= function
             | Ok () -> Lwt.return (Some conn)
-            | Error _ -> Lwt_utils.never_ending) :: acc
+            | Error _ -> Lwt_utils.never_ending ()) :: acc
         end in
     Lwt.pick (
       ( P2p_pool.Pool_event.wait_new_connection net.pool >>= fun () ->
@@ -448,8 +448,8 @@ let faked_network peer_cfg faked_metadata = {
   global_stat = (fun () -> Fake.empty_stat) ;
   get_peer_metadata = (fun _ -> peer_cfg.peer_meta_initial) ;
   set_peer_metadata = (fun _ _ -> ()) ;
-  recv = (fun _ -> Lwt_utils.never_ending) ;
-  recv_any = (fun () -> Lwt_utils.never_ending) ;
+  recv = (fun _ -> Lwt_utils.never_ending ()) ;
+  recv_any = (fun () -> Lwt_utils.never_ending ()) ;
   send = (fun _ _ -> fail P2p_errors.Connection_closed) ;
   try_send = (fun _ _ -> false) ;
   fold_connections = (fun ~init ~f:_ -> init) ;

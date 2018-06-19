@@ -19,9 +19,9 @@ module Int32 = struct
   let encoding = Data_encoding.int32
 end
 
-module Int64 = struct
-  type t = Int64.t
-  let encoding = Data_encoding.int64
+module Z = struct
+  type t = Z.t
+  let encoding = Data_encoding.z
 end
 
 module Int_index = struct
@@ -84,7 +84,7 @@ module Contract = struct
     Make_single_data_storage
       (Raw_context)
       (struct let name = ["global_counter"] end)
-      (Int32)
+      (Z)
 
   module Indexed_context =
     Make_indexed_subcontext
@@ -158,23 +158,23 @@ module Contract = struct
   module Counter =
     Indexed_context.Make_map
       (struct let name = ["counter"] end)
-      (Int32)
+      (Z)
 
   module Code =
     Indexed_context.Make_carbonated_map
       (struct let name = ["code"] end)
-      (Make_carbonated_value(struct
-         type t = Script_repr.lazy_expr
-         let encoding = Script_repr.lazy_expr_encoding
-       end))
+      (struct
+        type t = Script_repr.lazy_expr
+        let encoding = Script_repr.lazy_expr_encoding
+      end)
 
   module Storage =
     Indexed_context.Make_carbonated_map
       (struct let name = ["storage"] end)
-      (Make_carbonated_value(struct
-         type t = Script_repr.lazy_expr
-         let encoding = Script_repr.lazy_expr_encoding
-       end))
+      (struct
+        type t = Script_repr.lazy_expr
+        let encoding = Script_repr.lazy_expr_encoding
+      end)
 
   type bigmap_key = Raw_context.t * Contract_repr.t
 
@@ -184,10 +184,10 @@ module Contract = struct
          (Indexed_context.Raw_context)
          (struct let name = ["big_map"] end))
       (String_index)
-      (Make_carbonated_value (struct
-         type t = Script_repr.expr
-         let encoding = Script_repr.expr_encoding
-       end))
+      (struct
+        type t = Script_repr.expr
+        let encoding = Script_repr.expr_encoding
+      end)
 
   module Paid_storage_space_fees =
     Indexed_context.Make_map
@@ -197,7 +197,7 @@ module Contract = struct
   module Used_storage_space =
     Indexed_context.Make_map
       (struct let name = ["used_bytes"] end)
-      (Int64)
+      (Z)
 
   module Roll_list =
     Indexed_context.Make_map
@@ -534,6 +534,17 @@ let () =
        List.map
          (function
            | Contract_repr.Implicit (Secp256k1 pkh) -> pkh
+           | Contract_repr.Implicit _ -> assert false
+           | Contract_repr.Originated _ -> assert false)
+         l) ;
+  Raw_context.register_resolvers
+    P256.Public_key_hash.b58check_encoding
+    (fun ctxt p ->
+       let p = Contract_repr.Index.pkh_prefix_p256 p in
+       Contract.Indexed_context.resolve ctxt p >|= fun l ->
+       List.map
+         (function
+           | Contract_repr.Implicit (P256 pkh) -> pkh
            | Contract_repr.Implicit _ -> assert false
            | Contract_repr.Originated _ -> assert false)
          l)

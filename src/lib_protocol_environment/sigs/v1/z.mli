@@ -13,6 +13,9 @@ type t
 val zero: t
 val one: t
 
+val succ: t -> t
+(** Returns its argument plus one. *)
+
 val abs: t -> t
 (** Absolute value. *)
 

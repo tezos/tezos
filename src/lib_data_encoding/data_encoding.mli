@@ -169,16 +169,22 @@ module Encoding: sig
       - encoded as the concatenation of all the element in binary
        prefixed its length in bytes
 
+      If [max_length] is passed and the encoding of elements has fixed
+      size, a {!check_size} is automatically added for earlier rejection.
+
       @raise [Invalid_argument] if the inner encoding is variable. *)
-  val array : 'a encoding -> 'a array encoding
+  val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
   (** List combinator.
       - encoded as an array in JSON
       - encoded as the concatenation of all the element in binary
        prefixed its length in bytes
 
+      If [max_length] is passed and the encoding of elements has fixed
+      size, a {!check_size} is automatically added for earlier rejection.
+
       @raise [Invalid_argument] if the inner encoding is also variable. *)
-  val list : 'a encoding -> 'a list encoding
+  val list : ?max_length:int -> 'a encoding -> 'a list encoding
 
   (** Provide a transformer from one encoding to a different one.
 
@@ -419,16 +425,18 @@ module Encoding: sig
   (** Create encodings that produce data of a variable length when binary encoded.
       See the preamble for an explanation. *)
   module Variable : sig
+
     val string : string encoding
     val bytes : MBytes.t encoding
 
     (** @raises [Invalid_argument] if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
-    val array : 'a encoding -> 'a array encoding
+    val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
     (** @raises [Invalid_argument] if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
-    val list : 'a encoding -> 'a list encoding
+    val list : ?max_length:int -> 'a encoding -> 'a list encoding
+
   end
 
   module Bounded : sig
@@ -631,6 +639,8 @@ module Binary: sig
     | Invalid_float of { min : float ; v : float ; max : float }
     | Trailing_zero
     | Size_limit_exceeded
+    | List_too_long
+    | Array_too_long
   exception Read_error of read_error
   val pp_read_error: Format.formatter -> read_error -> unit
 
@@ -643,6 +653,8 @@ module Binary: sig
     | Invalid_bytes_length of { expected : int ; found : int }
     | Invalid_string_length of { expected : int ; found : int }
     | Invalid_natural
+    | List_too_long
+    | Array_too_long
   val pp_write_error : Format.formatter -> write_error -> unit
   exception Write_error of write_error
 

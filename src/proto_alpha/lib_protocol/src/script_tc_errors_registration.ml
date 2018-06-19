@@ -17,21 +17,22 @@ open Script_ir_translator
 (* Helpers for encoding *)
 let type_map_enc =
   let open Data_encoding in
+  let stack_enc = list (tup2 Script.expr_encoding (list string)) in
   list
     (conv
        (fun (loc, (bef, aft)) -> (loc, bef, aft))
        (fun (loc, bef, aft) -> (loc, (bef, aft)))
        (obj3
           (req "location" Script.location_encoding)
-          (req "stackBefore" (list Script.expr_encoding))
-          (req "stackAfter" (list Script.expr_encoding))))
+          (req "stackBefore" stack_enc)
+          (req "stackAfter" stack_enc)))
 
 let ex_ty_enc =
   Data_encoding.conv
-    (fun (Ex_ty ty) -> strip_locations (unparse_ty None ty))
+    (fun (Ex_ty ty) -> strip_locations (unparse_ty ty))
     (fun expr ->
        match parse_ty ~allow_big_map:true ~allow_operation:true (root expr) with
-       | Ok (Ex_ty ty, _) -> Ex_ty ty
+       | Ok ty -> ty
        | _ -> assert false)
     Script.expr_encoding
 
@@ -63,6 +64,8 @@ let () =
                   "string", String_kind ;
                   "primitiveApplication", Prim_kind ;
                   "sequence", Seq_kind ] in
+  let var_annot_enc =
+    conv (function `Var_annot x -> x)  (function x -> `Var_annot x) string in
   let ex_stack_ty_enc =
     let rec unfold = function
       | Ex_stack_ty (Item_t (ty, rest, annot)) ->
@@ -73,7 +76,7 @@ let () =
           let Ex_stack_ty rest = fold rest in
           Ex_stack_ty (Item_t (ty, rest, annot))
       | [] -> Ex_stack_ty Empty_t in
-    conv unfold fold (list (tup2 ex_ty_enc (option string))) in
+    conv unfold fold (list (tup2 ex_ty_enc (option var_annot_enc))) in
   (* -- Structure errors ---------------------- *)
   (* Invalid arity *)
   register_error_kind
@@ -332,6 +335,18 @@ let () =
     (function Inconsistent_annotations (annot1, annot2) -> Some (annot1, annot2)
             | _ -> None)
     (fun (annot1, annot2) -> Inconsistent_annotations (annot1, annot2)) ;
+  (* Inconsistent field annotations *)
+  register_error_kind
+    `Permanent
+    ~id:"inconsistentFieldAnnotations"
+    ~title:"Annotations for field accesses is inconsistent"
+    ~description:"The specified field does not match the field annotation in the type"
+    (obj2
+       (req "annot1" string)
+       (req "annot2" string))
+    (function Inconsistent_field_annotations (annot1, annot2) -> Some (annot1, annot2)
+            | _ -> None)
+    (fun (annot1, annot2) -> Inconsistent_field_annotations (annot1, annot2)) ;
   (* Inconsistent type annotations *)
   register_error_kind
     `Permanent
@@ -355,6 +370,16 @@ let () =
     (function Unexpected_annotation loc -> Some (loc, ())
             | _ -> None)
     (fun (loc, ()) -> Unexpected_annotation loc);
+  (* Unexpected annotation *)
+  register_error_kind
+    `Permanent
+    ~id:"ungroupedAnnotations"
+    ~title:"Annotations of the same kind were found spread apart"
+    ~description:"Annotations of the same kind must be grouped"
+    (located empty)
+    (function Ungrouped_annotations loc -> Some (loc, ())
+            | _ -> None)
+    (fun (loc, ()) -> Ungrouped_annotations loc);
   (* Unmatched branches *)
   register_error_kind
     `Permanent

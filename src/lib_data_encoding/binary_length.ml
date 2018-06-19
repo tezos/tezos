@@ -71,11 +71,15 @@ let rec length : type x. x Encoding.t -> x -> int =
     | Ignore -> 0
     | Bytes `Variable -> MBytes.length value
     | String `Variable -> String.length value
-    | Array e ->
+    | Array (Some max_length, _e) when Array.length value > max_length ->
+        raise (Write_error Array_too_long)
+    | Array (_, e) ->
         Array.fold_left
           (fun acc v -> length e v + acc)
           0 value
-    | List e ->
+    | List (Some max_length, _e) when List.length value > max_length ->
+        raise (Write_error List_too_long)
+    | List (_, e) ->
         List.fold_left
           (fun acc v -> length e v + acc)
           0 value

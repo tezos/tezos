@@ -29,7 +29,7 @@ let sig_algo_arg =
     ~doc:"use custom signature algorithm"
     ~long:"sig"
     ~short:'s'
-    ~placeholder:"ed25519|secp256k1"
+    ~placeholder:"ed25519|secp256k1|p256"
     ~default: "ed25519"
     (Signature.algo_param ())
 
@@ -166,15 +166,7 @@ let commands () : Client_context.io_wallet Clic.command list =
       (prefix "import"
        @@ prefixes [ "secret" ; "key" ]
        @@ Secret_key.fresh_alias_param
-       @@ param
-         ~name:"uri"
-         ~desc:"secret key\n\
-                Varies from one scheme to the other.\n\
-                Use command `list signing schemes` for more \
-                information."
-         (parameter (fun _ s ->
-              try return (Client_keys.make_sk_uri @@ Uri.of_string s)
-              with Failure s -> failwith "Error while parsing uri: %s" s))
+       @@ Client_keys.sk_uri_param
        @@ stop)
       (fun force name sk_uri (cctxt : Client_context.io_wallet) ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
@@ -182,35 +174,33 @@ let commands () : Client_context.io_wallet Clic.command list =
          begin
            Public_key.find_opt cctxt name >>=? function
            | None -> return ()
-           | Some pk ->
-               fail_unless (pk_uri = pk || force)
+           | Some (pk_uri_found, _) ->
+               fail_unless (pk_uri = pk_uri_found || force)
                  (failure
                     "public and secret keys '%s' don't correspond, \
                      please don't use -force" name)
          end >>=? fun () ->
-         Client_keys.public_key_hash pk_uri >>=? fun pkh ->
-         register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
+         Client_keys.public_key_hash pk_uri >>=? fun (pkh, public_key) ->
+         cctxt#message
+           "Tezos address added: %a"
+           Signature.Public_key_hash.pp pkh >>= fun () ->
+         register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name) ;
 
     command ~group ~desc: "Add a public key to the wallet."
       (args1 (Public_key.force_switch ()))
       (prefix "import"
        @@ prefixes [ "public" ; "key" ]
        @@ Public_key.fresh_alias_param
-       @@ param
-         ~name:"uri"
-         ~desc:"public key\n\
-                Varies from one scheme to the other.\n\
-                Use command `list signing schemes` for more \
-                information."
-         (parameter (fun _ s ->
-              try return (Client_keys.make_pk_uri @@ Uri.of_string s)
-              with Failure s -> failwith "Error while parsing uri: %s" s))
+       @@ Client_keys.pk_uri_param
        @@ stop)
       (fun force name pk_uri (cctxt : Client_context.io_wallet) ->
          Public_key.of_fresh cctxt force name >>=? fun name ->
-         Client_keys.public_key_hash pk_uri >>=? fun pkh ->
+         Client_keys.public_key_hash pk_uri >>=? fun (pkh, public_key) ->
          Public_key_hash.add ~force cctxt name pkh >>=? fun () ->
-         Public_key.add ~force cctxt name pk_uri) ;
+         cctxt#message
+           "Tezos address added: %a"
+           Signature.Public_key_hash.pp pkh >>= fun () ->
+         Public_key.add ~force cctxt name (pk_uri, public_key)) ;
 
     command ~group ~desc: "Add an identity to the wallet."
       (args1 (Public_key.force_switch ()))

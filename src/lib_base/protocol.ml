@@ -53,6 +53,11 @@ let encoding =
        (req "expected_env_version" env_version_encoding)
        (req "components" (list component_encoding)))
 
+let bounded_encoding ?max_size () =
+  match max_size with
+  | None -> encoding
+  | Some max_size -> Data_encoding.check_size max_size encoding
+
 let pp ppf op =
   Data_encoding.Json.pp ppf
     (Data_encoding.Json.construct encoding op)

@@ -73,15 +73,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         print_expr storage
         (Format.pp_print_list Operation_result.pp_internal_operation) operations
         print_big_map_diff maybe_big_map_diff
-        (Format.pp_print_list
-           (fun ppf (loc, gas, stack) ->
-              Format.fprintf ppf
-                "- @[<v 0>location: %d (remaining gas: %a)@,\
-                 [ @[<v 0>%a ]@]@]"
-                loc Gas.pp gas
-                (Format.pp_print_list print_expr)
-                stack))
-        trace >>= fun () ->
+        print_execution_trace trace >>= fun () ->
       return ()
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
@@ -133,7 +125,7 @@ let hash_and_sign
     sk =
   Alpha_services.Helpers.Scripts.hash_data
     cctxt (chain, block) (data.expanded, typ.expanded, gas) >>=? fun (hash, gas) ->
-  Client_keys.sign sk (MBytes.of_string hash) >>=? fun signature ->
+  Client_keys.sign cctxt sk (MBytes.of_string hash) >>=? fun signature ->
   return (hash, Signature.to_b58check signature, gas)
 
 let typecheck_data
