@@ -54,19 +54,6 @@ let generate_seed_nonce () =
   | Error _errs -> assert false
   | Ok nonce -> nonce
 
-let rec retry_call f ?(msg="Call error") ?(n=5) () =
-  f () >>= function
-  | Ok r -> return r
-  | (Error errs) as x ->
-      if n > 0 then
-        begin
-          lwt_log_error "%s\n%a\nRetrying..."
-            msg pp_print_error errs >>= fun () ->
-          Lwt_unix.sleep 1. >>= retry_call f ~msg ~n:(n-1)
-        end
-      else
-        Lwt.return x
-
 let forge_block_header
     (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block delegate_sk shell priority seed_nonce_hash =
@@ -621,12 +608,16 @@ let bake_slot
         errs >>= fun () ->
       return None
   | Ok operations ->
-      retry_call
+      Tezos_stdlib_unix.Lwt_utils_unix.retry
+        ~log:(fun errs ->
+          lwt_log_error
+            "Error while prevalidating operations\n%a\nRetrying..."
+            pp_print_error errs
+          )
         (fun () ->
            Alpha_block_services.Helpers.Preapply.block
              cctxt ~chain ~block
              ~timestamp ~sort:true ~protocol_data operations)
-        ~msg:"Error while prevalidating operations" ()
       >>= function
       | Error errs ->
           lwt_log_error "Error while prevalidating operations:@\n%a"
