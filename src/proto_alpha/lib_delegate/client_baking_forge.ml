@@ -13,6 +13,15 @@ open Alpha_context
 include Logging.Make(struct let name = "client.baking" end)
 
 
+(* The index of the different components of the protocol's validation passes *)
+(* TODO: ideally, we would like this to be more abstract and possibly part of
+   the protocol, while retaining the generality of lists *)
+let endorsements_index = 0
+let votes_index = 1
+let anonymous_index = 2
+let managers_index = 3
+
+
 type state = {
   genesis: Block_hash.t ;
   index : Context.index ;
@@ -184,14 +193,15 @@ let classify_operations (ops: Proto_alpha.operation list) =
     ops ;
   let t = Array.map List.rev t in
   (* Retrieve the maximum paying manager operations *)
-  let manager_operations = t.(3) in
-  let { Alpha_environment.Updater.max_size } = List.nth Proto_alpha.Main.validation_passes 3 in
+  let manager_operations = t.(managers_index) in
+  let { Alpha_environment.Updater.max_size } =
+    List.nth Proto_alpha.Main.validation_passes managers_index in
   sort_operations_by_fee manager_operations >>=? fun ordered_operations ->
   let max_operations =
     retain_operations_up_to_quota ordered_operations max_size
   in
   (* TODO ? : should preserve mempool order  *)
-  t.(3) <- max_operations;
+  t.(managers_index) <- max_operations;
   return @@ Array.fold_right (fun ops acc -> ops :: acc) t []
 
 let parse (op : Operation.raw) : Operation.packed =
@@ -501,10 +511,10 @@ let filter_invalid_operations (cctxt : #full) state block_info (operations : pac
   lwt_debug "Starting client-side validation %a"
     Block_hash.pp block_info.Client_baking_blocks.hash >>= fun () ->
   begin_construction cctxt state.index block_info >>=? fun initial_inc ->
-  let endorsements = List.nth operations 0 in
-  let votes = List.nth operations 1 in
-  let anonymous = List.nth operations 2 in
-  let managers = List.nth operations 3 in
+  let endorsements = List.nth operations endorsements_index in
+  let votes = List.nth operations votes_index in
+  let anonymous = List.nth operations anonymous_index in
+  let managers = List.nth operations managers_index in
   let validate_operation inc op =
     add_operation inc op >>= function
     | Error errs ->
@@ -549,9 +559,13 @@ let filter_invalid_operations (cctxt : #full) state block_info (operations : pac
         List.sub (List.rev endorsements) constants.Constants.parametric.endorsers_per_block
       in
       let votes =
-        retain_operations_up_to_quota (List.rev votes) (List.nth quota 1).max_size in
+        retain_operations_up_to_quota
+          (List.rev votes)
+          (List.nth quota votes_index).max_size in
       let anonymous =
-        retain_operations_up_to_quota (List.rev anonymous) (List.nth quota 2).max_size in
+        retain_operations_up_to_quota
+          (List.rev anonymous)
+          (List.nth quota anonymous_index).max_size in
       (* manager operations size check already occured in classify operations *)
       return @@ List.map List.rev [ endorsements ; votes ; anonymous ; managers ]
 
