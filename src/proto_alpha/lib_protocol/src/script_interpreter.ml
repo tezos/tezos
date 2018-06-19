@@ -429,6 +429,9 @@ let rec interp
             else
               Lwt.return (Gas.consume ctxt (Interp_costs.slice_string 0)) >>=? fun ctxt ->
               logged_return (Item ("", rest), ctxt)
+        | String_size, Item (s, rest) ->
+            Lwt.return (Gas.consume ctxt Interp_costs.push) >>=? fun ctxt ->
+            logged_return (Item (Script_int.(abs (of_int (String.length s))), rest), ctxt)
         (* bytes operations *)
         | Concat_bytes, Item (ss, rest) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.concat_bytes ss)) >>=? fun ctxt ->
@@ -444,6 +447,9 @@ let rec interp
             else
               Lwt.return (Gas.consume ctxt (Interp_costs.slice_string 0)) >>=? fun ctxt ->
               logged_return (Item (MBytes.create 0, rest), ctxt)
+        | Bytes_size, Item (s, rest) ->
+            Lwt.return (Gas.consume ctxt Interp_costs.push) >>=? fun ctxt ->
+            logged_return (Item (Script_int.(abs (of_int (MBytes.length s))), rest), ctxt)
         (* currency operations *)
         | Add_tez, Item (x, Item (y, rest)) ->
             Lwt.return (Gas.consume ctxt Interp_costs.int64_op) >>=? fun ctxt ->

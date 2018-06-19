@@ -313,6 +313,8 @@ module Cost_of = struct
         | Concat_bytes -> alloc_cost 1
         | Slice_string -> alloc_cost 1
         | Slice_bytes -> alloc_cost 1
+        | String_size -> alloc_cost 1
+        | Bytes_size -> alloc_cost 1
         | Add_seconds_to_timestamp -> alloc_cost 1
         | Add_timestamp_to_seconds -> alloc_cost 1
         | Sub_timestamp_seconds -> alloc_cost 1
