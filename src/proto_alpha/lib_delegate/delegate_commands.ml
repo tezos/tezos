@@ -63,17 +63,17 @@ let baker_commands () =
   [
     command ~group ~desc: "Launch the baker daemon."
       (args1 max_priority_arg)
-      (prefixes [ "launch" ; "with" ; "context" ]
+      (prefixes [ "run" ; "with" ; "local" ; "node" ]
        @@ param
          ~name:"context_path"
-         ~desc:"Path to the shell context (e.g. tezos-node.XXXXX/context/)"
+         ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
          directory_parameter
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun max_priority context_path delegates cctxt ->
+      (fun max_priority node_path delegates cctxt ->
          Client_daemon.Baker.run cctxt
            ?max_priority
            ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
-           ~context_path
+           ~context_path:(Filename.concat node_path "context")
            (List.map snd delegates)
       )
   ]
@@ -87,7 +87,7 @@ let endorser_commands () =
   [
     command ~group ~desc: "Launch the endorser daemon"
       (args1 endorsement_delay_arg )
-      (prefixes [ "launch" ]
+      (prefixes [ "run" ]
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun endorsement_delay delegates cctxt ->
          Client_daemon.Endorser.run cctxt
@@ -106,7 +106,7 @@ let accuser_commands () =
   [
     command ~group ~desc: "Launch the accuser daemon"
       no_options
-      (prefixes [ "launch" ]
+      (prefixes [ "run" ]
        @@ stop)
       (fun () cctxt -> Client_daemon.Accuser.run cctxt) ;
   ]

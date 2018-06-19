@@ -112,7 +112,7 @@ launch_baker() {
     wait_for_the_node_to_be_bootstraped
     exec "$baker" --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
-	 launch with context "$node_data_dir/context/"
+	 run with local node "$node_data_dir"
 }
 
 launch_endorser() {
@@ -120,5 +120,5 @@ launch_endorser() {
     wait_for_the_node_to_be_bootstraped
     exec "$endorser" --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
-	 launch
+	 run --endorsement-delay 10
 }
