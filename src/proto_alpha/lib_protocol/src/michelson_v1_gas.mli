@@ -40,6 +40,8 @@ module Cost_of : sig
   val branch : Gas.cost
   val concat_string : string list -> Gas.cost
   val concat_bytes : MBytes.t list -> Gas.cost
+  val slice_string : int -> Gas.cost
+  val slice_bytes : Gas.cost
   val map_mem :
     'a -> ('b, 'c) Script_typed_ir.map -> Gas.cost
   val map_to_list :

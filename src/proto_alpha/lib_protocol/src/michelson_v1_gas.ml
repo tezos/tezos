@@ -62,6 +62,9 @@ module Cost_of = struct
   let concat_string ss = concat string String.length ss
   let concat_bytes ss = concat bytes MBytes.length ss
 
+  let slice_string length = string length
+  let slice_bytes = alloc_cost 0
+
   (* Cost per cycle of a loop, fold, etc *)
   let loop_cycle = step_cost 2
 
@@ -308,6 +311,8 @@ module Cost_of = struct
         | Big_map_update -> alloc_cost 1
         | Concat_string -> alloc_cost 1
         | Concat_bytes -> alloc_cost 1
+        | Slice_string -> alloc_cost 1
+        | Slice_bytes -> alloc_cost 1
         | Add_seconds_to_timestamp -> alloc_cost 1
         | Add_timestamp_to_seconds -> alloc_cost 1
         | Sub_timestamp_seconds -> alloc_cost 1

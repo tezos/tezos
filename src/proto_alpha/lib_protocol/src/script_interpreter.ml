@@ -419,11 +419,31 @@ let rec interp
             Lwt.return (Gas.consume ctxt (Interp_costs.concat_string ss)) >>=? fun ctxt ->
             let s = String.concat "" ss in
             logged_return (Item (s, rest), ctxt)
+        | Slice_string, Item (offset, Item (length, Item (s, rest))) ->
+            let s_length = Z.of_int (String.length s) in
+            let offset = Script_int.to_zint offset in
+            let length = Script_int.to_zint length in
+            if Compare.Z.(offset < s_length && Z.add offset length <= s_length) then
+              Lwt.return (Gas.consume ctxt (Interp_costs.slice_string (Z.to_int length))) >>=? fun ctxt ->
+              logged_return (Item (String.sub s (Z.to_int offset) (Z.to_int length), rest), ctxt)
+            else
+              Lwt.return (Gas.consume ctxt (Interp_costs.slice_string 0)) >>=? fun ctxt ->
+              logged_return (Item ("", rest), ctxt)
         (* bytes operations *)
         | Concat_bytes, Item (ss, rest) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.concat_bytes ss)) >>=? fun ctxt ->
             let s = MBytes.concat "" ss in
             logged_return (Item (s, rest), ctxt)
+        | Slice_bytes, Item (offset, Item (length, Item (s, rest))) ->
+            let s_length = Z.of_int (MBytes.length s) in
+            let offset = Script_int.to_zint offset in
+            let length = Script_int.to_zint length in
+            if Compare.Z.(offset < s_length && Z.add offset length <= s_length) then
+              Lwt.return (Gas.consume ctxt (Interp_costs.slice_string (Z.to_int length))) >>=? fun ctxt ->
+              logged_return (Item (MBytes.sub s (Z.to_int offset) (Z.to_int length), rest), ctxt)
+            else
+              Lwt.return (Gas.consume ctxt (Interp_costs.slice_string 0)) >>=? fun ctxt ->
+              logged_return (Item (MBytes.create 0, rest), ctxt)
         (* currency operations *)
         | Add_tez, Item (x, Item (y, rest)) ->
             Lwt.return (Gas.consume ctxt Interp_costs.int64_op) >>=? fun ctxt ->
