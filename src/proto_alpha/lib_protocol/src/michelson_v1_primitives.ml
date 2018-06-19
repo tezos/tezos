@@ -66,7 +66,6 @@ type prim =
   | I_LSL
   | I_LSR
   | I_LT
-  | I_MANAGER
   | I_MAP
   | I_MEM
   | I_MUL
@@ -194,7 +193,6 @@ let string_of_prim = function
   | I_LSL -> "LSL"
   | I_LSR -> "LSR"
   | I_LT -> "LT"
-  | I_MANAGER -> "MANAGER"
   | I_MAP -> "MAP"
   | I_MEM -> "MEM"
   | I_MUL -> "MUL"
@@ -303,7 +301,6 @@ let prim_of_string = function
   | "LSL" -> ok I_LSL
   | "LSR" -> ok I_LSR
   | "LT" -> ok I_LT
-  | "MANAGER" -> ok I_MANAGER
   | "MAP" -> ok I_MAP
   | "MEM" -> ok I_MEM
   | "MUL" -> ok I_MUL
@@ -457,7 +454,6 @@ let prim_encoding =
     ("LSL", I_LSL) ;
     ("LSR", I_LSR) ;
     ("LT", I_LT) ;
-    ("MANAGER", I_MANAGER) ;
     ("MAP", I_MAP) ;
     ("MEM", I_MEM) ;
     ("MUL", I_MUL) ;

@@ -193,8 +193,6 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Ge -> 0
   | Address -> 0
   | Contract _ -> 1
-  | Manager -> 0
-  | Address_manager -> 0
   | Transfer_tokens -> 1
   | Create_account -> 0
   | Implicit_account -> 0
@@ -278,7 +276,6 @@ let namespace = function
   | I_LSL
   | I_LSR
   | I_LT
-  | I_MANAGER
   | I_MAP
   | I_MEM
   | I_MUL
@@ -2264,18 +2261,6 @@ and parse_instr
         >>=? fun annot ->
         typed ctxt loc (Contract t)
           (Item_t (Option_t ((Contract_t (t, None), None), None, None), rest, annot))
-    | Prim (loc, I_MANAGER, [], annot),
-      Item_t (Contract_t _, rest, contract_annot) ->
-        parse_var_annot loc annot ~default:(gen_access_annot contract_annot default_manager_annot)
-        >>=? fun annot ->
-        typed ctxt loc Manager
-          (Item_t (Key_hash_t None, rest, annot))
-    | Prim (loc, I_MANAGER, [], annot),
-      Item_t (Address_t _, rest, addr_annot) ->
-        parse_var_annot loc annot ~default:(gen_access_annot addr_annot default_manager_annot)
-        >>=? fun annot ->
-        typed ctxt loc Address_manager
-          (Item_t (Option_t ((Key_hash_t None, None), None, None), rest, annot))
     | Prim (loc, I_TRANSFER_TOKENS, [], annot),
       Item_t (p, Item_t
                 (Mutez_t _, Item_t
@@ -2408,7 +2393,7 @@ and parse_instr
                  | I_ABS | I_NEG | I_LSL | I_LSR
                  | I_COMPARE | I_EQ | I_NEQ
                  | I_LT | I_GT | I_LE | I_GE
-                 | I_MANAGER | I_TRANSFER_TOKENS | I_CREATE_ACCOUNT
+                 | I_TRANSFER_TOKENS | I_CREATE_ACCOUNT
                  | I_CREATE_CONTRACT | I_SET_DELEGATE | I_NOW
                  | I_IMPLICIT_ACCOUNT | I_AMOUNT | I_BALANCE
                  | I_CHECK_SIGNATURE | I_HASH_KEY | I_SOURCE | I_SENDER
@@ -2453,7 +2438,7 @@ and parse_instr
         fail (Bad_stack (loc, I_TRANSFER_TOKENS, 4, stack))
     | Prim (loc, (I_DROP | I_DUP | I_CAR | I_CDR | I_SOME | I_H | I_DIP
                  | I_IF_NONE | I_LEFT | I_RIGHT | I_IF_LEFT | I_IF
-                 | I_LOOP | I_IF_CONS | I_MANAGER | I_IMPLICIT_ACCOUNT
+                 | I_LOOP | I_IF_CONS | I_IMPLICIT_ACCOUNT
                  | I_NEG | I_ABS | I_INT | I_NOT
                  | I_EQ | I_NEQ | I_LT | I_GT | I_LE | I_GE as name), _, _),
       stack ->
@@ -2478,7 +2463,7 @@ and parse_instr
             I_ABS ; I_INT; I_NEG ; I_LSL ; I_LSR ;
             I_COMPARE ; I_EQ ; I_NEQ ;
             I_LT ; I_GT ; I_LE ; I_GE ;
-            I_MANAGER ; I_TRANSFER_TOKENS ; I_CREATE_ACCOUNT ;
+            I_TRANSFER_TOKENS ; I_CREATE_ACCOUNT ;
             I_CREATE_CONTRACT ; I_NOW ; I_AMOUNT ; I_BALANCE ;
             I_IMPLICIT_ACCOUNT ; I_CHECK_SIGNATURE ; I_H ; I_HASH_KEY ;
             I_STEPS_TO_QUOTA ;

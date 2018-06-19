@@ -610,18 +610,6 @@ let rec interp
               logged_return (Item (Some contract, rest), ctxt)
             else
               logged_return (Item (None, rest), ctxt)
-        | Manager, Item ((_, contract), rest) ->
-            Lwt.return (Gas.consume ctxt Interp_costs.manager) >>=? fun ctxt ->
-            Contract.get_manager ctxt contract >>=? fun manager ->
-            logged_return (Item (manager, rest), ctxt)
-        | Address_manager, Item (contract, rest) ->
-            Lwt.return (Gas.consume ctxt Interp_costs.manager) >>=? fun ctxt ->
-            Contract.exists ctxt contract >>=? fun exists ->
-            if exists then
-              Contract.get_manager ctxt contract >>=? fun manager ->
-              logged_return (Item (Some manager, rest), ctxt)
-            else
-              logged_return (Item (None, rest), ctxt)
         | Transfer_tokens,
           Item (p, Item (amount, Item ((tp, destination), rest))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.transfer) >>=? fun ctxt ->

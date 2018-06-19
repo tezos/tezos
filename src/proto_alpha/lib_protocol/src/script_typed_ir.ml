@@ -318,10 +318,6 @@ and ('bef, 'aft) instr =
       (_ typed_contract * 'rest, Contract.t * 'rest) instr
   | Contract : 'p ty ->
     (Contract.t * 'rest, 'p typed_contract option * 'rest) instr
-  | Manager :
-      ('arg typed_contract * 'rest, public_key_hash * 'rest) instr
-  | Address_manager :
-      (Contract.t * 'rest, public_key_hash option * 'rest) instr
   | Transfer_tokens :
       ('arg * (Tez.t * ('arg typed_contract * 'rest)), packed_internal_operation * 'rest) instr
   | Create_account :

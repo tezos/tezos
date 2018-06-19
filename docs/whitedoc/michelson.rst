@@ -1295,17 +1295,6 @@ for under/overflows.
 Operations on contracts
 ~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``MANAGER``: Access the manager of a contract.
-
-::
-
-    :: address : 'S   ->   key_hash option : 'S
-    :: contract 'p : 'S   ->   key_hash : 'S
-
-Note that the originator of an account/contract may set the manager to
-**any** key hash. Thus, ``SENDER; MANAGER`` is not appropriate for
-authentication.
-
 -  ``CREATE_CONTRACT``: Forge a contract creation operation.
 
 ::
@@ -1405,9 +1394,6 @@ contract, unit for an account.
    internal transaction. It may be the ``SOURCE``, but may
    also not if the source sent an order to an intermediate
    smart contract, which then called the current contract.
-   To make sure that ``SENDER`` is the ``SOURCE``, either
-   compare them, or make sure that ``SENDER`` is the implicit
-   account of its ``MANAGER``.
 
 ::
 
@@ -2036,7 +2022,6 @@ The instructions which accept at most one variable annotation are:
    GE
    ADDRESS
    CONTRACT
-   MANAGER
    SET_DELEGATE
    IMPLICIT_ACCOUNT
    NOW
@@ -2303,10 +2288,6 @@ A similar mechanism is used for context dependent instructions:
    ADDRESS  :: @c contract _ : 'S   ->   @c.address address : 'S
 
    CONTRACT 'p  :: @a address : 'S   ->   @a.contract contract 'p : 'S
-
-   MANAGER
-   :: @a address : 'S   ->   @a.manager key_hash option : 'S
-   :: @c contract 'p : 'S   ->   @c.manager key_hash : 'S
 
    BALANCE :: 'S   ->   @balance tez : 'S
 
@@ -2921,7 +2902,6 @@ XII - Full grammar
       | LE
       | GE
       | INT
-      | MANAGER
       | SELF
       | TRANSFER_TOKENS
       | SET_DELEGATE

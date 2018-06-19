@@ -217,7 +217,6 @@ module Script : sig
     | I_LSL
     | I_LSR
     | I_LT
-    | I_MANAGER
     | I_MAP
     | I_MEM
     | I_MUL
