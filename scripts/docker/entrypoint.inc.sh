@@ -43,6 +43,35 @@ wait_for_the_node_to_be_bootstraped() {
 
 launch_node() {
 
+    mkdir -p "$node_dir"
+
+    # Check if we have to reset the chain because the image we want to
+    # run has a incompatible version with the blockchain we have stored
+    # locally on disk
+
+    local image_version="$(cat "/usr/local/share/tezos/alphanet_version")"
+    echo "Current public chain: $image_version."
+    local local_data_version=""
+    if [ -f "$node_dir/alphanet_version" ]; then
+        local_data_version="$(cat "$node_dir/alphanet_version")"
+        echo "Local chain data: $local_data_version."
+    fi
+    if [ "$local_data_version" != "$image_version" ]; then
+        echo "Removing outdated chain data..."
+        if [ -f "$node_data_dir/identities.json" ]; then \
+            mv "$node_data_dir/identities.json" /tmp
+        fi
+        rm -rf "$node_data_dir"
+        rm -rf "$client_dir/blocks"
+        rm -rf "$client_dir/nonces"
+        rm -rf "$client_dir/endorsements"
+        if [ -f "/tmp/identities.json" ]; then \
+            mv /tmp/identities.json "$node_data_dir/"
+        fi
+        cp "/usr/local/share/tezos/alphanet_version" \
+           "$node_dir/alphanet_version"
+    fi
+
     mkdir -p "$node_data_dir"
 
     if [ ! -f "$node_data_dir/config.json" ]; then
@@ -62,34 +91,6 @@ launch_node() {
     for i in "$@"; do
         if [ "$i" = "--help" ] ; then exit 0; fi
     done
-
-    # Check if we have to reset the chain because the image we want to
-    # run has a incompatible version with the blockchain we have stored
-    # locally on disk
-
-    local image_version="$(cat "/usr/local/share/tezos/alphanet_version")"
-    echo "Current public chain: $image_version."
-    local local_data_version=""
-    if [ -f "$node_dir/alphanet_version" ]; then
-        local_data_version="$(cat "$node_dir/alphanet_version")"
-        echo "Local chain data: $local_data_version."
-    fi
-    if [ "$local_data_version" != "$image_version" ]; then
-        echo "Removing outdated chain data..."
-        if [ -f "$node_data_dir/identities.json" ]; then \
-            mv "$node_data_dir/identities.json" /tmp
-        fi
-        rm -rf "$node_dir"/*
-        rm -rf "$client_dir/blocks"
-        rm -rf "$client_dir/nonces"
-        rm -rf "$client_dir/endorsements"
-        if [ -f "/tmp/identities.json" ]; then \
-            mv /tmp/identities.json "$node_data_dir/"
-        fi
-        cp "/usr/local/share/tezos/alphanet_version" \
-           "$node_dir/alphanet_version"
-    fi
-
 
     # Generate a new identity if not present
 
