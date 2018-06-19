@@ -12,13 +12,14 @@ open Alpha_context
 
 include Logging.Make(struct let name = "client.baking" end)
 
+
 type state = {
   genesis: Block_hash.t ;
   index : Context.index ;
 
-  (* Only mutated once for caching/lazy initialisation *)
-  mutable delegates: public_key_hash list ;
-  mutable constants : Constants.t option ;
+  (* lazy-initialisation with retry-on-error *)
+  delegates: public_key_hash list tzlazy ;
+  constants: Constants.t tzlazy ;
 
   (* truly mutable *)
   mutable best: Client_baking_blocks.block_info ;
@@ -447,23 +448,6 @@ let safe_get_unrevealed_nonces cctxt block =
       lwt_warn "Cannot read nonces: %a@." pp_print_error err >>= fun () ->
       Lwt.return []
 
-let get_delegates cctxt state =
-  match state.delegates with
-  | [] ->
-      Client_keys.get_keys cctxt >>=? fun keys ->
-      let delegates = List.map (fun (_,pkh,_,_) -> pkh) keys in
-      state.delegates <- delegates;
-      return delegates
-  | _ :: _ as delegates -> return delegates
-
-let get_constants cctxt state =
-  match state.constants with
-  | None ->
-      Alpha_services.Constants.all cctxt (`Main, `Head 0) >>=? fun constants ->
-      state.constants <- Some constants;
-      return constants
-  | Some constants -> return constants
-
 
 
 let insert_block
@@ -481,7 +465,7 @@ let insert_block
     drop_old_slots
       ~before:(Time.add state.best.timestamp (-1800L)) state ;
   end ;
-  get_delegates cctxt state >>=? fun delegates ->
+  tzforce state.delegates >>=? fun delegates ->
   get_baking_slot cctxt ?max_priority bi delegates >>= function
   | [] ->
       lwt_debug
@@ -560,7 +544,7 @@ let filter_invalid_operations (cctxt : #full) state block_info (operations : pac
   | Ok () ->
       let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
       (* This shouldn't happen *)
-      get_constants cctxt state >>=? fun constants ->
+      tzforce state.constants >>=? fun constants ->
       let endorsements =
         List.sub (List.rev endorsements) constants.Constants.parametric.endorsers_per_block
       in
@@ -735,6 +719,8 @@ let check_error p =
   | Ok () -> Lwt.return_unit
   | Error errs -> lwt_log_error "Error while baking:@\n%a" pp_print_error errs
 
+
+
 (* [create] starts the main loop of the baker. The loop monitors new blocks and
    starts individual baking operations when baking-slots are available to any of
    the [delegates] *)
@@ -760,7 +746,17 @@ let create
     | Some t -> t in
   lwt_debug "Opening shell context" >>= fun () ->
   Client_baking_simulator.load_context ~context_path >>= fun index ->
-  let state = create_state genesis_hash index delegates None bi in
+  let delegates = match delegates with
+    | [] ->
+        tzlazy (fun () ->
+            Client_keys.get_keys cctxt >>=? fun keys ->
+            let delegates = List.map (fun (_,pkh,_,_) -> pkh) keys in
+            return delegates
+          )
+    | _ :: _ -> tzlazy (fun () -> return delegates) in
+  let constants =
+    tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Head 0)) in
+  let state = create_state genesis_hash index delegates constants bi in
   check_error @@ insert_block cctxt ?max_priority state bi >>= fun () ->
 
   (* main loop *)

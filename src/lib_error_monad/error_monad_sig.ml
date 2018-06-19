@@ -162,4 +162,18 @@ module type S = sig
   (** A {!Lwt.join} in the monad *)
   val join : unit tzresult Lwt.t list -> unit tzresult Lwt.t
 
+  (** Lazy values with retry-until success semantics *)
+  type 'a tzlazy
+
+  (** Create a {!tzlazy} value. *)
+  val tzlazy: (unit -> 'a tzresult Lwt.t) -> 'a tzlazy
+
+  (** [tzforce tzl] is either
+      (a) the remembered value carried by [tzl] if available
+      (b) the result of the callback/closure used to create [tzl] if successful,
+      in which case the value is remembered, or
+      (c) an error if the callback/closure used to create [tzl] is unsuccessful.
+  *)
+  val tzforce: 'a tzlazy -> 'a tzresult Lwt.t
+
 end
