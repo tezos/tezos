@@ -202,8 +202,11 @@ and ('bef, 'aft) instr =
   | Big_map_update :
       ('key * ('value option * (('key, 'value) big_map * 'rest)), ('key, 'value) big_map * 'rest) instr
   (* string operations *)
-  | Concat :
+  | Concat_string :
       (string list * 'rest, string * 'rest) instr
+  (* bytes operations *)
+  | Concat_bytes :
+      (MBytes.t list * 'rest, MBytes.t * 'rest) instr
   (* timestamp operations *)
   | Add_seconds_to_timestamp :
       (z num * (Script_timestamp.t * 'rest),

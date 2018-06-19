@@ -415,9 +415,14 @@ let rec interp
             consume_gas_binop descr (Script_timestamp.diff, t1, t2)
               Interp_costs.diff_timestamps rest ctxt
         (* string operations *)
-        | Concat, Item (ss, rest) ->
+        | Concat_string, Item (ss, rest) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.concat_string ss)) >>=? fun ctxt ->
             let s = String.concat "" ss in
+            logged_return (Item (s, rest), ctxt)
+        (* bytes operations *)
+        | Concat_bytes, Item (ss, rest) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.concat_bytes ss)) >>=? fun ctxt ->
+            let s = MBytes.concat "" ss in
             logged_return (Item (s, rest), ctxt)
         (* currency operations *)
         | Add_tez, Item (x, Item (y, rest)) ->
