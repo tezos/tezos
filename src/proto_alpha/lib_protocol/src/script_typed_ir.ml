@@ -206,11 +206,15 @@ and ('bef, 'aft) instr =
       (string list * 'rest, string * 'rest) instr
   | Slice_string :
       (n num * (n num * (string * 'rest)), string option * 'rest) instr
+  | String_size :
+      (string * 'rest, n num * 'rest) instr
   (* bytes operations *)
   | Concat_bytes :
       (MBytes.t list * 'rest, MBytes.t * 'rest) instr
   | Slice_bytes :
       (n num * (n num * (MBytes.t * 'rest)), MBytes.t option * 'rest) instr
+  | Bytes_size :
+      (MBytes.t * 'rest, n num * 'rest) instr
   (* timestamp operations *)
   | Add_seconds_to_timestamp :
       (z num * (Script_timestamp.t * 'rest),

@@ -157,8 +157,10 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Big_map_mem -> 0
   | Concat_string -> 0
   | Slice_string -> 0
+  | String_size -> 0
   | Concat_bytes -> 0
   | Slice_bytes -> 0
+  | Bytes_size -> 0
   | Add_seconds_to_timestamp -> 0
   | Add_timestamp_to_seconds -> 0
   | Sub_timestamp_seconds -> 0
@@ -2126,6 +2128,10 @@ and parse_instr
           loc annot >>=? fun annot ->
         typed ctxt loc Slice_string
           (Item_t (Option_t ((String_t tname, None), None, None), rest, annot))
+    | Prim (loc, I_SIZE, [], annot),
+      Item_t (String_t _, rest, _) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        typed ctxt loc String_size (Item_t (Nat_t None, rest, annot))
     (* bytes operations *)
     | Prim (loc, I_CONCAT, [], annot),
       Item_t (List_t (Bytes_t tname, _), rest, list_annot) ->
@@ -2139,6 +2145,10 @@ and parse_instr
           loc annot >>=? fun annot ->
         typed ctxt loc Slice_bytes
           (Item_t (Option_t ((Bytes_t tname, None), None, None), rest, annot))
+    | Prim (loc, I_SIZE, [], annot),
+      Item_t (Bytes_t _, rest, _) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        typed ctxt loc Bytes_size (Item_t (Nat_t None, rest, annot))
     (* currency operations *)
     | Prim (loc, I_ADD, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ->
@@ -2671,7 +2681,7 @@ and parse_instr
         Lwt.return @@ serialize_ty_for_error ctxt ta >>=? fun (ta, ctxt) ->
         Lwt.return @@ serialize_ty_for_error ctxt tb >>=? fun (tb, _ctxt) ->
         fail (Undefined_binop (loc, name, ta, tb))
-    | Prim (loc, (I_NEG | I_ABS | I_NOT | I_CONCAT
+    | Prim (loc, (I_NEG | I_ABS | I_NOT | I_CONCAT | I_SIZE
                  | I_EQ | I_NEQ | I_LT | I_GT | I_LE | I_GE as name),
             [], _),
       Item_t (t, _, _) ->
