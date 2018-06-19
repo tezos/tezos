@@ -15,7 +15,7 @@
 
 (* TEZOS CHANGES
 
-   * Import version 4.04.0
+   * Import version 4.06.1
    * Remove unsafe functions
    * Remove deprecated functions (enforcing string immutability)
    * Add binary data extraction functions
@@ -40,6 +40,20 @@
     Two parameters [start] and [len] are said to designate a valid
     substring of [s] if [len >= 0] and [start] and [start+len] are
     valid positions in [s].
+
+    OCaml strings used to be modifiable in place, for instance via the
+    {!String.set} and {!String.blit} functions described below. This
+    usage is deprecated and only possible when the compiler is put in
+    "unsafe-string" mode by giving the [-unsafe-string] command-line
+    option (which is currently the default for reasons of backward
+    compatibility). This is done by making the types [string] and
+    [bytes] (see module {!Bytes}) interchangeable so that functions
+    expecting byte sequences can also accept strings as arguments and
+    modify them.
+
+    All new code should avoid this feature and be compiled with the
+    [-safe-string] command-line option to enforce the separation between
+    the types [string] and [bytes].
 
 *)
 
@@ -141,11 +155,23 @@ val index : string -> char -> int
 
     Raise [Not_found] if [c] does not occur in [s]. *)
 
+val index_opt: string -> char -> int option
+(** [String.index_opt s c] returns the index of the first
+    occurrence of character [c] in string [s], or
+    [None] if [c] does not occur in [s].
+    @since 4.05 *)
+
 val rindex : string -> char -> int
 (** [String.rindex s c] returns the index of the last
     occurrence of character [c] in string [s].
 
     Raise [Not_found] if [c] does not occur in [s]. *)
+
+val rindex_opt: string -> char -> int option
+(** [String.rindex_opt s c] returns the index of the last occurrence
+    of character [c] in string [s], or [None] if [c] does not occur in
+    [s].
+    @since 4.05 *)
 
 val index_from : string -> int -> char -> int
 (** [String.index_from s i c] returns the index of the
@@ -155,6 +181,17 @@ val index_from : string -> int -> char -> int
     Raise [Invalid_argument] if [i] is not a valid position in [s].
     Raise [Not_found] if [c] does not occur in [s] after position [i]. *)
 
+val index_from_opt: string -> int -> char -> int option
+(** [String.index_from_opt s i c] returns the index of the
+    first occurrence of character [c] in string [s] after position [i]
+    or [None] if [c] does not occur in [s] after position [i].
+
+    [String.index_opt s c] is equivalent to [String.index_from_opt s 0 c].
+    Raise [Invalid_argument] if [i] is not a valid position in [s].
+
+    @since 4.05
+*)
+
 val rindex_from : string -> int -> char -> int
 (** [String.rindex_from s i c] returns the index of the
     last occurrence of character [c] in string [s] before position [i+1].
@@ -163,6 +200,19 @@ val rindex_from : string -> int -> char -> int
 
     Raise [Invalid_argument] if [i+1] is not a valid position in [s].
     Raise [Not_found] if [c] does not occur in [s] before position [i+1]. *)
+
+val rindex_from_opt: string -> int -> char -> int option
+(** [String.rindex_from_opt s i c] returns the index of the
+    last occurrence of character [c] in string [s] before position [i+1]
+    or [None] if [c] does not occur in [s] before position [i+1].
+
+    [String.rindex_opt s c] is equivalent to
+    [String.rindex_from_opt s (String.length s - 1) c].
+
+    Raise [Invalid_argument] if [i+1] is not a valid position in [s].
+
+    @since 4.05
+*)
 
 val contains : string -> char -> bool
 (** [String.contains s c] tests if character [c]
