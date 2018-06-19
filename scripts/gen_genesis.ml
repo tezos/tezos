@@ -14,17 +14,20 @@
 #mod_use "../src/lib_stdlib/utils.ml";;
 #mod_use "../src/lib_crypto/base58.ml";;
 
-let date =
-  Lwt_main.run (Lwt_process.pread_line (Lwt_process.shell "date +%FT%TZ --utc"))
 
 let prefix = "BLockGenesisGenesisGenesisGenesisGenesis"
-let suffix = String.sub Digest.(to_hex (string date)) 0 5
-let p =
+let rec genesis () =
+  let date =
+    Lwt_main.run
+      (Lwt_process.pread_line (Lwt_process.shell "date +%FT%TZ --utc")) in
+  let suffix = String.sub Digest.(to_hex (string date)) 0 5 in
   match Base58.raw_decode (prefix ^ suffix ^ "crcCRC") with
-  | None -> assert false
-  | Some s -> s
-let p = String.sub p 0 (String.length p - 4)
-let genesis = Base58.safe_encode p
+  | None -> genesis ()
+  | Some p ->
+      let p = String.sub p 0 (String.length p - 4) in
+      Base58.safe_encode p, date
+
+let genesis, date = genesis ()
 
 let () =
   Lwt_main.run (Lwt_io.lines_to_file "alphanet_version"
