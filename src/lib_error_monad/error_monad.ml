@@ -438,6 +438,28 @@ module Make(Prefix : sig val id : string end) = struct
             tt >>=? fun rt ->
             return (rh :: rt)
 
+  let rec filter_s f l =
+    match l with
+    | [] -> return []
+    | h :: t ->
+        f h >>=? function
+        | false -> filter_s f t
+        | true ->
+            filter_s f t >>=? fun t ->
+            return (h :: t)
+
+  let rec filter_p f l =
+    match l with
+    | [] -> return []
+    | h :: t ->
+        let jh = f h
+        and t = filter_p f t in
+        jh >>=? function
+        | false -> t
+        | true ->
+            t >>=? fun t ->
+            return (h :: t)
+
   let rec iter_s f l =
     match l with
     | [] -> return ()

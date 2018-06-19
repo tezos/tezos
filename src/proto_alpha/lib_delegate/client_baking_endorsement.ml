@@ -144,12 +144,7 @@ let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:int64) state bi =
     let time = Time.(add (now ()) state.delay) in
     let timeout = Lwt_unix.sleep (Int64.to_float state.delay) in
     tzforce state.delegates >>=? fun delegates ->
-    filter_map_p
-      (fun delegate ->
-         allowed_to_endorse cctxt bi delegate >>=? function
-         | true -> return (Some delegate)
-         | false -> return None)
-      delegates >>=? fun delegates ->
+    filter_p (allowed_to_endorse cctxt bi) delegates >>=? fun delegates ->
     state.pending <- Some {
         time ;
         timeout ;

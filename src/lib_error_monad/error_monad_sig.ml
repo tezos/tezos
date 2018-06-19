@@ -151,6 +151,12 @@ module type S = sig
   val filter_map_p :
     ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
+  (** A {!List.filter} in the monad *)
+  val filter_s :
+    ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
+  val filter_p :
+    ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
+
   (** A {!List.fold_left} in the monad *)
   val fold_left_s :
     ('a -> 'b -> 'a tzresult Lwt.t) -> 'a -> 'b list -> 'a tzresult Lwt.t
