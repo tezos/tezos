@@ -3,13 +3,11 @@
 (executable
  ((name test)
   (modules (Test))
-  (public_name test-uecc)
   (libraries (alcotest uecc))))
 
 (executable
  ((name test_vectors)
   (modules (Vectors Test_vectors))
-  (public_name test-uecc-vectors)
   (libraries (cstruct hex alcotest uecc))))
 
 (alias
