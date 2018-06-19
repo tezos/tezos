@@ -156,7 +156,9 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Big_map_update -> 0
   | Big_map_mem -> 0
   | Concat_string -> 0
+  | Slice_string -> 0
   | Concat_bytes -> 0
+  | Slice_bytes -> 0
   | Add_seconds_to_timestamp -> 0
   | Add_timestamp_to_seconds -> 0
   | Sub_timestamp_seconds -> 0
@@ -326,6 +328,7 @@ let namespace = function
   | I_SOURCE
   | I_SENDER
   | I_SELF
+  | I_SLICE
   | I_STEPS_TO_QUOTA
   | I_SUB
   | I_SWAP
@@ -2116,12 +2119,26 @@ and parse_instr
         parse_var_annot ~default:list_annot loc annot >>=? fun annot ->
         typed ctxt loc Concat_string
           (Item_t (String_t tname, rest, annot))
+    | Prim (loc, I_SLICE, [], annot),
+      Item_t (Nat_t _, Item_t (Nat_t _, Item_t (String_t tname, rest, string_annot), _), _) ->
+        parse_var_annot
+          ~default:(gen_access_annot string_annot default_slice_annot)
+          loc annot >>=? fun annot ->
+        typed ctxt loc Slice_string
+          (Item_t (Option_t ((String_t tname, None), None, None), rest, annot))
     (* bytes operations *)
     | Prim (loc, I_CONCAT, [], annot),
       Item_t (List_t (Bytes_t tname, _), rest, list_annot) ->
         parse_var_annot ~default:list_annot loc annot >>=? fun annot ->
         typed ctxt loc Concat_bytes
           (Item_t (Bytes_t tname, rest, annot))
+    | Prim (loc, I_SLICE, [], annot),
+      Item_t (Nat_t _, Item_t (Nat_t _, Item_t (Bytes_t tname, rest, bytes_annot), _), _) ->
+        parse_var_annot
+          ~default:(gen_access_annot bytes_annot default_slice_annot)
+          loc annot >>=? fun annot ->
+        typed ctxt loc Slice_bytes
+          (Item_t (Option_t ((Bytes_t tname, None), None, None), rest, annot))
     (* currency operations *)
     | Prim (loc, I_ADD, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ->
@@ -2617,7 +2634,7 @@ and parse_instr
         get_toplevel_type tc_context
     (* Primitive parsing errors *)
     | Prim (loc, (I_DROP | I_DUP | I_SWAP | I_SOME | I_UNIT
-                 | I_PAIR | I_CAR | I_CDR | I_CONS | I_CONCAT
+                 | I_PAIR | I_CAR | I_CDR | I_CONS | I_CONCAT | I_SLICE
                  | I_MEM | I_UPDATE | I_MAP
                  | I_GET | I_EXEC | I_FAILWITH | I_SIZE
                  | I_ADD | I_SUB
@@ -2660,10 +2677,10 @@ and parse_instr
       Item_t (t, _, _) ->
         Lwt.return @@ serialize_ty_for_error ctxt t >>=? fun (t, _ctxt) ->
         fail (Undefined_unop (loc, name, t))
-    | Prim (loc, I_UPDATE, [], _),
+    | Prim (loc, (I_UPDATE | I_SLICE as name), [], _),
       stack ->
         serialize_stack_for_error ctxt stack >>=? fun (stack, _ctxt) ->
-        fail (Bad_stack (loc, I_UPDATE, 3, stack))
+        fail (Bad_stack (loc, name, 3, stack))
     | Prim (loc, I_CREATE_CONTRACT, [], _),
       stack ->
         serialize_stack_for_error ctxt stack >>=? fun (stack, _ctxt) ->

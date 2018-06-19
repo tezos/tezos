@@ -46,6 +46,7 @@ val default_addr_annot : field_annot option
 val default_manager_annot : field_annot option
 val default_pack_annot : field_annot option
 val default_unpack_annot : field_annot option
+val default_slice_annot : field_annot option
 
 val default_elt_annot : field_annot option
 val default_key_annot : field_annot option
