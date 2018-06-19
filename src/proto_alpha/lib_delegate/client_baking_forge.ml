@@ -156,14 +156,18 @@ let get_operation_fee op =
           Tez.(total_fee +? fee)
       | _ -> return total_fee) Tez.zero l
 
-let sort_operations_by_fee (operations : Proto_alpha.operation list) =
-  (* There is no sort_s, so : *)
-  map_s (fun op -> get_operation_fee op >>=? fun fee -> return (op, fee))
+let sort_operations_by_fee ?(threshold = Tez.zero) (operations : Proto_alpha.operation list) =
+  filter_map_s
+    (fun op ->
+       get_operation_fee op >>=? fun fee ->
+       if Tez.(<) fee threshold then
+         return None
+       else
+         return (Some (op, fee)))
     operations >>=? fun operations ->
   let compare_fee (_, fee1) (_, fee2) =
-    Tez.compare fee1 fee2 * -1
-  in
-  (* Should we keep operations without fee ? *)
+    (* NOTE: inverted fee comparison to invert the order of sort *)
+    Tez.compare fee2 fee1 in
   return @@ List.map fst (List.sort compare_fee operations)
 
 let retain_operations_up_to_quota operations max_quota =
@@ -183,7 +187,7 @@ let retain_operations_up_to_quota operations max_quota =
     | Full ops -> ops in
   List.rev operations
 
-let classify_operations (ops: Proto_alpha.operation list) =
+let classify_operations ?threshold (ops: Proto_alpha.operation list) =
   let t = Array.make (List.length Proto_alpha.Main.validation_passes) [] in
   List.iter
     (fun (op: Proto_alpha.operation) ->
@@ -196,7 +200,7 @@ let classify_operations (ops: Proto_alpha.operation list) =
   let manager_operations = t.(managers_index) in
   let { Alpha_environment.Updater.max_size } =
     List.nth Proto_alpha.Main.validation_passes managers_index in
-  sort_operations_by_fee manager_operations >>=? fun ordered_operations ->
+  sort_operations_by_fee ?threshold manager_operations >>=? fun ordered_operations ->
   let max_operations =
     retain_operations_up_to_quota ordered_operations max_size
   in
@@ -310,6 +314,7 @@ let error_of_op (result: error Preapply_result.t) op =
 
 
 let forge_block cctxt ?(chain = `Main) block
+    ?threshold
     ?force
     ?operations ?(best_effort = operations = None) ?(sort = best_effort)
     ?timestamp
@@ -324,7 +329,7 @@ let forge_block cctxt ?(chain = `Main) block
 
   (* get basic building blocks *)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
-  classify_operations operations_arg >>=? fun operations ->
+  classify_operations ?threshold operations_arg >>=? fun operations ->
   Alpha_block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, result) ->
 
@@ -572,6 +577,7 @@ let filter_invalid_operations (cctxt : #full) state block_info (operations : pac
 let bake_slot
     cctxt
     state
+    ?threshold
     seed_nonce_hash
     (timestamp, (bi, priority, delegate)) (* baking slot *)
   =
@@ -601,7 +607,7 @@ let bake_slot
       None in
   let protocol_data =
     forge_faked_protocol_data ~priority ~seed_nonce_hash in
-  classify_operations operations >>=? fun operations ->
+  classify_operations ?threshold operations >>=? fun operations ->
   begin
     (* Don't load an alpha context if the chain is still in genesis *)
     if Protocol_hash.(bi.protocol = bi.next_protocol) then
@@ -669,7 +675,7 @@ let pp_operation_list_list =
 
 (* [bake] create a single block when woken up to do so. All the necessary
    information (e.g., slot) is available in the [state]. *)
-let bake (cctxt : #Proto_alpha.full) state =
+let bake (cctxt : #Proto_alpha.full) ?threshold state =
   let slots = pop_baking_slots state in
   lwt_log_info "Found %d current slots and %d future slots."
     (List.length slots)
@@ -678,7 +684,9 @@ let bake (cctxt : #Proto_alpha.full) state =
   let seed_nonce_hash = Nonce.hash seed_nonce in
 
   (* baking for each slot *)
-  filter_map_s (bake_slot cctxt state seed_nonce_hash) slots >>=? fun candidates ->
+  filter_map_s
+    (bake_slot cctxt ?threshold state seed_nonce_hash)
+    slots >>=? fun candidates ->
 
   (* FIXME: pick one block per-delegate *)
   (* selecting the candidate baked block *)
@@ -740,6 +748,7 @@ let check_error p =
    the [delegates] *)
 let create
     (cctxt : #Proto_alpha.full)
+    ?threshold
     ?max_priority
     ~(context_path: string)
     (delegates: public_key_hash list)
@@ -799,7 +808,7 @@ let create
           (* main event: it's baking time *)
           lwt_debug "Waking up for baking..." >>= fun () ->
           (* core functionality *)
-          check_error @@ bake cctxt state
+          check_error @@ bake cctxt ?threshold state
     end >>= fun () ->
     (* and restart *)
     worker_loop () in
@@ -812,6 +821,7 @@ let create
    unavailable blocks (empty block chain). *)
 let create
     (cctxt : #Proto_alpha.full)
+    ?threshold
     ?max_priority
     ~(context_path: string)
     (delegates: public_key_hash list)
@@ -819,4 +829,4 @@ let create
   Client_baking_scheduling.wait_for_first_block
     ~info:lwt_log_info
     block_stream
-    (create cctxt ?max_priority ~context_path delegates block_stream)
+    (create cctxt ?threshold ?max_priority ~context_path delegates block_stream)

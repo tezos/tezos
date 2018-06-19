@@ -13,6 +13,7 @@ open Clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 type error += Bad_max_priority of string
+type error += Bad_fee_threshold of string
 type error += Bad_endorsement_delay of string
 
 let () =
@@ -40,6 +41,16 @@ let () =
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_max_priority parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_max_priority parameter) ;
+  register_error_kind
+    `Permanent
+    ~id:"badFeeThresholdArg"
+    ~title:"Bad -fee-threshold arg"
+    ~description:("invalid fee threshold in -fee-threshold")
+    ~pp:(fun ppf literal ->
+        Format.fprintf ppf "invalid fee threshold '%s' in -fee-threshold" literal)
+    Data_encoding.(obj1 (req "parameter" string))
+    (function Bad_fee_threshold parameter -> Some parameter | _ -> None)
+    (fun parameter -> Bad_fee_threshold parameter) ;
   register_error_kind
     `Permanent
     ~id:"badEndorsementDelayArg"
@@ -184,6 +195,16 @@ let max_priority_arg =
     (parameter (fun _ s ->
          try return (int_of_string s)
          with _ -> fail (Bad_max_priority s)))
+
+let fee_threshold_arg =
+  arg
+    ~long:"fee-threshold"
+    ~placeholder:"threshold"
+    ~doc:"exclude operations with fees lower than this threshold (in mutez)"
+    (parameter (fun _ s ->
+         match Tez.of_string s with
+         | Some t -> return t
+         | None -> fail (Bad_fee_threshold s)))
 
 let endorsement_delay_arg =
   default_arg

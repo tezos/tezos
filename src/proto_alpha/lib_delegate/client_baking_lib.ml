@@ -12,6 +12,7 @@ open Alpha_context
 
 let bake_block (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block
+    ?threshold
     ?force ?max_priority ?(minimal_timestamp=false)
     ?src_sk ?src_pk delegate =
   begin
@@ -39,6 +40,7 @@ let bake_block (cctxt : #Proto_alpha.full)
       None, None in
   Client_baking_forge.forge_block cctxt
     ?timestamp:(if minimal_timestamp then None else Some (Time.now ()))
+    ?threshold
     ?force
     ?seed_nonce_hash ~src_sk block
     ~priority:(`Auto (delegate, max_priority)) () >>=? fun block_hash ->

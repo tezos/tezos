@@ -39,6 +39,7 @@ val forge_block:
   #Proto_alpha.full ->
   ?chain:Chain_services.chain ->
   Block_services.block ->
+  ?threshold:Tez.t ->
   ?force:bool ->
   ?operations: Operation.packed list ->
   ?best_effort:bool ->
@@ -49,7 +50,7 @@ val forge_block:
   src_sk:Client_keys.sk_uri ->
   unit ->
   Block_hash.t tzresult Lwt.t
-(** [forge_block cctxt parent_blk ?force ?operations ?best_effort
+(** [forge_block cctxt parent_blk ?threshold ?force ?operations ?best_effort
     ?sort ?timestamp ?max_priority ?priority ~seed_nonce ~src_sk
     pk_hash] injects a block in the node. In addition of inject_block,
     it will:
@@ -65,6 +66,9 @@ val forge_block:
     * Timestamp: If [?timestamp] is set, and is compatible with the
       computed baking priority, it will be used. Otherwise, it will be
       set at the best baking priority.
+
+    * Threshold: If [?threshold] is given, operations with fees lower than it
+      are not added to the block.
 *)
 
 module State : sig
@@ -83,6 +87,7 @@ end
 
 val create:
   #Proto_alpha.full ->
+  ?threshold:Tez.t ->
   ?max_priority: int ->
   context_path: string ->
   public_key_hash list ->

@@ -15,6 +15,7 @@ val bake_block:
   #Proto_alpha.full ->
   ?chain:Chain_services.chain ->
   Block_services.block ->
+  ?threshold:Tez.t ->
   ?force:bool ->
   ?max_priority: int ->
   ?minimal_timestamp: bool ->
