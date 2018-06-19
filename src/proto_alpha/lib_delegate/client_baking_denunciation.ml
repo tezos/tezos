@@ -18,6 +18,7 @@ let create cctxt endorsement_stream =
         last_get_endorsement := Some t ;
         t
     | Some t -> t in
+
   let rec worker_loop () =
     (* let timeout = compute_timeout state in *)
     Lwt.choose [
@@ -25,7 +26,8 @@ let create cctxt endorsement_stream =
       (get_endorsement () >|= fun e -> `Endorsement e) ;
     ] >>= function
     | `Endorsement (None | Some (Error _)) ->
-        Lwt.return_unit
+        lwt_log_error "Connection to node lost, exiting." >>= fun () ->
+        exit 1
     | `Endorsement (Some (Ok e)) ->
         last_get_endorsement := None ;
         Client_keys.Public_key_hash.name cctxt
@@ -37,9 +39,13 @@ let create cctxt endorsement_stream =
               source
               Format.(pp_print_list pp_print_int) e.slots >>= fun () ->
             worker_loop ()
-        | Error _ ->
-            (* TODO log *)
+        | Error errs ->
+            lwt_log_error "Error whilst checking the endorsment %a/%a:@\n%a"
+              Block_hash.pp_short e.block
+              Format.(pp_print_list pp_print_int) e.slots
+              pp_print_error errs >>= fun () ->
             worker_loop ()
   in
+
   lwt_log_info "Starting denunciation daemon" >>= fun () ->
   worker_loop ()
