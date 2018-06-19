@@ -320,6 +320,11 @@ module Prefix = struct
   let secp256k1_secret_key = "\017\162\224\201" (* spsk(54) *)
   let p256_secret_key = "\016\081\238\189" (* p2sk(54) *)
 
+  (* 56 *)
+  let ed25519_encrypted_seed = "\007\090\060\179\041" (* edesk(88) *)
+  let secp256k1_encrypted_secret_key = "\009\237\241\174\150" (* spesk(88) *)
+  let p256_encrypted_secret_key = "\009\048\057\115\171" (* p2esk(88) *)
+
   (* 33 *)
   let secp256k1_public_key = "\003\254\226\086" (* sppk(55) *)
   let p256_public_key = "\003\178\139\127" (* p2pk(55) *)
