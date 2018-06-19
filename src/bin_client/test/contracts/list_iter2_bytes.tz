@@ -1,0 +1,3 @@
+parameter (list bytes);
+storage bytes;
+code { UNPAIR ; SWAP ; CONS ; CONCAT; NIL operation; PAIR}

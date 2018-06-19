@@ -117,6 +117,10 @@ assert_storage $contract_dir/list_iter.tz 0 '{ 3 ; 6 ; 9 }' 162
 assert_storage $contract_dir/list_iter2.tz '"abc"' '{ "d" ; "e" ; "f" }' '"abcdef"'
 assert_storage $contract_dir/list_iter2.tz '"abc"' '{}' '"abc"'
 
+assert_storage $contract_dir/list_iter2_bytes.tz '0x00ab' '{ 0xcd ; 0xef ; 0x00 }' '0x00abcdef00'
+assert_storage $contract_dir/list_iter2_bytes.tz '0x' '{ 0x00 ; 0x11 ; 0x00 }' '0x001100'
+assert_storage $contract_dir/list_iter2_bytes.tz '0xabcd' '{}' '0xabcd'
+assert_storage $contract_dir/list_iter2_bytes.tz '0x' '{}' '0x'
 
 # Identity on sets
 assert_storage $contract_dir/set_id.tz '{}' '{ "a" ; "b" ; "c" }' '{ "a" ; "b" ; "c" }'

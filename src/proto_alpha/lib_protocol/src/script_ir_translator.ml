@@ -155,7 +155,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Big_map_get -> 0
   | Big_map_update -> 0
   | Big_map_mem -> 0
-  | Concat -> 0
+  | Concat_string -> 0
+  | Concat_bytes -> 0
   | Add_seconds_to_timestamp -> 0
   | Add_timestamp_to_seconds -> 0
   | Sub_timestamp_seconds -> 0
@@ -2113,8 +2114,14 @@ and parse_instr
     | Prim (loc, I_CONCAT, [], annot),
       Item_t (List_t (String_t tname, _), rest, list_annot) ->
         parse_var_annot ~default:list_annot loc annot >>=? fun annot ->
-        typed ctxt loc Concat
+        typed ctxt loc Concat_string
           (Item_t (String_t tname, rest, annot))
+    (* bytes operations *)
+    | Prim (loc, I_CONCAT, [], annot),
+      Item_t (List_t (Bytes_t tname, _), rest, list_annot) ->
+        parse_var_annot ~default:list_annot loc annot >>=? fun annot ->
+        typed ctxt loc Concat_bytes
+          (Item_t (Bytes_t tname, rest, annot))
     (* currency operations *)
     | Prim (loc, I_ADD, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ->
