@@ -37,7 +37,7 @@ let () =
     ~title:"Bad -max-priority arg"
     ~description:("invalid priority in -max-priority")
     ~pp:(fun ppf literal ->
-        Format.fprintf ppf "invalid priority '%s'in -max-priority" literal)
+        Format.fprintf ppf "invalid priority '%s' in -max-priority" literal)
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_max_priority parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_max_priority parameter) ;

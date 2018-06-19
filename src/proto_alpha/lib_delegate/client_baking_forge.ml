@@ -732,7 +732,7 @@ let bake (cctxt : #Proto_alpha.full) ?threshold state =
           return ()
     end
 
-  | _ ->
+  | _ -> (* no candidates, or none fit-enough *)
       lwt_debug "No valid candidates." >>= fun () ->
       return ()
 
@@ -792,7 +792,7 @@ let create
                  ] >>= function
         (* event matching *)
       | `Hash (None | Some (Error _)) ->
-          (* return to restart *)
+          (* exit when the node is unavailable *)
           last_get_block := None ;
           lwt_log_error "Connection to node lost, exiting." >>= fun () ->
           exit 1
