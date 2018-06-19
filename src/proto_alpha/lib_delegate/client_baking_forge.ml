@@ -45,9 +45,6 @@ let create_state genesis index delegates constants best =
     future_slots = [] ;
   }
 
-let generate_proof_of_work_nonce () =
-  Rand.generate Constants.proof_of_work_nonce_size
-
 let generate_seed_nonce () =
   match Nonce.of_bytes @@
     Rand.generate Constants.nonce_length with
@@ -57,32 +54,23 @@ let generate_seed_nonce () =
 let forge_block_header
     (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block delegate_sk shell priority seed_nonce_hash =
-  Alpha_services.Constants.all cctxt
-    (chain, block) >>=? fun { parametric = {
-      proof_of_work_threshold = stamp_threshold ;
-    } } ->
-  let rec loop () =
-    let proof_of_work_nonce = generate_proof_of_work_nonce () in
-    let contents =
-      { Block_header.priority ; seed_nonce_hash ; proof_of_work_nonce } in
-    if Baking.check_header_proof_of_work_stamp shell contents stamp_threshold then
-      let unsigned_header =
-        Data_encoding.Binary.to_bytes_exn
-          Alpha_context.Block_header.unsigned_encoding
-          (shell, contents) in
-      Client_keys.append cctxt delegate_sk ~watermark:Block_header unsigned_header
-    else
-      loop () in
-  loop ()
-
-let empty_proof_of_work_nonce =
-  MBytes.of_string
-    (String.make Constants_repr.proof_of_work_nonce_size  '\000')
+  Client_baking_pow.mine
+    cctxt chain block shell
+    (fun proof_of_work_nonce ->
+       { Block_header.priority ;
+         seed_nonce_hash ;
+         proof_of_work_nonce ;
+       }) >>=? fun contents ->
+  let unsigned_header =
+    Data_encoding.Binary.to_bytes_exn
+      Alpha_context.Block_header.unsigned_encoding
+      (shell, contents) in
+  Client_keys.append cctxt delegate_sk ~watermark:Block_header unsigned_header
 
 let forge_faked_protocol_data ~priority ~seed_nonce_hash =
   Alpha_context.Block_header.{
     contents = { priority ; seed_nonce_hash ;
-                 proof_of_work_nonce = empty_proof_of_work_nonce } ;
+                 proof_of_work_nonce = Client_baking_pow.empty_proof_of_work_nonce } ;
     signature = Signature.zero
   }
 
@@ -610,9 +598,9 @@ let bake_slot
   | Ok operations ->
       Tezos_stdlib_unix.Lwt_utils_unix.retry
         ~log:(fun errs ->
-          lwt_log_error
-            "Error while prevalidating operations\n%a\nRetrying..."
-            pp_print_error errs
+            lwt_log_error
+              "Error while prevalidating operations\n%a\nRetrying..."
+              pp_print_error errs
           )
         (fun () ->
            Alpha_block_services.Helpers.Preapply.block
