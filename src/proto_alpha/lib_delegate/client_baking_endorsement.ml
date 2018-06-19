@@ -54,7 +54,7 @@ let previously_endorsed_level cctxt pkh new_lvl  =
 
 let forge_endorsement (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block ?async
-    ~src_sk  ?slots src_pk =
+    ~src_sk src_pk =
   let src_pkh = Signature.Public_key.hash src_pk in
   Alpha_block_services.metadata cctxt
     ~chain ~block () >>=? fun { protocol_data = { level = { level } } } ->
@@ -64,43 +64,33 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
       cctxt#error "Level %a : previously endorsed."
         Raw_level.pp level
   | false ->
-      begin
-        match slots with
-        | Some slots -> return slots
-        | None ->
-            get_signing_slots
-              cctxt ~chain block src_pkh level >>=? function
-            | None -> cctxt#error "No slot found at level %a" Raw_level.pp level
-            | Some slots -> return slots
-      end >>=? fun slots ->
       Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
       inject_endorsement cctxt ~chain ?async block hash level src_sk src_pkh >>=? fun oph ->
       Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
       cctxt#message
-        "Injected endorsement level %a, contract %s '%a', slots @[<h>%a@]"
+        "Injected endorsement level %a, contract %s '%a'"
         Raw_level.pp level
         name
-        Operation_hash.pp_short oph
-        (Format.pp_print_list Format.pp_print_int) slots
-      >>=
-      fun () -> return oph
+        Operation_hash.pp_short oph >>= fun () ->
+      return oph
 
 (** Worker *)
 
 type state = {
   delegates: public_key_hash list ;
   delay: int64 ;
-  to_endorse : endorsement Signature.Public_key_hash.Table.t ;
+  mutable pending: endorsements option ;
 }
-and endorsement = {
+
+and endorsements = {
   time: Time.t ;
   timeout: unit Lwt.t ;
-  delegate: public_key_hash ;
+  delegates: public_key_hash list ;
   block: Client_baking_blocks.block_info ;
 }
 
 let create_state delegates delay =
-  { delegates ; delay ; to_endorse = Signature.Public_key_hash.Table.create 5 }
+  { delegates ; delay ; pending = None }
 
 let get_delegates cctxt state =
   match state.delegates with
@@ -110,7 +100,7 @@ let get_delegates cctxt state =
   | _ :: _ as delegates ->
       return delegates
 
-let endorse_for_delegate cctxt { delegate ; block } =
+let endorse_for_delegate cctxt block delegate =
   let { Client_baking_blocks.hash ; level } = block in
   let b = `Hash (hash, 0) in
   Client_keys.get_key cctxt delegate >>=? fun (name, _pk, sk) ->
@@ -127,80 +117,61 @@ let endorse_for_delegate cctxt { delegate ; block } =
     Raw_level.pp level
     name
     Operation_hash.pp_short oph >>= fun () ->
-  lwt_log_info
-    "Injected endorsement level %a, contract %s '%a'"
-    Raw_level.pp level
-    name
-    Operation_hash.pp_short oph >>= fun () ->
   return ()
 
-let endorse_for cctxt table =
-  let done_waiting = ref [] in
-  Signature.Public_key_hash.Table.filter_map_inplace
-    (fun _ ({ timeout } as endorsement) ->
-       match Lwt.state timeout with
-       | Lwt.Return () ->
-           done_waiting := endorsement :: !done_waiting ;
-           None
-       | Lwt.Sleep ->
-           Some endorsement
-       | Lwt.Fail exn ->
-           log_error "Endorsement failure: %s" (Printexc.to_string exn) ;
-           None)
-    table ;
-  iter_p (endorse_for_delegate cctxt) !done_waiting
-
-let allowed_to_endorse cctxt state (block: Client_baking_blocks.block_info) delegate time =
+let allowed_to_endorse cctxt bi delegate  =
   Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-  lwt_log_info "Checking if allowed to endorse block %a for %s"
-    Block_hash.pp_short block.hash name >>= fun () ->
-  let b = `Hash (block.hash, 0) in
-  let level = block.level in
+  lwt_debug "Checking if allowed to endorse block %a for %s"
+    Block_hash.pp_short bi.Client_baking_blocks.hash name >>= fun () ->
+  let b = `Hash (bi.hash, 0) in
+  let level = bi.level in
   get_signing_slots cctxt b delegate level >>=? function
-  | None ->
+  | None | Some [] ->
       lwt_debug "No slot found for %a/%s"
-        Block_hash.pp_short block.hash name >>= fun () ->
-      return ()
-  | Some slots ->
+        Block_hash.pp_short bi.hash name >>= fun () ->
+      return false
+  | Some (_ :: _ as slots) ->
       lwt_debug "Found slots for %a/%s (%d)"
-        Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->
+        Block_hash.pp_short bi.hash name (List.length slots) >>= fun () ->
       previously_endorsed_level cctxt delegate level >>=? function
       | true ->
           lwt_debug "Level %a (or higher) previously endorsed: do not endorse."
             Raw_level.pp level >>= fun () ->
-          return ()
+          return false
       | false ->
-          match Client_baking_scheduling.sleep_until time with
-          | None ->
-              lwt_debug "Endorsment opportunity is passed." >>= fun () ->
-              return ()
-          | Some timeout ->
-              let neu = { time ; timeout ; delegate ; block } in
-              Signature.Public_key_hash.Table.add state.to_endorse delegate neu ;
-              return ()
+          return true
 
 let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:int64) state bi =
-  get_delegates cctxt state >>=? fun delegates ->
-  Signature.Public_key_hash.Table.clear state.to_endorse ;
-  iter_p
-    (fun delegate ->
-       let open Client_baking_blocks in
-       if Time.diff (Time.now ()) bi.timestamp > max_past then
-         lwt_log_info "Ignore block %a: forged too far the past"
-           Block_hash.pp_short bi.hash >>= return
-       else
-         let time = Time.(add (now ()) state.delay) in
-         allowed_to_endorse cctxt state bi delegate time
-    )
-    delegates
+  if Time.diff (Time.now ()) bi.Client_baking_blocks.timestamp > max_past then
+    lwt_log_info "Ignore block %a: forged too far the past"
+      Block_hash.pp_short bi.hash >>= fun () ->
+    return ()
+  else
+    lwt_log_info "Received new block %a"
+      Block_hash.pp_short bi.hash >>= fun () ->
+    let time = Time.(add (now ()) state.delay) in
+    let timeout = Lwt_unix.sleep (Int64.to_float state.delay) in
+    get_delegates cctxt state >>=? fun delegates ->
+    filter_map_p
+      (fun delegate ->
+         allowed_to_endorse cctxt bi delegate >>=? function
+         | true -> return (Some delegate)
+         | false -> return None)
+      delegates >>=? fun delegates ->
+    state.pending <- Some {
+        time ;
+        timeout ;
+        block = bi ;
+        delegates ;
+      } ;
+    return ()
 
 let compute_timeout state =
-  match Signature.Public_key_hash.Table.fold
-      (fun _ v acc -> v :: acc)
-      state.to_endorse [] with
-  | [] -> Lwt_utils.never_ending ()
-  | to_ends ->
-      Lwt.choose (List.map (fun to_end -> to_end.timeout) to_ends)
+  match state.pending with
+  | None -> Lwt_utils.never_ending ()
+  | Some { timeout ; block ; delegates } ->
+      timeout >>= fun () ->
+      Lwt.return (`Timeout (block, delegates))
 
 let check_error f =
   f >>= function
@@ -229,25 +200,22 @@ let create
   (* main loop *)
   let rec worker_loop () =
     begin
-      let timeout = compute_timeout state in
-      Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
+      Lwt.choose [ compute_timeout state ;
                    (get_block () >|= fun b -> `Hash b) ] >>=  function
       | `Hash None ->
-          last_get_block := None;
+          last_get_block := None ;
           lwt_log_error "Connection to node lost, exiting." >>= fun () ->
           exit 1
       | `Hash (Some (Error _)) ->
-          last_get_block := None;
+          last_get_block := None ;
           Lwt.return_unit
       | `Hash (Some (Ok bi)) ->
-          last_get_block := None;
+          last_get_block := None ;
+          state.pending <- None ;
           check_error @@ prepare_endorsement cctxt ~max_past state bi
-      | `Timeout ->
-          endorse_for cctxt state.to_endorse >>= function
-          | Ok () ->
-              Lwt.return_unit
-          | Error errs ->
-              lwt_log_error "Error while endorsing:@\n%a" pp_print_error errs
+      | `Timeout (block, delegates) ->
+          state.pending <- None ;
+          check_error @@ iter_p (endorse_for_delegate cctxt block) delegates
     end >>= fun () ->
     worker_loop () in
 

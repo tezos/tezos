@@ -16,7 +16,6 @@ val forge_endorsement:
   Block_services.block ->
   ?async: bool ->
   src_sk:Client_keys.sk_uri ->
-  ?slots:int list ->
   public_key ->
   Operation_hash.t tzresult Lwt.t
 
