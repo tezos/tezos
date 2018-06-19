@@ -426,12 +426,12 @@ module Make(Prefix : sig val id : string end) = struct
             filter_map_s f t >>=? fun rt ->
             return (rh :: rt)
 
-  let filter_map_p f l =
+  let rec filter_map_p f l =
     match l with
     | [] -> return []
     | h :: t ->
         let th = f h
-        and tt = filter_map_s f t in
+        and tt = filter_map_p f t in
         th >>=? function
         | None -> tt
         | Some rh ->
