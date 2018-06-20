@@ -26,7 +26,28 @@ module Make(N : sig val scheme : string end) = struct
     let description =
       "Valid locators are of this form:\n"
       ^ " - " ^ scheme ^ "://host/tz1...\n"
-      ^ " - " ^ scheme ^ "://host:port/path/to/service/tz1..."
+      ^ " - " ^ scheme ^ "://host:port/path/to/service/tz1...\n"
+      ^ "Environment variable TEZOS_SIGNER_HTTP_HEADERS can be specified \
+         to add headers to the requests (only custom 'x-...' headers are supported)."
+
+    let headers = match Sys.getenv "TEZOS_SIGNER_HTTP_HEADERS" with
+      | exception Not_found -> None
+      | contents ->
+          let lines = String.split_on_char '\n' contents in
+          Some
+            (List.fold_left (fun acc line ->
+                 match String.index_opt line ':' with
+                 | None ->
+                     Pervasives.failwith
+                       "Http signer: invalid TEZOS_SIGNER_HTTP_HEADERS environment variable, missing colon"
+                 | Some pos ->
+                     let header = String.sub line 0 pos in
+                     if String.length header < 2
+                     || String.sub (String.lowercase_ascii header) 0 2 <> "x-" then
+                       Pervasives.failwith
+                         "Http signer: invalid TEZOS_SIGNER_HTTP_HEADERS environment variable, only x- headers are supported" ;
+                     let value = String.sub line (pos + 1) (String.length line - pos - 1) in
+                     (header, value) :: acc) [] lines)
 
     let parse uri =
       (* extract `tz1..` from the last component of the path *)
@@ -47,6 +68,7 @@ module Make(N : sig val scheme : string end) = struct
       parse (uri : pk_uri :> Uri.t) >>=? fun (base, pkh) ->
       RPC_client.call_service
         ~logger: P.logger
+        ?headers
         Media_type.all_media_types
         ~base Signer_services.public_key ((), pkh) () ()
 
@@ -66,6 +88,7 @@ module Make(N : sig val scheme : string end) = struct
             MBytes.concat "" [ Signature.bytes_of_watermark watermark ; msg ] in
       RPC_client.call_service
         ~logger: P.logger
+        ?headers
         Media_type.all_media_types
         ~base Signer_services.authorized_keys () () () >>=? fun authorized_keys ->
       begin match authorized_keys with
@@ -78,6 +101,7 @@ module Make(N : sig val scheme : string end) = struct
       end >>=? fun signature ->
       RPC_client.call_service
         ~logger: P.logger
+        ?headers
         Media_type.all_media_types
         ~base Signer_services.sign ((), pkh)
         signature

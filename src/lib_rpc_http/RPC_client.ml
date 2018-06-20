@@ -223,8 +223,8 @@ let request_failed meth uri error =
 type content_type = (string * string)
 type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
-let generic_call ?logger ?accept ?body ?media meth uri : (content, content) RPC_context.rest_result Lwt.t =
-  Client.generic_call meth ?logger ?accept ?body ?media uri >>= function
+let generic_call ?logger ?headers ?accept ?body ?media meth uri : (content, content) RPC_context.rest_result Lwt.t =
+  Client.generic_call meth ?logger ?headers ?accept ?body ?media uri >>= function
   | `Ok (Some v) -> return (`Ok v)
   | `Ok None -> request_failed meth uri Empty_answer
   | `Conflict _
@@ -277,13 +277,13 @@ let handle_error meth uri (body, media, _) f =
                                      acceptable = [Media_type.(name json)] ;
                                      body })
 
-let generic_json_call ?logger ?body meth uri : (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result Lwt.t =
+let generic_json_call ?logger ?headers ?body meth uri : (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result Lwt.t =
   let body =
     Option.map body ~f:begin fun b ->
       (Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
     end in
   let media = Media_type.json in
-  generic_call meth ?logger ~accept:Media_type.[bson ; json] ?body ~media uri >>=? function
+  generic_call meth ?logger ?headers ~accept:Media_type.[bson ; json] ?body ~media uri >>=? function
   | `Ok (body, (Some ("application", "json") | None), _) -> begin
       Cohttp_lwt.Body.to_string body >>= fun body ->
       match Data_encoding.Json.from_string body with
@@ -376,21 +376,21 @@ let handle accept (meth, uri, ans) =
 
 let call_streamed_service
     (type p q i o )
-    accept ?logger ~base (service : (_,_,p,q,i,o) RPC_service.t)
+    accept ?logger ?headers ~base (service : (_,_,p,q,i,o) RPC_service.t)
     ~on_chunk ~on_close
     (params : p) (query : q) (body : i) : (unit -> unit) tzresult Lwt.t =
   Client.call_streamed_service
-    accept ?logger ~base ~on_chunk ~on_close
+    accept ?logger ?headers ~base ~on_chunk ~on_close
     service params query body >>= fun ans ->
   handle accept ans
 
 let call_service
     (type p q i o )
-    accept ?logger ~base (service : (_,_,p,q,i,o) RPC_service.t)
+    accept ?logger ?headers ~base (service : (_,_,p,q,i,o) RPC_service.t)
     (params : p)
     (query : q) (body : i) : o tzresult Lwt.t =
   Client.call_service
-    ?logger ~base accept service params query body >>= fun ans ->
+    ?logger ?headers ~base accept service params query body >>= fun ans ->
   handle accept ans
 
 type config = {
@@ -404,7 +404,7 @@ let config_encoding =
   let open Data_encoding in
   conv
     (fun { host ; port ; tls } -> (host, port, tls))
-    (fun (host, port, tls) -> { host ; port ; tls ; logger = null_logger})
+    (fun (host, port, tls) -> { host ; port ; tls ; logger = null_logger })
     (obj3
        (req "host" string)
        (req "port" uint16)
