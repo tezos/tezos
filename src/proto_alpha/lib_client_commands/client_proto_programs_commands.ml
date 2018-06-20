@@ -65,9 +65,18 @@ let commands () =
     Clic.parameter (fun _ data ->
         Lwt.return (Micheline_parser.no_parsing_error
                     @@ Michelson_v1_parser.parse_expression data)) in
-  let hash_parameter =
-    Clic.parameter
-      (fun _cctxt hash -> return @@ MBytes.of_string hash) in
+  let bytes_parameter ~name ~desc =
+    Clic.param ~name ~desc
+      (parameter (fun (_cctxt : full) s ->
+           try
+             if String.length s < 2
+             || s.[0] <> '0' || s.[1] <> 'x' then
+               raise Exit
+             else
+               return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
+           with _ ->
+             failwith "Invalid bytes, expecting hexadecimal \
+                       notation (e.g. 0x1234abcd)" )) in
   let signature_parameter =
     Clic.parameter
       (fun _cctxt s ->
@@ -237,17 +246,7 @@ let commands () =
               `CHECK_SIGNATURE`."
       no_options
       (prefixes [ "sign" ; "bytes" ]
-       @@ Clic.param ~name:"data" ~desc:"the raw data to sign"
-         (parameter (fun (_cctxt : full) s ->
-              try
-                if String.length s < 2
-                || s.[0] <> '0' || s.[1] <> 'x' then
-                  raise Exit
-                else
-                  return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
-              with _ ->
-                failwith "Invalid bytes, expecting hexadecimal \
-                          notation (e.g. 0x1234abcd)" ))
+       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.source_param
        @@ stop)
@@ -257,11 +256,11 @@ let commands () =
          return ()) ;
 
     command ~group
-      ~desc: "Ask the node to check the signature of a hashed expression."
+      ~desc: "Check the signature of a byte sequence as per Michelson \
+              instruction `CHECK_SIGNATURE`."
       (args1 (switch ~doc:"Use only exit codes" ~short:'q' ~long:"quiet" ()))
       (prefixes [ "check" ; "that" ]
-       @@ Clic.param ~name:"hash" ~desc:"the hashed data"
-         hash_parameter
+       @@ bytes_parameter ~name:"bytes" ~desc:"the signed data"
        @@ prefixes [ "was" ; "signed" ; "by" ]
        @@ Client_keys.Public_key.alias_param
          ~name:"key"
@@ -269,18 +268,15 @@ let commands () =
        @@ Clic.param ~name:"signature" ~desc:"the signature to check"
          signature_parameter
        @@ stop)
-      (fun quiet hashed (_, (key_locator, _)) signature (cctxt : #Proto_alpha.full) ->
-         Client_keys.check key_locator signature hashed >>=? fun res ->
-         begin
-           if quiet
-           then if res
-             then return ()
-             else failwith "Not signed"
-           else begin if res
-             then cctxt#message "Signed with key"
-             else cctxt#message "Not signed with key"
-           end >>= return
-         end
+      (fun quiet bytes (_, (key_locator, _)) signature (cctxt : #Proto_alpha.full) ->
+         Client_keys.check key_locator signature bytes >>=? function
+         | false -> cctxt#error "invalid signature"
+         | true ->
+             if quiet then
+               return ()
+             else
+               cctxt#message "Signature check successfull." >>= fun () ->
+               return ()
       ) ;
 
   ]
