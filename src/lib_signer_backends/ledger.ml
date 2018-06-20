@@ -9,6 +9,7 @@
 
 open Client_keys
 
+include Logging.Make(struct let name = "client.signer.ledger" end)
 
 let scheme = "ledger"
 
@@ -49,7 +50,11 @@ let secp256k1_ctx =
 
 let get_public_key ledger curve path =
   let path = tezos_root @ path in
-  let pk = Ledgerwallet_tezos.get_public_key ledger curve path in
+  let buf = Buffer.create 100 in
+  let pp = Format.formatter_of_buffer buf in
+  let pk = Ledgerwallet_tezos.get_public_key ~pp ledger curve path in
+  Format.pp_print_flush pp () ;
+  debug "%s" (Buffer.contents buf) ;
   let pk = Cstruct.to_bigarray pk in
   match curve with
   | Ed25519 ->
@@ -203,8 +208,11 @@ let sign ?watermark sk_uri msg =
       end in
     let curve = curve_of_pkh pkh in
     let path = tezos_root @ path_of_sk_uri sk_uri in
-    let signature = Ledgerwallet_tezos.sign
-        ledger curve path (Cstruct.of_bigarray msg) in
+    let buf = Buffer.create 100 in
+    let pp = Format.formatter_of_buffer buf in
+    let signature = Ledgerwallet_tezos.sign ~pp ledger curve path (Cstruct.of_bigarray msg) in
+    Format.pp_print_flush pp () ;
+    debug "%s" (Buffer.contents buf) ;
     match curve with
     | Ed25519 ->
         let signature = Cstruct.to_bigarray signature in
