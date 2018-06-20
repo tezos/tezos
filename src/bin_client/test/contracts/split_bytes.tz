@@ -1,0 +1,16 @@
+parameter bytes ;
+storage (list bytes) ;
+code { UNPAIR ;
+       DIP { NIL bytes ; SWAP ; ITER { CONS } } ;
+       DUP ; SIZE ; PUSH nat 0 ; CMPNEQ ;
+       DIP { PUSH @index nat 0 } ;
+       LOOP
+         { PAIR ; DUP ;
+           DIP { UNPAIR ; DIP { PUSH nat 1 } ; SLICE ; ASSERT_SOME ; CONS @storage } ;
+           UNPAIR ;
+           PUSH nat 1 ; ADD @index ;
+           DUP ; DIP { DIP { DUP } ; SWAP ; SIZE ; CMPNEQ } ; SWAP ;
+         } ;
+       DROP ; DROP ;
+       NIL bytes ; SWAP ; ITER { CONS } ;
+       NIL operation ; PAIR }

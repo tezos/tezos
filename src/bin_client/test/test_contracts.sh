@@ -465,6 +465,38 @@ assert_success $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg
                '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")'
 bake
 
+# Test SLICE and SIZE on bytes
+init_with_transfer $contract_dir/slices.tz bootstrap1 \
+				   '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"' 1,000 bootstrap1
+
+assert_fails $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")'
+assert_fails $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xeaa9ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+assert_fails $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2deaad01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+assert_fails $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150733eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+assert_fails $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xe009ab79e8b84ef0 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+assert_success $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+bake
+
+init_with_transfer $contract_dir/split_string.tz bootstrap1 '{}' 1,000 bootstrap1
+
+bake_after $client transfer 0 from bootstrap1 to split_string -arg '"abc"'
+assert_storage_contains split_string '{ "a" ; "b" ; "c" }'
+bake_after $client transfer 0 from bootstrap1 to split_string -arg '"def"'
+assert_storage_contains split_string '{ "a" ; "b" ; "c" ; "d" ; "e" ; "f" }'
+
+init_with_transfer $contract_dir/split_bytes.tz bootstrap1 '{}' 1,000 bootstrap1
+
+bake_after $client transfer 0 from bootstrap1 to split_bytes -arg '0xaabbcc'
+assert_storage_contains split_bytes '{ 0xaa ; 0xbb ; 0xcc }'
+bake_after $client transfer 0 from bootstrap1 to split_bytes -arg '0xddeeff'
+assert_storage_contains split_bytes '{ 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }'
+
 # Test SET_DELEGATE
 b2='tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN'
 b3='tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU'
