@@ -28,4 +28,4 @@ The Tezos Alpha (test) network has been live and open since February 2017.
 
 The source code of Tezos is currently under exclusive copyright of
 Dynamic Ledger Solutions, and will be open sourced under the MIT
-license when the main network lunches.
+license when the main network launches.
