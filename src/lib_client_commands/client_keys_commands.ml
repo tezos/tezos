@@ -52,7 +52,7 @@ let gen_keys_containing
       if name_exists && not force
       then
         cctxt#warning
-          "Key for name '%s' already exists. Use -force to update." name >>= return
+          "Key for name '%s' already exists. Use --force to update." name >>= return
       else
         begin
           cctxt#warning "This process uses a brute force search and \
@@ -178,7 +178,7 @@ let commands () : Client_context.io_wallet Clic.command list =
                fail_unless (pk_uri = pk_uri_found || force)
                  (failure
                     "public and secret keys '%s' don't correspond, \
-                     please don't use -force" name)
+                     please don't use --force" name)
          end >>=? fun () ->
          Client_keys.public_key_hash pk_uri >>=? fun (pkh, public_key) ->
          cctxt#message
@@ -268,7 +268,7 @@ let commands () : Client_context.io_wallet Clic.command list =
       (fixed [ "forget" ; "all" ; "keys" ])
       (fun force (cctxt : Client_context.io_wallet) ->
          fail_unless force
-           (failure "this can only used with option -force") >>=? fun () ->
+           (failure "this can only used with option --force") >>=? fun () ->
          Public_key.set cctxt [] >>=? fun () ->
          Secret_key.set cctxt [] >>=? fun () ->
          Public_key_hash.set cctxt []) ;

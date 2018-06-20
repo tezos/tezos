@@ -147,12 +147,12 @@ module Alias = functor (Entity : Entity) -> struct
             end else if n = name && v <> value then begin
               failwith
                 "another %s is already aliased as %s, \
-                 use -force to update"
+                 use --force to update"
                 Entity.name n
             end else if n <> name && v = value then begin
               failwith
                 "this %s is already aliased as %s, \
-                 use -force to insert duplicate"
+                 use --force to insert duplicate"
                 Entity.name n
             end else begin
               return ()
@@ -208,7 +208,7 @@ module Alias = functor (Entity : Entity) -> struct
                failwith
                  "@[<v 2>The %s alias %s already exists.@,\
                   The current value is %s.@,\
-                  Use -force to update@]"
+                  Use --force to update@]"
                  Entity.name n
                  value
              else
