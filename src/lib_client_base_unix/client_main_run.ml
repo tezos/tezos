@@ -183,11 +183,13 @@ let main select_commands =
         Format.eprintf "@{<error>@{<title>Fatal error@}@} unknown protocol version.@." ;
         Lwt.return 1
     | Failure message ->
-        Format.eprintf "@{<error>@{<title>Fatal error@}@} @[<hov 0>%a@]@."
+        Format.eprintf "@{<error>@{<title>Fatal error@}@}@.\
+                       \  @[<h 0>%a@]@."
           Format.pp_print_text message ;
         Lwt.return 1
     | exn ->
-        Format.printf "@{<error>@{<title>Fatal error@}@} @[<hov 0>%a@]@."
+        Format.printf "@{<error>@{<title>Fatal error@}@}@.\
+                      \  @[<h 0>%a@]@."
           Format.pp_print_text (Printexc.to_string exn) ;
         Lwt.return 1
   end >>= fun retcode ->
