@@ -63,6 +63,7 @@ type error +=
 val call_service :
   Media_type.t list ->
   ?logger:logger ->
+  ?headers:(string * string) list ->
   base:Uri.t ->
   ([< Resto.meth ], unit, 'p, 'q, 'i, 'o) RPC_service.t ->
   'p -> 'q -> 'i -> 'o tzresult Lwt.t
@@ -70,6 +71,7 @@ val call_service :
 val call_streamed_service :
   Media_type.t list ->
   ?logger:logger ->
+  ?headers:(string * string) list ->
   base:Uri.t ->
   ([< Resto.meth ], unit, 'p, 'q, 'i, 'o) RPC_service.t ->
   on_chunk: ('o -> unit) ->
@@ -78,6 +80,7 @@ val call_streamed_service :
 
 val generic_json_call :
   ?logger:logger ->
+  ?headers:(string * string) list ->
   ?body:Data_encoding.json ->
   [< RPC_service.meth ] -> Uri.t ->
   (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result Lwt.t
@@ -87,6 +90,7 @@ type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
 val generic_call :
   ?logger:logger ->
+  ?headers:(string * string) list ->
   ?accept:Media_type.t list ->
   ?body:Cohttp_lwt.Body.t ->
   ?media:Media_type.t ->
