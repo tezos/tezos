@@ -38,62 +38,84 @@ let gen_keys_containing
     ~containing ~name (cctxt : #Client_context.io_wallet) =
   let unrepresentable =
     List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
+  let good_initial_char = "KLMNPQRSTUVWXYZabcdefghi" in
+  let bad_initial_char = "123456789ABCDEFGHJjkmnopqrstuvwxyz" in
   match unrepresentable with
   | _ :: _ ->
-      cctxt#warning
-        "The following can't be written in the key alphabet (%a): %a"
-        Base58.Alphabet.pp Base58.Alphabet.bitcoin
+      cctxt#error
+        "@[<v 0>The following words can't be written in the key alphabet: %a.@,\
+         Valid characters: %a@,\
+         Extra restriction for the first character: %s@]"
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
            (fun ppf s -> Format.fprintf ppf "'%s'" s))
-        unrepresentable >>= return
+        unrepresentable
+        Base58.Alphabet.pp Base58.Alphabet.bitcoin
+        good_initial_char
   | [] ->
-      Public_key_hash.mem cctxt name >>=? fun name_exists ->
-      if name_exists && not force
-      then
-        cctxt#warning
-          "Key for name '%s' already exists. Use --force to update." name >>= return
-      else
-        begin
-          cctxt#warning "This process uses a brute force search and \
-                         may take a long time to find a key." >>= fun () ->
-          let matches =
-            if prefix then
-              let containing_tz1 = List.map ((^) "tz1") containing in
-              (fun key -> List.exists
-                  (fun containing ->
-                     String.sub key 0 (String.length containing) = containing)
-                  containing_tz1)
-            else
-              let re = Re.Str.regexp (String.concat "\\|" containing) in
-              (fun key -> try ignore (Re.Str.search_forward re key 0); true
-                with Not_found -> false) in
-          let rec loop attempts =
-            let public_key_hash, public_key, secret_key =
-              Signature.generate_key () in
-            let hash = Signature.Public_key_hash.to_b58check @@
-              Signature.Public_key.hash public_key in
-            if matches hash
-            then
-              let pk_uri = Tezos_signer_backends.Unencrypted.make_pk public_key in
-              begin
-                if encrypted then
-                  Tezos_signer_backends.Encrypted.encrypt cctxt secret_key
+      let unrepresentable =
+        List.filter (fun s -> prefix &&
+                              String.contains bad_initial_char s.[0]) containing in
+      match unrepresentable with
+      | _ :: _ ->
+          cctxt#error
+            "@[<v 0>The following words don't respect the first character restriction: %a.@,\
+             Valid characters: %a@,\
+             Extra restriction for the first character: %s@]"
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+               (fun ppf s -> Format.fprintf ppf "'%s'" s))
+            unrepresentable
+            Base58.Alphabet.pp Base58.Alphabet.bitcoin
+            good_initial_char
+      | [] ->
+          Public_key_hash.mem cctxt name >>=? fun name_exists ->
+          if name_exists && not force
+          then
+            cctxt#warning
+              "Key for name '%s' already exists. Use --force to update." name >>= return
+          else
+            begin
+              cctxt#warning "This process uses a brute force search and \
+                             may take a long time to find a key." >>= fun () ->
+              let matches =
+                if prefix then
+                  let containing_tz1 = List.map ((^) "tz1") containing in
+                  (fun key -> List.exists
+                      (fun containing ->
+                         String.sub key 0 (String.length containing) = containing)
+                      containing_tz1)
                 else
-                  return (Tezos_signer_backends.Unencrypted.make_sk secret_key)
-              end >>=? fun sk_uri ->
-              register_key cctxt ~force
-                (public_key_hash, pk_uri, sk_uri) name >>=? fun () ->
-              return hash
-            else begin if attempts mod 25_000 = 0
-              then cctxt#message "Tried %d keys without finding a match" attempts
-              else Lwt.return () end >>= fun () ->
-              loop (attempts + 1) in
-          loop 1 >>=? fun key_hash ->
-          cctxt#message
-            "Generated '%s' under the name '%s'." key_hash name >>= fun () ->
-          return ()
-        end
+                  let re = Re.Str.regexp (String.concat "\\|" containing) in
+                  (fun key -> try ignore (Re.Str.search_forward re key 0); true
+                    with Not_found -> false) in
+              let rec loop attempts =
+                let public_key_hash, public_key, secret_key =
+                  Signature.generate_key () in
+                let hash = Signature.Public_key_hash.to_b58check @@
+                  Signature.Public_key.hash public_key in
+                if matches hash
+                then
+                  let pk_uri = Tezos_signer_backends.Unencrypted.make_pk public_key in
+                  begin
+                    if encrypted then
+                      Tezos_signer_backends.Encrypted.encrypt cctxt secret_key
+                    else
+                      return (Tezos_signer_backends.Unencrypted.make_sk secret_key)
+                  end >>=? fun sk_uri ->
+                  register_key cctxt ~force
+                    (public_key_hash, pk_uri, sk_uri) name >>=? fun () ->
+                  return hash
+                else begin if attempts mod 25_000 = 0
+                  then
+                    cctxt#message "Tried %d keys without finding a match" attempts
+                  else Lwt.return () end >>= fun () ->
+                  loop (attempts + 1) in
+              loop 1 >>=? fun key_hash ->
+              cctxt#message
+                "Generated '%s' under the name '%s'." key_hash name >>= fun () ->
+              return ()
+            end
 
 let commands () : Client_context.io_wallet Clic.command list =
   let open Clic in
