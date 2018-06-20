@@ -149,37 +149,17 @@ val escaped : string -> string
     i.e. [Scanf.unescaped (escaped s) = s] for any string [s] (unless
     [escape s] fails). *)
 
-val index : string -> char -> int
-(** [String.index s c] returns the index of the first
-    occurrence of character [c] in string [s].
-
-    Raise [Not_found] if [c] does not occur in [s]. *)
-
 val index_opt: string -> char -> int option
 (** [String.index_opt s c] returns the index of the first
     occurrence of character [c] in string [s], or
     [None] if [c] does not occur in [s].
     @since 4.05 *)
 
-val rindex : string -> char -> int
-(** [String.rindex s c] returns the index of the last
-    occurrence of character [c] in string [s].
-
-    Raise [Not_found] if [c] does not occur in [s]. *)
-
 val rindex_opt: string -> char -> int option
 (** [String.rindex_opt s c] returns the index of the last occurrence
     of character [c] in string [s], or [None] if [c] does not occur in
     [s].
     @since 4.05 *)
-
-val index_from : string -> int -> char -> int
-(** [String.index_from s i c] returns the index of the
-    first occurrence of character [c] in string [s] after position [i].
-    [String.index s c] is equivalent to [String.index_from s 0 c].
-
-    Raise [Invalid_argument] if [i] is not a valid position in [s].
-    Raise [Not_found] if [c] does not occur in [s] after position [i]. *)
 
 val index_from_opt: string -> int -> char -> int option
 (** [String.index_from_opt s i c] returns the index of the
@@ -191,15 +171,6 @@ val index_from_opt: string -> int -> char -> int option
 
     @since 4.05
 *)
-
-val rindex_from : string -> int -> char -> int
-(** [String.rindex_from s i c] returns the index of the
-    last occurrence of character [c] in string [s] before position [i+1].
-    [String.rindex s c] is equivalent to
-    [String.rindex_from s (String.length s - 1) c].
-
-    Raise [Invalid_argument] if [i+1] is not a valid position in [s].
-    Raise [Not_found] if [c] does not occur in [s] before position [i+1]. *)
 
 val rindex_from_opt: string -> int -> char -> int option
 (** [String.rindex_from_opt s i c] returns the index of the

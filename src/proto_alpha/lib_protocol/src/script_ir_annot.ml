@@ -308,16 +308,18 @@ let parse_var_annot
 let split_last_dot = function
   | None -> None, None
   | Some `Field_annot s ->
-      try
-        let i = String.rindex s '.' in
-        let s1 = String.sub s 0 i in
-        let s2 = String.sub s (i + 1) (String.length s - i - 1) in
-        let f =
-          if Compare.String.equal s2 "car" || Compare.String.equal s2 "cdr"
-          then None
-          else Some (`Field_annot s2) in
-        Some (`Var_annot s1), f
-      with Not_found -> None, Some (`Field_annot s)
+      match String.rindex_opt s '.' with
+      | None -> None, Some (`Field_annot s)
+      | Some i ->
+          let s1 = String.sub s 0 i in
+          let s2 = String.sub s (i + 1) (String.length s - i - 1) in
+          let f =
+            if Compare.String.equal s2 "car"
+            || Compare.String.equal s2 "cdr" then
+              None
+            else
+              Some (`Field_annot s2) in
+          Some (`Var_annot s1), f
 
 let common_prefix v1 v2 =
   match v1, v2 with

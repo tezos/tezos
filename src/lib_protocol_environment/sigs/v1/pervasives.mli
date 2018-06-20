@@ -300,11 +300,6 @@ val string_of_bool : bool -> string
     may be shared, the user should not modify them directly.
 *)
 
-val bool_of_string : string -> bool
-(** Convert the given string to a boolean.
-    Raise [Invalid_argument "bool_of_string"] if the string is not
-    ["true"] or ["false"]. *)
-
 val bool_of_string_opt: string -> bool option
 (** Convert the given string to a boolean.
     Return [None] if the string is not
@@ -315,7 +310,7 @@ val bool_of_string_opt: string -> bool option
 val string_of_int : int -> string
 (** Return the string representation of an integer, in decimal. *)
 
-external int_of_string : string -> int = "caml_int_of_string"
+val int_of_string_opt: string -> int option
 (** Convert the given string to an integer.
     The string is read in decimal (by default, or if the string
     begins with [0u]), in hexadecimal (if it begins with [0x] or
@@ -329,13 +324,10 @@ external int_of_string : string -> int = "caml_int_of_string"
 
     The [_] (underscore) character can appear anywhere in the string
     and is ignored.
-    Raise [Failure "int_of_string"] if the given string is not
-    a valid representation of an integer, or if the integer represented
-    exceeds the range of integers representable in type [int]. *)
 
-
-val int_of_string_opt: string -> int option
-(** Same as [int_of_string], but returns [None] instead of raising.
+    Return [None] if the given string is not a valid representation of
+    an integer, or if the integer represented exceeds the range of
+    integers representable in type [int].
     @since 4.05
 *)
 

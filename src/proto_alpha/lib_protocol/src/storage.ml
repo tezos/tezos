@@ -30,9 +30,7 @@ module Int_index = struct
   let to_path c l = string_of_int c :: l
   let of_path = function
     | [] | _ :: _ :: _ -> None
-    | [ c ] ->
-        try Some (int_of_string c)
-        with _ -> None
+    | [ c ] -> int_of_string_opt c
   type 'a ipath = 'a * t
   let args = Storage_description.One {
       rpc_arg = RPC_arg.int ;
@@ -330,12 +328,10 @@ module Roll = struct
       match Misc.take Cycle_repr.Index.path_length l with
       | None | Some (_, ([] | _ :: _ :: _ ))-> None
       | Some (l1, [l2]) ->
-          match Cycle_repr.Index.of_path l1 with
-          | None -> None
-          | Some c -> begin
-              try Some (c, int_of_string l2)
-              with _ -> None
-            end
+          match Cycle_repr.Index.of_path l1, int_of_string_opt l2 with
+          | None, _ | _, None -> None
+          | Some c, Some i -> Some (c, i)
+
     type 'a ipath = ('a * Cycle_repr.t) * int
     let left_args =
       Storage_description.One {
