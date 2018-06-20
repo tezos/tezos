@@ -133,7 +133,7 @@ let allowed_to_endorse cctxt bi delegate  =
       | false ->
           return true
 
-let prepare_endorsement (cctxt : #Proto_alpha.full) ~(max_past:int64) state bi =
+let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state bi =
   if Time.diff (Time.now ()) bi.Client_baking_blocks.timestamp > max_past then
     lwt_log_info "Ignore block %a: forged too far the past"
       Block_hash.pp_short bi.hash >>= fun () ->
@@ -158,7 +158,7 @@ let compute_timeout state =
   | None -> Lwt_utils.never_ending ()
   | Some { timeout ; block ; delegates } ->
       timeout >>= fun () ->
-      Lwt.return (`Timeout (block, delegates))
+      Lwt.return (block, delegates)
 
 let check_error f =
   f >>= function
@@ -167,68 +167,40 @@ let check_error f =
 
 let create
     (cctxt: #Proto_alpha.full)
-    ~max_past
-    ~delay
-    contracts
-    block_stream
-    bi =
-  lwt_log_info "Preparing endorsement daemon" >>= fun () ->
-  (* statefulness setup *)
-  let last_get_block = ref None in
-  let get_block () =
-    match !last_get_block with
-    | None ->
-        let t = Lwt_stream.get block_stream in
-        last_get_block := Some t ;
-        t
-    | Some t -> t in
-
-  let contracts = match contracts with
-    | [] ->
-        tzlazy (fun () ->
-            Client_keys.get_keys cctxt >>=? fun keys ->
-            return (List.map (fun (_, pkh, _, _) -> pkh) keys)
-          )
-    | _ :: _ ->
-        tzlazy (fun () -> return contracts) in
-  let state = create_state contracts (Int64.of_int delay) in
-
-  (* main loop *)
-  let rec worker_loop () =
-    begin
-      Lwt.choose [ compute_timeout state ;
-                   (get_block () >|= fun b -> `Hash b) ] >>=  function
-      | `Hash None ->
-          last_get_block := None ;
-          lwt_log_error "Connection to node lost, exiting." >>= fun () ->
-          exit 1
-      | `Hash (Some (Error _)) ->
-          last_get_block := None ;
-          Lwt.return_unit
-      | `Hash (Some (Ok bi)) ->
-          last_get_block := None ;
-          state.pending <- None ;
-          check_error @@ prepare_endorsement cctxt ~max_past state bi
-      | `Timeout (block, delegates) ->
-          state.pending <- None ;
-          check_error @@ iter_p (endorse_for_delegate cctxt block) delegates
-    end >>= fun () ->
-    worker_loop () in
-
-  (* ignition *)
-  check_error (prepare_endorsement cctxt ~max_past state bi) >>= fun () ->
-  lwt_log_notice "Starting endorsement daemon" >>= fun () ->
-  worker_loop ()
-
-(* A wrapper around the main create function (above) to wait for the initial
-   block. *)
-let create
-    (cctxt: #Proto_alpha.full)
     ?(max_past=110L)
     ~delay
     contracts
-    (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t) =
-  Client_baking_scheduling.wait_for_first_block
-    ~info:lwt_log_info
     block_stream
-    (create cctxt ~max_past ~delay contracts block_stream)
+  =
+
+  let state_maker _ _ =
+    let contracts = match contracts with
+      | [] ->
+          tzlazy (fun () ->
+              Client_keys.get_keys cctxt >>=? fun keys ->
+              return (List.map (fun (_, pkh, _, _) -> pkh) keys)
+            )
+      | _ :: _ ->
+          tzlazy (fun () -> return contracts) in
+    let state = create_state contracts (Int64.of_int delay) in
+    return state
+  in
+
+  let timeout_k cctxt state (block, delegates) =
+    state.pending <- None ;
+    iter_p (endorse_for_delegate cctxt block) delegates
+  in
+  let event_k cctxt state bi =
+    state.pending <- None ;
+    prepare_endorsement ~max_past () cctxt state bi
+  in
+
+  Client_baking_scheduling.main
+    ~name:"endorser"
+    ~cctxt
+    ~stream:block_stream
+    ~state_maker
+    ~pre_loop:(prepare_endorsement ~max_past ())
+    ~compute_timeout
+    ~timeout_k
+    ~event_k

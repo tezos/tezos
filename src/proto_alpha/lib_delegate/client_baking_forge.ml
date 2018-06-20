@@ -441,8 +441,9 @@ let safe_get_unrevealed_nonces cctxt block =
 
 
 let insert_block
-    (cctxt: #Proto_alpha.full)
     ?max_priority
+    ()
+    (cctxt: #Proto_alpha.full)
     state
     (bi: Client_baking_blocks.block_info) =
   begin
@@ -654,7 +655,12 @@ let pp_operation_list_list =
 
 (* [bake] create a single block when woken up to do so. All the necessary
    information (e.g., slot) is available in the [state]. *)
-let bake (cctxt : #Proto_alpha.full) ?threshold state =
+let bake
+    ?threshold
+    ()
+    (cctxt : #Proto_alpha.full)
+    state
+    () =
   let slots = pop_baking_slots state in
   lwt_log_info "Found %d current slots and %d future slots."
     (List.length slots)
@@ -715,11 +721,6 @@ let bake (cctxt : #Proto_alpha.full) ?threshold state =
       lwt_debug "No valid candidates." >>= fun () ->
       return ()
 
-let check_error p =
-  p >>= function
-  | Ok () -> Lwt.return_unit
-  | Error errs -> lwt_log_error "Error while baking:@\n%a" pp_print_error errs
-
 
 
 (* [create] starts the main loop of the baker. The loop monitors new blocks and
@@ -732,80 +733,31 @@ let create
     ~(context_path: string)
     (delegates: public_key_hash list)
     (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t)
-    (bi: Client_baking_blocks.block_info) =
+  =
 
-  lwt_log_info "Setting up before the baker can start." >>= fun () ->
-  Shell_services.Blocks.hash cctxt ~block:`Genesis () >>=? fun genesis_hash ->
+  let state_maker genesis_hash bi =
+    let delegates = match delegates with
+      | [] ->
+          tzlazy (fun () ->
+              Client_keys.get_keys cctxt >>=? fun keys ->
+              let delegates = List.map (fun (_,pkh,_,_) -> pkh) keys in
+              return delegates
+            )
+      | _ :: _ -> tzlazy (fun () -> return delegates) in
+    let constants =
+      tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Head 0)) in
+    Client_baking_simulator.load_context ~context_path >>= fun index ->
+    let state = create_state genesis_hash index delegates constants bi in
+    return state
+  in
 
-  (* statefulness *)
-  let last_get_block = ref None in
-  let get_block () =
-    match !last_get_block with
-    | None ->
-        let t = Lwt_stream.get block_stream in
-        last_get_block := Some t ;
-        t
-    | Some t -> t in
-  lwt_debug "Opening shell context" >>= fun () ->
-  Client_baking_simulator.load_context ~context_path >>= fun index ->
-  let delegates = match delegates with
-    | [] ->
-        tzlazy (fun () ->
-            Client_keys.get_keys cctxt >>=? fun keys ->
-            let delegates = List.map (fun (_,pkh,_,_) -> pkh) keys in
-            return delegates
-          )
-    | _ :: _ -> tzlazy (fun () -> return delegates) in
-  let constants =
-    tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Head 0)) in
-  let state = create_state genesis_hash index delegates constants bi in
-  check_error @@ insert_block cctxt ?max_priority state bi >>= fun () ->
+  Client_baking_scheduling.main
+    ~name:"baker"
+    ~cctxt
+    ~stream:block_stream
+    ~state_maker
+    ~pre_loop:(insert_block ?max_priority ())
+    ~compute_timeout
+    ~timeout_k:(bake ?threshold ())
+    ~event_k:(insert_block ?max_priority ())
 
-  (* main loop *)
-  let rec worker_loop () =
-    begin
-      (* event construction *)
-      let timeout = compute_timeout state in
-      Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
-                   (get_block () >|= fun b -> `Hash b) ;
-                 ] >>= function
-        (* event matching *)
-      | `Hash (None | Some (Error _)) ->
-          (* exit when the node is unavailable *)
-          last_get_block := None ;
-          lwt_log_error "Connection to node lost, exiting." >>= fun () ->
-          exit 1
-      | `Hash (Some (Ok bi)) -> begin
-          (* new block: cancel everything and bake on the new head *)
-          last_get_block := None ;
-          lwt_debug
-            "Discoverered block: %a"
-            Block_hash.pp_short bi.Client_baking_blocks.hash >>= fun () ->
-          check_error @@ insert_block cctxt ?max_priority state bi
-        end
-      | `Timeout ->
-          (* main event: it's baking time *)
-          lwt_debug "Waking up for baking..." >>= fun () ->
-          (* core functionality *)
-          check_error @@ bake cctxt ?threshold state
-    end >>= fun () ->
-    (* and restart *)
-    worker_loop () in
-
-  (* ignition *)
-  lwt_log_info "Starting baking daemon" >>= fun () ->
-  worker_loop ()
-
-(* Wrapper around previous [create] function that handles the case of
-   unavailable blocks (empty block chain). *)
-let create
-    (cctxt : #Proto_alpha.full)
-    ?threshold
-    ?max_priority
-    ~(context_path: string)
-    (delegates: public_key_hash list)
-    (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t) =
-  Client_baking_scheduling.wait_for_first_block
-    ~info:lwt_log_info
-    block_stream
-    (create cctxt ?threshold ?max_priority ~context_path delegates block_stream)

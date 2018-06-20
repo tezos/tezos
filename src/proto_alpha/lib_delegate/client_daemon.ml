@@ -12,7 +12,7 @@ module Endorser = struct
   let run (cctxt : #Proto_alpha.full) ~delay ?min_date delegates =
     Client_baking_blocks.monitor_heads
       cctxt `Main >>=? fun block_stream ->
-    Client_baking_endorsement.create cctxt ~delay delegates block_stream >>= fun () ->
+    Client_baking_endorsement.create cctxt ~delay delegates block_stream >>=? fun () ->
     ignore min_date;
     return ()
 
@@ -35,7 +35,7 @@ module Accuser = struct
   let run (cctxt : #Proto_alpha.full) =
     Client_baking_operations.monitor_endorsement
       cctxt >>=? fun endorsement_stream ->
-    Client_baking_denunciation.create cctxt endorsement_stream >>= fun () ->
+    Client_baking_denunciation.create cctxt endorsement_stream >>=? fun () ->
     return ()
 
 end
