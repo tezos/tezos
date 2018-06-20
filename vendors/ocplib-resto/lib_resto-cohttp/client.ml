@@ -120,9 +120,16 @@ module Make (Encoding : Resto.ENCODING) = struct
     | `Stream s -> `Stream (Lwt_stream.clone s)
     | x -> x
 
-  let generic_call meth ?(logger = null_logger) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
+  let generic_call meth ?(logger = null_logger) ?(headers = []) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
     let module Logger = (val logger) in
-    let headers = Header.init () in
+    let headers = List.fold_left (fun headers (header, value) ->
+        if String.length header < 2
+        || String.sub (String.lowercase_ascii header) 0 2 <> "x-" then
+          invalid_arg
+            "Resto_cohttp.Client.call: \
+             only headers starting with \"x-\" are supported"
+        else Header.add headers header value)
+        (Header.init ()) headers in
     begin
       match body with
       | None->
@@ -255,12 +262,12 @@ module Make (Encoding : Resto.ENCODING) = struct
     Lwt.return (log, meth, uri, body, media)
 
   let call_service media_types
-      ?logger ?base service params query body =
+      ?logger ?headers ?base service params query body =
     prepare
       media_types ?logger ?base
       service params query body >>= fun (log, meth, uri, body, media) ->
     begin
-      generic_call ~accept:media_types meth ?body ?media uri >>= function
+      generic_call ?headers ~accept:media_types meth ?body ?media uri >>= function
       | `Ok None ->
           log.log Encoding.untyped `No_content (lazy (Lwt.return "")) >>= fun () ->
           Lwt.return (`Ok None)
@@ -298,12 +305,12 @@ module Make (Encoding : Resto.ENCODING) = struct
     Lwt.return (meth, uri, ans)
 
   let call_streamed_service media_types
-      ?logger ?base service ~on_chunk ~on_close params query body =
+      ?logger ?headers ?base service ~on_chunk ~on_close params query body =
     prepare
       media_types ?logger ?base
       service params query body >>= fun (log, meth, uri, body, media) ->
     begin
-      generic_call ~accept:media_types meth ?body ?media uri >>= function
+      generic_call ?headers ~accept:media_types meth ?body ?media uri >>= function
       | `Ok None ->
           on_close () ;
           log.log Encoding.untyped `No_content (lazy (Lwt.return "")) >>= fun () ->
