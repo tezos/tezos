@@ -261,6 +261,23 @@ let commands () : Client_context.io_wallet Clic.command list =
                  else
                    return ()) ;
 
+    command ~group ~desc: "Forget one address."
+      (args1 (Clic.switch
+                ~long:"force" ~short:'f'
+                ~doc:"delete associated keys when present" ()))
+      (prefixes [ "forget" ; "address"]
+       @@ Public_key_hash.alias_param
+       @@ stop)
+      (fun force (name, _pkh) (cctxt : Client_context.io_wallet) ->
+         Secret_key.mem cctxt name >>=? fun has_secret_key ->
+         Public_key.mem cctxt name >>=? fun has_public_key ->
+         fail_when (not force && (has_secret_key || has_public_key))
+           (failure "secret or public key present for %s, \
+                     use --force to delete" name) >>=? fun () ->
+         Secret_key.del cctxt name >>=? fun () ->
+         Public_key.del cctxt name >>=? fun () ->
+         Public_key_hash.del cctxt name) ;
+
     command ~group ~desc: "Forget the entire wallet of keys."
       (args1 (Clic.switch
                 ~long:"force" ~short:'f'
@@ -268,7 +285,7 @@ let commands () : Client_context.io_wallet Clic.command list =
       (fixed [ "forget" ; "all" ; "keys" ])
       (fun force (cctxt : Client_context.io_wallet) ->
          fail_unless force
-           (failure "this can only used with option --force") >>=? fun () ->
+           (failure "this can only be used with option --force") >>=? fun () ->
          Public_key.set cctxt [] >>=? fun () ->
          Secret_key.set cctxt [] >>=? fun () ->
          Public_key_hash.set cctxt []) ;
