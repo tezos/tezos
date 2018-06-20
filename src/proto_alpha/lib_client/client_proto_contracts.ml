@@ -110,10 +110,6 @@ module ContractAlias = struct
 
 end
 
-module Contract_tags = Client_tags.Tags (struct
-    let name = "contract"
-  end)
-
 let list_contracts cctxt =
   RawContractAlias.load cctxt >>=? fun raw_contracts ->
   Lwt_list.map_s
