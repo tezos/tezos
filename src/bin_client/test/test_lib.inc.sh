@@ -82,7 +82,7 @@ run_contract_file () {
     if [ ! -z "$4" ]; then
         amount_flag="-amount $4"
     fi
-    $client run program "$contract" on storage "$storage" and input "$input" $amount_flag
+    $client run script "$contract" on storage "$storage" and input "$input" $amount_flag
 }
 
 assert_storage () {
@@ -122,7 +122,7 @@ contract_name_of_file () {
 init_contract_from_file () {
     local FILE="$1"
     local NAME=$(contract_name_of_file "${FILE}")
-    $client remember program "${NAME}" "file:${FILE}"
+    $client remember script "${NAME}" "file:${FILE}"
 }
 
 bake () {

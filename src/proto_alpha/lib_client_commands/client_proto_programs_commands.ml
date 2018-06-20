@@ -10,8 +10,8 @@
 open Proto_alpha
 
 let group =
-  { Clic.name = "programs" ;
-    title = "Commands for managing the library of known programs" }
+  { Clic.name = "scripts" ;
+    title = "Commands for managing the library of known scripts" }
 
 open Tezos_micheline
 open Client_proto_programs
@@ -76,17 +76,17 @@ let commands () =
          | None -> failwith "Not given a valid signature") in
   [
 
-    command ~group ~desc: "Lists all programs in the library."
+    command ~group ~desc: "Lists all scripts in the library."
       no_options
-      (fixed [ "list" ; "known" ; "programs" ])
+      (fixed [ "list" ; "known" ; "scripts" ])
       (fun () (cctxt : Proto_alpha.full) ->
          Program.load cctxt >>=? fun list ->
          Lwt_list.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
          return ()) ;
 
-    command ~group ~desc: "Add a program to the library."
+    command ~group ~desc: "Add a script to the library."
       (args1 (Program.force_switch ()))
-      (prefixes [ "remember" ; "program" ]
+      (prefixes [ "remember" ; "script" ]
        @@ Program.fresh_alias_param
        @@ Program.source_param
        @@ stop)
@@ -94,16 +94,16 @@ let commands () =
          Program.of_fresh cctxt force name >>=? fun name ->
          Program.add ~force cctxt name hash) ;
 
-    command ~group ~desc: "Remove a program from the library."
+    command ~group ~desc: "Remove a script from the library."
       no_options
-      (prefixes [ "forget" ; "program" ]
+      (prefixes [ "forget" ; "script" ]
        @@ Program.alias_param
        @@ stop)
       (fun () (name, _) cctxt -> Program.del cctxt name) ;
 
-    command ~group ~desc: "Display a program from the library."
+    command ~group ~desc: "Display a script from the library."
       no_options
-      (prefixes [ "show" ; "known" ; "program" ]
+      (prefixes [ "show" ; "known" ; "script" ]
        @@ Program.alias_param
        @@ stop)
       (fun () (_, program) (cctxt : Proto_alpha.full) ->
@@ -111,9 +111,9 @@ let commands () =
          cctxt#message "%s\n" source >>= fun () ->
          return ()) ;
 
-    command ~group ~desc: "Ask the node to run a program."
+    command ~group ~desc: "Ask the node to run a script."
       (args3 trace_stack_switch amount_arg no_print_source_flag)
-      (prefixes [ "run" ; "program" ]
+      (prefixes [ "run" ; "script" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
        @@ Clic.param ~name:"storage" ~desc:"the storage data"
@@ -131,9 +131,9 @@ let commands () =
           else
             run cctxt cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
             print_run_result cctxt ~show_source ~parsed:program res)) ;
-    command ~group ~desc: "Ask the node to typecheck a program."
+    command ~group ~desc: "Ask the node to typecheck a script."
       (args4 show_types_switch emacs_mode_switch no_print_source_flag custom_gas_flag)
-      (prefixes [ "typecheck" ; "program" ]
+      (prefixes [ "typecheck" ; "script" ]
        @@ Program.source_param
        @@ stop)
       (fun (show_types, emacs_mode, no_print_source, original_gas) program cctxt ->

@@ -23,7 +23,7 @@ module Program = Client_aliases.Alias (struct
     let of_source source =
       return (Michelson_v1_parser.parse_toplevel source)
     let to_source ({ Michelson_v1_parser.source }, _) = return source
-    let name = "program"
+    let name = "script"
   end)
 
 let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
@@ -32,7 +32,7 @@ let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
        ~details:false
        ~show_source
        ~parsed) errs >>= fun () ->
-  cctxt#error "error running program" >>= fun () ->
+  cctxt#error "error running script" >>= fun () ->
   return ()
 
 let print_big_map_diff ppf = function
@@ -181,4 +181,4 @@ let print_typecheck_result
              ~details: show_types
              ~show_source:print_source_on_error
              ~parsed:program) errs >>= fun () ->
-        cctxt#error "ill-typed program"
+        cctxt#error "ill-typed script"
