@@ -359,6 +359,20 @@ type packed_contents_and_result =
   | Contents_and_result :
       'kind Operation.contents * 'kind contents_result -> packed_contents_and_result
 
+type ('a, 'b) eq = Eq : ('a, 'a) eq
+
+let equal_manager_kind
+  : type a b. a Kind.manager -> b Kind.manager -> (a, b) eq option
+  = fun ka kb -> match ka, kb with
+    | Kind.Reveal_manager_kind, Kind.Reveal_manager_kind -> Some Eq
+    | Kind.Reveal_manager_kind, _ -> None
+    | Kind.Transaction_manager_kind, Kind.Transaction_manager_kind -> Some Eq
+    | Kind.Transaction_manager_kind, _ -> None
+    | Kind.Origination_manager_kind, Kind.Origination_manager_kind -> Some Eq
+    | Kind.Origination_manager_kind, _ -> None
+    | Kind.Delegation_manager_kind, Kind.Delegation_manager_kind -> Some Eq
+    | Kind.Delegation_manager_kind, _ -> None
+
 module Encoding = struct
 
   type 'kind case =
@@ -534,14 +548,22 @@ module Encoding = struct
             end
           | Contents_result
               (Manager_operation_result
-                 ({ operation_result = Skipped _ ; _ } as op)) ->
-              Some (Manager_operation_result
-                      { op with operation_result = Skipped res_case.kind })
+                 ({ operation_result = Skipped kind ; _ } as op)) ->
+              begin match equal_manager_kind kind res_case.kind with
+                | None -> None
+                | Some Eq ->
+                    Some (Manager_operation_result
+                            { op with operation_result = Skipped kind })
+              end
           | Contents_result
               (Manager_operation_result
-                 ({ operation_result = Failed (_, errs) ; _ } as op)) ->
-              Some (Manager_operation_result
-                      { op with operation_result = Failed (res_case.kind, errs) })
+                 ({ operation_result = Failed (kind, errs) ; _ } as op)) ->
+              begin match equal_manager_kind kind res_case.kind with
+                | None -> None
+                | Some Eq ->
+                    Some (Manager_operation_result
+                            { op with operation_result = Failed (kind, errs) })
+              end
           | Contents_result Ballot_result -> None
           | Contents_result (Endorsement_result _) -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
@@ -747,8 +769,6 @@ let operation_metadata_encoding =
         | _ -> None)
       (fun () -> No_operation_metadata) ;
   ]
-
-type ('a, 'b) eq = Eq : ('a, 'a) eq
 
 let kind_equal
   : type kind kind2. kind contents -> kind2 contents_result -> (kind, kind2) eq option =
