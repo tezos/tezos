@@ -57,7 +57,9 @@ module Make(N : sig val scheme : string end) = struct
         | None ->
             failwith "Invalid locator %a" Uri.pp_hum uri
         | Some i ->
-            let pkh = String.sub path (i + 1) (String.length path - i - 1) in
+            let pkh =
+              try String.sub path (i + 1) (String.length path - i - 1)
+              with _ -> "" in
             let path = String.sub path 0 i in
             return (Uri.with_path uri path, pkh)
       end >>=? fun (base, pkh) ->

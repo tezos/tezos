@@ -43,7 +43,6 @@ let run (cctxt : #Client_context.wallet) path ?magic_bytes ~require_auth =
     end ;
     loop ()
   in
-  Lwt_unix.listen fd 10 ;
   begin
     match path with
     | Tcp (host, port) ->

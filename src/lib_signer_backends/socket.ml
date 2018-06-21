@@ -23,19 +23,24 @@ module Make(P : sig
       | None -> msg
       | Some watermark ->
           MBytes.concat "" [ Signature.bytes_of_watermark watermark ; msg ] in
-    Lwt_utils_unix.Socket.connect path >>=? fun conn ->
-    Lwt_utils_unix.Socket.send
-      conn Request.encoding Request.Authorized_keys >>=? fun () ->
-    Lwt_utils_unix.Socket.recv conn
-      Authorized_keys.Response.encoding >>=? fun authorized_keys ->
-    begin match authorized_keys with
-      | No_authentication -> return None
-      | Authorized_keys authorized_keys ->
-          P.authenticate authorized_keys
-            (Sign.Request.to_sign ~pkh ~data:msg) >>=? fun signature ->
-          return (Some signature)
+    begin
+      Lwt_utils_unix.Socket.connect path >>=? fun conn ->
+      Lwt_utils_unix.Socket.send
+        conn Request.encoding Request.Authorized_keys >>=? fun () ->
+      Lwt_utils_unix.Socket.recv conn
+        (result_encoding Authorized_keys.Response.encoding) >>=? fun authorized_keys ->
+      Lwt.return authorized_keys >>=? fun authorized_keys ->
+      Lwt_unix.close conn >>= fun () ->
+      begin match authorized_keys with
+        | No_authentication -> return None
+        | Authorized_keys authorized_keys ->
+            P.authenticate authorized_keys
+              (Sign.Request.to_sign ~pkh ~data:msg) >>=? fun signature ->
+            return (Some signature)
+      end
     end >>=? fun signature ->
     let req = { Sign.Request.pkh ; data = msg ; signature } in
+    Lwt_utils_unix.Socket.connect path >>=? fun conn ->
     Lwt_utils_unix.Socket.send
       conn Request.encoding (Request.Sign req) >>=? fun () ->
     Lwt_utils_unix.Socket.recv conn
@@ -61,7 +66,7 @@ module Make(P : sig
 
     let description =
       "Valid locators are of the form\n\
-      \ - unix:///path/to/socket?pkh=tz1..."
+      \ - unix:/path/to/socket?pkh=tz1..."
 
     let parse uri =
       assert (Uri.scheme uri = Some scheme) ;
@@ -109,8 +114,12 @@ module Make(P : sig
       | _, None ->
           failwith "Missing host port"
       | Some path, Some port ->
+          let pkh = Uri.path uri in
+          let pkh =
+            try String.(sub pkh 1 (length pkh - 1))
+            with _ -> "" in
           Lwt.return
-            (Signature.Public_key_hash.of_b58check (Uri.path uri)) >>=? fun pkh ->
+            (Signature.Public_key_hash.of_b58check pkh) >>=? fun pkh ->
           return (Lwt_utils_unix.Socket.Tcp (path, port), pkh)
 
     let public_key uri =
