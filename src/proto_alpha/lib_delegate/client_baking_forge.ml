@@ -26,8 +26,10 @@ type state = {
   genesis: Block_hash.t ;
   index : Context.index ;
 
+  (* see [get_delegates] below to find delegates when the list is empty *)
+  delegates: public_key_hash list ;
+
   (* lazy-initialisation with retry-on-error *)
-  delegates: public_key_hash list tzlazy ;
   constants: Constants.t tzlazy ;
 
   (* truly mutable *)
@@ -44,6 +46,13 @@ let create_state genesis index delegates constants best =
     best ;
     future_slots = [] ;
   }
+
+let get_delegates cctxt state = match state.delegates with
+  | [] ->
+      Client_keys.get_keys cctxt >>=? fun keys ->
+      let delegates = List.map (fun (_,pkh,_,_) -> pkh) keys in
+      return delegates
+  | (_ :: _) as delegates -> return delegates
 
 let generate_seed_nonce () =
   match Nonce.of_bytes @@
@@ -456,7 +465,7 @@ let insert_block
     drop_old_slots
       ~before:(Time.add state.best.timestamp (-1800L)) state ;
   end ;
-  tzforce state.delegates >>=? fun delegates ->
+  get_delegates cctxt state >>=? fun delegates ->
   get_baking_slot cctxt ?max_priority bi delegates >>= function
   | [] ->
       lwt_debug
@@ -736,14 +745,6 @@ let create
   =
 
   let state_maker genesis_hash bi =
-    let delegates = match delegates with
-      | [] ->
-          tzlazy (fun () ->
-              Client_keys.get_keys cctxt >>=? fun keys ->
-              let delegates = List.map (fun (_,pkh,_,_) -> pkh) keys in
-              return delegates
-            )
-      | _ :: _ -> tzlazy (fun () -> return delegates) in
     let constants =
       tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Head 0)) in
     Client_baking_simulator.load_context ~context_path >>= fun index ->

@@ -77,7 +77,7 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
 (** Worker *)
 
 type state = {
-  delegates: public_key_hash list tzlazy ;
+  delegates: public_key_hash list ;
   delay: int64 ;
   mutable pending: endorsements option ;
 }
@@ -91,6 +91,13 @@ and endorsements = {
 
 let create_state delegates delay =
   { delegates ; delay ; pending = None }
+
+let get_delegates cctxt state = match state.delegates with
+  | [] ->
+      Client_keys.get_keys cctxt >>=? fun keys ->
+      let delegates = List.map (fun (_,pkh,_,_) -> pkh) keys in
+      return delegates
+  | (_ :: _) as delegates -> return delegates
 
 let endorse_for_delegate cctxt block delegate =
   let { Client_baking_blocks.hash ; level } = block in
@@ -143,7 +150,7 @@ let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state b
       Block_hash.pp_short bi.hash >>= fun () ->
     let time = Time.(add (now ()) state.delay) in
     let timeout = Lwt_unix.sleep (Int64.to_float state.delay) in
-    tzforce state.delegates >>=? fun delegates ->
+    get_delegates cctxt state >>=? fun delegates ->
     filter_p (allowed_to_endorse cctxt bi) delegates >>=? fun delegates ->
     state.pending <- Some {
         time ;
@@ -169,20 +176,12 @@ let create
     (cctxt: #Proto_alpha.full)
     ?(max_past=110L)
     ~delay
-    contracts
+    delegates
     block_stream
   =
 
   let state_maker _ _ =
-    let contracts = match contracts with
-      | [] ->
-          tzlazy (fun () ->
-              Client_keys.get_keys cctxt >>=? fun keys ->
-              return (List.map (fun (_, pkh, _, _) -> pkh) keys)
-            )
-      | _ :: _ ->
-          tzlazy (fun () -> return contracts) in
-    let state = create_state contracts (Int64.of_int delay) in
+    let state = create_state delegates (Int64.of_int delay) in
     return state
   in
 
