@@ -23,6 +23,7 @@ type t = {
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
   operation_gas: Gas_limit_repr.t ;
+  storage_space_to_pay: Z.t option ;
   block_storage: Z.t ;
   operation_storage: Storage_limit_repr.t ;
   origination_nonce: Contract_repr.origination_nonce option ;
@@ -180,6 +181,27 @@ let gas_consumed ~since ~until =
   | _, _ -> Z.zero
 
 type error += Storage_limit_too_high (* `Permanent *)
+
+let init_storage_space_to_pay ctxt =
+  match ctxt.storage_space_to_pay with
+  | Some _ ->
+      assert false
+  | None ->
+      ok { ctxt with storage_space_to_pay = Some Z.zero }
+
+let update_storage_space_to_pay ctxt n =
+  match ctxt.storage_space_to_pay with
+  | None ->
+      assert false
+  | Some storage_space_to_pay ->
+      ok { ctxt with storage_space_to_pay = Some (Z.add n storage_space_to_pay) }
+
+let clear_storage_space_to_pay ctxt =
+  match ctxt.storage_space_to_pay with
+  | None ->
+      assert false
+  | Some storage_space_to_pay ->
+      { ctxt with storage_space_to_pay = None }, storage_space_to_pay
 
 let () =
   let open Data_encoding in
@@ -427,6 +449,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
     rewards = Tez_repr.zero ;
     deposits = Signature.Public_key_hash.Map.empty ;
     operation_gas = Unaccounted ;
+    storage_space_to_pay = None ;
     block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
     operation_storage = Unaccounted ;
     block_storage = constants.Constants_repr.hard_storage_limit_per_block ;
@@ -475,6 +498,7 @@ let register_resolvers enc resolve =
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
       allowed_endorsements = Signature.Public_key_hash.Map.empty ;
+      storage_space_to_pay = None ;
       fees = Tez_repr.zero ;
       rewards = Tez_repr.zero ;
       deposits = Signature.Public_key_hash.Map.empty ;

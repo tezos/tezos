@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Alpha_context
-
 type error += Cannot_pay_storage_fee
 
 let () =
@@ -23,29 +21,30 @@ let () =
     (fun () -> Cannot_pay_storage_fee)
 
 
-let origination_burn c ~payer contract =
-  let origination_burn = Constants.origination_burn c in
-  Contract.spend_from_script c payer origination_burn >>=? fun c ->
-  Contract.used_storage_space c contract >>=? fun size ->
-  let cost_per_byte = Constants.cost_per_byte c in
-  Lwt.return (Tez.(cost_per_byte *? (Z.to_int64 size))) >>=? fun fees ->
-  trace Cannot_pay_storage_fee
-    (Contract.spend_from_script c payer fees >>=? fun c ->
-     Contract.pay_for_storage_space c contract fees) >>=? fun c ->
-  return (c, size, fees)
+let origination_burn c ~payer =
+  let origination_burn = Constants_storage.origination_burn c in
+  Contract_storage.spend_from_script c payer origination_burn >>=? fun c ->
+  return (c, origination_burn)
 
-let update_script_storage c ~payer contract =
-  Contract.paid_storage_space_fees c contract >>=? fun paid_fees ->
-  Contract.used_storage_space c contract >>=? fun size ->
-  let cost_per_byte = Constants.cost_per_byte c in
-  Lwt.return (Tez.(cost_per_byte *? (Z.to_int64 size))) >>=? fun fees ->
-  match Tez.(fees -? paid_fees) with
-  | Error _ ->
-      (* Previously paid fees are greater than required fees. *)
-      return (c, size, Tez.zero)
-  | Ok to_be_paid ->
-      (* Burning the fees... *)
-      trace Cannot_pay_storage_fee
-        (Contract.spend_from_script c payer to_be_paid >>=? fun c ->
-         Contract.pay_for_storage_space c contract to_be_paid) >>=? fun c ->
-      return (c, size, to_be_paid)
+let record_paid_storage_space c contract =
+  Contract_storage.used_storage_space c contract >>=? fun size ->
+  Contract_storage.record_paid_storage_space c contract size >>=? fun (to_be_paid, c) ->
+  Lwt.return (Raw_context.update_storage_space_to_pay c to_be_paid) >>=? fun c ->
+  let cost_per_byte = Constants_storage.cost_per_byte c in
+  Lwt.return (Tez_repr.(cost_per_byte *? (Z.to_int64 to_be_paid))) >>=? fun to_burn ->
+  return (c, size, to_burn)
+
+let burn_fees_for_storage c ~payer =
+  let c, storage_space_to_pay = Raw_context.clear_storage_space_to_pay c in
+  let cost_per_byte = Constants_storage.cost_per_byte c in
+  Lwt.return (Tez_repr.(cost_per_byte *? (Z.to_int64 storage_space_to_pay))) >>=? fun to_burn ->
+  (* Burning the fees... *)
+  trace Cannot_pay_storage_fee
+    (Contract_storage.spend_from_script c payer to_burn) >>=? fun c ->
+  return c
+
+let with_fees_for_storage c ~payer f =
+  Lwt.return (Raw_context.init_storage_space_to_pay c) >>=? fun c ->
+  f c >>=? fun (c, ret) ->
+  burn_fees_for_storage c ~payer >>=? fun c ->
+  return (c, ret)

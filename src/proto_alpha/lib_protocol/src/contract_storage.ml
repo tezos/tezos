@@ -225,7 +225,7 @@ let create_base c contract
        let total_size = Z.add (Z.add (Z.of_int code_size) (Z.of_int storage_size)) big_map_size in
        assert Compare.Z.(total_size >= Z.zero) ;
        Storage.Contract.Used_storage_space.init c contract total_size >>=? fun c ->
-       Storage.Contract.Paid_storage_space_fees.init c contract Tez_repr.zero
+       Storage.Contract.Paid_storage_space.init c contract Z.zero
    | None ->
        return c) >>=? fun c ->
   return c
@@ -252,7 +252,7 @@ let delete c contract =
       Storage.Contract.Counter.delete c contract >>=? fun c ->
       Storage.Contract.Code.remove c contract >>=? fun (c, _) ->
       Storage.Contract.Storage.remove c contract >>=? fun (c, _) ->
-      Storage.Contract.Paid_storage_space_fees.remove c contract >>= fun c ->
+      Storage.Contract.Paid_storage_space.remove c contract >>= fun c ->
       Storage.Contract.Used_storage_space.remove c contract >>= fun c ->
       return c
 
@@ -461,18 +461,19 @@ let used_storage_space c contract =
   | None -> return Z.zero
   | Some fees -> return fees
 
-let paid_storage_space_fees c contract =
-  Storage.Contract.Paid_storage_space_fees.get_option c contract >>=? function
-  | None -> return Tez_repr.zero
-  | Some paid_fees -> return paid_fees
+let paid_storage_space c contract =
+  Storage.Contract.Paid_storage_space.get_option c contract >>=? function
+  | None -> return Z.zero
+  | Some paid_space -> return paid_space
 
-let pay_for_storage_space c contract fees =
-  if Tez_repr.equal fees Tez_repr.zero then
-    return c
+let record_paid_storage_space c contract paid_storage =
+  Storage.Contract.Paid_storage_space.get c contract >>=? fun already_paid_fees ->
+  if Compare.Z.(already_paid_fees < paid_storage) then
+    return (Z.zero, c)
   else
-    Storage.Contract.Paid_storage_space_fees.get c contract >>=? fun paid_fees ->
-    Lwt.return (Tez_repr.(paid_fees +? fees)) >>=? fun paid_fees ->
-    Storage.Contract.Paid_storage_space_fees.set c contract paid_fees
+    let to_pay = Z.sub paid_storage already_paid_fees in
+    Storage.Contract.Paid_storage_space.set c contract paid_storage >>=? fun c ->
+    return (to_pay, c)
 
 module Big_map = struct
   let mem ctxt contract key =

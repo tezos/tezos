@@ -578,8 +578,6 @@ module Contract : sig
   val set_storage_unlimited: context -> context
 
   val used_storage_space: context -> t -> Z.t tzresult Lwt.t
-  val paid_storage_space_fees: context -> t -> Tez.t tzresult Lwt.t
-  val pay_for_storage_space: context -> t -> Tez.t -> context tzresult Lwt.t
 
   val increment_counter:
     context -> contract -> context tzresult Lwt.t
@@ -894,6 +892,21 @@ type packed_internal_operation =
   | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
 val manager_kind: 'kind manager_operation -> 'kind Kind.manager
+
+module Fees : sig
+
+  val origination_burn:
+    context -> payer:Contract.t -> (context * Tez.t) tzresult Lwt.t
+
+  val record_paid_storage_space:
+    context -> Contract.t -> (context * Z.t * Tez.t) tzresult Lwt.t
+
+  val with_fees_for_storage:
+    context -> payer:Contract.t ->
+    (context -> (context * 'a) tzresult Lwt.t) ->
+    (context * 'a) tzresult Lwt.t
+
+end
 
 module Operation : sig
 

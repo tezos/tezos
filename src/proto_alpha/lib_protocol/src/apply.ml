@@ -398,8 +398,8 @@ let apply_manager_operation_content :
             Contract.used_storage_space ctxt destination >>=? fun old_size ->
             Contract.update_script_storage
               ctxt destination storage big_map_diff >>=? fun ctxt ->
-            Fees.update_script_storage
-              ctxt ~payer destination >>=? fun (ctxt, new_size, fees) ->
+            Fees.record_paid_storage_space
+              ctxt destination >>=? fun (ctxt, new_size, fees) ->
             Contract.originated_from_current_nonce
               ~since: before_operation
               ~until: ctxt >>=? fun originated_contracts ->
@@ -440,12 +440,14 @@ let apply_manager_operation_content :
           ~manager ~delegate ~balance:credit
           ?script
           ~spendable ~delegatable >>=? fun ctxt ->
-        Fees.origination_burn ctxt ~payer contract >>=? fun (ctxt, size, fees) ->
+        Fees.origination_burn ctxt ~payer >>=? fun (ctxt, orignation_burn) ->
+        Fees.record_paid_storage_space ctxt contract >>=? fun (ctxt, size, fees) ->
+        Lwt.return Tez.(orignation_burn +? fees) >>=? fun all_fees ->
         let result =
           Origination_result
             { balance_updates =
                 cleanup_balance_updates
-                  [ Contract payer, Debited fees ;
+                  [ Contract payer, Debited all_fees ;
                     Contract source, Debited credit ;
                     Contract contract, Credited credit ] ;
               originated_contracts = [ contract ] ;
@@ -516,22 +518,24 @@ let apply_manager_contents
   Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
   Lwt.return (Contract.set_storage_limit ctxt storage_limit) >>=? fun ctxt ->
   let level = Level.current ctxt in
-  apply_manager_operation_content ctxt mode
-    ~source ~payer:source ~internal:false operation >>= begin function
-    | Ok (ctxt, operation_results, internal_operations) -> begin
-        apply_internal_manager_operations
-          ctxt mode ~payer:source internal_operations >>= function
-        | Ok (ctxt, internal_operations_results) ->
-            return (ctxt,
-                    Applied operation_results, internal_operations_results)
-        | Error internal_operations_results ->
-            return (ctxt (* backtracked *),
-                    Applied operation_results, internal_operations_results)
-      end
-    | Error operation_results ->
-        return (ctxt (* backtracked *),
-                Failed (manager_kind operation, operation_results), [])
-  end >>=? fun (ctxt, operation_result, internal_operation_results) ->
+  Fees.with_fees_for_storage ctxt ~payer:source begin fun ctxt ->
+    apply_manager_operation_content ctxt mode
+      ~source ~payer:source ~internal:false operation >>= begin function
+      | Ok (ctxt, operation_results, internal_operations) -> begin
+          apply_internal_manager_operations
+            ctxt mode ~payer:source internal_operations >>= function
+          | Ok (ctxt, internal_operations_results) ->
+              return (ctxt,
+                      (Applied operation_results, internal_operations_results))
+          | Error internal_operations_results ->
+              return (ctxt (* backtracked *),
+                      (Applied operation_results, internal_operations_results))
+        end
+      | Error operation_results ->
+          return (ctxt (* backtracked *),
+                  (Failed (manager_kind operation, operation_results), []))
+    end
+  end >>=? fun (ctxt, (operation_result, internal_operation_results)) ->
   return (ctxt,
           Manager_operation_result
             { balance_updates =

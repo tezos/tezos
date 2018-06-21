@@ -54,6 +54,7 @@ module Script = struct
   include Michelson_v1_primitives
   include Script_repr
 end
+module Fees = Fees
 
 type public_key = Signature.Public_key.t
 type public_key_hash = Signature.Public_key_hash.t

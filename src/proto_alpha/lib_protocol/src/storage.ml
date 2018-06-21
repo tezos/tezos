@@ -172,10 +172,10 @@ module Contract = struct
         let encoding = Script_repr.expr_encoding
       end)
 
-  module Paid_storage_space_fees =
+  module Paid_storage_space =
     Indexed_context.Make_map
       (struct let name = ["paid_bytes"] end)
-      (Tez_repr)
+      (Z)
 
   module Used_storage_space =
     Indexed_context.Make_map
