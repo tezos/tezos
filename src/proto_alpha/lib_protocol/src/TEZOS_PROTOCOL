@@ -52,7 +52,7 @@
         "Vote_storage",
         "Commitment_storage",
         "Init_storage",
-        "Fees",
+        "Fees_storage",
 
         "Alpha_context",
 
