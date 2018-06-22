@@ -9,6 +9,8 @@
 
 (** {1 Errors} ****************************************************************)
 
+type error += Too_many_internal_operations (* `Permanent *)
+
 (** An internal storage error that should not happen *)
 type storage_error =
   | Incompatible_protocol_version of string

@@ -15,6 +15,8 @@ type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
 type error += Unexpected_endorsement
+type error += Invalid_signature  (* `Permanent *)
+type error += Invalid_stamp  (* `Permanent *)
 
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
     time, given the predecessor block timestamp [pred_block_time],

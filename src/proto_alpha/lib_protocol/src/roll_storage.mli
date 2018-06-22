@@ -20,6 +20,7 @@
 type error +=
   | Consume_roll_change
   | No_roll_for_delegate
+  | No_roll_snapshot_for_cycle of Cycle_repr.t
   | Unregistered_delegate of Signature.Public_key_hash.t (* `Permanent *)
 
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
