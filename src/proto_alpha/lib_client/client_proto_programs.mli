@@ -18,7 +18,6 @@ val run :
   #Proto_alpha.rpc_context ->
   ?chain:Shell_services.chain ->
   Shell_services.block ->
-  ?contract:Contract.t ->
   ?amount:Tez.t ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
@@ -32,7 +31,6 @@ val trace :
   #Proto_alpha.rpc_context ->
   ?chain:Shell_services.chain ->
   Shell_services.block ->
-  ?contract:Contract.t ->
   ?amount:Tez.t ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->

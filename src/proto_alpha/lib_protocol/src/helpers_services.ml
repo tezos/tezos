@@ -45,12 +45,11 @@ module Scripts = struct
     let path = RPC_path.(path / "scripts")
 
     let run_code_input_encoding =
-      (obj5
+      (obj4
          (req "script" Script.expr_encoding)
          (req "storage" Script.expr_encoding)
          (req "input" Script.expr_encoding)
-         (req "amount" Tez.encoding)
-         (req "contract" Contract.encoding))
+         (req "amount" Tez.encoding))
 
     let run_code =
       RPC_service.post_service
@@ -140,32 +139,46 @@ module Scripts = struct
 
   let register () =
     let open Services_registration in
-    register0 S.run_code begin fun ctxt ()
-      (code, storage, parameter, amount, contract) ->
-      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
+    let originate_dummy_contract ctxt script =
       let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+      Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, dummy_contract) ->
+      let balance = match Tez.of_mutez 4_000_000_000_000L with
+        | Some balance -> balance
+        | None -> assert false in
+      Contract.originate ctxt dummy_contract
+        ~balance
+        ~manager: Signature.Public_key_hash.zero
+        ~delegate: None
+        ~spendable: false
+        ~delegatable: false
+        ~script: (script, None) >>=? fun ctxt ->
+      return (ctxt, dummy_contract) in
+    register0 S.run_code begin fun ctxt ()
+      (code, storage, parameter, amount) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
+      originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
+      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
       Script_interpreter.execute
         ctxt Readable
-        ~source:contract (* transaction initiator *)
-        ~payer:contract (* storage fees payer *)
-        ~self:(contract, { storage ; code }) (* script owner *)
+        ~source:dummy_contract
+        ~payer:dummy_contract
+        ~self:(dummy_contract, { storage ; code })
         ~amount ~parameter
       >>=? fun { Script_interpreter.storage ; operations ; big_map_diff ; _ } ->
       return (storage, operations, big_map_diff)
     end ;
     register0 S.trace_code begin fun ctxt ()
-      (code, storage, parameter, amount, contract) ->
-      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
-      let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+      (code, storage, parameter, amount) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
+      originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
+      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
       Script_interpreter.trace
         ctxt Readable
-        ~source:contract (* transaction initiator *)
-        ~payer:contract (* storage fees payer *)
-        ~self:(contract, { storage ; code }) (* script owner *)
+        ~source:dummy_contract
+        ~payer:dummy_contract
+        ~self:(dummy_contract, { storage ; code })
         ~amount ~parameter
       >>=? fun ({ Script_interpreter.storage ; operations ; big_map_diff ; _ }, trace) ->
       return (storage, operations, trace, big_map_diff)
@@ -249,13 +262,13 @@ module Scripts = struct
 
     end
 
-  let run_code ctxt block code (storage, input, amount, contract) =
+  let run_code ctxt block code (storage, input, amount) =
     RPC_context.make_call0 S.run_code ctxt
-      block () (code, storage, input, amount, contract)
+      block () (code, storage, input, amount)
 
-  let trace_code ctxt block code (storage, input, amount, contract) =
+  let trace_code ctxt block code (storage, input, amount) =
     RPC_context.make_call0 S.trace_code ctxt
-      block () (code, storage, input, amount, contract)
+      block () (code, storage, input, amount)
 
   let typecheck_code ctxt block =
     RPC_context.make_call0 S.typecheck_code ctxt block ()

@@ -78,42 +78,31 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
 
-let get_contract cctxt ?(chain = `Main) block contract =
-  match contract with
-  | Some contract -> return contract
-  | None ->
-      (* TODO use local contract by default *)
-      Alpha_services.Contract.list cctxt (chain, block) >>|? List.hd
-
 let run
     (cctxt : #Proto_alpha.rpc_context)
     ?(chain = `Main)
     block
-    ?contract
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
     () =
-  get_contract cctxt ~chain block contract >>=? fun contract ->
   Alpha_services.Helpers.Scripts.run_code cctxt
     (chain, block)
-    program.expanded (storage.expanded, input.expanded, amount, contract)
+    program.expanded (storage.expanded, input.expanded, amount)
 
 let trace
     (cctxt : #Proto_alpha.rpc_context)
     ?(chain = `Main)
     block
-    ?contract
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
     () =
-  get_contract cctxt ~chain block contract >>=? fun contract ->
   Alpha_services.Helpers.Scripts.trace_code cctxt
     (chain, block)
-    program.expanded (storage.expanded, input.expanded, amount, contract)
+    program.expanded (storage.expanded, input.expanded, amount)
 
 let typecheck_data
     cctxt
