@@ -393,7 +393,7 @@ let () =
     (function Unexpected_annotation loc -> Some (loc, ())
             | _ -> None)
     (fun (loc, ()) -> Unexpected_annotation loc);
-  (* Unexpected annotation *)
+  (* Ungrouped annotations *)
   register_error_kind
     `Permanent
     ~id:"ungroupedAnnotations"
