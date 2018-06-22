@@ -401,7 +401,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
            (append (split-string michelson-client-command " ")
                    (list
                     "typecheck"
-                    "program"
+                    "script"
                     (if michelson-alphanet
                         (concat "container:" tmp-file)
                       tmp-file)
