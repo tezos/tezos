@@ -95,6 +95,8 @@ let get_constants b =
 
 module Contract = struct
 
+  let pp = Alpha_context.Contract.pp
+
   let pkh c = Alpha_context.Contract.is_implicit c |> function
     | Some p -> return p
     | None -> failwith "pkh: only for implicit contracts"

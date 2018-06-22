@@ -19,12 +19,12 @@ open Test_tez
        destination contract with or without the fee of transfer.
     2- Check the equivalent of the balance of the source/destination
        contract before and after the transfer *)
-let transfer_and_check_balances ~loc b ?(fee=Tez.zero) src dst amount =
+let transfer_and_check_balances ~loc b ?(fee=Tez.zero) ?expect_failure src dst amount =
   Tez.(+?) fee amount >>?= fun amount_fee ->
   Context.Contract.balance (I b) src >>=? fun bal_src ->
   Context.Contract.balance (I b) dst >>=? fun bal_dst ->
   Op.transaction (I b) ~fee src dst amount >>=? fun op ->
-  Incremental.add_operation b op >>=? fun b ->
+  Incremental.add_operation ?expect_failure b op >>=? fun b ->
   Assert.balance_was_debited  ~loc (I b) src bal_src amount_fee >>=? fun () ->
   Assert.balance_was_credited ~loc (I b) dst bal_dst amount >>=? fun () ->
   return (b, op)
@@ -67,10 +67,11 @@ let register_two_contracts () =
 (** 1- Create a block and two contracts/accounts;
     2- Add a single transfer into this block;
     3- Bake this block. *)
-let single_transfer ?fee amount =
+let single_transfer ?fee ?expect_failure amount =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
-  transfer_and_check_balances ~loc:__LOC__ ?fee b contract_1 contract_2 amount >>=? fun (b,_) ->
+  transfer_and_check_balances ~loc:__LOC__ ?fee ?expect_failure
+    b contract_1 contract_2 amount >>=? fun (b,_) ->
   Incremental.finalize_block b >>=? fun _ ->
   return ()
 
@@ -80,7 +81,13 @@ let block_with_a_single_transfer () =
 
 (** single transfer without fee *)
 let transfer_zero_tez () =
-  single_transfer Tez.zero
+  single_transfer ~expect_failure:(
+    function
+    | Alpha_environment.Ecoproto_error (Contract_storage.Empty_transaction _) :: _ ->
+        return ()
+    | _ ->
+        failwith "Empty transaction should fail")
+    Tez.zero
 
 (** single transfer with fee *)
 let block_with_a_single_transfer_with_fee () =

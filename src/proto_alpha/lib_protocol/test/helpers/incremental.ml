@@ -95,9 +95,7 @@ let detect_script_failure :
         | Applied _ -> Ok ()
         | Skipped _ -> assert false
         | Failed (_, errs) ->
-            record_trace
-              (failure "The transfer simulation failed.")
-              (Alpha_environment.wrap_error (Error errs)) in
+            Alpha_environment.wrap_error (Error errs) in
       List.fold_left
         (fun acc (Internal_operation_result (_, r)) ->
            acc >>? fun () ->
@@ -114,14 +112,20 @@ let detect_script_failure :
         detect_script_failure rest in
   fun { contents } -> detect_script_failure contents
 
-let add_operation ?(allow_failure=false) st op =
+let add_operation ?expect_failure st op =
   let open Apply_operation_result in
   M.apply_operation st.state op >>=? function
   | state, Operation_metadata result ->
-      begin if allow_failure then
-          return ()
-        else
-          Lwt.return @@ detect_script_failure result
+      Lwt.return @@ detect_script_failure result >>= fun result ->
+      begin match expect_failure with
+        | None ->
+            Lwt.return result
+        | Some f ->
+            match result with
+            | Ok _ ->
+                failwith "Error expected while adding operation"
+            | Error e ->
+                f e
       end >>=? fun () ->
       return { st with state ; rev_operations = op :: st.rev_operations }
   | state, No_operation_metadata ->

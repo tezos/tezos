@@ -14,6 +14,7 @@ type error +=
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
   | Empty_implicit_contract of Signature.Public_key_hash.t (* `Temporary *)
+  | Empty_transaction of Contract_repr.t (* `Temporary *)
   | Inconsistent_hash of Signature.Public_key.t * Signature.Public_key_hash.t * Signature.Public_key_hash.t (* `Permanent *)
   | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t (* `Permanent *)
   | Failure of string (* `Permanent *)
