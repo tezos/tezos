@@ -1231,11 +1231,9 @@ let rec parse_data
         return (Script_timestamp.of_zint v, ctxt)
     | Timestamp_t _, String (_, s) (* As unparsed with [Redable]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.string_timestamp) >>=? fun ctxt ->
-        begin try
-            match Script_timestamp.of_string s with
-            | Some v -> return (v, ctxt)
-            | None -> fail (error ())
-          with _ -> fail (error ())
+        begin match Script_timestamp.of_string s with
+          | Some v -> return (v, ctxt)
+          | None -> fail (error ())
         end
     | Timestamp_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ; Int_kind ], kind expr)))
@@ -1248,10 +1246,9 @@ let rec parse_data
         end
     | Key_t _, String (_, s) -> (* As unparsed with [Readable]. *)
         Lwt.return (Gas.consume ctxt Typecheck_costs.key) >>=? fun ctxt ->
-        begin
-          try
-            return (Signature.Public_key.of_b58check_exn s, ctxt)
-          with _ -> fail (error ())
+        begin match Signature.Public_key.of_b58check_opt s with
+          | Some k -> return (k, ctxt)
+          | None -> fail (error ())
         end
     | Key_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
@@ -1264,41 +1261,34 @@ let rec parse_data
         end
     | Key_hash_t _, String (_, s) (* As unparsed with [Readable]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.key_hash) >>=? fun ctxt ->
-        begin
-          try
-            return (Signature.Public_key_hash.of_b58check_exn s, ctxt)
-          with _ -> fail (error ())
+        begin match Signature.Public_key_hash.of_b58check_opt s with
+          | Some k -> return (k, ctxt)
+          | None -> fail (error ())
         end
     | Key_hash_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Signatures *)
     | Signature_t _, Bytes (_, bytes) (* As unparsed with [Optimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.signature) >>=? fun ctxt ->
-        begin
-          match Data_encoding.Binary.of_bytes Signature.encoding bytes with
+        begin match Data_encoding.Binary.of_bytes Signature.encoding bytes with
           | Some k -> return (k, ctxt)
           | None -> fail (error ())
         end
     | Signature_t _, String (_, s) (* As unparsed with [Readable]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.signature) >>=? fun ctxt ->
-        begin
-          try
-            return (Signature.of_b58check_exn s, ctxt)
-          with _ -> fail (error ())
+        begin match Signature.of_b58check_opt s with
+          | Some s -> return (s, ctxt)
+          | None -> fail (error ())
         end
     | Signature_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Operations *)
-    | Operation_t _, Bytes (_, bytes) -> begin try
-          Lwt.return (Gas.consume ctxt (Typecheck_costs.operation bytes)) >>=? fun ctxt ->
-          match Data_encoding.Binary.of_bytes
-                  Operation.internal_operation_encoding
-                  bytes with
+    | Operation_t _, Bytes (_, bytes) ->
+        Lwt.return (Gas.consume ctxt (Typecheck_costs.operation bytes)) >>=? fun ctxt ->
+        begin match Data_encoding.Binary.of_bytes Operation.internal_operation_encoding bytes with
           | Some op -> return (op, ctxt)
-          | None -> raise Not_found
-        with _ ->
-          fail (error ())
-      end
+          | None -> fail (error ())
+        end
     | Operation_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ Bytes_kind ], kind expr)))
     (* Addresses *)
