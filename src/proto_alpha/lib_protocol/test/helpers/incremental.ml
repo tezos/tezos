@@ -80,9 +80,52 @@ let begin_construction ?(priority=0) ?timestamp (predecessor : Block.t) =
     delegate ;
   }
 
-let add_operation st op =
-  M.apply_operation st.state op >>=? fun (state, _result) ->
-  return { st with state ; rev_operations = op :: st.rev_operations }
+let detect_script_failure :
+  type kind. kind Apply_operation_result.operation_metadata -> _ =
+  let rec detect_script_failure :
+    type kind. kind Apply_operation_result.contents_result_list -> _ =
+    let open Apply_operation_result in
+    let detect_script_failure_single
+        (type kind)
+        (Manager_operation_result { operation_result ;
+                                    internal_operation_results }
+         : kind Kind.manager Apply_operation_result.contents_result) =
+      let detect_script_failure (type kind) (result : kind manager_operation_result) =
+        match result with
+        | Applied _ -> Ok ()
+        | Skipped _ -> assert false
+        | Failed (_, errs) ->
+            record_trace
+              (failure "The transfer simulation failed.")
+              (Alpha_environment.wrap_error (Error errs)) in
+      List.fold_left
+        (fun acc (Internal_operation_result (_, r)) ->
+           acc >>? fun () ->
+           detect_script_failure r)
+        (detect_script_failure operation_result)
+        internal_operation_results in
+    function
+    | Single_result (Manager_operation_result _ as res) ->
+        detect_script_failure_single res
+    | Single_result _ ->
+        Ok ()
+    | Cons_result (res, rest) ->
+        detect_script_failure_single res >>? fun () ->
+        detect_script_failure rest in
+  fun { contents } -> detect_script_failure contents
+
+let add_operation ?(allow_failure=false) st op =
+  let open Apply_operation_result in
+  M.apply_operation st.state op >>=? function
+  | state, Operation_metadata result ->
+      begin if allow_failure then
+          return ()
+        else
+          Lwt.return @@ detect_script_failure result
+      end >>=? fun () ->
+      return { st with state ; rev_operations = op :: st.rev_operations }
+  | state, No_operation_metadata ->
+      return { st with state ; rev_operations = op :: st.rev_operations }
 
 let finalize_block st =
   M.finalize_block st.state >>=? fun (result, _) ->
