@@ -157,7 +157,8 @@ let pp_manager_operation_contents_and_result ppf
           "This delegation was successfully applied"
     | Applied (Transaction_result { balance_updates ; consumed_gas ;
                                     storage ;
-                                    originated_contracts ; storage_size_diff }) ->
+                                    originated_contracts ;
+                                    storage_size ; paid_storage_size_diff }) ->
         Format.fprintf ppf
           "This transaction was successfully applied" ;
         begin match originated_contracts with
@@ -172,10 +173,15 @@ let pp_manager_operation_contents_and_result ppf
               Format.fprintf ppf "@,@[<hv 2>Updated storage:@ %a@]"
                 Michelson_v1_printer.print_expr expr
         end ;
-        begin if storage_size_diff <> Z.zero then
+        begin if storage_size <> Z.zero then
             Format.fprintf ppf
-              "@,Storage size difference: %s bytes"
-              (Z.to_string storage_size_diff)
+              "@,Storage size: %s bytes"
+              (Z.to_string storage_size)
+        end ;
+        begin if paid_storage_size_diff <> Z.zero then
+            Format.fprintf ppf
+              "@,Paid storage size diff: %s bytes"
+              (Z.to_string paid_storage_size_diff)
         end ;
         Format.fprintf ppf
           "@,Consumed gas: %s"
@@ -188,7 +194,8 @@ let pp_manager_operation_contents_and_result ppf
                 pp_balance_updates balance_updates
         end
     | Applied (Origination_result { balance_updates ; consumed_gas ;
-                                    originated_contracts ; storage_size_diff }) ->
+                                    originated_contracts ;
+                                    storage_size ; paid_storage_size_diff }) ->
         Format.fprintf ppf
           "This origination was successfully applied" ;
         begin match originated_contracts with
@@ -197,10 +204,15 @@ let pp_manager_operation_contents_and_result ppf
               Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
                 (Format.pp_print_list Contract.pp) contracts
         end ;
-        begin if storage_size_diff <> Z.zero then
+        begin if storage_size <> Z.zero then
             Format.fprintf ppf
-              "@,Storage size used: %s bytes"
-              (Z.to_string storage_size_diff)
+              "@,Storage size: %s bytes"
+              (Z.to_string storage_size)
+        end ;
+        begin if paid_storage_size_diff <> Z.zero then
+            Format.fprintf ppf
+              "@,Paid storage size diff: %s bytes"
+              (Z.to_string paid_storage_size_diff)
         end ;
         Format.fprintf ppf
           "@,Consumed gas: %s"

@@ -379,7 +379,9 @@ let apply_manager_operation_content :
                         Contract destination, Credited amount ] ;
                   originated_contracts = [] ;
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
-                  storage_size_diff = Z.zero } in
+                  storage_size = Z.zero ;
+                  paid_storage_size_diff = Z.zero ;
+                } in
             return (ctxt, result, [])
         | Some script ->
             begin match parameters with
@@ -395,11 +397,10 @@ let apply_manager_operation_content :
               ctxt mode
               ~source ~payer ~self:(destination, script) ~amount ~parameter
             >>=? fun { ctxt ; storage ; big_map_diff ; operations } ->
-            Contract.used_storage_space ctxt destination >>=? fun old_size ->
             Contract.update_script_storage
               ctxt destination storage big_map_diff >>=? fun ctxt ->
             Fees.record_paid_storage_space
-              ctxt destination >>=? fun (ctxt, new_size, fees) ->
+              ctxt destination >>=? fun (ctxt, new_size, paid_storage_size_diff, fees) ->
             Contract.originated_from_current_nonce
               ~since: before_operation
               ~until: ctxt >>=? fun originated_contracts ->
@@ -413,7 +414,8 @@ let apply_manager_operation_content :
                         Contract destination, Credited amount ] ;
                   originated_contracts ;
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
-                  storage_size_diff = Z.sub new_size old_size } in
+                  storage_size = new_size ;
+                  paid_storage_size_diff } in
             return (ctxt, result, operations)
       end
     | Origination { manager ; delegate ; script ; preorigination ;
@@ -441,7 +443,7 @@ let apply_manager_operation_content :
           ?script
           ~spendable ~delegatable >>=? fun ctxt ->
         Fees.origination_burn ctxt ~payer >>=? fun (ctxt, orignation_burn) ->
-        Fees.record_paid_storage_space ctxt contract >>=? fun (ctxt, size, fees) ->
+        Fees.record_paid_storage_space ctxt contract >>=? fun (ctxt, size, paid_storage_size_diff, fees) ->
         Lwt.return Tez.(orignation_burn +? fees) >>=? fun all_fees ->
         let result =
           Origination_result
@@ -452,7 +454,8 @@ let apply_manager_operation_content :
                     Contract contract, Credited credit ] ;
               originated_contracts = [ contract ] ;
               consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
-              storage_size_diff = size } in
+              storage_size = size ;
+              paid_storage_size_diff } in
         return (ctxt, result, [])
     | Delegation delegate ->
         set_delegate ctxt source delegate >>=? fun ctxt ->

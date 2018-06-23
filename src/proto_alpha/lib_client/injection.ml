@@ -124,8 +124,8 @@ let estimated_storage_single
      : kind Kind.manager contents_result) =
   let storage_size_diff (type kind) (result : kind manager_operation_result) =
     match result with
-    | Applied (Transaction_result { storage_size_diff }) -> Ok storage_size_diff
-    | Applied (Origination_result { storage_size_diff }) -> Ok storage_size_diff
+    | Applied (Transaction_result { paid_storage_size_diff }) -> Ok paid_storage_size_diff
+    | Applied (Origination_result { paid_storage_size_diff }) -> Ok paid_storage_size_diff
     | Applied Reveal_result -> Ok Z.zero
     | Applied Delegation_result -> Ok Z.zero
     | Skipped _ -> assert false

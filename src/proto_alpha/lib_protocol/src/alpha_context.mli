@@ -900,7 +900,7 @@ module Fees : sig
     context -> payer:Contract.t -> (context * Tez.t) tzresult Lwt.t
 
   val record_paid_storage_space:
-    context -> Contract.t -> (context * Z.t * Tez.t) tzresult Lwt.t
+    context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
 
   val with_fees_for_storage:
     context -> payer:Contract.t ->
