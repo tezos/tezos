@@ -39,9 +39,15 @@ let burn_fees_for_storage c ~payer =
   let cost_per_byte = Constants_storage.cost_per_byte c in
   Lwt.return (Tez_repr.(cost_per_byte *? (Z.to_int64 storage_space_to_pay))) >>=? fun to_burn ->
   (* Burning the fees... *)
-  trace Cannot_pay_storage_fee
-    (Contract_storage.spend_from_script c payer to_burn) >>=? fun c ->
-  return c
+  if Tez_repr.(to_burn = Tez_repr.zero) then
+    (* If the payer was was deleted by transfering all its balance, and no space was used,
+       burning zero would fail *)
+    return c
+  else
+    trace Cannot_pay_storage_fee
+      (Contract_storage.must_exist c payer >>=? fun () ->
+       Contract_storage.spend_from_script c payer to_burn) >>=? fun c ->
+    return c
 
 let with_fees_for_storage c ~payer f =
   Lwt.return (Raw_context.init_storage_space_to_pay c) >>=? fun c ->
