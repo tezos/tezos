@@ -302,15 +302,18 @@ let balance_too_low fee () =
   Context.Contract.balance (I i) contract_1 >>=? fun balance1 ->
   Context.Contract.balance (I i) contract_2 >>=? fun balance2 ->
   Op.transaction ~fee (I i) contract_1 contract_2 max_tez >>=? fun op ->
+  let expect_failure = function
+    | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+        return ()
+    | _ ->
+        failwith "balance too low should fail"
+  in
   if fee > balance1 then begin
-    Incremental.add_operation i op >>= fun res ->
-    Assert.proto_error ~loc:__LOC__ res begin function
-      | Contract_storage.Balance_too_low _ -> true
-      | _ -> false
-    end
+    Incremental.add_operation ~expect_failure i op >>= fun _res ->
+    return ()
   end
   else begin
-    Incremental.add_operation i op >>=? fun i ->
+    Incremental.add_operation ~expect_failure i op >>=? fun i ->
     (* contract_1 loses the fees *)
     Assert.balance_was_debited ~loc:__LOC__ (I i) contract_1 balance1 fee >>=? fun () ->
     (* contract_2 is not credited *)
@@ -337,7 +340,13 @@ let balance_too_low_two_transfers fee () =
   Context.Contract.balance (I i) contract_3 >>=? fun balance3 ->
   Op.transaction ~fee (I i) contract_1 contract_3
     two_third_of_balance >>=? fun operation ->
-  Incremental.add_operation i operation >>=? fun i ->
+  let expect_failure = function
+    | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+        return ()
+    | _ ->
+        failwith "balance too low should fail"
+  in
+  Incremental.add_operation ~expect_failure i operation >>=? fun i ->
   (* contract_1 loses the fees *)
   Assert.balance_was_debited ~loc:__LOC__ (I i) contract_1 balance1 fee >>=? fun () ->
   (* contract_3 is not credited *)
