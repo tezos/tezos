@@ -158,24 +158,17 @@ let apply_operation
   | _ ->
       let { shell ; protocol_data = Operation_data protocol_data } = operation in
       let operation : _ Alpha_context.operation = { shell ; protocol_data } in
-      let predecessor =
+      let predecessor, baker =
         match mode with
         | Partial_application
-            { block_header = { shell = { predecessor ; _ } ; _ } ; _ }
+            { block_header = { shell = { predecessor ; _ } ; _ } ; baker }
         | Application
-            { block_header = { shell = { predecessor ; _ } ; _ } ; _ }
-        | Full_construction { predecessor ; _ } ->
-            predecessor
-        | Partial_construction { predecessor } ->
-            predecessor in
-      let baker =
-        match mode with
-        | Partial_application { baker ; _ }
-        | Application { baker ; _ }
-        | Full_construction { baker ; _ } ->
-            baker
-        | Partial_construction _ ->
-            Signature.Public_key_hash.zero in
+            { block_header = { shell = { predecessor ; _ } ; _ } ; baker }
+        | Full_construction { predecessor ; baker ; _ }
+          -> predecessor, baker
+        | Partial_construction { predecessor }
+          -> predecessor, Signature.Public_key_hash.zero
+      in
       Apply.apply_operation ctxt Optimized predecessor baker
         (Alpha_context.Operation.hash operation)
         operation >>=? fun (ctxt, result) ->

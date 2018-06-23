@@ -313,13 +313,15 @@ let rec pp_contents_and_result_list :
           pp_balance_updates bus
     | Single_and_result
         (Endorsement { level },
-         Endorsement_result (delegate, slots)) ->
+         Endorsement_result { balance_updates ; delegate ; slots }) ->
         Format.fprintf ppf
           "@[<v 2>Endorsement:@,\
            Level: %a@,\
+           Balance updates:%a@,\
            Delegate: %a@,\
            Slots: %a@]"
           Raw_level.pp level
+          pp_balance_updates balance_updates
           Signature.Public_key_hash.pp delegate
           (Format.pp_print_list
              ~pp_sep:Format.pp_print_space

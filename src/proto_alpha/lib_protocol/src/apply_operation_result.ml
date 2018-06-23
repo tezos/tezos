@@ -339,7 +339,10 @@ let internal_operation_result_encoding :
 
 type 'kind contents_result =
   | Endorsement_result :
-      Signature.Public_key_hash.t * int list -> Kind.endorsement contents_result
+      { balance_updates : balance_updates ;
+        delegate : Signature.Public_key_hash.t ;
+        slots: int list ;
+      } -> Kind.endorsement contents_result
   | Seed_nonce_revelation_result :
       balance_updates -> Kind.seed_nonce_revelation contents_result
   | Double_endorsement_evidence_result :
@@ -402,7 +405,8 @@ module Encoding = struct
     Case {
       op_case = Operation.Encoding.endorsement_case ;
       encoding =
-        (obj2
+        (obj3
+           (req "balance_updates" balance_updates_encoding)
            (req "delegate" Signature.Public_key_hash.encoding)
            (req "slots" (list uint8)));
       select =
@@ -415,9 +419,11 @@ module Encoding = struct
           | _ -> None) ;
       proj =
         (function
-          | Endorsement_result (d, s) -> (d, s)) ;
+          | Endorsement_result { balance_updates ; delegate ; slots }
+            -> (balance_updates, delegate, slots)) ;
       inj =
-        (fun (d, s) -> Endorsement_result (d, s))
+        (fun (balance_updates, delegate, slots) ->
+           Endorsement_result { balance_updates ; delegate ; slots })
     }
 
   let seed_nonce_revelation_case =

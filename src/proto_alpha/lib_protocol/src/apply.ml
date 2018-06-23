@@ -322,17 +322,6 @@ let () =
 
 open Apply_operation_result
 
-(**
-   Transaction: source/payer A -> destination B
-   - payer: is the signer of the operation, the one that pays the storage fee.
-   This fee is not going to the baker but it will be burned.
-   - source: is the one who will pay for the fees: space and gas consumption.
-   This amount will go to the baker.
-   - internal: set to true in the case of transaction between smart contracts.
-   Where there is a new storage cost for each smart contract may occurs. The
-   source may not be the same A any more.
-*)
-
 let apply_manager_operation_content :
   type kind.
   ( Alpha_context.t -> Script_ir_translator.unparsing_mode -> payer:Contract.t -> source:Contract.t ->
@@ -543,10 +532,8 @@ let apply_manager_contents
           Manager_operation_result
             { balance_updates =
                 cleanup_balance_updates
-                  [
-                    Contract source, Debited fee ;
-                    Rewards (baker, level.cycle), Credited fee
-                  ] ;
+                  [ Contract source, Debited fee ;
+                    Rewards (baker, level.cycle), Credited fee ] ;
               operation_result ;
               internal_operation_results })
 
@@ -582,7 +569,8 @@ let rec precheck_manager_contents_list
 
 let rec apply_manager_contents_list
   : type kind.
-    Alpha_context.t -> _ -> _ -> kind Kind.manager contents_list ->
+    Alpha_context.t -> Script_ir_translator.unparsing_mode ->
+    public_key_hash -> kind Kind.manager contents_list ->
     (context * kind Kind.manager contents_result_list) Lwt.t =
   fun ctxt mode baker contents_list ->
     match contents_list with
@@ -651,7 +639,14 @@ let apply_contents_list
         Global.get_last_block_priority ctxt >>=? fun block_priority ->
         Baking.endorsement_reward ctxt ~block_priority gap >>=? fun reward ->
         Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
-        return (ctxt, Single_result (Endorsement_result (delegate, slots)))
+        let level = Level.from_raw ctxt level in
+        return (ctxt, Single_result
+                  (Endorsement_result
+                     { balance_updates =
+                         [ Rewards (baker, level.cycle), Credited reward;
+                           Rewards (delegate, level.cycle), Debited reward;
+                           Deposits (delegate, level.cycle), Credited deposit; ] ;
+                       delegate ; slots }))
   | Single (Seed_nonce_revelation { level ; nonce }) ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
@@ -660,9 +655,8 @@ let apply_contents_list
       add_rewards ctxt seed_nonce_revelation_tip >>=? fun ctxt ->
       return (ctxt, Single_result
                 (Seed_nonce_revelation_result
-                   [
-                     Rewards (baker, level.cycle), Credited seed_nonce_revelation_tip
-                   ]))
+                   [ Rewards (baker, level.cycle),
+                     Credited seed_nonce_revelation_tip ]))
   | Single (Double_endorsement_evidence { op1 ; op2 }) -> begin
       match op1.protocol_data.contents, op2.protocol_data.contents with
       | Single (Endorsement e1),
@@ -694,15 +688,12 @@ let apply_contents_list
             | Ok v -> v
             | Error _ -> Tez.zero in
           add_rewards ctxt reward >>=? fun ctxt ->
-          return
-            (ctxt,
-             Single_result
-               (Double_endorsement_evidence_result [
-                   Rewards (baker, level.cycle), Credited reward;
-                   Rewards (delegate1, level.cycle), Debited balance.rewards;
-                   Deposits (delegate1, level.cycle), Debited balance.deposit;
-                   Fees (delegate1, level.cycle), Debited balance.fees
-                 ]))
+          return (ctxt, Single_result
+                    (Double_endorsement_evidence_result [
+                        Rewards (baker, level.cycle), Credited reward;
+                        Rewards (delegate1, level.cycle), Debited balance.rewards;
+                        Deposits (delegate1, level.cycle), Debited balance.deposit;
+                        Fees (delegate1, level.cycle), Debited balance.fees ]))
       | _, _ -> fail Invalid_double_endorsement_evidence
     end
   | Single (Double_baking_evidence { bh1 ; bh2 }) ->
@@ -749,15 +740,12 @@ let apply_contents_list
         | Ok v -> v
         | Error _ -> Tez.zero in
       add_rewards ctxt reward >>=? fun ctxt ->
-      return
-        (ctxt,
-         Single_result
-           (Double_baking_evidence_result [
-               Rewards (baker, level.cycle), Credited reward ;
-               Rewards (delegate, level.cycle), Debited balance.rewards ;
-               Deposits (delegate, level.cycle), Debited balance.deposit ;
-               Fees (delegate, level.cycle), Debited balance.fees ;
-             ]))
+      return (ctxt, Single_result
+                (Double_baking_evidence_result [
+                    Rewards (baker, level.cycle), Credited reward ;
+                    Rewards (delegate, level.cycle), Debited balance.rewards ;
+                    Deposits (delegate, level.cycle), Debited balance.deposit ;
+                    Fees (delegate, level.cycle), Debited balance.fees ; ]))
   | Single (Activate_account { id = pkh ; activation_code }) -> begin
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh in
@@ -767,11 +755,8 @@ let apply_contents_list
           Commitment.delete ctxt blinded_pkh >>=? fun ctxt ->
           let contract = Contract.implicit_contract (Signature.Ed25519 pkh) in
           Contract.(credit ctxt contract amount) >>=? fun ctxt ->
-          return (ctxt, Single_result (
-              Activate_account_result
-                [
-                  Contract contract, Credited amount
-                ]))
+          return (ctxt, Single_result (Activate_account_result
+                                         [ Contract contract, Credited amount ]))
     end
   | Single (Proposals { source ; period ; proposals }) ->
       Roll.delegate_pubkey ctxt source >>=? fun delegate ->

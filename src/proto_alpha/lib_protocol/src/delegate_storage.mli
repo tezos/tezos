@@ -94,7 +94,7 @@ val cycle_end:
   Raw_context.t tzresult Lwt.t
 
 (** Burn all then frozen deposit/fees/rewards for a delegate at a given
-    cycle. Returns the burned amount. *)
+    cycle. Returns the burned amounts. *)
 val punish:
   Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t ->
   (Raw_context.t * frozen_balance) tzresult Lwt.t
