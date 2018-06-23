@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 (* This is the genesis protocol: initialise the state *)
-let prepare_first_block ctxt ~level ~timestamp ~fitness =
+let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block
     ~level ~timestamp ~fitness ctxt >>=? fun (param, ctxt) ->
   Commitment_storage.init ctxt param.commitments >>=? fun ctxt ->
@@ -16,6 +16,7 @@ let prepare_first_block ctxt ~level ~timestamp ~fitness =
   Seed_storage.init ctxt >>=? fun ctxt ->
   Contract_storage.init ctxt >>=? fun ctxt ->
   Bootstrap_storage.init ctxt
+    ~typecheck
     ?ramp_up_cycles:param.security_deposit_ramp_up_cycles
     ?no_reward_cycles:param.no_reward_cycles
     param.bootstrap_accounts >>=? fun ctxt ->

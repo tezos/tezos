@@ -1042,6 +1042,7 @@ end
 
 val prepare_first_block:
   Context.t ->
+  typecheck:(context -> Script.t -> context tzresult Lwt.t) ->
   level:Int32.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->

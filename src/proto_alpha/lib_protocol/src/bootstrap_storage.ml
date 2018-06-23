@@ -9,7 +9,7 @@
 
 open Misc
 
-let init_account ctxt ({ public_key; amount; script }: Parameters_repr.bootstrap_account) =
+let init_account ~typecheck ctxt ({ public_key; amount; script }: Parameters_repr.bootstrap_account) =
   let public_key_hash = Signature.Public_key.hash public_key in
   match script with
   | None ->
@@ -19,6 +19,7 @@ let init_account ctxt ({ public_key; amount; script }: Parameters_repr.bootstrap
       Delegate_storage.set ctxt contract (Some public_key_hash) >>=? fun ctxt ->
       return ctxt
   | Some (contract, script) ->
+      typecheck ctxt script >>=? fun ctxt ->
       Contract_storage.originate ctxt contract
         ~balance:amount
         ~manager:Signature.Public_key_hash.zero
@@ -28,8 +29,8 @@ let init_account ctxt ({ public_key; amount; script }: Parameters_repr.bootstrap
         ~delegatable:false >>=? fun ctxt ->
       return ctxt
 
-let init ctxt ?ramp_up_cycles ?no_reward_cycles accounts =
-  fold_left_s init_account ctxt accounts >>=? fun ctxt ->
+let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts =
+  fold_left_s (init_account ~typecheck) ctxt accounts >>=? fun ctxt ->
   begin
     match no_reward_cycles with
     | None -> return ctxt

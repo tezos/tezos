@@ -266,6 +266,11 @@ let init ctxt block_header =
   let level = block_header.Block_header.level in
   let fitness = block_header.fitness in
   let timestamp = block_header.timestamp in
+  let typecheck (ctxt:Alpha_context.context) (script:Alpha_context.Script.t) =
+    Script_ir_translator.parse_script ctxt script >>=? fun (_ex_script, ctxt) ->
+    return ctxt
+  in
   Alpha_context.prepare_first_block
+    ~typecheck
     ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   return (Alpha_context.finalize ctxt)
