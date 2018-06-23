@@ -223,7 +223,7 @@ module Make (T: QTY) : S = struct
 
   let encoding =
     let open Data_encoding in
-    (conv to_int64 (Json.wrap_error of_mutez_exn) int64)
+    (check_size 10 (conv Z.of_int64 (Json.wrap_error Z.to_int64) n))
 
   let () =
     let open Data_encoding in
