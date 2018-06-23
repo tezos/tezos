@@ -221,5 +221,3 @@ let encoding =
     (fun { fixed ; parametric } -> (fixed, parametric))
     (fun (fixed , parametric) -> { fixed ; parametric })
     (merge_objs fixed_encoding parametric_encoding)
-
-type error += Constant_read of exn

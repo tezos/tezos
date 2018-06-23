@@ -9,9 +9,7 @@
 
 open Alpha_context
 
-type error +=
-  | Cannot_parse_operation (* `Branch *)
-  | Cant_parse_block_header
+type error += Cannot_parse_operation (* `Branch *)
 
 val current_level:
   'a #RPC_context.simple ->
