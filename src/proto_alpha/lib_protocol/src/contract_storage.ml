@@ -474,8 +474,8 @@ let paid_storage_space c contract =
   | Some paid_space -> return paid_space
 
 let record_paid_storage_space c contract paid_storage =
-  Storage.Contract.Paid_storage_space.get c contract >>=? fun already_paid_fees ->
-  if Compare.Z.(already_paid_fees < paid_storage) then
+  Storage.Contract.Used_storage_space.get c contract >>=? fun already_paid_fees ->
+  if Compare.Z.(already_paid_fees >= paid_storage) then
     return (Z.zero, c)
   else
     let to_pay = Z.sub paid_storage already_paid_fees in
