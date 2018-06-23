@@ -84,6 +84,11 @@ end
 module Contract = struct
   include Contract_repr
   include Contract_storage
+
+  let originate c contract ~balance ~manager ?script ~delegate
+      ~spendable ~delegatable =
+    originate c contract ~balance ~manager ?script ~delegate
+      ~spendable ~delegatable
   let init_origination_nonce = Raw_context.init_origination_nonce
   let unset_origination_nonce = Raw_context.unset_origination_nonce
   type error += Block_storage_quota_exceeded = Storage_limit_repr.Block_quota_exceeded

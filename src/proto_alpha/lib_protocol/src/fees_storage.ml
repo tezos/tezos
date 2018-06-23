@@ -28,7 +28,7 @@ let origination_burn c ~payer =
 
 let record_paid_storage_space c contract =
   Contract_storage.used_storage_space c contract >>=? fun size ->
-  Contract_storage.record_paid_storage_space c contract size >>=? fun (to_be_paid, c) ->
+  Contract_storage.set_paid_storage_space_and_return_fees_to_pay c contract size >>=? fun (to_be_paid, c) ->
   Lwt.return (Raw_context.update_storage_space_to_pay c to_be_paid) >>=? fun c ->
   let cost_per_byte = Constants_storage.cost_per_byte c in
   Lwt.return (Tez_repr.(cost_per_byte *? (Z.to_int64 to_be_paid))) >>=? fun to_burn ->

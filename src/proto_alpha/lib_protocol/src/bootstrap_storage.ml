@@ -26,6 +26,7 @@ let init_contract ~typecheck ctxt
   typecheck ctxt script >>=? fun ctxt ->
   Contract_storage.originate ctxt contract
     ~balance:amount
+    ~prepaid_bootstrap_storage:true
     ~manager:Signature.Public_key_hash.zero
     ~script:(script, None)
     ~delegate:(Some delegate)

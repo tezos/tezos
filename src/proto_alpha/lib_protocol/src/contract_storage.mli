@@ -84,6 +84,7 @@ val spend_from_script:
 
 val originate:
   Raw_context.t ->
+  ?prepaid_bootstrap_storage:bool ->
   Contract_repr.t ->
   balance:Tez_repr.t ->
   manager:Signature.Public_key_hash.t ->
@@ -105,7 +106,7 @@ val init:
 
 val used_storage_space: Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
 val paid_storage_space: Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
-val record_paid_storage_space: Raw_context.t -> Contract_repr.t -> Z.t -> (Z.t * Raw_context.t) tzresult Lwt.t
+val set_paid_storage_space_and_return_fees_to_pay: Raw_context.t -> Contract_repr.t -> Z.t -> (Z.t * Raw_context.t) tzresult Lwt.t
 
 module Big_map : sig
   val mem :

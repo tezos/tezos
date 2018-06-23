@@ -201,13 +201,13 @@ let update_script_big_map c contract = function
               return (c, Z.add total (Z.of_int size_diff)))
         (c, Z.zero) diff
 
-let create_base c contract
+let create_base c
+    ?(prepaid_bootstrap_storage=false) (* Free space for bootstrap contracts *)
+    contract
     ~balance ~manager ~delegate ?script ~spendable ~delegatable =
   (match Contract_repr.is_implicit contract with
    | None -> return Z.zero
-   | Some _ ->
-       Storage.Contract.Paid_storage_space.init c contract Z.zero >>=? fun c ->
-       Storage.Contract.Global_counter.get c) >>=? fun counter ->
+   | Some _ -> Storage.Contract.Global_counter.get c) >>=? fun counter ->
   Storage.Contract.Balance.init c contract balance >>=? fun c ->
   Storage.Contract.Manager.init c contract (Manager_repr.Hash manager) >>=? fun c ->
   begin
@@ -226,10 +226,18 @@ let create_base c contract
        update_script_big_map c contract big_map_diff >>=? fun (c, big_map_size) ->
        let total_size = Z.add (Z.add (Z.of_int code_size) (Z.of_int storage_size)) big_map_size in
        assert Compare.Z.(total_size >= Z.zero) ;
+       let prepaid_bootstrap_storage =
+         if prepaid_bootstrap_storage then
+           total_size
+         else
+           Z.zero
+       in
+       Storage.Contract.Paid_storage_space.init c contract prepaid_bootstrap_storage >>=? fun c ->
        Storage.Contract.Used_storage_space.init c contract total_size
    | None -> begin
        match Contract_repr.is_implicit contract with
        | None ->
+           Storage.Contract.Paid_storage_space.init c contract Z.zero >>=? fun c ->
            Storage.Contract.Used_storage_space.init c contract Z.zero
        | Some _ ->
            return c
@@ -237,11 +245,14 @@ let create_base c contract
        return c) >>=? fun c ->
   return c
 
-let originate c contract ~balance ~manager ?script ~delegate ~spendable ~delegatable =
-  create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable
+let originate c ?prepaid_bootstrap_storage contract
+    ~balance ~manager ?script ~delegate ~spendable ~delegatable =
+  create_base c ?prepaid_bootstrap_storage contract ~balance ~manager
+    ~delegate ?script ~spendable ~delegatable
 
-let create_implicit c manager ~balance =
-  create_base c (Contract_repr.implicit_contract manager)
+let create_implicit c manager ~balance : Raw_context.t tzresult Lwt.t =
+  create_base c
+    (Contract_repr.implicit_contract manager)
     ~balance ~manager ?script:None ~delegate:None
     ~spendable:true ~delegatable:false
 
@@ -473,13 +484,13 @@ let paid_storage_space c contract =
   | None -> return Z.zero
   | Some paid_space -> return paid_space
 
-let record_paid_storage_space c contract paid_storage =
-  Storage.Contract.Used_storage_space.get c contract >>=? fun already_paid_fees ->
-  if Compare.Z.(already_paid_fees >= paid_storage) then
+let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space =
+  Storage.Contract.Paid_storage_space.get c contract >>=? fun already_paid_space ->
+  if Compare.Z.(already_paid_space >= new_storage_space) then
     return (Z.zero, c)
   else
-    let to_pay = Z.sub paid_storage already_paid_fees in
-    Storage.Contract.Paid_storage_space.set c contract paid_storage >>=? fun c ->
+    let to_pay = Z.sub new_storage_space already_paid_space in
+    Storage.Contract.Paid_storage_space.set c contract new_storage_space >>=? fun c ->
     return (to_pay, c)
 
 module Big_map = struct

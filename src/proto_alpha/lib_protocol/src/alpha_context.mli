@@ -547,7 +547,8 @@ module Contract : sig
   type big_map_diff = (Script_expr_hash.t * Script.expr option) list
 
   val originate:
-    context -> contract ->
+    context ->
+    contract ->
     balance: Tez.t ->
     manager: public_key_hash ->
     ?script: (Script.t * big_map_diff option) ->
