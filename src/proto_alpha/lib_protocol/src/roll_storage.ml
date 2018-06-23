@@ -10,24 +10,59 @@
 open Misc
 
 type error +=
-  | Consume_roll_change
-  | No_roll_for_delegate
-  | No_roll_snapshot_for_cycle of Cycle_repr.t
+  | Consume_roll_change (* `Permanent *)
+  | No_roll_for_delegate (* `Permanent *)
+  | No_roll_snapshot_for_cycle of Cycle_repr.t (* `Permanent *)
   | Unregistered_delegate of Signature.Public_key_hash.t (* `Permanent *)
 
 let () =
+  let open Data_encoding in
+  (* Consume roll change *)
+  register_error_kind
+    `Permanent
+    ~id:"contract.manager.consume_roll_change"
+    ~title:"Consume roll change"
+    ~description:"Change is not enough to consume a roll."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Not enough change to consume a roll.")
+    empty
+    (function Consume_roll_change -> Some () | _ -> None)
+    (fun () -> Consume_roll_change) ;
+  (* No roll for delegate *)
+  register_error_kind
+    `Permanent
+    ~id:"contract.manager.no_roll_for_delegate"
+    ~title:"No roll for delegate"
+    ~description:"Delegate has no roll."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Delegate has no roll.")
+    empty
+    (function No_roll_for_delegate -> Some () | _ -> None)
+    (fun () -> No_roll_for_delegate) ;
+  (* No roll snapshot for cycle *)
+  register_error_kind
+    `Permanent
+    ~id:"contract.manager.no_roll_snapshot_for_cycle"
+    ~title:"No roll snapshot for cycle"
+    ~description:"A snapshot of the rolls distribution does not exist for this cycle."
+    ~pp:(fun ppf c ->
+        Format.fprintf ppf
+          "A snapshot of the rolls distribution does not exist for cycle %a" Cycle_repr.pp c)
+    (obj1 (req "cycle" Cycle_repr.encoding))
+    (function No_roll_snapshot_for_cycle c-> Some c | _ -> None)
+    (fun c -> No_roll_snapshot_for_cycle c) ;
+  (* Unregistered delegate *)
   register_error_kind
     `Permanent
     ~id:"contract.manager.unregistered_delegate"
     ~title:"Unregistered delegate"
     ~description:"A contract cannot be delegated to an unregistered delegate"
-    ~pp:(fun ppf (k) ->
+    ~pp:(fun ppf k->
         Format.fprintf ppf "The provided public key (with hash %a) is \
                            \ not registered as valid delegate key."
           Signature.Public_key_hash.pp k)
-    Data_encoding.(obj1 (req "hash" Signature.Public_key_hash.encoding))
-    (function Unregistered_delegate (k) -> Some (k) | _ -> None)
-    (fun (k) -> Unregistered_delegate (k))
+    (obj1 (req "hash" Signature.Public_key_hash.encoding))
+    (function Unregistered_delegate k -> Some k | _ -> None)
+    (fun k -> Unregistered_delegate k)
 
 let get_contract_delegate c contract =
   Storage.Contract.Delegate.get_option c contract

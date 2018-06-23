@@ -10,7 +10,19 @@
 include Time
 type time = t
 
-type error += Timestamp_add of exn
+type error += Timestamp_add (* `Permanent *)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"timestamp_add"
+    ~title:"Timestamp add"
+    ~description:"Overflow when adding timestamps."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Overflow when adding timestamps.")
+    Data_encoding.empty
+    (function Timestamp_add -> Some () | _ -> None)
+    (fun () -> Timestamp_add)
 
 let of_seconds s =
   try Some (of_seconds (Int64.of_string s))
@@ -23,5 +35,4 @@ let pp = pp_hum
 let (+?) x y =
   (* TODO check overflow *)
   try ok (add x (Period_repr.to_seconds y))
-  with exn -> Error [Timestamp_add exn]
-
+  with _exn -> Error [ Timestamp_add ]

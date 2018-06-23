@@ -136,7 +136,19 @@ let check_baking_rights c { Block_header.priority ; _ }
   check_timestamp c priority pred_timestamp >>=? fun () ->
   return delegate
 
-type error += Incorrect_priority
+type error += Incorrect_priority (* `Permanent *)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"incorrect_priority"
+    ~title:"Incorrect priority"
+    ~description:"Block priority must be non-negative."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "The block priority must be non-negative.")
+    Data_encoding.unit
+    (function Incorrect_priority -> Some () | _ -> None)
+    (fun () -> Incorrect_priority)
 
 let endorsement_reward ctxt ~block_priority:prio n =
   if Compare.Int.(prio >= 0)

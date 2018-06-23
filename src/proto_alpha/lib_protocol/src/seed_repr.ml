@@ -76,7 +76,20 @@ let take_int32 s bound =
     in
     loop s
 
-type error += Unexpected_nonce_length
+type error += Unexpected_nonce_length (* `Permanent *)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"unexpected_nonce_length"
+    ~title:"Unexpected nonce length"
+    ~description:"Nonce length is incorrect."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Nonce length is not %i bytes long as it should."
+          Constants_repr.nonce_length)
+    Data_encoding.empty
+    (function Unexpected_nonce_length -> Some () | _ -> None)
+    (fun () -> Unexpected_nonce_length)
 
 let make_nonce nonce =
   if Compare.Int.(MBytes.length nonce <> Constants_repr.nonce_length)

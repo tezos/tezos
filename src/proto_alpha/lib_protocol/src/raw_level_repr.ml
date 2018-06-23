@@ -40,7 +40,19 @@ let of_int32_exn l =
   then l
   else invalid_arg "Level_repr.of_int32"
 
-type error += Unexpected_level of Int32.t
+type error += Unexpected_level of Int32.t (* `Permanent *)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"unexpected_level"
+    ~title:"Unexpected level"
+    ~description:"Level must be non-negative."
+    ~pp:(fun ppf l ->
+        Format.fprintf ppf "The level is %s but should be non-negative." (Int32.to_string l))
+    Data_encoding.(obj1 (req "level" int32))
+    (function Unexpected_level l -> Some l | _ -> None)
+    (fun l -> Unexpected_level l)
 
 let of_int32 l =
   try Ok (of_int32_exn l)

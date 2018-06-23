@@ -7,7 +7,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type error += Invalid_fitness
+type error += Invalid_fitness (* `Permanent *)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"invalid_fitness"
+    ~title:"Invalid fitness"
+    ~description:"Fitness representation should be exactly 8 bytes long."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Invalid fitness")
+    Data_encoding.empty
+    (function Invalid_fitness -> Some () | _ -> None)
+    (fun () -> Invalid_fitness)
 
 let int64_to_bytes i =
   let b = MBytes.create 8 in
