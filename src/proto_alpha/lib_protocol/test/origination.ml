@@ -200,7 +200,13 @@ let origination_contract_from_origination_contract_not_enough_fund fee () =
   register_origination_inc ~credit:amount () >>=? fun (inc, contract) ->
   (* contract's balance is not enough to afford origination burn  *)
   Op.origination ~fee (I inc) ~credit:amount contract >>=? fun (operation, orig_contract) ->
-  Incremental.add_operation inc operation >>=? fun inc ->
+  let expect_failure = function
+    | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+        return ()
+    | _ ->
+        failwith "The contract has not enought funds, it fail !"
+  in
+  Incremental.add_operation ~expect_failure inc operation >>=? fun inc ->
   Context.Contract.balance (I inc) contract >>=? fun balance_aft ->
   (* contract was debited of [fee] but not of origination burn *)
   Assert.balance_was_debited ~loc:__LOC__ (I inc) contract balance_aft fee >>=? fun () ->
