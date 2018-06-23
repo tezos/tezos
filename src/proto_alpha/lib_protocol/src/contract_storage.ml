@@ -250,9 +250,8 @@ let originate c ?prepaid_bootstrap_storage contract
   create_base c ?prepaid_bootstrap_storage contract ~balance ~manager
     ~delegate ?script ~spendable ~delegatable
 
-let create_implicit c manager ~balance : Raw_context.t tzresult Lwt.t =
-  create_base c
-    (Contract_repr.implicit_contract manager)
+let create_implicit c manager ~balance =
+  create_base c (Contract_repr.implicit_contract manager)
     ~balance ~manager ?script:None ~delegate:None
     ~spendable:true ~delegatable:false
 
