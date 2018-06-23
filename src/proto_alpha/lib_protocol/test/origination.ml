@@ -142,7 +142,13 @@ let undelegatable fee () =
   else
     (* delegation is processed ; but delegate does not change *)
     begin
-      Incremental.add_operation i operation >>=? fun i ->
+      let expect_failure = function
+        | Alpha_environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
+            return ()
+        | _ ->
+            failwith "The contract is not delegatable, it fail !"
+      in
+      Incremental.add_operation ~expect_failure i operation >>=? fun i ->
       (* new contracts loses the fee *)
       Assert.balance_was_debited ~loc:__LOC__ (I i) new_contract balance fee
       (* TODO delegate has not changed : wait for delegation tests and Context.Contract.delegate
