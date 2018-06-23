@@ -205,7 +205,9 @@ let create_base c contract
     ~balance ~manager ~delegate ?script ~spendable ~delegatable =
   (match Contract_repr.is_implicit contract with
    | None -> return Z.zero
-   | Some _ -> Storage.Contract.Global_counter.get c) >>=? fun counter ->
+   | Some _ ->
+       Storage.Contract.Paid_storage_space.init c contract Z.zero >>=? fun c ->
+       Storage.Contract.Global_counter.get c) >>=? fun counter ->
   Storage.Contract.Balance.init c contract balance >>=? fun c ->
   Storage.Contract.Manager.init c contract (Manager_repr.Hash manager) >>=? fun c ->
   begin
@@ -224,9 +226,14 @@ let create_base c contract
        update_script_big_map c contract big_map_diff >>=? fun (c, big_map_size) ->
        let total_size = Z.add (Z.add (Z.of_int code_size) (Z.of_int storage_size)) big_map_size in
        assert Compare.Z.(total_size >= Z.zero) ;
-       Storage.Contract.Used_storage_space.init c contract total_size >>=? fun c ->
-       Storage.Contract.Paid_storage_space.init c contract Z.zero
-   | None ->
+       Storage.Contract.Used_storage_space.init c contract total_size
+   | None -> begin
+       match Contract_repr.is_implicit contract with
+       | None ->
+           Storage.Contract.Used_storage_space.init c contract Z.zero
+       | Some _ ->
+           return c
+     end >>=? fun c ->
        return c) >>=? fun c ->
   return c
 
