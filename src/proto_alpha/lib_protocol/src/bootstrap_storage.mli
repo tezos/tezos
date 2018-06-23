@@ -13,6 +13,7 @@ val init:
   ?ramp_up_cycles:int ->
   ?no_reward_cycles:int ->
   Parameters_repr.bootstrap_account list ->
+  Parameters_repr.bootstrap_contract list ->
   Raw_context.t tzresult Lwt.t
 
 val cycle_end:

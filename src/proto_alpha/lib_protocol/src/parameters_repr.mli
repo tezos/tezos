@@ -8,13 +8,20 @@
 (**************************************************************************)
 
 type bootstrap_account = {
-  public_key : Signature.Public_key.t ;
+  public_key_hash : Signature.Public_key_hash.t ;
+  public_key : Signature.Public_key.t option ;
   amount : Tez_repr.t ;
-  script : (Contract_repr.t * Script_repr.t) option ;
+}
+
+type bootstrap_contract = {
+  delegate : Signature.Public_key_hash.t ;
+  amount : Tez_repr.t ;
+  script : Script_repr.t ;
 }
 
 type t = {
   bootstrap_accounts : bootstrap_account list ;
+  bootstrap_contracts : bootstrap_contract list ;
   commitments : Commitment_repr.t list ;
   constants : Constants_repr.parametric ;
   security_deposit_ramp_up_cycles : int option ;

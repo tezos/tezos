@@ -38,8 +38,11 @@ init_sandboxed_client() {
     [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
     [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
     [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ],
-    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "10000000",
-      { "address": "TZ1Yj9xA3jp8xy9maok89VB6HtBUtrK77tFk",
+    [ "tz1PooUKBaoxjBiCR2dxEtbtTUjLX3iaZQoJ", "100" ],
+    [ "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2", "1" ] ],
+  "bootstrap_contracts": [
+      { "delegate": "tz1TGu6TN5GSez2ndXXeDX6LgUDvLzPLqgYV",
+        "amount": "10000000",
         "script":
         { "code":
           [ { "prim": "parameter",
@@ -69,9 +72,7 @@ init_sandboxed_client() {
                   { "prim": "CONS" },
                   { "prim": "DIP", "args": [ [ { "prim": "NOW" } ] ] },
                   { "prim": "PAIR" } ] ] } ],
-          "storage": { "int": "0" } } } ] ],
-  "dictator_pubkey":
-    "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
+          "storage": { "int": "0" } } } ],
   "time_between_blocks" : [ "1", "0" ],
   "blocks_per_roll_snapshot" : 4,
   "blocks_per_cycle" : 8,
@@ -230,7 +231,6 @@ BOOTSTRAP5_PUBLIC="edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
 BOOTSTRAP5_SECRET="unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm"
 
 DICTATOR_SECRET="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
-FAUCET_ADDRESS="TZ1Yj9xA3jp8xy9maok89VB6HtBUtrK77tFk"
 
 add_sandboxed_bootstrap_identities() {
 
@@ -252,9 +252,6 @@ activate_alpha() {
         and key dictator \
 	and parameters "${parameters_file}" \
         --timestamp $(TZ='AAA+1' date +%FT%TZ)
-
-    ${client} remember contract faucet ${FAUCET_ADDRESS}
-
 }
 
 usage() {

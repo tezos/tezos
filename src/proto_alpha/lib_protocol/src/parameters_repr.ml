@@ -8,13 +8,20 @@
 (**************************************************************************)
 
 type bootstrap_account = {
-  public_key : Signature.Public_key.t ;
+  public_key_hash : Signature.Public_key_hash.t ;
+  public_key : Signature.Public_key.t option ;
   amount : Tez_repr.t ;
-  script : (Contract_repr.t * Script_repr.t) option ;
+}
+
+type bootstrap_contract = {
+  delegate : Signature.Public_key_hash.t ;
+  amount : Tez_repr.t ;
+  script : Script_repr.t ;
 }
 
 type t = {
   bootstrap_accounts : bootstrap_account list ;
+  bootstrap_contracts : bootstrap_contract list ;
   commitments : Commitment_repr.t list ;
   constants : Constants_repr.parametric ;
   security_deposit_ramp_up_cycles : int option ;
@@ -24,29 +31,43 @@ type t = {
 let bootstrap_account_encoding =
   let open Data_encoding in
   union
-    [ case (Tag 0) ~title:"Non_scripted"
+    [ case (Tag 0) ~title:"Public_key_known"
         (tup2
            Signature.Public_key.encoding
            Tez_repr.encoding)
         (function
-          | { public_key ; amount ; script = None } ->
+          | { public_key_hash ; public_key = Some public_key ; amount } ->
+              assert (Signature.Public_key_hash.equal
+                        (Signature.Public_key.hash public_key)
+                        public_key_hash) ;
               Some (public_key, amount)
-          | { script = Some _ }  -> None)
+          | { public_key = None }  -> None)
         (fun (public_key, amount) ->
-           { public_key ; amount ; script = None }) ;
-      case (Tag 1) ~title:"Scripted"
-        (tup3
-           Signature.Public_key.encoding
-           Tez_repr.encoding
-           (obj2
-              (req "address" Contract_repr.encoding)
-              (req "script" Script_repr.encoding)))
+           { public_key = Some public_key ;
+             public_key_hash = Signature.Public_key.hash public_key ;
+             amount }) ;
+      case (Tag 1) ~title:"Public_key_unknown"
+        (tup2
+           Signature.Public_key_hash.encoding
+           Tez_repr.encoding)
         (function
-          | { public_key ; amount ; script = Some script } ->
-              Some (public_key, amount, script)
-          | { script = None }  -> None)
-        (fun (public_key, amount, script) ->
-           { public_key ; amount ; script = Some script }) ]
+          | { public_key_hash ; public_key = None ; amount } ->
+              Some (public_key_hash, amount)
+          | { public_key = Some _ }  -> None)
+        (fun (public_key_hash, amount) ->
+           { public_key = None ;
+             public_key_hash ;
+             amount }) ]
+
+let bootstrap_contract_encoding =
+  let open Data_encoding in
+  conv
+    (fun { delegate ; amount ; script } -> (delegate, amount, script))
+    (fun (delegate, amount, script) -> { delegate ; amount ; script })
+    (obj3
+       (req "delegate" Signature.Public_key_hash.encoding)
+       (req "amount" Tez_repr.encoding)
+       (req "script" Script_repr.encoding))
 
 (* This encoding is used to read configuration files (e.g. sandbox.json)
    where some fields can be missing, in that case they are replaced by
@@ -249,19 +270,20 @@ let constants_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun { bootstrap_accounts ; commitments ; constants ;
+    (fun { bootstrap_accounts ; bootstrap_contracts ; commitments ; constants ;
            security_deposit_ramp_up_cycles ; no_reward_cycles } ->
-      ((bootstrap_accounts, commitments,
+      ((bootstrap_accounts, bootstrap_contracts, commitments,
         security_deposit_ramp_up_cycles, no_reward_cycles),
        constants))
-    (fun ( (bootstrap_accounts, commitments,
+    (fun ( (bootstrap_accounts, bootstrap_contracts, commitments,
             security_deposit_ramp_up_cycles, no_reward_cycles),
            constants) ->
-      { bootstrap_accounts ; commitments ; constants ;
+      { bootstrap_accounts ; bootstrap_contracts ; commitments ; constants ;
         security_deposit_ramp_up_cycles ; no_reward_cycles })
     (merge_objs
-       (obj4
+       (obj5
           (req "bootstrap_accounts" (list bootstrap_account_encoding))
+          (dft "bootstrap_contracts" (list bootstrap_contract_encoding) [])
           (dft "commitments" (list Commitment_repr.encoding) [])
           (opt "security_deposit_ramp_up_cycles" int31)
           (opt "no_reward_cycles" int31))

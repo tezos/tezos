@@ -184,8 +184,8 @@ let initial_context
     no_reward_cycles
   =
   let bootstrap_accounts =
-    List.map (fun (Account.{ pk = public_key ; _ }, amount) ->
-        Parameters_repr.{ public_key ; amount; script = None }
+    List.map (fun (Account.{ pk ; pkh ; _ }, amount) ->
+        Parameters_repr.{ public_key_hash = pkh ; public_key = Some pk ; amount }
       ) initial_accounts
   in
   let json =
@@ -193,6 +193,7 @@ let initial_context
       Parameters_repr.encoding
       Parameters_repr.{
         bootstrap_accounts ;
+        bootstrap_contracts = [] ;
         commitments ;
         constants ;
         security_deposit_ramp_up_cycles ;
