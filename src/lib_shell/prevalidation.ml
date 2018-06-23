@@ -102,7 +102,7 @@ let start_prevalidation
     ()
   >>=? fun state ->
   (* FIXME arbitrary value, to be customisable *)
-  let max_number_of_operations = 1000 in
+  let max_number_of_operations = 2000 in
   return (State { proto = (module Proto) ; state ;
                   max_number_of_operations })
 
