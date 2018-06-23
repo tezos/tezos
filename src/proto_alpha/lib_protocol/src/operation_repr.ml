@@ -468,9 +468,9 @@ module Encoding = struct
     (obj5
        (req "source" Contract_repr.encoding)
        (req "fee" Tez_repr.encoding)
-       (req "counter" (check_size 10 z))
-       (req "gas_limit" (check_size 10 z))
-       (req "storage_limit" (check_size 10 z)))
+       (req "counter" (check_size 10 n))
+       (req "gas_limit" (check_size 10 n))
+       (req "storage_limit" (check_size 10 n)))
 
   let extract
       (type kind)
