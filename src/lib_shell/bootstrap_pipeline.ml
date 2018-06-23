@@ -39,20 +39,23 @@ let assert_acceptable_header pipeline
     (Time.(add time_now 15L >= header.shell.timestamp))
     (Future_block_header { block = hash; time = time_now;
                            block_time = header.shell.timestamp }) >>=? fun () ->
-  State.Chain.checkpoint chain_state >>= fun (level, checkpoint) ->
+  State.Chain.checkpoint chain_state >>= fun (checkpoint_level, checkpoint) ->
   fail_when
-    (Int32.equal header.shell.level level &&
+    (Int32.equal header.shell.level checkpoint_level &&
      not (Block_hash.equal checkpoint hash))
     (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
   Chain.head chain_state >>= fun head ->
-  let checkpoint_reached = (State.Block.header head).shell.level >= level in
+  let checkpoint_reached = (State.Block.header head).shell.level >= checkpoint_level in
   if checkpoint_reached then
     (* If reached the checkpoint, every block before the checkpoint
        must be part of the chain. *)
-    Chain.mem chain_state hash >>= fun in_chain ->
-    fail_unless in_chain
-      (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
-    return ()
+    if header.shell.level <= checkpoint_level then
+      Chain.mem chain_state hash >>= fun in_chain ->
+      fail_unless in_chain
+        (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
+      return ()
+    else
+      return ()
   else
     return ()
 
