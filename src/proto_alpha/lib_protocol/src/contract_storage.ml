@@ -186,7 +186,7 @@ let () =
 
 let failwith msg = fail (Failure msg)
 
-type big_map_diff = (string * Script_repr.expr option) list
+type big_map_diff = (Script_expr_hash.t * Script_repr.expr option) list
 
 let update_script_big_map c contract = function
   | None -> return (c, Z.zero)
@@ -201,7 +201,9 @@ let update_script_big_map c contract = function
               return (c, Z.add total (Z.of_int size_diff)))
         (c, Z.zero) diff
 
-let create_base c contract
+let create_base c
+    ?(prepaid_bootstrap_storage=false) (* Free space for bootstrap contracts *)
+    contract
     ~balance ~manager ~delegate ?script ~spendable ~delegatable =
   (match Contract_repr.is_implicit contract with
    | None -> return Z.zero
@@ -224,14 +226,29 @@ let create_base c contract
        update_script_big_map c contract big_map_diff >>=? fun (c, big_map_size) ->
        let total_size = Z.add (Z.add (Z.of_int code_size) (Z.of_int storage_size)) big_map_size in
        assert Compare.Z.(total_size >= Z.zero) ;
-       Storage.Contract.Used_storage_space.init c contract total_size >>=? fun c ->
-       Storage.Contract.Paid_storage_space_fees.init c contract Tez_repr.zero
-   | None ->
+       let prepaid_bootstrap_storage =
+         if prepaid_bootstrap_storage then
+           total_size
+         else
+           Z.zero
+       in
+       Storage.Contract.Paid_storage_space.init c contract prepaid_bootstrap_storage >>=? fun c ->
+       Storage.Contract.Used_storage_space.init c contract total_size
+   | None -> begin
+       match Contract_repr.is_implicit contract with
+       | None ->
+           Storage.Contract.Paid_storage_space.init c contract Z.zero >>=? fun c ->
+           Storage.Contract.Used_storage_space.init c contract Z.zero
+       | Some _ ->
+           return c
+     end >>=? fun c ->
        return c) >>=? fun c ->
   return c
 
-let originate c contract ~balance ~manager ?script ~delegate ~spendable ~delegatable =
-  create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable
+let originate c ?prepaid_bootstrap_storage contract
+    ~balance ~manager ?script ~delegate ~spendable ~delegatable =
+  create_base c ?prepaid_bootstrap_storage contract ~balance ~manager
+    ~delegate ?script ~spendable ~delegatable
 
 let create_implicit c manager ~balance =
   create_base c (Contract_repr.implicit_contract manager)
@@ -252,7 +269,7 @@ let delete c contract =
       Storage.Contract.Counter.delete c contract >>=? fun c ->
       Storage.Contract.Code.remove c contract >>=? fun (c, _) ->
       Storage.Contract.Storage.remove c contract >>=? fun (c, _) ->
-      Storage.Contract.Paid_storage_space_fees.remove c contract >>= fun c ->
+      Storage.Contract.Paid_storage_space.remove c contract >>= fun c ->
       Storage.Contract.Used_storage_space.remove c contract >>= fun c ->
       return c
 
@@ -461,18 +478,19 @@ let used_storage_space c contract =
   | None -> return Z.zero
   | Some fees -> return fees
 
-let paid_storage_space_fees c contract =
-  Storage.Contract.Paid_storage_space_fees.get_option c contract >>=? function
-  | None -> return Tez_repr.zero
-  | Some paid_fees -> return paid_fees
+let paid_storage_space c contract =
+  Storage.Contract.Paid_storage_space.get_option c contract >>=? function
+  | None -> return Z.zero
+  | Some paid_space -> return paid_space
 
-let pay_for_storage_space c contract fees =
-  if Tez_repr.equal fees Tez_repr.zero then
-    return c
+let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space =
+  Storage.Contract.Paid_storage_space.get c contract >>=? fun already_paid_space ->
+  if Compare.Z.(already_paid_space >= new_storage_space) then
+    return (Z.zero, c)
   else
-    Storage.Contract.Paid_storage_space_fees.get c contract >>=? fun paid_fees ->
-    Lwt.return (Tez_repr.(paid_fees +? fees)) >>=? fun paid_fees ->
-    Storage.Contract.Paid_storage_space_fees.set c contract paid_fees
+    let to_pay = Z.sub new_storage_space already_paid_space in
+    Storage.Contract.Paid_storage_space.set c contract new_storage_space >>=? fun c ->
+    return (to_pay, c)
 
 module Big_map = struct
   let mem ctxt contract key =

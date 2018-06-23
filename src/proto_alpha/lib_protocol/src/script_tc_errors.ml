@@ -16,7 +16,7 @@ open Script_typed_ir
 
 (* Auxiliary types for error documentation *)
 type namespace = Type_namespace | Constant_namespace | Instr_namespace | Keyword_namespace
-type kind = Int_kind | String_kind | Prim_kind | Seq_kind
+type kind = Int_kind | String_kind | Bytes_kind | Prim_kind | Seq_kind
 type type_map = (int * ((Script.expr * Script.annot) list * (Script.expr * Script.annot) list)) list
 
 (* Structure errors *)

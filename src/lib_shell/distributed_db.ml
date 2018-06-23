@@ -491,9 +491,10 @@ module P2p_reader = struct
           (State.Block.known_invalid chain_db.chain_state)
           (Block_header.hash head :: hist) >>= fun known_invalid ->
         if known_invalid then begin
-          P2p.greylist_peer global_db.p2p state.gid;
-          Lwt.return_unit (* TODO Kick *)
-        end else if Time.(now () < head.shell.timestamp) then begin
+          (* TODO Kick *)
+          P2p.greylist_peer global_db.p2p state.gid ;
+          Lwt.return_unit
+        end else if Time.(add (now ()) 15L < head.shell.timestamp) then begin
           (* TODO some penalty *)
           lwt_log_notice "Received future block %a from peer %a."
             Block_hash.pp_short (Block_header.hash head)
@@ -541,10 +542,10 @@ module P2p_reader = struct
                This should probably warrant a reduction of the sender's score. *)
         in
         if known_invalid then begin
-          (* Kickban *)
+          (* TODO Kick *)
           P2p.greylist_peer global_db.p2p state.gid ;
-          Lwt.return_unit (* TODO Kick *)
-        end else if Time.(now () < header.shell.timestamp) then begin
+          Lwt.return_unit
+        end else if Time.(add (now ()) 15L < header.shell.timestamp) then begin
           (* TODO some penalty *)
           lwt_log_notice "Received future block %a from peer %a."
             Block_hash.pp_short head

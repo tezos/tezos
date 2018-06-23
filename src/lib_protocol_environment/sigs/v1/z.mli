@@ -65,7 +65,20 @@ val shift_right: t -> int -> t
 *)
 
 val to_string: t -> string
+(** Gives a human-readable, decimal string representation of the argument. *)
+
 val of_string: string -> t
+(** Converts a string to an integer.
+    An optional [-] prefix indicates a negative number, while a [+]
+    prefix is ignored.
+    An optional prefix [0x], [0o], or [0b] (following the optional [-]
+    or [+] prefix) indicates that the number is,
+    represented, in hexadecimal, octal, or binary, respectively.
+    Otherwise, base 10 is assumed.
+    (Unlike C, a lone [0] prefix does not denote octal.)
+    Raises an [Invalid_argument] exception if the string is not a
+    syntactically correct representation of an integer.
+*)
 
 val to_int64: t -> int64
 (** Converts to a 64-bit integer. May raise [Overflow]. *)

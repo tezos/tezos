@@ -17,6 +17,7 @@ let default_amount_annot = Some (`Var_annot "amount")
 let default_balance_annot = Some (`Var_annot "balance")
 let default_steps_annot = Some (`Var_annot "steps")
 let default_source_annot = Some (`Var_annot "source")
+let default_sender_annot = Some (`Var_annot "sender")
 let default_self_annot = Some (`Var_annot "self")
 let default_arg_annot = Some (`Var_annot "arg")
 let default_param_annot = Some (`Var_annot "parameter")
@@ -27,6 +28,8 @@ let default_cdr_annot = Some (`Field_annot "cdr")
 let default_contract_annot = Some (`Field_annot "contract")
 let default_addr_annot = Some (`Field_annot "address")
 let default_manager_annot = Some (`Field_annot "manager")
+let default_pack_annot = Some (`Field_annot "packed")
+let default_unpack_annot = Some (`Field_annot "unpacked")
 
 let default_elt_annot = Some (`Field_annot "elt")
 let default_key_annot = Some (`Field_annot "key")
@@ -305,16 +308,18 @@ let parse_var_annot
 let split_last_dot = function
   | None -> None, None
   | Some `Field_annot s ->
-      try
-        let i = String.rindex s '.' in
-        let s1 = String.sub s 0 i in
-        let s2 = String.sub s (i + 1) (String.length s - i - 1) in
-        let f =
-          if Compare.String.equal s2 "car" || Compare.String.equal s2 "cdr"
-          then None
-          else Some (`Field_annot s2) in
-        Some (`Var_annot s1), f
-      with Not_found -> None, Some (`Field_annot s)
+      match String.rindex_opt s '.' with
+      | None -> None, Some (`Field_annot s)
+      | Some i ->
+          let s1 = String.sub s 0 i in
+          let s2 = String.sub s (i + 1) (String.length s - i - 1) in
+          let f =
+            if Compare.String.equal s2 "car"
+            || Compare.String.equal s2 "cdr" then
+              None
+            else
+              Some (`Field_annot s2) in
+          Some (`Var_annot s1), f
 
 let common_prefix v1 v2 =
   match v1, v2 with

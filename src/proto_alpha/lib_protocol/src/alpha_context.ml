@@ -54,6 +54,7 @@ module Script = struct
   include Michelson_v1_primitives
   include Script_repr
 end
+module Fees = Fees_storage
 
 type public_key = Signature.Public_key.t
 type public_key_hash = Signature.Public_key_hash.t
@@ -83,6 +84,11 @@ end
 module Contract = struct
   include Contract_repr
   include Contract_storage
+
+  let originate c contract ~balance ~manager ?script ~delegate
+      ~spendable ~delegatable =
+    originate c contract ~balance ~manager ?script ~delegate
+      ~spendable ~delegatable
   let init_origination_nonce = Raw_context.init_origination_nonce
   let unset_origination_nonce = Raw_context.unset_origination_nonce
   type error += Block_storage_quota_exceeded = Storage_limit_repr.Block_quota_exceeded

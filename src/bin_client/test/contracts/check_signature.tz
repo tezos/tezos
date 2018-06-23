@@ -2,7 +2,7 @@ parameter key;
 storage (pair signature string);
 code { DUP; DUP;
        DIP{ CDR; DUP; CAR;
-            DIP{CDR; H}; PAIR};
+            DIP{CDR; PACK ; BLAKE2B}; PAIR};
        CAR; DIP {UNPAIR}; CHECK_SIGNATURE;
        IF {} {FAIL} ;
        CDR; NIL operation ; PAIR};

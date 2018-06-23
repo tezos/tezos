@@ -84,6 +84,7 @@ module Block = struct
     header: Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
+    last_allowed_fork_level: Int32.t ;
     context: Context_hash.t ;
     metadata: MBytes.t ;
   }
@@ -98,16 +99,19 @@ module Block = struct
            let open Data_encoding in
            conv
              (fun { header ; message ; max_operations_ttl ;
+                    last_allowed_fork_level ;
                     context ; metadata } ->
-               (message, max_operations_ttl,
+               (message, max_operations_ttl, last_allowed_fork_level,
                 context, metadata, header ))
-             (fun (message, max_operations_ttl,
+             (fun (message, max_operations_ttl, last_allowed_fork_level,
                    context, metadata, header ) ->
                { header ; message ; max_operations_ttl ;
+                 last_allowed_fork_level ;
                  context ; metadata })
-             (obj5
+             (obj6
                 (opt "message" string)
                 (req "max_operations_ttl" uint16)
+                (req "last_allowed_fork_level" int32)
                 (req "context" Context_hash.encoding)
                 (req "metadata" bytes)
                 (req "header" Block_header.encoding))
@@ -222,6 +226,17 @@ module Chain_data = struct
       (Block.Indexed_store.Store)
       (struct let name = ["in_chain"] end)
       (Store_helpers.Make_value(Block_hash)) (* successor *)
+
+  module Checkpoint =
+    Store_helpers.Make_single_store
+      (Chain.Indexed_store.Store)
+      (struct let name = ["checkpoint"] end)
+      (Store_helpers.Make_value(struct
+         type t = Int32.t * Block_hash.t
+         let encoding =
+           let open Data_encoding in
+           tup2 int32 Block_hash.encoding
+       end))
 
 end
 

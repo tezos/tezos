@@ -168,6 +168,9 @@ module Cost_of = struct
 
   let compare_res = step_cost 1
 
+  let unpack bytes = 10 *@ step_cost (MBytes.length bytes)
+  let pack bytes = alloc_bytes_cost (MBytes.length bytes)
+
   (* TODO: protocol operations *)
   let address = step_cost 3
   let contract = Gas.read_bytes_cost Z.zero +@ step_cost 3
@@ -182,7 +185,7 @@ module Cost_of = struct
   let check_signature = step_cost 3
   let hash_key = step_cost 3
   (* TODO: This needs to be a function of the data being hashed *)
-  let hash _data = step_cost 3
+  let hash data len = step_cost (MBytes.length data) +@ alloc_bytes_cost len
   let steps_to_quota = step_cost 1
   let source = step_cost 3
   let self = step_cost 3
@@ -190,6 +193,8 @@ module Cost_of = struct
   let compare_bool _ _ = step_cost 1
   let compare_string s1 s2 =
     step_cost (Compare.Int.max (String.length s1) (String.length s2) / 8) +@ step_cost 1
+  let compare_bytes s1 s2 =
+    step_cost (Compare.Int.max (MBytes.length s1) (MBytes.length s2) / 8) +@ step_cost 1
   let compare_tez _ _ = step_cost 1
   let compare_zint n1 n2 = step_cost (Compare.Int.max (Z.numbits n1) (Z.numbits n2) / 8) +@ step_cost 1
   let compare_int n1 n2 = compare_zint (Script_int.to_zint n1) (Script_int.to_zint n2)
@@ -224,9 +229,9 @@ module Cost_of = struct
     let primitive_type = alloc_cost 1
     let one_arg_type = alloc_cost 2
     let two_arg_type = alloc_cost 3
-    let operation s =
+    let operation b =
       (* TODO: proper handling of (de)serialization costs *)
-      let len = String.length s in
+      let len = MBytes.length b in
       alloc_cost len +@ step_cost (len * 10)
   end
 
@@ -238,7 +243,10 @@ module Cost_of = struct
     let cycle = step_cost 1
     let bool = prim_cost
     let unit = prim_cost
+    (* FIXME: not sure we should count the length of strings and bytes
+       as they are shared *)
     let string s = string_cost (String.length s)
+    let bytes s = alloc_bytes_cost (MBytes.length s)
     (* Approximates log10(x) *)
     let int i =
       let decimal_digits = (Z.numbits (Z.abs (Script_int.to_zint i))) / 4 in

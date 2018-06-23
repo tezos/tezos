@@ -24,6 +24,7 @@ val begin_construction:
   Block.t -> incremental tzresult Lwt.t
 
 val add_operation:
+  ?expect_failure:(error list -> unit tzresult Lwt.t) ->
   incremental -> Operation.packed -> incremental tzresult Lwt.t
 
 val finalize_block: incremental -> Block.t tzresult Lwt.t

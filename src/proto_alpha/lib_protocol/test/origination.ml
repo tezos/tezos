@@ -142,7 +142,13 @@ let undelegatable fee () =
   else
     (* delegation is processed ; but delegate does not change *)
     begin
-      Incremental.add_operation i operation >>=? fun i ->
+      let expect_failure = function
+        | Alpha_environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
+            return ()
+        | _ ->
+            failwith "The contract is not delegatable, it fail !"
+      in
+      Incremental.add_operation ~expect_failure i operation >>=? fun i ->
       (* new contracts loses the fee *)
       Assert.balance_was_debited ~loc:__LOC__ (I i) new_contract balance fee
       (* TODO delegate has not changed : wait for delegation tests and Context.Contract.delegate
@@ -194,7 +200,13 @@ let origination_contract_from_origination_contract_not_enough_fund fee () =
   register_origination_inc ~credit:amount () >>=? fun (inc, contract) ->
   (* contract's balance is not enough to afford origination burn  *)
   Op.origination ~fee (I inc) ~credit:amount contract >>=? fun (operation, orig_contract) ->
-  Incremental.add_operation inc operation >>=? fun inc ->
+  let expect_failure = function
+    | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+        return ()
+    | _ ->
+        failwith "The contract has not enought funds, it fail !"
+  in
+  Incremental.add_operation ~expect_failure inc operation >>=? fun inc ->
   Context.Contract.balance (I inc) contract >>=? fun balance_aft ->
   (* contract was debited of [fee] but not of origination burn *)
   Assert.balance_was_debited ~loc:__LOC__ (I inc) contract balance_aft fee >>=? fun () ->

@@ -45,12 +45,11 @@ module Scripts = struct
     let path = RPC_path.(path / "scripts")
 
     let run_code_input_encoding =
-      (obj5
+      (obj4
          (req "script" Script.expr_encoding)
          (req "storage" Script.expr_encoding)
          (req "input" Script.expr_encoding)
-         (req "amount" Tez.encoding)
-         (req "contract" Contract.encoding))
+         (req "amount" Tez.encoding))
 
     let run_code =
       RPC_service.post_service
@@ -60,7 +59,9 @@ module Scripts = struct
         ~output: (obj3
                     (req "storage" Script.expr_encoding)
                     (req "operations" (list Operation.internal_operation_encoding))
-                    (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
+                    (opt "big_map_diff" (list (tup2
+                                                 Script_expr_hash.encoding
+                                                 (option Script.expr_encoding)))))
         RPC_path.(path / "run_code")
 
     let trace_code =
@@ -81,7 +82,9 @@ module Scripts = struct
                                 (obj2
                                    (req "item" (Script.expr_encoding))
                                    (opt "annot" string))))))
-                    (opt "big_map_diff" (list (tup2 string (option Script.expr_encoding)))))
+                    (opt "big_map_diff" (list (tup2
+                                                 Script_expr_hash.encoding
+                                                 (option Script.expr_encoding)))))
         RPC_path.(path / "trace_code")
 
     let typecheck_code =
@@ -108,20 +111,20 @@ module Scripts = struct
         ~output: (obj1 (req "gas" Gas.encoding))
         RPC_path.(path / "typecheck_data")
 
-    let hash_data =
+    let pack_data =
       RPC_service.post_service
-        ~description: "Computes the hash of some data expression \
-                       using the same algorithm as script instruction H"
+        ~description: "Computes the serialized version of some data expression \
+                       using the same algorithm as script instruction PACK"
 
         ~input: (obj3
                    (req "data" Script.expr_encoding)
                    (req "type" Script.expr_encoding)
                    (opt "gas" z))
         ~output: (obj2
-                    (req "hash" string)
+                    (req "packed" bytes)
                     (req "gas" Gas.encoding))
         ~query: RPC_query.empty
-        RPC_path.(path / "hash_data")
+        RPC_path.(path / "pack_data")
 
     let run_operation =
       RPC_service.post_service
@@ -136,32 +139,46 @@ module Scripts = struct
 
   let register () =
     let open Services_registration in
-    register0 S.run_code begin fun ctxt ()
-      (code, storage, parameter, amount, contract) ->
-      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
+    let originate_dummy_contract ctxt script =
       let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+      Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, dummy_contract) ->
+      let balance = match Tez.of_mutez 4_000_000_000_000L with
+        | Some balance -> balance
+        | None -> assert false in
+      Contract.originate ctxt dummy_contract
+        ~balance
+        ~manager: Signature.Public_key_hash.zero
+        ~delegate: None
+        ~spendable: false
+        ~delegatable: false
+        ~script: (script, None) >>=? fun ctxt ->
+      return (ctxt, dummy_contract) in
+    register0 S.run_code begin fun ctxt ()
+      (code, storage, parameter, amount) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
+      originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
+      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
       Script_interpreter.execute
         ctxt Readable
-        ~source:contract (* transaction initiator *)
-        ~payer:contract (* storage fees payer *)
-        ~self:(contract, { storage ; code }) (* script owner *)
+        ~source:dummy_contract
+        ~payer:dummy_contract
+        ~self:(dummy_contract, { storage ; code })
         ~amount ~parameter
       >>=? fun { Script_interpreter.storage ; operations ; big_map_diff ; _ } ->
       return (storage, operations, big_map_diff)
     end ;
     register0 S.trace_code begin fun ctxt ()
-      (code, storage, parameter, amount, contract) ->
-      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
-      let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
+      (code, storage, parameter, amount) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
+      originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
+      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
       Script_interpreter.trace
         ctxt Readable
-        ~source:contract (* transaction initiator *)
-        ~payer:contract (* storage fees payer *)
-        ~self:(contract, { storage ; code }) (* script owner *)
+        ~source:dummy_contract
+        ~payer:dummy_contract
+        ~self:(dummy_contract, { storage ; code })
         ~amount ~parameter
       >>=? fun ({ Script_interpreter.storage ; operations ; big_map_diff ; _ }, trace) ->
       return (storage, operations, trace, big_map_diff)
@@ -180,15 +197,15 @@ module Scripts = struct
       Script_ir_translator.typecheck_data ctxt (data, ty) >>=? fun ctxt ->
       return (Gas.level ctxt)
     end ;
-    register0 S.hash_data begin fun ctxt () (expr, typ, maybe_gas) ->
+    register0 S.pack_data begin fun ctxt () (expr, typ, maybe_gas) ->
       let open Script_ir_translator in
       begin match maybe_gas with
         | None -> return (Gas.set_unlimited ctxt)
         | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
       Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ) ->
       parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
-      Script_ir_translator.hash_data ctxt typ data >>=? fun (hash, ctxt) ->
-      return (hash, Gas.level ctxt)
+      Script_ir_translator.pack_data ctxt typ data >>=? fun (bytes, ctxt) ->
+      return (bytes, Gas.level ctxt)
     end ;
     register0 S.run_operation begin fun ctxt ()
       { shell ; protocol_data = Operation_data protocol_data } ->
@@ -227,30 +244,31 @@ module Scripts = struct
       let operation : _ operation = { shell ; protocol_data } in
       let hash = Operation.hash { shell ; protocol_data } in
       let ctxt = Contract.init_origination_nonce ctxt hash in
+      let baker = Signature.Public_key_hash.zero in
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Readable op >>= fun (_ctxt, result) ->
+          Apply.apply_manager_contents_list ctxt Readable baker op >>= fun (_ctxt, result) ->
           return result
       | Cons (Manager_operation _, _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Readable op >>= fun (_ctxt, result) ->
+          Apply.apply_manager_contents_list ctxt Readable baker op >>= fun (_ctxt, result) ->
           return result
       | _ ->
           Apply.apply_contents_list
-            ctxt Readable shell.branch operation
+            ctxt Readable shell.branch baker operation
             operation.protocol_data.contents >>=? fun (_ctxt, result) ->
           return result
 
     end
 
-  let run_code ctxt block code (storage, input, amount, contract) =
+  let run_code ctxt block code (storage, input, amount) =
     RPC_context.make_call0 S.run_code ctxt
-      block () (code, storage, input, amount, contract)
+      block () (code, storage, input, amount)
 
-  let trace_code ctxt block code (storage, input, amount, contract) =
+  let trace_code ctxt block code (storage, input, amount) =
     RPC_context.make_call0 S.trace_code ctxt
-      block () (code, storage, input, amount, contract)
+      block () (code, storage, input, amount)
 
   let typecheck_code ctxt block =
     RPC_context.make_call0 S.typecheck_code ctxt block ()
@@ -258,8 +276,8 @@ module Scripts = struct
   let typecheck_data ctxt block =
     RPC_context.make_call0 S.typecheck_data ctxt block ()
 
-  let hash_data ctxt block =
-    RPC_context.make_call0 S.hash_data ctxt block ()
+  let pack_data ctxt block =
+    RPC_context.make_call0 S.pack_data ctxt block ()
 
   let run_operation ctxt block =
     RPC_context.make_call0 S.run_operation ctxt block ()

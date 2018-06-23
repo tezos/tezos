@@ -19,7 +19,7 @@ module Sign = struct
 
     let to_sign ~pkh ~data =
       MBytes.concat ""
-        [ MBytes.of_hex (`Hex "04") ;
+        [ MBytes.of_string "\x04" ;
           Signature.Public_key_hash.to_bytes pkh ;
           data ]
 

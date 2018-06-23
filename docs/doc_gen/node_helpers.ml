@@ -28,6 +28,7 @@ let with_node f =
       context_root = dir / "context" ;
       p2p = None ;
       test_chain_max_tll = None ;
+      checkpoint = None ;
     } in
     Node.create
       node_config

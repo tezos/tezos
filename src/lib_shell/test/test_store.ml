@@ -93,6 +93,7 @@ let lolblock ?(operations = []) header =
     max_operations_ttl = 0 ;
     message = None ;
     context = Context_hash.zero ;
+    last_allowed_fork_level = 0l ;
   }
 
 let b1 = lolblock "Blop !"

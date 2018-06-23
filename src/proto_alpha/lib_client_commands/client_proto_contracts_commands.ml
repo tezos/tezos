@@ -66,40 +66,4 @@ let commands  () =
          cctxt#message "%a\n%!" Contract.pp contract >>= fun () ->
          return ()) ;
 
-    command ~group ~desc: "Tag a contract in the wallet."
-      no_options
-      (prefixes [ "tag" ; "contract" ]
-       @@ RawContractAlias.alias_param
-       @@ prefixes [ "with" ]
-       @@ Contract_tags.tag_param
-       @@ stop)
-      (fun () (alias, _contract) new_tags cctxt ->
-         Contract_tags.find_opt cctxt alias >>=? fun tags ->
-         let new_tags =
-           match tags with
-           | None -> new_tags
-           | Some tags -> List.merge2 tags new_tags in
-         Contract_tags.update cctxt alias new_tags) ;
-
-    command ~group ~desc: "Remove tag(s) from a contract in the wallet."
-      no_options
-      (prefixes [ "untag" ; "contract" ]
-       @@ RawContractAlias.alias_param
-       @@ prefixes [ "with" ]
-       @@ Contract_tags.tag_param
-       @@ stop)
-      (fun () (alias, _contract) new_tags cctxt ->
-         Contract_tags.find_opt cctxt alias >>=? fun tags ->
-         let new_tags =
-           match tags with
-           | None -> []
-           | Some tags ->
-               List.merge_filter2
-                 ~f:(fun x1 x2 -> match x1, x2 with
-                     | None, None -> assert false
-                     | None, Some _ -> None
-                     | Some t1, Some t2 when t1 = t2 -> None
-                     | Some t1, _ -> Some t1) tags new_tags in
-         Contract_tags.update cctxt alias new_tags) ;
-
   ]

@@ -30,9 +30,9 @@ module Make(N : sig val scheme : string end) = struct
       ^ "Environment variable TEZOS_SIGNER_HTTP_HEADERS can be specified \
          to add headers to the requests (only custom 'x-...' headers are supported)."
 
-    let headers = match Sys.getenv "TEZOS_SIGNER_HTTP_HEADERS" with
-      | exception Not_found -> None
-      | contents ->
+    let headers = match Sys.getenv_opt "TEZOS_SIGNER_HTTP_HEADERS" with
+      | None -> None
+      | Some contents ->
           let lines = String.split_on_char '\n' contents in
           Some
             (List.fold_left (fun acc line ->
@@ -41,12 +41,12 @@ module Make(N : sig val scheme : string end) = struct
                      Pervasives.failwith
                        "Http signer: invalid TEZOS_SIGNER_HTTP_HEADERS environment variable, missing colon"
                  | Some pos ->
-                     let header = String.sub line 0 pos in
+                     let header = String.trim (String.sub line 0 pos) in
                      if String.length header < 2
                      || String.sub (String.lowercase_ascii header) 0 2 <> "x-" then
                        Pervasives.failwith
                          "Http signer: invalid TEZOS_SIGNER_HTTP_HEADERS environment variable, only x- headers are supported" ;
-                     let value = String.sub line (pos + 1) (String.length line - pos - 1) in
+                     let value = String.trim (String.sub line (pos + 1) (String.length line - pos - 1)) in
                      (header, value) :: acc) [] lines)
 
     let parse uri =
@@ -57,7 +57,9 @@ module Make(N : sig val scheme : string end) = struct
         | None ->
             failwith "Invalid locator %a" Uri.pp_hum uri
         | Some i ->
-            let pkh = String.sub path (i + 1) (String.length path - i - 1) in
+            let pkh =
+              try String.sub path (i + 1) (String.length path - i - 1)
+              with _ -> "" in
             let path = String.sub path 0 i in
             return (Uri.with_path uri path, pkh)
       end >>=? fun (base, pkh) ->

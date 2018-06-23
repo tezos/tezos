@@ -17,6 +17,7 @@ val default_amount_annot : var_annot option
 val default_balance_annot : var_annot option
 val default_steps_annot : var_annot option
 val default_source_annot : var_annot option
+val default_sender_annot : var_annot option
 val default_self_annot : var_annot option
 val default_arg_annot : var_annot option
 val default_param_annot : var_annot option
@@ -27,6 +28,8 @@ val default_cdr_annot : field_annot option
 val default_contract_annot : field_annot option
 val default_addr_annot : field_annot option
 val default_manager_annot : field_annot option
+val default_pack_annot : field_annot option
+val default_unpack_annot : field_annot option
 
 val default_elt_annot : field_annot option
 val default_key_annot : field_annot option

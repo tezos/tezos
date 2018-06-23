@@ -25,7 +25,7 @@ printf "\n\n"
 if [ ! $NO_TYPECHECK ] ; then
     for contract in `ls $contract_dir/*.tz`; do
         printf "[Typechecking %s]\n" "$contract";
-        ${client} typecheck program "$contract";
+        ${client} typecheck script "$contract";
     done
     printf "All contracts are well typed\n\n"
 fi
@@ -230,64 +230,64 @@ assert_storage $contract_dir/first.tz '111' '{ 4 }' '4'
 
 # Hash input string
 # Test assumed to be correct -- hash is based on encoding of AST
-assert_storage $contract_dir/hash_string.tz '"?"' '"abcdefg"' '"exprv3MnhXvjthGzZ7jDtXRRFremZyey9rsGtL7JRkeaQX1fThN7WF"'
-assert_storage $contract_dir/hash_string.tz '"?"' '"12345"' '"expru81QVHsW2qaWLNHnMHSxDNhqtat17ajadri6mKUvXyc2EWHZC3"'
+assert_storage $contract_dir/hash_string.tz '0x00' '"abcdefg"' '0x46fdbcb4ea4eadad5615cdaa17d67f783e01e21149ce2b27de497600b4cd8f4e'
+assert_storage $contract_dir/hash_string.tz '0x00' '"12345"' '0xb4c26c20de52a4eaf0d8a340db47ad8cb1e74049570859c9a9a3952b204c772f'
 
 # Test ASSERT
 assert_storage $contract_dir/assert.tz Unit True Unit
-assert_fails $client run program $contract_dir/assert.tz on storage Unit and input False
+assert_fails $client run script $contract_dir/assert.tz on storage Unit and input False
 
 # COMPARE; ASSERT_
 assert_storage $contract_dir/assert_eq.tz Unit '(Pair -1 -1)' Unit
-assert_fails $client run program $contract_dir/assert_eq.tz on storage Unit and input '(Pair 0 -1)'
+assert_fails $client run script $contract_dir/assert_eq.tz on storage Unit and input '(Pair 0 -1)'
 
 assert_storage $contract_dir/assert_eq.tz Unit '(Pair -1 -1)' Unit
-assert_fails $client run program $contract_dir/assert_eq.tz on storage Unit and input '(Pair 0 -1)'
+assert_fails $client run script $contract_dir/assert_eq.tz on storage Unit and input '(Pair 0 -1)'
 
 assert_storage $contract_dir/assert_neq.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run program $contract_dir/assert_neq.tz on storage Unit and input '(Pair -1 -1)'
+assert_fails $client run script $contract_dir/assert_neq.tz on storage Unit and input '(Pair -1 -1)'
 
 assert_storage $contract_dir/assert_lt.tz Unit '(Pair -1 0)' Unit
-assert_fails $client run program $contract_dir/assert_lt.tz on storage Unit and input '(Pair 0 -1)'
-assert_fails $client run program $contract_dir/assert_lt.tz on storage Unit and input '(Pair 0 0)'
+assert_fails $client run script $contract_dir/assert_lt.tz on storage Unit and input '(Pair 0 -1)'
+assert_fails $client run script $contract_dir/assert_lt.tz on storage Unit and input '(Pair 0 0)'
 
 assert_storage $contract_dir/assert_le.tz Unit '(Pair 0 0)' Unit
 assert_storage $contract_dir/assert_le.tz Unit '(Pair -1 0)' Unit
-assert_fails $client run program $contract_dir/assert_le.tz on storage Unit and input '(Pair 0 -1)'
+assert_fails $client run script $contract_dir/assert_le.tz on storage Unit and input '(Pair 0 -1)'
 
 assert_storage $contract_dir/assert_gt.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run program $contract_dir/assert_gt.tz on storage Unit and input '(Pair -1 0)'
-assert_fails $client run program $contract_dir/assert_gt.tz on storage Unit and input '(Pair 0 0)'
+assert_fails $client run script $contract_dir/assert_gt.tz on storage Unit and input '(Pair -1 0)'
+assert_fails $client run script $contract_dir/assert_gt.tz on storage Unit and input '(Pair 0 0)'
 
 assert_storage $contract_dir/assert_ge.tz Unit '(Pair 0 0)' Unit
 assert_storage $contract_dir/assert_ge.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run program $contract_dir/assert_ge.tz on storage Unit and input '(Pair -1 0)'
+assert_fails $client run script $contract_dir/assert_ge.tz on storage Unit and input '(Pair -1 0)'
 
 # ASSERT_CMP
 assert_storage $contract_dir/assert_cmpeq.tz Unit '(Pair -1 -1)' Unit
-assert_fails $client run program $contract_dir/assert_cmpeq.tz on storage Unit and input '(Pair 0 -1)'
+assert_fails $client run script $contract_dir/assert_cmpeq.tz on storage Unit and input '(Pair 0 -1)'
 
 assert_storage $contract_dir/assert_cmpeq.tz Unit '(Pair -1 -1)' Unit
-assert_fails $client run program $contract_dir/assert_cmpeq.tz on storage Unit and input '(Pair 0 -1)'
+assert_fails $client run script $contract_dir/assert_cmpeq.tz on storage Unit and input '(Pair 0 -1)'
 
 assert_storage $contract_dir/assert_cmpneq.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run program $contract_dir/assert_cmpneq.tz on storage Unit and input '(Pair -1 -1)'
+assert_fails $client run script $contract_dir/assert_cmpneq.tz on storage Unit and input '(Pair -1 -1)'
 
 assert_storage $contract_dir/assert_cmplt.tz Unit '(Pair -1 0)' Unit
-assert_fails $client run program $contract_dir/assert_cmplt.tz on storage Unit and input '(Pair 0 -1)'
-assert_fails $client run program $contract_dir/assert_cmplt.tz on storage Unit and input '(Pair 0 0)'
+assert_fails $client run script $contract_dir/assert_cmplt.tz on storage Unit and input '(Pair 0 -1)'
+assert_fails $client run script $contract_dir/assert_cmplt.tz on storage Unit and input '(Pair 0 0)'
 
 assert_storage $contract_dir/assert_cmple.tz Unit '(Pair 0 0)' Unit
 assert_storage $contract_dir/assert_cmple.tz Unit '(Pair -1 0)' Unit
-assert_fails $client run program $contract_dir/assert_cmple.tz on storage Unit and input '(Pair 0 -1)'
+assert_fails $client run script $contract_dir/assert_cmple.tz on storage Unit and input '(Pair 0 -1)'
 
 assert_storage $contract_dir/assert_cmpgt.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run program $contract_dir/assert_cmpgt.tz on storage Unit and input '(Pair -1 0)'
-assert_fails $client run program $contract_dir/assert_cmpgt.tz on storage Unit and input '(Pair 0 0)'
+assert_fails $client run script $contract_dir/assert_cmpgt.tz on storage Unit and input '(Pair -1 0)'
+assert_fails $client run script $contract_dir/assert_cmpgt.tz on storage Unit and input '(Pair 0 0)'
 
 assert_storage $contract_dir/assert_cmpge.tz Unit '(Pair 0 0)' Unit
 assert_storage $contract_dir/assert_cmpge.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run program $contract_dir/assert_cmpge.tz on storage Unit and input '(Pair -1 0)'
+assert_fails $client run script $contract_dir/assert_cmpge.tz on storage Unit and input '(Pair -1 0)'
 
 # IF_SOME
 assert_storage $contract_dir/if_some.tz '"?"' '(Some "hello")' '"hello"'
@@ -297,7 +297,7 @@ assert_storage $contract_dir/if_some.tz '"?"' 'None' '""'
 assert_storage  $contract_dir/set_car.tz '(Pair "hello" 0)' '"world"' '(Pair "world" 0)'
 assert_storage  $contract_dir/set_car.tz '(Pair "hello" 0)' '"abc"' '(Pair "abc" 0)'
 assert_storage  $contract_dir/set_car.tz '(Pair "hello" 0)' '""' '(Pair "" 0)'
-assert_fails $client run program $contract_dir/set_car.tz on storage '(Pair %wrong %field "hello" 0)' Unit and input '""'
+assert_fails $client run script $contract_dir/set_car.tz on storage '(Pair %wrong %field "hello" 0)' Unit and input '""'
 
 assert_storage  $contract_dir/set_cdr.tz '(Pair "hello" 0)' '1' '(Pair "hello" 1)'
 assert_storage  $contract_dir/set_cdr.tz '(Pair "hello" 500)' '3' '(Pair "hello" 3)'
@@ -314,12 +314,12 @@ assert_storage  $contract_dir/map_caddaadr.tz \
 '(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 1000000) 4) 5))) 6)'
 
 # Did the given key sign the string? (key is bootstrap1)
-assert_success $client run program $contract_dir/check_signature.tz \
-               on storage '(Pair 0x011eb640b67c1859228a72730fae1a006bb94a999395dfb569e2776e9c1ae546376247f001343a1042f92082690f6aa2e6ed230df319b09767d9807ef3f8191f "hello")' \
+assert_success $client run script $contract_dir/check_signature.tz \
+               on storage '(Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7" "hello")' \
                and input '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
 
-assert_fails $client run program $contract_dir/check_signature.tz \
-             on storage '(Pair 0x011eb640b67c1859228a72730fae1a006bb94a999395dfb569e2776e9c1ae546376247f001343a1042f92082690f6aa2e6ed230df319b09767d9807ef3f8191f "abcd")' \
+assert_fails $client run script $contract_dir/check_signature.tz \
+             on storage '(Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7" "abcd")' \
              and input '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
 
 
@@ -421,6 +421,17 @@ init_with_transfer $contract_dir/self.tz $key1 \
 bake_after $client transfer 0 from bootstrap1 to self
 assert_storage_contains self "\"$(get_contract_addr self)\""
 
+# Test bytes, SHA256, CHECK_SIGNATURE
+init_with_transfer $contract_dir/reveal_signed_preimage.tz bootstrap1 \
+				   '(Pair 0x9995c2ef7bcc7ae3bd15bdd9b02dc6e877c27b26732340d641a4cbc6524813bb "p2pk66uq221795tFxT7jfNmXtBMdjMf6RAaxRTwv1dbuSHbH6yfqGwz")' 1,000 bootstrap1
+assert_fails $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
+             '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972 "p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8")'
+assert_fails $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
+             '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8")'
+assert_success $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
+               '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")'
+bake
+
 # Test SET_DELEGATE
 b2='tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN'
 b3='tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU'
@@ -449,12 +460,12 @@ assert_fails $client typecheck data '{ "A" ; "B" ; "B" }' against type '(set str
 
 # Test hash consistency between Michelson and the CLI
 hash_result=`$client hash data '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))' \
-                     of type '(pair mutez (pair timestamp int))' | grep expr`
+                     of type '(pair mutez (pair timestamp int))' | grep Blake2b | sed 's/.*: *//'`
 
-assert_storage $contract_dir/hash_consistency_checker.tz '"?"' \
+assert_storage $contract_dir/hash_consistency_checker.tz '0x00' \
               '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))' "$hash_result"
 
-assert_storage $contract_dir/hash_consistency_checker.tz '"?"' \
+assert_storage $contract_dir/hash_consistency_checker.tz '0x00' \
               '(Pair 22220000000 (Pair "2017-12-13T04:49:00+00:00" 34))' "$hash_result"
 
 # Test for big maps

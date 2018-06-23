@@ -1,0 +1,7 @@
+parameter (pair bytes signature) ;
+storage (pair bytes key) ;
+code { DUP ; UNPAIR ; CAR ; SHA256 ; DIP { CAR } ; ASSERT_CMPEQ ;
+       DUP ; UNPAIR ; SWAP ; DIP { UNPAIR ; SWAP } ; CDR ; CHECK_SIGNATURE ; ASSERT ;
+       CDR ; DUP ; CDR ; HASH_KEY ; IMPLICIT_ACCOUNT ;
+       BALANCE ; UNIT ; TRANSFER_TOKENS ;
+       NIL operation ; SWAP ; CONS ; PAIR }

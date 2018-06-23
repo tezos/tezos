@@ -22,6 +22,7 @@ type 'ty comparable_ty =
   | Int_key : type_annot option -> (z num) comparable_ty
   | Nat_key : type_annot option -> (n num) comparable_ty
   | String_key : type_annot option -> string comparable_ty
+  | Bytes_key : type_annot option -> MBytes.t comparable_ty
   | Mutez_key : type_annot option -> Tez.t comparable_ty
   | Bool_key : type_annot option -> bool comparable_ty
   | Key_hash_key : type_annot option -> public_key_hash comparable_ty
@@ -72,6 +73,7 @@ and 'ty ty =
   | Nat_t : type_annot option -> n num ty
   | Signature_t : type_annot option -> signature ty
   | String_t : type_annot option -> string ty
+  | Bytes_t : type_annot option -> MBytes.t ty
   | Mutez_t : type_annot option -> Tez.t ty
   | Key_hash_t : type_annot option -> public_key_hash ty
   | Key_t : type_annot option -> public_key ty
@@ -292,8 +294,8 @@ and ('bef, 'aft) instr =
       ('arg * (('arg, 'ret) lambda * 'rest), 'ret * 'rest) instr
   | Lambda : ('arg, 'ret) lambda ->
     ('rest, ('arg, 'ret) lambda * 'rest) instr
-  | Fail :
-      ('bef, 'aft) instr
+  | Failwith :
+      'a ty -> ('a * 'rest, 'aft) instr
   | Nop :
       ('rest, 'rest) instr
   (* comparison *)
@@ -318,10 +320,6 @@ and ('bef, 'aft) instr =
       (_ typed_contract * 'rest, Contract.t * 'rest) instr
   | Contract : 'p ty ->
     (Contract.t * 'rest, 'p typed_contract option * 'rest) instr
-  | Manager :
-      ('arg typed_contract * 'rest, public_key_hash * 'rest) instr
-  | Address_manager :
-      (Contract.t * 'rest, public_key_hash option * 'rest) instr
   | Transfer_tokens :
       ('arg * (Tez.t * ('arg typed_contract * 'rest)), packed_internal_operation * 'rest) instr
   | Create_account :
@@ -339,14 +337,24 @@ and ('bef, 'aft) instr =
   | Balance :
       ('rest, Tez.t * 'rest) instr
   | Check_signature :
-      (public_key * (signature * (string * 'rest)), bool * 'rest) instr
+      (public_key * (signature * (MBytes.t * 'rest)), bool * 'rest) instr
   | Hash_key :
       (public_key * 'rest, public_key_hash * 'rest) instr
-  | H : 'a ty ->
-    ('a * 'rest, string * 'rest) instr
+  | Pack : 'a ty ->
+    ('a * 'rest, MBytes.t * 'rest) instr
+  | Unpack : 'a ty ->
+    (MBytes.t * 'rest, 'a option * 'rest) instr
+  | Blake2b :
+      (MBytes.t * 'rest, MBytes.t * 'rest) instr
+  | Sha256 :
+      (MBytes.t * 'rest, MBytes.t * 'rest) instr
+  | Sha512 :
+      (MBytes.t * 'rest, MBytes.t * 'rest) instr
   | Steps_to_quota : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr
   | Source :
+      ('rest, Contract.t * 'rest) instr
+  | Sender :
       ('rest, Contract.t * 'rest) instr
   | Self : 'p ty ->
     ('rest, 'p typed_contract * 'rest) instr

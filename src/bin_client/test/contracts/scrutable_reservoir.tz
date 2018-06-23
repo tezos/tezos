@@ -18,8 +18,8 @@ code
          NOW ;
          COMPARE ; LT ;
          IF { # Before timeout
-              # We compute ((1 + P) + N) mutez for keeping the contract alive
-              PUSH mutez 1000000 ;
+              # We compute (P + N) mutez
+              PUSH mutez 0 ;
               DIP { DUP ; CDDDAAR } ; ADD ; # P
               DIP { DUP ; CDDDADR } ; ADD ; # N
               # We compare to the cumulated amount
@@ -45,17 +45,17 @@ code
               # We update the global
               CDDR ; PUSH string "timeout" ; PAIR ;
               # We try to transfer the fee to the broker
-              PUSH mutez 1000000 ; BALANCE ; SUB ; # available
+              BALANCE ; # available
               DIP { DUP ; CDDAAR } ; # P
               COMPARE ; LT ; # available < P
-              IF { PUSH mutez 1000000 ; BALANCE ; SUB ; # available
+              IF { BALANCE ; # available
                    DIP { DUP ; CDDDAR } ; # X
                    UNIT ; TRANSFER_TOKENS }
                  { DUP ; CDDAAR ; # P
                    DIP { DUP ; CDDDAR } ; # X
                    UNIT ; TRANSFER_TOKENS } ;
               # We transfer the rest to B
-              DIP { PUSH mutez 1000000 ; BALANCE ; SUB ; # available
+              DIP { BALANCE ; # available
                     DIP { DUP ; CDDDDDR } ; # B
                     UNIT ; TRANSFER_TOKENS } ;
               NIL operation ; SWAP ; CONS ; SWAP ; CONS ;

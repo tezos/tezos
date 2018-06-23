@@ -27,14 +27,49 @@ let type_map_enc =
           (req "stackBefore" stack_enc)
           (req "stackAfter" stack_enc)))
 
+let rec strip_var_annots = function
+  | Int _ | String _ | Bytes _ as atom -> atom
+  | Seq (loc, args) -> Seq (loc, List.map strip_var_annots args)
+  | Prim (loc, name, args, annots) ->
+      let not_var_annot s = Compare.Char.(String.get s 0 <> '@') in
+      let annots = List.filter not_var_annot annots in
+      Prim (loc, name, List.map strip_var_annots args, annots)
+
 let ex_ty_enc =
   Data_encoding.conv
-    (fun (Ex_ty ty) -> strip_locations (unparse_ty ty))
+    (fun (Ex_ty ty) ->
+       strip_locations (strip_var_annots (unparse_ty ty)))
     (fun expr ->
        match parse_ty ~allow_big_map:true ~allow_operation:true (root expr) with
        | Ok ty -> ty
        | _ -> assert false)
     Script.expr_encoding
+
+let var_annot_enc =
+  let open Data_encoding in
+  conv
+    (function `Var_annot x -> "@" ^ x)
+    (function x ->
+       assert (Compare.Int.(String.length x > 0) && Compare.Char.(String.get x 0 = '@')) ;
+       `Var_annot (String.sub x 1 (String.length x - 1)))
+    string
+
+let ex_stack_ty_enc =
+  let open Data_encoding in
+  let rec unfold = function
+    | Ex_stack_ty (Item_t (ty, rest, annot)) ->
+        (Ex_ty ty, annot) :: unfold (Ex_stack_ty rest)
+    | Ex_stack_ty Empty_t -> [] in
+  let rec fold = function
+    | (Ex_ty ty, annot) :: rest ->
+        let Ex_stack_ty rest = fold rest in
+        Ex_stack_ty (Item_t (ty, rest, annot))
+    | [] -> Ex_stack_ty Empty_t in
+  conv unfold fold
+    (list
+       (obj2
+          (req "type" ex_ty_enc)
+          (opt "annot" var_annot_enc)))
 
 (* main registration *)
 let () =
@@ -62,21 +97,9 @@ let () =
          (integer, string, primitive application or sequence)." @@
     string_enum [ "integer", Int_kind ;
                   "string", String_kind ;
+                  "bytes", Bytes_kind ;
                   "primitiveApplication", Prim_kind ;
                   "sequence", Seq_kind ] in
-  let var_annot_enc =
-    conv (function `Var_annot x -> x)  (function x -> `Var_annot x) string in
-  let ex_stack_ty_enc =
-    let rec unfold = function
-      | Ex_stack_ty (Item_t (ty, rest, annot)) ->
-          (Ex_ty ty, annot) :: unfold (Ex_stack_ty rest)
-      | Ex_stack_ty Empty_t -> [] in
-    let rec fold = function
-      | (Ex_ty ty, annot) :: rest ->
-          let Ex_stack_ty rest = fold rest in
-          Ex_stack_ty (Item_t (ty, rest, annot))
-      | [] -> Ex_stack_ty Empty_t in
-    conv unfold fold (list (tup2 ex_ty_enc (option var_annot_enc))) in
   (* -- Structure errors ---------------------- *)
   (* Invalid arity *)
   register_error_kind

@@ -38,62 +38,123 @@ let gen_keys_containing
     ~containing ~name (cctxt : #Client_context.io_wallet) =
   let unrepresentable =
     List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
+  let good_initial_char = "KLMNPQRSTUVWXYZabcdefghi" in
+  let bad_initial_char = "123456789ABCDEFGHJjkmnopqrstuvwxyz" in
   match unrepresentable with
   | _ :: _ ->
-      cctxt#warning
-        "The following can't be written in the key alphabet (%a): %a"
-        Base58.Alphabet.pp Base58.Alphabet.bitcoin
+      cctxt#error
+        "@[<v 0>The following words can't be written in the key alphabet: %a.@,\
+         Valid characters: %a@,\
+         Extra restriction for the first character: %s@]"
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
            (fun ppf s -> Format.fprintf ppf "'%s'" s))
-        unrepresentable >>= return
+        unrepresentable
+        Base58.Alphabet.pp Base58.Alphabet.bitcoin
+        good_initial_char
   | [] ->
-      Public_key_hash.mem cctxt name >>=? fun name_exists ->
-      if name_exists && not force
-      then
-        cctxt#warning
-          "Key for name '%s' already exists. Use -force to update." name >>= return
-      else
-        begin
-          cctxt#warning "This process uses a brute force search and \
-                         may take a long time to find a key." >>= fun () ->
-          let matches =
-            if prefix then
-              let containing_tz1 = List.map ((^) "tz1") containing in
-              (fun key -> List.exists
-                  (fun containing ->
-                     String.sub key 0 (String.length containing) = containing)
-                  containing_tz1)
-            else
-              let re = Re.Str.regexp (String.concat "\\|" containing) in
-              (fun key -> try ignore (Re.Str.search_forward re key 0); true
-                with Not_found -> false) in
-          let rec loop attempts =
-            let public_key_hash, public_key, secret_key =
-              Signature.generate_key () in
-            let hash = Signature.Public_key_hash.to_b58check @@
-              Signature.Public_key.hash public_key in
-            if matches hash
-            then
-              let pk_uri = Tezos_signer_backends.Unencrypted.make_pk public_key in
-              begin
-                if encrypted then
-                  Tezos_signer_backends.Encrypted.encrypt cctxt secret_key
+      let unrepresentable =
+        List.filter (fun s -> prefix &&
+                              String.contains bad_initial_char s.[0]) containing in
+      match unrepresentable with
+      | _ :: _ ->
+          cctxt#error
+            "@[<v 0>The following words don't respect the first character restriction: %a.@,\
+             Valid characters: %a@,\
+             Extra restriction for the first character: %s@]"
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+               (fun ppf s -> Format.fprintf ppf "'%s'" s))
+            unrepresentable
+            Base58.Alphabet.pp Base58.Alphabet.bitcoin
+            good_initial_char
+      | [] ->
+          Public_key_hash.mem cctxt name >>=? fun name_exists ->
+          if name_exists && not force
+          then
+            cctxt#warning
+              "Key for name '%s' already exists. Use --force to update." name >>= return
+          else
+            begin
+              cctxt#warning "This process uses a brute force search and \
+                             may take a long time to find a key." >>= fun () ->
+              let matches =
+                if prefix then
+                  let containing_tz1 = List.map ((^) "tz1") containing in
+                  (fun key -> List.exists
+                      (fun containing ->
+                         String.sub key 0 (String.length containing) = containing)
+                      containing_tz1)
                 else
-                  return (Tezos_signer_backends.Unencrypted.make_sk secret_key)
-              end >>=? fun sk_uri ->
-              register_key cctxt ~force
-                (public_key_hash, pk_uri, sk_uri) name >>=? fun () ->
-              return hash
-            else begin if attempts mod 25_000 = 0
-              then cctxt#message "Tried %d keys without finding a match" attempts
-              else Lwt.return () end >>= fun () ->
-              loop (attempts + 1) in
-          loop 1 >>=? fun key_hash ->
-          cctxt#message
-            "Generated '%s' under the name '%s'." key_hash name >>= fun () ->
-          return ()
-        end
+                  let re = Re.Str.regexp (String.concat "\\|" containing) in
+                  (fun key -> try ignore (Re.Str.search_forward re key 0); true
+                    with Not_found -> false) in
+              let rec loop attempts =
+                let public_key_hash, public_key, secret_key =
+                  Signature.generate_key () in
+                let hash = Signature.Public_key_hash.to_b58check @@
+                  Signature.Public_key.hash public_key in
+                if matches hash
+                then
+                  let pk_uri = Tezos_signer_backends.Unencrypted.make_pk public_key in
+                  begin
+                    if encrypted then
+                      Tezos_signer_backends.Encrypted.encrypt cctxt secret_key
+                    else
+                      return (Tezos_signer_backends.Unencrypted.make_sk secret_key)
+                  end >>=? fun sk_uri ->
+                  register_key cctxt ~force
+                    (public_key_hash, pk_uri, sk_uri) name >>=? fun () ->
+                  return hash
+                else begin if attempts mod 25_000 = 0
+                  then
+                    cctxt#message "Tried %d keys without finding a match" attempts
+                  else Lwt.return () end >>= fun () ->
+                  loop (attempts + 1) in
+              loop 1 >>=? fun key_hash ->
+              cctxt#message
+                "Generated '%s' under the name '%s'." key_hash name >>= fun () ->
+              return ()
+            end
+
+let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
+  let rec get_boolean_answer (cctxt : #Client_context.io_wallet) ~default ~msg =
+    let prompt = if default then "(Y/n/q)" else "(y/N/q)" in
+    cctxt#prompt "%s %s: " msg prompt >>=? fun gen ->
+    match default, String.lowercase_ascii gen with
+    | default, "" -> return default
+    | _, "y" -> return true
+    | _, "n" -> return false
+    | _, "q" -> failwith "Exit by user request."
+    | _ -> get_boolean_answer cctxt ~msg ~default in
+  cctxt#prompt "Enter the e-mail used for the paper wallet: " >>=? fun email ->
+  let rec loop_words acc i =
+    if i > 14 then return (List.rev acc) else
+      cctxt#prompt_password "Enter word %d: " i >>=? fun word ->
+      match Bip39.index_of_word (MBytes.to_string word) with
+      | None -> loop_words acc i
+      | Some wordidx -> loop_words (wordidx :: acc) (succ i) in
+  loop_words [] 0 >>=? fun words ->
+  match Bip39.of_indices words with
+  | None -> assert false
+  | Some t ->
+      cctxt#prompt_password
+        "Enter the password used for the paper wallet: " >>=? fun password ->
+      (* TODO: unicode normalization (NFKD)... *)
+      let sk =
+        Bip39.to_seed ~passphrase:(email ^ MBytes.to_string password) t in
+      let sk = Cstruct.(to_bigarray (sub sk 0 32)) in
+      let sk : Signature.Secret_key.t =
+        Ed25519
+          (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk) in
+      let pk = Signature.Secret_key.to_public_key sk in
+      let pkh = Signature.Public_key.hash pk in
+      let msg = Format.asprintf
+          "Your public Tezos address is %a is that correct?"
+          Signature.Public_key_hash.pp pkh in
+      get_boolean_answer cctxt ~msg ~default:true >>=? function
+      | true -> return sk
+      | false -> input_fundraiser_params cctxt
 
 let commands () : Client_context.io_wallet Clic.command list =
   let open Clic in
@@ -178,13 +239,36 @@ let commands () : Client_context.io_wallet Clic.command list =
                fail_unless (pk_uri = pk_uri_found || force)
                  (failure
                     "public and secret keys '%s' don't correspond, \
-                     please don't use -force" name)
+                     please don't use --force" name)
          end >>=? fun () ->
          Client_keys.public_key_hash pk_uri >>=? fun (pkh, public_key) ->
          cctxt#message
            "Tezos address added: %a"
            Signature.Public_key_hash.pp pkh >>= fun () ->
          register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name) ;
+
+    command ~group ~desc: "Add a fundraiser secret key to the wallet."
+      (args1 (Secret_key.force_switch ()))
+      (prefix "import"
+       @@ prefixes [ "fundraiser" ; "secret" ; "key" ]
+       @@ Secret_key.fresh_alias_param
+       @@ stop)
+      (fun force name (cctxt : Client_context.io_wallet) ->
+         Secret_key.of_fresh cctxt force name >>=? fun name ->
+         input_fundraiser_params cctxt >>=? fun sk ->
+         Tezos_signer_backends.Encrypted.encrypt cctxt sk >>=? fun sk_uri ->
+         Client_keys.neuterize sk_uri >>=? fun pk_uri ->
+         begin
+           Public_key.find_opt cctxt name >>=? function
+           | None -> return ()
+           | Some (pk_uri_found, _) ->
+               fail_unless (pk_uri = pk_uri_found || force)
+                 (failure
+                    "public and secret keys '%s' don't correspond, \
+                     please don't use --force" name)
+         end >>=? fun () ->
+         Client_keys.public_key_hash pk_uri >>=? fun (pkh, _public_key) ->
+         register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
 
     command ~group ~desc: "Add a public key to the wallet."
       (args1 (Public_key.force_switch ()))
@@ -202,9 +286,9 @@ let commands () : Client_context.io_wallet Clic.command list =
            Signature.Public_key_hash.pp pkh >>= fun () ->
          Public_key.add ~force cctxt name (pk_uri, public_key)) ;
 
-    command ~group ~desc: "Add an identity to the wallet."
+    command ~group ~desc: "Add an address to the wallet."
       (args1 (Public_key.force_switch ()))
-      (prefixes [ "add" ; "identity" ]
+      (prefixes [ "add" ; "address" ]
        @@ Public_key_hash.fresh_alias_param
        @@ Public_key_hash.source_param
        @@ stop)
@@ -212,9 +296,9 @@ let commands () : Client_context.io_wallet Clic.command list =
          Public_key_hash.of_fresh cctxt force name >>=? fun name ->
          Public_key_hash.add ~force cctxt name hash) ;
 
-    command ~group ~desc: "List all identities and associated keys."
+    command ~group ~desc: "List all addresses and associated keys."
       no_options
-      (fixed [ "list" ; "known" ; "identities" ])
+      (fixed [ "list" ; "known" ; "addresses" ])
       (fun () (cctxt : #Client_context.io_wallet) ->
          list_keys cctxt >>=? fun l ->
          iter_s begin fun (name, pkh, pk, sk) ->
@@ -232,16 +316,16 @@ let commands () : Client_context.io_wallet Clic.command list =
            end >>= fun () -> return ()
          end l) ;
 
-    command ~group ~desc: "Show the keys associated with an identity."
+    command ~group ~desc: "Show the keys associated with an implicit account."
       (args1 show_private_switch)
-      (prefixes [ "show" ; "identity"]
+      (prefixes [ "show" ; "address"]
        @@ Public_key_hash.alias_param
        @@ stop)
       (fun show_private (name, _) (cctxt : #Client_context.io_wallet) ->
          alias_keys cctxt name >>=? fun key_info ->
          match key_info with
          | None ->
-             cctxt#message "No keys found for identity" >>= fun () ->
+             cctxt#message "No keys found for address" >>= fun () ->
              return ()
          | Some (pkh, pk, skloc) ->
              cctxt#message "Hash: %a"
@@ -261,6 +345,23 @@ let commands () : Client_context.io_wallet Clic.command list =
                  else
                    return ()) ;
 
+    command ~group ~desc: "Forget one address."
+      (args1 (Clic.switch
+                ~long:"force" ~short:'f'
+                ~doc:"delete associated keys when present" ()))
+      (prefixes [ "forget" ; "address"]
+       @@ Public_key_hash.alias_param
+       @@ stop)
+      (fun force (name, _pkh) (cctxt : Client_context.io_wallet) ->
+         Secret_key.mem cctxt name >>=? fun has_secret_key ->
+         Public_key.mem cctxt name >>=? fun has_public_key ->
+         fail_when (not force && (has_secret_key || has_public_key))
+           (failure "secret or public key present for %s, \
+                     use --force to delete" name) >>=? fun () ->
+         Secret_key.del cctxt name >>=? fun () ->
+         Public_key.del cctxt name >>=? fun () ->
+         Public_key_hash.del cctxt name) ;
+
     command ~group ~desc: "Forget the entire wallet of keys."
       (args1 (Clic.switch
                 ~long:"force" ~short:'f'
@@ -268,7 +369,7 @@ let commands () : Client_context.io_wallet Clic.command list =
       (fixed [ "forget" ; "all" ; "keys" ])
       (fun force (cctxt : Client_context.io_wallet) ->
          fail_unless force
-           (failure "this can only used with option -force") >>=? fun () ->
+           (failure "this can only be used with option --force") >>=? fun () ->
          Public_key.set cctxt [] >>=? fun () ->
          Secret_key.set cctxt [] >>=? fun () ->
          Public_key_hash.set cctxt []) ;

@@ -285,7 +285,7 @@ module Socket = struct
     | Tcp (host, port) ->
         get_addrs host >>=? fun addrs ->
         let rec try_connect = function
-          | [] -> failwith "..."
+          | [] -> failwith "could not resolve host '%s'" host
           | addr :: addrs ->
               Lwt.catch
                 (fun () ->
@@ -307,7 +307,7 @@ module Socket = struct
     | Tcp (host, port) ->
         get_addrs host >>=? fun addrs ->
         let rec try_bind = function
-          | [] -> failwith "..."
+          | [] -> failwith "could not resolve host '%s'" host
           | addr :: addrs ->
               Lwt.catch
                 (fun () ->
@@ -328,18 +328,18 @@ module Socket = struct
     register_error_kind `Permanent
       ~id: "signer.encoding_error"
       ~title: "Encoding_error"
-      ~description: "Error while encoding a request to the remote signer"
+      ~description: "Error while encoding a remote signer message"
       ~pp: (fun ppf () ->
-          Format.fprintf ppf "Could not encode a request to the remote signer")
+          Format.fprintf ppf "Could not encode a remote signer message")
       Data_encoding.empty
       (function Encoding_error -> Some () | _ -> None)
       (fun () -> Encoding_error) ;
     register_error_kind `Permanent
       ~id: "signer.decoding_error"
       ~title: "Decoding_error"
-      ~description: "Error while decoding a request to the remote signer"
+      ~description: "Error while decoding a remote signer message"
       ~pp: (fun ppf () ->
-          Format.fprintf ppf "Could not decode a request to the remote signer")
+          Format.fprintf ppf "Could not decode a remote signer message")
       Data_encoding.empty
       (function Decoding_error -> Some () | _ -> None)
       (fun () -> Decoding_error)

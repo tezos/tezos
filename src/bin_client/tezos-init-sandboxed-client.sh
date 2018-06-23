@@ -32,20 +32,52 @@ init_sandboxed_client() {
 
     if ! [ -f "$parameters_file" ]; then
         cat > "$parameters_file" <<EOF
-{ "bootstrap_accounts":
-  [
+{ "bootstrap_accounts": [
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
     [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
     [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
     [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
-    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
-  ],
-  "dictator_pubkey":
-    "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
+    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ],
+    [ "tz1PooUKBaoxjBiCR2dxEtbtTUjLX3iaZQoJ", "100" ],
+    [ "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2", "1" ] ],
+  "bootstrap_contracts": [
+      { "delegate": "tz1TGu6TN5GSez2ndXXeDX6LgUDvLzPLqgYV",
+        "amount": "10000000",
+        "script":
+        { "code":
+          [ { "prim": "parameter",
+              "args": [ { "prim": "key_hash" } ] },
+            { "prim": "storage",
+              "args": [ { "prim": "timestamp" } ] },
+            { "prim": "code",
+              "args":
+              [ [ [ [ { "prim": "DUP" }, { "prim": "CAR" },
+                      { "prim": "DIP", "args": [ [ { "prim": "CDR" } ] ] } ] ],
+                  { "prim": "SWAP" },
+                  { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "300" } ] },
+                  { "prim": "ADD", "annots": [ "@FIVE_MINUTES_LATER" ] },
+                  { "prim": "NOW" },
+                  [ [ { "prim": "COMPARE" }, { "prim": "GE" } ],
+                    { "prim": "IF",
+                      "args":
+                      [ [],
+                        [ [ { "prim": "UNIT" },
+                            { "prim": "FAILWITH" } ] ] ] } ],
+                  { "prim": "IMPLICIT_ACCOUNT" },
+                  { "prim": "PUSH", "args": [ { "prim": "mutez" }, { "int": "1000000" } ] },
+                  { "prim": "UNIT" },
+                  { "prim": "TRANSFER_TOKENS" },
+                  { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+                  { "prim": "SWAP" },
+                  { "prim": "CONS" },
+                  { "prim": "DIP", "args": [ [ { "prim": "NOW" } ] ] },
+                  { "prim": "PAIR" } ] ] } ],
+          "storage": { "int": "0" } } } ],
   "time_between_blocks" : [ "1", "0" ],
   "blocks_per_roll_snapshot" : 4,
   "blocks_per_cycle" : 8,
-  "preserved_cycles" : 2
+  "preserved_cycles" : 2,
+  "proof_of_work_threshold": "-1"
 }
 EOF
     fi
@@ -81,20 +113,6 @@ wait_for_the_node_to_be_bootstraped() {
     wait_for_the_node_to_be_ready
     echo "Waiting for the node to synchronize with the network..."
     $client bootstrapped
-}
-
-## Account #################################################################
-
-may_create_identity() {
-    if ! $client get balance for "my_identity" >/dev/null 2>&1 ; then
-        echo "Generating new manager key (known as 'my_identity')..."
-        $client gen keys "my_identity"
-    fi
-    if ! $client get balance for "my_account" >/dev/null 2>&1 ; then
-        echo "Creating new account for 'my_identity' (known as 'my_account')..."
-        $client forget contract "my_account" >/dev/null 2>&1 || true
-        $client originate free account "my_account" for "my_identity"
-    fi
 }
 
 ## Baker ###################################################################
@@ -223,7 +241,6 @@ add_sandboxed_bootstrap_identities() {
     ${client} import secret key bootstrap5 ${BOOTSTRAP5_SECRET}
 
     ${client} import secret key dictator ${DICTATOR_SECRET}
-
 }
 
 activate_alpha() {
@@ -235,7 +252,6 @@ activate_alpha() {
         and key dictator \
 	and parameters "${parameters_file}" \
         --timestamp $(TZ='AAA+1' date +%FT%TZ)
-
 }
 
 usage() {
@@ -317,7 +333,7 @@ The client is now properly initialized. In the rest of this shell
 session, you might now run \`tezos-client\` to communicate with a
 tezos node launched with \`launch-sandboxed-node $1\`. For instance:
 
-  tezos-client rpc get /chains/main/blocks/head/metadata/protocol_hash
+  tezos-client rpc get /chains/main/blocks/head/metadata
 
 Note: if the current protocol version, as reported by the previous
 command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you

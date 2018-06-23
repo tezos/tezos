@@ -54,7 +54,10 @@ and packed_contents_result_list =
 (** Result of applying an {!Operation.contents}. Follows the same structure. *)
 and 'kind contents_result =
   | Endorsement_result :
-      Signature.Public_key_hash.t * int list -> Kind.endorsement contents_result
+      { balance_updates : balance_updates ;
+        delegate : Signature.Public_key_hash.t ;
+        slots: int list ;
+      } -> Kind.endorsement contents_result
   | Seed_nonce_revelation_result :
       balance_updates -> Kind.seed_nonce_revelation contents_result
   | Double_endorsement_evidence_result :
@@ -90,13 +93,15 @@ and _ successful_manager_operation_result =
         balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Z.t ;
+        storage_size : Z.t ;
+        paid_storage_size_diff : Z.t ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
       { balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Z.t ;
+        storage_size : Z.t ;
+        paid_storage_size_diff : Z.t ;
       } -> Kind.origination successful_manager_operation_result
   | Delegation_result : Kind.delegation successful_manager_operation_result
 

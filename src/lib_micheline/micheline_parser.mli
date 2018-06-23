@@ -33,6 +33,7 @@ val location_encoding : location Data_encoding.encoding
 
 type token_value =
   | String of string
+  | Bytes of string
   | Int of string
   | Ident of string
   | Annot of string
@@ -66,6 +67,7 @@ type error += Undefined_escape_sequence of point * string
 type error += Missing_break_after_number of point
 type error += Unterminated_string of location
 type error += Unterminated_integer of location
+type error += Odd_lengthed_bytes of location
 type error += Unterminated_comment of location
 type error += Unclosed of token
 type error += Unexpected of token

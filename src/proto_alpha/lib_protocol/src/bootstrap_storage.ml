@@ -9,16 +9,39 @@
 
 open Misc
 
-let init_account ctxt (account: Parameters_repr.bootstrap_account) =
-  let public_key_hash = Signature.Public_key.hash account.public_key in
+let init_account ctxt
+    ({ public_key_hash ; public_key ; amount }: Parameters_repr.bootstrap_account) =
   let contract = Contract_repr.implicit_contract public_key_hash in
-  Contract_storage.credit ctxt contract account.amount >>=? fun ctxt ->
-  Contract_storage.reveal_manager_key ctxt contract account.public_key >>=? fun ctxt ->
-  Delegate_storage.set ctxt contract (Some public_key_hash) >>=? fun ctxt ->
+  Contract_storage.credit ctxt contract amount >>=? fun ctxt ->
+  match public_key with
+  | Some public_key ->
+      Contract_storage.reveal_manager_key ctxt contract public_key >>=? fun ctxt ->
+      Delegate_storage.set ctxt contract (Some public_key_hash) >>=? fun ctxt ->
+      return ctxt
+  | None -> return ctxt
+
+let init_contract ~typecheck ctxt
+    ({ delegate ; amount ; script }: Parameters_repr.bootstrap_contract) =
+  Contract_storage.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
+  typecheck ctxt script >>=? fun ctxt ->
+  Contract_storage.originate ctxt contract
+    ~balance:amount
+    ~prepaid_bootstrap_storage:true
+    ~manager:Signature.Public_key_hash.zero
+    ~script:(script, None)
+    ~delegate:(Some delegate)
+    ~spendable:false
+    ~delegatable:false >>=? fun ctxt ->
   return ctxt
 
-let init ctxt ?ramp_up_cycles ?no_reward_cycles accounts =
+let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
+  let nonce =
+    Operation_hash.hash_bytes
+      (* FIXME: change this nonce before lunch *)
+      [ MBytes.of_string "ZERONET_INIT_ORIGINATION_NONCE" ] in
+  let ctxt = Raw_context.init_origination_nonce ctxt nonce in
   fold_left_s init_account ctxt accounts >>=? fun ctxt ->
+  fold_left_s (init_contract ~typecheck) ctxt contracts >>=? fun ctxt ->
   begin
     match no_reward_cycles with
     | None -> return ctxt

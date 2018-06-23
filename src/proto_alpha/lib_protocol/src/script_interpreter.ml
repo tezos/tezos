@@ -17,7 +17,7 @@ open Script_ir_translator
 type execution_trace =
   (Script.location * Gas.t * (Script.expr * string option) list) list
 
-type error += Reject of Script.location * execution_trace option
+type error += Reject of Script.location * Script.expr * execution_trace option
 type error += Overflow of Script.location * execution_trace option
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
@@ -38,12 +38,13 @@ let () =
     `Temporary
     ~id:"scriptRejectedRuntimeError"
     ~title: "Script failed (runtime script error)"
-    ~description: "A FAIL instruction was reached"
-    (obj2
+    ~description: "A FAILWITH instruction was reached"
+    (obj3
        (req "location" Script.location_encoding)
+       (req "with" Script.expr_encoding)
        (opt "trace" trace_encoding))
-    (function Reject (loc, trace) -> Some (loc, trace) | _ -> None)
-    (fun (loc, trace) -> Reject (loc, trace));
+    (function Reject (loc, v, trace) -> Some (loc, v, trace) | _ -> None)
+    (fun (loc, v, trace) -> Reject (loc, v, trace));
   (* Overflow *)
   register_error_kind
     `Temporary
@@ -542,8 +543,10 @@ let rec interp
         | Lambda lam, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.push) >>=? fun ctxt ->
             logged_return (Item (lam, rest), ctxt)
-        | Fail, _ ->
-            fail (Reject (loc, get_log log))
+        | Failwith tv, Item (v, _) ->
+            unparse_data ctxt Optimized tv v >>=? fun (v, _ctxt) ->
+            let v = Micheline.strip_locations v in
+            fail (Reject (loc, v, get_log log))
         | Nop, stack ->
             logged_return (stack, ctxt)
         (* comparison *)
@@ -551,6 +554,8 @@ let rec interp
             consume_gaz_comparison descr Compare.Bool.compare Interp_costs.compare_bool a b rest
         | Compare (String_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Compare.String.compare Interp_costs.compare_string a b rest
+        | Compare (Bytes_key _), Item (a, Item (b, rest)) ->
+            consume_gaz_comparison descr MBytes.compare Interp_costs.compare_bytes a b rest
         | Compare (Mutez_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Tez.compare Interp_costs.compare_tez a b rest
         | Compare (Int_key _), Item (a, Item (b, rest)) ->
@@ -595,6 +600,19 @@ let rec interp
             let cmpres = Compare.Int.(cmpres >= 0) in
             Lwt.return (Gas.consume ctxt Interp_costs.compare_res) >>=? fun ctxt ->
             logged_return (Item (cmpres, rest), ctxt)
+        (* packing *)
+        | Pack t, Item (value, rest) ->
+            Script_ir_translator.pack_data ctxt t value >>=? fun (bytes, ctxt) ->
+            logged_return (Item (bytes, rest), ctxt)
+        | Unpack t, Item (bytes, rest) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.pack bytes)) >>=? fun ctxt ->
+            begin match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
+              | None ->
+                  logged_return (Item (None, rest), ctxt)
+              | Some expr ->
+                  parse_data ctxt t (Micheline.root expr) >>=? fun (value, ctxt) ->
+                  logged_return (Item (Some value, rest), ctxt)
+            end
         (* protocol *)
         | Address, Item ((_, contract), rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.address) >>=? fun ctxt ->
@@ -605,18 +623,6 @@ let rec interp
             if exists then
               Script_ir_translator.parse_contract ctxt loc t contract >>=? fun (ctxt, contract) ->
               logged_return (Item (Some contract, rest), ctxt)
-            else
-              logged_return (Item (None, rest), ctxt)
-        | Manager, Item ((_, contract), rest) ->
-            Lwt.return (Gas.consume ctxt Interp_costs.manager) >>=? fun ctxt ->
-            Contract.get_manager ctxt contract >>=? fun manager ->
-            logged_return (Item (manager, rest), ctxt)
-        | Address_manager, Item (contract, rest) ->
-            Lwt.return (Gas.consume ctxt Interp_costs.manager) >>=? fun ctxt ->
-            Contract.exists ctxt contract >>=? fun exists ->
-            if exists then
-              Contract.get_manager ctxt contract >>=? fun manager ->
-              logged_return (Item (Some manager, rest), ctxt)
             else
               logged_return (Item (None, rest), ctxt)
         | Transfer_tokens,
@@ -687,15 +693,22 @@ let rec interp
             logged_return (Item (now, rest), ctxt)
         | Check_signature, Item (key, Item (signature, Item (message, rest))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.check_signature) >>=? fun ctxt ->
-            let message = MBytes.of_string message in
             let res = Signature.check key signature message in
             logged_return (Item (res, rest), ctxt)
         | Hash_key, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.hash_key) >>=? fun ctxt ->
             logged_return (Item (Signature.Public_key.hash key, rest), ctxt)
-        | H ty, Item (v, rest) ->
-            Lwt.return (Gas.consume ctxt (Interp_costs.hash v)) >>=? fun ctxt ->
-            hash_data ctxt ty v >>=? fun (hash, ctxt) ->
+        | Blake2b, Item (bytes, rest) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes 32)) >>=? fun ctxt ->
+            let hash = Raw_hashes.blake2b bytes in
+            logged_return (Item (hash, rest), ctxt)
+        | Sha256, Item (bytes, rest) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes 32)) >>=? fun ctxt ->
+            let hash = Raw_hashes.sha256 bytes in
+            logged_return (Item (hash, rest), ctxt)
+        | Sha512, Item (bytes, rest) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes 64)) >>=? fun ctxt ->
+            let hash = Raw_hashes.sha512 bytes in
             logged_return (Item (hash, rest), ctxt)
         | Steps_to_quota, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.steps_to_quota) >>=? fun ctxt ->
@@ -704,6 +717,9 @@ let rec interp
               | Unaccounted -> Z.of_string "99999999" in
             logged_return (Item (Script_int.(abs (of_zint steps)), rest), ctxt)
         | Source, rest ->
+            Lwt.return (Gas.consume ctxt Interp_costs.source) >>=? fun ctxt ->
+            logged_return (Item (payer, rest), ctxt)
+        | Sender, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.source) >>=? fun ctxt ->
             logged_return (Item (source, rest), ctxt)
         | Self t, rest ->

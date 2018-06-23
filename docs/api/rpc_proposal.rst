@@ -2844,8 +2844,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $error:
       /* ... FIXME ... */
@@ -3739,8 +3738,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string</pre>
     </div>
   
@@ -4998,8 +4996,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $micheline.michelson_v1.expression:
       /* Micheline expression (michelson_v1 variant) */
@@ -5423,8 +5420,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $micheline.michelson_v1.expression:
       /* Micheline expression (michelson_v1 variant) */
@@ -5703,8 +5699,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $micheline.michelson_v1.expression:
       /* Micheline expression (michelson_v1 variant) */
@@ -6049,8 +6044,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $micheline.michelson_v1.expression:
       /* Micheline expression (michelson_v1 variant) */
@@ -6313,8 +6307,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $error:
       /* ... FIXME ... */
@@ -6900,8 +6893,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $micheline.michelson_v1.expression:
       /* Micheline expression (michelson_v1 variant) */
@@ -7029,8 +7021,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $micheline.michelson_v1.expression:
       /* Micheline expression (michelson_v1 variant) */
@@ -7213,8 +7204,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $micheline.michelson_v1.expression:
       /* Micheline expression (michelson_v1 variant) */
@@ -7346,8 +7336,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $micheline.location:
       /* Canonical location in a Micheline expression
@@ -8271,8 +8260,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $error:
       /* ... FIXME ... */
@@ -8728,8 +8716,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $error:
       /* ... FIXME ... */
@@ -9185,8 +9172,7 @@ Protocol Alpha
     $contract_id:
       /* A contract handle
          A contract notation as given to an RPC or inside scripts. Can be a
-         base58 public key hash, representing the implicit contract of this
-         identity, or a base58 originated contract hash. */
+         base58 implicit contract hash or a base58 originated contract hash. */
       string
     $error:
       /* ... FIXME ... */

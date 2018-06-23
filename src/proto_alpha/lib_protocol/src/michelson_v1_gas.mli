@@ -64,6 +64,8 @@ module Cost_of : sig
   val exec : Gas.cost
   val push : Gas.cost
   val compare_res : Gas.cost
+  val pack : MBytes.t -> Gas.cost
+  val unpack : MBytes.t -> Gas.cost
   val address : Gas.cost
   val contract : Gas.cost
   val manager : Gas.cost
@@ -76,7 +78,7 @@ module Cost_of : sig
   val now : Gas.cost
   val check_signature : Gas.cost
   val hash_key : Gas.cost
-  val hash : 'a -> Gas.cost
+  val hash : MBytes.t -> int -> Gas.cost
   val steps_to_quota : Gas.cost
   val source : Gas.cost
   val self : Gas.cost
@@ -84,6 +86,7 @@ module Cost_of : sig
   val wrap : Gas.cost
   val compare_bool : 'a -> 'b -> Gas.cost
   val compare_string : string -> string -> Gas.cost
+  val compare_bytes : MBytes.t -> MBytes.t -> Gas.cost
   val compare_tez : 'a -> 'b -> Gas.cost
   val compare_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
   val compare_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
@@ -128,7 +131,7 @@ module Cost_of : sig
     val one_arg_type : Gas.cost
     val two_arg_type : Gas.cost
 
-    val operation : string -> Gas.cost
+    val operation : MBytes.t -> Gas.cost
   end
 
   module Unparse : sig
@@ -138,6 +141,7 @@ module Cost_of : sig
     val int : 'a Script_int.num -> Gas.cost
     val tez : Gas.cost
     val string : string -> Gas.cost
+    val bytes : MBytes.t -> Gas.cost
     val timestamp : Script_timestamp.t -> Gas.cost
     val key : Gas.cost
     val key_hash : Gas.cost

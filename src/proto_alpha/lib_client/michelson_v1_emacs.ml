@@ -18,6 +18,7 @@ let print_expr ppf expr =
   let rec print_expr ppf = function
     | Int (_, value) -> Format.fprintf ppf "%s" (Z.to_string value)
     | String (_, value) -> Micheline_printer.print_string ppf value
+    | Bytes (_, value) -> Format.fprintf ppf "0x%a" MBytes.pp_hex value
     | Seq (_, items) ->
         Format.fprintf ppf "(seq %a)"
           (Format.pp_print_list ~pp_sep:Format.pp_print_space print_expr)
@@ -49,6 +50,7 @@ let print_type_map ppf (parsed, type_map) =
     | Seq (loc, [])
     | Prim (loc, _, [], _)
     | Int (loc, _)
+    | Bytes (loc, _)
     | String (loc, _) ->
         print_item ppf loc
     | Seq (loc, items)
@@ -154,6 +156,7 @@ let report_errors ppf (parsed, errs) =
             | Unterminated_string loc
             | Unterminated_integer loc
             | Unterminated_comment loc
+            | Odd_lengthed_bytes loc
             | Unclosed { loc }
             | Unexpected { loc }
             | Extra { loc } -> loc

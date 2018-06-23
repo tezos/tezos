@@ -54,8 +54,8 @@ let encoding =
       "A contract handle"
     ~description:
       "A contract notation as given to an RPC or inside scripts. \
-       Can be a base58 public key hash, representing the implicit contract \
-       of this identity, or a base58 originated contract hash." @@
+       Can be a base58 implicit contract hash \
+       or a base58 originated contract hash." @@
   splitted
     ~binary:
       (union ~tag_size:`Uint8 [

@@ -31,6 +31,31 @@ type t = {
   mutable errors: Error_monad.error list ;
 }
 
+let assert_acceptable_header pipeline
+    hash (header : Block_header.t) =
+  let chain_state = Distributed_db.chain_state pipeline.chain_db in
+  let time_now = Time.now () in
+  fail_unless
+    (Time.(add time_now 15L >= header.shell.timestamp))
+    (Future_block_header { block = hash; time = time_now;
+                           block_time = header.shell.timestamp }) >>=? fun () ->
+  State.Chain.checkpoint chain_state >>= fun (level, checkpoint) ->
+  fail_when
+    (Int32.equal header.shell.level level &&
+     not (Block_hash.equal checkpoint hash))
+    (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
+  Chain.head chain_state >>= fun head ->
+  let checkpoint_reached = (State.Block.header head).shell.level >= level in
+  if checkpoint_reached then
+    (* If reached the checkpoint, every block before the checkpoint
+       must be part of the chain. *)
+    Chain.mem chain_state hash >>= fun in_chain ->
+    fail_unless in_chain
+      (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
+    return ()
+  else
+    return ()
+
 let fetch_step pipeline (step : Block_locator.step)  =
   lwt_log_info "fetching step %a -> %a (%d%s) from peer %a."
     Block_hash.pp_short step.block
@@ -61,9 +86,7 @@ let fetch_step pipeline (step : Block_locator.step)  =
           pipeline.chain_db ~peer:pipeline.peer_id
           hash ()
       end >>=? fun header ->
-      fail_unless
-        (Time.(now () >= header.shell.timestamp))
-        (Future_block_header hash) >>=? fun () ->
+      assert_acceptable_header pipeline hash header >>=? fun () ->
       lwt_debug "fetched block header %a from peer %a."
         Block_hash.pp_short hash
         P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
@@ -102,9 +125,12 @@ let headers_fetch_worker_loop pipeline =
         P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
-  | Error [ Future_block_header bh ] ->
-      lwt_log_notice "Block locator %a from peer %a contains future blocks."
-        Block_hash.pp_short bh
+  | Error [ Future_block_header { block; block_time; time } ] ->
+      lwt_log_notice "Block locator %a from peer %a contains future blocks. \
+                      local time: %a, block time: %a"
+        Block_hash.pp_short block
+        Time.pp_hum time
+        Time.pp_hum block_time
         P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit

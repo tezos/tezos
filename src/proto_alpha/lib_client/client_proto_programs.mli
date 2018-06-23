@@ -18,7 +18,6 @@ val run :
   #Proto_alpha.rpc_context ->
   ?chain:Shell_services.chain ->
   Shell_services.block ->
-  ?contract:Contract.t ->
   ?amount:Tez.t ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
@@ -32,7 +31,6 @@ val trace :
   #Proto_alpha.rpc_context ->
   ?chain:Shell_services.chain ->
   Shell_services.block ->
-  ?contract:Contract.t ->
   ?amount:Tez.t ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
@@ -60,16 +58,6 @@ val print_trace_result :
    Script_interpreter.execution_trace *
    Contract.big_map_diff option)
     tzresult -> unit tzresult Lwt.t
-
-val hash_and_sign :
-  #Proto_alpha.full ->
-  ?chain:Shell_services.chain ->
-  Shell_services.block ->
-  ?gas:Z.t ->
-  Michelson_v1_parser.parsed ->
-  Michelson_v1_parser.parsed ->
-  Client_keys.sk_uri ->
-  (string * string * Gas.t) tzresult Lwt.t
 
 val typecheck_data :
   #Proto_alpha.rpc_context ->

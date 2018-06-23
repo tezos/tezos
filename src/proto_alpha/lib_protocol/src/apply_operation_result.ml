@@ -112,13 +112,15 @@ type _ successful_manager_operation_result =
         balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Z.t ;
+        storage_size : Z.t ;
+        paid_storage_size_diff : Z.t ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
       { balance_updates : balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
-        storage_size_diff : Z.t ;
+        storage_size : Z.t ;
+        paid_storage_size_diff : Z.t ;
       } -> Kind.origination successful_manager_operation_result
   | Delegation_result : Kind.delegation successful_manager_operation_result
 
@@ -209,12 +211,13 @@ module Manager_result = struct
     make
       ~op_case: Operation.Encoding.Manager_operations.transaction_case
       ~encoding:
-        (obj5
+        (obj6
            (opt "storage" Script.expr_encoding)
            (dft "balance_updates" balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
-           (dft "storage_size_diff" z Z.zero))
+           (dft "storage_size" z Z.zero)
+           (dft "paid_storage_size_diff" z Z.zero))
       ~iselect:
         (function
           | Internal_operation_result
@@ -231,27 +234,28 @@ module Manager_result = struct
           | Transaction_result
               { storage ; balance_updates ;
                 originated_contracts ; consumed_gas ;
-                storage_size_diff } ->
+                storage_size ; paid_storage_size_diff } ->
               (storage, balance_updates,
                originated_contracts, consumed_gas,
-               storage_size_diff))
+               storage_size, paid_storage_size_diff))
       ~inj:
         (fun (storage, balance_updates,
               originated_contracts, consumed_gas,
-              storage_size_diff) ->
+              storage_size, paid_storage_size_diff) ->
           Transaction_result { storage ; balance_updates ;
                                originated_contracts ; consumed_gas ;
-                               storage_size_diff })
+                               storage_size ; paid_storage_size_diff })
 
   let origination_case =
     make
       ~op_case: Operation.Encoding.Manager_operations.origination_case
       ~encoding:
-        (obj4
+        (obj5
            (dft "balance_updates" balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
-           (dft "storage_size_diff" z Z.zero))
+           (dft "storage_size" z Z.zero)
+           (dft "paid_storage_size_diff" z Z.zero))
       ~iselect:
         (function
           | Internal_operation_result
@@ -267,19 +271,19 @@ module Manager_result = struct
           | Origination_result
               { balance_updates ;
                 originated_contracts ; consumed_gas ;
-                storage_size_diff } ->
+                storage_size ; paid_storage_size_diff } ->
               (balance_updates,
                originated_contracts, consumed_gas,
-               storage_size_diff))
+               storage_size, paid_storage_size_diff))
       ~kind: Kind.Origination_manager_kind
       ~inj:
         (fun (balance_updates,
               originated_contracts, consumed_gas,
-              storage_size_diff) ->
+              storage_size, paid_storage_size_diff) ->
           Origination_result
             { balance_updates ;
               originated_contracts ; consumed_gas ;
-              storage_size_diff })
+              storage_size ; paid_storage_size_diff })
 
   let delegation_case =
     make
@@ -335,7 +339,10 @@ let internal_operation_result_encoding :
 
 type 'kind contents_result =
   | Endorsement_result :
-      Signature.Public_key_hash.t * int list -> Kind.endorsement contents_result
+      { balance_updates : balance_updates ;
+        delegate : Signature.Public_key_hash.t ;
+        slots: int list ;
+      } -> Kind.endorsement contents_result
   | Seed_nonce_revelation_result :
       balance_updates -> Kind.seed_nonce_revelation contents_result
   | Double_endorsement_evidence_result :
@@ -398,7 +405,8 @@ module Encoding = struct
     Case {
       op_case = Operation.Encoding.endorsement_case ;
       encoding =
-        (obj2
+        (obj3
+           (req "balance_updates" balance_updates_encoding)
            (req "delegate" Signature.Public_key_hash.encoding)
            (req "slots" (list uint8)));
       select =
@@ -411,9 +419,11 @@ module Encoding = struct
           | _ -> None) ;
       proj =
         (function
-          | Endorsement_result (d, s) -> (d, s)) ;
+          | Endorsement_result { balance_updates ; delegate ; slots }
+            -> (balance_updates, delegate, slots)) ;
       inj =
-        (fun (d, s) -> Endorsement_result (d, s))
+        (fun (balance_updates, delegate, slots) ->
+           Endorsement_result { balance_updates ; delegate ; slots })
     }
 
   let seed_nonce_revelation_case =

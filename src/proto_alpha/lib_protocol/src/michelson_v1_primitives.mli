@@ -24,7 +24,11 @@ type prim =
   | D_Some
   | D_True
   | D_Unit
-  | I_H
+  | I_PACK
+  | I_UNPACK
+  | I_BLAKE2B
+  | I_SHA256
+  | I_SHA512
   | I_ABS
   | I_ADD
   | I_AMOUNT
@@ -47,7 +51,7 @@ type prim =
   | I_EMPTY_SET
   | I_EQ
   | I_EXEC
-  | I_FAIL
+  | I_FAILWITH
   | I_GE
   | I_GET
   | I_GT
@@ -64,7 +68,6 @@ type prim =
   | I_LSL
   | I_LSR
   | I_LT
-  | I_MANAGER
   | I_MAP
   | I_MEM
   | I_MUL
@@ -81,6 +84,7 @@ type prim =
   | I_SIZE
   | I_SOME
   | I_SOURCE
+  | I_SENDER
   | I_SELF
   | I_STEPS_TO_QUOTA
   | I_SUB
@@ -113,6 +117,7 @@ type prim =
   | T_set
   | T_signature
   | T_string
+  | T_bytes
   | T_mutez
   | T_timestamp
   | T_unit

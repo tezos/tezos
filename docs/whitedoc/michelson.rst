@@ -16,11 +16,11 @@ are immutable and garbage collected.
 
 A Michelson program receives as input a single element stack containing
 an input value and the contents of a storage space. It must return a
-single element stack containing an output value and the new contents of
-the storage space. Alternatively, a Michelson program can fail,
-explicitly using a specific opcode, or because something went wrong that
-could not be caught by the type system (e.g. division by zero, gas
-exhaustion).
+single element stack containing aa output value a list of internal
+operations, and the new contents of the storage space. Alternatively,
+a Michelson program can fail, explicitly using a specific opcode,
+or because something went wrong that could not be caught by the type
+system (e.g. division by zero, gas exhaustion).
 
 The types of the input, output and storage are fixed and monomorphic,
 and the program is typechecked before being introduced into the system.
@@ -88,7 +88,7 @@ stack pattern. Finally, some rules add extra conditions over the values
 in the stack that follow the ``iff`` keyword. Sometimes, several rules
 may apply in a given context. In this case, the one that appears first
 in this specification is to be selected. If no rule applies, the result
-is equivalent to the one for the explicit ``FAIL`` instruction. This
+is equivalent to the one for the explicit ``FAILWITH`` instruction. This
 case does not happen on well-typed programs, as explained in the next
 section.
 
@@ -118,7 +118,7 @@ identify parts that can be used to build the result stack of the rule.
 
 If the partial result pattern does not actually match the result of the
 interpretation, then the result of the whole rule is equivalent to the
-one for the explicit ``FAIL`` instruction. Again, this case does not
+one for the explicit ``FAILWITH`` instruction. Again, this case does not
 happen on well-typed programs, as explained in the next section.
 
 Format of patterns
@@ -153,6 +153,7 @@ Data patterns are of one of the following syntactical forms.
 
 -  integer/natural number literals, (e.g. ``3``) ;
 -  string literals, (e.g. ``"contents"``) ;
+-  raw byte sequence literals (e.g. ``0xABCDEF42``)
 -  ``Tag`` (capitalized) is a symbolic constant, (e.g. ``Unit``,
    ``True``, ``False``) ;
 -  ``(Tag (arg) ...)`` tagged constructed data, (e.g. ``(Pair 3 4)``) ;
@@ -338,7 +339,8 @@ polymorphism.
 III - Core data types and notations
 -----------------------------------
 
--  ``string``, ``nat``, ``int``: The core primitive constant types.
+-  ``string``, ``nat``, ``int`` and ``bytes``: The core primitive
+   constant types.
 
 -  ``bool``: The type for booleans whose values are ``True`` and
    ``False``
@@ -383,19 +385,19 @@ IV - Core instructions
 Control structures
 ~~~~~~~~~~~~~~~~~~
 
--  ``FAIL``: Explicitly abort the current program.
+-  ``FAILWITH``: Explicitly abort the current program.
 
-   :: \_ -> \_
+   'a :: \_ -> \_
 
-   This special instruction is callable in any context, since it does
-   not use its input stack (first rule below), and makes the output
-   useless since all subsequent instruction will simply ignore their
-   usual semantics to propagate the failure up to the main result
+   This special instruction aborts the current program exposing the top
+   of the stack in its error message (first rule below). It makes the
+   output useless since all subsequent instructions will simply ignore
+   their usual semantics to propagate the failure up to the main result
    (second rule below). Its type is thus completely generic.
 
 ::
 
-    > FAIL / _  =>  [FAILED]
+    > FAILWITH / a : _  =>  [FAILED]
     > _ / [FAILED]  =>  [FAILED]
 
 -  ``{ I ; C }``: Sequence.
@@ -745,7 +747,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     > LSL / x : s : S  =>  (x << s) : S
         iff   s <= 256
-    > LSL / x : s : S  =>  [FAIL]
+    > LSL / x : s : S  =>  [FAILED]
         iff   s > 256
 
 -  ``LSR``
@@ -1166,7 +1168,7 @@ VI - Domain specific data types
 
 -  ``timestamp``: Dates in the real world.
 
--  ``tez``: A specific type for manipulating tokens.
+-  ``mutez``: A specific type for manipulating tokens.
 
 -  ``contract 'param``: A contract, with the type of its code.
 
@@ -1230,30 +1232,31 @@ retrieved from script parameters or globals.
         iff t1 > t2
 
 
-Operations on Tez
+Operations on Mutez
 ~~~~~~~~~~~~~~~~~
 
-Tez are internally represented by a 64 bit signed integer. There are
-restrictions to prevent creating a negative amount of tez. Operations
-are limited to prevent overflow and mixing them with other numerical
-types by mistake. They are also mandatory checked for under/overflows.
+Mutez (micro-Tez) are internally represented by a 64 bit signed
+integers. There are restrictions to prevent creating a negative amount
+of mutez. Operations are limited to prevent overflow and mixing them
+with other numerical types by mistake. They are also mandatory checked
+for under/overflows.
 
 -  ``ADD``:
 
 ::
 
-    :: tez : tez : 'S   ->   tez : 'S
+    :: mutez : mutez : 'S   ->   mutez : 'S
 
-    > ADD / x : y : S  =>  [FAIL]   on overflow
+    > ADD / x : y : S  =>  [FAILED]   on overflow
     > ADD / x : y : S  =>  (x + y) : S
 
 -  ``SUB``:
 
 ::
 
-    :: tez : tez : 'S   ->   tez : 'S
+    :: mutez : mutez : 'S   ->   mutez : 'S
 
-    > SUB / x : y : S  =>  [FAIL]
+    > SUB / x : y : S  =>  [FAILED]
         iff   x < y
     > SUB / x : y : S  =>  (x - y) : S
 
@@ -1261,18 +1264,18 @@ types by mistake. They are also mandatory checked for under/overflows.
 
 ::
 
-    :: tez : nat : 'S   ->   tez : 'S
-    :: nat : tez : 'S   ->   tez : 'S
+    :: mutez : nat : 'S   ->   mutez : 'S
+    :: nat : mutez : 'S   ->   mutez : 'S
 
-    > MUL / x : y : S  =>  [FAIL]   on overflow
+    > MUL / x : y : S  =>  [FAILED]   on overflow
     > MUL / x : y : S  =>  (x * y) : S
 
 -  ``EDIV``
 
 ::
 
-    :: tez : nat : 'S   ->   option (pair tez tez) : 'S
-    :: tez : tez : 'S   ->   option (pair nat tez) : 'S
+    :: mutez : nat : 'S   ->   option (pair mutez mutez) : 'S
+    :: mutez : mutez : 'S   ->   option (pair nat mutez) : 'S
 
     > EDIV / x : 0 : S  =>  None
     > EDIV / x : y : S  =>  Some (Pair (x / y) (x % y)) : S
@@ -1282,7 +1285,7 @@ types by mistake. They are also mandatory checked for under/overflows.
 
 ::
 
-   :: tez : tez : 'S -> int : 'S
+   :: mutez : mutez : 'S -> int : 'S
 
    > COMPARE / x : y : S  =>  -1 : S
        iff x < y
@@ -1294,18 +1297,11 @@ types by mistake. They are also mandatory checked for under/overflows.
 Operations on contracts
 ~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``MANAGER``: Access the manager of a contract.
-
-::
-
-    :: address : 'S   ->   key_hash option : 'S
-    :: contract 'p : 'S   ->   key_hash : 'S
-
 -  ``CREATE_CONTRACT``: Forge a contract creation operation.
 
 ::
 
-    :: key_hash : option key_hash : bool : bool : tez : lambda (pair 'p 'g) (pair (list operation) 'g) : 'g : 'S
+    :: key_hash : option key_hash : bool : bool : mutez : lambda (pair 'p 'g) (pair (list operation) 'g) : 'g : 'S
        -> operation : address : 'S
 
 As with non code-emitted originations the contract code takes as
@@ -1325,7 +1321,7 @@ The ``CONTRACT 'p`` instruction will fail until it is actually originated.
 
 ::
 
-    :: key_hash : option key_hash : bool : bool : tez : 'g : 'S
+    :: key_hash : option key_hash : bool : bool : mutez : 'g : 'S
        -> operation : address : 'S
 
 Originate a contract based on a literal. This is currently the only way
@@ -1338,7 +1334,7 @@ currently executed contract.
 
 ::
 
-    :: key_hash : option key_hash : bool : tez : 'S
+    :: key_hash : option key_hash : bool : mutez : 'S
        ->   operation : contract unit : 'S
 
 Take as argument the manager, optional delegate, the delegatable flag
@@ -1349,7 +1345,7 @@ contract.
 
 ::
 
-    :: 'p : tez : contract 'p : 'S   ->   operation : S
+    :: 'p : mutez : contract 'p : 'S   ->   operation : S
 
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
@@ -1360,11 +1356,11 @@ contract, unit for an account.
 
     :: option key_hash : 'S   ->   operation : S
 
--  ``BALANCE``: Push the current amount of tez of the current contract.
+-  ``BALANCE``: Push the current amount of mutez of the current contract.
 
 ::
 
-    :: 'S   ->   tez : 'S
+    :: 'S   ->   mutez : 'S
 
 -  ``ADDRESS``: Push the untyped version of a contract.
 
@@ -1385,8 +1381,21 @@ contract, unit for an account.
     > CONTRACT / addr : S  =>  None : S
         otherwise
 
--  ``SOURCE``: Push the source contract of the current
-   transaction.
+-  ``SOURCE``: Push the contract that initiated the current
+   transaction, i.e. the contract that paid the fees and
+   storage cost, and whose manager signed the operation
+   that was sent on the blockchain. Note that since
+   ``TRANSFER_TOKENS`` instructions can be chained,
+   ``SOURCE`` and ``SENDER`` are not necessarily the same.
+
+::
+
+    :: 'S   ->   address : 'S
+
+-  ``SENDER``: Push the contract that initiated the current
+   internal transaction. It may be the ``SOURCE``, but may
+   also not if the source sent an order to an intermediate
+   smart contract, which then called the current contract.
 
 ::
 
@@ -1403,7 +1412,7 @@ contract, unit for an account.
 
 ::
 
-    :: 'S   ->   tez : 'S
+    :: 'S   ->   mutez : 'S
 
 -  ``IMPLICIT_ACCOUNT``: Return a default contract with the given
    public/private key pair. Any funds deposited in this contract can
@@ -1433,6 +1442,40 @@ Special operations
 
     :: 'S   ->   timestamp : 'S
 
+Operations on bytes
+~~~~~~~~~~~~~~~~~~~~~
+
+Bytes are used for serializing data, in order to check signatures and
+compute hashes on them. They can also be used to incorporate data from
+the wild and untyped outside world.
+
+-  ``PACK``: Serializes a piece of data to its optimized
+   binary representation.
+
+::
+
+     :: 'a : 'S   ->   bytes : 'S
+
+-  ``UNPACK 'a``: Deserializes a piece of data, if valid.
+
+::
+
+     :: bytes : 'S   ->   option 'a : 'S
+
+-  ``COMPARE``: Lexicographic comparison.
+
+::
+
+    :: bytes : bytes : 'S   ->   int : 'S
+
+    > COMPARE / s : t : S  =>  -1 : S
+        iff s < t
+    > COMPARE / s : t : S  =>  0 : S
+        iff s = t
+    > COMPARE / s : t : S  =>  1 : S
+        iff s > t
+
+
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1442,19 +1485,33 @@ Cryptographic primitives
 
     :: key : 'S   ->   key_hash : 'S
 
--  ``H``: Compute a cryptographic hash of the value contents using the
+-  ``BLAKE2B``: Compute a cryptographic hash of the value contents using the
    Blake2B cryptographic hash function.
 
 ::
 
-    :: 'a : 'S   ->   string : 'S
+    :: bytes : 'S   ->   bytes : 'S
+
+-  ``SHA256``: Compute a cryptographic hash of the value contents using the
+   Sha256 cryptographic hash function.
+
+::
+
+    :: bytes : 'S   ->   bytes : 'S
+
+-  ``SHA512``: Compute a cryptographic hash of the value contents using the
+   Sha512 cryptographic hash function.
+
+::
+
+    :: bytes : 'S   ->   bytes : 'S
 
 -  ``CHECK_SIGNATURE``: Check that a sequence of bytes has been signed
    with a given key.
 
 ::
 
-    :: key : signature : string : 'S   ->   bool : 'S
+    :: key : signature : bytes : 'S   ->   bool : 'S
 
 -  ``COMPARE``:
 
@@ -1506,6 +1563,17 @@ combinators, and also for branching.
 
     > IFCMP(\op) / S  =>  COMPARE ; (\op) ; IF bt bf / S
 
+Fail
+~~~~
+
+The ``FAIL`` macros is equivalent to ``UNIT; FAILWITH`` and is callable
+in any context since it does not use its input stack.
+
+-  ``FAIL``
+
+::
+
+    > FAIL / S  =>  UNIT; FAILWITH / S
 
 Assertion Macros
 ~~~~~~~~~~~~~~~~
@@ -1696,13 +1764,13 @@ characters can only appear in comments and strings.
 Constants
 ~~~~~~~~~
 
-There are two kinds of constants:
+There are three kinds of constants:
 
-1. Integers or naturals in decimal (no prefix), hexadecimal (``0x`` prefix),
-   octal (``0o`` prefix) or binary (``0b`` prefix).
+1. Integers or naturals in decimal notation.
 2. Strings, with usual escape sequences: ``\n``, ``\t``, ``\b``,
    ``\r``, ``\\``, ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``)
    cannot appear in the middle of a string.
+3. Byte sequences in hexadecimal notation, prefixed with ``0x``.
 
 The current version of Michelson restricts strings to be the printable
 subset of 7-bit ASCII, plus the escaped characters mentioned above.
@@ -1777,31 +1845,22 @@ specification: instructions are represented by uppercase identifiers,
 type constructors by lowercase identifiers, and constant constructors
 are Capitalized.
 
-All domain specific constants are Micheline strings with specific
-formats:
+All domain specific constants are Micheline constants with specific
+formats. Some have two variants accepted by the data type checker: a
+readable one in a string and an optimized.
 
--  ``tez`` amounts are written using the same notation as JSON schemas
-   and the command line client: thousands are optionally separated by
-   commas, and so goes for mutez.
+-  ``mutez`` amounts are written as naturals.
+-  ``timestamp``\ s are written either using ``RFC 339`` notation
+   in a string (readable), or as the number of seconds since Epoch
+   in a natural (optimized).
+-  ``contract``\ s, ``address``\ es, ``key``\ s and ``signature``\ s
+   are written as strings, in their usual Base58 encoded versions
+   (readable), or as their raw bytes (optimized).
 
-   -  in regexp form: ``([0-9]{1,3}(,[0-9]{3})+)|[0-9]+(\.[0.9]{2})?``
-   -  ``"1234567"`` means 1234567 tez
-   -  ``"1,234,567"`` means 1234567 tez
-   -  ``"1234567.89"`` means 1234567890000 mutez
-   -  ``"1,234,567.0"`` means 123456789 tez
-   -  ``"10,123.456,789"`` means 10123456789 mutez
-   -  ``"1234,567"`` is invalid
-   -  ``"1,234,567.123456"`` is invalid
-
--  ``timestamp``\ s are written using ``RFC 339`` notation.
--  ``contract``\ s are the raw strings returned by JSON RPCs or the
-   command line interface and cannot be forged by hand so their format
-   is of no interest here.
--  ``key``\ s are ``Blake2B`` hashes of ``ed25519`` public keys encoded
-   in ``base58`` format with the following custom alphabet:
-   ``"eXMNE9qvHPQDdcFx5J86rT7VRm2atAypGhgLfbS3CKjnksB4"``.
--  ``signature``\ s are ``ed25519`` signatures as a series of
-   hex-encoded bytes.
+The optimized versions should not reach the RPCs, the protocol code
+will convert to optimized by itself when forging operations, storing
+to the database, and before hashing to get a canonical representation
+of a datum for a given type.
 
 To prevent errors, control flow primitives that take instructions as
 parameters require sequences in the concrete syntax.
@@ -1816,8 +1875,7 @@ Main program structure
 
 The toplevel of a smart contract file must be an un-delimited sequence
 of four primitive applications (in no particular order) that provide its
-``parameter``, ``return`` and ``storage`` types, as well as its
-``code``.
+``code``, ``parameter`` and ``storage`` fields.
 
 See the next section for a concrete example.
 
@@ -1962,7 +2020,7 @@ The instructions which do not accept any variable annotations are:
    LOOP
    LOOP_LEFT
    DIP
-   FAIL
+   FAILWITH
 
 The instructions which accept at most one variable annotation are:
 
@@ -2013,7 +2071,6 @@ The instructions which accept at most one variable annotation are:
    GE
    ADDRESS
    CONTRACT
-   MANAGER
    SET_DELEGATE
    IMPLICIT_ACCOUNT
    NOW
@@ -2021,9 +2078,10 @@ The instructions which accept at most one variable annotation are:
    BALANCE
    HASH_KEY
    CHECK_SIGNATURE
-   H
+   BLAKE2B
    STEPS_TO_QUOTA
    SOURCE
+   SENDER
    SELF
    CAST
    RENAME
@@ -2280,13 +2338,11 @@ A similar mechanism is used for context dependent instructions:
 
    CONTRACT 'p  :: @a address : 'S   ->   @a.contract contract 'p : 'S
 
-   MANAGER
-   :: @a address : 'S   ->   @a.manager key_hash option : 'S
-   :: @c contract 'p : 'S   ->   @c.manager key_hash : 'S
-
    BALANCE :: 'S   ->   @balance tez : 'S
 
    SOURCE  :: 'S   ->   @source address : 'S
+
+   SENDER  :: 'S   ->   @sender address : 'S
 
    SELF  :: 'S   ->   @self contract 'p : 'S
 
@@ -2495,11 +2551,6 @@ At the beginning of the transaction:
      A               via a CDDDDDAR
      B               via a CDDDDDDR
 
-For the contract to stay alive, we test that all least ``(Tez "1.00")``
-is still available after each transaction. This value is given as an
-example and must be updated according to the actual Tezos minimal value
-for contract balance.
-
 The complete source ``scrutable_reservoir.tz`` is:
 
 ::
@@ -2511,7 +2562,7 @@ The complete source ``scrutable_reservoir.tz`` is:
          (pair
             timestamp # T
             (pair
-               (pair tez tez) # P N
+               (pair mutez mutez) # P N
                (pair
                   (contract unit) # X
                   (pair (contract unit) (contract unit)))))) ; # A B
@@ -2524,8 +2575,8 @@ The complete source ``scrutable_reservoir.tz`` is:
              NOW ;
              COMPARE ; LT ;
              IF { # Before timeout
-                  # We compute ((1 + P) + N) tez for keeping the contract alive
-                  PUSH tez "1.00" ;
+                  # We compute (P + N) mutez
+                  PUSH mutez 0 ;
                   DIP { DUP ; CDDDAAR } ; ADD ; # P
                   DIP { DUP ; CDDDADR } ; ADD ; # N
                   # We compare to the cumulated amount
@@ -2551,17 +2602,17 @@ The complete source ``scrutable_reservoir.tz`` is:
                   # We update the global
                   CDDR ; PUSH string "timeout" ; PAIR ;
                   # We try to transfer the fee to the broker
-                  PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                  BALANCE ; # available
                   DIP { DUP ; CDDAAR } ; # P
                   COMPARE ; LT ; # available < P
-                  IF { PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                  IF { BALANCE ; # available
                        DIP { DUP ; CDDDAR } ; # X
                        UNIT ; TRANSFER_TOKENS }
                      { DUP ; CDDAAR ; # P
                        DIP { DUP ; CDDDAR } ; # X
                        UNIT ; TRANSFER_TOKENS } ;
                   # We transfer the rest to B
-                  DIP { PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                  DIP { BALANCE ; # available
                         DIP { DUP ; CDDDDDR } ; # B
                         UNIT ; TRANSFER_TOKENS } ;
                   NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
@@ -2668,9 +2719,6 @@ At the beginning of the transaction:
     the amount versed by the seller via a CDADDR
     the argument via a CAR
 
-The contract returns a unit value, and we assume that it is created with
-the minimum amount, set to ``(Tez "1.00")``.
-
 The complete source ``forward.tz`` is:
 
 ::
@@ -2717,13 +2765,12 @@ The complete source ``forward.tz`` is:
                { FAIL } } # (Right _)
            { # After Z + 24
              # if balance is emptied, just fail
-             BALANCE ; PUSH tez "0" ; IFCMPEQ { FAIL } {} ;
+             BALANCE ; PUSH mutez 0 ; IFCMPEQ { FAIL } {} ;
              # test if the required amount is reached
              DUP ; CDDAAR ; # Q
              DIP { DUP ; CDDDADR } ; MUL ; # C
              PUSH nat 2 ; MUL ;
-             PUSH tez "1.00" ; ADD ;
-             BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C) + 1
+             BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C)
              IF { # refund the parties
                   CDR ; DUP ; CADAR ; # amount versed by the buyer
                   DIP { DUP ; CDDDAAR } ; # B
@@ -2788,8 +2835,8 @@ The complete source ``forward.tz`` is:
                                  NOW ; COMPARE ; LT ;
                                  IF { # Between T + 24 and T + 48
                                       # We accept only delivery notifications, from W
-                                      DUP ; CDDDDDR ; MANAGER ; # W
-                                      SOURCE ; MANAGER ;
+                                      DUP ; CDDDDDR ; ADDRESS ; # W
+                                      SENDER ;
                                       COMPARE ; NEQ ;
                                       IF { FAIL } {} ; # fail if not the warehouse
                                       DUP ; CAR ; # we must receive (Right amount)
@@ -2879,7 +2926,9 @@ XII - Full grammar
       | LAMBDA <type> <type> { <instruction> ... }
       | EXEC
       | DIP { <instruction> ... }
-      | FAIL
+      | FAILWITH
+      | CAST
+      | RENAME
       | CONCAT
       | ADD
       | SUB
@@ -2902,7 +2951,6 @@ XII - Full grammar
       | LE
       | GE
       | INT
-      | MANAGER
       | SELF
       | TRANSFER_TOKENS
       | SET_DELEGATE
@@ -2913,10 +2961,11 @@ XII - Full grammar
       | AMOUNT
       | BALANCE
       | CHECK_SIGNATURE
-      | H
+      | BLAKE2B
       | HASH_KEY
       | STEPS_TO_QUOTA
-      | SOURCE <type> <type>
+      | SOURCE
+      | SENDER
     <type> ::=
       | <comparable type>
       | key

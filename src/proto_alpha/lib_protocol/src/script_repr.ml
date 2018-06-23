@@ -72,6 +72,7 @@ let rec node_size node =
   match node with
   | Int (_, n) -> (1, 1 + (Z.numbits n + 63) / 64)
   | String (_, s) -> (1, 1 + (String.length s + 7) / 8)
+  | Bytes (_, s) -> (1, 1 + (MBytes.length s + 7) / 8)
   | Prim (_, _, args, annot) ->
       List.fold_left
         (fun (blocks, words) node ->

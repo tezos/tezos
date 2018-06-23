@@ -67,6 +67,7 @@ type config = {
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
   test_chain_max_tll: int option ;
+  checkpoint: (Int32.t * Block_hash.t) option ;
 }
 
 and peer_validator_limits = Peer_validator.limits = {
@@ -134,9 +135,19 @@ let default_chain_validator_limits = {
   }
 }
 
+let may_update_checkpoint chain_state checkpoint =
+  match checkpoint with
+  | None ->
+      Lwt.return_unit
+  | Some checkpoint ->
+      State.best_known_head_for_checkpoint
+        chain_state checkpoint >>= fun new_head ->
+      Chain.set_head chain_state new_head >>= fun _old_head ->
+      State.Chain.set_checkpoint chain_state checkpoint
+
 let create { genesis ; store_root ; context_root ;
              patch_context ; p2p = p2p_params ;
-             test_chain_max_tll = max_child_ttl }
+             test_chain_max_tll = max_child_ttl ; checkpoint }
     peer_validator_limits
     block_validator_limits
     prevalidator_limits
@@ -148,6 +159,7 @@ let create { genesis ; store_root ; context_root ;
   init_p2p p2p_params >>=? fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context genesis >>=? fun (state, mainchain_state) ->
+  may_update_checkpoint mainchain_state checkpoint >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
   Validator.create state distributed_db
     peer_validator_limits

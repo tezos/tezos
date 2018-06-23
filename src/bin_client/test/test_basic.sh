@@ -35,7 +35,7 @@ $client gen keys $key2 --sig secp256k1
 $client gen keys $key3 --sig ed25519
 # $client gen keys $key6 --sig p256
 
-$client list known identities
+$client list known addresses
 $client get balance for bootstrap1
 
 bake_after $client transfer 1,000 from bootstrap1 to $key1
@@ -60,8 +60,8 @@ $client get balance for $key2 | assert "2000 ꜩ"
 
 bake
 
-$client remember program noop file:contracts/noop.tz
-$client typecheck program file:contracts/noop.tz
+$client remember script noop file:contracts/noop.tz
+$client typecheck script file:contracts/noop.tz
 bake_after $client originate contract noop \
         for $key1 transferring 1,000 from bootstrap1 \
         running file:contracts/noop.tz

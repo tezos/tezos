@@ -577,6 +577,14 @@ let expand_if_right = function
       error (Invalid_arity ("IF_RIGHT", List.length args, 2))
   | _ -> ok @@ None
 
+let expand_fail = function
+  | Prim (loc, "FAIL", [], []) ->
+      ok @@ Some (Seq (loc, [
+          Prim (loc, "UNIT", [], []) ;
+          Prim (loc, "FAILWITH", [], []) ;
+        ]))
+  | _ -> ok @@ None
+
 let expand original =
   let rec try_expansions = function
     | [] -> ok @@ original
@@ -598,6 +606,7 @@ let expand original =
       expand_asserts ;
       expand_if_some ;
       expand_if_right ;
+      expand_fail ;
     ]
 
 let expand_rec expr =
@@ -620,7 +629,7 @@ let expand_rec expr =
           | Prim (loc, name, args, annot) ->
               let args, errors = error_map expand_rec args in
               (Prim (loc, name, args, annot), errors)
-          | Int _ | String _ as atom -> (atom, []) end
+          | Int _ | String _ | Bytes _ as atom -> (atom, []) end
     | Error errors -> (expr, errors) in
   expand_rec expr
 
@@ -965,32 +974,49 @@ let unexpand_compare expanded =
 let unexpand_asserts expanded =
   match expanded with
   | Seq (loc, [ Prim (_, "IF", [ Seq (_, []) ;
-                                 Seq (_, [ Prim(_, "FAIL", [], []) ]) ],
+                                 Seq (_, [
+                                     Seq (_, [
+                                         Prim (_, "UNIT", [], []) ;
+                                         Prim (_, "FAILWITH", [], []) ]) ]) ],
                       []) ]) ->
       Some (Prim (loc, "ASSERT", [], []))
   | Seq (loc, [ Seq (_, [ Prim(_, "COMPARE", [], []) ; Prim (_, comparison, [], []) ]) ;
                 Prim (_, "IF", [ Seq (_, []) ;
-                                 Seq (_, [ Prim (_, "FAIL", [], []) ]) ],
+                                 Seq (_, [
+                                     Seq (_, [
+                                         Prim (_, "UNIT", [], []) ;
+                                         Prim (_, "FAILWITH", [], []) ]) ]) ],
                       []) ]) ->
       Some (Prim (loc, "ASSERT_CMP" ^ comparison, [], []))
   | Seq (loc, [ Prim (_, comparison, [], []) ;
                 Prim (_, "IF", [ Seq (_, []) ;
-                                 Seq (_, [ Prim (_, "FAIL", [], []) ]) ],
+                                 Seq (_, [
+                                     Seq (_, [
+                                         Prim (_, "UNIT", [], []) ;
+                                         Prim (_, "FAILWITH", [], []) ]) ]) ],
                       []) ]) ->
       Some (Prim (loc, "ASSERT_" ^ comparison, [], []))
   | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, []) ;
-                                      Seq (_, [ Prim (_, "FAIL", [], []) ]) ],
+                                      Seq (_, [
+                                          Seq (_, [
+                                              Prim (_, "UNIT", [], []) ;
+                                              Prim (_, "FAILWITH", [], []) ]) ]) ],
                       []) ]) ->
       Some (Prim (loc, "ASSERT_NONE", [], []))
-  | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, [ Prim (_, "FAIL", [], []) ]) ;
+  | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, [ Seq (_, [ Prim (_, "UNIT", [], []) ;
+                                                          Prim (_, "FAILWITH", [], []) ]) ]) ;
                                       Seq (_, [])],
                       []) ]) ->
       Some (Prim (loc, "ASSERT_SOME", [], []))
   | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, []) ;
-                                      Seq (_, [ Prim (_, "FAIL", [], []) ]) ],
+                                      Seq (_, [
+                                          Seq (_, [
+                                              Prim (_, "UNIT", [], []) ;
+                                              Prim (_, "FAILWITH", [], []) ]) ]) ],
                       []) ]) ->
       Some (Prim (loc, "ASSERT_LEFT", [], []))
-  | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, [ Prim (_, "FAIL", [], []) ]) ;
+  | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, [ Seq (_, [ Prim (_, "UNIT", [], []) ;
+                                                          Prim (_, "FAILWITH", [], []) ]) ]) ;
                                       Seq (_, []) ],
                       []) ]) ->
       Some (Prim (loc, "ASSERT_RIGHT", [], []))
@@ -1005,6 +1031,14 @@ let unexpand_if_some = function
 let unexpand_if_right = function
   | Seq (loc, [ Prim (_, "IF_LEFT", [ left ; right ], annot) ]) ->
       Some (Prim (loc, "IF_RIGHT", [ right ; left ], annot))
+  | _ -> None
+
+let unexpand_fail = function
+  | Seq (loc, [
+      Prim (_, "UNIT", [], []) ;
+      Prim (_, "FAILWITH", [], []) ;
+    ]) ->
+      Some (Prim (loc, "FAIL", [], []))
   | _ -> None
 
 let unexpand original =
@@ -1029,7 +1063,8 @@ let unexpand original =
       unexpand_duuuuup ;
       unexpand_compare ;
       unexpand_if_some ;
-      unexpand_if_right ]
+      unexpand_if_right ;
+      unexpand_fail ]
 
 let rec unexpand_rec expr =
   match unexpand expr with
@@ -1037,7 +1072,7 @@ let rec unexpand_rec expr =
       Seq (loc, List.map unexpand_rec items)
   | Prim (loc, name, args, annot) ->
       Prim (loc, name, List.map unexpand_rec args, annot)
-  | Int _ | String _ as atom -> atom
+  | Int _ | String _ | Bytes _ as atom -> atom
 
 let () =
   let open Data_encoding in

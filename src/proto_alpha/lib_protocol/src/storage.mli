@@ -179,16 +179,16 @@ module Contract : sig
      and type value = Z.t
      and type t := Raw_context.t
 
-  (** Total fees burnt for storage space. *)
-  module Paid_storage_space_fees : Indexed_data_storage
+  (** Maximal space available without needing to burn new fees. *)
+  module Paid_storage_space : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Tez_repr.t
+     and type value = Z.t
      and type t := Raw_context.t
 
   type bigmap_key = Raw_context.t * Contract_repr.t
 
   module Big_map : Non_iterable_indexed_carbonated_data_storage
-    with type key = string
+    with type key = Script_expr_hash.t
      and type value = Script_repr.expr
      and type t := bigmap_key
 

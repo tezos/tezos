@@ -71,9 +71,6 @@ USER tezos
 
 ENV EDITOR=/usr/bin/vi
 
-VOLUME /var/run/tezos/node
-VOLUME /var/run/tezos/client
-
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 EOF
 

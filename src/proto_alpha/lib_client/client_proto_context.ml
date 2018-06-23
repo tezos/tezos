@@ -67,7 +67,6 @@ let reveal cctxt
       | Apply_operation_result.Single_and_result
           (Manager_operation _ as op, result) ->
           return (oph, op, result)
-      | _ -> .
     end
 
 let originate
@@ -275,6 +274,33 @@ let read_key key =
       let pkh = Signature.Public_key.hash pk in
       return (pkh, pk, sk)
 
+let inject_activate_operation
+    cctxt ~chain ~block ?confirmations alias pkh activation_code =
+  let contents =
+    Single ( Activate_account { id = pkh ; activation_code } ) in
+  Injection.inject_operation
+    cctxt ?confirmations ~chain ~block
+    contents >>=? fun (oph, op, result) ->
+  begin
+    match confirmations with
+    | None ->
+        return ()
+    | Some _confirmations ->
+        Alpha_services.Contract.balance
+          cctxt (`Main, `Head 0)
+          (Contract.implicit_contract (Ed25519 pkh)) >>=? fun balance ->
+        cctxt#message "Account %s (%a) activated with %s%a."
+          alias
+          Ed25519.Public_key_hash.pp pkh
+          Client_proto_args.tez_sym
+          Tez.pp balance >>= fun () ->
+        return ()
+  end >>=? fun () ->
+  match Apply_operation_result.pack_contents_list op result with
+  | Apply_operation_result.Single_and_result
+      (Activate_account _ as op, result) ->
+      return (oph, op, result)
+
 let activate_account
     (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
@@ -286,11 +312,6 @@ let activate_account
               Embedded pkh: %a @]"
        Signature.Public_key_hash.pp pkh
        Ed25519.Public_key_hash.pp key.pkh) >>=? fun () ->
-  let contents =
-    Single ( Activate_account { id = key.pkh ; activation_code = key.activation_code } ) in
-  Injection.inject_operation
-    cctxt ?confirmations ~chain ~block
-    contents >>=? fun (oph, op, result) ->
   let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
   begin
     if encrypted then
@@ -299,23 +320,16 @@ let activate_account
       return (Tezos_signer_backends.Unencrypted.make_sk sk)
   end >>=? fun sk_uri ->
   Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name >>=? fun () ->
-  begin
-    match confirmations with
-    | None ->
-        return ()
-    | Some _confirmations ->
-        Alpha_services.Contract.balance
-          cctxt (`Main, `Head 0)
-          (Contract.implicit_contract pkh) >>=? fun balance ->
-        cctxt#message "Account %s (%a) created with %s%a."
-          name
-          Signature.Public_key_hash.pp pkh
-          Client_proto_args.tez_sym
-          Tez.pp balance >>= fun () ->
-        return ()
-  end >>=? fun () ->
-  match Apply_operation_result.pack_contents_list op result with
-  | Apply_operation_result.Single_and_result
-      (Activate_account _ as op, result) ->
-      return (oph, op, result)
-  | _ -> .
+  inject_activate_operation cctxt
+    ~chain ~block ?confirmations name key.pkh key.activation_code
+
+let activate_existing_account
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block ?confirmations
+    alias activation_code =
+  Client_keys.alias_keys cctxt alias >>=? function
+  | Some (Ed25519 pkh, _, _) ->
+      inject_activate_operation
+        cctxt ~chain ~block ?confirmations alias pkh activation_code
+  | Some _ -> failwith "Only Ed25519 accounts can be activated"
+  | None -> failwith "Unknown account"

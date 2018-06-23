@@ -75,6 +75,10 @@ module Chain_data : sig
     with type t = store * Block_hash.t
      and type value := Block_hash.t (* successor *)
 
+  module Checkpoint : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
+
 end
 
 
@@ -89,6 +93,7 @@ module Block : sig
     header: Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
+    last_allowed_fork_level: Int32.t ;
     context: Context_hash.t ;
     metadata: MBytes.t ;
   }

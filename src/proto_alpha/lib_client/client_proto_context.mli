@@ -162,3 +162,12 @@ val activate_account:
   activation_key ->
   string ->
   Kind.activate_account Injection.result tzresult Lwt.t
+
+val activate_existing_account:
+  #Proto_alpha.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  string ->
+  Blinded_public_key_hash.activation_code ->
+  Kind.activate_account Injection.result tzresult Lwt.t

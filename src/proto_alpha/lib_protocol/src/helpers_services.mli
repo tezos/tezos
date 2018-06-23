@@ -25,7 +25,7 @@ module Scripts : sig
 
   val run_code:
     'a #RPC_context.simple ->
-    'a -> Script.expr -> (Script.expr * Script.expr * Tez.t * Contract.t) ->
+    'a -> Script.expr -> (Script.expr * Script.expr * Tez.t) ->
     (Script.expr *
      packed_internal_operation list *
      Contract.big_map_diff option) shell_tzresult Lwt.t
@@ -33,7 +33,7 @@ module Scripts : sig
   val trace_code:
     'a #RPC_context.simple ->
     'a -> Script.expr ->
-    (Script.expr * Script.expr * Tez.t * Contract.t) ->
+    (Script.expr * Script.expr * Tez.t) ->
     (Script.expr *
      packed_internal_operation list *
      Script_interpreter.execution_trace *
@@ -48,9 +48,9 @@ module Scripts : sig
     'a #RPC_context.simple ->
     'a -> Script.expr * Script.expr * Z.t option -> Gas.t shell_tzresult Lwt.t
 
-  val hash_data:
+  val pack_data:
     'a #RPC_context.simple ->
-    'a -> Script.expr * Script.expr * Z.t option -> (string * Gas.t) shell_tzresult Lwt.t
+    'a -> Script.expr * Script.expr * Z.t option -> (MBytes.t * Gas.t) shell_tzresult Lwt.t
 
   val run_operation:
     'a #RPC_context.simple ->

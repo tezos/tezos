@@ -42,6 +42,7 @@ let comparable_type_size : type t. t comparable_ty -> int = fun ty ->
   | Int_key _ -> 1
   | Nat_key _ -> 1
   | String_key _ -> 1
+  | Bytes_key _ -> 1
   | Mutez_key _ -> 1
   | Bool_key _ -> 1
   | Key_hash_key _ -> 1
@@ -55,6 +56,7 @@ let rec type_size : type t. t ty -> int =
     | Int_t _ -> 1
     | Nat_t _ -> 1
     | Signature_t _ -> 1
+    | Bytes_t _ -> 1
     | String_t _ -> 1
     | Mutez_t _ -> 1
     | Key_hash_t _ -> 1
@@ -182,7 +184,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Dip _ -> 0
   | Exec -> 0
   | Lambda _ -> 1
-  | Fail -> 1
+  | Failwith _ -> 1
   | Nop -> 0
   | Compare _ -> 1
   | Eq -> 0
@@ -193,8 +195,6 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Ge -> 0
   | Address -> 0
   | Contract _ -> 1
-  | Manager -> 0
-  | Address_manager -> 0
   | Transfer_tokens -> 1
   | Create_account -> 0
   | Implicit_account -> 0
@@ -203,12 +203,17 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Balance -> 0
   | Check_signature -> 0
   | Hash_key -> 0
-  | H _ -> 0
+  | Blake2b -> 0
+  | Sha256 -> 0
+  | Sha512 -> 0
   | Steps_to_quota -> 0
   | Source -> 0
+  | Sender -> 0
   | Self _ -> 1
   | Amount -> 0
   | Set_delegate -> 0
+  | Pack _ -> 0
+  | Unpack _ -> 1
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -216,11 +221,13 @@ let location = function
   | Prim (loc, _, _, _)
   | Int (loc, _)
   | String (loc, _)
+  | Bytes (loc, _)
   | Seq (loc, _) -> loc
 
 let kind = function
   | Int _ -> Int_kind
   | String _ -> String_kind
+  | Bytes _ -> Bytes_kind
   | Prim _ -> Prim_kind
   | Seq _ -> Seq_kind
 
@@ -237,7 +244,11 @@ let namespace = function
   | D_Some
   | D_True
   | D_Unit -> Constant_namespace
-  | I_H
+  | I_PACK
+  | I_UNPACK
+  | I_BLAKE2B
+  | I_SHA256
+  | I_SHA512
   | I_ABS
   | I_ADD
   | I_AMOUNT
@@ -260,7 +271,7 @@ let namespace = function
   | I_EMPTY_SET
   | I_EQ
   | I_EXEC
-  | I_FAIL
+  | I_FAILWITH
   | I_GE
   | I_GET
   | I_GT
@@ -277,7 +288,6 @@ let namespace = function
   | I_LSL
   | I_LSR
   | I_LT
-  | I_MANAGER
   | I_MAP
   | I_MEM
   | I_MUL
@@ -294,6 +304,7 @@ let namespace = function
   | I_SIZE
   | I_SOME
   | I_SOURCE
+  | I_SENDER
   | I_SELF
   | I_STEPS_TO_QUOTA
   | I_SUB
@@ -326,6 +337,7 @@ let namespace = function
   | T_set
   | T_signature
   | T_string
+  | T_bytes
   | T_mutez
   | T_timestamp
   | T_unit
@@ -337,6 +349,7 @@ let unexpected expr exp_kinds exp_ns exp_prims =
   match expr with
   | Int (loc, _) -> Invalid_kind (loc, Prim_kind :: exp_kinds, Int_kind)
   | String (loc, _ ) -> Invalid_kind (loc, Prim_kind :: exp_kinds, String_kind)
+  | Bytes (loc, _ ) -> Invalid_kind (loc, Prim_kind :: exp_kinds, Bytes_kind)
   | Seq (loc, _) -> Invalid_kind (loc, Prim_kind :: exp_kinds, Seq_kind)
   | Prim (loc, name, _, _) ->
       match namespace name, exp_ns with
@@ -376,6 +389,7 @@ let compare_comparable
         else -1
     | Timestamp_key _ -> Script_timestamp.compare x y
     | Address_key _ -> Contract.compare x y
+    | Bytes_key _ -> MBytes.compare x y
 
 let empty_set
   : type a. a comparable_ty -> a set
@@ -499,6 +513,7 @@ let ty_of_comparable_ty
     | Int_key tname -> Int_t tname
     | Nat_key tname -> Nat_t tname
     | String_key tname -> String_t tname
+    | Bytes_key tname -> Bytes_t tname
     | Mutez_key tname -> Mutez_t tname
     | Bool_key tname -> Bool_t tname
     | Key_hash_key tname -> Key_hash_t tname
@@ -511,6 +526,7 @@ let unparse_comparable_ty
     | Int_key tname -> Prim (-1, T_int, [], unparse_type_annot tname)
     | Nat_key tname -> Prim (-1, T_nat, [], unparse_type_annot tname)
     | String_key tname -> Prim (-1, T_string, [], unparse_type_annot tname)
+    | Bytes_key tname -> Prim (-1, T_bytes, [], unparse_type_annot tname)
     | Mutez_key tname -> Prim (-1, T_mutez, [], unparse_type_annot tname)
     | Bool_key tname -> Prim (-1, T_bool, [], unparse_type_annot tname)
     | Key_hash_key tname -> Prim (-1, T_key_hash, [], unparse_type_annot tname)
@@ -529,6 +545,7 @@ let rec unparse_ty
     | Int_t tname -> Prim (-1, T_int, [], unparse_type_annot tname)
     | Nat_t tname -> Prim (-1, T_nat, [], unparse_type_annot tname)
     | String_t tname -> Prim (-1, T_string, [], unparse_type_annot tname)
+    | Bytes_t tname -> Prim (-1, T_bytes, [], unparse_type_annot tname)
     | Mutez_t tname -> Prim (-1, T_mutez, [], unparse_type_annot tname)
     | Bool_t tname -> Prim (-1, T_bool, [], unparse_type_annot tname)
     | Key_hash_t tname -> Prim (-1, T_key_hash, [], unparse_type_annot tname)
@@ -580,6 +597,7 @@ let name_of_ty
     | Int_t tname -> tname
     | Nat_t tname -> tname
     | String_t tname -> tname
+    | Bytes_t tname -> tname
     | Mutez_t tname -> tname
     | Bool_t tname -> tname
     | Key_hash_t tname -> tname
@@ -627,6 +645,7 @@ let rec ty_eq
     | Key_t _, Key_t _ -> Ok Eq
     | Key_hash_t _, Key_hash_t _ -> Ok Eq
     | String_t _, String_t _ -> Ok Eq
+    | Bytes_t _, Bytes_t _ -> Ok Eq
     | Signature_t _, Signature_t _ -> Ok Eq
     | Mutez_t _, Mutez_t _ -> Ok Eq
     | Timestamp_t _, Timestamp_t _ -> Ok Eq
@@ -722,6 +741,7 @@ let merge_comparable_types
 let rec strip_annotations = function
   | (Int (_,_) as i) -> i
   | (String (_,_) as s) -> s
+  | (Bytes (_,_) as s) -> s
   | Prim (loc, prim, args, _) -> Prim (loc, prim, List.map strip_annotations args, [])
   | Seq (loc, items) -> Seq (loc, List.map strip_annotations items)
 
@@ -748,6 +768,9 @@ let merge_types :
       | String_t tn1, String_t tn2 ->
           merge_type_annot tn1 tn2 >|? fun tname ->
           String_t tname
+      | Bytes_t tn1, Bytes_t tn2 ->
+          merge_type_annot tn1 tn2 >|? fun tname ->
+          Bytes_t tname
       | Signature_t tn1, Signature_t tn2 ->
           merge_type_annot tn1 tn2 >|? fun tname ->
           Signature_t tname
@@ -957,6 +980,9 @@ and parse_ty :
     | Prim (loc, T_string, [], annot) ->
         parse_type_annot loc annot >|? fun ty_name ->
         Ex_ty (String_t ty_name)
+    | Prim (loc, T_bytes, [], annot) ->
+        parse_type_annot loc annot >|? fun ty_name ->
+        Ex_ty (Bytes_t ty_name)
     | Prim (loc, T_mutez, [], annot) ->
         parse_type_annot loc annot >|? fun ty_name ->
         Ex_ty (Mutez_t ty_name)
@@ -1029,7 +1055,7 @@ and parse_ty :
         error (Unexpected_big_map loc)
     | Prim (loc, (T_unit | T_signature
                  | T_int | T_nat
-                 | T_string | T_mutez | T_bool
+                 | T_string | T_bytes | T_mutez | T_bool
                  | T_key | T_key_hash
                  | T_timestamp | T_address as prim), l, _) ->
         error (Invalid_arity (loc, prim, 0, List.length l))
@@ -1043,8 +1069,37 @@ and parse_ty :
             T_list ; T_option  ; T_lambda ;
             T_unit ; T_signature  ; T_contract ;
             T_int ; T_nat ; T_operation ;
-            T_string ; T_mutez ; T_bool ;
+            T_string ; T_bytes ; T_mutez ; T_bool ;
             T_key ; T_key_hash ; T_timestamp ]
+
+let check_no_big_map_or_operation loc root =
+  let rec check : type t. t ty -> unit tzresult = function
+    | Big_map_t _ -> error (Unexpected_big_map loc)
+    | Operation_t _ -> error (Unexpected_operation loc)
+    | Unit_t _ -> ok ()
+    | Int_t _ -> ok ()
+    | Nat_t _ -> ok ()
+    | Signature_t _ -> ok ()
+    | String_t _ -> ok ()
+    | Bytes_t _ -> ok ()
+    | Mutez_t _ -> ok ()
+    | Key_hash_t _ -> ok ()
+    | Key_t _ -> ok ()
+    | Timestamp_t _ -> ok ()
+    | Address_t _ -> ok ()
+    | Bool_t _ -> ok ()
+    | Pair_t ((l_ty, _, _), (r_ty, _, _), _) ->
+        check l_ty >>? fun () -> check r_ty
+    | Union_t ((l_ty, _), (r_ty, _), _) ->
+        check l_ty >>? fun () -> check r_ty
+    | Lambda_t (l_ty, r_ty, _) ->
+        check l_ty >>? fun () -> check r_ty
+    | Option_t ((v_ty, _), _, _) -> check v_ty
+    | List_t (elt_ty, _) -> check elt_ty
+    | Set_t (_, _) -> ok ()
+    | Map_t (_, elt_ty, _) -> check elt_ty
+    | Contract_t (_, _) -> ok () in
+  check root
 
 let rec unparse_stack
   : type a. a stack_ty -> (Script.expr * Script.annot) list
@@ -1054,21 +1109,6 @@ let rec unparse_stack
         (strip_locations (unparse_ty ty), unparse_var_annot annot) :: unparse_stack rest
 
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
-
-let public_key_hash_size =
-  match Data_encoding.Binary.fixed_length Signature.Public_key_hash.encoding with
-  | None -> assert false
-  | Some size -> size
-
-let signature_size =
-  match Data_encoding.Binary.fixed_length Signature.encoding with
-  | None -> assert false
-  | Some size -> size
-
-let address_size =
-  match Data_encoding.Binary.fixed_length Contract.encoding with
-  | None -> assert false
-  | Some size -> size
 
 (* Lwt versions *)
 let parse_var_annot loc ?default annot =
@@ -1115,18 +1155,10 @@ let rec parse_data
                fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
            | Prim (loc, name, _, _) ->
                fail @@ Invalid_primitive (loc, [ D_Elt ], name)
-           | Int _ | String _ | Seq _ ->
+           | Int _ | String _ | Bytes _ | Seq _ ->
                fail (error ()))
         (None, empty_map key_type, ctxt) items |> traced >>|? fun (_, items, ctxt) ->
       (items, ctxt) in
-    let bytes_of_padded_z z =
-      let bytes = Z.to_bits z in
-      let len = MBytes.length bytes in
-      if Compare.Int.(MBytes.length bytes = 0)
-      || Compare.Char.(MBytes.get_char bytes (MBytes.length bytes - 1) <> '\xFF') then
-        fail (error ())
-      else
-        return (MBytes.sub bytes 0 (len - 1)) in
     match ty, script_data with
     (* Unit *)
     | Unit_t ty_name, Prim (loc, D_Unit, [], annot) ->
@@ -1164,6 +1196,12 @@ let rec parse_data
           fail (error ())
     | String_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+    (* Byte sequences *)
+    | Bytes_t _, Bytes (_, v) ->
+        Lwt.return (Gas.consume ctxt (Typecheck_costs.string (MBytes.length v))) >>=? fun ctxt ->
+        return (v, ctxt)
+    | Bytes_t _, expr ->
+        traced (fail (Invalid_kind (location expr, [ Bytes_kind ], kind expr)))
     (* Integers *)
     | Int_t _, Int (_, v) ->
         return (Script_int.of_zint v, ctxt)
@@ -1187,90 +1225,76 @@ let rec parse_data
             fail @@ error ()
         end
     | Mutez_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ Int_kind ], kind expr)))
     (* Timestamps *)
     | Timestamp_t _, (Int (_, v)) (* As unparsed with [Optimized] or out of bounds [Readable]. *) ->
         return (Script_timestamp.of_zint v, ctxt)
     | Timestamp_t _, String (_, s) (* As unparsed with [Redable]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.string_timestamp) >>=? fun ctxt ->
-        begin try
-            match Script_timestamp.of_string s with
-            | Some v -> return (v, ctxt)
-            | None -> fail (error ())
-          with _ -> fail (error ())
+        begin match Script_timestamp.of_string s with
+          | Some v -> return (v, ctxt)
+          | None -> fail (error ())
         end
     | Timestamp_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ; Int_kind ], kind expr)))
     (* IDs *)
-    | Key_t _, Int (_, z) -> (* As unparsed with [Optimized]. *)
+    | Key_t _, Bytes (_, bytes) -> (* As unparsed with [Optimized]. *)
         Lwt.return (Gas.consume ctxt Typecheck_costs.key) >>=? fun ctxt ->
-        bytes_of_padded_z z >>=? fun bytes ->
         begin match Data_encoding.Binary.of_bytes Signature.Public_key.encoding bytes with
           | Some k -> return (k, ctxt)
           | None -> fail (error ())
         end
     | Key_t _, String (_, s) -> (* As unparsed with [Readable]. *)
         Lwt.return (Gas.consume ctxt Typecheck_costs.key) >>=? fun ctxt ->
-        begin
-          try
-            return (Signature.Public_key.of_b58check_exn s, ctxt)
-          with _ -> fail (error ())
+        begin match Signature.Public_key.of_b58check_opt s with
+          | Some k -> return (k, ctxt)
+          | None -> fail (error ())
         end
     | Key_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
-    | Key_hash_t _, Int (_, z) -> (* As unparsed with [Optimized]. *)
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
+    | Key_hash_t _, Bytes (_, bytes) -> (* As unparsed with [Optimized]. *)
         Lwt.return (Gas.consume ctxt Typecheck_costs.key_hash) >>=? fun ctxt ->
         begin
-          let bytes = Z.to_bits ~pad_to:public_key_hash_size z in
           match Data_encoding.Binary.of_bytes Signature.Public_key_hash.encoding bytes with
           | Some k -> return (k, ctxt)
           | None -> fail (error ())
         end
     | Key_hash_t _, String (_, s) (* As unparsed with [Readable]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.key_hash) >>=? fun ctxt ->
-        begin
-          try
-            return (Signature.Public_key_hash.of_b58check_exn s, ctxt)
-          with _ -> fail (error ())
+        begin match Signature.Public_key_hash.of_b58check_opt s with
+          | Some k -> return (k, ctxt)
+          | None -> fail (error ())
         end
     | Key_hash_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Signatures *)
-    | Signature_t _, Int (_, z) (* As unparsed with [Optimized]. *) ->
+    | Signature_t _, Bytes (_, bytes) (* As unparsed with [Optimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.signature) >>=? fun ctxt ->
-        begin
-          let bytes = Z.to_bits ~pad_to:signature_size z in
-          match Data_encoding.Binary.of_bytes Signature.encoding bytes with
+        begin match Data_encoding.Binary.of_bytes Signature.encoding bytes with
           | Some k -> return (k, ctxt)
           | None -> fail (error ())
         end
     | Signature_t _, String (_, s) (* As unparsed with [Readable]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.signature) >>=? fun ctxt ->
-        begin
-          try
-            return (Signature.of_b58check_exn s, ctxt)
-          with _ -> fail (error ())
+        begin match Signature.of_b58check_opt s with
+          | Some s -> return (s, ctxt)
+          | None -> fail (error ())
         end
     | Signature_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Operations *)
-    | Operation_t _, String (_, s) -> begin try
-          Lwt.return (Gas.consume ctxt (Typecheck_costs.operation s)) >>=? fun ctxt ->
-          match Data_encoding.Binary.of_bytes
-                  Operation.internal_operation_encoding
-                  (MBytes.of_hex (`Hex s)) with
+    | Operation_t _, Bytes (_, bytes) ->
+        Lwt.return (Gas.consume ctxt (Typecheck_costs.operation bytes)) >>=? fun ctxt ->
+        begin match Data_encoding.Binary.of_bytes Operation.internal_operation_encoding bytes with
           | Some op -> return (op, ctxt)
-          | None -> raise Not_found
-        with _ ->
-          fail (error ())
-      end
+          | None -> fail (error ())
+        end
     | Operation_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ Bytes_kind ], kind expr)))
     (* Addresses *)
-    | Address_t _, Int (_, z) (* As unparsed with [O[ptimized]. *) ->
+    | Address_t _, Bytes (_, bytes) (* As unparsed with [O[ptimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
         begin
-          let bytes = Z.to_bits ~pad_to:address_size z in
           match Data_encoding.Binary.of_bytes Contract.encoding bytes with
           | Some c -> return (c, ctxt)
           | None -> fail (error ())
@@ -1280,12 +1304,11 @@ let rec parse_data
         traced (Lwt.return (Contract.of_b58check s)) >>=? fun c ->
         return (c, ctxt)
     | Address_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Contracts *)
-    | Contract_t (ty, _), Int (loc, z) (* As unparsed with [Optimized]. *) ->
+    | Contract_t (ty, _), Bytes (loc, bytes) (* As unparsed with [Optimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
         begin
-          let bytes = Z.to_bits ~pad_to:address_size z in
           match Data_encoding.Binary.of_bytes Contract.encoding bytes with
           | Some c ->
               traced (parse_contract ctxt loc ty c) >>=? fun (ctxt, _) ->
@@ -1299,7 +1322,7 @@ let rec parse_data
         parse_contract ctxt loc ty c >>=? fun (ctxt, _) ->
         return ((ty, c), ctxt)
     | Contract_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Pairs *)
     | Pair_t ((ta, af, _), (tb, bf, _), ty_name), Prim (loc, D_Pair, [ va; vb ], annot) ->
         check_const_type_annot loc annot ty_name [af; bf] >>=? fun () ->
@@ -1454,13 +1477,15 @@ and parse_instr
       Lwt.return check in
     let check_item_ty exp got loc n =
       check_item (ty_eq exp got) loc n in
+    let log_stack loc stack_ty aft =
+      match type_logger, script_instr with
+      | None, _
+      | Some _, (Seq (-1, _) | Int _ | String _ | Bytes _) -> ()
+      | Some log, (Prim _ | Seq _) ->
+          log loc (unparse_stack stack_ty) (unparse_stack aft)
+    in
     let typed ctxt loc instr aft =
-      begin match type_logger, script_instr with
-        | None, _
-        | Some _, (Seq (-1, _) | Int _ | String _) -> ()
-        | Some log, (Prim _ | Seq _) ->
-            log loc (unparse_stack stack_ty) (unparse_stack aft)
-      end ;
+      log_stack loc stack_ty aft ;
       return ctxt (Typed { loc ; instr ; bef = stack_ty ; aft }) in
     match script_instr, stack_ty with
     (* stack ops *)
@@ -1883,10 +1908,11 @@ and parse_instr
           | Failed _ ->
               fail (Fail_not_in_tail_position loc)
         end
-    | Prim (loc, I_FAIL, [], annot),
-      bef ->
+    | Prim (loc, I_FAILWITH, [], annot),
+      Item_t (v, _rest, _) ->
         fail_unexpected_annot loc annot >>=? fun () ->
-        let descr aft = { loc ; instr = Fail ; bef ; aft } in
+        let descr aft = { loc ; instr = Failwith v ; bef = stack_ty ; aft } in
+        log_stack loc stack_ty Empty_t ;
         return ctxt (Failed { descr })
     (* timestamp operations *)
     | Prim (loc, I_ADD, [], annot),
@@ -2201,6 +2227,12 @@ and parse_instr
         Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
         typed ctxt loc (Compare (Address_key tname))
           (Item_t (Int_t None, rest, annot))
+    | Prim (loc, I_COMPARE, [], annot),
+      Item_t (Bytes_t tn1, Item_t (Bytes_t tn2, rest, _), _) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
+        typed ctxt loc (Compare (Bytes_key tname))
+          (Item_t (Int_t None, rest, annot))
     (* comparators *)
     | Prim (loc, I_EQ, [], annot),
       Item_t (Int_t _, rest, _) ->
@@ -2245,6 +2277,23 @@ and parse_instr
       Item_t (t, stack, _) ->
         parse_var_annot loc annot >>=? fun annot -> (* can erase annot *)
         typed ctxt loc Nop (Item_t (t, stack, annot))
+    (* packing *)
+    | Prim (loc, I_PACK, [], annot),
+      Item_t (t, rest, unpacked_annot) ->
+        Lwt.return (check_no_big_map_or_operation loc t) >>=? fun () ->
+        parse_var_annot loc annot ~default:(gen_access_annot unpacked_annot default_pack_annot)
+        >>=? fun annot ->
+        typed ctxt loc (Pack t)
+          (Item_t (Bytes_t None, rest, annot))
+    | Prim (loc, I_UNPACK, [ ty ], annot),
+      Item_t (Bytes_t _, rest, packed_annot) ->
+        Lwt.return @@ parse_ty ~allow_big_map:false ~allow_operation:false ty >>=? fun (Ex_ty t) ->
+        let stack_annot = gen_access_annot packed_annot default_unpack_annot in
+        parse_constr_annot loc annot
+          ~if_special_first:(var_to_field_annot stack_annot)
+        >>=? fun (annot, ty_name, some_field, none_field) ->
+        typed ctxt loc (Unpack t)
+          (Item_t (Option_t ((t, some_field), none_field, ty_name), rest, annot))
     (* protocol *)
     | Prim (loc, I_ADDRESS, [], annot),
       Item_t (Contract_t _, rest, contract_annot) ->
@@ -2259,18 +2308,6 @@ and parse_instr
         >>=? fun annot ->
         typed ctxt loc (Contract t)
           (Item_t (Option_t ((Contract_t (t, None), None), None, None), rest, annot))
-    | Prim (loc, I_MANAGER, [], annot),
-      Item_t (Contract_t _, rest, contract_annot) ->
-        parse_var_annot loc annot ~default:(gen_access_annot contract_annot default_manager_annot)
-        >>=? fun annot ->
-        typed ctxt loc Manager
-          (Item_t (Key_hash_t None, rest, annot))
-    | Prim (loc, I_MANAGER, [], annot),
-      Item_t (Address_t _, rest, addr_annot) ->
-        parse_var_annot loc annot ~default:(gen_access_annot addr_annot default_manager_annot)
-        >>=? fun annot ->
-        typed ctxt loc Address_manager
-          (Item_t (Option_t ((Key_hash_t None, None), None, None), rest, annot))
     | Prim (loc, I_TRANSFER_TOKENS, [], annot),
       Item_t (p, Item_t
                 (Mutez_t _, Item_t
@@ -2358,15 +2395,25 @@ and parse_instr
         typed ctxt loc Hash_key
           (Item_t (Key_hash_t None, rest, annot))
     | Prim (loc, I_CHECK_SIGNATURE, [], annot),
-      Item_t (Key_t _, Item_t (Signature_t _, Item_t (String_t _, rest, _), _), _) ->
+      Item_t (Key_t _, Item_t (Signature_t _, Item_t (Bytes_t _, rest, _), _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
         typed ctxt loc Check_signature
           (Item_t (Bool_t None, rest, annot))
-    | Prim (loc, I_H, [], annot),
-      Item_t (t, rest, _) ->
+    | Prim (loc, I_BLAKE2B, [], annot),
+      Item_t (Bytes_t _, rest, _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        typed ctxt loc (H t)
-          (Item_t (String_t None, rest, annot))
+        typed ctxt loc Blake2b
+          (Item_t (Bytes_t None, rest, annot))
+    | Prim (loc, I_SHA256, [], annot),
+      Item_t (Bytes_t _, rest, _) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        typed ctxt loc Sha256
+          (Item_t (Bytes_t None, rest, annot))
+    | Prim (loc, I_SHA512, [], annot),
+      Item_t (Bytes_t _, rest, _) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        typed ctxt loc Sha512
+          (Item_t (Bytes_t None, rest, annot))
     | Prim (loc, I_STEPS_TO_QUOTA, [], annot),
       stack ->
         parse_var_annot loc annot ~default:default_steps_annot >>=? fun annot ->
@@ -2376,6 +2423,11 @@ and parse_instr
       stack ->
         parse_var_annot loc annot ~default:default_source_annot >>=? fun annot ->
         typed ctxt loc Source
+          (Item_t (Address_t None, stack, annot))
+    | Prim (loc, I_SENDER, [], annot),
+      stack ->
+        parse_var_annot loc annot ~default:default_sender_annot >>=? fun annot ->
+        typed ctxt loc Sender
           (Item_t (Address_t None, stack, annot))
     | Prim (loc, I_SELF, [], annot),
       stack ->
@@ -2391,18 +2443,18 @@ and parse_instr
     | Prim (loc, (I_DROP | I_DUP | I_SWAP | I_SOME | I_UNIT
                  | I_PAIR | I_CAR | I_CDR | I_CONS
                  | I_MEM | I_UPDATE | I_MAP
-                 | I_GET | I_EXEC | I_FAIL | I_SIZE
+                 | I_GET | I_EXEC | I_FAILWITH | I_SIZE
                  | I_CONCAT | I_ADD | I_SUB
                  | I_MUL | I_EDIV | I_OR | I_AND | I_XOR
                  | I_NOT
                  | I_ABS | I_NEG | I_LSL | I_LSR
                  | I_COMPARE | I_EQ | I_NEQ
                  | I_LT | I_GT | I_LE | I_GE
-                 | I_MANAGER | I_TRANSFER_TOKENS | I_CREATE_ACCOUNT
+                 | I_TRANSFER_TOKENS | I_CREATE_ACCOUNT
                  | I_CREATE_CONTRACT | I_SET_DELEGATE | I_NOW
                  | I_IMPLICIT_ACCOUNT | I_AMOUNT | I_BALANCE
-                 | I_CHECK_SIGNATURE | I_HASH_KEY | I_SOURCE
-                 | I_H | I_STEPS_TO_QUOTA | I_ADDRESS
+                 | I_CHECK_SIGNATURE | I_HASH_KEY | I_SOURCE | I_SENDER
+                 | I_BLAKE2B | I_SHA256 | I_SHA512 | I_STEPS_TO_QUOTA | I_ADDRESS
                  as name), (_ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
     | Prim (loc, (I_NONE | I_LEFT | I_RIGHT | I_NIL | I_MAP | I_ITER
@@ -2441,10 +2493,11 @@ and parse_instr
     | Prim (loc, I_TRANSFER_TOKENS, [], _),
       stack ->
         fail (Bad_stack (loc, I_TRANSFER_TOKENS, 4, stack))
-    | Prim (loc, (I_DROP | I_DUP | I_CAR | I_CDR | I_SOME | I_H | I_DIP
+    | Prim (loc, (I_DROP | I_DUP | I_CAR | I_CDR | I_SOME
+                 | I_BLAKE2B | I_SHA256 | I_SHA512 | I_DIP
                  | I_IF_NONE | I_LEFT | I_RIGHT | I_IF_LEFT | I_IF
-                 | I_LOOP | I_IF_CONS | I_MANAGER | I_IMPLICIT_ACCOUNT
-                 | I_NEG | I_ABS | I_INT | I_NOT
+                 | I_LOOP | I_IF_CONS | I_IMPLICIT_ACCOUNT
+                 | I_NEG | I_ABS | I_INT | I_NOT | I_HASH_KEY
                  | I_EQ | I_NEQ | I_LT | I_GT | I_LE | I_GE as name), _, _),
       stack ->
         fail (Bad_stack (loc, name, 1, stack))
@@ -2461,21 +2514,22 @@ and parse_instr
           [ I_DROP ; I_DUP ; I_SWAP ; I_SOME ; I_UNIT ;
             I_PAIR ; I_CAR ; I_CDR ; I_CONS ;
             I_MEM ; I_UPDATE ; I_MAP ; I_ITER ;
-            I_GET ; I_EXEC ; I_FAIL ; I_SIZE ;
+            I_GET ; I_EXEC ; I_FAILWITH ; I_SIZE ;
             I_CONCAT ; I_ADD ; I_SUB ;
             I_MUL ; I_EDIV ; I_OR ; I_AND ; I_XOR ;
             I_NOT ;
             I_ABS ; I_INT; I_NEG ; I_LSL ; I_LSR ;
             I_COMPARE ; I_EQ ; I_NEQ ;
             I_LT ; I_GT ; I_LE ; I_GE ;
-            I_MANAGER ; I_TRANSFER_TOKENS ; I_CREATE_ACCOUNT ;
+            I_TRANSFER_TOKENS ; I_CREATE_ACCOUNT ;
             I_CREATE_CONTRACT ; I_NOW ; I_AMOUNT ; I_BALANCE ;
-            I_IMPLICIT_ACCOUNT ; I_CHECK_SIGNATURE ; I_H ; I_HASH_KEY ;
+            I_IMPLICIT_ACCOUNT ; I_CHECK_SIGNATURE ;
+            I_BLAKE2B ; I_SHA256 ; I_SHA512 ; I_HASH_KEY ;
             I_STEPS_TO_QUOTA ;
             I_PUSH ; I_NONE ; I_LEFT ; I_RIGHT ; I_NIL ;
             I_EMPTY_SET ; I_DIP ; I_LOOP ;
             I_IF_NONE ; I_IF_LEFT ; I_IF_CONS ;
-            I_EMPTY_MAP ; I_IF ; I_SOURCE ; I_SELF ; I_LAMBDA ]
+            I_EMPTY_MAP ; I_IF ; I_SOURCE ; I_SENDER ; I_SELF ; I_LAMBDA ]
 
 and parse_contract
   : type arg. context -> Script.location -> arg ty -> Contract.t ->
@@ -2511,6 +2565,7 @@ and parse_toplevel
     match root toplevel with
     | Int (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], Int_kind))
     | String (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], String_kind))
+    | Bytes (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], Bytes_kind))
     | Prim (loc, _, _, _) -> error (Invalid_kind (loc, [ Seq_kind ], Prim_kind))
     | Seq (_, fields) ->
         let rec find_fields p s c fields =
@@ -2518,6 +2573,7 @@ and parse_toplevel
           | [] -> ok (p, s, c)
           | Int (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], Int_kind))
           | String (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], String_kind))
+          | Bytes (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], Bytes_kind))
           | Seq (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], Seq_kind))
           | Prim (loc, K_parameter, [ arg ], _) :: rest ->
               begin match p with
@@ -2633,9 +2689,6 @@ module Unparse_costs = Michelson_v1_gas.Cost_of.Unparse
 let rec unparse_data
   : type a. context -> unparsing_mode -> a ty -> a -> (Script.node * context) tzresult Lwt.t
   = fun ctxt mode ty a ->
-    let padded_z_of_bytes bytes =
-      let bytes = MBytes.concat "" [ bytes ; MBytes.of_string "\xFF" ] in
-      Z.of_bits bytes in
     Lwt.return (Gas.consume ctxt Unparse_costs.cycle) >>=? fun ctxt ->
     match ty, a with
     | Unit_t _, () ->
@@ -2650,6 +2703,9 @@ let rec unparse_data
     | String_t _, s ->
         Lwt.return (Gas.consume ctxt (Unparse_costs.string s)) >>=? fun ctxt ->
         return (String (-1, s), ctxt)
+    | Bytes_t _, s ->
+        Lwt.return (Gas.consume ctxt (Unparse_costs.bytes s)) >>=? fun ctxt ->
+        return (Bytes (-1, s), ctxt)
     | Bool_t _, true ->
         Lwt.return (Gas.consume ctxt Unparse_costs.bool) >>=? fun ctxt ->
         return (Prim (-1, D_True, [], []), ctxt)
@@ -2672,7 +2728,7 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Contract.encoding c in
-              return (Int (-1, Z.of_bits bytes), ctxt)
+              return (Bytes (-1, bytes), ctxt)
           | Readable -> return (String (-1, Contract.to_b58check c), ctxt)
         end
     | Contract_t _, (_, c)  ->
@@ -2681,7 +2737,7 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Contract.encoding c in
-              return (Int (-1, Z.of_bits bytes), ctxt)
+              return (Bytes (-1, bytes), ctxt)
           | Readable -> return (String (-1, Contract.to_b58check c), ctxt)
         end
     | Signature_t _, s ->
@@ -2690,7 +2746,7 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Signature.encoding s in
-              return (Int (-1, Z.of_bits bytes), ctxt)
+              return (Bytes (-1, bytes), ctxt)
           | Readable ->
               return (String (-1, Signature.to_b58check s), ctxt)
         end
@@ -2703,7 +2759,7 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k in
-              return (Int (-1, padded_z_of_bytes bytes), ctxt)
+              return (Bytes (-1, bytes), ctxt)
           | Readable ->
               return (String (-1, Signature.Public_key.to_b58check k), ctxt)
         end
@@ -2713,15 +2769,14 @@ let rec unparse_data
           match mode with
           | Optimized ->
               let bytes = Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding k in
-              return (Int (-1, Z.of_bits bytes), ctxt)
+              return (Bytes (-1, bytes), ctxt)
           | Readable ->
               return (String (-1, Signature.Public_key_hash.to_b58check k), ctxt)
         end
     | Operation_t _, op ->
         let bytes = Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op in
-        let `Hex text = MBytes.to_hex bytes in
         Lwt.return (Gas.consume ctxt (Unparse_costs.operation bytes)) >>=? fun ctxt ->
-        return (String (-1, text), ctxt)
+        return (Bytes (-1, bytes), ctxt)
     | Pair_t ((tl, _, _), (tr, _, _), _), (l, r) ->
         Lwt.return (Gas.consume ctxt Unparse_costs.pair) >>=? fun ctxt ->
         unparse_data ctxt mode tl l >>=? fun (l, ctxt) ->
@@ -2797,7 +2852,7 @@ and unparse_code ctxt mode = function
            return (item :: l, ctxt))
         ([], ctxt) items >>=? fun (items, ctxt) ->
       return (Prim (loc, prim, List.rev items, annot), ctxt)
-  | Int _ | String _ as atom -> return (atom, ctxt)
+  | Int _ | String _ | Bytes _ as atom -> return (atom, ctxt)
 
 let unparse_script ctxt mode { code ; arg_type ; storage ; storage_type } =
   let Lam (_, original_code) = code in
@@ -2813,11 +2868,16 @@ let unparse_script ctxt mode { code ; arg_type ; storage ; storage_type } =
   return ({ code = lazy_expr (strip_locations code) ;
             storage = lazy_expr (strip_locations storage) }, ctxt)
 
-let hash_data ctxt typ data =
+let pack_data ctxt typ data =
   unparse_data ctxt Optimized typ data >>=? fun (data, ctxt) ->
   let unparsed = strip_annotations @@ data in
   let bytes = Data_encoding.Binary.to_bytes_exn expr_encoding (Micheline.strip_locations unparsed) in
-  return (Script_expr_hash.(hash_bytes [ bytes ] |> to_b58check), ctxt)
+  let bytes = MBytes.concat "" [ MBytes.of_string "\005" ; bytes ] in
+  return (bytes, ctxt)
+
+let hash_data ctxt typ data =
+  pack_data ctxt typ data >>=? fun (bytes, ctxt) ->
+  return (Script_expr_hash.(hash_bytes [ bytes ]), ctxt)
 
 (* ---------------- Big map -------------------------------------------------*)
 

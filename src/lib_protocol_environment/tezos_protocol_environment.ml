@@ -212,6 +212,11 @@ module Make (Context : CONTEXT) = struct
     module Format = Format
     module Option = Option
     module MBytes = MBytes
+    module Raw_hashes = struct
+      let sha256 msg = Hacl.Hash.SHA256.digest msg
+      let sha512 msg = Hacl.Hash.SHA512.digest msg
+      let blake2b msg = Blake2B.to_bytes (Blake2B.hash_bytes [ msg ])
+    end
     module Z = struct
       include Z
       let to_bits ?(pad_to = 0) z =

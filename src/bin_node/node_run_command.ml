@@ -90,7 +90,7 @@ let init_logger ?verbosity (log_config : Node_config_file.log) =
   end ;
   Logging_unix.init ~template:log_config.template log_config.output
 
-let init_node ?sandbox (config : Node_config_file.t) =
+let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   let patch_context json ctxt =
     begin
       match json with
@@ -181,6 +181,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
     context_root = context_dir config.data_dir ;
     p2p = p2p_config ;
     test_chain_max_tll = Some (48 * 3600) ; (* 2 days *)
+    checkpoint ;
   } in
   Node.create
     node_config
@@ -242,7 +243,7 @@ let init_signal () =
   ignore (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
   ignore (Lwt_unix.on_signal Sys.sigterm (handler "TERM") : Lwt_unix.signal_handler_id)
 
-let run ?verbosity ?sandbox (config : Node_config_file.t) =
+let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   Lwt_lock_file.create
     ~unlink_on_exit:true (lock_file config.data_dir) >>=? fun () ->
@@ -250,7 +251,7 @@ let run ?verbosity ?sandbox (config : Node_config_file.t) =
   init_logger ?verbosity config.log >>= fun () ->
   Updater.init (protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
-  init_node ?sandbox config >>=? fun node ->
+  init_node ?sandbox ?checkpoint config >>=? fun node ->
   init_rpc config.rpc node >>=? fun rpc ->
   lwt_log_notice "The Tezos node is now running!" >>= fun () ->
   Lwt_exit.termination_thread >>= fun x ->
@@ -262,7 +263,7 @@ let run ?verbosity ?sandbox (config : Node_config_file.t) =
   Logging_unix.close () >>= fun () ->
   return ()
 
-let process sandbox verbosity args =
+let process sandbox verbosity checkpoint args =
   let verbosity =
     match verbosity with
     | [] -> None
@@ -281,11 +282,36 @@ let process sandbox verbosity args =
           else return ()
       | None -> return ()
     end >>=? fun () ->
+    begin
+      match checkpoint with
+      | None -> return None
+      | Some s ->
+          match String.split ',' s with
+          | [ lvl ; block ] ->
+              Lwt.return (Block_hash.of_b58check block) >>=? fun block ->
+              begin
+                match Int32.of_string_opt lvl with
+                | None ->
+                    failwith "%s isn't a 32bit integer" lvl
+                | Some lvl ->
+                    return lvl
+              end >>=? fun lvl ->
+              return (Some (lvl, block))
+          | [] -> assert false
+          | [_] ->
+              failwith "Checkoints are expected to follow the format \
+                        \"<level>,<block_hash>\". \
+                        The character ',' is not present in %s" s
+          | _ ->
+              failwith "Checkoints are expected to follow the format \
+                        \"<level>,<block_hash>\". \
+                        The character ',' is present more than once in %s" s
+    end >>=? fun checkpoint ->
     Lwt_lock_file.is_locked
       (lock_file config.data_dir) >>=? function
     | false ->
         Lwt.catch
-          (fun () -> run ?sandbox ?verbosity config)
+          (fun () -> run ?sandbox ?verbosity ?checkpoint config)
           (function
             |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
                 begin match config.rpc.listen_addr with
@@ -327,8 +353,19 @@ module Term = struct
          info ~docs:Node_shared_arg.Manpage.misc_section
            ~doc ~docv:"FILE.json" ["sandbox"])
 
+  let checkpoint =
+    let open Cmdliner in
+    let doc =
+      "When asked to take a block hash as a checkpoint, the daemon \
+       will only accept the chains that contains that block and those \
+       that might reach it."
+    in
+    Arg.(value & opt (some string) None &
+         info ~docs:Node_shared_arg.Manpage.misc_section
+           ~doc ~docv:"<level>,<block_hash>" ["checkpoint"])
+
   let term =
-    Cmdliner.Term.(ret (const process $ sandbox $ verbosity $
+    Cmdliner.Term.(ret (const process $ sandbox $ verbosity $ checkpoint $
                         Node_shared_arg.Term.args))
 
 end

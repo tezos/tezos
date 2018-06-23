@@ -99,7 +99,7 @@ let default = {
     | Ok c -> c
     | Error _ -> assert false
   end ;
-  origination_burn = Tez_repr.one ;
+  origination_burn = Tez_repr.of_mutez_exn 257_000L ;
   block_security_deposit = Tez_repr.(mul_exn one 512) ;
   endorsement_security_deposit = Tez_repr.(mul_exn one 64) ;
   block_reward = Tez_repr.(mul_exn one 16) ;

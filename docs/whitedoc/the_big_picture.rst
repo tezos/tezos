@@ -164,7 +164,7 @@ protocols.
     used for the chain data, and the raw versioned key-value store
     used for storing the ledger's context (one version per
     block). This is implemented using :opam:`irmin` and currently
-    :opam:`lmdb`.
+    :package:`lmdb`.
   - :package:`tezos-protocol-updater` maintains the table of available
     protocol versions, embedded or dynamically linked.
   - :package:`tezos-shell` implements the scheduling of block
@@ -289,10 +289,6 @@ run them.
  - :package-name:`tezos-storage`
    (in directory :src:`src/lib_storage/test/`):
    tests for the versioned key-value context.
- - :package-name:`tezos-client-alpha`, :package-name:`tezos-baking-alpha`
-   (in directory :src:`src/proto_alpha/lib_baking/test/`):
-   tests of the OCaml client library, performing various short
-   scenarios via RPCs to a sandboxed node.
  - :package-name:`tezos-protocol-alpha`
    (in directory :src:`src/proto_alpha/lib_protocol/test/`):
    tests of the alpha protocol (without launching a node).

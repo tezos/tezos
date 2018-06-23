@@ -14,6 +14,7 @@ type error +=
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
   | Empty_implicit_contract of Signature.Public_key_hash.t (* `Temporary *)
+  | Empty_transaction of Contract_repr.t (* `Temporary *)
   | Inconsistent_hash of Signature.Public_key.t * Signature.Public_key_hash.t * Signature.Public_key_hash.t (* `Permanent *)
   | Inconsistent_public_key of Signature.Public_key.t * Signature.Public_key.t (* `Permanent *)
   | Failure of string (* `Permanent *)
@@ -60,7 +61,7 @@ val get_script:
 val get_storage:
   Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 
-type big_map_diff = (string * Script_repr.expr option) list
+type big_map_diff = (Script_expr_hash.t * Script_repr.expr option) list
 
 val update_script_storage:
   Raw_context.t -> Contract_repr.t ->
@@ -83,6 +84,7 @@ val spend_from_script:
 
 val originate:
   Raw_context.t ->
+  ?prepaid_bootstrap_storage:bool ->
   Contract_repr.t ->
   balance:Tez_repr.t ->
   manager:Signature.Public_key_hash.t ->
@@ -103,12 +105,12 @@ val init:
   Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 val used_storage_space: Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
-val paid_storage_space_fees: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
-val pay_for_storage_space: Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+val paid_storage_space: Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
+val set_paid_storage_space_and_return_fees_to_pay: Raw_context.t -> Contract_repr.t -> Z.t -> (Z.t * Raw_context.t) tzresult Lwt.t
 
 module Big_map : sig
   val mem :
-    Raw_context.t -> Contract_repr.t -> string -> (Raw_context.t * bool) tzresult Lwt.t
+    Raw_context.t -> Contract_repr.t -> Script_expr_hash.t -> (Raw_context.t * bool) tzresult Lwt.t
   val get_opt :
-    Raw_context.t -> Contract_repr.t -> string -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
+    Raw_context.t -> Contract_repr.t -> Script_expr_hash.t -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 end

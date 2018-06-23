@@ -177,7 +177,11 @@ module Script : sig
     | D_Some
     | D_True
     | D_Unit
-    | I_H
+    | I_PACK
+    | I_UNPACK
+    | I_BLAKE2B
+    | I_SHA256
+    | I_SHA512
     | I_ABS
     | I_ADD
     | I_AMOUNT
@@ -200,7 +204,7 @@ module Script : sig
     | I_EMPTY_SET
     | I_EQ
     | I_EXEC
-    | I_FAIL
+    | I_FAILWITH
     | I_GE
     | I_GET
     | I_GT
@@ -217,7 +221,6 @@ module Script : sig
     | I_LSL
     | I_LSR
     | I_LT
-    | I_MANAGER
     | I_MAP
     | I_MEM
     | I_MUL
@@ -234,6 +237,7 @@ module Script : sig
     | I_SIZE
     | I_SOME
     | I_SOURCE
+    | I_SENDER
     | I_SELF
     | I_STEPS_TO_QUOTA
     | I_SUB
@@ -266,6 +270,7 @@ module Script : sig
     | T_set
     | T_signature
     | T_string
+    | T_bytes
     | T_mutez
     | T_timestamp
     | T_unit
@@ -539,7 +544,7 @@ module Contract : sig
   val fresh_contract_from_current_nonce : context -> (context * t) tzresult Lwt.t
   val originated_from_current_nonce: since: context -> until:context -> contract list tzresult Lwt.t
 
-  type big_map_diff = (string * Script.expr option) list
+  type big_map_diff = (Script_expr_hash.t * Script.expr option) list
 
   val originate:
     context -> contract ->
@@ -573,8 +578,6 @@ module Contract : sig
   val set_storage_unlimited: context -> context
 
   val used_storage_space: context -> t -> Z.t tzresult Lwt.t
-  val paid_storage_space_fees: context -> t -> Tez.t tzresult Lwt.t
-  val pay_for_storage_space: context -> t -> Tez.t -> context tzresult Lwt.t
 
   val increment_counter:
     context -> contract -> context tzresult Lwt.t
@@ -584,9 +587,9 @@ module Contract : sig
 
   module Big_map : sig
     val mem:
-      context -> contract -> string -> (context * bool) tzresult Lwt.t
+      context -> contract -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
     val get_opt:
-      context -> contract -> string -> (context * Script_repr.expr option) tzresult Lwt.t
+      context -> contract -> Script_expr_hash.t -> (context * Script_repr.expr option) tzresult Lwt.t
   end
 
   (**/**)
@@ -625,9 +628,15 @@ module Delegate : sig
   val cycle_end:
     context -> Cycle.t -> Nonce.unrevealed list -> context tzresult Lwt.t
 
+  type frozen_balance = {
+    deposit : Tez.t ;
+    fees : Tez.t ;
+    rewards : Tez.t ;
+  }
+
   val punish:
     context -> public_key_hash -> Cycle.t ->
-    (context * Tez.t) tzresult Lwt.t
+    (context * frozen_balance) tzresult Lwt.t
 
   val full_balance:
     context -> public_key_hash -> Tez.t tzresult Lwt.t
@@ -638,12 +647,6 @@ module Delegate : sig
 
   val frozen_balance:
     context -> public_key_hash -> Tez.t tzresult Lwt.t
-
-  type frozen_balance = {
-    deposit : Tez.t ;
-    fees : Tez.t ;
-    rewards : Tez.t ;
-  }
 
   val frozen_balance_encoding: frozen_balance Data_encoding.t
   val frozen_balance_by_cycle_encoding: frozen_balance Cycle.Map.t Data_encoding.t
@@ -890,6 +893,21 @@ type packed_internal_operation =
 
 val manager_kind: 'kind manager_operation -> 'kind Kind.manager
 
+module Fees : sig
+
+  val origination_burn:
+    context -> payer:Contract.t -> (context * Tez.t) tzresult Lwt.t
+
+  val record_paid_storage_space:
+    context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
+
+  val with_fees_for_storage:
+    context -> payer:Contract.t ->
+    (context -> (context * 'a) tzresult Lwt.t) ->
+    (context * 'a) tzresult Lwt.t
+
+end
+
 module Operation : sig
 
   type nonrec 'kind contents = 'kind contents
@@ -1037,6 +1055,7 @@ end
 
 val prepare_first_block:
   Context.t ->
+  typecheck:(context -> Script.t -> context tzresult Lwt.t) ->
   level:Int32.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
