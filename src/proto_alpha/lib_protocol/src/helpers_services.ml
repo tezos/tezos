@@ -424,6 +424,14 @@ module Forge = struct
       block ~branch ~level ~nonce () =
     operation ctxt block ~branch (Seed_nonce_revelation { level ; nonce })
 
+  let double_baking_evidence ctxt
+      block ~branch ~bh1 ~bh2 () =
+    operation ctxt block ~branch (Double_baking_evidence { bh1 ; bh2 })
+
+  let double_endorsement_evidence ctxt
+      block ~branch ~op1 ~op2 () =
+    operation ctxt block ~branch (Double_endorsement_evidence { op1 ; op2 })
+
   let empty_proof_of_work_nonce =
     MBytes.of_string
       (String.make Constants_repr.proof_of_work_nonce_size  '\000')

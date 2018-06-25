@@ -154,6 +154,20 @@ module Forge : sig
     nonce:Nonce.t ->
     unit -> MBytes.t shell_tzresult Lwt.t
 
+  val double_baking_evidence:
+    'a #RPC_context.simple -> 'a ->
+    branch:Block_hash.t ->
+    bh1: Block_header.t ->
+    bh2: Block_header.t ->
+    unit -> MBytes.t shell_tzresult Lwt.t
+
+  val double_endorsement_evidence:
+    'a #RPC_context.simple -> 'a ->
+    branch:Block_hash.t ->
+    op1: Kind.endorsement operation ->
+    op2: Kind.endorsement operation ->
+    unit -> MBytes.t shell_tzresult Lwt.t
+
   val protocol_data:
     'a #RPC_context.simple -> 'a ->
     priority: int ->
