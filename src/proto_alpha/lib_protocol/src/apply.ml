@@ -540,21 +540,27 @@ let apply_manager_contents
 
 let rec mark_skipped
   : type kind.
-    kind Kind.manager contents_list ->
-    kind Kind.manager contents_result_list = function
-  | Single (Manager_operation op) ->
+    Signature.Public_key_hash.t -> Level.t -> kind Kind.manager contents_list ->
+    kind Kind.manager contents_result_list = fun baker level -> function
+  | Single (Manager_operation ({ source ; fee } as op)) ->
       Single_result
         (Manager_operation_result
-           { balance_updates = [] ;
+           { balance_updates =
+               cleanup_balance_updates
+                 [ Contract source, Debited fee ;
+                   Rewards (baker, level.cycle), Credited fee ] ;
              operation_result = Skipped (manager_kind op.operation) ;
              internal_operation_results = [] })
-  | Cons (Manager_operation op, rest) ->
+  | Cons (Manager_operation ({ source ; fee } as op), rest) ->
       Cons_result
         (Manager_operation_result {
-            balance_updates = [] ;
+            balance_updates =
+              cleanup_balance_updates
+                [ Contract source, Debited fee ;
+                  Rewards (baker, level.cycle), Credited fee ] ;
             operation_result = Skipped (manager_kind op.operation) ;
             internal_operation_results = [] },
-         mark_skipped rest)
+         mark_skipped baker level rest)
 
 let rec precheck_manager_contents_list
   : type kind.
@@ -574,13 +580,17 @@ let rec apply_manager_contents_list
     public_key_hash -> kind Kind.manager contents_list ->
     (context * kind Kind.manager contents_result_list) Lwt.t =
   fun ctxt mode baker contents_list ->
+    let level = Level.current ctxt in
     match contents_list with
-    | Single (Manager_operation { operation ; _ } as op) -> begin
+    | Single (Manager_operation { operation ; source ; fee ; _ } as op) -> begin
         apply_manager_contents ctxt mode baker op >>= function
         | Error errors ->
             let result =
               Manager_operation_result {
-                balance_updates = [] ;
+                balance_updates =
+                  cleanup_balance_updates
+                    [ Contract source, Debited fee ;
+                      Rewards (baker, level.cycle), Credited fee ] ;
                 operation_result = Failed (manager_kind operation, errors) ;
                 internal_operation_results = []
               } in
@@ -593,16 +603,19 @@ let rec apply_manager_contents_list
                  { operation_result = (Skipped _ | Failed _) ; _ } as result)) ->
             Lwt.return (ctxt, Single_result (result))
       end
-    | Cons (Manager_operation { operation ; _ } as op, rest) ->
+    | Cons (Manager_operation { operation ; source ; fee ; _ } as op, rest) ->
         apply_manager_contents ctxt mode baker op >>= function
         | Error errors ->
             let result =
               Manager_operation_result {
-                balance_updates = [] ;
+                balance_updates =
+                  cleanup_balance_updates
+                    [ Contract source, Debited fee ;
+                      Rewards (baker, level.cycle), Credited fee ] ;
                 operation_result = Failed (manager_kind operation, errors) ;
                 internal_operation_results = []
               } in
-            Lwt.return (ctxt, Cons_result (result, mark_skipped rest))
+            Lwt.return (ctxt, Cons_result (result, mark_skipped baker level rest))
         | Ok (ctxt, (Manager_operation_result
                        { operation_result = Applied _ ; _ } as result)) ->
             apply_manager_contents_list ctxt mode baker rest >>= fun (ctxt, results) ->
@@ -610,7 +623,7 @@ let rec apply_manager_contents_list
         | Ok (ctxt,
               (Manager_operation_result
                  { operation_result = (Skipped _ | Failed _) ; _ } as result)) ->
-            Lwt.return (ctxt, Cons_result (result, mark_skipped rest))
+            Lwt.return (ctxt, Cons_result (result, mark_skipped baker level rest))
 
 let apply_contents_list
     (type kind) ctxt mode pred_block baker
