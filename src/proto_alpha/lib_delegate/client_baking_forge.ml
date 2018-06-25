@@ -608,16 +608,9 @@ let bake_slot
         errs >>= fun () ->
       return None
   | Ok operations ->
-      Tezos_stdlib_unix.Lwt_utils_unix.retry
-        ~log:(fun errs ->
-            lwt_log_error
-              "Error while prevalidating operations\n%a\nRetrying..."
-              pp_print_error errs
-          )
-        (fun () ->
-           Alpha_block_services.Helpers.Preapply.block
-             cctxt ~chain ~block
-             ~timestamp ~sort:true ~protocol_data operations)
+      Alpha_block_services.Helpers.Preapply.block
+        cctxt ~chain ~block
+        ~timestamp ~sort:true ~protocol_data operations
       >>= function
       | Error errs ->
           lwt_log_error "Error while prevalidating operations:@\n%a"
@@ -706,7 +699,6 @@ let bake
       | true ->  lwt_log_error "Level %a : previously baked"
                    Raw_level.pp level  >>= return
       | false ->
-
           inject_block cctxt
             ~force:true ~chain
             ~shell_header ~priority ?seed_nonce_hash ~src_sk
