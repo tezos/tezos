@@ -376,7 +376,7 @@ let punish ctxt delegate cycle =
   get_frozen_rewards ctxt contract cycle >>=? fun rewards ->
   Roll_storage.Delegate.remove_amount ctxt delegate deposit >>=? fun ctxt ->
   Roll_storage.Delegate.remove_amount ctxt delegate fees >>=? fun ctxt ->
-  (* Rewards are not in the delegate balance yet... *)
+  (* Rewards are not accounted in the delegate's rolls yet... *)
   Storage.Contract.Frozen_deposits.remove (ctxt, contract) cycle >>= fun ctxt ->
   Storage.Contract.Frozen_fees.remove (ctxt, contract) cycle >>= fun ctxt ->
   Storage.Contract.Frozen_rewards.remove (ctxt, contract) cycle >>= fun ctxt ->

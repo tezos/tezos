@@ -45,7 +45,7 @@ val check_endorsement_rights:
   context -> Kind.endorsement Operation.t ->
   (public_key_hash * int list * bool) tzresult Lwt.t
 
-(** Returns the endorsement reward calculated w.r.t a given priotiry.  *)
+(** Returns the endorsement reward calculated w.r.t a given priority.  *)
 val endorsement_reward: context -> block_priority:int -> int -> Tez.t tzresult Lwt.t
 
 (** [baking_priorities ctxt level] is the lazy list of contract's

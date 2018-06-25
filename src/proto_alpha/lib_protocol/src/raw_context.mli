@@ -69,8 +69,16 @@ val patch_constants:
   context Lwt.t
 val first_level: context -> Raw_level_repr.t
 
+(** Increment the current block fee stash that will be credited to baker's
+    frozen_fees account at finalize_application *)
 val add_fees: context -> Tez_repr.t -> context tzresult Lwt.t
+
+(** Increment the current block reward stash that will be credited to baker's
+    frozen_fees account at finalize_application *)
 val add_rewards: context -> Tez_repr.t -> context tzresult Lwt.t
+
+(** Increment the current block deposit stash for a specific delegate. All the
+    delegates' frozen_deposit accounts are credited at finalize_application *)
 val add_deposit:
   context -> Signature.Public_key_hash.t -> Tez_repr.t -> context tzresult Lwt.t
 
