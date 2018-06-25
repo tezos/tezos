@@ -401,7 +401,7 @@ init_with_transfer $contract_dir/create_contract.tz $key2 Unit 1,000 bootstrap1
 created_contract=\
 `$client transfer 0 from bootstrap1 to create_contract -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' \
 | grep 'New contract' \
-| sed -E 's/.*(TZ1[a-zA-Z0-9]+).*/\1/' \
+| sed -E 's/.*(KT1[a-zA-Z0-9]+).*/\1/' \
 | head -1`
 bake
 assert_storage_contains $created_contract '"abcdefg"'
