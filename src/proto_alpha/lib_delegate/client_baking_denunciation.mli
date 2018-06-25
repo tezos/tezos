@@ -9,5 +9,6 @@
 
 val create:
   #Proto_alpha.full ->
-  Client_baking_operations.valid_endorsement tzresult Lwt_stream.t ->
+  preserved_levels: int ->
+  Client_baking_blocks.block_info tzresult Lwt_stream.t ->
   unit tzresult Lwt.t

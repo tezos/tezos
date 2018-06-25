@@ -87,7 +87,7 @@ let endorser_commands () =
   in
   [
     command ~group ~desc: "Launch the endorser daemon"
-      (args1 endorsement_delay_arg )
+      (args1 endorsement_delay_arg)
       (prefixes [ "run" ]
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun endorsement_delay delegates cctxt ->
@@ -106,8 +106,9 @@ let accuser_commands () =
   in
   [
     command ~group ~desc: "Launch the accuser daemon"
-      no_options
+      (args1 preserved_levels_arg)
       (prefixes [ "run" ]
        @@ stop)
-      (fun () cctxt -> Client_daemon.Accuser.run cctxt) ;
+      (fun preserved_levels cctxt ->
+         Client_daemon.Accuser.run ~preserved_levels cctxt) ;
   ]

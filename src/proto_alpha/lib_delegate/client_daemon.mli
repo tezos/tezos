@@ -30,5 +30,7 @@ end
 
 module Accuser : sig
   val run:
-    #Proto_alpha.full -> unit tzresult Lwt.t
+    #Proto_alpha.full ->
+    preserved_levels: int ->
+    unit tzresult Lwt.t
 end

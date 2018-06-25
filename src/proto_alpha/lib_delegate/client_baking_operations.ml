@@ -15,7 +15,6 @@ type operation = {
   content: Operation.packed option
 }
 
-
 type valid_endorsement = {
   hash: Operation_hash.t ;
   source: public_key_hash ;
