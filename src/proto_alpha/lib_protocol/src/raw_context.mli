@@ -90,7 +90,8 @@ val get_deposits: context -> Tez_repr.t Signature.Public_key_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 
-val set_gas_limit: t -> Z.t -> t tzresult
+val check_gas_limit: t -> Z.t -> unit tzresult
+val set_gas_limit: t -> Z.t -> t
 val set_gas_unlimited: t -> t
 val gas_level: t -> Gas_limit_repr.t
 val gas_consumed: since: t -> until: t -> Z.t

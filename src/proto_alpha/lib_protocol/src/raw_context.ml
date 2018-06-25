@@ -160,12 +160,14 @@ let () =
     (function Gas_limit_too_high -> Some () | _ -> None)
     (fun () -> Gas_limit_too_high)
 
-let set_gas_limit ctxt remaining =
+let check_gas_limit ctxt remaining =
   if Compare.Z.(remaining > ctxt.constants.hard_gas_limit_per_operation)
   || Compare.Z.(remaining < Z.zero) then
     error Gas_limit_too_high
   else
-    ok { ctxt with operation_gas = Limited { remaining } }
+    ok ()
+let set_gas_limit ctxt remaining =
+  { ctxt with operation_gas = Limited { remaining } }
 let set_gas_unlimited ctxt =
   { ctxt with operation_gas = Unaccounted }
 let consume_gas ctxt cost =

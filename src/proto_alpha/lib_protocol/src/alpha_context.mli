@@ -136,7 +136,8 @@ module Gas : sig
   val ( *@ ) : int -> cost -> cost
   val ( +@ ) : cost -> cost -> cost
 
-  val set_limit: context -> Z.t -> context tzresult
+  val check_limit: context -> Z.t -> unit tzresult
+  val set_limit: context -> Z.t -> context
   val set_unlimited: context -> context
   val consume: context -> cost -> context tzresult
   val level: context -> t

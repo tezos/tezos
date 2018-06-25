@@ -156,7 +156,7 @@ module Scripts = struct
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
       originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
-      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
+      let ctxt = Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt) in
       Script_interpreter.execute
         ctxt Readable
         ~source:dummy_contract
@@ -171,7 +171,7 @@ module Scripts = struct
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
       originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
-      Lwt.return (Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt)) >>=? fun ctxt ->
+      let ctxt = Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt) in
       Script_interpreter.trace
         ctxt Readable
         ~source:dummy_contract
@@ -182,24 +182,24 @@ module Scripts = struct
       return (storage, operations, trace, big_map_diff)
     end ;
     register0 S.typecheck_code begin fun ctxt () (expr, maybe_gas) ->
-      begin match maybe_gas with
-        | None -> return (Gas.set_unlimited ctxt)
-        | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
+      let ctxt = match maybe_gas with
+        | None -> Gas.set_unlimited ctxt
+        | Some gas -> Gas.set_limit ctxt gas in
       Script_ir_translator.typecheck_code ctxt expr >>=? fun (res, ctxt) ->
       return (res, Gas.level ctxt)
     end ;
     register0 S.typecheck_data begin fun ctxt () (data, ty, maybe_gas) ->
-      begin match maybe_gas with
-        | None -> return (Gas.set_unlimited ctxt)
-        | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
+      let ctxt = match maybe_gas with
+        | None -> Gas.set_unlimited ctxt
+        | Some gas -> Gas.set_limit ctxt gas in
       Script_ir_translator.typecheck_data ctxt (data, ty) >>=? fun ctxt ->
       return (Gas.level ctxt)
     end ;
     register0 S.pack_data begin fun ctxt () (expr, typ, maybe_gas) ->
       let open Script_ir_translator in
-      begin match maybe_gas with
-        | None -> return (Gas.set_unlimited ctxt)
-        | Some gas -> Lwt.return (Gas.set_limit ctxt gas) end >>=? fun ctxt ->
+      let ctxt = match maybe_gas with
+        | None -> Gas.set_unlimited ctxt
+        | Some gas -> Gas.set_limit ctxt gas in
       Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ) ->
       parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
       Script_ir_translator.pack_data ctxt typ data >>=? fun (bytes, ctxt) ->
