@@ -49,11 +49,6 @@ let n_transactions n b ?fee source dest amount =
 
 let ten_tez = Tez.of_int 10
 
-let max_tez =
-  match Tez.of_mutez Int64.max_int with
-  | None -> assert false
-  | Some p -> p
-
 (*********************************************************************)
 (* Tests                                                             *)
 (*********************************************************************)
@@ -301,7 +296,7 @@ let balance_too_low fee () =
   Incremental.begin_construction b >>=? fun i ->
   Context.Contract.balance (I i) contract_1 >>=? fun balance1 ->
   Context.Contract.balance (I i) contract_2 >>=? fun balance2 ->
-  Op.transaction ~fee (I i) contract_1 contract_2 max_tez >>=? fun op ->
+  Op.transaction ~fee (I i) contract_1 contract_2 Tez.max_tez >>=? fun op ->
   let expect_failure = function
     | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
         return ()

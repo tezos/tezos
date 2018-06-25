@@ -151,7 +151,8 @@ module Forge = struct
   let contents
       ?(proof_of_work_nonce = default_proof_of_work_nonce)
       ?(priority = 0) ?seed_nonce_hash () =
-    { Block_header.priority ;
+    {
+      Block_header.priority ;
       proof_of_work_nonce ;
       seed_nonce_hash ;
     }
@@ -349,11 +350,11 @@ let bake ?policy ?operation ?operations pred =
   Forge.sign_header header >>=? fun header ->
   apply header ?operations pred
 
+(********** Cycles ****************)
+
 (* This function is duplicated from Context to avoid a cyclic dependency *)
 let get_constants b =
   Alpha_services.Constants.all rpc_ctxt b
-
-(********** Cycles ****************)
 
 let bake_n ?policy n b =
   Error_monad.fold_left_s
