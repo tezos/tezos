@@ -482,8 +482,9 @@ let apply_internal_manager_operations ctxt mode ~payer ops =
 let precheck_manager_contents
     (type kind) ctxt raw_operation (op : kind Kind.manager contents)
   : context tzresult Lwt.t =
-  let Manager_operation { source ; fee ; counter ; operation ; gas_limit } = op in
+  let Manager_operation { source ; fee ; counter ; operation ; gas_limit ; storage_limit } = op in
   Lwt.return (Gas.check_limit ctxt gas_limit) >>=? fun () ->
+  Lwt.return (Fees.check_storage_limit ctxt storage_limit) >>=? fun () ->
   Contract.must_be_allocated ctxt source >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
   begin

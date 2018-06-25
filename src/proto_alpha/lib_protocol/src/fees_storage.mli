@@ -19,6 +19,9 @@ val record_paid_storage_space:
   Raw_context.t -> Contract_repr.t ->
   (Raw_context.t * Z.t * Z.t * Tez_repr.t) tzresult Lwt.t
 
+val check_storage_limit:
+  Raw_context.t -> storage_limit:Z.t -> unit tzresult
+
 val with_fees_for_storage:
   Raw_context.t -> storage_limit:Z.t -> payer:Contract_repr.t ->
   (Raw_context.t -> (Raw_context.t * 'a) tzresult Lwt.t) ->

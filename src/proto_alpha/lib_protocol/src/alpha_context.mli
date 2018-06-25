@@ -902,6 +902,8 @@ module Fees : sig
   type error += Operation_quota_exceeded (* `Temporary *)
   type error += Storage_limit_too_high (* `Permanent *)
 
+  val check_storage_limit: context -> storage_limit:Z.t -> unit tzresult
+
 end
 
 module Operation : sig

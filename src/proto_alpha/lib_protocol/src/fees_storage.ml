@@ -74,13 +74,14 @@ let burn_fees_for_storage c ~storage_limit ~payer =
          Contract_storage.spend_from_script c payer to_burn) >>=? fun c ->
       return c
 
-let with_fees_for_storage c ~storage_limit  ~payer f =
-  begin if Compare.Z.(storage_limit > (Raw_context.constants c).hard_storage_limit_per_operation)
-        || Compare.Z.(storage_limit < Z.zero)then
-      fail Storage_limit_too_high
-    else
-      return ()
-  end >>=? fun () ->
+let check_storage_limit c ~storage_limit =
+  if Compare.Z.(storage_limit > (Raw_context.constants c).hard_storage_limit_per_operation)
+  || Compare.Z.(storage_limit < Z.zero)then
+    error Storage_limit_too_high
+  else
+    ok ()
+
+let with_fees_for_storage c ~storage_limit ~payer f =
   Lwt.return (Raw_context.init_storage_space_to_pay c) >>=? fun c ->
   f c >>=? fun (c, ret) ->
   burn_fees_for_storage c ~storage_limit ~payer >>=? fun c ->
