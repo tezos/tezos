@@ -43,6 +43,7 @@ val set_delegate:
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
+  ?dry_run:bool ->
   fee:Tez.tez ->
   Contract.t ->
   src_pk:public_key ->
@@ -55,6 +56,7 @@ val register_as_delegate:
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
+  ?dry_run:bool ->
   fee:Tez.tez ->
   manager_sk:Client_keys.sk_uri ->
   public_key ->
@@ -72,6 +74,7 @@ val originate_account :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
+  ?dry_run:bool ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
@@ -95,6 +98,7 @@ val originate_contract:
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
+  ?dry_run:bool ->
   ?branch:int ->
   fee:Tez.t ->
   ?gas_limit:Z.t ->
@@ -116,6 +120,7 @@ val transfer :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
+  ?dry_run:bool ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
@@ -134,6 +139,7 @@ val reveal :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
+  ?dry_run:bool ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
@@ -157,6 +163,7 @@ val activate_account:
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
+  ?dry_run:bool ->
   ?encrypted:bool ->
   ?force:bool ->
   activation_key ->
@@ -168,6 +175,7 @@ val activate_existing_account:
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
+  ?dry_run:bool ->
   string ->
   Blinded_public_key_hash.activation_code ->
   Kind.activate_account Injection.result tzresult Lwt.t

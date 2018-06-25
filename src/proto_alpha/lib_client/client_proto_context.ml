@@ -26,6 +26,7 @@ let parse_expression arg =
 
 let transfer (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
+    ?dry_run
     ?branch ~source ~src_pk ~src_sk ~destination ?arg
     ~amount ~fee ?gas_limit ?storage_limit () =
   begin match arg with
@@ -38,6 +39,7 @@ let transfer (cctxt : #Proto_alpha.full)
   let contents = Transaction { amount ; parameters ; destination } in
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
+    ?dry_run
     ?branch ~source ~fee ?gas_limit ?storage_limit
     ~src_pk ~src_sk contents >>=? fun (_oph, _op, result as res) ->
   Lwt.return
@@ -46,6 +48,7 @@ let transfer (cctxt : #Proto_alpha.full)
 
 let reveal cctxt
     ~chain ~block ?confirmations
+    ?dry_run
     ?branch ~source ~src_pk ~src_sk ~fee () =
   Alpha_services.Contract.counter
     cctxt (chain, block) source >>=? fun pcounter ->
@@ -62,6 +65,7 @@ let reveal cctxt
                                gas_limit = Z.zero ; storage_limit = Z.zero ;
                                operation = Reveal src_pk }) in
       Injection.inject_operation cctxt ~chain ~block ?confirmations
+        ?dry_run
         ?branch ~src_sk contents >>=? fun (oph, op, result) ->
       match Apply_operation_result.pack_contents_list op result with
       | Apply_operation_result.Single_and_result
@@ -71,10 +75,12 @@ let reveal cctxt
 
 let originate
     cctxt ~chain ~block ?confirmations
+    ?dry_run
     ?branch ~source ~src_pk ~src_sk ~fee
     ?gas_limit ?storage_limit contents =
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
+    ?dry_run
     ?branch ~source ~fee ?gas_limit ?storage_limit
     ~src_pk ~src_sk contents >>=? fun (_oph, _op, result as res) ->
   Lwt.return
@@ -87,6 +93,7 @@ let originate
 
 let originate_account
     cctxt ~chain ~block ?confirmations
+    ?dry_run
     ?branch ~source ~src_pk ~src_sk ~manager_pkh
     ?(delegatable = false) ?delegate ~balance ~fee () =
   let origination =
@@ -99,15 +106,18 @@ let originate_account
                   preorigination = None } in
   originate
     cctxt ~chain ~block ?confirmations
+    ?dry_run
     ?branch ~source ~gas_limit:Z.zero ~src_pk ~src_sk ~fee origination
 
 let delegate_contract cctxt
     ~chain ~block ?branch ?confirmations
+    ?dry_run
     ~source ~src_pk ~src_sk
     ~fee delegate_opt =
   let operation = Delegation delegate_opt in
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
+    ?dry_run
     ?branch ~source ~fee ~gas_limit:Z.zero ~storage_limit:Z.zero
     ~src_pk ~src_sk operation >>=? fun res ->
   return res
@@ -152,17 +162,21 @@ let get_manager
 
 let set_delegate
     cctxt ~chain ~block ?confirmations
+    ?dry_run
     ~fee contract ~src_pk ~manager_sk opt_delegate =
   delegate_contract
     cctxt ~chain ~block ?confirmations
+    ?dry_run
     ~source:contract ~src_pk ~src_sk:manager_sk ~fee opt_delegate
 
 let register_as_delegate
     cctxt ~chain ~block ?confirmations
+    ?dry_run
     ~fee ~manager_sk src_pk =
   let source = Signature.Public_key.hash src_pk in
   delegate_contract
     cctxt ~chain ~block ?confirmations
+    ?dry_run
     ~source:(Contract.implicit_contract source) ~src_pk ~src_sk:manager_sk ~fee
     (Some source)
 
@@ -179,7 +193,9 @@ let save_contract ~force cctxt alias_name contract =
 
 let originate_contract
     (cctxt : #Proto_alpha.full)
-    ~chain ~block ?confirmations ?branch
+    ~chain ~block ?confirmations
+    ?dry_run
+    ?branch
     ~fee
     ?gas_limit
     ?storage_limit
@@ -207,6 +223,7 @@ let originate_contract
                   credit = balance ;
                   preorigination = None } in
   originate cctxt ~chain ~block ?confirmations
+    ?dry_run
     ?branch ~source ~src_pk ~src_sk ~fee ?gas_limit ?storage_limit origination
 
 type activation_key =
@@ -275,11 +292,15 @@ let read_key key =
       return (pkh, pk, sk)
 
 let inject_activate_operation
-    cctxt ~chain ~block ?confirmations alias pkh activation_code =
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    alias pkh activation_code =
   let contents =
     Single ( Activate_account { id = pkh ; activation_code } ) in
   Injection.inject_operation
-    cctxt ?confirmations ~chain ~block
+    cctxt ?confirmations
+    ?dry_run
+    ~chain ~block
     contents >>=? fun (oph, op, result) ->
   begin
     match confirmations with
@@ -304,6 +325,7 @@ let inject_activate_operation
 let activate_account
     (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
+    ?dry_run
     ?(encrypted = false) ?force key name =
   read_key key >>=? fun (pkh, pk, sk) ->
   fail_unless (Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
@@ -321,15 +343,20 @@ let activate_account
   end >>=? fun sk_uri ->
   Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name >>=? fun () ->
   inject_activate_operation cctxt
-    ~chain ~block ?confirmations name key.pkh key.activation_code
+    ~chain ~block ?confirmations
+    ?dry_run
+    name key.pkh key.activation_code
 
 let activate_existing_account
     (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
+    ?dry_run
     alias activation_code =
   Client_keys.alias_keys cctxt alias >>=? function
   | Some (Ed25519 pkh, _, _) ->
       inject_activate_operation
-        cctxt ~chain ~block ?confirmations alias pkh activation_code
+        cctxt ~chain ~block ?confirmations
+        ?dry_run
+        alias pkh activation_code
   | Some _ -> failwith "Only Ed25519 accounts can be activated"
   | None -> failwith "Unknown account"

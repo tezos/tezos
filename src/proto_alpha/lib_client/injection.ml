@@ -326,7 +326,10 @@ let may_patch_limits
 
 let inject_operation
     (type kind) cctxt ~chain ~block
-    ?confirmations ?branch ?src_sk (contents: kind contents_list)  =
+    ?confirmations
+    ?(dry_run = false)
+    ?branch ?src_sk
+    (contents: kind contents_list)  =
   Client_confirmations.wait_for_bootstrapped cctxt >>=? fun () ->
   may_patch_limits
     cctxt ~chain ~block ?branch contents >>=? fun contents ->
@@ -344,43 +347,56 @@ let inject_operation
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Operation.encoding (Operation.pack op) in
-  Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
-  cctxt#message "Operation successfully injected in the node." >>= fun () ->
-  cctxt#message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
-  begin
-    match confirmations with
-    | None -> return result
-    | Some confirmations ->
-        cctxt#message "Waiting for the operation to be included..." >>= fun () ->
-        Client_confirmations.wait_for_operation_inclusion
-          ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
-        Alpha_block_services.Operations.operation
-          cctxt ~block:(`Hash (h, 0)) i j >>=? fun op' ->
-        match op'.receipt with
-        | No_operation_metadata ->
-            failwith "Internal error: unexpected receipt."
-        | Operation_metadata receipt ->
-            match Apply_operation_result.kind_equal_list contents receipt.contents
-            with
-            | Some Apply_operation_result.Eq ->
-                return (receipt : kind operation_metadata)
-            | None -> failwith "Internal error: unexpected receipt."
-  end >>=? fun result ->
-  cctxt#message
-    "@[<v 2>This sequence of operations was run:@,%a@]"
-    Operation_result.pp_operation_result
-    (op.protocol_data.contents, result.contents) >>= fun () ->
-  Lwt.return (originated_contracts result.contents) >>=? fun contracts ->
-  Lwt_list.iter_s
-    (fun c ->
-       cctxt#message
-         "New contract %a originated."
-         Contract.pp c)
-    contracts >>= fun () ->
-  return (oph, op.protocol_data.contents, result.contents)
+  if dry_run then
+    let oph = Operation_hash.hash_bytes [bytes] in
+    cctxt#message
+      "@[<v 0>Operation: 0x%a@,\
+       Operation hash: %a@]"
+      MBytes.pp_hex bytes
+      Operation_hash.pp oph >>= fun () ->
+    cctxt#message
+      "@[<v 2>Simulation result:@,%a@]"
+      Operation_result.pp_operation_result
+      (op.protocol_data.contents, result.contents) >>= fun () ->
+    return (oph, op.protocol_data.contents, result.contents)
+  else
+    Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
+    cctxt#message "Operation successfully injected in the node." >>= fun () ->
+    cctxt#message "Operation hash: %a" Operation_hash.pp oph >>= fun () ->
+    begin
+      match confirmations with
+      | None -> return result
+      | Some confirmations ->
+          cctxt#message "Waiting for the operation to be included..." >>= fun () ->
+          Client_confirmations.wait_for_operation_inclusion
+            ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
+          Alpha_block_services.Operations.operation
+            cctxt ~block:(`Hash (h, 0)) i j >>=? fun op' ->
+          match op'.receipt with
+          | No_operation_metadata ->
+              failwith "Internal error: unexpected receipt."
+          | Operation_metadata receipt ->
+              match Apply_operation_result.kind_equal_list contents receipt.contents
+              with
+              | Some Apply_operation_result.Eq ->
+                  return (receipt : kind operation_metadata)
+              | None -> failwith "Internal error: unexpected receipt."
+    end >>=? fun result ->
+    cctxt#message
+      "@[<v 2>This sequence of operations was run:@,%a@]"
+      Operation_result.pp_operation_result
+      (op.protocol_data.contents, result.contents) >>= fun () ->
+    Lwt.return (originated_contracts result.contents) >>=? fun contracts ->
+    Lwt_list.iter_s
+      (fun c ->
+         cctxt#message
+           "New contract %a originated."
+           Contract.pp c)
+      contracts >>= fun () ->
+    return (oph, op.protocol_data.contents, result.contents)
 
 let inject_manager_operation
-    cctxt ~chain ~block ?branch ?confirmations
+    cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ~source ~src_pk ~src_sk ~fee ?(gas_limit = Z.minus_one) ?(storage_limit = (Z.of_int (-1)))
     (type kind) (operation : kind manager_operation)
   : (Operation_hash.t * kind Kind.manager contents *  kind Kind.manager contents_result) tzresult Lwt.t =
@@ -401,7 +417,7 @@ let inject_manager_operation
                                operation = Reveal src_pk },
            Single (Manager_operation { source ; fee ; counter = Z.succ counter ;
                                        gas_limit ; storage_limit ; operation })) in
-      inject_operation cctxt ~chain ~block ?confirmations
+      inject_operation cctxt ~chain ~block ?confirmations ?dry_run
         ?branch ~src_sk contents >>=? fun (oph, op, result) ->
       match pack_contents_list op result with
       | Cons_and_result (_, _, Single_and_result (op, result)) ->
@@ -413,7 +429,7 @@ let inject_manager_operation
       let contents =
         Single (Manager_operation { source ; fee ; counter ;
                                     gas_limit ; storage_limit ; operation }) in
-      inject_operation cctxt ~chain ~block ?confirmations
+      inject_operation cctxt ~chain ~block ?confirmations ?dry_run
         ?branch ~src_sk contents >>=? fun (oph, op, result) ->
       match pack_contents_list op result with
       | Single_and_result (Manager_operation _ as op, result) ->
