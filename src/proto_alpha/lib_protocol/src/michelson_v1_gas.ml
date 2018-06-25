@@ -233,6 +233,12 @@ module Cost_of = struct
       (* TODO: proper handling of (de)serialization costs *)
       let len = MBytes.length b in
       alloc_cost len +@ step_cost (len * 10)
+    let minimal_deserialize expr =
+      Data_encoding.fold_lazy
+        Script.expr_cost
+        (fun b -> alloc_bytes_cost (MBytes.length b))
+        (fun c _ -> c) (* keep expr cost if present *)
+        expr
   end
 
   module Unparse = struct

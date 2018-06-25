@@ -510,6 +510,11 @@ module Encoding: sig
   (** Make a lazy value from an immediate one. *)
   val make_lazy : 'a encoding -> 'a -> 'a lazy_t
 
+  (** Fold on structure of lazy value, and combine results *)
+  val fold_lazy :
+    ('a -> 'b) -> (MBytes.t -> 'b) -> ('b -> 'b -> 'b) ->
+    'a lazy_t -> 'b
+
 end
 
 include module type of Encoding with type 'a t = 'a Encoding.t

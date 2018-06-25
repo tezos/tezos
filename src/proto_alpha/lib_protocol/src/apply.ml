@@ -41,6 +41,7 @@ type error += Outdated_double_baking_evidence
   of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
 type error += Invalid_activation of { pkh : Ed25519.Public_key_hash.t }
 type error += Multiple_revelation
+type error += Not_enough_gas_minimal_deserialize
 
 let () =
   register_error_kind
@@ -318,7 +319,15 @@ let () =
           "Multiple revelations were included in a manager operation")
     Data_encoding.empty
     (function Multiple_revelation -> Some () | _ -> None)
-    (fun () -> Multiple_revelation)
+    (fun () -> Multiple_revelation) ;
+  register_error_kind
+    `Permanent
+    ~id:"not_enough_gas.minimal_deserialization"
+    ~title:"Not enough gas for minimal deserialization of transaction parameters"
+    ~description:"Gas quota is not enough for deserializing the transaction parameters, even for the cheapest case"
+    Data_encoding.empty
+    (function Not_enough_gas_minimal_deserialize -> Some () | _ -> None)
+    (fun () -> Not_enough_gas_minimal_deserialize)
 
 open Apply_results
 
@@ -491,6 +500,14 @@ let precheck_manager_contents
     match operation with
     | Reveal pk ->
         Contract.reveal_manager_key ctxt source pk
+    | Transaction { parameters = Some arg ; _ } ->
+        let min_gas = Michelson_v1_gas.Cost_of.Typechecking.minimal_deserialize arg in
+        (* Fail if not enough gas for minimal deserialization cost *)
+        begin
+          match Gas.consume ctxt min_gas with
+          | Ok _ -> return ctxt
+          | Error _ -> fail Not_enough_gas_minimal_deserialize
+        end
     | _ -> return ctxt
   end >>=? fun ctxt ->
   Contract.get_manager_key ctxt source >>=? fun public_key ->

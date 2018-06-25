@@ -301,6 +301,7 @@ module Script : sig
   val prim_encoding: prim Data_encoding.t
   val encoding: t Data_encoding.t
   val lazy_expr_encoding: lazy_expr Data_encoding.t
+  val expr_cost : expr -> Gas.cost
 end
 
 module Constants : sig

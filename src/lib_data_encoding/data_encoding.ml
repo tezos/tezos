@@ -100,6 +100,11 @@ struct
     splitted ~json ~binary
   let make_lazy encoding value =
     { encoding ; state = Value value }
+  let fold_lazy fun_value fun_bytes fun_combine le =
+    match le.state with
+    | Value value -> fun_value value
+    | Bytes bytes -> fun_bytes bytes
+    | Both (bytes, value) -> fun_combine (fun_value value) (fun_bytes bytes)
 
 end
 
