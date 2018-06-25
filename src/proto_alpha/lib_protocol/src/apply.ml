@@ -643,9 +643,9 @@ let apply_contents_list
         return (ctxt, Single_result
                   (Endorsement_result
                      { balance_updates =
-                         [ Rewards (baker, level.cycle), Credited reward;
-                           Rewards (delegate, level.cycle), Debited reward;
-                           Deposits (delegate, level.cycle), Credited deposit; ] ;
+                         [ Contract (Contract.implicit_contract delegate), Debited deposit;
+                           Deposits (delegate, level.cycle), Credited deposit;
+                           Rewards (delegate, level.cycle), Credited reward; ] ;
                        delegate ; slots }))
   | Single (Seed_nonce_revelation { level ; nonce }) ->
       let level = Level.from_raw ctxt level in
@@ -655,8 +655,7 @@ let apply_contents_list
       add_rewards ctxt seed_nonce_revelation_tip >>=? fun ctxt ->
       return (ctxt, Single_result
                 (Seed_nonce_revelation_result
-                   [ Rewards (baker, level.cycle),
-                     Credited seed_nonce_revelation_tip ]))
+                   [ Rewards (baker, level.cycle), Credited seed_nonce_revelation_tip ]))
   | Single (Double_endorsement_evidence { op1 ; op2 }) -> begin
       match op1.protocol_data.contents, op2.protocol_data.contents with
       | Single (Endorsement e1),
@@ -688,12 +687,13 @@ let apply_contents_list
             | Ok v -> v
             | Error _ -> Tez.zero in
           add_rewards ctxt reward >>=? fun ctxt ->
+          let current_cycle = (Level.current ctxt).cycle in
           return (ctxt, Single_result
                     (Double_endorsement_evidence_result [
-                        Rewards (baker, level.cycle), Credited reward;
-                        Rewards (delegate1, level.cycle), Debited balance.rewards;
-                        Deposits (delegate1, level.cycle), Debited balance.deposit;
-                        Fees (delegate1, level.cycle), Debited balance.fees ]))
+                        Deposits (delegate1, level.cycle), Debited balance.deposit ;
+                        Fees (delegate1, level.cycle), Debited balance.fees ;
+                        Rewards (delegate1, level.cycle), Debited balance.rewards ;
+                        Rewards (baker, current_cycle), Credited reward ]))
       | _, _ -> fail Invalid_double_endorsement_evidence
     end
   | Single (Double_baking_evidence { bh1 ; bh2 }) ->
@@ -740,12 +740,13 @@ let apply_contents_list
         | Ok v -> v
         | Error _ -> Tez.zero in
       add_rewards ctxt reward >>=? fun ctxt ->
+      let current_cycle = (Level.current ctxt).cycle in
       return (ctxt, Single_result
                 (Double_baking_evidence_result [
-                    Rewards (baker, level.cycle), Credited reward ;
-                    Rewards (delegate, level.cycle), Debited balance.rewards ;
                     Deposits (delegate, level.cycle), Debited balance.deposit ;
-                    Fees (delegate, level.cycle), Debited balance.fees ; ]))
+                    Fees (delegate, level.cycle), Debited balance.fees ;
+                    Rewards (delegate, level.cycle), Debited balance.rewards ;
+                    Rewards (baker, current_cycle), Credited reward ; ]))
   | Single (Activate_account { id = pkh ; activation_code }) -> begin
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh in
