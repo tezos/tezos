@@ -225,7 +225,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         print_trace locations rest
     | Alpha_environment.Ecoproto_error Gas.Gas_limit_too_high :: rest ->
         Format.fprintf ppf
-          "Gas limit for the block is out of the protocol hard bounds." ;
+          "Gas limit for the operation is out of the protocol hard bounds." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error Gas.Block_quota_exceeded :: rest ->
