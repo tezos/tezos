@@ -72,7 +72,6 @@ type parametric = {
   endorsement_reward: Tez_repr.t ;
   cost_per_byte: Tez_repr.t ;
   hard_storage_limit_per_operation: Z.t ;
-  hard_storage_limit_per_block: Z.t ;
 }
 
 let default = {
@@ -105,7 +104,6 @@ let default = {
   block_reward = Tez_repr.(mul_exn one 16) ;
   endorsement_reward = Tez_repr.(mul_exn one 2) ;
   hard_storage_limit_per_operation = Z.of_int 60_000 ;
-  hard_storage_limit_per_block = Z.of_int 1_000_000 ;
   cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
 }
 
@@ -135,8 +133,7 @@ let parametric_encoding =
           c.block_reward),
          (c.endorsement_reward,
           c.cost_per_byte,
-          c.hard_storage_limit_per_operation,
-          c.hard_storage_limit_per_block))) )
+          c.hard_storage_limit_per_operation))) )
     (fun (( preserved_cycles,
             blocks_per_cycle,
             blocks_per_commitment,
@@ -157,8 +154,7 @@ let parametric_encoding =
             block_reward),
            (endorsement_reward,
             cost_per_byte,
-            hard_storage_limit_per_operation,
-            hard_storage_limit_per_block))) ->
+            hard_storage_limit_per_operation))) ->
       { preserved_cycles ;
         blocks_per_cycle ;
         blocks_per_commitment ;
@@ -180,7 +176,6 @@ let parametric_encoding =
         endorsement_reward ;
         cost_per_byte ;
         hard_storage_limit_per_operation ;
-        hard_storage_limit_per_block ;
       } )
     (merge_objs
        (obj9
@@ -204,11 +199,10 @@ let parametric_encoding =
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
              (req "block_reward" Tez_repr.encoding))
-          (obj4
+          (obj3
              (req "endorsement_reward" Tez_repr.encoding)
              (req "cost_per_byte" Tez_repr.encoding)
-             (req "hard_storage_limit_per_operation" z)
-             (req "hard_storage_limit_per_block" z))))
+             (req "hard_storage_limit_per_operation" z))))
 
 type t = {
   fixed : fixed ;

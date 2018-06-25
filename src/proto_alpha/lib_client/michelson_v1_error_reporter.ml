@@ -238,17 +238,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           "@[<v 0>Gas limit exceeded during typechecking or execution.@,Try again with a higher gas limit.@]" ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error Contract.Storage_limit_too_high :: rest ->
-        Format.fprintf ppf
-          "Storage limit for the block is out of the protocol hard bounds." ;
-        if rest <> [] then Format.fprintf ppf "@," ;
-        print_trace locations rest
-    | Alpha_environment.Ecoproto_error Contract.Block_storage_quota_exceeded :: rest ->
-        Format.fprintf ppf
-          "Storage limit for the block exceeded during typechecking or execution." ;
-        if rest <> [] then Format.fprintf ppf "@," ;
-        print_trace locations rest
-    | Alpha_environment.Ecoproto_error Contract.Operation_storage_quota_exceeded :: rest ->
+    | Alpha_environment.Ecoproto_error Fees.Operation_quota_exceeded :: rest ->
         Format.fprintf ppf
           "@[<v 0>Storage limit exceeded during typechecking or execution.@,Try again with a higher storage limit.@]" ;
         if rest <> [] then Format.fprintf ppf "@," ;

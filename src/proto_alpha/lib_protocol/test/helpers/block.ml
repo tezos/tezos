@@ -233,7 +233,6 @@ let genesis
     ?(endorsement_reward = Constants_repr.default.endorsement_reward)
     ?(cost_per_byte = Constants_repr.default.cost_per_byte)
     ?(hard_storage_limit_per_operation = Constants_repr.default.hard_storage_limit_per_operation)
-    ?(hard_storage_limit_per_block = Constants_repr.default.hard_storage_limit_per_block)
     ?(commitments = [])
     ?(security_deposit_ramp_up_cycles = None)
     ?(no_reward_cycles = None)
@@ -278,7 +277,6 @@ let genesis
     endorsement_reward ;
     cost_per_byte ;
     hard_storage_limit_per_operation ;
-    hard_storage_limit_per_block ;
   } in
   check_constants_consistency constants >>=? fun () ->
 

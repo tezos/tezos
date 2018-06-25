@@ -7,9 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type error += Cannot_pay_storage_fee
+type error += Cannot_pay_storage_fee (* `Temporary *)
+type error += Operation_quota_exceeded (* `Temporary *)
+type error += Storage_limit_too_high (* `Permanent *)
 
 let () =
+  let open Data_encoding in
   register_error_kind
     `Temporary
     ~id:"contract.cannot_pay_storage_fee"
@@ -18,8 +21,26 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay storage storage fee")
     Data_encoding.empty
     (function Cannot_pay_storage_fee -> Some () | _ -> None)
-    (fun () -> Cannot_pay_storage_fee)
-
+    (fun () -> Cannot_pay_storage_fee) ;
+  register_error_kind
+    `Temporary
+    ~id:"storage_exhausted.operation"
+    ~title: "Storage quota exceeded for the operation"
+    ~description:
+      "A script or one of its callee wrote more \
+       bytes than the operation said it would"
+    Data_encoding.empty
+    (function Operation_quota_exceeded -> Some () | _ -> None)
+    (fun () -> Operation_quota_exceeded) ;
+  register_error_kind
+    `Permanent
+    ~id:"storage_limit_too_high"
+    ~title: "Storage limit out of protocol hard bounds"
+    ~description:
+      "A transaction tried to exceed the hard limit on storage"
+    empty
+    (function Storage_limit_too_high -> Some () | _ -> None)
+    (fun () -> Storage_limit_too_high)
 
 let origination_burn c ~payer =
   let origination_burn = Constants_storage.origination_burn c in
@@ -34,23 +55,33 @@ let record_paid_storage_space c contract =
   Lwt.return (Tez_repr.(cost_per_byte *? (Z.to_int64 to_be_paid))) >>=? fun to_burn ->
   return (c, size, to_be_paid, to_burn)
 
-let burn_fees_for_storage c ~payer =
+let burn_fees_for_storage c ~storage_limit ~payer =
   let c, storage_space_to_pay = Raw_context.clear_storage_space_to_pay c in
-  let cost_per_byte = Constants_storage.cost_per_byte c in
-  Lwt.return (Tez_repr.(cost_per_byte *? (Z.to_int64 storage_space_to_pay))) >>=? fun to_burn ->
-  (* Burning the fees... *)
-  if Tez_repr.(to_burn = Tez_repr.zero) then
-    (* If the payer was was deleted by transfering all its balance, and no space was used,
-       burning zero would fail *)
-    return c
+  let remaining = Z.sub storage_limit storage_space_to_pay in
+  if Compare.Z.(remaining < Z.zero) then
+    fail Operation_quota_exceeded
   else
-    trace Cannot_pay_storage_fee
-      (Contract_storage.must_exist c payer >>=? fun () ->
-       Contract_storage.spend_from_script c payer to_burn) >>=? fun c ->
-    return c
+    let cost_per_byte = Constants_storage.cost_per_byte c in
+    Lwt.return (Tez_repr.(cost_per_byte *? (Z.to_int64 storage_space_to_pay))) >>=? fun to_burn ->
+    (* Burning the fees... *)
+    if Tez_repr.(to_burn = Tez_repr.zero) then
+      (* If the payer was was deleted by transfering all its balance, and no space was used,
+         burning zero would fail *)
+      return c
+    else
+      trace Cannot_pay_storage_fee
+        (Contract_storage.must_exist c payer >>=? fun () ->
+         Contract_storage.spend_from_script c payer to_burn) >>=? fun c ->
+      return c
 
-let with_fees_for_storage c ~payer f =
+let with_fees_for_storage c ~storage_limit  ~payer f =
+  begin if Compare.Z.(storage_limit > (Raw_context.constants c).hard_storage_limit_per_operation)
+        || Compare.Z.(storage_limit < Z.zero)then
+      fail Storage_limit_too_high
+    else
+      return ()
+  end >>=? fun () ->
   Lwt.return (Raw_context.init_storage_space_to_pay c) >>=? fun c ->
   f c >>=? fun (c, ret) ->
-  burn_fees_for_storage c ~payer >>=? fun c ->
+  burn_fees_for_storage c ~storage_limit ~payer >>=? fun c ->
   return (c, ret)

@@ -21,7 +21,6 @@
         "Level_repr",
         "Seed_repr",
         "Gas_limit_repr",
-        "Storage_limit_repr",
         "Script_int_repr",
         "Script_timestamp_repr",
         "Michelson_v1_primitives",

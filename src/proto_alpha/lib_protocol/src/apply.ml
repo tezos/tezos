@@ -508,9 +508,8 @@ let apply_manager_contents
   let Manager_operation
       { source ; fee ; operation ; gas_limit ; storage_limit } = op in
   Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
-  Lwt.return (Contract.set_storage_limit ctxt storage_limit) >>=? fun ctxt ->
   let level = Level.current ctxt in
-  Fees.with_fees_for_storage ctxt ~payer:source begin fun ctxt ->
+  Fees.with_fees_for_storage ctxt ~payer:source ~storage_limit begin fun ctxt ->
     apply_manager_operation_content ctxt mode
       ~source ~payer:source ~internal:false operation >>= begin function
       | Ok (ctxt, operation_results, internal_operations) -> begin
@@ -790,7 +789,6 @@ let apply_operation ctxt mode pred_block baker hash operation =
     ctxt mode pred_block baker operation
     operation.protocol_data.contents >>=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
-  let ctxt = Contract.set_storage_unlimited ctxt in
   let ctxt = Contract.unset_origination_nonce ctxt in
   return (ctxt, { contents = result })
 
