@@ -361,7 +361,7 @@ writing your own configuration file if needed.
 
           "min-connections": 50,
 
-          /* Targeted number of connections to reach when bootstraping /
+          /* Targeted number of connections to reach when bootstrapping /
           maintaining. */
 
           "expected-connections": 100,

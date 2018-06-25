@@ -51,7 +51,7 @@ let init_p2p p2p_params =
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
-      lwt_log_notice "bootstraping chain..." >>= fun () ->
+      lwt_log_notice "bootstrapping chain..." >>= fun () ->
       P2p.create
         ~config ~limits
         peer_metadata_cfg

@@ -186,7 +186,7 @@ let limit : P2p.limits Data_encoding.t =
                 default_p2p_limits.min_connections)
              (dft "expected-connections"
                 ~description: "Targeted number of connections to reach when \
-                               bootstraping / maintaining."
+                               bootstrapping / maintaining."
                 uint16
                 default_p2p_limits.expected_connections)
              (dft "max-connections"
