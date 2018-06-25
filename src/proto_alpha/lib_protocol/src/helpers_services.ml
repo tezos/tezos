@@ -248,15 +248,15 @@ module Scripts = struct
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Readable baker op >>= fun (_ctxt, result) ->
+          Apply.apply_manager_contents_list ctxt Optimized baker op >>= fun (_ctxt, result) ->
           return result
       | Cons (Manager_operation _, _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Readable baker op >>= fun (_ctxt, result) ->
+          Apply.apply_manager_contents_list ctxt Optimized baker op >>= fun (_ctxt, result) ->
           return result
       | _ ->
           Apply.apply_contents_list
-            ctxt Readable shell.branch baker operation
+            ctxt Optimized shell.branch baker operation
             operation.protocol_data.contents >>=? fun (_ctxt, result) ->
           return result
 

@@ -147,7 +147,7 @@ let estimated_storage res =
         estimated_storage rest >>? fun storage2 ->
         Ok (Z.add storage1 storage2) in
   estimated_storage res >>? fun diff ->
-  Ok (max Z.zero diff)
+  Ok (Z.max Z.zero diff)
 
 let originated_contracts_single
     (type kind)
