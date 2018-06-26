@@ -537,8 +537,8 @@ let apply_manager_contents
 
 let rec mark_skipped
   : type kind.
-    Signature.Public_key_hash.t -> Level.t -> kind Kind.manager contents_list ->
-    kind Kind.manager contents_result_list = fun baker level -> function
+    baker : Signature.Public_key_hash.t -> Level.t -> kind Kind.manager contents_list ->
+    kind Kind.manager contents_result_list = fun ~baker level -> function
   | Single (Manager_operation ({ source ; fee } as op)) ->
       Single_result
         (Manager_operation_result
@@ -557,7 +557,7 @@ let rec mark_skipped
                   Rewards (baker, level.cycle), Credited fee ] ;
             operation_result = Skipped (manager_kind op.operation) ;
             internal_operation_results = [] },
-         mark_skipped baker level rest)
+         mark_skipped ~baker level rest)
 
 let rec precheck_manager_contents_list
   : type kind.
@@ -606,7 +606,7 @@ let rec apply_manager_contents_list_rec
                 operation_result ;
                 internal_operation_results ;
               } in
-            Lwt.return (`Failure, Cons_result (result, mark_skipped baker level rest))
+            Lwt.return (`Failure, Cons_result (result, mark_skipped ~baker level rest))
         | (`Success ctxt, operation_result, internal_operation_results) ->
             let result =
               Manager_operation_result {
