@@ -525,10 +525,7 @@ let apply_manager_contents
                   (`Success ctxt, Applied operation_results, internal_operations_results)
             | Error errors ->
                 Lwt.return
-                  (* TODO: maybe have a special kind of failure that
-                     does not drop the receipt while indicating a
-                     storage exhaustion. *)
-                  (`Failure, Failed (manager_kind operation, errors), [])
+                  (`Failure, Backtracked (operation_results, Some errors), internal_operations_results)
           end
       | (`Failure, internal_operations_results) ->
           Lwt.return
@@ -623,12 +620,40 @@ let rec apply_manager_contents_list_rec
             apply_manager_contents_list_rec ctxt mode baker rest >>= fun (ctxt_result, results) ->
             Lwt.return (ctxt_result, Cons_result (result, results))
 
+let mark_backtracked results =
+  let rec mark_contents_list
+    : type kind. kind Kind.manager contents_result_list -> kind Kind.manager contents_result_list
+    = function
+      | Single_result (Manager_operation_result op) ->
+          Single_result (Manager_operation_result
+                           { balance_updates =
+                               op.balance_updates ;
+                             operation_result =
+                               mark_manager_operation_result op.operation_result ;
+                             internal_operation_results =
+                               List.map mark_internal_operation_results op.internal_operation_results})
+      | Cons_result (Manager_operation_result op, rest) ->
+          Cons_result (Manager_operation_result
+                         { balance_updates =
+                             op.balance_updates ;
+                           operation_result =
+                             mark_manager_operation_result op.operation_result ;
+                           internal_operation_results =
+                             List.map mark_internal_operation_results op.internal_operation_results}, rest)
+  and mark_internal_operation_results (Internal_operation_result (kind, result)) =
+    (Internal_operation_result (kind, mark_manager_operation_result result))
+  and mark_manager_operation_result
+    : type kind. kind manager_operation_result -> kind manager_operation_result
+    = function
+      | Failed _ | Skipped _ | Backtracked _ as result -> result
+      | Applied result -> Backtracked (result, None) in
+  mark_contents_list results
+
 let apply_manager_contents_list ctxt mode baker contents_list =
   apply_manager_contents_list_rec ctxt mode baker contents_list >>= fun (ctxt_result, results) ->
-  let ctxt = match ctxt_result with
-    | `Failure -> ctxt (* backtracked *)
-    | `Success ctxt -> ctxt in
-  Lwt.return (ctxt, results)
+  match ctxt_result with
+  | `Failure -> Lwt.return (ctxt (* backtracked *), mark_backtracked results)
+  | `Success ctxt -> Lwt.return (ctxt, results)
 
 let apply_contents_list
     (type kind) ctxt mode pred_block baker

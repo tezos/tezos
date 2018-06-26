@@ -100,6 +100,8 @@ let estimated_gas_single
     | Applied Reveal_result -> Ok Z.zero
     | Applied Delegation_result -> Ok Z.zero
     | Skipped _ -> assert false
+    | Backtracked (_, None) -> Ok Z.zero (* there must be another error for this to happen *)
+    | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
     | Failed (_, errs) -> Alpha_environment.wrap_error (Error errs) in
   List.fold_left
     (fun acc (Internal_operation_result (_, r)) ->
@@ -129,6 +131,8 @@ let estimated_storage_single
     | Applied Reveal_result -> Ok Z.zero
     | Applied Delegation_result -> Ok Z.zero
     | Skipped _ -> assert false
+    | Backtracked (_, None) -> Ok Z.zero (* there must be another error for this to happen *)
+    | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
     | Failed (_, errs) -> Alpha_environment.wrap_error (Error errs) in
   List.fold_left
     (fun acc (Internal_operation_result (_, r)) ->
@@ -161,6 +165,8 @@ let originated_contracts_single
     | Applied Reveal_result -> Ok []
     | Applied Delegation_result -> Ok []
     | Skipped _ -> assert false
+    | Backtracked (_, None) -> Ok [] (* there must be another error for this to happen *)
+    | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
     | Failed (_, errs) -> Alpha_environment.wrap_error (Error errs) in
   List.fold_left
     (fun acc (Internal_operation_result (_, r)) ->
@@ -194,6 +200,12 @@ let detect_script_failure :
         match result with
         | Applied _ -> Ok ()
         | Skipped _ -> assert false
+        | Backtracked (_, None) -> (* there must be another error for this to happen *)
+            Ok ()
+        | Backtracked (_, Some errs) ->
+            record_trace
+              (failure "The transfer simulation failed.")
+              (Alpha_environment.wrap_error (Error errs))
         | Failed (_, errs) ->
             record_trace
               (failure "The transfer simulation failed.")

@@ -94,6 +94,11 @@ let detect_script_failure :
         match result with
         | Applied _ -> Ok ()
         | Skipped _ -> assert false
+        | Backtracked (_, None) ->
+            (* there must be another error for this to happen *)
+            Ok ()
+        | Backtracked (_, Some errs) ->
+            Alpha_environment.wrap_error (Error errs)
         | Failed (_, errs) ->
             Alpha_environment.wrap_error (Error errs) in
       List.fold_left
