@@ -24,8 +24,6 @@ type t = {
   block_gas: Z.t ;
   operation_gas: Gas_limit_repr.t ;
   storage_space_to_pay: Z.t option ;
-  block_storage: Z.t ;
-  operation_storage: Storage_limit_repr.t ;
   origination_nonce: Contract_repr.origination_nonce option ;
   internal_nonce: int ;
   internal_nonces_used: Int_set.t ;
@@ -162,12 +160,14 @@ let () =
     (function Gas_limit_too_high -> Some () | _ -> None)
     (fun () -> Gas_limit_too_high)
 
-let set_gas_limit ctxt remaining =
+let check_gas_limit ctxt remaining =
   if Compare.Z.(remaining > ctxt.constants.hard_gas_limit_per_operation)
   || Compare.Z.(remaining < Z.zero) then
     error Gas_limit_too_high
   else
-    ok { ctxt with operation_gas = Limited { remaining } }
+    ok ()
+let set_gas_limit ctxt remaining =
+  { ctxt with operation_gas = Limited { remaining } }
 let set_gas_unlimited ctxt =
   { ctxt with operation_gas = Unaccounted }
 let consume_gas ctxt cost =
@@ -180,21 +180,19 @@ let gas_consumed ~since ~until =
   | Limited { remaining = before }, Limited { remaining = after } -> Z.sub before after
   | _, _ -> Z.zero
 
-type error += Storage_limit_too_high (* `Permanent *)
-
 let init_storage_space_to_pay ctxt =
   match ctxt.storage_space_to_pay with
   | Some _ ->
       assert false
   | None ->
-      ok { ctxt with storage_space_to_pay = Some Z.zero }
+      { ctxt with storage_space_to_pay = Some Z.zero }
 
 let update_storage_space_to_pay ctxt n =
   match ctxt.storage_space_to_pay with
   | None ->
       assert false
   | Some storage_space_to_pay ->
-      ok { ctxt with storage_space_to_pay = Some (Z.add n storage_space_to_pay) }
+      { ctxt with storage_space_to_pay = Some (Z.add n storage_space_to_pay) }
 
 let clear_storage_space_to_pay ctxt =
   match ctxt.storage_space_to_pay with
@@ -202,30 +200,6 @@ let clear_storage_space_to_pay ctxt =
       assert false
   | Some storage_space_to_pay ->
       { ctxt with storage_space_to_pay = None }, storage_space_to_pay
-
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Permanent
-    ~id:"storage_limit_too_high"
-    ~title: "Storage limit out of protocol hard bounds"
-    ~description:
-      "A transaction tried to exceed the hard limit on storage"
-    empty
-    (function Storage_limit_too_high -> Some () | _ -> None)
-    (fun () -> Storage_limit_too_high)
-
-let set_storage_limit ctxt remaining =
-  if Compare.Z.(remaining > ctxt.constants.hard_storage_limit_per_operation)
-  || Compare.Z.(remaining < Z.zero)then
-    error Storage_limit_too_high
-  else
-    ok { ctxt with operation_storage = Limited { remaining } }
-let set_storage_unlimited ctxt =
-  { ctxt with operation_storage = Unaccounted }
-let record_bytes_stored ctxt bytes =
-  Storage_limit_repr.consume ctxt.block_storage ctxt.operation_storage ~bytes >>? fun (block_storage, operation_storage) ->
-  ok { ctxt with block_storage ; operation_storage }
 
 type storage_error =
   | Incompatible_protocol_version of string
@@ -451,8 +425,6 @@ let prepare ~level ~timestamp ~fitness ctxt =
     operation_gas = Unaccounted ;
     storage_space_to_pay = None ;
     block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
-    operation_storage = Unaccounted ;
-    block_storage = constants.Constants_repr.hard_storage_limit_per_block ;
     origination_nonce = None ;
     internal_nonce = 0 ;
     internal_nonces_used = Int_set.empty ;
@@ -504,8 +476,6 @@ let register_resolvers enc resolve =
       deposits = Signature.Public_key_hash.Map.empty ;
       block_gas = Constants_repr.default.hard_gas_limit_per_block ;
       operation_gas = Unaccounted ;
-      block_storage = Constants_repr.default.hard_storage_limit_per_block ;
-      operation_storage = Unaccounted ;
       origination_nonce = None ;
       internal_nonce = 0 ;
       internal_nonces_used = Int_set.empty ;
@@ -552,8 +522,6 @@ module type T = sig
   val absolute_key: context -> key -> key
 
   val consume_gas: context -> Gas_limit_repr.cost -> context tzresult
-
-  val record_bytes_stored: context -> Z.t -> context tzresult
 
   val description: context Storage_description.t
 

@@ -136,7 +136,8 @@ module Gas : sig
   val ( *@ ) : int -> cost -> cost
   val ( +@ ) : cost -> cost -> cost
 
-  val set_limit: context -> Z.t -> context tzresult
+  val check_limit: context -> Z.t -> unit tzresult
+  val set_limit: context -> Z.t -> context
   val set_unlimited: context -> context
   val consume: context -> cost -> context tzresult
   val level: context -> t
@@ -342,7 +343,6 @@ module Constants : sig
     endorsement_reward: Tez.t ;
     cost_per_byte: Tez.t ;
     hard_storage_limit_per_operation: Z.t ;
-    hard_storage_limit_per_block: Z.t ;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -357,7 +357,6 @@ module Constants : sig
   val hard_gas_limit_per_block: context -> Z.t
   val cost_per_byte: context -> Tez.t
   val hard_storage_limit_per_operation: context -> Z.t
-  val hard_storage_limit_per_block: context -> Z.t
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Signature.Public_key.t
   val tokens_per_roll: context -> Tez.t
@@ -569,13 +568,6 @@ module Contract : sig
     context -> contract ->
     Script.expr -> big_map_diff option ->
     context tzresult Lwt.t
-
-  type error += Block_storage_quota_exceeded (* `Temporary *)
-  type error += Operation_storage_quota_exceeded (* `Temporary *)
-  type error += Storage_limit_too_high (* `Permanent *)
-
-  val set_storage_limit: context -> Z.t -> context tzresult
-  val set_storage_unlimited: context -> context
 
   val used_storage_space: context -> t -> Z.t tzresult Lwt.t
 
@@ -901,10 +893,17 @@ module Fees : sig
   val record_paid_storage_space:
     context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
 
-  val with_fees_for_storage:
-    context -> payer:Contract.t ->
-    (context -> (context * 'a) tzresult Lwt.t) ->
-    (context * 'a) tzresult Lwt.t
+  val start_counting_storage_fees :
+    context -> context
+
+  val burn_storage_fees:
+    context -> storage_limit:Z.t -> payer:Contract.t -> context tzresult Lwt.t
+
+  type error += Cannot_pay_storage_fee (* `Temporary *)
+  type error += Operation_quota_exceeded (* `Temporary *)
+  type error += Storage_limit_too_high (* `Permanent *)
+
+  val check_storage_limit: context -> storage_limit:Z.t -> unit tzresult
 
 end
 

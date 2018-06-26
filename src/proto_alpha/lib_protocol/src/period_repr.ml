@@ -14,9 +14,32 @@ let encoding = Data_encoding.int64
 
 let pp ppf v = Format.fprintf ppf "%Ld" v
 
-type error +=
+type error += (* `Permanent *)
   | Malformed_period
   | Invalid_arg
+
+let () =
+  let open Data_encoding in
+  (* Malformed period *)
+  register_error_kind
+    `Permanent
+    ~id:"malformed_period"
+    ~title:"Malformed period"
+    ~description:"Period is negative."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Malformed period")
+    empty
+    (function Malformed_period -> Some () | _ -> None)
+    (fun () -> Malformed_period) ;
+  (* Invalid arg *)
+  register_error_kind
+    `Permanent
+    ~id:"invalid_arg"
+    ~title:"Invalid arg"
+    ~description:"Negative multiple of periods are not allowed."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Invalid arg")
+    empty
+    (function Invalid_arg -> Some () | _ -> None)
+    (fun () -> Invalid_arg)
 
 let of_seconds t =
   if Compare.Int64.(t >= 0L)

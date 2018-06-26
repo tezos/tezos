@@ -75,3 +75,10 @@ module Socket : sig
     Lwt_unix.file_descr -> 'a Data_encoding.t -> 'a tzresult Lwt.t
 
 end
+
+val retry:
+  ?log:('error -> unit Lwt.t) ->
+  ?n:int ->
+  ?sleep:float ->
+  (unit -> ('a, 'error) result Lwt.t) -> ('a, 'error) result Lwt.t
+

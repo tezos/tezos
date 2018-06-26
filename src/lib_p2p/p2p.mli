@@ -91,7 +91,7 @@ type limits = {
   (** Strict minimum number of connections (triggers an urgent maintenance) *)
 
   expected_connections : int ;
-  (** Targeted number of connections to reach when bootstraping / maintaining *)
+  (** Targeted number of connections to reach when bootstrapping / maintaining *)
 
   max_connections : int ;
   (** Maximum number of connections (exceeding peers are disconnected) *)

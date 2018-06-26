@@ -140,6 +140,73 @@ let pp_manager_operation_contents_and_result ppf
     (Manager_operation { source ; fee ; operation ; counter ; gas_limit ; storage_limit },
      Manager_operation_result { balance_updates ; operation_result ;
                                 internal_operation_results }) =
+  let pp_transaction_result
+      (Transaction_result { balance_updates ; consumed_gas ;
+                            storage ;
+                            originated_contracts ;
+                            storage_size ; paid_storage_size_diff }) =
+    begin match originated_contracts with
+      | [] -> ()
+      | contracts ->
+          Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
+            (Format.pp_print_list Contract.pp) contracts
+    end ;
+    begin match storage with
+      | None -> ()
+      | Some expr ->
+          Format.fprintf ppf "@,@[<hv 2>Updated storage:@ %a@]"
+            Michelson_v1_printer.print_expr expr
+    end ;
+    begin if storage_size <> Z.zero then
+        Format.fprintf ppf
+          "@,Storage size: %s bytes"
+          (Z.to_string storage_size)
+    end ;
+    begin if paid_storage_size_diff <> Z.zero then
+        Format.fprintf ppf
+          "@,Paid storage size diff: %s bytes"
+          (Z.to_string paid_storage_size_diff)
+    end ;
+    Format.fprintf ppf
+      "@,Consumed gas: %s"
+      (Z.to_string consumed_gas) ;
+    begin match balance_updates with
+      | [] -> ()
+      | balance_updates ->
+          Format.fprintf ppf
+            "@,Balance updates:@,  %a"
+            pp_balance_updates balance_updates
+    end in
+  let pp_origination_result
+      (Origination_result { balance_updates ; consumed_gas ;
+                            originated_contracts ;
+                            storage_size ; paid_storage_size_diff }) =
+    begin match originated_contracts with
+      | [] -> ()
+      | contracts ->
+          Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
+            (Format.pp_print_list Contract.pp) contracts
+    end ;
+    begin if storage_size <> Z.zero then
+        Format.fprintf ppf
+          "@,Storage size: %s bytes"
+          (Z.to_string storage_size)
+    end ;
+    begin if paid_storage_size_diff <> Z.zero then
+        Format.fprintf ppf
+          "@,Paid storage size diff: %s bytes"
+          (Z.to_string paid_storage_size_diff)
+    end ;
+    Format.fprintf ppf
+      "@,Consumed gas: %s"
+      (Z.to_string consumed_gas) ;
+    begin match balance_updates with
+      | [] -> ()
+      | balance_updates ->
+          Format.fprintf ppf
+            "@,Balance updates:@,  %a"
+            pp_balance_updates balance_updates
+    end in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
     match result with
@@ -152,78 +219,35 @@ let pp_manager_operation_contents_and_result ppf
     | Applied Reveal_result ->
         Format.fprintf ppf
           "This revelation was successfully applied"
+    | Backtracked (Reveal_result, _) ->
+        Format.fprintf ppf
+          "@[<v 0>This revelation was BACKTRACKED, \
+           its expected effects were NOT applied.@]" ;
     | Applied Delegation_result ->
         Format.fprintf ppf
           "This delegation was successfully applied"
-    | Applied (Transaction_result { balance_updates ; consumed_gas ;
-                                    storage ;
-                                    originated_contracts ;
-                                    storage_size ; paid_storage_size_diff }) ->
+    | Backtracked (Delegation_result, _) ->
+        Format.fprintf ppf
+          "@[<v 0>This delegation was BACKTRACKED, \
+           its expected effects were NOT applied.@]" ;
+    | Applied (Transaction_result _ as tx) ->
         Format.fprintf ppf
           "This transaction was successfully applied" ;
-        begin match originated_contracts with
-          | [] -> ()
-          | contracts ->
-              Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
-                (Format.pp_print_list Contract.pp) contracts
-        end ;
-        begin match storage with
-          | None -> ()
-          | Some expr ->
-              Format.fprintf ppf "@,@[<hv 2>Updated storage:@ %a@]"
-                Michelson_v1_printer.print_expr expr
-        end ;
-        begin if storage_size <> Z.zero then
-            Format.fprintf ppf
-              "@,Storage size: %s bytes"
-              (Z.to_string storage_size)
-        end ;
-        begin if paid_storage_size_diff <> Z.zero then
-            Format.fprintf ppf
-              "@,Paid storage size diff: %s bytes"
-              (Z.to_string paid_storage_size_diff)
-        end ;
+        pp_transaction_result tx
+    | Backtracked (Transaction_result _ as tx, _errs) ->
         Format.fprintf ppf
-          "@,Consumed gas: %s"
-          (Z.to_string consumed_gas) ;
-        begin match balance_updates with
-          | [] -> ()
-          | balance_updates ->
-              Format.fprintf ppf
-                "@,Balance updates:@,  %a"
-                pp_balance_updates balance_updates
-        end
-    | Applied (Origination_result { balance_updates ; consumed_gas ;
-                                    originated_contracts ;
-                                    storage_size ; paid_storage_size_diff }) ->
+          "@[<v 0>This transaction was BACKTRACKED, \
+           its expected effects (as follow) were NOT applied.@]" ;
+        pp_transaction_result tx
+    | Applied (Origination_result _ as op) ->
         Format.fprintf ppf
           "This origination was successfully applied" ;
-        begin match originated_contracts with
-          | [] -> ()
-          | contracts ->
-              Format.fprintf ppf "@,@[<v 2>Originated contracts:@,%a@]"
-                (Format.pp_print_list Contract.pp) contracts
-        end ;
-        begin if storage_size <> Z.zero then
-            Format.fprintf ppf
-              "@,Storage size: %s bytes"
-              (Z.to_string storage_size)
-        end ;
-        begin if paid_storage_size_diff <> Z.zero then
-            Format.fprintf ppf
-              "@,Paid storage size diff: %s bytes"
-              (Z.to_string paid_storage_size_diff)
-        end ;
+        pp_origination_result op
+    | Backtracked (Origination_result _ as op, _errs) ->
         Format.fprintf ppf
-          "@,Consumed gas: %s"
-          (Z.to_string consumed_gas) ;
-        begin match balance_updates with
-          | [] -> ()
-          | balance_updates ->
-              Format.fprintf ppf
-                "@,Balance updates:@,  %a"
-                pp_balance_updates balance_updates
-        end in
+          "@[<v 0>This origination was BACKTRACKED, \
+           its expected effects (as follow) were NOT applied.@]" ;
+        pp_origination_result op in
   Format.fprintf ppf
     "@[<v 0>@[<v 2>Manager signed operations:@,\
      From: %a@,\

@@ -13,7 +13,9 @@ open Clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 type error += Bad_max_priority of string
+type error += Bad_fee_threshold of string
 type error += Bad_endorsement_delay of string
+type error += Bad_preserved_levels of string
 
 let () =
   register_error_kind
@@ -36,10 +38,20 @@ let () =
     ~title:"Bad -max-priority arg"
     ~description:("invalid priority in -max-priority")
     ~pp:(fun ppf literal ->
-        Format.fprintf ppf "invalid priority '%s'in -max-priority" literal)
+        Format.fprintf ppf "invalid priority '%s' in -max-priority" literal)
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_max_priority parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_max_priority parameter) ;
+  register_error_kind
+    `Permanent
+    ~id:"badFeeThresholdArg"
+    ~title:"Bad -fee-threshold arg"
+    ~description:("invalid fee threshold in -fee-threshold")
+    ~pp:(fun ppf literal ->
+        Format.fprintf ppf "invalid fee threshold '%s' in -fee-threshold" literal)
+    Data_encoding.(obj1 (req "parameter" string))
+    (function Bad_fee_threshold parameter -> Some parameter | _ -> None)
+    (fun parameter -> Bad_fee_threshold parameter) ;
   register_error_kind
     `Permanent
     ~id:"badEndorsementDelayArg"
@@ -49,7 +61,17 @@ let () =
         Format.fprintf ppf "Bad argument value for -endorsement-delay. Expected an integer, but given '%s'" literal)
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_endorsement_delay parameter -> Some parameter | _ -> None)
-    (fun parameter -> Bad_endorsement_delay parameter)
+    (fun parameter -> Bad_endorsement_delay parameter) ;
+  register_error_kind
+    `Permanent
+    ~id:"badPreservedLevelsArg"
+    ~title:"Bad -preserved-levels arg"
+    ~description:("invalid number of levels in -preserved-levels")
+    ~pp:(fun ppf literal ->
+        Format.fprintf ppf "Bad argument value for -preserved_levels. Expected a positive integer, but given '%s'" literal)
+    Data_encoding.(obj1 (req "parameter" string))
+    (function Bad_preserved_levels parameter -> Some parameter | _ -> None)
+    (fun parameter -> Bad_preserved_levels parameter)
 
 
 let tez_sym =
@@ -185,6 +207,16 @@ let max_priority_arg =
          try return (int_of_string s)
          with _ -> fail (Bad_max_priority s)))
 
+let fee_threshold_arg =
+  arg
+    ~long:"fee-threshold"
+    ~placeholder:"threshold"
+    ~doc:"exclude operations with fees lower than this threshold (in mutez)"
+    (parameter (fun _ s ->
+         match Tez.of_string s with
+         | Some t -> return t
+         | None -> fail (Bad_fee_threshold s)))
+
 let endorsement_delay_arg =
   default_arg
     ~long:"endorsement-delay"
@@ -196,6 +228,21 @@ let endorsement_delay_arg =
     (parameter (fun _ s ->
          try return (int_of_string s)
          with _ -> fail (Bad_endorsement_delay s)))
+
+let preserved_levels_arg =
+  default_arg
+    ~long:"preserved-levels"
+    ~placeholder:"threshold"
+    ~doc:"Number of effective levels kept in the accuser's memory"
+    ~default:"200"
+    (parameter (fun _ s ->
+         try
+           let preserved_cycles = int_of_string s in
+           if preserved_cycles < 0 then
+             fail (Bad_preserved_levels s)
+           else
+             return preserved_cycles
+         with _ -> fail (Bad_preserved_levels s)))
 
 let no_print_source_flag =
   switch

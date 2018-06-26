@@ -21,6 +21,7 @@ end
 module Baker : sig
   val run:
     #Proto_alpha.full ->
+    ?threshold: Tez.tez ->
     ?max_priority: int ->
     ?min_date: Time.t ->
     context_path: string ->
@@ -29,5 +30,7 @@ end
 
 module Accuser : sig
   val run:
-    #Proto_alpha.full -> unit tzresult Lwt.t
+    #Proto_alpha.full ->
+    preserved_levels: int ->
+    unit tzresult Lwt.t
 end

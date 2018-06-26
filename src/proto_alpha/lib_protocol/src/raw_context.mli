@@ -9,6 +9,8 @@
 
 (** {1 Errors} ****************************************************************)
 
+type error += Too_many_internal_operations (* `Permanent *)
+
 (** An internal storage error that should not happen *)
 type storage_error =
   | Incompatible_protocol_version of string
@@ -69,8 +71,16 @@ val patch_constants:
   context Lwt.t
 val first_level: context -> Raw_level_repr.t
 
+(** Increment the current block fee stash that will be credited to baker's
+    frozen_fees account at finalize_application *)
 val add_fees: context -> Tez_repr.t -> context tzresult Lwt.t
+
+(** Increment the current block reward stash that will be credited to baker's
+    frozen_fees account at finalize_application *)
 val add_rewards: context -> Tez_repr.t -> context tzresult Lwt.t
+
+(** Increment the current block deposit stash for a specific delegate. All the
+    delegates' frozen_deposit accounts are credited at finalize_application *)
 val add_deposit:
   context -> Signature.Public_key_hash.t -> Tez_repr.t -> context tzresult Lwt.t
 
@@ -80,20 +90,16 @@ val get_deposits: context -> Tez_repr.t Signature.Public_key_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 
-val set_gas_limit: t -> Z.t -> t tzresult
+val check_gas_limit: t -> Z.t -> unit tzresult
+val set_gas_limit: t -> Z.t -> t
 val set_gas_unlimited: t -> t
 val gas_level: t -> Gas_limit_repr.t
 val gas_consumed: since: t -> until: t -> Z.t
 val block_gas_level: t -> Z.t
 
-type error += Storage_limit_too_high (* `Permanent *)
-
-val init_storage_space_to_pay: t -> t tzresult
-val update_storage_space_to_pay: t -> Z.t -> t tzresult
+val init_storage_space_to_pay: t -> t
+val update_storage_space_to_pay: t -> Z.t -> t
 val clear_storage_space_to_pay: t -> t * Z.t
-
-val set_storage_limit: t -> Z.t -> t tzresult
-val set_storage_unlimited: t -> t
 
 type error += Undefined_operation_nonce (* `Permanent *)
 
@@ -185,10 +191,6 @@ module type T = sig
   (** Internally used in {!Storage_functors} to consume gas from
       within a view. *)
   val consume_gas: context -> Gas_limit_repr.cost -> context tzresult
-
-  (** Internally used in {!Storage_functors} to consume storage from
-      within a view. *)
-  val record_bytes_stored: context -> Z.t -> context tzresult
 
   val description: context Storage_description.t
 

@@ -31,6 +31,7 @@ val inject_operation:
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
+  ?dry_run:bool ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
   'kind contents_list ->
@@ -45,6 +46,7 @@ val inject_manager_operation:
   block:Shell_services.block ->
   ?branch:int ->
   ?confirmations:int ->
+  ?dry_run:bool ->
   source:Contract.t ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->

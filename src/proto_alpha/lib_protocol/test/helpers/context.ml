@@ -139,6 +139,9 @@ module Contract = struct
     Alpha_services.Contract.manager_key rpc_ctxt ctxt contract >>=? fun (_, res) ->
     return (res <> None)
 
+  let delegate ctxt contract =
+    Alpha_services.Contract.delegate rpc_ctxt ctxt contract
+
   let delegate_opt ctxt contract =
     Alpha_services.Contract.delegate_opt rpc_ctxt ctxt contract
 

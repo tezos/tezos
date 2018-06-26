@@ -45,7 +45,7 @@ let info cctxt ?(chain = `Main) block =
   raw_info cctxt ~chain hash shell_header
 
 let monitor_valid_blocks cctxt ?chains ?protocols ?next_protocols () =
-  Shell_services.Monitor.valid_blocks cctxt
+  Monitor_services.valid_blocks cctxt
     ?chains ?protocols ?next_protocols () >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s
             (fun ((chain, block), { Tezos_base.Block_header.shell }) ->

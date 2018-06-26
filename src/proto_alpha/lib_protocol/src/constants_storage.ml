@@ -40,9 +40,6 @@ let cost_per_byte c =
 let hard_storage_limit_per_operation c =
   let constants = Raw_context.constants c in
   constants.hard_storage_limit_per_operation
-let hard_storage_limit_per_block c =
-  let constants = Raw_context.constants c in
-  constants.hard_storage_limit_per_block
 let proof_of_work_threshold c =
   let constants = Raw_context.constants c in
   constants.proof_of_work_threshold

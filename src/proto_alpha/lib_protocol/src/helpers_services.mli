@@ -9,9 +9,7 @@
 
 open Alpha_context
 
-type error +=
-  | Cannot_parse_operation (* `Branch *)
-  | Cant_parse_block_header
+type error += Cannot_parse_operation (* `Branch *)
 
 val current_level:
   'a #RPC_context.simple ->
@@ -154,6 +152,20 @@ module Forge : sig
     branch:Block_hash.t ->
     level:Raw_level.t ->
     nonce:Nonce.t ->
+    unit -> MBytes.t shell_tzresult Lwt.t
+
+  val double_baking_evidence:
+    'a #RPC_context.simple -> 'a ->
+    branch:Block_hash.t ->
+    bh1: Block_header.t ->
+    bh2: Block_header.t ->
+    unit -> MBytes.t shell_tzresult Lwt.t
+
+  val double_endorsement_evidence:
+    'a #RPC_context.simple -> 'a ->
+    branch:Block_hash.t ->
+    op1: Kind.endorsement operation ->
+    op2: Kind.endorsement operation ->
     unit -> MBytes.t shell_tzresult Lwt.t
 
   val protocol_data:

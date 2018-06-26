@@ -381,3 +381,18 @@ module Socket = struct
           return message
 
 end
+
+
+let rec retry ?(log=(fun _ -> Lwt.return ())) ?(n=5) ?(sleep=1.) f =
+  f () >>= function
+  | Ok r -> Lwt.return (Ok r)
+  | (Error error) as x ->
+      if n > 0 then
+        begin
+          log error >>= fun () ->
+          Lwt_unix.sleep sleep >>= fun () ->
+          retry ~log ~n:(n-1) ~sleep f
+        end
+      else
+        Lwt.return x
+

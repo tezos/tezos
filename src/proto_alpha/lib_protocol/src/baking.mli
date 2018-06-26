@@ -15,6 +15,8 @@ type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
 type error += Unexpected_endorsement
+type error += Invalid_signature  (* `Permanent *)
+type error += Invalid_stamp  (* `Permanent *)
 
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
     time, given the predecessor block timestamp [pred_block_time],
@@ -45,7 +47,7 @@ val check_endorsement_rights:
   context -> Kind.endorsement Operation.t ->
   (public_key_hash * int list * bool) tzresult Lwt.t
 
-(** Returns the endorsement reward calculated w.r.t a given priotiry.  *)
+(** Returns the endorsement reward calculated w.r.t a given priority.  *)
 val endorsement_reward: context -> block_priority:int -> int -> Tez.t tzresult Lwt.t
 
 (** [baking_priorities ctxt level] is the lazy list of contract's

@@ -453,7 +453,7 @@ let apply_manager_operation_content :
 let apply_internal_manager_operations ctxt mode ~payer ops =
   let rec apply ctxt applied worklist =
     match worklist with
-    | [] -> Lwt.return (Ok (ctxt, List.rev applied))
+    | [] -> Lwt.return (`Success ctxt, List.rev applied)
     | (Internal_operation
          ({ source ; operation ; nonce } as op)) :: rest ->
         begin
@@ -472,7 +472,7 @@ let apply_internal_manager_operations ctxt mode ~payer ops =
                 (fun (Internal_operation op) ->
                    Internal_operation_result (op, Skipped (manager_kind op.operation)))
                 rest in
-            Lwt.return (Error (List.rev (skipped @ (result :: applied))))
+            Lwt.return (`Failure, List.rev (skipped @ (result :: applied)))
         | Ok (ctxt, result, emitted) ->
             apply ctxt
               (Internal_operation_result (op, Applied result) :: applied)
@@ -482,7 +482,9 @@ let apply_internal_manager_operations ctxt mode ~payer ops =
 let precheck_manager_contents
     (type kind) ctxt raw_operation (op : kind Kind.manager contents)
   : context tzresult Lwt.t =
-  let Manager_operation { source ; fee ; counter ; operation } = op in
+  let Manager_operation { source ; fee ; counter ; operation ; gas_limit ; storage_limit } = op in
+  Lwt.return (Gas.check_limit ctxt gas_limit) >>=? fun () ->
+  Lwt.return (Fees.check_storage_limit ctxt storage_limit) >>=? fun () ->
   Contract.must_be_allocated ctxt source >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
   begin
@@ -503,57 +505,59 @@ let precheck_manager_contents
   return ctxt
 
 let apply_manager_contents
-    (type kind) ctxt mode baker (op : kind Kind.manager contents)
-  : (context * kind Kind.manager contents_result) tzresult Lwt.t =
+    (type kind) ctxt mode (op : kind Kind.manager contents)
+  : ([ `Success of context | `Failure ] *
+     kind manager_operation_result *
+     packed_internal_operation_result list) Lwt.t =
   let Manager_operation
-      { source ; fee ; operation ; gas_limit ; storage_limit } = op in
-  Lwt.return (Gas.set_limit ctxt gas_limit) >>=? fun ctxt ->
-  Lwt.return (Contract.set_storage_limit ctxt storage_limit) >>=? fun ctxt ->
-  let level = Level.current ctxt in
-  Fees.with_fees_for_storage ctxt ~payer:source begin fun ctxt ->
-    apply_manager_operation_content ctxt mode
-      ~source ~payer:source ~internal:false operation >>= begin function
-      | Ok (ctxt, operation_results, internal_operations) -> begin
-          apply_internal_manager_operations
-            ctxt mode ~payer:source internal_operations >>= function
-          | Ok (ctxt, internal_operations_results) ->
-              return (ctxt,
-                      (Applied operation_results, internal_operations_results))
-          | Error internal_operations_results ->
-              return (ctxt (* backtracked *),
-                      (Applied operation_results, internal_operations_results))
-        end
-      | Error operation_results ->
-          return (ctxt (* backtracked *),
-                  (Failed (manager_kind operation, operation_results), []))
+      { source ; operation ; gas_limit ; storage_limit } = op in
+  let ctxt = Gas.set_limit ctxt gas_limit in
+  let ctxt = Fees.start_counting_storage_fees ctxt in
+  apply_manager_operation_content ctxt mode
+    ~source ~payer:source ~internal:false operation >>= function
+  | Ok (ctxt, operation_results, internal_operations) -> begin
+      apply_internal_manager_operations
+        ctxt mode ~payer:source internal_operations >>= function
+      | (`Success ctxt, internal_operations_results) ->
+          Fees.burn_storage_fees ctxt ~storage_limit ~payer:source >>= begin function
+            | Ok ctxt ->
+                Lwt.return
+                  (`Success ctxt, Applied operation_results, internal_operations_results)
+            | Error errors ->
+                Lwt.return
+                  (`Failure, Backtracked (operation_results, Some errors), internal_operations_results)
+          end
+      | (`Failure, internal_operations_results) ->
+          Lwt.return
+            (`Failure, Applied operation_results, internal_operations_results)
     end
-  end >>=? fun (ctxt, (operation_result, internal_operation_results)) ->
-  return (ctxt,
-          Manager_operation_result
-            { balance_updates =
-                cleanup_balance_updates
-                  [ Contract source, Debited fee ;
-                    Rewards (baker, level.cycle), Credited fee ] ;
-              operation_result ;
-              internal_operation_results })
+  | Error errors ->
+      Lwt.return
+        (`Failure, Failed (manager_kind operation, errors), [])
 
 let rec mark_skipped
   : type kind.
-    kind Kind.manager contents_list ->
-    kind Kind.manager contents_result_list = function
-  | Single (Manager_operation op) ->
+    baker : Signature.Public_key_hash.t -> Level.t -> kind Kind.manager contents_list ->
+  kind Kind.manager contents_result_list = fun ~baker level -> function
+  | Single (Manager_operation ({ source ; fee } as op)) ->
       Single_result
         (Manager_operation_result
-           { balance_updates = [] ;
+           { balance_updates =
+               cleanup_balance_updates
+                 [ Contract source, Debited fee ;
+                   Rewards (baker, level.cycle), Credited fee ] ;
              operation_result = Skipped (manager_kind op.operation) ;
              internal_operation_results = [] })
-  | Cons (Manager_operation op, rest) ->
+  | Cons (Manager_operation ({ source ; fee } as op), rest) ->
       Cons_result
         (Manager_operation_result {
-            balance_updates = [] ;
+            balance_updates =
+              cleanup_balance_updates
+                [ Contract source, Debited fee ;
+                  Rewards (baker, level.cycle), Credited fee ] ;
             operation_result = Skipped (manager_kind op.operation) ;
             internal_operation_results = [] },
-         mark_skipped rest)
+         mark_skipped ~baker level rest)
 
 let rec precheck_manager_contents_list
   : type kind.
@@ -567,49 +571,89 @@ let rec precheck_manager_contents_list
         precheck_manager_contents ctxt raw_operation op >>=? fun ctxt ->
         precheck_manager_contents_list ctxt raw_operation rest
 
-let rec apply_manager_contents_list
+let rec apply_manager_contents_list_rec
   : type kind.
     Alpha_context.t -> Script_ir_translator.unparsing_mode ->
     public_key_hash -> kind Kind.manager contents_list ->
-    (context * kind Kind.manager contents_result_list) Lwt.t =
+    ([ `Success of context | `Failure ] *
+     kind Kind.manager contents_result_list) Lwt.t =
   fun ctxt mode baker contents_list ->
+    let level = Level.current ctxt in
     match contents_list with
-    | Single (Manager_operation { operation ; _ } as op) -> begin
-        apply_manager_contents ctxt mode baker op >>= function
-        | Error errors ->
-            let result =
-              Manager_operation_result {
-                balance_updates = [] ;
-                operation_result = Failed (manager_kind operation, errors) ;
-                internal_operation_results = []
-              } in
-            Lwt.return (ctxt, Single_result (result))
-        | Ok (ctxt, (Manager_operation_result
-                       { operation_result = Applied _ ; _ } as result)) ->
-            Lwt.return (ctxt, Single_result (result))
-        | Ok (ctxt,
-              (Manager_operation_result
-                 { operation_result = (Skipped _ | Failed _) ; _ } as result)) ->
-            Lwt.return (ctxt, Single_result (result))
+    | Single (Manager_operation { source ; fee ; _ } as op) -> begin
+        apply_manager_contents ctxt mode op
+        >>= fun (ctxt_result, operation_result, internal_operation_results) ->
+        let result =
+          Manager_operation_result {
+            balance_updates =
+              cleanup_balance_updates
+                [ Contract source, Debited fee ;
+                  Rewards (baker, level.cycle), Credited fee ] ;
+            operation_result ;
+            internal_operation_results ;
+          } in
+        Lwt.return (ctxt_result, Single_result (result))
       end
-    | Cons (Manager_operation { operation ; _ } as op, rest) ->
-        apply_manager_contents ctxt mode baker op >>= function
-        | Error errors ->
+    | Cons (Manager_operation { source ; fee ; _ } as op, rest) ->
+        apply_manager_contents ctxt mode op >>= function
+        | (`Failure, operation_result, internal_operation_results) ->
             let result =
               Manager_operation_result {
-                balance_updates = [] ;
-                operation_result = Failed (manager_kind operation, errors) ;
-                internal_operation_results = []
+                balance_updates =
+                  cleanup_balance_updates
+                    [ Contract source, Debited fee ;
+                      Rewards (baker, level.cycle), Credited fee ] ;
+                operation_result ;
+                internal_operation_results ;
               } in
-            Lwt.return (ctxt, Cons_result (result, mark_skipped rest))
-        | Ok (ctxt, (Manager_operation_result
-                       { operation_result = Applied _ ; _ } as result)) ->
-            apply_manager_contents_list ctxt mode baker rest >>= fun (ctxt, results) ->
-            Lwt.return (ctxt, Cons_result (result, results))
-        | Ok (ctxt,
-              (Manager_operation_result
-                 { operation_result = (Skipped _ | Failed _) ; _ } as result)) ->
-            Lwt.return (ctxt, Cons_result (result, mark_skipped rest))
+            Lwt.return (`Failure, Cons_result (result, mark_skipped ~baker level rest))
+        | (`Success ctxt, operation_result, internal_operation_results) ->
+            let result =
+              Manager_operation_result {
+                balance_updates =
+                  cleanup_balance_updates
+                    [ Contract source, Debited fee ;
+                      Rewards (baker, level.cycle), Credited fee ] ;
+                operation_result ;
+                internal_operation_results ;
+              } in
+            apply_manager_contents_list_rec ctxt mode baker rest >>= fun (ctxt_result, results) ->
+            Lwt.return (ctxt_result, Cons_result (result, results))
+
+let mark_backtracked results =
+  let rec mark_contents_list
+    : type kind. kind Kind.manager contents_result_list -> kind Kind.manager contents_result_list
+    = function
+      | Single_result (Manager_operation_result op) ->
+          Single_result (Manager_operation_result
+                           { balance_updates =
+                               op.balance_updates ;
+                             operation_result =
+                               mark_manager_operation_result op.operation_result ;
+                             internal_operation_results =
+                               List.map mark_internal_operation_results op.internal_operation_results})
+      | Cons_result (Manager_operation_result op, rest) ->
+          Cons_result (Manager_operation_result
+                         { balance_updates =
+                             op.balance_updates ;
+                           operation_result =
+                             mark_manager_operation_result op.operation_result ;
+                           internal_operation_results =
+                             List.map mark_internal_operation_results op.internal_operation_results}, rest)
+  and mark_internal_operation_results (Internal_operation_result (kind, result)) =
+    (Internal_operation_result (kind, mark_manager_operation_result result))
+  and mark_manager_operation_result
+    : type kind. kind manager_operation_result -> kind manager_operation_result
+    = function
+      | Failed _ | Skipped _ | Backtracked _ as result -> result
+      | Applied result -> Backtracked (result, None) in
+  mark_contents_list results
+
+let apply_manager_contents_list ctxt mode baker contents_list =
+  apply_manager_contents_list_rec ctxt mode baker contents_list >>= fun (ctxt_result, results) ->
+  match ctxt_result with
+  | `Failure -> Lwt.return (ctxt (* backtracked *), mark_backtracked results)
+  | `Success ctxt -> Lwt.return (ctxt, results)
 
 let apply_contents_list
     (type kind) ctxt mode pred_block baker
@@ -643,9 +687,9 @@ let apply_contents_list
         return (ctxt, Single_result
                   (Endorsement_result
                      { balance_updates =
-                         [ Rewards (baker, level.cycle), Credited reward;
-                           Rewards (delegate, level.cycle), Debited reward;
-                           Deposits (delegate, level.cycle), Credited deposit; ] ;
+                         [ Contract (Contract.implicit_contract delegate), Debited deposit;
+                           Deposits (delegate, level.cycle), Credited deposit;
+                           Rewards (delegate, level.cycle), Credited reward; ] ;
                        delegate ; slots }))
   | Single (Seed_nonce_revelation { level ; nonce }) ->
       let level = Level.from_raw ctxt level in
@@ -655,8 +699,7 @@ let apply_contents_list
       add_rewards ctxt seed_nonce_revelation_tip >>=? fun ctxt ->
       return (ctxt, Single_result
                 (Seed_nonce_revelation_result
-                   [ Rewards (baker, level.cycle),
-                     Credited seed_nonce_revelation_tip ]))
+                   [ Rewards (baker, level.cycle), Credited seed_nonce_revelation_tip ]))
   | Single (Double_endorsement_evidence { op1 ; op2 }) -> begin
       match op1.protocol_data.contents, op2.protocol_data.contents with
       | Single (Endorsement e1),
@@ -688,12 +731,13 @@ let apply_contents_list
             | Ok v -> v
             | Error _ -> Tez.zero in
           add_rewards ctxt reward >>=? fun ctxt ->
+          let current_cycle = (Level.current ctxt).cycle in
           return (ctxt, Single_result
                     (Double_endorsement_evidence_result [
-                        Rewards (baker, level.cycle), Credited reward;
-                        Rewards (delegate1, level.cycle), Debited balance.rewards;
-                        Deposits (delegate1, level.cycle), Debited balance.deposit;
-                        Fees (delegate1, level.cycle), Debited balance.fees ]))
+                        Deposits (delegate1, level.cycle), Debited balance.deposit ;
+                        Fees (delegate1, level.cycle), Debited balance.fees ;
+                        Rewards (delegate1, level.cycle), Debited balance.rewards ;
+                        Rewards (baker, current_cycle), Credited reward ]))
       | _, _ -> fail Invalid_double_endorsement_evidence
     end
   | Single (Double_baking_evidence { bh1 ; bh2 }) ->
@@ -740,12 +784,13 @@ let apply_contents_list
         | Ok v -> v
         | Error _ -> Tez.zero in
       add_rewards ctxt reward >>=? fun ctxt ->
+      let current_cycle = (Level.current ctxt).cycle in
       return (ctxt, Single_result
                 (Double_baking_evidence_result [
-                    Rewards (baker, level.cycle), Credited reward ;
-                    Rewards (delegate, level.cycle), Debited balance.rewards ;
                     Deposits (delegate, level.cycle), Debited balance.deposit ;
-                    Fees (delegate, level.cycle), Debited balance.fees ; ]))
+                    Fees (delegate, level.cycle), Debited balance.fees ;
+                    Rewards (delegate, level.cycle), Debited balance.rewards ;
+                    Rewards (baker, current_cycle), Credited reward ; ]))
   | Single (Activate_account { id = pkh ; activation_code }) -> begin
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh in
@@ -789,7 +834,6 @@ let apply_operation ctxt mode pred_block baker hash operation =
     ctxt mode pred_block baker operation
     operation.protocol_data.contents >>=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
-  let ctxt = Contract.set_storage_unlimited ctxt in
   let ctxt = Contract.unset_origination_nonce ctxt in
   return (ctxt, { contents = result })
 

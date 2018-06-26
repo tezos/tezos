@@ -123,3 +123,11 @@ launch_endorser() {
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
 	 run --endorsement-delay 10
 }
+
+launch_accuser() {
+    configure_client
+    wait_for_the_node_to_be_bootstraped
+    exec "$accuser" --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 run
+}

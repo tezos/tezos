@@ -14,6 +14,7 @@ client="/usr/local/bin/tezos-client"
 admin_client="/usr/local/bin/tezos-admin-client"
 baker="/usr/local/bin/tezos-alpha-baker"
 endorser="/usr/local/bin/tezos-alpha-endorser"
+accuser="/usr/local/bin/tezos-alpha-accuser"
 
 client_dir="$DATA_DIR/client"
 node_dir="$DATA_DIR/node"
@@ -33,6 +34,9 @@ case $command in
         ;;
     tezos-endorser)
         launch_endorser "$@"
+        ;;
+    tezos-accuser)
+        launch_accuser "$@"
         ;;
     tezos-client)
         configure_client

@@ -699,7 +699,7 @@ module Binary: sig
   val of_bytes : 'a Encoding.t -> MBytes.t -> 'a option
 
   (** [of_bytes_exn enc buf] is equivalent to [to_bytes], except
-      it raises [Read_error] instead of return [None] in case of error. *)
+      it raises [Read_error] instead of returning [None] in case of error. *)
   val of_bytes_exn : 'a Encoding.t -> MBytes.t -> 'a
 
   (** [to_bytes enc v] is the equivalent of [write env buf 0 len]
@@ -708,7 +708,7 @@ module Binary: sig
   val to_bytes : 'a Encoding.t -> 'a -> MBytes.t option
 
   (** [to_bytes_exn enc v] is equivalent to [to_bytes enc v], except
-      it raises [Write_error] instead of return [None] in case of error. *)
+      it raises [Write_error] instead of returning [None] in case of error. *)
   val to_bytes_exn : 'a Encoding.t -> 'a -> MBytes.t
 
   val describe : 'a Encoding.t -> Binary_schema.t

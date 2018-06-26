@@ -8,21 +8,22 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Alpha_context
 
-type operation = {
-  hash: Operation_hash.t ;
-  content: Operation.packed option ;
-}
+let generate_proof_of_work_nonce () =
+  Rand.generate Alpha_context.Constants.proof_of_work_nonce_size
 
-type valid_endorsement = {
-  hash: Operation_hash.t ;
-  source: public_key_hash ;
-  block: Block_hash.t ;
-  slots: int list ;
-}
+let empty_proof_of_work_nonce =
+  MBytes.of_string
+    (String.make Constants_repr.proof_of_work_nonce_size  '\000')
 
-val monitor_endorsement:
-  #Proto_alpha.rpc_context ->
-  valid_endorsement tzresult Lwt_stream.t tzresult Lwt.t
-
+let mine cctxt chain block shell builder =
+  Alpha_services.Constants.all cctxt (chain, block) >>=? fun constants ->
+  let threshold = constants.parametric.proof_of_work_threshold in
+  let rec loop () =
+    let block = builder (generate_proof_of_work_nonce ()) in
+    if Baking.check_header_proof_of_work_stamp shell block threshold then
+      return block
+    else
+      loop ()
+  in
+  loop ()

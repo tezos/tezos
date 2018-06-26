@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 (* 20 *)
-let contract_hash = "\003\099\029" (* TZ(36) *)
+let contract_hash = "\002\090\121" (* KT1(36) *)
 
 include Blake2B.Make(Base58)(struct
     let name = "Contract_hash"
@@ -18,4 +18,4 @@ include Blake2B.Make(Base58)(struct
   end)
 
 let () =
-  Base58.check_encoded_prefix b58check_encoding "TZ1" 36
+  Base58.check_encoded_prefix b58check_encoding "KT1" 36

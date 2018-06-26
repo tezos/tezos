@@ -151,7 +151,8 @@ module Forge = struct
   let contents
       ?(proof_of_work_nonce = default_proof_of_work_nonce)
       ?(priority = 0) ?seed_nonce_hash () =
-    { Block_header.priority ;
+    {
+      Block_header.priority ;
       proof_of_work_nonce ;
       seed_nonce_hash ;
     }
@@ -232,7 +233,6 @@ let genesis
     ?(endorsement_reward = Constants_repr.default.endorsement_reward)
     ?(cost_per_byte = Constants_repr.default.cost_per_byte)
     ?(hard_storage_limit_per_operation = Constants_repr.default.hard_storage_limit_per_operation)
-    ?(hard_storage_limit_per_block = Constants_repr.default.hard_storage_limit_per_block)
     ?(commitments = [])
     ?(security_deposit_ramp_up_cycles = None)
     ?(no_reward_cycles = None)
@@ -277,7 +277,6 @@ let genesis
     endorsement_reward ;
     cost_per_byte ;
     hard_storage_limit_per_operation ;
-    hard_storage_limit_per_block ;
   } in
   check_constants_consistency constants >>=? fun () ->
 
@@ -349,11 +348,11 @@ let bake ?policy ?operation ?operations pred =
   Forge.sign_header header >>=? fun header ->
   apply header ?operations pred
 
+(********** Cycles ****************)
+
 (* This function is duplicated from Context to avoid a cyclic dependency *)
 let get_constants b =
   Alpha_services.Constants.all rpc_ctxt b
-
-(********** Cycles ****************)
 
 let bake_n ?policy n b =
   Error_monad.fold_left_s

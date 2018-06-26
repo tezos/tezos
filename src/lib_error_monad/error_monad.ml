@@ -426,17 +426,39 @@ module Make(Prefix : sig val id : string end) = struct
             filter_map_s f t >>=? fun rt ->
             return (rh :: rt)
 
-  let filter_map_p f l =
+  let rec filter_map_p f l =
     match l with
     | [] -> return []
     | h :: t ->
         let th = f h
-        and tt = filter_map_s f t in
+        and tt = filter_map_p f t in
         th >>=? function
         | None -> tt
         | Some rh ->
             tt >>=? fun rt ->
             return (rh :: rt)
+
+  let rec filter_s f l =
+    match l with
+    | [] -> return []
+    | h :: t ->
+        f h >>=? function
+        | false -> filter_s f t
+        | true ->
+            filter_s f t >>=? fun t ->
+            return (h :: t)
+
+  let rec filter_p f l =
+    match l with
+    | [] -> return []
+    | h :: t ->
+        let jh = f h
+        and t = filter_p f t in
+        jh >>=? function
+        | false -> t
+        | true ->
+            t >>=? fun t ->
+            return (h :: t)
 
   let rec iter_s f l =
     match l with
@@ -580,6 +602,20 @@ module Make(Prefix : sig val id : string end) = struct
       Format.ikfprintf (fun _ -> return ()) Format.str_formatter fmt
     else
       Format.kasprintf (fun msg -> fail (Assert_error (loc, msg))) fmt
+
+
+  type 'a tzlazy_state =
+    | Remembered of 'a
+    | Not_yet_known of (unit -> 'a tzresult Lwt.t)
+  type 'a tzlazy = { mutable tzcontents: 'a tzlazy_state }
+  let tzlazy c = { tzcontents = Not_yet_known c }
+  let tzforce v = match v.tzcontents with
+    | Remembered v -> return v
+    | Not_yet_known c ->
+        c () >>=? fun w ->
+        v.tzcontents <- Remembered w;
+        return w
+
 
 end
 

@@ -151,6 +151,12 @@ module type S = sig
   val filter_map_p :
     ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
+  (** A {!List.filter} in the monad *)
+  val filter_s :
+    ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
+  val filter_p :
+    ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
+
   (** A {!List.fold_left} in the monad *)
   val fold_left_s :
     ('a -> 'b -> 'a tzresult Lwt.t) -> 'a -> 'b list -> 'a tzresult Lwt.t
@@ -161,5 +167,19 @@ module type S = sig
 
   (** A {!Lwt.join} in the monad *)
   val join : unit tzresult Lwt.t list -> unit tzresult Lwt.t
+
+  (** Lazy values with retry-until success semantics *)
+  type 'a tzlazy
+
+  (** Create a {!tzlazy} value. *)
+  val tzlazy: (unit -> 'a tzresult Lwt.t) -> 'a tzlazy
+
+  (** [tzforce tzl] is either
+      (a) the remembered value carried by [tzl] if available
+      (b) the result of the callback/closure used to create [tzl] if successful,
+      in which case the value is remembered, or
+      (c) an error if the callback/closure used to create [tzl] is unsuccessful.
+  *)
+  val tzforce: 'a tzlazy -> 'a tzresult Lwt.t
 
 end

@@ -130,6 +130,7 @@ type packed_successful_manager_operation_result =
 
 type 'kind manager_operation_result =
   | Applied of 'kind successful_manager_operation_result
+  | Backtracked of 'kind successful_manager_operation_result * error list option
   | Failed : 'kind Kind.manager * error list -> 'kind manager_operation_result
   | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
 
@@ -168,7 +169,7 @@ module Manager_result = struct
              encoding)
           (fun o ->
              match o with
-             | Skipped _ | Failed _ -> None
+             | Skipped _ | Failed _ | Backtracked _ -> None
              | Applied o ->
                  match select (Successful_manager_result o) with
                  | None -> None
@@ -185,7 +186,22 @@ module Manager_result = struct
           ~title:"Skipped"
           (obj1 (req "status" (constant "skipped")))
           (function Skipped _ -> Some () | _ -> None)
-          (fun () -> Skipped kind)
+          (fun () -> Skipped kind) ;
+        case (Tag 3)
+          ~title:"Backtracked"
+          (merge_objs
+             (obj2
+                (req "status" (constant "backtracked"))
+                (opt "errors" (list error_encoding)))
+             encoding)
+          (fun o ->
+             match o with
+             | Skipped _ | Failed _ | Applied _ -> None
+             | Backtracked (o, errs) ->
+                 match select (Successful_manager_result o) with
+                 | None -> None
+                 | Some o -> Some (((), errs), proj o))
+          (fun (((), errs), x) ->  (Backtracked (inj x, errs))) ;
       ] in
     MCase { op_case ; encoding ; kind ; iselect ; select ; proj ; inj ; t }
 
@@ -558,6 +574,15 @@ module Encoding = struct
             end
           | Contents_result
               (Manager_operation_result
+                 ({ operation_result = Backtracked (res, errs) ; _ } as op)) -> begin
+              match res_case.select (Successful_manager_result res) with
+              | Some res ->
+                  Some (Manager_operation_result
+                          { op with operation_result = Backtracked (res, errs) })
+              | None -> None
+            end
+          | Contents_result
+              (Manager_operation_result
                  ({ operation_result = Skipped kind ; _ } as op)) ->
               begin match equal_manager_kind kind res_case.kind with
                 | None -> None
@@ -805,6 +830,10 @@ let kind_equal
     | Manager_operation
         { operation = Reveal _ ; _ },
       Manager_operation_result
+        { operation_result = Backtracked (Reveal_result, _) ; _ } -> Some Eq
+    | Manager_operation
+        { operation = Reveal _ ; _ },
+      Manager_operation_result
         { operation_result =
             Failed (Alpha_context.Kind.Reveal_manager_kind, _); _ } -> Some Eq
     | Manager_operation
@@ -817,6 +846,10 @@ let kind_equal
         { operation = Transaction _ ; _ },
       Manager_operation_result
         { operation_result = Applied (Transaction_result _); _ } -> Some Eq
+    | Manager_operation
+        { operation = Transaction _ ; _ },
+      Manager_operation_result
+        { operation_result = Backtracked (Transaction_result _, _); _ } -> Some Eq
     | Manager_operation
         { operation = Transaction _ ; _ },
       Manager_operation_result
@@ -835,6 +868,10 @@ let kind_equal
     | Manager_operation
         { operation = Origination _ ; _ },
       Manager_operation_result
+        { operation_result = Backtracked (Origination_result _, _); _ } -> Some Eq
+    | Manager_operation
+        { operation = Origination _ ; _ },
+      Manager_operation_result
         { operation_result =
             Failed (Alpha_context.Kind.Origination_manager_kind, _); _ } -> Some Eq
     | Manager_operation
@@ -847,6 +884,10 @@ let kind_equal
         { operation = Delegation _ ; _ },
       Manager_operation_result
         { operation_result = Applied Delegation_result ; _ } -> Some Eq
+    | Manager_operation
+        { operation = Delegation _ ; _ },
+      Manager_operation_result
+        { operation_result = Backtracked (Delegation_result, _) ; _ } -> Some Eq
     | Manager_operation
         { operation = Delegation _ ; _ },
       Manager_operation_result
@@ -896,6 +937,9 @@ let rec pack_contents_list :
       | Cons (_, _),
         Single_result (Manager_operation_result
                          { operation_result = Applied _ ; _}) -> .
+      | Cons (_, _),
+        Single_result (Manager_operation_result
+                         { operation_result = Backtracked _ ; _}) -> .
       | Single _, Cons_result _ -> .
     end
 
