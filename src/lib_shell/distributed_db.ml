@@ -457,12 +457,13 @@ module P2p_reader = struct
     | chain_db ->
         f chain_db
 
+  module Handle_msg_Logging =
+    Logging.Make(struct let name = "node.distributed_db.p2p_reader" end)
+
   let handle_msg global_db state msg =
 
     let open Message in
-    let module Logging =
-      Logging.Make(struct let name = "node.distributed_db.p2p_reader" end) in
-    let open Logging in
+    let open Handle_msg_Logging in
 
     lwt_debug "Read message from %a: %a"
       P2p_peer.Id.pp_short state.gid Message.pp_json msg >>= fun () ->
