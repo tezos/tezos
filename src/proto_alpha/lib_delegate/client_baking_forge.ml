@@ -21,10 +21,10 @@ let votes_index = 1
 let anonymous_index = 2
 let managers_index = 3
 
-
 type state = {
   genesis: Block_hash.t ;
-  index : Context.index ;
+  context_path: string ;
+  mutable index : Context.index ;
 
   (* see [get_delegates] below to find delegates when the list is empty *)
   delegates: public_key_hash list ;
@@ -38,8 +38,9 @@ type state = {
     (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) list ;
 }
 
-let create_state genesis index delegates constants best =
+let create_state genesis context_path index delegates constants best =
   { genesis ;
+    context_path ;
     index ;
     delegates ;
     constants ;
@@ -312,7 +313,6 @@ let forge_block cctxt ?(chain = `Main) block
   decode_priority cctxt chain block priority >>=? fun (priority, minimal_timestamp) ->
   unopt_timestamp timestamp minimal_timestamp >>=? fun timestamp ->
 
-
   (* get basic building blocks *)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   classify_operations ?threshold operations_arg >>=? fun operations ->
@@ -449,8 +449,6 @@ let safe_get_unrevealed_nonces cctxt block =
       lwt_warn "Cannot read nonces: %a@." pp_print_error err >>= fun () ->
       Lwt.return []
 
-
-
 let insert_block
     ?max_priority
     ()
@@ -497,12 +495,21 @@ let pop_baking_slots state =
   state.future_slots <- future_slots ;
   slots
 
-
 let filter_invalid_operations (cctxt : #full) state block_info (operations : packed_operation list list) =
   let open Client_baking_simulator in
   lwt_debug "Starting client-side validation %a"
     Block_hash.pp block_info.Client_baking_blocks.hash >>= fun () ->
-  begin_construction cctxt state.index block_info >>=? fun initial_inc ->
+  begin begin_construction cctxt state.index block_info >>= function
+    | Ok inc -> return inc
+    | Error errs ->
+        lwt_log_error "Error while fetching current context : %a"
+          pp_print_error errs >>= fun () ->
+        lwt_log_notice "Retrying to open the context" >>= fun () ->
+        Client_baking_simulator.load_context ~context_path:state.context_path >>= fun index ->
+        begin_construction cctxt index block_info >>=? fun inc ->
+        state.index <- index;
+        return inc
+  end  >>=? fun initial_inc ->
   let endorsements = List.nth operations endorsements_index in
   let votes = List.nth operations votes_index in
   let anonymous = List.nth operations anonymous_index in
@@ -742,7 +749,7 @@ let create
     let constants =
       tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Head 0)) in
     Client_baking_simulator.load_context ~context_path >>= fun index ->
-    let state = create_state genesis_hash index delegates constants bi in
+    let state = create_state genesis_hash context_path index delegates constants bi in
     return state
   in
 
@@ -755,4 +762,3 @@ let create
     ~compute_timeout
     ~timeout_k:(bake ?threshold ())
     ~event_k:(insert_block ?max_priority ())
-
