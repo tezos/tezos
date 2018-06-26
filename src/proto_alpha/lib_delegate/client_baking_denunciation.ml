@@ -27,22 +27,16 @@ type state = {
   (* Blocks received so far *)
   blocks_table : Block_hash.t Delegate_Map.t HLevel.t ;
   (* Maximum delta of level to register *)
-  preserved_levels : Raw_level.t ;
+  preserved_levels : int ;
   (* Highest level seen in a block *)
   mutable highest_level_encountered : Raw_level.t ;
 }
 
 let create_state ~preserved_levels =
-  Alpha_environment.wrap_error @@ Raw_level.of_int32 (Int32.of_int preserved_levels)
-  |> function
-  | Error errs ->
-      lwt_log_error "Bad preserved_levels conversion : %a" pp_print_error errs >>=
-      exit 2
-  | Ok raw_level_preserved_levels ->
-      Lwt.return { endorsements_table = HLevel.create preserved_levels ;
-                   blocks_table = HLevel.create preserved_levels ;
-                   preserved_levels = raw_level_preserved_levels ;
-                   highest_level_encountered = Raw_level.root (* 0l *) }
+  Lwt.return { endorsements_table = HLevel.create preserved_levels ;
+               blocks_table = HLevel.create preserved_levels ;
+               preserved_levels ;
+               highest_level_encountered = Raw_level.root (* 0l *) }
 
 (* get the delegate that had the right to bake for a specific level/slot *)
 let fetch_baker (cctxt : #Proto_alpha.full) ~chain ~block =
@@ -50,14 +44,16 @@ let fetch_baker (cctxt : #Proto_alpha.full) ~chain ~block =
     { protocol_data = { Alpha_context.Block_header.baker  } } ->
   return baker
 
+(* We choose a previous offset (5 blocks from head) to ensure that the
+   injected operation is branched from a valid predecessor. *)
 let get_block_offset level =
-  Alpha_environment.wrap_error @@
-  Raw_level.of_int32 6l |> function
+  match Alpha_environment.wrap_error (Raw_level.of_int32 5l) with
   | Ok min_level ->
-      begin if Raw_level.(level <= min_level) then
-          Lwt.return (`Head 0)
-        else
-          Lwt.return (`Head 5) end
+      Lwt.return 
+        (if Raw_level.(level < min_level) then
+           `Head 0
+         else
+           `Head 5)
   | Error errs ->
       lwt_log_error "Invalid level conversion : %a" pp_print_error errs >>= fun () ->
       Lwt.return (`Head 0)
@@ -141,25 +137,26 @@ let process_block (cctxt : #Proto_alpha.full) state ~chain (header : Alpha_block
 
 (* Remove levels that are lower than the [highest_level_encountered] minus [preserved_levels] *)
 let cleanup_old_operations state =
-  let diff = Raw_level.diff state.highest_level_encountered state.preserved_levels in
-  Alpha_environment.wrap_error @@ begin if Int32.compare diff Int32.zero < 0 then
-      Alpha_environment.Error_monad.ok Raw_level.root
+  let highest_level_encountered =
+    Int32.to_int (Raw_level.to_int32 state.highest_level_encountered)
+  in
+  let diff = highest_level_encountered  - state.preserved_levels in
+  let threshold = begin if diff < 0 then
+      Raw_level.root
     else
-      Raw_level.of_int32 diff
-  end |> function
-  | Error errs ->
-      lwt_log_error "Bad conversion : %a" pp_print_error errs >>=
-      Lwt.return
-  | Ok threshold ->
-      let filter hmap =
-        HLevel.filter_map_inplace (fun level x ->
-            if Raw_level.(level < threshold) then
-              None
-            else
-              Some x
-          ) hmap in
-      filter state.endorsements_table ; filter state.blocks_table ;
-      Lwt.return ()
+      Raw_level.of_int32 (Int32.of_int diff) |> function
+      | Ok threshold -> threshold
+      | Error _ -> Raw_level.root
+  end in
+  let filter hmap =
+    HLevel.filter_map_inplace (fun level x ->
+        if Raw_level.(level < threshold) then
+          None
+        else
+          Some x
+      ) hmap in
+  filter state.endorsements_table ; filter state.blocks_table ;
+  ()
 
 let endorsements_index = 0
 
@@ -200,7 +197,7 @@ let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; leve
             pp_print_error errs >>= fun () ->
           return ()
     end >>=? fun () ->
-    cleanup_old_operations state >>= fun () ->
+    cleanup_old_operations state ;
     return ()
 
 let create (cctxt : #Proto_alpha.full) ~preserved_levels valid_blocks_stream =
