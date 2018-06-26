@@ -466,9 +466,10 @@ end = struct
         (* TODO *)
         Lwt.return_unit
 
-  let rec worker_loop state =
-    let shutdown = Lwt_canceler.cancelation state.canceler
-    and timeout = compute_timeout state in
+  let worker_loop state =
+    let shutdown = Lwt_canceler.cancelation state.canceler in
+    let rec loop state =
+    let timeout = compute_timeout state in
     Lwt.choose
       [ (state.events >|= fun _ -> ()) ; timeout ; shutdown ] >>= fun () ->
     if Lwt.state shutdown <> Lwt.Sleep then
@@ -479,7 +480,7 @@ end = struct
       state.events >>= fun events ->
       state.events <- Lwt_pipe.pop_all state.queue ;
       Lwt_list.iter_s (process_event state now) events >>= fun () ->
-      worker_loop state
+      loop state
     else
       lwt_debug "timeout" >>= fun () ->
       let now = Unix.gettimeofday () in
@@ -518,7 +519,9 @@ end = struct
               Hash.pp key P2p_peer.Id.pp_short peer)
           request
       end requests Lwt.return_unit >>= fun () ->
-      worker_loop state
+      loop state
+    in
+    loop state
 
   let create param =
     let state = {
