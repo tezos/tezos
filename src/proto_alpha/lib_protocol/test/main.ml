@@ -17,5 +17,6 @@ let () =
     "double baking", Double_baking.tests ;
     "seed", Seed.tests ;
     "baking", Baking.tests ;
+    "delegation", Delegation.tests ;
     "rolls", Rolls.tests ;
   ]
