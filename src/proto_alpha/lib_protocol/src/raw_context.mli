@@ -97,8 +97,8 @@ val gas_level: t -> Gas_limit_repr.t
 val gas_consumed: since: t -> until: t -> Z.t
 val block_gas_level: t -> Z.t
 
-val init_storage_space_to_pay: t -> t tzresult
-val update_storage_space_to_pay: t -> Z.t -> t tzresult
+val init_storage_space_to_pay: t -> t
+val update_storage_space_to_pay: t -> Z.t -> t
 val clear_storage_space_to_pay: t -> t * Z.t
 
 type error += Undefined_operation_nonce (* `Permanent *)

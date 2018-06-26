@@ -893,10 +893,11 @@ module Fees : sig
   val record_paid_storage_space:
     context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
 
-  val with_fees_for_storage:
-    context -> storage_limit:Z.t -> payer:Contract.t ->
-    (context -> (context * 'a) tzresult Lwt.t) ->
-    (context * 'a) tzresult Lwt.t
+  val start_counting_storage_fees :
+    context -> context
+
+  val burn_storage_fees:
+    context -> storage_limit:Z.t -> payer:Contract.t -> context tzresult Lwt.t
 
   type error += Cannot_pay_storage_fee (* `Temporary *)
   type error += Operation_quota_exceeded (* `Temporary *)

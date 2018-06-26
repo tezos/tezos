@@ -22,7 +22,8 @@ val record_paid_storage_space:
 val check_storage_limit:
   Raw_context.t -> storage_limit:Z.t -> unit tzresult
 
-val with_fees_for_storage:
-  Raw_context.t -> storage_limit:Z.t -> payer:Contract_repr.t ->
-  (Raw_context.t -> (Raw_context.t * 'a) tzresult Lwt.t) ->
-  (Raw_context.t * 'a) tzresult Lwt.t
+val start_counting_storage_fees :
+  Raw_context.t -> Raw_context.t
+
+val burn_storage_fees:
+  Raw_context.t -> storage_limit:Z.t -> payer:Contract_repr.t -> Raw_context.t tzresult Lwt.t

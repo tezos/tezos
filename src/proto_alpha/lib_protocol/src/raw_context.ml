@@ -185,14 +185,14 @@ let init_storage_space_to_pay ctxt =
   | Some _ ->
       assert false
   | None ->
-      ok { ctxt with storage_space_to_pay = Some Z.zero }
+      { ctxt with storage_space_to_pay = Some Z.zero }
 
 let update_storage_space_to_pay ctxt n =
   match ctxt.storage_space_to_pay with
   | None ->
       assert false
   | Some storage_space_to_pay ->
-      ok { ctxt with storage_space_to_pay = Some (Z.add n storage_space_to_pay) }
+      { ctxt with storage_space_to_pay = Some (Z.add n storage_space_to_pay) }
 
 let clear_storage_space_to_pay ctxt =
   match ctxt.storage_space_to_pay with

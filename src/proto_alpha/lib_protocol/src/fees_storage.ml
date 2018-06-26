@@ -50,12 +50,12 @@ let origination_burn c ~payer =
 let record_paid_storage_space c contract =
   Contract_storage.used_storage_space c contract >>=? fun size ->
   Contract_storage.set_paid_storage_space_and_return_fees_to_pay c contract size >>=? fun (to_be_paid, c) ->
-  Lwt.return (Raw_context.update_storage_space_to_pay c to_be_paid) >>=? fun c ->
+  let c = Raw_context.update_storage_space_to_pay c to_be_paid in
   let cost_per_byte = Constants_storage.cost_per_byte c in
   Lwt.return (Tez_repr.(cost_per_byte *? (Z.to_int64 to_be_paid))) >>=? fun to_burn ->
   return (c, size, to_be_paid, to_burn)
 
-let burn_fees_for_storage c ~storage_limit ~payer =
+let burn_storage_fees c ~storage_limit ~payer =
   let c, storage_space_to_pay = Raw_context.clear_storage_space_to_pay c in
   let remaining = Z.sub storage_limit storage_space_to_pay in
   if Compare.Z.(remaining < Z.zero) then
@@ -81,8 +81,5 @@ let check_storage_limit c ~storage_limit =
   else
     ok ()
 
-let with_fees_for_storage c ~storage_limit ~payer f =
-  Lwt.return (Raw_context.init_storage_space_to_pay c) >>=? fun c ->
-  f c >>=? fun (c, ret) ->
-  burn_fees_for_storage c ~storage_limit ~payer >>=? fun c ->
-  return (c, ret)
+let start_counting_storage_fees c =
+  Raw_context.init_storage_space_to_pay c
