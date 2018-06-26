@@ -209,11 +209,13 @@ let forge (op : Operation.packed) : Operation.raw =
   }
 
 let ops_of_mempool (ops : Alpha_block_services.Mempool.t) =
-  List.map (fun (_, op) -> op) ops.applied @
-  Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.refused [] @
-  Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.branch_refused [] @
-  Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.branch_delayed [] @
-  Operation_hash.Map.fold (fun _ op acc -> op :: acc) ops.unprocessed []
+  List.rev (
+    Operation_hash.Map.fold (fun _ op acc -> op :: acc) ops.unprocessed @@
+    Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.branch_delayed @@
+    Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.branch_refused @@
+    Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.refused @@
+    List.rev_map (fun (_, op) -> op) ops.applied
+  )
 
 let unopt_operations cctxt chain = function
   | None ->
