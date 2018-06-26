@@ -48,6 +48,7 @@ module Contract : sig
   val manager: t -> Contract.t -> Account.t tzresult Lwt.t
   val is_manager_key_revealed: t -> Contract.t -> bool tzresult Lwt.t
 
+  val delegate: t -> Contract.t -> public_key_hash tzresult Lwt.t
   val delegate_opt: t -> Contract.t -> public_key_hash option tzresult Lwt.t
 
 end
