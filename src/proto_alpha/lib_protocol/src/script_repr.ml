@@ -42,16 +42,6 @@ let lazy_expr_encoding =
 let lazy_expr expr =
   Data_encoding.make_lazy expr_encoding expr
 
-let force_decode expr =
-  match Data_encoding.force_decode expr with
-  | Some v -> ok v
-  | None -> error Lazy_script_decode
-
-let force_bytes expr =
-  match Data_encoding.force_bytes expr with
-  | bytes -> ok bytes
-  | exception _ -> error Lazy_script_decode
-
 type t = {
   code : lazy_expr ;
   storage : lazy_expr
@@ -95,6 +85,62 @@ let rec node_size node =
 let expr_size expr =
   node_size (Micheline.root expr)
 
-let expr_cost expr =
+let traversal_cost expr =
+  let blocks, _words = expr_size expr in
+  Gas_limit_repr.step_cost blocks
+
+let deserialized_cost expr =
+  let open Gas_limit_repr in
   let blocks, words = expr_size expr in
-  Gas_limit_repr.(((Compare.Int.max 0 (blocks - 1)) *@ alloc_cost 0) +@ alloc_cost words)
+  ((Compare.Int.max 0 (blocks - 1)) *@ alloc_cost 0) +@
+  alloc_cost words +@
+  step_cost blocks
+
+let serialized_cost bytes =
+  let open Gas_limit_repr in
+  alloc_bytes_cost (MBytes.length bytes)
+
+let force_decode lexpr =
+  match Data_encoding.force_decode lexpr with
+  | Some v ->
+      let deserialize_cost =
+        Data_encoding.fold_lazy
+          (fun _ -> Gas_limit_repr.free)
+          (fun _ -> deserialized_cost v)
+          (fun c_free _ -> c_free)
+          lexpr in
+      ok (v, deserialize_cost)
+  | None -> error Lazy_script_decode
+
+let force_bytes expr =
+  let open Gas_limit_repr in
+  match Data_encoding.force_bytes expr with
+  | bytes ->
+      let serialize_cost =
+        Data_encoding.fold_lazy
+          (fun v -> traversal_cost v +@ serialized_cost bytes)
+          (fun _ -> Gas_limit_repr.free)
+          (fun _ c_free -> c_free)
+          expr in
+      ok (bytes, serialize_cost)
+  | exception _ -> error Lazy_script_decode
+
+let minimal_deserialize_cost lexpr =
+  let open Gas_limit_repr in
+  Data_encoding.fold_lazy
+    (fun _ -> Gas_limit_repr.free)
+    (fun b -> alloc_bytes_cost (MBytes.length b))
+    (fun c_free _ -> c_free)
+    lexpr
+
+let minimal_serialize_cost lexpr =
+  let open Gas_limit_repr in
+  Data_encoding.fold_lazy
+    (fun v ->
+       let blocks, _words = expr_size v in
+       step_cost blocks +@
+       alloc_bytes_cost blocks (* TODO *)
+    )
+    (fun _ -> Gas_limit_repr.free)
+    (fun _ c_free -> c_free)
+    lexpr

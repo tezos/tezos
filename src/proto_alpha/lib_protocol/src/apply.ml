@@ -359,15 +359,16 @@ let apply_manager_operation_content :
         match script with
         | None -> begin
             match parameters with
-            | None -> return_unit
+            | None -> return ctxt
             | Some arg ->
-                Lwt.return (Script.force_decode arg) >>=? fun arg ->
+                Lwt.return (Script.force_decode arg) >>=? fun (arg, cost_arg) ->
+                Lwt.return (Gas.consume ctxt cost_arg) >>=? fun ctxt ->
                 match Micheline.root arg with
                 | Prim (_, D_Unit, [], _) ->
                     (* Allow [Unit] parameter to non-scripted contracts. *)
-                    return_unit
+                    return ctxt
                 | _ -> fail (Script_interpreter.Bad_contract_parameter destination)
-          end >>=? fun () ->
+          end >>=? fun ctxt ->
             let result =
               Transaction_result
                 { storage = None ;
@@ -388,7 +389,8 @@ let apply_manager_operation_content :
                   let unit = Micheline.strip_locations (Prim (0, Script.D_Unit, [], [])) in
                   return (ctxt, unit)
               | Some parameters ->
-                  Lwt.return (Script.force_decode parameters) >>=? fun arg ->
+                  Lwt.return (Script.force_decode parameters) >>=? fun (arg, cost_arg) ->
+                  Lwt.return (Gas.consume ctxt cost_arg) >>=? fun ctxt ->
                   return (ctxt, arg)
             end >>=? fun (ctxt, parameter) ->
             Script_interpreter.execute
@@ -501,13 +503,27 @@ let precheck_manager_contents
     | Reveal pk ->
         Contract.reveal_manager_key ctxt source pk
     | Transaction { parameters = Some arg ; _ } ->
-        let min_gas = Michelson_v1_gas.Cost_of.Typechecking.minimal_deserialize arg in
         (* Fail if not enough gas for minimal deserialization cost *)
-        begin
-          match Gas.consume ctxt min_gas with
+        begin match Gas.consume ctxt (Script.minimal_deserialize_cost arg) with
           | Ok _ -> return ctxt
           | Error _ -> fail Not_enough_gas_minimal_deserialize
-        end
+        end >>=? fun ctxt ->
+        Lwt.return @@ Script.force_decode arg >>=? fun (_arg, cost_arg) ->
+        Lwt.return @@ Gas.consume ctxt cost_arg
+    | Origination { script = Some script ; _ } ->
+        (* Fail if not enough gas for minimal deserialization cost *)
+        begin
+          match
+            Gas.consume ctxt (Script.minimal_deserialize_cost script.code) >>? fun ctxt ->
+            Gas.consume ctxt (Script.minimal_deserialize_cost script.storage)
+          with
+          | Ok _ -> return ctxt
+          | Error _ -> fail Not_enough_gas_minimal_deserialize
+        end >>=? fun ctxt ->
+        Lwt.return @@ Script.force_decode script.code >>=? fun (_code, cost_code) ->
+        Lwt.return @@ Gas.consume ctxt cost_code >>=? fun ctxt ->
+        Lwt.return @@ Script.force_decode script.storage >>=? fun (_storage, cost_storage) ->
+        Lwt.return @@ Gas.consume ctxt cost_storage
     | _ -> return ctxt
   end >>=? fun ctxt ->
   Contract.get_manager_key ctxt source >>=? fun public_key ->

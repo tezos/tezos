@@ -286,8 +286,6 @@ module Script : sig
 
   type lazy_expr = expr Data_encoding.lazy_t
 
-  val force_decode : lazy_expr -> expr tzresult
-  val force_bytes : lazy_expr -> MBytes.t tzresult
   val lazy_expr : expr -> lazy_expr
 
   type node = (location, prim) Micheline.node
@@ -301,7 +299,12 @@ module Script : sig
   val prim_encoding: prim Data_encoding.t
   val encoding: t Data_encoding.t
   val lazy_expr_encoding: lazy_expr Data_encoding.t
-  val expr_cost : expr -> Gas.cost
+  val deserialized_cost : expr -> Gas.cost
+  val serialized_cost : MBytes.t -> Gas.cost
+  val force_decode : lazy_expr -> (expr * Gas.cost) tzresult
+  val force_bytes : lazy_expr -> (MBytes.t * Gas.cost) tzresult
+  val minimal_deserialize_cost : lazy_expr -> Gas.cost
+  val minimal_serialize_cost : lazy_expr -> Gas.cost
 end
 
 module Constants : sig

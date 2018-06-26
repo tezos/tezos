@@ -132,8 +132,6 @@ module Cost_of : sig
     val two_arg_type : Gas.cost
 
     val operation : MBytes.t -> Gas.cost
-
-    val minimal_deserialize : Script.lazy_expr -> Gas.cost
   end
 
   module Unparse : sig

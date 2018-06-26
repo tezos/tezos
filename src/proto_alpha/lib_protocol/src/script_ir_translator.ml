@@ -2550,7 +2550,8 @@ and parse_contract
                ok (ctxt, contract))
         | Some { code ; _ } ->
             Lwt.return
-              (Script.force_decode code >>? fun code ->
+              (Script.force_decode code >>? fun (code, cost_code) ->
+               Gas.consume ctxt cost_code >>? fun ctxt ->
                parse_toplevel code >>? fun (arg_type, _, _) ->
                parse_ty ~allow_big_map:false ~allow_operation:false arg_type >>? fun (Ex_ty targ) ->
                ty_eq targ arg >>? fun Eq ->
@@ -2606,8 +2607,10 @@ let parse_script
   : ?type_logger: type_logger ->
     context -> Script.t -> (ex_script * context) tzresult Lwt.t
   = fun ?type_logger ctxt { code ; storage } ->
-    Lwt.return @@ Script.force_decode code >>=? fun code ->
-    Lwt.return @@ Script.force_decode storage >>=? fun storage ->
+    Lwt.return @@ Script.force_decode code >>=? fun (code, cost_code) ->
+    Lwt.return @@ Gas.consume ctxt cost_code >>=? fun ctxt ->
+    Lwt.return @@ Script.force_decode storage >>=? fun (storage, cost_storage) ->
+    Lwt.return @@ Gas.consume ctxt cost_storage >>=? fun ctxt ->
     Lwt.return @@ parse_toplevel code >>=? fun (arg_type, storage_type, code_field) ->
     trace
       (Ill_formed_type (Some "parameter", code, location arg_type))
@@ -2932,8 +2935,10 @@ let extract_big_map : type a. a ty -> a -> ex_big_map option = fun ty x ->
   | _, _ -> None
 
 let erase_big_map_initialization ctxt mode ({ code ; storage } : Script.t) =
-  Lwt.return (Script.force_decode code) >>=? fun code ->
-  Lwt.return (Script.force_decode storage) >>=? fun storage ->
+  Lwt.return @@ Script.force_decode code >>=? fun (code, cost_code) ->
+  Lwt.return @@ Gas.consume ctxt cost_code >>=? fun ctxt ->
+  Lwt.return @@ Script.force_decode storage >>=? fun (storage, cost_storage) ->
+  Lwt.return @@ Gas.consume ctxt cost_storage >>=? fun ctxt ->
   Lwt.return @@ parse_toplevel code >>=? fun (_, storage_type, _) ->
   Lwt.return @@ parse_ty ~allow_big_map:true ~allow_operation:false storage_type >>=? fun (Ex_ty ty) ->
   parse_data ctxt ty
