@@ -11,7 +11,7 @@ module Bounded_encoding = struct
 
   open Data_encoding
 
-  let block_header_max_size = ref None
+  let block_header_max_size = ref (Some (8 * 1024 * 1024)) (* FIXME: arbitrary *)
   let block_header_cache =
     ref (Block_header.bounded_encoding ?max_size:!block_header_max_size ())
   let block_locator_cache =
@@ -30,10 +30,12 @@ module Bounded_encoding = struct
   let block_header = delayed (fun () -> !block_header_cache)
   let block_locator = delayed (fun () -> !block_locator_cache)
 
-  let operation_max_size = ref None
-  let operation_list_max_size = ref None
-  let operation_list_max_length = ref None
-  let operation_max_pass = ref None
+  (* FIXME: all constants below are arbitrary high bounds until we
+     have the mechanism to update them properly *)
+  let operation_max_size = ref (Some (128 * 1024)) (* FIXME: arbitrary *)
+  let operation_list_max_size = ref (Some (1024 * 1024)) (* FIXME: arbitrary *)
+  let operation_list_max_length = ref None (* FIXME: arbitrary *)
+  let operation_max_pass = ref (Some 8) (* FIXME: arbitrary *)
 
   let operation_cache =
     ref (Operation.bounded_encoding ?max_size:!operation_max_size ())
@@ -86,7 +88,7 @@ module Bounded_encoding = struct
   let operation_list = delayed (fun () -> !operation_list_cache)
   let operation_hash_list = delayed (fun () -> !operation_hash_list_cache)
 
-  let protocol_max_size = ref None
+  let protocol_max_size = ref (Some (2 * 1024 * 1024)) (* FIXME: arbitrary *)
   let protocol_cache =
     ref (Protocol.bounded_encoding ?max_size:!protocol_max_size ())
   let update_protocol_encoding () =
