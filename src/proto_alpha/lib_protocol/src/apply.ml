@@ -538,7 +538,7 @@ let apply_manager_contents
 let rec mark_skipped
   : type kind.
     baker : Signature.Public_key_hash.t -> Level.t -> kind Kind.manager contents_list ->
-    kind Kind.manager contents_result_list = fun ~baker level -> function
+  kind Kind.manager contents_result_list = fun ~baker level -> function
   | Single (Manager_operation ({ source ; fee } as op)) ->
       Single_result
         (Manager_operation_result
