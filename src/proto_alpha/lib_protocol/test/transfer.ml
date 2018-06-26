@@ -59,7 +59,7 @@ let register_two_contracts () =
   let contract_2 = List.nth contracts 1 in
   return (b, contract_1, contract_2)
 
-(** 1- Create a block and two contracts/accounts;
+(** 1- Create a block and two contracts;
     2- Add a single transfer into this block;
     3- Bake this block. *)
 let single_transfer ?fee ?expect_failure amount =
@@ -88,7 +88,7 @@ let transfer_zero_tez () =
 let block_with_a_single_transfer_with_fee () =
   single_transfer ~fee:Tez.one Tez.one
 
-(** 1- Create a block, and a single contract/account;
+(** 1- Create a block, and a single contract;
     2- Add the originate operation into this block;
     3- Add a transfer from a contract to a contract created by
        originate operation, that requires to pay a fee of transfer;
@@ -103,7 +103,7 @@ let block_originate_and_transfer_with_fee () =
   Incremental.finalize_block b >>=? fun _ ->
   return ()
 
-(** 1- Create a block, and two contracts/accounts;
+(** 1- Create a block, and two contracts;
     2- Add a transfer from a current balance of a source contract
        into this block;
     3- Bake this block. *)
@@ -115,7 +115,7 @@ let block_transfer_from_contract_balance () =
   Incremental.finalize_block b >>=? fun _ ->
   return ()
 
-(** 1- Create a block and a single contract/account;
+(** 1- Create a block and a single contract;
     2- Add a transfer to a contract itself without fee into this block;
     3- Add a transfer to a contract itself with fee into this block;
     4- Bake this block. *)
@@ -130,7 +130,7 @@ let block_transfers_without_with_fee_to_self () =
   Incremental.finalize_block b >>=? fun _ ->
   return ()
 
-(** 1- Create a block, two contracts/accounts;
+(** 1- Create a block, two contracts;
     2- Add three transfers into the block;
     3- Do a transfer without adding it to the block;
     4- Bake the block with three transfers. *)
@@ -142,10 +142,10 @@ let four_transfers_bake_three_transfers () =
   Incremental.finalize_block b >>=? fun _ ->
   return ()
 
-(** 1- Create a contract from a bootstrap account;
+(** 1- Create a contract from a bootstrap contract;
     2- Create two implicit contracts;
     3- Build a block from genesis;
-    4- Add a transfer with fee for transfer from a bootstrap countract into an
+    4- Add a transfer with fee for transfer from a bootstrap contract into an
        implicit contract into this block;
     5- Add a transfer with fee for transfer, between two implicit contracts
        into this block;
@@ -218,6 +218,21 @@ let transfer_from_originated_to_implicit () =
   Incremental.finalize_block b >>=? fun _ ->
   return ()
 
+(** Checking that the sender of a transaction is the actual
+    manager of the contract.
+    Ownership of sender manager key (in case of a contract) *)
+let ownership_sender () =
+  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Incremental.begin_construction b >>=? fun b ->
+  (* get the manager of the contract_1 as a sender *)
+  Context.Contract.manager (I b) contract_1 >>=? fun manager ->
+  (* create an implicit_contract *)
+  let imcontract_1 = Alpha_context.Contract.implicit_contract manager.pkh in
+  transfer_and_check_balances ~loc:__LOC__ b imcontract_1 contract_2 Tez.one
+  >>=? fun (b,_) ->
+  Incremental.finalize_block b >>=? fun _ ->
+  return ()
+
 (* Slow tests case *)
 
 let multiple_transfer n ?fee amount =
@@ -267,7 +282,7 @@ let block_with_multiple_transfers_with_without_fee () =
   Incremental.finalize_block b >>=? fun _ ->
   return ()
 
-(** 1- Create a block with 8 contracts;
+(** 1- Create a block with two contracts;
     2- Bake 10 blocks with a transfer each time. *)
 let build_a_chain () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
@@ -315,7 +330,7 @@ let balance_too_low fee () =
     Assert.balance_was_credited ~loc:__LOC__ (I i) contract_2 balance2 Tez.zero
   end
 
-(** 1- Create a block, and three contracts/accounts;
+(** 1- Create a block, and three contracts;
     2- Add a transfer that at the end the balance of a contract is
        zero into this block;
     3- Add another transfer that send tez from a zero balance contract;
@@ -398,21 +413,6 @@ let unspendable_contract () =
     | _ -> false
   end
 
-(** Checking that the sender of a transaction is the actual
-    manager of the contract.
-    Ownership of sender manager key (in case of a contract) *)
-let ownership_sender () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
-  Incremental.begin_construction b >>=? fun b ->
-  (* get the manager of the contract_1 as a sender *)
-  Context.Contract.manager (I b) contract_1 >>=? fun manager ->
-  (* create an implicit_contract *)
-  let imcontract_1 = Alpha_context.Contract.implicit_contract manager.pkh in
-  transfer_and_check_balances ~loc:__LOC__ b imcontract_1 contract_2 Tez.one
-  >>=? fun (b,_) ->
-  Incremental.finalize_block b >>=? fun _ ->
-  return ()
-
 (*********************************************************************)
 (** Random transfer *)
 
@@ -464,7 +464,7 @@ let tests = [
   Test.tztest "block transfers without and with fee to itself" `Quick block_transfers_without_with_fee_to_self ;
   Test.tztest "four transfers but bake three transfers" `Quick four_transfers_bake_three_transfers ;
   Test.tztest "transfer from an implicit to implicit contract " `Quick transfer_from_implicit_to_implicit_contract ;
-  Test.tztest "transfer from an impicit to an originated contract" `Quick transfer_from_implicit_to_originated_contract ;
+  Test.tztest "transfer from an implicit to an originated contract" `Quick transfer_from_implicit_to_originated_contract ;
   Test.tztest "transfer from an originated to an originated contract" `Quick transfer_from_originated_to_originated ;
   Test.tztest "transfer from an originated to an implicit contract" `Quick transfer_from_originated_to_implicit ;
   Test.tztest "ownership sender" `Quick  ownership_sender ;
@@ -478,6 +478,7 @@ let tests = [
   (* Erroneous *)
   Test.tztest "balance too low" `Quick (balance_too_low  Tez.zero);
   Test.tztest "balance too low" `Quick (balance_too_low  Tez.one);
+  Test.tztest "balance too low (max fee)" `Quick (balance_too_low  Tez.max_tez);
   Test.tztest "balance too low with two transfers" `Quick (balance_too_low_two_transfers Tez.zero);
   Test.tztest "balance too low with two transfers" `Quick (balance_too_low_two_transfers Tez.one);
   Test.tztest "invalid_counter" `Quick invalid_counter ;
