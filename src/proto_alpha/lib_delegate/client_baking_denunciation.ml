@@ -49,7 +49,7 @@ let fetch_baker (cctxt : #Proto_alpha.full) ~chain ~block =
 let get_block_offset level =
   match Alpha_environment.wrap_error (Raw_level.of_int32 5l) with
   | Ok min_level ->
-      Lwt.return 
+      Lwt.return
         (if Raw_level.(level < min_level) then
            `Head 0
          else
@@ -63,7 +63,7 @@ let process_endorsements (cctxt : #Proto_alpha.full) state ~chain
   iter_s (fun { Alpha_block_services.shell ; receipt ; hash ; protocol_data ; _ } ->
       match protocol_data, receipt with
       | (Operation_data ({ contents = Single (Endorsement _) ; _ } as protocol_data)),
-        Apply_operation_result.(
+        Apply_results.(
           Operation_metadata { contents = Single_result (Endorsement_result { delegate ; _ }) }) ->
           let new_endorsement : Kind.endorsement Alpha_context.operation = { shell ; protocol_data } in
           let map = match HLevel.find_opt state.endorsements_table level with
@@ -168,7 +168,7 @@ let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; leve
   if Protocol_hash.(protocol <> next_protocol) then
     lwt_log_error "Protocol changing detected. Skipping the block." >>= fun () ->
     return_unit
-  else 
+  else
     lwt_debug "Block level : %a" Raw_level.pp level >>= fun () ->
     let chain = `Hash chain_id in
     let block = `Hash (hash, 0) in

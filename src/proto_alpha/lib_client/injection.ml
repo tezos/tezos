@@ -9,7 +9,7 @@
 
 open Proto_alpha
 open Alpha_context
-open Apply_operation_result
+open Apply_results
 
 let get_branch (rpc_config: #Proto_alpha.full)
     ~chain ~(block : Block_services.block) branch =
@@ -64,8 +64,8 @@ let preapply (type t)
   | [(Operation_data op', Operation_metadata result)] -> begin
       match Operation.equal
               op { shell = { branch } ; protocol_data = op' },
-            Apply_operation_result.kind_equal_list contents result.contents with
-      | Some Operation.Eq, Some Apply_operation_result.Eq ->
+            Apply_results.kind_equal_list contents result.contents with
+      | Some Operation.Eq, Some Apply_results.Eq ->
           return ((oph, op, result) : t preapply_result)
       | _ -> failwith "Unexpected result"
     end
@@ -84,8 +84,8 @@ let simulate (type t)
   | (Operation_data op', Operation_metadata result) -> begin
       match Operation.equal
               op { shell = { branch } ; protocol_data = op' },
-            Apply_operation_result.kind_equal_list contents result.contents with
-      | Some Operation.Eq, Some Apply_operation_result.Eq ->
+            Apply_results.kind_equal_list contents result.contents with
+      | Some Operation.Eq, Some Apply_results.Eq ->
           return ((oph, op, result) : t preapply_result)
       | _ -> failwith "Unexpected result"
     end
@@ -388,9 +388,9 @@ let inject_operation
           | No_operation_metadata ->
               failwith "Internal error: unexpected receipt."
           | Operation_metadata receipt ->
-              match Apply_operation_result.kind_equal_list contents receipt.contents
+              match Apply_results.kind_equal_list contents receipt.contents
               with
-              | Some Apply_operation_result.Eq ->
+              | Some Apply_results.Eq ->
                   return (receipt : kind operation_metadata)
               | None -> failwith "Internal error: unexpected receipt."
     end >>=? fun result ->

@@ -46,6 +46,6 @@ include Updater.PROTOCOL
    and type block_header_metadata = Alpha_context.Block_header.metadata
    and type block_header = Alpha_context.Block_header.t
    and type operation_data := operation_data
-   and type operation_receipt = Apply_operation_result.packed_operation_metadata
+   and type operation_receipt = Apply_results.packed_operation_metadata
    and type operation := operation
    and type validation_state := validation_state

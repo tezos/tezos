@@ -24,14 +24,14 @@ type operation_data = Alpha_context.packed_protocol_data =
   | Operation_data : 'kind Alpha_context.Operation.protocol_data -> operation_data
 let operation_data_encoding = Alpha_context.Operation.protocol_data_encoding
 
-type operation_receipt = Apply_operation_result.packed_operation_metadata =
-  | Operation_metadata : 'kind Apply_operation_result.operation_metadata -> operation_receipt
+type operation_receipt = Apply_results.packed_operation_metadata =
+  | Operation_metadata : 'kind Apply_results.operation_metadata -> operation_receipt
   | No_operation_metadata: operation_receipt
 let operation_receipt_encoding =
-  Apply_operation_result.operation_metadata_encoding
+  Apply_results.operation_metadata_encoding
 
 let operation_data_and_receipt_encoding =
-  Apply_operation_result.operation_data_and_metadata_encoding
+  Apply_results.operation_data_and_metadata_encoding
 
 type operation = Alpha_context.packed_operation = {
   shell: Operation.shell_header ;

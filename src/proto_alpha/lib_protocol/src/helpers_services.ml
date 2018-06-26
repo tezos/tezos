@@ -130,7 +130,7 @@ module Scripts = struct
           "Run an operation without signature checks"
         ~query: RPC_query.empty
         ~input: Operation.encoding
-        ~output: Apply_operation_result.operation_data_and_metadata_encoding
+        ~output: Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "run_operation")
 
   end
@@ -238,7 +238,7 @@ module Scripts = struct
               partial_precheck_manager_contents_list ctxt rest in
       let return contents =
         return (Operation_data protocol_data,
-                Apply_operation_result.Operation_metadata { contents }) in
+                Apply_results.Operation_metadata { contents }) in
       let operation : _ operation = { shell ; protocol_data } in
       let hash = Operation.hash { shell ; protocol_data } in
       let ctxt = Contract.init_origination_nonce ctxt hash in

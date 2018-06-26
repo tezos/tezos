@@ -320,7 +320,7 @@ let () =
     (function Multiple_revelation -> Some () | _ -> None)
     (fun () -> Multiple_revelation)
 
-open Apply_operation_result
+open Apply_results
 
 let apply_manager_operation_content :
   type kind.

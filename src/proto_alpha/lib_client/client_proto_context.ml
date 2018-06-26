@@ -70,8 +70,8 @@ let reveal cctxt
       Injection.inject_operation cctxt ~chain ~block ?confirmations
         ?dry_run
         ?branch ~src_sk contents >>=? fun (oph, op, result) ->
-      match Apply_operation_result.pack_contents_list op result with
-      | Apply_operation_result.Single_and_result
+      match Apply_results.pack_contents_list op result with
+      | Apply_results.Single_and_result
           (Manager_operation _ as op, result) ->
           return (oph, op, result)
     end
@@ -320,8 +320,8 @@ let inject_activate_operation
           Tez.pp balance >>= fun () ->
         return_unit
   end >>=? fun () ->
-  match Apply_operation_result.pack_contents_list op result with
-  | Apply_operation_result.Single_and_result
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result
       (Activate_account _ as op, result) ->
       return (oph, op, result)
 

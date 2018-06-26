@@ -9,7 +9,7 @@
 
 open Proto_alpha
 open Alpha_context
-open Apply_operation_result
+open Apply_results
 
 let pp_manager_operation_content
     (type kind) source internal pp_result
@@ -391,7 +391,7 @@ let pp_operation_result ppf
     (op, res : 'kind contents_list * 'kind contents_result_list) =
   Format.fprintf ppf "@[<v 0>" ;
   let contents_and_result_list =
-    Apply_operation_result.pack_contents_list op res in
+    Apply_results.pack_contents_list op res in
   pp_contents_and_result_list ppf contents_and_result_list ;
   Format.fprintf ppf "@]@."
 
