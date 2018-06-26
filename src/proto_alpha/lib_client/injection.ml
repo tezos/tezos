@@ -283,7 +283,7 @@ let may_patch_limits
                 cctxt#message
                   "Estimated gas: %s units (will add 100 for safety)"
                   (Z.to_string gas) >>= fun () ->
-                return (Z.add gas (Z.of_int 100))
+                return (Z.min (Z.add gas (Z.of_int 100)) gas_limit)
             end
           else return c.gas_limit
         end >>=? fun gas_limit ->
@@ -298,7 +298,7 @@ let may_patch_limits
                 cctxt#message
                   "Estimated storage: %s bytes added (will add 20 for safety)"
                   (Z.to_string storage) >>= fun () ->
-                return (Z.add storage (Z.of_int 20))
+                return (Z.min (Z.add storage (Z.of_int 20)) storage_limit)
             end
           else return c.storage_limit
         end >>=? fun storage_limit ->
