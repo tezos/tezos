@@ -72,7 +72,7 @@ let receive conn =
     P2p_io_scheduler.read conn buf >>= function
     | Ok _ -> loop ()
     | Error [P2p_errors.Connection_closed] ->
-        Lwt.return ()
+        Lwt.return_unit
     | Error err -> Lwt.fail (Error err)
   in
   loop ()
@@ -100,7 +100,7 @@ let server
   Lwt.join (List.map receive conns) >>= fun () ->
   iter_p P2p_io_scheduler.close conns >>=? fun () ->
   log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
-  return ()
+  return_unit
 
 let max_size ?max_upload_speed () =
   match max_upload_speed with
@@ -131,7 +131,7 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
   P2p_io_scheduler.close conn >>=? fun () ->
   let stat = P2p_io_scheduler.stat conn in
   lwt_log_notice "Client OK %a" P2p_stat.pp stat >>= fun () ->
-  return ()
+  return_unit
 
 let run
     ?display_client_stat

@@ -19,7 +19,7 @@ open Test_tez
    interpret the other tests that use them. *)
 
 let expect_error err = function
-  | err0 :: _ when err = err0 -> return ()
+  | err0 :: _ when err = err0 -> return_unit
   | _ -> failwith "Unexpected successful result"
 
 let expect_alpha_error err =
@@ -27,13 +27,13 @@ let expect_alpha_error err =
 
 let expect_non_delegatable_contract = function
   | Alpha_environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
-      return ()
+      return_unit
   | _ ->
       failwith "Contract is not delegatable and operation should fail."
 
 let expect_no_deletion_pkh pkh = function
   | Alpha_environment.Ecoproto_error (Delegate_storage.No_deletion pkh0) :: _ when pkh0 = pkh ->
-      return ()
+      return_unit
   | _ ->
       failwith "Delegate can not be deleted and operation should fail."
 
@@ -115,7 +115,7 @@ let bootstrap_manager_already_registered_delegate ~fee () =
     begin
       Incremental.add_operation ~expect_failure:(function
           |  Alpha_environment.Ecoproto_error Delegate_storage.Active_delegate :: _ ->
-              return ()
+              return_unit
           | _ ->
               failwith "Delegate is already active and operation should fail.")
         i sec_reg >>=? fun i ->
@@ -147,7 +147,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
     begin
       Incremental.add_operation i ~expect_failure:(function
           |  Alpha_environment.Ecoproto_error Contract.Balance_too_low _ :: _ ->
-              return ()
+              return_unit
           | _ ->
               failwith "Not enough balance for origination burn: operation should fail.")
         op >>=? fun i ->
@@ -307,7 +307,7 @@ Not credited:
 
 let expect_unregistered_key pkh = function
   | Alpha_environment.Ecoproto_error Roll_storage.Unregistered_delegate pkh0 :: _
-    when pkh = pkh0 -> return ()
+    when pkh = pkh0 -> return_unit
   | _ -> failwith "Delegate key is not registered: operation should fail."
 
 (* A1: no self-delegation *)
@@ -893,7 +893,7 @@ let double_registration () =
   (* credit 1μꜩ+ check balance *)
   Op.transaction (I i) bootstrap impl_contract (Tez.one_mutez) >>=? fun create_contract ->
   Incremental.add_operation i create_contract >>=? fun i ->
-  (* return () *)
+  (* return_unit *)
   (* self-delegation *)
   Op.delegation (I i) impl_contract (Some pkh) >>=? fun self_delegation ->
   Incremental.add_operation i self_delegation >>=? fun i ->

@@ -168,7 +168,7 @@ let activation_init () =
 let simple_init_with_commitments () =
   activation_init () >>=? fun (blk, _contracts, _secrets) ->
   Block.bake blk >>=? fun _ ->
-  return ()
+  return_unit
 
 (** A single activation *)
 let single_activation () =
@@ -196,7 +196,7 @@ let multi_activation_1 () =
 
       return blk
     ) blk secrets >>=? fun _ ->
-  return ()
+  return_unit
 
 (** All in one bake *)
 let multi_activation_2 () =

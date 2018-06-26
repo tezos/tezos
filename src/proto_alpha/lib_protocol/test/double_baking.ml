@@ -91,7 +91,7 @@ let same_blocks () =
   Assert.proto_error ~loc:__LOC__ res begin function
     | Apply.Invalid_double_baking_evidence _ -> true
     | _ -> false end >>=? fun () ->
-  return ()
+  return_unit
 
 (** Check that a double baking operation exposing two blocks with
     different levels fails *)

@@ -77,4 +77,4 @@ let add_operation st ( op : Operation.packed ) =
   return { st with state ; rev_operations = op :: st.rev_operations }
 
 let finalize_construction inc =
-  Main.finalize_block inc.state >>=? fun _ -> return ()
+  Main.finalize_block inc.state >>=? fun _ -> return_unit

@@ -33,7 +33,7 @@ let commands () = Clic.[
          | _ :: _ :: _ when unique -> Pervasives.exit 3
          | completions ->
              List.iter print_endline completions ;
-             return ()) ;
+             return_unit) ;
     command
       ~desc: "Wait for the node to be bootstrapped."
       no_options
@@ -48,6 +48,6 @@ let commands () = Clic.[
                 Time.pp_hum time
                 Time.pp_hum (Time.now ())) stream >>= fun () ->
          cctxt#answer "Bootstrapped." >>= fun () ->
-         return ()
+         return_unit
       )
   ]

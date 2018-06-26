@@ -195,11 +195,11 @@ let set_base c is_delegatable contract delegate =
             when Signature.Public_key_hash.equal delegate current_delegate ->
               if self_delegation then
                 Storage.Contract.Inactive_delegate.mem c contract >>= function
-                | true -> return ()
+                | true -> return_unit
                 | false -> fail Active_delegate
               else
                 fail Current_delegate
-          | None | Some _ -> return ()
+          | None | Some _ -> return_unit
         end >>=? fun () ->
         Storage.Contract.Balance.mem c contract >>= fun exists ->
         fail_when

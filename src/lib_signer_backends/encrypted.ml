@@ -94,10 +94,10 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
   Secret_key.load cctxt >>=? fun sks ->
   iter_s begin fun (name, sk_uri) ->
     if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then
-      return ()
+      return_unit
     else
       decrypt cctxt ~name sk_uri >>=? fun _ ->
-      return ()
+      return_unit
   end sks
 
 let rec read_passphrase (cctxt : #Client_context.io) =

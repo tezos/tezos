@@ -109,12 +109,12 @@ let gen_keys_containing
                 else begin if attempts mod 25_000 = 0
                   then
                     cctxt#message "Tried %d keys without finding a match" attempts
-                  else Lwt.return () end >>= fun () ->
+                  else Lwt.return_unit end >>= fun () ->
                   loop (attempts + 1) in
               loop 1 >>=? fun key_hash ->
               cctxt#message
                 "Generated '%s' under the name '%s'." key_hash name >>= fun () ->
-              return ()
+              return_unit
             end
 
 let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
@@ -234,7 +234,7 @@ let commands () : Client_context.io_wallet Clic.command list =
          Client_keys.neuterize sk_uri >>=? fun pk_uri ->
          begin
            Public_key.find_opt cctxt name >>=? function
-           | None -> return ()
+           | None -> return_unit
            | Some (pk_uri_found, _) ->
                fail_unless (pk_uri = pk_uri_found || force)
                  (failure
@@ -260,7 +260,7 @@ let commands () : Client_context.io_wallet Clic.command list =
          Client_keys.neuterize sk_uri >>=? fun pk_uri ->
          begin
            Public_key.find_opt cctxt name >>=? function
-           | None -> return ()
+           | None -> return_unit
            | Some (pk_uri_found, _) ->
                fail_unless (pk_uri = pk_uri_found || force)
                  (failure
@@ -313,7 +313,7 @@ let commands () : Client_context.io_wallet Clic.command list =
                  cctxt#message "%s: %s (%s sk known)" name v scheme
              | Some _, _ ->
                  cctxt#message "%s: %s (pk known)" name v
-           end >>= fun () -> return ()
+           end >>= fun () -> return_unit
          end l) ;
 
     command ~group ~desc: "Show the keys associated with an implicit account."
@@ -326,24 +326,24 @@ let commands () : Client_context.io_wallet Clic.command list =
          match key_info with
          | None ->
              cctxt#message "No keys found for address" >>= fun () ->
-             return ()
+             return_unit
          | Some (pkh, pk, skloc) ->
              cctxt#message "Hash: %a"
                Signature.Public_key_hash.pp pkh >>= fun () ->
              match pk with
-             | None -> return ()
+             | None -> return_unit
              | Some pk ->
                  cctxt#message "Public Key: %a"
                    Signature.Public_key.pp pk >>= fun () ->
                  if show_private then
                    match skloc with
-                   | None -> return ()
+                   | None -> return_unit
                    | Some skloc ->
                        Secret_key.to_source skloc >>=? fun skloc ->
                        cctxt#message "Secret Key: %s" skloc >>= fun () ->
-                       return ()
+                       return_unit
                  else
-                   return ()) ;
+                   return_unit) ;
 
     command ~group ~desc: "Forget one address."
       (args1 (Clic.switch

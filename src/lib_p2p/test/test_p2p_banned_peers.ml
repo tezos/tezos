@@ -25,7 +25,7 @@ let test_empty _ =
   List.iter (fun (_peer,addr) ->
       assert_equal_bool ~msg:__LOC__ false (P2p_acl.banned_addr empty addr)
     ) peers ;
-  Lwt.return ()
+  Lwt.return_unit
 ;;
 
 let test_ban _ =
@@ -34,7 +34,7 @@ let test_ban _ =
   List.iter (fun (_,addr) ->
       assert_equal_bool ~msg:__LOC__ true (P2p_acl.banned_addr set addr)
     ) peers ;
-  Lwt.return ()
+  Lwt.return_unit
 ;;
 
 let test_gc _ =
@@ -48,7 +48,7 @@ let test_gc _ =
   List.iter (fun (_peer,addr) ->
       assert_equal_bool ~msg:__LOC__ false (P2p_acl.banned_addr set addr)
     ) peers ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let () =
   let wrap (n, f) =

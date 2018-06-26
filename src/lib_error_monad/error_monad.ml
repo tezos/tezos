@@ -317,6 +317,8 @@ module Make(Prefix : sig val id : string end) = struct
 
   let return v = Lwt.return (Ok v)
 
+  let return_unit = Lwt.return (Ok ())
+
   let error s = Error [ s ]
 
   let ok v = Ok v
@@ -462,14 +464,14 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec iter_s f l =
     match l with
-    | [] -> return ()
+    | [] -> return_unit
     | h :: t ->
         f h >>=? fun () ->
         iter_s f t
 
   let rec iter_p f l =
     match l with
-    | [] -> return ()
+    | [] -> return_unit
     | x :: l ->
         let tx = f x and tl = iter_p f l in
         tx >>= fun tx_res ->
@@ -482,7 +484,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec iter2_p f l1 l2 =
     match l1, l2 with
-    | [], [] -> return ()
+    | [], [] -> return_unit
     | [], _ | _, [] -> invalid_arg "Error_monad.iter2_p"
     | x1 :: l1 , x2 :: l2 ->
         let tx = f x1 x2 and tl = iter2_p f l1 l2 in
@@ -497,7 +499,7 @@ module Make(Prefix : sig val id : string end) = struct
   let iteri2_p f l1 l2 =
     let rec iteri2_p i f l1 l2 =
       match l1, l2 with
-      | [], [] -> return ()
+      | [], [] -> return_unit
       | [], _ | _, [] -> invalid_arg "Error_monad.iteri2_p"
       | x1 :: l1 , x2 :: l2 ->
           let tx = f i x1 x2 and tl = iteri2_p (i+1) f l1 l2 in
@@ -526,7 +528,7 @@ module Make(Prefix : sig val id : string end) = struct
         f h acc
 
   let rec join = function
-    | [] -> return ()
+    | [] -> return_unit
     | t :: ts ->
         t >>= function
         | Error _ as err ->
@@ -546,16 +548,16 @@ module Make(Prefix : sig val id : string end) = struct
     | ok -> Lwt.return ok
 
   let fail_unless cond exn =
-    if cond then return () else fail exn
+    if cond then return_unit else fail exn
 
   let fail_when cond exn =
-    if cond then fail exn else return ()
+    if cond then fail exn else return_unit
 
   let unless cond f =
-    if cond then return () else f ()
+    if cond then return_unit else f ()
 
   let _when cond f =
-    if cond then f () else return ()
+    if cond then f () else return_unit
 
   let pp_print_error ppf errors =
     match errors with
@@ -599,7 +601,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let _assert b loc fmt =
     if b then
-      Format.ikfprintf (fun _ -> return ()) Format.str_formatter fmt
+      Format.ikfprintf (fun _ -> return_unit) Format.str_formatter fmt
     else
       Format.kasprintf (fun msg -> fail (Assert_error (loc, msg))) fmt
 

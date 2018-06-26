@@ -77,7 +77,7 @@ let commands () =
           (Activate { protocol = hash ; fitness ; protocol_parameters })
           sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
-        return ()
+        return_unit
       end ;
 
     command ~desc: "Fork a test protocol"
@@ -94,7 +94,7 @@ let commands () =
                                 delay = Int64.mul 24L 3600L })
           sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
-        return ()
+        return_unit
       end ;
 
   ]

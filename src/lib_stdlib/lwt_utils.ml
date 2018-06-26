@@ -60,10 +60,10 @@ let worker name ~run ~cancel =
     (fun () ->
        Lwt.catch run fail >>= fun () ->
        LC.signal stop ();
-       Lwt.return ()) ;
+       Lwt.return_unit) ;
   waiter >>= fun () ->
   log_info "%s worker ended" name ;
-  Lwt.return ()
+  Lwt.return_unit
 
 
 let rec chop k l =
@@ -162,6 +162,6 @@ let stable_sort cmp l =
 let sort = stable_sort
 
 let unless cond f =
-  if cond then Lwt.return () else f ()
+  if cond then Lwt.return_unit else f ()
 
 

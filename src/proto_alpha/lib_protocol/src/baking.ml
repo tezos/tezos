@@ -237,7 +237,7 @@ let check_proof_of_work_stamp ctxt block =
       block.Block_header.shell
       block.protocol_data.contents
       proof_of_work_threshold then
-    return ()
+    return_unit
   else
     fail Invalid_stamp
 
@@ -250,7 +250,7 @@ let check_signature block key =
         (shell, contents) in
     Signature.check ~watermark:Block_header key signature unsigned_header in
   if check_signature key block then
-    return ()
+    return_unit
   else
     fail (Invalid_block_signature (Block_header.hash block,
                                    Signature.Public_key.hash key))
@@ -266,7 +266,7 @@ let check_fitness_gap ctxt (block : Block_header.t) =
   if Compare.Int64.(gap <= 0L || max_fitness_gap ctxt < gap) then
     fail (Invalid_fitness_gap (max_fitness_gap ctxt, gap))
   else
-    return ()
+    return_unit
 
 let last_of_a_cycle ctxt l =
   Compare.Int32.(Int32.succ l.Level.cycle_position =

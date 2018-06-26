@@ -94,9 +94,9 @@ let process_endorsements (cctxt : #Proto_alpha.full) state ~chain
       | _ ->
           lwt_log_error "Inconsistent endorsement found %a"
             Operation_hash.pp hash >>= fun () ->
-          return ()
+          return_unit
     ) endorsements >>=? fun () ->
-  return ()
+  return_unit
 
 let process_block (cctxt : #Proto_alpha.full) state ~chain (header : Alpha_block_services.block_info) =
   let { Alpha_block_services.hash ; metadata = { protocol_data = { baker ; level = { level } } } } = header in
@@ -167,7 +167,7 @@ let endorsements_index = 0
 let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; level ; protocol ; next_protocol } =
   if Protocol_hash.(protocol <> next_protocol) then
     lwt_log_error "Protocol changing detected. Skipping the block." >>= fun () ->
-    return ()
+    return_unit
   else 
     lwt_debug "Block level : %a" Raw_level.pp level >>= fun () ->
     let chain = `Hash chain_id in
@@ -182,7 +182,7 @@ let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; leve
           lwt_log_error "Error while fetching operations in block %a@\n%a"
             Block_hash.pp_short hash
             pp_print_error errs >>= fun () ->
-          return ()
+          return_unit
     end >>=? fun () ->
     (* Processing endorsements *)
     begin Alpha_block_services.Operations.operations cctxt ~chain ~block () >>= function
@@ -190,15 +190,15 @@ let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; leve
           if List.length operations > endorsements_index then
             let endorsements = List.nth operations endorsements_index in
             process_endorsements cctxt state ~chain endorsements level
-          else return ()
+          else return_unit
       | Error errs ->
           lwt_log_error "Error while fetching operations in block %a@\n%a"
             Block_hash.pp_short hash
             pp_print_error errs >>= fun () ->
-          return ()
+          return_unit
     end >>=? fun () ->
     cleanup_old_operations state ;
-    return ()
+    return_unit
 
 let create (cctxt : #Proto_alpha.full) ~preserved_levels valid_blocks_stream =
 
@@ -225,7 +225,7 @@ let create (cctxt : #Proto_alpha.full) ~preserved_levels valid_blocks_stream =
     ~cctxt
     ~stream:valid_blocks_stream
     ~state_maker
-    ~pre_loop:(fun _ _ _ -> return ())
+    ~pre_loop:(fun _ _ _ -> return_unit)
     ~compute_timeout:(fun _ -> Lwt_utils.never_ending ())
-    ~timeout_k:(fun _ _ () -> return ())
+    ~timeout_k:(fun _ _ () -> return_unit)
     ~event_k:process_block

@@ -403,7 +403,7 @@ module Writer = struct
 
   let send_message st buf =
     let rec loop = function
-      | [] -> return ()
+      | [] -> return_unit
       | buf :: l ->
           protect ~canceler:st.canceler begin fun () ->
             Crypto.write_chunk st.conn.fd st.conn.cryptobox_data buf

@@ -409,7 +409,7 @@ let compute_timeout { future_slots } =
   | (timestamp, _) :: _ ->
       match Client_baking_scheduling.sleep_until timestamp with
       | None ->
-          Lwt.return ()
+          Lwt.return_unit
       | Some timeout ->
           timeout
 
@@ -470,7 +470,7 @@ let insert_block
   | [] ->
       lwt_debug
         "Can't compute slots for %a" Block_hash.pp_short bi.hash >>= fun () ->
-      return ()
+      return_unit
   | (_ :: _) as slots ->
       iter_p
         (fun ((timestamp, (_, _, delegate)) as slot) ->
@@ -480,7 +480,7 @@ let insert_block
              name
              Block_hash.pp_short bi.hash >>= fun () ->
            state.future_slots <- insert_baking_slot slot state.future_slots ;
-           return ()
+           return_unit
         )
         slots
 
@@ -657,7 +657,7 @@ let record_nonce_hash cctxt block_hash seed_nonce seed_nonce_hash =
     Client_baking_nonces.add cctxt block_hash seed_nonce
     |> trace_exn (Failure "Error while recording block")
   else
-    return ()
+    return_unit
 
 let pp_operation_list_list =
   Format.pp_print_list
@@ -724,12 +724,12 @@ let bake
             Raw_level.pp level priority
             Fitness.pp shell_header.fitness
             pp_operation_list_list operations >>= fun () ->
-          return ()
+          return_unit
     end
 
   | _ -> (* no candidates, or none fit-enough *)
       lwt_debug "No valid candidates." >>= fun () ->
-      return ()
+      return_unit
 
 
 

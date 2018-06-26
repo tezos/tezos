@@ -132,7 +132,7 @@ let regular () =
   Context.get_endorser (B b) >>=? fun (account, _slots) ->
   Op.delegation (B b) new_contract (Some account) >>=? fun operation ->
   Block.bake ~operation b >>=? fun _ ->
-  return ()
+  return_unit
 
 (*******************)
 (** ask source contract to pay a fee when originating a contract *)
@@ -141,7 +141,7 @@ let regular () =
 let pay_fee () =
   register_origination ~credit:(Tez.of_int 2) ~fee:ten_tez () >>=? fun (b, contract, new_contract) ->
   transfer_and_check_balances b new_contract contract (Tez.of_int 2) >>=? fun _ ->
-  return ()
+  return_unit
 
 (******************************************************)
 (** Errors *)
@@ -189,7 +189,7 @@ let undelegatable fee () =
     begin
       let expect_failure = function
         | Alpha_environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
-            return ()
+            return_unit
         | _ ->
             failwith "The contract is not delegatable, it fails!"
       in
@@ -225,7 +225,7 @@ let credit fee () =
     begin
       let not_enough_money = function
         | Alpha_environment.Ecoproto_error (Proto_alpha.Contract_storage.Balance_too_low _) :: _ ->
-            return ()
+            return_unit
         | _ -> failwith "The contract does not have enough money, it fails!"
       in
       Incremental.add_operation ~expect_failure:not_enough_money i operation >>=? fun i ->
@@ -259,7 +259,7 @@ let origination_contract_from_origination_contract_not_enough_fund fee () =
   Op.origination ~fee (I inc) ~credit:amount contract >>=? fun (operation, orig_contract) ->
   let expect_failure = function
     | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
-        return ()
+        return_unit
     | _ ->
         failwith "The contract has not enough funds, it fails!"
   in
@@ -377,7 +377,6 @@ let origination_contract_from_origination_contract () =
      originated contract exists and has been credited with the right amount *)
   Context.Contract.balance (B b) orig_contract >>=? fun credit0 ->
   Assert.equal_tez ~loc:__LOC__ credit0 credit
-
 
 (******************************************************)
 

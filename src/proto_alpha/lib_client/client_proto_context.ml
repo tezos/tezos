@@ -189,7 +189,7 @@ let source_to_keys (wallet : #Proto_alpha.full) ~chain ~block source =
 let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
   message_added_contract cctxt alias_name >>= fun () ->
-  return ()
+  return_unit
 
 let originate_contract
     (cctxt : #Proto_alpha.full)
@@ -305,7 +305,7 @@ let inject_activate_operation
   begin
     match confirmations with
     | None ->
-        return ()
+        return_unit
     | Some _confirmations ->
         Alpha_services.Contract.balance
           cctxt (`Main, `Head 0)
@@ -315,7 +315,7 @@ let inject_activate_operation
           Ed25519.Public_key_hash.pp pkh
           Client_proto_args.tez_sym
           Tez.pp balance >>= fun () ->
-        return ()
+        return_unit
   end >>=? fun () ->
   match Apply_operation_result.pack_contents_list op result with
   | Apply_operation_result.Single_and_result

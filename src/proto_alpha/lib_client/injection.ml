@@ -321,13 +321,13 @@ let may_patch_limits
   | Some contents ->
       simulate cctxt ~chain ~block ?branch contents >>=? fun (_, _, result) ->
       begin match detect_script_failure result with
-        | Ok () -> return ()
+        | Ok () -> return_unit
         | Error _ ->
             cctxt#message
               "@[<v 2>This simulation failed:@,%a@]"
               Operation_result.pp_operation_result
               (contents, result.contents) >>= fun () ->
-            return ()
+            return_unit
       end >>=? fun () ->
       let res = pack_contents_list contents result.contents in
       patch_list res
@@ -345,7 +345,7 @@ let inject_operation
   preapply cctxt ~chain ~block
     ?branch ?src_sk contents >>=? fun (_oph, op, result) ->
   begin match detect_script_failure result with
-    | Ok () -> return ()
+    | Ok () -> return_unit
     | Error _ as res ->
         cctxt#message
           "@[<v 2>This simulation failed:@,%a@]"

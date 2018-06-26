@@ -65,7 +65,7 @@ let test_known_tez_litterals () =
        let vs = Tez_repr.of_string s in
        Assert.is_none ~msg:("Unexpected successful parsing of " ^ s) vs)
     known_bad_tez_litterals ;
-  return ()
+  return_unit
 
 let test_random_tez_litterals () =
   for _ = 0 to 100_000 do
@@ -91,7 +91,7 @@ let test_random_tez_litterals () =
           Assert.equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev
     end
   done ;
-  return ()
+  return_unit
 
 open Tezos_micheline
 open Micheline

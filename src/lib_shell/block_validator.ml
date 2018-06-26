@@ -79,7 +79,7 @@ let check_header
     (invalid_block hash
        (Unexpected_number_of_validation_passes header.shell.validation_passes)
     ) >>=? fun () ->
-  return ()
+  return_unit
 
 let assert_no_duplicate_operations block live_operations operation_hashes =
   fold_left_s (fold_left_s (fun live_operations oph ->
@@ -87,7 +87,7 @@ let assert_no_duplicate_operations block live_operations operation_hashes =
         (invalid_block block @@ Replayed_operation oph) >>=? fun () ->
       return (Operation_hash.Set.add oph live_operations)))
     live_operations operation_hashes >>=? fun _ ->
-  return ()
+  return_unit
 
 let assert_operation_liveness block live_blocks operations =
   iter_s (iter_s (fun op ->
@@ -110,7 +110,7 @@ let check_liveness chain_state pred hash operations_hashes operations =
   assert_no_duplicate_operations
     hash live_operations operations_hashes >>=? fun () ->
   assert_operation_liveness hash live_blocks operations >>=? fun () ->
-  return ()
+  return_unit
 
 let may_patch_protocol
     ~level
@@ -147,7 +147,7 @@ let apply_block
               Oversized_operation
                 { operation = Operation.hash op ;
                   size ; max = Proto.max_operation_data_length })) ops >>=? fun () ->
-       return ())
+       return_unit)
     operations Proto.validation_passes >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
   check_liveness chain_state pred hash operation_hashes operations >>=? fun () ->
@@ -254,7 +254,7 @@ let check_chain_liveness chain_db hash (header: Block_header.t) =
       Expired_chain { chain_id = State.Chain.id chain_state ;
                       expiration = eol ;
                       timestamp = header.shell.timestamp }
-  | None | Some _ -> return ()
+  | None | Some _ -> return_unit
 
 let get_proto pred hash =
   State.Block.context pred >>= fun pred_context ->
@@ -340,13 +340,13 @@ let on_completion
     | Ok (Some _) ->
         Worker.record_event w
           (Event.Validation_success (Request.view r, st)) ;
-        Lwt.return ()
+        Lwt.return_unit
     | Ok None ->
-        Lwt.return ()
+        Lwt.return_unit
     | Error errs ->
         Worker.record_event w
           (Event.Validation_failure (Request.view r, st, errs)) ;
-        Lwt.return ()
+        Lwt.return_unit
 
 let table = Worker.create_table Queue
 
@@ -355,10 +355,10 @@ let create limits db =
     type self = t
     let on_launch = on_launch
     let on_request = on_request
-    let on_close _ = Lwt.return ()
+    let on_close _ = Lwt.return_unit
     let on_error = on_error
     let on_completion = on_completion
-    let on_no_request _ = return ()
+    let on_no_request _ = return_unit
   end in
   Worker.launch
     table

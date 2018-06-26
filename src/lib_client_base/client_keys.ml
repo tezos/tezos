@@ -210,7 +210,7 @@ let register_key cctxt ?(force=false) (public_key_hash, pk_uri, sk_uri) ?public_
   Public_key.add ~force cctxt name (pk_uri, public_key) >>=? fun () ->
   Secret_key.add ~force cctxt name sk_uri >>=? fun () ->
   Public_key_hash.add ~force cctxt name public_key_hash >>=? fun () ->
-  return ()
+  return_unit
 
 let raw_get_key (cctxt : #Client_context.wallet) pkh =
   begin

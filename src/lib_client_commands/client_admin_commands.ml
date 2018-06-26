@@ -24,6 +24,6 @@ let commands () =
               cctxt#message
                 "Block %a no longer marked invalid."
                 Block_hash.pp block >>= fun () ->
-              return ())
+              return_unit)
            blocks) ;
   ]

@@ -49,7 +49,7 @@ let commands () =
          Format.fprintf ppf "@[<v>%a@]@."
            (Format.pp_print_list Block_hash.pp)
            (List.concat heads) ;
-         return ()) ;
+         return_unit) ;
     command ~group ~desc: "The blocks that have been marked invalid by the node."
       (args1 output_arg)
       (fixed [ "list" ; "rejected" ; "blocks" ])
@@ -57,10 +57,10 @@ let commands () =
          Shell_services.Invalid_blocks.list cctxt () >>=? function
          | [] ->
              Format.fprintf ppf "No invalid blocks." ;
-             return ()
+             return_unit
          | _ :: _ as invalid ->
              Format.fprintf ppf "@[<v>%a@]@."
                (Format.pp_print_list print_invalid_blocks)
                invalid ;
-             return ()) ;
+             return_unit) ;
   ]

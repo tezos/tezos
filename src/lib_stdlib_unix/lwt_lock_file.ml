@@ -21,7 +21,7 @@ let create_inner
       Lwt_main.at_exit (fun () -> Lwt_unix.unlink fn) ;
     let pid_str = string_of_int @@ Unix.getpid () in
     Lwt_unix.write_string fd pid_str 0 (String.length pid_str) >>= fun _ ->
-    return ()
+    return_unit
   end
 
 let create = create_inner Unix.F_TLOCK

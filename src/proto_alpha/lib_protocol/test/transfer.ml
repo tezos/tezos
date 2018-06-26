@@ -68,7 +68,7 @@ let single_transfer ?fee ?expect_failure amount =
   transfer_and_check_balances ~loc:__LOC__ ?fee ?expect_failure
     b contract_1 contract_2 amount >>=? fun (b,_) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** single transfer without fee *)
 let block_with_a_single_transfer () =
@@ -79,7 +79,7 @@ let transfer_zero_tez () =
   single_transfer ~expect_failure:(
     function
     | Alpha_environment.Ecoproto_error (Contract_storage.Empty_transaction _) :: _ ->
-        return ()
+        return_unit
     | _ ->
         failwith "Empty transaction should fail")
     Tez.zero
@@ -101,7 +101,7 @@ let block_originate_and_transfer_with_fee () =
   Incremental.add_operation b operation >>=? fun b ->
   transfer_and_check_balances ~loc:__LOC__ b ~fee:ten_tez contract new_contract ten_tez >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** 1- Create a block, and two contracts;
     2- Add a transfer from a current balance of a source contract
@@ -113,7 +113,7 @@ let block_transfer_from_contract_balance () =
   Context.Contract.balance (I b) contract_1 >>=? fun balance ->
   transfer_and_check_balances ~loc:__LOC__ b contract_1 contract_2 balance >>=? fun (b,_) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** 1- Create a block and a single contract;
     2- Add a transfer to a contract itself without fee into this block;
@@ -128,7 +128,7 @@ let block_transfers_without_with_fee_to_self () =
   transfer_to_itself_and_check_balances ~loc:__LOC__ b ~fee:ten_tez contract ten_tez
   >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** 1- Create a block, two contracts;
     2- Add three transfers into the block;
@@ -140,7 +140,7 @@ let four_transfers_bake_three_transfers () =
   n_transactions 3 b contract_1 contract_2 ten_tez >>=? fun b ->
   Op.transaction (I b) contract_1 contract_2 ten_tez >>=? fun _ ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** 1- Create a contract from a bootstrap contract;
     2- Create two implicit contracts;
@@ -163,7 +163,7 @@ let transfer_from_implicit_to_implicit_contract () =
   transfer_and_check_balances ~loc:__LOC__ ~fee:(Tez.of_int 3) b
     src dest ten_tez >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** 1- Create a block, contract from bootstrap accounts, contract from originate;
     2- Add a transfer from the bootstract contract into the implicit contract;
@@ -183,7 +183,7 @@ let transfer_from_implicit_to_originated_contract () =
   transfer_and_check_balances ~loc:__LOC__ b src new_contract Alpha_context.Tez.one
   >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** 1- Create a block with 2 contracts;
     2- Originate 2 contracts from the previous ones;
@@ -199,7 +199,7 @@ let transfer_from_originated_to_originated () =
   transfer_and_check_balances ~loc:__LOC__ b
     orig_contract_1 orig_contract_2 Alpha_context.Tez.one >>=? fun (b,_) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** 1- Create a block, an originate contract, an impicit contract, a contract
        from bootstrap;
@@ -216,7 +216,7 @@ let transfer_from_originated_to_implicit () =
   transfer_and_check_balances ~loc:__LOC__ b new_contract src Alpha_context.Tez.one
   >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** Checking that the sender of a transaction is the actual
     manager of the contract.
@@ -231,7 +231,7 @@ let ownership_sender () =
   transfer_and_check_balances ~loc:__LOC__ b imcontract_1 contract_2 Tez.one
   >>=? fun (b,_) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (* Slow tests case *)
 
@@ -240,7 +240,7 @@ let multiple_transfer n ?fee amount =
   Incremental.begin_construction b >>=? fun b ->
   n_transactions n b ?fee contract_1 contract_2 amount >>=? fun b ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** 1- Create a block with two contracts;
     2- Apply 100 transfers. *)
@@ -280,7 +280,7 @@ let block_with_multiple_transfers_with_without_fee () =
   n_transactions 20  ~fee:ten b contracts.(1) contracts.(0) twenty >>=? fun b ->
 
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** 1- Create a block with two contracts;
     2- Bake 10 blocks with a transfer each time. *)
@@ -293,7 +293,7 @@ let build_a_chain () =
       >>=? fun (b, _) ->
       Incremental.finalize_block b
     ) b (1 -- 10) >>=? fun _ ->
-  return ()
+  return_unit
 
 (*********************************************************************)
 (* Expected error test cases                                         *)
@@ -314,13 +314,13 @@ let balance_too_low fee () =
   Op.transaction ~fee (I i) contract_1 contract_2 Tez.max_tez >>=? fun op ->
   let expect_failure = function
     | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
-        return ()
+        return_unit
     | _ ->
         failwith "balance too low should fail"
   in
   if fee > balance1 then begin
     Incremental.add_operation ~expect_failure i op >>= fun _res ->
-    return ()
+    return_unit
   end
   else begin
     Incremental.add_operation ~expect_failure i op >>=? fun i ->
@@ -352,7 +352,7 @@ let balance_too_low_two_transfers fee () =
     two_third_of_balance >>=? fun operation ->
   let expect_failure = function
     | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
-        return ()
+        return_unit
     | _ ->
         failwith "balance too low should fail"
   in
@@ -446,7 +446,7 @@ let random_transfer () =
       transfer_and_check_balances ~loc:__LOC__ b source dest amount
   end >>=? fun (b,_) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (** Transfer random transactions *)
 let random_multi_transactions () =

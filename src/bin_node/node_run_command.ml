@@ -261,7 +261,7 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Lwt_utils.may ~f:RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
   Logging_unix.close () >>= fun () ->
-  return ()
+  return_unit
 
 let process sandbox verbosity checkpoint args =
   let verbosity =
@@ -279,8 +279,8 @@ let process sandbox verbosity checkpoint args =
       | Some _ ->
           if config.data_dir = Node_config_file.default_data_dir
           then failwith "Cannot use default data directory while in sandbox mode"
-          else return ()
-      | None -> return ()
+          else return_unit
+      | None -> return_unit
     end >>=? fun () ->
     begin
       match checkpoint with

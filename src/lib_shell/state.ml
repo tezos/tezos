@@ -489,7 +489,7 @@ module Chain = struct
       (fun id ->
          locked_read global_state data id >>=? fun chain ->
          Chain_id.Table.add data.chains id chain ;
-         return ())
+         return_unit)
       ids
 
   let read_all state =

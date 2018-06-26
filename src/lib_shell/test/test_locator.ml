@@ -306,7 +306,7 @@ let test_locator base_dir =
          then
            Assert.fail_msg "Invalid locator %i" size)
       l_exp l_lin;
-    return ()
+    return_unit
   in
   let stop = locator_limit + 20 in
   let rec loop size =
@@ -314,7 +314,7 @@ let test_locator base_dir =
       check_locator size >>=? fun _ ->
       loop (size+5)
     )
-    else return ()
+    else return_unit
   in
   loop 1
 

@@ -14,9 +14,9 @@ let wait_for_bootstrapped (ctxt : #Client_context.full) =
     if not !display then
       ctxt#answer "Waiting for the node to be bootstrapped before injection..." >>= fun () ->
       display := true ;
-      Lwt.return ()
+      Lwt.return_unit
     else
-      Lwt.return ()
+      Lwt.return_unit
   end ;
   Monitor_services.bootstrapped ctxt >>=? fun (stream, _stop) ->
   Lwt_stream.iter_s
@@ -26,10 +26,10 @@ let wait_for_bootstrapped (ctxt : #Client_context.full) =
            Block_hash.pp_short hash
            Time.pp_hum time
            Time.pp_hum (Time.now ())
-       else Lwt.return ()) stream >>= fun () ->
+       else Lwt.return_unit) stream >>= fun () ->
   display := true ;
   ctxt#answer "Node is bootstrapped, ready for injecting operations." >>= fun () ->
-  return ()
+  return_unit
 
 let wait_for_operation_inclusion
     (ctxt : #Client_context.full)

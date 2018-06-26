@@ -138,12 +138,12 @@ module Alias = functor (Entity : Entity) -> struct
     load wallet >>=? fun list ->
     begin
       if force then
-        return ()
+        return_unit
       else
         iter_s (fun (n, v) ->
             if n = name && v = value then begin
               keep := true ;
-              return ()
+              return_unit
             end else if n = name && v <> value then begin
               failwith
                 "another %s is already aliased as %s, \
@@ -155,14 +155,14 @@ module Alias = functor (Entity : Entity) -> struct
                  use --force to insert duplicate"
                 Entity.name n
             end else begin
-              return ()
+              return_unit
             end)
           list
     end >>=? fun () ->
     let list = List.filter (fun (n, _) -> n <> name) list in
     let list = (name, value) :: list in
     if !keep then
-      return ()
+      return_unit
     else
       wallet#write Entity.name list wallet_encoding
 
@@ -199,7 +199,7 @@ module Alias = functor (Entity : Entity) -> struct
   let of_fresh (wallet : #wallet) force (Fresh s) =
     load wallet >>=? fun list ->
     begin if force then
-        return ()
+        return_unit
       else
         iter_s
           (fun (n, v) ->
@@ -212,7 +212,7 @@ module Alias = functor (Entity : Entity) -> struct
                  Entity.name n
                  value
              else
-               return ())
+               return_unit)
           list
     end >>=? fun () ->
     return s

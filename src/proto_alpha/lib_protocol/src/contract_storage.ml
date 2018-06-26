@@ -285,12 +285,12 @@ let exists c contract =
 
 let must_exist c contract =
   exists c contract >>=? function
-  | true -> return ()
+  | true -> return_unit
   | false -> fail (Non_existing_contract contract)
 
 let must_be_allocated c contract =
   allocated c contract >>=? function
-  | true -> return ()
+  | true -> return_unit
   | false ->
       match Contract_repr.is_implicit contract with
       | Some pkh -> fail (Empty_implicit_contract pkh)
@@ -315,7 +315,7 @@ let check_counter_increment c contract counter =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
   let expected = Z.succ contract_counter in
   if Compare.Z.(expected = counter)
-  then return ()
+  then return_unit
   else if Compare.Z.(expected > counter) then
     fail (Counter_in_the_past (contract, expected, counter))
   else

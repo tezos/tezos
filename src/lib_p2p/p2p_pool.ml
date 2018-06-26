@@ -647,13 +647,13 @@ let config { config } = config
 
 let fail_unless_disconnected_point point_info =
   match P2p_point_state.get point_info with
-  | Disconnected -> return ()
+  | Disconnected -> return_unit
   | Requested _ | Accepted _ -> fail P2p_errors.Pending_connection
   | Running _ -> fail P2p_errors.Connected
 
 let fail_unless_disconnected_peer_id peer_info =
   match P2p_peer_state.get peer_info with
-  | Disconnected -> return ()
+  | Disconnected -> return_unit
   | Accepted _ -> fail P2p_errors.Pending_connection
   | Running _ -> fail P2p_errors.Connected
 
@@ -702,7 +702,7 @@ let rec connect ?timeout pool point =
     protect ~canceler begin fun () ->
       log pool (Outgoing_connection point) ;
       Lwt_unix.connect fd uaddr >>= fun () ->
-      return ()
+      return_unit
     end ~on_error: begin fun err ->
       lwt_debug "connect: %a -> disconnect" P2p_point.Id.pp point >>= fun () ->
       P2p_point_state.set_disconnected point_info ;

@@ -80,6 +80,9 @@ module type S = sig
   (** Sucessful return *)
   val return : 'a -> 'a tzresult Lwt.t
 
+  (** Sucessful return of [()] *)
+  val return_unit : unit tzresult Lwt.t
+
   (** Erroneous result *)
   val error : error -> 'a tzresult
 

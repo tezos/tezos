@@ -254,7 +254,7 @@ let commands =
            | [] ->
                cctxt#message "No device found." >>= fun () ->
                cctxt#message "Make sure a Ledger Nano S is connected and in the Tezos Wallet app." >>= fun () ->
-               return ()
+               return_unit
            | ledgers ->
                iter_s begin fun { Ledger.device_info = { Hidapi.path ;
                                                          manufacturer_string ;
@@ -303,7 +303,7 @@ let commands =
                             | Ledgerwallet_tezos.Secp256r1 -> "p2")
                            Signature.Public_key_hash.pp pkh))
                    of_curve >>= fun () ->
-                 return ()
+                 return_unit
                end ledgers) ;
 
       Clic.command ~group
@@ -341,7 +341,7 @@ let commands =
                       Corresponding full public key: %a@]"
                      Signature.Public_key_hash.pp pkh
                      Signature.Public_key.pp pk >>= fun () ->
-                   return ()
+                   return_unit
         )
     ]
 

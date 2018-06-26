@@ -39,12 +39,12 @@ let inject_endorsement
 
 let check_endorsement cctxt level pkh =
   State.get cctxt pkh >>=? function
-  | None -> return ()
+  | None -> return_unit
   | Some recorded_level ->
       if Raw_level.(level = recorded_level) then
         Error_monad.failwith "Level %a already endorsed" Raw_level.pp recorded_level
       else
-        return ()
+        return_unit
 
 let previously_endorsed_level cctxt pkh new_lvl  =
   State.get cctxt pkh >>=? function
@@ -116,7 +116,7 @@ let endorse_for_delegate cctxt block delegate =
     Raw_level.pp level
     name
     Operation_hash.pp_short oph >>= fun () ->
-  return ()
+  return_unit
 
 let allowed_to_endorse cctxt bi delegate  =
   Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
@@ -144,7 +144,7 @@ let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state b
   if Time.diff (Time.now ()) bi.Client_baking_blocks.timestamp > max_past then
     lwt_log_info "Ignore block %a: forged too far the past"
       Block_hash.pp_short bi.hash >>= fun () ->
-    return ()
+    return_unit
   else
     lwt_log_info "Received new block %a"
       Block_hash.pp_short bi.hash >>= fun () ->
@@ -158,7 +158,7 @@ let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state b
         block = bi ;
         delegates ;
       } ;
-    return ()
+    return_unit
 
 let compute_timeout state =
   match state.pending with

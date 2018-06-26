@@ -730,11 +730,11 @@ let rec interp
             logged_return (Item (amount, rest), ctxt) in
     let stack = (Item (arg, Empty)) in
     begin match log with
-      | None -> return ()
+      | None -> return_unit
       | Some log ->
           unparse_stack ctxt (stack, code.bef) >>=? fun stack ->
           log := (code.loc, Gas.level ctxt, stack) :: !log ;
-          return ()
+          return_unit
     end >>=? fun () ->
     step ctxt code stack >>=? fun (Item (ret, Empty), ctxt) ->
     return (ret, ctxt)

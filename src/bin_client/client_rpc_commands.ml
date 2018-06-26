@@ -106,7 +106,7 @@ let fill_in ?(show_optionals=true) input schema =
   element [] (Json_schema.root schema)
 
 let random_fill_in ?(show_optionals=true) schema =
-  let display _ = Lwt.return () in
+  let display _ = Lwt.return_unit in
   let int min max _ _ =
     let max = Int64.of_int max
     and min = Int64.of_int min in
@@ -286,8 +286,8 @@ let list url (cctxt : #Client_context.full) =
   if !collected_args <> [] then begin
     cctxt#message "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
       (Format.pp_print_list display_arg) !collected_args >>= fun () ->
-    return ()
-  end else return ()
+    return_unit
+  end else return_unit
 
 
 let schema meth url (cctxt : #Client_context.full) =
@@ -299,21 +299,21 @@ let schema meth url (cctxt : #Client_context.full) =
       | exception Not_found ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
-          return ()
+          return_unit
       | { input = Some input ; output } ->
           let json = `O [ "input", Json_schema.to_json (fst input) ;
                           "output", Json_schema.to_json (fst output) ] in
           cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
-          return ()
+          return_unit
       | { input = None ; output } ->
           let json = `O [ "output", Json_schema.to_json (fst output) ] in
           cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
-          return ()
+          return_unit
     end
   | _ ->
       cctxt#message
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
-      return ()
+      return_unit
 
 let format binary meth url (cctxt : #Client_context.io_rpcs) =
   let args = String.split '/' url in
@@ -329,7 +329,7 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
       | exception Not_found ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
-          return ()
+          return_unit
       | { input = Some input ; output } ->
           cctxt#message
             "@[<v 0>\
@@ -338,19 +338,19 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
              @]"
             pp input
             pp output >>= fun () ->
-          return ()
+          return_unit
       | { input = None ; output } ->
           cctxt#message
             "@[<v 0>\
              @[<v 2>Output format:@,%a@]@,\
              @]"
             pp output >>= fun () ->
-          return ()
+          return_unit
     end
   | _ ->
       cctxt#message
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
-      return ()
+      return_unit
 
 let fill_in ?(show_optionals=true) schema =
   let open Json_schema in
@@ -363,13 +363,13 @@ let display_answer (cctxt : #Client_context.full) = function
   | `Ok json ->
       cctxt#message "%a"
         Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
-      return ()
+      return_unit
   | `Not_found _ ->
       cctxt#message "No service found at this URL\n%!" >>= fun () ->
-      return ()
+      return_unit
   | `Unauthorized _ | `Error _ | `Forbidden _ | `Conflict _ ->
       cctxt#message "Unexpected server answer\n%!" >>= fun () ->
-      return ()
+      return_unit
 
 let call meth raw_url (cctxt : #Client_context.full) =
   let uri = Uri.of_string raw_url in
@@ -381,7 +381,7 @@ let call meth raw_url (cctxt : #Client_context.full) =
           cctxt#message
             "No service found at this URL with this method \
              (but this is a valid prefix)\n%!" >>= fun () ->
-          return ()
+          return_unit
       | { input = None } ->
           cctxt#generic_json_call meth uri >>=?
           display_answer cctxt
@@ -389,14 +389,14 @@ let call meth raw_url (cctxt : #Client_context.full) =
           fill_in ~show_optionals:false (fst input) >>= function
           | Error msg ->
               cctxt#error "%s" msg >>= fun () ->
-              return ()
+              return_unit
           | Ok json ->
               cctxt#generic_json_call meth ~body:json uri >>=?
               display_answer cctxt
     end
   | _ ->
       cctxt#message "No service found at this URL\n%!" >>= fun () ->
-      return ()
+      return_unit
 
 let call_with_json meth raw_url json (cctxt: #Client_context.full) =
   let uri = Uri.of_string raw_url in

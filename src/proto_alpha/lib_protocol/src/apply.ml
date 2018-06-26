@@ -350,13 +350,13 @@ let apply_manager_operation_content :
         match script with
         | None -> begin
             match parameters with
-            | None -> return ()
+            | None -> return_unit
             | Some arg ->
                 Lwt.return (Script.force_decode arg) >>=? fun arg ->
                 match Micheline.root arg with
                 | Prim (_, D_Unit, [], _) ->
                     (* Allow [Unit] parameter to non-scripted contracts. *)
-                    return ()
+                    return_unit
                 | _ -> fail (Script_interpreter.Bad_contract_parameter destination)
           end >>=? fun () ->
             let result =

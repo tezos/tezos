@@ -47,13 +47,13 @@ let bake_block (cctxt : #Proto_alpha.full)
   let src_pkh = Signature.Public_key.hash src_pk in
   Client_baking_forge.State.record cctxt src_pkh level.level >>=? fun () ->
   begin match seed_nonce with
-    | None -> return ()
+    | None -> return_unit
     | Some seed_nonce ->
         Client_baking_nonces.add cctxt block_hash seed_nonce
         |> trace_exn (Failure "Error while recording block")
   end >>=? fun () ->
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
-  return ()
+  return_unit
 
 let endorse_block cctxt delegate =
   Client_keys.get_key cctxt delegate >>=? fun (_src_name, src_pk, src_sk) ->
@@ -61,7 +61,7 @@ let endorse_block cctxt delegate =
     cctxt#block ~src_sk src_pk >>=? fun oph ->
   cctxt#answer "Operation successfully injected in the node." >>= fun () ->
   cctxt#answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
-  return ()
+  return_unit
 
 let get_predecessor_cycle (cctxt : #Client_context.printer) cycle =
   match Cycle.pred cycle with
@@ -79,7 +79,7 @@ let do_reveal cctxt block blocks =
   Client_baking_revelation.forge_seed_nonce_revelation cctxt
     block nonces >>=? fun () ->
   Client_baking_nonces.dels cctxt (List.map fst blocks) >>=? fun () ->
-  return ()
+  return_unit
 
 let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
   Lwt_list.filter_map_p

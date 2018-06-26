@@ -363,7 +363,7 @@ let unexpected expr exp_kinds exp_ns exp_prims =
 let check_kind kinds expr =
   let kind = kind expr in
   if List.mem kind kinds then
-    return ()
+    return_unit
   else
     let loc = location expr in
     fail (Invalid_kind (loc, kinds, kind))
@@ -1147,8 +1147,8 @@ let rec parse_data
                        if Compare.Int.(0 = (compare_comparable key_type value k))
                        then fail (Duplicate_map_keys (loc, strip_locations expr))
                        else fail (Unordered_map_keys (loc, strip_locations expr))
-                     else return ()
-                 | None -> return ()
+                     else return_unit
+                 | None -> return_unit
                end >>=? fun () ->
                return (Some k, map_update k (Some (item_wrapper v)) map, ctxt)
            | Prim (loc, D_Elt, l, _) ->
@@ -1403,8 +1403,8 @@ let rec parse_data
                      if Compare.Int.(0 = (compare_comparable t value v))
                      then fail (Duplicate_set_values (loc, strip_locations expr))
                      else fail (Unordered_set_values (loc, strip_locations expr))
-                   else return ()
-               | None -> return ()
+                   else return_unit
+               | None -> return_unit
              end >>=? fun () ->
              Lwt.return (Gas.consume ctxt (Michelson_v1_gas.Cost_of.set_update v false set)) >>=? fun ctxt ->
              return (Some v, set_update v true set, ctxt))

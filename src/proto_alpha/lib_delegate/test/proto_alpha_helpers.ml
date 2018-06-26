@@ -36,7 +36,7 @@ let no_write_context ?(block = `Head 0) config : #Client_context.full = object
   method write : type a. string ->
     a ->
     a Data_encoding.encoding -> unit Error_monad.tzresult Lwt.t =
-    fun _ _ _ -> return ()
+    fun _ _ _ -> return_unit
   method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = fun f -> f ()
   method block = block
   method confirmations = None
@@ -614,7 +614,7 @@ let display_level block =
   Alpha_block_services.metadata
     !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
   Format.eprintf "Level: %a@." Level.pp_full level ;
-  return ()
+  return_unit
 
 let endorsement_security_deposit block =
   Constants_services.all !rpc_ctxt (`Main, block) >>=? fun c ->

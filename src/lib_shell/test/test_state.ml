@@ -120,7 +120,7 @@ let build_valid_chain state vtbl pred names =
        attempt None)
     pred
     names >>= fun _ ->
-  Lwt.return ()
+  Lwt.return_unit
 
 let build_example_tree chain =
   let vtbl = Hashtbl.create 23 in
@@ -159,11 +159,11 @@ let wrap_state_init f base_dir =
       genesis >>=? fun (state, chain) ->
     build_example_tree chain >>= fun vblock ->
     f { state ; chain ; vblock } >>=? fun () ->
-    return ()
+    return_unit
   end
 
 let test_init (_ : state) =
-  return ()
+  return_unit
 
 
 
@@ -181,7 +181,7 @@ let test_read_block (s: state) =
           (* FIXME COMPARE read operations ??? *)
           Lwt.return_unit
     ) (vblocks s) >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -209,7 +209,7 @@ let test_path (s: state) =
   check_path "A2" "A6" ["A3"; "A4"; "A5"; "A6"] >>= fun () ->
   check_path "B2" "B6" ["B3"; "B4"; "B5"; "B6"] >>= fun () ->
   check_path "A1" "B3" ["A2"; "A3"; "B1"; "B2"; "B3"] >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -237,7 +237,7 @@ let test_ancestor s =
   check_ancestor "B1" "A3" (vblock s "A3") >>= fun () ->
   check_ancestor "A2" "B1" (vblock s "A2") >>= fun () ->
   check_ancestor "B1" "A2" (vblock s "A2") >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -269,7 +269,7 @@ let test_locator s =
   check_locator 4 "B8" ["B7";"B6";"B5";"B4"] >>= fun () ->
   check_locator 0 "A5" [] >>= fun () ->
   check_locator 100 "A5" ["A4";"A3";"A2";"A1";"Genesis"] >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -291,7 +291,7 @@ let compare s name heads l =
 let test_known_heads s =
   Chain.known_heads s.chain >>= fun heads ->
   compare s "initial" heads ["A8";"B8"] ;
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -306,7 +306,7 @@ let test_head s =
   Chain.head s.chain >>= fun head ->
   if not (Block_hash.equal (State.Block.hash head) (State.Block.hash @@ vblock s "A6")) then
     Assert.fail_msg "unexpected head" ;
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -360,7 +360,7 @@ let test_mem s =
   test_mem s "B1" >>= fun () ->
   test_mem s "B6" >>= fun () ->
   test_mem s "B8" >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -388,7 +388,7 @@ let test_new_blocks s =
   test s "A6" "A6" "A6" [] >>= fun () ->
   test s "A8" "A6" "A6" ["A7";"A8"] >>= fun () ->
   test s "A8" "B7" "A3" ["A4";"A5";"A6";"A7";"A8"] >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)

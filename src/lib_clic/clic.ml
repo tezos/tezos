@@ -607,7 +607,7 @@ let rec parse_args :
   type a ctx. ?command:_ command -> (a, ctx) args -> string list TzString.Map.t -> ctx -> a tzresult Lwt.t =
   fun ?command spec args_dict ctx ->
     match spec with
-    | NoArgs -> return ()
+    | NoArgs -> return_unit
     | AddArg (arg, rest) ->
         parse_arg ?command arg args_dict ctx >>=? fun arg ->
         parse_args ?command rest args_dict ctx >>|? fun rest ->
@@ -637,7 +637,7 @@ type error += Help : 'a command option -> error
 
 let check_help_flag ?command = function
   | ("-help" | "--help") :: _ -> fail (Help command)
-  | _ -> return ()
+  | _ -> return_unit
 
 let add_occurrence long value acc =
   try TzString.Map.add long (TzString.Map.find long acc) acc
@@ -1196,7 +1196,7 @@ let add_manual ~executable_name ~global_options format ppf commands =
                 let commands = List.map (fun c -> Ex c) commands in
                 usage_internal ppf ~executable_name ~global_options ~highlights:keywords commands ;
                 restore_formatter ppf state ;
-                return ()) ]) in
+                return_unit) ]) in
   Lazy.force with_manual
 
 let pp_cli_errors ppf ~executable_name ~global_options ~default errs =

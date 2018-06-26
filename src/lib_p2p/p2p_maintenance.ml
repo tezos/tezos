@@ -124,7 +124,7 @@ let rec maintain st =
     (* end of maintenance when enough users have been reached *)
     Lwt_condition.broadcast st.just_maintained () ;
     lwt_debug "Maintenance step ended" >>= fun () ->
-    return ()
+    return_unit
   end
 
 and too_few_connections st n_connected =
@@ -175,7 +175,7 @@ let rec worker_loop st =
         P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
         P2p_pool.Pool_event.wait_too_many_connections pool
       ] >>= fun () ->
-      return ()
+      return_unit
     end >>=? fun () ->
     let n_connected = P2p_pool.active_connections pool in
     if n_connected < st.bounds.min_threshold
@@ -183,7 +183,7 @@ let rec worker_loop st =
       maintain st
     else begin
       P2p_pool.send_swap_request pool ;
-      return ()
+      return_unit
     end
   end >>= function
   | Ok () -> worker_loop st

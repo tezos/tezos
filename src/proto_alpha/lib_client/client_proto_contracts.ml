@@ -141,4 +141,4 @@ let may_check_key sourcePubKey sourcePubKeyHash =
            (Ed25519.Public_key.hash sourcePubKey) sourcePubKeyHash)
         (failure "Invalid public key in `client_proto_endorsement`")
   | None ->
-      return ()
+      return_unit

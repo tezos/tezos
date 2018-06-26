@@ -116,7 +116,7 @@ let test_simple { idx ; block2 } =
       Assert.equal_string_option (Some "Novembre") (c novembre) ;
       get ctxt ["a";"c"] >>= fun juin ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
-      Lwt.return ()
+      Lwt.return_unit
 
 let test_continuation { idx ; block3a } =
   checkout idx block3a >>= function
@@ -131,7 +131,7 @@ let test_continuation { idx ; block3a } =
       Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
       get ctxt ["a";"d"] >>= fun mars ->
       Assert.equal_string_option ~msg:__LOC__  (Some "Mars") (c mars) ;
-      Lwt.return ()
+      Lwt.return_unit
 
 let test_fork { idx ; block3b } =
   checkout idx block3b >>= function
@@ -146,7 +146,7 @@ let test_fork { idx ; block3b } =
       Assert.is_none ~msg:__LOC__ (c juin) ;
       get ctxt ["a";"d"] >>= fun mars ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
-      Lwt.return ()
+      Lwt.return_unit
 
 let test_replay { idx ; genesis }  =
   checkout idx genesis >>= function
@@ -169,7 +169,7 @@ let test_replay { idx ; genesis }  =
       Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
       get ctxt4b ["a";"d"] >>= fun juillet ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
-      Lwt.return ()
+      Lwt.return_unit
 
 let fold_keys s k ~init ~f =
   let rec loop k acc =
@@ -208,7 +208,7 @@ let test_fold { idx ; genesis } =
       Assert.equal_string_list_list ~msg:__LOC__ [["g";"h"]] l ;
       keys ctxt ["i"] >>= fun l ->
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
-      Lwt.return ()
+      Lwt.return_unit
 
 (******************************************************************************)
 

@@ -29,7 +29,7 @@ let forge_seed_nonce_revelation
   | [] ->
       cctxt#message "No nonce to reveal for block %a"
         Block_hash.pp_short hash >>= fun () ->
-      return ()
+      return_unit
   | _ ->
       inject_seed_nonce_revelation cctxt ~chain block nonces >>=? fun oph ->
       cctxt#answer
@@ -38,4 +38,4 @@ let forge_seed_nonce_revelation
         Block_hash.pp_short hash >>= fun () ->
       cctxt#answer "@[<v 2>Operation hash are:@ %a@]"
         (Format.pp_print_list Operation_hash.pp_short) oph >>= fun () ->
-      return ()
+      return_unit

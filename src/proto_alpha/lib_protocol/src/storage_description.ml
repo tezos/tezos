@@ -173,7 +173,7 @@ type _ opt_handler =
 
 let rec combine_object = function
   | [] -> Handler { encoding = Data_encoding.unit ;
-                    get = fun _ _ -> return () }
+                    get = fun _ _ -> return_unit }
   | (name, Opt_handler handler) :: fields ->
       let Handler handlers = combine_object fields in
       Handler { encoding =

@@ -119,7 +119,7 @@ let bootstrap_new_branch w _ancestor _head unknown_prefix =
   debug w
     "done validating new branch from peer %a."
     P2p_peer.Id.pp_short pv.peer_id ;
-  return ()
+  return_unit
 
 let validate_new_head w hash (header : Block_header.t) =
   let pv = Worker.state w in
@@ -149,7 +149,7 @@ let validate_new_head w hash (header : Block_header.t) =
     Block_hash.pp_short hash
     P2p_peer.Id.pp_short pv.peer_id ;
   set_bootstrapped pv ;
-  return ()
+  return_unit
 
 let only_if_fitness_increases w distant_header cont =
   let pv = Worker.state w in
@@ -164,7 +164,7 @@ let only_if_fitness_increases w distant_header cont =
       Block_hash.pp_short (Block_header.hash distant_header)
       P2p_peer.Id.pp_short pv.peer_id ;
     (* Don't download a branch that cannot beat the current head. *)
-    return ()
+    return_unit
   end else cont ()
 
 let assert_acceptable_head w hash (header: Block_header.t) =
@@ -190,7 +190,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
       P2p_peer.Id.pp_short pv.peer_id ;
     set_bootstrapped pv ;
     pv.last_validated_head <- header ;
-    return ()
+    return_unit
   end else if invalid_block then begin
     debug w
       "ignoring known invalid block %a from peer %a"
@@ -212,7 +212,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
       P2p_peer.Id.pp_short pv.peer_id ;
     Distributed_db.Request.current_branch
       pv.parameters.chain_db ~peer:pv.peer_id () ;
-    return ()
+    return_unit
   end else begin
     only_if_fitness_increases w header @@ fun () ->
     assert_acceptable_head w hash header >>=? fun () ->
@@ -242,7 +242,7 @@ let on_no_request w =
     P2p_peer.Id.pp_short pv.peer_id
     pv.parameters.limits.new_head_request_timeout ;
   Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
-  return ()
+  return_unit
 
 let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
   let pv = Worker.state w in
@@ -262,7 +262,7 @@ let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
 
 let on_completion w r _ st =
   Worker.record_event w (Event.Request (Request.view r, st, None )) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let on_error w r st errs =
   let pv = Worker.state w in
@@ -287,7 +287,7 @@ let on_error w r st errs =
       | Ok _ ->
           Distributed_db.Request.current_head
             pv.parameters.chain_db ~peer:pv.peer_id () ;
-          return ()
+          return_unit
       | Error _ ->
           (* TODO: punish *)
           debug w
@@ -306,7 +306,7 @@ let on_close w =
   let pv = Worker.state w in
   Distributed_db.disconnect pv.parameters.chain_db pv.peer_id >>= fun () ->
   pv.parameters.notify_termination () ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let on_launch _ name parameters =
   let chain_state = Distributed_db.chain_state parameters.chain_db in
@@ -365,7 +365,7 @@ let create
     let on_close = on_close
     let on_error = on_error
     let on_completion = on_completion
-    let on_no_request _ = return ()
+    let on_no_request _ = return_unit
   end in
   Worker.launch table ~timeout: limits.new_head_request_timeout limits.worker_limits
     name parameters
