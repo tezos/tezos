@@ -221,14 +221,14 @@ let pp_manager_operation_contents_and_result ppf
           "This revelation was successfully applied"
     | Backtracked (Reveal_result, _) ->
         Format.fprintf ppf
-          "@<v 0>This revelation was BACKTRACKED,@,\
+          "@[<v 0>This revelation was BACKTRACKED, \
            its expected effects were NOT applied.@]" ;
     | Applied Delegation_result ->
         Format.fprintf ppf
           "This delegation was successfully applied"
     | Backtracked (Delegation_result, _) ->
         Format.fprintf ppf
-          "@<v 0>This delegation was BACKTRACKED,@,\
+          "@[<v 0>This delegation was BACKTRACKED, \
            its expected effects were NOT applied.@]" ;
     | Applied (Transaction_result _ as tx) ->
         Format.fprintf ppf
@@ -236,7 +236,7 @@ let pp_manager_operation_contents_and_result ppf
         pp_transaction_result tx
     | Backtracked (Transaction_result _ as tx, _errs) ->
         Format.fprintf ppf
-          "@<v 0>This transaction was BACKTRACKED,@,\
+          "@[<v 0>This transaction was BACKTRACKED, \
            its expected effects (as follow) were NOT applied.@]" ;
         pp_transaction_result tx
     | Applied (Origination_result _ as op) ->
@@ -245,7 +245,7 @@ let pp_manager_operation_contents_and_result ppf
         pp_origination_result op
     | Backtracked (Origination_result _ as op, _errs) ->
         Format.fprintf ppf
-          "@<v 0>This origination was BACKTRACKED,@,\
+          "@[<v 0>This origination was BACKTRACKED, \
            its expected effects (as follow) were NOT applied.@]" ;
         pp_origination_result op in
   Format.fprintf ppf

@@ -320,6 +320,15 @@ let may_patch_limits
   match may_need_patching contents with
   | Some contents ->
       simulate cctxt ~chain ~block ?branch contents >>=? fun (_, _, result) ->
+      begin match detect_script_failure result with
+        | Ok () -> return ()
+        | Error _ ->
+            cctxt#message
+              "@[<v 2>This simulation failed:@,%a@]"
+              Operation_result.pp_operation_result
+              (contents, result.contents) >>= fun () ->
+            return ()
+      end >>=? fun () ->
       let res = pack_contents_list contents result.contents in
       patch_list res
   | None -> return contents
