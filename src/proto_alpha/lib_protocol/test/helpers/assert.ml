@@ -36,6 +36,7 @@ let not_equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b  =
   else
     return ()
 
+(* tez *)
 let equal_tez ~loc (a:Alpha_context.Tez.t) (b:Alpha_context.Tez.t) =
   let open Alpha_context in
   equal ~loc Tez.(=) "Tez aren't equal" Tez.pp a b
@@ -44,18 +45,28 @@ let not_equal_tez ~loc (a:Alpha_context.Tez.t) (b:Alpha_context.Tez.t) =
   let open Alpha_context in
   not_equal ~loc Tez.(=) "Tez are equal" Tez.pp a b
 
+(* int *)
 let equal_int ~loc (a:int) (b:int) =
   equal ~loc (=) "Integers aren't equal" Format.pp_print_int a b
 
 let not_equal_int ~loc (a:int) (b:int) =
   not_equal ~loc (=) "Integers are equal" Format.pp_print_int a b
 
+(* bool *)
 let equal_bool ~loc (a:bool) (b:bool) =
   equal ~loc (=) "Booleans aren't equal" Format.pp_print_bool a b
 
 let not_equal_bool ~loc (a:bool) (b:bool) =
   not_equal ~loc (=) "Booleans are equal" Format.pp_print_bool a b
 
+(* pkh *)
+let equal_pkh ~loc (a:Signature.Public_key_hash.t) (b:Signature.Public_key_hash.t) =
+  let module PKH = Signature.Public_key_hash in
+  equal ~loc PKH.equal "Public key hashes  aren't equal" PKH.pp a b
+
+let not_equal_pkh ~loc (a:Signature.Public_key_hash.t) (b:Signature.Public_key_hash.t) =
+  let module PKH = Signature.Public_key_hash in
+  not_equal ~loc PKH.equal "Public key hashes are equal" PKH.pp a b
 
 open Context
 (* Some asserts for account operations *)
