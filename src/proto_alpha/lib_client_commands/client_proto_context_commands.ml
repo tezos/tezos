@@ -304,7 +304,7 @@ let commands () =
         transfer cctxt
           ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
-          ~source ~fee ~src_pk ~src_sk ~destination ~arg ~amount ?gas_limit ?storage_limit () >>=
+          ~source ~fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit () >>=
         report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
         | None -> return_unit
         | Some (_res, _contracts) ->

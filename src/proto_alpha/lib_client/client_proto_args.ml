@@ -89,11 +89,10 @@ let init_arg =
     string_parameter
 
 let arg_arg =
-  default_arg
+  arg
     ~long:"arg"
     ~placeholder:"data"
     ~doc:"argument passed to the contract's script, if needed"
-    ~default:"Unit"
     string_parameter
 
 let delegate_arg =
