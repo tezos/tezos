@@ -43,7 +43,7 @@ type operation = Alpha_context.packed_operation = {
 
 include Updater.PROTOCOL
   with type block_header_data = Alpha_context.Block_header.protocol_data
-   and type block_header_metadata = Alpha_context.Block_header.metadata
+   and type block_header_metadata = Apply_results.block_metadata
    and type block_header = Alpha_context.Block_header.t
    and type operation_data := operation_data
    and type operation_receipt = Apply_results.packed_operation_metadata

@@ -987,3 +987,22 @@ let operation_data_and_metadata_encoding =
       (fun (Contents_list contents, signature) ->
          (Operation_data { contents ; signature }, No_operation_metadata))
   ]
+
+type block_metadata = {
+  baker: Signature.Public_key_hash.t ;
+  level: Level.t ;
+  voting_period_kind: Voting_period.kind ;
+}
+
+let block_metadata_encoding =
+  let open Data_encoding in
+  def "block_header.alpha.metadata" @@
+  conv
+    (fun { baker ; level ; voting_period_kind} ->
+       (baker, level, voting_period_kind))
+    (fun (baker, level, voting_period_kind) ->
+       { baker ; level ; voting_period_kind})
+    (obj3
+       (req "baker" Signature.Public_key_hash.encoding)
+       (req "level" Level.encoding)
+       (req "voting_period_kind" Voting_period.kind_encoding))

@@ -41,7 +41,7 @@ let create_state ~preserved_levels =
 (* get the delegate that had the right to bake for a specific level/slot *)
 let fetch_baker (cctxt : #Proto_alpha.full) ~chain ~block =
   Alpha_block_services.metadata cctxt ~chain ~block () >>=? fun
-    { protocol_data = { Alpha_context.Block_header.baker  } } ->
+    { protocol_data = { Apply_results.baker  } } ->
   return baker
 
 (* We choose a previous offset (5 blocks from head) to ensure that the

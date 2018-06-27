@@ -17,8 +17,8 @@ type block_header = Alpha_context.Block_header.t = {
 
 let block_header_data_encoding = Alpha_context.Block_header.protocol_data_encoding
 
-type block_header_metadata = Alpha_context.Block_header.metadata
-let block_header_metadata_encoding = Alpha_context.Block_header.metadata_encoding
+type block_header_metadata = Apply_results.block_metadata
+let block_header_metadata_encoding = Apply_results.block_metadata_encoding
 
 type operation_data = Alpha_context.packed_protocol_data =
   | Operation_data : 'kind Alpha_context.Operation.protocol_data -> operation_data
@@ -182,7 +182,7 @@ let apply_operation
 let finalize_block { mode ; ctxt ; op_count } =
   match mode with
   | Partial_construction _ ->
-      let level = Alpha_context. Level.current ctxt in
+      let level = Alpha_context.Level.current ctxt in
       Alpha_context.Vote.get_current_period_kind ctxt >>=? fun voting_period_kind ->
       let baker = Signature.Public_key_hash.zero in
       Signature.Public_key_hash.Map.fold
@@ -192,14 +192,12 @@ let finalize_block { mode ; ctxt ; op_count } =
         (Alpha_context.get_deposits ctxt)
         (return ctxt) >>=? fun ctxt ->
       let ctxt = Alpha_context.finalize ctxt in
-      return (ctxt, { Alpha_context.Block_header.baker ; level ;
-                      voting_period_kind })
+      return (ctxt, Apply_results.{ baker ; level ; voting_period_kind })
   | Partial_application { baker ; _ } ->
       let level = Alpha_context. Level.current ctxt in
       Alpha_context.Vote.get_current_period_kind ctxt >>=? fun voting_period_kind ->
       let ctxt = Alpha_context.finalize ctxt in
-      return (ctxt, { Alpha_context.Block_header.baker ; level ;
-                      voting_period_kind })
+      return (ctxt, Apply_results.{ baker ; level ; voting_period_kind })
   | Application
       { baker ;  block_header = { protocol_data = { contents = protocol_data ; _ } ; _ } }
   | Full_construction { protocol_data ; baker ; _ } ->
@@ -214,7 +212,7 @@ let finalize_block { mode ; ctxt ; op_count } =
           raw_level fitness priority op_count in
       Alpha_context.Vote.get_current_period_kind ctxt >>=? fun voting_period_kind ->
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
-      return (ctxt, { Alpha_context.Block_header.baker ; level ; voting_period_kind })
+      return (ctxt, Apply_results.{ baker ; level ; voting_period_kind })
 
 let compare_operations op1 op2 =
   let open Alpha_context in

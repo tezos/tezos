@@ -144,3 +144,10 @@ val unpack_contents_list :
 type ('a, 'b) eq = Eq : ('a, 'a) eq
 val kind_equal_list :
   'kind contents_list -> 'kind2 contents_result_list -> ('kind, 'kind2) eq option
+
+type block_metadata = {
+  baker: Signature.Public_key_hash.t ;
+  level: Level.t ;
+  voting_period_kind: Voting_period.kind ;
+}
+val block_metadata_encoding: block_metadata Data_encoding.encoding
