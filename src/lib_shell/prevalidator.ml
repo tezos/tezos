@@ -45,7 +45,7 @@ module Types = struct
     mutable validation_result : error Preapply_result.t ;
     mutable validation_state : Prevalidation.prevalidation_state tzresult ;
     mutable advertisement : [ `Pending of Mempool.t | `None ] ;
-    mutable rpc_directory : state RPC_directory.t tzresult Lwt.t ;
+    mutable rpc_directory : state RPC_directory.t tzresult Lwt.t lazy_t ;
   }
   type parameters = limits * Distributed_db.chain_db
 
@@ -94,8 +94,7 @@ let empty_rpc_directory : unit RPC_directory.t =
          unprocessed = Operation_hash.Map.empty ;
        })
 
-let rpc_directory block : Types.state RPC_directory.t tzresult Lwt.t =
-  State.Block.protocol_hash block >>= fun protocol ->
+let rpc_directory protocol =
   begin
     match Registered_protocol.get protocol with
     | None ->
@@ -401,6 +400,8 @@ let on_flush w pv predecessor =
   end >>= fun (validation_state, validation_result) ->
   debug w "%d operations were not washed by the flush"
     (Operation_hash.Map.cardinal pending) ;
+  State.Block.protocol_hash pv.predecessor >>= fun old_protocol ->
+  State.Block.protocol_hash predecessor >>= fun new_protocol ->
   pv.predecessor <- predecessor ;
   pv.live_blocks <- new_live_blocks ;
   pv.live_operations <- new_live_operations ;
@@ -410,7 +411,8 @@ let on_flush w pv predecessor =
   pv.in_mempool <- Operation_hash.Set.empty ;
   pv.validation_result <- validation_result ;
   pv.validation_state <- validation_state ;
-  pv.rpc_directory <- rpc_directory predecessor ;
+  if not (Protocol_hash.equal old_protocol new_protocol) then
+    pv.rpc_directory <- lazy (rpc_directory new_protocol) ;
   return ()
 
 let on_advertise pv =
@@ -459,6 +461,7 @@ let on_launch w _ (limits, chain_db) =
   Chain.data chain_state >>= fun
     { current_head = predecessor ; current_mempool = mempool ;
       live_blocks ; live_operations } ->
+  State.Block.protocol_hash predecessor >>= fun protocol ->
   let timestamp = Time.now () in
   Prevalidation.start_prevalidation
     ~predecessor ~timestamp () >>= fun validation_state ->
@@ -485,7 +488,7 @@ let on_launch w _ (limits, chain_db) =
       in_mempool = Operation_hash.Set.empty ;
       validation_result ; validation_state ;
       advertisement = `None ;
-      rpc_directory = rpc_directory predecessor ;
+      rpc_directory = lazy (rpc_directory protocol) ;
     } in
   List.iter
     (fun oph -> Lwt.ignore_result (fetch_operation w pv oph))
@@ -571,7 +574,7 @@ let rpc_directory  : t option RPC_directory.t =
             (RPC_directory.map (fun _ -> Lwt.return_unit) empty_rpc_directory)
       | Some w ->
           let pv = Worker.state w in
-          pv.rpc_directory >>= function
+          Lazy.force pv.rpc_directory >>= function
           | Error _ ->
               Lwt.return RPC_directory.empty
           | Ok rpc_directory ->
