@@ -131,30 +131,45 @@ let () =
       | _ -> None)
     (fun (hash, err) -> Failed_to_preapply (hash, err))
 
-let get_operation_fee op =
+let get_manager_operation_gas_and_fee op =
   let { protocol_data = Operation_data { contents } ; _ } = op in
   let open Operation in
   let l = to_list (Contents_list contents) in
-  fold_left_s (fun total_fee -> function
-      | Contents (Manager_operation { fee ; _ })
-        when Tez.(fee > zero) ->
+  fold_left_s (fun ((total_fee, total_gas) as acc) -> function
+      | Contents (Manager_operation { fee ; gas_limit ; _ }) ->
           Lwt.return @@ Alpha_environment.wrap_error @@
-          Tez.(total_fee +? fee)
-      | _ -> return total_fee) Tez.zero l
+          Tez.(total_fee +? fee) >>=? fun total_fee ->
+          return (total_fee, (Z.add total_gas gas_limit))
+      | _ -> return acc) (Tez.zero, Z.zero) l
 
-let sort_operations_by_fee ?(threshold = Tez.zero) (operations : Proto_alpha.operation list) =
+(* Sort operation consisdering potential gas and storage usage.
+   Weight = fee / (max ( (size/size_total), (gas/gas_total))) *)
+let sort_manager_operations
+    ~max_size
+    ~hard_gas_limit_per_block
+    ?(threshold = Tez.zero)
+    (operations : Proto_alpha.operation list)
+  =
+  let compute_weight op (fee, gas) =
+    let size = Data_encoding.Binary.length Operation.encoding op in
+    let size_f = Q.of_int size in
+    let gas_f = Q.of_bigint gas in
+    let fee_f = Q.of_int64 (Tez.to_mutez fee) in
+    let size_ratio = Q.(size_f / (Q.of_int max_size)) in
+    let gas_ratio = Q.(gas_f / (Q.of_bigint hard_gas_limit_per_block)) in
+    (size, gas, Q.(fee_f / (max size_ratio gas_ratio)))
+  in
   filter_map_s
     (fun op ->
-       get_operation_fee op >>=? fun fee ->
+       get_manager_operation_gas_and_fee op >>=? fun (fee, gas) ->
        if Tez.(<) fee threshold then
          return_none
        else
-         return_some (op, fee))
-    operations >>=? fun operations ->
-  let compare_fee (_, fee1) (_, fee2) =
-    (* NOTE: inverted fee comparison to invert the order of sort *)
-    Tez.compare fee2 fee1 in
-  return @@ List.map fst (List.sort compare_fee operations)
+         return (Some (op, (compute_weight op (fee, gas))))
+    ) operations >>=? fun operations ->
+  (* We sort by the biggest weight *)
+  return
+    (List.sort (fun (_, (_, _, w)) (_, (_, _, w')) -> Q.compare w' w) operations)
 
 let retain_operations_up_to_quota operations max_quota =
   let exception Full of packed_operation list in
@@ -173,8 +188,27 @@ let retain_operations_up_to_quota operations max_quota =
     | Full ops -> ops in
   List.rev operations
 
-let classify_operations ?threshold (ops: Proto_alpha.operation list) =
-  let t = Array.make (List.length LiftedMain.validation_passes) [] in
+let trim_manager_operations ~max_size ~hard_gas_limit_per_block manager_operations =
+  map_s (fun op ->
+      get_manager_operation_gas_and_fee op >>=? fun (_fee, gas) ->
+      let size = Data_encoding.Binary.length Operation.encoding op in
+      return (op, (size, gas))) manager_operations >>=? fun manager_operations ->
+  List.fold_left
+    (fun (total_size, total_gas, (good_ops, bad_ops)) (op, (size, gas)) ->
+       let new_size = total_size + size in
+       let new_gas = Z.(total_gas + gas) in
+       if new_size > max_size || (Z.gt new_gas hard_gas_limit_per_block) then
+         (new_size, new_gas, (good_ops, op :: bad_ops))
+       else
+         (new_size, new_gas, (op :: good_ops, bad_ops))
+    ) (0, Z.zero, ([], [])) manager_operations |> fun (_, _, (good_ops, bad_ops)) ->
+  (* We keep the overflowing operations, it may be used for client-side validation *)
+  return ((List.rev good_ops), (List.rev bad_ops))
+
+(* We classify operations, sort managers operation by interest and add bad ones at the end *)
+(* Hypothesis : we suppose that the received manager operations have a valid gas_limit *)
+let classify_operations ~hard_gas_limit_per_block ?threshold (ops: Proto_alpha.operation list) =
+  let t = Array.make (List.length Proto_alpha.Main.validation_passes) [] in
   List.iter
     (fun (op: Proto_alpha.operation) ->
        List.iter
@@ -182,17 +216,18 @@ let classify_operations ?threshold (ops: Proto_alpha.operation list) =
          (Main.acceptable_passes op))
     ops ;
   let t = Array.map List.rev t in
-  (* Retrieve the maximum paying manager operations *)
+
+  (* Retrieve the optimist maximum paying manager operations *)
   let manager_operations = t.(managers_index) in
   let { Alpha_environment.Updater.max_size } =
-    List.nth LiftedMain.validation_passes managers_index in
-  sort_operations_by_fee ?threshold manager_operations >>=? fun ordered_operations ->
-  let max_operations =
-    retain_operations_up_to_quota ordered_operations max_size
-  in
-  (* TODO ? : should preserve mempool order  *)
-  t.(managers_index) <- max_operations;
-  return @@ Array.fold_right (fun ops acc -> ops :: acc) t []
+    List.nth Proto_alpha.Main.validation_passes managers_index in
+  sort_manager_operations ~max_size ~hard_gas_limit_per_block ?threshold manager_operations
+  >>=? fun ordered_operations ->
+  (* Greedy heuristic *)
+  trim_manager_operations ~max_size ~hard_gas_limit_per_block (List.map fst ordered_operations)
+  >>=? fun (desired_manager_operations, overflowing_manager_operations) ->
+  t.(managers_index) <- desired_manager_operations ;
+  return @@ (Array.fold_right (fun ops acc -> ops :: acc) t [ overflowing_manager_operations ])
 
 let parse (op : Operation.raw) : Operation.packed =
   let protocol_data =
@@ -315,11 +350,28 @@ let forge_block cctxt ?(chain = `Main) block
 
   (* get basic building blocks *)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
-  classify_operations ?threshold operations_arg >>=? fun operations ->
+  Alpha_services.Constants.all cctxt (`Main, block) >>=?
+  fun Constants.{ parametric = { hard_gas_limit_per_block ; endorsers_per_block } } ->
+  classify_operations ~hard_gas_limit_per_block ?threshold operations_arg >>=? fun operations ->
+  (* Ensure that we retain operations up to the quota *)
+  let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
+  let endorsements = List.sub
+      (List.nth operations endorsements_index)
+      endorsers_per_block in
+  let votes = retain_operations_up_to_quota
+      (List.nth operations votes_index)
+      (List.nth quota votes_index).max_size in
+  let anonymous =
+    retain_operations_up_to_quota
+      (List.nth operations anonymous_index)
+      (List.nth quota anonymous_index).max_size in
+  (* Size/Gas check already occured in classify operations *)
+  let managers = List.nth operations managers_index in
+  let operations = [ endorsements ; votes ; anonymous ; managers ] in
   Alpha_block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, result) ->
 
-  (* now for some logging *)
+  (* Now for some logging *)
   let total_op_count = List.length operations_arg in
   let valid_op_count =
     List.fold_left
@@ -540,6 +592,11 @@ let filter_and_apply_operations
   let votes = List.nth operations votes_index in
   let anonymous = List.nth operations anonymous_index in
   let managers = List.nth operations managers_index in
+  let bad_managers =
+    if List.length operations > managers_index + 1 then
+      List.nth operations (managers_index + 1)
+    else []
+  in
   let validate_operation inc op =
     add_operation inc op >>= function
     | Error errs ->
@@ -570,16 +627,16 @@ let filter_and_apply_operations
   in
   filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
   filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
-  filter_valid_operations inc managers >>=? fun (inc, managers) ->
+  filter_valid_operations inc (managers @ bad_managers) >>=? fun (inc, managers) ->
   (* Gives a chance to the endorser to fund their deposit in the current block *)
   filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
   finalize_construction inc >>=? fun _ ->
-  let quota : Alpha_environment.Updater.quota list = LiftedMain.validation_passes in
-  (* This shouldn't happen *)
-  tzforce state.constants >>=? fun constants ->
+  let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
+  tzforce state.constants >>=? fun
+    { Constants.parametric = { endorsers_per_block ; hard_gas_limit_per_block ; } } ->
   let endorsements =
-    List.sub (List.rev endorsements)
-      constants.Constants.parametric.endorsers_per_block in
+    List.sub (List.rev endorsements) endorsers_per_block
+  in
   let votes =
     retain_operations_up_to_quota
       (List.rev votes)
@@ -588,14 +645,19 @@ let filter_and_apply_operations
     retain_operations_up_to_quota
       (List.rev anonymous)
       (List.nth quota anonymous_index).max_size in
-  (* manager operations size check already occured in classify operations *)
-  let operations = List.map List.rev [ endorsements ; votes ; anonymous ; managers ] in
-  (* Re-run with the final operations  *)
-  fold_left_s
-    add_operation
-    initial_inc (List.flatten operations) >>=? fun inc ->
-  finalize_construction inc >>=? fun (validation_result, metadata) ->
-  return @@ (inc, (validation_result, metadata), operations)
+  trim_manager_operations ~max_size:(List.nth quota managers_index).max_size
+    ~hard_gas_limit_per_block managers >>=? fun (accepted_managers, _overflowing_managers) ->
+
+  (* Make sure we only keep valid operations *)
+  filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
+  filter_valid_operations inc accepted_managers >>=? fun (inc, accepted_managers) ->
+  filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
+  (* Endorsements won't fail now *)
+  fold_left_s add_operation inc endorsements >>=? fun final_inc ->
+  let operations = List.map List.rev [ endorsements ; votes ; anonymous ; accepted_managers ] in
+  finalize_construction final_inc >>=? fun (validation_result, metadata) ->
+  return @@ (final_inc, (validation_result, metadata), operations)
 
 (* Build the block header : mimics node prevalidation *)
 let finalize_block_header
@@ -682,7 +744,8 @@ let bake_slot
       Some seed_nonce_hash
     else
       None in
-  classify_operations ?threshold operations >>=? fun operations ->
+  tzforce state.constants >>=? fun Constants.{ parametric = { hard_gas_limit_per_block } } ->
+  classify_operations ?threshold ~hard_gas_limit_per_block operations >>=? fun operations ->
   (* Don't load an alpha context if the chain is still in genesis *)
   if Protocol_hash.(Proto_alpha.hash <> bi.next_protocol) then
     (* Delegate validation to shell *)
@@ -695,7 +758,10 @@ let bake_slot
             f "Client-side validation: error while filtering invalid operations :@\n%a"
             -% t event "client_side_validation_error"
             -% a errs_tag errs) >>= fun () ->
-        shell_prevalidation cctxt ~chain ~block seed_nonce_hash [] slot
+        lwt_log_notice Tag.DSL.(fun f ->
+            f "Building an empty block using shell validation"
+            -% t event "shell_prevalidation_notice") >>= fun () ->
+        shell_prevalidation cctxt ~chain ~block seed_nonce_hash operations slot
     | Ok (final_context, validation_result, operations) ->
         lwt_debug Tag.DSL.(fun f ->
             f "Try forging locally the block header for %a (slot %d) for %s (%a)"

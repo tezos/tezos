@@ -53,7 +53,7 @@ let begin_construction ~timestamp ?protocol_data index predecessor =
           operations_hash = Operation_list_list_hash.zero ;
         } in
       LiftedMain.begin_construction
-        ~chain_id:predecessor.chain_id
+        ~chain_id: predecessor.chain_id
         ~predecessor_context: context
         ~predecessor_timestamp: predecessor.timestamp
         ~predecessor_fitness: predecessor.fitness
