@@ -35,9 +35,9 @@ let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_conte
            ~show_source: (not no_print_source)
            ?parsed:None) errs >>= fun () ->
       cctxt#error "%s" msg >>= fun () ->
-      Lwt.return None
+      Lwt.return_none
   | Ok data ->
-      Lwt.return (Some data)
+      Lwt.return_some data
 
 let file_parameter =
   Clic.parameter (fun _ p ->
@@ -73,7 +73,7 @@ let commands () =
           then cctxt#message "%Ld" (Time.to_seconds v)
           else cctxt#message "%s" (Time.to_notation v)
         end >>= fun () ->
-        return ()
+        return_unit
       end ;
 
     command ~group ~desc: "Lists all non empty contracts of the block."
@@ -85,7 +85,7 @@ let commands () =
         Lwt_list.iter_s
           (fun (alias, hash, kind) -> cctxt#message "%s%s%s" hash kind alias)
           contracts >>= fun () ->
-        return ()
+        return_unit
       end ;
 
     command ~group ~desc: "Get the balance of a contract."
@@ -98,12 +98,12 @@ let commands () =
           ~chain:`Main ~block:cctxt#block
           contract >>=? fun amount ->
         cctxt#answer "%a %s" Tez.pp amount Client_proto_args.tez_sym >>= fun () ->
-        return ()
+        return_unit
       end ;
 
     command ~group ~desc: "Get the storage of a contract."
       no_options
-      (prefixes [ "get" ; "storage" ; "for" ]
+      (prefixes [ "get" ; "script" ; "storage" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
@@ -114,7 +114,27 @@ let commands () =
             cctxt#error "This is not a smart contract."
         | Some storage ->
             cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped storage >>= fun () ->
-            return ()
+            return_unit
+      end ;
+
+    command ~group ~desc: "Get the storage of a contract."
+      no_options
+      (prefixes [ "get" ; "script" ; "code" ; "for" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+        get_script cctxt
+          ~chain:`Main ~block:cctxt#block
+          contract >>=? function
+        | None ->
+            cctxt#error "This is not a smart contract."
+        | Some { code ; storage = _ } ->
+            match Script.force_decode code with
+            | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Alpha_environment.Error_monad.pp) errs
+            | Ok code ->
+                begin cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped code >>= fun () ->
+                  return ()
+                end
       end ;
 
     command ~group ~desc: "Get the manager of a contract."
@@ -130,7 +150,7 @@ let commands () =
         Public_key_hash.to_source manager >>=? fun m ->
         cctxt#message "%s (%s)" m
           (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
-        return ()
+        return_unit
       end ;
 
     command ~group ~desc: "Get the delegate of a contract."
@@ -144,13 +164,13 @@ let commands () =
           contract >>=? function
         | None ->
             cctxt#message "none" >>= fun () ->
-            return ()
+            return_unit
         | Some delegate ->
             Public_key_hash.rev_find cctxt delegate >>=? fun mn ->
             Public_key_hash.to_source delegate >>=? fun m ->
             cctxt#message "%s (%s)" m
               (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
-            return ()
+            return_unit
       end ;
 
     command ~group ~desc: "Set the delegate of a contract."
@@ -169,7 +189,7 @@ let commands () =
           ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
           contract (Some delegate) ~fee ~src_pk ~manager_sk >>=? fun _ ->
-        return ()
+        return_unit
       end ;
 
     command ~group ~desc: "Withdraw the delegate from a contract."
@@ -185,7 +205,7 @@ let commands () =
           ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
           contract None ~fee ~src_pk ~manager_sk >>=? fun _ ->
-        return ()
+        return_unit
       end ;
 
     command ~group ~desc:"Open a new account."
@@ -215,10 +235,10 @@ let commands () =
           ~fee ?delegate ~delegatable ~manager_pkh ~balance
           ~source ~src_pk ~src_sk () >>=? fun (_res, contract) ->
         if dry_run then
-          return ()
+          return_unit
         else
           save_contract ~force cctxt alias_name contract >>=? fun () ->
-          return ()
+          return_unit
       end ;
 
     command ~group ~desc: "Launch a smart contract on the blockchain."
@@ -256,13 +276,13 @@ let commands () =
           ~fee ?gas_limit ?storage_limit ~delegate ~delegatable ~spendable ~initial_storage
           ~manager ~balance ~source ~src_pk ~src_sk ~code () >>= fun errors ->
         report_michelson_errors ~no_print_source ~msg:"origination simulation failed" cctxt errors >>= function
-        | None -> return ()
+        | None -> return_unit
         | Some (_res, contract) ->
             if dry_run then
-              return ()
+              return_unit
             else
               save_contract ~force cctxt alias_name contract >>=? fun () ->
-              return ()
+              return_unit
       end ;
 
     command ~group ~desc: "Transfer tokens / call a smart contract."
@@ -284,11 +304,11 @@ let commands () =
         transfer cctxt
           ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
-          ~source ~fee ~src_pk ~src_sk ~destination ~arg ~amount ?gas_limit ?storage_limit () >>=
+          ~source ~fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit () >>=
         report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
-        | None -> return ()
+        | None -> return_unit
         | Some (_res, _contracts) ->
-            return ()
+            return_unit
       end;
 
     command ~group ~desc: "Reveal the public key of the contract manager."
@@ -304,7 +324,7 @@ let commands () =
         reveal cctxt
           ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~source ~fee ~src_pk ~src_sk () >>=? fun _res ->
-        return ()
+        return_unit
       end;
 
     command ~group ~desc: "Register the public key hash as a delegate."
@@ -320,7 +340,7 @@ let commands () =
           ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
           ~fee ~manager_sk:src_sk src_pk >>=? fun _res ->
-        return ()
+        return_unit
       end;
 
     command ~group ~desc:"Register and activate an Alphanet/Zeronet faucet account."
@@ -349,7 +369,7 @@ let commands () =
              activate_account cctxt
                ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
                ~encrypted ~force key name >>=? fun _res ->
-             return ()
+             return_unit
       );
 
     command ~group ~desc:"Activate a fundraiser account."
@@ -368,7 +388,7 @@ let commands () =
            ~block:cctxt#block ?confirmations:cctxt#confirmations
            ~dry_run
            name code >>=? fun _res ->
-         return ()
+         return_unit
       );
 
     command ~desc:"Wait until an operation is included in a block"
@@ -408,7 +428,7 @@ let commands () =
           (failure "check-previous cannot be negative") >>=? fun () ->
         Client_confirmations.wait_for_operation_inclusion ctxt
           ~chain:`Main ~confirmations ~predecessors operation_hash >>=? fun _ ->
-        return ()
+        return_unit
       end ;
 
     command ~group:binary_description ~desc:"Describe unsigned block header"
@@ -419,7 +439,7 @@ let commands () =
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
              (Alpha_context.Block_header.unsigned_encoding)) >>= fun () ->
-        return ()
+        return_unit
       end ;
 
     command ~group:binary_description ~desc:"Describe unsigned block header"
@@ -430,7 +450,7 @@ let commands () =
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
              Alpha_context.Operation.unsigned_encoding) >>= fun () ->
-        return ()
+        return_unit
       end
 
   ]

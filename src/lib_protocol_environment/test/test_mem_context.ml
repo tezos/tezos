@@ -55,7 +55,7 @@ let test_simple { block2 = ctxt } =
   Assert.equal_string_option (Some "Novembre") (c novembre) ;
   Context.get ctxt ["a";"c"] >>= fun juin ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let test_continuation { block3a = ctxt } =
   Context.get ctxt ["version"] >>= fun version ->
@@ -66,7 +66,7 @@ let test_continuation { block3a = ctxt } =
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
   Context.get ctxt ["a";"d"] >>= fun mars ->
   Assert.equal_string_option ~msg:__LOC__  (Some "Mars") (c mars) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let test_fork { block3b = ctxt } =
   Context.get ctxt ["version"] >>= fun version ->
@@ -77,7 +77,7 @@ let test_fork { block3b = ctxt } =
   Assert.is_none ~msg:__LOC__ (c juin) ;
   Context.get ctxt ["a";"d"] >>= fun mars ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let test_replay { genesis = ctxt0 }  =
   Context.set ctxt0 ["version"] (MBytes.of_string "0.0") >>= fun ctxt1 ->
@@ -96,7 +96,7 @@ let test_replay { genesis = ctxt0 }  =
   Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
   Context.get ctxt4b ["a";"d"] >>= fun juillet ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let fold_keys s k ~init ~f =
   let rec loop k acc =
@@ -131,7 +131,7 @@ let test_fold { genesis = ctxt } =
   Assert.equal_string_list_list ~msg:__LOC__ [["g";"h"]] l ;
   keys ctxt ["i"] >>= fun l ->
   Assert.equal_string_list_list ~msg:__LOC__ [] l ;
-  Lwt.return ()
+  Lwt.return_unit
 
 (******************************************************************************)
 

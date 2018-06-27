@@ -91,7 +91,7 @@ let commands () =
       (fun () (cctxt : Proto_alpha.full) ->
          Program.load cctxt >>=? fun list ->
          Lwt_list.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
-         return ()) ;
+         return_unit) ;
 
     command ~group ~desc: "Add a script to the library."
       (args1 (Program.force_switch ()))
@@ -118,7 +118,7 @@ let commands () =
       (fun () (_, program) (cctxt : Proto_alpha.full) ->
          Program.to_source program >>=? fun source ->
          cctxt#message "%s\n" source >>= fun () ->
-         return ()) ;
+         return_unit) ;
 
     command ~group ~desc: "Ask the node to run a script."
       (args3 trace_stack_switch amount_arg no_print_source_flag)
@@ -161,7 +161,7 @@ let commands () =
              cctxt#message
                "(@[<v 0>(types . ())@ (errors . %a)@])"
                Michelson_v1_emacs.report_errors res_with_errors >>= fun () ->
-             return ()
+             return_unit
          | (parsed, errors) ->
              cctxt#message "%a"
                (fun ppf () ->
@@ -188,7 +188,7 @@ let commands () =
          | Ok gas ->
              cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]"
                Proto_alpha.Alpha_context.Gas.pp gas >>= fun () ->
-             return ()
+             return_unit
          | Error errs ->
              cctxt#warning "%a"
                (Michelson_v1_error_reporter.report_errors
@@ -230,7 +230,7 @@ let commands () =
                MBytes.pp_hex (Alpha_environment.Raw_hashes.sha256 bytes)
                MBytes.pp_hex (Alpha_environment.Raw_hashes.sha512 bytes)
                Proto_alpha.Alpha_context.Gas.pp remaining_gas >>= fun () ->
-             return ()
+             return_unit
          | Error errs ->
              cctxt#warning "%a"
                (Michelson_v1_error_reporter.report_errors
@@ -253,7 +253,7 @@ let commands () =
       (fun () bytes sk cctxt ->
          Client_keys.sign cctxt sk bytes >>=? fun signature ->
          cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
-         return ()) ;
+         return_unit) ;
 
     command ~group
       ~desc: "Check the signature of a byte sequence as per Michelson \
@@ -273,10 +273,10 @@ let commands () =
          | false -> cctxt#error "invalid signature"
          | true ->
              if quiet then
-               return ()
+               return_unit
              else
                cctxt#message "Signature check successfull." >>= fun () ->
-               return ()
+               return_unit
       ) ;
 
   ]

@@ -29,6 +29,7 @@ type validation_mode =
 
 type validation_state =
   { mode : validation_mode ;
+    chain_id : Chain_id.t ;
     ctxt : Alpha_context.t ;
     op_count : int ;
   }

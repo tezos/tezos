@@ -22,7 +22,7 @@ let builtin_commands =
          Lwt_list.iter_s
            (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
            (Client_commands.get_versions ()) >>= fun () ->
-         return ()) ;
+         return_unit) ;
   ]
 
 (* Duplicated from the node, here for now since the client still
@@ -156,7 +156,7 @@ let main select_commands =
               ~script ~cur_arg ~prev_arg ~args:original_args ~global_options
               commands client_config >>=? fun completions ->
             List.iter print_endline completions ;
-            return ()
+            return_unit
         | None ->
             Clic.dispatch commands client_config remaining
       end

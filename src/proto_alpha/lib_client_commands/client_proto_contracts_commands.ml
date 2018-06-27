@@ -64,6 +64,6 @@ let commands  () =
        @@ stop)
       (fun () (_, contract) (cctxt : Proto_alpha.full) ->
          cctxt#message "%a\n%!" Contract.pp contract >>= fun () ->
-         return ()) ;
+         return_unit) ;
 
   ]

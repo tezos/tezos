@@ -275,22 +275,22 @@ let delete c contract =
 
 let allocated c contract =
   Storage.Contract.Counter.get_option c contract >>=? function
-  | None -> return false
-  | Some _ -> return true
+  | None -> return_false
+  | Some _ -> return_true
 
 let exists c contract =
   match Contract_repr.is_implicit contract with
-  | Some _ -> return true
+  | Some _ -> return_true
   | None -> allocated c contract
 
 let must_exist c contract =
   exists c contract >>=? function
-  | true -> return ()
+  | true -> return_unit
   | false -> fail (Non_existing_contract contract)
 
 let must_be_allocated c contract =
   allocated c contract >>=? function
-  | true -> return ()
+  | true -> return_unit
   | false ->
       match Contract_repr.is_implicit contract with
       | Some pkh -> fail (Empty_implicit_contract pkh)
@@ -307,15 +307,15 @@ let originated_from_current_nonce ~since: ctxt_since ~until: ctxt_until =
   Lwt.return (Raw_context.origination_nonce ctxt_until) >>=? fun until ->
   filter_map_s
     (fun contract -> exists ctxt_until contract >>=? function
-       | true -> return (Some contract)
-       | false -> return None)
+       | true -> return_some contract
+       | false -> return_none)
     (Contract_repr.originated_contracts ~since ~until)
 
 let check_counter_increment c contract counter =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
   let expected = Z.succ contract_counter in
   if Compare.Z.(expected = counter)
-  then return ()
+  then return_unit
   else if Compare.Z.(expected > counter) then
     fail (Counter_in_the_past (contract, expected, counter))
   else
@@ -369,9 +369,9 @@ let get_manager_key c contract =
 
 let is_manager_key_revealed c contract =
   Storage.Contract.Manager.get_option c contract >>=? function
-  | None -> return false
-  | Some (Manager_repr.Hash _) -> return false
-  | Some (Manager_repr.Public_key _) -> return true
+  | None -> return_false
+  | Some (Manager_repr.Hash _) -> return_false
+  | Some (Manager_repr.Public_key _) -> return_true
 
 let reveal_manager_key c contract public_key =
   Storage.Contract.Manager.get c contract >>=? function
@@ -396,7 +396,7 @@ let get_balance c contract =
 let is_delegatable = Delegate_storage.is_delegatable
 let is_spendable c contract =
   match Contract_repr.is_implicit contract with
-  | Some _ -> return true
+  | Some _ -> return_true
   | None ->
       Storage.Contract.Spendable.mem c contract >>= return
 

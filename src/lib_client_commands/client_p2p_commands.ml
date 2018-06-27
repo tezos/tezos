@@ -84,7 +84,7 @@ let commands () =
                   P2p_point.Id.pp p
                   (if pi.trusted then "★" else " ")
       end points >>= fun () ->
-      return ()
+      return_unit
     end ;
 
     command ~group ~desc: "Connect to a new point."
@@ -133,7 +133,7 @@ let commands () =
          cctxt#message
            "The given ip address is %s"
            (if banned then "banned" else "not banned") >>= fun () ->
-         return ()
+         return_unit
       ) ;
 
     command ~group ~desc: "Remove a peer ID from the blacklist and whitelist."
@@ -173,7 +173,7 @@ let commands () =
          cctxt#message
            "The given peer ID is %s"
            (if banned then "banned" else "not banned") >>= fun () ->
-         return ()
+         return_unit
       ) ;
 
     command ~group ~desc: "Clear all ACLs."

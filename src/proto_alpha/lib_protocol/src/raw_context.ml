@@ -398,7 +398,7 @@ let check_inited ctxt =
   | Some bytes ->
       let s = MBytes.to_string bytes in
       if Compare.String.(s = version_value) then
-        return ()
+        return_unit
       else
         storage_error (Incompatible_protocol_version s)
 
@@ -432,13 +432,13 @@ let prepare ~level ~timestamp ~fitness ctxt =
 
 let check_first_block ctxt =
   Context.get ctxt version_key >>= function
-  | None -> return ()
+  | None -> return_unit
   | Some bytes ->
       let s = MBytes.to_string bytes in
       if Compare.String.(s = version_value) then
         failwith "Internal error: previously initialized context."
       else if Compare.String.(s = "genesis") then
-        return ()
+        return_unit
       else
         storage_error (Incompatible_protocol_version s)
 

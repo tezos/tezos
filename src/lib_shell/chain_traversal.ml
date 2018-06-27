@@ -14,7 +14,7 @@ let path (b1: Block.t) (b2: Block.t) =
     invalid_arg "Chain_traversal.path" ;
   let rec loop acc current =
     if Block.equal b1 current then
-      Lwt.return (Some acc)
+      Lwt.return_some acc
     else
       Block.predecessor current >>= function
       | Some pred -> loop (current :: acc) pred
@@ -87,7 +87,7 @@ let iter_predecessors ?max ?min_fitness ?min_date heads ~f =
         (fun b -> Time.(min_date <= Block.timestamp b)) in
   let rec loop () =
     match pop () with
-    | None -> Lwt.return ()
+    | None -> Lwt.return_unit
     | Some b ->
         check_count () ;
         f b >>= fun () ->
@@ -97,7 +97,7 @@ let iter_predecessors ?max ?min_fitness ?min_date heads ~f =
             if check_fitness p && check_date p then push p ;
             loop () in
   List.iter push heads ;
-  try loop () with Local.Exit -> Lwt.return ()
+  try loop () with Local.Exit -> Lwt.return_unit
 
 let iter_predecessors ?max ?min_fitness ?min_date heads ~f =
   match heads with

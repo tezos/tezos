@@ -123,7 +123,7 @@ let try_action addr port action =
   | Ok conn ->
       action conn >>=? fun () ->
       P2p_connection.close conn >>= fun () ->
-      return ()
+      return_unit
 
 let replicate n x =
   let rec replicate_acc acc n x =
@@ -226,7 +226,7 @@ let long_chain n conn =
   let prev_ref = ref genesis_block_hashed in
   let rec loop k =
     if k < 1 then
-      return ()
+      return_unit
     else
       let block = signed (block_forged ~prev:!prev_ref []) in
       prev_ref := Block_hash.hash_bytes [block] ;
@@ -238,7 +238,7 @@ let lots_transactions amount fee n conn =
   let signed_op = signed (tx_forged amount fee) in
   let rec loop k =
     if k < 1 then
-      return ()
+      return_unit
     else
       send conn (Operation signed_op) >>=? fun () ->
       loop (k-1) in

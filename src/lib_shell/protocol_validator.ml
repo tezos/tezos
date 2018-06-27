@@ -43,11 +43,11 @@ let rec worker_loop bv =
             (* no need to tag 'invalid' protocol on disk,
                the economic protocol prevents us from
                being spammed with protocol validation. *)
-            return true
+            return_true
         end >>=? fun _ ->
         match wakener with
         | None ->
-            return ()
+            return_unit
         | Some wakener ->
             if valid then
               match Registered_protocol.get hash with
@@ -63,7 +63,7 @@ let rec worker_loop bv =
                 (Error
                    [Invalid_protocol { hash ;
                                        error = Compilation_failed }]) ;
-            return ()
+            return_unit
   end >>= function
   | Ok () ->
       worker_loop bv
@@ -137,17 +137,17 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block: State.Block.t) =
   let protocol =
     Context.get_protocol context >>= fun protocol_hash ->
     fetch_and_compile_protocol pv ?peer ?timeout protocol_hash >>=? fun _ ->
-    return ()
+    return_unit
   and test_protocol =
     Context.get_test_chain context >>= function
-    | Not_running -> return ()
+    | Not_running -> return_unit
     | Forking { protocol }
     | Running { protocol } ->
         fetch_and_compile_protocol pv ?peer ?timeout protocol  >>=? fun _ ->
-        return () in
+        return_unit in
   protocol >>=? fun () ->
   test_protocol >>=? fun () ->
-  return ()
+  return_unit
 
 let prefetch_and_compile_protocols pv ?peer ?timeout block =
   try ignore (fetch_and_compile_protocols pv ?peer ?timeout block) with _ -> ()

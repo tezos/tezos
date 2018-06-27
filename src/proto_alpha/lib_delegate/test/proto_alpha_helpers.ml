@@ -36,7 +36,7 @@ let no_write_context ?(block = `Head 0) config : #Client_context.full = object
   method write : type a. string ->
     a ->
     a Data_encoding.encoding -> unit Error_monad.tzresult Lwt.t =
-    fun _ _ _ -> return ()
+    fun _ _ _ -> return_unit
   method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = fun f -> f ()
   method block = block
   method confirmations = None
@@ -555,7 +555,7 @@ module Endorse = struct
     let shell = { Tezos_base.Operation.branch = hash } in
     let contents =
       Single (Endorsement { level }) in
-    sign ~watermark:Endorsement src_sk shell (Contents_list contents)
+    sign ~watermark:(Endorsement Chain_id.zero) src_sk shell (Contents_list contents)
 
   let signing_slots
       block
@@ -565,7 +565,7 @@ module Endorse = struct
       !rpc_ctxt ~delegates:[delegate] ~levels:[level]
       (`Main, block) >>=? function
     | [{ slots }] -> return slots
-    | _ -> return []
+    | _ -> return_nil
 
   let endorse
       (contract : Account.t)
@@ -606,7 +606,7 @@ module Endorse = struct
       ~delegates:[delegate]
       (`Main, block) >>=? function
     | [{ level ; slots }] -> return (List.map (fun s -> (level, s)) slots)
-    | _ -> return []
+    | _ -> return_nil
 
 end
 
@@ -614,7 +614,7 @@ let display_level block =
   Alpha_block_services.metadata
     !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
   Format.eprintf "Level: %a@." Level.pp_full level ;
-  return ()
+  return_unit
 
 let endorsement_security_deposit block =
   Constants_services.all !rpc_ctxt (`Main, block) >>=? fun c ->

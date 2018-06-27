@@ -489,7 +489,7 @@ module Chain = struct
       (fun id ->
          locked_read global_state data id >>=? fun chain ->
          Chain_id.Table.add data.chains id chain ;
-         return ())
+         return_unit)
       ids
 
   let read_all state =
@@ -674,8 +674,8 @@ module Block = struct
     end
   let read_opt chain_state ?pred hash =
     read chain_state ?pred hash >>= function
-    | Error _ -> Lwt.return None
-    | Ok v -> Lwt.return (Some v)
+    | Error _ -> Lwt.return_none
+    | Ok v -> Lwt.return_some v
   let read_exn chain_state ?(pred = 0) hash =
     Shared.use chain_state.block_store begin fun store ->
       begin
@@ -696,8 +696,8 @@ module Block = struct
     return header.shell.predecessor
   let read_predecessor_opt chain_state hash =
     read_predecessor chain_state hash >>= function
-    | Error _ -> Lwt.return None
-    | Ok v -> Lwt.return (Some v)
+    | Error _ -> Lwt.return_none
+    | Ok v -> Lwt.return_some v
   let read_predecessor_exn chain_state hash =
     read_exn chain_state hash >>= fun { contents = { header } } ->
     Lwt.return header.shell.predecessor
@@ -707,7 +707,7 @@ module Block = struct
       Lwt.return_none           (* we are at genesis *)
     else
       read_exn chain_state header.shell.predecessor >>= fun block ->
-      Lwt.return (Some block)
+      Lwt.return_some block
 
   let predecessor_n b n =
     Shared.use b.chain_state.block_store begin fun block_store ->
@@ -739,7 +739,7 @@ module Block = struct
       fail_when known_invalid (failure "Known invalid") >>=? fun () ->
       Store.Block.Contents.known (store, hash) >>= fun known ->
       if known then
-        return None
+        return_none
       else begin
         (* safety check: never ever commit a block that is not compatible
            with the current checkpoint.  *)
@@ -806,7 +806,7 @@ module Block = struct
         let block = { chain_state ; hash ; contents } in
         Lwt_watcher.notify chain_state.block_watcher block ;
         Lwt_watcher.notify chain_state.global_state.block_watcher block ;
-        return (Some block)
+        return_some block
       end
     end
 
@@ -818,11 +818,11 @@ module Block = struct
       fail_when known_valid (failure "Known valid") >>=? fun () ->
       Store.Block.Invalid_block.known store hash >>= fun known_invalid ->
       if known_invalid then
-        return false
+        return_false
       else
         Store.Block.Invalid_block.store store hash
           { level = block_header.shell.level ; errors } >>= fun () ->
-        return true
+        return_true
     end
 
   let watcher (state : chain_state) =
@@ -959,7 +959,7 @@ let read_block { global_data } ?pred hash =
          | None ->
              Block.read_opt chain_state ?pred hash >>= function
              | None -> acc
-             | Some block -> Lwt.return (Some block))
+             | Some block -> Lwt.return_some block)
       chains
       Lwt.return_none
   end
@@ -1079,11 +1079,11 @@ module Protocol = struct
     Shared.use global_state.protocol_store begin fun store ->
       Store.Protocol.Contents.known store hash >>= fun known ->
       if known then
-        Lwt.return None
+        Lwt.return_none
       else
         Store.Protocol.RawContents.store (store, hash) bytes >>= fun () ->
         Lwt_watcher.notify global_state.protocol_watcher hash ;
-        Lwt.return (Some hash)
+        Lwt.return_some hash
     end
 
   let remove global_state hash =
@@ -1113,8 +1113,7 @@ module Current_mempool = struct
   let set chain_state ~head mempool =
     update_chain_data chain_state begin fun _chain_data_store data ->
       if Block_hash.equal head (Block.hash data.current_head) then
-        Lwt.return (Some { data with current_mempool = mempool },
-                    ())
+        Lwt.return (Some { data with current_mempool = mempool }, ())
       else
         Lwt.return (None, ())
     end

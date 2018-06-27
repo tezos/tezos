@@ -106,13 +106,13 @@ module Alias = functor (Entity : Entity) -> struct
 
   let autocomplete wallet =
     load wallet >>= function
-    | Error _ -> return []
+    | Error _ -> return_nil
     | Ok list -> return (List.map fst list)
 
   let find_opt (wallet : #wallet) name =
     load wallet >>=? fun list ->
-    try return (Some (List.assoc name list))
-    with Not_found -> return None
+    try return_some (List.assoc name list)
+    with Not_found -> return_none
 
   let find (wallet : #wallet) name =
     load wallet >>=? fun list ->
@@ -122,28 +122,28 @@ module Alias = functor (Entity : Entity) -> struct
 
   let rev_find (wallet : #wallet) v =
     load wallet >>=? fun list ->
-    try return (Some (List.find (fun (_, v') -> v = v') list |> fst))
-    with Not_found -> return None
+    try return_some (List.find (fun (_, v') -> v = v') list |> fst)
+    with Not_found -> return_none
 
   let mem (wallet : #wallet) name =
     load wallet >>=? fun list ->
     try
       ignore (List.assoc name list) ;
-      return true
+      return_true
     with
-    | Not_found -> return false
+    | Not_found -> return_false
 
   let add ~force (wallet : #wallet) name value =
     let keep = ref false in
     load wallet >>=? fun list ->
     begin
       if force then
-        return ()
+        return_unit
       else
         iter_s (fun (n, v) ->
             if n = name && v = value then begin
               keep := true ;
-              return ()
+              return_unit
             end else if n = name && v <> value then begin
               failwith
                 "another %s is already aliased as %s, \
@@ -155,14 +155,14 @@ module Alias = functor (Entity : Entity) -> struct
                  use --force to insert duplicate"
                 Entity.name n
             end else begin
-              return ()
+              return_unit
             end)
           list
     end >>=? fun () ->
     let list = List.filter (fun (n, _) -> n <> name) list in
     let list = (name, value) :: list in
     if !keep then
-      return ()
+      return_unit
     else
       wallet#write Entity.name list wallet_encoding
 
@@ -199,7 +199,7 @@ module Alias = functor (Entity : Entity) -> struct
   let of_fresh (wallet : #wallet) force (Fresh s) =
     load wallet >>=? fun list ->
     begin if force then
-        return ()
+        return_unit
       else
         iter_s
           (fun (n, v) ->
@@ -212,7 +212,7 @@ module Alias = functor (Entity : Entity) -> struct
                  Entity.name n
                  value
              else
-               return ())
+               return_unit)
           list
     end >>=? fun () ->
     return s

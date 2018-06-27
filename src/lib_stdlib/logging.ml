@@ -45,9 +45,8 @@ let ign_log_f
 
 let sections = ref []
 
-module Make(S : sig val name: string end) : LOG = struct
+module Make_unregistered(S : sig val name: string end) : LOG = struct
 
-  let () = sections := S.name :: !sections
   let section = Lwt_log_core.Section.make S.name
 
   let debug fmt = ign_log_f ~section ~level:Lwt_log_core.Debug fmt
@@ -63,6 +62,13 @@ module Make(S : sig val name: string end) : LOG = struct
   let lwt_warn fmt = log_f ~section ~level:Lwt_log_core.Warning fmt
   let lwt_log_error fmt = log_f ~section ~level:Lwt_log_core.Error fmt
   let lwt_fatal_error fmt = log_f ~section ~level:Lwt_log_core.Fatal fmt
+
+end
+
+module Make(S : sig val name: string end) : LOG = struct
+
+  let () = sections := S.name :: !sections
+  include Make_unregistered(S)
 
 end
 

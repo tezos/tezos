@@ -28,6 +28,7 @@ end
 module Core : LOG
 
 module Make(S: sig val name: string end) : LOG
+module Make_unregistered(S: sig val name: string end) : LOG
 
 type level = Lwt_log_core.level =
   | Debug

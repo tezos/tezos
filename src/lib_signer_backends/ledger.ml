@@ -103,17 +103,17 @@ module Ledger = struct
         (cur_pkh, (pk, curve)) :: of_pkh
       end (false, [], []) curves in
     match pkh with
-    | None -> return (Some (create ~device_info ~of_curve ~of_pkh))
+    | None -> return_some (create ~device_info ~of_curve ~of_pkh)
     | Some _ when pkh_found ->
-        return (Some (create ~device_info ~of_curve ~of_pkh))
-    | _ -> return None
+        return_some (create ~device_info ~of_curve ~of_pkh)
+    | _ -> return_none
 end
 
 let find_ledgers ?pkh () =
   let ledgers = Hidapi.enumerate ~vendor_id ~product_id () in
   filter_map_s begin fun device_info ->
     match Hidapi.(open_path device_info.path) with
-    | None -> return None
+    | None -> return_none
     | Some h ->
         Lwt.finalize
           (fun () -> Ledger.of_hidapi ?pkh device_info h)
@@ -254,7 +254,7 @@ let commands =
            | [] ->
                cctxt#message "No device found." >>= fun () ->
                cctxt#message "Make sure a Ledger Nano S is connected and in the Tezos Wallet app." >>= fun () ->
-               return ()
+               return_unit
            | ledgers ->
                iter_s begin fun { Ledger.device_info = { Hidapi.path ;
                                                          manufacturer_string ;
@@ -303,7 +303,7 @@ let commands =
                             | Ledgerwallet_tezos.Secp256r1 -> "p2")
                            Signature.Public_key_hash.pp pkh))
                    of_curve >>= fun () ->
-                 return ()
+                 return_unit
                end ledgers) ;
 
       Clic.command ~group
@@ -341,7 +341,7 @@ let commands =
                       Corresponding full public key: %a@]"
                      Signature.Public_key_hash.pp pkh
                      Signature.Public_key.pp pk >>= fun () ->
-                   return ()
+                   return_unit
         )
     ]
 

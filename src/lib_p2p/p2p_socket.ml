@@ -319,10 +319,10 @@ module Reader = struct
       let open Data_encoding.Binary in
       match status with
       | Success { result ; size ; stream } ->
-          return (Some (result, size, stream))
+          return_some (result, size, stream)
       | Error _ ->
           lwt_debug "[read_message] incremental decoding error" >>= fun () ->
-          return None
+          return_none
       | Await decode_next_buf ->
           protect ~canceler:st.canceler begin fun () ->
             Crypto.read_chunk st.conn.fd st.conn.cryptobox_data
@@ -341,12 +341,12 @@ module Reader = struct
       | None ->
           protect ~canceler:st.canceler begin fun () ->
             Lwt_pipe.push st.messages (Error [P2p_errors.Decoding_error]) >>= fun () ->
-            return None
+            return_none
           end
       | Some (msg, size, stream) ->
           protect ~canceler:st.canceler begin fun () ->
             Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
-            return (Some stream)
+            return_some stream
           end
     end >>= function
     | Ok (Some stream) ->
@@ -403,7 +403,7 @@ module Writer = struct
 
   let send_message st buf =
     let rec loop = function
-      | [] -> return ()
+      | [] -> return_unit
       | buf :: l ->
           protect ~canceler:st.canceler begin fun () ->
             Crypto.write_chunk st.conn.fd st.conn.cryptobox_data buf

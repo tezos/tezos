@@ -232,5 +232,7 @@ let main { compile_ml ; pack_objects ; link_shared } =
     Format.printf "let src_digest = %S ;;\n" (Digest.to_hex dsrc) ;
     Format.printf "let impl_digest = %S ;;\n" (Digest.to_hex dimpl) ;
     Format.printf "let intf_digest = %S ;;\n" (Digest.to_hex dintf)
-  end
+  end ;
+
+  Format.printf "Success: %a@." Protocol_hash.pp hash
 

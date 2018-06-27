@@ -139,14 +139,14 @@ module Scheduler(IO : IO) = struct
             IO.push conn.out_param msg >>= function
             | Ok ()
             | Error [ Canceled ] ->
-                return ()
+                return_unit
             | Error ([P2p_errors.Connection_closed |
                       Exn (Unix.Unix_error (EBADF, _, _) |
                            Lwt_pipe.Closed)] as err) ->
                 lwt_debug "Connection closed (push: %d, %s)"
                   conn.id IO.name >>= fun () ->
                 cancel conn err >>= fun () ->
-                return ()
+                return_unit
             | Error err ->
                 lwt_log_error
                   "@[Unexpected error in connection (push: %d, %s):@ %a@]"
@@ -187,7 +187,7 @@ module Scheduler(IO : IO) = struct
         canceler ;
         in_param ; out_param ;
         current_pop = Lwt.fail Not_found (* dummy *) ;
-        current_push = return () ;
+        current_push = return_unit ;
         counter = Moving_average.create ~init:0 ~alpha ;
         quota = 0 ; last_quota = 0 ;
       } in
@@ -447,7 +447,7 @@ let read_full conn ?pos ?len buf =
   assert (len <= maxlen - pos) ;
   let rec loop pos len =
     if len = 0 then
-      return ()
+      return_unit
     else
       read conn ~pos ~len buf >>=? fun read_len ->
       loop (pos + read_len) (len - read_len) in

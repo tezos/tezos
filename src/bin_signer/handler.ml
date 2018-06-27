@@ -19,12 +19,12 @@ module Authorized_key =
 
 let check_magic_byte magic_bytes data =
   match magic_bytes with
-  | None -> return ()
+  | None -> return_unit
   | Some magic_bytes ->
       let byte = MBytes.get_uint8 data 0 in
       if MBytes.length data > 1
       && (List.mem byte magic_bytes) then
-        return ()
+        return_unit
       else
         failwith "magic byte 0x%02X not allowed" byte
 
@@ -38,7 +38,7 @@ let sign
     (MBytes.get_uint8 data 0) >>= fun () ->
   check_magic_byte magic_bytes data >>=? fun () ->
   begin match require_auth, signature with
-    | false, _ -> return ()
+    | false, _ -> return_unit
     | true, None -> failwith "missing authentication signature field"
     | true, Some signature ->
         let to_sign = Signer_messages.Sign.Request.to_sign ~pkh ~data in
@@ -47,7 +47,7 @@ let sign
             (fun acc (_, key) -> acc || Signature.check key signature to_sign)
             false keys
         then
-          return ()
+          return_unit
         else
           failwith "invalid authentication signature"
   end >>=? fun () ->

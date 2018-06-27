@@ -75,7 +75,7 @@ let remove_dir dir =
     Lwt_stream.iter_s
       (fun file ->
          if file = "." || file = ".." then
-           Lwt.return ()
+           Lwt.return_unit
          else begin
            let file = Filename.concat dir file in
            if Sys.is_directory file
@@ -87,7 +87,7 @@ let remove_dir dir =
   if Sys.file_exists dir && Sys.is_directory dir then
     remove dir
   else
-    Lwt.return ()
+    Lwt.return_unit
 
 let rec create_dir ?(perm = 0o755) dir =
   Lwt_unix.file_exists dir >>= function
@@ -167,7 +167,7 @@ module Json = struct
       Lwt_io.with_file ~mode:Output file begin fun chan ->
         let str = Data_encoding.Json.to_string ~minify:false json in
         Lwt_io.write chan str >>= fun _ ->
-        return ()
+        return_unit
       end
     end
 
@@ -363,7 +363,7 @@ module Socket = struct
         (* we set the beginning of the buf with the length of what is next *)
         MBytes.set_int16 buf 0 encoded_message_len ;
         write_mbytes fd buf >>= fun () ->
-        return ()
+        return_unit
 
   let recv fd encoding =
     let header_buf = MBytes.create message_len_size in
@@ -383,7 +383,7 @@ module Socket = struct
 end
 
 
-let rec retry ?(log=(fun _ -> Lwt.return ())) ?(n=5) ?(sleep=1.) f =
+let rec retry ?(log=(fun _ -> Lwt.return_unit)) ?(n=5) ?(sleep=1.) f =
   f () >>= function
   | Ok r -> Lwt.return (Ok r)
   | (Error error) as x ->

@@ -19,8 +19,8 @@ let get_signing_slots cctxt ?(chain = `Main) block delegate level =
     ~levels:[level]
     ~delegates:[delegate]
     (chain, block) >>=? function
-  | [{ slots }] -> return (Some slots)
-  | _ -> return None
+  | [{ slots }] -> return_some slots
+  | _ -> return_none
 
 let inject_endorsement
     (cctxt : #Proto_alpha.full)
@@ -31,24 +31,25 @@ let inject_endorsement
     ~branch:hash
     ~level:level
     () >>=? fun bytes ->
+  Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
   Client_keys.append cctxt
-    src_sk ~watermark:Endorsement bytes >>=? fun signed_bytes ->
+    src_sk ~watermark:(Endorsement chain_id) bytes >>=? fun signed_bytes ->
   Shell_services.Injection.operation cctxt ?async ~chain signed_bytes >>=? fun oph ->
   State.record cctxt pkh level >>=? fun () ->
   return oph
 
 let check_endorsement cctxt level pkh =
   State.get cctxt pkh >>=? function
-  | None -> return ()
+  | None -> return_unit
   | Some recorded_level ->
       if Raw_level.(level = recorded_level) then
         Error_monad.failwith "Level %a already endorsed" Raw_level.pp recorded_level
       else
-        return ()
+        return_unit
 
 let previously_endorsed_level cctxt pkh new_lvl  =
   State.get cctxt pkh >>=? function
-  | None -> return false
+  | None -> return_false
   | Some last_lvl ->
       return (Raw_level.(last_lvl >= new_lvl))
 
@@ -116,7 +117,7 @@ let endorse_for_delegate cctxt block delegate =
     Raw_level.pp level
     name
     Operation_hash.pp_short oph >>= fun () ->
-  return ()
+  return_unit
 
 let allowed_to_endorse cctxt bi delegate  =
   Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
@@ -128,7 +129,7 @@ let allowed_to_endorse cctxt bi delegate  =
   | None | Some [] ->
       lwt_debug "No slot found for %a/%s"
         Block_hash.pp_short bi.hash name >>= fun () ->
-      return false
+      return_false
   | Some (_ :: _ as slots) ->
       lwt_debug "Found slots for %a/%s (%d)"
         Block_hash.pp_short bi.hash name (List.length slots) >>= fun () ->
@@ -136,15 +137,15 @@ let allowed_to_endorse cctxt bi delegate  =
       | true ->
           lwt_debug "Level %a (or higher) previously endorsed: do not endorse."
             Raw_level.pp level >>= fun () ->
-          return false
+          return_false
       | false ->
-          return true
+          return_true
 
 let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state bi =
   if Time.diff (Time.now ()) bi.Client_baking_blocks.timestamp > max_past then
     lwt_log_info "Ignore block %a: forged too far the past"
       Block_hash.pp_short bi.hash >>= fun () ->
-    return ()
+    return_unit
   else
     lwt_log_info "Received new block %a"
       Block_hash.pp_short bi.hash >>= fun () ->
@@ -158,7 +159,7 @@ let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state b
         block = bi ;
         delegates ;
       } ;
-    return ()
+    return_unit
 
 let compute_timeout state =
   match state.pending with

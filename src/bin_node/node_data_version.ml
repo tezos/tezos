@@ -100,7 +100,7 @@ let check_data_dir_version data_dir =
   fail_unless
     (String.equal data_version version)
     (Invalid_data_dir_version (data_version, version)) >>=? fun () ->
-  return ()
+  return_unit
 
 let ensure_data_dir data_dir =
   let write_version () =

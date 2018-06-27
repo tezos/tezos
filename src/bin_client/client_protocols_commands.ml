@@ -27,7 +27,7 @@ let commands () =
       (fun () (cctxt : #Client_context.full) ->
          Shell_services.Protocol.list cctxt >>=? fun protos ->
          Lwt_list.iter_s (fun ph -> cctxt#message "%a" Protocol_hash.pp ph) protos >>= fun () ->
-         return ()
+         return_unit
       );
 
     command ~group ~desc: "Inject a new protocol into the node."
@@ -42,15 +42,15 @@ let commands () =
               Shell_services.Injection.protocol cctxt proto >>= function
               | Ok hash ->
                   cctxt#message "Injected protocol %a successfully" Protocol_hash.pp_short hash >>= fun () ->
-                  return ()
+                  return_unit
               | Error err ->
                   cctxt#error "Error while injecting protocol from %s: %a"
                     dirname Error_monad.pp_print_error err >>= fun () ->
-                  return ())
+                  return_unit)
            (fun exn ->
               cctxt#error "Error while injecting protocol from %s: %a"
                 dirname Error_monad.pp_print_error [Error_monad.Exn exn] >>= fun () ->
-              return ())
+              return_unit)
       );
 
     command ~group ~desc: "Dump a protocol from the node's record of protocol."
@@ -62,6 +62,6 @@ let commands () =
          Shell_services.Protocol.contents cctxt ph >>=? fun proto ->
          Lwt_utils_unix.Protocol.write_dir (Protocol_hash.to_short_b58check ph) ~hash:ph proto >>=? fun () ->
          cctxt#message "Extracted protocol %a" Protocol_hash.pp_short ph >>= fun () ->
-         return ()
+         return_unit
       ) ;
   ]

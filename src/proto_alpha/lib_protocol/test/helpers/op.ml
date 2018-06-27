@@ -40,7 +40,7 @@ let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
     | Some level -> return level
   end >>=? fun level ->
   let op = Single (Endorsement { level }) in
-  return (sign ~watermark:Signature.Endorsement delegate.sk signing_context op)
+  return (sign ~watermark:Signature.(Endorsement Chain_id.zero) delegate.sk signing_context op)
 
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)

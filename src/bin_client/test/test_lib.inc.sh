@@ -169,7 +169,7 @@ get_contract_addr () {
 
 contract_storage () {
     local CONTRACT_NAME="$1"    # Can be either an alias or hash
-    $client get storage for ${CONTRACT_NAME}
+    $client get script storage for ${CONTRACT_NAME}
 }
 
 assert_storage_contains () {

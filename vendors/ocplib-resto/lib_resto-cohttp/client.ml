@@ -123,12 +123,14 @@ module Make (Encoding : Resto.ENCODING) = struct
   let generic_call meth ?(logger = null_logger) ?(headers = []) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
     let module Logger = (val logger) in
     let headers = List.fold_left (fun headers (header, value) ->
-        if String.length header < 2
-        || String.sub (String.lowercase_ascii header) 0 2 <> "x-" then
+        let header = String.lowercase_ascii header in
+        if header <> "host"
+        && (String.length header < 2
+            || String.sub header 0 2 <> "x-") then
           invalid_arg
             "Resto_cohttp.Client.call: \
-             only headers starting with \"x-\" are supported"
-        else Header.add headers header value)
+             only headers \"host\" or starting with \"x-\" are supported"
+        else Header.replace headers header value)
         (Header.init ()) headers in
     begin
       match body with

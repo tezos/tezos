@@ -22,13 +22,13 @@ let run (cctxt : #Client_context.wallet) path ?magic_bytes ~require_auth =
           Handler.sign cctxt req ?magic_bytes ~require_auth >>= fun res ->
           Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
           Lwt_unix.close fd >>= fun () ->
-          return ()
+          return_unit
       | Public_key pkh ->
           let encoding = result_encoding Public_key.Response.encoding in
           Handler.public_key cctxt pkh >>= fun res ->
           Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
           Lwt_unix.close fd >>= fun () ->
-          return ()
+          return_unit
       | Authorized_keys ->
           let encoding = result_encoding Authorized_keys.Response.encoding in
           begin if require_auth then
@@ -39,7 +39,7 @@ let run (cctxt : #Client_context.wallet) path ?magic_bytes ~require_auth =
           end >>= fun res ->
           Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
           Lwt_unix.close fd >>= fun () ->
-          return ()
+          return_unit
     end ;
     loop ()
   in

@@ -80,11 +80,11 @@ let max_block_length =
 
 let max_operation_data_length = 0
 
-let check_signature ctxt { shell ; protocol_data = { command ; signature } } =
+let check_signature ctxt ~chain_id { shell ; protocol_data = { command ; signature } } =
   let bytes = Data.Command.forge shell command in
   Data.Pubkey.get_pubkey ctxt >>= fun public_key ->
   fail_unless
-    (Signature.check public_key signature bytes)
+    (Signature.check ~watermark:(Block_header chain_id) public_key signature bytes)
     Invalid_signature
 
 type validation_state = Updater.validation_result
@@ -117,27 +117,31 @@ let prepare_application ctxt command level timestamp fitness =
              }
 
 let begin_application
+    ~chain_id
     ~predecessor_context:ctxt
     ~predecessor_timestamp:_
     ~predecessor_fitness:_
     block_header =
   Data.Init.check_inited ctxt >>=? fun () ->
-  check_signature ctxt block_header >>=? fun () ->
+  check_signature ctxt ~chain_id block_header >>=? fun () ->
   prepare_application ctxt block_header.protocol_data.command
     block_header.shell.level block_header.shell.timestamp block_header.shell.fitness
 
 let begin_partial_application
+    ~chain_id
     ~ancestor_context
     ~predecessor_timestamp
     ~predecessor_fitness
     block_header =
   begin_application
+    ~chain_id
     ~predecessor_context:ancestor_context
     ~predecessor_timestamp
     ~predecessor_fitness
     block_header
 
 let begin_construction
+    ~chain_id:_
     ~predecessor_context:ctxt
     ~predecessor_timestamp:_
     ~predecessor_level:level
@@ -168,12 +172,12 @@ let rpc_services = Services.rpc_services
 let sandbox_param_key = [ "sandbox_parameter" ]
 let get_sandbox_param ctxt =
   Context.get ctxt sandbox_param_key >>= function
-  | None -> return None
+  | None -> return_none
   | Some bytes ->
       match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
       | None ->
           failwith "Internal error: failed to parse the sandbox parameter."
-      | Some json -> return (Some json)
+      | Some json -> return_some json
 
 let init ctxt block_header =
   Data.Init.tag_first_block ctxt >>=? fun ctxt ->

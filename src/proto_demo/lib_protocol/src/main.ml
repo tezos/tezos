@@ -81,6 +81,7 @@ module Fitness = struct
 end
 
 let begin_application
+    ~chain_id:_
     ~predecessor_context:context
     ~predecessor_timestamp:_
     ~predecessor_fitness:_
@@ -89,17 +90,20 @@ let begin_application
   return { context ; fitness }
 
 let begin_partial_application
+    ~chain_id
     ~ancestor_context
     ~predecessor_timestamp
     ~predecessor_fitness
     block_header =
   begin_application
+    ~chain_id
     ~predecessor_context:ancestor_context
     ~predecessor_timestamp
     ~predecessor_fitness
     block_header
 
 let begin_construction
+    ~chain_id:_
     ~predecessor_context:context
     ~predecessor_timestamp:_
     ~predecessor_level:_

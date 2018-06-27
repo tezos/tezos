@@ -28,7 +28,7 @@ module Make(N : sig val scheme : string end) = struct
       ^ " - " ^ scheme ^ "://host/tz1...\n"
       ^ " - " ^ scheme ^ "://host:port/path/to/service/tz1...\n"
       ^ "Environment variable TEZOS_SIGNER_HTTP_HEADERS can be specified \
-         to add headers to the requests (only custom 'x-...' headers are supported)."
+         to add headers to the requests (only 'host' and custom 'x-...' headers are supported)."
 
     let headers = match Sys.getenv_opt "TEZOS_SIGNER_HTTP_HEADERS" with
       | None -> None
@@ -42,10 +42,13 @@ module Make(N : sig val scheme : string end) = struct
                        "Http signer: invalid TEZOS_SIGNER_HTTP_HEADERS environment variable, missing colon"
                  | Some pos ->
                      let header = String.trim (String.sub line 0 pos) in
-                     if String.length header < 2
-                     || String.sub (String.lowercase_ascii header) 0 2 <> "x-" then
+                     let header = String.lowercase_ascii header in
+                     if header <> "host"
+                     && (String.length header < 2
+                         || String.sub header 0 2 <> "x-") then
                        Pervasives.failwith
-                         "Http signer: invalid TEZOS_SIGNER_HTTP_HEADERS environment variable, only x- headers are supported" ;
+                         "Http signer: invalid TEZOS_SIGNER_HTTP_HEADERS environment variable, \
+                          only 'host' or 'x-' headers are supported" ;
                      let value = String.trim (String.sub line (pos + 1) (String.length line - pos - 1)) in
                      (header, value) :: acc) [] lines)
 
@@ -98,8 +101,8 @@ module Make(N : sig val scheme : string end) = struct
             P.authenticate
               authorized_keys
               (Signer_messages.Sign.Request.to_sign ~pkh ~data:msg) >>=? fun signature ->
-            return (Some signature)
-        | None -> return None
+            return_some signature
+        | None -> return_none
       end >>=? fun signature ->
       RPC_client.call_service
         ~logger: P.logger

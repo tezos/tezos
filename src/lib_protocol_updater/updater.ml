@@ -46,23 +46,23 @@ let do_compile hash p =
   end >>= function
   | Error err ->
       log_error "Error %a" pp_print_error err ;
-      Lwt.return false
+      Lwt.return_false
   | Ok (Unix.WSIGNALED _ | Unix.WSTOPPED _) ->
       log_error "INTERRUPTED COMPILATION (%s)" log_file;
-      Lwt.return false
+      Lwt.return_false
   | Ok (Unix.WEXITED x) when x <> 0 ->
       log_error "COMPILATION ERROR (%s)" log_file;
-      Lwt.return false
+      Lwt.return_false
   | Ok (Unix.WEXITED _) ->
-      try Dynlink.loadfile_private (plugin_file ^ ".cmxs"); Lwt.return true
+      try Dynlink.loadfile_private (plugin_file ^ ".cmxs"); Lwt.return_true
       with Dynlink.Error err ->
         log_error "Can't load plugin: %s (%s)"
           (Dynlink.error_message err) plugin_file;
-        Lwt.return false
+        Lwt.return_false
 
 let compile hash p =
   if Tezos_protocol_registerer.Registerer.mem hash then
-    Lwt.return true
+    Lwt.return_true
   else begin
     do_compile hash p >>= fun success ->
     let loaded = Tezos_protocol_registerer.Registerer.mem hash in

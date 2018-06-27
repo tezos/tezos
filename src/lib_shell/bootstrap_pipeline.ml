@@ -53,11 +53,11 @@ let assert_acceptable_header pipeline
       Chain.mem chain_state hash >>= fun in_chain ->
       fail_unless in_chain
         (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
-      return ()
+      return_unit
     else
-      return ()
+      return_unit
   else
-    return ()
+    return_unit
 
 let fetch_step pipeline (step : Block_locator.step)  =
   lwt_log_info "fetching step %a -> %a (%d%s) from peer %a."
@@ -103,7 +103,7 @@ let fetch_step pipeline (step : Block_locator.step)  =
       end
     end
     headers >>=? fun () ->
-  return ()
+  return_unit
 
 let headers_fetch_worker_loop pipeline =
   begin
@@ -113,7 +113,7 @@ let headers_fetch_worker_loop pipeline =
     let seed = {Block_locator.sender_id=pipeline.peer_id; receiver_id=sender_id } in
     let steps = Block_locator.to_steps seed pipeline.locator in
     iter_s (fetch_step pipeline) steps >>=? fun () ->
-    return ()
+    return_unit
   end >>= function
   | Ok () ->
       lwt_log_info "fetched all step from peer %a."
@@ -210,7 +210,7 @@ let rec validation_worker_loop pipeline =
     lwt_log_info "validated block %a from peer %a."
       Block_hash.pp_short hash
       P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
-    return ()
+    return_unit
   end >>= function
   | Ok () -> validation_worker_loop pipeline
   | Error [Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed] ->
@@ -286,7 +286,7 @@ let wait_workers pipeline =
 let wait pipeline =
   wait_workers pipeline >>= fun () ->
   match pipeline.errors with
-  | [] -> return ()
+  | [] -> return_unit
   | errors -> Lwt.return_error errors
 
 let cancel pipeline =

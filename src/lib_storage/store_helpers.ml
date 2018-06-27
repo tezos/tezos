@@ -201,7 +201,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let read_opt s i =
       read s i >>= function
       | Error _ -> Lwt.return_none
-      | Ok v -> Lwt.return (Some v)
+      | Ok v -> Lwt.return_some v
     let read_exn s i =
       read s i >>= function
       | Error _ -> Lwt.fail Not_found
@@ -305,7 +305,7 @@ module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
   let read_opt s i =
     read s i >>= function
     | Error _ -> Lwt.return_none
-    | Ok v -> Lwt.return (Some v)
+    | Ok v -> Lwt.return_some v
   let read_exn s i =
     read s i >>= function
     | Error _ -> Lwt.fail Not_found

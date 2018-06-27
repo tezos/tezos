@@ -21,7 +21,7 @@ let inject_block validator ?force ?chain bytes operations =
   read_chain_id validator chain >>= fun chain_id ->
   Validator.validate_block
     validator ?force ?chain_id bytes operations >>=? fun (hash, block) ->
-  return (hash, (block >>=? fun _ -> return ()))
+  return (hash, (block >>=? fun _ -> return_unit))
 
 let inject_operation validator ?chain bytes =
   read_chain_id validator chain >>= fun chain_id ->
@@ -49,7 +49,7 @@ let inject_protocol state ?force:_ proto =
             failwith
               "Previously registered protocol (%a)"
               Protocol_hash.pp_short hash
-        | Some _ -> return ()
+        | Some _ -> return_unit
   in
   Lwt.return (hash, validation)
 
@@ -65,19 +65,19 @@ let build_rpc_directory validator =
   register0 Injection_services.S.block begin fun q (raw, operations) ->
     inject_block validator
       ?chain:q#chain ~force:q#force raw operations >>=? fun (hash, wait) ->
-    (if q#async then return () else wait) >>=? fun () ->
+    (if q#async then return_unit else wait) >>=? fun () ->
     return hash
   end ;
 
   register0 Injection_services.S.operation begin fun q contents ->
     inject_operation validator ?chain:q#chain contents >>= fun (hash, wait) ->
-    (if q#async then return () else wait) >>=? fun () ->
+    (if q#async then return_unit else wait) >>=? fun () ->
     return hash
   end ;
 
   register0 Injection_services.S.protocol begin fun q protocol ->
     inject_protocol state ~force:q#force protocol >>= fun (hash, wait) ->
-    (if q#async then return () else wait) >>=? fun () ->
+    (if q#async then return_unit else wait) >>=? fun () ->
     return hash
   end ;
 

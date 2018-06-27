@@ -21,7 +21,7 @@ let create_inner
       Lwt_main.at_exit (fun () -> Lwt_unix.unlink fn) ;
     let pid_str = string_of_int @@ Unix.getpid () in
     Lwt_unix.write_string fd pid_str 0 (String.length pid_str) >>= fun _ ->
-    return ()
+    return_unit
   end
 
 let create = create_inner Unix.F_TLOCK
@@ -37,14 +37,14 @@ let blocking_create
   | Some duration -> with_timeout (Lwt_unix.sleep duration) (fun _ -> create ())
 
 let is_locked fn =
-  if not @@ Sys.file_exists fn then return false else
+  if not @@ Sys.file_exists fn then return_false else
     protect begin fun () ->
       Lwt_unix.openfile fn [Unix.O_RDONLY] 0o644 >>= fun fd ->
       Lwt.finalize (fun () ->
           Lwt.try_bind
             (fun () -> Lwt_unix.(lockf fd F_TEST 0))
-            (fun () -> return false)
-            (fun _ -> return true))
+            (fun () -> return_false)
+            (fun _ -> return_true))
         (fun () -> Lwt_unix.close fd)
     end
 

@@ -138,7 +138,7 @@ module Info = struct
         Lwt_utils_unix.Json.read_file path >>=? fun json ->
         return (Data_encoding.Json.destruct enc json)
       else
-        return []
+        return_nil
 
     let save path peer_metadata_encoding peers =
       let open Data_encoding in

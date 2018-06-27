@@ -78,7 +78,7 @@ let rec take_with_timeout timeout dropbox =
   | Some elt ->
       Lwt.cancel timeout ;
       dropbox.data <- None ;
-      Lwt.return (Some elt)
+      Lwt.return_some elt
   | None ->
       if Lwt.is_sleeping timeout then
         if dropbox.closed then

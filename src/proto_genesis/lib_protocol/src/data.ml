@@ -128,7 +128,7 @@ module Init = struct
     | Some version ->
         if Compare.String.(version_value <> MBytes.to_string version) then
           failwith "Internal error: incompatible protocol version" ;
-        return ()
+        return_unit
 
   let tag_first_block ctxt =
     Context.get ctxt version_key >>= function

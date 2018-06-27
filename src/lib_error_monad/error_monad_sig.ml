@@ -80,6 +80,24 @@ module type S = sig
   (** Sucessful return *)
   val return : 'a -> 'a tzresult Lwt.t
 
+  (** Sucessful return of [()] *)
+  val return_unit : unit tzresult Lwt.t
+
+  (** Sucessful return of [None] *)
+  val return_none : 'a option tzresult Lwt.t
+
+  (** [return_some x] is a sucessful return of [Some x] *)
+  val return_some : 'a -> 'a option tzresult Lwt.t
+
+  (** Sucessful return of [[]] *)
+  val return_nil : 'a list tzresult Lwt.t
+
+  (** Sucessful return of [true] *)
+  val return_true : bool tzresult Lwt.t
+
+  (** Sucessful return of [false] *)
+  val return_false : bool tzresult Lwt.t
+
   (** Erroneous result *)
   val error : error -> 'a tzresult
 

@@ -23,6 +23,13 @@ val get_storage:
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
+val get_script:
+  #Proto_alpha.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract.t ->
+  Script.t option tzresult Lwt.t
+
 val get_manager:
   #Proto_alpha.full ->
   chain:Shell_services.chain ->

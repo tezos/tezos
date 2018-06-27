@@ -45,8 +45,8 @@ module ContractAlias = struct
     match Contract.is_implicit c with
     | Some hash -> begin
         Client_keys.Public_key_hash.rev_find cctxt hash >>=? function
-        | Some name -> return (Some ("key:" ^ name))
-        | None -> return None
+        | Some name -> return_some ("key:" ^ name)
+        | None -> return_none
       end
     | None -> RawContractAlias.rev_find cctxt c
 
@@ -141,4 +141,4 @@ let may_check_key sourcePubKey sourcePubKeyHash =
            (Ed25519.Public_key.hash sourcePubKey) sourcePubKeyHash)
         (failure "Invalid public key in `client_proto_endorsement`")
   | None ->
-      return ()
+      return_unit

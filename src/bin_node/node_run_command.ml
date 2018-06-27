@@ -119,16 +119,16 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
     | None -> Lwt.return_none
     | Some sandbox_param ->
         match sandbox_param with
-        | None -> Lwt.return None
+        | None -> Lwt.return_none
         | Some file ->
             Lwt_utils_unix.Json.read_file file >>= function
             | Error err ->
                 lwt_warn
                   "Can't parse sandbox parameters: %s" file >>= fun () ->
                 lwt_debug "%a" pp_print_error err >>= fun () ->
-                Lwt.return None
+                Lwt.return_none
             | Ok json ->
-                Lwt.return (Some json)
+                Lwt.return_some json
   end >>= fun sandbox_param ->
   (* TODO "WARN" when pow is below our expectation. *)
   begin
@@ -146,10 +146,10 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
     match listening_addr, sandbox with
     | Some addr, Some _
       when Ipaddr.V6.(compare addr unspecified) = 0 ->
-        return None
+        return_none
     | Some addr, Some _ when not (Ipaddr.V6.is_private addr) ->
         fail (Non_private_sandbox addr)
-    | None, Some _ -> return None
+    | None, Some _ -> return_none
     | _ ->
         (Node_config_file.resolve_bootstrap_addrs
            config.p2p.bootstrap_peers) >>= fun trusted_points ->
@@ -172,7 +172,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
             disable_mempool = config.p2p.disable_mempool ;
           }
         in
-        return (Some (p2p_config, config.p2p.limits))
+        return_some (p2p_config, config.p2p.limits)
   end >>=? fun p2p_config ->
   let node_config : Node.config = {
     genesis ;
@@ -201,7 +201,7 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
   match rpc_config.listen_addr with
   | None ->
       lwt_log_notice "Not listening to RPC calls." >>= fun () ->
-      return None
+      return_none
   | Some addr ->
       Node_config_file.resolve_rpc_listening_addrs addr >>= function
       | [] ->
@@ -228,7 +228,7 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
                  ~media_types:Media_type.all_media_types
                  ~cors:{ allowed_origins = rpc_config.cors_origins ;
                          allowed_headers = cors_headers } >>= fun server ->
-               return (Some server))
+               return_some server)
             (function
               |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
                   fail (RPC_Port_already_in_use [(addr,port)])
@@ -261,7 +261,7 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Lwt_utils.may ~f:RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
   Logging_unix.close () >>= fun () ->
-  return ()
+  return_unit
 
 let process sandbox verbosity checkpoint args =
   let verbosity =
@@ -279,12 +279,12 @@ let process sandbox verbosity checkpoint args =
       | Some _ ->
           if config.data_dir = Node_config_file.default_data_dir
           then failwith "Cannot use default data directory while in sandbox mode"
-          else return ()
-      | None -> return ()
+          else return_unit
+      | None -> return_unit
     end >>=? fun () ->
     begin
       match checkpoint with
-      | None -> return None
+      | None -> return_none
       | Some s ->
           match String.split ',' s with
           | [ lvl ; block ] ->
@@ -296,7 +296,7 @@ let process sandbox verbosity checkpoint args =
                 | Some lvl ->
                     return lvl
               end >>=? fun lvl ->
-              return (Some (lvl, block))
+              return_some (lvl, block)
           | [] -> assert false
           | [_] ->
               failwith "Checkoints are expected to follow the format \

@@ -175,7 +175,7 @@ let register () =
         (fun pkh -> Delegate.deactivated ctxt pkh)
         delegates >>= return
     else
-      return []
+      return_nil
   end ;
   register1 S.info begin fun ctxt pkh () () ->
     Delegate.full_balance ctxt pkh >>=? fun balance ->
@@ -354,10 +354,10 @@ module Baking_rights = struct
         let delegate = Signature.Public_key.hash pk in
         begin
           match pred_timestamp with
-          | None -> return None
+          | None -> return_none
           | Some pred_timestamp ->
               Baking.minimal_time ctxt priority pred_timestamp >>=? fun t ->
-              return (Some t)
+              return_some t
         end>>=? fun timestamp ->
         let acc =
           { level = level.level ; delegate ; priority ; timestamp } :: acc in

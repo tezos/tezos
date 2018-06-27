@@ -57,6 +57,7 @@ let begin_construction (_cctxt : #Proto_alpha.full) index predecessor =
           operations_hash = Operation_list_list_hash.zero ;
         } in
       Main.begin_construction
+        ~chain_id: predecessor.chain_id
         ~predecessor_context: context
         ~predecessor_timestamp: header.timestamp
         ~predecessor_fitness: header.fitness
@@ -77,4 +78,4 @@ let add_operation st ( op : Operation.packed ) =
   return { st with state ; rev_operations = op :: st.rev_operations }
 
 let finalize_construction inc =
-  Main.finalize_block inc.state >>=? fun _ -> return ()
+  Main.finalize_block inc.state >>=? fun _ -> return_unit

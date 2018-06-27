@@ -51,7 +51,7 @@ let rec listen ?port addr =
 let sync ch =
   Process.Channel.push ch () >>=? fun () ->
   Process.Channel.pop ch >>=? fun () ->
-  return ()
+  return_unit
 
 let rec sync_nodes nodes =
   iter_p
@@ -65,7 +65,7 @@ let rec sync_nodes nodes =
 let sync_nodes nodes =
   sync_nodes nodes >>= function
   | Ok () | Error (Exn End_of_file :: _) ->
-      return ()
+      return_unit
   | Error _ as err ->
       Lwt.return err
 
@@ -75,14 +75,14 @@ let run_nodes client server =
     let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
     server channel sched main_socket >>=? fun () ->
     P2p_io_scheduler.shutdown sched >>= fun () ->
-    return ()
+    return_unit
   end >>= fun server_node ->
   Process.detach ~prefix:"client: " begin fun channel ->
     Lwt_utils_unix.safe_close main_socket >>= fun () ->
     let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
     client channel sched default_addr port >>=? fun () ->
     P2p_io_scheduler.shutdown sched >>= fun () ->
-    return ()
+    return_unit
   end >>= fun client_node ->
   let nodes = [ server_node ; client_node ] in
   Lwt.ignore_result (sync_nodes nodes) ;
@@ -148,13 +148,13 @@ module Low_level = struct
     P2p_io_scheduler.read_full fd msg >>=? fun () ->
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
     P2p_io_scheduler.close fd >>=? fun () ->
-    return ()
+    return_unit
 
   let server _ch sched socket =
     raw_accept sched socket >>= fun (fd, _point) ->
     P2p_io_scheduler.write fd simple_msg >>=? fun () ->
     P2p_io_scheduler.close fd >>=? fun _ ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -177,13 +177,13 @@ module Kick = struct
     _assert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0)
       __LOC__ "" >>=? fun () ->
     P2p_socket.kick auth_fd >>= fun () ->
-    return ()
+    return_unit
 
   let client _ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
     P2p_socket.accept auth_fd encoding >>= fun conn ->
     _assert (is_rejected conn) __LOC__ "" >>=? fun () ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -197,12 +197,12 @@ module Kicked = struct
     accept sched socket >>=? fun (_info, auth_fd) ->
     P2p_socket.accept auth_fd encoding >>= fun conn ->
     _assert (Kick.is_rejected conn) __LOC__ "" >>=? fun () ->
-    return ()
+    return_unit
 
   let client _ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
     P2p_socket.kick auth_fd >>= fun () ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -223,7 +223,7 @@ module Simple_message = struct
     _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -233,7 +233,7 @@ module Simple_message = struct
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -255,7 +255,7 @@ module Chunked_message = struct
     _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -266,7 +266,7 @@ module Chunked_message = struct
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -287,7 +287,7 @@ module Oversized_message = struct
     _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -297,7 +297,7 @@ module Oversized_message = struct
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -314,7 +314,7 @@ module Close_on_read = struct
     P2p_socket.accept auth_fd encoding >>=? fun conn ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -323,7 +323,7 @@ module Close_on_read = struct
     P2p_socket.read conn >>= fun err ->
     _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -340,7 +340,7 @@ module Close_on_write = struct
     P2p_socket.accept auth_fd encoding >>=? fun conn ->
     P2p_socket.close conn >>= fun _stat ->
     sync ch >>=? fun ()->
-    return ()
+    return_unit
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -350,7 +350,7 @@ module Close_on_write = struct
     P2p_socket.write_sync conn simple_msg >>= fun err ->
     _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -379,7 +379,7 @@ module Garbled_data = struct
     P2p_socket.read conn >>= fun err ->
     _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let client _ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -387,7 +387,7 @@ module Garbled_data = struct
     P2p_socket.read conn >>= fun err ->
     _assert (is_decoding_error err) __LOC__ "" >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 

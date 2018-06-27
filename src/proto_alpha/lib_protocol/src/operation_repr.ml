@@ -644,7 +644,7 @@ let () =
     (function Missing_signature -> Some () | _ -> None)
     (fun () -> Missing_signature)
 
-let check_signature_sync (type kind) key ({ shell ; protocol_data } : kind operation) =
+let check_signature_sync (type kind) key chain_id ({ shell ; protocol_data } : kind operation) =
   let check ~watermark contents signature =
     let unsigned_operation =
       Data_encoding.Binary.to_bytes_exn
@@ -659,14 +659,14 @@ let check_signature_sync (type kind) key ({ shell ; protocol_data } : kind opera
   | Cons _, None ->
       Error [Missing_signature]
   | Single (Endorsement _) as contents, Some signature ->
-      check ~watermark:Endorsement (Contents_list contents) signature
+      check ~watermark:(Endorsement chain_id) (Contents_list contents) signature
   | Single _ as contents, Some signature ->
       check ~watermark:Generic_operation (Contents_list contents) signature
   | Cons _ as contents, Some signature ->
       check ~watermark:Generic_operation (Contents_list contents) signature
 
-let check_signature pk op =
-  Lwt.return (check_signature_sync pk op)
+let check_signature pk chain_id op =
+  Lwt.return (check_signature_sync pk chain_id op)
 
 let hash_raw = Operation.hash
 let hash (o : _ operation) =

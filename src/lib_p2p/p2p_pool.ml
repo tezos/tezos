@@ -647,13 +647,13 @@ let config { config } = config
 
 let fail_unless_disconnected_point point_info =
   match P2p_point_state.get point_info with
-  | Disconnected -> return ()
+  | Disconnected -> return_unit
   | Requested _ | Accepted _ -> fail P2p_errors.Pending_connection
   | Running _ -> fail P2p_errors.Connected
 
 let fail_unless_disconnected_peer_id peer_info =
   match P2p_peer_state.get peer_info with
-  | Disconnected -> return ()
+  | Disconnected -> return_unit
   | Accepted _ -> fail P2p_errors.Pending_connection
   | Running _ -> fail P2p_errors.Connected
 
@@ -702,7 +702,7 @@ let rec connect ?timeout pool point =
     protect ~canceler begin fun () ->
       log pool (Outgoing_connection point) ;
       Lwt_unix.connect fd uaddr >>= fun () ->
-      return ()
+      return_unit
     end ~on_error: begin fun err ->
       lwt_debug "connect: %a -> disconnect" P2p_point.Id.pp point >>= fun () ->
       P2p_point_state.set_disconnected point_info ;
@@ -904,7 +904,7 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
            private_node_warn
              "Receive requests for peers addresses from %a"
              P2p_peer.Id.pp peer_id >>= fun () ->
-           Lwt.return []
+           Lwt.return_nil
         ) ;
       swap_request =
         (fun _point _peer_id ->
@@ -987,7 +987,7 @@ and list_known_points ?(ignore_private = false) pool conn =
   if P2p_socket.private_node conn.conn then
     private_node_warn "Private peer (%a) asked other peers addresses"
       P2p_peer.Id.pp (P2p_peer_state.Info.peer_id conn.peer_info) >>= fun () ->
-    Lwt.return []
+    Lwt.return_nil
   else
     let knowns =
       P2p_point.Table.fold

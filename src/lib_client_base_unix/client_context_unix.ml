@@ -91,10 +91,10 @@ class unix_logger ~base_dir =
   let log channel msg = match channel with
     | "stdout" ->
         print_endline msg ;
-        Lwt.return ()
+        Lwt.return_unit
     | "stderr" ->
         prerr_endline msg ;
-        Lwt.return ()
+        Lwt.return_unit
     | log ->
         let (//) = Filename.concat in
         Lwt_utils_unix.create_dir (base_dir // "logs" // log) >>= fun () ->

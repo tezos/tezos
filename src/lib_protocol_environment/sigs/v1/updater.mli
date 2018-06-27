@@ -144,6 +144,7 @@ module type PROTOCOL = sig
       The resulting `validation_state` will be used for multi-pass
       validation. *)
   val begin_partial_application:
+    chain_id: Chain_id.t ->
     ancestor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_fitness: Fitness.t ->
@@ -157,6 +158,7 @@ module type PROTOCOL = sig
       [begin_application], so all the check performed by the former
       must be repeated in the latter. *)
   val begin_application:
+    chain_id: Chain_id.t ->
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_fitness: Fitness.t ->
@@ -173,6 +175,7 @@ module type PROTOCOL = sig
       block header usually includes a signature, the header provided
       to {!begin_construction} should includes a faked signature. *)
   val begin_construction:
+    chain_id: Chain_id.t ->
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_level: Int32.t ->

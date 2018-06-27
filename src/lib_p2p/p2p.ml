@@ -146,13 +146,13 @@ let create_maintenance_worker limits pool =
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
-  | None -> Lwt.return None
+  | None -> Lwt.return_none
   | Some port ->
       P2p_welcome.run
         ~backlog:limits.backlog pool
         ?addr:config.listening_addr
         port >>= fun w ->
-      Lwt.return (Some w)
+      Lwt.return_some w
 
 type ('msg, 'peer_meta, 'conn_meta) connection =
   ('msg, 'peer_meta, 'conn_meta) P2p_pool.connection
@@ -233,7 +233,7 @@ module Real = struct
         net.pool ~init:[]
         ~f:begin fun _peer_id conn acc ->
           (P2p_pool.is_readable conn >>= function
-            | Ok () -> Lwt.return (Some conn)
+            | Ok () -> Lwt.return_some conn
             | Error _ -> Lwt_utils.never_ending ()) :: acc
         end in
     Lwt.pick (
@@ -261,7 +261,7 @@ module Real = struct
         lwt_debug "message sent to %a"
           P2p_peer.Id.pp
           (P2p_pool.Connection.info conn).peer_id >>= fun () ->
-        return ()
+        return_unit
     | Error err ->
         lwt_debug "error sending message from %a: %a"
           P2p_peer.Id.pp
@@ -366,13 +366,13 @@ type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
 let check_limits =
   let fail_1 v orig =
-    if not (v <= 0.) then return ()
+    if not (v <= 0.) then return_unit
     else
       Error_monad.failwith "value of option %S cannot be negative or null@."
         orig
   in
   let fail_2 v orig =
-    if not (v < 0) then return ()
+    if not (v < 0) then return_unit
     else
       Error_monad.failwith "value of option %S cannot be negative@." orig
   in
@@ -397,10 +397,10 @@ let check_limits =
       "swap-linger" >>=? fun () ->
     begin
       match c.binary_chunks_size with
-      | None -> return ()
+      | None -> return_unit
       | Some size -> P2p_socket.check_binary_chunks_size size
     end >>=? fun () ->
-    return ()
+    return_unit
 
 let create ~config ~limits peer_cfg conn_cfg msg_cfg =
   check_limits limits >>=? fun () ->
@@ -586,7 +586,7 @@ let build_rpc_directory net =
       | None -> failwith "The P2P layer is disabled."
       | Some pool ->
           P2p_pool.connect ~timeout:q#timeout pool point >>=? fun _conn ->
-          return ()
+          return_unit
     end in
 
   (* Network : Connection *)
@@ -616,7 +616,7 @@ let build_rpc_directory net =
     RPC_directory.register0 dir P2p_services.Connections.S.list
       begin fun () () ->
         match net.pool with
-        | None -> return []
+        | None -> return_nil
         | Some pool ->
             return @@
             P2p_pool.Connection.fold
@@ -632,7 +632,7 @@ let build_rpc_directory net =
     RPC_directory.register0 dir P2p_services.Peers.S.list
       begin fun q () ->
         match net.pool with
-        | None -> return []
+        | None -> return_nil
         | Some pool ->
             return @@
             P2p_pool.Peers.fold_known pool
@@ -651,7 +651,7 @@ let build_rpc_directory net =
     RPC_directory.opt_register1 dir P2p_services.Peers.S.info
       begin fun peer_id () () ->
         match net.pool with
-        | None -> return None
+        | None -> return_none
         | Some pool ->
             return @@
             Option.map ~f:(info_of_peer_info pool)
@@ -713,9 +713,9 @@ let build_rpc_directory net =
     RPC_directory.register1 dir P2p_services.Peers.S.banned
       begin fun peer_id () () ->
         match net.pool with
-        | None -> return false
+        | None -> return_false
         | Some pool when (P2p_pool.Peers.get_trusted pool peer_id) ->
-            return false
+            return_false
         | Some pool ->
             return (P2p_pool.Peers.banned pool peer_id)
       end in
@@ -726,7 +726,7 @@ let build_rpc_directory net =
     RPC_directory.register0 dir P2p_services.Points.S.list
       begin fun q () ->
         match net.pool with
-        | None -> return []
+        | None -> return_nil
         | Some pool ->
             return @@
             P2p_pool.Points.fold_known
@@ -745,7 +745,7 @@ let build_rpc_directory net =
     RPC_directory.opt_register1 dir P2p_services.Points.S.info
       begin fun point () () ->
         match net.pool with
-        | None -> return None
+        | None -> return_none
         | Some pool ->
             return @@
             Option.map
@@ -821,10 +821,10 @@ let build_rpc_directory net =
     RPC_directory.register dir P2p_services.ACL.S.clear
       begin fun () () () ->
         match net.pool with
-        | None -> return ()
+        | None -> return_unit
         | Some pool ->
             P2p_pool.acl_clear pool ;
-            return ()
+            return_unit
       end in
 
   dir

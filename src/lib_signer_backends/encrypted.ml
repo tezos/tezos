@@ -38,11 +38,11 @@ module Raw = struct
     let encrypted_sk = MBytes.sub encrypted_sk salt_len (len - salt_len) in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
     match Crypto_box.Secretbox.box_open key encrypted_sk nonce with
-    | None -> return None
+    | None -> return_none
     | Some bytes ->
         match Data_encoding.Binary.of_bytes Signature.Secret_key.encoding bytes with
         | None -> failwith "Corrupted wallet, deciphered key is invalid"
-        | Some sk -> return (Some sk)
+        | Some sk -> return_some sk
 
 end
 
@@ -69,11 +69,11 @@ let rec interactive_decrypt_loop
       return sk
 
 let rec noninteractice_decrypt_loop ~encrypted_sk = function
-  | [] -> return None
+  | [] -> return_none
   | password :: passwords ->
       Raw.decrypt ~password ~encrypted_sk >>=? function
       | None -> noninteractice_decrypt_loop ~encrypted_sk passwords
-      | Some sk -> return (Some sk)
+      | Some sk -> return_some sk
 
 let decrypt_payload cctxt ?name encrypted_sk =
   match Base58.safe_decode encrypted_sk with
@@ -94,10 +94,10 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
   Secret_key.load cctxt >>=? fun sks ->
   iter_s begin fun (name, sk_uri) ->
     if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then
-      return ()
+      return_unit
     else
       decrypt cctxt ~name sk_uri >>=? fun _ ->
-      return ()
+      return_unit
   end sks
 
 let rec read_passphrase (cctxt : #Client_context.io) =

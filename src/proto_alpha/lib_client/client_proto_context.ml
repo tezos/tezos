@@ -19,6 +19,9 @@ let get_balance (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
 let get_storage (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.storage_opt rpc (chain, block) contract
 
+let get_script (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+  Alpha_services.Contract.script_opt rpc (chain, block) contract
+
 let parse_expression arg =
   Lwt.return
     (Micheline_parser.no_parsing_error
@@ -32,8 +35,8 @@ let transfer (cctxt : #Proto_alpha.full)
   begin match arg with
     | Some arg ->
         parse_expression arg >>=? fun { expanded = arg } ->
-        return (Some arg)
-    | None -> return None
+        return_some arg
+    | None -> return_none
   end >>=? fun parameters ->
   let parameters = Option.map ~f:Script.lazy_expr parameters in
   let contents = Transaction { amount ; parameters ; destination } in
@@ -189,7 +192,7 @@ let source_to_keys (wallet : #Proto_alpha.full) ~chain ~block source =
 let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
   message_added_contract cctxt alias_name >>= fun () ->
-  return ()
+  return_unit
 
 let originate_contract
     (cctxt : #Proto_alpha.full)
@@ -305,7 +308,7 @@ let inject_activate_operation
   begin
     match confirmations with
     | None ->
-        return ()
+        return_unit
     | Some _confirmations ->
         Alpha_services.Contract.balance
           cctxt (`Main, `Head 0)
@@ -315,7 +318,7 @@ let inject_activate_operation
           Ed25519.Public_key_hash.pp pkh
           Client_proto_args.tez_sym
           Tez.pp balance >>= fun () ->
-        return ()
+        return_unit
   end >>=? fun () ->
   match Apply_operation_result.pack_contents_list op result with
   | Apply_operation_result.Single_and_result

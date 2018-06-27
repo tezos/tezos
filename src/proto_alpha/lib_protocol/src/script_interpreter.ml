@@ -96,7 +96,7 @@ let unparse_stack ctxt (stack, stack_ty) =
   let rec unparse_stack
     : type a. a stack * a stack_ty -> (Script.expr * string option) list tzresult Lwt.t
     = function
-      | Empty, Empty_t -> return []
+      | Empty, Empty_t -> return_nil
       | Item (v, rest), Item_t (ty, rest_ty, annot) ->
           unparse_data ctxt Readable ty v >>=? fun (data, _ctxt) ->
           unparse_stack (rest, rest_ty) >>=? fun rest ->
@@ -730,11 +730,11 @@ let rec interp
             logged_return (Item (amount, rest), ctxt) in
     let stack = (Item (arg, Empty)) in
     begin match log with
-      | None -> return ()
+      | None -> return_unit
       | Some log ->
           unparse_stack ctxt (stack, code.bef) >>=? fun stack ->
           log := (code.loc, Gas.level ctxt, stack) :: !log ;
-          return ()
+          return_unit
     end >>=? fun () ->
     step ctxt code stack >>=? fun (Item (ret, Empty), ctxt) ->
     return (ret, ctxt)

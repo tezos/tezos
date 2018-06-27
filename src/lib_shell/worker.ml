@@ -181,7 +181,7 @@ module Make
       match w.timeout with
       | None ->
           Lwt_pipe.pop message_queue >>= fun m ->
-          return (Some m)
+          return_some m
       | Some timeout ->
           Lwt_pipe.pop_with_timeout
             (Lwt_unix.sleep timeout) message_queue >>= fun m ->
@@ -193,7 +193,7 @@ module Make
         match w.timeout with
         | None ->
             Lwt_dropbox.take message_box >>= fun m ->
-            return (Some m)
+            return_some m
         | Some timeout ->
             Lwt_dropbox.take_with_timeout
               (Lwt_unix.sleep timeout) message_box >>= fun m ->
@@ -265,7 +265,7 @@ module Make
          List.iter (fun (_, ring) -> Ring.clear ring) w.event_log ;
          Lwt_unix.sleep (w.limits.zombie_lifetime -. w.limits.zombie_memory) >>= fun () ->
          Hashtbl.remove w.table.zombies w.id ;
-         Lwt.return ()) ;
+         Lwt.return_unit) ;
       Lwt.return_unit in
     let rec loop () =
       begin
@@ -286,7 +286,7 @@ module Make
                 w.current_request <- None ;
                 Handlers.on_completion w
                   request res Worker_types.{ pushed ; treated ; completed } >>= fun () ->
-                return ()
+                return_unit
             | Some u ->
                 Handlers.on_request w request >>= fun res ->
                 Lwt.wakeup_later u res ;
@@ -295,7 +295,7 @@ module Make
                 w.current_request <- None ;
                 Handlers.on_completion w
                   request res Worker_types.{ pushed ; treated ; completed } >>= fun () ->
-                return ()
+                return_unit
       end >>= function
       | Ok () ->
           loop ()
@@ -351,7 +351,7 @@ module Make
         let levels =
           [ Logging.Debug ; Info ; Notice ; Warning ; Error ; Fatal ] in
         List.map (fun l -> l, Ring.create limits.backlog_size) levels in
-      let module Logger = Logging.Make(struct let name = id_name end) in
+      let module Logger = Logging.Make_unregistered(struct let name = id_name end) in
       let w = { limits ; parameters ; name ; canceler ;
                 table ; buffer ; logger = (module Logger) ;
                 state = None ; id ;

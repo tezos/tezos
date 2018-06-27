@@ -167,10 +167,10 @@ let may_switch_test_chain w spawn_child block =
         nv.parameters.db chain_state
         nv.parameters.limits (* TODO: different limits main/test ? *) >>= fun child ->
       nv.child <- Some child ;
-      return ()
+      return_unit
     end else begin
       (* Ignoring request... *)
-      return ()
+      return_unit
     end in
 
   let check_child genesis protocol expiration current_time =
@@ -196,7 +196,7 @@ let may_switch_test_chain w spawn_child block =
     else if not activated && not expired then
       create_child genesis protocol expiration
     else
-      return () in
+      return_unit in
 
   begin
     let block_header = State.Block.header block in
@@ -252,7 +252,7 @@ let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
     begin match nv.prevalidator with
       | Some prevalidator ->
           Prevalidator.flush prevalidator block_hash
-      | None -> return ()
+      | None -> return_unit
     end >>=? fun () ->
     may_switch_test_chain w spawn_child block >>= fun () ->
     Lwt_watcher.notify nv.new_head_input block ;
@@ -267,7 +267,7 @@ let on_completion (type a) w  (req : a Request.t) (update : a) request_status =
   let fitness = State.Block.fitness block in
   let request = State.Block.hash block in
   Worker.record_event w (Processed_block { request ; request_status ; update ; fitness }) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let on_close w =
   let nv = Worker.state w in
@@ -352,7 +352,7 @@ let rec create
     let on_close = on_close
     let on_error _ _ _ errs = Lwt.return (Error errs)
     let on_completion = on_completion
-    let on_no_request _ = return ()
+    let on_no_request _ = return_unit
   end in
   let parameters =
     { max_child_ttl ;

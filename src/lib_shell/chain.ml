@@ -29,7 +29,7 @@ let head chain_state =
 let mem chain_state hash =
   State.read_chain_data chain_state begin fun chain_store data ->
     if Block_hash.equal (State.Block.hash data.current_head) hash then
-      Lwt.return true
+      Lwt.return_true
     else
       Store.Chain_data.In_main_branch.known (chain_store, hash)
   end

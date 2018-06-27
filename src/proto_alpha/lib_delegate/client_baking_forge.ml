@@ -75,7 +75,8 @@ let forge_block_header
     Data_encoding.Binary.to_bytes_exn
       Alpha_context.Block_header.unsigned_encoding
       (shell, contents) in
-  Client_keys.append cctxt delegate_sk ~watermark:Block_header unsigned_header
+  Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
+  Client_keys.append cctxt delegate_sk ~watermark:(Block_header chain_id) unsigned_header
 
 let forge_faked_protocol_data ~priority ~seed_nonce_hash =
   Alpha_context.Block_header.{
@@ -146,9 +147,9 @@ let sort_operations_by_fee ?(threshold = Tez.zero) (operations : Proto_alpha.ope
     (fun op ->
        get_operation_fee op >>=? fun fee ->
        if Tez.(<) fee threshold then
-         return None
+         return_none
        else
-         return (Some (op, fee)))
+         return_some (op, fee))
     operations >>=? fun operations ->
   let compare_fee (_, fee1) (_, fee2) =
     (* NOTE: inverted fee comparison to invert the order of sort *)
@@ -354,7 +355,7 @@ module State = Daemon_state.Make(struct let name = "block" end)
 
 let previously_baked_level cctxt pkh new_lvl  =
   State.get cctxt pkh  >>=? function
-  | None -> return false
+  | None -> return_false
   | Some last_lvl ->
       return (Raw_level.(last_lvl >= new_lvl))
 
@@ -371,11 +372,11 @@ let get_baking_slot cctxt
   | Error errs ->
       lwt_log_error "Error while fetching baking possibilities:\n%a"
         pp_print_error errs >>= fun () ->
-      Lwt.return []
+      Lwt.return_nil
   | Ok [] ->
       lwt_log_info "Found no baking rights for level %a"
         Raw_level.pp level >>= fun () ->
-      Lwt.return []
+      Lwt.return_nil
   | Ok slots ->
       let slots =
         List.filter_map
@@ -409,7 +410,7 @@ let compute_timeout { future_slots } =
   | (timestamp, _) :: _ ->
       match Client_baking_scheduling.sleep_until timestamp with
       | None ->
-          Lwt.return ()
+          Lwt.return_unit
       | Some timeout ->
           timeout
 
@@ -419,12 +420,12 @@ let get_unrevealed_nonces
     cctxt block ~offset:(-1l) () >>=? fun blocks ->
   filter_map_s (fun hash ->
       Client_baking_nonces.find cctxt hash >>=? function
-      | None -> return None
+      | None -> return_none
       | Some nonce ->
           Alpha_block_services.metadata
             cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
           if force then
-            return (Some (hash, (level.level, nonce)))
+            return_some (hash, (level.level, nonce))
           else
             Alpha_services.Nonce.get
               cctxt (chain, block) level.level >>=? function
@@ -433,13 +434,13 @@ let get_unrevealed_nonces
                 cctxt#warning "Found nonce for %a (level: %a)@."
                   Block_hash.pp_short hash
                   Level.pp level >>= fun () ->
-                return (Some (hash, (level.level, nonce)))
+                return_some (hash, (level.level, nonce))
             | Missing _nonce_hash ->
                 cctxt#error "Incoherent nonce for level %a"
                   Raw_level.pp level.level >>= fun () ->
-                return None
-            | Forgotten -> return None
-            | Revealed _ -> return None)
+                return_none
+            | Forgotten -> return_none
+            | Revealed _ -> return_none)
     blocks
 
 let safe_get_unrevealed_nonces cctxt block =
@@ -447,7 +448,7 @@ let safe_get_unrevealed_nonces cctxt block =
   | Ok r -> Lwt.return r
   | Error err ->
       lwt_warn "Cannot read nonces: %a@." pp_print_error err >>= fun () ->
-      Lwt.return []
+      Lwt.return_nil
 
 let insert_block
     ?max_priority
@@ -470,7 +471,7 @@ let insert_block
   | [] ->
       lwt_debug
         "Can't compute slots for %a" Block_hash.pp_short bi.hash >>= fun () ->
-      return ()
+      return_unit
   | (_ :: _) as slots ->
       iter_p
         (fun ((timestamp, (_, _, delegate)) as slot) ->
@@ -480,7 +481,7 @@ let insert_block
              name
              Block_hash.pp_short bi.hash >>= fun () ->
            state.future_slots <- insert_baking_slot slot state.future_slots ;
-           return ()
+           return_unit
         )
         slots
 
@@ -521,8 +522,8 @@ let filter_invalid_operations (cctxt : #full) state block_info (operations : pac
           Operation_hash.pp (Operation.hash_packed op)
           pp_print_error errs
         >>= fun () ->
-        return None
-    | Ok inc -> return (Some inc)
+        return_none
+    | Ok inc -> return_some inc
   in
   let filter_valid_operations inc ops =
     fold_left_s (fun (inc, acc) op ->
@@ -534,10 +535,10 @@ let filter_invalid_operations (cctxt : #full) state block_info (operations : pac
   (* Invalid endorsements are detected during block finalization *)
   let is_valid_endorsement inc endorsement =
     validate_operation inc endorsement >>=? function
-    | None -> return None
+    | None -> return_none
     | Some inc' -> finalize_construction inc' >>= begin function
-        | Ok _ -> return (Some endorsement)
-        | Error _ -> return None
+        | Ok _ -> return_some endorsement
+        | Error _ -> return_none
       end
   in
   filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
@@ -613,7 +614,7 @@ let bake_slot
       lwt_log_error "Client-side validation: error while filtering invalid operations :@\n%a"
         pp_print_error
         errs >>= fun () ->
-      return None
+      return_none
   | Ok operations ->
       Alpha_block_services.Helpers.Preapply.block
         cctxt ~chain ~block
@@ -623,7 +624,7 @@ let bake_slot
           lwt_log_error "Error while prevalidating operations:@\n%a"
             pp_print_error
             errs >>= fun () ->
-          return None
+          return_none
       | Ok (shell_header, operations) ->
           lwt_debug
             "Computed candidate block after %a (slot %d): %a/%d fitness: %a"
@@ -657,7 +658,7 @@ let record_nonce_hash cctxt block_hash seed_nonce seed_nonce_hash =
     Client_baking_nonces.add cctxt block_hash seed_nonce
     |> trace_exn (Failure "Error while recording block")
   else
-    return ()
+    return_unit
 
 let pp_operation_list_list =
   Format.pp_print_list
@@ -724,12 +725,12 @@ let bake
             Raw_level.pp level priority
             Fitness.pp shell_header.fitness
             pp_operation_list_list operations >>= fun () ->
-          return ()
+          return_unit
     end
 
   | _ -> (* no candidates, or none fit-enough *)
       lwt_debug "No valid candidates." >>= fun () ->
-      return ()
+      return_unit
 
 
 

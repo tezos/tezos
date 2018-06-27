@@ -43,7 +43,7 @@ let conn_meta_config : metadata P2p_socket.metadata_config = {
 let sync ch =
   Process.Channel.push ch () >>=? fun () ->
   Process.Channel.pop ch >>=? fun () ->
-  return ()
+  return_unit
 
 let rec sync_nodes nodes =
   iter_p
@@ -57,7 +57,7 @@ let rec sync_nodes nodes =
 let sync_nodes nodes =
   sync_nodes nodes >>= function
   | Ok () | Error (Exn End_of_file :: _) ->
-      return ()
+      return_unit
   | Error _ as err ->
       Lwt.return err
 
@@ -104,7 +104,7 @@ let detach_node f points n =
       P2p_pool.destroy pool >>= fun () ->
       P2p_io_scheduler.shutdown sched >>= fun () ->
       lwt_log_info "Bye." >>= fun () ->
-      return ()
+      return_unit
     end
 
 let detach_nodes run_node points =
@@ -165,7 +165,7 @@ module Simple = struct
     iter_p
       (fun conn ->
          trace Read @@ P2p_pool.read conn >>=? fun Ping ->
-         return ())
+         return_unit)
       conns
 
   let close_all conns =
@@ -183,7 +183,7 @@ module Simple = struct
     sync channel >>=? fun () ->
     close_all conns >>= fun () ->
     lwt_log_info "All connections successfully closed." >>= fun () ->
-    return ()
+    return_unit
 
   let run points = detach_nodes node points
 
@@ -203,12 +203,12 @@ module Random_connections = struct
       if !rem mod total = 0 then
         lwt_log_info "Remaining: %d." (!rem / total)
       else
-        Lwt.return ()
+        Lwt.return_unit
     end >>= fun () ->
     if n > 1 then
       connect_random pool total rem point (pred n)
     else
-      return ()
+      return_unit
 
   let connect_random_all pool points n =
     let total = List.length points in
@@ -219,7 +219,7 @@ module Random_connections = struct
     lwt_log_info "Begin random connections." >>= fun () ->
     connect_random_all pool points repeat >>=? fun () ->
     lwt_log_info "Random connections OK." >>= fun () ->
-    return ()
+    return_unit
 
   let run points repeat = detach_nodes (node repeat) points
 

@@ -14,7 +14,7 @@ module Endorser = struct
       cctxt `Main >>=? fun block_stream ->
     Client_baking_endorsement.create cctxt ~delay delegates block_stream >>=? fun () ->
     ignore min_date;
-    return ()
+    return_unit
 
 end
 
@@ -26,7 +26,7 @@ module Baker = struct
     Client_baking_forge.create cctxt
       ?threshold ?max_priority ~context_path delegates block_stream >>=? fun () ->
     ignore min_date;
-    return ()
+    return_unit
 
 end
 
@@ -35,6 +35,6 @@ module Accuser = struct
   let run (cctxt : #Proto_alpha.full) ~preserved_levels =
     Client_baking_blocks.monitor_valid_blocks cctxt ~chains:[ `Main ] () >>=? fun valid_blocks_stream ->
     Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream >>=? fun () ->
-    return ()
+    return_unit
 
 end

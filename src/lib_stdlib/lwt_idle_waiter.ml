@@ -39,7 +39,7 @@ let rec may_run_idle_tasks w =
             w.pending_tasks <- [] ;
             List.iter (fun u -> Lwt.wakeup u ()) pending_tasks ;
             may_run_idle_tasks w ;
-            Lwt.return ())
+            Lwt.return_unit)
 
 let wrap_error f =
   Lwt.catch
@@ -73,11 +73,11 @@ let when_idle w f =
   Lwt.on_cancel t (fun () -> canceled := true) ;
   let f () =
     if !canceled then
-      Lwt.return ()
+      Lwt.return_unit
     else
       wrap_error f >>= fun res ->
       wakeup_error u res ;
-      Lwt.return () in
+      Lwt.return_unit in
   w.pending_idle <- f :: w.pending_idle ;
   may_run_idle_tasks w ;
   t

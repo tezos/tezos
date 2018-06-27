@@ -282,7 +282,7 @@ let main () =
               ~global_options:(global_options ())
               commands cctxt >>=? fun completions ->
             List.iter print_endline completions ;
-            return ()
+            return_unit
         | None ->
             Clic.dispatch commands cctxt remaining
       end

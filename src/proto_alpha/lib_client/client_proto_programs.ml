@@ -33,7 +33,7 @@ let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
        ~show_source
        ~parsed) errs >>= fun () ->
   cctxt#error "error running script" >>= fun () ->
-  return ()
+  return_unit
 
 let print_big_map_diff ppf = function
   | None -> ()
@@ -60,7 +60,7 @@ let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed = fu
         print_expr storage
         (Format.pp_print_list Operation_result.pp_internal_operation) operations
         print_big_map_diff maybe_diff >>= fun () ->
-      return ()
+      return_unit
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
 
@@ -74,7 +74,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         (Format.pp_print_list Operation_result.pp_internal_operation) operations
         print_big_map_diff maybe_big_map_diff
         print_execution_trace trace >>= fun () ->
-      return ()
+      return_unit
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
 
@@ -140,7 +140,7 @@ let print_typecheck_result
       "(@[<v 0>(types . %a)@ (errors . %a)@])"
       Michelson_v1_emacs.print_type_map (program, type_map)
       Michelson_v1_emacs.report_errors (program, errs) >>= fun () ->
-    return ()
+    return_unit
   else
     match res with
     | Ok (type_map, gas) ->
@@ -149,8 +149,8 @@ let print_typecheck_result
           Gas.pp gas >>= fun () ->
         if show_types then
           cctxt#message "%a" Micheline_printer.print_expr program >>= fun () ->
-          return ()
-        else return ()
+          return_unit
+        else return_unit
     | Error errs ->
         cctxt#warning "%a"
           (Michelson_v1_error_reporter.report_errors

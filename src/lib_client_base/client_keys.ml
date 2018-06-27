@@ -210,7 +210,7 @@ let register_key cctxt ?(force=false) (public_key_hash, pk_uri, sk_uri) ?public_
   Public_key.add ~force cctxt name (pk_uri, public_key) >>=? fun () ->
   Secret_key.add ~force cctxt name sk_uri >>=? fun () ->
   Public_key_hash.add ~force cctxt name public_key_hash >>=? fun () ->
-  return ()
+  return_unit
 
 let raw_get_key (cctxt : #Client_context.wallet) pkh =
   begin
@@ -219,12 +219,12 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
     | Some n ->
         Secret_key.find_opt cctxt n >>=? fun sk_uri ->
         Public_key.find_opt cctxt n >>=? begin function
-          | None -> return None
-          | Some (_, Some pk) -> return (Some pk)
+          | None -> return_none
+          | Some (_, Some pk) -> return_some pk
           | Some (pk_uri, None) ->
               public_key pk_uri >>=? fun pk ->
               Public_key.update cctxt n (pk_uri, Some pk) >>=? fun () ->
-              return (Some pk)
+              return_some pk
         end >>=? fun pk ->
         return (n, pk, sk_uri)
   end >>= function
@@ -268,7 +268,7 @@ let get_keys (cctxt : #Client_context.wallet) =
       end >>=? fun pk ->
       return (name, pkh, pk, sk_uri)
     end >>= function
-    | Ok r -> Lwt.return (Some r)
+    | Ok r -> Lwt.return_some r
     | Error _ -> Lwt.return_none
   end sks >>= fun keys ->
   return keys
@@ -287,8 +287,8 @@ let list_keys cctxt =
 let alias_keys cctxt name =
   Public_key_hash.find cctxt name >>=? fun pkh ->
   raw_get_key cctxt pkh >>= function
-  | Ok (_name, pk, sk_uri) -> return (Some (pkh, pk, sk_uri))
-  | Error _ -> return None
+  | Ok (_name, pk, sk_uri) -> return_some (pkh, pk, sk_uri)
+  | Error _ -> return_none
 
 let force_switch () =
   Clic.switch

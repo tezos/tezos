@@ -254,7 +254,7 @@ module Scripts = struct
           return result
       | _ ->
           Apply.apply_contents_list
-            ctxt Optimized shell.branch baker operation
+            ctxt Chain_id.zero Optimized shell.branch baker operation
             operation.protocol_data.contents >>=? fun (_ctxt, result) ->
           return result
 
@@ -491,10 +491,10 @@ module Parse = struct
         Lwt.return (parse_operation raw) >>=? fun op ->
         begin match check with
           | Some true ->
-              return () (* FIXME *)
+              return_unit (* FIXME *)
           (* I.check_signature ctxt *)
           (* op.protocol_data.signature op.shell op.protocol_data.contents *)
-          | Some false | None -> return ()
+          | Some false | None -> return_unit
         end >>|? fun () -> op
       end operations
     end ;

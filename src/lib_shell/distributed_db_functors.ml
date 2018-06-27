@@ -135,7 +135,7 @@ end = struct
   let read_opt s k =
     match Memory_table.find s.memory k with
     | exception Not_found -> Disk_table.read_opt s.disk k
-    | Found v -> Lwt.return (Some v)
+    | Found v -> Lwt.return_some v
     | Pending _ -> Lwt.return_none
 
   let read_exn s k =
@@ -528,7 +528,7 @@ end = struct
       param ;
       queue = Lwt_pipe.create () ;
       pending = Table.create 17 ;
-      events = Lwt.return [] ;
+      events = Lwt.return_nil ;
       canceler = Lwt_canceler.create () ;
       worker = Lwt.return_unit ;
     } in

@@ -163,9 +163,9 @@ type error += Missing_signature (* `Permanent *)
 type error += Invalid_signature (* `Permanent *)
 
 val check_signature:
-  Signature.Public_key.t -> _ operation -> unit tzresult Lwt.t
+  Signature.Public_key.t -> Chain_id.t -> _ operation -> unit tzresult Lwt.t
 val check_signature_sync:
-  Signature.Public_key.t -> _ operation -> unit tzresult
+  Signature.Public_key.t -> Chain_id.t -> _ operation -> unit tzresult
 
 
 val internal_operation_encoding:

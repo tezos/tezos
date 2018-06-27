@@ -50,10 +50,10 @@ let run blkid =
       let res = predicate result in
       Format.eprintf "/%s (%d) -> %B@." (String.concat "/" path) depth res ;
       success := !success  && res ;
-      return ()
+      return_unit
     ) tests >>=? fun () ->
   if !success then
-    return ()
+    return_unit
   else
     failwith "Error!"
 

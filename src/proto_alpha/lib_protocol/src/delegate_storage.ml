@@ -116,7 +116,7 @@ let () =
 let is_delegatable c contract =
   match Contract_repr.is_implicit contract with
   | Some _ ->
-      return false
+      return_false
   | None ->
       Storage.Contract.Delegatable.mem c contract >>= return
 
@@ -144,8 +144,8 @@ let unlink c contract balance =
 let known c delegate =
   Storage.Contract.Manager.get_option
     c (Contract_repr.implicit_contract delegate) >>=? function
-  | None | Some (Manager_repr.Hash _) -> return false
-  | Some (Manager_repr.Public_key _) -> return true
+  | None | Some (Manager_repr.Hash _) -> return_false
+  | Some (Manager_repr.Public_key _) -> return_true
 
 (* A delegate is registered if its "implicit account"
    delegates to itself. *)
@@ -195,11 +195,11 @@ let set_base c is_delegatable contract delegate =
             when Signature.Public_key_hash.equal delegate current_delegate ->
               if self_delegation then
                 Storage.Contract.Inactive_delegate.mem c contract >>= function
-                | true -> return ()
+                | true -> return_unit
                 | false -> fail Active_delegate
               else
                 fail Current_delegate
-          | None | Some _ -> return ()
+          | None | Some _ -> return_unit
         end >>=? fun () ->
         Storage.Contract.Balance.mem c contract >>= fun exists ->
         fail_when
@@ -223,7 +223,7 @@ let set c contract delegate =
   set_base c is_delegatable contract delegate
 
 let set_from_script c contract delegate =
-  set_base c (fun _ _ -> return true) contract delegate
+  set_base c (fun _ _ -> return_true) contract delegate
 
 let remove ctxt contract =
   Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
@@ -386,10 +386,10 @@ let punish ctxt delegate cycle =
 let has_frozen_balance ctxt delegate cycle =
   let contract = Contract_repr.implicit_contract delegate in
   get_frozen_deposit ctxt contract cycle >>=? fun deposit ->
-  if Tez_repr.(deposit <> zero) then return true
+  if Tez_repr.(deposit <> zero) then return_true
   else
     get_frozen_fees ctxt contract cycle >>=? fun fees ->
-    if Tez_repr.(fees <> zero) then return true
+    if Tez_repr.(fees <> zero) then return_true
     else
       get_frozen_rewards ctxt contract cycle >>=? fun rewards ->
       return Tez_repr.(rewards <> zero)

@@ -19,7 +19,8 @@ let bake cctxt ?(timestamp = Time.now ()) block command sk =
     cctxt ~block ~timestamp ~protocol_data
     [] >>=? fun (shell_header, _) ->
   let blk = Data.Command.forge shell_header command in
-  Client_keys.append cctxt sk blk >>=? fun signed_blk ->
+  Shell_services.Chain.chain_id cctxt ~chain:`Main () >>=? fun chain_id ->
+  Client_keys.append cctxt sk ~watermark:(Block_header chain_id) blk >>=? fun signed_blk ->
   Shell_services.Injection.block cctxt signed_blk []
 
 let int64_parameter =
@@ -77,7 +78,7 @@ let commands () =
           (Activate { protocol = hash ; fitness ; protocol_parameters })
           sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
-        return ()
+        return_unit
       end ;
 
     command ~desc: "Fork a test protocol"
@@ -94,7 +95,7 @@ let commands () =
                                 delay = Int64.mul 24L 3600L })
           sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
-        return ()
+        return_unit
       end ;
 
   ]
