@@ -25,98 +25,18 @@ let error_encoding =
              json)
     ~binary:Error_monad.error_encoding
 
-type balance =
-  | Contract of Contract.t
-  | Rewards of Signature.Public_key_hash.t * Cycle.t
-  | Fees of Signature.Public_key_hash.t * Cycle.t
-  | Deposits of Signature.Public_key_hash.t * Cycle.t
-
-let balance_encoding =
-  def "operation_metadata.alpha.balance" @@
-  union
-    [ case (Tag 0)
-        ~title:"Contract"
-        (obj2
-           (req "kind" (constant "contract"))
-           (req "contract" Contract.encoding))
-        (function Contract c -> Some ((), c) | _ -> None )
-        (fun ((), c) -> (Contract c)) ;
-      case (Tag 1)
-        ~title:"Rewards"
-        (obj4
-           (req "kind" (constant "freezer"))
-           (req "category" (constant "rewards"))
-           (req "delegate" Signature.Public_key_hash.encoding)
-           (req "level" Cycle.encoding))
-        (function Rewards (d, l) -> Some ((), (), d, l) | _ -> None)
-        (fun ((), (), d, l) -> Rewards (d, l)) ;
-      case (Tag 2)
-        ~title:"Fees"
-        (obj4
-           (req "kind" (constant "freezer"))
-           (req "category" (constant "fees"))
-           (req "delegate" Signature.Public_key_hash.encoding)
-           (req "level" Cycle.encoding))
-        (function Fees (d, l) -> Some ((), (), d, l) | _ -> None)
-        (fun ((), (), d, l) -> Fees (d, l)) ;
-      case (Tag 3)
-        ~title:"Deposits"
-        (obj4
-           (req "kind" (constant "freezer"))
-           (req "category" (constant "deposits"))
-           (req "delegate" Signature.Public_key_hash.encoding)
-           (req "level" Cycle.encoding))
-        (function Deposits (d, l) -> Some ((), (), d, l) | _ -> None)
-        (fun ((), (), d, l) -> Deposits (d, l)) ]
-
-type balance_update =
-  | Debited of Tez.t
-  | Credited of Tez.t
-
-let balance_update_encoding =
-  def "operation_metadata.alpha.balance_update" @@
-  obj1
-    (req "change"
-       (conv
-          (function
-            | Credited v -> Tez.to_mutez v
-            | Debited v -> Int64.neg (Tez.to_mutez v))
-          (Json.wrap_error @@
-           fun v ->
-           if Compare.Int64.(v < 0L) then
-             match Tez.of_mutez (Int64.neg v) with
-             | Some v -> Debited v
-             | None -> failwith "Qty.of_mutez"
-           else
-             match Tez.of_mutez v with
-             | Some v -> Credited v
-             | None -> failwith "Qty.of_mutez")
-          int64))
-
-type balance_updates = (balance * balance_update) list
-
-let cleanup_balance_updates balance_updates =
-  List.filter
-    (fun (_, (Credited update | Debited update)) ->
-       not (Tez.equal update Tez.zero))
-    balance_updates
-
-let balance_updates_encoding =
-  def "operation_metadata.alpha.balance_updates" @@
-  list (merge_objs balance_encoding balance_update_encoding)
-
 type _ successful_manager_operation_result =
   | Reveal_result : Kind.reveal successful_manager_operation_result
   | Transaction_result :
       { storage : Script.expr option ;
-        balance_updates : balance_updates ;
+        balance_updates : Delegate.balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
         storage_size : Z.t ;
         paid_storage_size_diff : Z.t ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
-      { balance_updates : balance_updates ;
+      { balance_updates : Delegate.balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
         storage_size : Z.t ;
@@ -229,7 +149,7 @@ module Manager_result = struct
       ~encoding:
         (obj6
            (opt "storage" Script.expr_encoding)
-           (dft "balance_updates" balance_updates_encoding [])
+           (dft "balance_updates" Delegate.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
            (dft "storage_size" z Z.zero)
@@ -267,7 +187,7 @@ module Manager_result = struct
       ~op_case: Operation.Encoding.Manager_operations.origination_case
       ~encoding:
         (obj5
-           (dft "balance_updates" balance_updates_encoding [])
+           (dft "balance_updates" Delegate.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
            (dft "storage_size" z Z.zero)
@@ -355,22 +275,22 @@ let internal_operation_result_encoding :
 
 type 'kind contents_result =
   | Endorsement_result :
-      { balance_updates : balance_updates ;
+      { balance_updates : Delegate.balance_updates ;
         delegate : Signature.Public_key_hash.t ;
         slots: int list ;
       } -> Kind.endorsement contents_result
   | Seed_nonce_revelation_result :
-      balance_updates -> Kind.seed_nonce_revelation contents_result
+      Delegate.balance_updates -> Kind.seed_nonce_revelation contents_result
   | Double_endorsement_evidence_result :
-      balance_updates -> Kind.double_endorsement_evidence contents_result
+      Delegate.balance_updates -> Kind.double_endorsement_evidence contents_result
   | Double_baking_evidence_result :
-      balance_updates -> Kind.double_baking_evidence contents_result
+      Delegate.balance_updates -> Kind.double_baking_evidence contents_result
   | Activate_account_result :
-      balance_updates -> Kind.activate_account contents_result
+      Delegate.balance_updates -> Kind.activate_account contents_result
   | Proposals_result : Kind.proposals contents_result
   | Ballot_result : Kind.ballot contents_result
   | Manager_operation_result :
-      { balance_updates : balance_updates ;
+      { balance_updates : Delegate.balance_updates ;
         operation_result : 'kind manager_operation_result ;
         internal_operation_results : packed_internal_operation_result list ;
       } -> 'kind Kind.manager contents_result
@@ -422,7 +342,7 @@ module Encoding = struct
       op_case = Operation.Encoding.endorsement_case ;
       encoding =
         (obj3
-           (req "balance_updates" balance_updates_encoding)
+           (req "balance_updates" Delegate.balance_updates_encoding)
            (req "delegate" Signature.Public_key_hash.encoding)
            (req "slots" (list uint8)));
       select =
@@ -447,7 +367,7 @@ module Encoding = struct
       op_case = Operation.Encoding.seed_nonce_revelation_case ;
       encoding =
         (obj1
-           (req "balance_updates" balance_updates_encoding)) ;
+           (req "balance_updates" Delegate.balance_updates_encoding)) ;
       select =
         (function
           | Contents_result (Seed_nonce_revelation_result _ as op) -> Some op
@@ -465,7 +385,7 @@ module Encoding = struct
       op_case = Operation.Encoding.double_endorsement_evidence_case ;
       encoding =
         (obj1
-           (req "balance_updates" balance_updates_encoding)) ;
+           (req "balance_updates" Delegate.balance_updates_encoding)) ;
       select =
         (function
           | Contents_result (Double_endorsement_evidence_result _ as op) -> Some op
@@ -484,7 +404,7 @@ module Encoding = struct
       op_case = Operation.Encoding.double_baking_evidence_case ;
       encoding =
         (obj1
-           (req "balance_updates" balance_updates_encoding)) ;
+           (req "balance_updates" Delegate.balance_updates_encoding)) ;
       select =
         (function
           | Contents_result (Double_baking_evidence_result _ as op) -> Some op
@@ -503,7 +423,7 @@ module Encoding = struct
       op_case = Operation.Encoding.activate_account_case ;
       encoding =
         (obj1
-           (req "balance_updates" balance_updates_encoding)) ;
+           (req "balance_updates" Delegate.balance_updates_encoding)) ;
       select =
         (function
           | Contents_result (Activate_account_result _ as op) -> Some op
@@ -557,7 +477,7 @@ module Encoding = struct
       op_case = Operation.Encoding.Case op_case ;
       encoding =
         (obj3
-           (req "balance_updates" balance_updates_encoding)
+           (req "balance_updates" Delegate.balance_updates_encoding)
            (req "operation_result" res_case.t)
            (dft "internal_operation_results"
               (list internal_operation_result_encoding) [])) ;

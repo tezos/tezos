@@ -107,6 +107,7 @@ let pp_manager_operation_content
 let pp_balance_updates ppf = function
   | [] -> ()
   | balance_updates ->
+      let open Delegate in
       let balance_updates =
         List.map (fun (balance, update) ->
             let balance = match balance with

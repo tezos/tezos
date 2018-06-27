@@ -7,6 +7,89 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type balance =
+  | Contract of Contract_repr.t
+  | Rewards of Signature.Public_key_hash.t * Cycle_repr.t
+  | Fees of Signature.Public_key_hash.t * Cycle_repr.t
+  | Deposits of Signature.Public_key_hash.t * Cycle_repr.t
+
+let balance_encoding =
+  let open Data_encoding in
+  def "operation_metadata.alpha.balance" @@
+  union
+    [ case (Tag 0)
+        ~title:"Contract"
+        (obj2
+           (req "kind" (constant "contract"))
+           (req "contract" Contract_repr.encoding))
+        (function Contract c -> Some ((), c) | _ -> None )
+        (fun ((), c) -> (Contract c)) ;
+      case (Tag 1)
+        ~title:"Rewards"
+        (obj4
+           (req "kind" (constant "freezer"))
+           (req "category" (constant "rewards"))
+           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "level" Cycle_repr.encoding))
+        (function Rewards (d, l) -> Some ((), (), d, l) | _ -> None)
+        (fun ((), (), d, l) -> Rewards (d, l)) ;
+      case (Tag 2)
+        ~title:"Fees"
+        (obj4
+           (req "kind" (constant "freezer"))
+           (req "category" (constant "fees"))
+           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "level" Cycle_repr.encoding))
+        (function Fees (d, l) -> Some ((), (), d, l) | _ -> None)
+        (fun ((), (), d, l) -> Fees (d, l)) ;
+      case (Tag 3)
+        ~title:"Deposits"
+        (obj4
+           (req "kind" (constant "freezer"))
+           (req "category" (constant "deposits"))
+           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "level" Cycle_repr.encoding))
+        (function Deposits (d, l) -> Some ((), (), d, l) | _ -> None)
+        (fun ((), (), d, l) -> Deposits (d, l)) ]
+
+type balance_update =
+  | Debited of Tez_repr.t
+  | Credited of Tez_repr.t
+
+let balance_update_encoding =
+  let open Data_encoding in
+  def "operation_metadata.alpha.balance_update" @@
+  obj1
+    (req "change"
+       (conv
+          (function
+            | Credited v -> Tez_repr.to_mutez v
+            | Debited v -> Int64.neg (Tez_repr.to_mutez v))
+          (Json.wrap_error @@
+           fun v ->
+           if Compare.Int64.(v < 0L) then
+             match Tez_repr.of_mutez (Int64.neg v) with
+             | Some v -> Debited v
+             | None -> failwith "Qty.of_mutez"
+           else
+             match Tez_repr.of_mutez v with
+             | Some v -> Credited v
+             | None -> failwith "Qty.of_mutez")
+          int64))
+
+type balance_updates = (balance * balance_update) list
+
+let balance_updates_encoding =
+  let open Data_encoding in
+  def "operation_metadata.alpha.balance_updates" @@
+  list (merge_objs balance_encoding balance_update_encoding)
+
+let cleanup_balance_updates balance_updates =
+  List.filter
+    (fun (_, (Credited update | Debited update)) ->
+       not (Tez_repr.equal update Tez_repr.zero))
+    balance_updates
+
 type frozen_balance = {
   deposit : Tez_repr.t ;
   fees : Tez_repr.t ;

@@ -363,7 +363,7 @@ let apply_manager_operation_content :
               Transaction_result
                 { storage = None ;
                   balance_updates =
-                    cleanup_balance_updates
+                    Delegate.cleanup_balance_updates
                       [ Contract source, Debited amount ;
                         Contract destination, Credited amount ] ;
                   originated_contracts = [] ;
@@ -397,7 +397,7 @@ let apply_manager_operation_content :
               Transaction_result
                 { storage = Some storage ;
                   balance_updates =
-                    cleanup_balance_updates
+                    Delegate.cleanup_balance_updates
                       [ Contract payer, Debited fees ;
                         Contract source, Debited amount ;
                         Contract destination, Credited amount ] ;
@@ -437,7 +437,7 @@ let apply_manager_operation_content :
         let result =
           Origination_result
             { balance_updates =
-                cleanup_balance_updates
+                Delegate.cleanup_balance_updates
                   [ Contract payer, Debited all_fees ;
                     Contract source, Debited credit ;
                     Contract contract, Credited credit ] ;
@@ -543,7 +543,7 @@ let rec mark_skipped
       Single_result
         (Manager_operation_result
            { balance_updates =
-               cleanup_balance_updates
+               Delegate.cleanup_balance_updates
                  [ Contract source, Debited fee ;
                    Fees (baker, level.cycle), Credited fee ] ;
              operation_result = Skipped (manager_kind op.operation) ;
@@ -552,7 +552,7 @@ let rec mark_skipped
       Cons_result
         (Manager_operation_result {
             balance_updates =
-              cleanup_balance_updates
+              Delegate.cleanup_balance_updates
                 [ Contract source, Debited fee ;
                   Fees (baker, level.cycle), Credited fee ] ;
             operation_result = Skipped (manager_kind op.operation) ;
@@ -586,7 +586,7 @@ let rec apply_manager_contents_list_rec
         let result =
           Manager_operation_result {
             balance_updates =
-              cleanup_balance_updates
+              Delegate.cleanup_balance_updates
                 [ Contract source, Debited fee ;
                   Fees (baker, level.cycle), Credited fee ] ;
             operation_result ;
@@ -600,7 +600,7 @@ let rec apply_manager_contents_list_rec
             let result =
               Manager_operation_result {
                 balance_updates =
-                  cleanup_balance_updates
+                  Delegate.cleanup_balance_updates
                     [ Contract source, Debited fee ;
                       Fees (baker, level.cycle), Credited fee ] ;
                 operation_result ;
@@ -611,7 +611,7 @@ let rec apply_manager_contents_list_rec
             let result =
               Manager_operation_result {
                 balance_updates =
-                  cleanup_balance_updates
+                  Delegate.cleanup_balance_updates
                     [ Contract source, Debited fee ;
                       Fees (baker, level.cycle), Credited fee ] ;
                 operation_result ;

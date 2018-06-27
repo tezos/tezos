@@ -594,6 +594,22 @@ end
 
 module Delegate : sig
 
+  type balance =
+    | Contract of Contract.t
+    | Rewards of Signature.Public_key_hash.t * Cycle.t
+    | Fees of Signature.Public_key_hash.t * Cycle.t
+    | Deposits of Signature.Public_key_hash.t * Cycle.t
+
+  type balance_update =
+    | Debited of Tez.t
+    | Credited of Tez.t
+
+  type balance_updates = (balance * balance_update) list
+
+  val balance_updates_encoding : balance_updates Data_encoding.t
+
+  val cleanup_balance_updates : balance_updates -> balance_updates
+
   val get: context -> Contract.t -> public_key_hash option tzresult Lwt.t
 
   val set:
