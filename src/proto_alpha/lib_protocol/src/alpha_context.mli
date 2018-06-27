@@ -124,9 +124,6 @@ module Gas : sig
   type error += Block_quota_exceeded (* `Temporary *)
   type error += Operation_quota_exceeded (* `Temporary *)
   type error += Gas_limit_too_high (* `Permanent *)
-  type error += Not_enough_gas_minimal_deserialize_parameters (* `Permanent *)
-  type error += Not_enough_gas_minimal_deserialize_storage (* `Temporary *)
-  type error += Not_enough_gas_minimal_serialize_storage (* `Temporary *)
 
   val free : cost
   val step_cost : int -> cost

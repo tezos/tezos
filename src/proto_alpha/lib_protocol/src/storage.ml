@@ -152,24 +152,16 @@ module Contract = struct
         end)
 
     let consume_deserialize_gas ctxt value =
-      begin match Raw_context.consume_gas ctxt (Script_repr.minimal_deserialize_cost value) with
-          | Ok _ -> return ctxt
-          | Error _ ->
-              fail Script_repr.Not_enough_gas_minimal_deserialize_storage
-      end >>=? fun ctxt ->
       Lwt.return @@
-      (Script_repr.force_decode value >>? fun (_value, value_cost) ->
+      (Raw_context.consume_gas ctxt (Script_repr.minimal_deserialize_cost value) >>? fun _ ->
+       Script_repr.force_decode value >>? fun (_value, value_cost) ->
        Raw_context.consume_gas ctxt value_cost)
 
     let consume_serialize_gas ctxt value =
-      begin match Raw_context.consume_gas ctxt (Script_repr.minimal_serialize_cost value) with
-          | Ok _ -> return ctxt
-          | Error _ ->
-              fail Script_repr.Not_enough_gas_minimal_serialize_storage
-      end >>=? fun ctxt ->
       Lwt.return @@
-      (Script_repr.force_bytes value >>? fun (_value, value_cost) ->
-       Raw_context.consume_gas ctxt value_cost)
+      ( Raw_context.consume_gas ctxt (Script_repr.minimal_serialize_cost value) >>? fun _ ->
+        Script_repr.force_bytes value >>? fun (_value, value_cost) ->
+        Raw_context.consume_gas ctxt value_cost)
 
     let get ctxt contract =
       get ctxt contract >>=? fun (ctxt, value) ->

@@ -14,9 +14,6 @@ type annot = Micheline.annot
 type expr = Michelson_v1_primitives.prim Micheline.canonical
 
 type error += Lazy_script_decode (* `Permanent *)
-type error += Not_enough_gas_minimal_deserialize_parameters (* `Permanent *)
-type error += Not_enough_gas_minimal_deserialize_storage (* `Temporary *)
-type error += Not_enough_gas_minimal_serialize_storage (* `Temporary *)
 
 type lazy_expr = expr Data_encoding.lazy_t
 

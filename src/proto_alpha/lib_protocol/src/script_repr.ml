@@ -25,9 +25,6 @@ let expr_encoding =
     Michelson_v1_primitives.prim_encoding
 
 type error += Lazy_script_decode (* `Permanent *)
-type error += Not_enough_gas_minimal_deserialize_parameters (* `Permanent *)
-type error += Not_enough_gas_minimal_deserialize_storage (* `Temporary *)
-type error += Not_enough_gas_minimal_serialize_storage (* `Temporary *)
 
 let () =
   register_error_kind `Permanent
@@ -37,34 +34,7 @@ let () =
                   from its binary representation"
     Data_encoding.empty
     (function Lazy_script_decode -> Some () | _ -> None)
-    (fun () -> Lazy_script_decode) ;
-  register_error_kind
-    `Permanent
-    ~id:"gas_exhausted.minimal_deserialization_parameters"
-    ~title:"Not enough gas for minimal deserialization of transaction parameters"
-    ~description:"Gas quota is not enough for deserializing the transaction \
-                  parameters, even for the cheapest case"
-    Data_encoding.empty
-    (function Not_enough_gas_minimal_deserialize_parameters -> Some () | _ -> None)
-    (fun () -> Not_enough_gas_minimal_deserialize_parameters) ;
-  register_error_kind
-    `Temporary
-    ~id:"gas_exhausted.minimal_deserialization_storage"
-    ~title:"Not enough gas for minimal deserialization of contract storage"
-    ~description:"Gas quota is not enough for deserializing the contract \
-                  storage or code, even for the cheapest case"
-    Data_encoding.empty
-    (function Not_enough_gas_minimal_deserialize_storage -> Some () | _ -> None)
-    (fun () -> Not_enough_gas_minimal_deserialize_storage) ;
-  register_error_kind
-    `Temporary
-    ~id:"gas_exhausted.minimal_serialization_storage"
-    ~title:"Not enough gas for minimal serialization of contract storage"
-    ~description:"Gas quota is not enough for serializing the contract \
-                  storage or code, even for the cheapest case"
-    Data_encoding.empty
-    (function Not_enough_gas_minimal_deserialize_storage -> Some () | _ -> None)
-    (fun () -> Not_enough_gas_minimal_deserialize_storage)
+    (fun () -> Lazy_script_decode)
 
 let lazy_expr_encoding =
   Data_encoding.lazy_encoding expr_encoding

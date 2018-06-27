@@ -70,12 +70,6 @@ module Voting_period = Voting_period_repr
 module Gas = struct
   include Gas_limit_repr
   type error += Gas_limit_too_high = Raw_context.Gas_limit_too_high
-  type error += Not_enough_gas_minimal_deserialize_parameters =
-    Script_repr.Not_enough_gas_minimal_deserialize_parameters
-  type error += Not_enough_gas_minimal_deserialize_storage =
-    Script_repr.Not_enough_gas_minimal_deserialize_storage
-  type error += Not_enough_gas_minimal_serialize_storage =
-    Script_repr.Not_enough_gas_minimal_deserialize_storage
   let check_limit = Raw_context.check_gas_limit
   let set_limit = Raw_context.set_gas_limit
   let set_unlimited = Raw_context.set_gas_unlimited

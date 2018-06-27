@@ -41,6 +41,7 @@ type error += Outdated_double_baking_evidence
   of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
 type error += Invalid_activation of { pkh : Ed25519.Public_key_hash.t }
 type error += Multiple_revelation
+type error += Gas_quota_exceeded_init_deserialize (* Permanent *)
 
 let () =
   register_error_kind
@@ -318,7 +319,16 @@ let () =
           "Multiple revelations were included in a manager operation")
     Data_encoding.empty
     (function Multiple_revelation -> Some () | _ -> None)
-    (fun () -> Multiple_revelation)
+    (fun () -> Multiple_revelation) ;
+  register_error_kind
+    `Permanent
+    ~id:"gas_exhausted.init_deserialize"
+    ~title:"Not enough gas for initial deserialization of parameters"
+    ~description:"Gas quota was not enough to deserialize the transaction \
+                  parameters in precheck"
+    Data_encoding.empty
+    (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
+    (fun () -> Gas_quota_exceeded_init_deserialize)
 
 open Apply_results
 
@@ -502,26 +512,23 @@ let precheck_manager_contents
         Contract.reveal_manager_key ctxt source pk
     | Transaction { parameters = Some arg ; _ } ->
         (* Fail if not enough gas for minimal deserialization cost *)
-        begin match Gas.consume ctxt (Script.minimal_deserialize_cost arg) with
-          | Ok _ -> return ctxt
-          | Error _ -> fail Gas.Not_enough_gas_minimal_deserialize_parameters
-        end >>=? fun ctxt ->
+        Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
+        Gas.consume ctxt (Script.minimal_deserialize_cost arg) >>=? fun _ ->
         Lwt.return @@ Script.force_decode arg >>=? fun (_arg, cost_arg) ->
-        Lwt.return @@ Gas.consume ctxt cost_arg
+        Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
+        Gas.consume ctxt cost_arg
     | Origination { script = Some script ; _ } ->
         (* Fail if not enough gas for minimal deserialization cost *)
-        begin
-          match
-            Gas.consume ctxt (Script.minimal_deserialize_cost script.code) >>? fun ctxt ->
-            Gas.consume ctxt (Script.minimal_deserialize_cost script.storage)
-          with
-          | Ok _ -> return ctxt
-          | Error _ -> fail Gas.Not_enough_gas_minimal_deserialize_parameters
-        end >>=? fun ctxt ->
+        Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
+        (Gas.consume ctxt (Script.minimal_deserialize_cost script.code) >>? fun ctxt ->
+         Gas.consume ctxt (Script.minimal_deserialize_cost script.storage))
+        >>=? fun _ ->
         Lwt.return @@ Script.force_decode script.code >>=? fun (_code, cost_code) ->
-        Lwt.return @@ Gas.consume ctxt cost_code >>=? fun ctxt ->
+        Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
+        Gas.consume ctxt cost_code >>=? fun ctxt ->
         Lwt.return @@ Script.force_decode script.storage >>=? fun (_storage, cost_storage) ->
-        Lwt.return @@ Gas.consume ctxt cost_storage
+        Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
+        Gas.consume ctxt cost_storage
     | _ -> return ctxt
   end >>=? fun ctxt ->
   Contract.get_manager_key ctxt source >>=? fun public_key ->
