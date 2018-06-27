@@ -19,6 +19,9 @@ let get_balance (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
 let get_storage (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.storage_opt rpc (chain, block) contract
 
+let get_script (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+  Alpha_services.Contract.script_opt rpc (chain, block) contract
+
 let parse_expression arg =
   Lwt.return
     (Micheline_parser.no_parsing_error

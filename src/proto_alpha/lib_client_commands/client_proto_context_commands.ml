@@ -103,7 +103,7 @@ let commands () =
 
     command ~group ~desc: "Get the storage of a contract."
       no_options
-      (prefixes [ "get" ; "storage" ; "for" ]
+      (prefixes [ "get" ; "script" ; "storage" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
@@ -115,6 +115,26 @@ let commands () =
         | Some storage ->
             cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped storage >>= fun () ->
             return_unit
+      end ;
+
+    command ~group ~desc: "Get the storage of a contract."
+      no_options
+      (prefixes [ "get" ; "script" ; "code" ; "for" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+        get_script cctxt
+          ~chain:`Main ~block:cctxt#block
+          contract >>=? function
+        | None ->
+            cctxt#error "This is not a smart contract."
+        | Some { code ; storage = _ } ->
+            match Script.force_decode code with
+            | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Alpha_environment.Error_monad.pp) errs
+            | Ok code ->
+                begin cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped code >>= fun () ->
+                  return ()
+                end
       end ;
 
     command ~group ~desc: "Get the manager of a contract."
