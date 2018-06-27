@@ -109,16 +109,224 @@ let checkout_exn index key =
   | None -> Lwt.fail Not_found
   | Some p -> Lwt.return p
 
-
 let raw_commit ~time ?(message = "") context =
   let info =
     Irmin.Info.v ~date:(Time.to_seconds time) ~author:"Tezos" message in
   GitStore.Commit.v
     context.index.repo ~info ~parents:context.parents context.tree
 
+module P = GitStore.Private
+
+(* --- FIXME(samoht): I am so sorry --- *)
+module Hack = struct
+
+  module StepMap = struct
+    module X = struct
+      type t = GitStore.step
+      let t = GitStore.step_t
+      let compare = Irmin.Type.compare t
+    end
+    include Map.Make(X)
+  end
+
+  module Contents = struct
+
+    type key = P.Contents.key
+    type contents = P.Contents.value
+
+    type t =
+      | Key      of key
+      | Contents of contents
+      | Both     of key * contents
+
+    let t =
+      let open Irmin.Type in
+      variant "Node.Contents" (fun key contents both -> function
+          | Key x       -> key x
+          | Contents x -> contents x
+          | Both (x, y) -> both (x, y))
+      |~ case1 "Key" P.Contents.Key.t (fun x -> Key x)
+      |~ case1 "Contents" P.Contents.Val.t (fun x -> Contents x)
+      |~ case1 "Both" (pair P.Contents.Key.t P.Contents.Val.t)
+        (fun (x, y) -> Both (x, y))
+      |> sealv
+
+    let hash = function
+      | Key k | Both (k, _) -> k
+      | Contents c -> P.Contents.Key.digest P.Contents.Val.t c
+
+  end
+
+  type key = P.Node.key
+
+  type value = [ `Node of node | `Contents of Contents.t * Metadata.t ]
+
+  and map = value StepMap.t
+
+  and node =
+    | Map  of map
+    | Key  of key
+    | Both of key * map
+
+  let value t =
+    let open Irmin.Type in
+    variant "Node.value" (fun node contents -> function
+        | `Node x     -> node x
+        | `Contents x -> contents x)
+    |~ case1 "Node" t (fun x -> `Node x)
+    |~ case1 "Contents" (pair Contents.t Metadata.t) (fun x -> `Contents x)
+    |> sealv
+
+  let map value =
+    let open Irmin.Type in
+    let to_map x =
+      List.fold_left (fun acc (k, v) -> StepMap.add k v acc) StepMap.empty x
+    in
+    let of_map m = StepMap.fold (fun k v acc -> (k, v) :: acc) m [] in
+    like (list (pair GitStore.step_t value)) to_map of_map
+
+  let node map =
+    let open Irmin.Type in
+    variant "Node.node" (fun map key both -> function
+        | Map x      -> map x
+        | Key y      -> key y
+        | Both (y,z) -> both (y, z))
+    |~ case1 "Map" map (fun x -> Map x)
+    |~ case1 "Key" P.Node.Key.t (fun x -> Key x)
+    |~ case1 "Both" (pair P.Node.Key.t map) (fun (x, y) -> Both (x, y))
+    |> sealv
+
+  let node_t = Irmin.Type.mu (fun n ->
+      let value = value n in
+      node (map value)
+    )
+
+  (* Mimick irmin-lmdb ordering *)
+  module Sort_key = struct
+
+    exception Result of int
+
+    let compare (x, vx) (y, vy) = match vx, vy with
+      | `Contents _, `Contents _ -> String.compare x y
+      | _  ->
+          let lenx = String.length x in
+          let leny = String.length y in
+          let i = ref 0 in
+          try
+            while !i < lenx && !i < leny do
+              match
+                Char.compare
+                  (String.unsafe_get x !i) (String.unsafe_get y !i)
+              with
+              | 0 -> incr i
+              | i -> raise (Result i)
+            done;
+            let get len k v i =
+              if i < len then String.unsafe_get k i
+              else if i = len then match v with
+                | `Node _     -> '/'
+                | `Contents _ -> '\000'
+              else '\000'
+            in
+            match Char.compare (get lenx x vx !i) (get leny y vy !i) with
+            | 0 -> Char.compare (get lenx x vx (!i + 1)) (get leny y vy (!i + 1))
+            | i -> i
+          with Result i ->
+            i
+
+  end
+
+  let sort_entries = List.fast_sort Sort_key.compare
+
+  let pp_hex ppf x =
+    let buf = IrminBlake2B.to_raw x in
+    let `Hex hex = Hex.of_cstruct buf in
+    Fmt.string ppf hex
+
+  module Entry = struct
+    type kind = [ `Node | `Contents of Metadata.t ]
+    type entry = { kind : kind; name : string; node : IrminBlake2B.t; }
+
+    let entry_t =
+      let open Irmin.Type in
+      record "Tree.entry"
+        (fun kind name node ->
+           let kind =
+             match kind with
+             | None -> `Node
+             | Some m -> `Contents m in
+           { kind ; name ; node } )
+      |+ field "kind" (option Metadata.t) (function
+          | { kind = `Node ; _ } -> None
+          | { kind = `Contents m ; _ } -> Some m)
+      |+ field "name" string (fun { name ; _ } -> name)
+      |+ field "node" IrminBlake2B.t (fun { node ; _ } -> node)
+      |> sealr
+
+    let of_entry e = e.name, match e.kind with
+      | `Node       -> `Node e.node
+      | `Contents m -> `Contents (e.node, m)
+
+    let to_entry (name, value) = match value with
+      | `Node node -> { name; kind = `Node; node }
+      | `Contents (node, m) -> { name; kind = `Contents m; node }
+
+    let t = Irmin.Type.like entry_t of_entry to_entry
+
+  end
+
+  let rec export_map map =
+    let alist =
+      StepMap.fold (fun step v acc ->
+          (step, hash_value v) :: acc
+        ) map []
+    in
+    let l = sort_entries alist in
+    P.Node.Val.v l
+
+  and hash_value = function
+    | `Contents (c, m) -> `Contents (Contents.hash c, m)
+    | `Node n          -> `Node (hash_node n)
+
+  and hash_node = function
+    | Both (k, _) | Key k -> k
+    | Map m ->
+        let v = export_map m in
+        let entries = P.Node.Val.list v in
+        (* This needs to match what is done in the backend... *)
+        let v = Irmin.Type.encode_cstruct (Irmin.Type.list Entry.t) entries in
+        IrminBlake2B.digest Irmin.Type.cstruct v
+
+  let cast: GitStore.node -> node = fun n ->
+    let buf = Irmin.Type.encode_cstruct GitStore.node_t n in
+    match Irmin.Type.decode_cstruct node_t buf with
+    | Error (`Msg e) -> Fmt.failwith "invalid cast\n%s" e
+    | Ok x -> x
+
+end
+
+let tree_hash: GitStore.tree -> GitStore.Tree.hash = function
+  | `Contents (c, m) -> `Contents (P.Contents.Key.digest P.Contents.Val.t c, m)
+  | `Node n          -> `Node (Hack.hash_node (Hack.cast n))
+
+let hash ~time ?(message = "") context =
+  let info =
+    Irmin.Info.v ~date:(Time.to_seconds time) ~author:"Tezos" message
+  in
+  let parents = List.map (fun c -> GitStore.Commit.hash c) context.parents in
+  let node = match tree_hash context.tree with
+    | `Contents _ -> assert false
+    | `Node node  -> node
+  in
+  let commit = P.Commit.Val.v ~parents ~node ~info in
+  let x = P.Commit.Key.digest P.Commit.Val.t commit in
+  (* FIXME: this doesn't have to be lwt *)
+  Lwt.return x
+
 let commit ~time ?message context =
   raw_commit ~time ?message context >>= fun commit ->
-  Lwt.return (GitStore.Commit.hash commit)
+  let h = GitStore.Commit.hash commit in
+  Lwt.return h
 
 (*-- Generic Store Primitives ------------------------------------------------*)
 

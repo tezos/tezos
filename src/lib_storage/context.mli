@@ -60,6 +60,8 @@ val fold:
 val exists: index -> Context_hash.t -> bool Lwt.t
 val checkout: index -> Context_hash.t -> context option Lwt.t
 val checkout_exn: index -> Context_hash.t -> context Lwt.t
+val hash:   time:Time.t ->
+  ?message:string -> t -> Context_hash.t Lwt.t
 val commit:
   time:Time.t ->
   ?message:string ->
@@ -67,6 +69,7 @@ val commit:
   Context_hash.t Lwt.t
 val set_head: index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
 val set_master: index -> Context_hash.t -> unit Lwt.t
+
 
 (** {2 Predefined Fields} ****************************************************)
 
