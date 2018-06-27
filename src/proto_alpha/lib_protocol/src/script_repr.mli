@@ -40,5 +40,3 @@ val force_decode : lazy_expr -> (expr * Gas_limit_repr.cost) tzresult
 val force_bytes : lazy_expr -> (MBytes.t * Gas_limit_repr.cost) tzresult
 
 val minimal_deserialize_cost : lazy_expr -> Gas_limit_repr.cost
-
-val minimal_serialize_cost : lazy_expr -> Gas_limit_repr.cost

@@ -132,15 +132,3 @@ let minimal_deserialize_cost lexpr =
     (fun b -> alloc_bytes_cost (MBytes.length b))
     (fun c_free _ -> c_free)
     lexpr
-
-let minimal_serialize_cost lexpr =
-  let open Gas_limit_repr in
-  Data_encoding.fold_lazy
-    (fun v ->
-       let blocks, _words = expr_size v in
-       step_cost blocks +@
-       alloc_bytes_cost blocks (* TODO *)
-    )
-    (fun _ -> Gas_limit_repr.free)
-    (fun _ c_free -> c_free)
-    lexpr

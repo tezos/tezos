@@ -159,9 +159,8 @@ module Contract = struct
 
     let consume_serialize_gas ctxt value =
       Lwt.return @@
-      ( Raw_context.consume_gas ctxt (Script_repr.minimal_serialize_cost value) >>? fun _ ->
-        Script_repr.force_bytes value >>? fun (_value, value_cost) ->
-        Raw_context.consume_gas ctxt value_cost)
+      (Script_repr.force_bytes value >>? fun (_value, value_cost) ->
+       Raw_context.consume_gas ctxt value_cost)
 
     let get ctxt contract =
       get ctxt contract >>=? fun (ctxt, value) ->

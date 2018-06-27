@@ -304,7 +304,6 @@ module Script : sig
   val force_decode : lazy_expr -> (expr * Gas.cost) tzresult
   val force_bytes : lazy_expr -> (MBytes.t * Gas.cost) tzresult
   val minimal_deserialize_cost : lazy_expr -> Gas.cost
-  val minimal_serialize_cost : lazy_expr -> Gas.cost
 end
 
 module Constants : sig
