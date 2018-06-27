@@ -173,12 +173,12 @@ let wait_parameter () =
   parameter
     (fun _ wait ->
        match wait with
-       | "no" | "none" -> return None
+       | "no" | "none" -> return_none
        | _ ->
            try
              let w = int_of_string wait in
              if 0 <= w then
-               return (Some w)
+               return_some w
              else
                fail (Invalid_wait_arg wait)
            with _ -> fail (Invalid_wait_arg wait))
@@ -193,7 +193,7 @@ let protocol_parameter () =
                  (Protocol_hash.to_b58check hash))
              (Client_commands.get_versions ())
          in
-         return (Some hash)
+         return_some hash
        with Not_found -> fail (Invalid_protocol_argument arg)
     )
 

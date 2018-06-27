@@ -181,7 +181,7 @@ module Make
       match w.timeout with
       | None ->
           Lwt_pipe.pop message_queue >>= fun m ->
-          return (Some m)
+          return_some m
       | Some timeout ->
           Lwt_pipe.pop_with_timeout
             (Lwt_unix.sleep timeout) message_queue >>= fun m ->
@@ -193,7 +193,7 @@ module Make
         match w.timeout with
         | None ->
             Lwt_dropbox.take message_box >>= fun m ->
-            return (Some m)
+            return_some m
         | Some timeout ->
             Lwt_dropbox.take_with_timeout
               (Lwt_unix.sleep timeout) message_box >>= fun m ->

@@ -81,7 +81,7 @@ let start_prevalidation
     timestamp >>= fun predecessor_context ->
   begin
     match protocol_data with
-    | None -> return None
+    | None -> return_none
     | Some protocol_data ->
         match
           Data_encoding.Binary.of_bytes
@@ -89,7 +89,7 @@ let start_prevalidation
             protocol_data
         with
         | None -> failwith "Invalid block header"
-        | Some protocol_data -> return (Some protocol_data)
+        | Some protocol_data -> return_some protocol_data
   end >>=? fun protocol_data ->
   Proto.begin_construction
     ~predecessor_context

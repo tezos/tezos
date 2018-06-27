@@ -382,7 +382,7 @@ let validate w
         bv.protocol_validator
         ?peer ~timeout:bv.limits.protocol_timeout
         block ;
-      return None
+      return_none
   | None ->
       map_p (map_p (fun op ->
           let op_hash = Operation.hash op in

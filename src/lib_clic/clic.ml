@@ -564,8 +564,8 @@ let parse_arg :
     match spec with
     | Arg { parameter = (long, _) ; kind = { converter ; _  } ; _ } ->
         begin match TzString.Map.find long args_dict with
-          | exception Not_found -> return None
-          | [] -> return None
+          | exception Not_found -> return_none
+          | [] -> return_none
           | [ s ] ->
               (trace
                  (Bad_option_argument ("--" ^ long, command))
@@ -595,9 +595,9 @@ let parse_arg :
         end
     | Switch { parameter = (long, _) ; _ } ->
         begin match TzString.Map.find long args_dict with
-          | exception Not_found -> return false
-          | [] -> return false
-          | [ _ ] -> return true
+          | exception Not_found -> return_false
+          | [] -> return_false
+          | [ _ ] -> return_true
           | _ :: _ -> fail (Multiple_occurences (long, command))
         end
     | Constant c -> return c
@@ -984,7 +984,7 @@ let rec list_args : type arg ctx. (arg, ctx) args -> string list = function
 
 let complete_func autocomplete cctxt =
   match autocomplete with
-  | None -> return []
+  | None -> return_nil
   | Some autocomplete -> autocomplete cctxt
 
 let list_command_args (Command { options = Argument { spec ; _ } ; _ }) =
@@ -994,8 +994,8 @@ let complete_arg : type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t
   fun ctx -> function
     | Arg { kind = { autocomplete ; _ } ; _ } -> complete_func autocomplete ctx
     | DefArg { kind = { autocomplete ; _ } ; _ } -> complete_func autocomplete ctx
-    | Switch _ -> return []
-    | Constant _ -> return []
+    | Switch _ -> return_nil
+    | Constant _ -> return_nil
 
 let rec remaining_spec :
   type a ctx. TzString.Set.t -> (a, ctx) args -> string list =
@@ -1013,7 +1013,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   let arities = make_arities_dict args_spec TzString.Map.empty in
   let rec complete_spec : type a. string -> (a, ctx) args -> string list tzresult Lwt.t =
     fun name -> function
-      | NoArgs -> return []
+      | NoArgs -> return_nil
       | AddArg (Constant _, rest) ->
           complete_spec name rest
       | AddArg (arg, rest) ->
@@ -1057,7 +1057,7 @@ let complete_next_tree cctxt = function
   | TParam { autocomplete ; _ } ->
       complete_func autocomplete cctxt
   | TStop command -> return (list_command_args command)
-  | TEmpty -> return []
+  | TEmpty -> return_nil
 
 let complete_tree cctxt tree index args =
   let rec help tree args ind =
@@ -1069,14 +1069,14 @@ let complete_tree cctxt tree index args =
       | TPrefix { prefix ; _ }, hd :: tl ->
           begin
             try help (List.assoc hd prefix) tl (ind - 1)
-            with Not_found -> return []
+            with Not_found -> return_nil
           end
       | TParam { tree ; _ }, _ :: tl ->
           help tree tl (ind - 1)
       | TStop Command { options = Argument { spec ; _ } ; conv ;_ }, args ->
-          complete_options (fun _ _ -> return []) args spec ind (conv cctxt)
+          complete_options (fun _ _ -> return_nil) args spec ind (conv cctxt)
       | (TParam _ | TPrefix _), []
-      | TEmpty, _ -> return []
+      | TEmpty, _ -> return_nil
   in help tree args index
 
 let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands cctxt =
@@ -1097,7 +1097,7 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands cct
     else
       match ind 0 args with
       | None ->
-          return []
+          return_nil
       | Some index ->
           begin
             let Argument { spec ; _ } = global_options in

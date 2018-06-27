@@ -103,17 +103,17 @@ module Ledger = struct
         (cur_pkh, (pk, curve)) :: of_pkh
       end (false, [], []) curves in
     match pkh with
-    | None -> return (Some (create ~device_info ~of_curve ~of_pkh))
+    | None -> return_some (create ~device_info ~of_curve ~of_pkh)
     | Some _ when pkh_found ->
-        return (Some (create ~device_info ~of_curve ~of_pkh))
-    | _ -> return None
+        return_some (create ~device_info ~of_curve ~of_pkh)
+    | _ -> return_none
 end
 
 let find_ledgers ?pkh () =
   let ledgers = Hidapi.enumerate ~vendor_id ~product_id () in
   filter_map_s begin fun device_info ->
     match Hidapi.(open_path device_info.path) with
-    | None -> return None
+    | None -> return_none
     | Some h ->
         Lwt.finalize
           (fun () -> Ledger.of_hidapi ?pkh device_info h)

@@ -43,7 +43,7 @@ let rec worker_loop bv =
             (* no need to tag 'invalid' protocol on disk,
                the economic protocol prevents us from
                being spammed with protocol validation. *)
-            return true
+            return_true
         end >>=? fun _ ->
         match wakener with
         | None ->

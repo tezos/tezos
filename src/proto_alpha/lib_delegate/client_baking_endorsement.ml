@@ -19,8 +19,8 @@ let get_signing_slots cctxt ?(chain = `Main) block delegate level =
     ~levels:[level]
     ~delegates:[delegate]
     (chain, block) >>=? function
-  | [{ slots }] -> return (Some slots)
-  | _ -> return None
+  | [{ slots }] -> return_some slots
+  | _ -> return_none
 
 let inject_endorsement
     (cctxt : #Proto_alpha.full)
@@ -48,7 +48,7 @@ let check_endorsement cctxt level pkh =
 
 let previously_endorsed_level cctxt pkh new_lvl  =
   State.get cctxt pkh >>=? function
-  | None -> return false
+  | None -> return_false
   | Some last_lvl ->
       return (Raw_level.(last_lvl >= new_lvl))
 
@@ -128,7 +128,7 @@ let allowed_to_endorse cctxt bi delegate  =
   | None | Some [] ->
       lwt_debug "No slot found for %a/%s"
         Block_hash.pp_short bi.hash name >>= fun () ->
-      return false
+      return_false
   | Some (_ :: _ as slots) ->
       lwt_debug "Found slots for %a/%s (%d)"
         Block_hash.pp_short bi.hash name (List.length slots) >>= fun () ->
@@ -136,9 +136,9 @@ let allowed_to_endorse cctxt bi delegate  =
       | true ->
           lwt_debug "Level %a (or higher) previously endorsed: do not endorse."
             Raw_level.pp level >>= fun () ->
-          return false
+          return_false
       | false ->
-          return true
+          return_true
 
 let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state bi =
   if Time.diff (Time.now ()) bi.Client_baking_blocks.timestamp > max_past then

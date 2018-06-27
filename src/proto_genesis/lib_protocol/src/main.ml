@@ -168,12 +168,12 @@ let rpc_services = Services.rpc_services
 let sandbox_param_key = [ "sandbox_parameter" ]
 let get_sandbox_param ctxt =
   Context.get ctxt sandbox_param_key >>= function
-  | None -> return None
+  | None -> return_none
   | Some bytes ->
       match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
       | None ->
           failwith "Internal error: failed to parse the sandbox parameter."
-      | Some json -> return (Some json)
+      | Some json -> return_some json
 
 let init ctxt block_header =
   Data.Init.tag_first_block ctxt >>=? fun ctxt ->

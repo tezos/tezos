@@ -32,8 +32,8 @@ let transfer (cctxt : #Proto_alpha.full)
   begin match arg with
     | Some arg ->
         parse_expression arg >>=? fun { expanded = arg } ->
-        return (Some arg)
-    | None -> return None
+        return_some arg
+    | None -> return_none
   end >>=? fun parameters ->
   let parameters = Option.map ~f:Script.lazy_expr parameters in
   let contents = Transaction { amount ; parameters ; destination } in

@@ -98,8 +98,8 @@ module Make(N : sig val scheme : string end) = struct
             P.authenticate
               authorized_keys
               (Signer_messages.Sign.Request.to_sign ~pkh ~data:msg) >>=? fun signature ->
-            return (Some signature)
-        | None -> return None
+            return_some signature
+        | None -> return_none
       end >>=? fun signature ->
       RPC_client.call_service
         ~logger: P.logger

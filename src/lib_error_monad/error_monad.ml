@@ -319,6 +319,16 @@ module Make(Prefix : sig val id : string end) = struct
 
   let return_unit = Lwt.return (Ok ())
 
+  let return_none = Lwt.return (Ok None)
+
+  let return_some x = Lwt.return (Ok (Some x))
+
+  let return_nil = Lwt.return (Ok [])
+
+  let return_true = Lwt.return (Ok true)
+
+  let return_false = Lwt.return (Ok false)
+
   let error s = Error [ s ]
 
   let ok v = Ok v
@@ -342,7 +352,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec map_s f l =
     match l with
-    | [] -> return []
+    | [] -> return_nil
     | h :: t ->
         f h >>=? fun rh ->
         map_s f t >>=? fun rt ->
@@ -351,7 +361,7 @@ module Make(Prefix : sig val id : string end) = struct
   let mapi_s f l =
     let rec mapi_s f i l =
       match l with
-      | [] -> return []
+      | [] -> return_nil
       | h :: t ->
           f i h >>=? fun rh ->
           mapi_s f (i+1) t >>=? fun rt ->
@@ -362,7 +372,7 @@ module Make(Prefix : sig val id : string end) = struct
   let rec map_p f l =
     match l with
     | [] ->
-        return []
+        return_nil
     | x :: l ->
         let tx = f x and tl = map_p f l in
         tx >>= fun x ->
@@ -377,7 +387,7 @@ module Make(Prefix : sig val id : string end) = struct
     let rec mapi_p f i l =
       match l with
       | [] ->
-          return []
+          return_nil
       | x :: l ->
           let tx = f i x and tl = mapi_p f (i+1) l in
           tx >>= fun x ->
@@ -391,7 +401,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec map2_s f l1 l2 =
     match l1, l2 with
-    | [], [] -> return []
+    | [], [] -> return_nil
     | _ :: _, [] | [], _ :: _ -> invalid_arg "Error_monad.map2_s"
     | h1 :: t1, h2 :: t2 ->
         f h1 h2 >>=? fun rh ->
@@ -401,7 +411,7 @@ module Make(Prefix : sig val id : string end) = struct
   let mapi2_s f l1 l2 =
     let rec mapi2_s i f l1 l2 =
       match l1, l2 with
-      | [], [] -> return []
+      | [], [] -> return_nil
       | _ :: _, [] | [], _ :: _ -> invalid_arg "Error_monad.mapi2_s"
       | h1 :: t1, h2 :: t2 ->
           f i h1 h2 >>=? fun rh ->
@@ -420,7 +430,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec filter_map_s f l =
     match l with
-    | [] -> return []
+    | [] -> return_nil
     | h :: t ->
         f h >>=? function
         | None -> filter_map_s f t
@@ -430,7 +440,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec filter_map_p f l =
     match l with
-    | [] -> return []
+    | [] -> return_nil
     | h :: t ->
         let th = f h
         and tt = filter_map_p f t in
@@ -442,7 +452,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec filter_s f l =
     match l with
-    | [] -> return []
+    | [] -> return_nil
     | h :: t ->
         f h >>=? function
         | false -> filter_s f t
@@ -452,7 +462,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec filter_p f l =
     match l with
-    | [] -> return []
+    | [] -> return_nil
     | h :: t ->
         let jh = f h
         and t = filter_p f t in

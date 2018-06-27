@@ -138,7 +138,7 @@ module Operation_hashes_storage = struct
     | None -> Lwt.return_none
     | Some b ->
         State.Block.operation_hashes b i >>= fun (ops, _) ->
-        Lwt.return (Some ops)
+        Lwt.return_some ops
   let read_exn chain_state (h, i) =
     State.Block.read_exn chain_state h >>= fun b ->
     State.Block.operation_hashes b i >>= fun (ops, _) ->
@@ -216,7 +216,7 @@ module Operations_storage = struct
     | None -> Lwt.return_none
     | Some b ->
         State.Block.operations b i >>= fun (ops, _) ->
-        Lwt.return (Some ops)
+        Lwt.return_some ops
   let read_exn chain_state (h, i) =
     State.Block.read_exn chain_state h >>= fun b ->
     State.Block.operations b i >>= fun (ops, _) ->

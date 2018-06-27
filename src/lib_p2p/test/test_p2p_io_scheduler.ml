@@ -37,7 +37,7 @@ let accept main_socket =
 
 let rec accept_n main_socket n =
   if n <= 0 then
-    return []
+    return_nil
   else
     accept_n main_socket (n-1) >>=? fun acc ->
     accept main_socket >>=? fun conn ->

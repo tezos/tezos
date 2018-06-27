@@ -123,8 +123,8 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
     cctxt#prompt "%s %s: " msg prompt >>=? fun gen ->
     match default, String.lowercase_ascii gen with
     | default, "" -> return default
-    | _, "y" -> return true
-    | _, "n" -> return false
+    | _, "y" -> return_true
+    | _, "n" -> return_false
     | _, "q" -> failwith "Exit by user request."
     | _ -> get_boolean_answer cctxt ~msg ~default in
   cctxt#prompt "Enter the e-mail used for the paper wallet: " >>=? fun email ->

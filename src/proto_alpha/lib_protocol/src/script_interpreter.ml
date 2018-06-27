@@ -96,7 +96,7 @@ let unparse_stack ctxt (stack, stack_ty) =
   let rec unparse_stack
     : type a. a stack * a stack_ty -> (Script.expr * string option) list tzresult Lwt.t
     = function
-      | Empty, Empty_t -> return []
+      | Empty, Empty_t -> return_nil
       | Item (v, rest), Item_t (ty, rest_ty, annot) ->
           unparse_data ctxt Readable ty v >>=? fun (data, _ctxt) ->
           unparse_stack (rest, rest_ty) >>=? fun rest ->

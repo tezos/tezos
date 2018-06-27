@@ -106,13 +106,13 @@ module Alias = functor (Entity : Entity) -> struct
 
   let autocomplete wallet =
     load wallet >>= function
-    | Error _ -> return []
+    | Error _ -> return_nil
     | Ok list -> return (List.map fst list)
 
   let find_opt (wallet : #wallet) name =
     load wallet >>=? fun list ->
-    try return (Some (List.assoc name list))
-    with Not_found -> return None
+    try return_some (List.assoc name list)
+    with Not_found -> return_none
 
   let find (wallet : #wallet) name =
     load wallet >>=? fun list ->
@@ -122,16 +122,16 @@ module Alias = functor (Entity : Entity) -> struct
 
   let rev_find (wallet : #wallet) v =
     load wallet >>=? fun list ->
-    try return (Some (List.find (fun (_, v') -> v = v') list |> fst))
-    with Not_found -> return None
+    try return_some (List.find (fun (_, v') -> v = v') list |> fst)
+    with Not_found -> return_none
 
   let mem (wallet : #wallet) name =
     load wallet >>=? fun list ->
     try
       ignore (List.assoc name list) ;
-      return true
+      return_true
     with
-    | Not_found -> return false
+    | Not_found -> return_false
 
   let add ~force (wallet : #wallet) name value =
     let keep = ref false in

@@ -24,7 +24,7 @@ let traverse_rolls ctxt head =
 
 let get_rolls ctxt delegate =
   Storage.Roll.Delegate_roll_list.get_option ctxt delegate >>= wrap >>=? function
-  | None -> return []
+  | None -> return_nil
   | Some head_roll -> traverse_rolls ctxt head_roll
 
 let check_rolls b (account:Account.t) =

@@ -92,7 +92,7 @@ let fill_in ?(show_optionals=true) input schema =
             Lwt.return acc
           else
             element (string_of_int n :: path) elt >>= fun json ->
-            (if n < min then Lwt.return true else input.continue title path) >>= function
+            (if n < min then Lwt.return_true else input.continue title path) >>= function
             | true -> fill_loop (json :: acc) min (succ n) max
             | false -> Lwt.return (json :: acc)
         in

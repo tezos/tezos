@@ -87,7 +87,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
        Lwt.catch
          (fun () ->
             Client_baking_blocks.info cctxt (`Hash (hash, 0)) >>= function
-            | Ok bi -> Lwt.return (Some bi)
+            | Ok bi -> Lwt.return_some bi
             | Error _ ->
                 Lwt.fail Not_found)
          (fun _ ->
@@ -101,9 +101,9 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
       | None ->
           cctxt#warning "Cannot find nonces for block %a (ignoring)@."
             Block_hash.pp_short bi.hash >>= fun () ->
-          return None
+          return_none
       | Some nonce ->
-          return (Some (bi.hash, (bi.level, nonce))))
+          return_some (bi.hash, (bi.level, nonce)))
     block_infos >>=? fun blocks ->
   do_reveal cctxt cctxt#block blocks
 

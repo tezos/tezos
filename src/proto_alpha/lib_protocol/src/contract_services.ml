@@ -163,14 +163,14 @@ let register () =
   register_opt_field S.storage (fun ctxt contract ->
       Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
       match script with
-      | None -> return None
+      | None -> return_none
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt script >>=? fun (Ex_script script, ctxt) ->
           unparse_script ctxt Readable script >>=? fun (script, _ctxt) ->
           Lwt.return (Script.force_decode script.storage) >>=? fun storage ->
-          return (Some storage)) ;
+          return_some storage) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Contract.get_manager ctxt contract >>=? fun manager ->

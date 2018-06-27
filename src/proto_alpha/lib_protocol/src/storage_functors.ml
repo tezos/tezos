@@ -85,11 +85,11 @@ module Make_single_data_storage (C : Raw_context.T) (N : NAME) (V : VALUE)
     Lwt.return (of_bytes ~key b)
   let get_option t =
     C.get_option t N.name >>= function
-    | None -> return None
+    | None -> return_none
     | Some b ->
         let key = C.absolute_key t N.name in
         match of_bytes ~key b with
-        | Ok v -> return (Some v)
+        | Ok v -> return_some v
         | Error _ as err -> Lwt.return err
   let init t v =
     C.init t N.name (to_bytes v) >>=? fun t ->
@@ -200,8 +200,8 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX)
       ~get:(fun c ->
           let (c, k) = unpack c in
           mem c k >>= function
-          | true -> return (Some true)
-          | false -> return None)
+          | true -> return_some true
+          | false -> return_none)
       (register_indexed_subcontext
          ~list:(fun c -> elements c >>= return)
          C.description I.args)
@@ -227,11 +227,11 @@ module Make_indexed_data_storage
     Lwt.return (of_bytes ~key b)
   let get_option s i =
     C.get_option s (I.to_path i []) >>= function
-    | None -> return None
+    | None -> return_none
     | Some b ->
         let key = C.absolute_key s (I.to_path i []) in
         match of_bytes ~key b with
-        | Ok v -> return (Some v)
+        | Ok v -> return_some v
         | Error _ as err -> Lwt.return err
   let set s i v =
     C.set s (I.to_path i []) (to_bytes v) >>=? fun t ->
@@ -634,8 +634,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
         ~get:(fun c ->
             let (c, k) = unpack c in
             mem c k >>= function
-            | true -> return (Some true)
-            | false -> return None)
+            | true -> return_some true
+            | false -> return_none)
         (register_named_subcontext Raw_context.description N.name)
         Data_encoding.bool
 
@@ -655,11 +655,11 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       Lwt.return (of_bytes ~key b)
     let get_option s i =
       Raw_context.get_option (pack s i) N.name >>= function
-      | None -> return None
+      | None -> return_none
       | Some b ->
           let key = Raw_context.absolute_key (pack s i) N.name in
           match of_bytes ~key b with
-          | Ok v -> return (Some v)
+          | Ok v -> return_some v
           | Error _ as err -> Lwt.return err
     let set s i v =
       Raw_context.set (pack s i) N.name (to_bytes v) >>=? fun c ->

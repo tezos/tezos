@@ -14,7 +14,7 @@ let path (b1: Block.t) (b2: Block.t) =
     invalid_arg "Chain_traversal.path" ;
   let rec loop acc current =
     if Block.equal b1 current then
-      Lwt.return (Some acc)
+      Lwt.return_some acc
     else
       Block.predecessor current >>= function
       | Some pred -> loop (current :: acc) pred

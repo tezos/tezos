@@ -46,11 +46,11 @@ let preapply (type t)
     | _ -> Signature.Generic_operation in
   begin
     match src_sk with
-    | None -> return None
+    | None -> return_none
     | Some src_sk ->
         Client_keys.sign cctxt
           ~watermark src_sk bytes >>=? fun signature ->
-        return (Some signature)
+        return_some signature
   end >>=? fun signature ->
   let op : _ Operation.t =
     { shell = { branch } ;

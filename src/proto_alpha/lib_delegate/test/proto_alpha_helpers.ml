@@ -565,7 +565,7 @@ module Endorse = struct
       !rpc_ctxt ~delegates:[delegate] ~levels:[level]
       (`Main, block) >>=? function
     | [{ slots }] -> return slots
-    | _ -> return []
+    | _ -> return_nil
 
   let endorse
       (contract : Account.t)
@@ -606,7 +606,7 @@ module Endorse = struct
       ~delegates:[delegate]
       (`Main, block) >>=? function
     | [{ level ; slots }] -> return (List.map (fun s -> (level, s)) slots)
-    | _ -> return []
+    | _ -> return_nil
 
 end
 

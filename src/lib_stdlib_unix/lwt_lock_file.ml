@@ -37,14 +37,14 @@ let blocking_create
   | Some duration -> with_timeout (Lwt_unix.sleep duration) (fun _ -> create ())
 
 let is_locked fn =
-  if not @@ Sys.file_exists fn then return false else
+  if not @@ Sys.file_exists fn then return_false else
     protect begin fun () ->
       Lwt_unix.openfile fn [Unix.O_RDONLY] 0o644 >>= fun fd ->
       Lwt.finalize (fun () ->
           Lwt.try_bind
             (fun () -> Lwt_unix.(lockf fd F_TEST 0))
-            (fun () -> return false)
-            (fun _ -> return true))
+            (fun () -> return_false)
+            (fun _ -> return_true))
         (fun () -> Lwt_unix.close fd)
     end
 

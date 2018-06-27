@@ -96,16 +96,16 @@ let read_base_uri_from_env () =
         Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST",
         Sys.getenv_opt "TEZOS_SIGNER_HTTP_HOST",
         Sys.getenv_opt "TEZOS_SIGNER_HTTPS_HOST" with
-  | None, None, None, None -> return None
+  | None, None, None, None -> return_none
   | Some path, None, None, None ->
-      return (Some (Socket.make_unix_base path))
+      return_some (Socket.make_unix_base path)
   | None, Some host, None, None -> begin
       try
         let port =
           match Sys.getenv_opt "TEZOS_SIGNER_TCP_PORT" with
           | None -> 7732
           | Some port -> int_of_string port in
-        return (Some (Socket.make_tcp_base host port))
+        return_some (Socket.make_tcp_base host port)
       with Invalid_argument _ ->
         failwith "Failed to parse TEZOS_SIGNER_TCP_PORT.@."
     end
@@ -115,7 +115,7 @@ let read_base_uri_from_env () =
           match Sys.getenv_opt "TEZOS_SIGNER_HTTP_PORT" with
           | None -> 6732
           | Some port -> int_of_string port in
-        return (Some (Http.make_base host port))
+        return_some (Http.make_base host port)
       with Invalid_argument _ ->
         failwith "Failed to parse TEZOS_SIGNER_HTTP_PORT.@."
     end
@@ -125,7 +125,7 @@ let read_base_uri_from_env () =
           match Sys.getenv_opt "TEZOS_SIGNER_HTTPS_PORT" with
           | None -> 443
           | Some port -> int_of_string port in
-        return (Some (Https.make_base host port))
+        return_some (Https.make_base host port)
       with Invalid_argument _ ->
         failwith "Failed to parse TEZOS_SIGNER_HTTPS_PORT.@."
     end

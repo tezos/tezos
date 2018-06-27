@@ -141,7 +141,7 @@ let wait_all processes =
               | [] -> loop remaining
               | Ok () :: finished -> handle finished
               | Error err :: _ ->
-                  Lwt.return (Some (err, remaining)) in
+                  Lwt.return_some (err, remaining) in
             handle finished in
   loop (List.map (fun p -> p.termination) processes) >>= function
   | None ->

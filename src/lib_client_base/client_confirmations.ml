@@ -66,7 +66,7 @@ let wait_for_operation_inclusion
           "Error while fetching block (ignored): %a"
           pp_print_error err >>= fun () ->
         (* Will be retried when a new head arrives *)
-        Lwt.return [] in
+        Lwt.return_nil in
 
   (* Check whether a block as enough confirmations. This function
      assumes that the block predecessor has been processed already. *)
@@ -81,9 +81,9 @@ let wait_for_operation_inclusion
           (n+1) Block_hash.pp hash >>= fun () ->
         Block_hash.Table.add blocks hash (Some (block_with_op, n+1)) ;
         if n+1 < confirmations then begin
-          return None
+          return_none
         end else
-          return (Some block_with_op)
+          return_some block_with_op
     | None ->
         Shell_services.Blocks.Operation_hashes.operation_hashes
           ctxt ~chain ~block () >>=? fun operations ->
@@ -101,16 +101,16 @@ let wait_for_operation_inclusion
         match in_block with
         | None ->
             Block_hash.Table.add blocks hash None ;
-            return None
+            return_none
         | Some (i, j) -> begin
             ctxt#answer
               "Operation found in block: %a (pass: %d, offset: %d)"
               Block_hash.pp hash i j >>= fun () ->
             Block_hash.Table.add blocks hash (Some ((hash, i, j), 0)) ;
             if confirmations <= 0 then
-              return (Some (hash, i, j))
+              return_some (hash, i, j)
             else begin
-              return None
+              return_none
             end
           end in
 
@@ -138,8 +138,8 @@ let wait_for_operation_inclusion
                Lwt_stream.find_s
                  (fun (hash, header) ->
                     process hash header >>= function
-                    | Ok None -> Lwt.return false
-                    | Ok (Some _) -> Lwt.return true
+                    | Ok None -> Lwt.return_false
+                    | Ok (Some _) -> Lwt.return_true
                     | Error err ->
                         Lwt.fail (WrapError err)) stream >>= return)
             (function

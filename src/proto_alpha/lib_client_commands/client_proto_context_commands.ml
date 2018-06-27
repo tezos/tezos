@@ -35,9 +35,9 @@ let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_conte
            ~show_source: (not no_print_source)
            ?parsed:None) errs >>= fun () ->
       cctxt#error "%s" msg >>= fun () ->
-      Lwt.return None
+      Lwt.return_none
   | Ok data ->
-      Lwt.return (Some data)
+      Lwt.return_some data
 
 let file_parameter =
   Clic.parameter (fun _ p ->

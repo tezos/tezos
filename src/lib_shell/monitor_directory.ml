@@ -29,7 +29,7 @@ let build_rpc_directory validator mainchain_validator =
         Chain.head chain_state >>= fun head ->
         let head_hash = State.Block.hash head in
         let head_header = State.Block.header head in
-        Lwt.return (Some (head_hash, head_header.shell.timestamp))
+        Lwt.return_some (head_hash, head_header.shell.timestamp)
       end else begin
         Lwt.pick [
           ( Lwt_stream.get block_stream >|=

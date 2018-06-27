@@ -275,6 +275,6 @@ let last_of_a_cycle ctxt l =
 let dawn_of_a_new_cycle ctxt =
   let level = Level.current ctxt in
   if last_of_a_cycle ctxt level then
-    return (Some level.cycle)
+    return_some level.cycle
   else
-    return None
+    return_none

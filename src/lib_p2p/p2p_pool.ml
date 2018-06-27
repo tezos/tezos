@@ -904,7 +904,7 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
            private_node_warn
              "Receive requests for peers addresses from %a"
              P2p_peer.Id.pp peer_id >>= fun () ->
-           Lwt.return []
+           Lwt.return_nil
         ) ;
       swap_request =
         (fun _point _peer_id ->
@@ -987,7 +987,7 @@ and list_known_points ?(ignore_private = false) pool conn =
   if P2p_socket.private_node conn.conn then
     private_node_warn "Private peer (%a) asked other peers addresses"
       P2p_peer.Id.pp (P2p_peer_state.Info.peer_id conn.peer_info) >>= fun () ->
-    Lwt.return []
+    Lwt.return_nil
   else
     let knowns =
       P2p_point.Table.fold

@@ -216,13 +216,13 @@ let build_directory : type key. key t -> key RPC_directory.t =
       fun dir path ->
         match !dir with
         | Empty -> Opt_handler { encoding = Data_encoding.unit ;
-                                 get = fun _ _ -> return None }
+                                 get = fun _ _ -> return_none }
         | Value { get ; encoding } ->
             let handler =
               Opt_handler {
                 encoding ;
                 get =
-                  fun k i -> if Compare.Int.(i < 0) then return None else get k
+                  fun k i -> if Compare.Int.(i < 0) then return_none else get k
               } in
             register path handler ;
             handler
@@ -239,10 +239,10 @@ let build_directory : type key. key t -> key RPC_directory.t =
                 { encoding = handler.encoding ;
                   get = fun k i ->
                     if Compare.Int.(i < 0) then
-                      return None
+                      return_none
                     else
                       handler.get k (i-1) >>=? fun v ->
-                      return (Some v) } in
+                      return_some v } in
             register path handler ;
             handler
         | IndexedDir { arg ; arg_encoding ; list ; subdir } ->
@@ -265,8 +265,8 @@ let build_directory : type key. key t -> key RPC_directory.t =
                   (fun (key, value) -> (key, Some value)) ;
               ] in
             let get k i =
-              if Compare.Int.(i < 0) then return None
-              else if Compare.Int.(i = 0) then return (Some [])
+              if Compare.Int.(i < 0) then return_none
+              else if Compare.Int.(i = 0) then return_some []
               else
                 list k >>=? fun keys ->
                 map_p
@@ -277,7 +277,7 @@ let build_directory : type key. key t -> key RPC_directory.t =
                        handler.get (k, key) (i-1) >>=? fun value ->
                        return (key, value))
                   keys >>=? fun values ->
-                return (Some values) in
+                return_some values in
             let handler =
               Opt_handler {
                 encoding = Data_encoding.(list (dynamic_size encoding)) ;

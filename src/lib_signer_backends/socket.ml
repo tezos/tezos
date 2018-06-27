@@ -32,11 +32,11 @@ module Make(P : sig
       Lwt.return authorized_keys >>=? fun authorized_keys ->
       Lwt_unix.close conn >>= fun () ->
       begin match authorized_keys with
-        | No_authentication -> return None
+        | No_authentication -> return_none
         | Authorized_keys authorized_keys ->
             P.authenticate authorized_keys
               (Sign.Request.to_sign ~pkh ~data:msg) >>=? fun signature ->
-            return (Some signature)
+            return_some signature
       end
     end >>=? fun signature ->
     let req = { Sign.Request.pkh ; data = msg ; signature } in
