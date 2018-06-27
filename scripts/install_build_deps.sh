@@ -28,10 +28,6 @@ if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
     opam install --unlock-base ocaml-base-compiler.$ocaml_version
 fi
 
-"$script_dir"/opam-unpin.sh
-. "$script_dir"/opam-pin.sh
-
 opam list --installed depext || opam install depext
-opam depext $packages
 
-opam install $packages --deps-only --with-test
+"$script_dir"/install_build_deps.raw.sh

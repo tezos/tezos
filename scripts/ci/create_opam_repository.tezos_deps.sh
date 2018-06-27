@@ -11,7 +11,7 @@ cd "$src_dir"
 
 build_dir=${build_dir:-_docker_build}
 
-if [ -f "$build_dir/opam_repository-tezos_deps-$ocaml_version.tgz" ]; then
+if [ -f "$build_dir/opam_repository-tezos_deps-$ocaml_version-$opam_repository_tag.tgz" ]; then
     exit 0
 fi
 
@@ -30,7 +30,7 @@ trap cleanup EXIT INT
 ## Creating a repository of tezos packages
 
 repo="$tmp_dir"/opam-repository-tezos
-opams=$(find "$src_dir" -name \*.opam -print)
+opams=$(find "$src_dir/src" "$src_dir"/vendors -name \*.opam -print)
 mkdir -p "$repo/packages"
 echo "1.2" > "$repo/version"
 packages=
@@ -50,15 +50,9 @@ done
 # inline some of the test and doc dependencies.
 extra_packages="depext alcotest-lwt ocp-indent odoc ounit crowbar"
 
-if ! [ -f "$build_dir"/opam-repository-master.tgz ]; then
-    echo
-    echo "### Fetching opam-repository-master.tar.gz ..."
-    echo
-    mkdir -p "$build_dir"
-    wget -O "$build_dir"/opam-repository-master.tgz \
-         https://github.com/ocaml/opam-repository/archive/master.tar.gz
-fi
-tar -C "$tmp_dir" -xzf "$build_dir"/opam-repository-master.tgz
+git clone $opam_repository_url "$tmp_dir/opam-repository-master"
+git -C "$tmp_dir"/opam-repository-master reset --hard $opam_repository_tag
+rm -rf "$tmp_dir"/opam-repository-master/.git
 
 ## HACK: Once opam2 is released, we should use the `ocaml/opam` image
 ## instead of this custom installation of ocaml and opam.
@@ -71,17 +65,15 @@ echo "### Building tezos_bundle.tar.gz..."
 echo
 
 cat <<EOF > "$tmp_dir"/Dockerfile
-FROM alpine
+FROM alpine:3.7
 ENV PACKAGER "Tezos <ci@tezos.com>"
 COPY opam-repository-master opam-repository-master
 COPY opam /usr/local/bin/opam
 RUN apk add --no-cache ocaml build-base m4 tar xz bzip2 curl perl rsync
-RUN cd ./opam-repository-master/compilers && \
-    ( ls -1 | grep -v ${ocaml_version} | xargs rm -r )
-RUN opam init --no-setup --yes default ./opam-repository-master
+RUN opam init --disable-sandboxing --no-setup --yes default ./opam-repository-master
 RUN opam install --yes opam-bundle
 COPY opam-repository-tezos opam-repository-tezos
-RUN opam bundle --yes --output="tezos_bundle-$ocaml_version" \
+RUN opam bundle --yes --output="tezos_bundle-$ocaml_version-$opam_repository_tag" \
                 --repository=opam-repository-tezos \
                 --repository=opam-repository-master \
                 --ocaml=$ocaml_version \
@@ -91,20 +83,20 @@ EOF
 docker build --pull -t $tmp_image "$tmp_dir"
 
 container=$(docker create $tmp_image)
-docker cp -L $container:/tezos_bundle-$ocaml_version.tar.gz "$tmp_dir"
+docker cp -L $container:/tezos_bundle-$ocaml_version-$opam_repository_tag.tar.gz "$tmp_dir"
 
 cd "$tmp_dir"
-tar xf tezos_bundle-$ocaml_version.tar.gz tezos_bundle-$ocaml_version/repo
+tar xf tezos_bundle-$ocaml_version-$opam_repository_tag.tar.gz tezos_bundle-$ocaml_version-$opam_repository_tag/repo
 
 # removing fake tezos packages
-cd tezos_bundle-$ocaml_version/repo/packages
+cd tezos_bundle-$ocaml_version-$opam_repository_tag/repo/packages
 rm -r $packages
 
 # Repacking the repo
 cd "$tmp_dir"
-mv tezos_bundle-$ocaml_version/repo opam_repository-tezos_deps
-tar czf "opam_repository-tezos_deps-$ocaml_version.tgz" \
+mv tezos_bundle-$ocaml_version-$opam_repository_tag/repo opam_repository-tezos_deps
+tar czf "opam_repository-tezos_deps-$ocaml_version-$opam_repository_tag.tgz" \
     opam_repository-tezos_deps
 
 cd "$src_dir"
-mv "$tmp_dir"/opam_repository-tezos_deps-$ocaml_version.tgz "$build_dir"
+mv "$tmp_dir"/opam_repository-tezos_deps-$ocaml_version-$opam_repository_tag.tgz "$build_dir"

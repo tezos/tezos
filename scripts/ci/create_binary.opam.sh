@@ -45,7 +45,7 @@ echo
 cp -a "$build_dir"/opam-$opam_tag.tgz "$tmp_dir"
 
 cat <<EOF > "$tmp_dir"/Dockerfile
-FROM ocaml/opam:alpine-${alpine_version}_ocaml-4.06.0
+FROM ocaml/opam:alpine-3.6_ocaml-4.06.0
 ENV PACKAGER "Tezos <ci@tezos.com>"
 COPY opam-$opam_tag.tgz opam-$opam_tag.tgz
 RUN tar xzf opam-$opam_tag.tgz && \

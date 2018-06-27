@@ -38,7 +38,7 @@ cp -a "$build_dir"/hidapi-$hidapi_version-r0.apk \
 cp "$build_dir"/opam-$opam_tag "$tmp_dir/opam"
 cp "$build_dir"/opam-installer-$opam_tag "$tmp_dir/opam-installer"
 
-tar -C "$tmp_dir" -xzf "$build_dir"/opam_repository-tezos_deps-$ocaml_version.tgz
+tar -C "$tmp_dir" -xzf "$build_dir"/opam_repository-tezos_deps-$ocaml_version-$opam_repository_tag.tgz
 
 cat <<EOF > "$tmp_dir"/Dockerfile
 FROM alpine:$alpine_version
@@ -73,11 +73,11 @@ RUN mkdir ~/.ssh && \
     chmod 700 ~/.ssh && \
     git config --global user.email "ci@tezos.com" && \
     git config --global user.name "Tezos CI" && \
-    opam init --bare --no-setup --yes \
+    opam init --disable-sandboxing --bare --no-setup --yes \
               tezos_deps /home/opam/opam-repository-tezos_deps && \
-    opam switch create --yes tezos ocaml-base-compiler.${ocaml_version}
+    opam switch create --yes /home/opam/tezos ocaml-base-compiler.${ocaml_version}
 
-RUN opam install --yes opam-depext
+RUN opam install --switch=/home/opam/tezos --yes opam-depext
 
 ENTRYPOINT [ "opam", "exec", "--" ]
 CMD [ "/bin/bash" ]
