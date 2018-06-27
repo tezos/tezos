@@ -411,46 +411,53 @@ let unfreeze ctxt delegate cycle =
   get_frozen_fees ctxt contract cycle >>=? fun fees ->
   get_frozen_rewards ctxt contract cycle >>=? fun rewards ->
   Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
-  Lwt.return Tez_repr.(balance +? deposit) >>=? fun balance ->
-  Lwt.return Tez_repr.(balance +? fees) >>=? fun balance ->
-  Lwt.return Tez_repr.(balance +? rewards) >>=? fun balance ->
+  Lwt.return Tez_repr.(deposit +? fees) >>=? fun unfrozen_amount ->
+  Lwt.return Tez_repr.(unfrozen_amount +? rewards) >>=? fun unfrozen_amount ->
+  Lwt.return Tez_repr.(balance +? unfrozen_amount) >>=? fun balance ->
   Storage.Contract.Balance.set ctxt contract balance >>=? fun ctxt ->
   Roll_storage.Delegate.add_amount ctxt delegate rewards >>=? fun ctxt ->
   Storage.Contract.Frozen_deposits.remove (ctxt, contract) cycle >>= fun ctxt ->
   Storage.Contract.Frozen_fees.remove (ctxt, contract) cycle >>= fun ctxt ->
   Storage.Contract.Frozen_rewards.remove (ctxt, contract) cycle >>= fun ctxt ->
-  return ctxt
+  return (ctxt, (cleanup_balance_updates
+                   [(Deposits (delegate, cycle), Debited deposit) ;
+                    (Fees (delegate, cycle), Debited fees) ;
+                    (Rewards (delegate, cycle), Debited rewards) ;
+                    (Contract (Contract_repr.implicit_contract delegate), Credited unfrozen_amount)]))
 
 let cycle_end ctxt last_cycle unrevealed =
   let preserved = Constants_storage.preserved_cycles ctxt in
   begin
     match Cycle_repr.pred last_cycle with
-    | None -> return ctxt
+    | None -> return (ctxt,[])
     | Some revealed_cycle ->
         List.fold_left
-          (fun ctxt (u : Nonce_storage.unrevealed) ->
-             ctxt >>=? fun ctxt ->
+          (fun acc (u : Nonce_storage.unrevealed) ->
+             acc >>=? fun (ctxt, balance_updates) ->
              burn_fees
                ctxt u.delegate revealed_cycle u.fees >>=? fun ctxt ->
              burn_rewards
                ctxt u.delegate revealed_cycle u.rewards >>=? fun ctxt ->
-             return ctxt)
-          (return ctxt) unrevealed
-  end >>=? fun ctxt ->
+             let bus = [(Fees (u.delegate, revealed_cycle), Debited u.fees);
+                        (Rewards (u.delegate, revealed_cycle), Debited u.rewards)] in
+             return (ctxt, bus @ balance_updates))
+          (return (ctxt,[])) unrevealed
+  end >>=? fun (ctxt, balance_updates) ->
   match Cycle_repr.sub last_cycle preserved with
-  | None -> return ctxt
+  | None -> return (ctxt, balance_updates, [])
   | Some unfrozen_cycle ->
       fold ctxt
-        ~init:(Ok ctxt)
-        ~f:(fun delegate ctxt ->
-            Lwt.return ctxt >>=? fun ctxt ->
-            unfreeze ctxt delegate unfrozen_cycle >>=? fun ctxt ->
+        ~init:(Ok (ctxt, balance_updates, []))
+        ~f:(fun delegate acc ->
+            Lwt.return acc >>=? fun (ctxt, bus, deactivated) ->
+            unfreeze ctxt delegate unfrozen_cycle >>=? fun (ctxt, balance_updates) ->
             Storage.Contract.Delegate_desactivation.get ctxt
               (Contract_repr.implicit_contract delegate) >>=? fun cycle ->
             if Cycle_repr.(cycle <= last_cycle) then
-              Roll_storage.Delegate.set_inactive ctxt delegate
+              Roll_storage.Delegate.set_inactive ctxt delegate >>=? fun ctxt ->
+              return (ctxt, balance_updates @ bus, delegate::deactivated)
             else
-              return ctxt)
+              return (ctxt, balance_updates @ bus, deactivated))
 
 let punish ctxt delegate cycle =
   let contract = Contract_repr.implicit_contract delegate in

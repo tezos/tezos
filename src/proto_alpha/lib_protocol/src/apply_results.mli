@@ -131,5 +131,9 @@ type block_metadata = {
   baker: Signature.Public_key_hash.t ;
   level: Level.t ;
   voting_period_kind: Voting_period.kind ;
+  nonce_hash: Nonce_hash.t option ;
+  consumed_gas: Z.t ;
+  deactivated: Signature.Public_key_hash.t list ;
+  balance_updates: Delegate.balance_updates ;
 }
 val block_metadata_encoding: block_metadata Data_encoding.encoding

@@ -192,16 +192,28 @@ let finalize_block { mode ; ctxt ; op_count } =
         (Alpha_context.get_deposits ctxt)
         (return ctxt) >>=? fun ctxt ->
       let ctxt = Alpha_context.finalize ctxt in
-      return (ctxt, Apply_results.{ baker ; level ; voting_period_kind })
+      return (ctxt, Apply_results.{ baker ;
+                                    level ;
+                                    voting_period_kind ;
+                                    nonce_hash = None ;
+                                    consumed_gas = Z.zero ;
+                                    deactivated = [];
+                                    balance_updates = []})
   | Partial_application { baker ; _ } ->
       let level = Alpha_context. Level.current ctxt in
       Alpha_context.Vote.get_current_period_kind ctxt >>=? fun voting_period_kind ->
       let ctxt = Alpha_context.finalize ctxt in
-      return (ctxt, Apply_results.{ baker ; level ; voting_period_kind })
+      return (ctxt, Apply_results.{ baker ;
+                                    level ;
+                                    voting_period_kind ;
+                                    nonce_hash = None ;
+                                    consumed_gas = Z.zero ;
+                                    deactivated = [];
+                                    balance_updates = []})
   | Application
       { baker ;  block_header = { protocol_data = { contents = protocol_data ; _ } ; _ } }
   | Full_construction { protocol_data ; baker ; _ } ->
-      Apply.finalize_application ctxt protocol_data baker >>=? fun ctxt ->
+      Apply.finalize_application ctxt protocol_data baker >>=? fun (ctxt, receipt) ->
       let level = Alpha_context.Level.current ctxt in
       let priority = protocol_data.priority in
       let raw_level = Alpha_context.Raw_level.to_int32 level.level in
@@ -210,9 +222,8 @@ let finalize_block { mode ; ctxt ; op_count } =
         Format.asprintf
           "lvl %ld, fit %Ld, prio %d, %d ops"
           raw_level fitness priority op_count in
-      Alpha_context.Vote.get_current_period_kind ctxt >>=? fun voting_period_kind ->
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
-      return (ctxt, Apply_results.{ baker ; level ; voting_period_kind })
+      return (ctxt, receipt)
 
 let compare_operations op1 op2 =
   let open Alpha_context in

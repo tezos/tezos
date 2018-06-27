@@ -912,17 +912,29 @@ type block_metadata = {
   baker: Signature.Public_key_hash.t ;
   level: Level.t ;
   voting_period_kind: Voting_period.kind ;
+  nonce_hash: Nonce_hash.t option ;
+  consumed_gas: Z.t ;
+  deactivated: Signature.Public_key_hash.t list ;
+  balance_updates: Delegate.balance_updates ;
 }
 
 let block_metadata_encoding =
   let open Data_encoding in
   def "block_header.alpha.metadata" @@
   conv
-    (fun { baker ; level ; voting_period_kind} ->
-       (baker, level, voting_period_kind))
-    (fun (baker, level, voting_period_kind) ->
-       { baker ; level ; voting_period_kind})
-    (obj3
+    (fun { baker ; level ; voting_period_kind ; nonce_hash ;
+           consumed_gas ; deactivated ; balance_updates } ->
+      ( baker, level, voting_period_kind, nonce_hash,
+        consumed_gas, deactivated, balance_updates ))
+    (fun ( baker, level, voting_period_kind, nonce_hash,
+           consumed_gas, deactivated, balance_updates ) ->
+      { baker ; level ; voting_period_kind ; nonce_hash ;
+        consumed_gas ; deactivated ; balance_updates })
+    (obj7
        (req "baker" Signature.Public_key_hash.encoding)
        (req "level" Level.encoding)
-       (req "voting_period_kind" Voting_period.kind_encoding))
+       (req "voting_period_kind" Voting_period.kind_encoding)
+       (req "nonce_hash" (option Nonce_hash.encoding))
+       (req "consumed_gas" (check_size 10 n))
+       (req "deactivated" (list Signature.Public_key_hash.encoding))
+       (req "balance_updates" Delegate.balance_updates_encoding))

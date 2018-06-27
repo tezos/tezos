@@ -634,7 +634,8 @@ module Delegate : sig
     context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
 
   val cycle_end:
-    context -> Cycle.t -> Nonce.unrevealed list -> context tzresult Lwt.t
+    context -> Cycle.t -> Nonce.unrevealed list ->
+    (context * balance_updates * Signature.Public_key_hash.t list) tzresult Lwt.t
 
   type frozen_balance = {
     deposit : Tez.t ;

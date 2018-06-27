@@ -106,12 +106,13 @@ val freeze_rewards:
   Raw_context.t tzresult Lwt.t
 
 (** Trigger the context maintenance at the end of cycle 'n', i.e.:
-    unfroze deposit/fees/rewards from 'n - preserved_cycle' ; punish the
-    provided unrevealed seeds (tipically seed from from cycle 'n -
-    1'). *)
+    unfreeze deposit/fees/rewards from 'n - preserved_cycle' ; punish the
+    provided unrevealed seeds (tipically seed from cycle 'n - 1').
+    Returns a list of account with the amount that was unfrozen for each
+    and the list of deactivated delegates. *)
 val cycle_end:
   Raw_context.t -> Cycle_repr.t -> Nonce_storage.unrevealed list ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * balance_updates * Signature.Public_key_hash.t list) tzresult Lwt.t
 
 (** Burn all then frozen deposit/fees/rewards for a delegate at a given
     cycle. Returns the burned amounts. *)

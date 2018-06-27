@@ -686,10 +686,10 @@ let apply_contents_list
         let level = Level.from_raw ctxt level in
         return (ctxt, Single_result
                   (Endorsement_result
-                     { balance_updates =
-                         [ Contract (Contract.implicit_contract delegate), Debited deposit;
-                           Deposits (delegate, level.cycle), Credited deposit;
-                           Rewards (delegate, level.cycle), Credited reward; ] ;
+                     { balance_updates = Delegate.cleanup_balance_updates
+                           [ Contract (Contract.implicit_contract delegate), Debited deposit;
+                             Deposits (delegate, level.cycle), Credited deposit;
+                             Rewards (delegate, level.cycle), Credited reward; ] ;
                        delegate ; slots }))
   | Single (Seed_nonce_revelation { level ; nonce }) ->
       let level = Level.from_raw ctxt level in
@@ -733,11 +733,12 @@ let apply_contents_list
           add_rewards ctxt reward >>=? fun ctxt ->
           let current_cycle = (Level.current ctxt).cycle in
           return (ctxt, Single_result
-                    (Double_endorsement_evidence_result [
-                        Deposits (delegate1, level.cycle), Debited balance.deposit ;
-                        Fees (delegate1, level.cycle), Debited balance.fees ;
-                        Rewards (delegate1, level.cycle), Debited balance.rewards ;
-                        Rewards (baker, current_cycle), Credited reward ]))
+                    (Double_endorsement_evidence_result
+                       (Delegate.cleanup_balance_updates [
+                           Deposits (delegate1, level.cycle), Debited balance.deposit ;
+                           Fees (delegate1, level.cycle), Debited balance.fees ;
+                           Rewards (delegate1, level.cycle), Debited balance.rewards ;
+                           Rewards (baker, current_cycle), Credited reward ])))
       | _, _ -> fail Invalid_double_endorsement_evidence
     end
   | Single (Double_baking_evidence { bh1 ; bh2 }) ->
@@ -786,11 +787,12 @@ let apply_contents_list
       add_rewards ctxt reward >>=? fun ctxt ->
       let current_cycle = (Level.current ctxt).cycle in
       return (ctxt, Single_result
-                (Double_baking_evidence_result [
-                    Deposits (delegate, level.cycle), Debited balance.deposit ;
-                    Fees (delegate, level.cycle), Debited balance.fees ;
-                    Rewards (delegate, level.cycle), Debited balance.rewards ;
-                    Rewards (baker, current_cycle), Credited reward ; ]))
+                (Double_baking_evidence_result
+                   (Delegate.cleanup_balance_updates [
+                       Deposits (delegate, level.cycle), Debited balance.deposit ;
+                       Fees (delegate, level.cycle), Debited balance.fees ;
+                       Rewards (delegate, level.cycle), Debited balance.rewards ;
+                       Rewards (baker, current_cycle), Credited reward ; ])))
   | Single (Activate_account { id = pkh ; activation_code }) -> begin
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh in
@@ -851,13 +853,13 @@ let may_snapshot_roll ctxt =
 
 let may_start_new_cycle ctxt =
   Baking.dawn_of_a_new_cycle ctxt >>=? function
-  | None -> return ctxt
+  | None -> return (ctxt, [], [])
   | Some last_cycle ->
       Seed.cycle_end ctxt last_cycle >>=? fun (ctxt, unrevealed) ->
       Roll.cycle_end ctxt last_cycle >>=? fun ctxt ->
-      Delegate.cycle_end ctxt last_cycle unrevealed >>=? fun ctxt ->
+      Delegate.cycle_end ctxt last_cycle unrevealed >>=? fun (ctxt, update_balances, deactivated) ->
       Bootstrap.cycle_end ctxt last_cycle >>=? fun ctxt ->
-      return ctxt
+      return (ctxt, update_balances, deactivated)
 
 let begin_full_construction ctxt pred_timestamp protocol_data =
   Baking.check_baking_rights
@@ -905,7 +907,8 @@ let begin_application ctxt chain_id block_header pred_timestamp =
 let finalize_application ctxt protocol_data delegate =
   let deposit = Constants.block_security_deposit ctxt in
   add_deposit ctxt delegate deposit >>=? fun ctxt ->
-  add_rewards ctxt (Constants.block_reward ctxt) >>=? fun ctxt ->
+  let reward = (Constants.block_reward ctxt) in
+  add_rewards ctxt reward >>=? fun ctxt ->
   Signature.Public_key_hash.Map.fold
     (fun delegate deposit ctxt ->
        ctxt >>=? fun ctxt ->
@@ -928,6 +931,21 @@ let finalize_application ctxt protocol_data delegate =
     ctxt protocol_data.priority >>=? fun ctxt ->
   (* end of cycle *)
   may_snapshot_roll ctxt >>=? fun ctxt ->
-  may_start_new_cycle ctxt >>=? fun ctxt ->
+  may_start_new_cycle ctxt >>=? fun (ctxt, balance_updates, deactivated) ->
   Amendment.may_start_new_voting_cycle ctxt >>=? fun ctxt ->
-  return ctxt
+  let cycle = (Level.current ctxt).cycle in
+  let balance_updates =
+    Delegate.(cleanup_balance_updates
+                ([ Contract (Contract.implicit_contract delegate), Debited deposit ;
+                   Deposits (delegate, cycle), Credited deposit ;
+                   Rewards (delegate, cycle), Credited reward ] @ balance_updates)) in
+  let consumed_gas = Z.sub (Constants.hard_gas_limit_per_block ctxt) (Alpha_context.Gas.block_level ctxt) in
+  Alpha_context.Vote.get_current_period_kind ctxt >>=? fun voting_period_kind ->
+  let receipt = Apply_results.{ baker = delegate ;
+                                level = Level.current ctxt;
+                                voting_period_kind ;
+                                nonce_hash = protocol_data.seed_nonce_hash ;
+                                consumed_gas ;
+                                deactivated ;
+                                balance_updates } in
+  return (ctxt, receipt)
