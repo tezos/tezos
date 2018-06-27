@@ -10,39 +10,32 @@
 open Proto_alpha
 open Alpha_context
 open Tezos_micheline
-open Script_typed_ir
 open Script_tc_errors
-open Script_ir_annot
-open Script_ir_translator
 open Script_interpreter
 open Michelson_v1_printer
 
-let print_ty (type t) ppf (ty : t ty) =
-  unparse_ty ty
-  |> Micheline.strip_locations
-  |> Michelson_v1_printer.print_expr_unwrapped ppf
+let print_ty ppf ty =
+  Michelson_v1_printer.print_expr_unwrapped ppf ty
 
 let print_var_annot ppf annot =
-  List.iter (Format.fprintf ppf "@ %s") (unparse_var_annot annot)
+  List.iter (Format.fprintf ppf "@ %s") annot
 
-let print_stack_ty (type t) ?(depth = max_int) ppf (s : t stack_ty) =
-  let rec loop
-    : type t. int -> Format.formatter -> t stack_ty -> unit
-    = fun depth ppf -> function
-      | Empty_t -> ()
-      | _ when depth <= 0 ->
-          Format.fprintf ppf "..."
-      | Item_t (last, Empty_t, annot) ->
-          Format.fprintf ppf "%a%a"
-            print_ty last
-            print_var_annot annot
-      | Item_t (last, rest, annot) ->
-          Format.fprintf ppf "%a%a@ :@ %a"
-            print_ty last
-            print_var_annot annot
-            (loop (depth - 1)) rest in
+let print_stack_ty ?(depth = max_int) ppf s =
+  let rec loop depth ppf = function
+    | [] -> ()
+    | _ when depth <= 0 ->
+        Format.fprintf ppf "..."
+    | [last, annot] ->
+        Format.fprintf ppf "%a%a"
+          print_ty last
+          print_var_annot annot
+    | (last, annot) :: rest ->
+        Format.fprintf ppf "%a%a@ :@ %a"
+          print_ty last
+          print_var_annot annot
+          (loop (depth - 1)) rest in
   match s with
-  | Empty_t ->
+  | [] ->
       Format.fprintf ppf "[]"
   | sty ->
       Format.fprintf ppf "@[<hov 2>[ %a ]@]" (loop depth) sty
@@ -338,7 +331,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  - @[<v 0>expected return stack type:@ %a,@]@,\
                  - @[<v 0>actual stack type:@ %a.@]@]"
                 print_loc loc
-                (fun ppf -> print_stack_ty ppf) (Item_t (exp, Empty_t, None))
+                (fun ppf -> print_stack_ty ppf) [exp, []]
                 (fun ppf -> print_stack_ty ppf) got
           | Bad_stack (loc, name, depth, sty) ->
               Format.fprintf ppf

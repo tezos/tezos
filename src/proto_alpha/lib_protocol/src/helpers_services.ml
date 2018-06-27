@@ -200,7 +200,7 @@ module Scripts = struct
       let ctxt = match maybe_gas with
         | None -> Gas.set_unlimited ctxt
         | Some gas -> Gas.set_limit ctxt gas in
-      Lwt.return (parse_ty ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ) ->
+      Lwt.return (parse_ty ctxt ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ) ->
       parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
       Script_ir_translator.pack_data ctxt typ data >>=? fun (bytes, ctxt) ->
       return (bytes, Gas.level ctxt)

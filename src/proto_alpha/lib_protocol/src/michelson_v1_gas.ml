@@ -236,21 +236,27 @@ module Cost_of = struct
   end
 
   module Unparse = struct
-    let prim_cost = alloc_cost 4 (* location, primitive name, list, annotation *)
+    let prim_cost nb_args =
+      alloc_cost 4 (* location, primitive name, list, annotation *) +@
+      (nb_args *@ alloc_cost 2)
+    let seq_cost nb_args =
+      alloc_cost 2 (* location, list *) +@
+      (nb_args *@ alloc_cost 2)
     let string_cost length =
       alloc_cost 3 +@ alloc_bytes_cost length
 
     let cycle = step_cost 1
-    let bool = prim_cost
-    let unit = prim_cost
+    let bool = prim_cost 0
+    let unit = prim_cost 0
     (* FIXME: not sure we should count the length of strings and bytes
        as they are shared *)
     let string s = string_cost (String.length s)
     let bytes s = alloc_bytes_cost (MBytes.length s)
     (* Approximates log10(x) *)
-    let int i =
-      let decimal_digits = (Z.numbits (Z.abs (Script_int.to_zint i))) / 4 in
-      prim_cost +@ (alloc_bytes_cost decimal_digits)
+    let z i =
+      let decimal_digits = (Z.numbits (Z.abs i)) / 4 in
+      prim_cost 0 +@ (alloc_bytes_cost decimal_digits)
+    let int i = z (Script_int.to_zint i)
     let tez = string_cost 19 (* max length of 64 bit int *)
     let timestamp x = Script_timestamp.to_zint x |> Script_int.of_zint |> int
     let operation bytes = string_cost (MBytes.length bytes * 2)
@@ -258,17 +264,15 @@ module Cost_of = struct
     let key_hash = string_cost 36
     let signature = string_cost 128
     let contract = string_cost 36
-    let pair = prim_cost +@ alloc_cost 4
-    let union = prim_cost +@ alloc_cost 2
-    let lambda = prim_cost +@ alloc_cost 3
-    let some = prim_cost +@ alloc_cost 2
-    let none = prim_cost
-    let list_element = prim_cost +@ alloc_cost 2
+    let pair = prim_cost 2
+    let union = prim_cost 1
+    let some = prim_cost 1
+    let none = prim_cost 0
+    let list_element = prim_cost 1
     let set_element = alloc_cost 2
     let map_element = alloc_cost 2
-    let primitive_type = prim_cost
-    let one_arg_type = prim_cost +@ alloc_cost 2
-    let two_arg_type = prim_cost +@ alloc_cost 4
+    let one_arg_type = prim_cost 1
+    let two_arg_type = prim_cost 2
 
     let set_to_list = set_to_list
     let map_to_list = map_to_list

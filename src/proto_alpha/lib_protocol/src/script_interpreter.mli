@@ -16,6 +16,9 @@ type error += Reject of Script.location * Script.expr * execution_trace option
 type error += Overflow of Script.location * execution_trace option
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
+type error += Cannot_serialize_log
+type error += Cannot_serialize_failure
+type error += Cannot_serialize_storage
 
 type execution_result =
   { ctxt : context ;

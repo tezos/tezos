@@ -57,6 +57,7 @@ val big_map_update :
   ('key, 'value) Script_typed_ir.big_map
 
 val ty_eq :
+  context ->
   'ta Script_typed_ir.ty -> 'tb Script_typed_ir.ty ->
   ('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq tzresult
 
@@ -69,13 +70,16 @@ val unparse_data :
   (Script.node * context) tzresult Lwt.t
 
 val parse_ty :
+  context ->
   allow_big_map: bool ->
   allow_operation: bool ->
   Script.node -> ex_ty tzresult
-val unparse_ty : 'a Script_typed_ir.ty -> Script.node
 
-val parse_toplevel
-  : Script.expr -> (Script.node * Script.node * Script.node) tzresult
+val unparse_ty :
+  context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult Lwt.t
+
+val parse_toplevel :
+  Script.expr -> (Script.node * Script.node * Script.node) tzresult
 
 val typecheck_code :
   context -> Script.expr -> (type_map * context) tzresult Lwt.t

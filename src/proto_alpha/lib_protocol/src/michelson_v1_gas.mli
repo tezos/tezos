@@ -135,9 +135,12 @@ module Cost_of : sig
   end
 
   module Unparse : sig
+    val prim_cost : int -> Gas.cost
+    val seq_cost : int -> Gas.cost
     val cycle : Gas.cost
     val unit : Gas.cost
     val bool : Gas.cost
+    val z : Z.t -> Gas.cost
     val int : 'a Script_int.num -> Gas.cost
     val tez : Gas.cost
     val string : string -> Gas.cost
@@ -155,8 +158,6 @@ module Cost_of : sig
 
     val union : Gas.cost
 
-    val lambda : Gas.cost
-
     val some : Gas.cost
     val none : Gas.cost
 
@@ -164,7 +165,6 @@ module Cost_of : sig
     val set_element : Gas.cost
     val map_element : Gas.cost
 
-    val primitive_type : Gas.cost
     val one_arg_type : Gas.cost
     val two_arg_type : Gas.cost
     val set_to_list : 'a Script_typed_ir.set -> Gas.cost
