@@ -41,7 +41,6 @@ type error += Outdated_double_baking_evidence
   of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
 type error += Invalid_activation of { pkh : Ed25519.Public_key_hash.t }
 type error += Multiple_revelation
-type error += Not_enough_gas_minimal_deserialize
 
 let () =
   register_error_kind
@@ -319,15 +318,7 @@ let () =
           "Multiple revelations were included in a manager operation")
     Data_encoding.empty
     (function Multiple_revelation -> Some () | _ -> None)
-    (fun () -> Multiple_revelation) ;
-  register_error_kind
-    `Permanent
-    ~id:"not_enough_gas.minimal_deserialization"
-    ~title:"Not enough gas for minimal deserialization of transaction parameters"
-    ~description:"Gas quota is not enough for deserializing the transaction parameters, even for the cheapest case"
-    Data_encoding.empty
-    (function Not_enough_gas_minimal_deserialize -> Some () | _ -> None)
-    (fun () -> Not_enough_gas_minimal_deserialize)
+    (fun () -> Multiple_revelation)
 
 open Apply_results
 
@@ -506,7 +497,7 @@ let precheck_manager_contents
         (* Fail if not enough gas for minimal deserialization cost *)
         begin match Gas.consume ctxt (Script.minimal_deserialize_cost arg) with
           | Ok _ -> return ctxt
-          | Error _ -> fail Not_enough_gas_minimal_deserialize
+          | Error _ -> fail Gas.Not_enough_gas_minimal_deserialize_parameters
         end >>=? fun ctxt ->
         Lwt.return @@ Script.force_decode arg >>=? fun (_arg, cost_arg) ->
         Lwt.return @@ Gas.consume ctxt cost_arg
@@ -518,7 +509,7 @@ let precheck_manager_contents
             Gas.consume ctxt (Script.minimal_deserialize_cost script.storage)
           with
           | Ok _ -> return ctxt
-          | Error _ -> fail Not_enough_gas_minimal_deserialize
+          | Error _ -> fail Gas.Not_enough_gas_minimal_deserialize_parameters
         end >>=? fun ctxt ->
         Lwt.return @@ Script.force_decode script.code >>=? fun (_code, cost_code) ->
         Lwt.return @@ Gas.consume ctxt cost_code >>=? fun ctxt ->

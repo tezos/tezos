@@ -143,21 +143,74 @@ module Contract = struct
       (struct let name = ["counter"] end)
       (Z)
 
+  module Make_carbonated_map_expr (N : Storage_sigs.NAME) = struct
+    include Indexed_context.Make_carbonated_map
+        (N)
+        (struct
+          type t = Script_repr.lazy_expr
+          let encoding = Script_repr.lazy_expr_encoding
+        end)
+
+    let consume_deserialize_gas ctxt value =
+      begin match Raw_context.consume_gas ctxt (Script_repr.minimal_deserialize_cost value) with
+          | Ok _ -> return ctxt
+          | Error _ ->
+              fail Script_repr.Not_enough_gas_minimal_deserialize_storage
+      end >>=? fun ctxt ->
+      Lwt.return @@
+      (Script_repr.force_decode value >>? fun (_value, value_cost) ->
+       Raw_context.consume_gas ctxt value_cost)
+
+    let consume_serialize_gas ctxt value =
+      begin match Raw_context.consume_gas ctxt (Script_repr.minimal_serialize_cost value) with
+          | Ok _ -> return ctxt
+          | Error _ ->
+              fail Script_repr.Not_enough_gas_minimal_serialize_storage
+      end >>=? fun ctxt ->
+      Lwt.return @@
+      (Script_repr.force_bytes value >>? fun (_value, value_cost) ->
+       Raw_context.consume_gas ctxt value_cost)
+
+    let get ctxt contract =
+      get ctxt contract >>=? fun (ctxt, value) ->
+      consume_deserialize_gas ctxt value >>|? fun ctxt ->
+      (ctxt, value)
+
+    let get_option ctxt contract =
+      get_option ctxt contract >>=? fun (ctxt, value_opt) ->
+      match value_opt with
+      | None -> return (ctxt, None)
+      | Some value ->
+          consume_deserialize_gas ctxt value >>|? fun ctxt ->
+          (ctxt, value_opt)
+
+    let set ctxt contract value =
+      consume_serialize_gas ctxt value >>=? fun ctxt ->
+      set ctxt contract value
+
+    let set_option ctxt contract value_opt =
+      match value_opt with
+      | None -> set_option ctxt contract None
+      | Some value ->
+          consume_serialize_gas ctxt value >>=? fun ctxt ->
+          set_option ctxt contract value_opt
+
+    let init ctxt contract value =
+      consume_serialize_gas ctxt value >>=? fun ctxt ->
+      init ctxt contract value
+
+    let init_set ctxt contract value =
+      consume_serialize_gas ctxt value >>=? fun ctxt ->
+      init_set ctxt contract value
+  end
+
   module Code =
-    Indexed_context.Make_carbonated_map
+    Make_carbonated_map_expr
       (struct let name = ["code"] end)
-      (struct
-        type t = Script_repr.lazy_expr
-        let encoding = Script_repr.lazy_expr_encoding
-      end)
 
   module Storage =
-    Indexed_context.Make_carbonated_map
+    Make_carbonated_map_expr
       (struct let name = ["storage"] end)
-      (struct
-        type t = Script_repr.lazy_expr
-        let encoding = Script_repr.lazy_expr_encoding
-      end)
 
   type bigmap_key = Raw_context.t * Contract_repr.t
 
