@@ -352,7 +352,8 @@ let apply_manager_operation_content :
             match parameters with
             | None -> return ctxt
             | Some arg ->
-                Lwt.return (Script.force_decode arg) >>=? fun (arg, cost_arg) ->
+                Lwt.return (Script.force_decode arg) >>=? fun (arg, _cost_arg) ->
+                let cost_arg = Script.deserialized_cost arg in
                 Lwt.return (Gas.consume ctxt cost_arg) >>=? fun ctxt ->
                 match Micheline.root arg with
                 | Prim (_, D_Unit, [], _) ->
@@ -380,7 +381,8 @@ let apply_manager_operation_content :
                   let unit = Micheline.strip_locations (Prim (0, Script.D_Unit, [], [])) in
                   return (ctxt, unit)
               | Some parameters ->
-                  Lwt.return (Script.force_decode parameters) >>=? fun (arg, cost_arg) ->
+                  Lwt.return (Script.force_decode parameters) >>=? fun (arg, _cost_arg) ->
+                  let cost_arg = Script.deserialized_cost arg in
                   Lwt.return (Gas.consume ctxt cost_arg) >>=? fun ctxt ->
                   return (ctxt, arg)
             end >>=? fun (ctxt, parameter) ->
@@ -414,6 +416,10 @@ let apply_manager_operation_content :
         begin match script with
           | None -> return (None, ctxt)
           | Some script ->
+              Lwt.return (Script.force_decode script.storage) >>=? fun (ustorage, _) ->
+              Lwt.return (Gas.consume ctxt (Script.deserialized_cost ustorage)) >>=? fun ctxt ->
+              Lwt.return (Script.force_decode script.storage) >>=? fun (ucode, _) ->
+              Lwt.return (Gas.consume ctxt (Script.deserialized_cost ucode)) >>=? fun ctxt ->
               Script_ir_translator.parse_script ctxt script >>=? fun (_, ctxt) ->
               Script_ir_translator.erase_big_map_initialization ctxt Optimized script >>=? fun (script, big_map_diff, ctxt) ->
               return (Some (script, big_map_diff), ctxt)
@@ -486,6 +492,7 @@ let precheck_manager_contents
   : context tzresult Lwt.t =
   let Manager_operation { source ; fee ; counter ; operation ; gas_limit ; storage_limit } = op in
   Lwt.return (Gas.check_limit ctxt gas_limit) >>=? fun () ->
+  let ctxt = Gas.set_limit ctxt gas_limit in
   Lwt.return (Fees.check_storage_limit ctxt storage_limit) >>=? fun () ->
   Contract.must_be_allocated ctxt source >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
