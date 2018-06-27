@@ -50,9 +50,15 @@ done
 # inline some of the test and doc dependencies.
 extra_packages="depext alcotest-lwt ocp-indent odoc ounit crowbar"
 
-git clone $opam_repository_url "$tmp_dir/opam-repository-master"
-git -C "$tmp_dir"/opam-repository-master reset --hard $opam_repository_tag
-rm -rf "$tmp_dir"/opam-repository-master/.git
+if ! [ -f "$build_dir"/opam-repository-$opam_repository_tag.tar.gz ]; then
+    echo
+    echo "### Fetching opam-repository-$opam_repository_tag.tar.gz ..."
+    echo
+    mkdir -p "$build_dir"
+    wget -O "$build_dir"/opam-repository-$opam_repository_tag.tgz \
+         https://gitlab.com/tezos/opam-repository/-/archive/$opam_repository_tag/opam-repository-$opam_repository_tag.tar.gz
+fi
+tar -C "$tmp_dir" -xzf "$build_dir"/opam-repository-$opam_repository_tag.tgz
 
 ## HACK: Once opam2 is released, we should use the `ocaml/opam` image
 ## instead of this custom installation of ocaml and opam.
@@ -67,15 +73,15 @@ echo
 cat <<EOF > "$tmp_dir"/Dockerfile
 FROM alpine:3.7
 ENV PACKAGER "Tezos <ci@tezos.com>"
-COPY opam-repository-master opam-repository-master
+COPY opam-repository-$opam_repository_tag opam-repository-$opam_repository_tag
 COPY opam /usr/local/bin/opam
 RUN apk add --no-cache ocaml build-base m4 tar xz bzip2 curl perl rsync
-RUN opam init --disable-sandboxing --no-setup --yes default ./opam-repository-master
+RUN opam init --disable-sandboxing --no-setup --yes default ./opam-repository-$opam_repository_tag
 RUN opam install --yes opam-bundle
 COPY opam-repository-tezos opam-repository-tezos
 RUN opam bundle --yes --output="tezos_bundle-$ocaml_version-$opam_repository_tag" \
                 --repository=opam-repository-tezos \
-                --repository=opam-repository-master \
+                --repository=opam-repository-$opam_repository_tag \
                 --ocaml=$ocaml_version \
                 $packages $extra_packages
 EOF

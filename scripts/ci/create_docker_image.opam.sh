@@ -79,7 +79,7 @@ RUN mkdir ~/.ssh && \
 
 RUN opam install --switch=/home/opam/tezos --yes opam-depext
 
-ENTRYPOINT [ "opam", "exec", "--" ]
+ENTRYPOINT [ "opam", "exec", "--set-switch", "--switch=/home/opam/tezos", "--" ]
 CMD [ "/bin/bash" ]
 EOF
 
