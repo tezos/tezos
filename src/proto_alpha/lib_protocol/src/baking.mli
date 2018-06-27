@@ -44,7 +44,7 @@ val endorsement_rights:
 (** Check that the operation was signed by a delegate allowed
     to endorse at the level specified by the endorsement. *)
 val check_endorsement_rights:
-  context -> Kind.endorsement Operation.t ->
+  context -> Chain_id.t -> Kind.endorsement Operation.t ->
   (public_key_hash * int list * bool) tzresult Lwt.t
 
 (** Returns the endorsement reward calculated w.r.t a given priority.  *)
@@ -67,9 +67,9 @@ val first_baking_priorities:
   Level.t ->
   int list tzresult Lwt.t
 
-(** [check_signature ctxt block id] check if the block is signed with
-    the given key *)
-val check_signature: Block_header.t -> public_key -> unit tzresult Lwt.t
+(** [check_signature ctxt chain_id block id] check if the block is
+    signed with the given key, and belongs to the given [chain_id] *)
+val check_signature: Block_header.t -> Chain_id.t -> public_key -> unit tzresult Lwt.t
 
 (** Checks if the header that would be built from the given components
     is valid for the given diffculty. The signature is not passed as it

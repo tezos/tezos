@@ -78,6 +78,7 @@ type validation_mode =
 
 type validation_state =
   { mode : validation_mode ;
+    chain_id : Chain_id.t ;
     ctxt : Alpha_context.t ;
     op_count : int ;
   }
@@ -86,6 +87,7 @@ let current_context { ctxt ; _ } =
   return (Alpha_context.finalize ctxt).context
 
 let begin_partial_application
+    ~chain_id
     ~ancestor_context:ctxt
     ~predecessor_timestamp
     ~predecessor_fitness
@@ -95,13 +97,14 @@ let begin_partial_application
   let timestamp = block_header.shell.timestamp in
   Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
-    ctxt block_header predecessor_timestamp >>=? fun (ctxt, baker) ->
+    ctxt chain_id block_header predecessor_timestamp >>=? fun (ctxt, baker) ->
   let mode =
     Partial_application
       { block_header ; baker = Signature.Public_key.hash baker } in
-  return { mode ; ctxt ; op_count = 0 }
+  return { mode ; chain_id ; ctxt ; op_count = 0 }
 
 let begin_application
+    ~chain_id
     ~predecessor_context:ctxt
     ~predecessor_timestamp
     ~predecessor_fitness
@@ -111,11 +114,12 @@ let begin_application
   let timestamp = block_header.shell.timestamp in
   Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
-    ctxt block_header predecessor_timestamp >>=? fun (ctxt, baker) ->
+    ctxt chain_id block_header predecessor_timestamp >>=? fun (ctxt, baker) ->
   let mode = Application { block_header ; baker = Signature.Public_key.hash baker } in
-  return { mode ; ctxt ; op_count = 0 }
+  return { mode ; chain_id ; ctxt ; op_count = 0 }
 
 let begin_construction
+    ~chain_id
     ~predecessor_context:ctxt
     ~predecessor_timestamp:pred_timestamp
     ~predecessor_level:pred_level
@@ -142,10 +146,10 @@ let begin_construction
           Full_construction { predecessor ; baker ; protocol_data } in
         return (mode, ctxt)
   end >>=? fun (mode, ctxt) ->
-  return { mode ; ctxt ; op_count = 0 }
+  return { mode ; chain_id ; ctxt ; op_count = 0 }
 
 let apply_operation
-    ({ mode ; ctxt ; op_count ; _ } as data)
+    ({ mode ; chain_id ; ctxt ; op_count ; _ } as data)
     (operation : Alpha_context.packed_operation) =
   match mode with
   | Partial_application _ when
@@ -169,7 +173,7 @@ let apply_operation
         | Partial_construction { predecessor }
           -> predecessor, Signature.Public_key_hash.zero
       in
-      Apply.apply_operation ctxt Optimized predecessor baker
+      Apply.apply_operation ctxt chain_id Optimized predecessor baker
         (Alpha_context.Operation.hash operation)
         operation >>=? fun (ctxt, result) ->
       let op_count = op_count + 1 in

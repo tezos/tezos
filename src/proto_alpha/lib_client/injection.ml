@@ -21,7 +21,8 @@ let get_branch (rpc_config: #Proto_alpha.full)
     | `Genesis -> return `Genesis
   end >>=? fun block ->
   Shell_services.Blocks.hash rpc_config ~chain ~block () >>=? fun hash ->
-  return hash
+  Shell_services.Chain.chain_id rpc_config ~chain () >>=? fun chain_id ->
+  return (chain_id, hash)
 
 type 'kind preapply_result =
   Operation_hash.t * 'kind operation * 'kind operation_metadata
@@ -35,21 +36,23 @@ type 'kind result =
 let preapply (type t)
     (cctxt: #Proto_alpha.full) ~chain ~block
     ?branch ?src_sk (contents : t contents_list) =
-  get_branch cctxt ~chain ~block branch >>=? fun branch ->
+  get_branch cctxt ~chain ~block branch >>=? fun (chain_id, branch) ->
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Operation.unsigned_encoding
       ({ branch }, Contents_list contents) in
-  let watermark =
-    match contents with
-    | Single (Endorsement _) -> Signature.Endorsement
-    | _ -> Signature.Generic_operation in
   begin
     match src_sk with
     | None -> return_none
     | Some src_sk ->
-        Client_keys.sign cctxt
-          ~watermark src_sk bytes >>=? fun signature ->
+        begin match contents with
+          | Single (Endorsement _) ->
+              Client_keys.sign cctxt
+                ~watermark:Signature.(Endorsement chain_id) src_sk bytes
+          | _ ->
+              Client_keys.sign cctxt
+                ~watermark:Signature.Generic_operation src_sk bytes
+        end >>=? fun signature ->
         return_some signature
   end >>=? fun signature ->
   let op : _ Operation.t =
@@ -71,7 +74,7 @@ let preapply (type t)
 let simulate (type t)
     (cctxt: #Proto_alpha.full) ~chain ~block
     ?branch (contents : t contents_list) =
-  get_branch cctxt ~chain ~block branch >>=? fun branch ->
+  get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
   let op : _ Operation.t =
     { shell = { branch } ;
       protocol_data = { contents ; signature = None } } in

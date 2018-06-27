@@ -118,7 +118,8 @@ module Forge = struct
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding
         (shell, contents) in
-    let signature = Signature.sign ~watermark:Signature.Block_header delegate.sk unsigned_bytes in
+    let signature =
+      Signature.sign ~watermark:Signature.(Block_header Chain_id.zero) delegate.sk unsigned_bytes in
     Block_header.{ shell ; protocol_data = { contents ; signature } } |>
     return
 
@@ -321,6 +322,7 @@ let apply header ?(operations = []) pred =
   begin
     let open Alpha_environment.Error_monad in
     Proto_alpha.Main.begin_application
+      ~chain_id: Chain_id.zero
       ~predecessor_context: pred.context
       ~predecessor_fitness: pred.header.shell.fitness
       ~predecessor_timestamp: pred.header.shell.timestamp

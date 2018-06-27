@@ -82,18 +82,21 @@ module Make (Context : CONTEXT) = struct
     type validation_state
     val current_context: validation_state -> context tzresult Lwt.t
     val begin_partial_application:
+      chain_id: Chain_id.t ->
       ancestor_context: context ->
       predecessor_timestamp: Time.t ->
       predecessor_fitness: Fitness.t ->
       block_header ->
       validation_state tzresult Lwt.t
     val begin_application:
+      chain_id: Chain_id.t ->
       predecessor_context: context ->
       predecessor_timestamp: Time.t ->
       predecessor_fitness: Fitness.t ->
       block_header ->
       validation_state tzresult Lwt.t
     val begin_construction:
+      chain_id: Chain_id.t ->
       predecessor_context: context ->
       predecessor_timestamp: Time.t ->
       predecessor_level: Int32.t ->
@@ -128,6 +131,7 @@ module Make (Context : CONTEXT) = struct
        and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
+       and type Chain_id.t = Chain_id.t
        and type Block_hash.t = Block_hash.t
        and type Operation_hash.t = Operation_hash.t
        and type Operation_list_hash.t = Operation_list_hash.t
@@ -397,6 +401,7 @@ module Make (Context : CONTEXT) = struct
       | Ok _ as ok -> ok
       | Error errors -> Error (List.map (fun error -> Ecoproto_error error) errors)
 
+    module Chain_id = Chain_id
     module Block_hash = Block_hash
     module Operation_hash = Operation_hash
     module Operation_list_hash = Operation_list_hash
@@ -642,25 +647,25 @@ module Make (Context : CONTEXT) = struct
     module Lift(P : Updater.PROTOCOL) = struct
       include P
       let begin_partial_application
-          ~ancestor_context ~predecessor_timestamp ~predecessor_fitness
+          ~chain_id ~ancestor_context ~predecessor_timestamp ~predecessor_fitness
           raw_block =
         begin_partial_application
-          ~ancestor_context ~predecessor_timestamp ~predecessor_fitness
+          ~chain_id ~ancestor_context ~predecessor_timestamp ~predecessor_fitness
           raw_block >|= wrap_error
       let begin_application
-          ~predecessor_context ~predecessor_timestamp
+          ~chain_id ~predecessor_context ~predecessor_timestamp
           ~predecessor_fitness
           raw_block =
         begin_application
-          ~predecessor_context ~predecessor_timestamp
+          ~chain_id ~predecessor_context ~predecessor_timestamp
           ~predecessor_fitness
           raw_block >|= wrap_error
       let begin_construction
-          ~predecessor_context ~predecessor_timestamp
+          ~chain_id ~predecessor_context ~predecessor_timestamp
           ~predecessor_level ~predecessor_fitness
           ~predecessor ~timestamp ?protocol_data () =
         begin_construction
-          ~predecessor_context ~predecessor_timestamp
+          ~chain_id ~predecessor_context ~predecessor_timestamp
           ~predecessor_level ~predecessor_fitness
           ~predecessor ~timestamp ?protocol_data () >|= wrap_error
       let current_context c =

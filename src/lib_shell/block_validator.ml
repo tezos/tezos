@@ -184,6 +184,7 @@ let apply_block
     pred_context pred_hash header.shell.timestamp >>= fun context ->
   (* TODO wrap 'proto_error' into 'block_error' *)
   Proto.begin_application
+    ~chain_id: (State.Chain.id chain_state)
     ~predecessor_context:context
     ~predecessor_timestamp:pred_header.shell.timestamp
     ~predecessor_fitness:pred_header.shell.fitness

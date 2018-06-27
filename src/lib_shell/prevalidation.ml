@@ -65,7 +65,7 @@ let start_prevalidation
     State.Block.header predecessor in
   State.Block.context predecessor >>= fun predecessor_context ->
   Context.get_protocol predecessor_context >>= fun protocol ->
-  let predecessor = State.Block.hash predecessor in
+  let predecessor_hash = State.Block.hash predecessor in
   begin
     match Registered_protocol.get protocol with
     | None ->
@@ -77,7 +77,7 @@ let start_prevalidation
         return protocol
   end >>=? fun (module Proto) ->
   Context.reset_test_chain
-    predecessor_context predecessor
+    predecessor_context predecessor_hash
     timestamp >>= fun predecessor_context ->
   begin
     match protocol_data with
@@ -92,11 +92,12 @@ let start_prevalidation
         | Some protocol_data -> return_some protocol_data
   end >>=? fun protocol_data ->
   Proto.begin_construction
+    ~chain_id: (State.Block.chain_id predecessor)
     ~predecessor_context
     ~predecessor_timestamp
     ~predecessor_fitness
     ~predecessor_level
-    ~predecessor
+    ~predecessor: predecessor_hash
     ~timestamp
     ?protocol_data
     ()

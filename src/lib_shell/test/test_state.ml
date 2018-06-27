@@ -97,6 +97,7 @@ let build_valid_chain state vtbl pred names =
            let pred_header = State.Block.header pred in
            begin
              Proto.begin_application
+               ~chain_id: Chain_id.zero
                ~predecessor_context
                ~predecessor_timestamp: pred_header.shell.timestamp
                ~predecessor_fitness: pred_header.shell.fitness

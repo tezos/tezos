@@ -480,7 +480,7 @@ let apply_internal_manager_operations ctxt mode ~payer ops =
   apply ctxt [] ops
 
 let precheck_manager_contents
-    (type kind) ctxt raw_operation (op : kind Kind.manager contents)
+    (type kind) ctxt chain_id raw_operation (op : kind Kind.manager contents)
   : context tzresult Lwt.t =
   let Manager_operation { source ; fee ; counter ; operation ; gas_limit ; storage_limit } = op in
   Lwt.return (Gas.check_limit ctxt gas_limit) >>=? fun () ->
@@ -498,7 +498,7 @@ let precheck_manager_contents
      all operations are required to be from the same manager. This may
      change in the future, allowing several managers to group-sign a
      sequence of transactions.  *)
-  Operation.check_signature public_key raw_operation >>=? fun () ->
+  Operation.check_signature public_key chain_id raw_operation >>=? fun () ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
   Contract.spend ctxt source fee >>=? fun ctxt ->
   add_fees ctxt fee >>=? fun ctxt ->
@@ -561,15 +561,15 @@ let rec mark_skipped
 
 let rec precheck_manager_contents_list
   : type kind.
-    Alpha_context.t -> _ Operation.t -> kind Kind.manager contents_list ->
+    Alpha_context.t -> Chain_id.t -> _ Operation.t -> kind Kind.manager contents_list ->
     context tzresult Lwt.t =
-  fun ctxt raw_operation contents_list ->
+  fun ctxt chain_id raw_operation contents_list ->
     match contents_list with
     | Single (Manager_operation _ as op) ->
-        precheck_manager_contents ctxt raw_operation op
+        precheck_manager_contents ctxt chain_id raw_operation op
     | Cons (Manager_operation _ as op, rest) ->
-        precheck_manager_contents ctxt raw_operation op >>=? fun ctxt ->
-        precheck_manager_contents_list ctxt raw_operation rest
+        precheck_manager_contents ctxt chain_id raw_operation op >>=? fun ctxt ->
+        precheck_manager_contents_list ctxt chain_id raw_operation rest
 
 let rec apply_manager_contents_list_rec
   : type kind.
@@ -656,7 +656,7 @@ let apply_manager_contents_list ctxt mode baker contents_list =
   | `Success ctxt -> Lwt.return (ctxt, results)
 
 let apply_contents_list
-    (type kind) ctxt mode pred_block baker
+    (type kind) ctxt chain_id mode pred_block baker
     (operation : kind operation)
     (contents_list : kind contents_list)
   : (context * kind contents_result_list) tzresult Lwt.t =
@@ -670,7 +670,7 @@ let apply_contents_list
       fail_unless
         Raw_level.(succ level = current_level)
         Invalid_endorsement_level >>=? fun () ->
-      Baking.check_endorsement_rights ctxt operation >>=? fun (delegate, slots, used) ->
+      Baking.check_endorsement_rights ctxt chain_id operation >>=? fun (delegate, slots, used) ->
       if used then fail (Duplicate_endorsement delegate)
       else
         let ctxt = record_endorsement ctxt delegate in
@@ -716,8 +716,8 @@ let apply_contents_list
             (Outdated_double_endorsement_evidence
                { level = level.level ;
                  last = oldest_level }) >>=? fun () ->
-          Baking.check_endorsement_rights ctxt op1 >>=? fun (delegate1, _, _) ->
-          Baking.check_endorsement_rights ctxt op2 >>=? fun (delegate2, _, _) ->
+          Baking.check_endorsement_rights ctxt chain_id op1 >>=? fun (delegate1, _, _) ->
+          Baking.check_endorsement_rights ctxt chain_id op2 >>=? fun (delegate2, _, _) ->
           fail_unless
             (Signature.Public_key_hash.equal delegate1 delegate2)
             (Inconsistent_double_endorsement_evidence
@@ -765,10 +765,10 @@ let apply_contents_list
       let level = Level.from_raw ctxt raw_level in
       Roll.baking_rights_owner
         ctxt level ~priority:bh1.protocol_data.contents.priority >>=? fun delegate1 ->
-      Baking.check_signature bh1 delegate1 >>=? fun () ->
+      Baking.check_signature bh1 chain_id delegate1 >>=? fun () ->
       Roll.baking_rights_owner
         ctxt level ~priority:bh2.protocol_data.contents.priority >>=? fun delegate2 ->
-      Baking.check_signature bh2 delegate2 >>=? fun () ->
+      Baking.check_signature bh2 chain_id delegate2 >>=? fun () ->
       fail_unless
         (Signature.Public_key.equal delegate1 delegate2)
         (Inconsistent_double_baking_evidence
@@ -805,7 +805,7 @@ let apply_contents_list
     end
   | Single (Proposals { source ; period ; proposals }) ->
       Roll.delegate_pubkey ctxt source >>=? fun delegate ->
-      Operation.check_signature delegate operation >>=? fun () ->
+      Operation.check_signature delegate chain_id operation >>=? fun () ->
       let level = Level.current ctxt in
       fail_unless Voting_period.(level.voting_period = period)
         (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
@@ -813,25 +813,25 @@ let apply_contents_list
       return (ctxt, Single_result Proposals_result)
   | Single (Ballot { source ; period ; proposal ; ballot }) ->
       Roll.delegate_pubkey ctxt source >>=? fun delegate ->
-      Operation.check_signature delegate operation >>=? fun () ->
+      Operation.check_signature delegate chain_id operation >>=? fun () ->
       let level = Level.current ctxt in
       fail_unless Voting_period.(level.voting_period = period)
         (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
       Amendment.record_ballot ctxt source proposal ballot >>=? fun ctxt ->
       return (ctxt, Single_result Ballot_result)
   | Single (Manager_operation _) as op ->
-      precheck_manager_contents_list ctxt operation op >>=? fun ctxt ->
+      precheck_manager_contents_list ctxt chain_id operation op >>=? fun ctxt ->
       apply_manager_contents_list ctxt mode baker op >>= fun (ctxt, result) ->
       return (ctxt, result)
   | Cons (Manager_operation _, _) as op ->
-      precheck_manager_contents_list ctxt operation op >>=? fun ctxt ->
+      precheck_manager_contents_list ctxt chain_id operation op >>=? fun ctxt ->
       apply_manager_contents_list ctxt mode baker op >>= fun (ctxt, result) ->
       return (ctxt, result)
 
-let apply_operation ctxt mode pred_block baker hash operation =
+let apply_operation ctxt chain_id mode pred_block baker hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash in
   apply_contents_list
-    ctxt mode pred_block baker operation
+    ctxt chain_id mode pred_block baker operation
     operation.protocol_data.contents >>=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
   let ctxt = Contract.unset_origination_nonce ctxt in
@@ -879,13 +879,13 @@ let begin_partial_construction ctxt =
       let ctxt = init_endorsements ctxt rights in
       return ctxt
 
-let begin_application ctxt block_header pred_timestamp =
+let begin_application ctxt chain_id block_header pred_timestamp =
   let current_level = Alpha_context.Level.current ctxt in
   Baking.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
   Baking.check_baking_rights
     ctxt block_header.protocol_data.contents pred_timestamp >>=? fun delegate_pk ->
-  Baking.check_signature block_header delegate_pk >>=? fun () ->
+  Baking.check_signature block_header chain_id delegate_pk >>=? fun () ->
   let has_commitment =
     match block_header.protocol_data.contents.seed_nonce_hash with
     | None -> false

@@ -241,6 +241,7 @@ let build_raw_rpc_directory
     let predecessor = State.Block.hash block in
     let header = State.Block.shell_header block in
     Next_proto.begin_construction
+      ~chain_id: (State.Block.chain_id block)
       ~predecessor_context:ctxt
       ~predecessor_timestamp:header.timestamp
       ~predecessor_level:header.level

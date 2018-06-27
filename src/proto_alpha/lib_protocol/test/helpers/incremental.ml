@@ -64,6 +64,7 @@ let begin_construction ?(priority=0) ?timestamp (predecessor : Block.t) =
     } ;
   } in
   M.begin_construction
+    ~chain_id: Chain_id.zero
     ~predecessor_context: predecessor.context
     ~predecessor_timestamp: predecessor.header.shell.timestamp
     ~predecessor_fitness: predecessor.header.shell.fitness

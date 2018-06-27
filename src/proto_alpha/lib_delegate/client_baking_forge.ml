@@ -75,7 +75,8 @@ let forge_block_header
     Data_encoding.Binary.to_bytes_exn
       Alpha_context.Block_header.unsigned_encoding
       (shell, contents) in
-  Client_keys.append cctxt delegate_sk ~watermark:Block_header unsigned_header
+  Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
+  Client_keys.append cctxt delegate_sk ~watermark:(Block_header chain_id) unsigned_header
 
 let forge_faked_protocol_data ~priority ~seed_nonce_hash =
   Alpha_context.Block_header.{

@@ -57,6 +57,7 @@ let begin_construction (_cctxt : #Proto_alpha.full) index predecessor =
           operations_hash = Operation_list_list_hash.zero ;
         } in
       Main.begin_construction
+        ~chain_id: predecessor.chain_id
         ~predecessor_context: context
         ~predecessor_timestamp: header.timestamp
         ~predecessor_fitness: header.fitness

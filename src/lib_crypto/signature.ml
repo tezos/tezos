@@ -25,8 +25,8 @@ type secret_key =
   | P256 of P256.Secret_key.t
 
 type watermark =
-  | Block_header
-  | Endorsement
+  | Block_header of Chain_id.t
+  | Endorsement of Chain_id.t
   | Generic_operation
   | Custom of MBytes.t
 
@@ -502,8 +502,8 @@ let of_p256 s = P256 s
 let zero = of_ed25519 Ed25519.zero
 
 let bytes_of_watermark = function
-  | Block_header      -> MBytes.of_string "\x01"
-  | Endorsement       -> MBytes.of_string "\x02"
+  | Block_header chain_id -> MBytes.concat "" [ MBytes.of_string "\x01" ; Chain_id.to_bytes chain_id ]
+  | Endorsement chain_id -> MBytes.concat "" [ MBytes.of_string "\x02" ; Chain_id.to_bytes chain_id ]
   | Generic_operation -> MBytes.of_string "\x03"
   | Custom bytes      -> bytes
 

@@ -23,8 +23,8 @@ type secret_key =
   | P256 of P256.Secret_key.t
 
 type watermark =
-  | Block_header
-  | Endorsement
+  | Block_header of Chain_id.t
+  | Endorsement of Chain_id.t
   | Generic_operation
   | Custom of MBytes.t
 
