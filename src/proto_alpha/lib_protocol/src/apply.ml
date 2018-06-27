@@ -545,7 +545,7 @@ let rec mark_skipped
            { balance_updates =
                cleanup_balance_updates
                  [ Contract source, Debited fee ;
-                   Rewards (baker, level.cycle), Credited fee ] ;
+                   Fees (baker, level.cycle), Credited fee ] ;
              operation_result = Skipped (manager_kind op.operation) ;
              internal_operation_results = [] })
   | Cons (Manager_operation ({ source ; fee } as op), rest) ->
@@ -554,7 +554,7 @@ let rec mark_skipped
             balance_updates =
               cleanup_balance_updates
                 [ Contract source, Debited fee ;
-                  Rewards (baker, level.cycle), Credited fee ] ;
+                  Fees (baker, level.cycle), Credited fee ] ;
             operation_result = Skipped (manager_kind op.operation) ;
             internal_operation_results = [] },
          mark_skipped ~baker level rest)
@@ -588,7 +588,7 @@ let rec apply_manager_contents_list_rec
             balance_updates =
               cleanup_balance_updates
                 [ Contract source, Debited fee ;
-                  Rewards (baker, level.cycle), Credited fee ] ;
+                  Fees (baker, level.cycle), Credited fee ] ;
             operation_result ;
             internal_operation_results ;
           } in
@@ -602,7 +602,7 @@ let rec apply_manager_contents_list_rec
                 balance_updates =
                   cleanup_balance_updates
                     [ Contract source, Debited fee ;
-                      Rewards (baker, level.cycle), Credited fee ] ;
+                      Fees (baker, level.cycle), Credited fee ] ;
                 operation_result ;
                 internal_operation_results ;
               } in
@@ -613,7 +613,7 @@ let rec apply_manager_contents_list_rec
                 balance_updates =
                   cleanup_balance_updates
                     [ Contract source, Debited fee ;
-                      Rewards (baker, level.cycle), Credited fee ] ;
+                      Fees (baker, level.cycle), Credited fee ] ;
                 operation_result ;
                 internal_operation_results ;
               } in
