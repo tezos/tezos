@@ -18,6 +18,7 @@ type block_info = {
   timestamp: Time.t ;
   protocol: Protocol_hash.t ;
   next_protocol: Protocol_hash.t ;
+  proto_level: int ;
   level: Raw_level.t ;
   context : Context_hash.t ;
 }
