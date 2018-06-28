@@ -143,6 +143,8 @@ module Contract = struct
       (struct let name = ["counter"] end)
       (Z)
 
+  (* Consume gas for serilization and deserialization of expr in this
+     module *)
   module Make_carbonated_map_expr (N : Storage_sigs.NAME) = struct
     module I = Indexed_context.Make_carbonated_map
         (N)
@@ -213,16 +215,48 @@ module Contract = struct
 
   type bigmap_key = Raw_context.t * Contract_repr.t
 
-  module Big_map =
-    Storage_functors.Make_indexed_carbonated_data_storage
-      (Make_subcontext
-         (Indexed_context.Raw_context)
-         (struct let name = ["big_map"] end))
-      (Make_index(Script_expr_hash))
-      (struct
-        type t = Script_repr.expr
-        let encoding = Script_repr.expr_encoding
-      end)
+  (* Consume gas for serilization and deserialization of expr in this
+     module *)
+  module Big_map = struct
+    module I = Storage_functors.Make_indexed_carbonated_data_storage
+        (Make_subcontext
+           (Indexed_context.Raw_context)
+           (struct let name = ["big_map"] end))
+        (Make_index(Script_expr_hash))
+        (struct
+          type t = Script_repr.expr
+          let encoding = Script_repr.expr_encoding
+        end)
+
+    type context = I.context
+    type key = I.key
+    type value = I.value
+
+    let mem = I.mem
+    let delete = I.delete
+    let remove = I.remove
+    let set = I.set
+    let set_option = I.set_option
+    let init = I.init
+    let init_set = I.init_set
+
+    let consume_deserialize_gas ctxt value =
+      Lwt.return @@
+      Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
+
+    let get ctxt contract =
+      I.get ctxt contract >>=? fun (ctxt, value) ->
+      consume_deserialize_gas ctxt value >>|? fun ctxt ->
+      (ctxt, value)
+
+    let get_option ctxt contract =
+      I.get_option ctxt contract >>=? fun (ctxt, value_opt) ->
+      match value_opt with
+      | None -> return (ctxt, None)
+      | Some value ->
+          consume_deserialize_gas ctxt value >>|? fun ctxt ->
+          (ctxt, value_opt)
+  end
 
   module Paid_storage_space =
     Indexed_context.Make_map

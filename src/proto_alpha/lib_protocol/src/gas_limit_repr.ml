@@ -165,6 +165,9 @@ let ( *@ ) x y =
     bytes_read = Z.mul (Z.of_int x) y.bytes_read ;
     bytes_written = Z.mul (Z.of_int x) y.bytes_written }
 
+let alloc_mbytes_cost n =
+  alloc_cost 12 +@ alloc_bytes_cost n
+
 let () =
   let open Data_encoding in
   register_error_kind

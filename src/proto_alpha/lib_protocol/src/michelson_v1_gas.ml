@@ -32,7 +32,7 @@ module Cost_of = struct
     alloc_bytes_cost length
 
   let bytes length =
-    alloc_cost 12 +@ alloc_bytes_cost length
+    alloc_mbytes_cost length
 
   let concat s1 s2 =
     string (String.length s1 + String.length s2)

@@ -135,7 +135,7 @@ let deserialized_cost expr =
 
 let serialized_cost bytes =
   let open Gas_limit_repr in
-  alloc_cost 12 +@ alloc_bytes_cost (MBytes.length bytes)
+  alloc_mbytes_cost (MBytes.length bytes)
 
 let force_decode lexpr =
   match Data_encoding.force_decode lexpr with
