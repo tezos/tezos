@@ -198,8 +198,8 @@ val lazy_encoding : 'a encoding -> 'a lazy_t encoding
 val force_decode : 'a lazy_t -> 'a option
 val force_bytes : 'a lazy_t -> MBytes.t
 val make_lazy : 'a encoding -> 'a -> 'a lazy_t
-val fold_lazy :
-  ('a -> 'b) -> (MBytes.t -> 'b) -> ('b -> 'b -> 'b) ->
+val apply_lazy :
+  fun_value:('a -> 'b) -> fun_bytes:(MBytes.t -> 'b) -> fun_combine:('b -> 'b -> 'b) ->
   'a lazy_t -> 'b
 
 module Json : sig

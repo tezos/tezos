@@ -233,11 +233,14 @@ module Cost_of = struct
     let operation b = bytes b
     let type_ nb_args = alloc_cost (nb_args + 1)
 
+    (* Cost of parsing instruction, is cost of allocation of
+       constructor + cost of contructor parameters + cost of
+       allocation on the stack type *)
     let instr
       : type b a. (b, a) Script_typed_ir.instr -> cost
       = fun i ->
         let open Script_typed_ir in
-        alloc_cost 1 +@
+        alloc_cost 1 +@ (* cost of allocation of constructor *)
         match i with
         | Drop -> alloc_cost 0
         | Dup -> alloc_cost 1

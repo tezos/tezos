@@ -135,16 +135,16 @@ let deserialized_cost expr =
 
 let serialized_cost bytes =
   let open Gas_limit_repr in
-  alloc_bytes_cost (MBytes.length bytes)
+  alloc_cost 12 +@ alloc_bytes_cost (MBytes.length bytes)
 
 let force_decode lexpr =
   match Data_encoding.force_decode lexpr with
   | Some v ->
       let deserialize_cost =
-        Data_encoding.fold_lazy
-          (fun _ -> Gas_limit_repr.free)
-          (fun _ -> deserialized_cost v)
-          (fun c_free _ -> c_free)
+        Data_encoding.apply_lazy
+          ~fun_value:(fun _ -> Gas_limit_repr.free)
+          ~fun_bytes:(fun _ -> deserialized_cost v)
+          ~fun_combine:(fun c_free _ -> c_free)
           lexpr in
       ok (v, deserialize_cost)
   | None -> error Lazy_script_decode
@@ -154,18 +154,17 @@ let force_bytes expr =
   match Data_encoding.force_bytes expr with
   | bytes ->
       let serialize_cost =
-        Data_encoding.fold_lazy
-          (fun v -> traversal_cost v +@ serialized_cost bytes)
-          (fun _ -> Gas_limit_repr.free)
-          (fun _ c_free -> c_free)
+        Data_encoding.apply_lazy
+          ~fun_value:(fun v -> traversal_cost v +@ serialized_cost bytes)
+          ~fun_bytes:(fun _ -> Gas_limit_repr.free)
+          ~fun_combine:(fun _ c_free -> c_free)
           expr in
       ok (bytes, serialize_cost)
   | exception _ -> error Lazy_script_decode
 
 let minimal_deserialize_cost lexpr =
-  let open Gas_limit_repr in
-  Data_encoding.fold_lazy
-    (fun _ -> Gas_limit_repr.free)
-    (fun b -> alloc_bytes_cost (MBytes.length b))
-    (fun c_free _ -> c_free)
+  Data_encoding.apply_lazy
+    ~fun_value:(fun _ -> Gas_limit_repr.free)
+    ~fun_bytes:(fun b -> serialized_cost b)
+    ~fun_combine:(fun c_free _ -> c_free)
     lexpr

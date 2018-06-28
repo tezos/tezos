@@ -140,6 +140,7 @@ module Gas : sig
   val set_limit: context -> Z.t -> context
   val set_unlimited: context -> context
   val consume: context -> cost -> context tzresult
+  val check_enough: context -> cost -> unit tzresult
   val level: context -> t
   val consumed: since: context -> until: context -> Z.t
   val block_level: context -> Z.t
@@ -311,9 +312,9 @@ module Script : sig
   val prim_node_cost_nonrec_of_length : int -> annot -> Gas.cost
   val seq_node_cost_nonrec : expr list -> Gas.cost
   val seq_node_cost_nonrec_of_length : int -> Gas.cost
-  val force_decode : lazy_expr -> (expr * Gas.cost) tzresult
-  val force_bytes : lazy_expr -> (MBytes.t * Gas.cost) tzresult
   val minimal_deserialize_cost : lazy_expr -> Gas.cost
+  val force_decode : context -> lazy_expr -> (expr * context) tzresult Lwt.t
+  val force_bytes : context -> lazy_expr -> (MBytes.t * context) tzresult Lwt.t
 end
 
 module Constants : sig

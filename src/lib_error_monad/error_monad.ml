@@ -557,6 +557,20 @@ module Make(Prefix : sig val id : string end) = struct
     | Error errs -> Lwt.return (Error (err :: errs))
     | ok -> Lwt.return ok
 
+  let record_trace_eval mk_err result =
+    match result with
+    | Ok _ as res -> res
+    | Error errs ->
+        mk_err () >>? fun err ->
+        Error (err :: errs)
+
+  let trace_eval mk_err f =
+    f >>= function
+    | Error errs ->
+        mk_err () >>=? fun err ->
+        Lwt.return (Error (err :: errs))
+    | ok -> Lwt.return ok
+
   let fail_unless cond exn =
     if cond then return_unit else fail exn
 

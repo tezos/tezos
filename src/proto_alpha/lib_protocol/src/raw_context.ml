@@ -173,6 +173,8 @@ let set_gas_unlimited ctxt =
 let consume_gas ctxt cost =
   Gas_limit_repr.consume ctxt.block_gas ctxt.operation_gas cost >>? fun (block_gas, operation_gas) ->
   ok { ctxt with block_gas ; operation_gas }
+let check_enough_gas ctxt cost =
+  Gas_limit_repr.check_enough ctxt.block_gas ctxt.operation_gas cost
 let gas_level ctxt = ctxt.operation_gas
 let block_gas_level ctxt = ctxt.block_gas
 let gas_consumed ~since ~until =
@@ -522,6 +524,8 @@ module type T = sig
   val absolute_key: context -> key -> key
 
   val consume_gas: context -> Gas_limit_repr.cost -> context tzresult
+
+  val check_enough_gas: context -> Gas_limit_repr.cost -> unit tzresult
 
   val description: context Storage_description.t
 

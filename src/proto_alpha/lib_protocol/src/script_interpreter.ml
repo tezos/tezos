@@ -694,12 +694,12 @@ let rec interp
                            (credit, Item
                               (init, rest)))))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_contract) >>=? fun ctxt ->
-            unparse_ty ctxt param_type >>=? fun (u_param_type, ctxt) ->
-            unparse_ty ctxt storage_type >>=? fun (u_storage_type, ctxt) ->
+            unparse_ty ctxt param_type >>=? fun (unparsed_param_type, ctxt) ->
+            unparse_ty ctxt storage_type >>=? fun (unparsed_storage_type, ctxt) ->
             let code =
               Micheline.strip_locations
-                (Seq (0, [ Prim (0, K_parameter, [ u_param_type ], []) ;
-                           Prim (0, K_storage, [ u_storage_type ], []) ;
+                (Seq (0, [ Prim (0, K_parameter, [ unparsed_param_type ], []) ;
+                           Prim (0, K_storage, [ unparsed_storage_type ], []) ;
                            Prim (0, K_code, [ Micheline.root code ], []) ])) in
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
             let storage = Micheline.strip_locations storage in
@@ -788,8 +788,7 @@ and execute ?log ctxt mode ~source ~payer ~self script amount arg :
   trace
     (Bad_contract_parameter self)
     (parse_data ctxt arg_type arg) >>=? fun (arg, ctxt) ->
-  Lwt.return @@ Script.force_decode script.code >>=? fun (script_code, cost_script_code) ->
-  Lwt.return @@ Gas.consume ctxt cost_script_code >>=? fun ctxt ->
+  Script.force_decode ctxt script.code >>=? fun (script_code, ctxt) ->
   trace
     (Runtime_contract_error (self, script_code))
     (interp ?log ctxt ~source ~payer ~self amount code (arg, storage))

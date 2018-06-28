@@ -144,16 +144,24 @@ module Contract = struct
       (Z)
 
   module Make_carbonated_map_expr (N : Storage_sigs.NAME) = struct
-    include Indexed_context.Make_carbonated_map
+    module I = Indexed_context.Make_carbonated_map
         (N)
         (struct
           type t = Script_repr.lazy_expr
           let encoding = Script_repr.lazy_expr_encoding
         end)
 
+    type context = I.context
+    type key = I.key
+    type value = I.value
+
+    let mem = I.mem
+    let delete = I.delete
+    let remove = I.remove
+
     let consume_deserialize_gas ctxt value =
       Lwt.return @@
-      (Raw_context.consume_gas ctxt (Script_repr.minimal_deserialize_cost value) >>? fun _ ->
+      (Raw_context.check_enough_gas ctxt (Script_repr.minimal_deserialize_cost value) >>? fun () ->
        Script_repr.force_decode value >>? fun (_value, value_cost) ->
        Raw_context.consume_gas ctxt value_cost)
 
@@ -163,12 +171,12 @@ module Contract = struct
        Raw_context.consume_gas ctxt value_cost)
 
     let get ctxt contract =
-      get ctxt contract >>=? fun (ctxt, value) ->
+      I.get ctxt contract >>=? fun (ctxt, value) ->
       consume_deserialize_gas ctxt value >>|? fun ctxt ->
       (ctxt, value)
 
     let get_option ctxt contract =
-      get_option ctxt contract >>=? fun (ctxt, value_opt) ->
+      I.get_option ctxt contract >>=? fun (ctxt, value_opt) ->
       match value_opt with
       | None -> return (ctxt, None)
       | Some value ->
@@ -177,22 +185,22 @@ module Contract = struct
 
     let set ctxt contract value =
       consume_serialize_gas ctxt value >>=? fun ctxt ->
-      set ctxt contract value
+      I.set ctxt contract value
 
     let set_option ctxt contract value_opt =
       match value_opt with
-      | None -> set_option ctxt contract None
+      | None -> I.set_option ctxt contract None
       | Some value ->
           consume_serialize_gas ctxt value >>=? fun ctxt ->
-          set_option ctxt contract value_opt
+          I.set_option ctxt contract value_opt
 
     let init ctxt contract value =
       consume_serialize_gas ctxt value >>=? fun ctxt ->
-      init ctxt contract value
+      I.init ctxt contract value
 
     let init_set ctxt contract value =
       consume_serialize_gas ctxt value >>=? fun ctxt ->
-      init_set ctxt contract value
+      I.init_set ctxt contract value
   end
 
   module Code =

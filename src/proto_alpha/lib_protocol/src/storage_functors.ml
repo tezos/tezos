@@ -66,6 +66,7 @@ module Make_subcontext (C : Raw_context.T) (N : NAME)
   let project = C.project
   let absolute_key c k = C.absolute_key c (to_key k)
   let consume_gas = C.consume_gas
+  let check_enough_gas = C.check_enough_gas
   let description =
     Storage_description.register_named_subcontext C.description N.name
 end
@@ -555,6 +556,9 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     let consume_gas c g =
       let (t, i) = unpack c in
       C.consume_gas t g >>? fun t -> ok (pack t i)
+    let check_enough_gas c g =
+      let (t, _i) = unpack c in
+      C.check_enough_gas t g
     let description = description
   end
 

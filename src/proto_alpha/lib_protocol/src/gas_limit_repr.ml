@@ -99,6 +99,10 @@ let consume block_gas operation_gas cost = match operation_gas with
       then error Block_quota_exceeded
       else ok (block_remaining, Limited { remaining })
 
+let check_enough block_gas operation_gas cost =
+  consume block_gas operation_gas cost
+  >|? fun (_block_remainig, _remaining) -> ()
+
 let alloc_cost n =
   { allocations = Z.of_int (n + 1) ;
     steps = Z.zero ;

@@ -510,9 +510,9 @@ module Encoding: sig
   (** Make a lazy value from an immediate one. *)
   val make_lazy : 'a encoding -> 'a -> 'a lazy_t
 
-  (** Fold on structure of lazy value, and combine results *)
-  val fold_lazy :
-    ('a -> 'b) -> (MBytes.t -> 'b) -> ('b -> 'b -> 'b) ->
+  (** Apply on structure of lazy value, and combine results *)
+  val apply_lazy :
+    fun_value:('a -> 'b) -> fun_bytes:(MBytes.t -> 'b) -> fun_combine:('b -> 'b -> 'b) ->
     'a lazy_t -> 'b
 
 end

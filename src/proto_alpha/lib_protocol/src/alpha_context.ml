@@ -53,6 +53,16 @@ end
 module Script = struct
   include Michelson_v1_primitives
   include Script_repr
+  let force_decode ctxt lexpr =
+    Lwt.return
+      (Script_repr.force_decode lexpr >>? fun (v, cost) ->
+       Raw_context.consume_gas ctxt cost >|? fun ctxt ->
+       (v, ctxt))
+  let force_bytes ctxt lexpr =
+    Lwt.return
+      (Script_repr.force_bytes lexpr >>? fun (b, cost) ->
+       Raw_context.consume_gas ctxt cost >|? fun ctxt ->
+       (b, ctxt))
 end
 module Fees = Fees_storage
 
@@ -74,6 +84,7 @@ module Gas = struct
   let set_limit = Raw_context.set_gas_limit
   let set_unlimited = Raw_context.set_gas_unlimited
   let consume = Raw_context.consume_gas
+  let check_enough = Raw_context.check_enough_gas
   let level = Raw_context.gas_level
   let consumed = Raw_context.gas_consumed
   let block_level = Raw_context.block_gas_level
