@@ -181,6 +181,11 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           Format.fprintf ppf "Ill typed contract.";
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
+    | Alpha_environment.Ecoproto_error Apply.Gas_quota_exceeded_init_deserialize :: rest ->
+        Format.fprintf ppf
+          "@[<v 0>Not enough gas to deserialize the operation.@,\
+           Injecting such a transaction could have you banned from mempools.@]" ;
+        print_trace locations rest
     | Alpha_environment.Ecoproto_error (Missing_field prim) :: rest ->
         Format.fprintf ppf "@[<v 0>Missing contract field: %s@]"
           (Michelson_v1_primitives.string_of_prim prim) ;

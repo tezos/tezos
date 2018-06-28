@@ -323,9 +323,11 @@ let () =
   register_error_kind
     `Permanent
     ~id:"gas_exhausted.init_deserialize"
-    ~title:"Not enough gas for initial deserialization of parameters"
-    ~description:"Gas quota was not enough to deserialize the transaction \
-                  parameters in precheck"
+    ~title:"Not enough gas for initial deserialization of script expresions"
+    ~description:"Gas limit was not high enough to deserialize the \
+                  transaction parameters or origination script code or \
+                  initial storage, making the operation impossible to \
+                  parse within the provided gas bounds."
     Data_encoding.empty
     (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
     (fun () -> Gas_quota_exceeded_init_deserialize)
