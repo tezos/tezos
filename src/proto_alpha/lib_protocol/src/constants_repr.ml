@@ -61,7 +61,6 @@ type parametric = {
   hard_gas_limit_per_operation: Z.t ;
   hard_gas_limit_per_block: Z.t ;
   proof_of_work_threshold: int64 ;
-  dictator_pubkey: Signature.Public_key.t ;
   tokens_per_roll: Tez_repr.t ;
   michelson_maximum_type_size: int;
   seed_nonce_revelation_tip: Tez_repr.t ;
@@ -87,9 +86,6 @@ let default = {
   hard_gas_limit_per_block = Z.of_int 4_000_000 ;
   proof_of_work_threshold =
     Int64.(sub (shift_left 1L 56) 1L) ;
-  dictator_pubkey =
-    Signature.Public_key.of_b58check_exn
-      "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ;
   tokens_per_roll =
     Tez_repr.(mul_exn one 10_000) ;
   michelson_maximum_type_size = 1000 ;
@@ -123,7 +119,6 @@ let parametric_encoding =
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block),
         ((c.proof_of_work_threshold,
-          c.dictator_pubkey,
           c.tokens_per_roll,
           c.michelson_maximum_type_size,
           c.seed_nonce_revelation_tip,
@@ -144,7 +139,6 @@ let parametric_encoding =
             hard_gas_limit_per_operation,
             hard_gas_limit_per_block),
           ((proof_of_work_threshold,
-            dictator_pubkey,
             tokens_per_roll,
             michelson_maximum_type_size,
             seed_nonce_revelation_tip,
@@ -165,7 +159,6 @@ let parametric_encoding =
         hard_gas_limit_per_operation ;
         hard_gas_limit_per_block ;
         proof_of_work_threshold ;
-        dictator_pubkey ;
         tokens_per_roll ;
         michelson_maximum_type_size ;
         seed_nonce_revelation_tip ;
@@ -189,9 +182,8 @@ let parametric_encoding =
           (req "hard_gas_limit_per_operation" z)
           (req "hard_gas_limit_per_block" z))
        (merge_objs
-          (obj9
+          (obj8
              (req "proof_of_work_threshold" int64)
-             (req "dictator_pubkey" Signature.Public_key.encoding)
              (req "tokens_per_roll" Tez_repr.encoding)
              (req "michelson_maximum_type_size" uint16)
              (req "seed_nonce_revelation_tip" Tez_repr.encoding)

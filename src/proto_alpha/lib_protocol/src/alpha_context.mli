@@ -332,7 +332,6 @@ module Constants : sig
     hard_gas_limit_per_operation: Z.t ;
     hard_gas_limit_per_block: Z.t ;
     proof_of_work_threshold: int64 ;
-    dictator_pubkey: Signature.Public_key.t ;
     tokens_per_roll: Tez.t ;
     michelson_maximum_type_size: int;
     seed_nonce_revelation_tip: Tez.t ;
@@ -358,7 +357,6 @@ module Constants : sig
   val cost_per_byte: context -> Tez.t
   val hard_storage_limit_per_operation: context -> Z.t
   val proof_of_work_threshold: context -> int64
-  val dictator_pubkey: context -> Signature.Public_key.t
   val tokens_per_roll: context -> Tez.t
   val michelson_maximum_type_size: context -> int
   val block_reward: context -> Tez.t
