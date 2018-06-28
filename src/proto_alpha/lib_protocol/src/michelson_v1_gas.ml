@@ -57,7 +57,7 @@ module Cost_of = struct
   let map_to_list : type key value. (key, value) Script_typed_ir.map -> cost
     = fun (module Box) ->
       let size = snd Box.boxed in
-      2 *@ (alloc_cost (size * 2))
+      3 *@ alloc_cost size
 
   let map_mem _key map = step_cost (map_access map)
 
@@ -85,10 +85,13 @@ module Cost_of = struct
   let wrap = alloc_cost 1
 
   let mul n1 n2 =
-    let bits =
+    let steps =
       (Z.numbits (Script_int.to_zint n1))
       * (Z.numbits (Script_int.to_zint n2)) in
-    step_cost bits +@ alloc_bits_cost bits
+    let bits =
+      (Z.numbits (Script_int.to_zint n1))
+      + (Z.numbits (Script_int.to_zint n2)) in
+    step_cost steps +@ alloc_bits_cost bits
 
   let div n1 n2 =
     mul n1 n2 +@ alloc_cost 2
@@ -171,24 +174,21 @@ module Cost_of = struct
   let unpack bytes = 10 *@ step_cost (MBytes.length bytes)
   let pack bytes = alloc_bytes_cost (MBytes.length bytes)
 
-  (* TODO: protocol operations *)
-  let address = step_cost 3
-  let contract = Gas.read_bytes_cost Z.zero +@ step_cost 3
-  let manager = step_cost 3
-  let transfer = step_cost 50
-  let create_account = step_cost 20
-  let create_contract = step_cost 70
+  let address = step_cost 1
+  let contract = Gas.read_bytes_cost Z.zero +@ step_cost 100
+  let transfer = step_cost 10
+  let create_account = step_cost 10
+  let create_contract = step_cost 10
   let implicit_account = step_cost 10
-  let set_delegate = step_cost 10
-  let balance = step_cost 5
-  let now = step_cost 3
-  let check_signature = step_cost 3
-  let hash_key = step_cost 3
-  (* TODO: This needs to be a function of the data being hashed *)
-  let hash data len = step_cost (MBytes.length data) +@ alloc_bytes_cost len
+  let set_delegate = step_cost 10 +@ write_bytes_cost (Z.of_int 32)
+  let balance = step_cost 1 +@ read_bytes_cost (Z.of_int 8)
+  let now = step_cost 5
+  let check_signature = step_cost 100
+  let hash_key = step_cost 3 +@ bytes 20
+  let hash data len = 10 *@ step_cost (MBytes.length data) +@ bytes len
   let steps_to_quota = step_cost 1
-  let source = step_cost 3
-  let self = step_cost 3
+  let source = step_cost 1
+  let self = step_cost 1
   let amount = step_cost 1
   let compare_bool _ _ = step_cost 1
   let compare_string s1 s2 =
@@ -225,8 +225,8 @@ module Cost_of = struct
     let some = alloc_cost 1
     let none = alloc_cost 0
     let list_element = alloc_cost 2 +@ step_cost 1
-    let set_element = alloc_cost 3 +@ step_cost 2
-    let map_element = alloc_cost 4 +@ step_cost 2
+    let set_element size = log2 size *@ (alloc_cost 3 +@ step_cost 2)
+    let map_element size = log2 size *@ (alloc_cost 4 +@ step_cost 2)
     let primitive_type = alloc_cost 1
     let one_arg_type = alloc_cost 2
     let two_arg_type = alloc_cost 3
@@ -379,8 +379,8 @@ module Cost_of = struct
     let some = prim_cost 1 []
     let none = prim_cost 0 []
     let list_element = alloc_cost 2
-    let set_element = alloc_cost 2 (* FIXME: log(size) *)
-    let map_element = alloc_cost 2 (* FIXME: log(size) *)
+    let set_element = alloc_cost 2
+    let map_element = alloc_cost 2
     let one_arg_type = prim_cost 1
     let two_arg_type = prim_cost 2
 

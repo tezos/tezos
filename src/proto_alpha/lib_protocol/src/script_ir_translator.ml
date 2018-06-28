@@ -1243,9 +1243,10 @@ let rec parse_data
     let traced body =
       trace error body in
     let parse_items ?type_logger loc ctxt expr key_type value_type items item_wrapper =
+      let length = List.length items in
       fold_left_s
         (fun (last_value, map, ctxt) item ->
-           Lwt.return (Gas.consume ctxt Typecheck_costs.cycle) >>=? fun ctxt ->
+           Lwt.return (Gas.consume ctxt (Typecheck_costs.map_element length)) >>=? fun ctxt ->
            match item with
            | Prim (_, D_Elt, [ k; v ], _) ->
                parse_comparable_data ?type_logger ctxt key_type k >>=? fun (k, ctxt) ->
@@ -1498,10 +1499,11 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Sets *)
     | Set_t (t, _ty_name), (Seq (loc, vs) as expr) ->
+        let length = List.length vs in
         traced @@
         fold_left_s
           (fun (last_value, set, ctxt) v ->
-             Lwt.return (Gas.consume ctxt Typecheck_costs.set_element) >>=? fun ctxt ->
+             Lwt.return (Gas.consume ctxt (Typecheck_costs.set_element length)) >>=? fun ctxt ->
              parse_comparable_data ?type_logger ctxt t v >>=? fun (v, ctxt) ->
              begin match last_value with
                | Some value ->

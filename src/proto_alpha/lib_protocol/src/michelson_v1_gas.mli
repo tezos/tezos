@@ -68,7 +68,6 @@ module Cost_of : sig
   val unpack : MBytes.t -> Gas.cost
   val address : Gas.cost
   val contract : Gas.cost
-  val manager : Gas.cost
   val transfer : Gas.cost
   val create_account : Gas.cost
   val create_contract : Gas.cost
@@ -125,8 +124,8 @@ module Cost_of : sig
     val none : Gas.cost
 
     val list_element : Gas.cost
-    val set_element : Gas.cost
-    val map_element : Gas.cost
+    val set_element : int -> Gas.cost
+    val map_element : int -> Gas.cost
 
     val primitive_type : Gas.cost
     val one_arg_type : Gas.cost
