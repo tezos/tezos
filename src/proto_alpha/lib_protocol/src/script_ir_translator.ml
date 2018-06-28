@@ -995,32 +995,35 @@ let merge_branches
         return (Typed (branch (descrt dbf.aft) dbf))
 
 let rec parse_comparable_ty
-  : context -> Script.node -> ex_comparable_ty tzresult
-  = fun ctxt -> function
+  : context -> Script.node -> (ex_comparable_ty * context) tzresult
+  = fun ctxt ty ->
+    Gas.consume ctxt Typecheck_costs.cycle >>? fun ctxt ->
+    Gas.consume ctxt (Typecheck_costs.type_ 0) >>? fun ctxt ->
+    match ty with
     | Prim (loc, T_int, [], annot) ->
         parse_type_annot loc annot >|? fun tname ->
-        Ex_comparable_ty ( Int_key tname )
+        Ex_comparable_ty ( Int_key tname ), ctxt
     | Prim (loc, T_nat, [], annot) ->
         parse_type_annot loc annot >|? fun tname ->
-        Ex_comparable_ty ( Nat_key tname )
+        Ex_comparable_ty ( Nat_key tname ), ctxt
     | Prim (loc, T_string, [], annot) ->
         parse_type_annot loc annot >|? fun tname ->
-        Ex_comparable_ty ( String_key tname )
+        Ex_comparable_ty ( String_key tname ), ctxt
     | Prim (loc, T_mutez, [], annot) ->
         parse_type_annot loc annot >|? fun tname ->
-        Ex_comparable_ty ( Mutez_key tname )
+        Ex_comparable_ty ( Mutez_key tname ), ctxt
     | Prim (loc, T_bool, [], annot) ->
         parse_type_annot loc annot >|? fun tname ->
-        Ex_comparable_ty ( Bool_key tname )
+        Ex_comparable_ty ( Bool_key tname ), ctxt
     | Prim (loc, T_key_hash, [], annot) ->
         parse_type_annot loc annot >|? fun tname ->
-        Ex_comparable_ty ( Key_hash_key tname )
+        Ex_comparable_ty ( Key_hash_key tname ), ctxt
     | Prim (loc, T_timestamp, [], annot) ->
         parse_type_annot loc annot >|? fun tname ->
-        Ex_comparable_ty ( Timestamp_key tname )
+        Ex_comparable_ty ( Timestamp_key tname ), ctxt
     | Prim (loc, T_address, [], annot) ->
         parse_type_annot loc annot >|? fun tname ->
-        Ex_comparable_ty ( Address_key tname )
+        Ex_comparable_ty ( Address_key tname ), ctxt
     | Prim (loc, (T_int | T_nat
                  | T_string | T_mutez | T_bool
                  | T_key | T_address | T_timestamp as prim), l, _) ->
@@ -1028,7 +1031,7 @@ let rec parse_comparable_ty
     | Prim (loc, (T_pair | T_or | T_set | T_map
                  | T_list | T_option  | T_lambda
                  | T_unit | T_signature  | T_contract), _, _) as expr ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation:false expr >>? fun (Ex_ty ty) ->
+        parse_ty ctxt ~allow_big_map:false ~allow_operation:false expr >>? fun (Ex_ty ty, ctxt) ->
         serialize_ty_for_error ctxt ty >>? fun (ty, _ctxt) ->
         error (Comparable_type_expected (loc, ty))
     | expr ->
@@ -1041,8 +1044,9 @@ and parse_ty :
   context ->
   allow_big_map: bool ->
   allow_operation: bool ->
-  Script.node -> ex_ty tzresult
+  Script.node -> (ex_ty * context) tzresult
   = fun ctxt ~allow_big_map ~allow_operation node ->
+    Gas.consume ctxt Typecheck_costs.cycle >>? fun ctxt ->
     match node with
     | Prim (loc, T_pair,
             [ Prim (big_map_loc, T_big_map, args, map_annot) ; remaining_storage ],
@@ -1050,103 +1054,126 @@ and parse_ty :
       when allow_big_map ->
         begin match args with
           | [ key_ty ; value_ty ] ->
-              parse_comparable_ty ctxt key_ty >>? fun (Ex_comparable_ty key_ty) ->
+              parse_comparable_ty ctxt key_ty >>? fun (Ex_comparable_ty key_ty, ctxt) ->
               parse_ty ctxt ~allow_big_map:false ~allow_operation value_ty
-              >>? fun (Ex_ty value_ty) ->
+              >>? fun (Ex_ty value_ty, ctxt) ->
               parse_ty ctxt ~allow_big_map:false ~allow_operation remaining_storage
-              >>? fun (Ex_ty remaining_storage) ->
+              >>? fun (Ex_ty remaining_storage, ctxt) ->
               parse_type_annot big_map_loc map_annot >>? fun map_name ->
               parse_composed_type_annot loc storage_annot
-              >|? fun (ty_name, map_field, storage_field) ->
+              >>? fun (ty_name, map_field, storage_field) ->
+              Gas.consume ctxt (Typecheck_costs.type_ 2) >|? fun ctxt ->
               let big_map_ty = Big_map_t (key_ty, value_ty, map_name) in
               Ex_ty (Pair_t ((big_map_ty, map_field, None),
                              (remaining_storage, storage_field, None),
-                             ty_name))
+                             ty_name)),
+              ctxt
           | args -> error @@ Invalid_arity (big_map_loc, T_big_map, 2, List.length args)
         end
     | Prim (loc, T_unit, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Unit_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Unit_t ty_name), ctxt
     | Prim (loc, T_int, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Int_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Int_t ty_name), ctxt
     | Prim (loc, T_nat, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Nat_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Nat_t ty_name), ctxt
     | Prim (loc, T_string, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (String_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (String_t ty_name), ctxt
     | Prim (loc, T_bytes, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Bytes_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Bytes_t ty_name), ctxt
     | Prim (loc, T_mutez, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Mutez_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Mutez_t ty_name), ctxt
     | Prim (loc, T_bool, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Bool_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Bool_t ty_name), ctxt
     | Prim (loc, T_key, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Key_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Key_t ty_name), ctxt
     | Prim (loc, T_key_hash, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Key_hash_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Key_hash_t ty_name), ctxt
     | Prim (loc, T_timestamp, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Timestamp_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Timestamp_t ty_name), ctxt
     | Prim (loc, T_address, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Address_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Address_t ty_name), ctxt
     | Prim (loc, T_signature, [], annot) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Signature_t ty_name)
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Signature_t ty_name), ctxt
     | Prim (loc, T_operation, [], annot) ->
         if allow_operation then
-          parse_type_annot loc annot >|? fun ty_name ->
-          Ex_ty (Operation_t ty_name)
+          parse_type_annot loc annot >>? fun ty_name ->
+          Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+          Ex_ty (Operation_t ty_name), ctxt
         else
           error (Unexpected_operation loc)
     | Prim (loc, T_contract, [ utl ], annot) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation utl >>? fun (Ex_ty tl) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Contract_t (tl, ty_name))
+        parse_ty ctxt ~allow_big_map:false ~allow_operation utl >>? fun (Ex_ty tl, ctxt) ->
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 1) >|? fun ctxt ->
+        Ex_ty (Contract_t (tl, ty_name)), ctxt
     | Prim (loc, T_pair, [ utl; utr ], annot) ->
         extract_field_annot utl >>? fun (utl, left_field) ->
         extract_field_annot utr >>? fun (utr, right_field) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation utl >>? fun (Ex_ty tl) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Pair_t ((tl, left_field, None), (tr, right_field, None), ty_name))
+        parse_ty ctxt ~allow_big_map:false ~allow_operation utl >>? fun (Ex_ty tl, ctxt) ->
+        parse_ty ctxt ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr, ctxt) ->
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 2) >|? fun ctxt ->
+        Ex_ty (Pair_t ((tl, left_field, None), (tr, right_field, None), ty_name)), ctxt
     | Prim (loc, T_or, [ utl; utr ], annot) ->
         extract_field_annot utl >>? fun (utl, left_constr) ->
         extract_field_annot utr >>? fun (utr, right_constr) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation utl >>? fun (Ex_ty tl) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Union_t ((tl, left_constr), (tr, right_constr), ty_name))
+        parse_ty ctxt ~allow_big_map:false ~allow_operation utl >>? fun (Ex_ty tl, ctxt) ->
+        parse_ty ctxt ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr, ctxt) ->
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 2) >|? fun ctxt ->
+        Ex_ty (Union_t ((tl, left_constr), (tr, right_constr), ty_name)), ctxt
     | Prim (loc, T_lambda, [ uta; utr ], annot) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation uta >>? fun (Ex_ty ta) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Lambda_t (ta, tr, ty_name))
+        parse_ty ctxt ~allow_big_map:false ~allow_operation uta >>? fun (Ex_ty ta, ctxt) ->
+        parse_ty ctxt ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr, ctxt) ->
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 2) >|? fun ctxt ->
+        Ex_ty (Lambda_t (ta, tr, ty_name)), ctxt
     | Prim (loc, T_option, [ ut ], annot) ->
         extract_field_annot ut >>? fun (ut, some_constr) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation ut >>? fun (Ex_ty t) ->
-        parse_composed_type_annot loc annot >|? fun (ty_name, none_constr, _) ->
-        Ex_ty (Option_t ((t, some_constr), none_constr, ty_name))
+        parse_ty ctxt ~allow_big_map:false ~allow_operation ut >>? fun (Ex_ty t, ctxt) ->
+        parse_composed_type_annot loc annot >>? fun (ty_name, none_constr, _) ->
+        Gas.consume ctxt (Typecheck_costs.type_ 2) >|? fun ctxt ->
+        Ex_ty (Option_t ((t, some_constr), none_constr, ty_name)), ctxt
     | Prim (loc, T_list, [ ut ], annot) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation ut >>? fun (Ex_ty t) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (List_t (t, ty_name))
+        parse_ty ctxt ~allow_big_map:false ~allow_operation ut >>? fun (Ex_ty t, ctxt) ->
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 1) >|? fun ctxt ->
+        Ex_ty (List_t (t, ty_name)), ctxt
     | Prim (loc, T_set, [ ut ], annot) ->
-        parse_comparable_ty ctxt ut >>? fun (Ex_comparable_ty t) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Set_t (t, ty_name))
+        parse_comparable_ty ctxt ut >>? fun (Ex_comparable_ty t, ctxt) ->
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 1) >|? fun ctxt ->
+        Ex_ty (Set_t (t, ty_name)), ctxt
     | Prim (loc, T_map, [ uta; utr ], annot) ->
-        parse_comparable_ty ctxt uta >>? fun (Ex_comparable_ty ta) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr) ->
-        parse_type_annot loc annot >|? fun ty_name ->
-        Ex_ty (Map_t (ta, tr, ty_name))
+        parse_comparable_ty ctxt uta >>? fun (Ex_comparable_ty ta, ctxt) ->
+        parse_ty ctxt ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr, ctxt) ->
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 2) >|? fun ctxt ->
+        Ex_ty (Map_t (ta, tr, ty_name)), ctxt
     | Prim (loc, T_big_map, _, _) ->
         error (Unexpected_big_map loc)
     | Prim (loc, (T_unit | T_signature
@@ -1611,7 +1638,7 @@ and parse_instr
     | Prim (loc, I_PUSH, [ t ; d ], annot),
       stack ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:false t >>=? fun (Ex_ty t) ->
+        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:false t >>=? fun (Ex_ty t, ctxt) ->
         parse_data ?type_logger ctxt t d >>=? fun (v, ctxt) ->
         typed ctxt loc (Const v) (Item_t (t, stack, annot))
     | Prim (loc, I_UNIT, [], annot),
@@ -1628,7 +1655,7 @@ and parse_instr
           (Item_t (Option_t ((t, some_field), none_field, ty_name), rest, annot))
     | Prim (loc, I_NONE, [ t ], annot),
       stack ->
-        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true t >>=? fun (Ex_ty t) ->
+        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true t >>=? fun (Ex_ty t, ctxt) ->
         parse_constr_annot loc annot >>=? fun (annot, ty_name, some_field, none_field) ->
         typed ctxt loc (Cons_none t)
           (Item_t (Option_t ((t, some_field), none_field, ty_name), stack, annot))
@@ -1676,14 +1703,14 @@ and parse_instr
     (* unions *)
     | Prim (loc, I_LEFT, [ tr ], annot),
       Item_t (tl, rest, stack_annot) ->
-        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true tr >>=? fun (Ex_ty tr) ->
+        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true tr >>=? fun (Ex_ty tr, ctxt) ->
         parse_constr_annot loc annot
           ~if_special_first:(var_to_field_annot stack_annot)
         >>=? fun (annot, tname, l_field, r_field) ->
         typed ctxt loc Left (Item_t (Union_t ((tl, l_field), (tr, r_field), tname), rest, annot))
     | Prim (loc, I_RIGHT, [ tl ], annot),
       Item_t (tr, rest, stack_annot) ->
-        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true tl >>=? fun (Ex_ty tl) ->
+        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true tl >>=? fun (Ex_ty tl, ctxt) ->
         parse_constr_annot loc annot
           ~if_special_second:(var_to_field_annot stack_annot)
         >>=? fun (annot, tname, l_field, r_field) ->
@@ -1704,7 +1731,7 @@ and parse_instr
     (* lists *)
     | Prim (loc, I_NIL, [ t ], annot),
       stack ->
-        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true t >>=? fun (Ex_ty t) ->
+        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true t >>=? fun (Ex_ty t, ctxt) ->
         parse_var_type_annot loc annot >>=? fun (annot, ty_name) ->
         typed ctxt loc Nil (Item_t (List_t (t, ty_name), stack, annot))
     | Prim (loc, I_CONS, [], annot),
@@ -1778,7 +1805,7 @@ and parse_instr
     (* sets *)
     | Prim (loc, I_EMPTY_SET, [ t ], annot),
       rest ->
-        Lwt.return @@ parse_comparable_ty ctxt t >>=? fun (Ex_comparable_ty t) ->
+        Lwt.return @@ parse_comparable_ty ctxt t >>=? fun (Ex_comparable_ty t, ctxt) ->
         parse_var_type_annot loc annot >>=? fun (annot, tname) ->
         typed ctxt loc (Empty_set t) (Item_t (Set_t (t, tname), rest, annot))
     | Prim (loc, I_ITER, [ body ], annot),
@@ -1821,8 +1848,8 @@ and parse_instr
     (* maps *)
     | Prim (loc, I_EMPTY_MAP, [ tk ; tv ], annot),
       stack ->
-        Lwt.return @@ parse_comparable_ty ctxt tk >>=? fun (Ex_comparable_ty tk) ->
-        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true tv >>=? fun (Ex_ty tv) ->
+        Lwt.return @@ parse_comparable_ty ctxt tk >>=? fun (Ex_comparable_ty tk, ctxt) ->
+        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true tv >>=? fun (Ex_ty tv, ctxt) ->
         parse_var_type_annot loc annot >>=? fun (annot, ty_name) ->
         typed ctxt loc (Empty_map (tk, tv)) (Item_t (Map_t (tk, tv, ty_name), stack, annot))
     | Prim (loc, I_MAP, [ body ], annot),
@@ -2011,9 +2038,9 @@ and parse_instr
     | Prim (loc, I_LAMBDA, [ arg ; ret ; code ], annot),
       stack ->
         Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true arg
-        >>=? fun (Ex_ty arg) ->
+        >>=? fun (Ex_ty arg, ctxt) ->
         Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:true ret
-        >>=? fun (Ex_ty ret) ->
+        >>=? fun (Ex_ty ret, ctxt) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
         parse_var_annot loc annot >>=? fun annot ->
         parse_returning Lambda ?type_logger ctxt
@@ -2396,7 +2423,7 @@ and parse_instr
       Item_t (t, stack, item_annot) ->
         parse_var_annot loc annot ~default:item_annot >>=? fun annot ->
         (Lwt.return @@ parse_ty ctxt ~allow_big_map:true ~allow_operation:true cast_t)
-        >>=? fun (Ex_ty cast_t) ->
+        >>=? fun (Ex_ty cast_t, ctxt) ->
         Lwt.return @@ ty_eq ctxt cast_t t >>=? fun Eq ->
         Lwt.return @@ merge_types ctxt loc cast_t t >>=? fun _ ->
         typed ctxt loc Nop (Item_t (cast_t, stack, annot))
@@ -2414,7 +2441,7 @@ and parse_instr
           (Item_t (Bytes_t None, rest, annot))
     | Prim (loc, I_UNPACK, [ ty ], annot),
       Item_t (Bytes_t _, rest, packed_annot) ->
-        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:false ty >>=? fun (Ex_ty t) ->
+        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:false ty >>=? fun (Ex_ty t, ctxt) ->
         let stack_annot = gen_access_annot packed_annot default_unpack_annot in
         parse_constr_annot loc annot
           ~if_special_first:(var_to_field_annot stack_annot)
@@ -2430,7 +2457,7 @@ and parse_instr
           (Item_t (Address_t None, rest, annot))
     | Prim (loc, I_CONTRACT, [ ty ], annot),
       Item_t (Address_t _, rest, addr_annot) ->
-        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:false ty >>=? fun (Ex_ty t) ->
+        Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:false ty >>=? fun (Ex_ty t, ctxt) ->
         parse_var_annot loc annot ~default:(gen_access_annot addr_annot default_contract_annot)
         >>=? fun annot ->
         typed ctxt loc (Contract t)
@@ -2475,12 +2502,12 @@ and parse_instr
           (fun () -> Error_monad.return
               (Ill_formed_type (Some "parameter", cannonical_code, location arg_type)))
           (Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:false arg_type)
-        >>=? fun (Ex_ty arg_type) ->
+        >>=? fun (Ex_ty arg_type, ctxt) ->
         trace
           (fun () -> Error_monad.return
               (Ill_formed_type (Some "storage", cannonical_code, location storage_type)))
           (Lwt.return @@ parse_ty ctxt ~allow_big_map:true ~allow_operation:false storage_type)
-        >>=? fun (Ex_ty storage_type) ->
+        >>=? fun (Ex_ty storage_type, ctxt) ->
         let arg_annot = default_annot (type_to_var_annot (name_of_ty arg_type))
             ~default:default_param_annot in
         let storage_annot = default_annot (type_to_var_annot (name_of_ty storage_type))
@@ -2691,7 +2718,7 @@ and parse_contract
               (Script.force_decode code >>? fun (code, cost_code) ->
                Gas.consume ctxt cost_code >>? fun ctxt ->
                parse_toplevel code >>? fun (arg_type, _, _) ->
-               parse_ty ctxt ~allow_big_map:false ~allow_operation:false arg_type >>? fun (Ex_ty targ) ->
+               parse_ty ctxt ~allow_big_map:false ~allow_operation:false arg_type >>? fun (Ex_ty targ, ctxt) ->
                ty_eq ctxt targ arg >>? fun Eq ->
                merge_types ctxt loc targ arg >>? fun arg ->
                let contract : arg typed_contract = (arg, contract) in
@@ -2753,11 +2780,11 @@ let parse_script
     trace
       (fun () -> return (Ill_formed_type (Some "parameter", code, location arg_type)))
       (Lwt.return (parse_ty ctxt ~allow_big_map:false ~allow_operation:false arg_type))
-    >>=? fun (Ex_ty arg_type) ->
+    >>=? fun (Ex_ty arg_type, ctxt) ->
     trace
       (fun () -> return (Ill_formed_type (Some "storage", code, location storage_type)))
       (Lwt.return (parse_ty ctxt ~allow_big_map:true ~allow_operation:false storage_type))
-    >>=? fun (Ex_ty storage_type) ->
+    >>=? fun (Ex_ty storage_type, ctxt) ->
     let arg_annot = default_annot (type_to_var_annot (name_of_ty arg_type))
         ~default:default_param_annot in
     let storage_annot = default_annot (type_to_var_annot (name_of_ty storage_type))
@@ -2787,11 +2814,11 @@ let typecheck_code
     trace
       (fun () -> return (Ill_formed_type (Some "parameter", code, location arg_type)))
       (Lwt.return (parse_ty ctxt ~allow_big_map:false ~allow_operation:false arg_type))
-    >>=? fun (Ex_ty arg_type) ->
+    >>=? fun (Ex_ty arg_type, ctxt) ->
     trace
       (fun () -> return (Ill_formed_type (Some "storage", code, location storage_type)))
       (Lwt.return (parse_ty ctxt ~allow_big_map:true ~allow_operation:false storage_type))
-    >>=? fun (Ex_ty storage_type) ->
+    >>=? fun (Ex_ty storage_type, ctxt) ->
     let arg_annot = default_annot (type_to_var_annot (name_of_ty arg_type))
         ~default:default_param_annot in
     let storage_annot = default_annot (type_to_var_annot (name_of_ty storage_type))
@@ -2819,7 +2846,7 @@ let typecheck_data
     trace
       (fun () -> return (Ill_formed_type (None, exp_ty, 0)))
       (Lwt.return @@ parse_ty ctxt ~allow_big_map:true ~allow_operation:false (root exp_ty))
-    >>=? fun (Ex_ty exp_ty) ->
+    >>=? fun (Ex_ty exp_ty, ctxt) ->
     trace
       (fun () ->
          Lwt.return @@ serialize_ty_for_error ctxt exp_ty >>|? fun (exp_ty, _ctxt) ->
@@ -2977,7 +3004,7 @@ let rec unparse_data
 
 and unparse_code ctxt mode = function
   | Prim (loc, I_PUSH, [ ty ; data ], annot) ->
-      Lwt.return (parse_ty ctxt ~allow_big_map:false ~allow_operation:false ty) >>=? fun (Ex_ty t) ->
+      Lwt.return (parse_ty ctxt ~allow_big_map:false ~allow_operation:false ty) >>=? fun (Ex_ty t, ctxt) ->
       parse_data ctxt t data >>=? fun (data, ctxt) ->
       unparse_data ctxt mode t data >>=? fun (data, ctxt) ->
       return (Prim (loc, I_PUSH, [ ty ; data ], annot), ctxt)
@@ -3082,7 +3109,7 @@ let erase_big_map_initialization ctxt mode ({ code ; storage } : Script.t) =
   Lwt.return @@ Script.force_decode storage >>=? fun (storage, cost_storage) ->
   Lwt.return @@ Gas.consume ctxt cost_storage >>=? fun ctxt ->
   Lwt.return @@ parse_toplevel code >>=? fun (_, storage_type, _) ->
-  Lwt.return @@ parse_ty ctxt ~allow_big_map:true ~allow_operation:false storage_type >>=? fun (Ex_ty ty) ->
+  Lwt.return @@ parse_ty ctxt ~allow_big_map:true ~allow_operation:false storage_type >>=? fun (Ex_ty ty, ctxt) ->
   parse_data ctxt ty
     (Micheline.root storage) >>=? fun (storage, ctxt) ->
   begin

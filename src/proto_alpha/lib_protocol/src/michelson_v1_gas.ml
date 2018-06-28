@@ -233,6 +233,7 @@ module Cost_of = struct
       (* TODO: proper handling of (de)serialization costs *)
       let len = MBytes.length b in
       alloc_cost len +@ step_cost (len * 10)
+    let type_ nb_args = alloc_cost (nb_args + 1)
   end
 
   module Unparse = struct

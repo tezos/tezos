@@ -73,7 +73,7 @@ val parse_ty :
   context ->
   allow_big_map: bool ->
   allow_operation: bool ->
-  Script.node -> ex_ty tzresult
+  Script.node -> (ex_ty * context) tzresult
 
 val unparse_ty :
   context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult Lwt.t

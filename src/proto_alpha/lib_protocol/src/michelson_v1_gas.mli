@@ -132,6 +132,9 @@ module Cost_of : sig
     val two_arg_type : Gas.cost
 
     val operation : MBytes.t -> Gas.cost
+
+    (** Cost of parsing a type *)
+    val type_ : int -> Gas.cost
   end
 
   module Unparse : sig
