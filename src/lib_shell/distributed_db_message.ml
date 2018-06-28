@@ -12,8 +12,11 @@ module Bounded_encoding = struct
   open Data_encoding
 
   let block_header_max_size = ref None
-  let block_header_cache = ref Block_header.encoding
-  let block_locator_cache = ref Block_locator.encoding
+  let block_header_cache =
+    ref (Block_header.bounded_encoding ?max_size:!block_header_max_size ())
+  let block_locator_cache =
+    ref (Block_locator.bounded_encoding
+           ?max_header_size:!block_header_max_size ())
 
   let update_block_header_encoding () =
     block_header_cache :=
