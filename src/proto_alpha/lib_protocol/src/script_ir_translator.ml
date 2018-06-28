@@ -1383,14 +1383,10 @@ let rec parse_data
     | Signature_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Operations *)
-    | Operation_t _, Bytes (_, bytes) ->
-        Lwt.return (Gas.consume ctxt (Typecheck_costs.operation bytes)) >>=? fun ctxt ->
-        begin match Data_encoding.Binary.of_bytes Operation.internal_operation_encoding bytes with
-          | Some op -> return (op, ctxt)
-          | None -> error () >>=? fail
-        end
-    | Operation_t _, expr ->
-        traced (fail (Invalid_kind (location expr, [ Bytes_kind ], kind expr)))
+    | Operation_t _, _ ->
+        (* operations cannot appear in parameters or storage,
+           the protocol should never parse the bytes of an operation *)
+        assert false
     (* Addresses *)
     | Address_t _, Bytes (_, bytes) (* As unparsed with [O[ptimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
