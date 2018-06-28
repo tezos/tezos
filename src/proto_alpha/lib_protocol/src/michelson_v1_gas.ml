@@ -34,6 +34,9 @@ module Cost_of = struct
   let bytes length =
     alloc_mbytes_cost length
 
+  let zint z =
+    alloc_bits_cost (Z.numbits z)
+
   let concat s1 s2 =
     string (String.length s1 + String.length s2)
 
@@ -209,6 +212,7 @@ module Cost_of = struct
     let unit = free
     let string = string
     let bytes = bytes
+    let z = zint
     let int_of_string str =
       alloc_cost @@ (Pervasives.(/) (String.length str) 5)
     let tez = step_cost 1 +@ alloc_cost 1

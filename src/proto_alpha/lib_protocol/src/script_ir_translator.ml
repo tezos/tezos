@@ -1297,10 +1297,10 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ Bytes_kind ], kind expr)))
     (* Integers *)
     | Int_t _, Int (_, v) ->
-        (* TODO gas *)
+        Lwt.return (Gas.consume ctxt (Typecheck_costs.z v)) >>=? fun ctxt ->
         return (Script_int.of_zint v, ctxt)
     | Nat_t _, Int (_, v) ->
-        (* TODO gas *)
+        Lwt.return (Gas.consume ctxt (Typecheck_costs.z v)) >>=? fun ctxt ->
         let v = Script_int.of_zint v in
         if Compare.Int.(Script_int.compare v Script_int.zero >= 0) then
           return (Script_int.abs v, ctxt)
@@ -1312,7 +1312,10 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ Int_kind ], kind expr)))
     (* Tez amounts *)
     | Mutez_t _, Int (_, v) ->
-        Lwt.return (Gas.consume ctxt Typecheck_costs.tez) >>=? fun ctxt ->
+        Lwt.return (
+          Gas.consume ctxt Typecheck_costs.tez >>? fun ctxt ->
+          Gas.consume ctxt Michelson_v1_gas.Cost_of.z_to_int64
+        ) >>=? fun ctxt ->
         begin try
             match Tez.of_mutez (Z.to_int64 v) with
             | None -> raise Exit
@@ -1324,7 +1327,7 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ Int_kind ], kind expr)))
     (* Timestamps *)
     | Timestamp_t _, (Int (_, v)) (* As unparsed with [Optimized] or out of bounds [Readable]. *) ->
-        (* TODO gas *)
+        Lwt.return (Gas.consume ctxt (Typecheck_costs.z v)) >>=? fun ctxt ->
         return (Script_timestamp.of_zint v, ctxt)
     | Timestamp_t _, String (_, s) (* As unparsed with [Redable]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.string_timestamp) >>=? fun ctxt ->
@@ -1473,7 +1476,6 @@ let rec parse_data
         traced (fail (unexpected expr [] Constant_namespace [ D_Some ; D_None ]))
     (* Lists *)
     | List_t (t, _ty_name), Seq (_loc, items) ->
-        (* TODO gas *)
         traced @@
         fold_right_s
           (fun v (rest, ctxt) ->
@@ -1485,7 +1487,6 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Sets *)
     | Set_t (t, _ty_name), (Seq (loc, vs) as expr) ->
-        (* TODO gas *)
         let length = List.length vs in
         traced @@
         fold_left_s
@@ -1510,12 +1511,10 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Maps *)
     | Map_t (tk, tv, _ty_name), (Seq (loc, vs) as expr) ->
-        (* TODO gas *)
         parse_items ?type_logger loc ctxt expr tk tv vs (fun x -> x)
     | Map_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     | Big_map_t (tk, tv, _ty_name), (Seq (loc, vs) as expr) ->
-        (* TODO gas *)
         parse_items ?type_logger loc ctxt expr tk tv vs (fun x -> Some x) >>|? fun (diff, ctxt) ->
         ({ diff ; key_type = ty_of_comparable_ty tk ; value_type = tv }, ctxt)
     | Big_map_t (_tk, _tv, _), expr ->

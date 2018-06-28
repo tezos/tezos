@@ -98,6 +98,7 @@ module Cost_of : sig
     val unit : Gas.cost
     val bool : Gas.cost
     val tez : Gas.cost
+    val z : Z.t -> Gas.cost
     val string : int -> Gas.cost
     val bytes : int -> Gas.cost
     val int_of_string : string -> Gas.cost
