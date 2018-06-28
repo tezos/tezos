@@ -364,7 +364,10 @@ let apply_manager_operation_content :
             match parameters with
             | None -> return ctxt
             | Some arg ->
-                Lwt.return (Script.force_decode arg) >>=? fun (arg, _cost_arg) ->
+                Lwt.return (Script.force_decode arg) >>=? fun (arg, _cost_arg (* see [note] *)) ->
+                (* [note]: for toplevel ops, _cost_* is nil since the
+                   lazy value has already been forced at precheck, so
+                   we compute and consume the full cost again *)
                 let cost_arg = Script.deserialized_cost arg in
                 Lwt.return (Gas.consume ctxt cost_arg) >>=? fun ctxt ->
                 match Micheline.root arg with
@@ -393,7 +396,7 @@ let apply_manager_operation_content :
                   let unit = Micheline.strip_locations (Prim (0, Script.D_Unit, [], [])) in
                   return (ctxt, unit)
               | Some parameters ->
-                  Lwt.return (Script.force_decode parameters) >>=? fun (arg, _cost_arg) ->
+                  Lwt.return (Script.force_decode parameters) >>=? fun (arg, _cost_arg (* see [note] *)) ->
                   let cost_arg = Script.deserialized_cost arg in
                   Lwt.return (Gas.consume ctxt cost_arg) >>=? fun ctxt ->
                   return (ctxt, arg)
@@ -428,9 +431,9 @@ let apply_manager_operation_content :
         begin match script with
           | None -> return (None, ctxt)
           | Some script ->
-              Lwt.return (Script.force_decode script.storage) >>=? fun (ustorage, _) ->
+              Lwt.return (Script.force_decode script.storage) >>=? fun (ustorage, _cost (* see [note] *)) ->
               Lwt.return (Gas.consume ctxt (Script.deserialized_cost ustorage)) >>=? fun ctxt ->
-              Lwt.return (Script.force_decode script.storage) >>=? fun (ucode, _) ->
+              Lwt.return (Script.force_decode script.storage) >>=? fun (ucode, _cost (* see [note] *)) ->
               Lwt.return (Gas.consume ctxt (Script.deserialized_cost ucode)) >>=? fun ctxt ->
               Script_ir_translator.parse_script ctxt script >>=? fun (_, ctxt) ->
               Script_ir_translator.erase_big_map_initialization ctxt Optimized script >>=? fun (script, big_map_diff, ctxt) ->
@@ -513,18 +516,19 @@ let precheck_manager_contents
     | Reveal pk ->
         Contract.reveal_manager_key ctxt source pk
     | Transaction { parameters = Some arg ; _ } ->
-        (* Fail if not enough gas for minimal deserialization cost *)
+        (* Fail quickly if not enough gas for minimal deserialization cost *)
         Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
         Gas.consume ctxt (Script.minimal_deserialize_cost arg) >>=? fun _ ->
+        (* Fail if not enough gas for complete deserialization cost *)
         Lwt.return @@ Script.force_decode arg >>=? fun (_arg, cost_arg) ->
         Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
         Gas.consume ctxt cost_arg
     | Origination { script = Some script ; _ } ->
-        (* Fail if not enough gas for minimal deserialization cost *)
+        (* Fail quickly if not enough gas for minimal deserialization cost *)
         Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
         (Gas.consume ctxt (Script.minimal_deserialize_cost script.code) >>? fun ctxt ->
-         Gas.consume ctxt (Script.minimal_deserialize_cost script.storage))
-        >>=? fun _ ->
+         Gas.consume ctxt (Script.minimal_deserialize_cost script.storage)) >>=? fun _ ->
+        (* Fail if not enough gas for complete deserialization cost *)
         Lwt.return @@ Script.force_decode script.code >>=? fun (_code, cost_code) ->
         Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
         Gas.consume ctxt cost_code >>=? fun ctxt ->
