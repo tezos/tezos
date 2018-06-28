@@ -10,9 +10,6 @@
 open Alpha_context
 open Gas
 
-(* FIXME: this really is a preliminary estimation of costs,
-   everything in this file needs to be tweaked and proofread. *)
-
 module Cost_of = struct
   let cycle = step_cost 1
   let nop = free
@@ -33,6 +30,9 @@ module Cost_of = struct
 
   let string length =
     alloc_bytes_cost length
+
+  let bytes length =
+    alloc_cost 12 +@ alloc_bytes_cost length
 
   let concat s1 s2 =
     string (String.length s1 + String.length s2)
@@ -208,6 +208,7 @@ module Cost_of = struct
     let bool = free
     let unit = free
     let string = string
+    let bytes = bytes
     let int_of_string str =
       alloc_cost @@ (Pervasives.(/) (String.length str) 5)
     let tez = step_cost 1 +@ alloc_cost 1
@@ -229,10 +230,7 @@ module Cost_of = struct
     let primitive_type = alloc_cost 1
     let one_arg_type = alloc_cost 2
     let two_arg_type = alloc_cost 3
-    let operation b =
-      (* TODO: proper handling of (de)serialization costs *)
-      let len = MBytes.length b in
-      alloc_cost len +@ step_cost (len * 10)
+    let operation b = bytes b
     let type_ nb_args = alloc_cost (nb_args + 1)
 
     let instr
@@ -356,41 +354,33 @@ module Cost_of = struct
   end
 
   module Unparse = struct
-    let prim_cost nb_args =
-      alloc_cost 4 (* location, primitive name, list, annotation *) +@
-      (nb_args *@ alloc_cost 2)
-    let seq_cost nb_args =
-      alloc_cost 2 (* location, list *) +@
-      (nb_args *@ alloc_cost 2)
-    let string_cost length =
-      alloc_cost 3 +@ alloc_bytes_cost length
+    let prim_cost l annot = Script.prim_node_cost_nonrec_of_length l annot
+    let seq_cost = Script.seq_node_cost_nonrec_of_length
+    let string_cost length = Script.string_node_cost_of_length length
 
     let cycle = step_cost 1
-    let bool = prim_cost 0
-    let unit = prim_cost 0
-    (* FIXME: not sure we should count the length of strings and bytes
-       as they are shared *)
-    let string s = string_cost (String.length s)
-    let bytes s = alloc_bytes_cost (MBytes.length s)
-    (* Approximates log10(x) *)
-    let z i =
-      let decimal_digits = (Z.numbits (Z.abs i)) / 4 in
-      prim_cost 0 +@ (alloc_bytes_cost decimal_digits)
-    let int i = z (Script_int.to_zint i)
-    let tez = string_cost 19 (* max length of 64 bit int *)
+    let bool = prim_cost 0 []
+    let unit = prim_cost 0 []
+    (* We count the length of strings and bytes to prevent hidden
+       miscalculations due to non detectable expansion of sharing. *)
+    let string s = Script.string_node_cost s
+    let bytes s = Script.bytes_node_cost s
+    let z i = Script.int_node_cost i
+    let int i = Script.int_node_cost (Script_int.to_zint i)
+    let tez = Script.int_node_cost_of_numbits 60 (* int64 bound *)
     let timestamp x = Script_timestamp.to_zint x |> Script_int.of_zint |> int
-    let operation bytes = string_cost (MBytes.length bytes * 2)
+    let operation bytes = Script.bytes_node_cost bytes
     let key = string_cost 54
     let key_hash = string_cost 36
     let signature = string_cost 128
     let contract = string_cost 36
-    let pair = prim_cost 2
-    let union = prim_cost 1
-    let some = prim_cost 1
-    let none = prim_cost 0
-    let list_element = prim_cost 1
-    let set_element = alloc_cost 2
-    let map_element = alloc_cost 2
+    let pair = prim_cost 2 []
+    let union = prim_cost 1 []
+    let some = prim_cost 1 []
+    let none = prim_cost 0 []
+    let list_element = alloc_cost 2
+    let set_element = alloc_cost 2 (* FIXME: log(size) *)
+    let map_element = alloc_cost 2 (* FIXME: log(size) *)
     let one_arg_type = prim_cost 1
     let two_arg_type = prim_cost 2
 

@@ -301,6 +301,16 @@ module Script : sig
   val lazy_expr_encoding: lazy_expr Data_encoding.t
   val deserialized_cost : expr -> Gas.cost
   val serialized_cost : MBytes.t -> Gas.cost
+  val int_node_cost : Z.t -> Gas.cost
+  val int_node_cost_of_numbits : int -> Gas.cost
+  val string_node_cost : string -> Gas.cost
+  val string_node_cost_of_length : int -> Gas.cost
+  val bytes_node_cost : MBytes.t -> Gas.cost
+  val bytes_node_cost_of_length : int -> Gas.cost
+  val prim_node_cost_nonrec : expr list -> annot  -> Gas.cost
+  val prim_node_cost_nonrec_of_length : int -> annot -> Gas.cost
+  val seq_node_cost_nonrec : expr list -> Gas.cost
+  val seq_node_cost_nonrec_of_length : int -> Gas.cost
   val force_decode : lazy_expr -> (expr * Gas.cost) tzresult
   val force_bytes : lazy_expr -> (MBytes.t * Gas.cost) tzresult
   val minimal_deserialize_cost : lazy_expr -> Gas.cost

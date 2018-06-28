@@ -547,7 +547,7 @@ let rec unparse_ty_no_lwt
     Gas.consume ctxt Unparse_costs.cycle >>? fun ctxt ->
     let return ctxt (name, args, annot) =
       let result = Prim (-1, name, args, annot) in
-      Gas.consume ctxt (Unparse_costs.prim_cost (List.length args)) >>? fun ctxt ->
+      Gas.consume ctxt (Unparse_costs.prim_cost (List.length args) annot) >>? fun ctxt ->
       ok (result, ctxt) in
     match ty with
     | Unit_t tname -> return ctxt (T_unit, [], unparse_type_annot tname)
