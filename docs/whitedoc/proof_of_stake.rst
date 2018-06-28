@@ -257,6 +257,11 @@ reward is ``ENDORSEMENT_REWARD`` = 2 / ``BLOCK_PRIORITY`` where block
 priority starts at 1. So the endorsement reward is only half if the
 block of priority 2 for a given slot is being endorsed.
 
+It is possible that the same endorser be selected ``k`` times for the
+same block, in this case ``k`` deposits are required and ``k`` rewards
+gained. However a single operation needs to be sent on the network to
+endorse ``k`` times the same block.
+
 Inflation
 ~~~~~~~~~
 
