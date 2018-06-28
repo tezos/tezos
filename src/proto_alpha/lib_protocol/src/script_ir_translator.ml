@@ -1617,7 +1617,9 @@ and parse_instr
           return (judgement, ctxt) in
     let typed ctxt loc instr aft =
       log_stack ctxt loc stack_ty aft >>=? fun () ->
+      Lwt.return @@ Gas.consume ctxt (Typecheck_costs.instr instr) >>=? fun ctxt ->
       return ctxt (Typed { loc ; instr ; bef = stack_ty ; aft }) in
+    Lwt.return @@ Gas.consume ctxt Typecheck_costs.cycle >>=? fun ctxt ->
     match script_instr, stack_ty with
     (* stack ops *)
     | Prim (loc, I_DROP, [], annot),

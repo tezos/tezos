@@ -234,6 +234,125 @@ module Cost_of = struct
       let len = MBytes.length b in
       alloc_cost len +@ step_cost (len * 10)
     let type_ nb_args = alloc_cost (nb_args + 1)
+
+    let instr
+      : type b a. (b, a) Script_typed_ir.instr -> cost
+      = fun i ->
+        let open Script_typed_ir in
+        alloc_cost 1 +@
+        match i with
+        | Drop -> alloc_cost 0
+        | Dup -> alloc_cost 1
+        | Swap -> alloc_cost 0
+        | Const _ -> alloc_cost 1
+        | Cons_pair -> alloc_cost 2
+        | Car -> alloc_cost 1
+        | Cdr -> alloc_cost 1
+        | Cons_some -> alloc_cost 2
+        | Cons_none _ -> alloc_cost 3
+        | If_none _ -> alloc_cost 2
+        | Left -> alloc_cost 3
+        | Right -> alloc_cost 3
+        | If_left _ -> alloc_cost 2
+        | Cons_list -> alloc_cost 1
+        | Nil -> alloc_cost 1
+        | If_cons _ -> alloc_cost 2
+        | List_map _ -> alloc_cost 5
+        | List_iter _ -> alloc_cost 4
+        | List_size -> alloc_cost 1
+        | Empty_set _ -> alloc_cost 1
+        | Set_iter _ -> alloc_cost 4
+        | Set_mem -> alloc_cost 1
+        | Set_update -> alloc_cost 1
+        | Set_size -> alloc_cost 1
+        | Empty_map _ -> alloc_cost 2
+        | Map_map _ -> alloc_cost 5
+        | Map_iter _ -> alloc_cost 4
+        | Map_mem -> alloc_cost 1
+        | Map_get -> alloc_cost 1
+        | Map_update -> alloc_cost 1
+        | Map_size -> alloc_cost 1
+        | Big_map_mem -> alloc_cost 1
+        | Big_map_get -> alloc_cost 1
+        | Big_map_update -> alloc_cost 1
+        | Concat -> alloc_cost 1
+        | Add_seconds_to_timestamp -> alloc_cost 1
+        | Add_timestamp_to_seconds -> alloc_cost 1
+        | Sub_timestamp_seconds -> alloc_cost 1
+        | Diff_timestamps -> alloc_cost 1
+        | Add_tez -> alloc_cost 1
+        | Sub_tez -> alloc_cost 1
+        | Mul_teznat -> alloc_cost 1
+        | Mul_nattez -> alloc_cost 1
+        | Ediv_teznat -> alloc_cost 1
+        | Ediv_tez -> alloc_cost 1
+        | Or -> alloc_cost 1
+        | And -> alloc_cost 1
+        | Xor -> alloc_cost 1
+        | Not -> alloc_cost 1
+        | Is_nat -> alloc_cost 1
+        | Neg_nat -> alloc_cost 1
+        | Neg_int -> alloc_cost 1
+        | Abs_int -> alloc_cost 1
+        | Int_nat -> alloc_cost 1
+        | Add_intint -> alloc_cost 1
+        | Add_intnat -> alloc_cost 1
+        | Add_natint -> alloc_cost 1
+        | Add_natnat -> alloc_cost 1
+        | Sub_int -> alloc_cost 1
+        | Mul_intint -> alloc_cost 1
+        | Mul_intnat -> alloc_cost 1
+        | Mul_natint -> alloc_cost 1
+        | Mul_natnat -> alloc_cost 1
+        | Ediv_intint -> alloc_cost 1
+        | Ediv_intnat -> alloc_cost 1
+        | Ediv_natint -> alloc_cost 1
+        | Ediv_natnat -> alloc_cost 1
+        | Lsl_nat -> alloc_cost 1
+        | Lsr_nat -> alloc_cost 1
+        | Or_nat -> alloc_cost 1
+        | And_nat -> alloc_cost 1
+        | And_int_nat -> alloc_cost 1
+        | Xor_nat -> alloc_cost 1
+        | Not_nat -> alloc_cost 1
+        | Not_int -> alloc_cost 1
+        | Seq _ -> alloc_cost 8
+        | If _ -> alloc_cost 8
+        | Loop _ -> alloc_cost 4
+        | Loop_left _ -> alloc_cost 5
+        | Dip _ -> alloc_cost 4
+        | Exec -> alloc_cost 1
+        | Lambda _ -> alloc_cost 2
+        | Failwith _ -> alloc_cost 1
+        | Nop -> alloc_cost 0
+        | Compare _ -> alloc_cost 1
+        | Eq -> alloc_cost 1
+        | Neq -> alloc_cost 1
+        | Lt -> alloc_cost 1
+        | Gt -> alloc_cost 1
+        | Le -> alloc_cost 1
+        | Ge -> alloc_cost 1
+        | Address -> alloc_cost 1
+        | Contract _ -> alloc_cost 2
+        | Transfer_tokens -> alloc_cost 1
+        | Create_account -> alloc_cost 2
+        | Implicit_account -> alloc_cost 1
+        | Create_contract _ -> alloc_cost 8
+        | Set_delegate -> alloc_cost 1
+        | Now -> alloc_cost 1
+        | Balance -> alloc_cost 1
+        | Check_signature -> alloc_cost 1
+        | Hash_key -> alloc_cost 1
+        | Pack _ -> alloc_cost 2
+        | Unpack _ -> alloc_cost 2
+        | Blake2b -> alloc_cost 1
+        | Sha256 -> alloc_cost 1
+        | Sha512 -> alloc_cost 1
+        | Steps_to_quota -> alloc_cost 1
+        | Source -> alloc_cost 1
+        | Sender -> alloc_cost 1
+        | Self _ -> alloc_cost 2
+        | Amount -> alloc_cost 1
   end
 
   module Unparse = struct

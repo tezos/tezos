@@ -135,6 +135,9 @@ module Cost_of : sig
 
     (** Cost of parsing a type *)
     val type_ : int -> Gas.cost
+
+    (** Cost of parsing an instruction *)
+    val instr : ('a, 'b) Script_typed_ir.instr -> Gas.cost
   end
 
   module Unparse : sig
