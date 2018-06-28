@@ -541,86 +541,68 @@ let add_field_annot a var = function
       Prim (loc, prim, args, annots @ unparse_field_annot a @ unparse_var_annot var )
   | expr -> expr
 
-let rec unparse_ty
-  : type a. a ty -> Script.node
-  = function
-    | Unit_t tname -> Prim (-1, T_unit, [], unparse_type_annot tname)
-    | Int_t tname -> Prim (-1, T_int, [], unparse_type_annot tname)
-    | Nat_t tname -> Prim (-1, T_nat, [], unparse_type_annot tname)
-    | String_t tname -> Prim (-1, T_string, [], unparse_type_annot tname)
-    | Bytes_t tname -> Prim (-1, T_bytes, [], unparse_type_annot tname)
-    | Mutez_t tname -> Prim (-1, T_mutez, [], unparse_type_annot tname)
-    | Bool_t tname -> Prim (-1, T_bool, [], unparse_type_annot tname)
-    | Key_hash_t tname -> Prim (-1, T_key_hash, [], unparse_type_annot tname)
-    | Key_t tname -> Prim (-1, T_key, [], unparse_type_annot tname)
-    | Timestamp_t tname -> Prim (-1, T_timestamp, [], unparse_type_annot tname)
-    | Address_t tname -> Prim (-1, T_address, [], unparse_type_annot tname)
-    | Signature_t tname -> Prim (-1, T_signature, [], unparse_type_annot tname)
-    | Operation_t tname -> Prim (-1, T_operation, [], unparse_type_annot tname)
-    | Contract_t (ut, tname) ->
-        let t = unparse_ty ut in
-        Prim (-1, T_contract, [ t ], unparse_type_annot tname)
-    | Pair_t ((utl, l_field, l_var), (utr, r_field, r_var), tname) ->
-        let annot = unparse_type_annot tname in
-        let tl = unparse_ty utl |> add_field_annot l_field l_var in
-        let tr = unparse_ty utr |> add_field_annot r_field r_var in
-        Prim (-1, T_pair, [ tl; tr ], annot)
-    | Union_t ((utl, l_field), (utr, r_field), tname) ->
-        let annot = unparse_type_annot tname in
-        let tl = unparse_ty utl |> add_field_annot l_field None in
-        let tr = unparse_ty utr |> add_field_annot r_field None in
-        Prim (-1, T_or, [ tl; tr ], annot)
-    | Lambda_t (uta, utr, tname) ->
-        let ta = unparse_ty uta in
-        let tr = unparse_ty utr in
-        Prim (-1, T_lambda, [ ta; tr ], unparse_type_annot tname)
-    | Option_t ((ut, some_field), _none_field, tname) ->
-        let annot = unparse_type_annot tname in
-        let t = unparse_ty ut |> add_field_annot some_field None in
-        Prim (-1, T_option, [ t ], annot)
-    | List_t (ut, tname) ->
-        let t = unparse_ty ut in
-        Prim (-1, T_list, [ t ], unparse_type_annot tname)
-    | Set_t (ut, tname) ->
-        let t = unparse_comparable_ty ut in
-        Prim (-1, T_set, [ t ], unparse_type_annot tname)
-    | Map_t (uta, utr, tname) ->
-        let ta = unparse_comparable_ty uta in
-        let tr = unparse_ty utr in
-        Prim (-1, T_map, [ ta; tr ], unparse_type_annot tname)
-    | Big_map_t (uta, utr, tname) ->
-        let ta = unparse_comparable_ty uta in
-        let tr = unparse_ty utr in
-        Prim (-1, T_big_map, [ ta; tr ], unparse_type_annot tname)
-
-let rec account_gas_node
-  : context tzresult -> Script.node -> context tzresult
-  = fun ctxt node ->
-    match ctxt with
-    | Error _ -> ctxt
-    | Ok ctxt ->
-        Gas.consume ctxt Unparse_costs.cycle >>? fun ctxt ->
-        match node with
-        | Int (_, v) ->
-            Gas.consume ctxt (Unparse_costs.z v)
-        | String (_, s) ->
-            Gas.consume ctxt (Unparse_costs.string s)
-        | Bytes (_, s) ->
-            Gas.consume ctxt (Unparse_costs.bytes s)
-        | Prim (_, _, args, _) ->
-            List.fold_left account_gas_node (ok ctxt) args >>? fun ctxt ->
-            Gas.consume ctxt (Unparse_costs.prim_cost (List.length args))
-        | Seq (_, args) ->
-            List.fold_left account_gas_node (ok ctxt) args >>? fun ctxt ->
-            Gas.consume ctxt (Unparse_costs.seq_cost (List.length args))
-
-(* unparse_ty with gas accounting *)
-let unparse_ty_no_lwt
+let rec unparse_ty_no_lwt
   : type a. context -> a ty -> (Script.node * context) tzresult
   = fun ctxt ty ->
-    let ty = unparse_ty ty in
-    account_gas_node (ok ctxt) ty >|? fun ctxt ->
-    (ty, ctxt)
+    Gas.consume ctxt Unparse_costs.cycle >>? fun ctxt ->
+    let return ctxt (name, args, annot) =
+      let result = Prim (-1, name, args, annot) in
+      Gas.consume ctxt (Unparse_costs.prim_cost (List.length args)) >>? fun ctxt ->
+      ok (result, ctxt) in
+    match ty with
+    | Unit_t tname -> return ctxt (T_unit, [], unparse_type_annot tname)
+    | Int_t tname -> return ctxt (T_int, [], unparse_type_annot tname)
+    | Nat_t tname -> return ctxt (T_nat, [], unparse_type_annot tname)
+    | String_t tname -> return ctxt (T_string, [], unparse_type_annot tname)
+    | Bytes_t tname -> return ctxt (T_bytes, [], unparse_type_annot tname)
+    | Mutez_t tname -> return ctxt (T_mutez, [], unparse_type_annot tname)
+    | Bool_t tname -> return ctxt (T_bool, [], unparse_type_annot tname)
+    | Key_hash_t tname -> return ctxt (T_key_hash, [], unparse_type_annot tname)
+    | Key_t tname -> return ctxt (T_key, [], unparse_type_annot tname)
+    | Timestamp_t tname -> return ctxt (T_timestamp, [], unparse_type_annot tname)
+    | Address_t tname -> return ctxt (T_address, [], unparse_type_annot tname)
+    | Signature_t tname -> return ctxt (T_signature, [], unparse_type_annot tname)
+    | Operation_t tname -> return ctxt (T_operation, [], unparse_type_annot tname)
+    | Contract_t (ut, tname) ->
+        unparse_ty_no_lwt ctxt ut >>? fun (t, ctxt) ->
+        return ctxt (T_contract, [ t ], unparse_type_annot tname)
+    | Pair_t ((utl, l_field, l_var), (utr, r_field, r_var), tname) ->
+        let annot = unparse_type_annot tname in
+        unparse_ty_no_lwt ctxt utl >>? fun (utl, ctxt) ->
+        let tl = add_field_annot l_field l_var utl in
+        unparse_ty_no_lwt ctxt utr >>? fun (utr, ctxt) ->
+        let tr = add_field_annot r_field r_var utr in
+        return ctxt (T_pair, [ tl; tr ], annot)
+    | Union_t ((utl, l_field), (utr, r_field), tname) ->
+        let annot = unparse_type_annot tname in
+        unparse_ty_no_lwt ctxt utl >>? fun (utl, ctxt) ->
+        let tl = add_field_annot l_field None utl in
+        unparse_ty_no_lwt ctxt utr >>? fun (utr, ctxt) ->
+        let tr = add_field_annot r_field None utr in
+        return ctxt (T_or, [ tl; tr ], annot)
+    | Lambda_t (uta, utr, tname) ->
+        unparse_ty_no_lwt ctxt uta >>? fun (ta, ctxt) ->
+        unparse_ty_no_lwt ctxt utr >>? fun (tr, ctxt) ->
+        return ctxt (T_lambda, [ ta; tr ], unparse_type_annot tname)
+    | Option_t ((ut, some_field), _none_field, tname) ->
+        let annot = unparse_type_annot tname in
+        unparse_ty_no_lwt ctxt ut >>? fun (ut, ctxt) ->
+        let t = add_field_annot some_field None ut in
+        return ctxt (T_option, [ t ], annot)
+    | List_t (ut, tname) ->
+        unparse_ty_no_lwt ctxt ut >>? fun (t, ctxt) ->
+        return ctxt (T_list, [ t ], unparse_type_annot tname)
+    | Set_t (ut, tname) ->
+        let t = unparse_comparable_ty ut in
+        return ctxt (T_set, [ t ], unparse_type_annot tname)
+    | Map_t (uta, utr, tname) ->
+        let ta = unparse_comparable_ty uta in
+        unparse_ty_no_lwt ctxt utr >>? fun (tr, ctxt) ->
+        return ctxt (T_map, [ ta; tr ], unparse_type_annot tname)
+    | Big_map_t (uta, utr, tname) ->
+        let ta = unparse_comparable_ty uta in
+        unparse_ty_no_lwt ctxt utr >>? fun (tr, ctxt) ->
+        return ctxt (T_big_map, [ ta; tr ], unparse_type_annot tname)
 
 let unparse_ty ctxt ty = Lwt.return (unparse_ty_no_lwt ctxt ty)
 
