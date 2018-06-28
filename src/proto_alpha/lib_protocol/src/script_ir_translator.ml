@@ -1561,15 +1561,18 @@ and parse_instr
       Lwt.return check in
     let check_item_ty exp got loc n =
       check_item (ty_eq ctxt exp got) loc n in
-    let log_stack ctxt loc stack_ty aft : context tzresult Lwt.t =
+    let log_stack ctxt loc stack_ty aft =
       match type_logger, script_instr with
       | None, _
-      | Some _, (Seq (-1, _) | Int _ | String _ | Bytes _) -> return ctxt
+      | Some _, (Seq (-1, _) | Int _ | String _ | Bytes _) -> return ()
       | Some log, (Prim _ | Seq _) ->
-          unparse_stack ctxt stack_ty >>=? fun (stack_ty, ctxt) ->
-          unparse_stack ctxt aft >>=? fun (aft, ctxt) ->
+          (* Unparsing for logging done in an unlimited context as this
+             is used only by the client and not the protocol *)
+          let ctxt = Gas.set_unlimited ctxt in
+          unparse_stack ctxt stack_ty >>=? fun (stack_ty, _) ->
+          unparse_stack ctxt aft >>=? fun (aft, _) ->
           log loc stack_ty aft;
-          return ctxt
+          return ()
     in
     let return :
       context -> bef judgement -> (bef judgement * context) tzresult Lwt.t = fun ctxt judgement ->
@@ -1586,7 +1589,7 @@ and parse_instr
       | Failed _ ->
           return (judgement, ctxt) in
     let typed ctxt loc instr aft =
-      log_stack ctxt loc stack_ty aft >>=? fun ctxt ->
+      log_stack ctxt loc stack_ty aft >>=? fun () ->
       return ctxt (Typed { loc ; instr ; bef = stack_ty ; aft }) in
     match script_instr, stack_ty with
     (* stack ops *)
@@ -2036,7 +2039,7 @@ and parse_instr
       Item_t (v, _rest, _) ->
         fail_unexpected_annot loc annot >>=? fun () ->
         let descr aft = { loc ; instr = Failwith v ; bef = stack_ty ; aft } in
-        log_stack ctxt loc stack_ty Empty_t >>=? fun ctxt ->
+        log_stack ctxt loc stack_ty Empty_t >>=? fun () ->
         return ctxt (Failed { descr })
     (* timestamp operations *)
     | Prim (loc, I_ADD, [], annot),
