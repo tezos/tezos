@@ -3306,9 +3306,6 @@ Protocol Alpha
       "hard_gas_limit_per_operation": $bignum,
       "hard_gas_limit_per_block": $bignum,
       "proof_of_work_threshold": integer ∈ [-2^31-2, 2^31+2] || string,
-      "dictator_pubkey":
-        string
-        /* A Secp256k1 or Ed25519 public key (Base58Check-encoded) */,
       "max_operation_data_length": integer ∈ [-2^30-2, 2^30+2],
       "tokens_per_roll":
         /* Amount in mutez */

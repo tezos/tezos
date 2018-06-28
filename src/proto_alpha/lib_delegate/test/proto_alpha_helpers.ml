@@ -114,7 +114,7 @@ let vote_protocol_parameters =
 
 let activate_alpha ?(vote = false) () =
   let fitness = Fitness_repr.from_int64 0L in
-  let dictator_sk =
+  let activator_sk =
     Tezos_signer_backends.Unencrypted.make_sk
       (Signature.Secret_key.of_b58check_exn
          "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6") in
@@ -126,7 +126,7 @@ let activate_alpha ?(vote = false) () =
                  fitness ;
                  protocol_parameters ;
                })
-    dictator_sk
+    activator_sk
 
 let init ?exe ?vote ?rpc_port () =
   begin

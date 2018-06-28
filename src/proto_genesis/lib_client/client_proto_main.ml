@@ -64,7 +64,7 @@ let commands () =
          int64_parameter
        @@ prefixes [ "and" ; "key" ]
        @@ Client_keys.Secret_key.source_param
-         ~name:"password" ~desc:"Dictator's key"
+         ~name:"password" ~desc:"Activator's key"
        @@ prefixes [ "and" ; "parameters" ]
        @@ param ~name:"parameters"
          ~desc:"Protocol parameters (as JSON file)"
@@ -87,7 +87,7 @@ let commands () =
        @@ Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
        @@ Client_keys.Secret_key.source_param
-         ~name:"password" ~desc:"Dictator's key"
+         ~name:"password" ~desc:"Activator's key"
        @@ stop)
       begin fun timestamp hash sk cctxt ->
         bake cctxt ?timestamp cctxt#block
