@@ -288,6 +288,9 @@ the blocks in the cycle are sufficient to include all revelations.
 
 The revelations are hashed together to generate a random seed at the
 very end of cycle ``(n-PRESERVED_CYCLES-1)``.
+The seed of cycle ``(n-PRESERVED_CYCLES-2)`` is hashed with a constant
+and then with each revelation of cycle ``(n-PRESERVED_CYCLES-1)``.
+Once computed, this new seed is stored and used during cycle ``n``.
 
 Denunciations
 -------------
