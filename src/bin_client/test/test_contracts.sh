@@ -210,7 +210,7 @@ assert_storage $contract_dir/exec_concat.tz '"?"' '""' '"_abc"'
 assert_storage $contract_dir/exec_concat.tz '"?"' '"test"' '"test_abc"'
 
 # Get current steps to quota
-assert_storage $contract_dir/steps_to_quota.tz 111 Unit 399849
+assert_storage $contract_dir/steps_to_quota.tz 111 Unit 399817
 
 # Get the current balance of the contract
 assert_storage $contract_dir/balance.tz '111' Unit '4000000000000'

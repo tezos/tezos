@@ -59,7 +59,7 @@ val big_map_update :
 val ty_eq :
   context ->
   'ta Script_typed_ir.ty -> 'tb Script_typed_ir.ty ->
-  ('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq tzresult
+  (('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq * context) tzresult
 
 val parse_data :
   ?type_logger: type_logger ->
