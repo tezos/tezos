@@ -296,7 +296,7 @@ Denunciations
 -------------
 
 If two endorsements are made for the same slot or two blocks at the same
-height by a delegate, this can be denounced. The denunciation would be
+height by a delegate, this can be denounced. The denunciation would
 typically be made by the baker, who includes it as a special operation.
 In a first time, denunciation will only forfeit the security deposit
 for the doubly signed operation. However, over time, as the risk of
