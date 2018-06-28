@@ -28,7 +28,7 @@ COPY Makefile tezos/
 COPY src tezos/src/
 COPY vendors tezos/vendors/
 RUN sudo chown -R opam tezos && \
-    opam exec -- make -C tezos all build-test
+    cd tezos && opam exec -- make all build-test
 EOF
 
 echo
