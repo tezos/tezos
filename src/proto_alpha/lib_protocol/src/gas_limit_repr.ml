@@ -112,10 +112,10 @@ let alloc_cost n =
     bytes_written = Z.zero }
 
 let alloc_bytes_cost n =
-  alloc_cost (n / 8)
+  alloc_cost ((n + 7) / 8)
 
 let alloc_bits_cost n =
-  alloc_cost (n / 64)
+  alloc_cost ((n + 63) / 64)
 
 let step_cost n =
   { allocations = Z.zero ;

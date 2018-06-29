@@ -71,9 +71,9 @@ module Cost_of = struct
 
   let map_size = step_cost 2
 
-  let big_map_mem _key _map = step_cost 200
-  let big_map_get _key _map = step_cost 200
-  let big_map_update _key _value _map = step_cost 200
+  let big_map_mem _key _map = step_cost 50
+  let big_map_get _key _map = step_cost 50
+  let big_map_update _key _value _map = step_cost 10
 
   let set_access : type elt. elt -> elt Script_typed_ir.set -> int
     = fun _key (module Box) ->
@@ -186,7 +186,7 @@ module Cost_of = struct
   let set_delegate = step_cost 10 +@ write_bytes_cost (Z.of_int 32)
   let balance = step_cost 1 +@ read_bytes_cost (Z.of_int 8)
   let now = step_cost 5
-  let check_signature = step_cost 100
+  let check_signature = step_cost 1000
   let hash_key = step_cost 3 +@ bytes 20
   let hash data len = 10 *@ step_cost (MBytes.length data) +@ bytes len
   let steps_to_quota = step_cost 1
@@ -195,11 +195,11 @@ module Cost_of = struct
   let amount = step_cost 1
   let compare_bool _ _ = step_cost 1
   let compare_string s1 s2 =
-    step_cost (Compare.Int.max (String.length s1) (String.length s2) / 8) +@ step_cost 1
+    step_cost ((7 + Compare.Int.max (String.length s1) (String.length s2)) / 8) +@ step_cost 1
   let compare_bytes s1 s2 =
-    step_cost (Compare.Int.max (MBytes.length s1) (MBytes.length s2) / 8) +@ step_cost 1
+    step_cost ((7 + Compare.Int.max (MBytes.length s1) (MBytes.length s2)) / 8) +@ step_cost 1
   let compare_tez _ _ = step_cost 1
-  let compare_zint n1 n2 = step_cost (Compare.Int.max (Z.numbits n1) (Z.numbits n2) / 8) +@ step_cost 1
+  let compare_zint n1 n2 = step_cost ((7 + Compare.Int.max (Z.numbits n1) (Z.numbits n2)) / 8) +@ step_cost 1
   let compare_int n1 n2 = compare_zint (Script_int.to_zint n1) (Script_int.to_zint n2)
   let compare_nat = compare_int
   let compare_key_hash _ _ = alloc_bytes_cost 36

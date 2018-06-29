@@ -210,7 +210,7 @@ assert_storage $contract_dir/exec_concat.tz '"?"' '""' '"_abc"'
 assert_storage $contract_dir/exec_concat.tz '"?"' '"test"' '"test_abc"'
 
 # Get current steps to quota
-assert_storage $contract_dir/steps_to_quota.tz 111 Unit 399815
+assert_storage $contract_dir/steps_to_quota.tz 111 Unit 399813
 
 # Gas bounds checks
 assert_fails $client -l originate contract first_explosion for bootstrap1 \
