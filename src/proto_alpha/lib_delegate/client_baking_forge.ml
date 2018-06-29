@@ -588,7 +588,9 @@ let filter_and_apply_operations
         state.index <- index ;
         return inc
   end  >>=? fun initial_inc ->
-  let endorsements = List.nth operations endorsements_index in
+  let endorsements = List.nth operations endorsements_index
+
+  in
   let votes = List.nth operations votes_index in
   let anonymous = List.nth operations anonymous_index in
   let managers = List.nth operations managers_index in
@@ -627,6 +629,9 @@ let filter_and_apply_operations
   in
   filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
   filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
+  (* Retrieve the correct index order *)
+  let managers = List.sort Proto_alpha.compare_operations managers in
+  let bad_managers = List.sort Proto_alpha.compare_operations bad_managers in
   filter_valid_operations inc (managers @ bad_managers) >>=? fun (inc, managers) ->
   (* Gives a chance to the endorser to fund their deposit in the current block *)
   filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
@@ -647,7 +652,8 @@ let filter_and_apply_operations
       (List.nth quota anonymous_index).max_size in
   trim_manager_operations ~max_size:(List.nth quota managers_index).max_size
     ~hard_gas_limit_per_block managers >>=? fun (accepted_managers, _overflowing_managers) ->
-
+  (* Retrieve the correct index order *)
+  let accepted_managers = List.sort Proto_alpha.compare_operations accepted_managers in
   (* Make sure we only keep valid operations *)
   filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
   filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
