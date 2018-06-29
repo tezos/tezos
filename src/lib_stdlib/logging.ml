@@ -105,33 +105,33 @@ module Make_semantic(S : MESSAGE) : SEMLOG = struct
 
 
   let log_f ~level =
-    if level >= Lwt_log_core.Section.level section then
+    if level < Lwt_log_core.Section.level section then
+      fun format ?(tags=Tag.empty) ->
+        Format.ikfprintf
+          (fun _ -> call_taps { section = Section ; level ; text = None ; tags }; Lwt.return_unit)
+          Format.std_formatter
+          format
+    else
       fun format ?(tags=Tag.empty) ->
         Format.kasprintf
           (fun text ->
              call_taps { section = Section ; level ; text = Some text ; tags };
              Lwt_log_core.log ~section ~level text)
           format
-    else
-      fun format ?(tags=Tag.empty) ->
-        Format.ikfprintf
-          (fun _ -> call_taps { section = Section ; level ; text = None ; tags }; Lwt.return_unit)
-          Format.std_formatter
-          format
 
   let ign_log_f ~level =
-    if level >= Lwt_log_core.Section.level section then
+    if level < Lwt_log_core.Section.level section then
+      fun format ?(tags=Tag.empty) ->
+        Format.ikfprintf
+          (fun _ -> call_taps { section = Section ; level ; text = None ; tags })
+          Format.std_formatter
+          format
+    else
       fun format ?(tags=Tag.empty) ->
         Format.kasprintf
           (fun text ->
              call_taps { section = Section ; level ; text = Some text ; tags };
              Lwt_log_core.ign_log ~section ~level text)
-          format
-    else
-      fun format ?(tags=Tag.empty) ->
-        Format.ikfprintf
-          (fun _ -> call_taps { section = Section ; level ; text = None ; tags })
-          Format.std_formatter
           format
 
   let debug f = f (ign_log_f ~level:Lwt_log_core.Debug) ?tags:(Some Tag.empty)
