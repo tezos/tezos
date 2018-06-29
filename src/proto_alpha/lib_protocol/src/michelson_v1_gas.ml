@@ -174,8 +174,12 @@ module Cost_of = struct
 
   let compare_res = step_cost 1
 
-  let unpack bytes = 10 *@ step_cost (MBytes.length bytes)
-  let pack bytes = alloc_bytes_cost (MBytes.length bytes)
+  let unpack_failed bytes =
+    (* We cannot instrument failed deserialization,
+       so we take worst case fees: a set of size 1 bytes values. *)
+    let len = MBytes.length bytes in
+    (len *@ alloc_mbytes_cost 1) +@
+    (len *@ (log2 len *@ (alloc_cost 3 +@ step_cost 1)))
 
   let address = step_cost 1
   let contract = Gas.read_bytes_cost Z.zero +@ step_cost 100

@@ -641,13 +641,18 @@ let rec interp
             Script_ir_translator.pack_data ctxt t value >>=? fun (bytes, ctxt) ->
             logged_return (Item (bytes, rest), ctxt)
         | Unpack t, Item (bytes, rest) ->
-            Lwt.return (Gas.consume ctxt (Interp_costs.pack bytes)) >>=? fun ctxt ->
-            begin match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
+            begin match Data_encoding.Binary.of_bytes Script.lazy_expr_encoding bytes with
               | None ->
+                  Lwt.return (Gas.consume ctxt (Interp_costs.unpack_failed bytes)) >>=? fun ctxt ->
                   logged_return (Item (None, rest), ctxt)
-              | Some expr ->
-                  parse_data ctxt t (Micheline.root expr) >>=? fun (value, ctxt) ->
-                  logged_return (Item (Some value, rest), ctxt)
+              | Some lexpr ->
+                  (Script.force_decode ctxt lexpr >>=? fun (expr, ctxt) ->
+                   parse_data ctxt t (Micheline.root expr)) >>= function
+                  | Ok (value, ctxt) ->
+                      logged_return (Item (Some value, rest), ctxt)
+                  | Error _ignored ->
+                      Lwt.return (Gas.consume ctxt (Interp_costs.unpack_failed bytes)) >>=? fun ctxt ->
+                      logged_return (Item (None, rest), ctxt)
             end
         (* protocol *)
         | Address, Item ((_, contract), rest) ->

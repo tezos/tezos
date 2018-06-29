@@ -64,8 +64,7 @@ module Cost_of : sig
   val exec : Gas.cost
   val push : Gas.cost
   val compare_res : Gas.cost
-  val pack : MBytes.t -> Gas.cost
-  val unpack : MBytes.t -> Gas.cost
+  val unpack_failed : MBytes.t -> Gas.cost
   val address : Gas.cost
   val contract : Gas.cost
   val transfer : Gas.cost
