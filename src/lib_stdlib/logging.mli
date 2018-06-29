@@ -30,7 +30,7 @@ type log_section = private ..
 type log_message = {
   section : log_section ;
   level : level ;
-  text : string ;
+  text : string option ;
   tags : Tag.set ;
 }
 

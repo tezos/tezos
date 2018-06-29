@@ -37,7 +37,7 @@ type log_section = ..
 type log_message = {
   section : log_section ;
   level : level ;
-  text : string ;
+  text : string option ;
   tags : Tag.set ;
 }
 
@@ -109,13 +109,13 @@ module Make_semantic(S : MESSAGE) : SEMLOG = struct
       fun format ?(tags=Tag.empty) ->
         Format.kasprintf
           (fun text ->
-             call_taps { section = Section ; level ; text ; tags };
+             call_taps { section = Section ; level ; text = Some text ; tags };
              Lwt_log_core.log ~section ~level text)
           format
     else
       fun format ?(tags=Tag.empty) ->
         Format.ikfprintf
-          (fun _ -> call_taps { section = Section ; level ; text = "" ; tags }; Lwt.return_unit)
+          (fun _ -> call_taps { section = Section ; level ; text = None ; tags }; Lwt.return_unit)
           Format.std_formatter
           format
 
@@ -124,13 +124,13 @@ module Make_semantic(S : MESSAGE) : SEMLOG = struct
       fun format ?(tags=Tag.empty) ->
         Format.kasprintf
           (fun text ->
-             call_taps { section = Section ; level ; text ; tags };
+             call_taps { section = Section ; level ; text = Some text ; tags };
              Lwt_log_core.ign_log ~section ~level text)
           format
     else
       fun format ?(tags=Tag.empty) ->
         Format.ikfprintf
-          (fun _ -> call_taps { section = Section ; level ; text = "" ; tags })
+          (fun _ -> call_taps { section = Section ; level ; text = None ; tags })
           Format.std_formatter
           format
 
@@ -187,7 +187,7 @@ module Make_unregistered(S : sig val name: string end) : LOG = struct
     else
       Format.kasprintf
         (fun msg ->
-           call_taps { section = Section ; level ; text = msg ; tags = Tag.empty };
+           call_taps { section = Section ; level ; text = Some msg ; tags = Tag.empty };
            Lwt_log_core.log ?exn ~section ?location ?logger ~level msg)
         format
 
@@ -198,7 +198,7 @@ module Make_unregistered(S : sig val name: string end) : LOG = struct
     else
       Format.kasprintf
         (fun msg ->
-           call_taps { section = Section ; level ; text = msg ; tags = Tag.empty };
+           call_taps { section = Section ; level ; text = Some msg ; tags = Tag.empty };
            Lwt_log_core.ign_log ?exn ~section ?location ?logger ~level msg)
         format
 
