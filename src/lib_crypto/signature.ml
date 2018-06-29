@@ -193,6 +193,9 @@ module Public_key_hash = struct
       ~descr:"A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)"
       "pkh"
 
+  module Logging = struct
+    let tag = Tag.def ~doc:title name pp
+  end
 end
 
 module Public_key = struct

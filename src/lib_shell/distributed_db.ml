@@ -24,6 +24,10 @@ module Make_raw
        val name : string
        val encoding : t Data_encoding.t
        val pp : Format.formatter -> t -> unit
+
+       module Logging : sig
+         val tag : t Tag.def
+       end
      end)
     (Disk_table :
        Distributed_db_functors.DISK_TABLE with type key := Hash.t)
@@ -164,6 +168,9 @@ module Raw_operation_hashes = struct
         let encoding =
           let open Data_encoding in
           obj2 (req "block" Block_hash.encoding) (req "index" uint16)
+        module Logging = struct
+          let tag = Tag.def ~doc:"Operation hashes" "operation_hashes" pp
+        end
       end)
       (Operation_hashes_storage)
       (Operations_table)
@@ -233,6 +240,9 @@ module Raw_operations = struct
         let encoding =
           let open Data_encoding in
           obj2 (req "block" Block_hash.encoding) (req "index" uint16)
+        module Logging = struct
+          let tag = Tag.def ~doc:"Operations" "operations" pp
+        end
       end)
       (Operations_storage)
       (Operations_table)
@@ -458,15 +468,18 @@ module P2p_reader = struct
         f chain_db
 
   module Handle_msg_Logging =
-    Logging.Make(struct let name = "node.distributed_db.p2p_reader" end)
+    Tezos_stdlib.Logging.Make_semantic(struct let name = "node.distributed_db.p2p_reader" end)
 
   let handle_msg global_db state msg =
 
     let open Message in
     let open Handle_msg_Logging in
 
-    lwt_debug "Read message from %a: %a"
-      P2p_peer.Id.pp_short state.gid Message.pp_json msg >>= fun () ->
+    lwt_debug Tag.DSL.(fun f ->
+        f "Read message from %a: %a"
+        -% t event "read_message"
+        -% a P2p_peer.Id.Logging.tag state.gid
+        -% a Message.Logging.tag msg) >>= fun () ->
 
     match msg with
 
@@ -497,9 +510,11 @@ module P2p_reader = struct
           Lwt.return_unit
         end else if Time.(add (now ()) 15L < head.shell.timestamp) then begin
           (* TODO some penalty *)
-          lwt_log_notice "Received future block %a from peer %a."
-            Block_hash.pp_short (Block_header.hash head)
-            P2p_peer.Id.pp_short state.gid >>= fun () ->
+          lwt_log_notice Tag.DSL.(fun f ->
+              f "Received future block %a from peer %a."
+              -% t event "received_future_block"
+              -% a Block_hash.Logging.tag (Block_header.hash head)
+              -% a P2p_peer.Id.Logging.tag state.gid) >>= fun () ->
           Lwt.return_unit
         end else begin
           chain_db.callback.notify_branch state.gid locator ;
@@ -548,9 +563,11 @@ module P2p_reader = struct
           Lwt.return_unit
         end else if Time.(add (now ()) 15L < header.shell.timestamp) then begin
           (* TODO some penalty *)
-          lwt_log_notice "Received future block %a from peer %a."
-            Block_hash.pp_short head
-            P2p_peer.Id.pp_short state.gid >>= fun () ->
+          lwt_log_notice Tag.DSL.(fun f ->
+              f "Received future block %a from peer %a."
+              -% t event "received_future_block"
+              -% a Block_hash.Logging.tag head
+              -% a P2p_peer.Id.Logging.tag state.gid) >>= fun () ->
           Lwt.return_unit
         end else begin
           chain_db.callback.notify_head state.gid header mempool ;

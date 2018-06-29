@@ -7,7 +7,155 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type ('a, 'b) msgf =
+  (('a, Format.formatter, unit, 'b) format4 -> ?tags:Tag.set -> 'a) -> ?tags:Tag.set -> 'b
+
+type ('a, 'b) log = ('a, 'b) msgf -> 'b
+
+module type MESSAGE = sig
+  val name: string
+end
+
+type level = Lwt_log_core.level =
+  | Debug
+  (** Debugging message. They can be automatically removed by the
+      syntax extension. *)
+  | Info
+  (** Informational message. Suitable to be displayed when the
+      program is in verbose mode. *)
+  | Notice
+  (** Same as {!Info}, but is displayed by default. *)
+  | Warning
+  (** Something strange happend *)
+  | Error
+  (** An error message, which should not means the end of the
+      program. *)
+  | Fatal
+
+type log_section = ..
+
+type log_message = {
+  section : log_section ;
+  level : level ;
+  text : string option ;
+  tags : Tag.set ;
+}
+
+type tap_id = int
+let next_tap : int ref = ref 0
+
+type tap = {
+  id : tap_id ;
+  process : log_message -> unit ;
+}
+
+let taps : tap list ref = ref []
+
+let tap process = let id = !next_tap in
+  begin
+    next_tap := id + 1 ;
+    taps := { id ; process } :: !taps ;
+    id
+  end
+
+let untap x = taps := List.filter (fun tap -> tap.id <> x) !taps
+
+let call_taps v = List.iter (fun tap -> tap.process v) !taps
+
+module type SEMLOG = sig
+
+  type log_section += Section
+
+  module Tag = Tag
+
+  val debug: ('a, unit) log
+  val log_info: ('a, unit) log
+  val log_notice: ('a, unit) log
+  val warn: ('a, unit) log
+  val log_error: ('a, unit) log
+  val fatal_error: ('a, unit) log
+
+  val lwt_debug: ('a, unit Lwt.t) log
+  val lwt_log_info: ('a, unit Lwt.t) log
+  val lwt_log_notice: ('a, unit Lwt.t) log
+  val lwt_warn: ('a, unit Lwt.t) log
+  val lwt_log_error: ('a, unit Lwt.t) log
+  val lwt_fatal_error: ('a, unit Lwt.t) log
+
+  val event : string Tag.def
+  val exn : exn Tag.def
+
+end
+
+let sections = ref []
+
+let event = Tag.def ~doc:"String identifier for the class of event being logged" "event" Format.pp_print_text
+let exn = Tag.def ~doc:"Exception which was detected" "exception" (fun f e -> Format.pp_print_text f (Printexc.to_string e))
+
+module Make_semantic(S : MESSAGE) : SEMLOG = struct
+
+  include S
+
+  type log_section += Section
+
+  module Tag = Tag
+
+  let () = sections := S.name :: !sections
+  let section = Lwt_log_core.Section.make S.name
+
+
+  let log_f ~level =
+    if level < Lwt_log_core.Section.level section then
+      fun format ?(tags=Tag.empty) ->
+        Format.ikfprintf
+          (fun _ -> call_taps { section = Section ; level ; text = None ; tags }; Lwt.return_unit)
+          Format.std_formatter
+          format
+    else
+      fun format ?(tags=Tag.empty) ->
+        Format.kasprintf
+          (fun text ->
+             call_taps { section = Section ; level ; text = Some text ; tags };
+             Lwt_log_core.log ~section ~level text)
+          format
+
+  let ign_log_f ~level =
+    if level < Lwt_log_core.Section.level section then
+      fun format ?(tags=Tag.empty) ->
+        Format.ikfprintf
+          (fun _ -> call_taps { section = Section ; level ; text = None ; tags })
+          Format.std_formatter
+          format
+    else
+      fun format ?(tags=Tag.empty) ->
+        Format.kasprintf
+          (fun text ->
+             call_taps { section = Section ; level ; text = Some text ; tags };
+             Lwt_log_core.ign_log ~section ~level text)
+          format
+
+  let debug f = f (ign_log_f ~level:Lwt_log_core.Debug) ?tags:(Some Tag.empty)
+  let log_info f = f (ign_log_f ~level:Lwt_log_core.Info) ?tags:(Some Tag.empty)
+  let log_notice f = f (ign_log_f ~level:Lwt_log_core.Notice) ?tags:(Some Tag.empty)
+  let warn f = f (ign_log_f ~level:Lwt_log_core.Warning) ?tags:(Some Tag.empty)
+  let log_error f = f (ign_log_f ~level:Lwt_log_core.Error) ?tags:(Some Tag.empty)
+  let fatal_error f = f (ign_log_f ~level:Lwt_log_core.Fatal) ?tags:(Some Tag.empty)
+
+  let lwt_debug f = f (log_f ~level:Lwt_log_core.Debug) ?tags:(Some Tag.empty)
+  let lwt_log_info f = f (log_f ~level:Lwt_log_core.Info) ?tags:(Some Tag.empty)
+  let lwt_log_notice f = f (log_f ~level:Lwt_log_core.Notice) ?tags:(Some Tag.empty)
+  let lwt_warn f = f (log_f ~level:Lwt_log_core.Warning) ?tags:(Some Tag.empty)
+  let lwt_log_error f = f (log_f ~level:Lwt_log_core.Error) ?tags:(Some Tag.empty)
+  let lwt_fatal_error f = f (log_f ~level:Lwt_log_core.Fatal) ?tags:(Some Tag.empty)
+
+  let event = event
+  let exn = exn
+
+end
+
 module type LOG = sig
+
+  type log_section += Section
 
   val debug: ('a, Format.formatter, unit, unit) format4 -> 'a
   val log_info: ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -25,29 +173,34 @@ module type LOG = sig
 
 end
 
-let log_f
-    ?exn ?(section = Lwt_log_core.Section.main) ?location ?logger ~level format =
-  if level < Lwt_log_core.Section.level section then
-    Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter format
-  else
-    Format.kasprintf
-      (fun msg -> Lwt_log_core.log ?exn ~section ?location ?logger ~level msg)
-      format
-
-let ign_log_f
-    ?exn ?(section = Lwt_log_core.Section.main) ?location ?logger ~level format =
-  if level < Lwt_log_core.Section.level section then
-    Format.ikfprintf (fun _ -> ()) Format.std_formatter format
-  else
-    Format.kasprintf
-      (fun msg -> Lwt_log_core.ign_log ?exn ~section ?location ?logger ~level msg)
-      format
-
 let sections = ref []
 
-module Make_unregistered(S : sig val name: string end) : LOG = struct
+module Make_unregistered(S : MESSAGE) : LOG = struct
 
   let section = Lwt_log_core.Section.make S.name
+  type log_section += Section
+
+  let log_f
+      ?exn ?(section = Lwt_log_core.Section.main) ?location ?logger ~level format =
+    if level < Lwt_log_core.Section.level section then
+      Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter format
+    else
+      Format.kasprintf
+        (fun msg ->
+           call_taps { section = Section ; level ; text = Some msg ; tags = Tag.empty };
+           Lwt_log_core.log ?exn ~section ?location ?logger ~level msg)
+        format
+
+  let ign_log_f
+      ?exn ?(section = Lwt_log_core.Section.main) ?location ?logger ~level format =
+    if level < Lwt_log_core.Section.level section then
+      Format.ikfprintf (fun _ -> ()) Format.std_formatter format
+    else
+      Format.kasprintf
+        (fun msg ->
+           call_taps { section = Section ; level ; text = Some msg ; tags = Tag.empty };
+           Lwt_log_core.ign_log ?exn ~section ?location ?logger ~level msg)
+        format
 
   let debug fmt = ign_log_f ~section ~level:Lwt_log_core.Debug fmt
   let log_info fmt = ign_log_f ~section ~level:Lwt_log_core.Info fmt
@@ -65,30 +218,18 @@ module Make_unregistered(S : sig val name: string end) : LOG = struct
 
 end
 
-module Make(S : sig val name: string end) : LOG = struct
+module Make(S : MESSAGE) : LOG = struct
 
   let () = sections := S.name :: !sections
   include Make_unregistered(S)
 
 end
 
-module Core = Make(struct let name = "core" end)
+module Core = struct
+  include Make_semantic(struct let name = "core" end)
 
-type level = Lwt_log_core.level =
-  | Debug
-  (** Debugging message. They can be automatically removed by the
-      syntax extension. *)
-  | Info
-  (** Informational message. Suitable to be displayed when the
-      program is in verbose mode. *)
-  | Notice
-  (** Same as {!Info}, but is displayed by default. *)
-  | Warning
-  (** Something strange happend *)
-  | Error
-  (** An error message, which should not means the end of the
-      program. *)
-  | Fatal
+  let worker = Tag.def ~doc:"Name of affected worker" "worker" Format.pp_print_text
+end
 
 type template = Lwt_log_core.template
 let default_template = "$(date) - $(section): $(message)"

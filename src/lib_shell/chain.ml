@@ -9,6 +9,8 @@
 
 open State_logging
 
+let block_hash_tag = Tag.def ~doc:"Block hash" "block_hash" Block_hash.pp_short
+
 let mempool_encoding = Mempool.encoding
 
 let genesis chain_state =
@@ -57,7 +59,10 @@ let locked_set_head chain_store data block =
     if Block_hash.equal hash ancestor then
       Lwt.return_unit
     else
-      lwt_debug "pop_block %a" Block_hash.pp_short hash >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "pop_block %a"
+          -% t event "pop_block"
+          -% a block_hash_tag hash) >>= fun () ->
       Store.Chain_data.In_main_branch.remove (chain_store, hash) >>= fun () ->
       State.Block.predecessor block >>= function
       | Some predecessor ->
@@ -66,7 +71,10 @@ let locked_set_head chain_store data block =
   in
   let push_block pred_hash block =
     let hash = State.Block.hash block in
-    lwt_debug "push_block %a" Block_hash.pp_short hash >>= fun () ->
+    lwt_debug Tag.DSL.(fun f ->
+        f "push_block %a"
+        -% t event "push_block"
+        -% a block_hash_tag hash) >>= fun () ->
     Store.Chain_data.In_main_branch.store
       (chain_store, pred_hash) hash >>= fun () ->
     Lwt.return hash

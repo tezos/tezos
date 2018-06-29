@@ -82,15 +82,15 @@ let begin_construction ?(priority=0) ?timestamp (predecessor : Block.t) =
   }
 
 let detect_script_failure :
-  type kind. kind Apply_operation_result.operation_metadata -> _ =
+  type kind. kind Apply_results.operation_metadata -> _ =
   let rec detect_script_failure :
-    type kind. kind Apply_operation_result.contents_result_list -> _ =
-    let open Apply_operation_result in
+    type kind. kind Apply_results.contents_result_list -> _ =
+    let open Apply_results in
     let detect_script_failure_single
         (type kind)
         (Manager_operation_result { operation_result ;
                                     internal_operation_results }
-         : kind Kind.manager Apply_operation_result.contents_result) =
+         : kind Kind.manager Apply_results.contents_result) =
       let detect_script_failure (type kind) (result : kind manager_operation_result) =
         match result with
         | Applied _ -> Ok ()
@@ -119,7 +119,7 @@ let detect_script_failure :
   fun { contents } -> detect_script_failure contents
 
 let add_operation ?expect_failure st op =
-  let open Apply_operation_result in
+  let open Apply_results in
   M.apply_operation st.state op >>=? function
   | state, Operation_metadata result ->
       Lwt.return @@ detect_script_failure result >>= fun result ->

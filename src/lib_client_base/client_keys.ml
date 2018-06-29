@@ -33,13 +33,19 @@ let () =
     (function Invalid_uri s -> Some (Uri.to_string s) | _ -> None)
     (fun s -> Invalid_uri (Uri.of_string s))
 
-module Public_key_hash = Client_aliases.Alias (struct
-    type t =  Signature.Public_key_hash.t
-    let encoding = Signature.Public_key_hash.encoding
-    let of_source s = Lwt.return (Signature.Public_key_hash.of_b58check s)
-    let to_source p = return (Signature.Public_key_hash.to_b58check p)
-    let name = "public key hash"
-  end)
+module Public_key_hash = struct
+  include Client_aliases.Alias (struct
+      type t =  Signature.Public_key_hash.t
+      let encoding = Signature.Public_key_hash.encoding
+      let of_source s = Lwt.return (Signature.Public_key_hash.of_b58check s)
+      let to_source p = return (Signature.Public_key_hash.to_b58check p)
+      let name = "public key hash"
+    end)
+end
+
+module Logging = struct
+  let tag = Tag.def ~doc:"Identity" "pk_alias" Format.pp_print_text
+end
 
 module type KEY = sig
   type t

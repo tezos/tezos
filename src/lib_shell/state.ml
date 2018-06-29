@@ -577,7 +577,10 @@ module Chain = struct
     end
 
   let destroy state chain =
-    lwt_debug "destroy %a" Chain_id.pp (id chain) >>= fun () ->
+    lwt_debug Tag.DSL.(fun f ->
+        f "destroy %a"
+        -% t event "destroy"
+        -% a chain_id (id chain)) >>= fun () ->
     Shared.use state.global_data begin fun { global_store ; chains } ->
       Chain_id.Table.remove chains (id chain) ;
       Store.Chain.destroy global_store (id chain) >>= fun () ->
@@ -732,7 +735,7 @@ module Block = struct
       (List.for_all2
          (fun l1 l2 -> List.length l1 = List.length l2)
          operations operations_metadata)
-      (failure "State.Block.store: inconstent operations and operations_data") >>=? fun () ->
+      (failure "State.Block.store: inconsistent operations and operations_data") >>=? fun () ->
     (* let's the validator check the consistency... of fitness, level, ... *)
     Shared.use chain_state.block_store begin fun store ->
       Store.Block.Invalid_block.known store hash >>= fun known_invalid ->

@@ -15,4 +15,4 @@ val pp_internal_operation:
 
 val pp_operation_result:
   Format.formatter ->
-  ('kind contents_list * 'kind Apply_operation_result.contents_result_list) -> unit
+  ('kind contents_list * 'kind Apply_results.contents_result_list) -> unit

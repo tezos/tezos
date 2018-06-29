@@ -7,7 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Logging.Make(struct let name = "node.validator.bootstrap_pipeline" end)
+include Logging.Make_semantic(struct let name = "node.validator.bootstrap_pipeline" end)
+
+let node_time_tag = Tag.def ~doc:"local time at this node" "node_time" Time.pp_hum
+let block_time_tag = Tag.def ~doc:"claimed creation time of block" "block_time" Time.pp_hum
 
 open Validation_errors
 
@@ -30,6 +33,8 @@ type t = {
   (* HACK, a worker should be able to return the 'error'. *)
   mutable errors: Error_monad.error list ;
 }
+
+let operations_index_tag = Tag.def ~doc:"Operations index" "operations_index" Format.pp_print_int
 
 let assert_acceptable_header pipeline
     hash (header : Block_header.t) =
@@ -60,29 +65,36 @@ let assert_acceptable_header pipeline
     return_unit
 
 let fetch_step pipeline (step : Block_locator.step)  =
-  lwt_log_info "fetching step %a -> %a (%d%s) from peer %a."
-    Block_hash.pp_short step.block
-    Block_hash.pp_short step.predecessor
-    step.step
-    (if step.strict_step then "" else " max")
-    P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+  lwt_log_info Tag.DSL.(fun f ->
+      f "fetching step %a -> %a (%a) from peer %a."
+      -% t event "fetching_step_from_peer"
+      -% a Block_hash.Logging.tag step.block
+      -% a Block_hash.Logging.predecessor_tag step.predecessor
+      -% a (Tag.def ~doc:"" "" Block_locator.pp_step) step
+      -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
   let rec fetch_loop acc hash cpt =
     Lwt_unix.yield () >>= fun () ->
     if cpt < 0 then
-      lwt_log_info "invalid step from peer %a (too long)."
-        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+      lwt_log_info Tag.DSL.(fun f ->
+          f "invalid step from peer %a (too long)."
+          -% t event "step_too_long"
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
       fail (Invalid_locator (pipeline.peer_id, pipeline.locator))
     else if Block_hash.equal hash step.predecessor then
       if step.strict_step && cpt <> 0 then
-        lwt_log_info "invalid step from peer %a (too short)."
-          P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+        lwt_log_info Tag.DSL.(fun f ->
+            f "invalid step from peer %a (too short)."
+            -% t event "step_too_short"
+            -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
         fail (Invalid_locator (pipeline.peer_id, pipeline.locator))
       else
         return acc
     else
-      lwt_debug "fetching block header %a from peer %a."
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "fetching block header %a from peer %a."
+          -% t event "fetching_block_header_from_peer"
+          -% a Block_hash.Logging.tag hash
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
       protect ~canceler:pipeline.canceler begin fun () ->
         Distributed_db.Block_header.fetch
           ~timeout:pipeline.block_header_timeout
@@ -90,9 +102,11 @@ let fetch_step pipeline (step : Block_locator.step)  =
           hash ()
       end >>=? fun header ->
       assert_acceptable_header pipeline hash header >>=? fun () ->
-      lwt_debug "fetched block header %a from peer %a."
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "fetched block header %a from peer %a."
+          -% t event "fetched_block_header_from_peer"
+          -% a Block_hash.Logging.tag hash
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
       fetch_loop ((hash, header) :: acc) header.shell.predecessor (cpt - 1)
   in
   fetch_loop [] step.block step.step >>=? fun headers ->
@@ -116,31 +130,39 @@ let headers_fetch_worker_loop pipeline =
     return_unit
   end >>= function
   | Ok () ->
-      lwt_log_info "fetched all step from peer %a."
-        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+      lwt_log_info Tag.DSL.(fun f ->
+          f "fetched all steps from peer %a."
+          -% t event "fetched_all_steps_from_peer"
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
       Lwt_pipe.close pipeline.fetched_headers ;
       Lwt.return_unit
   | Error [Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed] ->
       Lwt.return_unit
   | Error [ Distributed_db.Block_header.Timeout bh ] ->
-      lwt_log_info "request for header %a from peer %a timed out."
-        Block_hash.pp_short bh
-        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+      lwt_log_info Tag.DSL.(fun f ->
+          f "request for header %a from peer %a timed out."
+          -% t event "header_request_timeout"
+          -% a Block_hash.Logging.tag bh
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
   | Error [ Future_block_header { block; block_time; time } ] ->
-      lwt_log_notice "Block locator %a from peer %a contains future blocks. \
-                      local time: %a, block time: %a"
-        Block_hash.pp_short block
-        Time.pp_hum time
-        Time.pp_hum block_time
-        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "Block locator %a from peer %a contains future blocks. \
+             local time: %a, block time: %a"
+          -% t event "locator_contains_future_blocks"
+          -% a Block_hash.Logging.tag block
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id
+          -% a node_time_tag time
+          -% a block_time_tag block_time) >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
-      lwt_log_error "@[Unexpected error (headers fetch):@ %a@]"
-        pp_print_error err >>= fun () ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "@[Unexpected error (headers fetch):@ %a@]"
+          -% t event "unexpected_error"
+          -% a errs_tag err) >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
 
@@ -150,9 +172,11 @@ let rec operations_fetch_worker_loop pipeline =
     protect ~canceler:pipeline.canceler begin fun () ->
       Lwt_pipe.pop pipeline.fetched_headers >>= return
     end >>=? fun (hash, header) ->
-    lwt_log_info "fetching operations of block %a from peer %a."
-      Block_hash.pp_short hash
-      P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+    lwt_log_info Tag.DSL.(fun f ->
+        f "fetching operations of block %a from peer %a."
+        -% t event "fetching_operations"
+        -% a Block_hash.Logging.tag hash
+        -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
     let operations =
       map_p
         (fun i ->
@@ -163,9 +187,11 @@ let rec operations_fetch_worker_loop pipeline =
                (hash, i) header.shell.operations_hash
            end)
         (0 -- (header.shell.validation_passes - 1)) >>=? fun operations ->
-      lwt_log_info "fetched operations of block %a from peer %a."
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+      lwt_log_info Tag.DSL.(fun f ->
+          f "fetched operations of block %a from peer %a."
+          -% t event "fetched_operations"
+          -% a Block_hash.Logging.tag hash
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
       return operations in
     protect ~canceler:pipeline.canceler begin fun () ->
       Lwt_pipe.push pipeline.fetched_blocks
@@ -178,15 +204,20 @@ let rec operations_fetch_worker_loop pipeline =
       Lwt_pipe.close pipeline.fetched_blocks ;
       Lwt.return_unit
   | Error [ Distributed_db.Operations.Timeout (bh, n) ] ->
-      lwt_log_info "request for operations %a:%d from peer %a timed out."
-        Block_hash.pp_short bh n
-        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+      lwt_log_info Tag.DSL.(fun f ->
+          f "request for operations %a:%d from peer %a timed out."
+          -% t event "request_operations_timeout"
+          -% a Block_hash.Logging.tag bh
+          -% s operations_index_tag n
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
-      lwt_log_error "@[Unexpected error (operations fetch):@ %a@]"
-        pp_print_error err >>= fun () ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "@[Unexpected error (operations fetch):@ %a@]"
+          -% t event "unexpected_error"
+          -% a errs_tag err) >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
 
@@ -196,9 +227,11 @@ let rec validation_worker_loop pipeline =
     protect ~canceler:pipeline.canceler begin fun () ->
       Lwt_pipe.pop pipeline.fetched_blocks >>= return
     end >>=? fun (hash, header, operations) ->
-    lwt_log_info "requesting validation for block %a from peer %a."
-      Block_hash.pp_short hash
-      P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+    lwt_log_info Tag.DSL.(fun f ->
+        f "requesting validation for block %a from peer %a."
+        -% t event "requesting_validation"
+        -% a Block_hash.Logging.tag hash
+        -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
     operations >>=? fun operations ->
     protect ~canceler:pipeline.canceler begin fun () ->
       Block_validator.validate
@@ -207,9 +240,11 @@ let rec validation_worker_loop pipeline =
         pipeline.block_validator
         pipeline.chain_db hash header operations
     end >>=? fun _block ->
-    lwt_log_info "validated block %a from peer %a."
-      Block_hash.pp_short hash
-      P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
+    lwt_log_info Tag.DSL.(fun f ->
+        f "validated block %a from peer %a."
+        -% t event "validated_block"
+        -% a Block_hash.Logging.tag hash
+        -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
     return_unit
   end >>= function
   | Ok () -> validation_worker_loop pipeline
@@ -223,8 +258,10 @@ let rec validation_worker_loop pipeline =
       Lwt.return_unit
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
-      lwt_log_error "@[Unexpected error (validator):@ %a@]"
-        pp_print_error err >>= fun () ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "@[Unexpected error (validator):@ %a@]"
+          -% t event "unexpected_error"
+          -% a errs_tag err) >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
 

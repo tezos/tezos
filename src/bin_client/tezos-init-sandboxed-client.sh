@@ -230,7 +230,7 @@ BOOTSTRAP5_IDENTITY="tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"
 BOOTSTRAP5_PUBLIC="edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
 BOOTSTRAP5_SECRET="unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm"
 
-DICTATOR_SECRET="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
+ACTIVATOR_SECRET="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
 
 add_sandboxed_bootstrap_identities() {
 
@@ -240,7 +240,7 @@ add_sandboxed_bootstrap_identities() {
     ${client} import secret key bootstrap4 ${BOOTSTRAP4_SECRET}
     ${client} import secret key bootstrap5 ${BOOTSTRAP5_SECRET}
 
-    ${client} import secret key dictator ${DICTATOR_SECRET}
+    ${client} import secret key activator ${ACTIVATOR_SECRET}
 }
 
 activate_alpha() {
@@ -249,7 +249,7 @@ activate_alpha() {
         -block genesis \
         activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
         with fitness 1 \
-        and key dictator \
+        and key activator \
 	and parameters "${parameters_file}" \
         --timestamp $(TZ='AAA+1' date +%FT%TZ)
 }
@@ -320,7 +320,7 @@ main () {
     cat <<EOF
 if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias tezos-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key dictator and parameters $parameters_file --timestamp $(TZ='AAA+1' date +%FT%TZ)" ;
+alias tezos-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key activator and parameters $parameters_file --timestamp $(TZ='AAA+1' date +%FT%TZ)" ;
 alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha tezos-client-reset" ;
 alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 trap tezos-client-reset EXIT ;

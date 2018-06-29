@@ -143,34 +143,120 @@ module Contract = struct
       (struct let name = ["counter"] end)
       (Z)
 
+  (* Consume gas for serilization and deserialization of expr in this
+     module *)
+  module Make_carbonated_map_expr (N : Storage_sigs.NAME) = struct
+    module I = Indexed_context.Make_carbonated_map
+        (N)
+        (struct
+          type t = Script_repr.lazy_expr
+          let encoding = Script_repr.lazy_expr_encoding
+        end)
+
+    type context = I.context
+    type key = I.key
+    type value = I.value
+
+    let mem = I.mem
+    let delete = I.delete
+    let remove = I.remove
+
+    let consume_deserialize_gas ctxt value =
+      Lwt.return @@
+      (Raw_context.check_enough_gas ctxt (Script_repr.minimal_deserialize_cost value) >>? fun () ->
+       Script_repr.force_decode value >>? fun (_value, value_cost) ->
+       Raw_context.consume_gas ctxt value_cost)
+
+    let consume_serialize_gas ctxt value =
+      Lwt.return @@
+      (Script_repr.force_bytes value >>? fun (_value, value_cost) ->
+       Raw_context.consume_gas ctxt value_cost)
+
+    let get ctxt contract =
+      I.get ctxt contract >>=? fun (ctxt, value) ->
+      consume_deserialize_gas ctxt value >>|? fun ctxt ->
+      (ctxt, value)
+
+    let get_option ctxt contract =
+      I.get_option ctxt contract >>=? fun (ctxt, value_opt) ->
+      match value_opt with
+      | None -> return (ctxt, None)
+      | Some value ->
+          consume_deserialize_gas ctxt value >>|? fun ctxt ->
+          (ctxt, value_opt)
+
+    let set ctxt contract value =
+      consume_serialize_gas ctxt value >>=? fun ctxt ->
+      I.set ctxt contract value
+
+    let set_option ctxt contract value_opt =
+      match value_opt with
+      | None -> I.set_option ctxt contract None
+      | Some value ->
+          consume_serialize_gas ctxt value >>=? fun ctxt ->
+          I.set_option ctxt contract value_opt
+
+    let init ctxt contract value =
+      consume_serialize_gas ctxt value >>=? fun ctxt ->
+      I.init ctxt contract value
+
+    let init_set ctxt contract value =
+      consume_serialize_gas ctxt value >>=? fun ctxt ->
+      I.init_set ctxt contract value
+  end
+
   module Code =
-    Indexed_context.Make_carbonated_map
+    Make_carbonated_map_expr
       (struct let name = ["code"] end)
-      (struct
-        type t = Script_repr.lazy_expr
-        let encoding = Script_repr.lazy_expr_encoding
-      end)
 
   module Storage =
-    Indexed_context.Make_carbonated_map
+    Make_carbonated_map_expr
       (struct let name = ["storage"] end)
-      (struct
-        type t = Script_repr.lazy_expr
-        let encoding = Script_repr.lazy_expr_encoding
-      end)
 
   type bigmap_key = Raw_context.t * Contract_repr.t
 
-  module Big_map =
-    Storage_functors.Make_indexed_carbonated_data_storage
-      (Make_subcontext
-         (Indexed_context.Raw_context)
-         (struct let name = ["big_map"] end))
-      (Make_index(Script_expr_hash))
-      (struct
-        type t = Script_repr.expr
-        let encoding = Script_repr.expr_encoding
-      end)
+  (* Consume gas for serilization and deserialization of expr in this
+     module *)
+  module Big_map = struct
+    module I = Storage_functors.Make_indexed_carbonated_data_storage
+        (Make_subcontext
+           (Indexed_context.Raw_context)
+           (struct let name = ["big_map"] end))
+        (Make_index(Script_expr_hash))
+        (struct
+          type t = Script_repr.expr
+          let encoding = Script_repr.expr_encoding
+        end)
+
+    type context = I.context
+    type key = I.key
+    type value = I.value
+
+    let mem = I.mem
+    let delete = I.delete
+    let remove = I.remove
+    let set = I.set
+    let set_option = I.set_option
+    let init = I.init
+    let init_set = I.init_set
+
+    let consume_deserialize_gas ctxt value =
+      Lwt.return @@
+      Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
+
+    let get ctxt contract =
+      I.get ctxt contract >>=? fun (ctxt, value) ->
+      consume_deserialize_gas ctxt value >>|? fun ctxt ->
+      (ctxt, value)
+
+    let get_option ctxt contract =
+      I.get_option ctxt contract >>=? fun (ctxt, value_opt) ->
+      match value_opt with
+      | None -> return (ctxt, None)
+      | Some value ->
+          consume_deserialize_gas ctxt value >>|? fun ctxt ->
+          (ctxt, value_opt)
+  end
 
   module Paid_storage_space =
     Indexed_context.Make_map

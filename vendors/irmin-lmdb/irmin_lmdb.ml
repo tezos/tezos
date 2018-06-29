@@ -642,7 +642,8 @@ module Make
         let root = match root with None -> "irmin.ldb" | Some root -> root in
         if not (Sys.file_exists root) then Unix.mkdir root 0o755 ;
 	let flags = Lmdb.NoTLS :: if readonly then [ Lmdb.RdOnly ] else [] in
-        match Lmdb.opendir ~mapsize ~flags root 0o644 with
+        let file_flags = if readonly then 0o444 else 0o644 in
+        match Lmdb.opendir ~mapsize ~flags root file_flags with
         | Error err -> Lwt.fail_with (Lmdb.string_of_error err)
         | Ok db ->
             let db = { db ; root } in

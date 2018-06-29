@@ -29,6 +29,10 @@ module Public_key :
 module Secret_key :
   Client_aliases.Alias with type t = sk_uri
 
+module Logging : sig
+  val tag : string Tag.def
+end
+
 (** {2 Interface for external signing modules.} *)
 
 module type SIGNER = sig

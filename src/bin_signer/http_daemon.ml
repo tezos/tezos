@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 let log = Signer_logging.lwt_log_notice
+open Signer_logging
 
 let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~require_auth mode =
   let dir = RPC_directory.empty in
@@ -32,7 +33,10 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~require_auth mode 
        List.map
          (fun host ->
             let host = Ipaddr.V6.to_string host in
-            log "Listening on address %s" host >>= fun () ->
+            log Tag.DSL.(fun f ->
+                f "Listening on address %s"
+                -% t event "signer_listening"
+                -% s host_name host) >>= fun () ->
             RPC_server.launch ~host mode dir
               ~media_types:Media_type.all_media_types
             >>= fun _server ->
@@ -49,7 +53,10 @@ let run_https (cctxt : #Client_context.wallet) ~host ~port ~cert ~key ?magic_byt
       failwith "Cannot resolve listening address: %S" host
   | points ->
       let hosts = fst (List.split points) in
-      log "Accepting HTTPS requests on port %d" port >>= fun () ->
+      log Tag.DSL.(fun f ->
+          f "Accepting HTTPS requests on port %d"
+          -% t event "accepting_https_requests"
+          -% s port_number port) >>= fun () ->
       let mode : Conduit_lwt_unix.server =
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port) in
       run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~require_auth mode
@@ -60,7 +67,10 @@ let run_http (cctxt : #Client_context.wallet) ~host ~port ?magic_bytes ~require_
       failwith "Cannot resolve listening address: %S" host
   | points ->
       let hosts = fst (List.split points) in
-      log "Accepting HTTP requests on port %d" port >>= fun () ->
+      log Tag.DSL.(fun f ->
+          f "Accepting HTTP requests on port %d"
+          -% t event "accepting_http_requests"
+          -% s port_number port) >>= fun () ->
       let mode : Conduit_lwt_unix.server =
         `TCP (`Port port) in
       run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~require_auth mode

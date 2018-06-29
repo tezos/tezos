@@ -50,3 +50,7 @@ module Bounded_encoding : sig
   val set_protocol_max_size: int option -> unit
   val set_mempool_max_operations: int option -> unit
 end
+
+module Logging : sig
+  val tag : t Tag.def
+end

@@ -53,7 +53,7 @@ module Scripts : sig
   val run_operation:
     'a #RPC_context.simple ->
     'a -> packed_operation ->
-    (packed_protocol_data * Apply_operation_result.packed_operation_metadata) shell_tzresult Lwt.t
+    (packed_protocol_data * Apply_results.packed_operation_metadata) shell_tzresult Lwt.t
 
 end
 

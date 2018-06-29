@@ -301,11 +301,7 @@ module Delegate = struct
       if inactive then return (c, change) else loop c change
     end >>=? fun (c, change) ->
     Lwt.return Tez_repr.(change -? amount) >>=? fun change ->
-    Storage.Roll.Delegate_roll_list.mem c delegate >>= fun rolls ->
-    if not inactive && Tez_repr.(change = zero) && not rolls then
-      Storage.Roll.Delegate_change.delete c delegate
-    else
-      Storage.Roll.Delegate_change.set c delegate change
+    Storage.Roll.Delegate_change.set c delegate change
 
   let set_inactive ctxt delegate =
     ensure_inited ctxt delegate >>=? fun ctxt ->

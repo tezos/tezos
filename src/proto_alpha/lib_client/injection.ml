@@ -9,7 +9,7 @@
 
 open Proto_alpha
 open Alpha_context
-open Apply_operation_result
+open Apply_results
 
 let get_branch (rpc_config: #Proto_alpha.full)
     ~chain ~(block : Block_services.block) branch =
@@ -64,8 +64,8 @@ let preapply (type t)
   | [(Operation_data op', Operation_metadata result)] -> begin
       match Operation.equal
               op { shell = { branch } ; protocol_data = op' },
-            Apply_operation_result.kind_equal_list contents result.contents with
-      | Some Operation.Eq, Some Apply_operation_result.Eq ->
+            Apply_results.kind_equal_list contents result.contents with
+      | Some Operation.Eq, Some Apply_results.Eq ->
           return ((oph, op, result) : t preapply_result)
       | _ -> failwith "Unexpected result"
     end
@@ -84,8 +84,8 @@ let simulate (type t)
   | (Operation_data op', Operation_metadata result) -> begin
       match Operation.equal
               op { shell = { branch } ; protocol_data = op' },
-            Apply_operation_result.kind_equal_list contents result.contents with
-      | Some Operation.Eq, Some Apply_operation_result.Eq ->
+            Apply_results.kind_equal_list contents result.contents with
+      | Some Operation.Eq, Some Apply_results.Eq ->
           return ((oph, op, result) : t preapply_result)
       | _ -> failwith "Unexpected result"
     end
@@ -377,7 +377,13 @@ let inject_operation
     cctxt#message "Operation hash: %a" Operation_hash.pp oph >>= fun () ->
     begin
       match confirmations with
-      | None -> return result
+      | None ->
+          cctxt#message "@[<v 0>NOT waiting for the operation to be included.@,\
+                         Use command@,\
+                        \  tezos-client wait for %a to be included --confirmations 30@,\
+                         and/or an external block explorer to make sure that it has been included.@]"
+            Operation_hash.pp oph >>= fun () ->
+          return result
       | Some confirmations ->
           cctxt#message "Waiting for the operation to be included..." >>= fun () ->
           Client_confirmations.wait_for_operation_inclusion
@@ -388,9 +394,9 @@ let inject_operation
           | No_operation_metadata ->
               failwith "Internal error: unexpected receipt."
           | Operation_metadata receipt ->
-              match Apply_operation_result.kind_equal_list contents receipt.contents
+              match Apply_results.kind_equal_list contents receipt.contents
               with
-              | Some Apply_operation_result.Eq ->
+              | Some Apply_results.Eq ->
                   return (receipt : kind operation_metadata)
               | None -> failwith "Internal error: unexpected receipt."
     end >>=? fun result ->
@@ -405,6 +411,22 @@ let inject_operation
            "New contract %a originated."
            Contract.pp c)
       contracts >>= fun () ->
+    begin match confirmations with
+      | None -> Lwt.return_unit
+      | Some number ->
+          if number >= 30 then
+            cctxt#message
+              "The operation was included in a block %d blocks ago."
+              number
+          else
+            cctxt#message
+              "@[<v 0>The operation has only been included %d blocks ago.@,\
+               We recommend to wait more.@,\
+               Use command@,\
+              \  tezos-client wait for %a to be included --confirmations 30@,\
+               and/or an external block explorer.@]"
+              number Operation_hash.pp oph
+    end >>= fun () ->
     return (oph, op.protocol_data.contents, result.contents)
 
 let inject_manager_operation

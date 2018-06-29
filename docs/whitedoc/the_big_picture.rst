@@ -221,9 +221,9 @@ Three economic protocols are included in the main Tezos repository.
 
   - :package:`tezos-protocol-genesis`
     (:package:`tezos-embedded-protocol-genesis`) is the protocol of
-    the genesis block. It accepts a single block, signed by a dictator
+    the genesis block. It accepts a single block, signed by a activator
     whose public key is hardcoded, that single action is to switch to
-    a new protocol chosen by the dictator.
+    a new protocol chosen by the activator.
   - :package:`tezos-protocol-alpha`
     (:package:`tezos-embedded-protocol-alpha`) is the first real
     protocol of Tezos. A :ref:`tutorial<entering_alpha>` is available
@@ -256,7 +256,7 @@ compatible, and library vs command line interface.
   - :package:`tezos-client-alpha-commands` plugs the functions from
     :package:`tezos-client-alpha` as handlers for the alpha specific
     commands of the ``tezos-client`` command line wallet.
-  - :package:`tezos-client-genesis` contains the basic dictator
+  - :package:`tezos-client-genesis` contains the basic activator
     commands available on the genesis protocol.
   - :package:`tezos-client-base-unix` implements configuration file
     and wallet storage in Unix files, user interaction via the Unix

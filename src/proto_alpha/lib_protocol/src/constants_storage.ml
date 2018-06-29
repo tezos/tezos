@@ -43,9 +43,6 @@ let hard_storage_limit_per_operation c =
 let proof_of_work_threshold c =
   let constants = Raw_context.constants c in
   constants.proof_of_work_threshold
-let dictator_pubkey c =
-  let constants = Raw_context.constants c in
-  constants.dictator_pubkey
 let tokens_per_roll c =
   let constants = Raw_context.constants c in
   constants.tokens_per_roll

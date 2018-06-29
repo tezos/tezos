@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Tezos_stdlib.Logging.LOG
+include Tezos_stdlib.Logging.SEMLOG

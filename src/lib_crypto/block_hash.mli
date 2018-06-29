@@ -8,3 +8,8 @@
 (**************************************************************************)
 
 include S.HASH
+
+module Logging : sig
+  val tag : t Tag.def
+  val predecessor_tag : t Tag.def
+end

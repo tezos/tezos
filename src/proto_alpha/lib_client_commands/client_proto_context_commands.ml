@@ -129,11 +129,11 @@ let commands () =
         | None ->
             cctxt#error "This is not a smart contract."
         | Some { code ; storage = _ } ->
-            match Script.force_decode code with
+            match Script_repr.force_decode code with
             | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Alpha_environment.Error_monad.pp) errs
-            | Ok code ->
+            | Ok (code, _) ->
                 begin cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped code >>= fun () ->
-                  return ()
+                  return_unit
                 end
       end ;
 

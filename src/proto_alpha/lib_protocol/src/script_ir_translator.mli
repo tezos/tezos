@@ -57,8 +57,9 @@ val big_map_update :
   ('key, 'value) Script_typed_ir.big_map
 
 val ty_eq :
+  context ->
   'ta Script_typed_ir.ty -> 'tb Script_typed_ir.ty ->
-  ('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq tzresult
+  (('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq * context) tzresult
 
 val parse_data :
   ?type_logger: type_logger ->
@@ -69,13 +70,16 @@ val unparse_data :
   (Script.node * context) tzresult Lwt.t
 
 val parse_ty :
+  context ->
   allow_big_map: bool ->
   allow_operation: bool ->
-  Script.node -> ex_ty tzresult
-val unparse_ty : 'a Script_typed_ir.ty -> Script.node
+  Script.node -> (ex_ty * context) tzresult
 
-val parse_toplevel
-  : Script.expr -> (Script.node * Script.node * Script.node) tzresult
+val unparse_ty :
+  context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult Lwt.t
+
+val parse_toplevel :
+  Script.expr -> (Script.node * Script.node * Script.node) tzresult
 
 val typecheck_code :
   context -> Script.expr -> (type_map * context) tzresult Lwt.t
@@ -87,6 +91,8 @@ val typecheck_data :
 val parse_script :
   ?type_logger: type_logger ->
   context -> Script.t -> (ex_script * context) tzresult Lwt.t
+
+(* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 val unparse_script :
   context -> unparsing_mode ->
   ('a, 'b) Script_typed_ir.script -> (Script.t * context) tzresult Lwt.t

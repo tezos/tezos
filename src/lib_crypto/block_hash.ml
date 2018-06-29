@@ -14,5 +14,11 @@ include Blake2B.Make (Base58) (struct
     let size = None
   end)
 
+
+module Logging = struct
+  let tag = Tag.def ~doc:"Block Hash" "block_hash" pp_short
+  let predecessor_tag = Tag.def ~doc:"Block Predecessor Hash" "predecessor_hash" pp_short
+end
+
 let () =
   Base58.check_encoded_prefix b58check_encoding "B" 51

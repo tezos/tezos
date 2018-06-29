@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Logging.Make(struct let name = "node.validator" end)
+include Logging.Make_semantic(struct let name = "node.validator" end)
 
 type t = {
 
@@ -40,7 +40,10 @@ let create state db
 
 let activate v ?max_child_ttl ~start_prevalidator chain_state =
   let chain_id = State.Chain.id chain_state in
-  lwt_log_notice "activate chain %a" Chain_id.pp chain_id >>= fun () ->
+  lwt_log_notice Tag.DSL.(fun f ->
+      f "activate chain %a"
+      -% t event "active_chain"
+      -% a State_logging.chain_id chain_id) >>= fun () ->
   try Chain_id.Table.find v.active_chains chain_id
   with Not_found ->
     let nv =

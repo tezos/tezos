@@ -99,6 +99,10 @@ let consume block_gas operation_gas cost = match operation_gas with
       then error Block_quota_exceeded
       else ok (block_remaining, Limited { remaining })
 
+let check_enough block_gas operation_gas cost =
+  consume block_gas operation_gas cost
+  >|? fun (_block_remainig, _remaining) -> ()
+
 let alloc_cost n =
   { allocations = Z.of_int (n + 1) ;
     steps = Z.zero ;
@@ -108,10 +112,10 @@ let alloc_cost n =
     bytes_written = Z.zero }
 
 let alloc_bytes_cost n =
-  alloc_cost (n / 8)
+  alloc_cost ((n + 7) / 8)
 
 let alloc_bits_cost n =
-  alloc_cost (n / 64)
+  alloc_cost ((n + 63) / 64)
 
 let step_cost n =
   { allocations = Z.zero ;
@@ -160,6 +164,9 @@ let ( *@ ) x y =
     writes = Z.mul (Z.of_int x) y.writes ;
     bytes_read = Z.mul (Z.of_int x) y.bytes_read ;
     bytes_written = Z.mul (Z.of_int x) y.bytes_written }
+
+let alloc_mbytes_cost n =
+  alloc_cost 12 +@ alloc_bytes_cost n
 
 let () =
   let open Data_encoding in

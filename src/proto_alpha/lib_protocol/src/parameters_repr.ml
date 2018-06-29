@@ -110,9 +110,6 @@ let constants_encoding =
        and proof_of_work_threshold =
          opt Compare.Int64.(=)
            default.proof_of_work_threshold c.proof_of_work_threshold
-       and dictator_pubkey =
-         opt Signature.Public_key.(=)
-           default.dictator_pubkey c.dictator_pubkey
        and tokens_per_roll =
          opt Tez_repr.(=)
            default.tokens_per_roll c.tokens_per_roll
@@ -154,7 +151,6 @@ let constants_encoding =
           hard_gas_limit_per_operation,
           hard_gas_limit_per_block),
         ((proof_of_work_threshold,
-          dictator_pubkey,
           tokens_per_roll,
           michelson_maximum_type_size,
           seed_nonce_revelation_tip,
@@ -175,7 +171,6 @@ let constants_encoding =
             hard_gas_limit_per_operation,
             hard_gas_limit_per_block),
           ((proof_of_work_threshold,
-            dictator_pubkey,
             tokens_per_roll,
             michelson_maximum_type_size,
             seed_nonce_revelation_tip,
@@ -209,8 +204,6 @@ let constants_encoding =
           unopt default.hard_gas_limit_per_block hard_gas_limit_per_block ;
         proof_of_work_threshold =
           unopt default.proof_of_work_threshold proof_of_work_threshold ;
-        dictator_pubkey =
-          unopt default.dictator_pubkey dictator_pubkey ;
         tokens_per_roll =
           unopt default.tokens_per_roll tokens_per_roll ;
         michelson_maximum_type_size =
@@ -244,9 +237,8 @@ let constants_encoding =
           (opt "hard_gas_limit_per_operation" z)
           (opt "hard_gas_limit_per_block" z))
        (merge_objs
-          (obj9
+          (obj8
              (opt "proof_of_work_threshold" int64)
-             (opt "dictator_pubkey" Signature.Public_key.encoding)
              (opt "tokens_per_roll" Tez_repr.encoding)
              (opt "michelson_maximum_type_size" uint16)
              (opt "seed_nonce_revelation_tip" Tez_repr.encoding)

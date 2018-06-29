@@ -133,6 +133,8 @@ type step = {
   strict_step: bool ;
 }
 
+let pp_step ppf step = Format.fprintf ppf "%d%s" step.step (if step.strict_step then "" else " max")
+
 let to_steps seed locator =
   fold locator seed
     ~init:[]

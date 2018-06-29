@@ -38,7 +38,7 @@ $admin_client list protocols
 
 $client activate protocol $protocol_version \
         with fitness 1 \
-        and key dictator \
+        and key activator \
         and parameters $parameters_file
 
 retry 2 15 assert_protocol "$protocol_version"

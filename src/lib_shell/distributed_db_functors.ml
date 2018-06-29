@@ -320,6 +320,10 @@ module Make_request_scheduler
        val name : string
        val encoding : t Data_encoding.t
        val pp : Format.formatter -> t -> unit
+
+       module Logging : sig
+         val tag : t Tag.def
+       end
      end)
     (Table : MEMORY_TABLE with type key := Hash.t)
     (Request : REQUEST with type key := Hash.t) : sig
@@ -331,7 +335,7 @@ module Make_request_scheduler
 
 end = struct
 
-  include Logging.Make(struct let name = "node.distributed_db.scheduler." ^ Hash.name end)
+  include Logging.Make_semantic(struct let name = "node.distributed_db.scheduler." ^ Hash.name end)
 
   type key = Hash.t
 
@@ -363,24 +367,38 @@ end = struct
   let request t p k =
     assert (Lwt_pipe.push_now t.queue (Request (p, k)))
   let notify t p k =
-    debug "push received %a from %a"
-      Hash.pp k P2p_peer.Id.pp_short p ;
+    debug Tag.DSL.(fun f ->
+        f "push received %a from %a"
+        -% t event "push_received"
+        -% a Hash.Logging.tag k
+        -% a P2p_peer.Id.Logging.tag p);
     assert (Lwt_pipe.push_now t.queue (Notify (p, k)))
   let notify_cancelation t k =
-    debug "push cancelation %a"
-      Hash.pp k ;
+    debug Tag.DSL.(fun f ->
+        f "push cancelation %a"
+        -% t event "push_cancelation"
+        -% a Hash.Logging.tag k);
     assert (Lwt_pipe.push_now t.queue (Notify_cancelation k))
   let notify_invalid t p k =
-    debug "push received invalid %a from %a"
-      Hash.pp k P2p_peer.Id.pp_short p ;
+    debug Tag.DSL.(fun f ->
+        f "push received invalid %a from %a"
+        -% t event "push_received_invalid"
+        -% a Hash.Logging.tag k
+        -% a P2p_peer.Id.Logging.tag p);
     assert (Lwt_pipe.push_now t.queue (Notify_invalid (p, k)))
   let notify_duplicate t p k =
-    debug "push received duplicate %a from %a"
-      Hash.pp k P2p_peer.Id.pp_short p ;
+    debug Tag.DSL.(fun f ->
+        f "push received duplicate %a from %a"
+        -% t event "push_received_duplicate"
+        -% a Hash.Logging.tag k
+        -% a P2p_peer.Id.Logging.tag p);
     assert (Lwt_pipe.push_now t.queue (Notify_duplicate (p, k)))
   let notify_unrequested t p k =
-    debug "push received unrequested %a from %a"
-      Hash.pp k P2p_peer.Id.pp_short p ;
+    debug Tag.DSL.(fun f ->
+        f "push received unrequested %a from %a"
+        -% t event "push_received_unrequested"
+        -% a Hash.Logging.tag k
+        -% a P2p_peer.Id.Logging.tag p);
     assert (Lwt_pipe.push_now t.queue (Notify_unrequested (p, k)))
 
   let compute_timeout state =
@@ -401,17 +419,16 @@ end = struct
           Lwt_unix.sleep delay
         end
 
-  let may_pp_peer ppf = function
-    | None -> ()
-    | Some peer -> P2p_peer.Id.pp_short ppf peer
-
   (* TODO should depend on the ressource kind... *)
   let initial_delay = 0.5
 
   let process_event state now = function
     | Request (peer, key) -> begin
-        lwt_debug "registering request %a from %a"
-          Hash.pp key may_pp_peer peer >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "registering request %a from %a"
+            -% t event "registering_request"
+            -% a Hash.Logging.tag key
+            -% a P2p_peer.Id.Logging.tag_opt peer) >>= fun () ->
         try
           let data = Table.find state.pending key in
           let peers =
@@ -423,8 +440,11 @@ end = struct
             next_request = min data.next_request (now +. initial_delay) ;
             peers ;
           } ;
-          lwt_debug "registering request %a from %a -> replaced"
-            Hash.pp key may_pp_peer peer >>= fun () ->
+          lwt_debug Tag.DSL.(fun f ->
+              f "registering request %a from %a -> replaced"
+              -% t event "registering_request_replaced"
+              -% a Hash.Logging.tag key
+              -% a P2p_peer.Id.Logging.tag_opt peer) >>= fun () ->
           Lwt.return_unit
         with Not_found ->
           let peers =
@@ -436,33 +456,50 @@ end = struct
             next_request = now ;
             delay = initial_delay ;
           } ;
-          lwt_debug "registering request %a from %a -> added"
-            Hash.pp key may_pp_peer peer >>= fun () ->
+          lwt_debug Tag.DSL.(fun f ->
+              f "registering request %a from %a -> added"
+              -% t event "registering_request_added"
+              -% a Hash.Logging.tag key
+              -% a P2p_peer.Id.Logging.tag_opt peer) >>= fun () ->
           Lwt.return_unit
       end
     | Notify (peer, key) ->
         Table.remove state.pending key ;
-        lwt_debug "received %a from %a"
-          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "received %a from %a"
+            -% t event "received"
+            -% a Hash.Logging.tag key
+            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
         Lwt.return_unit
     | Notify_cancelation key ->
         Table.remove state.pending key ;
-        lwt_debug "canceled %a"
-          Hash.pp key >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "canceled %a"
+            -% t event "canceled"
+            -% a Hash.Logging.tag key) >>= fun () ->
         Lwt.return_unit
     | Notify_invalid (peer, key) ->
-        lwt_debug "received invalid %a from %a"
-          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "received invalid %a from %a"
+            -% t event "received_invalid"
+            -% a Hash.Logging.tag key
+            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
         (* TODO *)
         Lwt.return_unit
     | Notify_unrequested (peer, key) ->
-        lwt_debug "received unrequested %a from %a"
-          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "received unrequested %a from %a"
+            -% t event "received_unrequested"
+            -% a Hash.Logging.tag key
+            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
         (* TODO *)
         Lwt.return_unit
     | Notify_duplicate (peer, key) ->
-        lwt_debug "received duplicate %a from %a"
-          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "received duplicate %a from %a"
+            -% t event "received_duplicate"
+            -% a Hash.Logging.tag key
+            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
         (* TODO *)
         Lwt.return_unit
 
@@ -473,7 +510,8 @@ end = struct
       Lwt.choose
         [ (state.events >|= fun _ -> ()) ; timeout ; shutdown ] >>= fun () ->
       if Lwt.state shutdown <> Lwt.Sleep then
-        lwt_debug "terminating" >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "terminating" -% t event "terminating") >>= fun () ->
         Lwt.return_unit
       else if Lwt.state state.events <> Lwt.Sleep then
         let now = Unix.gettimeofday () in
@@ -482,7 +520,8 @@ end = struct
         Lwt_list.iter_s (process_event state now) events >>= fun () ->
         loop state
       else
-        lwt_debug "timeout" >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "timeout" -% t event "timeout") >>= fun () ->
         let now = Unix.gettimeofday () in
         let active_peers = Request.active state.param in
         let requests =
@@ -515,8 +554,11 @@ end = struct
         P2p_peer.Map.fold begin fun peer request acc ->
           acc >>= fun () ->
           Lwt_list.iter_s (fun key ->
-              lwt_debug "requested %a from %a"
-                Hash.pp key P2p_peer.Id.pp_short peer)
+              lwt_debug Tag.DSL.(fun f ->
+                  f "requested %a from %a"
+                  -% t event "requested"
+                  -% a Hash.Logging.tag key
+                  -% a P2p_peer.Id.Logging.tag peer))
             request
         end requests Lwt.return_unit >>= fun () ->
         loop state

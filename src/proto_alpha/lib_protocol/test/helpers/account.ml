@@ -27,7 +27,7 @@ let new_account () =
 let add_account ({ pkh ; _ } as account) =
   Signature.Public_key_hash.Table.add known_accounts pkh account
 
-let dictator_account = new_account ()
+let activator_account = new_account ()
 
 let find pkh =
   try return (Signature.Public_key_hash.Table.find known_accounts pkh)

@@ -9,7 +9,7 @@
 
 open Validation_errors
 
-include Logging.Make(struct let name = "node.validator.block" end)
+include Logging.Make_semantic(struct let name = "node.validator.block" end)
 
 type 'a request =
   | Request_validation: {
@@ -68,11 +68,14 @@ let rec worker_loop bv =
   | Ok () ->
       worker_loop bv
   | Error [Canceled | Exn Lwt_pipe.Closed] ->
-      lwt_log_notice "terminating" >>= fun () ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "terminating" -% t event "terminating") >>= fun () ->
       Lwt.return_unit
   | Error err ->
-      lwt_log_error "@[Unexpected error (worker):@ %a@]"
-        pp_print_error err >>= fun () ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "@[Unexpected error (worker):@ %a@]"
+          -% t event "unexpected_error"
+          -% a errs_tag err) >>= fun () ->
       Lwt_canceler.cancel bv.canceler >>= fun () ->
       Lwt.return_unit
 
@@ -99,13 +102,17 @@ let shutdown { canceler ; worker } =
 let validate { messages } hash protocol =
   match Registered_protocol.get hash with
   | Some protocol ->
-      lwt_debug "previously validated protocol %a (before pipe)"
-        Protocol_hash.pp_short hash >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "previously validated protocol %a (before pipe)"
+          -% t event "previously_validated_protocol"
+          -% a Protocol_hash.Logging.tag hash) >>= fun () ->
       return protocol
   | None ->
       let res, wakener = Lwt.task () in
-      lwt_debug "pushing validation request for protocol %a"
-        Protocol_hash.pp_short hash >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "pushing validation request for protocol %a"
+          -% t event "pushing_validation_request"
+          -% a Protocol_hash.Logging.tag hash) >>= fun () ->
       Lwt_pipe.push messages
         (Message (Request_validation { hash ; protocol },
                   Some wakener)) >>= fun () ->
@@ -119,14 +126,11 @@ let fetch_and_compile_protocol pv ?peer ?timeout hash =
         Distributed_db.Protocol.read_opt pv.db hash >>= function
         | Some protocol -> return protocol
         | None ->
-            let may_print_peer ppf = function
-              | None -> ()
-              | Some peer ->
-                  Format.fprintf ppf " from peer %a"
-                    P2p_peer.Id.pp peer in
-            lwt_log_notice "Fetching protocol %a%a"
-              Protocol_hash.pp_short hash
-              may_print_peer peer >>= fun () ->
+            lwt_log_notice Tag.DSL.(fun f ->
+                f "Fetching protocol %a%a"
+                -% t event "fetching_protocol"
+                -% a Protocol_hash.Logging.tag hash
+                -% a P2p_peer.Id.Logging.tag_source peer) >>= fun () ->
             Distributed_db.Protocol.fetch pv.db ?peer ?timeout hash ()
       end >>=? fun protocol ->
       validate pv hash protocol >>=? fun proto ->

@@ -66,6 +66,7 @@ module Make_subcontext (C : Raw_context.T) (N : NAME)
   let project = C.project
   let absolute_key c k = C.absolute_key c (to_key k)
   let consume_gas = C.consume_gas
+  let check_enough_gas = C.check_enough_gas
   let description =
     Storage_description.register_named_subcontext C.description N.name
 end
@@ -326,9 +327,10 @@ module Make_indexed_carbonated_data_storage
     get c (len_name i) >>=? fun len ->
     decode_len_value (len_name i) len >>=? fun len ->
     Lwt.return (C.consume_gas c (Gas_limit_repr.read_bytes_cost (Z.of_int len)))
-  let consume_write_gas set c i v =
+  let consume_serialize_write_gas set c i v =
     let bytes = to_bytes v in
     let len = MBytes.length bytes in
+    Lwt.return (C.consume_gas c (Gas_limit_repr.alloc_mbytes_cost len)) >>=? fun c ->
     Lwt.return (C.consume_gas c (Gas_limit_repr.write_bytes_cost (Z.of_int len))) >>=? fun c ->
     set c (len_name i) (encode_len_value bytes) >>=? fun c ->
     return (c, bytes)
@@ -355,19 +357,19 @@ module Make_indexed_carbonated_data_storage
       return (C.project s, None)
   let set s i v =
     existing_size s i >>=? fun prev_size ->
-    consume_write_gas C.set s i v >>=? fun (s, bytes) ->
+    consume_serialize_write_gas C.set s i v >>=? fun (s, bytes) ->
     C.set s (name i) bytes >>=? fun t ->
     let size_diff = MBytes.length bytes - prev_size in
     return (C.project t, size_diff)
   let init s i v =
-    consume_write_gas C.init s i v >>=? fun (s, bytes) ->
+    consume_serialize_write_gas C.init s i v >>=? fun (s, bytes) ->
     C.init s (name i) bytes >>=? fun t ->
     let size = MBytes.length bytes in
     return (C.project t, size)
   let init_set s i v =
     let init_set s i v = C.init_set s i v >>= return in
     existing_size s i >>=? fun prev_size ->
-    consume_write_gas init_set s i v >>=? fun (s, bytes) ->
+    consume_serialize_write_gas init_set s i v >>=? fun (s, bytes) ->
     init_set s (name i) bytes >>=? fun t ->
     let size_diff = MBytes.length bytes - prev_size in
     return (C.project t, size_diff)
@@ -387,7 +389,6 @@ module Make_indexed_carbonated_data_storage
     | None -> remove s i
     | Some v -> init_set s i v
 
-  let data_name = "TODO remove" (* This is some rebasing artefact and should be removed *)
   let fold_keys_unaccounted s ~init ~f =
     let rec dig i path acc =
       if Compare.Int.(i <= 1) then
@@ -555,6 +556,9 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     let consume_gas c g =
       let (t, i) = unpack c in
       C.consume_gas t g >>? fun t -> ok (pack t i)
+    let check_enough_gas c g =
+      let (t, _i) = unpack c in
+      C.check_enough_gas t g
     let description = description
   end
 

@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Tezos_stdlib.Logging.Make(struct let name = "node.worker" end)
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "node.worker" end)

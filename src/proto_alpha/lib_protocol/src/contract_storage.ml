@@ -339,7 +339,8 @@ let get_storage ctxt contract =
   Storage.Contract.Storage.get_option ctxt contract >>=? function
   | (ctxt, None) -> return (ctxt, None)
   | (ctxt, Some storage) ->
-      Lwt.return (Script_repr.force_decode storage) >>=? fun storage ->
+      Lwt.return (Script_repr.force_decode storage) >>=? fun (storage, cost) ->
+      Lwt.return (Raw_context.consume_gas ctxt cost) >>=? fun ctxt ->
       return (ctxt, Some storage)
 
 let get_counter c contract =

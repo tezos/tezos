@@ -68,7 +68,6 @@ module Cost_of : sig
   val unpack : MBytes.t -> Gas.cost
   val address : Gas.cost
   val contract : Gas.cost
-  val manager : Gas.cost
   val transfer : Gas.cost
   val create_account : Gas.cost
   val create_contract : Gas.cost
@@ -99,7 +98,9 @@ module Cost_of : sig
     val unit : Gas.cost
     val bool : Gas.cost
     val tez : Gas.cost
+    val z : Z.t -> Gas.cost
     val string : int -> Gas.cost
+    val bytes : int -> Gas.cost
     val int_of_string : string -> Gas.cost
     val string_timestamp : Gas.cost
     val key : Gas.cost
@@ -124,20 +125,29 @@ module Cost_of : sig
     val none : Gas.cost
 
     val list_element : Gas.cost
-    val set_element : Gas.cost
-    val map_element : Gas.cost
+    val set_element : int -> Gas.cost
+    val map_element : int -> Gas.cost
 
     val primitive_type : Gas.cost
     val one_arg_type : Gas.cost
     val two_arg_type : Gas.cost
 
-    val operation : MBytes.t -> Gas.cost
+    val operation : int -> Gas.cost
+
+    (** Cost of parsing a type *)
+    val type_ : int -> Gas.cost
+
+    (** Cost of parsing an instruction *)
+    val instr : ('a, 'b) Script_typed_ir.instr -> Gas.cost
   end
 
   module Unparse : sig
+    val prim_cost : int -> Script.annot -> Gas.cost
+    val seq_cost : int -> Gas.cost
     val cycle : Gas.cost
     val unit : Gas.cost
     val bool : Gas.cost
+    val z : Z.t -> Gas.cost
     val int : 'a Script_int.num -> Gas.cost
     val tez : Gas.cost
     val string : string -> Gas.cost
@@ -155,8 +165,6 @@ module Cost_of : sig
 
     val union : Gas.cost
 
-    val lambda : Gas.cost
-
     val some : Gas.cost
     val none : Gas.cost
 
@@ -164,9 +172,8 @@ module Cost_of : sig
     val set_element : Gas.cost
     val map_element : Gas.cost
 
-    val primitive_type : Gas.cost
-    val one_arg_type : Gas.cost
-    val two_arg_type : Gas.cost
+    val one_arg_type : Script.annot -> Gas.cost
+    val two_arg_type : Script.annot -> Gas.cost
     val set_to_list : 'a Script_typed_ir.set -> Gas.cost
     val map_to_list : ('a, 'b) Script_typed_ir.map -> Gas.cost
   end

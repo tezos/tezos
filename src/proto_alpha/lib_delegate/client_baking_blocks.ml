@@ -18,6 +18,7 @@ type block_info = {
   timestamp: Time.t ;
   protocol: Protocol_hash.t ;
   next_protocol: Protocol_hash.t ;
+  proto_level: int ;
   level: Raw_level.t ;
   context : Context_hash.t ;
 }
@@ -29,12 +30,12 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
     cctxt ~chain ~block () >>=? fun { current_protocol = protocol ;
                                       next_protocol } ->
   let { Tezos_base.Block_header.predecessor ; fitness ;
-        timestamp ; level ; context ; _ } =
+        timestamp ; level ; context ; proto_level ; _ } =
     shell_header in
   match Raw_level.of_int32 level with
   | Ok level ->
       return { hash ; chain_id ; predecessor ; fitness ;
-               timestamp ; protocol ; next_protocol ; level ; context }
+               timestamp ; protocol ; next_protocol ; proto_level ; level ; context }
   | Error _ ->
       failwith "Cannot convert level into int32"
 

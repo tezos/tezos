@@ -9,7 +9,7 @@
 
 open Proto_alpha
 open Alpha_context
-open Apply_operation_result
+open Apply_results
 
 type 'kind preapply_result =
   Operation_hash.t * 'kind operation * 'kind operation_metadata

@@ -16,19 +16,12 @@ let () =
   Lwt.async_exception_hook :=
     (function
       | Exit -> ()
-      | exn ->
+      | e ->
           let backtrace = Printexc.get_backtrace () in
-          Base_logging.fatal_error "@[<v 2>%a%a@]"
-            (fun ppf exn ->
-               Format.fprintf ppf
-                 "@[Uncaught (asynchronous) exception (%d):@ %a@]"
-                 (Unix.getpid ())
-                 Error_monad.pp_exn exn)
-            exn
-            (fun ppf backtrace ->
-               if String.length backtrace <> 0 then
-                 Format.fprintf ppf
-                   "@,Backtrace:@,  @[<h>%a@]"
-                   Format.pp_print_text backtrace)
-            backtrace ;
+          Base_logging.(fatal_error Tag.DSL.(fun f ->
+              f "@[<v 2>@[Uncaught (asynchronous) exception (%d):@ %a@]%a@]"
+              -% t event "uncaught_async_exception"
+              -% s pid (Unix.getpid ())
+              -% a exn e
+              -% a exn_trace backtrace)) ;
           Lwt.wakeup exit_wakener 1)

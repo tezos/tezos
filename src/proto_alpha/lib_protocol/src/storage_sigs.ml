@@ -213,18 +213,21 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
 
   (** Updates the content of a bucket ; returns A {!Storage_Error
       Missing_key} if the value does not exists.
+      Consumes serialization cost.
       Consumes [Gas_repr.write_bytes_cost <size of the new value>].
       Returns the difference from the old to the new size. *)
   val set: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
 
   (** Allocates a storage bucket at the given key and initializes it ;
       returns a {!Storage_error Existing_key} if the bucket exists.
+      Consumes serialization cost.
       Consumes [Gas_repr.write_bytes_cost <size of the value>].
       Returns the size. *)
   val init: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
 
   (** Allocates a storage bucket at the given key and initializes it
       with a value ; just updates it if the bucket exists.
+      Consumes serialization cost.
       Consumes [Gas_repr.write_bytes_cost <size of the new value>].
       Returns the difference from the old (maybe 0) to the new size. *)
   val init_set: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
@@ -233,6 +236,7 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
       it with [v] ; just updates it if the bucket exists. When the
       valus is [None], delete the storage bucket when the value ; does
       nothing if the bucket does not exists.
+      Consumes serialization cost.
       Consumes the same gas cost as either {!remove} or {!init_set}.
       Returns the difference from the old (maybe 0) to the new size. *)
   val set_option: context -> key -> value option -> (Raw_context.t * int) tzresult Lwt.t

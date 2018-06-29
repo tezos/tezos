@@ -7,6 +7,89 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type balance =
+  | Contract of Contract_repr.t
+  | Rewards of Signature.Public_key_hash.t * Cycle_repr.t
+  | Fees of Signature.Public_key_hash.t * Cycle_repr.t
+  | Deposits of Signature.Public_key_hash.t * Cycle_repr.t
+
+let balance_encoding =
+  let open Data_encoding in
+  def "operation_metadata.alpha.balance" @@
+  union
+    [ case (Tag 0)
+        ~title:"Contract"
+        (obj2
+           (req "kind" (constant "contract"))
+           (req "contract" Contract_repr.encoding))
+        (function Contract c -> Some ((), c) | _ -> None )
+        (fun ((), c) -> (Contract c)) ;
+      case (Tag 1)
+        ~title:"Rewards"
+        (obj4
+           (req "kind" (constant "freezer"))
+           (req "category" (constant "rewards"))
+           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "level" Cycle_repr.encoding))
+        (function Rewards (d, l) -> Some ((), (), d, l) | _ -> None)
+        (fun ((), (), d, l) -> Rewards (d, l)) ;
+      case (Tag 2)
+        ~title:"Fees"
+        (obj4
+           (req "kind" (constant "freezer"))
+           (req "category" (constant "fees"))
+           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "level" Cycle_repr.encoding))
+        (function Fees (d, l) -> Some ((), (), d, l) | _ -> None)
+        (fun ((), (), d, l) -> Fees (d, l)) ;
+      case (Tag 3)
+        ~title:"Deposits"
+        (obj4
+           (req "kind" (constant "freezer"))
+           (req "category" (constant "deposits"))
+           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "level" Cycle_repr.encoding))
+        (function Deposits (d, l) -> Some ((), (), d, l) | _ -> None)
+        (fun ((), (), d, l) -> Deposits (d, l)) ]
+
+type balance_update =
+  | Debited of Tez_repr.t
+  | Credited of Tez_repr.t
+
+let balance_update_encoding =
+  let open Data_encoding in
+  def "operation_metadata.alpha.balance_update" @@
+  obj1
+    (req "change"
+       (conv
+          (function
+            | Credited v -> Tez_repr.to_mutez v
+            | Debited v -> Int64.neg (Tez_repr.to_mutez v))
+          (Json.wrap_error @@
+           fun v ->
+           if Compare.Int64.(v < 0L) then
+             match Tez_repr.of_mutez (Int64.neg v) with
+             | Some v -> Debited v
+             | None -> failwith "Qty.of_mutez"
+           else
+             match Tez_repr.of_mutez v with
+             | Some v -> Credited v
+             | None -> failwith "Qty.of_mutez")
+          int64))
+
+type balance_updates = (balance * balance_update) list
+
+let balance_updates_encoding =
+  let open Data_encoding in
+  def "operation_metadata.alpha.balance_updates" @@
+  list (merge_objs balance_encoding balance_update_encoding)
+
+let cleanup_balance_updates balance_updates =
+  List.filter
+    (fun (_, (Credited update | Debited update)) ->
+       not (Tez_repr.equal update Tez_repr.zero))
+    balance_updates
+
 type frozen_balance = {
   deposit : Tez_repr.t ;
   fees : Tez_repr.t ;
@@ -328,46 +411,53 @@ let unfreeze ctxt delegate cycle =
   get_frozen_fees ctxt contract cycle >>=? fun fees ->
   get_frozen_rewards ctxt contract cycle >>=? fun rewards ->
   Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
-  Lwt.return Tez_repr.(balance +? deposit) >>=? fun balance ->
-  Lwt.return Tez_repr.(balance +? fees) >>=? fun balance ->
-  Lwt.return Tez_repr.(balance +? rewards) >>=? fun balance ->
+  Lwt.return Tez_repr.(deposit +? fees) >>=? fun unfrozen_amount ->
+  Lwt.return Tez_repr.(unfrozen_amount +? rewards) >>=? fun unfrozen_amount ->
+  Lwt.return Tez_repr.(balance +? unfrozen_amount) >>=? fun balance ->
   Storage.Contract.Balance.set ctxt contract balance >>=? fun ctxt ->
   Roll_storage.Delegate.add_amount ctxt delegate rewards >>=? fun ctxt ->
   Storage.Contract.Frozen_deposits.remove (ctxt, contract) cycle >>= fun ctxt ->
   Storage.Contract.Frozen_fees.remove (ctxt, contract) cycle >>= fun ctxt ->
   Storage.Contract.Frozen_rewards.remove (ctxt, contract) cycle >>= fun ctxt ->
-  return ctxt
+  return (ctxt, (cleanup_balance_updates
+                   [(Deposits (delegate, cycle), Debited deposit) ;
+                    (Fees (delegate, cycle), Debited fees) ;
+                    (Rewards (delegate, cycle), Debited rewards) ;
+                    (Contract (Contract_repr.implicit_contract delegate), Credited unfrozen_amount)]))
 
 let cycle_end ctxt last_cycle unrevealed =
   let preserved = Constants_storage.preserved_cycles ctxt in
   begin
     match Cycle_repr.pred last_cycle with
-    | None -> return ctxt
+    | None -> return (ctxt,[])
     | Some revealed_cycle ->
         List.fold_left
-          (fun ctxt (u : Nonce_storage.unrevealed) ->
-             ctxt >>=? fun ctxt ->
+          (fun acc (u : Nonce_storage.unrevealed) ->
+             acc >>=? fun (ctxt, balance_updates) ->
              burn_fees
                ctxt u.delegate revealed_cycle u.fees >>=? fun ctxt ->
              burn_rewards
                ctxt u.delegate revealed_cycle u.rewards >>=? fun ctxt ->
-             return ctxt)
-          (return ctxt) unrevealed
-  end >>=? fun ctxt ->
+             let bus = [(Fees (u.delegate, revealed_cycle), Debited u.fees);
+                        (Rewards (u.delegate, revealed_cycle), Debited u.rewards)] in
+             return (ctxt, bus @ balance_updates))
+          (return (ctxt,[])) unrevealed
+  end >>=? fun (ctxt, balance_updates) ->
   match Cycle_repr.sub last_cycle preserved with
-  | None -> return ctxt
+  | None -> return (ctxt, balance_updates, [])
   | Some unfrozen_cycle ->
       fold ctxt
-        ~init:(Ok ctxt)
-        ~f:(fun delegate ctxt ->
-            Lwt.return ctxt >>=? fun ctxt ->
-            unfreeze ctxt delegate unfrozen_cycle >>=? fun ctxt ->
+        ~init:(Ok (ctxt, balance_updates, []))
+        ~f:(fun delegate acc ->
+            Lwt.return acc >>=? fun (ctxt, bus, deactivated) ->
+            unfreeze ctxt delegate unfrozen_cycle >>=? fun (ctxt, balance_updates) ->
             Storage.Contract.Delegate_desactivation.get ctxt
               (Contract_repr.implicit_contract delegate) >>=? fun cycle ->
             if Cycle_repr.(cycle <= last_cycle) then
-              Roll_storage.Delegate.set_inactive ctxt delegate
+              Roll_storage.Delegate.set_inactive ctxt delegate >>=? fun ctxt ->
+              return (ctxt, balance_updates @ bus, delegate::deactivated)
             else
-              return ctxt)
+              return (ctxt, balance_updates @ bus, deactivated))
 
 let punish ctxt delegate cycle =
   let contract = Contract_repr.implicit_contract delegate in

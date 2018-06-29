@@ -7,9 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Signer_logging
 open Signer_messages
 
-let log = Signer_logging.lwt_log_notice
+let log = lwt_log_notice
 
 let run (cctxt : #Client_context.wallet) path ?magic_bytes ~require_auth =
   Lwt_utils_unix.Socket.bind path >>=? fun fd ->
@@ -46,13 +47,20 @@ let run (cctxt : #Client_context.wallet) path ?magic_bytes ~require_auth =
   begin
     match path with
     | Tcp (host, port) ->
-        log "Accepting TCP requests on port %s:%d" host port
+        log Tag.DSL.(fun f ->
+            f "Accepting TCP requests on port %s:%d"
+            -% t event "accepting_tcp_requests"
+            -% s host_name host
+            -% s port_number port)
     | Unix path ->
         Sys.set_signal Sys.sigint (Signal_handle begin fun _ ->
             Format.printf "Removing the local socket file and quitting.@." ;
             Unix.unlink path ;
             exit 0
           end) ;
-        log "Accepting UNIX requests on %s" path
+        log Tag.DSL.(fun f ->
+            f "Accepting UNIX requests on %s"
+            -% t event "accepting_unix_requests"
+            -% s unix_socket_path path)
   end >>= fun () ->
   loop ()

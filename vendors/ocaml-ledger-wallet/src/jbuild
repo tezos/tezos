@@ -5,7 +5,7 @@
   (public_name ledgerwallet)
   (modules     (Apdu Transport))
   (synopsis "Ledger wallet library for OCaml: common parts")
-  (libraries (result cstruct hidapi))))
+  (libraries (rresult cstruct hidapi))))
 
 (library
  ((name        ledgerwallet_tezos)

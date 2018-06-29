@@ -16,7 +16,7 @@ type t = {
 }
 type account = t
 
-val dictator_account: account
+val activator_account: account
 val dummy_account: account
 
 val new_account: unit -> account

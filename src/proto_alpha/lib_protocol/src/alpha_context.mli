@@ -129,6 +129,7 @@ module Gas : sig
   val step_cost : int -> cost
   val alloc_cost : int -> cost
   val alloc_bytes_cost : int -> cost
+  val alloc_mbytes_cost : int -> cost
   val alloc_bits_cost : int -> cost
   val read_bytes_cost : Z.t -> cost
   val write_bytes_cost : Z.t -> cost
@@ -140,6 +141,7 @@ module Gas : sig
   val set_limit: context -> Z.t -> context
   val set_unlimited: context -> context
   val consume: context -> cost -> context tzresult
+  val check_enough: context -> cost -> unit tzresult
   val level: context -> t
   val consumed: since: context -> until: context -> Z.t
   val block_level: context -> Z.t
@@ -286,8 +288,6 @@ module Script : sig
 
   type lazy_expr = expr Data_encoding.lazy_t
 
-  val force_decode : lazy_expr -> expr tzresult
-  val force_bytes : lazy_expr -> MBytes.t tzresult
   val lazy_expr : expr -> lazy_expr
 
   type node = (location, prim) Micheline.node
@@ -301,6 +301,21 @@ module Script : sig
   val prim_encoding: prim Data_encoding.t
   val encoding: t Data_encoding.t
   val lazy_expr_encoding: lazy_expr Data_encoding.t
+  val deserialized_cost : expr -> Gas.cost
+  val serialized_cost : MBytes.t -> Gas.cost
+  val int_node_cost : Z.t -> Gas.cost
+  val int_node_cost_of_numbits : int -> Gas.cost
+  val string_node_cost : string -> Gas.cost
+  val string_node_cost_of_length : int -> Gas.cost
+  val bytes_node_cost : MBytes.t -> Gas.cost
+  val bytes_node_cost_of_length : int -> Gas.cost
+  val prim_node_cost_nonrec : expr list -> annot  -> Gas.cost
+  val prim_node_cost_nonrec_of_length : int -> annot -> Gas.cost
+  val seq_node_cost_nonrec : expr list -> Gas.cost
+  val seq_node_cost_nonrec_of_length : int -> Gas.cost
+  val minimal_deserialize_cost : lazy_expr -> Gas.cost
+  val force_decode : context -> lazy_expr -> (expr * context) tzresult Lwt.t
+  val force_bytes : context -> lazy_expr -> (MBytes.t * context) tzresult Lwt.t
 end
 
 module Constants : sig
@@ -332,7 +347,6 @@ module Constants : sig
     hard_gas_limit_per_operation: Z.t ;
     hard_gas_limit_per_block: Z.t ;
     proof_of_work_threshold: int64 ;
-    dictator_pubkey: Signature.Public_key.t ;
     tokens_per_roll: Tez.t ;
     michelson_maximum_type_size: int;
     seed_nonce_revelation_tip: Tez.t ;
@@ -358,7 +372,6 @@ module Constants : sig
   val cost_per_byte: context -> Tez.t
   val hard_storage_limit_per_operation: context -> Z.t
   val proof_of_work_threshold: context -> int64
-  val dictator_pubkey: context -> Signature.Public_key.t
   val tokens_per_roll: context -> Tez.t
   val michelson_maximum_type_size: context -> int
   val block_reward: context -> Tez.t
@@ -594,6 +607,22 @@ end
 
 module Delegate : sig
 
+  type balance =
+    | Contract of Contract.t
+    | Rewards of Signature.Public_key_hash.t * Cycle.t
+    | Fees of Signature.Public_key_hash.t * Cycle.t
+    | Deposits of Signature.Public_key_hash.t * Cycle.t
+
+  type balance_update =
+    | Debited of Tez.t
+    | Credited of Tez.t
+
+  type balance_updates = (balance * balance_update) list
+
+  val balance_updates_encoding : balance_updates Data_encoding.t
+
+  val cleanup_balance_updates : balance_updates -> balance_updates
+
   val get: context -> Contract.t -> public_key_hash option tzresult Lwt.t
 
   val set:
@@ -618,7 +647,8 @@ module Delegate : sig
     context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
 
   val cycle_end:
-    context -> Cycle.t -> Nonce.unrevealed list -> context tzresult Lwt.t
+    context -> Cycle.t -> Nonce.unrevealed list ->
+    (context * balance_updates * Signature.Public_key_hash.t list) tzresult Lwt.t
 
   type frozen_balance = {
     deposit : Tez.t ;
@@ -738,12 +768,6 @@ module Block_header : sig
   type raw = Block_header.t
   type shell_header = Block_header.shell_header
 
-  type metadata = {
-    baker: Signature.Public_key_hash.t ;
-    level: Level.t ;
-    voting_period_kind: Voting_period.kind ;
-  }
-
   val raw: block_header -> raw
 
   val hash: block_header -> Block_hash.t
@@ -755,7 +779,6 @@ module Block_header : sig
   val unsigned_encoding: (shell_header * contents) Data_encoding.t
   val protocol_data_encoding: protocol_data Data_encoding.encoding
   val shell_header_encoding: shell_header Data_encoding.encoding
-  val metadata_encoding: metadata Data_encoding.encoding
 
   val max_header_length: int
   (** The maximum size of block headers in bytes *)

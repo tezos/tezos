@@ -192,6 +192,9 @@ module type T = sig
       within a view. *)
   val consume_gas: context -> Gas_limit_repr.cost -> context tzresult
 
+  (** Check if consume_gas will fail *)
+  val check_enough_gas: context -> Gas_limit_repr.cost -> unit tzresult
+
   val description: context Storage_description.t
 
 end

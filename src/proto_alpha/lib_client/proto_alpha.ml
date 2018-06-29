@@ -15,6 +15,7 @@ module Proto = Tezos_protocol_alpha.Functor.Make(Alpha_environment)
 module Alpha_block_services = Block_services.Make(Proto)(Proto)
 
 include Proto
+module LiftedMain = Alpha_environment.Lift(Proto)
 
 class type rpc_context = object
   inherit RPC_context.json

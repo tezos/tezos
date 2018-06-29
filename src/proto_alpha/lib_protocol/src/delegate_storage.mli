@@ -7,6 +7,26 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Places where tezzies can be found in the ledger's state. *)
+type balance =
+  | Contract of Contract_repr.t
+  | Rewards of Signature.Public_key_hash.t * Cycle_repr.t
+  | Fees of Signature.Public_key_hash.t * Cycle_repr.t
+  | Deposits of Signature.Public_key_hash.t * Cycle_repr.t
+
+(** A credit or debit of tezzies to a balance. *)
+type balance_update =
+  | Debited of Tez_repr.t
+  | Credited of Tez_repr.t
+
+(** A list of balance updates. Duplicates may happen. *)
+type balance_updates = (balance * balance_update) list
+
+val balance_updates_encoding : balance_updates Data_encoding.t
+
+(** Remove zero-valued balances from a list of updates. *)
+val cleanup_balance_updates : balance_updates -> balance_updates
+
 type frozen_balance = {
   deposit : Tez_repr.t ;
   fees : Tez_repr.t ;
@@ -86,12 +106,13 @@ val freeze_rewards:
   Raw_context.t tzresult Lwt.t
 
 (** Trigger the context maintenance at the end of cycle 'n', i.e.:
-    unfroze deposit/fees/rewards from 'n - preserved_cycle' ; punish the
-    provided unrevealed seeds (tipically seed from from cycle 'n -
-    1'). *)
+    unfreeze deposit/fees/rewards from 'n - preserved_cycle' ; punish the
+    provided unrevealed seeds (tipically seed from cycle 'n - 1').
+    Returns a list of account with the amount that was unfrozen for each
+    and the list of deactivated delegates. *)
 val cycle_end:
   Raw_context.t -> Cycle_repr.t -> Nonce_storage.unrevealed list ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * balance_updates * Signature.Public_key_hash.t list) tzresult Lwt.t
 
 (** Burn all then frozen deposit/fees/rewards for a delegate at a given
     cycle. Returns the burned amounts. *)

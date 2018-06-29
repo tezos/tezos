@@ -127,6 +127,12 @@ module type S = sig
   (** Automatically enrich error reporting on stack rewind *)
   val trace : error -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
 
+  (** Same as record_trace, for unevaluated error *)
+  val record_trace_eval : (unit -> error tzresult) -> 'a tzresult -> 'a tzresult
+
+  (** Same as trace, for unevaluated Lwt error *)
+  val trace_eval : (unit -> error tzresult Lwt.t) -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+
   (** Erroneous return on failed assertion *)
   val fail_unless : bool -> error -> unit tzresult Lwt.t
   val fail_when : bool -> error -> unit tzresult Lwt.t

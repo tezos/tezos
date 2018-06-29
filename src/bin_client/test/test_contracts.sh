@@ -210,7 +210,20 @@ assert_storage $contract_dir/exec_concat.tz '"?"' '""' '"_abc"'
 assert_storage $contract_dir/exec_concat.tz '"?"' '"test"' '"test_abc"'
 
 # Get current steps to quota
-assert_storage $contract_dir/steps_to_quota.tz 111 Unit 399992
+assert_storage $contract_dir/steps_to_quota.tz 111 Unit 399813
+
+# Typing gas bounds checks
+assert_fails $client originate contract first_explosion for bootstrap1 \
+             transferring 0 from bootstrap1 \
+             running '{parameter unit;storage unit;code{DROP;PUSH nat 0;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;}}' -G 8000
+
+# Serialization gas bounds checks
+assert_success $client run script  '{parameter (list int);storage (list (list (list int)));code{CAR;DIP{NIL (list int)};DUP;ITER{DROP;DUP;DIP{CONS}};DROP;DIP{NIL (list (list int))};DUP;ITER{DROP;DUP;DIP{CONS}};DROP;NIL operation;PAIR}}' \
+               on storage '{}' \
+               and input '{1;2;3;4;5;6;7;8;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1}'
+assert_fails $client run script  '{parameter (list int);storage (list (list (list int)));code{CAR;DIP{NIL (list int)};DUP;ITER{DROP;DUP;DIP{CONS}};DROP;DIP{NIL (list (list int))};DUP;ITER{DROP;DUP;DIP{CONS}};DROP;NIL operation;PAIR}}' \
+               on storage '{}' \
+               and input '{1;2;3;4;5;6;7;8;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1}'
 
 # Get the current balance of the contract
 assert_storage $contract_dir/balance.tz '111' Unit '4000000000000'

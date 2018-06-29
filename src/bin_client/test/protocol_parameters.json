@@ -18,8 +18,6 @@
     [ "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ],
     [ "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ]
   ],
-  "dictator_pubkey":
-    "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
   "time_between_blocks" : [ "1", "0" ],
   "blocks_per_cycle" : 128,
   "blocks_per_roll_snapshot" : 32,

@@ -14,24 +14,6 @@
 
 open Alpha_context
 
-(** Places where tezzies can be found in the ledger's state. *)
-type balance =
-  | Contract of Contract.t
-  | Rewards of Signature.Public_key_hash.t * Cycle.t
-  | Fees of Signature.Public_key_hash.t * Cycle.t
-  | Deposits of Signature.Public_key_hash.t * Cycle.t
-
-(** A credit or debit of tezzies to a balance. *)
-type balance_update =
-  | Debited of Tez.t
-  | Credited of Tez.t
-
-(** A list of balance updates. Duplicates may happen. *)
-type balance_updates = (balance * balance_update) list
-
-(** Remove zero-valued balances from a list of updates. *)
-val cleanup_balance_updates : balance_updates -> balance_updates
-
 (** Result of applying a {!Operation.t}. Follows the same structure. *)
 type 'kind operation_metadata = {
   contents: 'kind contents_result_list ;
@@ -54,22 +36,22 @@ and packed_contents_result_list =
 (** Result of applying an {!Operation.contents}. Follows the same structure. *)
 and 'kind contents_result =
   | Endorsement_result :
-      { balance_updates : balance_updates ;
+      { balance_updates : Delegate.balance_updates ;
         delegate : Signature.Public_key_hash.t ;
         slots: int list ;
       } -> Kind.endorsement contents_result
   | Seed_nonce_revelation_result :
-      balance_updates -> Kind.seed_nonce_revelation contents_result
+      Delegate.balance_updates -> Kind.seed_nonce_revelation contents_result
   | Double_endorsement_evidence_result :
-      balance_updates -> Kind.double_endorsement_evidence contents_result
+      Delegate.balance_updates -> Kind.double_endorsement_evidence contents_result
   | Double_baking_evidence_result :
-      balance_updates -> Kind.double_baking_evidence contents_result
+      Delegate.balance_updates -> Kind.double_baking_evidence contents_result
   | Activate_account_result :
-      balance_updates -> Kind.activate_account contents_result
+      Delegate.balance_updates -> Kind.activate_account contents_result
   | Proposals_result : Kind.proposals contents_result
   | Ballot_result : Kind.ballot contents_result
   | Manager_operation_result :
-      { balance_updates : balance_updates ;
+      { balance_updates : Delegate.balance_updates ;
         operation_result : 'kind manager_operation_result ;
         internal_operation_results : packed_internal_operation_result list ;
       } -> 'kind Kind.manager contents_result
@@ -91,14 +73,14 @@ and _ successful_manager_operation_result =
   | Reveal_result : Kind.reveal successful_manager_operation_result
   | Transaction_result :
       { storage : Script.expr option ;
-        balance_updates : balance_updates ;
+        balance_updates : Delegate.balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
         storage_size : Z.t ;
         paid_storage_size_diff : Z.t ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
-      { balance_updates : balance_updates ;
+      { balance_updates : Delegate.balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
         storage_size : Z.t ;
@@ -144,3 +126,14 @@ val unpack_contents_list :
 type ('a, 'b) eq = Eq : ('a, 'a) eq
 val kind_equal_list :
   'kind contents_list -> 'kind2 contents_result_list -> ('kind, 'kind2) eq option
+
+type block_metadata = {
+  baker: Signature.Public_key_hash.t ;
+  level: Level.t ;
+  voting_period_kind: Voting_period.kind ;
+  nonce_hash: Nonce_hash.t option ;
+  consumed_gas: Z.t ;
+  deactivated: Signature.Public_key_hash.t list ;
+  balance_updates: Delegate.balance_updates ;
+}
+val block_metadata_encoding: block_metadata Data_encoding.encoding

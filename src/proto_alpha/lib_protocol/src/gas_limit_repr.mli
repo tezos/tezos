@@ -23,11 +23,13 @@ type error += Block_quota_exceeded (* `Temporary *)
 type error += Operation_quota_exceeded (* `Temporary *)
 
 val consume : Z.t -> t -> cost -> (Z.t * t) tzresult
+val check_enough : Z.t -> t -> cost -> unit tzresult
 
 val free : cost
 val step_cost : int -> cost
 val alloc_cost : int -> cost
 val alloc_bytes_cost : int -> cost
+val alloc_mbytes_cost : int -> cost
 val alloc_bits_cost : int -> cost
 val read_bytes_cost : Z.t -> cost
 val write_bytes_cost : Z.t -> cost
