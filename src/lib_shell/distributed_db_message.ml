@@ -289,7 +289,7 @@ let encoding =
 
 let versions =
   let open P2p_version in
-  [ { name = "TEZOS_ZERONET_2018-06-28T16:22:52Z" ;
+  [ { name = "TEZOS_ZERONET_2018-06-29T15:51:11Z" ;
       major = 0 ;
       minor = 0 ;
     }
