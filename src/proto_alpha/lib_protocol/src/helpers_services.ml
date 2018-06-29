@@ -211,13 +211,43 @@ module Scripts = struct
       let partial_precheck_manager_contents
           (type kind) ctxt (op : kind Kind.manager contents)
         : context tzresult Lwt.t =
-        let Manager_operation { source ; fee ; counter ; operation } = op in
+        let Manager_operation { source ; fee ; counter ; operation ; gas_limit ; storage_limit } = op in
+        Lwt.return (Gas.check_limit ctxt gas_limit) >>=? fun () ->
+        let ctxt = Gas.set_limit ctxt gas_limit in
+        Lwt.return (Fees.check_storage_limit ctxt storage_limit) >>=? fun () ->
         Contract.must_be_allocated ctxt source >>=? fun () ->
         Contract.check_counter_increment ctxt source counter >>=? fun () ->
         begin
           match operation with
           | Reveal pk ->
               Contract.reveal_manager_key ctxt source pk
+          | Transaction { parameters = Some arg ; _ } ->
+              (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
+              let arg_bytes = Data_encoding.Binary.to_bytes_exn Script.lazy_expr_encoding arg in
+              let arg = match Data_encoding.Binary.of_bytes Script.lazy_expr_encoding arg_bytes with
+                | Some arg -> arg
+                | None -> assert false in
+              (* Fail quickly if not enough gas for minimal deserialization cost *)
+              Lwt.return @@ record_trace Apply.Gas_quota_exceeded_init_deserialize @@
+              Gas.check_enough ctxt (Script.minimal_deserialize_cost arg) >>=? fun () ->
+              (* Fail if not enough gas for complete deserialization cost *)
+              trace Apply.Gas_quota_exceeded_init_deserialize @@
+              Script.force_decode ctxt arg >>|? fun (_arg, ctxt) -> ctxt
+          | Origination { script = Some script ; _ } ->
+              (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
+              let script_bytes = Data_encoding.Binary.to_bytes_exn Script.encoding script in
+              let script = match Data_encoding.Binary.of_bytes Script.encoding script_bytes with
+                | Some script -> script
+                | None -> assert false in
+              (* Fail quickly if not enough gas for minimal deserialization cost *)
+              Lwt.return @@ record_trace Apply.Gas_quota_exceeded_init_deserialize @@
+              (Gas.consume ctxt (Script.minimal_deserialize_cost script.code) >>? fun ctxt ->
+               Gas.check_enough ctxt (Script.minimal_deserialize_cost script.storage)) >>=? fun () ->
+              (* Fail if not enough gas for complete deserialization cost *)
+              trace Apply.Gas_quota_exceeded_init_deserialize @@
+              Script.force_decode ctxt script.code >>=? fun (_code, ctxt) ->
+              trace Apply.Gas_quota_exceeded_init_deserialize @@
+              Script.force_decode ctxt script.storage >>|? fun (_storage, ctxt) -> ctxt
           | _ -> return ctxt
         end >>=? fun ctxt ->
         Contract.get_manager_key ctxt source >>=? fun _public_key ->
