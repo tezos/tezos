@@ -2978,12 +2978,13 @@ let rec unparse_data
     | Lambda_t _, Lam (_, original_code) ->
         unparse_code ctxt mode (root original_code)
 
-(* only used in client, don't account for gas *)
+(* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 and unparse_code ctxt mode = function
   | Prim (loc, I_PUSH, [ ty ; data ], annot) ->
       Lwt.return (parse_ty ctxt ~allow_big_map:false ~allow_operation:false ty) >>=? fun (Ex_ty t, ctxt) ->
       parse_data ctxt t data >>=? fun (data, ctxt) ->
       unparse_data ctxt mode t data >>=? fun (data, ctxt) ->
+      Lwt.return (Gas.consume ctxt (Unparse_costs.prim_cost 2 annot)) >>=? fun ctxt ->
       return (Prim (loc, I_PUSH, [ ty ; data ], annot), ctxt)
   | Seq (loc, items) ->
       fold_left_s
@@ -2991,6 +2992,7 @@ and unparse_code ctxt mode = function
            unparse_code ctxt mode item >>=? fun (item, ctxt) ->
            return (item :: l, ctxt))
         ([], ctxt) items >>=? fun (items, ctxt) ->
+      Lwt.return (Gas.consume ctxt (Unparse_costs.seq_cost (List.length items))) >>=? fun ctxt ->
       return (Micheline.Seq (loc, List.rev items), ctxt)
   | Prim (loc, prim, items, annot) ->
       fold_left_s
@@ -2998,23 +3000,29 @@ and unparse_code ctxt mode = function
            unparse_code ctxt mode item >>=? fun (item, ctxt) ->
            return (item :: l, ctxt))
         ([], ctxt) items >>=? fun (items, ctxt) ->
+      Lwt.return (Gas.consume ctxt (Unparse_costs.prim_cost 3 annot)) >>=? fun ctxt ->
       return (Prim (loc, prim, List.rev items, annot), ctxt)
   | Int _ | String _ | Bytes _ as atom -> return (atom, ctxt)
 
-(* only used in client, don't account for gas *)
+(* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 let unparse_script ctxt mode { code ; arg_type ; storage ; storage_type } =
   let Lam (_, original_code) = code in
   unparse_code ctxt mode (root original_code) >>=? fun (code, ctxt) ->
   unparse_data ctxt mode storage_type storage >>=? fun (storage, ctxt) ->
   unparse_ty ctxt arg_type >>=? fun (arg_type, ctxt) ->
-  unparse_ty ctxt storage_type >>=? fun (storage_type, _ctxt) ->
+  unparse_ty ctxt storage_type >>=? fun (storage_type, ctxt) ->
   let open Micheline in
   let code =
     Seq (-1, [ Prim (-1, K_parameter, [ arg_type ], []) ;
                Prim (-1, K_storage, [ storage_type ], []) ;
                Prim (-1, K_code, [ code ], []) ]) in
+  Lwt.return
+    (Gas.consume ctxt (Unparse_costs.seq_cost 3) >>? fun ctxt ->
+     Gas.consume ctxt (Unparse_costs.prim_cost 1 []) >>? fun ctxt ->
+     Gas.consume ctxt (Unparse_costs.prim_cost 1 []) >>? fun ctxt ->
+     Gas.consume ctxt (Unparse_costs.prim_cost 1 [])) >>=? fun ctxt ->
   return ({ code = lazy_expr (strip_locations code) ;
-            storage = lazy_expr (strip_locations storage) })
+            storage = lazy_expr (strip_locations storage) }, ctxt)
 
 let pack_data ctxt typ data =
   unparse_data ctxt Optimized typ data >>=? fun (data, ctxt) ->

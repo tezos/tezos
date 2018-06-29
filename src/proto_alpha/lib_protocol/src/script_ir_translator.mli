@@ -92,10 +92,10 @@ val parse_script :
   ?type_logger: type_logger ->
   context -> Script.t -> (ex_script * context) tzresult Lwt.t
 
-(* only used in client, don't account for gas *)
+(* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 val unparse_script :
   context -> unparsing_mode ->
-  ('a, 'b) Script_typed_ir.script -> Script.t tzresult Lwt.t
+  ('a, 'b) Script_typed_ir.script -> (Script.t * context) tzresult Lwt.t
 
 val parse_contract :
   context -> Script.location -> 'a Script_typed_ir.ty -> Contract.t ->

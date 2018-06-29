@@ -168,7 +168,7 @@ let register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt script >>=? fun (Ex_script script, ctxt) ->
-          unparse_script ctxt Readable script >>=? fun script ->
+          unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
           Script.force_decode ctxt script.storage >>=? fun (storage, _ctxt) ->
           return_some storage) ;
   register_field S.info (fun ctxt contract ->
@@ -185,7 +185,7 @@ let register () =
             let ctxt = Gas.set_unlimited ctxt in
             let open Script_ir_translator in
             parse_script ctxt script >>=? fun (Ex_script script, ctxt) ->
-            unparse_script ctxt Readable script >>=? fun script ->
+            unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
             return (Some script, ctxt)
       end >>=? fun (script, _ctxt) ->
       return { manager ; balance ;
