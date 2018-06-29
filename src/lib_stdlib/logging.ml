@@ -175,7 +175,7 @@ end
 
 let sections = ref []
 
-module Make_unregistered(S : sig val name: string end) : LOG = struct
+module Make_unregistered(S : MESSAGE) : LOG = struct
 
   let section = Lwt_log_core.Section.make S.name
   type log_section += Section
@@ -218,7 +218,7 @@ module Make_unregistered(S : sig val name: string end) : LOG = struct
 
 end
 
-module Make(S : sig val name: string end) : LOG = struct
+module Make(S : MESSAGE) : LOG = struct
 
   let () = sections := S.name :: !sections
   include Make_unregistered(S)

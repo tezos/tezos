@@ -103,8 +103,8 @@ module Core : sig
   val worker : string Tag.def
 end
 
-module Make(S: sig val name: string end) : LOG
-module Make_unregistered(S: sig val name: string end) : LOG
+module Make(S: MESSAGE) : LOG
+module Make_unregistered(S: MESSAGE) : LOG
 
 module Make_semantic(S: MESSAGE) : SEMLOG
 
