@@ -67,12 +67,12 @@ let pp_cost ppf { allocations ; steps ; reads ; writes ; bytes_read ; bytes_writ
 type error += Block_quota_exceeded (* `Temporary *)
 type error += Operation_quota_exceeded (* `Temporary *)
 
-let allocation_weight = Z.of_int 2 (* FIXME: placeholder *)
-let step_weight = Z.of_int 1 (* FIXME: placeholder *)
-let read_base_weight = Z.of_int 10 (* FIXME: placeholder *)
-let write_base_weight = Z.of_int 20 (* FIXME: placeholder *)
-let byte_read_weight = Z.of_int 10 (* FIXME: placeholder *)
-let byte_written_weight = Z.of_int 20 (* FIXME: placeholder *)
+let allocation_weight = Z.of_int 2
+let step_weight = Z.of_int 1
+let read_base_weight = Z.of_int 50
+let write_base_weight = Z.of_int 80
+let byte_read_weight = Z.of_int 10
+let byte_written_weight = Z.of_int 15
 
 let consume block_gas operation_gas cost = match operation_gas with
   | Unaccounted -> ok (block_gas, Unaccounted)
