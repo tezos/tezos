@@ -13,17 +13,6 @@ let group =
   { Clic.name = "keys" ;
     title = "Commands for managing the wallet of cryptographic keys" }
 
-let encrypted_switch () =
-  if List.exists
-      (fun (scheme, _) ->
-         scheme = Tezos_signer_backends.Unencrypted.scheme)
-      (Client_keys.registered_signers ()) then
-    Clic.switch
-      ~long:"encrypted"
-      ~doc:("Encrypt the key on-disk") ()
-  else
-    Clic.constant true
-
 let sig_algo_arg =
   Clic.default_arg
     ~doc:"use custom signature algorithm"
@@ -156,8 +145,18 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       | true -> return sk
       | false -> input_fundraiser_params cctxt
 
-let commands () : Client_context.io_wallet Clic.command list =
+let commands version : Client_context.io_wallet Clic.command list =
   let open Clic in
+  let encrypted_switch () =
+    if List.exists
+        (fun (scheme, _) ->
+           scheme = Tezos_signer_backends.Unencrypted.scheme)
+        (Client_keys.registered_signers ()) then
+      Clic.switch
+        ~long:"encrypted"
+        ~doc:("Encrypt the key on-disk") ()
+    else
+      Clic.constant true in
   let show_private_switch =
     switch
       ~long:"show-secret"
@@ -188,39 +187,73 @@ let commands () : Client_context.io_wallet Clic.command list =
                 n S.title Format.pp_print_text S.description)
            signers >>= return) ;
 
-    command ~group ~desc: "Generate a pair of keys."
-      (args3 (Secret_key.force_switch ()) sig_algo_arg (encrypted_switch ()))
-      (prefixes [ "gen" ; "keys" ]
-       @@ Secret_key.fresh_alias_param
-       @@ stop)
-      (fun (force, algo, encrypted) name (cctxt : Client_context.io_wallet) ->
-         Secret_key.of_fresh cctxt force name >>=? fun name ->
-         let (pkh, pk, sk) = Signature.generate_key ~algo () in
-         let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
-         begin
-           if encrypted then
-             Tezos_signer_backends.Encrypted.encrypt cctxt sk
-           else
-             return (Tezos_signer_backends.Unencrypted.make_sk sk)
-         end >>=? fun sk_uri ->
-         register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
+    begin match version with
+      | Some `Betanet ->
+          command ~group ~desc: "Generate a pair of keys."
+            (args2 (Secret_key.force_switch ()) sig_algo_arg)
+            (prefixes [ "gen" ; "keys" ]
+             @@ Secret_key.fresh_alias_param
+             @@ stop)
+            (fun (force, algo) name (cctxt : Client_context.io_wallet) ->
+               Secret_key.of_fresh cctxt force name >>=? fun name ->
+               let (pkh, pk, sk) = Signature.generate_key ~algo () in
+               let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
+               Tezos_signer_backends.Encrypted.encrypt cctxt sk >>=? fun sk_uri ->
+               register_key cctxt ~force (pkh, pk_uri, sk_uri) name)
+      | _ ->
+          command ~group ~desc: "Generate a pair of keys."
+            (args3 (Secret_key.force_switch ()) sig_algo_arg (encrypted_switch ()))
+            (prefixes [ "gen" ; "keys" ]
+             @@ Secret_key.fresh_alias_param
+             @@ stop)
+            (fun (force, algo, encrypted) name (cctxt : Client_context.io_wallet) ->
+               Secret_key.of_fresh cctxt force name >>=? fun name ->
+               let (pkh, pk, sk) = Signature.generate_key ~algo () in
+               let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
+               begin
+                 if encrypted then
+                   Tezos_signer_backends.Encrypted.encrypt cctxt sk
+                 else
+                   return (Tezos_signer_backends.Unencrypted.make_sk sk)
+               end >>=? fun sk_uri ->
+               register_key cctxt ~force (pkh, pk_uri, sk_uri) name)
+    end ;
 
-    command ~group ~desc: "Generate keys including the given string."
-      (args3
-         (switch
-            ~long:"prefix"
-            ~short:'P'
-            ~doc:"the key must begin with tz1[word]"
-            ())
-         (force_switch ())
-         (encrypted_switch ()))
-      (prefixes [ "gen" ; "vanity" ; "keys" ]
-       @@ Public_key_hash.fresh_alias_param
-       @@ prefix "matching"
-       @@ (seq_of_param @@ string ~name:"words" ~desc:"string key must contain one of these words"))
-      (fun (prefix, force, encrypted) name containing (cctxt : Client_context.io_wallet) ->
-         Public_key_hash.of_fresh cctxt force name >>=? fun name ->
-         gen_keys_containing ~encrypted ~force ~prefix ~containing ~name cctxt) ;
+    begin match version with
+      | Some `Betanet ->
+          command ~group ~desc: "Generate keys including the given string."
+            (args2
+               (switch
+                  ~long:"prefix"
+                  ~short:'P'
+                  ~doc:"the key must begin with tz1[word]"
+                  ())
+               (force_switch ()))
+            (prefixes [ "gen" ; "vanity" ; "keys" ]
+             @@ Public_key_hash.fresh_alias_param
+             @@ prefix "matching"
+             @@ (seq_of_param @@ string ~name:"words" ~desc:"string key must contain one of these words"))
+            (fun (prefix, force) name containing (cctxt : Client_context.io_wallet) ->
+               Public_key_hash.of_fresh cctxt force name >>=? fun name ->
+               gen_keys_containing ~encrypted:true ~force ~prefix ~containing ~name cctxt)
+      | _ ->
+          command ~group ~desc: "Generate keys including the given string."
+            (args3
+               (switch
+                  ~long:"prefix"
+                  ~short:'P'
+                  ~doc:"the key must begin with tz1[word]"
+                  ())
+               (force_switch ())
+               (encrypted_switch ()))
+            (prefixes [ "gen" ; "vanity" ; "keys" ]
+             @@ Public_key_hash.fresh_alias_param
+             @@ prefix "matching"
+             @@ (seq_of_param @@ string ~name:"words" ~desc:"string key must contain one of these words"))
+            (fun (prefix, force, encrypted) name containing (cctxt : Client_context.io_wallet) ->
+               Public_key_hash.of_fresh cctxt force name >>=? fun name ->
+               gen_keys_containing ~encrypted ~force ~prefix ~containing ~name cctxt)
+    end ;
 
     command ~group ~desc: "Add a secret key to the wallet."
       (args1 (Secret_key.force_switch ()))
