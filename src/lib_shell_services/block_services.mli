@@ -33,6 +33,7 @@ type prefix = (unit * chain) * block
 val dir_path: (chain_prefix, chain_prefix) RPC_path.t
 val path: (chain_prefix, chain_prefix * block) RPC_path.t
 val mempool_path : ('a, 'b) RPC_path.t -> ('a, 'b) RPC_path.t
+val live_blocks_path : ('a, 'b) RPC_path.t -> ('a, 'b) RPC_path.t
 
 type operation_list_quota = {
   max_size: int ;
@@ -236,6 +237,12 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
   end
 
+  val live_blocks:
+    #simple ->
+    ?chain:chain ->
+    ?block:block ->
+    unit -> Block_hash.Set.t tzresult Lwt.t
+
   module S : sig
 
     val hash:
@@ -375,6 +382,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
          Mempool.t) RPC_service.t
 
     end
+
+    val live_blocks:
+      ([ `GET ], prefix,
+       prefix, unit, unit,
+       Block_hash.Set.t) RPC_service.t
 
   end
 

@@ -54,6 +54,14 @@ let build_raw_rpc_directory
     return (State.Block.hash block)
   end ;
 
+  register0 S.live_blocks begin fun block () () ->
+    Chain_traversal.live_blocks
+      block
+      (State.Block.max_operations_ttl block)
+    >>= fun (live_blocks, _) ->
+    return live_blocks
+  end ;
+
   (* block header *)
 
   register0 S.header begin fun block () () ->

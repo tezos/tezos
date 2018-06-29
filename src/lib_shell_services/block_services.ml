@@ -76,6 +76,7 @@ type chain_prefix = unit * chain
 type prefix = chain_prefix * block
 let chain_path = RPC_path.(root / "chains" /: chain_arg)
 let mempool_path p = RPC_path.(p / "mempool")
+let live_blocks_path p = RPC_path.(p / "live_blocks")
 let dir_path : (chain_prefix, chain_prefix) RPC_path.t =
   RPC_path.(open_root / "blocks")
 let path = RPC_path.(dir_path /: blocks_arg)
@@ -664,6 +665,16 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
     end
 
+    let live_blocks =
+      RPC_service.get_service
+        ~description:"List the ancestors of the given block which, if \
+                      referred to as the branch in an operation \
+                      header, are recent enough for that operation to \
+                      be included in the current block."
+        ~query: RPC_query.empty
+        ~output: Block_hash.Set.encoding
+        RPC_path.(live_blocks_path open_root)
+
   end
 
   let path = RPC_path.prefix chain_path path
@@ -844,6 +855,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
       RPC_context.make_call1 s ctxt chain () ()
 
   end
+
+  let live_blocks ctxt =
+    let f = make_call0 S.live_blocks ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
 
 end
 
