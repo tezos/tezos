@@ -212,6 +212,13 @@ assert_storage $contract_dir/exec_concat.tz '"?"' '"test"' '"test_abc"'
 # Get current steps to quota
 assert_storage $contract_dir/steps_to_quota.tz 111 Unit 399815
 
+# Gas bounds checks
+assert_fails $client -l originate contract first_explosion for bootstrap1 \
+             transferring 0 from bootstrap1 \
+             running '{parameter unit;\
+                       storage unit;\
+                       code{DROP;PUSH nat 0;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;}}' -G 8000
+
 # Get the current balance of the contract
 assert_storage $contract_dir/balance.tz '111' Unit '4000000000000'
 

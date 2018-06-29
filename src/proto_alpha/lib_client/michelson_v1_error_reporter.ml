@@ -189,7 +189,12 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         print_trace locations rest
     | Alpha_environment.Ecoproto_error Cannot_serialize_error :: rest ->
         Format.fprintf ppf
-          "Error too big to serialize using the provided gas bounds." ;
+          "Error too big to serialize within the provided gas bounds." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Cannot_serialize_storage :: rest ->
+        Format.fprintf ppf
+          "Cannot serialize the resulting storage value within the provided gas bounds." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Missing_field prim) :: rest ->
