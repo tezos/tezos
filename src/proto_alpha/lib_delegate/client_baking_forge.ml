@@ -171,7 +171,12 @@ let sort_manager_operations
   return
     (List.sort (fun (_, (_, _, w)) (_, (_, _, w')) -> Q.compare w' w) operations)
 
-let retain_operations_up_to_quota operations max_quota =
+let retain_operations_up_to_quota operations quota =
+  let { T.max_op ; max_size } = quota in
+  let operations = match max_op with
+    | Some n -> List.sub operations n
+    | None -> operations
+  in
   let exception Full of packed_operation list in
   let operations = try
       List.fold_left (fun (ops, size) op ->
@@ -179,7 +184,7 @@ let retain_operations_up_to_quota operations max_quota =
             Data_encoding.Binary.length Alpha_context.Operation.encoding op
           in
           let new_size = size + operation_size in
-          if new_size > max_quota then
+          if new_size > max_size then
             raise (Full ops)
           else
             (op :: ops, new_size)
@@ -360,11 +365,11 @@ let forge_block cctxt ?(chain = `Main) block
       endorsers_per_block in
   let votes = retain_operations_up_to_quota
       (List.nth operations votes_index)
-      (List.nth quota votes_index).max_size in
+      (List.nth quota votes_index) in
   let anonymous =
     retain_operations_up_to_quota
       (List.nth operations anonymous_index)
-      (List.nth quota anonymous_index).max_size in
+      (List.nth quota anonymous_index) in
   (* Size/Gas check already occured in classify operations *)
   let managers = List.nth operations managers_index in
   let operations = [ endorsements ; votes ; anonymous ; managers ] in
@@ -588,9 +593,7 @@ let filter_and_apply_operations
         state.index <- index ;
         return inc
   end  >>=? fun initial_inc ->
-  let endorsements = List.nth operations endorsements_index
-
-  in
+  let endorsements = List.nth operations endorsements_index in
   let votes = List.nth operations votes_index in
   let anonymous = List.nth operations anonymous_index in
   let managers = List.nth operations managers_index in
@@ -645,11 +648,11 @@ let filter_and_apply_operations
   let votes =
     retain_operations_up_to_quota
       (List.rev votes)
-      (List.nth quota votes_index).max_size in
+      (List.nth quota votes_index) in
   let anonymous =
     retain_operations_up_to_quota
       (List.rev anonymous)
-      (List.nth quota anonymous_index).max_size in
+      (List.nth quota anonymous_index) in
   trim_manager_operations ~max_size:(List.nth quota managers_index).max_size
     ~hard_gas_limit_per_block managers >>=? fun (accepted_managers, _overflowing_managers) ->
   (* Retrieve the correct index order *)
