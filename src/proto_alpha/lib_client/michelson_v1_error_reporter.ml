@@ -185,23 +185,33 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         Format.fprintf ppf
           "@[<v 0>Not enough gas to deserialize the operation.@,\
            Injecting such a transaction could have you banned from mempools.@]" ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Cannot_serialize_error :: rest ->
+        Format.fprintf ppf
+          "Error too big to serialize using the provided gas bounds." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Missing_field prim) :: rest ->
         Format.fprintf ppf "@[<v 0>Missing contract field: %s@]"
           (Michelson_v1_primitives.string_of_prim prim) ;
+        if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Duplicate_field (loc, prim)) :: rest ->
         Format.fprintf ppf "@[<v 0>%aduplicate contract field: %s@]"
           print_loc loc
           (Michelson_v1_primitives.string_of_prim prim) ;
+        if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Unexpected_big_map loc) :: rest ->
         Format.fprintf ppf "%abig_map type only allowed on the left of the toplevel storage pair"
           print_loc loc ;
+        if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Unexpected_operation loc) :: rest ->
         Format.fprintf ppf "%aoperation type forbidden in parameter, storage and constants"
           print_loc loc ;
+        if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Runtime_contract_error (contract, expr)) :: rest ->
         let parsed =
