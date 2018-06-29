@@ -425,24 +425,18 @@ let broadcast_bootstrap_msg pool =
 
 (* this function duplicates bit of code from the modules below to avoid
    creating mutually recurvive modules *)
+let connection_of_peer_id pool peer_id =
+  Option.apply
+    (P2p_peer.Table.find_opt pool.known_peer_ids peer_id) ~f:begin fun p ->
+    match P2p_peer_state.get p with
+    | Running { data } -> Some data
+    | _ -> None
+  end
+
 let get_addr pool peer_id =
-  let info peer_id =
-    try Some (P2p_peer.Table.find pool.known_peer_ids peer_id)
-    with Not_found -> None
-  in
-  let find_by_peer_id peer_id =
-    Option.apply
-      (info peer_id)
-      ~f:(fun p ->
-          match P2p_peer_state.get p with
-          | Running { data } -> Some data
-          | _ -> None)
-  in
-  match find_by_peer_id peer_id with
-  | None -> None
-  | Some ci ->
-      let info = P2p_socket.info ci.conn in
-      Some(info.id_point)
+  Option.map (connection_of_peer_id pool peer_id) ~f:begin fun ci ->
+    (P2p_socket.info ci.conn).id_point
+  end
 
 module Points = struct
 
@@ -532,7 +526,12 @@ module Peers = struct
   let ban pool peer =
     Option.iter (get_addr pool peer) ~f:begin fun point ->
       Points.ban pool point ;
-      P2p_acl.PeerBlacklist.add pool.acl peer
+      P2p_acl.PeerBlacklist.add pool.acl peer ;
+    end ;
+    (* Kick [peer] if it is in `Running` state. *)
+    Option.iter (connection_of_peer_id pool peer) ~f:begin fun conn ->
+      conn.wait_close <- false ;
+      Lwt.async (fun () -> Answerer.shutdown (Lazy.force conn.answerer))
     end
 
   let trust pool peer =
