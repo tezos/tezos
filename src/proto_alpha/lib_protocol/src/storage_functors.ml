@@ -389,7 +389,6 @@ module Make_indexed_carbonated_data_storage
     | None -> remove s i
     | Some v -> init_set s i v
 
-  let data_name = "TODO remove" (* This is some rebasing artefact and should be removed *)
   let fold_keys_unaccounted s ~init ~f =
     let rec dig i path acc =
       if Compare.Int.(i <= 1) then
