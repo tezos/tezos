@@ -140,17 +140,22 @@ let build_raw_rpc_directory
   end ;
 
   register1 S.Operations.operations_in_pass begin fun block i () () ->
-    State.Block.operations block i >>= fun (ops, _path) ->
-    State.Block.operations_metadata block i >>= fun metadata ->
     let chain_id = State.Block.chain_id block in
-    return (List.map2 (convert chain_id) ops metadata)
+    try
+      State.Block.operations block i >>= fun (ops, _path) ->
+      State.Block.operations_metadata block i >>= fun metadata ->
+      return (List.map2 (convert chain_id) ops metadata)
+    with _ -> Lwt.fail Not_found
   end ;
 
   register2 S.Operations.operation begin fun block i j () () ->
-    State.Block.operations block i >>= fun (ops, _path) ->
-    State.Block.operations_metadata block i >>= fun metadata ->
     let chain_id = State.Block.chain_id block in
-    return (convert chain_id (List.nth ops j) (List.nth metadata j))
+    begin try
+        State.Block.operations block i >>= fun (ops, _path) ->
+        State.Block.operations_metadata block i >>= fun metadata ->
+        Lwt.return (List.nth ops j, List.nth metadata j)
+      with _ -> Lwt.fail Not_found end >>= fun (op, md) ->
+    return (convert chain_id op md)
   end ;
 
   (* operation_hashes *)
@@ -165,8 +170,11 @@ let build_raw_rpc_directory
   end ;
 
   register2 S.Operation_hashes.operation_hash begin fun block i j () () ->
-    State.Block.operation_hashes block i >>= fun (ops, _) ->
-    return (List.nth ops j)
+    begin try
+        State.Block.operation_hashes block i >>= fun (ops, _) ->
+        Lwt.return (List.nth ops j)
+      with _ -> Lwt.fail Not_found end >>= fun op ->
+    return op
   end ;
 
   (* context *)
