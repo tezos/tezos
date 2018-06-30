@@ -16,7 +16,7 @@ type nonce = MBytes.t
 
 let nonce_encoding = Data_encoding.Fixed.bytes Constants_repr.nonce_length
 
-let init = "1234567890123456789012"
+let init = "Laissez-faire les proprietaires."
 let zero_bytes = MBytes.of_string (String.make Nonce_hash.size '\000')
 
 let state_hash_encoding =

@@ -37,8 +37,7 @@ let init_contract ~typecheck ctxt
 let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
   let nonce =
     Operation_hash.hash_bytes
-      (* FIXME: change this nonce before lunch *)
-      [ MBytes.of_string "ZERONET_INIT_ORIGINATION_NONCE" ] in
+      [ MBytes.of_string "Un festival de GADT." ] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
   fold_left_s init_account ctxt accounts >>=? fun ctxt ->
   fold_left_s (init_contract ~typecheck) ctxt contracts >>=? fun ctxt ->
