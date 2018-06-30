@@ -681,7 +681,8 @@ let mark_backtracked results =
                            operation_result =
                              mark_manager_operation_result op.operation_result ;
                            internal_operation_results =
-                             List.map mark_internal_operation_results op.internal_operation_results}, rest)
+                             List.map mark_internal_operation_results op.internal_operation_results},
+                       mark_contents_list rest)
   and mark_internal_operation_results (Internal_operation_result (kind, result)) =
     (Internal_operation_result (kind, mark_manager_operation_result result))
   and mark_manager_operation_result
