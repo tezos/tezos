@@ -209,6 +209,13 @@ assert_storage $contract_dir/loop_left.tz '{""}' '{ "c" ; "b" ; "a" }' '{ "a" ; 
 assert_storage $contract_dir/exec_concat.tz '"?"' '""' '"_abc"'
 assert_storage $contract_dir/exec_concat.tz '"?"' '"test"' '"test_abc"'
 
+# Test PACK/UNPACK and binary format
+assert_success $client run script $contract_dir/packunpack.tz on storage Unit and input \
+               '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003)'
+
+assert_fails $client run script $contract_dir/packunpack.tz on storage Unit and input \
+               '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)'
+
 # Get current steps to quota
 assert_storage $contract_dir/steps_to_quota.tz 111 Unit 399813
 
