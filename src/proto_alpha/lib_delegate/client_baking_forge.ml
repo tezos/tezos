@@ -212,7 +212,20 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block manager_operatio
 
 (* We classify operations, sort managers operation by interest and add bad ones at the end *)
 (* Hypothesis : we suppose that the received manager operations have a valid gas_limit *)
-let classify_operations ~hard_gas_limit_per_block ?threshold (ops: Proto_alpha.operation list) =
+let classify_operations
+    (cctxt : #Proto_alpha.full)
+    ?threshold
+    ~block
+    ~hard_gas_limit_per_block
+    (ops: Proto_alpha.operation list) =
+  Alpha_block_services.live_blocks cctxt ~chain:`Main ~block ()
+  >>=? fun live_blocks ->
+  (* Remove operations that are too old for the mempool *)
+  let ops =
+    List.filter (fun { shell = { branch } } ->
+        Block_hash.Set.mem branch live_blocks
+      ) ops
+  in
   let t = Array.make (List.length Proto_alpha.Main.validation_passes) [] in
   List.iter
     (fun (op: Proto_alpha.operation) ->
@@ -251,11 +264,10 @@ let forge (op : Operation.packed) : Operation.raw =
   }
 
 let ops_of_mempool (ops : Alpha_block_services.Mempool.t) =
+  (* We only retain the applied, unprocessed and delayed operations *)
   List.rev (
     Operation_hash.Map.fold (fun _ op acc -> op :: acc) ops.unprocessed @@
     Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.branch_delayed @@
-    Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.branch_refused @@
-    Operation_hash.Map.fold (fun _ (op, _) acc -> op :: acc) ops.refused @@
     List.rev_map (fun (_, op) -> op) ops.applied
   )
 
@@ -357,7 +369,7 @@ let forge_block cctxt ?(chain = `Main) block
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   Alpha_services.Constants.all cctxt (`Main, block) >>=?
   fun Constants.{ parametric = { hard_gas_limit_per_block ; endorsers_per_block } } ->
-  classify_operations ~hard_gas_limit_per_block ?threshold operations_arg >>=? fun operations ->
+  classify_operations cctxt ~hard_gas_limit_per_block ~block:block ?threshold operations_arg >>=? fun operations ->
   (* Ensure that we retain operations up to the quota *)
   let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
   let endorsements = List.sub
@@ -754,7 +766,7 @@ let bake_slot
     else
       None in
   tzforce state.constants >>=? fun Constants.{ parametric = { hard_gas_limit_per_block } } ->
-  classify_operations ?threshold ~hard_gas_limit_per_block operations >>=? fun operations ->
+  classify_operations cctxt ?threshold ~hard_gas_limit_per_block ~block operations >>=? fun operations ->
   (* Don't load an alpha context if the chain is still in genesis *)
   if Protocol_hash.(Proto_alpha.hash <> bi.next_protocol) then
     (* Delegate validation to shell *)

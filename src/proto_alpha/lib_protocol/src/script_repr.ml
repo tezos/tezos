@@ -109,29 +109,32 @@ let rec node_size node =
 let expr_size expr =
   node_size (Micheline.root expr)
 
-let traversal_cost expr =
-  let blocks, _words = expr_size expr in
+let traversal_cost node =
+  let blocks, _words = node_size node in
   Gas_limit_repr.step_cost blocks
 
-let node_cost (blocks, words) =
+let cost_of_size (blocks, words) =
   let open Gas_limit_repr in
   ((Compare.Int.max 0 (blocks - 1)) *@ alloc_cost 0) +@
   alloc_cost words +@
   step_cost blocks
 
-let int_node_cost n = node_cost (int_node_size n)
-let int_node_cost_of_numbits n = node_cost (int_node_size_of_numbits n)
-let string_node_cost s = node_cost (string_node_size s)
-let string_node_cost_of_length s = node_cost (string_node_size_of_length s)
-let bytes_node_cost s = node_cost (bytes_node_size s)
-let bytes_node_cost_of_length s = node_cost (bytes_node_size_of_length s)
-let prim_node_cost_nonrec args annot = node_cost (prim_node_size_nonrec args annot)
-let prim_node_cost_nonrec_of_length n_args annot = node_cost (prim_node_size_nonrec_of_lengths n_args annot)
-let seq_node_cost_nonrec args = node_cost (seq_node_size_nonrec args)
-let seq_node_cost_nonrec_of_length n_args = node_cost (seq_node_size_nonrec_of_length n_args)
+let node_cost node =
+  cost_of_size (node_size node)
+
+let int_node_cost n = cost_of_size (int_node_size n)
+let int_node_cost_of_numbits n = cost_of_size (int_node_size_of_numbits n)
+let string_node_cost s = cost_of_size (string_node_size s)
+let string_node_cost_of_length s = cost_of_size (string_node_size_of_length s)
+let bytes_node_cost s = cost_of_size (bytes_node_size s)
+let bytes_node_cost_of_length s = cost_of_size (bytes_node_size_of_length s)
+let prim_node_cost_nonrec args annot = cost_of_size (prim_node_size_nonrec args annot)
+let prim_node_cost_nonrec_of_length n_args annot = cost_of_size (prim_node_size_nonrec_of_lengths n_args annot)
+let seq_node_cost_nonrec args = cost_of_size (seq_node_size_nonrec args)
+let seq_node_cost_nonrec_of_length n_args = cost_of_size (seq_node_size_nonrec_of_length n_args)
 
 let deserialized_cost expr =
-  node_cost (expr_size expr)
+  cost_of_size (expr_size expr)
 
 let serialized_cost bytes =
   let open Gas_limit_repr in
@@ -163,7 +166,7 @@ let force_bytes expr =
   match Data_encoding.force_bytes expr with
   | bytes ->
       begin match account_serialization_cost with
-        | Some v -> ok (bytes, traversal_cost v +@ serialized_cost bytes)
+        | Some v -> ok (bytes, traversal_cost (Micheline.root v) +@ serialized_cost bytes)
         | None -> ok (bytes, Gas_limit_repr.free)
       end
   | exception _ -> error Lazy_script_decode

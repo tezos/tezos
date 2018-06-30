@@ -34,6 +34,8 @@ val encoding : t Data_encoding.encoding
 val deserialized_cost : expr -> Gas_limit_repr.cost
 
 val serialized_cost : MBytes.t -> Gas_limit_repr.cost
+val traversal_cost : node -> Gas_limit_repr.cost
+val node_cost : node -> Gas_limit_repr.cost
 
 val int_node_cost : Z.t -> Gas_limit_repr.cost
 val int_node_cost_of_numbits : int -> Gas_limit_repr.cost
