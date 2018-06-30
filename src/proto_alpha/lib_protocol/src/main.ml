@@ -52,7 +52,7 @@ let validation_passes =
     Alpha_context.Constants.max_revelations_per_block +
     (* allow 100 wallet activations or denunciations per block *) 100 in
   Updater.[ { max_size = 32 * 1024 ; max_op = Some 32 } ; (* 32 endorsements *)
-            { max_size = 64 * 1024 ; max_op = None } ; (* 64k of voting operations *)
+            { max_size = 32 * 1024 ; max_op = None } ; (* 32k of voting operations *)
             { max_size = max_anonymous_operations * 1024 ;
               max_op = Some max_anonymous_operations } ;
             { max_size = 512 * 1024 ; max_op = None } ] (* 512kB *)

@@ -80,12 +80,12 @@ let default = {
   blocks_per_roll_snapshot = 256l ;
   blocks_per_voting_period = 32768l ;
   time_between_blocks =
-    List.map Period_repr.of_seconds_exn [ 60L ] ;
+    List.map Period_repr.of_seconds_exn [ 60L ; 75L ] ;
   endorsers_per_block = 32 ;
   hard_gas_limit_per_operation = Z.of_int 400_000 ;
   hard_gas_limit_per_block = Z.of_int 4_000_000 ;
   proof_of_work_threshold =
-    Int64.(sub (shift_left 1L 56) 1L) ;
+    Int64.(sub (shift_left 1L 46) 1L) ;
   tokens_per_roll =
     Tez_repr.(mul_exn one 10_000) ;
   michelson_maximum_type_size = 1000 ;
