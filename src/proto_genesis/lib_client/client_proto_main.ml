@@ -101,5 +101,5 @@ let commands () =
   ]
 
 let () =
-  Client_commands.register protocol @@
+  Client_commands.register protocol @@ fun _network ->
   commands ()

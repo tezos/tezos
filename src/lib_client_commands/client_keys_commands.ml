@@ -279,30 +279,32 @@ let commands version : Client_context.io_wallet Clic.command list =
            "Tezos address added: %a"
            Signature.Public_key_hash.pp pkh >>= fun () ->
          register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name) ;
-
-    command ~group ~desc: "Add a fundraiser secret key to the wallet."
-      (args1 (Secret_key.force_switch ()))
-      (prefix "import"
-       @@ prefixes [ "fundraiser" ; "secret" ; "key" ]
-       @@ Secret_key.fresh_alias_param
-       @@ stop)
-      (fun force name (cctxt : Client_context.io_wallet) ->
-         Secret_key.of_fresh cctxt force name >>=? fun name ->
-         input_fundraiser_params cctxt >>=? fun sk ->
-         Tezos_signer_backends.Encrypted.encrypt cctxt sk >>=? fun sk_uri ->
-         Client_keys.neuterize sk_uri >>=? fun pk_uri ->
-         begin
-           Public_key.find_opt cctxt name >>=? function
-           | None -> return_unit
-           | Some (pk_uri_found, _) ->
-               fail_unless (pk_uri = pk_uri_found || force)
-                 (failure
-                    "public and secret keys '%s' don't correspond, \
-                     please don't use --force" name)
-         end >>=? fun () ->
-         Client_keys.public_key_hash pk_uri >>=? fun (pkh, _public_key) ->
-         register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
-
+  ] @
+  (if version <> (Some `Betanet) then [] else [
+      command ~group ~desc: "Add a fundraiser secret key to the wallet."
+        (args1 (Secret_key.force_switch ()))
+        (prefix "import"
+         @@ prefixes [ "fundraiser" ; "secret" ; "key" ]
+         @@ Secret_key.fresh_alias_param
+         @@ stop)
+        (fun force name (cctxt : Client_context.io_wallet) ->
+           Secret_key.of_fresh cctxt force name >>=? fun name ->
+           input_fundraiser_params cctxt >>=? fun sk ->
+           Tezos_signer_backends.Encrypted.encrypt cctxt sk >>=? fun sk_uri ->
+           Client_keys.neuterize sk_uri >>=? fun pk_uri ->
+           begin
+             Public_key.find_opt cctxt name >>=? function
+             | None -> return_unit
+             | Some (pk_uri_found, _) ->
+                 fail_unless (pk_uri = pk_uri_found || force)
+                   (failure
+                      "public and secret keys '%s' don't correspond, \
+                       please don't use --force" name)
+           end >>=? fun () ->
+           Client_keys.public_key_hash pk_uri >>=? fun (pkh, _public_key) ->
+           register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ;
+    ]) @
+  [
     command ~group ~desc: "Add a public key to the wallet."
       (args1 (Public_key.force_switch ()))
       (prefix "import"

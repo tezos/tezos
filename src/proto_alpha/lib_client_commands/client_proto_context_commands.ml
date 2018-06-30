@@ -58,7 +58,7 @@ let binary_description =
   { Clic.name = "description" ;
     title = "Binary Description" }
 
-let commands () =
+let commands version () =
   let open Clic in
   [
     command ~group ~desc: "Access the timestamp of the block."
@@ -342,55 +342,58 @@ let commands () =
           ~fee ~manager_sk:src_sk src_pk >>=? fun _res ->
         return_unit
       end;
-
-    command ~group ~desc:"Register and activate an Alphanet/Zeronet faucet account."
-      (args2
-         (Secret_key.force_switch ())
-         encrypted_switch)
-      (prefixes [ "activate" ; "account" ]
-       @@ Secret_key.fresh_alias_param
-       @@ prefixes [ "with" ]
-       @@ param ~name:"activation_key"
-         ~desc:"Activate an Alphanet/Zeronet faucet account from the doanloaded JSON file."
-         file_parameter
-       @@ stop)
-      (fun (force, encrypted) name activation_key_file cctxt ->
-         Secret_key.of_fresh cctxt force name >>=? fun name ->
-         Lwt_utils_unix.Json.read_file activation_key_file >>=? fun json ->
-         match Data_encoding.Json.destruct
-                 Client_proto_context.activation_key_encoding
-                 json with
-         | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
-             Format.kasprintf (fun s -> failwith "%s" s)
-               "Invalid activation file: %a %a"
-               (fun ppf -> Data_encoding.Json.print_error ppf) exn
-               Data_encoding.Json.pp json
-         | key ->
-             activate_account cctxt
-               ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
-               ~encrypted ~force key name >>=? fun _res ->
-             return_unit
-      );
-
-    command ~group ~desc:"Activate a fundraiser account."
-      (args1 dry_run_switch)
-      (prefixes [ "activate" ; "fundraiser" ; "account" ]
-       @@ Public_key_hash.alias_param
-       @@ prefixes [ "with" ]
-       @@ param ~name:"code"
-         (Clic.parameter (fun _ctx code ->
-              protect (fun () ->
-                  return (Blinded_public_key_hash.activation_code_of_hex code))))
-         ~desc:"Activation code obtained from the Tezos foundation."
-       @@ stop)
-      (fun dry_run (name, _pkh) code cctxt ->
-         activate_existing_account cctxt ~chain:`Main
-           ~block:cctxt#block ?confirmations:cctxt#confirmations
-           ~dry_run
-           name code >>=? fun _res ->
-         return_unit
-      );
-
+  ] @
+  (if version = (Some `Betanet) then [] else [
+      command ~group ~desc:"Register and activate an Alphanet/Zeronet faucet account."
+        (args2
+           (Secret_key.force_switch ())
+           encrypted_switch)
+        (prefixes [ "activate" ; "account" ]
+         @@ Secret_key.fresh_alias_param
+         @@ prefixes [ "with" ]
+         @@ param ~name:"activation_key"
+           ~desc:"Activate an Alphanet/Zeronet faucet account from the downloaded JSON file."
+           file_parameter
+         @@ stop)
+        (fun (force, encrypted) name activation_key_file cctxt ->
+           Secret_key.of_fresh cctxt force name >>=? fun name ->
+           Lwt_utils_unix.Json.read_file activation_key_file >>=? fun json ->
+           match Data_encoding.Json.destruct
+                   Client_proto_context.activation_key_encoding
+                   json with
+           | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
+               Format.kasprintf (fun s -> failwith "%s" s)
+                 "Invalid activation file: %a %a"
+                 (fun ppf -> Data_encoding.Json.print_error ppf) exn
+                 Data_encoding.Json.pp json
+           | key ->
+               activate_account cctxt
+                 ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+                 ~encrypted ~force key name >>=? fun _res ->
+               return_unit
+        );
+    ]) @
+  (if version <> Some `Betanet then [] else [
+      command ~group ~desc:"Activate a fundraiser account."
+        (args1 dry_run_switch)
+        (prefixes [ "activate" ; "fundraiser" ; "account" ]
+         @@ Public_key_hash.alias_param
+         @@ prefixes [ "with" ]
+         @@ param ~name:"code"
+           (Clic.parameter (fun _ctx code ->
+                protect (fun () ->
+                    return (Blinded_public_key_hash.activation_code_of_hex code))))
+           ~desc:"Activation code obtained from the Tezos foundation."
+         @@ stop)
+        (fun dry_run (name, _pkh) code cctxt ->
+           activate_existing_account cctxt ~chain:`Main
+             ~block:cctxt#block ?confirmations:cctxt#confirmations
+             ~dry_run
+             name code >>=? fun _res ->
+           return_unit
+        );
+    ]) @
+  [
     command ~desc:"Wait until an operation is included in a block"
       (let int_param =
          parameter

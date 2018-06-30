@@ -75,7 +75,7 @@ let sandbox () =
       \    Do @{<warning>NOT@} use your fundraiser keys on this network.@,\
        You should not see this message if you are not a developer.@]@\n@."
 
-let check_version ctxt =
+let check_network ctxt =
   Shell_services.P2p.versions ctxt >>= function
   | Error _ ->
       default () ;
@@ -98,12 +98,12 @@ let check_version ctxt =
           default () ;
           Lwt.return_none
 
-let get_commands_for_version ctxt block protocol =
+let get_commands_for_version ctxt network block protocol =
   Shell_services.Blocks.protocols ctxt ~block () >>= function
   | Ok { next_protocol = version } -> begin
       match protocol with
       | None ->
-          return (Some version, Client_commands.commands_for_version version)
+          return (Some version, Client_commands.commands_for_version version network)
       | Some given_version -> begin
           if not (Protocol_hash.equal version given_version) then
             Format.eprintf
@@ -112,7 +112,7 @@ let get_commands_for_version ctxt block protocol =
                is not the one retrieved from the node (%a).@]@\n@."
               Protocol_hash.pp_short given_version
               Protocol_hash.pp_short version ;
-          return (Some version, Client_commands.commands_for_version given_version)
+          return (Some version, Client_commands.commands_for_version given_version network)
         end
     end
   | Error errs -> begin
@@ -125,18 +125,18 @@ let get_commands_for_version ctxt block protocol =
           return (None, [])
         end
       | Some version ->
-          return (Some version, Client_commands.commands_for_version version)
+          return (Some version, Client_commands.commands_for_version version network)
     end
 
 let select_commands ctxt { block ; protocol } =
-  check_version ctxt >>= fun version ->
-  get_commands_for_version ctxt block protocol >>|? fun (_, commands_for_version)  ->
+  check_network ctxt >>= fun network ->
+  get_commands_for_version ctxt network block protocol >>|? fun (_, commands_for_version)  ->
   Client_rpc_commands.commands @
   List.map
     (Clic.map_command
        (fun (o : Client_context.full) -> (o :> Client_context.io_wallet)))
     (Tezos_signer_backends.Ledger.commands () @
-     Client_keys_commands.commands version) @
+     Client_keys_commands.commands network) @
   Client_helpers_commands.commands () @
   commands_for_version
 
