@@ -57,10 +57,10 @@ module Id = struct
     if len = 0 then
       ("", "")
     else if s.[0] = '[' then begin (* inline IPv6 *)
-      match String.rindex s ']' with
-      | exception Not_found ->
+      match String.rindex_opt s ']' with
+      | None ->
           invalid_arg "Utils.parse_addr_port (missing ']')"
-      | pos ->
+      | Some pos ->
           let addr = String.sub s 1 (pos - 1) in
           let port =
             if pos = len - 1 then
@@ -72,10 +72,10 @@ module Id = struct
           check_port port ;
           addr, port
     end else begin
-      match String.rindex s ']' with
-      | _pos ->
+      match String.rindex_opt s ']' with
+      | Some _pos ->
           invalid_arg "Utils.parse_addr_port (unexpected char ']')"
-      | exception Not_found ->
+      | None ->
           match String.index s ':' with
           | exception _ -> s, ""
           | pos ->

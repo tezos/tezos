@@ -272,18 +272,16 @@ let group_commands commands =
     List.fold_left
       (fun (grouped, ungrouped) (Ex (Command { group ; _ }) as command) ->
          match group with
-         | None ->
-             (grouped, command :: ungrouped)
+         | None -> (grouped, command :: ungrouped)
          | Some group ->
-             try
-               let ({ title ; _ }, r) =
-                 List.find (fun ({ name ; _ }, _) -> group.name = name) grouped in
-               if title <> group.title then
-                 invalid_arg "Clic.usage: duplicate group name" ;
-               r := command :: !r ;
-               (grouped, ungrouped)
-             with Not_found ->
-               ((group, ref [ command ]) :: grouped, ungrouped))
+             match
+               List.find_opt (fun ({ name ; _ }, _) -> group.name = name) grouped with
+             | None -> ((group, ref [ command ]) :: grouped, ungrouped)
+             | Some ({ title ; _ }, r) ->
+                 if title <> group.title then
+                   invalid_arg "Clic.usage: duplicate group name" ;
+                 r := command :: !r ;
+                 (grouped, ungrouped))
       ([], [])
       commands in
   List.map (fun (g, c) -> (g, List.rev !c))
@@ -579,15 +577,15 @@ let parse_arg :
   fun ?command spec args_dict ctx ->
     match spec with
     | Arg { parameter = (long, _) ; kind = { converter ; _  } ; _ } ->
-        begin match TzString.Map.find long args_dict with
-          | exception Not_found -> return_none
-          | [] -> return_none
-          | [ s ] ->
+        begin match TzString.Map.find_opt long args_dict with
+          | None
+          | Some [] -> return_none
+          | Some [ s ] ->
               (trace
                  (Bad_option_argument ("--" ^ long, command))
                  (converter ctx s)) >>|? fun x ->
               Some x
-          | _ :: _ ->
+          | Some (_ :: _) ->
               fail (Multiple_occurences ("--" ^ long, command))
         end
     | DefArg { parameter = (long, _) ; kind = { converter ; _ } ; default ; _ } ->
@@ -599,22 +597,22 @@ let parse_arg :
                 (Format.sprintf
                    "Value provided as default for '%s' could not be parsed by converter function."
                    long) end >>=? fun default ->
-        begin match TzString.Map.find long args_dict with
-          | exception Not_found -> return default
-          | [] -> return default
-          | [ s ] ->
+        begin match TzString.Map.find_opt long args_dict with
+          | None
+          | Some [] -> return default
+          | Some [ s ] ->
               (trace
                  (Bad_option_argument (long, command))
                  (converter ctx s))
-          | _ :: _ ->
+          | Some (_ :: _) ->
               fail (Multiple_occurences (long, command))
         end
     | Switch { parameter = (long, _) ; _ } ->
-        begin match TzString.Map.find long args_dict with
-          | exception Not_found -> return_false
-          | [] -> return_false
-          | [ _ ] -> return_true
-          | _ :: _ -> fail (Multiple_occurences (long, command))
+        begin match TzString.Map.find_opt long args_dict with
+          | None
+          | Some [] -> return_false
+          | Some [ _ ] -> return_true
+          | Some (_ :: _) -> fail (Multiple_occurences (long, command))
         end
     | Constant c -> return c
 
@@ -656,8 +654,9 @@ let check_help_flag ?command = function
   | _ -> return_unit
 
 let add_occurrence long value acc =
-  try TzString.Map.add long (TzString.Map.find long acc) acc
-  with Not_found -> TzString.Map.add long [ value ] acc
+  match TzString.Map.find_opt long acc with
+  | Some v -> TzString.Map.add long v acc
+  | None -> TzString.Map.add long [ value ] acc
 
 let make_args_dict_consume ?command spec args =
   let rec make_args_dict completing arities acc args =

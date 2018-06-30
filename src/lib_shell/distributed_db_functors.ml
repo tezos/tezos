@@ -75,6 +75,7 @@ module type MEMORY_TABLE = sig
   type key
   val create: int -> 'a t
   val find: 'a t -> key -> 'a
+  val find_opt: 'a t -> key -> 'a option
   val add: 'a t -> key -> 'a -> unit
   val replace: 'a t -> key -> 'a -> unit
   val remove: 'a t -> key -> unit
@@ -143,22 +144,22 @@ end = struct
     | Found of value
 
   let known s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> Disk_table.known s.disk k
-    | Pending _ -> Lwt.return_false
-    | Found _ -> Lwt.return_true
+    match Memory_table.find_opt s.memory k with
+    | None -> Disk_table.known s.disk k
+    | Some (Pending _) -> Lwt.return_false
+    | Some (Found _) -> Lwt.return_true
 
   let read_opt s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> Disk_table.read_opt s.disk k
-    | Found v -> Lwt.return_some v
-    | Pending _ -> Lwt.return_none
+    match Memory_table.find_opt s.memory k with
+    | None -> Disk_table.read_opt s.disk k
+    | Some (Found v) -> Lwt.return_some v
+    | Some (Pending _) -> Lwt.return_none
 
   let read_exn s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> Disk_table.read_exn s.disk k
-    | Found v -> Lwt.return v
-    | Pending _ -> Lwt.fail Not_found
+    match Memory_table.find_opt s.memory k with
+    | None -> Disk_table.read_exn s.disk k
+    | Some (Found v) -> Lwt.return v
+    | Some (Pending _) -> Lwt.fail Not_found
 
   type error += Missing_data of key
   type error += Canceled of key
@@ -200,20 +201,20 @@ end = struct
       (fun key -> Timeout key)
 
   let read s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found ->
+    match Memory_table.find_opt s.memory k with
+    | None ->
         trace (Missing_data k) @@
         Disk_table.read s.disk k
-    | Found v -> return v
-    | Pending _ -> fail (Missing_data k)
+    | Some (Found v) -> return v
+    | Some (Pending _) -> fail (Missing_data k)
 
   let wrap s k ?timeout t =
     let t = Lwt.protected t in
     Lwt.on_cancel t begin fun () ->
-      match Memory_table.find s.memory k with
-      | exception Not_found -> ()
-      | Found _ -> ()
-      | Pending data ->
+      match Memory_table.find_opt s.memory k with
+      | None -> ()
+      | Some (Found _) -> ()
+      | Some (Pending data) ->
           data.waiters <- data.waiters - 1 ;
           if data.waiters = 0 then begin
             Memory_table.remove s.memory k ;
@@ -228,37 +229,37 @@ end = struct
         Lwt.pick [ t ; timeout ]
 
   let fetch s ?peer ?timeout k param =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> begin
+    match Memory_table.find_opt s.memory k with
+    | None -> begin
         Disk_table.read_opt s.disk k >>= function
         | Some v -> return v
         | None ->
-            match Memory_table.find s.memory k with
-            | exception Not_found -> begin
+            match Memory_table.find_opt s.memory k with
+            | None -> begin
                 let waiter, wakener = Lwt.wait () in
                 Memory_table.add s.memory k
                   (Pending { waiter ; wakener ; waiters =  1 ; param }) ;
                 Scheduler.request s.scheduler peer k ;
                 wrap s k ?timeout waiter
               end
-            | Pending data ->
+            | Some (Pending data) ->
                 Scheduler.request s.scheduler peer k ;
                 data.waiters <- data.waiters + 1 ;
                 wrap s k ?timeout data.waiter
-            | Found v -> return v
+            | Some (Found v) -> return v
       end
-    | Pending data ->
+    | Some (Pending data) ->
         Scheduler.request s.scheduler peer k ;
         data.waiters <- data.waiters + 1 ;
         wrap s k ?timeout data.waiter
-    | Found v -> return v
+    | Some (Found v) -> return v
 
   let prefetch s ?peer ?timeout k param =
     try ignore (fetch s ?peer ?timeout k param) with _ -> ()
 
   let notify s p k v =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> begin
+    match Memory_table.find_opt s.memory k with
+    | None -> begin
         Disk_table.known s.disk k >>= function
         | true ->
             Scheduler.notify_duplicate s.scheduler p k ;
@@ -267,7 +268,7 @@ end = struct
             Scheduler.notify_unrequested s.scheduler p k ;
             Lwt.return_unit
       end
-    | Pending { wakener = w ; param } -> begin
+    | Some (Pending { wakener = w ; param }) -> begin
         match Precheck.precheck k param v with
         | None ->
             Scheduler.notify_invalid s.scheduler p k ;
@@ -281,13 +282,13 @@ end = struct
             Lwt_watcher.notify s.input (k, v) ;
             Lwt.return_unit
       end
-    | Found _ ->
+    | Some (Found _) ->
         Scheduler.notify_duplicate s.scheduler p k ;
         Lwt.return_unit
 
   let inject s k v =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> begin
+    match Memory_table.find_opt s.memory k with
+    | None -> begin
         Disk_table.known s.disk k >>= function
         | true ->
             Lwt.return_false
@@ -295,18 +296,18 @@ end = struct
             Memory_table.add s.memory k (Found v) ;
             Lwt.return_true
       end
-    | Pending _
-    | Found _ ->
+    | Some (Pending _)
+    | Some (Found _) ->
         Lwt.return_false
 
   let clear_or_cancel s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> ()
-    | Pending { wakener = w ; _ } ->
+    match Memory_table.find_opt s.memory k with
+    | None -> ()
+    | Some (Pending { wakener = w ; _ }) ->
         Scheduler.notify_cancelation s.scheduler k ;
         Memory_table.remove s.memory k ;
         Lwt.wakeup_later w (Error [Canceled k])
-    | Found _ -> Memory_table.remove s.memory k
+    | Some (Found _) -> Memory_table.remove s.memory k
 
   let watch s = Lwt_watcher.create_stream s.input
 
@@ -316,10 +317,10 @@ end = struct
     { scheduler ; disk ; memory ; input ; global_input }
 
   let pending s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> false
-    | Found _ -> false
-    | Pending _ -> true
+    match Memory_table.find_opt s.memory k with
+    | None -> false
+    | Some (Found _) -> false
+    | Some (Pending _) -> true
 
 end
 

@@ -86,20 +86,20 @@ let public_key (cctxt : #Client_context.wallet) pkh =
       -% t event "request_for_public_key"
       -% a Signature.Public_key_hash.Logging.tag pkh) >>= fun () ->
   Client_keys.list_keys cctxt >>=? fun all_keys ->
-  match List.find (fun (_, h, _, _) -> Signature.Public_key_hash.equal h pkh) all_keys with
-  | exception Not_found ->
+  match List.find_opt (fun (_, h, _, _) -> Signature.Public_key_hash.equal h pkh) all_keys with
+  | None ->
       log Tag.DSL.(fun f ->
           f "No public key found for hash %a"
           -% t event "not_found_public_key"
           -% a Signature.Public_key_hash.Logging.tag pkh) >>= fun () ->
       Lwt.fail Not_found
-  | (_, _, None, _) ->
+  | Some (_, _, None, _) ->
       log Tag.DSL.(fun f ->
           f "No public key found for hash %a"
           -% t event "not_found_public_key"
           -% a Signature.Public_key_hash.Logging.tag pkh) >>= fun () ->
       Lwt.fail Not_found
-  | (name, _, Some pk, _) ->
+  | Some (name, _, Some pk, _) ->
       log Tag.DSL.(fun f ->
           f "Found public key for hash %a (name: %s)"
           -% t event "found_public_key"

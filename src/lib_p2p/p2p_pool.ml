@@ -371,8 +371,8 @@ let gc_peer_ids ({ peer_meta_config = { score } ;
       log pool Gc_peer_ids
 
 let register_peer pool peer_id =
-  match P2p_peer.Table.find pool.known_peer_ids peer_id with
-  | exception Not_found ->
+  match P2p_peer.Table.find_opt pool.known_peer_ids peer_id with
+  | None ->
       Lwt_condition.broadcast pool.events.new_peer () ;
       let peer =
         P2p_peer_state.Info.create peer_id
@@ -383,7 +383,7 @@ let register_peer pool peer_id =
       P2p_peer.Table.add pool.known_peer_ids peer_id peer ;
       log pool (New_peer peer_id) ;
       peer
-  | peer -> peer
+  | Some peer -> peer
 
 
 (***************************************************************************)
