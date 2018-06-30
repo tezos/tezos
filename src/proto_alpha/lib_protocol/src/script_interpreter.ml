@@ -660,12 +660,8 @@ let rec interp
             logged_return (Item (contract, rest), ctxt)
         | Contract t, Item (contract, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.contract) >>=? fun ctxt ->
-            Contract.exists ctxt contract >>=? fun exists ->
-            if exists then
-              Script_ir_translator.parse_contract ctxt loc t contract >>=? fun (ctxt, contract) ->
-              logged_return (Item (Some contract, rest), ctxt)
-            else
-              logged_return (Item (None, rest), ctxt)
+            Script_ir_translator.parse_contract_for_script ctxt loc t contract >>=? fun (ctxt, maybe_contract) ->
+            logged_return (Item (maybe_contract, rest), ctxt)
         | Transfer_tokens,
           Item (p, Item (amount, Item ((tp, destination), rest))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.transfer) >>=? fun ctxt ->

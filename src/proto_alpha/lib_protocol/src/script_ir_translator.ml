@@ -2702,6 +2702,55 @@ and parse_contract
                let contract : arg typed_contract = (arg, contract) in
                ok (ctxt, contract))
 
+(* Same as the one above, but does not fail when the contact is missing or
+   if the expected type doesn't match the actual one. In that case None is
+   returned and some overapproximation of the typechecking gas is consumed.
+   This can still fail on gas exhaustion. *)
+and parse_contract_for_script
+  : type arg. context -> Script.location -> arg ty -> Contract.t ->
+    (context * arg typed_contract option) tzresult Lwt.t
+  = fun ctxt loc arg contract ->
+    Lwt.return @@ Gas.consume ctxt Typecheck_costs.contract_exists >>=? fun ctxt ->
+    Contract.exists ctxt contract >>=? function
+    | false -> return (ctxt, None)
+    | true ->
+        Lwt.return @@ Gas.consume ctxt Typecheck_costs.get_script >>=? fun ctxt ->
+        trace
+          (Invalid_contract (loc, contract)) @@
+        Contract.get_script ctxt contract >>=? fun (ctxt, script) -> match script with (* can only fail because of gas *)
+        | None ->
+            Lwt.return
+              (match ty_eq ctxt arg (Unit_t None) with
+               | Ok (Eq, ctxt) ->
+                   let contract : arg typed_contract = (arg, contract) in
+                   ok (ctxt, Some contract)
+               | Error _ ->
+                   Gas.consume ctxt Typecheck_costs.cycle >>? fun ctxt ->
+                   ok (ctxt, None))
+        | Some { code ; _ } ->
+            Script.force_decode ctxt code >>=? fun (code, ctxt) -> (* can only fail because of gas *)
+            Lwt.return
+              (match parse_toplevel code with
+               | Error _ -> error (Invalid_contract (loc, contract))
+               | Ok (arg_type, _, _) ->
+                   match parse_ty ctxt ~allow_big_map:false ~allow_operation:false arg_type with
+                   | Error _ ->
+                       error (Invalid_contract (loc, contract))
+                   | Ok (Ex_ty targ, ctxt) ->
+                       match
+                         (ty_eq ctxt targ arg >>? fun (Eq, ctxt) ->
+                          merge_types ctxt loc targ arg >>? fun (arg, ctxt) ->
+                          let contract : arg typed_contract = (arg, contract) in
+                          ok (ctxt, Some contract))
+                       with
+                       | Ok res -> ok res
+                       | Error _ ->
+                           (* overapproximation by checking if targ = targ,
+                              can only fail because of gas *)
+                           ty_eq ctxt targ targ >>? fun (Eq, ctxt) ->
+                           merge_types ctxt loc targ targ >>? fun (_, ctxt) ->
+                           ok (ctxt, None))
+
 and parse_toplevel
   : Script.expr -> (Script.node * Script.node * Script.node) tzresult
   = fun toplevel ->

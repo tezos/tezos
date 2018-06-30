@@ -303,6 +303,8 @@ module Script : sig
   val lazy_expr_encoding: lazy_expr Data_encoding.t
   val deserialized_cost : expr -> Gas.cost
   val serialized_cost : MBytes.t -> Gas.cost
+  val traversal_cost : node -> Gas.cost
+  val node_cost : node -> Gas.cost
   val int_node_cost : Z.t -> Gas.cost
   val int_node_cost_of_numbits : int -> Gas.cost
   val string_node_cost : string -> Gas.cost

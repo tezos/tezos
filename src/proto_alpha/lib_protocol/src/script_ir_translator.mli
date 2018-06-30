@@ -101,6 +101,10 @@ val parse_contract :
   context -> Script.location -> 'a Script_typed_ir.ty -> Contract.t ->
   (context * 'a Script_typed_ir.typed_contract) tzresult Lwt.t
 
+val parse_contract_for_script :
+  context -> Script.location -> 'a Script_typed_ir.ty -> Contract.t ->
+  (context * 'a Script_typed_ir.typed_contract option) tzresult Lwt.t
+
 val pack_data : context -> 'a Script_typed_ir.ty -> 'a -> (MBytes.t * context) tzresult Lwt.t
 val hash_data : context -> 'a Script_typed_ir.ty -> 'a -> (Script_expr_hash.t * context) tzresult Lwt.t
 
