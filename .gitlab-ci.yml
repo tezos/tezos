@@ -82,6 +82,7 @@ build:
     - master
     - alphanet
     - zeronet
+    - betanet
   script:
     - make all
     - make build-test
@@ -99,6 +100,7 @@ build:
     - master
     - alphanet
     - zeronet
+    - betanet
   dependencies:
     - build
 
@@ -552,6 +554,7 @@ publish:docker:minimal:
     - master
     - alphanet
     - zeronet
+    - betanet
   script:
     - ./scripts/ci/create_docker_image.build.sh
         "tezos_build" "${CI_COMMIT_REF_NAME}"
