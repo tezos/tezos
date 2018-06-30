@@ -177,7 +177,7 @@ contract_storage () {
 assert_storage_contains () {
     local CONTRACT_NAME="$1"
     local EXPECTED_STORAGE="$2"
-    contract_storage ${CONTRACT_NAME} | assert_in_output ${EXPECTED_STORAGE}
+    contract_storage ${CONTRACT_NAME} | assert_in_output "${EXPECTED_STORAGE}"
 }
 
 assert() {

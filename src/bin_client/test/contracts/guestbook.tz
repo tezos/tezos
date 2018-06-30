@@ -1,0 +1,10 @@
+parameter string;
+storage (map address (option string));
+
+code { UNPAIR @message @guestbook; SWAP;
+       DUP; SENDER; GET @previous_message;
+       ASSERT_SOME;
+       ASSERT_NONE;
+       SWAP; SOME; SOME; SENDER; UPDATE;
+       NIL operation;
+       PAIR }
