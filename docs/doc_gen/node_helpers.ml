@@ -31,7 +31,7 @@ let genesis : State.Chain.genesis = {
       "BLockGenesisGenesisGenesisGenesisGenesisa52f8bUWPcg" ;
   protocol =
     Protocol_hash.of_b58check_exn
-      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
+      "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" ;
 }
 
 let with_node f =

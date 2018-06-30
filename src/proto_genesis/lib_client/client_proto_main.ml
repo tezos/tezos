@@ -27,7 +27,7 @@ open Proto_genesis
 
 let protocol =
   Protocol_hash.of_b58check_exn
-    "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+    "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
 
 let bake cctxt ?(timestamp = Time.now ()) block command sk =
   let protocol_data = { command ; signature = Signature.zero } in
