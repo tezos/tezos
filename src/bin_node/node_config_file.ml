@@ -103,7 +103,7 @@ let default_p2p_limits : P2p.limits = {
 
 let default_p2p = {
   expected_pow = 26. ;
-  bootstrap_peers  = ["bootstrap.tezos.com"] ;
+  bootstrap_peers  = [] ;
   listen_addr  = Some ("[::]:" ^ string_of_int default_p2p_port) ;
   private_mode  = false ;
   limits = default_p2p_limits ;
