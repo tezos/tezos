@@ -31,14 +31,16 @@ module Secretbox = struct
     MBytes.fill cmsg '\x00' ;
     MBytes.blit msg 0 cmsg zerobytes msglen ;
     box ~key ~nonce ~msg:cmsg ~cmsg ;
-    cmsg
+    MBytes.sub cmsg boxzerobytes (msglen + zerobytes - boxzerobytes)
 
   let box_open key cmsg nonce =
     let cmsglen = MBytes.length cmsg in
-    let msg = MBytes.create cmsglen in
-    match box_open ~key ~nonce ~cmsg ~msg with
+    let msg = MBytes.create (cmsglen + boxzerobytes) in
+    MBytes.fill msg '\x00' ;
+    MBytes.blit cmsg 0 msg boxzerobytes cmsglen ;
+    match box_open ~key ~nonce ~cmsg:msg ~msg with
     | false -> None
-    | true -> Some (MBytes.sub msg zerobytes (cmsglen - zerobytes))
+    | true -> Some (MBytes.sub msg zerobytes (cmsglen - boxzerobytes))
 end
 
 module Public_key_hash = Blake2B.Make (Base58) (struct

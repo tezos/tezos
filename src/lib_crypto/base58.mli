@@ -31,6 +31,10 @@ module Prefix : sig
   val p256_public_key: string
   val p256_secret_key: string
   val p256_signature: string
+  val ed25519_encrypted_seed: string
+  val secp256k1_encrypted_secret_key: string
+  val p256_encrypted_secret_key: string
+
   val generic_signature: string
   val chain_id: string
 

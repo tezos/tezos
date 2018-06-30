@@ -67,7 +67,7 @@ let magic_bytes_arg =
                      is expected, separated by commas."))
 
 let commands base_dir require_auth =
-  Client_keys_commands.commands () @
+  Client_keys_commands.commands None @
   Tezos_signer_backends.Ledger.commands () @
   [ command ~group
       ~desc: "Launch a signer daemon over a TCP socket."

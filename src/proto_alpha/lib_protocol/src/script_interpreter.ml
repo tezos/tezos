@@ -641,19 +641,24 @@ let rec interp
             Script_ir_translator.pack_data ctxt t value >>=? fun (bytes, ctxt) ->
             logged_return (Item (bytes, rest), ctxt)
         | Unpack t, Item (bytes, rest) ->
-            begin match Data_encoding.Binary.of_bytes Script.lazy_expr_encoding bytes with
+            Lwt.return (Gas.check_enough ctxt (Script.serialized_cost bytes)) >>=? fun () ->
+            if Compare.Int.(MBytes.length bytes >= 1) &&
+               Compare.Int.(MBytes.get_uint8 bytes 0 = 0x05) then
+              let bytes = MBytes.sub bytes 1 (MBytes.length bytes - 1) in
+              match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
               | None ->
                   Lwt.return (Gas.consume ctxt (Interp_costs.unpack_failed bytes)) >>=? fun ctxt ->
                   logged_return (Item (None, rest), ctxt)
-              | Some lexpr ->
-                  (Script.force_decode ctxt lexpr >>=? fun (expr, ctxt) ->
-                   parse_data ctxt t (Micheline.root expr)) >>= function
+              | Some expr ->
+                  Lwt.return (Gas.consume ctxt (Script.deserialized_cost expr)) >>=? fun ctxt ->
+                  parse_data ctxt t (Micheline.root expr) >>= function
                   | Ok (value, ctxt) ->
                       logged_return (Item (Some value, rest), ctxt)
                   | Error _ignored ->
                       Lwt.return (Gas.consume ctxt (Interp_costs.unpack_failed bytes)) >>=? fun ctxt ->
                       logged_return (Item (None, rest), ctxt)
-            end
+            else
+              logged_return (Item (None, rest), ctxt)
         (* protocol *)
         | Address, Item ((_, contract), rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.address) >>=? fun ctxt ->

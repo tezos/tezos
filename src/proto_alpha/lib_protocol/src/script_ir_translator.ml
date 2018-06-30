@@ -1122,8 +1122,8 @@ and parse_ty :
         Gas.consume ctxt (Typecheck_costs.type_ 2) >|? fun ctxt ->
         Ex_ty (Union_t ((tl, left_constr), (tr, right_constr), ty_name)), ctxt
     | Prim (loc, T_lambda, [ uta; utr ], annot) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation uta >>? fun (Ex_ty ta, ctxt) ->
-        parse_ty ctxt ~allow_big_map:false ~allow_operation utr >>? fun (Ex_ty tr, ctxt) ->
+        parse_ty ctxt ~allow_big_map:false ~allow_operation:true uta >>? fun (Ex_ty ta, ctxt) ->
+        parse_ty ctxt ~allow_big_map:false ~allow_operation:true utr >>? fun (Ex_ty tr, ctxt) ->
         parse_type_annot loc annot >>? fun ty_name ->
         Gas.consume ctxt (Typecheck_costs.type_ 2) >|? fun ctxt ->
         Ex_ty (Lambda_t (ta, tr, ty_name)), ctxt

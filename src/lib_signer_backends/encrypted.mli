@@ -10,7 +10,7 @@
 module Make(C : sig val cctxt: Client_context.prompter end) : Client_keys.SIGNER
 
 val decrypt:
-  #Client_context.io_wallet ->
+  #Client_context.prompter ->
   ?name:string ->
   Client_keys.sk_uri -> Signature.secret_key tzresult Lwt.t
 
