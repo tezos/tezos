@@ -106,7 +106,7 @@ module Encodings = struct
   let secp256k1 =
     let open Libsecp256k1.External in
     let length =
-      Key.secret_bytes + Crypto_box.boxzerobytes +Raw.salt_len in
+      Key.secret_bytes + Crypto_box.boxzerobytes + Raw.salt_len in
     Base58.register_encoding
       ~prefix: Base58.Prefix.secp256k1_encrypted_secret_key
       ~length
@@ -155,11 +155,11 @@ let rec interactive_decrypt_loop
   | None ->
       interactive_decrypt_loop cctxt ?name ~encrypted_sk algo
 
-let rec noninteractice_decrypt_loop algo ~encrypted_sk = function
+let rec noninteractive_decrypt_loop algo ~encrypted_sk = function
   | [] -> return_none
   | password :: passwords ->
       Raw.decrypt algo ~password ~encrypted_sk >>=? function
-      | None -> noninteractice_decrypt_loop algo ~encrypted_sk passwords
+      | None -> noninteractive_decrypt_loop algo ~encrypted_sk passwords
       | Some sk -> return_some sk
 
 let decrypt_payload cctxt ?name encrypted_sk =
@@ -172,7 +172,7 @@ let decrypt_payload cctxt ?name encrypted_sk =
         return (Signature.P256, encrypted_sk)
     | _ -> failwith "Not a Base58Check-encoded encrypted key"
   end >>=? fun (algo, encrypted_sk) ->
-  noninteractice_decrypt_loop algo ~encrypted_sk !passwords >>=? function
+  noninteractive_decrypt_loop algo ~encrypted_sk !passwords >>=? function
   | Some sk -> return sk
   | None -> interactive_decrypt_loop cctxt ?name ~encrypted_sk algo
 
