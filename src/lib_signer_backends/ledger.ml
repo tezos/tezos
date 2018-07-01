@@ -148,10 +148,12 @@ module Ledger = struct
   let create ~device_info ~version ~of_curve ~of_pkh =
     { device_info ; version ; of_curve ; of_pkh }
 
-  let curves { Ledgerwallet_tezos.Version.minor ; patch ; _ } =
+  let curves { Ledgerwallet_tezos.Version.major ; minor ; patch ; _ } =
     let open Ledgerwallet_tezos in
-    Ed25519 :: Secp256k1 ::
-    (if minor > 0 && patch > 0 then [Secp256r1] else [])
+    match major, minor, patch with
+    | 0, 0, _
+    | 0, 1, 0 -> [ Ed25519 ; Secp256k1 ]
+    | _ -> [ Ed25519 ; Secp256k1 ; Secp256r1 ]
 
   let of_hidapi ?pkh device_info h =
     let find_ledgers version =
