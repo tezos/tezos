@@ -83,27 +83,48 @@ module Hash = struct
       finish st
   end
 
-  module SHA256 = Make(struct
-      (* state -> unit *)
-      external init : Bigstring.t -> unit =
-        "ml_Hacl_SHA2_256_init" [@@noalloc]
+  module SHA256 = struct
+    module H = Make(struct
+        (* state -> unit *)
+        external init : Bigstring.t -> unit =
+          "ml_Hacl_SHA2_256_init" [@@noalloc]
 
-      (* state -> data -> unit *)
-      external update : Bigstring.t -> Bigstring.t -> unit =
-        "ml_Hacl_SHA2_256_update" [@@noalloc]
+        (* state -> data -> unit *)
+        external update : Bigstring.t -> Bigstring.t -> unit =
+          "ml_Hacl_SHA2_256_update" [@@noalloc]
 
-      (* state -> data -> datalen -> unit *)
-      external update_last : Bigstring.t -> Bigstring.t -> int -> unit =
-        "ml_Hacl_SHA2_256_update_last" [@@noalloc]
+        (* state -> data -> datalen -> unit *)
+        external update_last : Bigstring.t -> Bigstring.t -> int -> unit =
+          "ml_Hacl_SHA2_256_update_last" [@@noalloc]
 
-      (* state -> hash *)
-      external finish : Bigstring.t -> Bigstring.t -> unit =
-        "ml_Hacl_SHA2_256_finish" [@@noalloc]
+        (* state -> hash *)
+        external finish : Bigstring.t -> Bigstring.t -> unit =
+          "ml_Hacl_SHA2_256_finish" [@@noalloc]
 
-      let bytes = 32
-      let blockbytes = 64
-      let statebytes = 137 * 4
-    end)
+        let bytes = 32
+        let blockbytes = 64
+        let statebytes = 137 * 4
+      end)
+    include H
+
+    module HMAC = struct
+      (* mac -> key -> data *)
+      external hmac :
+        Bigstring.t -> Bigstring.t -> Bigstring.t -> unit =
+        "ml_Hacl_HMAC_SHA2_256_hmac" [@@noalloc]
+
+      let write_hmac ~key ~msg buf =
+        if Bigstring.length buf < 32 then
+          invalid_arg (Printf.sprintf "Hash.write_hmac_sha156: invalid len \
+                                       %d" 32) ;
+        hmac buf key msg
+
+      let hmac ~key ~msg =
+        let buf = Bigstring.create 32 in
+        write_hmac ~key ~msg buf ;
+        buf
+    end
+  end
 
   module SHA512 = Make(struct
       (* state -> unit *)
@@ -127,23 +148,6 @@ module Hash = struct
       let statebytes = 169 * 8
     end)
 
-  module HMAC_SHA256 = struct
-    (* mac -> key -> data *)
-    external hmac :
-      Bigstring.t -> Bigstring.t -> Bigstring.t -> unit =
-      "ml_Hacl_HMAC_SHA2_256_hmac" [@@noalloc]
-
-    let write_hmac ~key ~msg buf =
-      if Bigstring.length buf < 32 then
-        invalid_arg (Printf.sprintf "Hash.write_hmac_sha156: invalid len \
-                                     %d" 32) ;
-      hmac buf key msg
-
-    let hmac ~key ~msg =
-      let buf = Bigstring.create 32 in
-      write_hmac ~key ~msg buf ;
-      buf
-  end
 end
 
 module Nonce = struct
