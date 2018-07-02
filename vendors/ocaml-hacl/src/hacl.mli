@@ -28,7 +28,7 @@ module Rand : sig
 end
 
 module Hash : sig
-  module SHA256 : sig
+  module type S = sig
     type state
 
     val bytes : int
@@ -55,32 +55,8 @@ module Hash : sig
     end
   end
 
-  module SHA512 : sig
-    type state
-
-    val bytes : int
-    val blockbytes : int
-    val statebytes : int
-
-    (** Incremental Interface *)
-
-    val init : unit -> state
-    val update : state -> Bigstring.t -> unit
-    val finish : state -> Bigstring.t
-
-    (** Direct Interface *)
-
-    val digest : Bigstring.t -> Bigstring.t
-
-    module HMAC : sig
-      val write :
-        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t -> unit
-      (** @raise [Invalid_argument] if argument is less than 32 bytes long *)
-
-      val digest :
-        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t
-    end
-  end
+  module SHA256 : S
+  module SHA512 : S
 end
 
 module Nonce : sig

@@ -32,7 +32,7 @@ module Rand = struct
 end
 
 module Hash = struct
-  module type S = sig
+  module type HASH = sig
     val init : Bigstring.t -> unit
     val update : Bigstring.t -> Bigstring.t -> unit
     val update_last : Bigstring.t -> Bigstring.t -> int -> unit
@@ -43,7 +43,7 @@ module Hash = struct
     val statebytes : int
   end
 
-  module Make(S: S) = struct
+  module Make(S: HASH) = struct
     type state = {
       state : Bigstring.t ;
       buf : Bigstring.t ;
@@ -85,6 +85,33 @@ module Hash = struct
       let st = init () in
       update st msg ;
       finish st
+  end
+
+  module type S = sig
+    type state
+
+    val bytes : int
+    val blockbytes : int
+    val statebytes : int
+
+    (** Incremental Interface *)
+
+    val init : unit -> state
+    val update : state -> Bigstring.t -> unit
+    val finish : state -> Bigstring.t
+
+    (** Direct Interface *)
+
+    val digest : Bigstring.t -> Bigstring.t
+
+    module HMAC : sig
+      val write :
+        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t -> unit
+      (** @raise [Invalid_argument] if argument is less than 32 bytes long *)
+
+      val digest :
+        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t
+    end
   end
 
   module SHA256 = struct
