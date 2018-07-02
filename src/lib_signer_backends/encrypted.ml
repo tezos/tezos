@@ -43,10 +43,7 @@ module Raw = struct
   let encrypted_size = Crypto_box.boxzerobytes + 32
 
   let pbkdf ~salt ~password =
-    Cstruct.to_bigarray
-      (Pbkdf.pbkdf2 ~prf:`SHA512 ~count:32768 ~dk_len:32l
-         ~salt: (Cstruct.of_bigarray salt)
-         ~password: (Cstruct.of_bigarray password))
+    Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
 
   let encrypt ~password sk =
     let salt = Rand.generate salt_len in

@@ -73,8 +73,12 @@ let secrets () =
     | None -> assert false
     | Some t ->
         (* TODO: unicode normalization (NFKD)... *)
-        let sk = Bip39.to_seed ~passphrase:(email ^ password) t in
-        let sk = Cstruct.(to_bigarray (sub sk 0 32)) in
+        let passphrase = MBytes.(concat "" [
+            of_string email ;
+            of_string password ;
+          ]) in
+        let sk = Bip39.to_seed ~passphrase t in
+        let sk = MBytes.sub sk 0 32 in
         let sk : Signature.Secret_key.t =
           Ed25519 (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk) in
         let pk = Signature.Secret_key.to_public_key sk in
