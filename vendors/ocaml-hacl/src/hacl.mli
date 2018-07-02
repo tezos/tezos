@@ -31,6 +31,10 @@ module Hash : sig
   module SHA256 : sig
     type state
 
+    val bytes : int
+    val blockbytes : int
+    val statebytes : int
+
     (** Incremental Interface *)
 
     val init : unit -> state
@@ -53,6 +57,10 @@ module Hash : sig
 
   module SHA512 : sig
     type state
+
+    val bytes : int
+    val blockbytes : int
+    val statebytes : int
 
     (** Incremental Interface *)
 

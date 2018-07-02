@@ -50,6 +50,10 @@ module Hash = struct
       mutable pos : int ;
     }
 
+    let bytes = S.bytes
+    let blockbytes = S.blockbytes
+    let statebytes = S.statebytes
+
     let init () =
       let state = Bigstring.create S.statebytes in
       let buf = Bigstring.create S.blockbytes in
