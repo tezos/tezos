@@ -46,11 +46,11 @@ module Hash : sig
     val digest : Bigstring.t -> Bigstring.t
 
     module HMAC : sig
-      val write_hmac :
+      val write :
         key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t -> unit
       (** @raise [Invalid_argument] if argument is less than 32 bytes long *)
 
-      val hmac :
+      val digest :
         key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t
     end
   end
@@ -71,6 +71,15 @@ module Hash : sig
     (** Direct Interface *)
 
     val digest : Bigstring.t -> Bigstring.t
+
+    module HMAC : sig
+      val write :
+        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t -> unit
+      (** @raise [Invalid_argument] if argument is less than 32 bytes long *)
+
+      val digest :
+        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t
+    end
   end
 end
 
