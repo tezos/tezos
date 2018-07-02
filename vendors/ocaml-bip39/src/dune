@@ -2,7 +2,7 @@
  (name        bip39)
  (public_name bip39)
  (modules english bip39)
- (libraries nocrypto pbkdf))
+ (libraries bigstring hacl pbkdf))
 
 (rule
  (targets english.ml)
