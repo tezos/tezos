@@ -16,7 +16,7 @@ fi
 
 set -e
 
-current_hash_genesis=`jq '.hash' < src/proto_genesis/lib_protocol/src/TEZOS_PROTOCOL`
+current_hash_genesis=`jq '.hash' < src/proto_genesis/lib_protocol/src/TEZOS_PROTOCOL | tr -d '"'`
 echo "Genesis's current hash: $current_hash_genesis"
 genesis_tmpdir=`mktemp -d`
 mkdir $genesis_tmpdir/src
@@ -32,7 +32,7 @@ else
     "Proto Genesis's hash hasn't changed, nothing to do"
 fi
 
-current_hash_alpha=`jq '.hash' < src/proto_alpha/lib_protocol/src/TEZOS_PROTOCOL`
+current_hash_alpha=`jq '.hash' < src/proto_alpha/lib_protocol/src/TEZOS_PROTOCOL | tr -d '"'`
 echo "Alpha's current hash: $current_hash_alpha"
 alpha_tmpdir=`mktemp -d`
 mkdir $alpha_tmpdir/src
