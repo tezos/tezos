@@ -513,6 +513,12 @@ case $(basename $0) in
         docker_compose_base_name=zeronet
         default_port=19732
         ;;
+    betanet.sh)
+        docker_base_dir="$HOME/.tezos-betanet"
+        docker_image=tezos/tezos:betanet
+        docker_compose_base_name=betanet
+        default_port=9732
+        ;;
     *)
         docker_base_dir="$HOME/.tezos-alphanet"
         docker_image=tezos/tezos:alphanet
