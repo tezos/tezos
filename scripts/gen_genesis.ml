@@ -56,7 +56,7 @@ let _ =
 let sed =
   Format.sprintf
     "sed -E -i \
-     -e 's/name = \"(TEZOS[A_Z]+)[^\"]*\" ;/name = \"\\1%s\" ;/' \
+     -e 's/name = \"(TEZOS[_A-Z]+)[^\"]*\" ;/name = \"\\1%s\" ;/' \
      ../src/lib_shell/distributed_db_message.ml"
     date
 
