@@ -2,18 +2,19 @@
 DEV ?= --dev
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 
-current_ocaml_version := $(shell ocamlc -version)
 current_opam_version := $(shell opam --version)
 include scripts/version.sh
 
-ifneq (${current_ocaml_version},${ocaml_version})
-$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
-endif
 ifneq (${current_opam_version},${opam_version})
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}))
 endif
 
+current_ocaml_version := $(shell opam exec -- ocamlc -version)
+
 all:
+ifneq (${current_ocaml_version},${ocaml_version})
+	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
+endif
 	@jbuilder build ${DEV} \
 		src/bin_node/main.exe \
 		src/bin_client/main_client.exe \
