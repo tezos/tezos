@@ -150,10 +150,10 @@ module Ledger = struct
 
   let curves { Ledgerwallet_tezos.Version.major ; minor ; patch ; _ } =
     let open Ledgerwallet_tezos in
-    match major, minor, patch with
-    | 0, 0, _
-    | 0, 1, 0 -> [ Ed25519 ; Secp256k1 ]
-    | _ -> [ Ed25519 ; Secp256k1 ; Secp256r1 ]
+    if (major, minor, patch) <= (0, 1, 0) then
+      [ Ed25519 ; Secp256k1 ]
+    else
+      [ Ed25519 ; Secp256k1 ; Secp256r1 ]
 
   let of_hidapi ?pkh device_info h =
     let find_ledgers version =
@@ -286,7 +286,7 @@ let public_key_hash pk_uri =
 
 let sign ?watermark sk_uri msg =
   pkh_of_sk_uri sk_uri >>=? fun pkh ->
-  with_ledger pkh begin fun ledger _version _of_curve _of_pkh ->
+  with_ledger pkh begin fun ledger { major; minor; patch; _ } _of_curve _of_pkh ->
     let msg = Option.unopt_map watermark
         ~default:msg ~f:begin fun watermark ->
         MBytes.concat "" [Signature.bytes_of_watermark watermark ;
@@ -296,7 +296,7 @@ let sign ?watermark sk_uri msg =
     let path = tezos_root @ path_of_sk_uri sk_uri in
     let msg_len = MBytes.length msg in
     wrap_ledger_cmd begin fun pp ->
-      if msg_len > 1024 then
+      if msg_len > 1024 && (major, minor, patch) < (1, 1, 0) then
         Ledgerwallet_tezos.sign ~hash_on_ledger:false
           ~pp ledger curve path
           (Cstruct.of_bigarray (Blake2B.(to_bytes (hash_bytes [ msg ]))))
