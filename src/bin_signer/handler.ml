@@ -27,6 +27,63 @@ open Signer_logging
 
 let log = lwt_log_notice
 
+module High_watermark = struct
+  let encoding =
+    let open Data_encoding in
+    let raw_hash =
+      conv Blake2B.to_bytes Blake2B.of_bytes_exn bytes in
+    conv
+      (List.map (fun (chain_id, marks) -> Chain_id.to_b58check chain_id, marks))
+      (List.map (fun (chain_id, marks) -> Chain_id.of_b58check_exn chain_id, marks)) @@
+    assoc @@
+    conv
+      (List.map (fun (pkh, mark) -> Signature.Public_key_hash.to_b58check pkh, mark))
+      (List.map (fun (pkh, mark) -> Signature.Public_key_hash.of_b58check_exn pkh, mark)) @@
+    assoc @@
+    obj2
+      (req "level" int32)
+      (req "hash" raw_hash)
+
+  let mark_if_block_or_endorsement (cctxt : #Client_context.wallet) pkh bytes =
+    let mark art name get_level =
+      let file = name ^ "_high_watermark" in
+      cctxt#with_lock @@ fun () ->
+      cctxt#load file ~default:[] encoding >>=? fun all ->
+      if MBytes.length bytes < 9 then
+        failwith "byte sequence too short to be %s %s" art name
+      else
+        let hash = Blake2B.hash_bytes [ bytes ] in
+        let chain_id = Chain_id.of_bytes_exn (MBytes.sub bytes 1 4) in
+        let level = get_level () in
+        begin match List.assoc_opt chain_id all with
+          | None -> return ()
+          | Some marks ->
+              match List.assoc_opt pkh marks with
+              | None -> return ()
+              | Some (previous_level, previous_hash) ->
+                  if previous_level > level then
+                    failwith "%s level %ld below high watermark %ld" name level previous_level
+                  else if previous_level = level && previous_hash <> hash then
+                    failwith "%s level %ld already signed with a different header" name level
+                  else
+                    return ()
+        end >>=? fun () ->
+        let rec update = function
+          | [] -> [ chain_id, [ pkh, (level, hash) ] ]
+          | (e_chain_id, marks) :: rest ->
+              if chain_id = e_chain_id then
+                let marks = (pkh, (level, hash)) :: List.filter (fun (pkh', _) -> pkh <> pkh') marks in
+                (e_chain_id, marks) :: rest
+              else
+                (e_chain_id, marks) :: update rest in
+        cctxt#write file (update all) encoding in
+    if MBytes.length bytes > 0 && MBytes.get_uint8 bytes 0 = 0x01 then
+      mark "a" "block" (fun () -> MBytes.get_int32 bytes 5)
+    else if MBytes.length bytes > 0 && MBytes.get_uint8 bytes 0 = 0x02 then
+      mark "an" "endorsement" (fun () -> MBytes.get_int32 bytes (MBytes.length bytes - 4))
+    else return ()
+
+end
 
 module Authorized_key =
   Client_aliases.Alias (struct
@@ -50,7 +107,7 @@ let check_magic_byte magic_bytes data =
 let sign
     (cctxt : #Client_context.wallet)
     Signer_messages.Sign.Request.{ pkh ; data ; signature }
-    ?magic_bytes ~require_auth =
+    ?magic_bytes ~check_high_watermark ~require_auth =
   log Tag.DSL.(fun f ->
       f "Request for signing %d bytes of data for key %a, magic byte = %02X"
       -% t event "request_for_signing"
@@ -77,6 +134,10 @@ let sign
       f "Signing data for key %s"
       -% t event "signing_data"
       -% s Client_keys.Logging.tag name) >>= fun () ->
+  begin if check_high_watermark then
+      High_watermark.mark_if_block_or_endorsement cctxt pkh data
+    else return ()
+  end >>=? fun () ->
   Client_keys.sign cctxt sk_uri data >>=? fun signature ->
   return signature
 

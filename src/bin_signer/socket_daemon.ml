@@ -28,11 +28,11 @@ open Signer_messages
 
 let log = lwt_log_notice
 
-let handle_client ?magic_bytes ~require_auth cctxt fd =
+let handle_client ?magic_bytes ~check_high_watermark ~require_auth cctxt fd =
   Lwt_utils_unix.Socket.recv fd Request.encoding >>=? function
   | Sign req ->
       let encoding = result_encoding Sign.Response.encoding in
-      Handler.sign cctxt req ?magic_bytes ~require_auth >>= fun res ->
+      Handler.sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth >>= fun res ->
       Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
       Lwt_unix.close fd >>= fun () ->
       return_unit
@@ -54,7 +54,7 @@ let handle_client ?magic_bytes ~require_auth cctxt fd =
       Lwt_unix.close fd >>= fun () ->
       return_unit
 
-let run (cctxt : #Client_context.wallet) path ?magic_bytes ~require_auth =
+let run (cctxt : #Client_context.wallet) path ?magic_bytes ~check_high_watermark ~require_auth =
   let open Lwt_utils_unix.Socket in
   begin
     match path with
@@ -84,7 +84,7 @@ let run (cctxt : #Client_context.wallet) path ?magic_bytes ~require_auth =
             | [Exn End_of_file] -> return_unit
             | errs -> Lwt.return (Error errs))
         (fun () ->
-           handle_client ?magic_bytes ~require_auth cctxt cfd)
+           handle_client ?magic_bytes ~check_high_watermark ~require_auth cctxt cfd)
     end ;
     loop fd
   in

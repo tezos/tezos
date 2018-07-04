@@ -26,11 +26,11 @@
 let log = Signer_logging.lwt_log_notice
 open Signer_logging
 
-let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~require_auth mode =
+let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~check_high_watermark ~require_auth mode =
   let dir = RPC_directory.empty in
   let dir =
     RPC_directory.register1 dir Signer_services.sign begin fun pkh signature data ->
-      Handler.sign cctxt { pkh ; data ; signature } ?magic_bytes ~require_auth
+      Handler.sign cctxt { pkh ; data ; signature } ?magic_bytes ~check_high_watermark ~require_auth
     end in
   let dir =
     RPC_directory.register1 dir Signer_services.public_key begin fun pkh () () ->
@@ -63,7 +63,7 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~require_auth mode 
           failwith "Port already in use."
       | exn -> Lwt.return (error_exn exn))
 
-let run_https (cctxt : #Client_context.wallet) ~host ~port ~cert ~key ?magic_bytes ~require_auth =
+let run_https (cctxt : #Client_context.wallet) ~host ~port ~cert ~key ?magic_bytes ~check_high_watermark ~require_auth =
   Lwt_utils_unix.getaddrinfo ~passive:true ~node:host ~service:(string_of_int port) >>= function
   | []->
       failwith "Cannot resolve listening address: %S" host
@@ -75,9 +75,9 @@ let run_https (cctxt : #Client_context.wallet) ~host ~port ~cert ~key ?magic_byt
           -% s port_number port) >>= fun () ->
       let mode : Conduit_lwt_unix.server =
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port) in
-      run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~require_auth mode
+      run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~check_high_watermark ~require_auth mode
 
-let run_http (cctxt : #Client_context.wallet) ~host ~port ?magic_bytes ~require_auth =
+let run_http (cctxt : #Client_context.wallet) ~host ~port ?magic_bytes ~check_high_watermark ~require_auth =
   Lwt_utils_unix.getaddrinfo ~passive:true ~node:host ~service:(string_of_int port) >>= function
   | [] ->
       failwith "Cannot resolve listening address: %S" host
@@ -89,4 +89,4 @@ let run_http (cctxt : #Client_context.wallet) ~host ~port ?magic_bytes ~require_
           -% s port_number port) >>= fun () ->
       let mode : Conduit_lwt_unix.server =
         `TCP (`Port port) in
-      run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~require_auth mode
+      run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes ~check_high_watermark ~require_auth mode
