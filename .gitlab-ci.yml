@@ -8,28 +8,17 @@ variables:
 stages:
   - build
   - test
-  - opam
+  - packaging
   - publish
 
-## Template for `docker_in_docker` jobs
 
-.dind_template: &dind_definition
-  image: docker:latest
-  variables:
-    DOCKER_DRIVER: overlay2
-  services:
-    - docker:dind
-  before_script:
-    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
-    - apk add --no-cache curl jq
-    - . ./scripts/version.sh
-  tags:
-    - safe_docker
+############################################################
+## Stage: build (only MR)                                 ##
+############################################################
 
-## Tezos
-
-.build_deps_image_template: &build_deps_image_definition
+.build_template: &build_definition
   image: ${build_deps_image_name}:${build_deps_image_version}
+  stage: build
   except:
     - master
     - alphanet
@@ -41,19 +30,23 @@ stages:
   tags:
     - gitlab-org
 
-check_deps:
-  <<: *build_deps_image_definition
-  stage: build
+check_opam_deps:
+  <<: *build_definition
   script:
     - if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
         echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab-ci.yml'." ;
         exit 1 ;
       fi
     - ./scripts/opam-check.sh
+    - ./scripts/check_opam_test.sh
+
+check_indentation:
+  <<: *build_definition
+  script:
+    - jbuilder build @runtest_indent
 
 build:
-  <<: *build_deps_image_definition
-  stage: build
+  <<: *build_definition
   script:
     - make all
     - make build-test
@@ -62,23 +55,17 @@ build:
     - _build
     expire_in: 1 day
 
-## Basic tests (run on merge requests)
+
+
+############################################################
+## Stage: test (only MR)                                  ##
+############################################################
 
 .test_template: &test_definition
-  <<: *build_deps_image_definition
+  <<: *build_definition
   stage: test
   dependencies:
     - build
-
-test:opam_packaging:
-  <<: *test_definition
-  script:
-    - ./scripts/check_opam_test.sh "$CI_PROJECT_DIR/$CI_CONFIG_PATH"
-
-test:ocp-indent:
-  <<: *test_definition
-  script:
-    - jbuilder build @runtest_indent
 
 test:stdlib:
   <<: *test_definition
@@ -182,11 +169,15 @@ test:documentation:
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - make doc-html
 
-## Basic tests through opam packaged (run on master only)
+
+
+############################################################
+## Stage: building opam packages (only master and *opam*) ##
+############################################################
 
 .opam_template: &opam_definition
   image: ${build_deps_image_name}:opam--${build_deps_image_version}
-  stage: opam
+  stage: packaging
   dependencies: []
   only:
     - master
@@ -514,40 +505,63 @@ opam:60:tezos-baker-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha-commands
-
-
 ##END_OPAM##
 
-## Publishing (small) docker images with tezos binaries
 
-publish:docker:minimal:
-  <<: *dind_definition
+
+############################################################
+## Stage: publish                                         ##
+############################################################
+
+publish:docker:
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
   stage: publish
   only:
     - master
     - alphanet
     - zeronet
     - betanet
+  before_script:
+    - mkdir ~/.docker || true
+    - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json
   script:
     - ./scripts/create_docker_image.sh
         "${public_docker_image}" "${CI_COMMIT_REF_NAME}"
-    - mkdir ~/.docker || true
-    - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json ;
     - docker push "${public_docker_image}:${CI_COMMIT_REF_NAME}"
+  tags:
+    - safe_docker
 
-## Publish docs to gitlab...
-
-pages:
+publish:doc:
   image: ${build_deps_image_name}:${build_deps_image_version}
   stage: publish
   only:
-    - master@tezos/tezos
-  artifacts:
-    paths:
-    - public
-  script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - master
+    - alphanet
+    - zeronet
+    - betanet
+  before_script:
+    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - make doc-html && sudo mv docs/_build "${CI_PROJECT_DIR}"/public
+    - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
+    - echo "${CI_KH}" > ~/.ssh/known_hosts
+    - chmod 400 ~/.ssh/id_ed25519
+  script:
+    - make doc-html
+    - git clone git@gitlab.com:${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAMESPACE}.gitlab.io gitlab.io
+    - rsync --recursive --links --perms --delete --verbose
+        --exclude=.doctrees
+        docs/_build/ gitlab.io/public/"${CI_COMMIT_REF_NAME}"
+    - cd gitlab.io
+    - if [ -z "$(git status -s)" ] ; then
+        echo "Nothing to commit!" ;
+      else
+        git add public/"${CI_COMMIT_REF_NAME}" ;
+        git commit -m "Import doc for ${CI_COMMIT_REF_NAME} (${CI_COMMIT_SHA})" ;
+        git push origin master ;
+      fi
   tags:
     - gitlab-org
