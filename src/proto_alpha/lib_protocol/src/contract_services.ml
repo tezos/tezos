@@ -127,6 +127,16 @@ module S = struct
       ~output: Script.expr_encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "storage")
 
+  let big_map_get =
+    RPC_service.post_service
+      ~description: "Access the value associated with a key in the big map storage  of the contract."
+      ~query: RPC_query.empty
+      ~input: (obj2
+                 (req "key" Script.expr_encoding)
+                 (req "type" Script.expr_encoding))
+      ~output: (option Script.expr_encoding)
+      RPC_path.(custom_root /: Contract.rpc_arg / "big_map_get")
+
   let info =
     RPC_service.get_service
       ~description: "Access the complete status of a contract."
@@ -187,6 +197,15 @@ let register () =
           unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
           Script.force_decode ctxt script.storage >>=? fun (storage, _ctxt) ->
           return_some storage) ;
+  register1 S.big_map_get (fun ctxt contract () (key, key_type) ->
+      let open Script_ir_translator in
+      let ctxt = Gas.set_unlimited ctxt in
+      Lwt.return (parse_ty ctxt ~allow_big_map:false ~allow_operation:false (Micheline.root key_type))
+      >>=? fun (Ex_ty key_type, ctxt) ->
+      parse_data ctxt key_type (Micheline.root key) >>=? fun (key, ctxt) ->
+      hash_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
+      Contract.Big_map.get_opt ctxt contract key_hash >>=? fun (_ctxt, value) ->
+      return value) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Contract.get_manager ctxt contract >>=? fun manager ->
@@ -249,3 +268,6 @@ let storage ctxt block contract =
 
 let storage_opt ctxt block contract =
   RPC_context.make_opt_call1 S.storage ctxt block contract () ()
+
+let big_map_get_opt ctxt block contract key =
+  RPC_context.make_call1 S.big_map_get ctxt block contract () key
