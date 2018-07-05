@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let () =
+  Prevalidator_filters.register
+    (module Tezos_mempool_002_PsYLVpVv.Filter)
+
 (** Commands *)
 
 let show (args : Node_shared_arg.t) =
