@@ -89,6 +89,7 @@ and _ successful_manager_operation_result =
   | Reveal_result : Kind.reveal successful_manager_operation_result
   | Transaction_result :
       { storage : Script.expr option ;
+        big_map_diff : Contract.big_map_diff option ;
         balance_updates : Delegate.balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
