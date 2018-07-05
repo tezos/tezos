@@ -3137,7 +3137,9 @@ let diff_of_big_map ctxt mode (Ex_bm { key_type ; value_type ; diff }) =
   fold_left_s
     (fun (acc, ctxt) (key, value) ->
        Lwt.return (Gas.consume ctxt Typecheck_costs.cycle) >>=? fun ctxt ->
-       hash_data ctxt key_type key >>=? fun (hash, ctxt) ->
+       hash_data ctxt key_type key >>=? fun (diff_key_hash, ctxt) ->
+       unparse_data ctxt mode key_type key >>=? fun (key_node, ctxt) ->
+       let diff_key = Micheline.strip_locations key_node in
        begin
          match value with
          | None -> return (None, ctxt)
@@ -3146,8 +3148,9 @@ let diff_of_big_map ctxt mode (Ex_bm { key_type ; value_type ; diff }) =
                unparse_data ctxt mode value_type x >>=? fun (node, ctxt) ->
                return (Some (Micheline.strip_locations node), ctxt)
              end
-       end >>=? fun (value, ctxt) ->
-       return ((hash, value) :: acc, ctxt))
+       end >>=? fun (diff_value, ctxt) ->
+       let diff_item = Contract.{ diff_key ; diff_key_hash ; diff_value } in
+       return (diff_item :: acc, ctxt))
     ([], ctxt) pairs
 
 (* Get the big map from a contract's storage if one exists *)

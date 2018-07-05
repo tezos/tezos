@@ -65,6 +65,17 @@ module Scripts = struct
          (req "input" Script.expr_encoding)
          (req "amount" Tez.encoding))
 
+    let trace_encoding =
+      def "scripted.trace" @@
+      (list @@ obj3
+         (req "location" Script.location_encoding)
+         (req "gas" Gas.encoding)
+         (req "stack"
+            (list
+               (obj2
+                  (req "item" (Script.expr_encoding))
+                  (opt "annot" string)))))
+
     let run_code =
       RPC_service.post_service
         ~description: "Run a piece of code in the current context"
@@ -73,9 +84,7 @@ module Scripts = struct
         ~output: (obj3
                     (req "storage" Script.expr_encoding)
                     (req "operations" (list Operation.internal_operation_encoding))
-                    (opt "big_map_diff" (list (tup2
-                                                 Script_expr_hash.encoding
-                                                 (option Script.expr_encoding)))))
+                    (opt "big_map_diff" Contract.big_map_diff_encoding))
         RPC_path.(path / "run_code")
 
     let trace_code =
@@ -87,18 +96,8 @@ module Scripts = struct
         ~output: (obj4
                     (req "storage" Script.expr_encoding)
                     (req "operations" (list Operation.internal_operation_encoding))
-                    (req "trace"
-                       (list @@ obj3
-                          (req "location" Script.location_encoding)
-                          (req "gas" Gas.encoding)
-                          (req "stack"
-                             (list
-                                (obj2
-                                   (req "item" (Script.expr_encoding))
-                                   (opt "annot" string))))))
-                    (opt "big_map_diff" (list (tup2
-                                                 Script_expr_hash.encoding
-                                                 (option Script.expr_encoding)))))
+                    (req "trace" trace_encoding)
+                    (opt "big_map_diff" Contract.big_map_diff_encoding))
         RPC_path.(path / "trace_code")
 
     let typecheck_code =

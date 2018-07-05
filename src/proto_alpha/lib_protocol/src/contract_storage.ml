@@ -202,18 +202,40 @@ let () =
 
 let failwith msg = fail (Failure msg)
 
-type big_map_diff = (Script_expr_hash.t * Script_repr.expr option) list
+type big_map_diff_item = {
+  diff_key : Script_repr.expr;
+  diff_key_hash : Script_expr_hash.t;
+  diff_value : Script_repr.expr option;
+}
+type big_map_diff = big_map_diff_item list
+
+let big_map_diff_item_encoding =
+  let open Data_encoding in
+  conv
+    (fun { diff_key_hash ; diff_key ; diff_value } -> (diff_key_hash, diff_key, diff_value))
+    (fun (diff_key_hash, diff_key, diff_value) -> { diff_key_hash ; diff_key ; diff_value })
+    (obj3
+       (req "key_hash" Script_expr_hash.encoding)
+       (req "key" Script_repr.expr_encoding)
+       (opt "value" Script_repr.expr_encoding))
+
+let big_map_diff_encoding =
+  let open Data_encoding in
+  def "contract.big_map_diff" @@
+  list big_map_diff_item_encoding
 
 let update_script_big_map c contract = function
   | None -> return (c, Z.zero)
   | Some diff ->
-      fold_left_s (fun (c, total) (key, value) ->
-          match value with
+      fold_left_s (fun (c, total) diff_item ->
+          match diff_item.diff_value with
           | None ->
-              Storage.Contract.Big_map.remove (c, contract) key >>=? fun (c, freed) ->
+              Storage.Contract.Big_map.remove (c, contract) diff_item.diff_key_hash
+              >>=? fun (c, freed) ->
               return (c, Z.sub total (Z.of_int freed))
           | Some v ->
-              Storage.Contract.Big_map.init_set (c, contract) key v >>=? fun (c, size_diff) ->
+              Storage.Contract.Big_map.init_set (c, contract) diff_item.diff_key_hash v
+              >>=? fun (c, size_diff) ->
               return (c, Z.add total (Z.of_int size_diff)))
         (c, Z.zero) diff
 
