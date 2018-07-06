@@ -147,17 +147,17 @@ test:shell:
 test:p2p:io-scheduler:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_io_scheduler
+    - jbuilder build @src/lib_p2p/runtest_p2p_io_scheduler_ipv4
 
 test:p2p:socket:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_socket
+    - jbuilder build @src/lib_p2p/runtest_p2p_socket_ipv4
 
 test:p2p:pool:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_pool
+    - jbuilder build @src/lib_p2p/runtest_p2p_pool_ipv4
 
 test:proto_alpha:
   <<: *test_definition
