@@ -80,9 +80,9 @@
 
 (alias
  ((name runtest)
-  (deps ((alias runtest_p2p_socket)
-         (alias runtest_p2p_pool)
-         (alias runtest_p2p_io_scheduler)
+  (deps ((alias runtest_p2p_socket_ipv4)
+         (alias runtest_p2p_pool_ipv4)
+         (alias runtest_p2p_io_scheduler_ipv4)
          (alias runtest_p2p_peerset)
          (alias runtest_p2p_ipv6set)
          (alias runtest_p2p_banned_peers)
