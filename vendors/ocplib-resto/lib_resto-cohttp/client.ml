@@ -95,7 +95,7 @@ module Make (Encoding : Resto.ENCODING) = struct
   let faked_media = {
     Media_type.name = AnyMedia ;
     q = None ;
-    pp = (fun _enc ppf s -> Format.pp_print_string ppf s) ;
+    pp = (fun _enc ppf s -> Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s) ;
     construct = (fun _ -> assert false) ;
     destruct = (fun _ -> assert false) ;
   }
@@ -136,8 +136,13 @@ module Make (Encoding : Resto.ENCODING) = struct
     | `Stream s -> `Stream (Lwt_stream.clone s)
     | x -> x
 
-  let generic_call meth ?(logger = null_logger) ?(headers = []) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
-    let module Logger = (val logger) in
+  type log = {
+    log:
+      'a. ?media:Media_type.t -> 'a Encoding.t -> Cohttp.Code.status_code ->
+      string Lwt.t Lazy.t -> unit Lwt.t ;
+  }
+
+  let internal_call meth (log : log) ?(headers = []) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
     let headers = List.fold_left (fun headers (header, value) ->
         let header = String.lowercase_ascii header in
         if header <> "host"
@@ -148,16 +153,6 @@ module Make (Encoding : Resto.ENCODING) = struct
              only headers \"host\" or starting with \"x-\" are supported"
         else Header.replace headers header value)
         (Header.init ()) headers in
-    begin
-      match body with
-      | None->
-          Logger.log_empty_request uri
-      | Some (`Stream _) ->
-          Logger.log_request Encoding.untyped uri "<stream>"
-      | Some body ->
-          Cohttp_lwt.Body.to_string body >>= fun body ->
-          Logger.log_request ?media Encoding.untyped uri body
-    end >>= fun log_request ->
     let body, headers =
       match body, media with
       | None, _ -> Cohttp_lwt.Body.empty, headers
@@ -171,9 +166,29 @@ module Make (Encoding : Resto.ENCODING) = struct
       | Some ranges ->
           Header.add headers "accept" (Media_type.accept_header ranges) in
     Lwt.catch begin fun () ->
-      Cohttp_lwt_unix.Client.call
-        ~headers
-        (meth :> Code.meth) ~body uri >>= fun (response, ansbody) ->
+      let rec call_and_retry_on_502 attempt delay =
+        Cohttp_lwt_unix.Client.call
+          ~headers
+          (meth :> Code.meth) ~body uri >>= fun (response, ansbody) ->
+        let status = Response.status response in
+        match status with
+        | `Bad_gateway ->
+            let log_ansbody = clone_body ansbody in
+            log.log ~media:faked_media Encoding.untyped status
+              (lazy (Cohttp_lwt.Body.to_string log_ansbody >>= fun text ->
+                     Lwt.return @@ Format.sprintf
+                       "Attempt number %d/10, will retry after %g seconds.\n\
+                        Original body follows.\n\
+                        %s"
+                       attempt delay text)) >>= fun () ->
+            if attempt >= 10 then
+              Lwt.return (response, ansbody)
+            else
+              Lwt_unix.sleep delay >>= fun () ->
+              call_and_retry_on_502 (attempt + 1) (delay +. 0.1)
+        | _ ->
+            Lwt.return (response, ansbody) in
+      call_and_retry_on_502 1 0. >>= fun (response, ansbody) ->
       let headers = Response.headers response in
       let media_name =
         match Header.get headers "content-type" with
@@ -187,9 +202,6 @@ module Make (Encoding : Resto.ENCODING) = struct
         | None -> None
         | Some media_types -> find_media media_name media_types in
       let status = Response.status response in
-      let log_ansbody = clone_body ansbody in
-      Logger.log_response log_request ?media Encoding.untyped status
-        (lazy (Cohttp_lwt.Body.to_string log_ansbody)) >>= fun () ->
       match status with
       | `OK -> Lwt.return (`Ok (Some (ansbody, media_name, media)))
       | `No_content -> Lwt.return (`Ok None)
@@ -229,12 +241,6 @@ module Make (Encoding : Resto.ENCODING) = struct
         | e -> Printexc.to_string e in
       Lwt.return (`Connection_failed msg)
     end
-
-  type log = {
-    log:
-      'a. ?media:Media_type.t -> 'a Encoding.t -> Cohttp.Code.status_code ->
-      string Lwt.t Lazy.t -> unit Lwt.t ;
-  }
 
   let handle_error log service (body, media_name, media) status f =
     Cohttp_lwt.Body.is_empty body >>= fun empty ->
@@ -285,7 +291,7 @@ module Make (Encoding : Resto.ENCODING) = struct
       media_types ?logger ?base
       service params query body >>= fun (log, meth, uri, body, media) ->
     begin
-      generic_call ?headers ~accept:media_types meth ?body ?media uri >>= function
+      internal_call meth log ?headers ~accept:media_types ?body ?media uri >>= function
       | `Ok None ->
           log.log Encoding.untyped `No_content (lazy (Lwt.return "")) >>= fun () ->
           Lwt.return (`Ok None)
@@ -328,7 +334,7 @@ module Make (Encoding : Resto.ENCODING) = struct
       media_types ?logger ?base
       service params query body >>= fun (log, meth, uri, body, media) ->
     begin
-      generic_call ?headers ~accept:media_types meth ?body ?media uri >>= function
+      internal_call meth log ?headers ~accept:media_types ?body ?media uri >>= function
       | `Ok None ->
           on_close () ;
           log.log Encoding.untyped `No_content (lazy (Lwt.return "")) >>= fun () ->
@@ -385,5 +391,19 @@ module Make (Encoding : Resto.ENCODING) = struct
       | `OCaml_exception _ as err -> Lwt.return err
     end >>= fun ans ->
     Lwt.return (meth, uri, ans)
+
+  let generic_call meth ?(logger = null_logger) ?headers ?accept ?body ?media uri =
+    let module Logger = (val logger) in
+    begin match body with
+      | None->
+          Logger.log_empty_request uri
+      | Some (`Stream _) ->
+          Logger.log_request Encoding.untyped uri "<stream>"
+      | Some body ->
+          Cohttp_lwt.Body.to_string body >>= fun body ->
+          Logger.log_request ?media Encoding.untyped uri body
+    end >>= fun log_request ->
+    let log = { log = fun ?media -> Logger.log_response log_request ?media } in
+    internal_call meth log ?headers ?accept ?body ?media uri
 
 end
