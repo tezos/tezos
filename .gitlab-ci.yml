@@ -1,4 +1,3 @@
-
 variables:
   ## Please update `scripts/version.sh` accordingly
   build_deps_image_version: 63f06ab145e22aef4cc55b5b9557756d4c868843
@@ -531,7 +530,7 @@ publish:docker:
   script:
     - ./scripts/create_docker_image.sh
         "${public_docker_image}" "${CI_COMMIT_REF_NAME}"
-    - docker push "${public_docker_image}:${CI_COMMIT_REF_NAME}"
+    - docker push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
   tags:
     - safe_docker
 
