@@ -6,14 +6,19 @@ capability. Tezos not only comes to consensus about the state of its ledger,
 like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
 
- - Developer documentation is available online at http://doc.tzalpha.net
+ - Developer documentation is available online at http://tezos.gitlab.io/master
+   always in sync with the master branch (which may be desynchronized with
+   the code running on the live networks, replace `master` in the URL by the
+   branch of your choice: betanet, alphanet, zeronet, to make sure you are
+   consulting the right API version)
  - The page https://www.tezos.com/ contains more information about the
    project, even though it is frozen in time due to external reasons
  - All development now happens on Gitlab at https://gitlab.com/tezos/tezos
 
 The Tezos Alpha (test) network has been live and open since February 2017.
 
- - More information on joining the Alphanet at http://doc.tzalpha.net/introduction/alphanet.html
+The Tezos Beta (experimental) network has been live and open since June 2018.
+
  - Several community built block explorers are available:
    - https://ostez.com
    - https://tzscan.io
@@ -26,6 +31,4 @@ The Tezos Alpha (test) network has been live and open since February 2017.
  - There is a *#tezos* channel on *freenode* that is reserved for technical discussions
  - There is also a community FAQ at https://github.com/tezoscommunity/faq
 
-The source code of Tezos is currently under exclusive copyright of
-Dynamic Ledger Solutions, and will be open sourced under the MIT
-license when the main network lunches.
+The source code of Tezos is placed under the MIT Open Source License.
