@@ -28,7 +28,8 @@ mkdir -p "$tmp_dir"/bin
 mkdir -p "$tmp_dir"/scripts
 container=$(docker create $build_image)
 for bin in tezos-client tezos-admin-client tezos-node \
-	   tezos-alpha-baker tezos-alpha-endorser tezos-alpha-accuser; do
+	   tezos-alpha-baker tezos-alpha-endorser tezos-alpha-accuser \
+	   tezos-signer; do
     docker cp -L $container:/home/tezos/tezos/$bin "$tmp_dir"/bin
 done
 cp -a "$script_dir"/docker/entrypoint.sh "$tmp_dir"/bin/

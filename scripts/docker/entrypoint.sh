@@ -15,6 +15,7 @@ admin_client="/usr/local/bin/tezos-admin-client"
 baker="/usr/local/bin/tezos-alpha-baker"
 endorser="/usr/local/bin/tezos-alpha-endorser"
 accuser="/usr/local/bin/tezos-alpha-accuser"
+signer="/usr/local/bin/tezos-signer"
 
 client_dir="$DATA_DIR/client"
 node_dir="$DATA_DIR/node"
@@ -46,6 +47,9 @@ case $command in
         configure_client
         exec "$admin_client" "$@"
         ;;
+    tezos-signer)
+        exec "$signer" "$@"
+        ;;
     *)
         cat <<EOF
 Available commands:
@@ -53,6 +57,7 @@ Available commands:
 - tezos-client [args]
 - tezos-baker [keys]
 - tezos-endorser [keys]
+- tezos-signer [args]
 EOF
         ;;
 esac
