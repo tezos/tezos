@@ -529,7 +529,7 @@ publish:docker:
     - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json
   script:
     - ./scripts/create_docker_image.sh
-        "${public_docker_image}" "${CI_COMMIT_REF_NAME}"
+        "${public_docker_image_name}" "${CI_COMMIT_REF_NAME}"
     - docker push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
   tags:
     - safe_docker
