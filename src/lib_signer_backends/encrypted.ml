@@ -192,6 +192,17 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
       return_unit
   end sks
 
+let decrypt_list (cctxt : #Client_context.io_wallet) keys =
+  Secret_key.load cctxt >>=? fun sks ->
+  iter_s begin fun (name, sk_uri) ->
+    if Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme &&
+       (keys = [] || List.mem name keys) then
+      decrypt cctxt ~name sk_uri >>=? fun _ ->
+      return_unit
+    else
+      return_unit
+  end sks
+
 let rec read_passphrase (cctxt : #Client_context.io) =
   cctxt#prompt_password
     "Enter passphrase to encrypt your key: " >>=? fun password ->

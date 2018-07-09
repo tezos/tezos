@@ -86,6 +86,8 @@ let baker_commands () =
          directory_parameter
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun (max_priority, threshold) node_path delegates cctxt ->
+         Tezos_signer_backends.Encrypted.decrypt_list
+           cctxt (List.map fst delegates) >>=? fun () ->
          Client_daemon.Baker.run cctxt
            ?threshold
            ?max_priority
@@ -107,6 +109,8 @@ let endorser_commands () =
       (prefixes [ "run" ]
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun endorsement_delay delegates cctxt ->
+         Tezos_signer_backends.Encrypted.decrypt_list
+           cctxt (List.map fst delegates) >>=? fun () ->
          Client_daemon.Endorser.run cctxt
            ~delay:endorsement_delay
            ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
