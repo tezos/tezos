@@ -164,6 +164,7 @@ let finalize_block st =
     { st.header with
       shell = {
         st.header.shell with
+        level = Int32.succ st.header.shell.level ;
         operations_hash ; fitness = result.fitness ;
       } } in
   let hash = Block_header.hash header in
