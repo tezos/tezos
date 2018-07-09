@@ -28,7 +28,6 @@
     a public key hash (pkh) and a secret.
 
     The commitments are composed of :
-    - half a pkh ;
     - a blinded pkh that can be revealed by the secret ;
     - an amount.
 
