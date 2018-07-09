@@ -23,6 +23,9 @@ stages:
     - alphanet
     - zeronet
     - betanet
+    - alphanet-staging
+    - zeronet-staging
+    - betanet-staging
   before_script:
     - opam list
     - . ./scripts/version.sh
@@ -524,6 +527,9 @@ publish:docker:
     - alphanet
     - zeronet
     - betanet
+    - alphanet-staging
+    - zeronet-staging
+    - betanet-staging
   before_script:
     - mkdir ~/.docker || true
     - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json
@@ -542,6 +548,9 @@ publish:doc:
     - alphanet
     - zeronet
     - betanet
+    - alphanet-staging
+    - zeronet-staging
+    - betanet-staging
   before_script:
     - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
