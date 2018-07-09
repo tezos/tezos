@@ -26,10 +26,9 @@ def package_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
     else:
       lib = text
     src = find_dot_opam(lib)
-    branch = os.environ.get('CI_COMMIT_REF_NAME')
-    if not branch:
-        branch = 'master'
-    src_url = "https://gitlab.com/tezos/tezos/tree/" + branch + "/" + src
+    branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
+    project_url = os.environ.get('CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos')
+    src_url = project_url + "/tree/" + branch + "/" + src
     if os.path.isdir('_build/api/odoc/'+lib):
       if os.path.isdir(os.path.join('_build','api','odoc',lib,lib.replace('-','_').capitalize())):
         lib = lib + '/' + lib.replace('-','_').capitalize()
@@ -71,9 +70,8 @@ def src_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
     else:
       src = text
       text = text
-    branch = os.environ.get('CI_COMMIT_REF_NAME')
-    if not branch:
-        branch = 'master'
-    url = "https://gitlab.com/tezos/tezos/tree/" + branch + "/" + src
+    branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
+    project_url = os.environ.get('CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos')
+    url = project_url + "/tree/" + branch + "/" + src
     node = nodes.reference(rawtext, text, refuri=url, **options)
     return [node], []
