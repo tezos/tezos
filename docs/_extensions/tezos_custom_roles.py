@@ -29,8 +29,8 @@ def package_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
     branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
     project_url = os.environ.get('CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos')
     src_url = project_url + "/tree/" + branch + "/" + src
-    if os.path.isdir('_build/api/odoc/'+lib):
-      if os.path.isdir(os.path.join('_build','api','odoc',lib,lib.replace('-','_').capitalize())):
+    if os.path.isdir('_build/api/odoc/_html/'+lib):
+      if os.path.isdir(os.path.join('_build','api','odoc','_html',lib,lib.replace('-','_').capitalize())):
         lib = lib + '/' + lib.replace('-','_').capitalize()
       url = "api/api-inline.html#" + lib + '/index.html'
       for i in range(1,rel_lvl):
