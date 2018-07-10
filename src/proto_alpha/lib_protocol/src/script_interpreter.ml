@@ -187,7 +187,7 @@ let rec interp
                 log := (descr.loc, Gas.level ctxt, stack) :: !log ;
                 return (ret, ctxt) in
         let get_log (log : execution_trace ref option) =
-          Option.map ~f:(!) log in
+          Option.map ~f:(fun l -> List.rev !l) log in
         let consume_gas_terop : type ret arg1 arg2 arg3 rest.
           (_ * (_ * (_ * rest)), ret * rest) descr ->
           ((arg1 -> arg2 -> arg3 -> ret) * arg1 * arg2 * arg3) ->
