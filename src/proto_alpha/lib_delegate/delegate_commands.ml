@@ -51,6 +51,20 @@ let context_path_arg =
     ~doc:"When use the client will read in the local context at the provided path in order to build the block, instead of relying on the 'preapply' RPC."
     string_parameter
 
+let pidfile_arg =
+  Clic.arg
+    ~doc: "write process id in file"
+    ~short: 'P'
+    ~long: "pidfile"
+    ~placeholder: "filename"
+    (Clic.parameter (fun _ s -> return s))
+
+let may_lock_pidfile = function
+  | None -> return_unit
+  | Some pidfile ->
+      trace (failure "Failed to create the pidfile: %s" pidfile) @@
+      Lwt_lock_file.create ~unlink_on_exit:true pidfile
+
 let delegate_commands () =
   let open Clic in
   [
@@ -102,6 +116,15 @@ let delegate_commands () =
       (fun () delegate cctxt -> endorse_block cctxt delegate) ;
   ]
 
+let init_signal () =
+  let handler name id =
+    try
+      Format.eprintf "Received the %s signal, triggering shutdown.@." name ;
+      Lwt_exit.exit id
+    with _ -> () in
+  ignore (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
+  ignore (Lwt_unix.on_signal Sys.sigterm (handler "TERM") : Lwt_unix.signal_handler_id)
+
 let baker_commands () =
   let open Clic in
   let group =
@@ -110,7 +133,8 @@ let baker_commands () =
   in
   [
     command ~group ~desc: "Launch the baker daemon."
-      (args5
+      (args6
+         pidfile_arg
          max_priority_arg
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
@@ -122,9 +146,11 @@ let baker_commands () =
          ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
          directory_parameter
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun (max_priority, minimal_fees, minimal_nanotez_per_gas_unit,
+      (fun (pidfile, max_priority, minimal_fees, minimal_nanotez_per_gas_unit,
             minimal_nanotez_per_byte, no_waiting_for_endorsements)
         node_path delegates cctxt ->
+        init_signal () ;
+        may_lock_pidfile pidfile >>=? fun () ->
         Tezos_signer_backends.Encrypted.decrypt_list
           cctxt (List.map fst delegates) >>=? fun () ->
         Client_daemon.Baker.run cctxt
@@ -146,10 +172,12 @@ let endorser_commands () =
   in
   [
     command ~group ~desc: "Launch the endorser daemon"
-      (args1 endorsement_delay_arg)
+      (args2 pidfile_arg endorsement_delay_arg)
       (prefixes [ "run" ]
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun endorsement_delay delegates cctxt ->
+      (fun (pidfile, endorsement_delay) delegates cctxt ->
+         init_signal () ;
+         may_lock_pidfile pidfile >>=? fun () ->
          Tezos_signer_backends.Encrypted.decrypt_list
            cctxt (List.map fst delegates) >>=? fun () ->
          Client_daemon.Endorser.run cctxt
@@ -166,9 +194,11 @@ let accuser_commands () =
   in
   [
     command ~group ~desc: "Launch the accuser daemon"
-      (args1 preserved_levels_arg)
+      (args2 pidfile_arg preserved_levels_arg)
       (prefixes [ "run" ]
        @@ stop)
-      (fun preserved_levels cctxt ->
+      (fun (pidfile, preserved_levels) cctxt ->
+         init_signal () ;
+         may_lock_pidfile pidfile >>=? fun () ->
          Client_daemon.Accuser.run ~preserved_levels cctxt) ;
   ]
