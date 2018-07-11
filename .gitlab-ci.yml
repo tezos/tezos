@@ -508,11 +508,6 @@ opam:62:tezos-baker-alpha-commands:
   variables:
     package: tezos-baker-alpha-commands
 
-opam:63:tezos-bench:
-  <<: *opam_definition
-  variables:
-    package: tezos-bench
-
 
 ##END_OPAM##
 
