@@ -94,12 +94,35 @@ let high_watermark_switch =
     ~long: "check-high-watermark"
     ()
 
+let pidfile_arg =
+  arg
+    ~doc: "write process id in file"
+    ~short: 'P'
+    ~long: "pidfile"
+    ~placeholder: "filename"
+    (parameter (fun _ s -> return s))
+
+let init_signal () =
+  let handler name id = try
+      Format.eprintf "Received the %s signal, triggering shutdown.@." name ;
+      exit id
+    with _ -> () in
+  ignore (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
+  ignore (Lwt_unix.on_signal Sys.sigterm (handler "TERM") : Lwt_unix.signal_handler_id)
+
+let may_setup_pidfile = function
+  | None -> return_unit
+  | Some pidfile ->
+      trace (failure "Failed to create the pidfile: %s" pidfile) @@
+      Lwt_lock_file.create ~unlink_on_exit:true pidfile
+
 let commands base_dir require_auth =
   Client_keys_commands.commands None @
   Tezos_signer_backends.Ledger.commands () @
   [ command ~group
       ~desc: "Launch a signer daemon over a TCP socket."
-      (args4
+      (args5
+         pidfile_arg
          magic_bytes_arg
          high_watermark_switch
          (default_arg
@@ -117,7 +140,9 @@ let commands base_dir require_auth =
             ~default: default_tcp_port
             (parameter (fun _ s -> return s))))
       (prefixes [ "launch" ; "socket" ; "signer" ] @@ stop)
-      (fun (magic_bytes, check_high_watermark, host, port) cctxt ->
+      (fun (pidfile, magic_bytes, check_high_watermark, host, port) cctxt ->
+         init_signal () ;
+         may_setup_pidfile pidfile >>=? fun () ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
          Socket_daemon.run
            cctxt (Tcp (host, port, [AI_SOCKTYPE SOCK_STREAM]))
@@ -125,7 +150,8 @@ let commands base_dir require_auth =
          return_unit) ;
     command ~group
       ~desc: "Launch a signer daemon over a local Unix socket."
-      (args3
+      (args4
+         pidfile_arg
          magic_bytes_arg
          high_watermark_switch
          (default_arg
@@ -136,14 +162,17 @@ let commands base_dir require_auth =
             ~default: (Filename.concat base_dir "socket")
             (parameter (fun _ s -> return s))))
       (prefixes [ "launch" ; "local" ; "signer" ] @@ stop)
-      (fun (magic_bytes, check_high_watermark, path) cctxt ->
+      (fun (pidfile, magic_bytes, check_high_watermark, path) cctxt ->
+         init_signal () ;
+         may_setup_pidfile pidfile >>=? fun () ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
          Socket_daemon.run
            cctxt (Unix path) ?magic_bytes ~check_high_watermark ~require_auth >>=? fun _ ->
          return_unit) ;
     command ~group
       ~desc: "Launch a signer daemon over HTTP."
-      (args4
+      (args5
+         pidfile_arg
          magic_bytes_arg
          high_watermark_switch
          (default_arg
@@ -164,12 +193,15 @@ let commands base_dir require_auth =
                   try return (int_of_string x)
                   with Failure _ -> failwith "Invalid port %s" x))))
       (prefixes [ "launch" ; "http" ; "signer" ] @@ stop)
-      (fun (magic_bytes, check_high_watermark, host, port) cctxt ->
+      (fun (pidfile, magic_bytes, check_high_watermark, host, port) cctxt ->
+         init_signal () ;
+         may_setup_pidfile pidfile >>=? fun () ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
          Http_daemon.run_http cctxt ~host ~port ?magic_bytes ~check_high_watermark ~require_auth) ;
     command ~group
       ~desc: "Launch a signer daemon over HTTPS."
-      (args4
+      (args5
+         pidfile_arg
          magic_bytes_arg
          high_watermark_switch
          (default_arg
@@ -206,7 +238,9 @@ let commands base_dir require_auth =
                 failwith "No such TLS key file %s" s
               else
                 return s)) @@ stop)
-      (fun (magic_bytes, check_high_watermark, host, port) cert key cctxt ->
+      (fun (pidfile, magic_bytes, check_high_watermark, host, port) cert key cctxt ->
+         init_signal () ;
+         may_setup_pidfile pidfile >>=? fun () ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
          Http_daemon.run_https cctxt ~host ~port ~cert ~key ?magic_bytes ~check_high_watermark ~require_auth) ;
     command ~group

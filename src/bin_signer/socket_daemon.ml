@@ -65,13 +65,13 @@ let run (cctxt : #Client_context.wallet) path ?magic_bytes ~check_high_watermark
             -% s host_name host
             -% s service_name service)
     | Unix path ->
-        List.iter begin fun signal ->
+        ListLabels.iter Sys.[sigint ; sigterm] ~f:begin fun signal ->
           Sys.set_signal signal (Signal_handle begin fun _ ->
               Format.printf "Removing the local socket file and quitting.@." ;
               Unix.unlink path ;
               exit 0
             end)
-        end Sys.[sigint ; sigterm] ;
+        end ;
         log Tag.DSL.(fun f ->
             f "Accepting UNIX requests on %s"
             -% t event "accepting_unix_requests"
