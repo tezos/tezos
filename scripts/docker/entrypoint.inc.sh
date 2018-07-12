@@ -96,7 +96,7 @@ launch_node() {
 
     if [ ! -f "$node_data_dir/identity.json" ]; then
         echo "Generating a new node identity..."
-        "$node" identity generate 24. \
+        "$node" identity generate "${IDENTITY_POW:-26}". \
                 --data-dir "$node_data_dir"
     fi
 
