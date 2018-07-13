@@ -1,17 +1,32 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module Message = Distributed_db_message
-module Metadata = Distributed_db_metadata
 
-type p2p = (Message.t, Metadata.t) P2p.net
-type connection = (Message.t, Metadata.t) P2p.connection
+type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
+type connection = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.connection
 
 type 'a request_param = {
   data: 'a ;
@@ -25,6 +40,10 @@ module Make_raw
        val name : string
        val encoding : t Data_encoding.t
        val pp : Format.formatter -> t -> unit
+
+       module Logging : sig
+         val tag : t Tag.def
+       end
      end)
     (Disk_table :
        Distributed_db_functors.DISK_TABLE with type key := Hash.t)
@@ -32,6 +51,7 @@ module Make_raw
        Distributed_db_functors.MEMORY_TABLE with type key := Hash.t)
     (Request_message : sig
        type param
+       val max_length : int
        val forge : param -> Hash.t list -> Message.t
      end)
     (Precheck : Distributed_db_functors.PRECHECK
@@ -41,8 +61,10 @@ module Make_raw
   module Request = struct
     type param = Request_message.param request_param
     let active { active } = active ()
-    let send { data ; send } gid keys =
-      send gid (Request_message.forge data keys)
+    let rec send state gid keys =
+      let first_keys, keys = List.split_n Request_message.max_length keys in
+      state.send gid (Request_message.forge state.data first_keys) ;
+      if keys <> [] then send state gid keys
   end
 
   module Scheduler =
@@ -83,6 +105,7 @@ module Raw_operation =
     (Operation_hash.Table)
     (struct
       type param = unit
+      let max_length = 10
       let forge () keys = Message.Get_operations keys
     end)
     (struct
@@ -113,6 +136,7 @@ module Raw_block_header =
     (Block_hash.Table)
     (struct
       type param = unit
+      let max_length = 10
       let forge () keys = Message.Get_block_headers keys
     end)
     (struct
@@ -134,7 +158,7 @@ module Operation_hashes_storage = struct
     | None -> Lwt.return_none
     | Some b ->
         State.Block.operation_hashes b i >>= fun (ops, _) ->
-        Lwt.return (Some ops)
+        Lwt.return_some ops
   let read_exn chain_state (h, i) =
     State.Block.read_exn chain_state h >>= fun b ->
     State.Block.operation_hashes b i >>= fun (ops, _) ->
@@ -160,11 +184,15 @@ module Raw_operation_hashes = struct
         let encoding =
           let open Data_encoding in
           obj2 (req "block" Block_hash.encoding) (req "index" uint16)
+        module Logging = struct
+          let tag = Tag.def ~doc:"Operation hashes" "operation_hashes" pp
+        end
       end)
       (Operation_hashes_storage)
       (Operations_table)
       (struct
         type param = unit
+        let max_length = 10
         let forge () keys =
           Message.Get_operation_hashes_for_blocks keys
       end)
@@ -211,7 +239,7 @@ module Operations_storage = struct
     | None -> Lwt.return_none
     | Some b ->
         State.Block.operations b i >>= fun (ops, _) ->
-        Lwt.return (Some ops)
+        Lwt.return_some ops
   let read_exn chain_state (h, i) =
     State.Block.read_exn chain_state h >>= fun b ->
     State.Block.operations b i >>= fun (ops, _) ->
@@ -228,11 +256,15 @@ module Raw_operations = struct
         let encoding =
           let open Data_encoding in
           obj2 (req "block" Block_hash.encoding) (req "index" uint16)
+        module Logging = struct
+          let tag = Tag.def ~doc:"Operations" "operations" pp
+        end
       end)
       (Operations_storage)
       (Operations_table)
       (struct
         type param = unit
+        let max_length = 10
         let forge () keys =
           Message.Get_operations_for_blocks keys
       end)
@@ -282,6 +314,7 @@ module Raw_protocol =
     (Protocol_hash.Table)
     (struct
       type param = unit
+      let max_length = 10
       let forge () keys = Message.Get_protocols keys
     end)
     (struct
@@ -413,19 +446,19 @@ let read_operation { active_chains } h =
 module P2p_reader = struct
 
   let may_activate global_db state chain_id f =
-    match Chain_id.Table.find state.peer_active_chains chain_id with
-    | chain_db ->
+    match Chain_id.Table.find_opt state.peer_active_chains chain_id with
+    | Some chain_db ->
         f chain_db
-    | exception Not_found ->
-        match Chain_id.Table.find global_db.active_chains chain_id with
-        | chain_db ->
+    | None ->
+        match Chain_id.Table.find_opt global_db.active_chains chain_id with
+        | Some chain_db ->
             chain_db.active_peers :=
               P2p_peer.Set.add state.gid !(chain_db.active_peers) ;
             P2p_peer.Table.add chain_db.active_connections
               state.gid state ;
             Chain_id.Table.add state.peer_active_chains chain_id chain_db ;
             f chain_db
-        | exception Not_found ->
+        | None ->
             (* TODO  decrease peer score. *)
             Lwt.return_unit
 
@@ -436,29 +469,33 @@ module P2p_reader = struct
     P2p_peer.Table.remove chain_db.active_connections state.gid
 
   let may_handle state chain_id f =
-    match Chain_id.Table.find state.peer_active_chains chain_id with
-    | exception Not_found ->
+    match Chain_id.Table.find_opt state.peer_active_chains chain_id with
+    | None ->
         (* TODO decrease peer score *)
         Lwt.return_unit
-    | chain_db ->
+    | Some chain_db ->
         f chain_db
 
   let may_handle_global global_db chain_id f =
-    match Chain_id.Table.find global_db.active_chains chain_id with
-    | exception Not_found ->
+    match Chain_id.Table.find_opt global_db.active_chains chain_id with
+    | None ->
         Lwt.return_unit
-    | chain_db ->
+    | Some chain_db ->
         f chain_db
+
+  module Handle_msg_Logging =
+    Tezos_stdlib.Logging.Make_semantic(struct let name = "node.distributed_db.p2p_reader" end)
 
   let handle_msg global_db state msg =
 
     let open Message in
-    let module Logging =
-      Logging.Make(struct let name = "node.distributed_db.p2p_reader" end) in
-    let open Logging in
+    let open Handle_msg_Logging in
 
-    lwt_debug "Read message from %a: %a"
-      P2p_peer.Id.pp_short state.gid Message.pp_json msg >>= fun () ->
+    lwt_debug Tag.DSL.(fun f ->
+        f "Read message from %a: %a"
+        -% t event "read_message"
+        -% a P2p_peer.Id.Logging.tag state.gid
+        -% a Message.Logging.tag msg) >>= fun () ->
 
     match msg with
 
@@ -483,13 +520,17 @@ module P2p_reader = struct
         Lwt_list.exists_p
           (State.Block.known_invalid chain_db.chain_state)
           (Block_header.hash head :: hist) >>= fun known_invalid ->
-        if known_invalid then
-          Lwt.return_unit (* TODO Kickban *)
-        else if Time.(now () < head.shell.timestamp) then begin
+        if known_invalid then begin
+          (* TODO Kick *)
+          P2p.greylist_peer global_db.p2p state.gid ;
+          Lwt.return_unit
+        end else if Time.(add (now ()) 15L < head.shell.timestamp) then begin
           (* TODO some penalty *)
-          lwt_log_notice "Received future block %a from peer %a."
-            Block_hash.pp_short (Block_header.hash head)
-            P2p_peer.Id.pp_short state.gid >>= fun () ->
+          lwt_log_notice Tag.DSL.(fun f ->
+              f "Received future block %a from peer %a."
+              -% t event "received_future_block"
+              -% a Block_hash.Logging.tag (Block_header.hash head)
+              -% a P2p_peer.Id.Logging.tag state.gid) >>= fun () ->
           Lwt.return_unit
         end else begin
           chain_db.callback.notify_branch state.gid locator ;
@@ -504,7 +545,15 @@ module P2p_reader = struct
 
     | Get_current_head chain_id ->
         may_handle state chain_id @@ fun chain_db ->
-        State.Current_mempool.get chain_db.chain_state >>= fun (head, mempool) ->
+        let { Connection_metadata.disable_mempool } =
+          P2p.connection_remote_metadata chain_db.global_db.p2p state.conn in
+        begin
+          if disable_mempool then
+            Chain.head chain_db.chain_state >>= fun head ->
+            Lwt.return (State.Block.header head, Mempool.empty)
+          else
+            State.Current_mempool.get chain_db.chain_state
+        end >>= fun (head, mempool) ->
         (* TODO bound the sent mempool size *)
         ignore
         @@ P2p.try_send global_db.p2p state.conn
@@ -515,13 +564,26 @@ module P2p_reader = struct
         may_handle state chain_id @@ fun chain_db ->
         let head = Block_header.hash header in
         State.Block.known_invalid chain_db.chain_state head >>= fun known_invalid ->
-        if known_invalid then
-          Lwt.return_unit (* TODO Kickban *)
-        else if Time.(now () < header.shell.timestamp) then begin
+        let { Connection_metadata.disable_mempool } =
+          P2p.connection_local_metadata chain_db.global_db.p2p state.conn in
+        let known_invalid =
+          known_invalid ||
+          (disable_mempool && mempool <> Mempool.empty)
+          (* A non-empty mempool was received while mempool is desactivated,
+               so the message is ignored.
+               This should probably warrant a reduction of the sender's score. *)
+        in
+        if known_invalid then begin
+          (* TODO Kick *)
+          P2p.greylist_peer global_db.p2p state.gid ;
+          Lwt.return_unit
+        end else if Time.(add (now ()) 15L < header.shell.timestamp) then begin
           (* TODO some penalty *)
-          lwt_log_notice "Received future block %a from peer %a."
-            Block_hash.pp_short head
-            P2p_peer.Id.pp_short state.gid >>= fun () ->
+          lwt_log_notice Tag.DSL.(fun f ->
+              f "Received future block %a from peer %a."
+              -% t event "received_future_block"
+              -% a Block_hash.Logging.tag head
+              -% a P2p_peer.Id.Logging.tag state.gid) >>= fun () ->
           Lwt.return_unit
         end else begin
           chain_db.callback.notify_head state.gid header mempool ;
@@ -717,15 +779,16 @@ let create disk p2p =
   let db =
     { p2p ; p2p_readers ; disk ;
       active_chains ; protocol_db ;
-      block_input ; operation_input } in
+      block_input ; operation_input ;
+    } in
   P2p.on_new_connection p2p (P2p_reader.run db) ;
   P2p.iter_connections p2p (P2p_reader.run db) ;
   db
 
 let activate ({ p2p ; active_chains } as global_db) chain_state =
   let chain_id = State.Chain.id chain_state in
-  match Chain_id.Table.find active_chains chain_id with
-  | exception Not_found ->
+  match Chain_id.Table.find_opt active_chains chain_id with
+  | None ->
       let active_peers = ref P2p_peer.Set.empty in
       let p2p_request =
         { data = () ;
@@ -754,7 +817,7 @@ let activate ({ p2p ; active_chains } as global_db) chain_state =
           end) ;
       Chain_id.Table.add active_chains chain_id chain ;
       chain
-  | chain ->
+  | Some chain ->
       chain
 
 let set_callback chain_db callback =
@@ -777,8 +840,10 @@ let deactivate chain_db =
   Lwt.return_unit
 
 let get_chain { active_chains } chain_id =
-  try Some (Chain_id.Table.find active_chains chain_id)
-  with Not_found -> None
+  Chain_id.Table.find_opt active_chains chain_id
+
+let greylist { global_db = { p2p } } peer_id =
+  Lwt.return (P2p.greylist_peer p2p peer_id)
 
 let disconnect { global_db = { p2p } } peer_id =
   match P2p.find_connection p2p peer_id with
@@ -806,10 +871,12 @@ let clear_block chain_db hash n =
   Raw_operation_hashes.clear_all chain_db.operation_hashes_db.table hash n ;
   Raw_block_header.Table.clear_or_cancel chain_db.block_header_db.table hash
 
-let commit_block chain_db hash header operations result =
+let commit_block chain_db hash
+    header header_data operations operations_data result =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
   assert (List.length operations = header.shell.validation_passes) ;
-  State.Block.store chain_db.chain_state header operations result >>=? fun res ->
+  State.Block.store chain_db.chain_state
+    header header_data operations operations_data result >>=? fun res ->
   clear_block chain_db hash header.shell.validation_passes ;
   return res
 
@@ -916,10 +983,10 @@ let broadcast chain_db msg =
     chain_db.active_connections
 
 let try_send chain_db peer_id msg =
-  try
-    let conn = P2p_peer.Table.find chain_db.active_connections peer_id in
-    ignore (P2p.try_send chain_db.global_db.p2p conn.conn msg : bool)
-  with Not_found -> ()
+  match P2p_peer.Table.find_opt chain_db.active_connections peer_id with
+  | None -> ()
+  | Some conn ->
+      ignore (P2p.try_send chain_db.global_db.p2p conn.conn msg : bool)
 
 let send chain_db ?peer msg =
   match peer with
@@ -943,8 +1010,26 @@ module Advertise = struct
   let current_head chain_db ?peer ?(mempool = Mempool.empty) head =
     let chain_id = State.Chain.id chain_db.chain_state in
     assert (Chain_id.equal chain_id (State.Block.chain_id head)) ;
-    send chain_db ?peer @@
-    Current_head (chain_id, State.Block.header head, mempool)
+    let msg_mempool =
+      Message.Current_head (chain_id, State.Block.header head, mempool) in
+    if mempool = Mempool.empty then
+      send chain_db ?peer msg_mempool
+    else
+      let msg_disable_mempool =
+        Message.Current_head (chain_id, State.Block.header head, Mempool.empty) in
+      let send_mempool state =
+        let { Connection_metadata.disable_mempool } =
+          P2p.connection_remote_metadata chain_db.global_db.p2p state.conn in
+        let msg = if disable_mempool then msg_disable_mempool else msg_mempool in
+        ignore @@ P2p.try_send chain_db.global_db.p2p state.conn msg
+      in
+      match peer with
+      | Some receiver_id ->
+          let state = P2p_peer.Table.find chain_db.active_connections receiver_id in
+          send_mempool state
+      | None ->
+          List.iter (fun (_receiver_id, state) -> send_mempool state)
+            (P2p_peer.Table.fold (fun k v acc -> (k,v)::acc) chain_db.active_connections [])
 
   let current_branch ?peer chain_db =
     let chain_id = State.Chain.id chain_db.chain_state in

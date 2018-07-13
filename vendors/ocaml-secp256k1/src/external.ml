@@ -325,9 +325,9 @@ module Sign = struct
             let _nb_written = write_exn ~der ctx buf signature in
             buf
       | R _ as signature ->
-        let buf = Bigstring.create recoverable_bytes in
-        let _nb_written = write_exn ctx buf signature in
-        buf
+          let buf = Bigstring.create recoverable_bytes in
+          let _nb_written = write_exn ctx buf signature in
+          buf
 
   external normalize :
     Context.t -> Bigstring.t -> Bigstring.t -> bool =
@@ -454,5 +454,5 @@ module Sign = struct
 
   let recover ctx ~signature msg =
     try Ok (recover_exn ctx ~signature msg) with
-    Invalid_argument msg -> Error msg
+      Invalid_argument msg -> Error msg
 end

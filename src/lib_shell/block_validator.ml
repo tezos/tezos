@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Block_validator_worker_state
 open Block_validator_errors
@@ -79,7 +95,7 @@ let check_header
     (invalid_block hash
        (Unexpected_number_of_validation_passes header.shell.validation_passes)
     ) >>=? fun () ->
-  return ()
+  return_unit
 
 let assert_no_duplicate_operations block live_operations operation_hashes =
   fold_left_s (fold_left_s (fun live_operations oph ->
@@ -87,7 +103,7 @@ let assert_no_duplicate_operations block live_operations operation_hashes =
         (invalid_block block @@ Replayed_operation oph) >>=? fun () ->
       return (Operation_hash.Set.add oph live_operations)))
     live_operations operation_hashes >>=? fun _ ->
-  return ()
+  return_unit
 
 let assert_operation_liveness block live_blocks operations =
   iter_s (iter_s (fun op ->
@@ -110,7 +126,17 @@ let check_liveness chain_state pred hash operations_hashes operations =
   assert_no_duplicate_operations
     hash live_operations operations_hashes >>=? fun () ->
   assert_operation_liveness hash live_blocks operations >>=? fun () ->
-  return ()
+  return_unit
+
+let may_patch_protocol
+    ~level
+    (validation_result : Tezos_protocol_environment_shell.validation_result) =
+  match Block_header.get_forced_protocol_upgrade ~level with
+  | None ->
+      return validation_result
+  | Some hash ->
+      Context.set_protocol validation_result.context hash >>= fun context ->
+      return { validation_result with context }
 
 let apply_block
     chain_state
@@ -129,28 +155,43 @@ let apply_block
           invalid_block hash @@
           Too_many_operations
             { pass = i + 1 ; found = List.length ops ; max }) >>=? fun () ->
-       let max_size = State.Block.max_operation_data_length pred in
        iter_p (fun op ->
            let size = Data_encoding.Binary.length Operation.encoding op in
            fail_unless
-             (size <= max_size)
+             (size <= Proto.max_operation_data_length)
              (invalid_block hash @@
               Oversized_operation
                 { operation = Operation.hash op ;
-                  size ; max = max_size })) ops >>=? fun () ->
-       return ())
+                  size ; max = Proto.max_operation_data_length })) ops >>=? fun () ->
+       return_unit)
     operations Proto.validation_passes >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
   check_liveness chain_state pred hash operation_hashes operations >>=? fun () ->
-  mapi2_s (fun pass -> map2_s begin fun op_hash raw ->
-      Lwt.return (Proto.parse_operation op_hash raw)
-      |> trace (invalid_block hash (Cannot_parse_operation op_hash)) >>=? fun op ->
-      let allowed_pass = Proto.acceptable_passes op in
-      fail_unless (List.mem pass allowed_pass)
-        (invalid_block hash
-           (Unallowed_pass { operation = op_hash ;
-                             pass ; allowed_pass } )) >>=? fun () ->
-      return op
+  begin
+    match
+      Data_encoding.Binary.of_bytes
+        Proto.block_header_data_encoding
+        header.protocol_data with
+    | None ->
+        fail (invalid_block hash Cannot_parse_block_header)
+    | Some protocol_data ->
+        return ({ shell = header.shell ; protocol_data } : Proto.block_header)
+  end >>=? fun header ->
+  mapi2_s (fun pass -> map2_s begin fun op_hash op ->
+      match
+        Data_encoding.Binary.of_bytes
+          Proto.operation_data_encoding
+          op.Operation.proto with
+      | None ->
+          fail (invalid_block hash (Cannot_parse_operation op_hash))
+      | Some protocol_data ->
+          let op = { Proto.shell = op.shell ; protocol_data } in
+          let allowed_pass = Proto.acceptable_passes op in
+          fail_unless (List.mem pass allowed_pass)
+            (invalid_block hash
+               (Unallowed_pass { operation = op_hash ;
+                                 pass ; allowed_pass } )) >>=? fun () ->
+          return op
     end)
     operation_hashes
     operations >>=? fun parsed_operations ->
@@ -159,15 +200,24 @@ let apply_block
     pred_context pred_hash header.shell.timestamp >>= fun context ->
   (* TODO wrap 'proto_error' into 'block_error' *)
   Proto.begin_application
+    ~chain_id: (State.Chain.id chain_state)
     ~predecessor_context:context
     ~predecessor_timestamp:pred_header.shell.timestamp
     ~predecessor_fitness:pred_header.shell.fitness
     header >>=? fun state ->
-  fold_left_s (fold_left_s (fun state op ->
-      Proto.apply_operation state op >>=? fun state ->
-      return state))
-    state parsed_operations >>=? fun state ->
-  Proto.finalize_block state >>=? fun validation_result ->
+  fold_left_s
+    (fun (state, acc) ops ->
+       fold_left_s
+         (fun (state, acc) op ->
+            Proto.apply_operation state op >>=? fun (state, op_metadata) ->
+            return (state, op_metadata :: acc))
+         (state, []) ops >>=? fun (state, ops_metadata) ->
+       return (state, List.rev ops_metadata :: acc))
+    (state, []) parsed_operations >>=? fun (state, ops_metadata) ->
+  let ops_metadata = List.rev ops_metadata in
+  Proto.finalize_block state >>=? fun (validation_result, block_data) ->
+  may_patch_protocol
+    ~level:header.shell.level validation_result >>=? fun validation_result ->
   Context.get_protocol validation_result.context >>= fun new_protocol ->
   let expected_proto_level =
     if Protocol_hash.equal new_protocol Proto.hash then
@@ -203,7 +253,15 @@ let apply_block
          validation_result.max_operations_ttl) in
   let validation_result =
     { validation_result with max_operations_ttl } in
-  return validation_result
+  let block_data =
+    Data_encoding.Binary.to_bytes_exn Proto.block_header_metadata_encoding block_data in
+  let ops_metadata =
+    List.map
+      (List.map
+         (Data_encoding.Binary.to_bytes_exn
+            Proto.operation_receipt_encoding))
+      ops_metadata in
+  return (validation_result, block_data, ops_metadata)
 
 let check_chain_liveness chain_db hash (header: Block_header.t) =
   let chain_state = Distributed_db.chain_state chain_db in
@@ -213,7 +271,7 @@ let check_chain_liveness chain_db hash (header: Block_header.t) =
       Expired_chain { chain_id = State.Chain.id chain_state ;
                       expiration = eol ;
                       timestamp = header.shell.timestamp }
-  | None | Some _ -> return ()
+  | None | Some _ -> return_unit
 
 let get_proto pred hash =
   State.Block.context pred >>= fun pred_context ->
@@ -255,9 +313,12 @@ let on_request
               protect ?canceler begin fun () ->
                 apply_block
                   (Distributed_db.chain_state chain_db)
-                  pred proto hash header operations >>=? fun result ->
+                  pred proto hash
+                  header operations >>=? fun (result, header_data, operations_data) ->
                 Distributed_db.commit_block
-                  chain_db hash header operations result >>=? function
+                  chain_db hash
+                  header header_data operations operations_data
+                  result >>=? function
                 | None -> assert false (* should not happen *)
                 | Some block -> return block
               end
@@ -296,13 +357,13 @@ let on_completion
     | Ok (Some _) ->
         Worker.record_event w
           (Event.Validation_success (Request.view r, st)) ;
-        Lwt.return ()
+        Lwt.return_unit
     | Ok None ->
-        Lwt.return ()
+        Lwt.return_unit
     | Error errs ->
         Worker.record_event w
           (Event.Validation_failure (Request.view r, st, errs)) ;
-        Lwt.return ()
+        Lwt.return_unit
 
 let table = Worker.create_table Queue
 
@@ -311,10 +372,10 @@ let create limits db =
     type self = t
     let on_launch = on_launch
     let on_request = on_request
-    let on_close _ = Lwt.return ()
+    let on_close _ = Lwt.return_unit
     let on_error = on_error
     let on_completion = on_completion
-    let on_no_request _ = return ()
+    let on_no_request _ = return_unit
   end in
   Worker.launch
     table
@@ -338,7 +399,7 @@ let validate w
         bv.protocol_validator
         ?peer ~timeout:bv.limits.protocol_timeout
         block ;
-      return None
+      return_none
   | None ->
       map_p (map_p (fun op ->
           let op_hash = Operation.hash op in

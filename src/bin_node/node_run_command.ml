@@ -1,23 +1,39 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
-open Logging.Node.Main
+open Node_logging
 
 let genesis : State.Chain.genesis = {
   time =
-    Time.of_notation_exn "2018-05-17T16:43:02Z" ;
+    Time.of_notation_exn "2018-06-30T16:07:32Z" ;
   block =
     Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesis72b86fSfRAL" ;
+      "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" ;
   protocol =
     Protocol_hash.of_b58check_exn
-      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
+      "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" ;
 }
 
 type error += Non_private_sandbox of P2p_addr.t
@@ -90,7 +106,7 @@ let init_logger ?verbosity (log_config : Node_config_file.log) =
   end ;
   Logging_unix.init ~template:log_config.template log_config.output
 
-let init_node ?sandbox (config : Node_config_file.t) =
+let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   let patch_context json ctxt =
     begin
       match json with
@@ -98,7 +114,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
       | Some json ->
           Tezos_storage.Context.set ctxt
             ["sandbox_parameter"]
-            (Data_encoding.Binary.to_bytes Data_encoding.json json)
+            (Data_encoding.Binary.to_bytes_exn Data_encoding.json json)
     end >>= fun ctxt ->
     let module Proto = (val Registered_protocol.get_exn genesis.protocol) in
     Proto.init ctxt {
@@ -119,16 +135,16 @@ let init_node ?sandbox (config : Node_config_file.t) =
     | None -> Lwt.return_none
     | Some sandbox_param ->
         match sandbox_param with
-        | None -> Lwt.return None
+        | None -> Lwt.return_none
         | Some file ->
             Lwt_utils_unix.Json.read_file file >>= function
             | Error err ->
                 lwt_warn
                   "Can't parse sandbox parameters: %s" file >>= fun () ->
                 lwt_debug "%a" pp_print_error err >>= fun () ->
-                Lwt.return None
+                Lwt.return_none
             | Ok json ->
-                Lwt.return (Some json)
+                Lwt.return_some json
   end >>= fun sandbox_param ->
   (* TODO "WARN" when pow is below our expectation. *)
   begin
@@ -146,10 +162,10 @@ let init_node ?sandbox (config : Node_config_file.t) =
     match listening_addr, sandbox with
     | Some addr, Some _
       when Ipaddr.V6.(compare addr unspecified) = 0 ->
-        return None
+        return_none
     | Some addr, Some _ when not (Ipaddr.V6.is_private addr) ->
         fail (Non_private_sandbox addr)
-    | None, Some _ -> return None
+    | None, Some _ -> return_none
     | _ ->
         (Node_config_file.resolve_bootstrap_addrs
            config.p2p.bootstrap_peers) >>= fun trusted_points ->
@@ -165,13 +181,14 @@ let init_node ?sandbox (config : Node_config_file.t) =
             trusted_points ;
             peers_file =
               (config.data_dir // "peers.json") ;
-            closed_network = config.p2p.closed ;
+            private_mode = config.p2p.private_mode ;
             identity ;
             proof_of_work_target =
               Crypto_box.make_target config.p2p.expected_pow ;
+            disable_mempool = config.p2p.disable_mempool ;
           }
         in
-        return (Some (p2p_config, config.p2p.limits))
+        return_some (p2p_config, config.p2p.limits)
   end >>=? fun p2p_config ->
   let node_config : Node.config = {
     genesis ;
@@ -180,6 +197,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
     context_root = context_dir config.data_dir ;
     p2p = p2p_config ;
     test_chain_max_tll = Some (48 * 3600) ; (* 2 days *)
+    checkpoint ;
   } in
   Node.create
     node_config
@@ -199,14 +217,14 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
   match rpc_config.listen_addr with
   | None ->
       lwt_log_notice "Not listening to RPC calls." >>= fun () ->
-      return None
+      return_none
   | Some addr ->
       Node_config_file.resolve_rpc_listening_addrs addr >>= function
       | [] ->
           failwith "Cannot resolve listening address: %S" addr
       | (addr, port) :: _ ->
           let host = Ipaddr.V6.to_string addr in
-          let dir = Node_rpc.build_rpc_directory node in
+          let dir = Node.build_rpc_directory node in
           let mode =
             match rpc_config.tls with
             | None -> `TCP (`Port port)
@@ -226,7 +244,7 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
                  ~media_types:Media_type.all_media_types
                  ~cors:{ allowed_origins = rpc_config.cors_origins ;
                          allowed_headers = cors_headers } >>= fun server ->
-               return (Some server))
+               return_some server)
             (function
               |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
                   fail (RPC_Port_already_in_use [(addr,port)])
@@ -241,7 +259,7 @@ let init_signal () =
   ignore (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
   ignore (Lwt_unix.on_signal Sys.sigterm (handler "TERM") : Lwt_unix.signal_handler_id)
 
-let run ?verbosity ?sandbox (config : Node_config_file.t) =
+let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   Lwt_lock_file.create
     ~unlink_on_exit:true (lock_file config.data_dir) >>=? fun () ->
@@ -249,7 +267,7 @@ let run ?verbosity ?sandbox (config : Node_config_file.t) =
   init_logger ?verbosity config.log >>= fun () ->
   Updater.init (protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
-  init_node ?sandbox config >>=? fun node ->
+  init_node ?sandbox ?checkpoint config >>=? fun node ->
   init_rpc config.rpc node >>=? fun rpc ->
   lwt_log_notice "The Tezos node is now running!" >>= fun () ->
   Lwt_exit.termination_thread >>= fun x ->
@@ -259,9 +277,9 @@ let run ?verbosity ?sandbox (config : Node_config_file.t) =
   Lwt_utils.may ~f:RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
   Logging_unix.close () >>= fun () ->
-  return ()
+  return_unit
 
-let process sandbox verbosity args =
+let process sandbox verbosity checkpoint args =
   let verbosity =
     match verbosity with
     | [] -> None
@@ -277,14 +295,39 @@ let process sandbox verbosity args =
       | Some _ ->
           if config.data_dir = Node_config_file.default_data_dir
           then failwith "Cannot use default data directory while in sandbox mode"
-          else return ()
-      | None -> return ()
+          else return_unit
+      | None -> return_unit
     end >>=? fun () ->
+    begin
+      match checkpoint with
+      | None -> return_none
+      | Some s ->
+          match String.split ',' s with
+          | [ lvl ; block ] ->
+              Lwt.return (Block_hash.of_b58check block) >>=? fun block ->
+              begin
+                match Int32.of_string_opt lvl with
+                | None ->
+                    failwith "%s isn't a 32bit integer" lvl
+                | Some lvl ->
+                    return lvl
+              end >>=? fun lvl ->
+              return_some (lvl, block)
+          | [] -> assert false
+          | [_] ->
+              failwith "Checkoints are expected to follow the format \
+                        \"<level>,<block_hash>\". \
+                        The character ',' is not present in %s" s
+          | _ ->
+              failwith "Checkoints are expected to follow the format \
+                        \"<level>,<block_hash>\". \
+                        The character ',' is present more than once in %s" s
+    end >>=? fun checkpoint ->
     Lwt_lock_file.is_locked
       (lock_file config.data_dir) >>=? function
     | false ->
         Lwt.catch
-          (fun () -> run ?sandbox ?verbosity config)
+          (fun () -> run ?sandbox ?verbosity ?checkpoint config)
           (function
             |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
                 begin match config.rpc.listen_addr with
@@ -326,8 +369,19 @@ module Term = struct
          info ~docs:Node_shared_arg.Manpage.misc_section
            ~doc ~docv:"FILE.json" ["sandbox"])
 
+  let checkpoint =
+    let open Cmdliner in
+    let doc =
+      "When asked to take a block hash as a checkpoint, the daemon \
+       will only accept the chains that contains that block and those \
+       that might reach it."
+    in
+    Arg.(value & opt (some string) None &
+         info ~docs:Node_shared_arg.Manpage.misc_section
+           ~doc ~docv:"<level>,<block_hash>" ["checkpoint"])
+
   let term =
-    Cmdliner.Term.(ret (const process $ sandbox $ verbosity $
+    Cmdliner.Term.(ret (const process $ sandbox $ verbosity $ checkpoint $
                         Node_shared_arg.Term.args))
 
 end

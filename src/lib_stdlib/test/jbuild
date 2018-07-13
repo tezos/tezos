@@ -2,7 +2,6 @@
 
 (executables
  ((names (test_tzList
-          test_mbytes_buffer
           test_lwt_pipe))
   (libraries (tezos-stdlib
               alcotest
@@ -14,16 +13,11 @@
 (alias
   ((name buildtest)
    (deps (test_tzList.exe
-          test_mbytes_buffer.exe
           test_lwt_pipe.exe))))
 
 (alias
  ((name runtest_tzList)
   (action (run ${exe:test_tzList.exe}))))
-
-(alias
- ((name runtest_mbytes_buffer)
-  (action (run ${exe:test_mbytes_buffer.exe}))))
 
 (alias
  ((name runtest_lwt_pipe)
@@ -32,10 +26,9 @@
 (alias
  ((name runtest)
   (deps ((alias runtest_tzList)
-         (alias runtest_mbytes_buffer)
          (alias runtest_lwt_pipe)))))
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files *.ml*)))
+  (deps ((glob_files *.ml{,i})))
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

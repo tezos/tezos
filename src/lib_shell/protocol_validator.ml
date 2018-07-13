@@ -1,15 +1,31 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Validation_errors
 
-include Logging.Make(struct let name = "node.validator.block" end)
+include Logging.Make_semantic(struct let name = "node.validator.block" end)
 
 type 'a request =
   | Request_validation: {
@@ -43,11 +59,11 @@ let rec worker_loop bv =
             (* no need to tag 'invalid' protocol on disk,
                the economic protocol prevents us from
                being spammed with protocol validation. *)
-            return true
+            return_true
         end >>=? fun _ ->
         match wakener with
         | None ->
-            return ()
+            return_unit
         | Some wakener ->
             if valid then
               match Registered_protocol.get hash with
@@ -63,16 +79,19 @@ let rec worker_loop bv =
                 (Error
                    [Invalid_protocol { hash ;
                                        error = Compilation_failed }]) ;
-            return ()
+            return_unit
   end >>= function
   | Ok () ->
       worker_loop bv
   | Error [Canceled | Exn Lwt_pipe.Closed] ->
-      lwt_log_notice "terminating" >>= fun () ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "terminating" -% t event "terminating") >>= fun () ->
       Lwt.return_unit
   | Error err ->
-      lwt_log_error "@[Unexpected error (worker):@ %a@]"
-        pp_print_error err >>= fun () ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "@[Unexpected error (worker):@ %a@]"
+          -% t event "unexpected_error"
+          -% a errs_tag err) >>= fun () ->
       Lwt_canceler.cancel bv.canceler >>= fun () ->
       Lwt.return_unit
 
@@ -99,13 +118,17 @@ let shutdown { canceler ; worker } =
 let validate { messages } hash protocol =
   match Registered_protocol.get hash with
   | Some protocol ->
-      lwt_debug "previously validated protocol %a (before pipe)"
-        Protocol_hash.pp_short hash >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "previously validated protocol %a (before pipe)"
+          -% t event "previously_validated_protocol"
+          -% a Protocol_hash.Logging.tag hash) >>= fun () ->
       return protocol
   | None ->
       let res, wakener = Lwt.task () in
-      lwt_debug "pushing validation request for protocol %a"
-        Protocol_hash.pp_short hash >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "pushing validation request for protocol %a"
+          -% t event "pushing_validation_request"
+          -% a Protocol_hash.Logging.tag hash) >>= fun () ->
       Lwt_pipe.push messages
         (Message (Request_validation { hash ; protocol },
                   Some wakener)) >>= fun () ->
@@ -119,8 +142,11 @@ let fetch_and_compile_protocol pv ?peer ?timeout hash =
         Distributed_db.Protocol.read_opt pv.db hash >>= function
         | Some protocol -> return protocol
         | None ->
-            lwt_log_notice "Fetching protocol %a from peer "
-              Protocol_hash.pp_short hash >>= fun () ->
+            lwt_log_notice Tag.DSL.(fun f ->
+                f "Fetching protocol %a%a"
+                -% t event "fetching_protocol"
+                -% a Protocol_hash.Logging.tag hash
+                -% a P2p_peer.Id.Logging.tag_source peer) >>= fun () ->
             Distributed_db.Protocol.fetch pv.db ?peer ?timeout hash ()
       end >>=? fun protocol ->
       validate pv hash protocol >>=? fun proto ->
@@ -131,17 +157,17 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block: State.Block.t) =
   let protocol =
     Context.get_protocol context >>= fun protocol_hash ->
     fetch_and_compile_protocol pv ?peer ?timeout protocol_hash >>=? fun _ ->
-    return ()
+    return_unit
   and test_protocol =
     Context.get_test_chain context >>= function
-    | Not_running -> return ()
+    | Not_running -> return_unit
     | Forking { protocol }
     | Running { protocol } ->
         fetch_and_compile_protocol pv ?peer ?timeout protocol  >>=? fun _ ->
-        return () in
+        return_unit in
   protocol >>=? fun () ->
   test_protocol >>=? fun () ->
-  return ()
+  return_unit
 
 let prefetch_and_compile_protocols pv ?peer ?timeout block =
   try ignore (fetch_and_compile_protocols pv ?peer ?timeout block) with _ -> ()

@@ -156,51 +156,51 @@ module Sign : sig
   (** {4 Creation} *)
 
   val sign : Context.t -> sk:Key.secret Key.t -> Bigstring.t -> (plain
-   t, string) result
+                                                                   t, string) result
 
   val sign_exn : Context.t -> sk:Key.secret Key.t -> Bigstring.t ->
-   plain t
+    plain t
 
   val sign_recoverable : Context.t -> sk:Key.secret Key.t ->
-   Bigstring.t -> (recoverable t, string) result
+    Bigstring.t -> (recoverable t, string) result
 
   val sign_recoverable_exn : Context.t -> sk:Key.secret Key.t ->
-   Bigstring.t -> recoverable t
+    Bigstring.t -> recoverable t
 
   (** {4 Direct write} *)
 
   val write_sign : Context.t -> Bigstring.t -> sk:Key.secret Key.t ->
-   msg:Bigstring.t -> (int, string) result (** [write_sign ctx buf ~sk
-   ~msg] writes signs [msg] with [sk] and writes the signature to
-   [buf] at [?pos]. It returns the number of bytes written (64) on
-   success, or ar error message otherwise. *)
+    msg:Bigstring.t -> (int, string) result (** [write_sign ctx buf ~sk
+                                                ~msg] writes signs [msg] with [sk] and writes the signature to
+                                                [buf] at [?pos]. It returns the number of bytes written (64) on
+                                                success, or ar error message otherwise. *)
 
   val write_sign_exn : Context.t -> Bigstring.t -> sk:Key.secret Key.t
-   -> msg:Bigstring.t -> int (** [write_sign_exn ctx buf ~sk ~msg]
-   writes signs [msg] with [sk] and writes the signature to [buf] at
-   [?pos]. It returns the number of bytes written (64).
+    -> msg:Bigstring.t -> int (** [write_sign_exn ctx buf ~sk ~msg]
+                                  writes signs [msg] with [sk] and writes the signature to [buf] at
+                                  [?pos]. It returns the number of bytes written (64).
 
-      @raise [Invalid_argument] if [buf] is not long enough to contain
-   a signature or signing has failed. *)
+                                  @raise [Invalid_argument] if [buf] is not long enough to contain
+                                  a signature or signing has failed. *)
 
   val write_sign_recoverable : Context.t -> sk:Key.secret Key.t ->
-   msg:Bigstring.t -> Bigstring.t -> (int, string) result
+    msg:Bigstring.t -> Bigstring.t -> (int, string) result
 
   val write_sign_recoverable_exn : Context.t -> sk:Key.secret Key.t ->
-   msg:Bigstring.t -> Bigstring.t -> int
+    msg:Bigstring.t -> Bigstring.t -> int
 
   (** {4 Verification} *)
 
   val verify_exn : Context.t -> pk:Key.public Key.t -> msg:Bigstring.t
-   -> signature:_ t -> bool
+    -> signature:_ t -> bool
 
   val verify : Context.t -> pk:Key.public Key.t -> msg:Bigstring.t ->
-   signature:_ t -> (bool, string) result
+    signature:_ t -> (bool, string) result
 
   (** {4 Recovery} *)
 
   val recover_exn : Context.t -> signature:recoverable t ->
-   Bigstring.t -> Key.public Key.t
+    Bigstring.t -> Key.public Key.t
 
   val recover : Context.t -> signature:recoverable t -> Bigstring.t ->
-   (Key.public Key.t, string) result end
+    (Key.public Key.t, string) result end

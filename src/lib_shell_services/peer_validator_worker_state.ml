@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module Request = struct
   type view =
@@ -15,13 +31,13 @@ module Request = struct
   let encoding =
     let open Data_encoding in
     union
-      [ case (Tag 0)
+      [ case (Tag 0) ~title:"New_head"
           (obj2
              (req "request" (constant "new_head"))
              (req "block" Block_hash.encoding))
           (function New_head h -> Some ((), h) | _ -> None)
           (fun ((), h) -> New_head h) ;
-        case (Tag 1)
+        case (Tag 1) ~title:"New_branch"
           (obj3
              (req "request" (constant "new_branch"))
              (req "block" Block_hash.encoding)
@@ -51,16 +67,19 @@ module Event = struct
     let open Data_encoding in
     union
       [ case (Tag 0)
+          ~title:"Debug"
           (obj1 (req "message" string))
           (function Debug msg -> Some msg | _ -> None)
           (fun msg -> Debug msg) ;
         case (Tag 1)
+          ~title:"Request"
           (obj2
              (req "request" Request.encoding)
              (req "status" Worker_types.request_status_encoding))
           (function Request (req, t, None) -> Some (req, t) | _ -> None)
           (fun (req, t) -> Request (req, t, None)) ;
         case (Tag 2)
+          ~title:"Failed request"
           (obj3
              (req "error" RPC_error.encoding)
              (req "failed_request" Request.encoding)

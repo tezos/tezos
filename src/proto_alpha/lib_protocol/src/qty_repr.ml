@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module type QTY = sig
   val id : string
@@ -78,7 +94,7 @@ module Make (T: QTY) : S = struct
   let one_mutez = 1L
   let one_cent = Int64.mul one_mutez 10_000L
   let fifty_cents = Int64.mul one_cent 50L
-  (* 1 tez = 100 cents = 10_000_000 mutez *)
+  (* 1 tez = 100 cents = 1_000_000 mutez *)
   let one = Int64.mul one_cent 100L
   let id = T.id
 
@@ -128,7 +144,7 @@ module Make (T: QTY) : S = struct
     let rec left ppf amount =
       let d, r = Int64.(div amount 1000L), Int64.(rem amount 1000L) in
       if d > 0L then
-        Format.fprintf ppf "%a,%03Ld" left d r
+        Format.fprintf ppf "%a%03Ld" left d r
       else
         Format.fprintf ppf "%Ld" r in
     let right ppf amount =
@@ -143,7 +159,7 @@ module Make (T: QTY) : S = struct
       if Compare.Int.(lo = 0) then
         Format.fprintf ppf "%a" triplet hi
       else
-        Format.fprintf ppf "%03d,%a" hi triplet lo in
+        Format.fprintf ppf "%03d%a" hi triplet lo in
     let ints, decs =
       Int64.(div amount mult_int),
       Int64.(to_int (rem amount mult_int)) in
@@ -159,12 +175,12 @@ module Make (T: QTY) : S = struct
     then Some (Int64.sub t1 t2)
     else None
 
-  let (-?) t1 t2 =
+  let ( -? ) t1 t2 =
     match t1 - t2 with
     | None -> error (Subtraction_underflow (t1, t2))
     | Some v -> ok v
 
-  let (+?) t1 t2 =
+  let ( +? ) t1 t2 =
     let t = Int64.add t1 t2 in
     if t < t1
     then error (Addition_overflow (t1, t2))
@@ -223,9 +239,7 @@ module Make (T: QTY) : S = struct
 
   let encoding =
     let open Data_encoding in
-    describe
-      ~title: "Amount in mutez"
-      (conv to_int64 (Json.wrap_error of_mutez_exn) int64)
+    (check_size 10 (conv Z.of_int64 (Json.wrap_error Z.to_int64) n))
 
   let () =
     let open Data_encoding in

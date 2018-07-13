@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** Tezos Shell - High-level API for the Gossip network and local storage. *)
 
@@ -15,9 +31,8 @@ type t
 type db = t
 
 module Message = Distributed_db_message
-module Metadata = Distributed_db_metadata
 
-type p2p = (Message.t, Metadata.t) P2p.net
+type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
 val create: State.t -> p2p -> t
 val state: db -> State.t
@@ -53,6 +68,9 @@ val set_callback: chain_db -> callback -> unit
 
 (** Kick a given peer. *)
 val disconnect: chain_db -> P2p_peer.Id.t -> unit Lwt.t
+
+(** Greylist a given peer. *)
+val greylist: chain_db -> P2p_peer.Id.t -> unit Lwt.t
 
 (** Various accessors. *)
 val chain_state: chain_db -> State.Chain.t
@@ -126,7 +144,8 @@ module Operation_hashes :
 val commit_block:
   chain_db ->
   Block_hash.t ->
-  Block_header.t -> Operation.t list list ->
+  Block_header.t -> MBytes.t ->
+  Operation.t list list -> MBytes.t list list ->
   Tezos_protocol_environment_shell.validation_result ->
   State.Block.t option tzresult Lwt.t
 

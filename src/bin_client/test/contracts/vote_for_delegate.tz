@@ -1,0 +1,30 @@
+parameter (option key_hash) ;
+storage (pair
+           (pair %mgr1 (address %addr) (option %key key_hash))
+           (pair %mgr2 (address %addr) (option %key key_hash))) ;
+code { # Update the storage
+       DUP ; CDAAR %addr @%; SENDER ; PAIR %@ %@; UNPAIR;
+       IFCMPEQ
+         { UNPAIR ; SWAP ; SET_CADR %key @changed_mgr1_key }
+         { DUP ; CDDAR ; SENDER ;
+           IFCMPEQ
+             { UNPAIR ; SWAP ; SET_CDDR %key }
+             { FAIL } } ;
+       # Now compare the proposals
+       DUP ; CADR ;
+       DIP { DUP ; CDDR } ;
+       IF_NONE
+         { IF_NONE
+             { NONE key_hash ;
+               SET_DELEGATE ; NIL operation ; SWAP ; CONS }
+             { DROP ; NIL operation } }
+         { SWAP ;
+           IF_SOME
+             { DIP { DUP } ;
+               IFCMPEQ
+                 { SOME ;
+                   SET_DELEGATE ; NIL operation ; SWAP ; CONS }
+                 { DROP ;
+                   NIL operation }}
+             { DROP ; NIL operation }} ;
+       PAIR }

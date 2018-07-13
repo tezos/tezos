@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** {1 Entity Accessor Signatures} ****************************************)
 
@@ -61,6 +77,72 @@ module type Single_data_storage = sig
 
 end
 
+(** Variant of {!Single_data_storage} with gas accounting. *)
+module type Single_carbonated_data_storage = sig
+
+  type t
+  type context = t
+
+  (** The type of the value *)
+  type value
+
+  (** Tells if the data is already defined.
+      Consumes [Gas_repr.read_bytes_cost Z.zero]. *)
+  val mem: context -> (Raw_context.t * bool) tzresult Lwt.t
+
+  (** Retrieve the value from the storage bucket ; returns a
+      {!Storage_error} if the key is not set or if the deserialisation
+      fails.
+      Consumes [Gas_repr.read_bytes_cost <size of the value>]. *)
+  val get: context -> (Raw_context.t * value) tzresult Lwt.t
+
+  (** Retrieves the value from the storage bucket ; returns [None] if
+      the data is not initialized, or {!Storage_helpers.Storage_error}
+      if the deserialisation fails.
+      Consumes [Gas_repr.read_bytes_cost <size of the value>] if present
+      or [Gas_repr.read_bytes_cost Z.zero]. *)
+  val get_option: context -> (Raw_context.t * value option) tzresult Lwt.t
+
+  (** Allocates the storage bucket and initializes it ; returns a
+      {!Storage_error Missing_key} if the bucket exists.
+      Consumes [Gas_repr.write_bytes_cost <size of the value>].
+      Returns the size. *)
+  val init: context -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Updates the content of the bucket ; returns a {!Storage_Error
+      Existing_key} if the value does not exists.
+      Consumes [Gas_repr.write_bytes_cost <size of the new value>].
+      Returns the difference from the old to the new size. *)
+  val set: context -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Allocates the data and initializes it with a value ; just
+      updates it if the bucket exists.
+      Consumes [Gas_repr.write_bytes_cost <size of the new value>].
+      Returns the difference from the old (maybe 0) to the new size. *)
+  val init_set: context -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** When the value is [Some v], allocates the data and initializes
+      it with [v] ; just updates it if the bucket exists. When the
+      valus is [None], delete the storage bucket when the value ; does
+      nothing if the bucket does not exists.
+      Consumes the same gas cost as either {!remove} or {!init_set}.
+      Returns the difference from the old (maybe 0) to the new size. *)
+  val set_option: context -> value option -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Delete the storage bucket ; returns a {!Storage_error
+      Missing_key} if the bucket does not exists.
+      Consumes [Gas_repr.write_bytes_cost Z.zero].
+      Returns the freed size. *)
+  val delete: context -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Removes the storage bucket and its contents ; does nothing if
+      the bucket does not exists.
+      Consumes [Gas_repr.write_bytes_cost Z.zero].
+      Returns the freed size. *)
+  val remove: context -> (Raw_context.t * int) tzresult Lwt.t
+
+end
+
 (** Restricted version of {!Indexed_data_storage} w/o iterators. *)
 module type Non_iterable_indexed_data_storage = sig
 
@@ -112,6 +194,80 @@ module type Non_iterable_indexed_data_storage = sig
   (** Removes a storage bucket and its contents ; does nothing if the
       bucket does not exists. *)
   val remove: context -> key -> Raw_context.t Lwt.t
+
+end
+
+(** Variant of {!Non_iterable_indexed_data_storage} with gas accounting. *)
+module type Non_iterable_indexed_carbonated_data_storage = sig
+
+  type t
+  type context = t
+
+  (** An abstract type for keys *)
+  type key
+
+  (** The type of values *)
+  type value
+
+  (** Tells if a given key is already bound to a storage bucket.
+      Consumes [Gas_repr.read_bytes_cost Z.zero]. *)
+  val mem: context -> key -> (Raw_context.t * bool) tzresult Lwt.t
+
+  (** Retrieve a value from the storage bucket at a given key ;
+      returns {!Storage_error Missing_key} if the key is not set ;
+      returns {!Storage_error Corrupted_data} if the deserialisation
+      fails.
+      Consumes [Gas_repr.read_bytes_cost <size of the value>]. *)
+  val get: context -> key -> (Raw_context.t * value) tzresult Lwt.t
+
+  (** Retrieve a value from the storage bucket at a given key ;
+      returns [None] if the value is not set ; returns {!Storage_error
+      Corrupted_data} if the deserialisation fails.
+      Consumes [Gas_repr.read_bytes_cost <size of the value>] if present
+      or [Gas_repr.read_bytes_cost Z.zero]. *)
+  val get_option: context -> key -> (Raw_context.t * value option) tzresult Lwt.t
+
+  (** Updates the content of a bucket ; returns A {!Storage_Error
+      Missing_key} if the value does not exists.
+      Consumes serialization cost.
+      Consumes [Gas_repr.write_bytes_cost <size of the new value>].
+      Returns the difference from the old to the new size. *)
+  val set: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Allocates a storage bucket at the given key and initializes it ;
+      returns a {!Storage_error Existing_key} if the bucket exists.
+      Consumes serialization cost.
+      Consumes [Gas_repr.write_bytes_cost <size of the value>].
+      Returns the size. *)
+  val init: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Allocates a storage bucket at the given key and initializes it
+      with a value ; just updates it if the bucket exists.
+      Consumes serialization cost.
+      Consumes [Gas_repr.write_bytes_cost <size of the new value>].
+      Returns the difference from the old (maybe 0) to the new size. *)
+  val init_set: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** When the value is [Some v], allocates the data and initializes
+      it with [v] ; just updates it if the bucket exists. When the
+      valus is [None], delete the storage bucket when the value ; does
+      nothing if the bucket does not exists.
+      Consumes serialization cost.
+      Consumes the same gas cost as either {!remove} or {!init_set}.
+      Returns the difference from the old (maybe 0) to the new size. *)
+  val set_option: context -> key -> value option -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Delete a storage bucket and its contents ; returns a
+      {!Storage_error Missing_key} if the bucket does not exists.
+      Consumes [Gas_repr.write_bytes_cost Z.zero].
+      Returns the freed size. *)
+  val delete: context -> key -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Removes a storage bucket and its contents ; does nothing if the
+      bucket does not exists.
+      Consumes [Gas_repr.write_bytes_cost Z.zero].
+      Returns the freed size. *)
+  val remove: context -> key -> (Raw_context.t * int) tzresult Lwt.t
 
 end
 
@@ -199,8 +355,7 @@ end
 
 module type VALUE = sig
   type t
-  val of_bytes: MBytes.t -> t tzresult
-  val to_bytes: t -> MBytes.t
+  val encoding: t Data_encoding.t
 end
 
 module type Indexed_raw_context = sig
@@ -208,6 +363,7 @@ module type Indexed_raw_context = sig
   type t
   type context = t
   type key
+  type 'a ipath
 
   val clear: context -> Raw_context.t Lwt.t
 
@@ -226,6 +382,11 @@ module type Indexed_raw_context = sig
                             and type key = key
                             and type value = V.t
 
-  module Raw_context : Raw_context.T with type t = t * key
+  module Make_carbonated_map (N : NAME) (V : VALUE)
+    : Non_iterable_indexed_carbonated_data_storage with type t = t
+                                                    and type key = key
+                                                    and type value = V.t
+
+  module Raw_context : Raw_context.T with type t = t ipath
 
 end

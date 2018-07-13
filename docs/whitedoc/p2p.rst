@@ -7,7 +7,7 @@ This document explains the inner workings of the peer-to-peer layer of
 the Tezos shell. This part is in charge of establishing and
 maintaining network connections with other nodes (gossip).
 
-The P2P layer is instanciated by the node. It is parametrized by the
+The P2P layer is instantiated by the node. It is parametrized by the
 type of messages that are exchanged over the network (to allow
 different P2P protocol versions/extensions), and the type of metadata
 associated to each peer. The latter is useful to compute a score for
@@ -28,7 +28,7 @@ General operation
 I/O Scheduling
 ~~~~~~~~~~~~~~
 
-The P2P layer uses I/O scheduling in order to be able to control its
+The P2P layer uses a scheduling mechanism in order to control its
 bandwidth usage as well as implementing different policies
 (e.g. read/write quotas) to different peers. For now, each peer is
 granted a fair share of the global allocated bandwidth, but it is
@@ -83,6 +83,18 @@ layer. It basically runs the ``accept(2)`` syscall and call
 that it is made aware of an incoming connection. From there, the pool
 will decide how this new connection must be handled.
 
+{Black, While, Grey}lists
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The welcome worker takes care of filtering all incoming connections using two
+static lists of addresses handled either by ``tezos-admin-client`` and a system
+table that is handled automatically by the p2p layer. The node admin can block
+or whitelist individual ip addresses, while the p2p layer is in charge of
+temporarily banning ip addresses and peers who misbehave. The delay to remove
+an ip address from the greylist table is defined by the configuration variable
+``greylist_timeout``, while peers that are greylisted are periodically removed.
+The node admin can also flush greylist tables with the ``tezos-admin-client``.
+
 Maintenance worker
 ------------------
 
@@ -111,4 +123,5 @@ Given these bounds, the maintenance worker:
   peers until it reaches at least ``min_target`` connections (and never
   more than ``max_target`` connections).
 
-
+The maintenance worker is also in charge of periodically run the
+greylists GC functions to unban ip addresses from the greylist.

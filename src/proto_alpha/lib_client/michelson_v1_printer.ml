@@ -1,13 +1,30 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Proto_alpha
+open Alpha_context
 open Tezos_micheline
 open Micheline
 open Micheline_printer
@@ -26,25 +43,53 @@ let print_expr_unwrapped ppf expr =
   |> Micheline.inject_locations (fun _ -> anon)
   |> print_expr_unwrapped ppf
 
+let print_var_annots ppf =
+  List.iter (Format.fprintf ppf "%s ")
+
+let print_annot_expr_unwrapped ppf (expr, annot) =
+  Format.fprintf ppf "%a%a"
+    print_var_annots annot
+    print_expr_unwrapped expr
+
 let print_stack ppf = function
   | [] -> Format.fprintf ppf "[]"
   | more ->
       Format.fprintf ppf "@[<hov 0>[ %a ]@]"
         (Format.pp_print_list
            ~pp_sep: (fun ppf () -> Format.fprintf ppf "@ : ")
-           print_expr_unwrapped)
+           print_annot_expr_unwrapped)
         more
+
+let print_execution_trace ppf trace =
+  Format.pp_print_list
+    (fun ppf (loc, gas, stack) ->
+       Format.fprintf ppf
+         "- @[<v 0>location: %d (remaining gas: %a)@,\
+          [ @[<v 0>%a ]@]@]"
+         loc Gas.pp gas
+         (Format.pp_print_list
+            (fun ppf (e, annot) ->
+               Format.fprintf ppf
+                 "@[<v 0>%a  \t%s@]"
+                 print_expr e
+                 (match annot with None -> "" | Some a -> a)
+            ))
+         stack)
+    ppf
+    trace
 
 let inject_types type_map parsed =
   let rec inject_expr = function
-    | Seq (loc, items, annot) ->
-        Seq (inject_loc `before loc, List.map inject_expr items, annot)
+    | Seq (loc, items) ->
+        Seq (inject_loc `before loc, List.map inject_expr items)
     | Prim (loc, name, items, annot) ->
         Prim (inject_loc `after loc, name, List.map inject_expr items, annot)
     | Int (loc, value) ->
         Int (inject_loc `after loc, value)
     | String (loc, value) ->
         String (inject_loc `after loc, value)
+    | Bytes (loc, value) ->
+        Bytes (inject_loc `after loc, value)
   and inject_loc which loc = try
       let stack =
         let locs =
@@ -69,14 +114,16 @@ let unparse ?type_map parse expanded =
           |> Michelson_v1_primitives.strings_of_prims
           |> root |> Michelson_v1_macros.unexpand_rec |> Micheline.extract_locations in
         let rec inject_expr = function
-          | Seq (loc, items, annot) ->
-              Seq (inject_loc `before loc, List.map inject_expr items, annot)
+          | Seq (loc, items) ->
+              Seq (inject_loc `before loc, List.map inject_expr items)
           | Prim (loc, name, items, annot) ->
               Prim (inject_loc `after loc, name, List.map inject_expr items, annot)
           | Int (loc, value) ->
               Int (inject_loc `after loc, value)
           | String (loc, value) ->
               String (inject_loc `after loc, value)
+          | Bytes (loc, value) ->
+              Bytes (inject_loc `after loc, value)
         and inject_loc which loc = try
             let stack =
               let (bef, aft) =

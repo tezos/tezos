@@ -1,20 +1,39 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+type annot = string list
 
 (** The abstract syntax tree of Micheline expressions. The first
     parameter is used to conatin locations, but can also embed custom
     data. The second parameter is the type of primitive names. *)
 type ('l, 'p) node =
-  | Int of 'l * string
+  | Int of 'l * Z.t
   | String of 'l * string
-  | Prim of 'l * 'p * ('l, 'p) node list * string option
-  | Seq of 'l * ('l, 'p) node list * string option
+  | Bytes of 'l * MBytes.t
+  | Prim of 'l * 'p * ('l, 'p) node list * annot
+  | Seq of 'l * ('l, 'p) node list
 
 (** Encoding for expressions, as their {!canonical} encoding.
     Locations are stored in a side table.
@@ -33,8 +52,8 @@ val erased_encoding : variant:string ->
 (** Extract the location of the node. *)
 val location : ('l, 'p) node -> 'l
 
-(** Extract the annotation of the node. *)
-val annotation : ('l, 'p) node -> string option
+(** Extract the annotations of the node. *)
+val annotations : ('l, 'p) node -> string list
 
 (** Expression form using canonical integer numbering as
     locations. The root has number zero, and each node adds one in the

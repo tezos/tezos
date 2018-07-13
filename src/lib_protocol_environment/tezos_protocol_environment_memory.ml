@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module Context = struct
 
@@ -24,8 +40,9 @@ module Context = struct
     match k, m with
     | [], m -> Some m
     | n :: k, Dir m -> begin
-        try raw_get (StringMap.find n m) k
-        with Not_found -> None
+        match StringMap.find_opt n m with
+        | Some res -> raw_get res k
+        | None -> None
       end
     | _ :: _, Key _ -> None
 
@@ -37,22 +54,13 @@ module Context = struct
         if m == v then None else Some v
     | [], (Key _ | Dir _), None -> Some empty
     | n :: k, Dir m, _ -> begin
-        match raw_set (StringMap.find n m) k v with
-        | exception Not_found -> begin
-            match raw_set empty k v with
-            | None -> None
-            | Some rm ->
-                if rm = empty then
-                  Some (Dir (StringMap.remove n m))
-                else
-                  Some (Dir (StringMap.add n rm m))
-          end
+        match raw_set (Option.unopt ~default:empty
+                         (StringMap.find_opt n m)) k v with
         | None -> None
+        | Some rm when rm = empty ->
+            Some (Dir (StringMap.remove n m))
         | Some rm ->
-            if rm = empty then
-              Some (Dir (StringMap.remove n m))
-            else
-              Some (Dir (StringMap.add n rm m))
+            Some (Dir (StringMap.add n rm m))
       end
     | _ :: _, Key _, None -> None
     | _ :: _, Key _, Some _ ->

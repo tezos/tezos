@@ -5,7 +5,7 @@ set -e
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
 
-opams=$(find "$src_dir" -name \*.opam -print)
+opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
 
 yml="${1:-$src_dir/.gitlab-ci.yml}"
 
@@ -21,7 +21,7 @@ done
 
 tested=$(grep -e '^opam:..:tezos-.*:$' "$yml" | cut -d: -f3)
 for package in $tested; do
-    found=$(find "$src_dir" -name $package.opam | wc -l 2>&1)
+    found=$(find "$src_dir/src" "$src_dir/vendors" -name $package.opam | wc -l 2>&1)
     if [ $found != 1 ] ; then
         missing=yes
         echo "Test for unknown package '$package'."

@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Proto_alpha
 open Tezos_micheline
@@ -13,17 +29,17 @@ open Micheline
 
 let print_expr ppf expr =
   let print_annot ppf = function
-    | None -> ()
-    | Some annot -> Format.fprintf ppf " %s" annot in
+    | [] -> ()
+    | annots -> Format.fprintf ppf " %s" (String.concat " " annots) in
   let rec print_expr ppf = function
-    | Int (_, value) -> Format.fprintf ppf "%s" value
+    | Int (_, value) -> Format.fprintf ppf "%s" (Z.to_string value)
     | String (_, value) -> Micheline_printer.print_string ppf value
-    | Seq (_, items, annot) ->
-        Format.fprintf ppf "(seq%a %a)"
-          print_annot annot
+    | Bytes (_, value) -> Format.fprintf ppf "0x%a" MBytes.pp_hex value
+    | Seq (_, items) ->
+        Format.fprintf ppf "(seq %a)"
           (Format.pp_print_list ~pp_sep:Format.pp_print_space print_expr)
           items
-    | Prim (_, name, [], None) ->
+    | Prim (_, name, [], []) ->
         Format.fprintf ppf "%s" name
     | Prim (_, name, items, annot) ->
         Format.fprintf ppf "(%s%a%s%a)"
@@ -34,23 +50,32 @@ let print_expr ppf expr =
   let root = root (Michelson_v1_primitives.strings_of_prims expr) in
   Format.fprintf ppf "@[<h>%a@]" print_expr root
 
+let print_var_annots ppf =
+  List.iter (Format.fprintf ppf "%s ")
+
+let print_annot_expr ppf (expr, annot) =
+  Format.fprintf ppf "(%a%a)"
+    print_var_annots annot
+    print_expr expr
+
 open Micheline_parser
 open Script_tc_errors
 
 let print_type_map ppf (parsed, type_map) =
   let rec print_expr_types ppf = function
-    | Seq (loc, [], _)
+    | Seq (loc, [])
     | Prim (loc, _, [], _)
     | Int (loc, _)
+    | Bytes (loc, _)
     | String (loc, _) ->
         print_item ppf loc
-    | Seq (loc, items, _)
+    | Seq (loc, items)
     | Prim (loc, _, items, _) ->
         print_item ppf loc ;
         List.iter (print_expr_types ppf) items
   and print_stack ppf items =
     Format.fprintf ppf "(%a)"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space print_expr)
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space print_annot_expr)
       items
   and print_item ppf loc = try
       let { start = { point = s } ; stop = { point = e } }, locs =
@@ -81,8 +106,6 @@ let first_error_location errs =
       | Bad_return (loc, _, _)
       | Bad_stack (loc, _, _, _)
       | Unmatched_branches (loc, _, _)
-      | Transfer_in_lambda loc
-      | Transfer_in_dip loc
       | Invalid_constant (loc, _, _)
       | Invalid_contract (loc, _)
       | Comparable_type_expected (loc, _)
@@ -149,6 +172,7 @@ let report_errors ppf (parsed, errs) =
             | Unterminated_string loc
             | Unterminated_integer loc
             | Unterminated_comment loc
+            | Odd_lengthed_bytes loc
             | Unclosed { loc }
             | Unexpected { loc }
             | Extra { loc } -> loc

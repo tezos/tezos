@@ -12,28 +12,72 @@ init_sandboxed_client() {
     rpc=$((18730 + id))
     client_dir="$(mktemp -d -t tezos-tmp-client.XXXXXXXX)"
     client_dirs+=("$client_dir")
-    client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-    admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-    alpha_baker="$local_alpha_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+    signer="$local_signer -d $client_dir"
+    if [ -n "$USE_TLS" ]; then
+        client="$local_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        admin_client="$local_admin_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        alpha_baker="$local_alpha_baker -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+	alpha_endorser="$local_alpha_endorser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+	alpha_accuser="$local_alpha_accuser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        signer="$local_signer -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+    else
+        client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        alpha_baker="$local_alpha_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+	alpha_endorser="$local_alpha_endorser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+	alpha_accuser="$local_alpha_accuser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        signer="$local_signer -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+    fi
     parameters_file="${parameters_file:-$client_dir/protocol_parameters.json}"
 
     if ! [ -f "$parameters_file" ]; then
         cat > "$parameters_file" <<EOF
-{ "bootstrap_accounts":
-  [
+{ "bootstrap_accounts": [
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
     [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
     [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
     [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
-    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
-  ],
-  "dictator_pubkey":
-    "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
-  "time_between_blocks" : [ 1, 0 ],
+    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ],
+    [ "tz1PooUKBaoxjBiCR2dxEtbtTUjLX3iaZQoJ", "100" ],
+    [ "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2", "1" ] ],
+  "bootstrap_contracts": [
+      { "delegate": "tz1TGu6TN5GSez2ndXXeDX6LgUDvLzPLqgYV",
+        "amount": "10000000",
+        "script":
+        { "code":
+          [ { "prim": "parameter",
+              "args": [ { "prim": "key_hash" } ] },
+            { "prim": "storage",
+              "args": [ { "prim": "timestamp" } ] },
+            { "prim": "code",
+              "args":
+              [ [ [ [ { "prim": "DUP" }, { "prim": "CAR" },
+                      { "prim": "DIP", "args": [ [ { "prim": "CDR" } ] ] } ] ],
+                  { "prim": "SWAP" },
+                  { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "300" } ] },
+                  { "prim": "ADD", "annots": [ "@FIVE_MINUTES_LATER" ] },
+                  { "prim": "NOW" },
+                  [ [ { "prim": "COMPARE" }, { "prim": "GE" } ],
+                    { "prim": "IF",
+                      "args":
+                      [ [],
+                        [ [ { "prim": "UNIT" },
+                            { "prim": "FAILWITH" } ] ] ] } ],
+                  { "prim": "IMPLICIT_ACCOUNT" },
+                  { "prim": "PUSH", "args": [ { "prim": "mutez" }, { "int": "1000000" } ] },
+                  { "prim": "UNIT" },
+                  { "prim": "TRANSFER_TOKENS" },
+                  { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+                  { "prim": "SWAP" },
+                  { "prim": "CONS" },
+                  { "prim": "DIP", "args": [ [ { "prim": "NOW" } ] ] },
+                  { "prim": "PAIR" } ] ] } ],
+          "storage": { "int": "0" } } } ],
+  "time_between_blocks" : [ "1", "0" ],
   "blocks_per_roll_snapshot" : 4,
   "blocks_per_cycle" : 8,
   "preserved_cycles" : 2,
-  "first_free_baking_slot" : 4
+  "proof_of_work_threshold": "-1"
 }
 EOF
     fi
@@ -49,10 +93,10 @@ cleanup_clients() {
 
 wait_for_the_node_to_be_ready() {
     local count=0
-    if $client rpc call blocks/head/hash >/dev/null 2>&1; then return; fi
+    if $client rpc get /chains/main/blocks/head/hash >/dev/null 2>&1; then return; fi
     printf "Waiting for the node to initialize..."
     sleep 1
-    while ! $client rpc call blocks/head/hash >/dev/null 2>&1
+    while ! $client rpc get /chains/main/blocks/head/hash >/dev/null 2>&1
     do
         count=$((count+1))
         if [ "$count" -ge 30 ]; then
@@ -71,26 +115,12 @@ wait_for_the_node_to_be_bootstraped() {
     $client bootstrapped
 }
 
-## Account #################################################################
-
-may_create_identity() {
-    if ! $client get balance for "my_identity" >/dev/null 2>&1 ; then
-        echo "Generating new manager key (known as 'my_identity')..."
-        $client gen keys "my_identity"
-    fi
-    if ! $client get balance for "my_account" >/dev/null 2>&1 ; then
-        echo "Creating new account for 'my_identity' (known as 'my_account')..."
-        $client forget contract "my_account" >/dev/null 2>&1 || true
-        $client originate free account "my_account" for "my_identity"
-    fi
-}
-
 ## Baker ###################################################################
 
 check_baker() {
-    pids=$(pgrep -x tezos-client 2>/dev/null)
+    pids=$(pgrep -x tezos-alpha-baker 2>/dev/null)
     for pid in $pids; do
-        if grep -- "-baking" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
+        if grep -- "-max-priority" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
             return 0
         fi
     done
@@ -103,13 +133,13 @@ run_baker() {
         exit 1
     fi
     echo "Start baker..."
-    exec $client launch daemon -baking -max-priority 64 "$@" > "$client_dir/baker.log"
+    exec $alpha_baker launch daemon -max-priority 64 "$@" > "$client_dir/baker.log"
 }
 
 stop_baker() {
-    pids=$(pgrep -x tezos-client 2>/dev/null)
+    pids=$(pgrep -x tezos-alpha-baker 2>/dev/null)
     for pid in $pids; do
-        if grep -- "-baking" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
+        if grep -- "-max-priority" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
             echo "Killing the baker..."
             kill "$pid"
         fi
@@ -134,9 +164,9 @@ log_baker() {
 ## Endorser ################################################################
 
 check_endorser() {
-    pids=$(pgrep -x tezos-client 2>/dev/null)
+    pids=$(pgrep -x tezos-alpha-endorser 2>/dev/null)
     for pid in $pids; do
-        if grep -- "-endorsement" "/proc/$pid/cmdline" > /dev/null 2>&1 ; then
+        if grep -- "tezos-alpha-endorser" "/proc/$pid/cmdline" > /dev/null 2>&1 ; then
             return 0
         fi
     done
@@ -149,13 +179,13 @@ run_endorser() {
         exit 1
     fi
     echo "Start endorser..."
-    exec $client launch daemon -endorsement "$@" > "$client_dir/endorser.log"
+    exec $alpha_endorser launch daemon"$@" > "$client_dir/endorser.log"
 }
 
 stop_endorser() {
-    pids=$(pgrep -x tezos-client 2>/dev/null)
+    pids=$(pgrep -x tezos-alpha-endorser 2>/dev/null)
     for pid in $pids; do
-        if grep -- "-endorsement" "/proc/$pid/cmdline" > /dev/null 2>&1 ; then
+        if grep -- "tezos-alpha-endorser" "/proc/$pid/cmdline" > /dev/null 2>&1 ; then
             kill "$pid"
         fi
     done
@@ -182,46 +212,46 @@ log_endorser() {
 
 BOOTSTRAP1_IDENTITY="tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
 BOOTSTRAP1_PUBLIC="edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
-BOOTSTRAP1_SECRET="edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
+BOOTSTRAP1_SECRET="unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
 
 BOOTSTRAP2_IDENTITY="tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"
 BOOTSTRAP2_PUBLIC="edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9"
-BOOTSTRAP2_SECRET="edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo"
+BOOTSTRAP2_SECRET="unencrypted:edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo"
 
 BOOTSTRAP3_IDENTITY="tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
 BOOTSTRAP3_PUBLIC="edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV"
-BOOTSTRAP3_SECRET="edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ"
+BOOTSTRAP3_SECRET="unencrypted:edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ"
 
 BOOTSTRAP4_IDENTITY="tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
 BOOTSTRAP4_PUBLIC="edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU"
-BOOTSTRAP4_SECRET="edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3"
+BOOTSTRAP4_SECRET="unencrypted:edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3"
 
 BOOTSTRAP5_IDENTITY="tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"
 BOOTSTRAP5_PUBLIC="edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
-BOOTSTRAP5_SECRET="edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm"
+BOOTSTRAP5_SECRET="unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm"
 
-DICTATOR_SECRET="edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
+ACTIVATOR_SECRET="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
 
 add_sandboxed_bootstrap_identities() {
 
-    ${client} import unencrypted secret key bootstrap1 ${BOOTSTRAP1_SECRET}
-    ${client} import unencrypted secret key bootstrap2 ${BOOTSTRAP2_SECRET}
-    ${client} import unencrypted secret key bootstrap3 ${BOOTSTRAP3_SECRET}
-    ${client} import unencrypted secret key bootstrap4 ${BOOTSTRAP4_SECRET}
-    ${client} import unencrypted secret key bootstrap5 ${BOOTSTRAP5_SECRET}
+    ${client} import secret key bootstrap1 ${BOOTSTRAP1_SECRET}
+    ${client} import secret key bootstrap2 ${BOOTSTRAP2_SECRET}
+    ${client} import secret key bootstrap3 ${BOOTSTRAP3_SECRET}
+    ${client} import secret key bootstrap4 ${BOOTSTRAP4_SECRET}
+    ${client} import secret key bootstrap5 ${BOOTSTRAP5_SECRET}
 
-    ${client} import unencrypted secret key dictator ${DICTATOR_SECRET}
-
+    ${client} import secret key activator ${ACTIVATOR_SECRET}
 }
 
 activate_alpha() {
 
     ${client} \
         -block genesis \
-        activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
+        activate protocol PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY \
         with fitness 1 \
-        and key dictator \
-	and parameters "${parameters_file}"
+        and key activator \
+	and parameters "${parameters_file}" \
+        --timestamp $(TZ='AAA+1' date +%FT%TZ)
 }
 
 usage() {
@@ -238,12 +268,18 @@ main () {
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
         local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
         local_alpha_baker="${local_alpha_baker:-$bin_dir/../../_build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe}"
+        local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_signer/main_signer.exe}"
+	local_alpha_endorser="${local_alpha_endorser:-$bin_dir/../../_build/default/src/proto_alpha/bin_endorser/main_endorser_alpha.exe}"
+	local_alpha_accuser="${local_alpha_accuser:-$bin_dir/../../_build/default/src/proto_alpha/bin_accuser/main_accuser_alpha.exe}"
         parameters_file="${parameters_file:-$bin_dir/../../scripts/protocol_parameters.json}"
     else
 	# we assume a clean install with tezos-(admin-)client in the path
         local_client="${local_client:-$(which tezos-client)}"
         local_admin_client="${local_admin_client:-$(which tezos-admin-client)}"
         local_alpha_baker="${local_alpha_baker:-$(which tezos-alpha-baker)}"
+	local_alpha_endorser="${local_alpha_endorser:-$(which tezos-alpha-endorser)}"
+	local_alpha_accuser="${local_alpha_accuser:-$(which tezos-alpha-accuser)}"
+        local_signer="${local_signer:-$(which tezos-signer)}"
     fi
 
     if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
@@ -269,10 +305,22 @@ main () {
     echo "exec $alpha_baker \"\$@\""  >> $client_dir/bin/tezos-alpha-baker
     chmod +x $client_dir/bin/tezos-alpha-baker
 
+    echo '#!/bin/sh' > $client_dir/bin/tezos-alpha-endorser
+    echo "exec $alpha_endorser \"\$@\""  >> $client_dir/bin/tezos-alpha-endorser
+    chmod +x $client_dir/bin/tezos-alpha-endorser
+
+    echo '#!/bin/sh' > $client_dir/bin/tezos-alpha-accuser
+    echo "exec $alpha_accuser \"\$@\""  >> $client_dir/bin/tezos-alpha-accuser
+    chmod +x $client_dir/bin/tezos-alpha-accuser
+
+    echo '#!/bin/sh' > $client_dir/bin/tezos-signer
+    echo "exec $signer \"\$@\""  >> $client_dir/bin/tezos-signer
+    chmod +x $client_dir/bin/tezos-signer
+
     cat <<EOF
 if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias tezos-activate-alpha="$client -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key dictator and parameters $parameters_file" ;
+alias tezos-activate-alpha="$client  -block genesis activate protocol PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY with fitness 1 and key activator and parameters $parameters_file --timestamp $(TZ='AAA+1' date +%FT%TZ)" ;
 alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha tezos-client-reset" ;
 alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 trap tezos-client-reset EXIT ;
@@ -285,10 +333,10 @@ The client is now properly initialized. In the rest of this shell
 session, you might now run \`tezos-client\` to communicate with a
 tezos node launched with \`launch-sandboxed-node $1\`. For instance:
 
-  tezos-client rpc call blocks/head/protocol
+  tezos-client rpc get /chains/main/blocks/head/metadata
 
 Note: if the current protocol version, as reported by the previous
-command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you
+command, is "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P", you
 may have to activate in your "sandboxed network" the same economic
 protocol than used by the alphanet by running:
 

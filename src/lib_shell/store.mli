@@ -1,19 +1,36 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Store_sigs
 
 type t
 type global_store = t
 
-(** Open or initialize a store at a given path. *)
-val init: string -> t tzresult Lwt.t
+(** [init ~mapsize path] returns an initialized store at [path] of
+    maximum capacity [mapsize] bytes. *)
+val init: ?mapsize:int64 -> string -> t tzresult Lwt.t
 val close : t -> unit
 
 
@@ -74,6 +91,10 @@ module Chain_data : sig
     with type t = store * Block_hash.t
      and type value := Block_hash.t (* successor *)
 
+  module Checkpoint : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
+
 end
 
 
@@ -88,8 +109,9 @@ module Block : sig
     header: Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
-    max_operation_data_length: int;
+    last_allowed_fork_level: Int32.t ;
     context: Context_hash.t ;
+    metadata: MBytes.t ;
   }
 
   module Contents : SINGLE_STORE
@@ -110,6 +132,11 @@ module Block : sig
     with type t = store * Block_hash.t
      and type key = int
      and type value = Operation.t list
+
+  module Operations_metadata : MAP_STORE
+    with type t = store * Block_hash.t
+     and type key = int
+     and type value = MBytes.t list
 
   type invalid_block = {
     level: int32 ;

@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 include Logging.Make (struct let name = "test.p2p.connection-pool" end)
 
@@ -16,6 +32,7 @@ let msg_config : message P2p_pool.message_config = {
   encoding = [
     P2p_pool.Encoding {
       tag = 0x10 ;
+      title = "Ping" ;
       encoding = Data_encoding.empty ;
       wrap = (function () -> Ping) ;
       unwrap = (function Ping -> Some ()) ;
@@ -27,16 +44,22 @@ let msg_config : message P2p_pool.message_config = {
 
 type metadata = unit
 
-let meta_config : metadata P2p_pool.meta_config = {
-  encoding = Data_encoding.empty ;
-  initial = () ;
+let peer_meta_config : metadata P2p_pool.peer_meta_config = {
+  peer_meta_encoding = Data_encoding.empty ;
+  peer_meta_initial = () ;
   score = fun () -> 0. ;
+}
+
+let conn_meta_config : metadata P2p_socket.metadata_config = {
+  conn_meta_encoding = Data_encoding.empty ;
+  conn_meta_value = (fun _ -> ()) ;
+  private_node = (fun _ -> false) ;
 }
 
 let sync ch =
   Process.Channel.push ch () >>=? fun () ->
   Process.Channel.pop ch >>=? fun () ->
-  return ()
+  return_unit
 
 let rec sync_nodes nodes =
   iter_p
@@ -50,7 +73,7 @@ let rec sync_nodes nodes =
 let sync_nodes nodes =
   sync_nodes nodes >>= function
   | Ok () | Error (Exn End_of_file :: _) ->
-      return ()
+      return_unit
   | Error _ as err ->
       Lwt.return err
 
@@ -64,13 +87,14 @@ let detach_node f points n =
       proof_of_work_target ;
       trusted_points = points ;
       peers_file = "/dev/null" ;
-      closed_network = true ;
+      private_mode = true ;
       listening_port = Some port ;
       min_connections = nb_points ;
       max_connections = nb_points ;
       max_incoming_connections = nb_points ;
       connection_timeout = 10. ;
       authentication_timeout = 2. ;
+      greylist_timeout = 2 ;
       incoming_app_message_queue_size = None ;
       incoming_message_queue_size = None ;
       outgoing_message_queue_size = None ;
@@ -86,7 +110,7 @@ let detach_node f points n =
     begin fun channel ->
       let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
       P2p_pool.create
-        config meta_config msg_config sched >>= fun pool ->
+        config peer_meta_config conn_meta_config msg_config sched >>= fun pool ->
       P2p_welcome.run ~backlog:10 pool ~addr port >>= fun welcome ->
       lwt_log_info "Node ready (port: %d)" port >>= fun () ->
       sync channel >>=? fun () ->
@@ -96,7 +120,7 @@ let detach_node f points n =
       P2p_pool.destroy pool >>= fun () ->
       P2p_io_scheduler.shutdown sched >>= fun () ->
       lwt_log_info "Bye." >>= fun () ->
-      return ()
+      return_unit
     end
 
 let detach_nodes run_node points =
@@ -157,7 +181,7 @@ module Simple = struct
     iter_p
       (fun conn ->
          trace Read @@ P2p_pool.read conn >>=? fun Ping ->
-         return ())
+         return_unit)
       conns
 
   let close_all conns =
@@ -175,7 +199,7 @@ module Simple = struct
     sync channel >>=? fun () ->
     close_all conns >>= fun () ->
     lwt_log_info "All connections successfully closed." >>= fun () ->
-    return ()
+    return_unit
 
   let run points = detach_nodes node points
 
@@ -195,12 +219,12 @@ module Random_connections = struct
       if !rem mod total = 0 then
         lwt_log_info "Remaining: %d." (!rem / total)
       else
-        Lwt.return ()
+        Lwt.return_unit
     end >>= fun () ->
     if n > 1 then
       connect_random pool total rem point (pred n)
     else
-      return ()
+      return_unit
 
   let connect_random_all pool points n =
     let total = List.length points in
@@ -211,7 +235,7 @@ module Random_connections = struct
     lwt_log_info "Begin random connections." >>= fun () ->
     connect_random_all pool points repeat >>=? fun () ->
     lwt_log_info "Random connections OK." >>= fun () ->
-    return ()
+    return_unit
 
   let run points repeat = detach_nodes (node repeat) points
 

@@ -1,0 +1,14 @@
+(jbuild_version 1)
+
+(executable
+ ((name test)
+  (libraries (hex hacl alcotest))))
+
+(alias
+ ((name    runtest-hacl)
+  (deps    (test.exe))
+  (action  (run ${<}))))
+
+(alias
+ ((name    runtest)
+  (deps    ((alias runtest-hacl)))))

@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Proto_alpha
 open Alpha_context
@@ -13,138 +29,122 @@ open Tezos_micheline
 open Client_proto_contracts
 open Client_keys
 
-let get_balance (rpc : #Proto_alpha.rpc_context) block contract =
-  Alpha_services.Contract.balance rpc block contract
+let get_balance (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+  Alpha_services.Contract.balance rpc (chain, block) contract
 
-let get_storage (rpc : #Proto_alpha.rpc_context) block contract =
-  Alpha_services.Contract.storage_opt rpc block contract
+let get_storage (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+  Alpha_services.Contract.storage_opt rpc (chain, block) contract
 
-let get_branch rpc_config block branch =
-  let branch = Option.unopt ~default:0 branch in (* TODO export parameter *)
-  begin
-    match block with
-    | `Head n -> return (`Head (n+branch))
-    | `Test_head n -> return (`Test_head (n+branch))
-    | `Hash (h,n) -> return (`Hash (h,n+branch))
-    | `Genesis -> return `Genesis
-  end >>=? fun block ->
-  Block_services.info rpc_config block >>=? fun { chain_id ; hash } ->
-  return (chain_id, hash)
+let get_script (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+  Alpha_services.Contract.script_opt rpc (chain, block) contract
 
 let parse_expression arg =
   Lwt.return
     (Micheline_parser.no_parsing_error
        (Michelson_v1_parser.parse_expression arg))
 
-let transfer cctxt
-    block ?branch
-    ~source ~src_pk ~src_sk ~destination ?arg ~amount ~fee () =
-  get_branch cctxt block branch >>=? fun (chain_id, branch) ->
+let transfer (cctxt : #Proto_alpha.full)
+    ~chain ~block ?confirmations
+    ?dry_run
+    ?branch ~source ~src_pk ~src_sk ~destination ?arg
+    ~amount ~fee ?gas_limit ?storage_limit () =
   begin match arg with
     | Some arg ->
         parse_expression arg >>=? fun { expanded = arg } ->
-        return (Some arg)
-    | None -> return None
+        return_some arg
+    | None -> return_none
   end >>=? fun parameters ->
-  Alpha_services.Contract.counter
-    cctxt block source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
-  Alpha_services.Forge.Manager.transaction
-    cctxt block
-    ~branch ~source ~sourcePubKey:src_pk ~counter ~amount
-    ~destination ?parameters ~fee () >>=? fun bytes ->
-  Block_services.predecessor cctxt block >>=? fun predecessor ->
-  Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
-  let signed_bytes = Signature.concat bytes signature in
-  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Alpha_services.Helpers.apply_operation cctxt block
-    predecessor oph bytes (Some signature) >>=? fun contracts ->
-  Shell_services.inject_operation
-    cctxt ~chain_id signed_bytes >>=? fun injected_oph ->
-  assert (Operation_hash.equal oph injected_oph) ;
-  return (oph, contracts)
+  let parameters = Option.map ~f:Script.lazy_expr parameters in
+  let contents = Transaction { amount ; parameters ; destination } in
+  Injection.inject_manager_operation
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ?branch ~source ~fee ?gas_limit ?storage_limit
+    ~src_pk ~src_sk contents >>=? fun (_oph, _op, result as res) ->
+  Lwt.return
+    (Injection.originated_contracts (Single_result result)) >>=? fun contracts ->
+  return (res, contracts)
 
 let reveal cctxt
-    block ?branch ~source ~src_pk ~src_sk ~fee () =
-  get_branch cctxt block branch >>=? fun (chain_id, branch) ->
-  Alpha_services.Contract.counter cctxt block source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
-  Alpha_services.Forge.Manager.reveal
-    cctxt block
-    ~branch ~source ~sourcePubKey:src_pk ~counter ~fee () >>=? fun bytes ->
-  Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
-  let signed_bytes = Signature.concat bytes signature in
-  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Shell_services.inject_operation
-    cctxt ~chain_id signed_bytes >>=? fun injected_oph ->
-  assert (Operation_hash.equal oph injected_oph) ;
-  return oph
+    ~chain ~block ?confirmations
+    ?dry_run
+    ?branch ~source ~src_pk ~src_sk ~fee () =
+  Alpha_services.Contract.counter
+    cctxt (chain, block) source >>=? fun pcounter ->
+  let counter = Z.succ pcounter in
+  Alpha_services.Contract.manager_key
+    cctxt (chain, block) source >>=? fun (_, key) ->
+  match key with
+  | Some _ ->
+      failwith "The manager key was previously revealed."
+  | None -> begin
+      let contents =
+        Single
+          (Manager_operation { source ; fee ; counter ;
+                               gas_limit = Z.zero ; storage_limit = Z.zero ;
+                               operation = Reveal src_pk }) in
+      Injection.inject_operation cctxt ~chain ~block ?confirmations
+        ?dry_run
+        ?branch ~src_sk contents >>=? fun (oph, op, result) ->
+      match Apply_results.pack_contents_list op result with
+      | Apply_results.Single_and_result
+          (Manager_operation _ as op, result) ->
+          return (oph, op, result)
+    end
 
-let originate rpc_config ?chain_id ~block ?signature bytes =
-  let signed_bytes =
-    match signature with
-    | None -> bytes
-    | Some signature -> Signature.concat bytes signature in
-  Block_services.predecessor rpc_config block >>=? fun predecessor ->
-  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Alpha_services.Helpers.apply_operation rpc_config block
-    predecessor oph bytes signature >>=? function
-  | [ contract ] ->
-      Shell_services.inject_operation
-        rpc_config ?chain_id signed_bytes >>=? fun injected_oph ->
-      assert (Operation_hash.equal oph injected_oph) ;
-      return (oph, contract)
+let originate
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ?branch ~source ~src_pk ~src_sk ~fee
+    ?gas_limit ?storage_limit contents =
+  Injection.inject_manager_operation
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ?branch ~source ~fee ?gas_limit ?storage_limit
+    ~src_pk ~src_sk contents >>=? fun (_oph, _op, result as res) ->
+  Lwt.return
+    (Injection.originated_contracts (Single_result result)) >>=? function
+  | [ contract ] -> return (res, contract)
   | contracts ->
       failwith
         "The origination introduced %d contracts instead of one."
         (List.length contracts)
 
-let operation_submitted_message (cctxt : #Client_context.printer) ?(contracts = []) oph =
-  cctxt#message "Operation successfully injected in the node." >>= fun () ->
-  cctxt#message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
-  Lwt_list.iter_s
-    (fun c ->
-       cctxt#message
-         "New contract %a originated from a smart contract."
-         Contract.pp c)
-    contracts >>= return
-
-let originate_account ?branch
-    ~source ~src_pk ~src_sk ~manager_pkh
-    ?delegatable ?delegate ~balance ~fee block cctxt () =
-  get_branch cctxt block branch >>=? fun (chain_id, branch) ->
-  Alpha_services.Contract.counter
-    cctxt block source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
-  Alpha_services.Forge.Manager.origination cctxt block
-    ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
-    ~counter ~balance ~spendable:true
-    ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
-  Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
-  originate cctxt ~block ~chain_id ~signature bytes
+let originate_account
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ?branch ~source ~src_pk ~src_sk ~manager_pkh
+    ?(delegatable = false) ?delegate ~balance ~fee () =
+  let origination =
+    Origination { manager = manager_pkh ;
+                  delegate ;
+                  script = None ;
+                  spendable = true ;
+                  delegatable ;
+                  credit = balance ;
+                  preorigination = None } in
+  originate
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ?branch ~source ~gas_limit:Z.zero ~src_pk ~src_sk ~fee origination
 
 let delegate_contract cctxt
-    block ?branch
-    ~source ?src_pk ~manager_sk
+    ~chain ~block ?branch ?confirmations
+    ?dry_run
+    ~source ~src_pk ~src_sk
     ~fee delegate_opt =
-  get_branch cctxt block branch >>=? fun (chain_id, branch) ->
-  Alpha_services.Contract.counter
-    cctxt block source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
-  Alpha_services.Forge.Manager.delegation cctxt block
-    ~branch ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
-  >>=? fun bytes ->
-  Client_keys.sign cctxt manager_sk bytes >>=? fun signature ->
-  let signed_bytes = Signature.concat bytes signature in
-  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Shell_services.inject_operation
-    cctxt ~chain_id signed_bytes >>=? fun injected_oph ->
-  assert (Operation_hash.equal oph injected_oph) ;
-  return oph
+  let operation = Delegation delegate_opt in
+  Injection.inject_manager_operation
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ?branch ~source ~fee ~gas_limit:Z.zero ~storage_limit:Z.zero
+    ~src_pk ~src_sk operation >>=? fun res ->
+  return res
 
-let list_contract_labels (cctxt : #Proto_alpha.full) block =
-  Alpha_services.Contract.list
-    cctxt block >>=? fun contracts ->
+let list_contract_labels
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block =
+  Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
   map_s (fun h ->
       begin match Contract.is_implicit h with
         | Some m -> begin
@@ -171,47 +171,53 @@ let list_contract_labels (cctxt : #Proto_alpha.full) block =
 let message_added_contract (cctxt : #Proto_alpha.full) name =
   cctxt#message "Contract memorized as %s." name
 
-let get_manager (cctxt : #Proto_alpha.full) block source =
+let get_manager
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block source =
   Client_proto_contracts.get_manager
-    cctxt block source >>=? fun src_pkh ->
+    cctxt ~chain ~block source >>=? fun src_pkh ->
   Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
   return (src_name, src_pkh, src_pk, src_sk)
 
-let dictate rpc_config block command seckey =
-  Block_services.info
-    rpc_config block >>=? fun { chain_id ; hash = branch } ->
-  Alpha_services.Forge.Dictator.operation
-    rpc_config block ~branch command >>=? fun bytes ->
-  let signature = Signature.sign seckey bytes in
-  let signed_bytes = Signature.concat bytes signature in
-  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Shell_services.inject_operation
-    rpc_config ~chain_id signed_bytes >>=? fun injected_oph ->
-  assert (Operation_hash.equal oph injected_oph) ;
-  return oph
-
-let set_delegate cctxt block ~fee contract ~src_pk ~manager_sk opt_delegate =
+let set_delegate
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ~fee contract ~src_pk ~manager_sk opt_delegate =
   delegate_contract
-    cctxt block ~source:contract ~src_pk ~manager_sk ~fee opt_delegate
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ~source:contract ~src_pk ~src_sk:manager_sk ~fee opt_delegate
 
-let register_as_delegate cctxt block ~fee ~manager_sk src_pk =
+let register_as_delegate
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ~fee ~manager_sk src_pk =
   let source = Signature.Public_key.hash src_pk in
   delegate_contract
-    cctxt block
-    ~source:(Contract.implicit_contract source) ~src_pk ~manager_sk ~fee
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ~source:(Contract.implicit_contract source) ~src_pk ~src_sk:manager_sk ~fee
     (Some source)
 
-let source_to_keys (wallet : #Proto_alpha.full) block source =
-  get_manager wallet block source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
+let source_to_keys (wallet : #Proto_alpha.full) ~chain ~block source =
+  get_manager
+    wallet ~chain ~block
+    source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
   return (src_pk, src_sk)
 
 let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
   message_added_contract cctxt alias_name >>= fun () ->
-  return ()
+  return_unit
 
 let originate_contract
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block ?confirmations
+    ?dry_run
+    ?branch
     ~fee
+    ?gas_limit
+    ?storage_limit
     ~delegate
     ?(delegatable=true)
     ?(spendable=false)
@@ -222,93 +228,73 @@ let originate_contract
     ~src_pk
     ~src_sk
     ~code
-    (cctxt : #Proto_alpha.full) =
+    () =
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage) >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
   fun { Michelson_v1_parser.expanded = storage } ->
-  let block = cctxt#block in
-  Alpha_services.Contract.counter
-    cctxt block source >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
-  get_branch cctxt block None >>=? fun (_chain_id, branch) ->
-  Alpha_services.Forge.Manager.origination cctxt block
-    ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager
-    ~counter ~balance ~spendable:spendable
-    ~delegatable ?delegatePubKey:delegate
-    ~script:{ code ; storage } ~fee () >>=? fun bytes ->
-  Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
-  originate cctxt ~block ~signature bytes
-
-let wait_for_operation_inclusion
-    (ctxt : #Proto_alpha.full)
-    ?(predecessors = 10)
-    ?(confirmations = 1)
-    operation_hash =
-  let confirmed_blocks = Hashtbl.create confirmations in
-  Block_services.monitor ctxt ~length:predecessors >>=? fun (stream, stop) ->
-  let stream = Lwt_stream.flatten @@ Lwt_stream.flatten @@ stream in
-  Lwt_stream.find_s begin fun bi ->
-    match Hashtbl.find_opt confirmed_blocks bi.Block_services.predecessor with
-    | Some n ->
-        ctxt#answer
-          "Operation received %d confirmations as of block: %a"
-          (n+1) Block_hash.pp bi.hash >>= fun () ->
-        if n+1 < confirmations then begin
-          Hashtbl.add confirmed_blocks bi.hash (n+1) ;
-          Lwt.return_false
-        end else
-          Lwt.return_true
-    | None ->
-        Block_services.operations ctxt (`Hash (bi.hash, 0)) >>= fun operations ->
-        let in_block =
-          match operations with
-          | Error _ -> false
-          | Ok operations ->
-              List.exists
-                (List.exists
-                   (fun (hash, _) ->
-                      Operation_hash.equal operation_hash hash))
-                operations in
-        if not in_block then
-          Lwt.return_false
-        else begin
-          ctxt#answer
-            "Operation found in block: %a"
-            Block_hash.pp bi.hash >>= fun () ->
-          if confirmations <= 0 then
-            Lwt.return_true
-          else begin
-            Hashtbl.add confirmed_blocks bi.hash 0 ;
-            Lwt.return_false
-          end
-        end
-  end stream >>= fun _ ->
-  stop () ;
-  return ()
+  let code = Script.lazy_expr code and storage = Script.lazy_expr storage in
+  let origination =
+    Origination { manager ;
+                  delegate ;
+                  script = Some { code ; storage } ;
+                  spendable ;
+                  delegatable ;
+                  credit = balance ;
+                  preorigination = None } in
+  originate cctxt ~chain ~block ?confirmations
+    ?dry_run
+    ?branch ~source ~src_pk ~src_sk ~fee ?gas_limit ?storage_limit origination
 
 type activation_key =
   { pkh : Ed25519.Public_key_hash.t ;
     amount : Tez.t ;
-    secret : Blinded_public_key_hash.secret ;
+    activation_code : Blinded_public_key_hash.activation_code ;
     mnemonic : string list ;
     password : string ;
     email : string ;
   }
 
+let raw_activation_key_encoding =
+  let open Data_encoding in
+  obj6
+    (req "pkh" Ed25519.Public_key_hash.encoding)
+    (req "amount" Tez.encoding)
+    (req "activation_code" Blinded_public_key_hash.activation_code_encoding)
+    (req "mnemonic" (list string))
+    (req "password" string)
+    (req "email" string)
+
 let activation_key_encoding =
+  (* Hack: allow compatibility with older encoding *)
   let open Data_encoding in
   conv
-    (fun { pkh ; amount ; secret ; mnemonic ; password ; email } ->
-       ( pkh, amount, secret, mnemonic, password, email ))
-    (fun ( pkh, amount, secret, mnemonic, password, email ) ->
-       { pkh ; amount ; secret ; mnemonic ; password ; email })
-    (obj6
-       (req "pkh" Ed25519.Public_key_hash.encoding)
-       (req "amount" Tez.encoding)
-       (req "secret" Blinded_public_key_hash.secret_encoding)
-       (req "mnemonic" (list string))
-       (req "password" string)
-       (req "email" string))
+    (fun { pkh ; amount ; activation_code ; mnemonic ; password ; email } ->
+       ( pkh, amount, activation_code, mnemonic, password, email ))
+    (fun ( pkh, amount, activation_code, mnemonic, password, email ) ->
+       { pkh ; amount ; activation_code ; mnemonic ; password ; email }) @@
+  splitted
+    ~binary:raw_activation_key_encoding
+    ~json:
+      (union [
+          case
+            ~title:"Activation"
+            Json_only
+            raw_activation_key_encoding
+            (fun x -> Some x)
+            (fun x -> x) ;
+          case
+            ~title:"Deprecated_activation"
+            Json_only
+            (obj6
+               (req "pkh" Ed25519.Public_key_hash.encoding)
+               (req "amount" Tez.encoding)
+               (req "secret" Blinded_public_key_hash.activation_code_encoding)
+               (req "mnemonic" (list string))
+               (req "password" string)
+               (req "email" string))
+            (fun _ -> None)
+            (fun x -> x) ;
+        ])
 
 let read_key key =
   match Bip39.of_words key.mnemonic with
@@ -324,8 +310,42 @@ let read_key key =
       let pkh = Signature.Public_key.hash pk in
       return (pkh, pk, sk)
 
-let claim_commitment (cctxt : #Proto_alpha.full)
-    ?confirmations ?force block key name =
+let inject_activate_operation
+    cctxt ~chain ~block ?confirmations
+    ?dry_run
+    alias pkh activation_code =
+  let contents =
+    Single ( Activate_account { id = pkh ; activation_code } ) in
+  Injection.inject_operation
+    cctxt ?confirmations
+    ?dry_run
+    ~chain ~block
+    contents >>=? fun (oph, op, result) ->
+  begin
+    match confirmations with
+    | None ->
+        return_unit
+    | Some _confirmations ->
+        Alpha_services.Contract.balance
+          cctxt (`Main, `Head 0)
+          (Contract.implicit_contract (Ed25519 pkh)) >>=? fun balance ->
+        cctxt#message "Account %s (%a) activated with %s%a."
+          alias
+          Ed25519.Public_key_hash.pp pkh
+          Client_proto_args.tez_sym
+          Tez.pp balance >>= fun () ->
+        return_unit
+  end >>=? fun () ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result
+      (Activate_account _ as op, result) ->
+      return (oph, op, result)
+
+let activate_account
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block ?confirmations
+    ?dry_run
+    ?(encrypted = false) ?force key name =
   read_key key >>=? fun (pkh, pk, sk) ->
   fail_unless (Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
     (failure "@[<v 2>Inconsistent activation key:@ \
@@ -333,29 +353,29 @@ let claim_commitment (cctxt : #Proto_alpha.full)
               Embedded pkh: %a @]"
        Signature.Public_key_hash.pp pkh
        Ed25519.Public_key_hash.pp key.pkh) >>=? fun () ->
-  let op = [ Activation { id = key.pkh ; secret = key.secret } ] in
-  Block_services.info cctxt block >>=? fun bi ->
-  Alpha_services.Forge.Anonymous.operations
-    cctxt block ~branch:bi.hash op >>=? fun bytes ->
-  Shell_services.inject_operation
-    cctxt ~chain_id:bi.chain_id bytes >>=? fun oph ->
-  operation_submitted_message cctxt oph >>=? fun () ->
+  let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
   begin
-    match confirmations with
-    | None ->
-        Client_keys.register_key cctxt ?force (pkh, pk, sk) name >>=? fun () ->
-        return ()
-    | Some confirmations ->
-        cctxt#message "Waiting for the operation to be included..." >>= fun () ->
-        wait_for_operation_inclusion ~confirmations cctxt oph >>=? fun () ->
-        Client_keys.register_key cctxt ?force (pkh, pk, sk) name >>=? fun () ->
-        Alpha_services.Contract.balance
-          cctxt (`Head 0) (Contract.implicit_contract pkh) >>=? fun balance ->
-        cctxt#message "Account %s (%a) created with %s%a."
-          name
-          Signature.Public_key_hash.pp pkh
-          Client_proto_args.tez_sym
-          Tez.pp balance >>= fun () ->
-        return ()
-  end
+    if encrypted then
+      Tezos_signer_backends.Encrypted.encrypt cctxt sk
+    else
+      return (Tezos_signer_backends.Unencrypted.make_sk sk)
+  end >>=? fun sk_uri ->
+  Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name >>=? fun () ->
+  inject_activate_operation cctxt
+    ~chain ~block ?confirmations
+    ?dry_run
+    name key.pkh key.activation_code
 
+let activate_existing_account
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block ?confirmations
+    ?dry_run
+    alias activation_code =
+  Client_keys.alias_keys cctxt alias >>=? function
+  | Some (Ed25519 pkh, _, _) ->
+      inject_activate_operation
+        cctxt ~chain ~block ?confirmations
+        ?dry_run
+        alias pkh activation_code
+  | Some _ -> failwith "Only Ed25519 accounts can be activated"
+  | None -> failwith "Unknown account"

@@ -1,4 +1,0 @@
-parameter nat;
-storage (pair string nat);
-return (pair string nat);
-code { DUP; CDR; DIP{CAR}; SET_CDR @annot; DUP; PAIR };

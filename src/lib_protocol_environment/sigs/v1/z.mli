@@ -1,17 +1,36 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** Tezos Protocol Environment - Arbitrary precision arithmetic. *)
 
 type t
 val zero: t
 val one: t
+
+val succ: t -> t
+(** Returns its argument plus one. *)
 
 val abs: t -> t
 (** Absolute value. *)
@@ -62,7 +81,20 @@ val shift_right: t -> int -> t
 *)
 
 val to_string: t -> string
+(** Gives a human-readable, decimal string representation of the argument. *)
+
 val of_string: string -> t
+(** Converts a string to an integer.
+    An optional [-] prefix indicates a negative number, while a [+]
+    prefix is ignored.
+    An optional prefix [0x], [0o], or [0b] (following the optional [-]
+    or [+] prefix) indicates that the number is,
+    represented, in hexadecimal, octal, or binary, respectively.
+    Otherwise, base 10 is assumed.
+    (Unlike C, a lone [0] prefix does not denote octal.)
+    Raises an [Invalid_argument] exception if the string is not a
+    syntactically correct representation of an integer.
+*)
 
 val to_int64: t -> int64
 (** Converts to a 64-bit integer. May raise [Overflow]. *)
@@ -75,6 +107,9 @@ val to_int: t -> int
 
 val of_int: int -> t
 (** Converts from a base integer. *)
+
+val to_bits: ?pad_to:int -> t -> MBytes.t
+val of_bits: MBytes.t -> t
 
 val equal: t -> t -> bool
 val compare: t -> t -> int

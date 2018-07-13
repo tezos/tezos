@@ -1,4 +1,3 @@
-parameter (pair tez (pair timestamp int)) ;
-return string ;
-storage unit ;
-code { CAR ; H ; UNIT ; SWAP ; PAIR }
+parameter (pair mutez (pair timestamp int)) ;
+storage bytes ;
+code { CAR ; PACK ; BLAKE2B ; NIL operation ; PAIR }

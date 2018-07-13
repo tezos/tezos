@@ -5,7 +5,8 @@
 #require "lwt";;
 #require "lwt.unix";;
 #require "zarith";;
-#require "nocrypto";;
+#require "re";;
+#require "hacl";;
 #require "calendar";;
 #mod_use "../src/lib_stdlib/tzString.ml";;
 #mod_use "../src/lib_stdlib/option.ml";;
@@ -13,21 +14,32 @@
 #mod_use "../src/lib_stdlib/utils.ml";;
 #mod_use "../src/lib_crypto/base58.ml";;
 
-let date =
-  Lwt_main.run (Lwt_process.pread_line (Lwt_process.shell "date +%FT%TZ --utc"))
+open Lwt.Infix;;
 
 let prefix = "BLockGenesisGenesisGenesisGenesisGenesis"
-let suffix = String.sub Digest.(to_hex (string date)) 0 5
-let p =
+let rec genesis () =
+  let date =
+    Lwt_main.run
+      (Lwt_process.pread_line (Lwt_process.shell "date +%FT%TZ --utc")) in
+  let suffix = String.sub Digest.(to_hex (string date)) 0 5 in
   match Base58.raw_decode (prefix ^ suffix ^ "crcCRC") with
-  | None -> assert false
-  | Some s -> s
-let p = String.sub p 0 (String.length p - 4)
-let genesis = Base58.safe_encode p
+  | None -> genesis ()
+  | Some p ->
+      let p = String.sub p 0 (String.length p - 4) in
+      Base58.safe_encode p, date
+
+let genesis, date = genesis ()
 
 let () =
-  Lwt_main.run (Lwt_io.lines_to_file "alphanet_version"
-                  (Lwt_stream.of_list [date]))
+  Lwt_main.run @@
+  let stream = Lwt_io.lines_of_file "alphanet_version" in
+  Lwt_stream.to_list stream >>= function
+  | [] | _ :: _ :: _ -> failwith "bad alphanet_version file"
+  | [ line ] -> match String.split_on_char 'Z' line with
+    | [ _ ; branch ] ->
+        let contents = if String.trim branch = "" then date else date ^ branch in
+        Lwt_io.lines_to_file "alphanet_version" (Lwt_stream.of_list [ contents ])
+    | _ -> failwith "bad alphanet_version file"
 
 let sed =
   Format.sprintf
@@ -43,8 +55,8 @@ let _ =
 
 let sed =
   Format.sprintf
-    "sed -i \
-     -e 's/name = \"TEZOS[^\"]*\" ;/name = \"TEZOS_%s\" ;/' \
+    "sed -E -i \
+     -e 's/name = \"(TEZOS[_A-Z]+)[^\"]*\" ;/name = \"\\1%s\" ;/' \
      ../src/lib_shell/distributed_db_message.ml"
     date
 

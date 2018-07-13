@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (* FIXME ignore/postpone fetching/validating of block in the future... *)
 
@@ -119,47 +135,37 @@ let bootstrap_new_branch w _ancestor _head unknown_prefix =
   debug w
     "done validating new branch from peer %a."
     P2p_peer.Id.pp_short pv.peer_id ;
-  return ()
+  return_unit
 
 let validate_new_head w hash (header : Block_header.t) =
   let pv = Worker.state w in
-  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Block.known chain_state header.shell.predecessor >>= function
-  | false ->
-      debug w
-        "missing predecessor for new head %a from peer %a"
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pv.peer_id ;
-      Distributed_db.Request.current_branch pv.parameters.chain_db ~peer:pv.peer_id () ;
-      return ()
-  | true ->
-      debug w
-        "fetching operations for new head %a from peer %a"
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pv.peer_id ;
-      map_p
-        (fun i ->
-           Worker.protect w begin fun () ->
-             Distributed_db.Operations.fetch
-               ~timeout:pv.parameters.limits.block_operations_timeout
-               pv.parameters.chain_db ~peer:pv.peer_id
-               (hash, i) header.shell.operations_hash
-           end)
-        (0 -- (header.shell.validation_passes - 1)) >>=? fun operations ->
-      debug w
-        "requesting validation for new head %a from peer %a"
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pv.peer_id ;
-      Block_validator.validate
-        ~notify_new_block:pv.parameters.notify_new_block
-        pv.parameters.block_validator pv.parameters.chain_db
-        hash header operations >>=? fun _block ->
-      debug w
-        "end of validation for new head %a from peer %a"
-        Block_hash.pp_short hash
-        P2p_peer.Id.pp_short pv.peer_id ;
-      set_bootstrapped pv ;
-      return ()
+  debug w
+    "fetching operations for new head %a from peer %a"
+    Block_hash.pp_short hash
+    P2p_peer.Id.pp_short pv.peer_id ;
+  map_p
+    (fun i ->
+       Worker.protect w begin fun () ->
+         Distributed_db.Operations.fetch
+           ~timeout:pv.parameters.limits.block_operations_timeout
+           pv.parameters.chain_db ~peer:pv.peer_id
+           (hash, i) header.shell.operations_hash
+       end)
+    (0 -- (header.shell.validation_passes - 1)) >>=? fun operations ->
+  debug w
+    "requesting validation for new head %a from peer %a"
+    Block_hash.pp_short hash
+    P2p_peer.Id.pp_short pv.peer_id ;
+  Block_validator.validate
+    ~notify_new_block:pv.parameters.notify_new_block
+    pv.parameters.block_validator pv.parameters.chain_db
+    hash header operations >>=? fun _block ->
+  debug w
+    "end of validation for new head %a from peer %a"
+    Block_hash.pp_short hash
+    P2p_peer.Id.pp_short pv.peer_id ;
+  set_bootstrapped pv ;
+  return_unit
 
 let only_if_fitness_increases w distant_header cont =
   let pv = Worker.state w in
@@ -174,38 +180,67 @@ let only_if_fitness_increases w distant_header cont =
       Block_hash.pp_short (Block_header.hash distant_header)
       P2p_peer.Id.pp_short pv.peer_id ;
     (* Don't download a branch that cannot beat the current head. *)
-    return ()
+    return_unit
   end else cont ()
 
-let may_validate_new_head w hash header =
+let assert_acceptable_head w hash (header: Block_header.t) =
   let pv = Worker.state w in
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Block.known chain_state hash >>= function
-  | true -> begin
-      State.Block.known_valid chain_state hash >>= function
-      | true ->
-          debug w
-            "ignoring previously validated block %a from peer %a"
-            Block_hash.pp_short hash
-            P2p_peer.Id.pp_short pv.peer_id ;
-          set_bootstrapped pv ;
-          pv.last_validated_head <- header ;
-          return ()
-      | false ->
-          debug w
-            "ignoring known invalid block %a from peer %a"
-            Block_hash.pp_short hash
-            P2p_peer.Id.pp_short pv.peer_id ;
-          fail Validation_errors.Known_invalid
-    end
-  | false ->
-      only_if_fitness_increases w header @@ fun () ->
-      validate_new_head w hash header
+  State.Chain.acceptable_block chain_state hash header >>= fun acceptable ->
+  fail_unless acceptable
+    (Validation_errors.Checkpoint_error (hash, Some pv.peer_id))
+
+let may_validate_new_head w hash (header : Block_header.t) =
+  let pv = Worker.state w in
+  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  State.Block.known_valid chain_state hash >>= fun valid_block ->
+  State.Block.known_invalid chain_state hash >>= fun invalid_block ->
+  State.Block.known_valid chain_state
+    header.shell.predecessor >>= fun valid_predecessor ->
+  State.Block.known_invalid chain_state
+    header.shell.predecessor >>= fun invalid_predecessor ->
+  if valid_block then begin
+    debug w
+      "ignoring previously validated block %a from peer %a"
+      Block_hash.pp_short hash
+      P2p_peer.Id.pp_short pv.peer_id ;
+    set_bootstrapped pv ;
+    pv.last_validated_head <- header ;
+    return_unit
+  end else if invalid_block then begin
+    debug w
+      "ignoring known invalid block %a from peer %a"
+      Block_hash.pp_short hash
+      P2p_peer.Id.pp_short pv.peer_id ;
+    fail Validation_errors.Known_invalid
+  end else if invalid_predecessor then begin
+    debug w
+      "ignoring known invalid block %a from peer %a"
+      Block_hash.pp_short hash
+      P2p_peer.Id.pp_short pv.peer_id ;
+    Distributed_db.commit_invalid_block pv.parameters.chain_db
+      hash header [Validation_errors.Known_invalid] >>=? fun _ ->
+    fail Validation_errors.Known_invalid
+  end else if not valid_predecessor then begin
+    debug w
+      "missing predecessor for new head %a from peer %a"
+      Block_hash.pp_short hash
+      P2p_peer.Id.pp_short pv.peer_id ;
+    Distributed_db.Request.current_branch
+      pv.parameters.chain_db ~peer:pv.peer_id () ;
+    return_unit
+  end else begin
+    only_if_fitness_increases w header @@ fun () ->
+    assert_acceptable_head w hash header >>=? fun () ->
+    validate_new_head w hash header
+  end
 
 let may_validate_new_branch w distant_hash locator =
   let pv = Worker.state w in
   let distant_header, _ = (locator : Block_locator.t :> Block_header.t * _) in
   only_if_fitness_increases w distant_header @@ fun () ->
+  assert_acceptable_head w
+    (Block_header.hash distant_header) distant_header >>=? fun () ->
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
   State.Block.known_ancestor chain_state locator >>= function
   | None ->
@@ -223,7 +258,7 @@ let on_no_request w =
     P2p_peer.Id.pp_short pv.peer_id
     pv.parameters.limits.new_head_request_timeout ;
   Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
-  return ()
+  return_unit
 
 let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
   let pv = Worker.state w in
@@ -243,7 +278,7 @@ let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
 
 let on_completion w r _ st =
   Worker.record_event w (Event.Request (Request.view r, st, None )) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let on_error w r st errs =
   let pv = Worker.state w in
@@ -251,7 +286,7 @@ let on_error w r st errs =
     ((( Validation_errors.Unknown_ancestor
       | Validation_errors.Invalid_locator _
       | Block_validator_errors.Invalid_block _ ) :: _) as errors ) ->
-      (* TODO ban the peer_id... *)
+      Distributed_db.greylist pv.parameters.chain_db pv.peer_id >>= fun () ->
       debug w
         "Terminating the validation worker for peer %a (kickban)."
         P2p_peer.Id.pp_short pv.peer_id ;
@@ -265,9 +300,12 @@ let on_error w r st errs =
         ~peer:pv.peer_id
         ~timeout:pv.parameters.limits.protocol_timeout
         protocol >>= function
-      | Ok _ -> return ()
+      | Ok _ ->
+          Distributed_db.Request.current_head
+            pv.parameters.chain_db ~peer:pv.peer_id () ;
+          return_unit
       | Error _ ->
-          (* TODO penality... *)
+          (* TODO: punish *)
           debug w
             "Terminating the validation worker for peer %a \
              (missing protocol %a)."
@@ -284,7 +322,7 @@ let on_close w =
   let pv = Worker.state w in
   Distributed_db.disconnect pv.parameters.chain_db pv.peer_id >>= fun () ->
   pv.parameters.notify_termination () ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let on_launch _ name parameters =
   let chain_state = Distributed_db.chain_state parameters.chain_db in
@@ -343,7 +381,7 @@ let create
     let on_close = on_close
     let on_error = on_error
     let on_completion = on_completion
-    let on_no_request _ = return ()
+    let on_no_request _ = return_unit
   end in
   Worker.launch table ~timeout: limits.new_head_request_timeout limits.worker_limits
     name parameters

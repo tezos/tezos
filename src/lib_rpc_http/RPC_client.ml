@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module Client = Resto_cohttp.Client.Make(RPC_encoding)
 
@@ -37,35 +53,41 @@ let rpc_error_encoding =
   let open Data_encoding in
   union
     [ case (Tag  0)
+        ~title:"Empty_answer"
         (obj1
            (req "kind" (constant "empty_answer")))
         (function Empty_answer -> Some () | _ -> None)
         (fun () -> Empty_answer) ;
       case (Tag  1)
+        ~title:"Connection_failed"
         (obj2
            (req "kind" (constant "connection_failed"))
            (req "message" string))
         (function Connection_failed msg -> Some ((), msg) | _ -> None)
         (function (), msg -> Connection_failed msg) ;
       case (Tag  2)
+        ~title:"Bad_request"
         (obj2
            (req "kind" (constant "bad_request"))
            (req "message" string))
         (function Bad_request msg -> Some ((), msg) | _ -> None)
         (function (), msg -> Bad_request msg) ;
       case (Tag  3)
+        ~title:"Method_not_allowed"
         (obj2
            (req "kind" (constant "method_not_allowed"))
            (req "allowed" (list RPC_service.meth_encoding)))
         (function Method_not_allowed meths -> Some ((), meths) | _ -> None)
         (function ((), meths) -> Method_not_allowed meths) ;
       case (Tag  4)
+        ~title:"Unsupported_media_type"
         (obj2
            (req "kind" (constant "unsupported_media_type"))
            (opt "content_type" string))
         (function Unsupported_media_type m -> Some ((), m) | _ -> None)
         (function ((), m) -> Unsupported_media_type m) ;
       case (Tag  5)
+        ~title:"Not_acceptable"
         (obj3
            (req "kind" (constant "not_acceptable"))
            (req "proposed" string)
@@ -77,6 +99,7 @@ let rpc_error_encoding =
         (function ((), proposed, acceptable) ->
            Not_acceptable { proposed ; acceptable }) ;
       case (Tag  6)
+        ~title:"Unexpected_status_code"
         (obj4
            (req "kind" (constant "unexpected_status_code"))
            (req "code" uint16)
@@ -90,6 +113,7 @@ let rpc_error_encoding =
            let code = Cohttp.Code.status_of_code code in
            Unexpected_status_code { code ; content ; media_type }) ;
       case (Tag  7)
+        ~title:"Unexpected_content_type"
         (obj4
            (req "kind" (constant "unexpected_content_type"))
            (req "received" string)
@@ -102,6 +126,7 @@ let rpc_error_encoding =
         (function ((), received, acceptable, body) ->
            Unexpected_content_type { received ; acceptable ; body }) ;
       case (Tag  8)
+        ~title:"Unexpected_content"
         (obj4
            (req "kind" (constant "unexpected_content"))
            (req "content" string)
@@ -114,6 +139,7 @@ let rpc_error_encoding =
         (function ((), content, media_type, error) ->
            Unexpected_content { content ; media_type ; error  }) ;
       case (Tag  9)
+        ~title:"OCaml_exception"
         (obj2
            (req "kind" (constant "ocaml_exception"))
            (req "content" string))
@@ -213,8 +239,8 @@ let request_failed meth uri error =
 type content_type = (string * string)
 type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
-let generic_call ?logger ?accept ?body ?media meth uri : (content, content) RPC_context.rest_result Lwt.t =
-  Client.generic_call meth ?logger ?accept ?body ?media uri >>= function
+let generic_call ?logger ?headers ?accept ?body ?media meth uri : (content, content) RPC_context.rest_result Lwt.t =
+  Client.generic_call meth ?logger ?headers ?accept ?body ?media uri >>= function
   | `Ok (Some v) -> return (`Ok v)
   | `Ok None -> request_failed meth uri Empty_answer
   | `Conflict _
@@ -267,13 +293,13 @@ let handle_error meth uri (body, media, _) f =
                                      acceptable = [Media_type.(name json)] ;
                                      body })
 
-let generic_json_call ?logger ?body meth uri : (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result Lwt.t =
+let generic_json_call ?logger ?headers ?body meth uri : (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result Lwt.t =
   let body =
     Option.map body ~f:begin fun b ->
       (Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
     end in
   let media = Media_type.json in
-  generic_call meth ?logger ~accept:Media_type.[bson ; json] ?body ~media uri >>=? function
+  generic_call meth ?logger ?headers ~accept:Media_type.[bson ; json] ?body ~media uri >>=? function
   | `Ok (body, (Some ("application", "json") | None), _) -> begin
       Cohttp_lwt.Body.to_string body >>= fun body ->
       match Data_encoding.Json.from_string body with
@@ -366,21 +392,21 @@ let handle accept (meth, uri, ans) =
 
 let call_streamed_service
     (type p q i o )
-    accept ?logger ~base (service : (_,_,p,q,i,o) RPC_service.t)
+    accept ?logger ?headers ~base (service : (_,_,p,q,i,o) RPC_service.t)
     ~on_chunk ~on_close
     (params : p) (query : q) (body : i) : (unit -> unit) tzresult Lwt.t =
   Client.call_streamed_service
-    accept ?logger ~base ~on_chunk ~on_close
+    accept ?logger ?headers ~base ~on_chunk ~on_close
     service params query body >>= fun ans ->
   handle accept ans
 
 let call_service
     (type p q i o )
-    accept ?logger ~base (service : (_,_,p,q,i,o) RPC_service.t)
+    accept ?logger ?headers ~base (service : (_,_,p,q,i,o) RPC_service.t)
     (params : p)
     (query : q) (body : i) : o tzresult Lwt.t =
   Client.call_service
-    ?logger ~base accept service params query body >>= fun ans ->
+    ?logger ?headers ~base accept service params query body >>= fun ans ->
   handle accept ans
 
 type config = {
@@ -394,7 +420,7 @@ let config_encoding =
   let open Data_encoding in
   conv
     (fun { host ; port ; tls } -> (host, port, tls))
-    (fun (host, port, tls) -> { host ; port ; tls ; logger = null_logger})
+    (fun (host, port, tls) -> { host ; port ; tls ; logger = null_logger })
     (obj3
        (req "host" string)
        (req "port" uint16)
@@ -437,4 +463,5 @@ class http_ctxt config media_types : RPC_context.json =
       fun service ~on_chunk ~on_close params query body ->
         call_streamed_service media_types service
           ~logger ~base ~on_chunk ~on_close params query body
+    method base = base
   end

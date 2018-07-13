@@ -1,17 +1,36 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+type annot = string list
 
 type ('l, 'p) node =
-  | Int of 'l * string
+  | Int of 'l * Z.t
   | String of 'l * string
-  | Prim of 'l * 'p * ('l, 'p) node list * string option
-  | Seq of 'l * ('l, 'p) node list * string option
+  | Bytes of 'l * MBytes.t
+  | Prim of 'l * 'p * ('l, 'p) node list * annot
+  | Seq of 'l * ('l, 'p) node list
 
 type canonical_location = int
 
@@ -20,8 +39,7 @@ type 'p canonical = Canonical of (canonical_location, 'p) node
 let canonical_location_encoding =
   let open Data_encoding in
   def
-    "micheline.location" @@
-  describe
+    "micheline.location"
     ~title:
       "Canonical location in a Micheline expression"
     ~description:
@@ -33,15 +51,16 @@ let canonical_location_encoding =
 let location = function
   | Int (loc, _) -> loc
   | String (loc, _) -> loc
-  | Seq (loc, _, _) -> loc
+  | Bytes (loc, _) -> loc
+  | Seq (loc, _) -> loc
   | Prim (loc, _, _, _) -> loc
 
-let annotation = function
-  | Int (_, _) -> None
-  | String (_, _) -> None
-  | Seq (_, _, annot) -> annot
-  | Prim (_, _, _, annot) -> annot
-
+let annotations = function
+  | Int (_, _) -> []
+  | String (_, _) -> []
+  | Bytes (_, _) -> []
+  | Seq (_, _) -> []
+  | Prim (_, _, _, annots) -> annots
 
 let root (Canonical expr) = expr
 
@@ -54,10 +73,12 @@ let strip_locations root =
         Int (id, v)
     | String (_, v) ->
         String (id, v)
-    | Seq (_, seq, annot) ->
-        Seq (id, List.map strip_locations seq, annot)
-    | Prim (_, name, seq, annot) ->
-        Prim (id, name, List.map strip_locations seq, annot) in
+    | Bytes (_, v) ->
+        Bytes (id, v)
+    | Seq (_, seq) ->
+        Seq (id, List.map strip_locations seq)
+    | Prim (_, name, seq, annots) ->
+        Prim (id, name, List.map strip_locations seq, annots) in
   Canonical (strip_locations root)
 
 let extract_locations root =
@@ -72,12 +93,15 @@ let extract_locations root =
     | String (loc, v) ->
         loc_table := (id, loc) :: !loc_table ;
         String (id, v)
-    | Seq (loc, seq, annot) ->
+    | Bytes (loc, v) ->
         loc_table := (id, loc) :: !loc_table ;
-        Seq (id, List.map strip_locations seq, annot)
-    | Prim (loc, name, seq, annot) ->
+        Bytes (id, v)
+    | Seq (loc, seq) ->
         loc_table := (id, loc) :: !loc_table ;
-        Prim (id, name, List.map strip_locations seq, annot) in
+        Seq (id, List.map strip_locations seq)
+    | Prim (loc, name, seq, annots) ->
+        loc_table := (id, loc) :: !loc_table ;
+        Prim (id, name, List.map strip_locations seq, annots) in
   let stripped = strip_locations root in
   Canonical stripped, List.rev !loc_table
 
@@ -88,19 +112,21 @@ let inject_locations lookup (Canonical root) =
         Int (lookup loc, v)
     | String (loc, v) ->
         String (lookup loc, v)
-    | Seq (loc, seq, annot) ->
-        Seq (lookup loc, List.map inject_locations seq, annot)
-    | Prim (loc, name, seq, annot) ->
-        Prim (lookup loc, name, List.map inject_locations seq, annot) in
+    | Bytes (loc, v) ->
+        Bytes (lookup loc, v)
+    | Seq (loc, seq) ->
+        Seq (lookup loc, List.map inject_locations seq)
+    | Prim (loc, name, seq, annots) ->
+        Prim (lookup loc, name, List.map inject_locations seq, annots) in
   inject_locations root
 
 let map f (Canonical expr) =
   let rec map_node f = function
-    | Int _ | String _ as node -> node
-    | Seq (loc, seq, annot) ->
-        Seq (loc, List.map (map_node f) seq, annot)
-    | Prim (loc, name, seq, annot) ->
-        Prim (loc, f name, List.map (map_node f) seq, annot) in
+    | Int _ | String _ | Bytes _ as node -> node
+    | Seq (loc, seq) ->
+        Seq (loc, List.map (map_node f) seq)
+    | Prim (loc, name, seq, annots) ->
+        Prim (loc, f name, List.map (map_node f) seq, annots) in
   Canonical (map_node f expr)
 
 let rec map_node fl fp = function
@@ -108,44 +134,69 @@ let rec map_node fl fp = function
       Int (fl loc, v)
   | String (loc, v) ->
       String (fl loc, v)
-  | Seq (loc, seq, annot) ->
-      Seq (fl loc, List.map (map_node fl fp) seq, annot)
-  | Prim (loc, name, seq, annot) ->
-      Prim (fl loc, fp name, List.map (map_node fl fp) seq, annot)
+  | Bytes (loc, v) ->
+      Bytes (fl loc, v)
+  | Seq (loc, seq) ->
+      Seq (fl loc, List.map (map_node fl fp) seq)
+  | Prim (loc, name, seq, annots) ->
+      Prim (fl loc, fp name, List.map (map_node fl fp) seq, annots)
 
 let canonical_encoding ~variant prim_encoding =
   let open Data_encoding in
   let int_encoding =
-    obj1 (req "int" string) in
+    obj1 (req "int" z) in
   let string_encoding =
     obj1 (req "string" string) in
+  let bytes_encoding =
+    obj1 (req "bytes" bytes) in
   let int_encoding tag =
     case tag int_encoding
+      ~title:"Int"
       (function Int (_, v) -> Some v | _ -> None)
       (fun v -> Int (0, v)) in
   let string_encoding tag =
     case tag string_encoding
+      ~title:"String"
       (function String (_, v) -> Some v | _ -> None)
       (fun v -> String (0, v)) in
+  let bytes_encoding tag =
+    case tag bytes_encoding
+      ~title:"Bytes"
+      (function Bytes (_, v) -> Some v | _ -> None)
+      (fun v -> Bytes (0, v)) in
   let seq_encoding tag expr_encoding =
     case tag (list expr_encoding)
-      (function Seq (_, v, _annot) -> Some v | _ -> None)
-      (fun args -> Seq (0, args, None)) in
+      ~title:"Sequence"
+      (function Seq (_, v) -> Some v | _ -> None)
+      (fun args -> Seq (0, args)) in
+  let annots_encoding =
+    let split s =
+      let annots = String.split_on_char ' ' s in
+      List.iter (fun a ->
+          if String.length a > 255 then failwith "Oversized annotation"
+        ) annots;
+      if String.concat " " annots <> s then
+        failwith "Invalid annotation string, \
+                  must be a sequence of valid annotations with spaces" ;
+      annots in
+    splitted
+      ~json:(list (Bounded.string 255))
+      ~binary:(conv (String.concat " ") split string) in
   let application_encoding tag expr_encoding =
     case tag
+      ~title:"Generic prim (any number of args with or without annot)"
       (obj3 (req "prim" prim_encoding)
-         (req "args" (list expr_encoding))
-         (opt "annot" string))
-      (function Prim (_, prim, args, annot) -> Some (prim, args, annot)
+         (dft "args" (list expr_encoding) [])
+         (dft "annots" annots_encoding []))
+      (function Prim (_, prim, args, annots) -> Some (prim, args, annots)
               | _ -> None)
-      (fun (prim, args, annot) -> Prim (0, prim, args, annot)) in
+      (fun (prim, args, annots) -> Prim (0, prim, args, annots)) in
   let node_encoding = mu ("micheline." ^ variant ^ ".expression") (fun expr_encoding ->
-      describe
-        ~title: ("Micheline expression (" ^ variant ^ " variant)") @@
       splitted
         ~json:(union ~tag_size:`Uint8
                  [ int_encoding Json_only;
                    string_encoding Json_only ;
+                   bytes_encoding Json_only ;
                    seq_encoding Json_only expr_encoding ;
                    application_encoding Json_only expr_encoding ])
         ~binary:(union ~tag_size:`Uint8
@@ -154,56 +205,63 @@ let canonical_encoding ~variant prim_encoding =
                      seq_encoding (Tag 2) expr_encoding ;
                      (* No args, no annot *)
                      case (Tag 3)
+                       ~title:"Prim (no args, annot)"
                        (obj1 (req "prim" prim_encoding))
-                       (function Prim (_, v, [], None) -> Some v
+                       (function Prim (_, v, [], []) -> Some v
                                | _ -> None)
-                       (fun v -> Prim (0, v, [], None)) ;
-                     (* No args, with annot *)
+                       (fun v -> Prim (0, v, [], [])) ;
+                     (* No args, with annots *)
                      case (Tag 4)
+                       ~title:"Prim (no args + annot)"
                        (obj2 (req "prim" prim_encoding)
-                          (req "annot" string))
+                          (req "annots" annots_encoding))
                        (function
-                         | Prim (_, v, [], Some annot) -> Some (v, annot)
+                         | Prim (_, v, [], annots) -> Some (v, annots)
                          | _ -> None)
-                       (function (prim, annot) -> Prim (0, prim, [], Some annot)) ;
+                       (function (prim, annots) -> Prim (0, prim, [], annots)) ;
                      (* Single arg, no annot *)
                      case (Tag 5)
+                       ~title:"Prim (1 arg, no annot)"
                        (obj2 (req "prim" prim_encoding)
                           (req "arg" expr_encoding))
                        (function
-                         | Prim (_, v, [ arg ], None) -> Some (v, arg)
+                         | Prim (_, v, [ arg ], []) -> Some (v, arg)
                          | _ -> None)
-                       (function (prim, arg) -> Prim (0, prim, [ arg ], None)) ;
+                       (function (prim, arg) -> Prim (0, prim, [ arg ], [])) ;
                      (* Single arg, with annot *)
                      case (Tag 6)
+                       ~title:"Prim (1 arg + annot)"
                        (obj3 (req "prim" prim_encoding)
                           (req "arg" expr_encoding)
-                          (req "annot" string))
+                          (req "annots" annots_encoding))
                        (function
-                         | Prim (_, prim, [ arg ], Some annot) -> Some (prim, arg, annot)
+                         | Prim (_, prim, [ arg ], annots) -> Some (prim, arg, annots)
                          | _ -> None)
-                       (fun (prim, arg, annot) -> Prim (0, prim, [ arg ], Some annot)) ;
+                       (fun (prim, arg, annots) -> Prim (0, prim, [ arg ], annots)) ;
                      (* Two args, no annot *)
                      case (Tag 7)
+                       ~title:"Prim (2 args, no annot)"
                        (obj3 (req "prim" prim_encoding)
                           (req "arg1" expr_encoding)
                           (req "arg2" expr_encoding))
                        (function
-                         | Prim (_, prim, [ arg1 ; arg2 ], None) -> Some (prim, arg1, arg2)
+                         | Prim (_, prim, [ arg1 ; arg2 ], []) -> Some (prim, arg1, arg2)
                          | _ -> None)
-                       (fun (prim, arg1, arg2) -> Prim (0, prim, [ arg1 ; arg2 ], None)) ;
-                     (* Two args, with annot *)
+                       (fun (prim, arg1, arg2) -> Prim (0, prim, [ arg1 ; arg2 ], [])) ;
+                     (* Two args, with annots *)
                      case (Tag 8)
+                       ~title:"Prim (2 args + annot)"
                        (obj4 (req "prim" prim_encoding)
                           (req "arg1" expr_encoding)
                           (req "arg2" expr_encoding)
-                          (req "annot" string))
+                          (req "annots" annots_encoding))
                        (function
-                         | Prim (_, prim, [ arg1 ; arg2 ], Some annot) -> Some (prim, arg1, arg2, annot)
+                         | Prim (_, prim, [ arg1 ; arg2 ], annots) -> Some (prim, arg1, arg2, annots)
                          | _ -> None)
-                       (fun (prim, arg1, arg2, annot) -> Prim (0, prim, [ arg1 ; arg2 ], Some annot)) ;
+                       (fun (prim, arg1, arg2, annots) -> Prim (0, prim, [ arg1 ; arg2 ], annots)) ;
                      (* General case *)
-                     application_encoding (Tag 9) expr_encoding ]))
+                     application_encoding (Tag 9) expr_encoding ;
+                     bytes_encoding (Tag 10) ]))
   in
   conv
     (function Canonical node -> node)

@@ -1,3 +1,5 @@
+.. _michelson:
+
 Michelson: the language of Smart Contracts in Tezos
 ===================================================
 
@@ -14,11 +16,11 @@ are immutable and garbage collected.
 
 A Michelson program receives as input a single element stack containing
 an input value and the contents of a storage space. It must return a
-single element stack containing an output value and the new contents of
-the storage space. Alternatively, a Michelson program can fail,
-explicitly using a specific opcode, or because something went wrong that
-could not be caught by the type system (e.g. division by zero, gas
-exhaustion).
+single element stack containing aa output value a list of internal
+operations, and the new contents of the storage space. Alternatively,
+a Michelson program can fail, explicitly using a specific opcode,
+or because something went wrong that could not be caught by the type
+system (e.g. division by zero, gas exhaustion).
 
 The types of the input, output and storage are fixed and monomorphic,
 and the program is typechecked before being introduced into the system.
@@ -73,7 +75,7 @@ The rules have the main following form.
     > (syntax pattern) / (initial stack pattern)  =>  (result stack pattern)
         iff (conditions)
         where (recursions)
-	and (more recursions)
+        and (more recursions)
 
 The left hand side of the ``=>`` sign is used for selecting the rule.
 Given a program and an initial stack, one (and only one) rule can be
@@ -86,7 +88,7 @@ stack pattern. Finally, some rules add extra conditions over the values
 in the stack that follow the ``iff`` keyword. Sometimes, several rules
 may apply in a given context. In this case, the one that appears first
 in this specification is to be selected. If no rule applies, the result
-is equivalent to the one for the explicit ``FAIL`` instruction. This
+is equivalent to the one for the explicit ``FAILWITH`` instruction. This
 case does not happen on well-typed programs, as explained in the next
 section.
 
@@ -116,7 +118,7 @@ identify parts that can be used to build the result stack of the rule.
 
 If the partial result pattern does not actually match the result of the
 interpretation, then the result of the whole rule is equivalent to the
-one for the explicit ``FAIL`` instruction. Again, this case does not
+one for the explicit ``FAILWITH`` instruction. Again, this case does not
 happen on well-typed programs, as explained in the next section.
 
 Format of patterns
@@ -137,7 +139,7 @@ Code patterns are of one of the following syntactical forms.
 
 Stack patterns are of one of the following syntactical forms.
 
--  ``[FAIL]`` is the special failed state ;
+-  ``[FAILED]`` is the special failed state ;
 -  ``[]`` is the empty stack ;
 -  ``(top) : (rest)`` is a stack whose top element is matched by the
    data pattern ``(top)`` on the left, and whose remaining elements are
@@ -151,6 +153,7 @@ Data patterns are of one of the following syntactical forms.
 
 -  integer/natural number literals, (e.g. ``3``) ;
 -  string literals, (e.g. ``"contents"``) ;
+-  raw byte sequence literals (e.g. ``0xABCDEF42``)
 -  ``Tag`` (capitalized) is a symbolic constant, (e.g. ``Unit``,
    ``True``, ``False``) ;
 -  ``(Tag (arg) ...)`` tagged constructed data, (e.g. ``(Pair 3 4)``) ;
@@ -321,31 +324,6 @@ the program on an abstract stack representing the input type provided by
 the programmer, and checking that the resulting symbolic stack is
 consistent with the expected result, also provided by the programmer.
 
-Annotations
-~~~~~~~~~~~
-
-Most instructions in the language can optionally take an annotation.
-Annotations allow you to better track data, on the stack and within
-pairs and unions.
-
-If added on the components of a type, the annotation will be propagated
-by the typechecker througout access instructions.
-
-Annotating an instruction that produces a value on the stack will
-rewrite the annotation an the toplevel of its type.
-
-Trying to annotate an instruction that does not produce a value will
-result in a typechecking error.
-
-At join points in the program (``IF``, ``IF_LEFT``, ``IF_CONS``,
-``IF_NONE``, ``LOOP``), annotations must be compatible. Annotations are
-compatible if both elements are annotated with the same annotation or if
-at least one of the values/types is unannotated.
-
-Stack visualization tools like the Michelson’s Emacs mode print
-annotations associated with each type in the program, as propagated by
-the typechecker. This is useful as a debugging aid.
-
 Side note
 ~~~~~~~~~
 
@@ -361,7 +339,8 @@ polymorphism.
 III - Core data types and notations
 -----------------------------------
 
--  ``string``, ``nat``, ``int``: The core primitive constant types.
+-  ``string``, ``nat``, ``int`` and ``bytes``: The core primitive
+   constant types.
 
 -  ``bool``: The type for booleans whose values are ``True`` and
    ``False``
@@ -406,20 +385,20 @@ IV - Core instructions
 Control structures
 ~~~~~~~~~~~~~~~~~~
 
--  ``FAIL``: Explicitly abort the current program.
+-  ``FAILWITH``: Explicitly abort the current program.
 
-   :: \_ -> \_
+   'a :: \_ -> \_
 
-   This special instruction is callable in any context, since it does
-   not use its input stack (first rule below), and makes the output
-   useless since all subsequent instruction will simply ignore their
-   usual semantics to propagate the failure up to the main result
+   This special instruction aborts the current program exposing the top
+   of the stack in its error message (first rule below). It makes the
+   output useless since all subsequent instructions will simply ignore
+   their usual semantics to propagate the failure up to the main result
    (second rule below). Its type is thus completely generic.
 
 ::
 
-    > FAIL / _  =>  [FAIL]
-    > _ / [FAIL]  =>  [FAIL]
+    > FAILWITH / a : _  =>  [FAILED]
+    > _ / [FAILED]  =>  [FAILED]
 
 -  ``{ I ; C }``: Sequence.
 
@@ -458,10 +437,10 @@ Control structures
 
 ::
 
-    :: (or 'a 'b) : 'A   ->   'A
+    :: (or 'a 'b) : 'A   ->  'b : 'A
        iff   body :: [ 'a : 'A -> (or 'a 'b) : 'A ]
 
-    > LOOP_LEFT body / (Left a)  : S  =>  body ; LOOP_LEFT body / (or 'a 'b) : S
+    > LOOP_LEFT body / (Left a) : S  =>  body ; LOOP_LEFT body / a : S
     > LOOP_LEFT body / (Right b) : S  =>  b : S
 
 -  ``DIP code``: Runs code protecting the top of the stack.
@@ -730,11 +709,12 @@ Bitwise logical operators are also available on unsigned integers.
 
     > OR / x : y : S  =>  (x | y) : S
 
--  ``AND``
+-  ``AND`` (also available when the top operand is signed)
 
 ::
 
     :: nat : nat : 'S   ->   nat : 'S
+    :: int : nat : 'S   ->   nat : 'S
 
     > AND / x : y : S  =>  (x & y) : S
 
@@ -748,8 +728,9 @@ Bitwise logical operators are also available on unsigned integers.
 
 -  ``NOT`` The return type of ``NOT`` is an ``int`` and not a ``nat``.
    This is because the sign is also negated. The resulting integer is
-   computed using two’s complement. For instance, the boolean negation
-   of ``0`` is ``-1``.
+   computed using two's complement. For instance, the boolean negation
+   of ``0`` is ``-1``. To get a natural back, a possibility is to use
+   ``AND`` with an unsigned mask afterwards.
 
 ::
 
@@ -766,7 +747,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     > LSL / x : s : S  =>  (x << s) : S
         iff   s <= 256
-    > LSL / x : s : S  =>  [FAIL]
+    > LSL / x : s : S  =>  [FAILED]
         iff   s > 256
 
 -  ``LSR``
@@ -822,7 +803,7 @@ constants as is, concatenate them and use them as keys.
 Operations on pairs
 ~~~~~~~~~~~~~~~~~~~
 
--  ``PAIR``: Build a pair from the stack’s top two elements.
+-  ``PAIR``: Build a pair from the stack's top two elements.
 
 ::
 
@@ -897,17 +878,6 @@ Operations on sets
     > UPDATE / x : true : { hd ; <tl> } : S  =>  { x ; hd ; <tl> } : S
         iff COMPARE / x : hd : []  =>  -1 : []
 
--  ``REDUCE``: Apply a function on a set passing the result of each
-   application to the next one and return the last.
-
-::
-
-    :: lambda (pair 'elt * 'b) 'b : set 'elt : 'b : 'S   ->   'b : 'S
-
-    > REDUCE / f : {} : b : S  =>  b : S
-    > REDUCE / f : { hd : <tl> } : b : S  =>  REDUCE / f : { <tl> } : c : S
-        where f / Pair hd b : []  =>  c : []
-
 -  ``ITER body``: Apply the body expression to each element of a set.
    The body sequence has access to the stack.
 
@@ -955,7 +925,7 @@ Operations on maps
     > GET / x : {} : S  =>  None : S
     > GET / x : { Elt k v ; <tl> } : S  =>  opt_y : S
         iff COMPARE / x : k : []  =>  1 : []
-	where GET / x : { <tl> } : S  =>  opt_y : S
+        where GET / x : { <tl> } : S  =>  opt_y : S
     > GET / x : { Elt k v ; <tl> } : S  =>  Some v : S
         iff COMPARE / x : k : []  =>  0 : []
     > GET / x : { Elt k v ; <tl> } : S  =>  None : S
@@ -986,7 +956,7 @@ Operations on maps
     > UPDATE / x : Some y : {} : S  =>  { Elt x y } : S
     > UPDATE / x : opt_y : { Elt k v ; <tl> } : S  =>  { Elt k v ; <tl'> } : S
         iff COMPARE / x : k : []  =>  1 : []
-	where UPDATE / x : opt_y : { <tl> } : S  =>  { <tl'> } : S
+	      where UPDATE / x : opt_y : { <tl> } : S  =>  { <tl'> } : S
     > UPDATE / x : None : { Elt k v ; <tl> } : S  =>  { <tl> } : S
         iff COMPARE / x : k : []  =>  0 : []
     > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt k y ; <tl> } : S
@@ -995,19 +965,6 @@ Operations on maps
         iff COMPARE / x : k : []  =>  -1 : []
     > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt x y ; Elt k v ; <tl> } : S
         iff COMPARE / x : k : []  =>  -1 : []
-
-
--  ``MAP``: Apply a function on a map and return the map of results
-   under the same bindings.
-
-::
-
-    :: lambda (pair 'key 'val) 'b : map 'key 'val : 'S   ->   map 'key 'b : 'S
-
-    > MAP / f : {} : S  =>  {} : S
-    > MAP / f : { Elt k v ; <tl> } : S  =>  { Elt k (f (Pair k v)) ; <tl'> } : S
-        where MAP / f : { <tl> } : S  =>  { <tl'> } : S
-
 
 -  ``MAP body``: Apply the body expression to each element of a map. The
    body sequence has access to the stack.
@@ -1020,18 +977,6 @@ Operations on maps
     > MAP body / {} : S  =>  {} : S
     > MAP body / { Elt k v ; <tl> } : S  =>  { Elt k (body (Pair k v)) ; <tl'> } : S
         where MAP body / { <tl> } : S  =>  { <tl'> } : S
-
-
--  ``REDUCE``: Apply a function on a map passing the result of each
-   application to the next one and return the last.
-
-::
-
-    :: lambda (pair (pair 'key 'val) 'b) 'b : map 'key 'val : 'b : 'S   ->   'b : 'S
-
-    > REDUCE / f : {} : b : S  =>  b : S
-    > REDUCE / f : { Elt k v ; <tl> } : b : S  =>  REDUCE / f : { <tl> } : c : S
-        where f / Pair (Pair k v) b : []  =>  c
 
 -  ``ITER body``: Apply the body expression to each element of a map.
    The body sequence has access to the stack.
@@ -1058,7 +1003,7 @@ Operations on maps
 Operations on ``big_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The behaviour of these operations is the same as if they were normal
+The behavior of these operations is the same as if they were normal
 maps, except that under the hood, the elements are loaded and
 deserialized on demand.
 
@@ -1184,18 +1129,6 @@ Operations on lists
     > IF_CONS bt bf / { a ; <rest> } : S  =>  bt / a : { <rest> } : S
     > IF_CONS bt bf / {} : S  =>  bf / S
 
--  ``MAP``: Apply a function on a list from left to right and return the
-   list of results in the same order.
-
-::
-
-    :: lambda 'a 'b : list 'a : 'S -> list 'b : 'S
-
-    > MAP / f : { a ; <rest> } : S  =>  { f a ; <rest'> } : S
-        where MAP / f : { <rest> } : S  =>  { <rest'> } : S
-    > MAP / f : {} : S  =>  {} : S
-
-
 -  ``MAP body``: Apply the body expression to each element of the list.
    The body sequence has access to the stack.
 
@@ -1207,19 +1140,6 @@ Operations on lists
     > MAP body / { a ; <rest> } : S  =>  { body a ; <rest'> } : S
         where MAP body / { <rest> } : S  =>  { <rest'> } : S
     > MAP body / {} : S  =>  {} : S
-
-
--  ``REDUCE``: Apply a function on a list from left to right passing the
-   result of each application to the next one and return the last.
-
-::
-
-    :: lambda (pair 'a 'b) 'b : list 'a : 'b : 'S -> 'b : 'S
-
-    > REDUCE / f : { a : <rest> } : b : S  =>  REDUCE / f : { <rest> } : c : S
-        where f / Pair a b : []  =>  c
-    > REDUCE / f : {} : b : S  =>  b : S
-
 
 -  ``SIZE``: Get the number of elements in the list.
 
@@ -1248,9 +1168,13 @@ VI - Domain specific data types
 
 -  ``timestamp``: Dates in the real world.
 
--  ``tez``: A specific type for manipulating tokens.
+-  ``mutez``: A specific type for manipulating tokens.
 
--  ``contract 'param 'result``: A contract, with the type of its code.
+-  ``contract 'param``: A contract, with the type of its code.
+
+-  ``address``: An untyped contract address.
+
+-  ``operation``: An internal operation emitted by a contract.
 
 -  ``key``: A public cryptography key.
 
@@ -1308,30 +1232,31 @@ retrieved from script parameters or globals.
         iff t1 > t2
 
 
-Operations on Tez
+Operations on Mutez
 ~~~~~~~~~~~~~~~~~
 
-Tez are internally represented by a 64 bit signed integer. There are
-restrictions to prevent creating a negative amount of tez. Operations
-are limited to prevent overflow and mixing them with other numerical
-types by mistake. They are also mandatory checked for under/overflows.
+Mutez (micro-Tez) are internally represented by a 64 bit signed
+integers. There are restrictions to prevent creating a negative amount
+of mutez. Operations are limited to prevent overflow and mixing them
+with other numerical types by mistake. They are also mandatory checked
+for under/overflows.
 
 -  ``ADD``:
 
 ::
 
-    :: tez : tez : 'S   ->   tez : 'S
+    :: mutez : mutez : 'S   ->   mutez : 'S
 
-    > ADD / x : y : S  =>  [FAIL]   on overflow
+    > ADD / x : y : S  =>  [FAILED]   on overflow
     > ADD / x : y : S  =>  (x + y) : S
 
 -  ``SUB``:
 
 ::
 
-    :: tez : tez : 'S   ->   tez : 'S
+    :: mutez : mutez : 'S   ->   mutez : 'S
 
-    > SUB / x : y : S  =>  [FAIL]
+    > SUB / x : y : S  =>  [FAILED]
         iff   x < y
     > SUB / x : y : S  =>  (x - y) : S
 
@@ -1339,18 +1264,18 @@ types by mistake. They are also mandatory checked for under/overflows.
 
 ::
 
-    :: tez : nat : 'S   ->   tez : 'S
-    :: nat : tez : 'S   ->   tez : 'S
+    :: mutez : nat : 'S   ->   mutez : 'S
+    :: nat : mutez : 'S   ->   mutez : 'S
 
-    > MUL / x : y : S  =>  [FAIL]   on overflow
+    > MUL / x : y : S  =>  [FAILED]   on overflow
     > MUL / x : y : S  =>  (x * y) : S
 
 -  ``EDIV``
 
 ::
 
-    :: tez : nat : 'S   ->   option (pair tez tez) : 'S
-    :: tez : tez : 'S   ->   option (pair nat tez) : 'S
+    :: mutez : nat : 'S   ->   option (pair mutez mutez) : 'S
+    :: mutez : mutez : 'S   ->   option (pair nat mutez) : 'S
 
     > EDIV / x : 0 : S  =>  None
     > EDIV / x : y : S  =>  Some (Pair (x / y) (x % y)) : S
@@ -1360,7 +1285,7 @@ types by mistake. They are also mandatory checked for under/overflows.
 
 ::
 
-   :: tez : tez : ’S -> int : ’S
+   :: mutez : mutez : 'S -> int : 'S
 
    > COMPARE / x : y : S  =>  -1 : S
        iff x < y
@@ -1372,103 +1297,124 @@ types by mistake. They are also mandatory checked for under/overflows.
 Operations on contracts
 ~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``MANAGER``: Access the manager of a contract.
+-  ``CREATE_CONTRACT``: Forge a contract creation operation.
 
 ::
 
-    :: contract 'p 'r : 'S   ->   key_hash : 'S
-
--  ``CREATE_CONTRACT``: Forge a new contract.
-
-::
-
-    :: key_hash : option key_hash : bool : bool : tez : lambda (pair 'p 'g) (pair 'r 'g) : 'g : 'S
-       -> contract 'p 'r : 'S
+    :: key_hash : option key_hash : bool : bool : mutez : lambda (pair 'p 'g) (pair (list operation) 'g) : 'g : 'S
+       -> operation : address : 'S
 
 As with non code-emitted originations the contract code takes as
 argument the transferred amount plus an ad-hoc argument and returns an
 ad-hoc value. The code also takes the global data and returns it to be
 stored and retrieved on the next transaction. These data are initialized
 by another parameter. The calling convention for the code is as follows:
-``(Pair arg globals)) -> (Pair ret globals)``, as extrapolatable from
+``(Pair arg globals)) -> (Pair operations globals)``, as extrapolated from
 the instruction type. The first parameters are the manager, optional
 delegate, then spendable and delegatable flags and finally the initial
 amount taken from the currently executed contract. The contract is
-returned as a first class value to be called immediately or stored.
+returned as a first class value (to be dropped, passed as parameter or stored).
+The ``CONTRACT 'p`` instruction will fail until it is actually originated.
 
--  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; return 'r ; code ... }``:
+-  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
    Forge a new contract from a literal.
 
 ::
 
-    :: key_hash : option key_hash : bool : bool : tez : 'g : 'S
-       -> contract 'p 'r : 'S
+    :: key_hash : option key_hash : bool : bool : mutez : 'g : 'S
+       -> operation : address : 'S
 
 Originate a contract based on a literal. This is currently the only way
 to include transfers inside of an originated contract. The first
 parameters are the manager, optional delegate, then spendable and
 delegatable flags and finally the initial amount taken from the
-currently executed contract. The contract is returned as a first class
-value to be called immediately or stored.
+currently executed contract.
 
--  ``CREATE_ACCOUNT``: Forge an account (a contract without code).
+-  ``CREATE_ACCOUNT``: Forge an account (a contract without code) creation operation.
 
 ::
 
-    :: key_hash : option key_hash : bool : tez : 'S   ->   contract unit unit : 'S
+    :: key_hash : option key_hash : bool : mutez : 'S
+       ->   operation : contract unit : 'S
 
 Take as argument the manager, optional delegate, the delegatable flag
 and finally the initial amount taken from the currently executed
 contract.
 
--  ``TRANSFER_TOKENS``: Forge and evaluate a transaction.
+-  ``TRANSFER_TOKENS``: Forge a transaction.
 
 ::
 
-    :: 'p : tez : contract 'p 'r : 'g : []   ->   'r : 'g : []
+    :: 'p : mutez : contract 'p : 'S   ->   operation : S
 
-The parameter and return value must be consistent with the ones expected
-by the contract, unit for an account. To preserve the global consistency
-of the system, the current contract’s storage must be updated before
-passing the control to another script. For this, the script must put the
-partially updated storage on the stack (’g is the type of the contract’s
-storage). If a recursive call to the current contract happened, the
-updated storage is put on the stack next to the return value. Nothing
-else can remain on the stack during a nested call. If some local values
-have to be kept for after the nested call, they have to be stored
-explicitly in a transient part of the storage. A trivial example of that
-is to reserve a boolean in the storage, initialized to false, reset to
-false at the end of each contract execution, and set to true during a
-nested call. This thus gives an easy way for a contract to prevent
-recursive call (the contract just fails if the boolean is true).
+The parameter must be consistent with the one expected by the
+contract, unit for an account.
 
--  ``BALANCE``: Push the current amount of tez of the current contract.
+-  ``SET_DELEGATE``: Forge a delegation.
 
 ::
 
-    :: 'S   ->   tez : 'S
+    :: option key_hash : 'S   ->   operation : S
 
--  ``SOURCE 'p 'r``: Push the source contract of the current
-   transaction.
+-  ``BALANCE``: Push the current amount of mutez of the current contract.
 
 ::
 
-    :: 'S   ->   contract 'p 'r : 'S
+    :: 'S   ->   mutez : 'S
+
+-  ``ADDRESS``: Push the untyped version of a contract.
+
+::
+
+    :: contract _ : 'S   ->   address : 'S
+
+-  ``CONTRACT 'p``: Push the untyped version of a contract.
+
+::
+
+    :: address : 'S   ->   contract 'p : 'S
+
+    > CONTRACT / addr : S  =>  Some addr : S
+        iff addr exists and is a contract of parameter type 'p
+    > CONTRACT / addr : S  =>  Some addr : S
+        iff 'p = unit and addr is an implicit contract
+    > CONTRACT / addr : S  =>  None : S
+        otherwise
+
+-  ``SOURCE``: Push the contract that initiated the current
+   transaction, i.e. the contract that paid the fees and
+   storage cost, and whose manager signed the operation
+   that was sent on the blockchain. Note that since
+   ``TRANSFER_TOKENS`` instructions can be chained,
+   ``SOURCE`` and ``SENDER`` are not necessarily the same.
+
+::
+
+    :: 'S   ->   address : 'S
+
+-  ``SENDER``: Push the contract that initiated the current
+   internal transaction. It may be the ``SOURCE``, but may
+   also not if the source sent an order to an intermediate
+   smart contract, which then called the current contract.
+
+::
+
+    :: 'S   ->   address : 'S
 
 -  ``SELF``: Push the current contract.
 
 ::
 
-    :: 'S   ->   contract 'p 'r : 'S
-       where   contract 'p 'r is the type of the current contract
+    :: 'S   ->   contract 'p : 'S
+       where   contract 'p is the type of the current contract
 
 -  ``AMOUNT``: Push the amount of the current transaction.
 
 ::
 
-    :: 'S   ->   tez : 'S
+    :: 'S   ->   mutez : 'S
 
--  ``DEFAULT_ACCOUNT``: Return a default contract with the given
+-  ``IMPLICIT_ACCOUNT``: Return a default contract with the given
    public/private key pair. Any funds deposited in this contract can
    immediately be spent by the holder of the private key. This contract
    cannot execute Michelson code and will always exist on the
@@ -1476,7 +1422,7 @@ recursive call (the contract just fails if the boolean is true).
 
 ::
 
-    :: key_hash : 'S   ->   contract unit unit : 'S
+    :: key_hash : 'S   ->   contract unit : 'S
 
 Special operations
 ~~~~~~~~~~~~~~~~~~
@@ -1496,6 +1442,40 @@ Special operations
 
     :: 'S   ->   timestamp : 'S
 
+Operations on bytes
+~~~~~~~~~~~~~~~~~~~~~
+
+Bytes are used for serializing data, in order to check signatures and
+compute hashes on them. They can also be used to incorporate data from
+the wild and untyped outside world.
+
+-  ``PACK``: Serializes a piece of data to its optimized
+   binary representation.
+
+::
+
+     :: 'a : 'S   ->   bytes : 'S
+
+-  ``UNPACK 'a``: Deserializes a piece of data, if valid.
+
+::
+
+     :: bytes : 'S   ->   option 'a : 'S
+
+-  ``COMPARE``: Lexicographic comparison.
+
+::
+
+    :: bytes : bytes : 'S   ->   int : 'S
+
+    > COMPARE / s : t : S  =>  -1 : S
+        iff s < t
+    > COMPARE / s : t : S  =>  0 : S
+        iff s = t
+    > COMPARE / s : t : S  =>  1 : S
+        iff s > t
+
+
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1505,19 +1485,33 @@ Cryptographic primitives
 
     :: key : 'S   ->   key_hash : 'S
 
--  ``H``: Compute a cryptographic hash of the value contents using the
+-  ``BLAKE2B``: Compute a cryptographic hash of the value contents using the
    Blake2B cryptographic hash function.
 
 ::
 
-    :: 'a : 'S   ->   string : 'S
+    :: bytes : 'S   ->   bytes : 'S
+
+-  ``SHA256``: Compute a cryptographic hash of the value contents using the
+   Sha256 cryptographic hash function.
+
+::
+
+    :: bytes : 'S   ->   bytes : 'S
+
+-  ``SHA512``: Compute a cryptographic hash of the value contents using the
+   Sha512 cryptographic hash function.
+
+::
+
+    :: bytes : 'S   ->   bytes : 'S
 
 -  ``CHECK_SIGNATURE``: Check that a sequence of bytes has been signed
    with a given key.
 
 ::
 
-    :: key : pair signature string : 'S   ->   bool : 'S
+    :: key : signature : bytes : 'S   ->   bool : 'S
 
 -  ``COMPARE``:
 
@@ -1536,12 +1530,12 @@ VIII - Macros
 -------------
 
 In addition to the operations above, several extensions have been added
-to the language’s concrete syntax. If you are interacting with the node
+to the language's concrete syntax. If you are interacting with the node
 via RPC, bypassing the client, which expands away these macros, you will
-need to de-surgar them yourself.
+need to desugar them yourself.
 
 These macros are designed to be unambiguous and reversible, meaning that
-errors are reported in terms of de-sugared syntax. Below you’ll see
+errors are reported in terms of desugared syntax. Below you'll see
 these macros defined in terms of other syntactic forms. That is how
 these macros are seen by the node.
 
@@ -1568,6 +1562,18 @@ combinators, and also for branching.
 ::
 
     > IFCMP(\op) / S  =>  COMPARE ; (\op) ; IF bt bf / S
+
+Fail
+~~~~
+
+The ``FAIL`` macros is equivalent to ``UNIT; FAILWITH`` and is callable
+in any context since it does not use its input stack.
+
+-  ``FAIL``
+
+::
+
+    > FAIL / S  =>  UNIT; FAILWITH / S
 
 Assertion Macros
 ~~~~~~~~~~~~~~~~
@@ -1637,12 +1643,44 @@ operations.
 
     > DUU(\rest=U*)P / S  =>  DIP (DU(\rest)P) ; SWAP / S
 
--  ``P(A*AI)+R``: A syntactic sugar for building nested pairs in bulk.
+-  ``P(\left=A|P(\left)(\right))(\right=I|P(\left)(\right))R``: A syntactic sugar
+   for building nested pairs.
 
 ::
 
-    > P(\fst=A*)AI(\rest=(A*AI)+)R / S  =>  P(\fst)AIR ; P(\rest)R / S
-    > PA(\rest=A*)AIR / S  =>  DIP (P(\rest)AIR) / S
+    > PA(\right)R / S => DIP ((\right)R) ; PAIR / S
+    > P(\left)IR / S => PAIR ; (\left)R / S
+    > P(\left)(\right)R => (\right)R ; (\left)R ; PAIR / S
+
+A good way to quickly figure which macro to use is to mentally parse the
+macro as ``P`` for pair constructor, ``A`` for left leaf and ``I`` for
+right leaf. The macro takes as many elements on the stack as there are
+leaves and constructs a nested pair with the shape given by its name.
+
+Take the macro ``PAPPAIIR`` for instance:
+
+::
+
+    P A  P P A  I    I R
+    ( l, ( ( l, r ), r ))
+
+A typing rule can be inferred:
+
+::
+
+   PAPPAIIR
+   :: 'a : 'b : 'c : 'd : 'S  ->  (pair 'a (pair (pair 'b 'c) 'd))
+
+-  ``UNP(\left=A|P(\left)(\right))(\right=I|P(\left)(\right))R``: A syntactic sugar
+   for destructing nested pairs. These macros follow the same convention
+   as the previous one.
+
+::
+
+    > UNPAIR / S => DUP ; CAR ; DIP { CDR } / S
+    > UNPA(\right)R / S => UNPAIR ; DIP (UN(\right)R) / S
+    > UNP(\left)IR / S => UNPAIR ; UN(\left)R / S
+    > UNP(\left)(\right)R => UNPAIR ; UN(\left)R ; UN(\right)R / S
 
 -  ``C[AD]+R``: A syntactic sugar for accessing fields in nested pairs.
 
@@ -1688,7 +1726,7 @@ operations.
 
 ::
 
-    > MAP_CAR code  =>  DUP ; CDR ; SWAP ; code ; CAR ; PAIR
+    > MAP_CAR code  =>  DUP ; CDR ; DIP { CAR ; code } ; SWAP ; PAIR
 
 -  ``MAP_CDR`` code: Transform the first value of a pair.
 
@@ -1701,9 +1739,9 @@ operations.
 
 ::
 
-    > MAP_CA(\rest=[AD]+)R / S   =>
+    > MAP_CA(\rest=[AD]+)R code / S   =>
         { DUP ; DIP { CAR ; MAP_C(\rest)R code } ; CDR ; SWAP ; PAIR } / S
-    > MAP_CD(\rest=[AD]+)R / S   =>
+    > MAP_CD(\rest=[AD]+)R code / S   =>
         { DUP ; DIP { CDR ; MAP_C(\rest)R code } ; CAR ; PAIR } / S
 
 IX - Concrete syntax
@@ -1720,19 +1758,22 @@ language can only be one of the four following constructs.
 
 This simple four cases notation is called Micheline.
 
+The encoding of a Micheline source file must be UTF-8, and non-ASCII
+characters can only appear in comments and strings.
+
 Constants
 ~~~~~~~~~
 
-There are two kinds of constants:
+There are three kinds of constants:
 
-1. Integers or naturals in decimal (no prefix), hexadecimal (0x prefix),
-   octal (0o prefix) or binary (0b prefix).
-2. Strings with usual escapes ``\n``, ``\t``, ``\b``, ``\r``, ``\\``,
-   ``\"``. The encoding of a Michelson source file must be UTF-8, and
-   non-ASCII characters can only appear in comments. No line break can
-   appear in a string. Any non-printable characters must be escaped
-   using two hexadecimal characters, as in ``\xHH`` or the
-   predefine escape sequences above..
+1. Integers or naturals in decimal notation.
+2. Strings, with usual escape sequences: ``\n``, ``\t``, ``\b``,
+   ``\r``, ``\\``, ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``)
+   cannot appear in the middle of a string.
+3. Byte sequences in hexadecimal notation, prefixed with ``0x``.
+
+The current version of Michelson restricts strings to be the printable
+subset of 7-bit ASCII, plus the escaped characters mentioned above.
 
 Primitive applications
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1796,26 +1837,6 @@ indentation rules.
    -  All arguments in a sequence must be indented to the right of the
       primitive name by at least one column.
 
-.. _annotations-1:
-
-Annotations
-~~~~~~~~~~~
-
-Sequences and primitive applications can receive an annotation.
-
-An annotation is a lowercase identifier that starts with an ``@`` sign.
-It comes after the opening curly brace for sequence, and after the
-primitive name for primitive applications.
-
-::
-
-    { @annot
-      expr ;
-      expr ;
-      ... }
-
-    (prim @annot arg arg ...)
-
 Differences with the formal notation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1824,31 +1845,22 @@ specification: instructions are represented by uppercase identifiers,
 type constructors by lowercase identifiers, and constant constructors
 are Capitalized.
 
-All domain specific constants are Micheline strings with specific
-formats:
+All domain specific constants are Micheline constants with specific
+formats. Some have two variants accepted by the data type checker: a
+readable one in a string and an optimized.
 
--  ``tez`` amounts are written using the same notation as JSON schemas
-   and the command line client: thousands are optionally separated by
-   commas, and so goes for mutez.
+-  ``mutez`` amounts are written as naturals.
+-  ``timestamp``\ s are written either using ``RFC 339`` notation
+   in a string (readable), or as the number of seconds since Epoch
+   in a natural (optimized).
+-  ``contract``\ s, ``address``\ es, ``key``\ s and ``signature``\ s
+   are written as strings, in their usual Base58 encoded versions
+   (readable), or as their raw bytes (optimized).
 
-   -  in regexp form: ``([0-9]{1,3}(,[0-9]{3})+)|[0-9]+(\.[0.9]{2})?``
-   -  ``"1234567"`` means 1234567 tez
-   -  ``"1,234,567"`` means 1234567 tez
-   -  ``"1234567.89"`` means 1234567890000 mutez
-   -  ``"1,234,567.0"`` means 123456789 tez
-   -  ``"10,123.456,789"`` means 10123456789 mutez
-   -  ``"1234,567"`` is invalid
-   -  ``"1,234,567.123456"`` is invalid
-
--  ``timestamp``\ s are written using ``RFC 339`` notation.
--  ``contract``\ s are the raw strings returned by JSON RPCs or the
-   command line interface and cannot be forged by hand so their format
-   is of no interest here.
--  ``key``\ s are ``Blake2B`` hashes of ``ed25519`` public keys encoded
-   in ``base58`` format with the following custom alphabet:
-   ``"eXMNE9qvHPQDdcFx5J86rT7VRm2atAypGhgLfbS3CKjnksB4"``.
--  ``signature``\ s are ``ed25519`` signatures as a series of
-   hex-encoded bytes.
+The optimized versions should not reach the RPCs, the protocol code
+will convert to optimized by itself when forging operations, storing
+to the database, and before hashing to get a canonical representation
+of a datum for a given type.
 
 To prevent errors, control flow primitives that take instructions as
 parameters require sequences in the concrete syntax.
@@ -1863,8 +1875,7 @@ Main program structure
 
 The toplevel of a smart contract file must be an un-delimited sequence
 of four primitive applications (in no particular order) that provide its
-``parameter``, ``return`` and ``storage`` types, as well as its
-``code``.
+``code``, ``parameter`` and ``storage`` fields.
 
 See the next section for a concrete example.
 
@@ -1884,18 +1895,515 @@ example.
 Comments that span on multiple lines or that stop before the end of the
 line can also be written, using C-like delimiters (``/* ... */``).
 
-X - JSON syntax
+X - Annotations
+---------------
+
+The annotation mechanism of Michelson provides ways to better track data
+on the stack and to give additional type constraints. Annotaions are
+only here to add constraints, *i.e.* they cannot turn an otherwise
+rejected program into an accepted one.
+
+Stack visualization tools like the Michelson's Emacs mode print
+annotations associated with each type in the program, as propagated by
+the typechecker as well as variable annotations on the types of elements
+in the stack. This is useful as a debugging aid.
+
+We distinguish three kinds of annotations:
+- type annotations, written ``:type_annot``,
+- variable annotations, written ``@var_annot``,
+- and field or constructors annotations, written ``%field_annot``.
+
+Type Annotations
+~~~~~~~~~~~~~~~~
+
+Each type can be annotated with at most one type annotation. They are
+used to give names to types. For types to be equal, their unnamed
+version must be equal and their names must be the same or at least one
+type must be unnamed.
+
+For instance, the following Michelson program which put its integer
+parameter in the storage is not well typed:
+
+::
+
+    parameter (int :p) ;
+    storage (int :s) ;
+    code { UNPAIR ; SWAP ; DROP ; NIL operation ; PAIR }
+
+Whereas this one is:
+
+::
+
+    parameter (int :p) ;
+    storage int ;
+    code { UNPAIR ; SWAP ; DROP ; NIL operation ; PAIR }
+
+Inner components of composed typed can also be named.
+
+::
+
+   (pair :point (int :x_pos) (int :y_pos))
+
+Push-like instructions, that act as constructors, can also be given a
+type annotation. The stack type will then have a correspondingly named
+type on top.
+
+::
+
+   UNIT :t
+   :: 'A -> (unit :t) : 'A
+
+   PAIR :t
+   :: 'a : 'b : 'S -> (pair :t 'a 'b) : 'S
+
+   SOME t:
+   :: 'a : 'S -> (option :t 'a) : 'S
+
+   NONE :t 'a
+   :: 'S -> (option :t 'a) : 'S
+
+   LEFT :t 'b
+   :: 'a : 'S -> (or :t 'a 'b) : 'S
+
+   RIGHT :t 'a
+   :: 'b : 'S -> (or :t 'a 'b) : 'S
+
+   NIL :t 'a
+   :: 'S -> (list :t 'a) : 'S
+
+   EMPTY_SET :t 'elt
+   :: 'S -> (set :t 'elt) : 'S
+
+   EMPTY_MAP :t 'key 'val
+   :: 'S -> (map :t 'key 'val) : 'S
+
+
+A no-op instruction ``CAST`` ensures the top of the stack has the
+specified type, and change its type if it is compatible. In particular,
+this allows to change or remove type names explicitly.
+
+::
+
+   CAST 'b
+   :: 'a : 'S   ->   'b : 'S
+      iff  'a = 'b
+
+   > CAST t / a : S  =>  a : S
+
+
+Variable Annotations
+~~~~~~~~~~~~~~~~~~~~
+
+Variable annotations can only be used on instructions that produce
+elements on the stack. An instruction that produces ``n`` elements on
+the stack can be given at most ``n`` variable annotations.
+
+The stack type contains both the types of each element in the stack, as
+well as an optional variable annotation for each element. In this
+sub-section we note:
+- ``[]`` for the empty stack ;
+- ``@annot (top) : (rest)`` for the stack whose first value has type
+  ``(top)`` and is annotated with variable annotation ``@annot`` and
+  whose queue has stack type ``(rest)``.
+
+The instructions which do not accept any variable annotations are:
+
+::
+
+   DROP
+   SWAP
+   IF_NONE
+   IF_LEFT
+   IF_CONS
+   ITER
+   IF
+   LOOP
+   LOOP_LEFT
+   DIP
+   FAILWITH
+
+The instructions which accept at most one variable annotation are:
+
+::
+
+   DUP
+   PUSH
+   UNIT
+   SOME
+   NONE
+   PAIR
+   CAR
+   CDR
+   LEFT
+   RIGHT
+   NIL
+   CONS
+   SIZE
+   MAP
+   MEM
+   EMPTY_SET
+   EMPTY_MAP
+   UPDATE
+   GET
+   LAMBDA
+   EXEC
+   ADD
+   SUB
+   CONCAT
+   MUL
+   OR
+   AND
+   XOR
+   NOT
+   ABS
+   IS_NAT
+   INT
+   NEG
+   EDIV
+   LSL
+   LSR
+   COMPARE
+   EQ
+   NEQ
+   LT
+   GT
+   LE
+   GE
+   ADDRESS
+   CONTRACT
+   SET_DELEGATE
+   IMPLICIT_ACCOUNT
+   NOW
+   AMOUNT
+   BALANCE
+   HASH_KEY
+   CHECK_SIGNATURE
+   BLAKE2B
+   STEPS_TO_QUOTA
+   SOURCE
+   SENDER
+   SELF
+   CAST
+   RENAME
+
+The instructions which accept at most two variable annotations are:
+
+::
+
+   CREATE_ACCOUNT
+   CREATE_CONTRACT
+
+Annotations on instructions that produce multiple elements on the stack
+will be used in order, where the first variable annotation is given to
+the top-most element on the resulting stack. Instructions that produce
+``n`` elements on the stack but are given less than ``n`` variable
+annotations will see only their top-most stack type elements annotated.
+
+::
+
+   CREATE_ACCOUNT @op @addr
+   :: key_hash : option key_hash : bool : tez : 'S
+      ->  @op operation : @addr address : 'S
+
+   CREATE_ACCOUNT @op
+   :: key_hash : option key_hash : bool : tez : 'S
+      ->  @op operation : address : 'S
+
+A no-op instruction ``RENAME`` allows to rename variables in the stack
+or to erase variable annotations in the stack.
+
+::
+
+   RENAME @new
+   :: @old 'a ; 'S -> @new 'a : 'S
+
+   RENAME
+   :: @old 'a ; 'S -> 'a : 'S
+
+
+Field and Constructor Annotations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Components of pair types, option types and or types can be annotated
+with a field or constructor annotation. This feature is useful to encode
+records fields and constructors of sum types.
+
+::
+
+   (pair :point
+         (int %x)
+         (int %y))
+
+The previous Michelson type can be used as visual aid to represent the
+record type (given in OCaml-like syntax):
+
+::
+
+   type point = { x : int ; y : int }
+
+Similarly,
+
+::
+
+   (or :t
+       (int %A)
+       (or
+          (bool %B)
+          (pair %C
+                (nat %n1)
+                (nat %n2))))
+
+can be used to represent the algebraic data type (in OCaml-like syntax):
+
+::
+
+   type t =
+     | A of int
+     | B of bool
+     | C of { n1 : nat ; n2 : nat }
+
+
+Field annotations are part of the type (at the same level as type name
+annotations), and so types with differing field names (if present) are
+not considered equal.
+
+Instructions that construct elements of composed types can also be
+annotated with one or multiple field annotations (in addition to type
+and variable annotations).
+
+::
+
+   PAIR %fst %snd
+   :: 'a : 'b : 'S -> (pair ('a %fst) ('b %fst)) : 'S
+
+   LEFT %left %right 'b
+   :: 'a : 'S -> (or ('a %left) ('b %right)) : 'S
+
+   RIGHT %left %right 'a
+   :: 'b : 'S -> (or ('a %left) ('b %right)) : 'S
+
+   NONE %some 'a
+   :: 'S -> (option ('a %some))
+
+   Some %some
+   :: 'a : 'S -> (option ('a %some))
+
+To improve readability and robustness, instructions ``CAR`` and ``CDR``
+accept one field annotation. For the contract to type check, the name of
+the accessed field in the destructed pair must match the one given here.
+
+::
+
+   CAR %fst
+   :: (pair ('a %fst) 'b) : S -> 'a : 'S
+
+   CDR %snd
+   :: (pair 'a ('b %snd)) : S -> 'b : 'S
+
+
+Syntax
+~~~~~~
+
+Primitive applications can receive one or many annotations.
+
+An annotation is a sequence of characters that matches the regular
+expression ``[@:%](|@|%|%%|[_a-ZA-Z][_0-9a-zA-Z\.]*)``. They come after
+the primitive name and before its potential arguments.
+
+::
+
+    (prim @v :t %x arg1 arg2 ...)
+
+
+Ordering between different kinds of annotations is not significant, but
+ordering among annotations of the same kind is. Annotations of a same
+kind must be grouped together.
+
+For instance these two annotated instructions are equivalent:
+
+::
+
+   PAIR :t @my_pair %x %y
+
+   PAIR %x %y :t @my_pair
+
+An annotation can be empty, in this case is will mean *no annotation*
+and can be used as a wildcard. For instance, it is useful to annotate
+only the right field of a pair instruction ``PAIR % %right`` or to
+ignore field access constraints, *e.g.* in the macro ``UNPPAIPAIR %x1 %
+%x3 %x4``.
+
+Annotations and Macros
+~~~~~~~~~~~~~~~~~~~~~~
+
+Macros also support annotations, which are propagated on their expanded
+forms. As with instructions, macros that produce ``n`` values on the
+stack accept ``n`` variable annotations.
+
+::
+
+   DUU+P @annot
+   > DUU(\rest=U*)P @annot / S  =>  DIP (DU(\rest)P @annot) ; SWAP / S
+
+   C[AD]+R @annot %field_name
+   > CA(\rest=[AD]+)R @annot %field_name / S  =>  CAR ; C(\rest)R @annot %field_name / S
+   > CD(\rest=[AD]+)R @annot %field_name / S  =>  CDR ; C(\rest)R @annot %field_name / S
+
+   ``CMP{EQ|NEQ|LT|GT|LE|GE}`` @annot
+   > CMP(\op) @annot / S  =>  COMPARE ; (\op) @annot / S
+
+The variable annotation on ``SET_C[AD]+R`` and ``MAP_C[AD]+R`` annotates
+the resulting toplevel pair while its field annotation is used to check
+that the modified field is the expected one.
+
+::
+
+   SET_C[AD]+R @var %field
+   > SET_CAR @var %field =>  CDR %field ; SWAP ; PAIR @var
+   > SET_CDR @var %field =>  CAR %field ; PAIR @var
+   > SET_CA(\rest=[AD]+)R @var %field / S   =>
+     { DUP ; DIP { CAR ; SET_C(\rest)R %field } ; CDR ; SWAP ; PAIR @var } / S
+   > SET_CD(\rest=[AD]+)R  @var %field/ S   =>
+     { DUP ; DIP { CDR ; SET_C(\rest)R %field } ; CAR ; PAIR @var } / S
+
+   MAP_C[AD]+R @var %field code
+   > MAP_CAR code  =>  DUP ; CDR ; DIP { CAR %field ; code } ; SWAP ; PAIR @var
+   > MAP_CDR code  =>  DUP ; CDR %field ; code ; SWAP ; CAR ; PAIR @var
+   > MAP_CA(\rest=[AD]+)R @var %field code / S   =>
+     { DUP ; DIP { CAR ; MAP_C(\rest)R %field code } ; CDR ; SWAP ; PAIR @var} / S
+   > MAP_CD(\rest=[AD]+)R @var %field code / S   =>
+    { DUP ; DIP { CDR ; MAP_C(\rest)R %field code } ; CAR ; PAIR @var} / S
+
+Macros for nested ``PAIR`` and ``UNPAIR`` accept multiple
+annotations. Field annotations for ``PAIR`` give names to leaves of the
+constructed nested pair, in order. Variable annotations for ``UNPAIR``
+give names to deconstructed components on the stack. This next snippet
+gives examples instead of generic rewrite rules for readability
+purposes.
+
+::
+
+   PAPPAIIR @p %x1 %x2 %x3 %x4
+   :: 'a : 'b : 'c : 'd : 'S
+      -> @p (pair ('a %x1) (pair (pair ('b %x) ('c %x3)) ('d %x4))) : 'S
+
+   PAPAIR @p %x1 %x2 %x3
+   :: 'a : 'b : 'c : 'S  ->  @p (pair ('a %x1) (pair ('b %x) ('c %x3))) : 'S
+
+   UNPAIR @x @y
+   :: (pair 'a 'b) : 'S -> @x 'a : @y 'b : 'S
+
+   UNPAPPAIIR @x1 @x2 @x3 @x4
+   :: (pair 'a (pair (pair 'b 'c) 'd )) : 'S
+      -> @x1 'a : @x2 'b : @x3 'c : @x4 'd : 'S
+
+Automatic Variable and Field Annotations Inferring
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When no annotation is provided by the Michelson programmer, the
+typechecker infers some annotations in specific cases. This greatly
+helps users track information in the stack for bare contracts.
+
+For unannotated accesses with ``CAR`` and ``CDR`` to fields that are
+named will be appended (with an additional ``.`` character) to the pair
+variable annotation.
+
+::
+
+   CDAR
+   :: @p (pair ('a %foo) (pair %bar ('b %x) ('c %y))) : 'S ->  @p.bar.x 'b : 'S
+
+If fields are not named but the pair is still named in the stack then
+``.car`` or ``.cdr`` will be appended.
+
+::
+
+   CDAR
+   :: @p (pair 'a (pair 'b 'c)) : 'S ->  @p.cdr.car 'b : 'S
+
+If the original pair is not named in the stack, but a field annotation
+is present in the pair type the accessed value will be annotated with a
+variable annotation corresponding to the field annotation alone.
+
+::
+
+   CDAR
+   :: (pair ('a %foo) (pair %bar ('b %x) ('c %y))) : 'S ->  @p.bar.x 'b : 'S
+
+A similar mechanism is used for context dependent instructions:
+
+::
+
+   ADDRESS  :: @c contract _ : 'S   ->   @c.address address : 'S
+
+   CONTRACT 'p  :: @a address : 'S   ->   @a.contract contract 'p : 'S
+
+   BALANCE :: 'S   ->   @balance tez : 'S
+
+   SOURCE  :: 'S   ->   @source address : 'S
+
+   SENDER  :: 'S   ->   @sender address : 'S
+
+   SELF  :: 'S   ->   @self contract 'p : 'S
+
+   AMOUNT  :: 'S   ->   @amount tez : 'S
+
+   STEPS_TO_QUOTA  :: 'S   ->  @steps nat : 'S
+
+   NOW  :: 'S   ->   @now timestamp : 'S
+
+Inside nested code blocks, bound items on the stack will be given a
+default variable name annotation depending on the instruction and stack
+type (which can be changed). For instance the annotated typing rule for
+``ITER`` on lists is:
+
+::
+
+   ITER body
+   :: @l (list 'e) : 'A  ->  'A
+      iff body :: [ @l.elt e' : 'A -> 'A ]
+
+Special Annotations
+~~~~~~~~~~~~~~~~~~~
+
+The special variable annotations ``@%%`` can be used on instructions
+``CAR`` and ``CDR``. It means to use the accessed field name (if any) as
+a name for the value on the stack. The following typing rule
+demonstrates their use for instruction ``CAR``.
+
+::
+   CAR @%
+   :: @p (pair ('a %fst) ('b %snd)) : 'S   ->   @fst 'a : 'S
+
+   CAR @%%
+   :: @p (pair ('a %fst) ('b %snd)) : 'S   ->   @p.fst 'a : 'S
+
+The special variable annotation ``%@`` can be used on instructions
+``PAIR``, ``SOME``, ``LEFT``, ``RIGHT``. It means to use the variable
+name annotation in the stack as a field name for the constructed
+element. Two examples with ``PAIR`` follows, notice the special
+treatment of annotations with `.`.
+
+::
+   PAIR %@ %@
+   :: @x 'a : @y 'b : 'S   ->   (pair ('a %x) ('b %y)) : 'S
+
+   PAIR %@ %@
+   :: @p.x 'a : @p.y 'b : 'S   ->  @p (pair ('a %x) ('b %y)) : 'S
+   :: @p.x 'a : @q.y 'b : 'S   ->  (pair ('a %x) ('b %y)) : 'S
+
+XI - JSON syntax
 ---------------
 
 Micheline expressions are encoded in JSON like this:
 
 -  An integer ``N`` is an object with a single field ``"int"`` whose
-   valus is the decimal representation as a string.
+   value is the decimal representation as a string.
 
    ``{ "int": "N" }``
 
 -  A string ``"contents"`` is an object with a single field ``"string"``
-   whose valus is the decimal representation as a string.
+   whose value is the decimal representation as a string.
 
    ``{ "string": "contents" }``
 
@@ -1903,18 +2411,19 @@ Micheline expressions are encoded in JSON like this:
 
    ``[ expr, ... ]``
 
--  A primitive application is an object with two fields ``"prim"`` for
+- A primitive application is an object with two fields ``"prim"`` for
    the primitive name and ``"args"`` for the arguments (that must
-   contain an array). A third optionnal field ``"annot"`` may contains
-   an annotation, including the ``@`` sign.
+   contain an array). A third optional field ``"annots"`` contains a
+   list of annotations, including their leading ``@``, ``%`` or ``%``
+   sign.
 
-   { “prim”: “pair”, “args”: [ { “prim”: “nat”, args: [] }, { “prim”:
-   “nat”, args: [] } ], “annot”: “@numbers” }\`
+   ``{ "prim": "pair", "args": [ { "prim": "nat", "args": [] }, { "prim":
+     "nat", "args": [] } ], "annots": [":t"] }``
 
 As in the concrete syntax, all domain specific constants are encoded as
 strings.
 
-XI - Examples
+XII - Examples
 -------------
 
 Contracts in the system are stored as a piece of code and a global data
@@ -1922,25 +2431,25 @@ storage. The type of the global data of the storage is fixed for each
 contract at origination time. This is ensured statically by checking on
 origination that the code preserves the type of the global data. For
 this, the code of the contract is checked to be of  type
-``lambda (pair ’arg ’global) -> (pair ’ret ’global)`` where ``’global`` is the
-type of the original global store given on origination. The contract
-also takes a parameter and returns a value, hence the complete calling
-convention above.
+``lambda (pair 'arg 'global) -> (pair (list operation) 'global)`` where
+``'global`` is the type of the original global store given on origination.
+The contract also takes a parameter and returns a list of internal operations,
+hence the complete calling convention above. The internal operations are
+queued for execution when the contract returns.
 
 Empty contract
 ~~~~~~~~~~~~~~
 
-Any contract with the same ``parameter`` and ``return`` types may be
-written with an empty sequence in its ``code`` section. The simplest
-contract is the contract for which the ``parameter``, ``storage``, and
-``return`` are all of type ``unit``. This contract is as follows:
+The simplest contract is the contract for which the ``parameter`` and
+``storage`` are all of type ``unit``. This contract is as follows:
 
 ::
 
-    code {};
+    code { CDR ;           # keep the storage
+           NIL operation ; # return no internal operation
+           PAIR };         # respect the calling convention
     storage unit;
     parameter unit;
-    return unit;
 
 Reservoir contract
 ~~~~~~~~~~~~~~~~~~
@@ -1948,7 +2457,7 @@ Reservoir contract
 We want to create a contract that stores tez until a timestamp ``T`` or
 a maximum amount ``N`` is reached. Whenever ``N`` is reached before
 ``T``, all tokens are reversed to an account ``B`` (and the contract is
-automatically deleted). Any call to the contract’s code performed after
+automatically deleted). Any call to the contract's code performed after
 ``T`` will otherwise transfer the tokens to another account ``A``.
 
 We want to build this contract in a reusable manner, so we do not
@@ -1962,7 +2471,7 @@ Hence, the global data of the contract has the following type
     'g =
       pair
         (pair timestamp tez)
-        (pair (contract unit unit) (contract unit unit))
+        (pair (contract unit) (contract unit))
 
 Following the contract calling convention, the code is a lambda of type
 
@@ -1970,7 +2479,7 @@ Following the contract calling convention, the code is a lambda of type
 
     lambda
       (pair unit 'g)
-      (pair unit 'g)
+      (pair (list operation) 'g)
 
 written as
 
@@ -1981,48 +2490,46 @@ written as
          unit
          (pair
            (pair timestamp tez)
-           (pair (contract unit unit) (contract unit unit))))
+           (pair (contract unit) (contract unit))))
       (pair
-         unit
+         (list operation)
          (pair
             (pair timestamp tez)
-            (pair (contract unit unit) (contract unit unit))))
+            (pair (contract unit) (contract unit))))
 
 The complete source ``reservoir.tz`` is:
 
 ::
 
-    parameter timestamp ;
+    parameter unit ;
     storage
       (pair
-         (pair timestamp tez) # T N
-         (pair (contract unit unit) (contract unit unit))) ; # A B
-    return unit ;
+         (pair (timestamp %T) (tez %N)) # T N
+         (pair (contract %A unit) (contract %B unit))) ; # A B
     code
-      { DUP ; CDAAR ; # T
-        NOW ;
-        COMPARE ; LE ;
-        IF { DUP ; CDADR ; # N
+      { CDR ; DUP ; CAAR %T; # T
+        NOW ; COMPARE ; LE ;
+        IF { DUP ; CADR %N; # N
              BALANCE ;
              COMPARE ; LE ;
-             IF { CDR ; UNIT ; PAIR }
-                { DUP ; CDDDR ; # B
+             IF { NIL operation ; PAIR }
+                { DUP ; CDDR %B; # B
                   BALANCE ; UNIT ;
-                  DIIIP { CDR } ;
                   TRANSFER_TOKENS ;
+                  NIL operation ; SWAP ; CONS ;
                   PAIR } }
-           { DUP ; CDDAR ; # A
+           { DUP ; CDAR %A; # A
              BALANCE ;
              UNIT ;
-             DIIIP { CDR } ;
              TRANSFER_TOKENS ;
+             NIL operation ; SWAP ; CONS ;
              PAIR } }
 
 Reservoir contract (variant with broker and status)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We basically want the same contract as the previous one, but instead of
-destroying it, we want to keep it alive, storing a flag ``S`` so that we
+leaving it empty, we want to keep it alive, storing a flag ``S`` so that we
 can tell afterwards if the tokens have been transferred to ``A`` or
 ``B``. We also want a broker ``X`` to get some fee ``P`` in any case.
 
@@ -2044,29 +2551,23 @@ At the beginning of the transaction:
      A               via a CDDDDDAR
      B               via a CDDDDDDR
 
-For the contract to stay alive, we test that all least ``(Tez "1.00")``
-is still available after each transaction. This value is given as an
-example and must be updated according to the actual Tezos minimal value
-for contract balance.
-
 The complete source ``scrutable_reservoir.tz`` is:
 
 ::
 
-    parameter timestamp ;
+    parameter unit ;
     storage
       (pair
          string # S
          (pair
             timestamp # T
             (pair
-               (pair tez tez) ; # P N
+               (pair mutez mutez) # P N
                (pair
-                  (contract unit unit) # X
-                  (pair (contract unit unit) (contract unit unit)))))) ; # A B
-    return unit ;
+                  (contract unit) # X
+                  (pair (contract unit) (contract unit)))))) ; # A B
     code
-      { DUP ; CDAR # S
+      { DUP ; CDAR ; # S
         PUSH string "open" ;
         COMPARE ; NEQ ;
         IF { FAIL } # on "success", "timeout" or a bad init value
@@ -2074,8 +2575,8 @@ The complete source ``scrutable_reservoir.tz`` is:
              NOW ;
              COMPARE ; LT ;
              IF { # Before timeout
-                  # We compute ((1 + P) + N) tez for keeping the contract alive
-                  PUSH tez "1.00" ;
+                  # We compute (P + N) mutez
+                  PUSH mutez 0 ;
                   DIP { DUP ; CDDDAAR } ; ADD ; # P
                   DIP { DUP ; CDDDADR } ; ADD ; # N
                   # We compare to the cumulated amount
@@ -2083,37 +2584,39 @@ The complete source ``scrutable_reservoir.tz`` is:
                   COMPARE; LT ;
                   IF { # Not enough cash, we just accept the transaction
                        # and leave the global untouched
-                       CDR }
+                       CDR ; NIL operation ; PAIR }
                      { # Enough cash, successful ending
                        # We update the global
                        CDDR ; PUSH string "success" ; PAIR ;
                        # We transfer the fee to the broker
                        DUP ; CDDAAR ; # P
-                       DIP { DUP ; CDDDAR } # X
-                       UNIT ; TRANSFER_TOKENS ; DROP ;
+                       DIP { DUP ; CDDDAR } ; # X
+                       UNIT ; TRANSFER_TOKENS ;
                        # We transfer the rest to A
-                       DUP ; CDDADR ; # N
-                       DIP { DUP ; CDDDDAR } # A
-                       UNIT ; TRANSFER_TOKENS ; DROP } }
+                       DIP { DUP ; CDDADR ; # N
+                             DIP { DUP ; CDDDDAR } ; # A
+                             UNIT ; TRANSFER_TOKENS } ;
+                       NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
+                       PAIR } }
                 { # After timeout, we refund
                   # We update the global
                   CDDR ; PUSH string "timeout" ; PAIR ;
                   # We try to transfer the fee to the broker
-                  PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                  BALANCE ; # available
                   DIP { DUP ; CDDAAR } ; # P
                   COMPARE ; LT ; # available < P
-                  IF { PUSH tez "1.00" ; BALANCE ; SUB ; # available
-                       DIP { DUP ; CDDDAR } # X
-                       UNIT ; TRANSFER_TOKENS ; DROP }
+                  IF { BALANCE ; # available
+                       DIP { DUP ; CDDDAR } ; # X
+                       UNIT ; TRANSFER_TOKENS }
                      { DUP ; CDDAAR ; # P
-                       DIP { DUP ; CDDDAR } # X
-                       UNIT ; TRANSFER_TOKENS ; DROP }
+                       DIP { DUP ; CDDDAR } ; # X
+                       UNIT ; TRANSFER_TOKENS } ;
                   # We transfer the rest to B
-                  PUSH tez "1.00" ; BALANCE ; SUB ; # available
-                  DIP { DUP ; CDDDDDR } # B
-                  UNIT ; TRANSFER_TOKENS ; DROP } }
-        # return Unit
-        UNIT ; PAIR }
+                  DIP { BALANCE ; # available
+                        DIP { DUP ; CDDDDDR } ; # B
+                        UNIT ; TRANSFER_TOKENS } ;
+                  NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
+                  PAIR } } }
 
 Forward contract
 ~~~~~~~~~~~~~~~~
@@ -2157,13 +2660,13 @@ After the first day, nothing cam happen until ``T``.
 During the 24 hours after ``T``, the buyer must pay ``(Q * K)`` to the
 contract, minus the amount already sent.
 
-After this day, if the buyer didn’t pay enough then any transaction will
+After this day, if the buyer didn't pay enough then any transaction will
 send all the tokens to the seller.
 
 Otherwise, the seller must deliver at least ``Q`` tons of dried peas to
 the warehouse, in the next 24 hours. When the amount is equal to or
-exceeds ``Q``, all the tokens are transferred to the seller and the
-contract is destroyed. For storing the quantity of peas already
+exceeds ``Q``, all the tokens are transferred to the seller.
+For storing the quantity of peas already
 delivered, we add a counter of type ``nat`` in the global storage. For
 knowing this quantity, we accept messages from W with a partial amount
 of delivered peas as argument.
@@ -2216,15 +2719,12 @@ At the beginning of the transaction:
     the amount versed by the seller via a CDADDR
     the argument via a CAR
 
-The contract returns a unit value, and we assume that it is created with
-the minimum amount, set to ``(Tez "1.00")``.
-
 The complete source ``forward.tz`` is:
 
 ::
 
-    parameter (or string nat) ;
-    return unit ;
+    parameter
+      (or string nat) ;
     storage
       (pair
          (pair nat (pair tez tez)) # counter from_buyer from_seller
@@ -2233,11 +2733,11 @@ The complete source ``forward.tz`` is:
             (pair
                (pair tez tez) # K C
                (pair
-                  (pair (contract unit unit) (contract unit unit)) # B S
-                  (contract unit unit))))) ; # W
+                  (pair (contract unit) (contract unit)) # B S
+                  (contract unit))))) ; # W
     code
       { DUP ; CDDADDR ; # Z
-        PUSH nat 86400 ; SWAP ; ADD ; # one day in second
+        PUSH int 86400 ; SWAP ; ADD ; # one day in second
         NOW ; COMPARE ; LT ;
         IF { # Before Z + 24
              DUP ; CAR ; # we must receive (Left "buyer") or (Left "seller")
@@ -2251,7 +2751,7 @@ The complete source ``forward.tz`` is:
                       PUSH nat 0 ; PAIR ; # delivery counter at 0
                       DIP { CDDR } ; PAIR ; # parameters
                       # and return Unit
-                      UNIT ; PAIR }
+                      NIL operation ; PAIR }
                     { PUSH string "seller" ; COMPARE ; EQ ;
                       IF { DUP ; CDADDR ; # amount already versed by the seller
                            DIP { AMOUNT } ; ADD ; # transaction
@@ -2260,37 +2760,41 @@ The complete source ``forward.tz`` is:
                            PUSH nat 0 ; PAIR ; # delivery counter at 0
                            DIP { CDDR } ; PAIR ; # parameters
                            # and return Unit
-                           UNIT ; PAIR }
+                           NIL operation ; PAIR }
                          { FAIL } } } # (Left _)
                { FAIL } } # (Right _)
            { # After Z + 24
+             # if balance is emptied, just fail
+             BALANCE ; PUSH mutez 0 ; IFCMPEQ { FAIL } {} ;
              # test if the required amount is reached
              DUP ; CDDAAR ; # Q
              DIP { DUP ; CDDDADR } ; MUL ; # C
              PUSH nat 2 ; MUL ;
-             PUSH tez "1.00" ; ADD ;
-             BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C) + 1
+             BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C)
              IF { # refund the parties
                   CDR ; DUP ; CADAR ; # amount versed by the buyer
-                  DIP { DUP ; CDDDAAR } # B
-                  UNIT ; TRANSFER_TOKENS ; DROP
+                  DIP { DUP ; CDDDAAR } ; # B
+                  UNIT ; TRANSFER_TOKENS ;
+                  NIL operation ; SWAP ; CONS ; SWAP ;
                   DUP ; CADDR ; # amount versed by the seller
-                  DIP { DUP ; CDDDADR } # S
-                  UNIT ; TRANSFER_TOKENS ; DROP
-                  BALANCE ; # bonus to the warehouse to destroy the account
-                  DIP { DUP ; CDDDDR } # W
-                  UNIT ; TRANSFER_TOKENS ; DROP
-                  # return unit, don't change the global
-                  # since the contract will be destroyed
-                  UNIT ; PAIR }
+                  DIP { DUP ; CDDDADR } ; # S
+                  UNIT ; TRANSFER_TOKENS ; SWAP ;
+                  DIP { CONS } ;
+                  DUP ; CADAR ; DIP { DUP ; CADDR } ; ADD ;
+                  BALANCE ; SUB ; # bonus to the warehouse
+                  DIP { DUP ; CDDDDR } ; # W
+                  UNIT ; TRANSFER_TOKENS ;
+                  DIP { SWAP } ; CONS ;
+                  # leave the storage as-is, as the balance is now 0
+                  PAIR }
                 { # otherwise continue
-                  DUP ; CDDADAR # T
-                  NOW ; COMPARE ; LT
+                  DUP ; CDDADAR ; # T
+                  NOW ; COMPARE ; LT ;
                   IF { FAIL } # Between Z + 24 and T
                      { # after T
-                       DUP ; CDDADAR # T
-                       PUSH nat 86400 ; ADD # one day in second
-                       NOW ; COMPARE ; LT
+                       DUP ; CDDADAR ; # T
+                       PUSH int 86400 ; ADD ; # one day in second
+                       NOW ; COMPARE ; LT ;
                        IF { # Between T and T + 24
                             # we only accept transactions from the buyer
                             DUP ; CAR ; # we must receive (Left "buyer")
@@ -2309,7 +2813,7 @@ The complete source ``forward.tz`` is:
                                      PUSH nat 0 ; PAIR ; # delivery counter at 0
                                      DIP { CDDR } ; PAIR ; # parameters
                                      # and return Unit
-                                     UNIT ; PAIR }
+                                     NIL operation ; PAIR }
                                    { FAIL } } # (Left _)
                               { FAIL } } # (Right _)
                           { # After T + 24
@@ -2318,24 +2822,23 @@ The complete source ``forward.tz`` is:
                             DIP { DUP ; CDDDAAR } ; MUL ; # K
                             DIP { DUP ; CDADAR } ; # amount already versed by the buyer
                             COMPARE ; NEQ ;
-                            IF { # not reached, pay the seller and destroy the contract
+                            IF { # not reached, pay the seller
                                  BALANCE ;
-                                 DIP { DUP ; CDDDDADR } # S
+                                 DIP { DUP ; CDDDDADR } ; # S
                                  DIIP { CDR } ;
-                                 UNIT ; TRANSFER_TOKENS ; DROP ;
-                                 # and return Unit
-                                 UNIT ; PAIR }
+                                 UNIT ; TRANSFER_TOKENS ;
+                                 NIL operation ; SWAP ; CONS ; PAIR }
                                { # otherwise continue
-                                 DUP ; CDDADAR # T
-                                 PUSH nat 86400 ; ADD ;
-                                 PUSH nat 86400 ; ADD ; # two days in second
-                                 NOW ; COMPARE ; LT
+                                 DUP ; CDDADAR ; # T
+                                 PUSH int 86400 ; ADD ;
+                                 PUSH int 86400 ; ADD ; # two days in second
+                                 NOW ; COMPARE ; LT ;
                                  IF { # Between T + 24 and T + 48
                                       # We accept only delivery notifications, from W
-                                      DUP ; CDDDDDR ; MANAGER ; # W
-                                      SOURCE unit unit ; MANAGER ;
+                                      DUP ; CDDDDDR ; ADDRESS ; # W
+                                      SENDER ;
                                       COMPARE ; NEQ ;
-                                      IF { FAIL } {} # fail if not the warehouse
+                                      IF { FAIL } {} ; # fail if not the warehouse
                                       DUP ; CAR ; # we must receive (Right amount)
                                       IF_LEFT
                                         { FAIL } # (Left _)
@@ -2349,20 +2852,21 @@ The complete source ``forward.tz`` is:
                                           DUP ; CDAAR ;
                                           DIP { DUP ; CDDAAR } ;
                                           COMPARE ; LT ; # counter < Q
-                                          IF { CDR } # wait for more
+                                          IF { CDR ; NIL operation } # wait for more
                                              { # Transfer all the money to the seller
-                                               BALANCE ; # and destroy the contract
-                                               DIP { DUP ; CDDDDADR } # S
+                                               BALANCE ;
+                                               DIP { DUP ; CDDDDADR } ; # S
                                                DIIP { CDR } ;
-                                               UNIT ; TRANSFER_TOKENS ; DROP } } ;
-                                      UNIT ; PAIR }
+                                               UNIT ; TRANSFER_TOKENS ;
+                                               NIL operation ; SWAP ; CONS } } ;
+                                      PAIR }
                                     { # after T + 48, transfer everything to the buyer
-                                      BALANCE ; # and destroy the contract
-                                      DIP { DUP ; CDDDDAAR } # B
+                                      BALANCE ;
+                                      DIP { DUP ; CDDDDAAR } ; # B
                                       DIIP { CDR } ;
-                                      UNIT ; TRANSFER_TOKENS ; DROP ;
-                                      # and return unit
-                                      UNIT ; PAIR } } } } } } }
+                                      UNIT ; TRANSFER_TOKENS ;
+                                      NIL operation ; SWAP ; CONS ;
+                                      PAIR} } } } } } }
 
 XII - Full grammar
 ------------------
@@ -2411,9 +2915,7 @@ XII - Full grammar
       | IF_CONS { <instruction> ... } { <instruction> ... }
       | EMPTY_SET <type>
       | EMPTY_MAP <comparable type> <type>
-      | MAP
       | MAP { <instruction> ... }
-      | REDUCE
       | ITER { <instruction> ... }
       | MEM
       | GET
@@ -2424,7 +2926,9 @@ XII - Full grammar
       | LAMBDA <type> <type> { <instruction> ... }
       | EXEC
       | DIP { <instruction> ... }
-      | FAIL
+      | FAILWITH
+      | CAST
+      | RENAME
       | CONCAT
       | ADD
       | SUB
@@ -2447,20 +2951,21 @@ XII - Full grammar
       | LE
       | GE
       | INT
-      | MANAGER
       | SELF
       | TRANSFER_TOKENS
+      | SET_DELEGATE
       | CREATE_ACCOUNT
       | CREATE_CONTRACT
-      | DEFAULT_ACCOUNT
+      | IMPLICIT_ACCOUNT
       | NOW
       | AMOUNT
       | BALANCE
       | CHECK_SIGNATURE
-      | H
+      | BLAKE2B
       | HASH_KEY
       | STEPS_TO_QUOTA
-      | SOURCE <type> <type>
+      | SOURCE
+      | SENDER
     <type> ::=
       | <comparable type>
       | key
@@ -2469,7 +2974,8 @@ XII - Full grammar
       | option <type>
       | list <type>
       | set <comparable type>
-      | contract <type> <type>
+      | operation
+      | contract <type>
       | pair <type> <type>
       | or <type> <type>
       | lambda <type> <type>
@@ -2492,7 +2998,7 @@ The language is implemented in OCaml as follows:
 -  The lower internal representation is written as a GADT whose type
    parameters encode exactly the typing rules given in this
    specification. In other words, if a program written in this
-   representation is accepted by OCaml’s typechecker, it is mandatorily
+   representation is accepted by OCaml's typechecker, it is guaranteed
    type-safe. This of course also valid for programs not handwritten but
    generated by OCaml code, so we are sure that any manipulated code is
    type-safe.
@@ -2504,7 +3010,7 @@ The language is implemented in OCaml as follows:
 
 -  The interpreter is basically the direct transcription of the
    rewriting rules presented above. It takes an instruction, a stack and
-   transforms it. OCaml’s typechecker ensures that the transformation
+   transforms it. OCaml's typechecker ensures that the transformation
    respects the pre and post stack types declared by the GADT case for
    each instruction.
 
@@ -2521,7 +3027,7 @@ The language is implemented in OCaml as follows:
 -  The typechecker is a simple function that recognizes the abstract
    grammar described in section X by pattern matching, producing the
    well-typed, corresponding GADT expressions. It is mostly a checker,
-   not a full inferer, and thus takes some annotations (basically the
+   not a full inferrer, and thus takes some annotations (basically the
    input and output of the program, of lambdas and of uninitialized maps
    and sets). It works by performing a symbolic evaluation of the
    program, transforming a symbolic stack. It only needs one pass over

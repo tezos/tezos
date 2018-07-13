@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (* TODO decide whether we need to preallocate buffers or not. *)
 
@@ -139,14 +155,14 @@ module Scheduler(IO : IO) = struct
             IO.push conn.out_param msg >>= function
             | Ok ()
             | Error [ Canceled ] ->
-                return ()
+                return_unit
             | Error ([P2p_errors.Connection_closed |
                       Exn (Unix.Unix_error (EBADF, _, _) |
                            Lwt_pipe.Closed)] as err) ->
                 lwt_debug "Connection closed (push: %d, %s)"
                   conn.id IO.name >>= fun () ->
                 cancel conn err >>= fun () ->
-                return ()
+                return_unit
             | Error err ->
                 lwt_log_error
                   "@[Unexpected error in connection (push: %d, %s):@ %a@]"
@@ -187,7 +203,7 @@ module Scheduler(IO : IO) = struct
         canceler ;
         in_param ; out_param ;
         current_pop = Lwt.fail Not_found (* dummy *) ;
-        current_push = return () ;
+        current_push = return_unit ;
         counter = Moving_average.create ~init:0 ~alpha ;
         quota = 0 ; last_quota = 0 ;
       } in
@@ -447,7 +463,7 @@ let read_full conn ?pos ?len buf =
   assert (len <= maxlen - pos) ;
   let rec loop pos len =
     if len = 0 then
-      return ()
+      return_unit
     else
       read conn ~pos ~len buf >>=? fun read_len ->
       loop (pos + read_len) (len - read_len) in

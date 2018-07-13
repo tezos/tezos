@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Lwt.Infix
 
@@ -79,7 +95,7 @@ module Make (Encoding : Resto.ENCODING) = struct
   let faked_media = {
     Media_type.name = AnyMedia ;
     q = None ;
-    pp = (fun _enc ppf s -> Format.pp_print_string ppf s) ;
+    pp = (fun _enc ppf s -> Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s) ;
     construct = (fun _ -> assert false) ;
     destruct = (fun _ -> assert false) ;
   }
@@ -98,11 +114,11 @@ module Make (Encoding : Resto.ENCODING) = struct
         let id = !cpt in
         let uri = Uri.to_string uri in
         incr cpt ;
-        Format.fprintf ppf "@[<2>>>>>%d: %s@,%a@]@." id uri (media.pp enc) body ;
+        Format.fprintf ppf "@[<v 2>>>>>%d: %s@,%a@]@." id uri (media.pp enc) body ;
         Lwt.return (id, uri)
       let log_response (id, _uri) ?(media = faked_media) enc code body =
         Lazy.force body >>= fun body ->
-        Format.fprintf ppf "@[<2><<<<%d: %s@,%a@]@."
+        Format.fprintf ppf "@[<v 2><<<<%d: %s@,%a@]@."
           id (Cohttp.Code.string_of_status code) (media.pp enc) body ;
         Lwt.return_unit
     end : LOGGER)
@@ -120,19 +136,23 @@ module Make (Encoding : Resto.ENCODING) = struct
     | `Stream s -> `Stream (Lwt_stream.clone s)
     | x -> x
 
-  let generic_call meth ?(logger = null_logger) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
-    let module Logger = (val logger) in
-    let headers = Header.init () in
-    begin
-      match body with
-      | None->
-          Logger.log_empty_request uri
-      | Some (`Stream _) ->
-          Logger.log_request Encoding.untyped uri "<stream>"
-      | Some body ->
-          Cohttp_lwt.Body.to_string body >>= fun body ->
-          Logger.log_request ?media Encoding.untyped uri body
-    end >>= fun log_request ->
+  type log = {
+    log:
+      'a. ?media:Media_type.t -> 'a Encoding.t -> Cohttp.Code.status_code ->
+      string Lwt.t Lazy.t -> unit Lwt.t ;
+  }
+
+  let internal_call meth (log : log) ?(headers = []) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
+    let headers = List.fold_left (fun headers (header, value) ->
+        let header = String.lowercase_ascii header in
+        if header <> "host"
+        && (String.length header < 2
+            || String.sub header 0 2 <> "x-") then
+          invalid_arg
+            "Resto_cohttp.Client.call: \
+             only headers \"host\" or starting with \"x-\" are supported"
+        else Header.replace headers header value)
+        (Header.init ()) headers in
     let body, headers =
       match body, media with
       | None, _ -> Cohttp_lwt.Body.empty, headers
@@ -146,9 +166,29 @@ module Make (Encoding : Resto.ENCODING) = struct
       | Some ranges ->
           Header.add headers "accept" (Media_type.accept_header ranges) in
     Lwt.catch begin fun () ->
-      Cohttp_lwt_unix.Client.call
-        ~headers
-        (meth :> Code.meth) ~body uri >>= fun (response, ansbody) ->
+      let rec call_and_retry_on_502 attempt delay =
+        Cohttp_lwt_unix.Client.call
+          ~headers
+          (meth :> Code.meth) ~body uri >>= fun (response, ansbody) ->
+        let status = Response.status response in
+        match status with
+        | `Bad_gateway ->
+            let log_ansbody = clone_body ansbody in
+            log.log ~media:faked_media Encoding.untyped status
+              (lazy (Cohttp_lwt.Body.to_string log_ansbody >>= fun text ->
+                     Lwt.return @@ Format.sprintf
+                       "Attempt number %d/10, will retry after %g seconds.\n\
+                        Original body follows.\n\
+                        %s"
+                       attempt delay text)) >>= fun () ->
+            if attempt >= 10 then
+              Lwt.return (response, ansbody)
+            else
+              Lwt_unix.sleep delay >>= fun () ->
+              call_and_retry_on_502 (attempt + 1) (delay +. 0.1)
+        | _ ->
+            Lwt.return (response, ansbody) in
+      call_and_retry_on_502 1 0. >>= fun (response, ansbody) ->
       let headers = Response.headers response in
       let media_name =
         match Header.get headers "content-type" with
@@ -162,9 +202,6 @@ module Make (Encoding : Resto.ENCODING) = struct
         | None -> None
         | Some media_types -> find_media media_name media_types in
       let status = Response.status response in
-      let log_ansbody = clone_body ansbody in
-      Logger.log_response log_request ?media Encoding.untyped status
-        (lazy (Cohttp_lwt.Body.to_string log_ansbody)) >>= fun () ->
       match status with
       | `OK -> Lwt.return (`Ok (Some (ansbody, media_name, media)))
       | `No_content -> Lwt.return (`Ok None)
@@ -204,12 +241,6 @@ module Make (Encoding : Resto.ENCODING) = struct
         | e -> Printexc.to_string e in
       Lwt.return (`Connection_failed msg)
     end
-
-  type log = {
-    log:
-      'a. ?media:Media_type.t -> 'a Encoding.t -> Cohttp.Code.status_code ->
-      string Lwt.t Lazy.t -> unit Lwt.t ;
-  }
 
   let handle_error log service (body, media_name, media) status f =
     Cohttp_lwt.Body.is_empty body >>= fun empty ->
@@ -255,12 +286,12 @@ module Make (Encoding : Resto.ENCODING) = struct
     Lwt.return (log, meth, uri, body, media)
 
   let call_service media_types
-      ?logger ?base service params query body =
+      ?logger ?headers ?base service params query body =
     prepare
       media_types ?logger ?base
       service params query body >>= fun (log, meth, uri, body, media) ->
     begin
-      generic_call ~accept:media_types meth ?body ?media uri >>= function
+      internal_call meth log ?headers ~accept:media_types ?body ?media uri >>= function
       | `Ok None ->
           log.log Encoding.untyped `No_content (lazy (Lwt.return "")) >>= fun () ->
           Lwt.return (`Ok None)
@@ -298,12 +329,12 @@ module Make (Encoding : Resto.ENCODING) = struct
     Lwt.return (meth, uri, ans)
 
   let call_streamed_service media_types
-      ?logger ?base service ~on_chunk ~on_close params query body =
+      ?logger ?headers ?base service ~on_chunk ~on_close params query body =
     prepare
       media_types ?logger ?base
       service params query body >>= fun (log, meth, uri, body, media) ->
     begin
-      generic_call ~accept:media_types meth ?body ?media uri >>= function
+      internal_call meth log ?headers ~accept:media_types ?body ?media uri >>= function
       | `Ok None ->
           on_close () ;
           log.log Encoding.untyped `No_content (lazy (Lwt.return "")) >>= fun () ->
@@ -360,5 +391,19 @@ module Make (Encoding : Resto.ENCODING) = struct
       | `OCaml_exception _ as err -> Lwt.return err
     end >>= fun ans ->
     Lwt.return (meth, uri, ans)
+
+  let generic_call meth ?(logger = null_logger) ?headers ?accept ?body ?media uri =
+    let module Logger = (val logger) in
+    begin match body with
+      | None->
+          Logger.log_empty_request uri
+      | Some (`Stream _) ->
+          Logger.log_request Encoding.untyped uri "<stream>"
+      | Some body ->
+          Cohttp_lwt.Body.to_string body >>= fun body ->
+          Logger.log_request ?media Encoding.untyped uri body
+    end >>= fun log_request ->
+    let log = { log = fun ?media -> Logger.log_response log_request ?media } in
+    internal_call meth log ?headers ?accept ?body ?media uri
 
 end

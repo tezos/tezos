@@ -103,7 +103,7 @@ Alternatives/Solutions
    unique. This counter should be per key so that users can find out
    what they need to approve. This should be paired with a signed hash
    of your contract to prevent cross-contract replays.
--  Use the ``SOURCE`` instruction to verify that the expected sender is
+-  Use the ``SENDER`` instruction to verify that the expected sender is
    the source of the message.
 
 Do not assume users will use a unique key for every smart contract

@@ -1,32 +1,44 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Alpha_context
 
 type rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: Block_header.raw ;
-  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-  operations: unit -> Operation.raw list list Lwt.t ;
+  block_header: Block_header.shell_header ;
   context: Alpha_context.t ;
 }
 
-let rpc_init (rpc_context : Updater.rpc_context Lwt.t) =
-  rpc_context >>= fun { block_hash ; block_header ;
-                        operation_hashes ; operations ; context } ->
-  let level = block_header.shell.level in
-  let timestamp = block_header.shell.timestamp in
-  let fitness = block_header.shell.fitness in
+let rpc_init ({ block_hash ; block_header ; context } : Updater.rpc_context) =
+  let level = block_header.level in
+  let timestamp = block_header.timestamp in
+  let fitness = block_header.fitness in
   Alpha_context.prepare ~level ~timestamp ~fitness context >>=? fun context ->
-  return { block_hash ; block_header ; operation_hashes ; operations ; context }
+  return { block_hash ; block_header ; context }
 
-let rpc_services = ref (RPC_directory.empty : Updater.rpc_context Lwt.t RPC_directory.t)
+let rpc_services = ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
 
 let register0_fullctxt s f =
   rpc_services :=
@@ -68,4 +80,15 @@ let register2_fullctxt s f =
 let register2 s f =
   register2_fullctxt s (fun { context ; _ } a1 a2 q i -> f context a1 a2 q i)
 
-let get_rpc_services () = !rpc_services
+let get_rpc_services () =
+  let p =
+    RPC_directory.map
+      (fun c ->
+         rpc_init c >>= function
+         | Error _ -> assert false
+         | Ok c -> Lwt.return c.context)
+      (Storage_description.build_directory Alpha_context.description) in
+  RPC_directory.register_dynamic_directory
+    !rpc_services
+    RPC_path.(open_root / "context" / "raw" / "json")
+    (fun _ -> Lwt.return p)

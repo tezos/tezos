@@ -1,4 +1,0 @@
-parameter string;
-storage (set string);
-return bool;
-code {DUP; CAR; DIP{CDR}; MEM; DIP{EMPTY_SET string}; PAIR};

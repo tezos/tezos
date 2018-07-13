@@ -1,41 +1,57 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Proto_alpha
 open Alpha_context
 open Tezos_micheline
-open Script_typed_ir
 open Script_tc_errors
-open Script_ir_translator
 open Script_interpreter
 open Michelson_v1_printer
 
-let print_ty (type t) ppf (annot, (ty : t ty)) =
-  unparse_ty annot ty
-  |> Micheline.strip_locations
-  |> Michelson_v1_printer.print_expr_unwrapped ppf
+let print_ty ppf ty =
+  Michelson_v1_printer.print_expr_unwrapped ppf ty
 
-let print_stack_ty (type t) ?(depth = max_int) ppf (s : t stack_ty) =
-  let rec loop
-    : type t. int -> Format.formatter -> t stack_ty -> unit
-    = fun depth ppf -> function
-      | Empty_t -> ()
-      | _ when depth <= 0 ->
-          Format.fprintf ppf "..."
-      | Item_t (last, Empty_t, annot) ->
-          Format.fprintf ppf "%a"
-            print_ty (annot, last)
-      | Item_t (last, rest, annot) ->
-          Format.fprintf ppf "%a :@ %a"
-            print_ty (annot, last) (loop (depth - 1)) rest in
+let print_var_annot ppf annot =
+  List.iter (Format.fprintf ppf "@ %s") annot
+
+let print_stack_ty ?(depth = max_int) ppf s =
+  let rec loop depth ppf = function
+    | [] -> ()
+    | _ when depth <= 0 ->
+        Format.fprintf ppf "..."
+    | [last, annot] ->
+        Format.fprintf ppf "%a%a"
+          print_ty last
+          print_var_annot annot
+    | (last, annot) :: rest ->
+        Format.fprintf ppf "%a%a@ :@ %a"
+          print_ty last
+          print_var_annot annot
+          (loop (depth - 1)) rest in
   match s with
-  | Empty_t ->
+  | [] ->
       Format.fprintf ppf "[]"
   | sty ->
       Format.fprintf ppf "@[<hov 2>[ %a ]@]" (loop depth) sty
@@ -65,26 +81,26 @@ let collect_error_locations errs =
         (Invalid_arity (loc, _, _, _)
         | Inconsistent_type_annotations (loc, _, _)
         | Unexpected_annotation loc
+        | Ungrouped_annotations loc
         | Type_too_large (loc, _, _)
         | Invalid_namespace (loc, _, _, _)
         | Invalid_primitive (loc, _, _)
         | Invalid_kind (loc, _, _)
         | Duplicate_field (loc, _)
         | Unexpected_big_map loc
+        | Unexpected_operation loc
         | Fail_not_in_tail_position loc
         | Undefined_binop (loc, _, _, _)
         | Undefined_unop (loc, _, _)
         | Bad_return (loc, _, _)
         | Bad_stack (loc, _, _, _)
         | Unmatched_branches (loc, _, _)
-        | Transfer_in_lambda loc
         | Self_in_lambda loc
-        | Transfer_in_dip loc
         | Invalid_constant (loc, _, _)
         | Invalid_contract (loc, _)
         | Comparable_type_expected (loc, _)
-        | Overflow loc
-        | Reject loc) :: rest ->
+        | Overflow (loc, _)
+        | Reject (loc, _, _)) :: rest ->
         collect (loc :: acc) rest
     | _ :: rest -> collect acc rest in
   collect [] errs
@@ -149,7 +165,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
              | Some s -> Format.fprintf ppf "%s " s)
           name
           print_source (parsed, hilights)
-          print_ty (None, ty) ;
+          print_ty ty ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
     | Alpha_environment.Ecoproto_error (Ill_formed_type (_, expr, loc)) :: rest ->
@@ -181,18 +197,42 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           Format.fprintf ppf "Ill typed contract.";
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
+    | Alpha_environment.Ecoproto_error Apply.Gas_quota_exceeded_init_deserialize :: rest ->
+        Format.fprintf ppf
+          "@[<v 0>Not enough gas to deserialize the operation.@,\
+           Injecting such a transaction could have you banned from mempools.@]" ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Cannot_serialize_error :: rest ->
+        Format.fprintf ppf
+          "Error too big to serialize within the provided gas bounds." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Cannot_serialize_storage :: rest ->
+        Format.fprintf ppf
+          "Cannot serialize the resulting storage value within the provided gas bounds." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
     | Alpha_environment.Ecoproto_error (Missing_field prim) :: rest ->
         Format.fprintf ppf "@[<v 0>Missing contract field: %s@]"
           (Michelson_v1_primitives.string_of_prim prim) ;
+        if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Duplicate_field (loc, prim)) :: rest ->
         Format.fprintf ppf "@[<v 0>%aduplicate contract field: %s@]"
           print_loc loc
           (Michelson_v1_primitives.string_of_prim prim) ;
+        if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Unexpected_big_map loc) :: rest ->
         Format.fprintf ppf "%abig_map type only allowed on the left of the toplevel storage pair"
           print_loc loc ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error (Unexpected_operation loc) :: rest ->
+        Format.fprintf ppf "%aoperation type forbidden in parameter, storage and constants"
+          print_loc loc ;
+        if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Alpha_environment.Ecoproto_error (Runtime_contract_error (contract, expr)) :: rest ->
         let parsed =
@@ -206,25 +246,43 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_source (parsed, hilights) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
+    | Alpha_environment.Ecoproto_error (Apply.Internal_operation_replay op) :: rest ->
+        Format.fprintf ppf
+          "@[<v 2>Internal operation replay attempt:@,%a@]"
+          Operation_result.pp_internal_operation op ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Gas.Gas_limit_too_high :: rest ->
+        Format.fprintf ppf
+          "Gas limit for the operation is out of the protocol hard bounds." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Gas.Block_quota_exceeded :: rest ->
+        Format.fprintf ppf
+          "Gas limit for the block exceeded during typechecking or execution." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Gas.Operation_quota_exceeded :: rest ->
+        Format.fprintf ppf
+          "@[<v 0>Gas limit exceeded during typechecking or execution.@,Try again with a higher gas limit.@]" ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Alpha_environment.Ecoproto_error Fees.Operation_quota_exceeded :: rest ->
+        Format.fprintf ppf
+          "@[<v 0>Storage limit exceeded during typechecking or execution.@,Try again with a higher storage limit.@]" ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | [ Alpha_environment.Ecoproto_error (Script_interpreter.Bad_contract_parameter c) ] ->
+        Format.fprintf ppf
+          "@[<v 0>Account %a is not a smart contract, it does not take arguments.@,\
+           The `-arg' flag should not be used when transferring to an account.@]"
+          Contract.pp c
     | Alpha_environment.Ecoproto_error err :: rest ->
         begin match err with
-          | Apply.Bad_contract_parameter (c, None, _) ->
+          | Script_interpreter.Bad_contract_parameter c ->
               Format.fprintf ppf
-                "@[<v 0>Account %a is not a smart contract, it does not take arguments.@,\
-                 The `-arg' flag cannot be used when transferring to an account.@]"
+                "Invalid argument passed to contract %a."
                 Contract.pp c
-          | Apply.Bad_contract_parameter (c, Some expected, None) ->
-              Format.fprintf ppf
-                "@[<v 0>Contract %a expected an argument of type@,  %a@,but no argument was provided.@,\
-                 The `-arg' flag can be used when transferring to a smart contract.@]"
-                Contract.pp c
-                print_expr expected
-          | Apply.Bad_contract_parameter (c, Some expected, Some argument) ->
-              Format.fprintf ppf
-                "@[<v 0>Contract %a expected an argument of type@,  %a@,but received@,  %a@]"
-                Contract.pp c
-                print_expr expected
-                print_expr argument
           | Invalid_arity (loc, name, exp, got) ->
               Format.fprintf ppf
                 "%aprimitive %s expects %d arguments but is given %d."
@@ -253,7 +311,8 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 | Seq_kind -> ("a", "sequence")
                 | Prim_kind -> ("a", "primitive")
                 | Int_kind -> ("an", "int")
-                | String_kind -> ("a", "string") in
+                | String_kind -> ("a", "string")
+                | Bytes_kind -> ("a", "byte sequence") in
               Format.fprintf ppf
                 "@[%aunexpected %s, only@ %a@ can be used here."
                 print_loc loc
@@ -294,21 +353,21 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  @[<hov 2>and@ %a.@]@]"
                 print_loc loc
                 (Michelson_v1_primitives.string_of_prim name)
-                print_ty (None, tya)
-                print_ty (None, tyb)
+                print_ty tya
+                print_ty tyb
           | Undefined_unop (loc, name, ty) ->
               Format.fprintf ppf
                 "@[<hov 0>@[<hov 2>%aoperator %s is undefined on@ %a@]@]"
                 print_loc loc
                 (Michelson_v1_primitives.string_of_prim name)
-                print_ty (None, ty)
+                print_ty ty
           | Bad_return (loc, got, exp) ->
               Format.fprintf ppf
                 "@[<v 2>%awrong stack type at end of body:@,\
                  - @[<v 0>expected return stack type:@ %a,@]@,\
                  - @[<v 0>actual stack type:@ %a.@]@]"
                 print_loc loc
-                (fun ppf -> print_stack_ty ppf) (Item_t (exp, Empty_t, None))
+                (fun ppf -> print_stack_ty ppf) [exp, []]
                 (fun ppf -> print_stack_ty ppf) got
           | Bad_stack (loc, name, depth, sty) ->
               Format.fprintf ppf
@@ -327,34 +386,38 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           | Inconsistent_annotations (annot1, annot2) ->
               Format.fprintf ppf
                 "@[<v 2>The two annotations do not match:@,\
-                 - @[<hov>%s@]@,\
-                 - @[<hov>%s@]"
-                annot1 annot2
+                 - @[<v>%s@]@,\
+                 - @[<v>%s@]@]"
+                annot1
+                annot2
+          | Inconsistent_field_annotations (annot1, annot2) ->
+              Format.fprintf ppf
+                "@[<v 2>The field access annotation does not match:@,\
+                 - @[<v>%s@]@,\
+                 - @[<v>%s@]@]"
+                annot1
+                annot2
           | Inconsistent_type_annotations (loc, ty1, ty2) ->
               Format.fprintf ppf
                 "@[<v 2>%athe two types contain incompatible annotations:@,\
                  - @[<hov>%a@]@,\
-                 - @[<hov>%a@]"
+                 - @[<hov>%a@]@]"
                 print_loc loc
-                print_ty (None, ty1)
-                print_ty (None, ty2)
+                print_ty ty1
+                print_ty ty2
           | Unexpected_annotation loc ->
               Format.fprintf ppf
                 "@[<v 2>%aunexpected annotation."
+                print_loc loc
+          | Ungrouped_annotations loc ->
+              Format.fprintf ppf
+                "@[<v 2>%aAnnotations of the same kind must be grouped."
                 print_loc loc
           | Type_too_large (loc, size, maximum_size) ->
               Format.fprintf ppf
                 "@[<v 2>%atype size (%d) exceeded maximum type size (%d)."
                 print_loc loc
                 size maximum_size
-          | Transfer_in_lambda loc ->
-              Format.fprintf ppf
-                "%aThe TRANSFER_TOKENS instruction cannot appear in a lambda."
-                print_loc loc
-          | Transfer_in_dip loc ->
-              Format.fprintf ppf
-                "%aThe TRANSFER_TOKENS instruction cannot appear within a DIP."
-                print_loc loc
           | Self_in_lambda loc ->
               Format.fprintf ppf
                 "%aThe SELF instruction cannot appear in a lambda."
@@ -372,7 +435,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  @[<hov 2>is invalid for type@ %a.@]@]"
                 print_loc loc
                 print_expr got
-                print_ty (None, exp)
+                print_ty exp
           | Invalid_contract (loc, contract) ->
               Format.fprintf ppf
                 "%ainvalid contract %a."
@@ -381,19 +444,33 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               Format.fprintf ppf "%acomparable type expected."
                 print_loc loc ;
               Format.fprintf ppf "@[<hov 0>@[<hov 2>Type@ %a@]@ is not comparable.@]"
-                print_ty (None, ty)
+                print_ty ty
           | Inconsistent_types (tya, tyb) ->
               Format.fprintf ppf
                 "@[<hov 0>@[<hov 2>Type@ %a@]@ \
                  @[<hov 2>is not compatible with type@ %a.@]@]"
-                print_ty (None, tya)
-                print_ty (None, tyb)
-          | Reject loc ->
-              Format.fprintf ppf "%ascript reached FAIL instruction"
+                print_ty tya
+                print_ty tyb
+          | Reject (loc, v, trace) ->
+              Format.fprintf ppf
+                "%ascript reached FAILWITH instruction@ \
+                 @[<hov 2>with@ %a@]%a"
+                print_loc loc print_expr v
+                (fun ppf -> function
+                   | None -> ()
+                   | Some trace ->
+                       Format.fprintf ppf "@,@[<v 2>trace@,%a@]"
+                         print_execution_trace trace)
+                trace
+          | Overflow (loc, trace) ->
+              Format.fprintf ppf "%aunexpected arithmetic overflow%a"
                 print_loc loc
-          | Overflow loc ->
-              Format.fprintf ppf "%aunexpected arithmetic overflow"
-                print_loc loc
+                (fun ppf -> function
+                   | None -> ()
+                   | Some trace ->
+                       Format.fprintf ppf "@,@[<v 2>trace@,%a@]"
+                         print_execution_trace trace)
+                trace
           | err -> Format.fprintf ppf "%a" Alpha_environment.Error_monad.pp err
         end ;
         if rest <> [] then Format.fprintf ppf "@," ;

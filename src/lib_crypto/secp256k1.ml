@@ -1,18 +1,39 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
-module Public_key_hash = Blake2B.Make(Base58)(struct
-    let name  = "Secp256k1.Public_key_hash"
-    let title = "A Secp256k1 public key hash"
-    let b58check_prefix = Base58.Prefix.secp256k1_public_key_hash
-    let size = Some 20
-  end)
+module Public_key_hash = struct
+  include Blake2B.Make(Base58)(struct
+      let name  = "Secp256k1.Public_key_hash"
+      let title = "A Secp256k1 public key hash"
+      let b58check_prefix = Base58.Prefix.secp256k1_public_key_hash
+      let size = Some 20
+    end)
+  module Logging = struct
+    let tag = Tag.def ~doc:title name pp
+  end
+end
 
 let () =
   Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz2" 36
@@ -62,7 +83,7 @@ module Public_key = struct
   include Compare.Make(struct
       type nonrec t = t
       let compare a b =
-        MBytes.compare (Key.buffer a) (Key.buffer b)
+        MBytes.compare (to_bytes a) (to_bytes b)
     end)
 
   include Helpers.MakeRaw(struct
@@ -173,6 +194,8 @@ end
 
 type t = Sign.plain Sign.t
 
+type watermark = MBytes.t
+
 let name = "Secp256k1"
 let title = "A Secp256k1 signature"
 
@@ -237,17 +260,28 @@ include Helpers.MakeEncoder(struct
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let zero = of_bytes_exn (MBytes.init size '\000')
+let zero = of_bytes_exn (MBytes.make size '\000')
 
-let sign sk msg =
+let sign ?watermark sk msg =
+  let msg =
+    Blake2B.to_bytes @@
+    Blake2B.hash_bytes @@
+    match watermark with
+    | None -> [msg]
+    | Some prefix -> [ prefix ; msg ] in
   Sign.sign_exn context ~sk msg
 
-let check public_key signature msg =
+let check ?watermark public_key signature msg =
+  let msg =
+    Blake2B.to_bytes @@
+    Blake2B.hash_bytes @@
+    match watermark with
+    | None -> [msg]
+    | Some prefix -> [ prefix ; msg ] in
   Sign.verify_exn context ~pk:public_key ~msg ~signature
 
-let generate_key () =
-  let sk = Key.read_sk_exn context (Cstruct.to_bigarray (Tweetnacl.Rand.gen 32)) in
+let generate_key ?(seed=Rand.generate 32) () =
+  let sk = Key.read_sk_exn context seed in
   let pk = Key.neuterize_exn context sk in
   let pkh = Public_key.hash pk in
-  (pkh, pk, sk)
-
+  pkh, pk, sk

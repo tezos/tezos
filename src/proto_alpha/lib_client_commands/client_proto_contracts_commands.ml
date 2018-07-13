@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Proto_alpha
 open Alpha_context
@@ -64,42 +80,6 @@ let commands  () =
        @@ stop)
       (fun () (_, contract) (cctxt : Proto_alpha.full) ->
          cctxt#message "%a\n%!" Contract.pp contract >>= fun () ->
-         return ()) ;
-
-    command ~group ~desc: "Tag a contract in the wallet."
-      no_options
-      (prefixes [ "tag" ; "contract" ]
-       @@ RawContractAlias.alias_param
-       @@ prefixes [ "with" ]
-       @@ Contract_tags.tag_param
-       @@ stop)
-      (fun () (alias, _contract) new_tags cctxt ->
-         Contract_tags.find_opt cctxt alias >>=? fun tags ->
-         let new_tags =
-           match tags with
-           | None -> new_tags
-           | Some tags -> List.merge2 tags new_tags in
-         Contract_tags.update cctxt alias new_tags) ;
-
-    command ~group ~desc: "Remove tag(s) from a contract in the wallet."
-      no_options
-      (prefixes [ "untag" ; "contract" ]
-       @@ RawContractAlias.alias_param
-       @@ prefixes [ "with" ]
-       @@ Contract_tags.tag_param
-       @@ stop)
-      (fun () (alias, _contract) new_tags cctxt ->
-         Contract_tags.find_opt cctxt alias >>=? fun tags ->
-         let new_tags =
-           match tags with
-           | None -> []
-           | Some tags ->
-               List.merge_filter2
-                 ~f:(fun x1 x2 -> match x1, x2 with
-                     | None, None -> assert false
-                     | None, Some _ -> None
-                     | Some t1, Some t2 when t1 = t2 -> None
-                     | Some t1, _ -> Some t1) tags new_tags in
-         Contract_tags.update cctxt alias new_tags) ;
+         return_unit) ;
 
   ]

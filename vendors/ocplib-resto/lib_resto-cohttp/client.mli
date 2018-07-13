@@ -54,6 +54,7 @@ module Make (Encoding : Resto.ENCODING) : sig
   val generic_call:
     [< Resto.meth ] ->
     ?logger:logger ->
+    ?headers:(string * string) list ->
     ?accept:Media_type.Make(Encoding).t list ->
     ?body:Cohttp_lwt.Body.t ->
     ?media:Media_type.Make(Encoding).t ->
@@ -69,6 +70,7 @@ module Make (Encoding : Resto.ENCODING) : sig
   val call_service:
     Media_type.Make(Encoding).t list ->
     ?logger:logger ->
+    ?headers:(string * string) list ->
     ?base:Uri.t ->
     ([< Resto.meth ], unit, 'p, 'q, 'i, 'o, 'e) Service.t ->
     'p -> 'q -> 'i -> (Resto.meth * Uri.t * ('o, 'e) service_result) Lwt.t
@@ -76,6 +78,7 @@ module Make (Encoding : Resto.ENCODING) : sig
   val call_streamed_service:
     Media_type.Make(Encoding).t list ->
     ?logger:logger ->
+    ?headers:(string * string) list ->
     ?base:Uri.t ->
     ([< Resto.meth ], unit, 'p, 'q, 'i, 'o, 'e) Service.t ->
     on_chunk: ('o -> unit) ->

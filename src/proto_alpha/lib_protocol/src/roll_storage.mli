@@ -1,18 +1,34 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (**
 
    Basic roll manipulation.
 
    If storage related to roll (a.k.a. `Storage.Roll`) are not used
-   outside this module, this interface enforce the invariant that a
+   outside of this module, this interface enforces the invariant that a
    roll is always either in the limbo list or in a contract list.
 
 *)
@@ -20,6 +36,7 @@
 type error +=
   | Consume_roll_change
   | No_roll_for_delegate
+  | No_roll_snapshot_for_cycle of Cycle_repr.t
   | Unregistered_delegate of Signature.Public_key_hash.t (* `Permanent *)
 
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
@@ -69,6 +86,11 @@ end
 val delegate_pubkey:
   Raw_context.t -> Signature.Public_key_hash.t ->
   Signature.Public_key.t tzresult Lwt.t
+
+val get_rolls:
+  Raw_context.t -> Signature.Public_key_hash.t -> Roll_repr.t list tzresult Lwt.t
+val get_change:
+  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
 (**/**)
 

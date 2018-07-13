@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module Request = struct
   type 'a t =
@@ -22,12 +38,14 @@ module Request = struct
     let open Data_encoding in
     union
       [ case (Tag 0)
+          ~title:"Flush"
           (obj2
              (req "request" (constant "flush"))
              (req "block" Block_hash.encoding))
           (function View (Flush hash) -> Some ((), hash) | _ -> None)
           (fun ((), hash) -> View (Flush hash)) ;
         case (Tag 1)
+          ~title:"Notify"
           (obj3
              (req "request" (constant "notify"))
              (req "peer" P2p_peer.Id.encoding)
@@ -35,12 +53,14 @@ module Request = struct
           (function View (Notify (peer, mempool)) -> Some ((), peer, mempool) | _ -> None)
           (fun ((), peer, mempool) -> View (Notify (peer, mempool))) ;
         case (Tag 2)
+          ~title:"Inject"
           (obj2
              (req "request" (constant "inject"))
              (req "operation" Operation.encoding))
           (function View (Inject op) -> Some ((), op) | _ -> None)
           (fun ((), op) -> View (Inject op)) ;
         case (Tag 3)
+          ~title:"Arrived"
           (obj3
              (req "request" (constant "arrived"))
              (req "operation_hash" Operation_hash.encoding)
@@ -48,6 +68,7 @@ module Request = struct
           (function View (Arrived (oph, op)) -> Some ((), oph, op) | _ -> None)
           (fun ((), oph, op) -> View (Arrived (oph, op))) ;
         case (Tag 4)
+          ~title:"Advertise"
           (obj1 (req "request" (constant "advertise")))
           (function View Advertise -> Some () | _ -> None)
           (fun () -> View Advertise) ]
@@ -99,16 +120,19 @@ module Event = struct
     let open Data_encoding in
     union
       [ case (Tag 0)
+          ~title:"Debug"
           (obj1 (req "message" string))
           (function Debug msg -> Some msg | _ -> None)
           (fun msg -> Debug msg) ;
         case (Tag 1)
+          ~title:"Request"
           (obj2
              (req "request" Request.encoding)
              (req "status" Worker_types.request_status_encoding))
           (function Request (req, t, None) -> Some (req, t) | _ -> None)
           (fun (req, t) -> Request (req, t, None)) ;
         case (Tag 2)
+          ~title:"Failed request"
           (obj3
              (req "error" RPC_error.encoding)
              (req "failed_request" Request.encoding)

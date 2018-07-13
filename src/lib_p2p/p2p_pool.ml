@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (* TODO Test cancelation of a (pending) connection *)
 
@@ -19,6 +35,7 @@ include Logging.Make (struct let name = "p2p.connection-pool" end)
 
 type 'msg encoding = Encoding : {
     tag: int ;
+    title: string ;
     encoding: 'a Data_encoding.t ;
     wrap: 'a -> 'msg ;
     unwrap: 'msg -> 'a option ;
@@ -39,29 +56,45 @@ module Message = struct
     let open Data_encoding in
     dynamic_size @@
     union ~tag_size:`Uint16
-      ([ case (Tag 0x01) null
+      ([ case (Tag 0x01) ~title:"Disconnect"
+           (obj1 (req "kind" (constant "Disconnect")))
            (function Disconnect -> Some () | _ -> None)
            (fun () -> Disconnect);
-         case (Tag 0x02) null
+         case (Tag 0x02) ~title:"Bootstrap"
+           (obj1 (req "kind" (constant "Bootstrap")))
            (function Bootstrap -> Some () | _ -> None)
            (fun () -> Bootstrap);
-         case (Tag 0x03) (Variable.list P2p_point.Id.encoding)
-           (function Advertise points -> Some points | _ -> None)
-           (fun points -> Advertise points);
-         case (Tag 0x04) (tup2 P2p_point.Id.encoding P2p_peer.Id.encoding)
+         case (Tag 0x03) ~title:"Advertise"
+           (obj2
+              (req "id" (Variable.list P2p_point.Id.encoding))
+              (req "kind" (constant "Advertise")))
+           (function Advertise points -> Some (points, ()) | _ -> None)
+           (fun (points, ()) -> Advertise points);
+         case (Tag 0x04) ~title:"Swap_request"
+           (obj3
+              (req "point" P2p_point.Id.encoding)
+              (req "peer_id" P2p_peer.Id.encoding)
+              (req "kind" (constant "Swap_request")))
            (function
-             | Swap_request (point, peer_id) -> Some (point, peer_id)
+             | Swap_request (point, peer_id) -> Some (point, peer_id, ())
              | _ -> None)
-           (fun (point, peer_id) -> Swap_request (point, peer_id)) ;
-         case (Tag 0x05) (tup2 P2p_point.Id.encoding P2p_peer.Id.encoding)
+           (fun (point, peer_id, ()) -> Swap_request (point, peer_id)) ;
+         case (Tag 0x05)
+           ~title:"Swap_ack"
+           (obj3
+              (req "point" P2p_point.Id.encoding)
+              (req "peer_id" P2p_peer.Id.encoding)
+              (req "kind" (constant "Swap_ack")))
            (function
-             | Swap_ack (point, peer_id) -> Some (point, peer_id)
+             | Swap_ack (point, peer_id) -> Some (point, peer_id, ())
              | _ -> None)
-           (fun (point, peer_id) -> Swap_ack (point, peer_id)) ;
+           (fun (point, peer_id, ()) -> Swap_ack (point, peer_id)) ;
        ] @
        ListLabels.map msg_encoding
-         ~f:(function Encoding { tag ; encoding ; wrap ; unwrap } ->
-             case (Tag tag) encoding
+         ~f:(function Encoding { tag ; title ; encoding ; wrap ; unwrap } ->
+             Data_encoding.case (Tag tag)
+               ~title
+               encoding
                (function Message msg -> unwrap msg | _ -> None)
                (fun msg -> Message (wrap msg))))
 
@@ -78,9 +111,9 @@ module Answerer = struct
     swap_ack: P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t ;
   }
 
-  type 'msg t = {
+  type ('msg, 'meta) t = {
     canceler: Lwt_canceler.t ;
-    conn: 'msg Message.t P2p_socket.t ;
+    conn: ('msg Message.t, 'meta) P2p_socket.t ;
     callback: 'msg callback ;
     mutable worker: unit Lwt.t ;
   }
@@ -91,6 +124,8 @@ module Answerer = struct
       P2p_socket.read st.conn
     end >>= function
     | Ok (_, Bootstrap) -> begin
+        (* st.callback.bootstrap will return an empty list if the node
+           is in private mode *)
         st.callback.bootstrap () >>= function
         | [] ->
             worker_loop st
@@ -104,6 +139,8 @@ module Answerer = struct
                 Lwt.return_unit
       end
     | Ok (_, Advertise points) ->
+        (* st.callback.advertise will ignore the points if the node is
+           in private mode *)
         st.callback.advertise points >>= fun () ->
         worker_loop st
     | Ok (_, Swap_request (point, peer)) ->
@@ -154,7 +191,7 @@ type config = {
 
   trusted_points : P2p_point.Id.t list ;
   peers_file : string ;
-  closed_network : bool ;
+  private_mode : bool ;
 
   listening_port : P2p_addr.port option ;
   min_connections : int ;
@@ -162,6 +199,7 @@ type config = {
   max_incoming_connections : int ;
   connection_timeout : float ;
   authentication_timeout : float ;
+  greylist_timeout : int ;
 
   incoming_app_message_queue_size : int option ;
   incoming_message_queue_size : int option ;
@@ -177,10 +215,10 @@ type config = {
   binary_chunks_size : int option ;
 }
 
-type 'meta meta_config = {
-  encoding : 'meta Data_encoding.t;
-  initial : 'meta;
-  score : 'meta -> float;
+type 'peer_meta peer_meta_config = {
+  peer_meta_encoding : 'peer_meta Data_encoding.t ;
+  peer_meta_initial : 'peer_meta ;
+  score : 'peer_meta -> float ;
 }
 
 type 'msg message_config = {
@@ -188,24 +226,32 @@ type 'msg message_config = {
   versions : P2p_version.t list;
 }
 
-type ('msg, 'meta) t = {
+type ('msg, 'peer_meta, 'conn_meta) t = {
   config : config ;
-  meta_config : 'meta meta_config ;
+  peer_meta_config : 'peer_meta peer_meta_config ;
+  conn_meta_config : 'conn_meta P2p_socket.metadata_config ;
   message_config : 'msg message_config ;
   my_id_points : unit P2p_point.Table.t ;
   known_peer_ids :
-    (('msg, 'meta) connection, 'meta) P2p_peer_state.Info.t P2p_peer.Table.t ;
+    (('msg, 'peer_meta, 'conn_meta) connection,
+     'peer_meta,
+     'conn_meta) P2p_peer_state.Info.t P2p_peer.Table.t ;
   connected_peer_ids :
-    (('msg, 'meta) connection, 'meta) P2p_peer_state.Info.t P2p_peer.Table.t ;
-  known_points : ('msg, 'meta) connection P2p_point_state.Info.t P2p_point.Table.t ;
-  connected_points : ('msg, 'meta) connection P2p_point_state.Info.t P2p_point.Table.t ;
+    (('msg, 'peer_meta, 'conn_meta) connection,
+     'peer_meta,
+     'conn_meta) P2p_peer_state.Info.t P2p_peer.Table.t ;
+  known_points :
+    ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t P2p_point.Table.t ;
+  connected_points :
+    ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t P2p_point.Table.t ;
   incoming : Lwt_canceler.t P2p_point.Table.t ;
   io_sched : P2p_io_scheduler.t ;
   encoding : 'msg Message.t Data_encoding.t ;
   events : events ;
   watcher : P2p_connection.Pool_event.t Lwt_watcher.input ;
+  acl : P2p_acl.t ;
   mutable new_connection_hook :
-    (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) list ;
+    (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) list ;
   mutable latest_accepted_swap : Time.t ;
   mutable latest_succesfull_swap : Time.t  ;
 }
@@ -217,18 +263,20 @@ and events = {
   new_connection : unit Lwt_condition.t ;
 }
 
-and ('msg, 'meta) connection = {
+and ('msg, 'peer_meta, 'conn_meta) connection = {
   canceler : Lwt_canceler.t ;
   messages : (int * 'msg) Lwt_pipe.t ;
-  conn : 'msg Message.t P2p_socket.t ;
-  peer_info : (('msg, 'meta) connection, 'meta) P2p_peer_state.Info.t ;
-  point_info : ('msg, 'meta) connection P2p_point_state.Info.t option ;
-  answerer : 'msg Answerer.t Lazy.t ;
+  conn : ('msg Message.t, 'conn_meta) P2p_socket.t ;
+  peer_info :
+    (('msg, 'peer_meta, 'conn_meta) connection, 'peer_meta, 'conn_meta) P2p_peer_state.Info.t ;
+  point_info :
+    ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t option ;
+  answerer : ('msg, 'conn_meta) Answerer.t Lazy.t ;
   mutable last_sent_swap_request : (Time.t * P2p_peer.Id.t) option ;
   mutable wait_close : bool ;
 }
 
-type ('msg, 'meta) pool = ('msg, 'meta) t
+type ('msg, 'peer_meta, 'conn_meta) pool = ('msg, 'peer_meta, 'conn_meta) t
 
 module Pool_event = struct
   let wait_too_few_connections pool =
@@ -243,6 +291,8 @@ end
 
 let watch { watcher } = Lwt_watcher.create_stream watcher
 let log { watcher } event = Lwt_watcher.notify watcher event
+let private_node_warn fmt =
+  Format.kasprintf (fun s -> lwt_warn "[private node] %s" s) fmt
 
 module Gc_point_set = List.Bounded(struct
     type t = Time.t * P2p_point.Id.t
@@ -270,8 +320,8 @@ let gc_points ({ config = { max_known_points } ; known_points } as pool) =
       log pool Gc_points
 
 let register_point pool ?trusted _source_peer_id (addr, port as point) =
-  match P2p_point.Table.find pool.known_points point with
-  | exception Not_found ->
+  match P2p_point.Table.find_opt pool.known_points point with
+  | None ->
       let point_info = P2p_point_state.Info.create ?trusted addr port in
       Option.iter pool.config.max_known_points ~f:begin fun (max, _) ->
         if P2p_point.Table.length pool.known_points >= max then gc_points pool
@@ -279,7 +329,7 @@ let register_point pool ?trusted _source_peer_id (addr, port as point) =
       P2p_point.Table.add pool.known_points point point_info ;
       log pool (New_point point) ;
       point_info
-  | point_info -> point_info
+  | Some point_info -> point_info
 
 let may_register_my_id_point pool = function
   | [P2p_errors.Myself (addr, Some port)] ->
@@ -302,7 +352,7 @@ module Gc_peer_set = List.Bounded(struct
       if score_cmp = 0 then Time.compare t t' else - score_cmp
   end)
 
-let gc_peer_ids ({ meta_config = { score } ;
+let gc_peer_ids ({ peer_meta_config = { score } ;
                    config = { max_known_peer_ids } ;
                    known_peer_ids ; } as pool) =
   match max_known_peer_ids with
@@ -311,7 +361,7 @@ let gc_peer_ids ({ meta_config = { score } ;
       let table = Gc_peer_set.create target in
       P2p_peer.Table.iter (fun peer_id peer_info ->
           let created = P2p_peer_state.Info.created peer_info in
-          let score = score @@ P2p_peer_state.Info.metadata peer_info in
+          let score = score @@ P2p_peer_state.Info.peer_metadata peer_info in
           Gc_peer_set.insert (score, created, peer_id) table
         ) known_peer_ids ;
       let to_remove = Gc_peer_set.get table in
@@ -321,27 +371,30 @@ let gc_peer_ids ({ meta_config = { score } ;
       log pool Gc_peer_ids
 
 let register_peer pool peer_id =
-  match P2p_peer.Table.find pool.known_peer_ids peer_id with
-  | exception Not_found ->
+  match P2p_peer.Table.find_opt pool.known_peer_ids peer_id with
+  | None ->
       Lwt_condition.broadcast pool.events.new_peer () ;
-      let peer = P2p_peer_state.Info.create peer_id ~metadata:pool.meta_config.initial in
+      let peer =
+        P2p_peer_state.Info.create peer_id
+          ~peer_metadata:pool.peer_meta_config.peer_meta_initial in
       Option.iter pool.config.max_known_peer_ids ~f:begin fun (max, _) ->
         if P2p_peer.Table.length pool.known_peer_ids >= max then gc_peer_ids pool
       end ;
       P2p_peer.Table.add pool.known_peer_ids peer_id peer ;
       log pool (New_peer peer_id) ;
       peer
-  | peer -> peer
+  | Some peer -> peer
 
 
 (***************************************************************************)
 
 let read { messages ; conn } =
   Lwt.catch
-    (fun () -> Lwt_pipe.pop messages >>= fun (s, msg) ->
-      lwt_debug "%d bytes message popped from queue %a\027[0m"
-        s P2p_connection.Info.pp (P2p_socket.info conn) >>= fun () ->
-      return msg)
+    (fun () ->
+       Lwt_pipe.pop messages >>= fun (s, msg) ->
+       lwt_debug "%d bytes message popped from queue %a\027[0m"
+         s P2p_peer.Id.pp (P2p_socket.info conn).peer_id >>= fun () ->
+       return msg)
     (fun _ (* Closed *) -> fail P2p_errors.Connection_closed)
 
 let is_readable { messages } =
@@ -371,34 +424,95 @@ let write_all pool msg =
     pool.connected_peer_ids
 
 let broadcast_bootstrap_msg pool =
-  P2p_peer.Table.iter
-    (fun _peer_id peer_info ->
-       match P2p_peer_state.get peer_info with
-       | Running { data = { conn } } ->
-           ignore (P2p_socket.write_now conn Bootstrap : bool tzresult )
-       | _ -> ())
-    pool.connected_peer_ids
+  if not pool.config.private_mode then
+    P2p_peer.Table.iter
+      (fun _peer_id peer_info ->
+         match P2p_peer_state.get peer_info with
+         | Running { data = { conn } } ->
+             (* should not ask private nodes for the list of their
+                known peers*)
+             if not (P2p_socket.private_node conn) then
+               ignore (P2p_socket.write_now conn Bootstrap : bool tzresult )
+         | _ -> ())
+      pool.connected_peer_ids
 
 
 (***************************************************************************)
 
+(* this function duplicates bit of code from the modules below to avoid
+   creating mutually recurvive modules *)
+let connection_of_peer_id pool peer_id =
+  Option.apply
+    (P2p_peer.Table.find_opt pool.known_peer_ids peer_id) ~f:begin fun p ->
+    match P2p_peer_state.get p with
+    | Running { data } -> Some data
+    | _ -> None
+  end
+
+let get_addr pool peer_id =
+  Option.map (connection_of_peer_id pool peer_id) ~f:begin fun ci ->
+    (P2p_socket.info ci.conn).id_point
+  end
+
+module Points = struct
+
+  type ('msg, 'peer_meta, 'conn_meta) info =
+    ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t
+
+  let info { known_points } point =
+    P2p_point.Table.find_opt known_points point
+
+  let get_trusted pool point =
+    Option.unopt_map ~default:false ~f:P2p_point_state.Info.trusted
+      (P2p_point.Table.find_opt pool.known_points point)
+
+  let set_trusted pool point =
+    P2p_point_state.Info.set_trusted
+      (register_point pool pool.config.identity.peer_id point)
+
+  let unset_trusted pool point =
+    Option.iter ~f:P2p_point_state.Info.unset_trusted
+      (P2p_point.Table.find_opt pool.known_points point)
+
+  let fold_known pool ~init ~f =
+    P2p_point.Table.fold f pool.known_points init
+
+  let fold_connected  pool ~init ~f =
+    P2p_point.Table.fold f pool.connected_points init
+
+  let banned pool (addr, _port) =
+    P2p_acl.banned_addr pool.acl addr
+
+  let ban pool (addr, _port) =
+    P2p_acl.IPBlacklist.add pool.acl addr
+
+  let trust pool (addr, _port) =
+    P2p_acl.IPBlacklist.remove pool.acl addr
+
+  let forget pool ((addr, _port) as point) =
+    unset_trusted pool point; (* remove from whitelist *)
+    P2p_acl.IPBlacklist.remove pool.acl addr
+
+end
+
 module Peers = struct
 
-  type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) P2p_peer_state.Info.t
+  type ('msg, 'peer_meta, 'conn_meta) info =
+    (('msg, 'peer_meta, 'conn_meta) connection, 'peer_meta, 'conn_meta) P2p_peer_state.Info.t
 
-  let info { known_peer_ids } point =
-    try Some (P2p_peer.Table.find known_peer_ids point)
+  let info { known_peer_ids } peer_id =
+    try Some (P2p_peer.Table.find known_peer_ids peer_id)
     with Not_found -> None
 
-  let get_metadata pool peer_id =
-    try P2p_peer_state.Info.metadata (P2p_peer.Table.find pool.known_peer_ids peer_id)
-    with Not_found -> pool.meta_config.initial
+  let get_peer_metadata pool peer_id =
+    try P2p_peer_state.Info.peer_metadata (P2p_peer.Table.find pool.known_peer_ids peer_id)
+    with Not_found -> pool.peer_meta_config.peer_meta_initial
 
   let get_score pool peer_id =
-    pool.meta_config.score (get_metadata pool peer_id)
+    pool.peer_meta_config.score (get_peer_metadata pool peer_id)
 
-  let set_metadata pool peer_id data =
-    P2p_peer_state.Info.set_metadata (register_peer pool peer_id) data
+  let set_peer_metadata pool peer_id data =
+    P2p_peer_state.Info.set_peer_metadata (register_peer pool peer_id) data
 
   let get_trusted pool peer_id =
     try P2p_peer_state.Info.trusted (P2p_peer.Table.find pool.known_peer_ids peer_id)
@@ -418,35 +532,29 @@ module Peers = struct
   let fold_connected pool ~init ~f =
     P2p_peer.Table.fold f pool.connected_peer_ids init
 
-end
+  let forget pool peer =
+    Option.iter (get_addr pool peer) ~f:begin fun (addr, _port) ->
+      unset_trusted pool peer; (* remove from whitelist *)
+      P2p_acl.PeerBlacklist.remove pool.acl peer;
+      P2p_acl.IPBlacklist.remove pool.acl addr
+    end
 
-module Points = struct
+  let ban pool peer =
+    Option.iter (get_addr pool peer) ~f:begin fun point ->
+      Points.ban pool point ;
+      P2p_acl.PeerBlacklist.add pool.acl peer ;
+    end ;
+    (* Kick [peer] if it is in `Running` state. *)
+    Option.iter (connection_of_peer_id pool peer) ~f:begin fun conn ->
+      conn.wait_close <- false ;
+      Lwt.async (fun () -> Answerer.shutdown (Lazy.force conn.answerer))
+    end
 
-  type ('msg, 'meta) info = ('msg, 'meta) connection P2p_point_state.Info.t
+  let trust pool peer =
+    Option.iter (get_addr pool peer) ~f:(Points.trust pool)
 
-  let info { known_points } point =
-    try Some (P2p_point.Table.find known_points point)
-    with Not_found -> None
-
-  let get_trusted pool point =
-    try P2p_point_state.Info.trusted (P2p_point.Table.find pool.known_points point)
-    with Not_found -> false
-
-  let set_trusted pool point =
-    try
-      P2p_point_state.Info.set_trusted
-        (register_point pool pool.config.identity.peer_id point)
-    with Not_found -> ()
-
-  let unset_trusted pool peer_id =
-    try P2p_point_state.Info.unset_trusted (P2p_point.Table.find pool.known_points peer_id)
-    with Not_found -> ()
-
-  let fold_known pool ~init ~f =
-    P2p_point.Table.fold f pool.known_points init
-
-  let fold_connected  pool ~init ~f =
-    P2p_point.Table.fold f pool.connected_points init
+  let banned pool peer =
+    P2p_acl.banned_peer pool.acl peer
 
 end
 
@@ -462,30 +570,36 @@ module Connection = struct
   let list pool =
     fold pool ~init:[] ~f:(fun peer_id c acc -> (peer_id, c) :: acc)
 
-  let random ?different_than pool =
+  let random ?different_than ~no_private pool =
     let candidates =
       fold pool ~init:[] ~f:begin fun _peer conn acc ->
-        match different_than with
-        | Some excluded_conn
-          when P2p_socket.equal conn.conn excluded_conn.conn -> acc
-        | Some _ | None -> conn :: acc
+        if no_private && (P2p_socket.private_node conn.conn) then
+          acc
+        else
+          match different_than with
+          | Some excluded_conn
+            when P2p_socket.equal conn.conn excluded_conn.conn -> acc
+          | Some _ | None -> conn :: acc
       end in
     match candidates with
     | [] -> None
     | _ :: _ ->
         Some (List.nth candidates (Random.int @@ List.length candidates))
 
-  let random_lowid ?different_than pool =
+  let random_lowid ?different_than ~no_private pool =
     let candidates =
       fold pool ~init:[] ~f:begin fun _peer conn acc ->
-        match different_than with
-        | Some excluded_conn
-          when P2p_socket.equal conn.conn excluded_conn.conn -> acc
-        | Some _ | None ->
-            let ci = P2p_socket.info conn.conn in
-            match ci.id_point with
-            | _, None -> acc
-            | addr, Some port -> ((addr, port), ci.peer_id, conn) :: acc
+        if no_private && (P2p_socket.private_node conn.conn) then
+          acc
+        else
+          match different_than with
+          | Some excluded_conn
+            when P2p_socket.equal conn.conn excluded_conn.conn -> acc
+          | Some _ | None ->
+              let ci = P2p_socket.info conn.conn in
+              match ci.id_point with
+              | _, None -> acc
+              | addr, Some port -> ((addr, port), ci.peer_id, conn) :: acc
       end in
     match candidates with
     | [] -> None
@@ -495,10 +609,16 @@ module Connection = struct
   let stat { conn } =
     P2p_socket.stat conn
 
-  let score { meta_config = { score }} meta = score meta
+  let score { peer_meta_config = { score }} meta = score meta
 
   let info { conn } =
     P2p_socket.info conn
+
+  let local_metadata { conn } =
+    P2p_socket.local_metadata conn
+
+  let remote_metadata { conn } =
+    P2p_socket.remote_metadata conn
 
   let find_by_peer_id pool peer_id =
     Option.apply
@@ -518,21 +638,37 @@ module Connection = struct
 
 end
 
+let greylist_addr pool addr =
+  P2p_acl.IPGreylist.add pool.acl addr (Time.now ())
+
+let greylist_peer pool peer =
+  Option.iter (get_addr pool peer) ~f:begin fun (addr, _port) ->
+    greylist_addr pool addr ;
+    P2p_acl.PeerGreylist.add pool.acl peer
+  end
+
+let acl_clear pool =
+  P2p_acl.clear pool.acl
+
+let gc_greylist ~older_than pool =
+  P2p_acl.IPGreylist.remove_old ~older_than pool.acl
+
 let pool_stat { io_sched } =
   P2p_io_scheduler.global_stat io_sched
 
+let config { config } = config
 
 (***************************************************************************)
 
 let fail_unless_disconnected_point point_info =
   match P2p_point_state.get point_info with
-  | Disconnected -> return ()
+  | Disconnected -> return_unit
   | Requested _ | Accepted _ -> fail P2p_errors.Pending_connection
   | Running _ -> fail P2p_errors.Connected
 
 let fail_unless_disconnected_peer_id peer_info =
   match P2p_peer_state.get peer_info with
-  | Disconnected -> return ()
+  | Disconnected -> return_unit
   | Accepted _ -> fail P2p_errors.Pending_connection
   | Running _ -> fail P2p_errors.Connected
 
@@ -557,6 +693,8 @@ let compare_known_point_info p1 p2 =
   | true, true -> compare_last_seen p2 p1
 
 let rec connect ?timeout pool point =
+  fail_when (Points.banned pool point)
+    (P2p_errors.Point_banned point) >>=? fun () ->
   let timeout =
     Option.unopt ~default:pool.config.connection_timeout timeout in
   fail_unless
@@ -568,8 +706,8 @@ let rec connect ?timeout pool point =
       register_point pool pool.config.identity.peer_id point in
     let addr, port as point = P2p_point_state.Info.point point_info in
     fail_unless
-      (not pool.config.closed_network || P2p_point_state.Info.trusted point_info)
-      P2p_errors.Closed_network >>=? fun () ->
+      (not pool.config.private_mode || P2p_point_state.Info.trusted point_info)
+      P2p_errors.Private_mode >>=? fun () ->
     fail_unless_disconnected_point point_info >>=? fun () ->
     P2p_point_state.set_requested point_info canceler ;
     let fd = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
@@ -579,7 +717,7 @@ let rec connect ?timeout pool point =
     protect ~canceler begin fun () ->
       log pool (Outgoing_connection point) ;
       Lwt_unix.connect fd uaddr >>= fun () ->
-      return ()
+      return_unit
     end ~on_error: begin fun err ->
       lwt_debug "connect: %a -> disconnect" P2p_point.Id.pp point >>= fun () ->
       P2p_point_state.set_disconnected point_info ;
@@ -604,20 +742,32 @@ and authenticate pool ?point_info canceler fd point =
       ~incoming (P2p_io_scheduler.register pool.io_sched fd) point
       ?listening_port:pool.config.listening_port
       pool.config.identity pool.message_config.versions
+      pool.conn_meta_config
   end ~on_error: begin fun err ->
-    (* TODO do something when the error is Not_enough_proof_of_work ?? *)
     begin match err with
       | [ Canceled ] ->
           (* Currently only on time out *)
           lwt_debug "authenticate: %a%s -> canceled"
             P2p_point.Id.pp point
             (if incoming then " incoming" else "")
-      | err ->
-          (* Authentication incorrect! *)
+      | err -> begin
+          (* Authentication incorrect! Temp ban the offending points/peers *)
+          List.iter (function
+              | P2p_errors.Not_enough_proof_of_work _
+              | P2p_errors.Invalid_auth
+              | P2p_errors.Decipher_error
+              | P2p_errors.Invalid_message_size
+              | P2p_errors.Encoding_error
+              | P2p_errors.Decoding_error
+              | P2p_errors.Invalid_chunks_size _ ->
+                  greylist_addr pool (fst point)
+              | _ -> ()
+            ) err ;
           lwt_debug "@[authenticate: %a%s -> failed@ %a@]"
             P2p_point.Id.pp point
             (if incoming then " incoming" else "")
             pp_print_error err
+        end
     end >>= fun () ->
     may_register_my_id_point pool err ;
     log pool (Authentication_failed point) ;
@@ -630,7 +780,9 @@ and authenticate pool ?point_info canceler fd point =
   (* Authentication correct! *)
   lwt_debug "authenticate: %a -> auth %a"
     P2p_point.Id.pp point
-    P2p_connection.Info.pp info >>= fun () ->
+    P2p_peer.Id.pp info.peer_id >>= fun () ->
+  fail_when (Peers.banned pool info.peer_id)
+    (P2p_errors.Peer_banned info.peer_id) >>=? fun () ->
   let remote_point_info =
     match info.id_point with
     | addr, Some port
@@ -647,13 +799,19 @@ and authenticate pool ?point_info canceler fd point =
   in
   let acceptable_point =
     Option.unopt_map connection_point_info
-      ~default:(not pool.config.closed_network)
+      ~default:(not pool.config.private_mode)
       ~f:begin fun connection_point_info ->
         match P2p_point_state.get connection_point_info with
         | Requested _ -> not incoming
         | Disconnected ->
-            not pool.config.closed_network
-            || P2p_point_state.Info.trusted connection_point_info
+            let unexpected =
+              pool.config.private_mode
+              && not (P2p_point_state.Info.trusted connection_point_info)
+            in
+            if unexpected then
+              warn "[private node] incoming connection from untrused \
+                    peer rejected!";
+            not unexpected
         | Accepted _ | Running _ -> false
       end
   in
@@ -676,24 +834,24 @@ and authenticate pool ?point_info canceler fd point =
       P2p_peer_state.set_accepted peer_info info.id_point canceler ;
       lwt_debug "authenticate: %a -> accept %a"
         P2p_point.Id.pp point
-        P2p_connection.Info.pp info >>= fun () ->
+        P2p_peer.Id.pp info.peer_id >>= fun () ->
       protect ~canceler begin fun () ->
         P2p_socket.accept
           ?incoming_message_queue_size:pool.config.incoming_message_queue_size
           ?outgoing_message_queue_size:pool.config.outgoing_message_queue_size
           ?binary_chunks_size:pool.config.binary_chunks_size
-          auth_fd pool.encoding >>= fun conn ->
+          auth_fd pool.encoding >>=? fun conn ->
         lwt_debug "authenticate: %a -> Connected %a"
           P2p_point.Id.pp point
-          P2p_connection.Info.pp info >>= fun () ->
-        Lwt.return conn
+          P2p_peer.Id.pp info.peer_id >>= fun () ->
+        return conn
       end ~on_error: begin fun err ->
         if incoming then
           log pool
             (Request_rejected (point, Some (info.id_point, info.peer_id))) ;
         lwt_debug "authenticate: %a -> rejected %a"
           P2p_point.Id.pp point
-          P2p_connection.Info.pp info >>= fun () ->
+          P2p_peer.Id.pp info.peer_id >>= fun () ->
         Option.iter connection_point_info
           ~f:P2p_point_state.set_disconnected ;
         P2p_peer_state.set_disconnected peer_info ;
@@ -712,7 +870,7 @@ and authenticate pool ?point_info canceler fd point =
       log pool (Rejecting_request (point, info.id_point, info.peer_id)) ;
       lwt_debug "authenticate: %a -> kick %a point: %B peer_id: %B"
         P2p_point.Id.pp point
-        P2p_connection.Info.pp info
+        P2p_peer.Id.pp info.peer_id
         acceptable_point acceptable_peer_id >>= fun () ->
       P2p_socket.kick auth_fd >>= fun () ->
       if not incoming then begin
@@ -730,31 +888,76 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
       ~f:(fun qs -> qs, fun (size, _) ->
           (Sys.word_size / 8) * 11 + size + Lwt_pipe.push_overhead) in
   let messages = Lwt_pipe.create ?size () in
-  let rec callback =
+
+  let rec callback_default =
     { Answerer.message =
         (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
       advertise =
         (fun points -> register_new_points pool conn points ) ;
       bootstrap =
-        (fun () -> list_known_points pool conn () ) ;
+        (fun () -> list_known_points ~ignore_private:true pool conn) ;
       swap_request =
         (fun point peer_id -> swap_request pool conn point peer_id ) ;
       swap_ack =
         (fun point peer_id -> swap_ack pool conn point peer_id ) ;
     }
-  and answerer = lazy (Answerer.run p2p_conn canceler callback)
+
+  (* when the node is in private mode: deactivate advertising,
+     peers_swap and sending list of peers in callback *)
+  and callback_private =
+    { Answerer.message =
+        (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
+      advertise =
+        (fun _points ->
+           private_node_warn
+             "Received new peers addresses from %a"
+             P2p_peer.Id.pp peer_id >>= fun () ->
+           Lwt.return_unit
+        ) ;
+      bootstrap =
+        (fun () ->
+           private_node_warn
+             "Receive requests for peers addresses from %a"
+             P2p_peer.Id.pp peer_id >>= fun () ->
+           Lwt.return_nil
+        ) ;
+      swap_request =
+        (fun _point _peer_id ->
+           private_node_warn
+             "Received swap requests from %a"
+             P2p_peer.Id.pp peer_id >>= fun () ->
+           Lwt.return_unit
+        ) ;
+      swap_ack =
+        (fun _point _peer_id ->
+           private_node_warn
+             "Received swap ack from %a"
+             P2p_peer.Id.pp peer_id >>= fun () ->
+           Lwt.return_unit
+        ) ;
+    }
+
+  and answerer =
+    lazy (
+      Answerer.run p2p_conn canceler @@
+      if pool.config.private_mode then callback_private else callback_default
+    )
+
   and conn =
     { conn = p2p_conn ; point_info ; peer_info ;
       messages ; canceler ; answerer ; wait_close = false ;
       last_sent_swap_request = None } in
   ignore (Lazy.force answerer) ;
+  let conn_meta = P2p_socket.remote_metadata p2p_conn in
   Option.iter point_info ~f:begin fun point_info ->
     let point = P2p_point_state.Info.point point_info in
-    P2p_point_state.set_running point_info peer_id conn ;
+    P2p_point_state.set_running
+      ~known_private:(pool.conn_meta_config.private_node conn_meta)
+      point_info peer_id conn;
     P2p_point.Table.add pool.connected_points point point_info ;
   end ;
   log pool (Connection_established (id_point, peer_id)) ;
-  P2p_peer_state.set_running peer_info id_point conn ;
+  P2p_peer_state.set_running peer_info id_point conn conn_meta ;
   P2p_peer.Table.add pool.connected_peer_ids peer_id peer_info ;
   Lwt_condition.broadcast pool.events.new_connection () ;
   Lwt_canceler.on_cancel canceler begin fun () ->
@@ -795,14 +998,22 @@ and register_new_point pool _source_peer_id point =
   if not (P2p_point.Table.mem pool.my_id_points point) then
     ignore (register_point pool _source_peer_id point)
 
-and list_known_points pool _conn () =
-  let knowns =
-    P2p_point.Table.fold
-      (fun _ point_info acc -> point_info :: acc)
-      pool.known_points [] in
-  let best_knowns =
-    List.take_n ~compare:compare_known_point_info 50 knowns in
-  Lwt.return (List.map P2p_point_state.Info.point best_knowns)
+and list_known_points ?(ignore_private = false) pool conn =
+  if P2p_socket.private_node conn.conn then
+    private_node_warn "Private peer (%a) asked other peers addresses"
+      P2p_peer.Id.pp (P2p_peer_state.Info.peer_id conn.peer_info) >>= fun () ->
+    Lwt.return_nil
+  else
+    let knowns =
+      P2p_point.Table.fold
+        (fun _ point_info acc ->
+           if ignore_private &&
+              not (P2p_point_state.Info.known_public point_info) then acc
+           else point_info :: acc)
+        pool.known_points [] in
+    let best_knowns =
+      List.take_n ~compare:compare_known_point_info 50 knowns in
+    Lwt.return (List.map P2p_point_state.Info.point best_knowns)
 
 and active_connections pool = P2p_peer.Table.length pool.connected_peer_ids
 
@@ -824,7 +1035,7 @@ and swap_request pool conn new_point _new_peer_id =
     log pool (Swap_request_ignored { source = source_peer_id }) ;
     lwt_log_info "Ignoring swap request from %a" P2p_peer.Id.pp source_peer_id
   end else begin
-    match Connection.random_lowid pool with
+    match Connection.random_lowid pool ~no_private:true with
     | None ->
         lwt_log_info
           "No swap candidate for %a" P2p_peer.Id.pp source_peer_id
@@ -887,7 +1098,9 @@ and swap pool conn current_peer_id new_point =
 let accept pool fd point =
   log pool (Incoming_connection point) ;
   if pool.config.max_incoming_connections <= P2p_point.Table.length pool.incoming
-  || pool.config.max_connections <= active_connections pool then
+  || pool.config.max_connections <= active_connections pool
+  (* silently ignore banned points *)
+  || (P2p_acl.banned_addr pool.acl (fst point)) then
     Lwt.async (fun () -> Lwt_utils_unix.safe_close fd)
   else
     let canceler = Lwt_canceler.create () in
@@ -899,11 +1112,14 @@ let accept pool fd point =
     end
 
 let send_swap_request pool =
-  match Connection.random pool with
-  | None -> ()
-  | Some recipient ->
+  match Connection.random ~no_private:true pool with
+  | Some recipient when not pool.config.private_mode -> begin
       let recipient_peer_id = (Connection.info recipient).peer_id in
-      match Connection.random_lowid ~different_than:recipient pool with
+      match
+        Connection.random_lowid
+          ~different_than:recipient
+          ~no_private:true pool
+      with
       | None -> ()
       | Some (proposed_point, proposed_peer_id, _proposed_conn) ->
           log pool (Swap_request_sent { source = recipient_peer_id }) ;
@@ -911,10 +1127,12 @@ let send_swap_request pool =
             Some (Time.now (), proposed_peer_id) ;
           ignore (P2p_socket.write_now recipient.conn
                     (Swap_request (proposed_point, proposed_peer_id)))
+    end
+  | Some _ | None -> ()
 
 (***************************************************************************)
 
-let create config meta_config message_config io_sched =
+let create config peer_meta_config conn_meta_config message_config io_sched =
   let events = {
     too_few_connections = Lwt_condition.create () ;
     too_many_connections = Lwt_condition.create () ;
@@ -922,7 +1140,7 @@ let create config meta_config message_config io_sched =
     new_connection = Lwt_condition.create () ;
   } in
   let pool = {
-    config ; meta_config ; message_config ;
+    config ; peer_meta_config ; conn_meta_config ; message_config ;
     my_id_points = P2p_point.Table.create 7 ;
     known_peer_ids = P2p_peer.Table.create 53 ;
     connected_peer_ids = P2p_peer.Table.create 53 ;
@@ -933,12 +1151,15 @@ let create config meta_config message_config io_sched =
     encoding = Message.encoding message_config.encoding ;
     events ;
     watcher = Lwt_watcher.create_input () ;
+    acl = P2p_acl.create 1023;
     new_connection_hook = [] ;
     latest_accepted_swap = Time.epoch ;
     latest_succesfull_swap = Time.epoch ;
   } in
   List.iter (Points.set_trusted pool) config.trusted_points ;
-  P2p_peer_state.Info.File.load config.peers_file meta_config.encoding >>= function
+  P2p_peer_state.Info.File.load
+    config.peers_file
+    peer_meta_config.peer_meta_encoding >>= function
   | Ok peer_ids ->
       List.iter
         (fun peer_info ->

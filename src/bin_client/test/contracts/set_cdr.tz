@@ -1,4 +1,3 @@
 parameter nat;
-storage (pair string nat);
-return (pair string nat);
-code { DUP; CDR; DIP{CAR}; SET_CDR @annot; DUP; PAIR };
+storage (pair (string %s) (nat %n));
+code { DUP; CDR; DIP{CAR}; SET_CDR %n; NIL operation; PAIR };

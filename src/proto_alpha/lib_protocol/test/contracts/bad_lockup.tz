@@ -1,6 +1,0 @@
-parameter unit;
-storage (pair timestamp (pair (contract unit unit) (contract unit unit)));
-return unit;
-code { CDR; DUP; CAR; NOW; CMPLT; IF {FAIL} {};
-       DUP; CDAR; PUSH tez "100"; UNIT; TRANSFER_TOKENS; DROP;
-       DUP; CDDR; PUSH tez "100"; UNIT; TRANSFER_TOKENS; PAIR }

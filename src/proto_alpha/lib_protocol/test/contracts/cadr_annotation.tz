@@ -1,4 +1,0 @@
-parameter (pair (pair unit (string @no_name)) bool);
-storage unit;
-return unit;
-code { CAR @name; CADR @second_name; DROP; UNIT; UNIT; PAIR }

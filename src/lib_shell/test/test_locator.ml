@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2017.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 let (//) = Filename.concat
 
@@ -43,9 +59,9 @@ let incr_fitness fitness =
           Data_encoding.Binary.of_bytes Data_encoding.int64 fitness
           |> Option.unopt ~default:0L
           |> Int64.succ
-          |> Data_encoding.Binary.to_bytes Data_encoding.int64
+          |> Data_encoding.Binary.to_bytes_exn Data_encoding.int64
         )
-    | _ -> Data_encoding.Binary.to_bytes Data_encoding.int64 1L
+    | _ -> Data_encoding.Binary.to_bytes_exn Data_encoding.int64 1L
   in
   [ new_fitness ]
 
@@ -54,10 +70,11 @@ let incr_fitness fitness =
 let init_chain base_dir : State.Chain.t Lwt.t =
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in
-  State.read ~store_root ~context_root () >>= function
+  State.read
+    ~store_root ~context_root state_genesis_block >>= function
   | Error _ -> Pervasives.failwith "read err"
-  | Ok (state:State.global_state) ->
-      State.Chain.create state state_genesis_block
+  | Ok (_state, chain) ->
+      Lwt.return chain
 
 
 let block_header
@@ -81,6 +98,8 @@ let block_header
     Block_header.protocol_data = MBytes.of_string "" ;
   }
 
+let zero = MBytes.create 0
+
 (* adds n blocks on top of an initialized chain *)
 let make_empty_chain (chain:State.Chain.t) n : Block_hash.t Lwt.t =
   State.Block.read_exn chain genesis_hash >>= fun genesis ->
@@ -93,7 +112,6 @@ let make_empty_chain (chain:State.Chain.t) n : Block_hash.t Lwt.t =
     context = empty_context ;
     fitness = [] ;
     message = None ;
-    max_operation_data_length = 0 ;
     max_operations_ttl = 0 ;
     last_allowed_fork_level = 0l ;
   } in
@@ -105,7 +123,7 @@ let make_empty_chain (chain:State.Chain.t) n : Block_hash.t Lwt.t =
         { header with
           shell = { header.shell with predecessor = pred ;
                                       level = Int32.of_int lvl } } in
-      State.Block.store chain header [] empty_result >>=? fun _ ->
+      State.Block.store chain header zero [] [] empty_result >>=? fun _ ->
       loop (lvl+1) (Block_header.hash header)
   in
   loop 1 genesis_hash >>= function
@@ -304,7 +322,7 @@ let test_locator base_dir =
          then
            Assert.fail_msg "Invalid locator %i" size)
       l_exp l_lin;
-    return ()
+    return_unit
   in
   let stop = locator_limit + 20 in
   let rec loop size =
@@ -312,7 +330,7 @@ let test_locator base_dir =
       check_locator size >>=? fun _ ->
       loop (size+5)
     )
-    else return ()
+    else return_unit
   in
   loop 1
 

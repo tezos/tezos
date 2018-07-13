@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module type LOGGER = sig
   type request
@@ -63,6 +79,7 @@ type error +=
 val call_service :
   Media_type.t list ->
   ?logger:logger ->
+  ?headers:(string * string) list ->
   base:Uri.t ->
   ([< Resto.meth ], unit, 'p, 'q, 'i, 'o) RPC_service.t ->
   'p -> 'q -> 'i -> 'o tzresult Lwt.t
@@ -70,6 +87,7 @@ val call_service :
 val call_streamed_service :
   Media_type.t list ->
   ?logger:logger ->
+  ?headers:(string * string) list ->
   base:Uri.t ->
   ([< Resto.meth ], unit, 'p, 'q, 'i, 'o) RPC_service.t ->
   on_chunk: ('o -> unit) ->
@@ -78,6 +96,7 @@ val call_streamed_service :
 
 val generic_json_call :
   ?logger:logger ->
+  ?headers:(string * string) list ->
   ?body:Data_encoding.json ->
   [< RPC_service.meth ] -> Uri.t ->
   (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result Lwt.t
@@ -87,9 +106,11 @@ type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
 val generic_call :
   ?logger:logger ->
+  ?headers:(string * string) list ->
   ?accept:Media_type.t list ->
   ?body:Cohttp_lwt.Body.t ->
   ?media:Media_type.t ->
   [< RPC_service.meth ] ->
   Uri.t -> (content, content) RPC_context.rest_result Lwt.t
 
+val uri_encoding: Uri.t Data_encoding.t

@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Level_repr
 
@@ -56,14 +72,23 @@ let last_level_in_cycle ctxt c =
   | None -> assert false
   | Some x -> x
 
-let levels_in_cycle ctxt c =
-  let first = first_level_in_cycle ctxt c in
+let levels_in_cycle ctxt cycle =
+  let first = first_level_in_cycle ctxt cycle in
   let rec loop n acc =
     if Cycle_repr.(n.cycle = first.cycle)
     then loop (succ ctxt n) (n :: acc)
     else acc
   in
   loop first []
+
+let levels_in_current_cycle ctxt ?(offset = 0l) () =
+  let current_cycle = Cycle_repr.to_int32 (current ctxt).cycle in
+  let cycle = Int32.add current_cycle offset in
+  if Compare.Int32.(cycle < 0l) then
+    []
+  else
+    let cycle = Cycle_repr.of_int32_exn cycle in
+    levels_in_cycle ctxt cycle
 
 let levels_with_commitments_in_cycle ctxt c =
   let first = first_level_in_cycle ctxt c in

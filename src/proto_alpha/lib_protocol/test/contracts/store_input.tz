@@ -1,4 +1,0 @@
-parameter string;
-return unit;
-storage string;
-code {CAR; UNIT; PAIR};

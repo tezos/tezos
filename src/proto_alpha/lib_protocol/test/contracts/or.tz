@@ -1,5 +1,0 @@
-parameter (pair bool bool);
-return bool;
-storage unit;
-code {CAR; DUP; CAR; SWAP; CDR; OR;
-      UNIT; SWAP; PAIR};

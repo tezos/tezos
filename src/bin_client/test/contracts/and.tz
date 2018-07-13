@@ -1,4 +1,3 @@
-parameter (pair (bool @first) (bool @second));
-return bool;
-storage unit;
-code { CAR @param; DUP; CAR @first; DIP{CDR @second}; AND; UNIT; SWAP; PAIR };
+parameter (pair :param (bool %first) (bool %second));
+storage (option bool);
+code { CAR ; UNPAIR; AND @and; SOME @res; NIL @noop operation; PAIR; UNPAIR @x @y; PAIR %a %b };

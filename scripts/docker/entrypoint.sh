@@ -12,9 +12,14 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 node="/usr/local/bin/tezos-node"
 client="/usr/local/bin/tezos-client"
 admin_client="/usr/local/bin/tezos-admin-client"
+baker="/usr/local/bin/tezos-alpha-baker"
+endorser="/usr/local/bin/tezos-alpha-endorser"
+accuser="/usr/local/bin/tezos-alpha-accuser"
+signer="/usr/local/bin/tezos-signer"
 
 client_dir="$DATA_DIR/client"
 node_dir="$DATA_DIR/node"
+node_data_dir="$node_dir/data"
 
 . "$bin_dir/entrypoint.inc.sh"
 
@@ -31,6 +36,9 @@ case $command in
     tezos-endorser)
         launch_endorser "$@"
         ;;
+    tezos-accuser)
+        launch_accuser "$@"
+        ;;
     tezos-client)
         configure_client
         exec "$client" "$@"
@@ -39,6 +47,9 @@ case $command in
         configure_client
         exec "$admin_client" "$@"
         ;;
+    tezos-signer)
+        exec "$signer" "$@"
+        ;;
     *)
         cat <<EOF
 Available commands:
@@ -46,7 +57,7 @@ Available commands:
 - tezos-client [args]
 - tezos-baker [keys]
 - tezos-endorser [keys]
+- tezos-signer [args]
 EOF
         ;;
 esac
-

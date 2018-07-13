@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Error_monad
 
@@ -38,7 +54,7 @@ module Make_minimal (K : Name) = struct
     if String.length s <> size then
       None
     else
-      Some (Blake2b.Hash (Cstruct.of_string s))
+      Some (Blake2b.Hash (MBytes.of_string s))
   let of_string s =
     match of_string_opt s with
     | None ->
@@ -52,7 +68,7 @@ module Make_minimal (K : Name) = struct
           "%s.of_string: wrong string size (%d)"
           K.name (String.length s)
     | Some h -> h
-  let to_string (Blake2b.Hash h) = Cstruct.to_string h
+  let to_string (Blake2b.Hash h) = MBytes.to_string h
 
   let of_hex s = of_string (Hex.to_string s)
   let of_hex_opt s = of_string_opt (Hex.to_string s)
@@ -70,7 +86,7 @@ module Make_minimal (K : Name) = struct
     if MBytes.length b <> size then
       None
     else
-      Some (Blake2b.Hash (Cstruct.of_bigarray b))
+      Some (Blake2b.Hash b)
   let of_bytes_exn b =
     match of_bytes_opt b with
     | None ->
@@ -84,21 +100,20 @@ module Make_minimal (K : Name) = struct
     | Some x -> Ok x
     | None ->
         generic_error "Failed to deserialize a hash (%s)" K.name
-  let to_bytes (Blake2b.Hash h) = Cstruct.to_bigarray h
+  let to_bytes (Blake2b.Hash h) = h
 
   (* let read src off = of_bytes_exn @@ MBytes.sub src off size *)
   (* let write dst off h = MBytes.blit (to_bytes h) 0 dst off size *)
 
   let hash_bytes ?key l =
-    let key = Option.map ~f:Cstruct.of_bigarray key in
     let state = Blake2b.init ?key size in
-    List.iter (fun b -> Blake2b.update state (Cstruct.of_bigarray b)) l ;
+    List.iter (fun b -> Blake2b.update state b) l ;
     Blake2b.final state
 
   let hash_string ?key l =
-    let key = Option.map ~f:Cstruct.of_string key in
+    let key = Option.map ~f:Bigstring.of_string key in
     let state = Blake2b.init ?key size in
-    List.iter (fun s -> Blake2b.update state (Cstruct.of_string s)) l ;
+    List.iter (fun s -> Blake2b.update state (MBytes.of_string s)) l ;
     Blake2b.final state
 
   let path_length = 6
@@ -129,7 +144,7 @@ module Make_minimal (K : Name) = struct
 
   include Compare.Make(struct
       type nonrec t = t
-      let compare (Blake2b.Hash h1) (Blake2b.Hash h2) = Cstruct.compare h1 h2
+      let compare (Blake2b.Hash h1) (Blake2b.Hash h2) = MBytes.compare h1 h2
     end)
 
 end
@@ -275,6 +290,8 @@ module Generic_Merkle_tree (H : sig
 
 end
 
+let rec log2 x = if x <= 1 then 0 else 1 + log2 ((x+1) / 2)
+
 module Make_merkle_tree
     (R : sig
        val register_encoding:
@@ -312,22 +329,32 @@ module Make_merkle_tree
       (fun path_encoding ->
          union [
            case (Tag 240)
+             ~title:"Left"
              (obj2
                 (req "path" path_encoding)
                 (req "right" encoding))
              (function Left (p, r) -> Some (p, r) | _ -> None)
              (fun (p, r) -> Left (p, r)) ;
            case (Tag 15)
+             ~title:"Right"
              (obj2
                 (req "left" encoding)
                 (req "path" path_encoding))
              (function Right (r, p) -> Some (r, p) | _ -> None)
              (fun (r, p) -> Right (r, p)) ;
            case (Tag 0)
+             ~title:"Op"
              unit
              (function Op -> Some () | _ -> None)
              (fun () -> Op)
          ])
+
+  let bounded_path_encoding ?max_length () =
+    match max_length with
+    | None -> path_encoding
+    | Some max_length ->
+        let max_depth = log2 max_length in
+        Data_encoding.check_size (max_depth * (size + 1) + 1) path_encoding
 
 end
 

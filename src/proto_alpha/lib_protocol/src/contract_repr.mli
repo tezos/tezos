@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 type t = private
   | Implicit of Signature.Public_key_hash.t
@@ -31,7 +47,7 @@ type origination_nonce
 
 val originated_contract : origination_nonce -> contract
 
-val originated_contracts : origination_nonce -> contract list
+val originated_contracts : since: origination_nonce -> until: origination_nonce -> contract list
 
 val initial_origination_nonce : Operation_hash.t -> origination_nonce
 
@@ -58,14 +74,12 @@ val encoding : contract Data_encoding.t
 
 val origination_nonce_encoding : origination_nonce Data_encoding.t
 
-val arg : contract RPC_arg.arg
+val rpc_arg : contract RPC_arg.arg
 
 module Index : sig
-  type t = contract
-  val path_length: int
-  val to_path: t -> string list -> string list
-  val of_path: string list -> t option
+  include Storage_description.INDEX with type t = t
   val contract_prefix: string -> string list
   val pkh_prefix_ed25519: string -> string list
   val pkh_prefix_secp256k1: string -> string list
+  val pkh_prefix_p256: string -> string list
 end

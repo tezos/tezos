@@ -59,6 +59,7 @@ services:
     links:
       - node
     volumes:
+      - node_data:/var/run/tezos/node:ro
       - client_data:/var/run/tezos/client
     restart: on-failure
 
@@ -105,7 +106,7 @@ exec_docker() {
             container_args+=("${arg}");
         fi
     done
-    docker exec "$interactive_flags" "$docker_node_container" "$@"
+    docker exec "$interactive_flags" "$docker_node_container" "${container_args[@]}"
 }
 
 ## Container ###############################################################
@@ -385,8 +386,8 @@ run_shell() {
 
 display_head() {
     assert_node_uptodate
-    exec_docker tezos-client rpc call /blocks/head with '{}'
-    exec_docker tezos-client rpc call /blocks/head/proto/context/level with '{}'
+    exec_docker tezos-client rpc get /chains/main/blocks/head
+    exec_docker tezos-client rpc get /chains/main/blocks/head/metadata/protocol_data/level
 }
 
 ## Main ####################################################################
@@ -447,8 +448,6 @@ usage() {
     echo "    $0 start [--rpc-port <int>] [OPTIONS]"
     echo "       Launch a full Tezos alphanet node in a docker container"
     echo "       automatically generating a new network identity."
-    echo "       An account 'my_account' for a manager 'my_identity' is also"
-    echo "       created to be used via the client."
     echo "       OPTIONS (others than --rpc-port) are directly passed to the"
     echo "       Tezos node, see '$0 shell tezos-node config --help'"
     echo "       for more details."
@@ -513,6 +512,12 @@ case $(basename $0) in
         docker_image=tezos/tezos:zeronet
         docker_compose_base_name=zeronet
         default_port=19732
+        ;;
+    betanet.sh)
+        docker_base_dir="$HOME/.tezos-betanet"
+        docker_image=tezos/tezos:betanet
+        docker_compose_base_name=betanet
+        default_port=9732
         ;;
     *)
         docker_base_dir="$HOME/.tezos-alphanet"

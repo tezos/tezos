@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 type t = {
   expected_env: env_version ;
@@ -34,8 +50,8 @@ let component_encoding =
        { name ; interface ; implementation })
     (obj3
        (req "name" string)
-       (opt "interface" string)
-       (req "implementation" string))
+       (opt "interface" (conv MBytes.of_string MBytes.to_string bytes))
+       (req "implementation" (conv MBytes.of_string MBytes.to_string bytes)))
 
 let env_version_encoding =
   let open Data_encoding in
@@ -52,6 +68,11 @@ let encoding =
     (obj2
        (req "expected_env_version" env_version_encoding)
        (req "components" (list component_encoding)))
+
+let bounded_encoding ?max_size () =
+  match max_size with
+  | None -> encoding
+  | Some max_size -> Data_encoding.check_size max_size encoding
 
 let pp ppf op =
   Data_encoding.Json.pp ppf
@@ -79,7 +100,7 @@ let pp_ocaml ppf { expected_env ; components } =
        pp_ocaml_component)
     components
 
-let to_bytes v = Data_encoding.Binary.to_bytes encoding v
+let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v
 let of_bytes b = Data_encoding.Binary.of_bytes encoding b
 let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 let hash proto = Protocol_hash.hash_bytes [to_bytes proto]

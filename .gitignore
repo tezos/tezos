@@ -17,6 +17,9 @@ __pycache__
 /tezos-client
 /tezos-admin-client
 /tezos-alpha-baker
+/tezos-alpha-endorser
+/tezos-alpha-accuser
+/tezos-signer
 
 /scripts/opam-test-all.sh.DONE
 /scripts/create_genesis/src
@@ -24,7 +27,9 @@ __pycache__
 /docs/introduction/readme.rst
 /docs/api/errors.rst
 /docs/api/rpc.rst
-/docs/_extensions/*.pyc
+/docs/api/p2p.rst
+
+/src/bin_client/test/LOG.*
 
 *.install
 .merlin

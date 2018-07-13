@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (* Tezos Command line interface - Main Program *)
 
@@ -22,7 +38,7 @@ let builtin_commands =
          Lwt_list.iter_s
            (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
            (Client_commands.get_versions ()) >>= fun () ->
-         return ()) ;
+         return_unit) ;
   ]
 
 (* Duplicated from the node, here for now since the client still
@@ -78,6 +94,7 @@ let main select_commands =
       Client_config.parse_config_args
         (new unix_full
           ~block:Client_config.default_block
+          ~confirmations:None
           ~base_dir:Client_config.default_base_dir
           ~rpc_config:RPC_client.default_config)
         original_args
@@ -89,14 +106,6 @@ let main select_commands =
         tls = parsed_config_file.tls ;
       } in
       let ctxt = new RPC_client.http_ctxt rpc_config Media_type.all_media_types in
-      select_commands ctxt parsed_args >>=? fun commands ->
-      let commands =
-        Clic.add_manual
-          ~executable_name
-          ~global_options
-          (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
-          Format.std_formatter
-          (config_commands @ builtin_commands @ commands) in
       let rpc_config =
         if parsed_args.print_timings then
           { rpc_config with
@@ -108,15 +117,62 @@ let main select_commands =
       let client_config =
         new unix_full
           ~block:parsed_args.block
+          ~confirmations:parsed_args.confirmations
           ~base_dir:parsed_config_file.base_dir
           ~rpc_config:rpc_config in
+      Client_keys.register_signer
+        (module Tezos_signer_backends.Unencrypted) ;
+      Client_keys.register_signer
+        (module Tezos_signer_backends.Encrypted.Make(struct
+             let cctxt = (client_config :> Client_context.prompter)
+           end)) ;
+      let module Remote_params = struct
+        let authenticate pkhs payload =
+          Client_keys.list_keys client_config >>=? fun keys ->
+          match List.filter_map
+                  (function
+                    | (_, known_pkh, _, Some known_sk_uri)
+                      when List.exists (fun pkh -> Signature.Public_key_hash.equal pkh known_pkh) pkhs ->
+                        Some known_sk_uri
+                    | _ -> None)
+                  keys with
+          | sk_uri :: _ ->
+              Client_keys.sign client_config sk_uri payload
+          | [] -> failwith
+                    "remote signer expects authentication signature, \
+                     but no authorized key was found in the wallet"
+        let logger = rpc_config.logger
+      end in
+      let module Https = Tezos_signer_backends.Https.Make(Remote_params) in
+      let module Http = Tezos_signer_backends.Http.Make(Remote_params) in
+      let module Socket = Tezos_signer_backends.Socket.Make(Remote_params) in
+      Client_keys.register_signer (module Https) ;
+      Client_keys.register_signer (module Http) ;
+      Client_keys.register_signer (module Socket.Unix) ;
+      Client_keys.register_signer (module Socket.Tcp) ;
+      Option.iter parsed_config_file.remote_signer ~f: begin fun signer ->
+        Client_keys.register_signer
+          (module Tezos_signer_backends.Remote.Make(struct
+               let default = signer
+               include Remote_params
+             end))
+      end ;
+      Client_keys.register_signer (module Tezos_signer_backends.Ledger) ;
+      select_commands ctxt parsed_args >>=? fun commands ->
+      let commands =
+        Clic.add_manual
+          ~executable_name
+          ~global_options
+          (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
+          Format.std_formatter
+          (config_commands @ builtin_commands @ commands) in
       begin match autocomplete with
         | Some (prev_arg, cur_arg, script) ->
             Clic.autocompletion
               ~script ~cur_arg ~prev_arg ~args:original_args ~global_options
               commands client_config >>=? fun completions ->
             List.iter print_endline completions ;
-            return ()
+            return_unit
         | None ->
             Clic.dispatch commands client_config remaining
       end
@@ -143,10 +199,14 @@ let main select_commands =
         Format.eprintf "@{<error>@{<title>Fatal error@}@} unknown protocol version.@." ;
         Lwt.return 1
     | Failure message ->
-        Format.eprintf "@{<error>@{<title>Fatal error@}@} %s.@." message ;
+        Format.eprintf "@{<error>@{<title>Fatal error@}@}@.\
+                       \  @[<h 0>%a@]@."
+          Format.pp_print_text message ;
         Lwt.return 1
     | exn ->
-        Format.printf "@{<error>@{<title>Fatal error@}@} %s.@." (Printexc.to_string exn) ;
+        Format.printf "@{<error>@{<title>Fatal error@}@}@.\
+                      \  @[<h 0>%a@]@."
+          Format.pp_print_text (Printexc.to_string exn) ;
         Lwt.return 1
   end >>= fun retcode ->
   Format.pp_print_flush Format.err_formatter () ;

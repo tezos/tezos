@@ -1,5 +1,0 @@
-
-parameter unit;
-storage unit;
-return unit;
-code {}

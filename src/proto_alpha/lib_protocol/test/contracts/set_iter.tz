@@ -1,4 +1,0 @@
-parameter (set int);
-return int;
-storage unit;
-code { CAR; PUSH int 0; SWAP; ITER { ADD }; UNIT; SWAP; PAIR }

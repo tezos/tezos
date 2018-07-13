@@ -1,9 +1,8 @@
-
 parameter unit;
-storage (list (contract unit unit));
-return unit;
-code { CDR; PUSH bool True;     # Setup loop
-       LOOP {IF_CONS { PUSH tez "1.00"; UNIT; TRANSFER_TOKENS; # Make transfer
-                       DROP; PUSH bool True}                   # Setup for next round of loop
-                     { NIL (contract unit unit); PUSH bool False}}; # Data to satisfy types and end loop
-       UNIT; PAIR};                                                 # Calling convention
+storage (list (contract unit));
+code { CDR; DUP;
+       DIP {NIL operation}; PUSH bool True;     # Setup loop
+       LOOP {IF_CONS { PUSH mutez 1000000; UNIT; TRANSFER_TOKENS; # Make transfer
+                       SWAP; DIP {CONS}; PUSH bool True}                   # Setup for next round of loop
+                     { NIL (contract unit); PUSH bool False}}; # Data to satisfy types and end loop
+       DROP; PAIR};                                                 # Calling convention

@@ -1,9 +1,0 @@
-
-parameter string;
-return string;
-storage string;                 # Note that all three values are of the same type
-code { DUP; # In order to access both the storage and parameter, I need to duplicate the (pair parameter storage)
-       CAR; # Access the parameter
-       SWAP;            # Exchange top and second element on the stack
-       CDR;             # Get the storage in the pair
-       PAIR};           # Generate pair of elements

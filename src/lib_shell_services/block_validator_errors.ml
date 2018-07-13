@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 type block_error =
   | Cannot_parse_operation of Operation_hash.t
@@ -30,12 +46,14 @@ type block_error =
   | Unallowed_pass of { operation: Operation_hash.t ;
                         pass: int ;
                         allowed_pass: int list }
+  | Cannot_parse_block_header
 
 let block_error_encoding =
   let open Data_encoding in
   union
     [
       case (Tag 0)
+        ~title:"Cannot_parse_operation"
         (obj2
            (req "error" (constant "cannot_parse_operation"))
            (req "operation" Operation_hash.encoding))
@@ -43,6 +61,7 @@ let block_error_encoding =
                 | _ -> None)
         (fun ((), operation) -> Cannot_parse_operation operation) ;
       case (Tag 1)
+        ~title:"Invalid_fitness"
         (obj3
            (req "error" (constant "invalid_fitness"))
            (req "expected" Fitness.encoding)
@@ -53,18 +72,21 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), expected, found) -> Invalid_fitness { expected ; found }) ;
       case (Tag 2)
+        ~title:"Non_increasing_timestamp"
         (obj1
            (req "error" (constant "non_increasing_timestamp")))
         (function Non_increasing_timestamp -> Some ()
                 | _ -> None)
         (fun () -> Non_increasing_timestamp) ;
       case (Tag 3)
+        ~title:"Non_increasing_fitness"
         (obj1
            (req "error" (constant "non_increasing_fitness")))
         (function Non_increasing_fitness -> Some ()
                 | _ -> None)
         (fun () -> Non_increasing_fitness) ;
       case (Tag 4)
+        ~title:"Invalid_level"
         (obj3
            (req "error" (constant "invalid_level"))
            (req "expected" int32)
@@ -75,6 +97,7 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), expected, found) -> Invalid_level { expected ; found }) ;
       case (Tag 5)
+        ~title:"Invalid_proto_level"
         (obj3
            (req "error" (constant "invalid_proto_level"))
            (req "expected" uint8)
@@ -86,6 +109,7 @@ let block_error_encoding =
         (fun ((), expected, found) ->
            Invalid_proto_level { expected ; found }) ;
       case (Tag 6)
+        ~title:"Replayed_operation"
         (obj2
            (req "error" (constant "replayed_operation"))
            (req "operation" Operation_hash.encoding))
@@ -93,6 +117,7 @@ let block_error_encoding =
                 | _ -> None)
         (fun ((), operation) -> Replayed_operation operation) ;
       case (Tag 7)
+        ~title:"Outdated_operation"
         (obj3
            (req "error" (constant "outdated_operation"))
            (req "operation" Operation_hash.encoding)
@@ -104,6 +129,7 @@ let block_error_encoding =
         (fun ((), operation, originating_block) ->
            Outdated_operation { operation ; originating_block }) ;
       case (Tag 8)
+        ~title:"Unexpected_number_of_validation_passes"
         (obj2
            (req "error" (constant "unexpected_number_of_passes"))
            (req "found" uint8))
@@ -112,6 +138,7 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), n) -> Unexpected_number_of_validation_passes n) ;
       case (Tag 9)
+        ~title:"Too_many_operations"
         (obj4
            (req "error" (constant "too_many_operations"))
            (req "validation_pass" uint8)
@@ -124,6 +151,7 @@ let block_error_encoding =
         (fun ((), pass, found, max) ->
            Too_many_operations { pass ; found ; max }) ;
       case (Tag 10)
+        ~title:"Oversized_operation"
         (obj4
            (req "error" (constant "oversized_operation"))
            (req "operation" Operation_hash.encoding)
@@ -136,6 +164,7 @@ let block_error_encoding =
         (fun ((), operation, size, max) ->
            Oversized_operation { operation ; size ; max }) ;
       case (Tag 11)
+        ~title:"Unallowed_pass"
         (obj4
            (req "error" (constant "invalid_pass"))
            (req "operation" Operation_hash.encoding)
@@ -213,6 +242,8 @@ let pp_block_error ppf = function
         \ while only the following passes are allowed: @[<h>%a@]"
         Operation_hash.pp_short operation pass
         Format.(pp_print_list pp_print_int) allowed_pass
+  | Cannot_parse_block_header ->
+      Format.fprintf ppf "Failed to parse the block header."
 
 type error +=
   | Invalid_block of

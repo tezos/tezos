@@ -7,6 +7,8 @@ cd "$test_dir"
 sandbox_file="$test_dir/sandbox.json"
 parameters_file="$test_dir/protocol_parameters.json"
 
+export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
+
 tezos_sandboxed_node="${1:-$test_dir/../../bin_node/tezos-sandboxed-node.sh}"
 local_node="${2:-$test_dir/../../../_build/default/src/bin_node/main.exe}"
 tezos_init_sandboxed_client="${3:-$test_dir/../../bin_client/tezos-init-sandboxed-client.sh}"
@@ -49,6 +51,7 @@ display_logs() {
 ### Node/Client instances control
 
 client_instances=()
+admin_client_instances=()
 
 start_node() {
     local id=${1:-1}
@@ -59,6 +62,7 @@ start_node() {
     wait_for_the_node_to_be_ready
     add_sandboxed_bootstrap_identities
     client_instances+=("$client")
+    admin_client_instances+=("$admin_client")
     export "client$id=$client"
 }
 
@@ -80,25 +84,7 @@ run_contract_file () {
     if [ ! -z "$4" ]; then
         amount_flag="-amount $4"
     fi
-    $client run program "$contract" on storage "$storage" and input "$input" $amount_flag
-}
-
-assert_output () {
-    local contract=$1;
-    local input=$2;
-    local storage=$3;
-    local expected=$4;
-    local amount=$5;
-    echo "Testing [$contract]"
-    local output=$(run_contract_file "$contract" "$input" "$storage" "$amount" | sed '1,/output/d' |
-                       sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' ||
-                       { printf '\nTest failed with error at line %s\n' "$(caller)" 1>&2;
-                         exit 1; });
-    if [ "$expected" != "$output" ]; then
-        echo "Test at " `caller` failed 1>&2 ;
-        printf "Expected %s but got %s" "$expected" "$output" 1>&2 ;
-        exit 1;
-    fi
+    $client run script "$contract" on storage "$storage" and input "$input" $amount_flag
 }
 
 assert_storage () {
@@ -138,7 +124,16 @@ contract_name_of_file () {
 init_contract_from_file () {
     local FILE="$1"
     local NAME=$(contract_name_of_file "${FILE}")
-    $client remember program "${NAME}" "file:${FILE}"
+    $client remember script "${NAME}" "file:${FILE}"
+}
+
+bake () {
+    $client bake for bootstrap1 --max-priority 512 --minimal-timestamp
+}
+
+bake_after () {
+    "$@"
+    bake
 }
 
 init_with_transfer () {
@@ -152,15 +147,7 @@ init_with_transfer () {
     $client originate contract ${NAME} \
             for ${KEY} transferring "${TRANSFER_AMT}" \
             from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}"
-    $client bake for bootstrap1 -max-priority 512
-    sleep 1
-}
-
-
-bake_after () {
-    "$@"
-    $client bake for bootstrap1 -max-priority 512
-    sleep 1
+    bake
 }
 
 # Takes a grep regexp and fails with an error message if command does not include
@@ -184,13 +171,13 @@ get_contract_addr () {
 
 contract_storage () {
     local CONTRACT_NAME="$1"    # Can be either an alias or hash
-    $client get storage for ${CONTRACT_NAME}
+    $client get script storage for ${CONTRACT_NAME}
 }
 
 assert_storage_contains () {
     local CONTRACT_NAME="$1"
     local EXPECTED_STORAGE="$2"
-    contract_storage ${CONTRACT_NAME} | assert_in_output ${EXPECTED_STORAGE}
+    contract_storage ${CONTRACT_NAME} | assert_in_output "${EXPECTED_STORAGE}"
 }
 
 assert() {
@@ -200,6 +187,17 @@ assert() {
         echo "Unexpected result: \"${result}\""
         echo "Expected: \"${expected}\""
         exit 2
+    fi
+}
+
+assert_success() {
+    printf "[Asserting success]\n"
+    if "$@" 2> /dev/null; then
+        return 0
+    else
+        printf "Expected command line to success, but failed:\n"
+        echo "$@"
+        exit 1
     fi
 }
 
@@ -228,4 +226,43 @@ assert_contract_fails() {
 
 extract_operation_hash() {
     grep "Operation hash is" | grep -o "'.*'" | tr -d "'"
+}
+
+assert_propagation_level() {
+    level=$1
+    printf "\n\nAsserting all nodes have reached level %s\n" "$level"
+    for client in "${client_instances[@]}"; do
+        ( $client rpc get /chains/main/blocks/head/header/shell \
+              | assert_in_output "\"level\": $level" ) \
+            || exit 2
+    done
+}
+
+assert_protocol() {
+    proto=$1
+    printf "\n\nAsserting protocol propagation\n"
+    for client in "${client_instances[@]}"; do
+        ( $client -p Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P \
+                  rpc get /chains/main/blocks/head/metadata | assert_in_output "\"next_protocol\": \"$proto\"" ) \
+              || exit 2
+    done
+}
+
+retry() {
+    local timeout=$1
+    local attempts=$2
+    shift 2
+    sleep $timeout
+    while ! ( "$@" ) ; do
+        echo
+        echo "Will retry after $timeout seconds..."
+        echo
+        sleep $timeout
+        attempts=$(($attempts-1))
+        if [ "$attempts" -eq 0 ] ; then
+            echo
+            echo "Failed after too many retries" 1>&2
+            exit 1
+        fi
+    done
 }

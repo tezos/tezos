@@ -1,7 +1,0 @@
-parameter unit ;
-code
-  { # This contract stops accepting transactions after N incoming transactions
-    CDR ; DUP ; PUSH int 0 ; CMPLT; IF {PUSH int -1 ; ADD} {FAIL};
-    UNIT; PAIR} ;
-return unit ;
-storage int

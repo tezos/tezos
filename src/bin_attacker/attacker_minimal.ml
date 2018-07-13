@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Format
 include Logging.Make(struct let name = "attacker" end)
@@ -123,7 +139,7 @@ let try_action addr port action =
   | Ok conn ->
       action conn >>=? fun () ->
       P2p_connection.close conn >>= fun () ->
-      return ()
+      return_unit
 
 let replicate n x =
   let rec replicate_acc acc n x =
@@ -226,7 +242,7 @@ let long_chain n conn =
   let prev_ref = ref genesis_block_hashed in
   let rec loop k =
     if k < 1 then
-      return ()
+      return_unit
     else
       let block = signed (block_forged ~prev:!prev_ref []) in
       prev_ref := Block_hash.hash_bytes [block] ;
@@ -238,7 +254,7 @@ let lots_transactions amount fee n conn =
   let signed_op = signed (tx_forged amount fee) in
   let rec loop k =
     if k < 1 then
-      return ()
+      return_unit
     else
       send conn (Operation signed_op) >>=? fun () ->
       loop (k-1) in

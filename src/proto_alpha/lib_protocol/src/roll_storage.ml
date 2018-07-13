@@ -1,33 +1,84 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Misc
 
 type error +=
-  | Consume_roll_change
-  | No_roll_for_delegate
-  | No_roll_snapshot_for_cycle of Cycle_repr.t
+  | Consume_roll_change (* `Permanent *)
+  | No_roll_for_delegate (* `Permanent *)
+  | No_roll_snapshot_for_cycle of Cycle_repr.t (* `Permanent *)
   | Unregistered_delegate of Signature.Public_key_hash.t (* `Permanent *)
 
 let () =
+  let open Data_encoding in
+  (* Consume roll change *)
+  register_error_kind
+    `Permanent
+    ~id:"contract.manager.consume_roll_change"
+    ~title:"Consume roll change"
+    ~description:"Change is not enough to consume a roll."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Not enough change to consume a roll.")
+    empty
+    (function Consume_roll_change -> Some () | _ -> None)
+    (fun () -> Consume_roll_change) ;
+  (* No roll for delegate *)
+  register_error_kind
+    `Permanent
+    ~id:"contract.manager.no_roll_for_delegate"
+    ~title:"No roll for delegate"
+    ~description:"Delegate has no roll."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Delegate has no roll.")
+    empty
+    (function No_roll_for_delegate -> Some () | _ -> None)
+    (fun () -> No_roll_for_delegate) ;
+  (* No roll snapshot for cycle *)
+  register_error_kind
+    `Permanent
+    ~id:"contract.manager.no_roll_snapshot_for_cycle"
+    ~title:"No roll snapshot for cycle"
+    ~description:"A snapshot of the rolls distribution does not exist for this cycle."
+    ~pp:(fun ppf c ->
+        Format.fprintf ppf
+          "A snapshot of the rolls distribution does not exist for cycle %a" Cycle_repr.pp c)
+    (obj1 (req "cycle" Cycle_repr.encoding))
+    (function No_roll_snapshot_for_cycle c-> Some c | _ -> None)
+    (fun c -> No_roll_snapshot_for_cycle c) ;
+  (* Unregistered delegate *)
   register_error_kind
     `Permanent
     ~id:"contract.manager.unregistered_delegate"
     ~title:"Unregistered delegate"
     ~description:"A contract cannot be delegated to an unregistered delegate"
-    ~pp:(fun ppf (k) ->
+    ~pp:(fun ppf k->
         Format.fprintf ppf "The provided public key (with hash %a) is \
                            \ not registered as valid delegate key."
           Signature.Public_key_hash.pp k)
-    Data_encoding.(obj1 (req "hash" Signature.Public_key_hash.encoding))
-    (function Unregistered_delegate (k) -> Some (k) | _ -> None)
-    (fun (k) -> Unregistered_delegate (k))
+    (obj1 (req "hash" Signature.Public_key_hash.encoding))
+    (function Unregistered_delegate k -> Some k | _ -> None)
+    (fun k -> Unregistered_delegate k)
 
 let get_contract_delegate c contract =
   Storage.Contract.Delegate.get_option c contract
@@ -130,6 +181,23 @@ let baking_rights_owner c level ~priority =
 
 let endorsement_rights_owner c level ~slot =
   Random.owner c "endorsement" level slot
+
+let traverse_rolls ctxt head =
+  let rec loop acc roll =
+    Storage.Roll.Successor.get_option ctxt roll >>=? function
+    | None -> return (List.rev acc)
+    | Some next -> loop (next :: acc) next in
+  loop [head] head
+
+let get_rolls ctxt delegate =
+  Storage.Roll.Delegate_roll_list.get_option ctxt delegate >>=? function
+  | None -> return_nil
+  | Some head_roll -> traverse_rolls ctxt head_roll
+
+let get_change c delegate =
+  Storage.Roll.Delegate_change.get_option c delegate >>=? function
+  | None -> return Tez_repr.zero
+  | Some change -> return change
 
 module Delegate = struct
 
@@ -249,11 +317,7 @@ module Delegate = struct
       if inactive then return (c, change) else loop c change
     end >>=? fun (c, change) ->
     Lwt.return Tez_repr.(change -? amount) >>=? fun change ->
-    Storage.Roll.Delegate_roll_list.mem c delegate >>= fun rolls ->
-    if not inactive && Tez_repr.(change = zero) && not rolls then
-      Storage.Roll.Delegate_change.delete c delegate
-    else
-      Storage.Roll.Delegate_change.set c delegate change
+    Storage.Roll.Delegate_change.set c delegate change
 
   let set_inactive ctxt delegate =
     ensure_inited ctxt delegate >>=? fun ctxt ->

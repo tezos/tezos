@@ -1,13 +1,29 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
-include Logging.Make(struct let name = "node.validator" end)
+include Logging.Make_semantic(struct let name = "node.validator" end)
 
 type t = {
 
@@ -38,14 +54,18 @@ let create state db
       valid_block_input ;
       active_chains = Chain_id.Table.create 7 }
 
-let activate v ?max_child_ttl chain_state =
+let activate v ?max_child_ttl ~start_prevalidator chain_state =
   let chain_id = State.Chain.id chain_state in
-  lwt_log_notice "activate chain %a" Chain_id.pp chain_id >>= fun () ->
+  lwt_log_notice Tag.DSL.(fun f ->
+      f "activate chain %a"
+      -% t event "active_chain"
+      -% a State_logging.chain_id chain_id) >>= fun () ->
   try Chain_id.Table.find v.active_chains chain_id
   with Not_found ->
     let nv =
       Chain_validator.create
         ?max_child_ttl
+        ~start_prevalidator
         v.peer_validator_limits v.prevalidator_limits
         v.block_validator v.valid_block_input v.db chain_state
         v.chain_validator_limits in
@@ -126,5 +146,9 @@ let inject_operation v ?chain_id op =
             failwith "Unknown branch (%a), cannot inject the operation."
               Block_hash.pp_short op.shell.branch
   end >>=? fun nv ->
-  let pv = Chain_validator.prevalidator nv in
-  Prevalidator.inject_operation pv op
+  let pv_opt = Chain_validator.prevalidator nv in
+  match pv_opt with
+  | Some pv -> Prevalidator.inject_operation pv op
+  | None -> failwith "Prevalidator is not running, cannot inject the operation."
+
+let distributed_db { db } = db

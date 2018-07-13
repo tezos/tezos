@@ -1,0 +1,9 @@
+(executable
+ ((name test_tezos)
+  (modules (Test_tezos))
+  (libraries (hex alcotest ledgerwallet-tezos tweetnacl uecc))))
+
+(alias
+ ((name    runtest-ledgerwallet-tezos)
+  (deps    (test_tezos.exe))
+  (action  (run ${<}))))

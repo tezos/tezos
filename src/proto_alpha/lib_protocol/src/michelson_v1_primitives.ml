@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Micheline
 
@@ -15,7 +31,6 @@ type error += Invalid_primitive_name of string Micheline.canonical * Micheline.c
 
 type prim =
   | K_parameter
-  | K_return
   | K_storage
   | K_code
   | D_False
@@ -27,7 +42,11 @@ type prim =
   | D_Some
   | D_True
   | D_Unit
-  | I_H
+  | I_PACK
+  | I_UNPACK
+  | I_BLAKE2B
+  | I_SHA256
+  | I_SHA512
   | I_ABS
   | I_ADD
   | I_AMOUNT
@@ -41,7 +60,7 @@ type prim =
   | I_CONS
   | I_CREATE_ACCOUNT
   | I_CREATE_CONTRACT
-  | I_DEFAULT_ACCOUNT
+  | I_IMPLICIT_ACCOUNT
   | I_DIP
   | I_DROP
   | I_DUP
@@ -50,7 +69,7 @@ type prim =
   | I_EMPTY_SET
   | I_EQ
   | I_EXEC
-  | I_FAIL
+  | I_FAILWITH
   | I_GE
   | I_GET
   | I_GT
@@ -67,7 +86,6 @@ type prim =
   | I_LSL
   | I_LSR
   | I_LT
-  | I_MANAGER
   | I_MAP
   | I_MEM
   | I_MUL
@@ -80,21 +98,27 @@ type prim =
   | I_OR
   | I_PAIR
   | I_PUSH
-  | I_REDUCE
   | I_RIGHT
   | I_SIZE
   | I_SOME
   | I_SOURCE
+  | I_SENDER
   | I_SELF
   | I_STEPS_TO_QUOTA
   | I_SUB
   | I_SWAP
   | I_TRANSFER_TOKENS
+  | I_SET_DELEGATE
   | I_UNIT
   | I_UPDATE
   | I_XOR
   | I_ITER
   | I_LOOP_LEFT
+  | I_ADDRESS
+  | I_CONTRACT
+  | I_ISNAT
+  | I_CAST
+  | I_RENAME
   | T_bool
   | T_contract
   | T_int
@@ -111,9 +135,12 @@ type prim =
   | T_set
   | T_signature
   | T_string
-  | T_tez
+  | T_bytes
+  | T_mutez
   | T_timestamp
   | T_unit
+  | T_operation
+  | T_address
 
 let valid_case name =
   let is_lower = function  '_' | 'a'..'z' -> true | _ -> false in
@@ -136,7 +163,6 @@ let valid_case name =
 
 let string_of_prim = function
   | K_parameter -> "parameter"
-  | K_return -> "return"
   | K_storage -> "storage"
   | K_code -> "code"
   | D_False -> "False"
@@ -148,7 +174,11 @@ let string_of_prim = function
   | D_Some -> "Some"
   | D_True -> "True"
   | D_Unit -> "Unit"
-  | I_H -> "H"
+  | I_PACK -> "PACK"
+  | I_UNPACK -> "UNPACK"
+  | I_BLAKE2B -> "BLAKE2B"
+  | I_SHA256 -> "SHA256"
+  | I_SHA512 -> "SHA512"
   | I_ABS -> "ABS"
   | I_ADD -> "ADD"
   | I_AMOUNT -> "AMOUNT"
@@ -162,7 +192,7 @@ let string_of_prim = function
   | I_CONS -> "CONS"
   | I_CREATE_ACCOUNT -> "CREATE_ACCOUNT"
   | I_CREATE_CONTRACT -> "CREATE_CONTRACT"
-  | I_DEFAULT_ACCOUNT -> "DEFAULT_ACCOUNT"
+  | I_IMPLICIT_ACCOUNT -> "IMPLICIT_ACCOUNT"
   | I_DIP -> "DIP"
   | I_DROP -> "DROP"
   | I_DUP -> "DUP"
@@ -171,7 +201,7 @@ let string_of_prim = function
   | I_EMPTY_SET -> "EMPTY_SET"
   | I_EQ -> "EQ"
   | I_EXEC -> "EXEC"
-  | I_FAIL -> "FAIL"
+  | I_FAILWITH -> "FAILWITH"
   | I_GE -> "GE"
   | I_GET -> "GET"
   | I_GT -> "GT"
@@ -188,7 +218,6 @@ let string_of_prim = function
   | I_LSL -> "LSL"
   | I_LSR -> "LSR"
   | I_LT -> "LT"
-  | I_MANAGER -> "MANAGER"
   | I_MAP -> "MAP"
   | I_MEM -> "MEM"
   | I_MUL -> "MUL"
@@ -201,21 +230,27 @@ let string_of_prim = function
   | I_OR -> "OR"
   | I_PAIR -> "PAIR"
   | I_PUSH -> "PUSH"
-  | I_REDUCE -> "REDUCE"
   | I_RIGHT -> "RIGHT"
   | I_SIZE -> "SIZE"
   | I_SOME -> "SOME"
   | I_SOURCE -> "SOURCE"
+  | I_SENDER -> "SENDER"
   | I_SELF -> "SELF"
   | I_STEPS_TO_QUOTA -> "STEPS_TO_QUOTA"
   | I_SUB -> "SUB"
   | I_SWAP -> "SWAP"
   | I_TRANSFER_TOKENS -> "TRANSFER_TOKENS"
+  | I_SET_DELEGATE -> "SET_DELEGATE"
   | I_UNIT -> "UNIT"
   | I_UPDATE -> "UPDATE"
   | I_XOR -> "XOR"
   | I_ITER -> "ITER"
   | I_LOOP_LEFT -> "LOOP_LEFT"
+  | I_ADDRESS -> "ADDRESS"
+  | I_CONTRACT -> "CONTRACT"
+  | I_ISNAT -> "ISNAT"
+  | I_CAST -> "CAST"
+  | I_RENAME -> "RENAME"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -232,13 +267,15 @@ let string_of_prim = function
   | T_set -> "set"
   | T_signature -> "signature"
   | T_string -> "string"
-  | T_tez -> "tez"
+  | T_bytes -> "bytes"
+  | T_mutez -> "mutez"
   | T_timestamp -> "timestamp"
   | T_unit -> "unit"
+  | T_operation -> "operation"
+  | T_address -> "address"
 
 let prim_of_string = function
   | "parameter" -> ok K_parameter
-  | "return" -> ok K_return
   | "storage" -> ok K_storage
   | "code" -> ok K_code
   | "False" -> ok D_False
@@ -250,7 +287,11 @@ let prim_of_string = function
   | "Some" -> ok D_Some
   | "True" -> ok D_True
   | "Unit" -> ok D_Unit
-  | "H" -> ok I_H
+  | "PACK" -> ok I_PACK
+  | "UNPACK" -> ok I_UNPACK
+  | "BLAKE2B" -> ok I_BLAKE2B
+  | "SHA256" -> ok I_SHA256
+  | "SHA512" -> ok I_SHA512
   | "ABS" -> ok I_ABS
   | "ADD" -> ok I_ADD
   | "AMOUNT" -> ok I_AMOUNT
@@ -264,7 +305,7 @@ let prim_of_string = function
   | "CONS" -> ok I_CONS
   | "CREATE_ACCOUNT" -> ok I_CREATE_ACCOUNT
   | "CREATE_CONTRACT" -> ok I_CREATE_CONTRACT
-  | "DEFAULT_ACCOUNT" -> ok I_DEFAULT_ACCOUNT
+  | "IMPLICIT_ACCOUNT" -> ok I_IMPLICIT_ACCOUNT
   | "DIP" -> ok I_DIP
   | "DROP" -> ok I_DROP
   | "DUP" -> ok I_DUP
@@ -273,7 +314,7 @@ let prim_of_string = function
   | "EMPTY_SET" -> ok I_EMPTY_SET
   | "EQ" -> ok I_EQ
   | "EXEC" -> ok I_EXEC
-  | "FAIL" -> ok I_FAIL
+  | "FAILWITH" -> ok I_FAILWITH
   | "GE" -> ok I_GE
   | "GET" -> ok I_GET
   | "GT" -> ok I_GT
@@ -290,7 +331,6 @@ let prim_of_string = function
   | "LSL" -> ok I_LSL
   | "LSR" -> ok I_LSR
   | "LT" -> ok I_LT
-  | "MANAGER" -> ok I_MANAGER
   | "MAP" -> ok I_MAP
   | "MEM" -> ok I_MEM
   | "MUL" -> ok I_MUL
@@ -303,21 +343,27 @@ let prim_of_string = function
   | "OR" -> ok I_OR
   | "PAIR" -> ok I_PAIR
   | "PUSH" -> ok I_PUSH
-  | "REDUCE" -> ok I_REDUCE
   | "RIGHT" -> ok I_RIGHT
   | "SIZE" -> ok I_SIZE
   | "SOME" -> ok I_SOME
   | "SOURCE" -> ok I_SOURCE
+  | "SENDER" -> ok I_SENDER
   | "SELF" -> ok I_SELF
   | "STEPS_TO_QUOTA" -> ok I_STEPS_TO_QUOTA
   | "SUB" -> ok I_SUB
   | "SWAP" -> ok I_SWAP
   | "TRANSFER_TOKENS" -> ok I_TRANSFER_TOKENS
+  | "SET_DELEGATE" -> ok I_SET_DELEGATE
   | "UNIT" -> ok I_UNIT
   | "UPDATE" -> ok I_UPDATE
   | "XOR" -> ok I_XOR
   | "ITER" -> ok I_ITER
   | "LOOP_LEFT" -> ok I_LOOP_LEFT
+  | "ADDRESS" -> ok I_ADDRESS
+  | "CONTRACT" -> ok I_CONTRACT
+  | "ISNAT" -> ok I_ISNAT
+  | "CAST" -> ok I_CAST
+  | "RENAME" -> ok I_RENAME
   | "bool" -> ok T_bool
   | "contract" -> ok T_contract
   | "int" -> ok T_int
@@ -334,9 +380,12 @@ let prim_of_string = function
   | "set" -> ok T_set
   | "signature" -> ok T_signature
   | "string" -> ok T_string
-  | "tez" -> ok T_tez
+  | "bytes" -> ok T_bytes
+  | "mutez" -> ok T_mutez
   | "timestamp" -> ok T_timestamp
   | "unit" -> ok T_unit
+  | "operation" -> ok T_operation
+  | "address" -> ok T_address
   | n ->
       if valid_case n then
         error (Unknown_primitive_name n)
@@ -345,7 +394,7 @@ let prim_of_string = function
 
 let prims_of_strings expr =
   let rec convert = function
-    | Int _ | String _ as expr -> ok expr
+    | Int _ | String _ | Bytes _ as expr -> ok expr
     | Prim (loc, prim, args, annot) ->
         Error_monad.record_trace
           (Invalid_primitive_name (expr, loc))
@@ -357,34 +406,34 @@ let prims_of_strings expr =
              ok (arg :: args))
           (ok []) args >>? fun args ->
         ok (Prim (0, prim, List.rev args, annot))
-    | Seq (_, args, annot) ->
+    | Seq (_, args) ->
         List.fold_left
           (fun acc arg ->
              acc >>? fun args ->
              convert arg >>? fun arg ->
              ok (arg :: args))
           (ok []) args >>? fun args ->
-        ok (Seq (0, List.rev args, annot)) in
+        ok (Seq (0, List.rev args)) in
   convert (root expr) >>? fun expr ->
   ok (strip_locations expr)
 
 let strings_of_prims expr =
   let rec convert = function
-    | Int _ | String _ as expr -> expr
+    | Int _ | String _ | Bytes _ as expr -> expr
     | Prim (_, prim, args, annot) ->
         let prim = string_of_prim prim in
         let args = List.map convert args in
         Prim (0, prim, args, annot)
-    | Seq (_, args, annot) ->
+    | Seq (_, args) ->
         let args = List.map convert args in
-        Seq (0, args, annot) in
+        Seq (0, args) in
   strip_locations (convert (root expr))
 
 let prim_encoding =
   let open Data_encoding in
+  def "michelson.v1.primitives" @@
   string_enum [
     ("parameter", K_parameter) ;
-    ("return", K_return) ;
     ("storage", K_storage) ;
     ("code", K_code) ;
     ("False", D_False) ;
@@ -396,7 +445,11 @@ let prim_encoding =
     ("Some", D_Some) ;
     ("True", D_True) ;
     ("Unit", D_Unit) ;
-    ("H", I_H) ;
+    ("PACK", I_PACK) ;
+    ("UNPACK", I_UNPACK) ;
+    ("BLAKE2B", I_BLAKE2B) ;
+    ("SHA256", I_SHA256) ;
+    ("SHA512", I_SHA512) ;
     ("ABS", I_ABS) ;
     ("ADD", I_ADD) ;
     ("AMOUNT", I_AMOUNT) ;
@@ -410,7 +463,7 @@ let prim_encoding =
     ("CONS", I_CONS) ;
     ("CREATE_ACCOUNT", I_CREATE_ACCOUNT) ;
     ("CREATE_CONTRACT", I_CREATE_CONTRACT) ;
-    ("DEFAULT_ACCOUNT", I_DEFAULT_ACCOUNT) ;
+    ("IMPLICIT_ACCOUNT", I_IMPLICIT_ACCOUNT) ;
     ("DIP", I_DIP) ;
     ("DROP", I_DROP) ;
     ("DUP", I_DUP) ;
@@ -419,7 +472,7 @@ let prim_encoding =
     ("EMPTY_SET", I_EMPTY_SET) ;
     ("EQ", I_EQ) ;
     ("EXEC", I_EXEC) ;
-    ("FAIL", I_FAIL) ;
+    ("FAILWITH", I_FAILWITH) ;
     ("GE", I_GE) ;
     ("GET", I_GET) ;
     ("GT", I_GT) ;
@@ -436,7 +489,6 @@ let prim_encoding =
     ("LSL", I_LSL) ;
     ("LSR", I_LSR) ;
     ("LT", I_LT) ;
-    ("MANAGER", I_MANAGER) ;
     ("MAP", I_MAP) ;
     ("MEM", I_MEM) ;
     ("MUL", I_MUL) ;
@@ -449,21 +501,27 @@ let prim_encoding =
     ("OR", I_OR) ;
     ("PAIR", I_PAIR) ;
     ("PUSH", I_PUSH) ;
-    ("REDUCE", I_REDUCE) ;
     ("RIGHT", I_RIGHT) ;
     ("SIZE", I_SIZE) ;
     ("SOME", I_SOME) ;
     ("SOURCE", I_SOURCE) ;
+    ("SENDER", I_SENDER) ;
     ("SELF", I_SELF) ;
     ("STEPS_TO_QUOTA", I_STEPS_TO_QUOTA) ;
     ("SUB", I_SUB) ;
     ("SWAP", I_SWAP) ;
     ("TRANSFER_TOKENS", I_TRANSFER_TOKENS) ;
+    ("SET_DELEGATE", I_SET_DELEGATE) ;
     ("UNIT", I_UNIT) ;
     ("UPDATE", I_UPDATE) ;
     ("XOR", I_XOR) ;
     ("ITER", I_ITER) ;
     ("LOOP_LEFT", I_LOOP_LEFT) ;
+    ("ADDRESS", I_ADDRESS) ;
+    ("CONTRACT", I_CONTRACT) ;
+    ("ISNAT", I_ISNAT) ;
+    ("CAST", I_CAST) ;
+    ("RENAME", I_RENAME) ;
     ("bool", T_bool) ;
     ("contract", T_contract) ;
     ("int", T_int) ;
@@ -480,9 +538,12 @@ let prim_encoding =
     ("set", T_set) ;
     ("signature", T_signature) ;
     ("string", T_string) ;
-    ("tez", T_tez) ;
+    ("bytes", T_bytes) ;
+    ("mutez", T_mutez) ;
     ("timestamp", T_timestamp) ;
-    ("unit", T_unit) ]
+    ("unit", T_unit) ;
+    ("operation", T_operation) ;
+    ("address", T_address) ]
 
 let () =
   register_error_kind

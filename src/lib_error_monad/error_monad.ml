@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (* Tezos Protocol Implementation - Error Monad *)
 
@@ -118,13 +134,14 @@ module Make(Prefix : sig val id : string end) = struct
     let encoding_case =
       let open Data_encoding in
       case Json_only
-        (describe ~title ~description @@
+        ~title:"Generic error"
+        (def "generic_error" ~title ~description @@
          conv (fun x -> ((), x)) (fun ((), x) -> x) @@
          (obj2
             (req "kind" (constant "generic"))
             (req "error" string)))
         from_error to_error in
-    let pp = Format.pp_print_string in
+    let pp ppf s = Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s in
     error_kinds :=
       Error_kind { id ; title ; description ;
                    from_error ; category ; encoding_case ; pp } :: !error_kinds
@@ -141,7 +158,9 @@ module Make(Prefix : sig val id : string end) = struct
       | _ -> None in
     let encoding_case =
       let open Data_encoding in
-      case Json_only json from_error to_error in
+      case Json_only
+        ~title:"Unregistred error"
+        json from_error to_error in
     let pp ppf json =
       Format.fprintf ppf "@[<v 2>Unregistred error:@ %a@]"
         Data_encoding.Json.pp json in
@@ -177,7 +196,9 @@ module Make(Prefix : sig val id : string end) = struct
             | WEM.Unregistred_error _ ->
                 failwith "ignore wrapped error when deserializing"
             | res -> WEM.wrap res in
-          case Json_only WEM.error_encoding unwrap wrap
+          case Json_only
+            ~title:name
+            WEM.error_encoding unwrap wrap
       | Main category ->
           let with_id_and_kind_encoding =
             merge_objs
@@ -186,9 +207,12 @@ module Make(Prefix : sig val id : string end) = struct
                  (req "id" (constant name)))
               encoding in
           case Json_only
-            (describe ~title ~description
-               (conv (fun x -> (((), ()), x)) (fun (((),()), x) -> x)
-                  with_id_and_kind_encoding))
+            ~title
+            ~description
+            (conv
+               (fun x -> (((), ()), x))
+               (fun (((),()), x) -> x)
+               with_id_and_kind_encoding)
             from_error to_error in
     !set_error_encoding_cache_dirty () ;
     error_kinds :=
@@ -293,21 +317,33 @@ module Make(Prefix : sig val id : string end) = struct
   let result_encoding t_encoding =
     let open Data_encoding in
     let errors_encoding =
-      describe ~title: "An erroneous result" @@
       obj1 (req "error" (list error_encoding)) in
     let t_encoding =
-      describe ~title: "A successful result" @@
       obj1 (req "result" t_encoding) in
     union
       ~tag_size:`Uint8
       [ case (Tag 0) t_encoding
+          ~title:"Ok"
           (function Ok x -> Some x | _ -> None)
           (function res -> Ok res) ;
         case (Tag 1) errors_encoding
+          ~title:"Error"
           (function Error x -> Some x | _ -> None)
           (fun errs -> Error errs) ]
 
   let return v = Lwt.return (Ok v)
+
+  let return_unit = Lwt.return (Ok ())
+
+  let return_none = Lwt.return (Ok None)
+
+  let return_some x = Lwt.return (Ok (Some x))
+
+  let return_nil = Lwt.return (Ok [])
+
+  let return_true = Lwt.return (Ok true)
+
+  let return_false = Lwt.return (Ok false)
 
   let error s = Error [ s ]
 
@@ -332,7 +368,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec map_s f l =
     match l with
-    | [] -> return []
+    | [] -> return_nil
     | h :: t ->
         f h >>=? fun rh ->
         map_s f t >>=? fun rt ->
@@ -341,7 +377,7 @@ module Make(Prefix : sig val id : string end) = struct
   let mapi_s f l =
     let rec mapi_s f i l =
       match l with
-      | [] -> return []
+      | [] -> return_nil
       | h :: t ->
           f i h >>=? fun rh ->
           mapi_s f (i+1) t >>=? fun rt ->
@@ -352,7 +388,7 @@ module Make(Prefix : sig val id : string end) = struct
   let rec map_p f l =
     match l with
     | [] ->
-        return []
+        return_nil
     | x :: l ->
         let tx = f x and tl = map_p f l in
         tx >>= fun x ->
@@ -367,7 +403,7 @@ module Make(Prefix : sig val id : string end) = struct
     let rec mapi_p f i l =
       match l with
       | [] ->
-          return []
+          return_nil
       | x :: l ->
           let tx = f i x and tl = mapi_p f (i+1) l in
           tx >>= fun x ->
@@ -381,7 +417,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec map2_s f l1 l2 =
     match l1, l2 with
-    | [], [] -> return []
+    | [], [] -> return_nil
     | _ :: _, [] | [], _ :: _ -> invalid_arg "Error_monad.map2_s"
     | h1 :: t1, h2 :: t2 ->
         f h1 h2 >>=? fun rh ->
@@ -391,7 +427,7 @@ module Make(Prefix : sig val id : string end) = struct
   let mapi2_s f l1 l2 =
     let rec mapi2_s i f l1 l2 =
       match l1, l2 with
-      | [], [] -> return []
+      | [], [] -> return_nil
       | _ :: _, [] | [], _ :: _ -> invalid_arg "Error_monad.mapi2_s"
       | h1 :: t1, h2 :: t2 ->
           f i h1 h2 >>=? fun rh ->
@@ -410,7 +446,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec filter_map_s f l =
     match l with
-    | [] -> return []
+    | [] -> return_nil
     | h :: t ->
         f h >>=? function
         | None -> filter_map_s f t
@@ -418,28 +454,50 @@ module Make(Prefix : sig val id : string end) = struct
             filter_map_s f t >>=? fun rt ->
             return (rh :: rt)
 
-  let filter_map_p f l =
+  let rec filter_map_p f l =
     match l with
-    | [] -> return []
+    | [] -> return_nil
     | h :: t ->
         let th = f h
-        and tt = filter_map_s f t in
+        and tt = filter_map_p f t in
         th >>=? function
         | None -> tt
         | Some rh ->
             tt >>=? fun rt ->
             return (rh :: rt)
 
+  let rec filter_s f l =
+    match l with
+    | [] -> return_nil
+    | h :: t ->
+        f h >>=? function
+        | false -> filter_s f t
+        | true ->
+            filter_s f t >>=? fun t ->
+            return (h :: t)
+
+  let rec filter_p f l =
+    match l with
+    | [] -> return_nil
+    | h :: t ->
+        let jh = f h
+        and t = filter_p f t in
+        jh >>=? function
+        | false -> t
+        | true ->
+            t >>=? fun t ->
+            return (h :: t)
+
   let rec iter_s f l =
     match l with
-    | [] -> return ()
+    | [] -> return_unit
     | h :: t ->
         f h >>=? fun () ->
         iter_s f t
 
   let rec iter_p f l =
     match l with
-    | [] -> return ()
+    | [] -> return_unit
     | x :: l ->
         let tx = f x and tl = iter_p f l in
         tx >>= fun tx_res ->
@@ -452,7 +510,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let rec iter2_p f l1 l2 =
     match l1, l2 with
-    | [], [] -> return ()
+    | [], [] -> return_unit
     | [], _ | _, [] -> invalid_arg "Error_monad.iter2_p"
     | x1 :: l1 , x2 :: l2 ->
         let tx = f x1 x2 and tl = iter2_p f l1 l2 in
@@ -467,7 +525,7 @@ module Make(Prefix : sig val id : string end) = struct
   let iteri2_p f l1 l2 =
     let rec iteri2_p i f l1 l2 =
       match l1, l2 with
-      | [], [] -> return ()
+      | [], [] -> return_unit
       | [], _ | _, [] -> invalid_arg "Error_monad.iteri2_p"
       | x1 :: l1 , x2 :: l2 ->
           let tx = f i x1 x2 and tl = iteri2_p (i+1) f l1 l2 in
@@ -496,7 +554,7 @@ module Make(Prefix : sig val id : string end) = struct
         f h acc
 
   let rec join = function
-    | [] -> return ()
+    | [] -> return_unit
     | t :: ts ->
         t >>= function
         | Error _ as err ->
@@ -515,17 +573,31 @@ module Make(Prefix : sig val id : string end) = struct
     | Error errs -> Lwt.return (Error (err :: errs))
     | ok -> Lwt.return ok
 
+  let record_trace_eval mk_err result =
+    match result with
+    | Ok _ as res -> res
+    | Error errs ->
+        mk_err () >>? fun err ->
+        Error (err :: errs)
+
+  let trace_eval mk_err f =
+    f >>= function
+    | Error errs ->
+        mk_err () >>=? fun err ->
+        Lwt.return (Error (err :: errs))
+    | ok -> Lwt.return ok
+
   let fail_unless cond exn =
-    if cond then return () else fail exn
+    if cond then return_unit else fail exn
 
   let fail_when cond exn =
-    if cond then fail exn else return ()
+    if cond then fail exn else return_unit
 
   let unless cond f =
-    if cond then return () else f ()
+    if cond then return_unit else f ()
 
   let _when cond f =
-    if cond then f () else return ()
+    if cond then f () else return_unit
 
   let pp_print_error ppf errors =
     match errors with
@@ -551,13 +623,12 @@ module Make(Prefix : sig val id : string end) = struct
     let description =  "An fatal assertion" in
     let encoding_case =
       let open Data_encoding in
-      case Json_only
-        (describe ~title ~description @@
-         conv (fun (x, y) -> ((), x, y)) (fun ((), x, y) -> (x, y)) @@
-         (obj3
-            (req "kind" (constant "assertion"))
-            (req "location" string)
-            (req "error" string)))
+      case Json_only ~title ~description
+        (conv (fun (x, y) -> ((), x, y)) (fun ((), x, y) -> (x, y))
+           ((obj3
+               (req "kind" (constant "assertion"))
+               (req "location" string)
+               (req "error" string))))
         from_error to_error in
     let pp ppf (loc, msg) =
       Format.fprintf ppf
@@ -570,9 +641,23 @@ module Make(Prefix : sig val id : string end) = struct
 
   let _assert b loc fmt =
     if b then
-      Format.ikfprintf (fun _ -> return ()) Format.str_formatter fmt
+      Format.ikfprintf (fun _ -> return_unit) Format.str_formatter fmt
     else
       Format.kasprintf (fun msg -> fail (Assert_error (loc, msg))) fmt
+
+
+  type 'a tzlazy_state =
+    | Remembered of 'a
+    | Not_yet_known of (unit -> 'a tzresult Lwt.t)
+  type 'a tzlazy = { mutable tzcontents: 'a tzlazy_state }
+  let tzlazy c = { tzcontents = Not_yet_known c }
+  let tzforce v = match v.tzcontents with
+    | Remembered v -> return v
+    | Not_yet_known c ->
+        c () >>=? fun w ->
+        v.tzcontents <- Remembered w;
+        return w
+
 
 end
 
@@ -603,7 +688,7 @@ let () =
     ~id:"failure"
     ~title:"Generic error"
     ~description:"Unclassified error"
-    ~pp:Format.pp_print_string
+    ~pp:(fun ppf s -> Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s)
     Data_encoding.(obj1 (req "msg" string))
     (function
       | Exn (Failure msg) -> Some msg
@@ -616,7 +701,7 @@ type error += Canceled
 let protect ?on_error ?canceler t =
   let cancelation =
     match canceler with
-    | None -> Lwt_utils.never_ending
+    | None -> Lwt_utils.never_ending ()
     | Some canceler ->
         (Lwt_canceler.cancelation canceler >>= fun () ->
          fail Canceled ) in
@@ -656,3 +741,5 @@ let with_timeout ?(canceler = Lwt_canceler.create ()) timeout f =
     Lwt_canceler.cancel canceler >>= fun () ->
     fail Timeout
   end
+
+let errs_tag = Tag.def ~doc:"Errors" "errs" pp_print_error

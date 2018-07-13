@@ -17,6 +17,8 @@ module MethMap : Map.S with type key = meth
 module StringMap : Map.S with type 'a t = 'a Map.Make(String).t
                           and type key = string
 
+type (_, _) eq = Eq : ('a, 'a) eq
+
 (** Typed path argument. *)
 module Arg : sig
 
@@ -43,6 +45,8 @@ module Arg : sig
   val string: string arg
 
   val like: 'a arg -> ?descr:string -> string -> 'a arg
+
+  val eq: 'a arg -> 'b arg -> ('a, 'b) eq option
 
 end
 
@@ -74,6 +78,15 @@ module Path : sig
 
   val prefix:
     ('prefix, 'a) path -> ('a, 'params) path -> ('prefix, 'params) path
+
+  val subst0:
+    ('p, 'p) path -> ('p2, 'p2) path
+  val subst1:
+    ('p, 'p * 'a) path -> ('p2, 'p2 * 'a) path
+  val subst2:
+    ('p, ('p * 'a) * 'b) path -> ('p2, ('p2 * 'a) * 'b) path
+  val subst3:
+    ('p, (('p * 'a) * 'b) * 'c) path -> ('p2, (('p2 * 'a) * 'b) * 'c) path
 
 end
 
@@ -172,8 +185,6 @@ module Internal : sig
   module Ty : sig
 
     exception Not_equal
-    type (_, _) eq = Eq : ('a, 'a) eq
-
     type 'a id
     val eq : 'a id -> 'b id -> ('a, 'b) eq
 

@@ -4,24 +4,35 @@
  ((name main)
   (libraries (tezos-base
               tezos-micheline
-              tezos_proto_alpha_isolate_helpers
-              tezos_proto_alpha_isolate_michelson_parser
-              alcotest-lwt))
+              tezos-protocol-environment
+              alcotest-lwt
+              tezos_alpha_test_helpers
+              michelson_parser
+              tezos-stdlib-unix
+              bip39
+              ))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_micheline
-                    -open Tezos_proto_alpha_isolate_michelson_parser))))
+                    -open Tezos_alpha_test_helpers
+))))
 
 (alias
  ((name buildtest)
   (package tezos-protocol-alpha)
   (deps (main.exe))))
 
+; runs only the `Quick tests
 (alias
  ((name runtest_proto_alpha)
   (package tezos-protocol-alpha)
-  (deps (sandbox.json (glob_files contracts/*.tz)))
-  (action (chdir ${ROOT} (run ${exe:main.exe})))))
+  (action (chdir ${ROOT} (run ${exe:main.exe} -v -q)))))
+
+; runs both `Quick and `Slow tests
+(alias
+ ((name runtest_slow)
+  (package tezos-protocol-alpha)
+  (action (chdir ${ROOT} (run ${exe:main.exe} -v)))))
 
 (alias
  ((name runtest)

@@ -1,4 +1,0 @@
-parameter (pair (bool @first) (bool @second));
-return bool;
-storage unit;
-code { CAR @param; DUP; CAR @first; DIP{CDR @second}; AND; UNIT; SWAP; PAIR };

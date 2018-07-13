@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Proto_alpha
 open Alpha_context
@@ -45,8 +61,8 @@ module ContractAlias = struct
     match Contract.is_implicit c with
     | Some hash -> begin
         Client_keys.Public_key_hash.rev_find cctxt hash >>=? function
-        | Some name -> return (Some ("key:" ^ name))
-        | None -> return None
+        | Some name -> return_some ("key:" ^ name)
+        | None -> return_none
       end
     | None -> RawContractAlias.rev_find cctxt c
 
@@ -110,10 +126,6 @@ module ContractAlias = struct
 
 end
 
-module Contract_tags = Client_tags.Tags (struct
-    let name = "contract"
-  end)
-
 let list_contracts cctxt =
   RawContractAlias.load cctxt >>=? fun raw_contracts ->
   Lwt_list.map_s
@@ -129,13 +141,13 @@ let list_contracts cctxt =
     keys >>=? fun accounts ->
   return (contracts @ accounts)
 
-let get_manager cctxt block source =
+let get_manager cctxt ~chain ~block source =
   match Contract.is_implicit source with
   | Some hash -> return hash
-  | None -> Alpha_services.Contract.manager cctxt block source
+  | None -> Alpha_services.Contract.manager cctxt (chain, block) source
 
-let get_delegate cctxt block source =
-  Alpha_services.Contract.delegate_opt cctxt block source
+let get_delegate cctxt ~chain ~block source =
+  Alpha_services.Contract.delegate_opt cctxt (chain, block) source
 
 let may_check_key sourcePubKey sourcePubKeyHash =
   match sourcePubKey with
@@ -145,4 +157,4 @@ let may_check_key sourcePubKey sourcePubKeyHash =
            (Ed25519.Public_key.hash sourcePubKey) sourcePubKeyHash)
         (failure "Invalid public key in `client_proto_endorsement`")
   | None ->
-      return ()
+      return_unit

@@ -1,18 +1,61 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Data_encoding
+
+type chain = [
+  | `Main
+  | `Test
+  | `Hash of Chain_id.t
+]
+
+let parse_chain s =
+  try
+    match s with
+    | "main" -> Ok `Main
+    | "test" -> Ok `Test
+    | h -> Ok (`Hash (Chain_id.of_b58check_exn h))
+  with _ -> Error "Cannot parse block identifier."
+
+let chain_to_string = function
+  | `Main -> "main"
+  | `Test -> "test"
+  | `Hash h -> Chain_id.to_b58check h
+
+let chain_arg =
+  let name = "chain_id" in
+  let descr =
+    "A chain identifier. This is either a chain hash in Base58Check notation \
+     or a one the predefined aliases: 'main', 'test'." in
+  let construct = chain_to_string in
+  let destruct = parse_chain in
+  RPC_arg.make ~name ~descr ~construct ~destruct ()
 
 type block = [
   | `Genesis
   | `Head of int
-  | `Test_head of int
   | `Hash of Block_hash.t * int
 ]
 
@@ -21,9 +64,7 @@ let parse_block s =
     match String.split '~' s with
     | ["genesis"] -> Ok `Genesis
     | ["head"] -> Ok (`Head 0)
-    | ["test_head"] -> Ok (`Test_head 0)
     | ["head"; n] -> Ok (`Head (int_of_string n))
-    | ["test_head"; n] -> Ok (`Test_head (int_of_string n))
     | [h] -> Ok (`Hash (Block_hash.of_b58check_exn h, 0))
     | [h ; n] -> Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
     | _ -> raise Exit
@@ -33,500 +74,843 @@ let to_string = function
   | `Genesis -> "genesis"
   | `Head 0 -> "head"
   | `Head n -> Printf.sprintf "head~%d" n
-  | `Test_head 0 -> "test_head"
-  | `Test_head n -> Printf.sprintf "test_head~%d" n
   | `Hash (h, 0) -> Block_hash.to_b58check h
   | `Hash (h, n) -> Printf.sprintf "%s~%d" (Block_hash.to_b58check h) n
 
-type block_info = {
-  hash: Block_hash.t ;
-  chain_id: Chain_id.t ;
-  level: Int32.t ;
-  proto_level: int ; (* uint8 *)
-  predecessor: Block_hash.t ;
-  timestamp: Time.t ;
-  validation_passes: int ; (* uint8 *)
-  operations_hash: Operation_list_list_hash.t ;
-  fitness: MBytes.t list ;
-  context: Context_hash.t ;
-  protocol_data: MBytes.t ;
-  operations: (Operation_hash.t * Operation.t) list list option ;
-  protocol: Protocol_hash.t ;
-  test_chain: Test_chain_status.t ;
+let blocks_arg =
+  let name = "block_id" in
+  let descr =
+    "A block identifier. This is either a block hash in Base58Check notation \
+     or a one the predefined aliases: 'genesis', 'head'. \
+     One might alse use 'head~N' or '<hash>~N' where N is an integer to \
+     denotes the Nth predecessors of the designated block." in
+  let construct = to_string in
+  let destruct = parse_block in
+  RPC_arg.make ~name ~descr ~construct ~destruct ()
+
+type chain_prefix = unit * chain
+type prefix = chain_prefix * block
+let chain_path = RPC_path.(root / "chains" /: chain_arg)
+let mempool_path p = RPC_path.(p / "mempool")
+let live_blocks_path p = RPC_path.(p / "live_blocks")
+let dir_path : (chain_prefix, chain_prefix) RPC_path.t =
+  RPC_path.(open_root / "blocks")
+let path = RPC_path.(dir_path /: blocks_arg)
+
+type operation_list_quota = {
+  max_size: int ;
+  max_op: int option ;
 }
 
-let pp_block_info ppf
-    { hash ; chain_id ; level ;
-      proto_level ; predecessor ; timestamp ;
-      operations_hash ; fitness ; protocol_data ;
-      operations ; protocol ; test_chain } =
-  Format.fprintf ppf
-    "@[<v 2>Hash: %a\
-     @ Test chain: %a\
-     @ Level: %ld\
-     @ Proto_level: %d\
-     @ Predecessor: %a\
-     @ Protocol: %a\
-     @ Net id: %a\
-     @ Timestamp: %a\
-     @ @[<hov 2>Fitness: %a@]\
-     @ Operations hash: %a\
-     @ @[<hov 2>Operations:@ %a@]\
-     @ @[<hov 2>Protocol data:@ %a@]@]"
-    Block_hash.pp hash
-    Test_chain_status.pp test_chain
-    level
-    proto_level
-    Block_hash.pp predecessor
-    Protocol_hash.pp protocol
-    Chain_id.pp chain_id
-    Time.pp_hum timestamp
-    Fitness.pp fitness
-    Operation_list_list_hash.pp operations_hash
-    (fun ppf -> function
-       | None -> Format.fprintf ppf "None"
-       | Some operations ->
-           Format.pp_print_list ~pp_sep:Format.pp_print_newline
-             (Format.pp_print_list ~pp_sep:Format.pp_print_space
-                (fun ppf (oph, _) -> Operation_hash.pp ppf oph))
-             ppf operations)
-    operations
-    Hex.pp (MBytes.to_hex protocol_data)
-
-let block_info_encoding =
-  let operation_encoding =
-    merge_objs
-      (obj1 (req "hash" Operation_hash.encoding))
-      Operation.encoding in
+let operation_list_quota_encoding =
   conv
-    (fun { hash ; chain_id ; level ; proto_level ; predecessor ;
-           fitness ; timestamp ; protocol ;
-           validation_passes ; operations_hash ; context ; protocol_data ;
-           operations ; test_chain } ->
-      ((hash, chain_id, operations, protocol, test_chain),
-       { Block_header.shell =
-           { level ; proto_level ; predecessor ;
-             timestamp ; validation_passes ; operations_hash ; fitness ;
-             context } ;
-         protocol_data }))
-    (fun ((hash, chain_id, operations, protocol, test_chain),
-          { Block_header.shell =
-              { level ; proto_level ; predecessor ;
-                timestamp ; validation_passes ; operations_hash ; fitness ;
-                context } ;
-            protocol_data }) ->
-      { hash ; chain_id ; level ; proto_level ; predecessor ;
-        fitness ; timestamp ; protocol ;
-        validation_passes ; operations_hash ; context ; protocol_data ;
-        operations ; test_chain })
-    (dynamic_size
-       (merge_objs
-          (obj5
-             (req "hash" Block_hash.encoding)
-             (req "chain_id" Chain_id.encoding)
-             (opt "operations" (dynamic_size (list (dynamic_size (list (dynamic_size operation_encoding))))))
-             (req "protocol" Protocol_hash.encoding)
-             (dft "test_chain"
-                Test_chain_status.encoding Not_running))
-          Block_header.encoding))
+    (fun { max_size ; max_op } -> (max_size, max_op))
+    (fun (max_size, max_op) -> { max_size ; max_op })
+    (obj2
+       (req "max_size" int31)
+       (opt "max_op" int31))
 
-type preapply_result = {
-  shell_header: Block_header.shell_header ;
-  operations: error Preapply_result.t list ;
-}
-
-let preapply_result_encoding =
-  (conv
-     (fun { shell_header ; operations } ->
-        (shell_header, operations))
-     (fun (shell_header, operations) ->
-        { shell_header ; operations })
-     (obj2
-        (req "shell_header" Block_header.shell_header_encoding)
-        (req "operations"
-           (list (Preapply_result.encoding RPC_error.encoding)))))
-
-type raw_context_result =
+type raw_context =
   | Key of MBytes.t
-  | Dir of (string * raw_context_result) list
+  | Dir of (string * raw_context) list
   | Cut
 
-let raw_context_result_pp t =
-  let open Format in
-  let rec loop ppf = function
-    | Cut -> fprintf ppf "..."
-    | Key v -> let `Hex s = MBytes.to_hex v in fprintf ppf "%S" s
-    | Dir l ->
-        fprintf ppf "{@[<v 1>@,%a@]@,}"
-          (pp_print_list ~pp_sep:Format.pp_print_cut
-             (fun ppf (s,t) -> fprintf ppf "%s : %a" s loop t)) l
-  in
-  asprintf "%a" loop t
+let rec pp_raw_context ppf = function
+  | Cut -> Format.fprintf ppf "..."
+  | Key v -> Hex.pp ppf (MBytes.to_hex v)
+  | Dir l ->
+      Format.fprintf ppf "{@[<v 1>@,%a@]@,}"
+        (Format.pp_print_list
+           ~pp_sep:Format.pp_print_cut
+           (fun ppf (s, t) -> Format.fprintf ppf "%s : %a" s pp_raw_context t))
+        l
 
-module S = struct
+let raw_context_encoding =
+  mu "raw_context"
+    (fun encoding ->
+       union [
+         case (Tag 0) bytes
+           ~title:"Key"
+           (function Key k -> Some k | _ -> None)
+           (fun k -> Key k) ;
+         case (Tag 1) (assoc encoding)
+           ~title:"Dir"
+           (function Dir k -> Some k | _ -> None)
+           (fun k -> Dir k) ;
+         case (Tag 2) null
+           ~title:"Cut"
+           (function Cut -> Some () | _ -> None)
+           (fun () -> Cut) ;
+       ])
 
-  let blocks_arg =
-    let name = "block_id" in
-    let descr =
-      "A block identifier. This is either a block hash in hexadecimal \
-       notation or a one the predefined aliases: \
-       'genesis', 'head', \
-       or 'test_head'. One might alse use 'head~N'
-       to 'test_head~N', where N is an integer to denotes the Nth predecessors
-       of 'head' or 'test_head'." in
-    let construct = to_string in
-    let destruct = parse_block in
-    RPC_arg.make ~name ~descr ~construct ~destruct ()
+type error +=
+  | Invalid_depth_arg of int
 
-  let block_path : (unit, unit * block) RPC_path.path =
-    RPC_path.(root / "blocks" /: blocks_arg)
-  let proto_path () =
-    RPC_path.(open_root / "blocks" /: blocks_arg / "proto")
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"raw_context.invalid_depth"
+    ~title:"Invalid depth argument"
+    ~description:"The raw context extraction depth argument must be positive."
+    ~pp:(fun ppf depth ->
+        Format.fprintf ppf "Extraction depth %d is invalid" depth)
+    Data_encoding.(obj1 (req "depth" int31))
+    (function Invalid_depth_arg depth -> Some depth | _ -> None)
+    (fun depth -> Invalid_depth_arg depth)
 
-
-  let info =
-    RPC_service.post_service
-      ~description:"All the information about a block."
-      ~query: RPC_query.empty
-      ~input: (obj1 (dft "operations" bool true))
-      ~output: block_info_encoding
-      block_path
-
-  let chain_id =
-    RPC_service.post_service
-      ~description:"Returns the chain in which the block belongs."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "chain_id" Chain_id.encoding))
-      RPC_path.(block_path / "chain_id")
-
-  let level =
-    RPC_service.post_service
-      ~description:"Returns the block's level."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "level" int32))
-      RPC_path.(block_path / "level")
-
-  let predecessor =
-    RPC_service.post_service
-      ~description:"Returns the previous block's id."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "predecessor" Block_hash.encoding))
-      RPC_path.(block_path / "predecessor")
-
-  let predecessors =
-    RPC_service.post_service
-      ~description:
-        "...."
-      ~query: RPC_query.empty
-      ~input: (obj1 (req "length" Data_encoding.uint16))
-      ~output: (obj1
-                  (req "blocks" (Data_encoding.list Block_hash.encoding)))
-      RPC_path.(block_path / "predecessors")
-
-  let hash =
-    RPC_service.post_service
-      ~description:"Returns the block's id."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "hash" Block_hash.encoding))
-      RPC_path.(block_path / "hash")
-
-  let fitness =
-    RPC_service.post_service
-      ~description:"Returns the block's fitness."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "fitness" Fitness.encoding))
-      RPC_path.(block_path / "fitness")
-
-  let context =
-    RPC_service.post_service
-      ~description:"Returns the hash of the resulting context."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "context" Context_hash.encoding))
-      RPC_path.(block_path / "context")
-
-  let raw_context_args : string RPC_arg.t =
-    let name = "context_path" in
-    let descr = "A path inside the context" in
-    let construct = fun s -> s in
-    let destruct = fun s -> Ok s in
-    RPC_arg.make ~name ~descr ~construct ~destruct ()
-
-  let raw_context_result_encoding : raw_context_result Data_encoding.t =
-    let open Data_encoding in
-    obj1 (req "content"
-            (mu "context_tree" (fun raw_context_result_encoding ->
-                 union [
-                   case (Tag 0) bytes
-                     (function Key k -> Some k | _ -> None)
-                     (fun k -> Key k) ;
-                   case (Tag 1) (assoc raw_context_result_encoding)
-                     (function Dir k -> Some k | _ -> None)
-                     (fun k -> Dir k) ;
-                   case (Tag 2) null
-                     (function Cut -> Some () | _ -> None)
-                     (fun () -> Cut) ;
-                 ])))
-
-  (* The depth query argument for the [raw_context] service,
-     default value is 1. *)
-  let depth_query : < depth: int > RPC_query.t =
-    let open RPC_query in
-    query (fun depth -> object
-            method depth = depth
-          end)
-    |+ field "depth" RPC_arg.int 1 (fun t -> t#depth)
-    |> seal
-
-  let raw_context =
-    RPC_service.post_service
-      ~description:"Returns the raw context."
-      ~query: depth_query
-      ~input: empty
-      ~output: raw_context_result_encoding
-      RPC_path.(block_path / "raw_context" /:* raw_context_args)
-
-  let timestamp =
-    RPC_service.post_service
-      ~description:"Returns the block's timestamp."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "timestamp" Time.encoding))
-      RPC_path.(block_path / "timestamp")
-
-  type operations_param = {
-    contents: bool ;
+module type PROTO = sig
+  val hash: Protocol_hash.t
+  type block_header_data
+  val block_header_data_encoding: block_header_data Data_encoding.t
+  type block_header_metadata
+  val block_header_metadata_encoding:
+    block_header_metadata Data_encoding.t
+  type operation_data
+  type operation_receipt
+  type operation = {
+    shell: Operation.shell_header ;
+    protocol_data: operation_data ;
   }
 
-  let operations_param_encoding =
+  val operation_data_encoding: operation_data Data_encoding.t
+  val operation_receipt_encoding: operation_receipt Data_encoding.t
+  val operation_data_and_receipt_encoding:
+    (operation_data * operation_receipt) Data_encoding.t
+end
+
+
+type protocols = {
+  current_protocol: Protocol_hash.t ;
+  next_protocol: Protocol_hash.t ;
+}
+
+let raw_protocol_encoding =
+  conv
+    (fun { current_protocol ; next_protocol } ->
+       ((current_protocol, next_protocol), ()))
+    (fun ((current_protocol, next_protocol), ()) ->
+       { current_protocol ; next_protocol })
+    (merge_objs
+       (obj2
+          (req "protocol" Protocol_hash.encoding)
+          (req "next_protocol" Protocol_hash.encoding))
+       unit)
+
+module Make(Proto : PROTO)(Next_proto : PROTO) = struct
+
+  let protocol_hash = Protocol_hash.to_b58check Proto.hash
+  let next_protocol_hash = Protocol_hash.to_b58check Next_proto.hash
+
+  type raw_block_header = {
+    shell: Block_header.shell_header ;
+    protocol_data: Proto.block_header_data ;
+  }
+
+  let raw_block_header_encoding =
+    def "raw_block_header" @@
+    conv
+      (fun { shell ; protocol_data } -> (shell, protocol_data))
+      (fun (shell, protocol_data) -> { shell ; protocol_data } )
+      (merge_objs
+         Block_header.shell_header_encoding
+         Proto.block_header_data_encoding)
+
+  type block_header = {
+    chain_id: Chain_id.t ;
+    hash: Block_hash.t ;
+    shell: Block_header.shell_header ;
+    protocol_data: Proto.block_header_data ;
+  }
+
+  let block_header_encoding =
+    def "block_header" @@
+    conv
+      (fun { chain_id ; hash ; shell ; protocol_data } ->
+         (((), chain_id, hash), { shell ; protocol_data }))
+      (fun (((), chain_id, hash), { shell ; protocol_data }) ->
+         { chain_id ; hash ; shell ; protocol_data } )
+      (merge_objs
+         (obj3
+            (req "protocol" (constant protocol_hash))
+            (req "chain_id" Chain_id.encoding)
+            (req "hash" Block_hash.encoding))
+         raw_block_header_encoding)
+
+  type block_metadata = {
+    protocol_data: Proto.block_header_metadata ;
+    test_chain_status: Test_chain_status.t ;
+    (* for the next block: *)
+    max_operations_ttl: int ;
+    max_operation_data_length: int ;
+    max_block_header_length: int ;
+    operation_list_quota: operation_list_quota list ;
+  }
+
+  let block_metadata_encoding =
+    def "block_header_metadata" @@
+    conv
+      (fun { protocol_data ; test_chain_status ; max_operations_ttl ;
+             max_operation_data_length ; max_block_header_length ;
+             operation_list_quota } ->
+        (((), (), test_chain_status,
+          max_operations_ttl, max_operation_data_length,
+          max_block_header_length, operation_list_quota),
+         protocol_data))
+      (fun (((), (), test_chain_status,
+             max_operations_ttl, max_operation_data_length,
+             max_block_header_length, operation_list_quota),
+            protocol_data) ->
+        { protocol_data ; test_chain_status ; max_operations_ttl ;
+          max_operation_data_length ; max_block_header_length ;
+          operation_list_quota })
+      (merge_objs
+         (obj7
+            (req "protocol" (constant protocol_hash))
+            (req "next_protocol" (constant next_protocol_hash))
+            (req "test_chain_status" Test_chain_status.encoding)
+            (req "max_operations_ttl" int31)
+            (req "max_operation_data_length" int31)
+            (req "max_block_header_length" int31)
+            (req "max_operation_list_length"
+               (dynamic_size (list operation_list_quota_encoding))))
+         Proto.block_header_metadata_encoding)
+
+  let next_operation_encoding =
+    let open Data_encoding in
+    def "next_operation" @@
+    conv
+      (fun Next_proto.{ shell ; protocol_data } ->
+         ((), (shell, protocol_data)))
+      (fun ((), (shell, protocol_data)) ->
+         { shell ; protocol_data } )
+      (merge_objs
+         (obj1 (req "protocol" (constant next_protocol_hash)))
+         (merge_objs
+            (dynamic_size Operation.shell_header_encoding)
+            (dynamic_size Next_proto.operation_data_encoding)))
+
+  type operation = {
+    chain_id: Chain_id.t ;
+    hash: Operation_hash.t ;
+    shell: Operation.shell_header ;
+    protocol_data: Proto.operation_data ;
+    receipt: Proto.operation_receipt ;
+  }
+
+  let operation_encoding =
+    def "operation" @@
     let open Data_encoding in
     conv
-      (fun { contents } -> (contents))
-      (fun (contents) -> { contents })
-      (obj1 (dft "contents" bool false))
+      (fun { chain_id ; hash ; shell ; protocol_data ; receipt } ->
+         (((), chain_id, hash), (shell, (protocol_data, receipt))))
+      (fun (((), chain_id, hash), (shell, (protocol_data,  receipt))) ->
+         { chain_id ; hash ; shell ; protocol_data ; receipt })
+      (merge_objs
+         (obj3
+            (req "protocol" (constant protocol_hash))
+            (req "chain_id" Chain_id.encoding)
+            (req "hash" Operation_hash.encoding))
+         (merge_objs
+            (dynamic_size Operation.shell_header_encoding)
+            (dynamic_size Proto.operation_data_and_receipt_encoding)))
 
-  let operations =
-    RPC_service.post_service
-      ~description:"List the block operations."
-      ~query: RPC_query.empty
-      ~input: operations_param_encoding
-      ~output: (obj1
-                  (req "operations"
-                     (list (list
-                              (obj2
-                                 (req "hash" Operation_hash.encoding)
-                                 (opt "contents"
-                                    (dynamic_size Operation.encoding)))))))
-      RPC_path.(block_path / "operations")
-
-  let protocol =
-    RPC_service.post_service
-      ~description:"List the block protocol."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output: (obj1 (req "protocol" Protocol_hash.encoding))
-      RPC_path.(block_path / "protocol")
-
-  let test_chain =
-    RPC_service.post_service
-      ~description:"Returns the status of the associated test chain."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output: Test_chain_status.encoding
-      RPC_path.(block_path / "test_chain")
-
-  type preapply_param = {
-    timestamp: Time.t ;
-    protocol_data: MBytes.t ;
-    operations: Operation.t list list ;
-    sort_operations: bool ;
+  type block_info = {
+    chain_id: Chain_id.t ;
+    hash: Block_hash.t ;
+    header: raw_block_header ;
+    metadata: block_metadata ;
+    operations: operation list list ;
   }
 
-  let preapply_param_encoding =
-    (conv
-       (fun { timestamp ; protocol_data ; operations ; sort_operations } ->
-          (timestamp, protocol_data, operations, sort_operations))
-       (fun (timestamp, protocol_data, operations, sort_operations) ->
-          { timestamp ; protocol_data ; operations ; sort_operations })
-       (obj4
-          (req "timestamp" Time.encoding)
-          (req "protocol_data" bytes)
-          (req "operations" (list (dynamic_size (list (dynamic_size Operation.encoding)))))
-          (dft "sort_operations" bool false)))
-
-  let preapply =
-    RPC_service.post_service
-      ~description:
-        "Simulate the validation of a block that would contain \
-         the given operations and return the resulting fitness."
-      ~query: RPC_query.empty
-      ~input: preapply_param_encoding
-      ~output: preapply_result_encoding
-      RPC_path.(block_path / "preapply")
-
-  let complete =
-    let prefix_arg =
-      let destruct s = Ok s
-      and construct s = s in
-      RPC_arg.make ~name:"prefix" ~destruct ~construct () in
-    RPC_service.post_service
-      ~description: "Try to complete a prefix of a Base58Check-encoded data. \
-                     This RPC is actually able to complete hashes of \
-                     block, operations, public_keys and contracts."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output: (list string)
-      RPC_path.(block_path / "complete" /: prefix_arg )
-
-  type list_param = {
-    include_ops: bool ;
-    length: int option ;
-    heads: Block_hash.t list option ;
-    monitor: bool option ;
-    delay: int option ;
-    min_date: Time.t option;
-    min_heads: int option;
-  }
-  let list_param_encoding =
+  let block_info_encoding =
     conv
-      (fun { include_ops ; length ; heads ; monitor ;
-             delay ; min_date ; min_heads } ->
-        (include_ops, length, heads, monitor, delay, min_date, min_heads))
-      (fun (include_ops, length, heads, monitor,
-            delay, min_date, min_heads) ->
-        { include_ops ; length ; heads ; monitor ;
-          delay ; min_date ; min_heads })
-      (obj7
-         (dft "include_ops"
-            (Data_encoding.describe
-               ~description:
-                 "Whether the resulting block informations should include the \
-                  list of operations' hashes. Default false."
-               bool) false)
-         (opt "length"
-            (Data_encoding.describe
-               ~description:
-                 "The requested number of predecessors to returns (per \
-                  requested head)."
-               int31))
-         (opt "heads"
-            (Data_encoding.describe
-               ~description:
-                 "An empty argument requests blocks from the current heads. \
-                  A non empty list allow to request specific fragment \
-                  of the chain."
-               (list Block_hash.encoding)))
-         (opt "monitor"
-            (Data_encoding.describe
-               ~description:
-                 "When true, the socket is \"kept alive\" after the first \
-                  answer and new heads are streamed when discovered."
-               bool))
-         (opt "delay"
-            (Data_encoding.describe
-               ~description:
-                 "By default only the blocks that were validated by the node \
-                  are considered. \
-                  When this optional argument is 0, only blocks with a \
-                  timestamp in the past are considered. Other values allows to \
-                  adjust the current time."
-               int31))
-         (opt "min_date"
-            (Data_encoding.describe
-               ~description: "When `min_date` is provided, heads with a \
-                              timestamp before `min_date` are filtered ouf"
-               Time.encoding))
-         (opt "min_heads"
-            (Data_encoding.describe
-               ~description:"When `min_date` is provided, returns at least \
-                             `min_heads` even when their timestamp is before \
-                             `min_date`."
-               int31)))
+      (fun { chain_id ; hash ; header ; metadata ; operations } ->
+         ((), chain_id, hash, header, metadata, operations))
+      (fun ((), chain_id, hash, header, metadata, operations) ->
+         { chain_id ; hash ; header ; metadata ; operations })
+      (obj6
+         (req "protocol" (constant protocol_hash))
+         (req "chain_id" Chain_id.encoding)
+         (req "hash" Block_hash.encoding)
+         (req "header" (dynamic_size raw_block_header_encoding))
+         (req "metadata" (dynamic_size block_metadata_encoding))
+         (req "operations"
+            (list (dynamic_size (list operation_encoding)))))
 
-  let list =
-    RPC_service.post_service
-      ~description:
-        "Lists known heads of the blockchain sorted with decreasing fitness. \
-         Optional arguments allows to returns the list of predecessors for \
-         known heads or the list of predecessors for a given list of blocks."
-      ~query: RPC_query.empty
-      ~input: list_param_encoding
-      ~output: (obj1 (req "blocks" (list (list block_info_encoding))))
-      RPC_path.(root / "blocks")
+  module S = struct
 
-  let list_invalid =
-    RPC_service.post_service
-      ~description:
-        "Lists blocks that have been declared invalid along with the errors\
-         that led to them being declared invalid"
-      ~query: RPC_query.empty
-      ~input:empty
-      ~output:(Data_encoding.list
-                 (obj3
-                    (req "block" Block_hash.encoding)
-                    (req "level" int32)
-                    (req "errors" RPC_error.encoding)))
-      RPC_path.(root / "invalid_blocks")
+    let path : prefix RPC_path.context = RPC_path.open_root
 
-  let unmark_invalid =
-    RPC_service.post_service
-      ~description:
-        "Unmark an invalid block"
-      ~query: RPC_query.empty
-      ~input: Data_encoding.empty
-      ~output: Data_encoding.empty
-      RPC_path.(root / "invalid_blocks" /: Block_hash.rpc_arg / "unmark" )
+    let hash =
+      RPC_service.get_service
+        ~description:"The block's hash, its unique identifier."
+        ~query: RPC_query.empty
+        ~output: Block_hash.encoding
+        RPC_path.(path / "hash")
+
+    let header =
+      RPC_service.get_service
+        ~description:"The whole block header."
+        ~query: RPC_query.empty
+        ~output: block_header_encoding
+        RPC_path.(path / "header")
+
+    let raw_header =
+      RPC_service.get_service
+        ~description:"The whole block header (unparsed)."
+        ~query: RPC_query.empty
+        ~output: bytes
+        RPC_path.(path / "header" / "raw")
+
+    let metadata =
+      RPC_service.get_service
+        ~description:"All the metadata associated to the block."
+        ~query: RPC_query.empty
+        ~output: block_metadata_encoding
+        RPC_path.(path / "metadata")
+
+    let protocols =
+      (* same endpoint than 'metadata' *)
+      RPC_service.get_service
+        ~description:".. unexported ..."
+        ~query: RPC_query.empty
+        ~output: raw_protocol_encoding
+        RPC_path.(path / "metadata")
+
+    module Header = struct
+
+      let path = RPC_path.(path / "header")
+
+      let shell_header =
+        RPC_service.get_service
+          ~description:"The shell-specific fragment of the block header."
+          ~query: RPC_query.empty
+          ~output: Block_header.shell_header_encoding
+          RPC_path.(path / "shell")
+
+      let protocol_data =
+        RPC_service.get_service
+          ~description:"The version-specific fragment of the block header."
+          ~query: RPC_query.empty
+          ~output:
+            (conv
+               (fun h -> ((), h)) (fun ((), h) -> h)
+               (merge_objs
+                  (obj1 (req "protocol" (constant protocol_hash)))
+                  Proto.block_header_data_encoding))
+          RPC_path.(path / "protocol_data")
+
+      let raw_protocol_data =
+        RPC_service.get_service
+          ~description:"The version-specific fragment of the block header (unparsed)."
+          ~query: RPC_query.empty
+          ~output: bytes
+          RPC_path.(path / "protocol_data" / "raw")
+
+    end
+
+    module Operations = struct
+
+      let path = RPC_path.(path / "operations")
+
+      let operations =
+        RPC_service.get_service
+          ~description:"All the operations included in the block."
+          ~query: RPC_query.empty
+          ~output: (list (dynamic_size (list operation_encoding)))
+          path
+
+      let list_arg =
+        let name = "list_offset" in
+        let descr =
+          "Index `n` of the requested validation pass." in
+        let construct = string_of_int in
+        let destruct s =
+          try Ok (int_of_string s)
+          with _ -> Error (Format.sprintf "Invalid list offset (%s)" s) in
+        RPC_arg.make ~name ~descr ~construct ~destruct ()
+
+      let offset_arg =
+        let name = "operation_offset" in
+        let descr =
+          "Index `m` of the requested operation in its validation pass." in
+        let construct = string_of_int in
+        let destruct s =
+          try Ok (int_of_string s)
+          with _ -> Error (Format.sprintf "Invalid operation offset (%s)" s) in
+        RPC_arg.make ~name ~descr ~construct ~destruct ()
+
+      let operations_in_pass =
+        RPC_service.get_service
+          ~description:
+            "All the operations included in `n-th` validation pass of the block."
+          ~query: RPC_query.empty
+          ~output: (list operation_encoding)
+          RPC_path.(path /: list_arg)
+
+      let operation =
+        RPC_service.get_service
+          ~description:
+            "The `m-th` operation in the `n-th` validation pass of the block."
+          ~query: RPC_query.empty
+          ~output: operation_encoding
+          RPC_path.(path /: list_arg /: offset_arg)
+
+    end
+
+    module Operation_hashes = struct
+
+      let path = RPC_path.(path / "operation_hashes")
+
+      let operation_hashes =
+        RPC_service.get_service
+          ~description:"The hashes of all the operations included in the block."
+          ~query: RPC_query.empty
+          ~output: (list (list Operation_hash.encoding))
+          path
+
+      let operation_hashes_in_pass =
+        RPC_service.get_service
+          ~description:
+            "All the operations included in `n-th` validation pass of the block."
+          ~query: RPC_query.empty
+          ~output: (list Operation_hash.encoding)
+          RPC_path.(path /: Operations.list_arg)
+
+      let operation_hash =
+        RPC_service.get_service
+          ~description:
+            "The hash of then `m-th` operation in the `n-th` validation pass of the block."
+          ~query: RPC_query.empty
+          ~output: Operation_hash.encoding
+          RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
+    end
+
+    module Helpers = struct
+
+      let path = RPC_path.(path / "helpers")
+
+      module Forge = struct
+
+        let block_header =
+          RPC_service.post_service
+            ~description: "Forge a block header"
+            ~query: RPC_query.empty
+            ~input: Block_header.encoding
+            ~output: (obj1 (req "block" bytes))
+            RPC_path.(path / "forge_block_header")
+
+      end
+
+      module Preapply = struct
+
+        let path = RPC_path.(path / "preapply")
+
+        let block_result_encoding =
+          obj2
+            (req "shell_header" Block_header.shell_header_encoding)
+            (req "operations"
+               (list (Preapply_result.encoding RPC_error.encoding)))
+
+        type block_param = {
+          protocol_data: Next_proto.block_header_data ;
+          operations: Next_proto.operation list list ;
+        }
+
+        let block_param_encoding =
+          (conv
+             (fun { protocol_data ; operations } ->
+                (protocol_data, operations))
+             (fun (protocol_data, operations) ->
+                { protocol_data ; operations })
+             (obj2
+                (req "protocol_data"
+                   (conv
+                      (fun h -> ((), h)) (fun ((), h) -> h)
+                      (merge_objs
+                         (obj1 (req "protocol" (constant next_protocol_hash)))
+                         (dynamic_size Next_proto.block_header_data_encoding))))
+                (req "operations"
+                   (list (dynamic_size (list next_operation_encoding))))))
+
+        let block_query =
+          let open RPC_query in
+          query (fun sort timestamp -> object
+                  method sort_operations = sort
+                  method timestamp = timestamp
+                end)
+          |+ flag "sort" (fun t -> t#sort_operations)
+          |+ opt_field "timestamp" Time.rpc_arg (fun t -> t#timestamp)
+          |> seal
+
+        let block =
+          RPC_service.post_service
+            ~description:
+              "Simulate the validation of a block that would contain \
+               the given operations and return the resulting fitness \
+               and context hash."
+            ~query: block_query
+            ~input: block_param_encoding
+            ~output: block_result_encoding
+            RPC_path.(path / "block")
+
+        let operations =
+          RPC_service.post_service
+            ~description:
+              "Simulate the validation of an operation."
+            ~query: RPC_query.empty
+            ~input: (list next_operation_encoding)
+            ~output: (list (dynamic_size Next_proto.operation_data_and_receipt_encoding))
+            RPC_path.(path / "operations")
+
+      end
+
+      let complete =
+        let prefix_arg =
+          let destruct s = Ok s
+          and construct s = s in
+          RPC_arg.make ~name:"prefix" ~destruct ~construct () in
+        RPC_service.get_service
+          ~description: "Try to complete a prefix of a Base58Check-encoded data. \
+                         This RPC is actually able to complete hashes of \
+                         block, operations, public_keys and contracts."
+          ~query: RPC_query.empty
+          ~output: (list string)
+          RPC_path.(path / "complete" /: prefix_arg )
+
+    end
+
+    module Context = struct
+
+      let path = RPC_path.(path / "context" / "raw" / "bytes")
+
+      let context_path_arg : string RPC_arg.t =
+        let name = "context_path" in
+        let descr = "A path inside the context" in
+        let construct = fun s -> s in
+        let destruct = fun s -> Ok s in
+        RPC_arg.make ~name ~descr ~construct ~destruct ()
+
+      let raw_context_query : < depth: int option > RPC_query.t =
+        let open RPC_query in
+        query (fun depth -> object
+                method depth = depth
+              end)
+        |+ opt_field "depth" RPC_arg.int (fun t -> t#depth)
+        |> seal
+
+      let read =
+        RPC_service.get_service
+          ~description:"Returns the raw context."
+          ~query: raw_context_query
+          ~output: raw_context_encoding
+          RPC_path.(path /:* context_path_arg)
+
+    end
+
+    let info =
+      RPC_service.get_service
+        ~description:"All the information about a block."
+        ~query: RPC_query.empty
+        ~output: block_info_encoding
+        path
+
+    module Mempool = struct
+
+      type t = {
+        applied: (Operation_hash.t * Next_proto.operation) list ;
+        refused: (Next_proto.operation * error list) Operation_hash.Map.t ;
+        branch_refused: (Next_proto.operation * error list) Operation_hash.Map.t ;
+        branch_delayed: (Next_proto.operation * error list) Operation_hash.Map.t ;
+        unprocessed: Next_proto.operation Operation_hash.Map.t ;
+      }
+
+      let encoding =
+        conv
+          (fun
+            { applied ;
+              refused ; branch_refused ; branch_delayed ;
+              unprocessed } ->
+            (applied, refused, branch_refused, branch_delayed, unprocessed))
+          (fun
+            (applied, refused, branch_refused, branch_delayed, unprocessed) ->
+            { applied ;
+              refused ; branch_refused ; branch_delayed ;
+              unprocessed })
+          (obj5
+             (req "applied"
+                (list
+                   (conv
+                      (fun (hash, (op : Next_proto.operation)) ->
+                         ((hash, op.shell), (op.protocol_data)))
+                      (fun ((hash, shell), (protocol_data)) ->
+                         (hash, { shell ; protocol_data }))
+                      (merge_objs
+                         (merge_objs
+                            (obj1 (req "hash" Operation_hash.encoding))
+                            (dynamic_size Operation.shell_header_encoding))
+                         (dynamic_size Next_proto.operation_data_encoding)
+                      ))))
+             (req "refused"
+                (Operation_hash.Map.encoding
+                   (merge_objs
+                      (dynamic_size next_operation_encoding)
+                      (obj1 (req "error" RPC_error.encoding)))))
+             (req "branch_refused"
+                (Operation_hash.Map.encoding
+                   (merge_objs
+                      (dynamic_size next_operation_encoding)
+                      (obj1 (req "error" RPC_error.encoding)))))
+             (req "branch_delayed"
+                (Operation_hash.Map.encoding
+                   (merge_objs
+                      (dynamic_size next_operation_encoding)
+                      (obj1 (req "error" RPC_error.encoding)))))
+             (req "unprocessed"
+                (Operation_hash.Map.encoding
+                   (dynamic_size next_operation_encoding))))
+
+      let pending_operations path =
+        (* TODO: branch_delayed/... *)
+        RPC_service.get_service
+          ~description:
+            "List the not-yet-prevalidated operations."
+          ~query: RPC_query.empty
+          ~output: encoding
+          path
+
+    end
+
+    let live_blocks =
+      RPC_service.get_service
+        ~description:"List the ancestors of the given block which, if \
+                      referred to as the branch in an operation \
+                      header, are recent enough for that operation to \
+                      be included in the current block."
+        ~query: RPC_query.empty
+        ~output: Block_hash.Set.encoding
+        RPC_path.(live_blocks_path open_root)
+
+  end
+
+  let path = RPC_path.prefix chain_path path
+
+  let make_call0 s ctxt a b q p =
+    let s = RPC_service.prefix path s in
+    RPC_context.make_call2 s ctxt a b q p
+
+  let make_call1 s ctxt a b c q p =
+    let s = RPC_service.prefix path s in
+    RPC_context.make_call3 s ctxt a b c q p
+
+  let make_call2 s ctxt a b c d q p =
+    let s = RPC_service.prefix path s in
+    RPC_context.make_call s ctxt (((((), a), b), c), d) q p
+
+  let hash ctxt =
+    let f = make_call0 S.hash ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      match block with
+      | `Hash (h, 0) -> return h
+      | _ -> f chain block () ()
+
+  let header ctxt =
+    let f = make_call0 S.header ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
+
+  let raw_header ctxt =
+    let f = make_call0 S.raw_header ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
+
+  let metadata ctxt =
+    let f = make_call0 S.metadata ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
+
+  let protocols ctxt =
+    let f = make_call0 S.protocols ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
+
+  module Header = struct
+
+    module S = S.Header
+
+    let shell_header ctxt =
+      let f = make_call0 S.shell_header ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) () ->
+        f chain block () ()
+    let protocol_data ctxt =
+      let f = make_call0 S.protocol_data ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) () ->
+        f chain block () ()
+    let raw_protocol_data ctxt =
+      let f = make_call0 S.raw_protocol_data ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) () ->
+        f chain block () ()
+
+  end
+
+  module Operations = struct
+
+    module S = S.Operations
+
+    let operations ctxt =
+      let f = make_call0 S.operations ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) () ->
+        f chain block () ()
+
+    let operations_in_pass ctxt =
+      let f = make_call1 S.operations_in_pass ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) n ->
+        f chain block n () ()
+
+    let operation ctxt =
+      let f = make_call2 S.operation ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) n m ->
+        f chain block n m () ()
+
+  end
+
+  module Operation_hashes = struct
+
+    module S = S.Operation_hashes
+
+    let operation_hashes ctxt =
+      let f = make_call0 S.operation_hashes ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) () ->
+        f chain block () ()
+
+    let operation_hashes_in_pass ctxt =
+      let f = make_call1 S.operation_hashes_in_pass ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) n ->
+        f chain block n () ()
+
+    let operation_hash ctxt =
+      let f = make_call2 S.operation_hash ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) n m ->
+        f chain block n m () ()
+
+  end
+
+  module Context = struct
+
+    module S = S.Context
+
+    let read ctxt =
+      let f = make_call1 S.read ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) ?depth path ->
+        f chain block path
+          (object method depth = depth end) ()
+
+  end
+
+  module Helpers = struct
+
+    module S = S.Helpers
+
+    module Forge = struct
+
+      module S = S.Forge
+
+      let block_header ctxt =
+        let f = make_call0 S.block_header ctxt in
+        fun
+          ?(chain = `Main) ?(block = `Head 0)
+          header ->
+          f chain block () header
+
+    end
+
+    module Preapply = struct
+
+      module S = S.Preapply
+
+      let block ctxt =
+        let f = make_call0 S.block ctxt in
+        fun
+          ?(chain = `Main) ?(block = `Head 0)
+          ?(sort = false) ?timestamp ~protocol_data operations ->
+          f chain block
+            (object method sort_operations = sort method timestamp = timestamp end)
+            { protocol_data ; operations  }
+
+      let operations ctxt =
+        let f = make_call0 S.operations ctxt in
+        fun ?(chain = `Main) ?(block = `Head 0) operations ->
+          f chain block () operations
+
+    end
+
+    let complete ctxt =
+      let f = make_call1 S.complete ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) s ->
+        f chain block s () ()
+
+  end
+
+  let info ctxt =
+    let f = make_call0 S.info ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
+
+  module Mempool = struct
+
+    type t = S.Mempool.t = {
+      applied: (Operation_hash.t * Next_proto.operation) list ;
+      refused: (Next_proto.operation * error list) Operation_hash.Map.t ;
+      branch_refused: (Next_proto.operation * error list) Operation_hash.Map.t ;
+      branch_delayed: (Next_proto.operation * error list) Operation_hash.Map.t ;
+      unprocessed: Next_proto.operation Operation_hash.Map.t ;
+    }
+
+    let pending_operations ctxt ?(chain = `Main) () =
+      let s = S.Mempool.pending_operations (mempool_path chain_path) in
+      RPC_context.make_call1 s ctxt chain () ()
+
+  end
+
+  let live_blocks ctxt =
+    let f = make_call0 S.live_blocks ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      f chain block () ()
 
 end
 
-open RPC_context
+module Fake_protocol = struct
+  let hash = Protocol_hash.zero
+  type block_header_data = unit
+  let block_header_data_encoding = Data_encoding.empty
+  type block_header_metadata = unit
+  let block_header_metadata_encoding = Data_encoding.empty
+  type operation_data = unit
+  type operation_receipt = unit
+  type operation = {
+    shell: Operation.shell_header ;
+    protocol_data: operation_data ;
+  }
+  let operation_data_encoding = Data_encoding.empty
+  let operation_receipt_encoding = Data_encoding.empty
+  let operation_data_and_receipt_encoding =
+    Data_encoding.conv
+      (fun ((), ()) -> ())
+      (fun () -> ((), ()))
+      Data_encoding.empty
+end
 
-let chain_id ctxt b = make_call1 S.chain_id ctxt b () ()
-let level ctxt b = make_call1 S.level ctxt b () ()
-let predecessor ctxt b = make_call1 S.predecessor ctxt b () ()
-let predecessors ctxt b n = make_call1 S.predecessors ctxt b () n
-let hash ctxt b = make_call1 S.hash ctxt b () ()
-let timestamp ctxt b = make_call1 S.timestamp ctxt b () ()
-let fitness ctxt b = make_call1 S.fitness ctxt b () ()
-let operations ctxt ?(contents = false) h =
-  make_call1 S.operations ctxt h () { contents }
-let protocol ctxt b = make_call1 S.protocol ctxt b () ()
-let test_chain ctxt b = make_call1 S.test_chain ctxt b () ()
-let info ctxt ?(include_ops = true) h =
-  make_call1 S.info ctxt h () include_ops
-let monitor ?(include_ops = false)
-    ?length ?heads ?delay ?min_date ?min_heads ctxt =
-  make_streamed_call S.list ctxt () ()
-    { include_ops ; length ; heads ;
-      monitor = Some true ; delay ;
-      min_date ; min_heads }
-let list ?(include_ops = false)
-    ?length ?heads ?delay ?min_date ?min_heads ctxt =
-  make_call S.list ctxt () ()
-    { include_ops ; length ; heads ;
-      monitor = Some false ; delay ;
-      min_date ; min_heads }
-let complete ctxt b s =
-  make_call2 S.complete ctxt b s () ()
-let preapply ctxt h
-    ?(timestamp = Time.now ()) ?(sort = false) ~protocol_data operations =
-  make_call1 S.preapply ctxt h ()
-    { timestamp ; protocol_data ; sort_operations = sort ; operations }
+module Empty = Make(Fake_protocol)(Fake_protocol)
 
-let unmark_invalid ctxt h =
-  make_call1 S.unmark_invalid ctxt h () ()
+let () =
+  Printexc.register_printer
+    (function
+      | (Json_schema.Cannot_parse _
+        | Json_schema.Dangling_reference _
+        | Json_schema.Bad_reference _
+        | Json_schema.Unexpected _
+        | Json_schema.Duplicate_definition _ ) as exn ->
+          Some (Format.asprintf "%a" (fun ppf -> Json_schema.print_error ppf) exn)
+      | _ -> None)
 
-let list_invalid ctxt =
-  make_call S.list_invalid ctxt () () ()
-
-let raw_context ctxt b key depth =
-  let depth = object
-    method depth = depth
-  end
-  in
-  make_call2 S.raw_context ctxt b key depth ()
+let protocols = Empty.protocols

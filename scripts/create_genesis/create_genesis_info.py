@@ -59,14 +59,12 @@ def genesis_commitments(wallets, blind):
     for pkh_b58, amount in wallets.iteritems():
         # Public key hash corresponding to this Tezos address.
         pkh = bitcoin.b58check_to_bin(pkh_b58)[2:]
-        hpkh_b58 = bitcoin.bin_to_b58check((pkh[:10] + '\000' * 10), magicbyte=434591)
         # The redemption code is unique to the public key hash and deterministically
         # constructed using a secret blinding value.
         secret = secret_code(pkh, blind)
         # The redemption code is used to blind the pkh
         blinded_pkh = blake2b(pkh, 20, key=secret).digest()
         commitment = {
-            'half_pkh': hpkh_b58,
             'blinded_pkh': bitcoin.bin_to_b58check(blinded_pkh, magicbyte=16921055),
             'amount': amount
         }
@@ -106,7 +104,7 @@ if __name__ == '__main__':
                           "email" : email,
                           "password" : password,
                           "amount" : str(amount),
-                          "secret" : secret }
+                          "activation_code" : secret }
                         for pkh, (mnemonic, email, password, amount, secret) in secrets.iteritems()], f, indent=1)
     else:
         wallets = get_wallets( sys.argv[1] )
@@ -114,7 +112,8 @@ if __name__ == '__main__':
     commitments = genesis_commitments(wallets, blind)
 
     with open('commitments.json', 'w') as f:
-        json.dump({ "bootstrap_accounts": [
+        json.dump({
+        "bootstrap_accounts": [
             [ "edsk4X12XaKRPHgDkgvMe4UWEiygx8AVrt9rpktmhu1uT2GCPU4dp7",
               "12000000000000" ],
             [ "edsk46ypB8PztxMDPMdVnEgjQmJhca7zMJvTMDrdwJaJ4mgm4qNmwE",
@@ -126,8 +125,10 @@ if __name__ == '__main__':
             [ "edsk3T8CRr8YK2vnjsZK2vDzCjpcWpMEUXMAzjeR1GWjmyhGaDHTNV",
               "12000000000000" ]
         ],
-                    "commitments":
-                    [ (commitment['half_pkh'],
-                       commitment['blinded_pkh'],
-                       str(commitment['amount']))
-                      for commitment in commitments if commitment['amount'] > 0]}, f, indent=1)
+            "commitments": [
+                (commitment['blinded_pkh'], str(commitment['amount']))
+                for commitment in commitments if commitment['amount'] > 0
+            ],
+            "no_rewards_cycles": 7,
+            "security_deposit_ramp_up_cycles": 64
+        }, f, indent=1)

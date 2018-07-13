@@ -1,15 +1,31 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 include Logging.Make (struct let name = "test.p2p.connection" end)
 
-let default_addr = Ipaddr.V6.localhost
+let addr = ref Ipaddr.V6.localhost
 
 let proof_of_work_target = Crypto_box.make_target 16.
 let id1 = P2p_identity.generate proof_of_work_target
@@ -20,6 +36,13 @@ let id0 =
   P2p_identity.generate (Crypto_box.make_target 0.)
 
 let versions = P2p_version.[{ name = "TEST" ; minor = 0 ; major = 0 }]
+
+type metadata = unit
+let conn_meta_config : metadata P2p_socket.metadata_config = {
+  conn_meta_encoding = Data_encoding.empty ;
+  conn_meta_value = (fun _ -> ()) ;
+  private_node = (fun _ -> false) ;
+}
 
 let rec listen ?port addr =
   let tentative_port =
@@ -44,7 +67,7 @@ let rec listen ?port addr =
 let sync ch =
   Process.Channel.push ch () >>=? fun () ->
   Process.Channel.pop ch >>=? fun () ->
-  return ()
+  return_unit
 
 let rec sync_nodes nodes =
   iter_p
@@ -58,24 +81,24 @@ let rec sync_nodes nodes =
 let sync_nodes nodes =
   sync_nodes nodes >>= function
   | Ok () | Error (Exn End_of_file :: _) ->
-      return ()
+      return_unit
   | Error _ as err ->
       Lwt.return err
 
 let run_nodes client server =
-  listen default_addr >>= fun (main_socket, port) ->
+  listen !addr >>= fun (main_socket, port) ->
   Process.detach ~prefix:"server: " begin fun channel ->
     let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
     server channel sched main_socket >>=? fun () ->
     P2p_io_scheduler.shutdown sched >>= fun () ->
-    return ()
+    return_unit
   end >>= fun server_node ->
   Process.detach ~prefix:"client: " begin fun channel ->
     Lwt_utils_unix.safe_close main_socket >>= fun () ->
     let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-    client channel sched default_addr port >>=? fun () ->
+    client channel sched !addr port >>=? fun () ->
     P2p_io_scheduler.shutdown sched >>= fun () ->
-    return ()
+    return_unit
   end >>= fun client_node ->
   let nodes = [ server_node ; client_node ] in
   Lwt.ignore_result (sync_nodes nodes) ;
@@ -96,6 +119,7 @@ let accept sched main_socket =
   P2p_socket.authenticate
     ~proof_of_work_target
     ~incoming:true fd point id1 versions
+    conn_meta_config
 
 let raw_connect sched addr port =
   let fd = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
@@ -109,7 +133,8 @@ let connect sched addr port id =
   raw_connect sched addr port >>= fun fd ->
   P2p_socket.authenticate
     ~proof_of_work_target
-    ~incoming:false fd (addr, port) id versions >>=? fun (info, auth_fd) ->
+    ~incoming:false fd
+    (addr, port) id versions conn_meta_config >>=? fun (info, auth_fd) ->
   _assert (not info.incoming) __LOC__ "" >>=? fun () ->
   _assert (P2p_peer.Id.compare info.peer_id id1.peer_id = 0)
     __LOC__ "" >>=? fun () ->
@@ -139,13 +164,13 @@ module Low_level = struct
     P2p_io_scheduler.read_full fd msg >>=? fun () ->
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
     P2p_io_scheduler.close fd >>=? fun () ->
-    return ()
+    return_unit
 
   let server _ch sched socket =
     raw_accept sched socket >>= fun (fd, _point) ->
     P2p_io_scheduler.write fd simple_msg >>=? fun () ->
     P2p_io_scheduler.close fd >>=? fun _ ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -168,13 +193,13 @@ module Kick = struct
     _assert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0)
       __LOC__ "" >>=? fun () ->
     P2p_socket.kick auth_fd >>= fun () ->
-    return ()
+    return_unit
 
   let client _ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
     P2p_socket.accept auth_fd encoding >>= fun conn ->
     _assert (is_rejected conn) __LOC__ "" >>=? fun () ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -188,12 +213,12 @@ module Kicked = struct
     accept sched socket >>=? fun (_info, auth_fd) ->
     P2p_socket.accept auth_fd encoding >>= fun conn ->
     _assert (Kick.is_rejected conn) __LOC__ "" >>=? fun () ->
-    return ()
+    return_unit
 
   let client _ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
     P2p_socket.kick auth_fd >>= fun () ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -214,7 +239,7 @@ module Simple_message = struct
     _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -224,7 +249,7 @@ module Simple_message = struct
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -246,7 +271,7 @@ module Chunked_message = struct
     _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -257,7 +282,7 @@ module Chunked_message = struct
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -278,7 +303,7 @@ module Oversized_message = struct
     _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -288,7 +313,7 @@ module Oversized_message = struct
     _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -305,7 +330,7 @@ module Close_on_read = struct
     P2p_socket.accept auth_fd encoding >>=? fun conn ->
     sync ch >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -314,7 +339,7 @@ module Close_on_read = struct
     P2p_socket.read conn >>= fun err ->
     _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -331,7 +356,7 @@ module Close_on_write = struct
     P2p_socket.accept auth_fd encoding >>=? fun conn ->
     P2p_socket.close conn >>= fun _stat ->
     sync ch >>=? fun ()->
-    return ()
+    return_unit
 
   let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -341,7 +366,7 @@ module Close_on_write = struct
     P2p_socket.write_sync conn simple_msg >>= fun err ->
     _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
@@ -370,7 +395,7 @@ module Garbled_data = struct
     P2p_socket.read conn >>= fun err ->
     _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let client _ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
@@ -378,13 +403,16 @@ module Garbled_data = struct
     P2p_socket.read conn >>= fun err ->
     _assert (is_decoding_error err) __LOC__ "" >>=? fun () ->
     P2p_socket.close conn >>= fun _stat ->
-    return ()
+    return_unit
 
   let run _dir = run_nodes client server
 
 end
 
 let spec = Arg.[
+
+    "--addr", String (fun p -> addr := Ipaddr.V6.of_string_exn p),
+    " Listening addr";
 
     "-v", Unit (fun () ->
         Lwt_log_core.(add_rule "test.p2p.connection" Info) ;

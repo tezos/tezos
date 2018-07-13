@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** Categories of error *)
 type error_category =
@@ -80,6 +96,24 @@ module type S = sig
   (** Sucessful return *)
   val return : 'a -> 'a tzresult Lwt.t
 
+  (** Sucessful return of [()] *)
+  val return_unit : unit tzresult Lwt.t
+
+  (** Sucessful return of [None] *)
+  val return_none : 'a option tzresult Lwt.t
+
+  (** [return_some x] is a sucessful return of [Some x] *)
+  val return_some : 'a -> 'a option tzresult Lwt.t
+
+  (** Sucessful return of [[]] *)
+  val return_nil : 'a list tzresult Lwt.t
+
+  (** Sucessful return of [true] *)
+  val return_true : bool tzresult Lwt.t
+
+  (** Sucessful return of [false] *)
+  val return_false : bool tzresult Lwt.t
+
   (** Erroneous result *)
   val error : error -> 'a tzresult
 
@@ -108,6 +142,12 @@ module type S = sig
 
   (** Automatically enrich error reporting on stack rewind *)
   val trace : error -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+
+  (** Same as record_trace, for unevaluated error *)
+  val record_trace_eval : (unit -> error tzresult) -> 'a tzresult -> 'a tzresult
+
+  (** Same as trace, for unevaluated Lwt error *)
+  val trace_eval : (unit -> error tzresult Lwt.t) -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
 
   (** Erroneous return on failed assertion *)
   val fail_unless : bool -> error -> unit tzresult Lwt.t
@@ -151,6 +191,12 @@ module type S = sig
   val filter_map_p :
     ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
+  (** A {!List.filter} in the monad *)
+  val filter_s :
+    ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
+  val filter_p :
+    ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
+
   (** A {!List.fold_left} in the monad *)
   val fold_left_s :
     ('a -> 'b -> 'a tzresult Lwt.t) -> 'a -> 'b list -> 'a tzresult Lwt.t
@@ -161,5 +207,19 @@ module type S = sig
 
   (** A {!Lwt.join} in the monad *)
   val join : unit tzresult Lwt.t list -> unit tzresult Lwt.t
+
+  (** Lazy values with retry-until success semantics *)
+  type 'a tzlazy
+
+  (** Create a {!tzlazy} value. *)
+  val tzlazy: (unit -> 'a tzresult Lwt.t) -> 'a tzlazy
+
+  (** [tzforce tzl] is either
+      (a) the remembered value carried by [tzl] if available
+      (b) the result of the callback/closure used to create [tzl] if successful,
+      in which case the value is remembered, or
+      (c) an error if the callback/closure used to create [tzl] is unsuccessful.
+  *)
+  val tzforce: 'a tzlazy -> 'a tzresult Lwt.t
 
 end

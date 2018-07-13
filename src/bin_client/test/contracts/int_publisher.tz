@@ -1,21 +1,17 @@
-# NONE if user wants to get the value
-# SOME (signed hash of the string, string)
+# (signed hash of the string, string)
 parameter (option (pair signature int));
-return int;
-# The key used to update the contract
-# The data
 storage (pair key int);
 code {DUP; DUP; CAR;
-      IF_NONE {PUSH tez "1.00"; # Fee pattern from July 26
+      IF_NONE {PUSH mutez 1000000; # Fee pattern from July 26
                AMOUNT; CMPLE; IF {FAIL} {};
                # Provide the data
                CDR; DIP {CDDR}}
               {DUP; DIP{SWAP}; SWAP; CDAR; # Move key to the top
-               DIP {DUP; CAR; DIP {CDR; H}; PAIR}; # Arrange the new piece of data
+               DIP {DUP; CAR; DIP {CDR; PACK ; BLAKE2B}}; # Arrange the new piece of data
                CHECK_SIGNATURE;                    # Check to ensure the data is authentic
                # Update data
                IF {CDR; SWAP; DIP{DUP}; CDAR; PAIR}
                   # Revert the update. This could be replaced with FAIL
                   {DROP; DUP; CDR; DIP{CDDR}}};
       # Cleanup
-      SWAP; PAIR}
+      DIP{DROP}; NIL operation; PAIR}

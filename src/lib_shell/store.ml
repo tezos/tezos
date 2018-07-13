@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 type t = Raw_store.t
 type global_store = t
@@ -84,8 +100,9 @@ module Block = struct
     header: Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
-    max_operation_data_length: int;
+    last_allowed_fork_level: Int32.t ;
     context: Context_hash.t ;
+    metadata: MBytes.t ;
   }
 
   module Contents =
@@ -98,19 +115,21 @@ module Block = struct
            let open Data_encoding in
            conv
              (fun { header ; message ; max_operations_ttl ;
-                    max_operation_data_length ; context } ->
-               (message, max_operations_ttl,
-                max_operation_data_length, context, header))
-             (fun (message, max_operations_ttl,
-                   max_operation_data_length, context, header) ->
+                    last_allowed_fork_level ;
+                    context ; metadata } ->
+               (message, max_operations_ttl, last_allowed_fork_level,
+                context, metadata, header ))
+             (fun (message, max_operations_ttl, last_allowed_fork_level,
+                   context, metadata, header ) ->
                { header ; message ; max_operations_ttl ;
-                 max_operation_data_length ;
-                 context })
-             (obj5
+                 last_allowed_fork_level ;
+                 context ; metadata })
+             (obj6
                 (opt "message" string)
                 (req "max_operations_ttl" uint16)
-                (req "max_operation_data_length" uint16)
+                (req "last_allowed_fork_level" int32)
                 (req "context" Context_hash.encoding)
+                (req "metadata" bytes)
                 (req "header" Block_header.encoding))
        end))
 
@@ -143,6 +162,14 @@ module Block = struct
       (Store_helpers.Make_value(struct
          type t = Operation.t list
          let encoding = Data_encoding.(list (dynamic_size Operation.encoding))
+       end))
+
+  module Operations_metadata =
+    Operations_index.Make_map
+      (struct let name = ["metadata"] end)
+      (Store_helpers.Make_value(struct
+         type t = MBytes.t list
+         let encoding = Data_encoding.(list bytes)
        end))
 
   type invalid_block = {
@@ -216,6 +243,17 @@ module Chain_data = struct
       (struct let name = ["in_chain"] end)
       (Store_helpers.Make_value(Block_hash)) (* successor *)
 
+  module Checkpoint =
+    Store_helpers.Make_single_store
+      (Chain.Indexed_store.Store)
+      (struct let name = ["checkpoint"] end)
+      (Store_helpers.Make_value(struct
+         type t = Int32.t * Block_hash.t
+         let encoding =
+           let open Data_encoding in
+           tup2 int32 Block_hash.encoding
+       end))
+
 end
 
 
@@ -254,8 +292,8 @@ module Protocol = struct
 
 end
 
-let init dir =
-  Raw_store.init dir >>=? fun s ->
+let init ?mapsize dir =
+  Raw_store.init ?mapsize dir >>=? fun s ->
   Block.register s ;
   Protocol.register s ;
   return s

@@ -1,64 +1,35 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Alpha_context
-
-val preserved_cycles:
-  'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
-
-val blocks_per_cycle:
-  'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
-
-val blocks_per_commitment:
-  'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
-
-val blocks_per_roll_snapshot:
-  'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
-
-val blocks_per_voting_period:
-  'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
-
-val time_between_blocks:
-  'a #RPC_context.simple -> 'a -> Period.t list shell_tzresult Lwt.t
-
-val first_free_baking_slot:
-  'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
-
-val endorsers_per_block:
-  'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
-
-val max_gas:
-  'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
-
-val proof_of_work_threshold:
-  'a #RPC_context.simple -> 'a -> Int64.t shell_tzresult Lwt.t
-
-val seed_nonce_revelation_tip:
-  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val origination_burn:
-  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val block_security_deposit:
-  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val endorsement_security_deposit:
-  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val block_reward:
-  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val endorsement_reward:
-  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
 
 val errors:
   'a #RPC_context.simple -> 'a -> Data_encoding.json_schema shell_tzresult Lwt.t
 
+(** Returns all the constants of the protocol *)
 val all:
   'a #RPC_context.simple -> 'a -> Constants.t shell_tzresult Lwt.t
+
+val register: unit -> unit

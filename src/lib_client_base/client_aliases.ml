@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (* Tezos Command line interface - Local Storage for Configuration *)
 
@@ -68,7 +84,7 @@ module type Alias = sig
     ('a, (< .. > as 'obj)) Clic.params ->
     (fresh_param -> 'a, 'obj) Clic.params
   val force_switch :
-    unit -> (bool, #Client_context.full) arg
+    unit -> (bool, _) arg
   val of_fresh :
     #Client_context.wallet ->
     bool ->
@@ -106,13 +122,13 @@ module Alias = functor (Entity : Entity) -> struct
 
   let autocomplete wallet =
     load wallet >>= function
-    | Error _ -> return []
+    | Error _ -> return_nil
     | Ok list -> return (List.map fst list)
 
   let find_opt (wallet : #wallet) name =
     load wallet >>=? fun list ->
-    try return (Some (List.assoc name list))
-    with Not_found -> return None
+    try return_some (List.assoc name list)
+    with Not_found -> return_none
 
   let find (wallet : #wallet) name =
     load wallet >>=? fun list ->
@@ -122,47 +138,47 @@ module Alias = functor (Entity : Entity) -> struct
 
   let rev_find (wallet : #wallet) v =
     load wallet >>=? fun list ->
-    try return (Some (List.find (fun (_, v') -> v = v') list |> fst))
-    with Not_found -> return None
+    try return_some (List.find (fun (_, v') -> v = v') list |> fst)
+    with Not_found -> return_none
 
   let mem (wallet : #wallet) name =
     load wallet >>=? fun list ->
     try
       ignore (List.assoc name list) ;
-      return true
+      return_true
     with
-    | Not_found -> return false
+    | Not_found -> return_false
 
   let add ~force (wallet : #wallet) name value =
     let keep = ref false in
     load wallet >>=? fun list ->
     begin
       if force then
-        return ()
+        return_unit
       else
         iter_s (fun (n, v) ->
             if n = name && v = value then begin
               keep := true ;
-              return ()
+              return_unit
             end else if n = name && v <> value then begin
               failwith
                 "another %s is already aliased as %s, \
-                 use -force to update"
+                 use --force to update"
                 Entity.name n
             end else if n <> name && v = value then begin
               failwith
                 "this %s is already aliased as %s, \
-                 use -force to insert duplicate"
+                 use --force to insert duplicate"
                 Entity.name n
             end else begin
-              return ()
+              return_unit
             end)
           list
     end >>=? fun () ->
     let list = List.filter (fun (n, _) -> n <> name) list in
     let list = (name, value) :: list in
     if !keep then
-      return ()
+      return_unit
     else
       wallet#write Entity.name list wallet_encoding
 
@@ -199,7 +215,7 @@ module Alias = functor (Entity : Entity) -> struct
   let of_fresh (wallet : #wallet) force (Fresh s) =
     load wallet >>=? fun list ->
     begin if force then
-        return ()
+        return_unit
       else
         iter_s
           (fun (n, v) ->
@@ -208,11 +224,11 @@ module Alias = functor (Entity : Entity) -> struct
                failwith
                  "@[<v 2>The %s alias %s already exists.@,\
                   The current value is %s.@,\
-                  Use -force to update@]"
+                  Use --force to update@]"
                  Entity.name n
                  value
              else
-               return ())
+               return_unit)
           list
     end >>=? fun () ->
     return s

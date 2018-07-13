@@ -1,4 +1,4 @@
 parameter unit;
-storage (pair (pair nat (pair nat (pair (pair (pair nat tez) nat) nat))) nat);
-return unit;
-code { MAP_CDADDAADR { PUSH tez "1.00" ; ADD } };
+storage (pair (pair nat (pair nat (pair (pair (pair (nat %p) (mutez %value)) nat) nat))) nat);
+code { MAP_CDADDAADR @new_storage %value { PUSH mutez 1000000 ; ADD } ;
+       NIL operation ; SWAP; SET_CAR };

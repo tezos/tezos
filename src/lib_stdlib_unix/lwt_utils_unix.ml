@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 let () =
   register_error_kind
@@ -75,7 +91,7 @@ let remove_dir dir =
     Lwt_stream.iter_s
       (fun file ->
          if file = "." || file = ".." then
-           Lwt.return ()
+           Lwt.return_unit
          else begin
            let file = Filename.concat dir file in
            if Sys.is_directory file
@@ -87,7 +103,7 @@ let remove_dir dir =
   if Sys.file_exists dir && Sys.is_directory dir then
     remove dir
   else
-    Lwt.return ()
+    Lwt.return_unit
 
 let rec create_dir ?(perm = 0o755) dir =
   Lwt_unix.file_exists dir >>= function
@@ -167,7 +183,7 @@ module Json = struct
       Lwt_io.with_file ~mode:Output file begin fun chan ->
         let str = Data_encoding.Json.to_string ~minify:false json in
         Lwt_io.write chan str >>= fun _ ->
-        return ()
+        return_unit
       end
     end
 
@@ -263,3 +279,136 @@ let with_tempdir name f =
   Lwt_unix.unlink base_dir >>= fun () ->
   Lwt_unix.mkdir base_dir 0o700 >>= fun () ->
   Lwt.finalize (fun () -> f base_dir) (fun () -> remove_dir base_dir)
+
+
+module Socket = struct
+
+  type addr =
+    | Unix of string
+    | Tcp of string * int
+
+  let get_addrs host =
+    try return (Array.to_list (Unix.gethostbyname host).h_addr_list)
+    with Not_found -> failwith "Host %s not found" host
+
+  let connect path =
+    match path with
+    | Unix path ->
+        let addr = Lwt_unix.ADDR_UNIX path in
+        let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
+        Lwt_unix.connect sock addr >>= fun () ->
+        return sock
+    | Tcp (host, port) ->
+        get_addrs host >>=? fun addrs ->
+        let rec try_connect = function
+          | [] -> failwith "could not resolve host '%s'" host
+          | addr :: addrs ->
+              Lwt.catch
+                (fun () ->
+                   let addr = Lwt_unix.ADDR_INET (addr, port) in
+                   let sock = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
+                   Lwt_unix.connect sock addr >>= fun () ->
+                   return sock)
+                (fun _ -> try_connect addrs) in
+        try_connect addrs
+
+  let bind ?(backlog = 10) path =
+    match path with
+    | Unix path ->
+        let addr = Lwt_unix.ADDR_UNIX path in
+        let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
+        Lwt_unix.bind sock addr >>= fun () ->
+        Lwt_unix.listen sock backlog ;
+        return sock
+    | Tcp (host, port) ->
+        get_addrs host >>=? fun addrs ->
+        let rec try_bind = function
+          | [] -> failwith "could not resolve host '%s'" host
+          | addr :: addrs ->
+              Lwt.catch
+                (fun () ->
+                   let addr = Lwt_unix.ADDR_INET (addr, port) in
+                   let sock = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
+                   Lwt_unix.setsockopt sock SO_REUSEADDR true ;
+                   Lwt_unix.bind sock addr >>= fun () ->
+                   Lwt_unix.listen sock backlog ;
+                   return sock)
+                (fun _ -> try_bind addrs) in
+        try_bind addrs
+
+  type error +=
+    | Encoding_error
+    | Decoding_error
+
+  let () =
+    register_error_kind `Permanent
+      ~id: "signer.encoding_error"
+      ~title: "Encoding_error"
+      ~description: "Error while encoding a remote signer message"
+      ~pp: (fun ppf () ->
+          Format.fprintf ppf "Could not encode a remote signer message")
+      Data_encoding.empty
+      (function Encoding_error -> Some () | _ -> None)
+      (fun () -> Encoding_error) ;
+    register_error_kind `Permanent
+      ~id: "signer.decoding_error"
+      ~title: "Decoding_error"
+      ~description: "Error while decoding a remote signer message"
+      ~pp: (fun ppf () ->
+          Format.fprintf ppf "Could not decode a remote signer message")
+      Data_encoding.empty
+      (function Decoding_error -> Some () | _ -> None)
+      (fun () -> Decoding_error)
+
+  let message_len_size = 2
+
+  let send fd encoding message =
+    let encoded_message_len = Data_encoding.Binary.length encoding message in
+    fail_unless
+      (encoded_message_len < 1 lsl (message_len_size * 8))
+      Encoding_error >>=? fun () ->
+    (* len is the length of int16 plus the length of the message we want to send *)
+    let len = message_len_size + encoded_message_len in
+    let buf = MBytes.create len in
+    match Data_encoding.Binary.write
+            encoding message buf message_len_size encoded_message_len with
+    | None ->
+        fail Encoding_error
+    | Some last ->
+        fail_unless (last = len) Encoding_error >>=? fun () ->
+        (* we set the beginning of the buf with the length of what is next *)
+        MBytes.set_int16 buf 0 encoded_message_len ;
+        write_mbytes fd buf >>= fun () ->
+        return_unit
+
+  let recv fd encoding =
+    let header_buf = MBytes.create message_len_size in
+    read_mbytes ~len:message_len_size fd header_buf >>= fun () ->
+    let len = MBytes.get_uint16 header_buf 0 in
+    let buf = MBytes.create len in
+    read_mbytes ~len fd buf >>= fun () ->
+    match Data_encoding.Binary.read encoding buf 0 len with
+    | None ->
+        fail Decoding_error
+    | Some (read_len, message) ->
+        if read_len <> len then
+          fail Decoding_error
+        else
+          return message
+
+end
+
+
+let rec retry ?(log=(fun _ -> Lwt.return_unit)) ?(n=5) ?(sleep=1.) f =
+  f () >>= function
+  | Ok r -> Lwt.return (Ok r)
+  | (Error error) as x ->
+      if n > 0 then
+        begin
+          log error >>= fun () ->
+          Lwt_unix.sleep sleep >>= fun () ->
+          retry ~log ~n:(n-1) ~sleep f
+        end
+      else
+        Lwt.return x
+

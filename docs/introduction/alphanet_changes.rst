@@ -1,8 +1,8 @@
-Alphanet changelog
-==================
+Changelog
+---------
 
 Reset 2018-05-03
-----------------
+~~~~~~~~~~~~~~~~
 
 [Alpha]
 
@@ -12,7 +12,8 @@ Reset 2018-05-03
 
 - 32 endorsers per blocks (was 15)
 
-- Selegation rights are now frozen 5 cycles in advance (approx 15 days in mainnet or 10 hours on zeronet);
+- Delegation rights are now frozen 5 cycles in advance (approx 15 days
+  in mainnet or 10 hours on zeronet);
 
 - Security deposits are recovered after 5 cycles;
 
@@ -20,7 +21,8 @@ Reset 2018-05-03
 
 - Pending deposits and fees count in the staking balance of a delegate;
 
-- Delegates will be tagged as "deactivated" after 5 cycles of inactivity and they will lose their baking rights;
+- Delegates will be tagged as "deactivated" after 5 cycles of
+  inactivity and they will lose their baking rights;
 
 - Do not allow revealing the same endorsement twice.
 
@@ -52,14 +54,15 @@ Reset 2018-05-03
 - Split the code base into separate OPAM packages.
 
 Patch 2018-01-15
-----------------
+~~~~~~~~~~~~~~~~
 
 [Node]
 
 - Fix a performance issue in block locator computation
 
+
 Reset 2017-11-20
-----------------
+~~~~~~~~~~~~~~~~
 
 [Alphanet]
 
@@ -88,19 +91,19 @@ Reset 2017-11-20
 
 - P2p: fix issue with data greater than 2^16 bytes
 
-- Irmin: use an experimental LevelDB backend
+- Irmin: use an experimental LMDB backend
 
 [Build]
 
 - Refactor the economic protocol amendment code. Protocols are
    now compiled to functors, taking the type signature of their
    runtime environment as parameter. This simplifies the
-   dependencies, and will allow third party developpers to
-   instanciate economic protocols in other contexts than the node.
+   dependencies, and will allow third party developers to
+   instantiate economic protocols in other contexts than the node.
 
 - Switch from Makefiles to jbuilder, yay!
 
-- Rename (hopefully) all occurences of "mining" into "baking".
+- Rename (hopefully) all occurrences of "mining" into "baking".
 
 [Michelson]
 
@@ -109,13 +112,13 @@ Reset 2017-11-20
    of the client or node.
 
 - Implement a basic semantics of annotations.
-   The typechecker now propagates annotations on types througout the
+   The typechecker now propagates annotations on types throughout the
    code, and tagging instructions with an annotation allows the
    programmer to reannotate the element produced by the instruction.
    The emacs mode displays propagated annotations.
 
 - Add a version of `ITER` that takes a static code block and expects
-   a colletion on the initial stack, and works like a `LOOP`, pushing
+   a collection on the initial stack, and works like a `LOOP`, pushing
    the element of the collection one at a time on the stack. This is
    like `REDUCE` but using a static code block instead of a dynamic
    lambda. In the same vein, `MAP` can take a code block.
@@ -129,7 +132,7 @@ Reset 2017-11-20
 - Add `SIZE` on lists.
 
 Reset 2017-11-17
-----------------
+~~~~~~~~~~~~~~~~
 
 [Node]
 
@@ -137,7 +140,7 @@ Reset 2017-11-17
 - Irmin: restore usage `git-repack`... (mistakenly removed)
 
 Reset 2017-10-13
-----------------
+~~~~~~~~~~~~~~~~
 
 [Client]
 
@@ -159,7 +162,7 @@ Reset 2017-10-13
    prevent an error raised when using an unrevealed key.
 
 Reset 2017-09-21
-----------------
+~~~~~~~~~~~~~~~~
 
 [Node]
 
@@ -181,7 +184,7 @@ Reset 2017-09-21
    prevent an error raised when using an unrevealed key.
 
 Reset 2017-08-10
-----------------
+~~~~~~~~~~~~~~~~
 
 This update includes changes in the on-disk state of the node and in
 the format of blocks and operations. It thus requires a chain reset.
@@ -195,7 +198,7 @@ Main changes includes:
 
     https://raw.githubusercontent.com/tezos/tezos/alphanet/README.md
 
-- The `alphanet` branch of the github repository is now automaticaly
+- The `alphanet` branch of the github repository is now automatically
   synchronized with `alphanet` docker image. And the latest version of
   the `alphanet.sh` is available at:
 
@@ -216,7 +219,7 @@ Main changes includes:
 - minor language enhancements, mostly resulting from the feedback of
   Milo's daily challenge:
 
-    http://www.michelson-lang.com/
+    https://www.michelson-lang.com/
 
 - the alphanet scripts now understands a container: prefix wherever a
   file: prefix is accepted, temporarily copying the file into the
@@ -247,6 +250,5 @@ Main changes includes:
 [CI]
 
 - This is not directly visible in the alphanet, but our CI
-  infrastrucre is now ready for open development.
+  infrastructure is now ready for open development.
   More about that soon (or later).
-

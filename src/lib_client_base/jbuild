@@ -4,7 +4,6 @@
  ((name tezos_client_base)
   (public_name tezos-client-base)
   (libraries (tezos-base
-              tezos-stdlib-unix
               tezos-shell-services
               tezos-rpc))
   (library_flags (:standard -linkall))
@@ -16,5 +15,5 @@
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files *.ml*)))
+  (deps ((glob_files *.ml{,i})))
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

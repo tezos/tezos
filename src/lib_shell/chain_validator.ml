@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Chain_validator_worker_state
 
@@ -56,7 +72,7 @@ module Types = struct
 
     mutable child:
       (state * (unit -> unit Lwt.t (* shutdown *))) option ;
-    prevalidator: Prevalidator.t ;
+    prevalidator: Prevalidator.t option ;
     active_peers: Peer_validator.t Lwt.t P2p_peer.Table.t ;
     bootstrapped_peers: unit P2p_peer.Table.t ;
   }
@@ -127,6 +143,19 @@ let may_activate_peer_validator w peer_id =
     P2p_peer.Table.add nv.active_peers peer_id pv ;
     pv
 
+let may_update_checkpoint chain_state new_head =
+  State.Chain.checkpoint chain_state >>= fun (old_level, _old_block) ->
+  let new_level = State.Block.last_allowed_fork_level new_head in
+  if new_level <= old_level then
+    Lwt.return_unit
+  else
+    let head_level = State.Block.level new_head in
+    State.Block.predecessor_n new_head
+      (Int32.to_int (Int32.sub head_level new_level)) >>= function
+    | None -> Lwt.return_unit (* should not happen *)
+    | Some new_block ->
+        State.Chain.set_checkpoint chain_state (new_level, new_block)
+
 let may_switch_test_chain w spawn_child block =
   let nv = Worker.state w in
   let create_child genesis protocol expiration =
@@ -154,10 +183,10 @@ let may_switch_test_chain w spawn_child block =
         nv.parameters.db chain_state
         nv.parameters.limits (* TODO: different limits main/test ? *) >>= fun child ->
       nv.child <- Some child ;
-      return ()
+      return_unit
     end else begin
       (* Ignoring request... *)
-      return ()
+      return_unit
     end in
 
   let check_child genesis protocol expiration current_time =
@@ -183,7 +212,7 @@ let may_switch_test_chain w spawn_child block =
     else if not activated && not expired then
       create_child genesis protocol expiration
     else
-      return () in
+      return_unit in
 
   begin
     let block_header = State.Block.header block in
@@ -234,8 +263,13 @@ let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
     return Event.Ignored_head
   else begin
     Chain.set_head nv.parameters.chain_state block >>= fun previous ->
+    may_update_checkpoint nv.parameters.chain_state block >>= fun () ->
     broadcast_head w ~previous block >>= fun () ->
-    Prevalidator.flush nv.prevalidator block_hash >>=? fun () ->
+    begin match nv.prevalidator with
+      | Some prevalidator ->
+          Prevalidator.flush prevalidator block_hash
+      | None -> return_unit
+    end >>=? fun () ->
     may_switch_test_chain w spawn_child block >>= fun () ->
     Lwt_watcher.notify nv.new_head_input block ;
     if Block_hash.equal head_hash block_header.shell.predecessor then
@@ -249,23 +283,29 @@ let on_completion (type a) w  (req : a Request.t) (update : a) request_status =
   let fitness = State.Block.fitness block in
   let request = State.Block.hash block in
   Worker.record_event w (Processed_block { request ; request_status ; update ; fitness }) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let on_close w =
   let nv = Worker.state w in
   Distributed_db.deactivate nv.parameters.chain_db >>= fun () ->
   Lwt.join
-    (Prevalidator.shutdown nv.prevalidator ::
+    (begin match nv.prevalidator with
+       | Some prevalidator -> Prevalidator.shutdown prevalidator
+       | None -> Lwt.return_unit
+     end ::
      Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child ::
      P2p_peer.Table.fold
        (fun _ pv acc -> (pv >>= Peer_validator.shutdown) :: acc)
        nv.active_peers []) >>= fun () ->
   Lwt.return_unit
 
-let on_launch w _ parameters =
+let on_launch start_prevalidator w _ parameters =
   Chain.init_head parameters.chain_state >>= fun () ->
-  Prevalidator.create
-    parameters.prevalidator_limits parameters.chain_db >>= fun prevalidator ->
+  (if start_prevalidator then
+     Prevalidator.create
+       parameters.prevalidator_limits parameters.chain_db >>= fun prevalidator ->
+     Lwt.return_some prevalidator
+   else Lwt.return_none) >>= fun prevalidator ->
   let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let bootstrapped_waiter, bootstrapped_wakener = Lwt.wait () in
@@ -296,7 +336,11 @@ let on_launch w _ parameters =
         may_activate_peer_validator w peer_id >>= fun pv ->
         Peer_validator.notify_head pv block ;
         (* TODO notify prevalidator only if head is known ??? *)
-        Prevalidator.notify_operations nv.prevalidator peer_id ops ;
+        begin match nv.prevalidator with
+          | Some prevalidator ->
+              Prevalidator.notify_operations prevalidator peer_id ops
+          | None -> ()
+        end ;
         Lwt.return_unit
       end;
     end ;
@@ -311,20 +355,20 @@ let on_launch w _ parameters =
   Lwt.return nv
 
 let rec create
-    ?max_child_ttl ?parent
+    ?max_child_ttl ~start_prevalidator ?parent
     peer_validator_limits prevalidator_limits block_validator
     global_valid_block_input db chain_state limits =
   let spawn_child ~parent pvl pl bl gvbi db n l =
-    create ~parent pvl pl bl gvbi db n l >>= fun w ->
+    create ~start_prevalidator ~parent pvl pl bl gvbi db n l >>= fun w ->
     Lwt.return (Worker.state w, (fun () -> Worker.shutdown w)) in
   let module Handlers = struct
     type self = t
-    let on_launch = on_launch
+    let on_launch = on_launch start_prevalidator
     let on_request w = on_request w spawn_child
     let on_close = on_close
     let on_error _ _ _ errs = Lwt.return (Error errs)
     let on_completion = on_completion
-    let on_no_request _ = return ()
+    let on_no_request _ = return_unit
   end in
   let parameters =
     { max_child_ttl ;
@@ -347,11 +391,13 @@ let rec create
 
 let create
     ?max_child_ttl
+    ~start_prevalidator
     peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_db state limits =
   (* hide the optional ?parent *)
   create
     ?max_child_ttl
+    ~start_prevalidator
     peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_db state limits
 
@@ -378,22 +424,35 @@ let child w =
       try Some (List.assoc (State.Chain.id chain_state) (Worker.list table))
       with Not_found -> None
 
-let validate_block w ?(force = false) hash block operations =
+let assert_fitness_increases ?(force = false) w distant_header =
+  let pv = Worker.state w in
+  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  Chain.head chain_state >>= fun local_header ->
+  fail_when
+    (not force &&
+     Fitness.compare
+       distant_header.Block_header.shell.fitness
+       (State.Block.fitness local_header) <= 0)
+    (failure "Fitness too low")
+
+let assert_checkpoint w hash (header: Block_header.t) =
+  let pv = Worker.state w in
+  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  State.Chain.acceptable_block chain_state hash header >>= fun acceptable ->
+  fail_unless acceptable
+    (Validation_errors.Checkpoint_error (hash, None))
+
+let validate_block w ?force hash block operations =
   let nv = Worker.state w in
   assert (Block_hash.equal hash (Block_header.hash block)) ;
-  Chain.head nv.parameters.chain_state >>= fun head ->
-  let head = State.Block.header head in
-  if
-    force || Fitness.(head.shell.fitness < block.shell.fitness)
-  then
-    Block_validator.validate
-      ~canceler:(Worker.canceler w)
-      ~notify_new_block:(notify_new_block w)
-      nv.parameters.block_validator
-      nv.parameters.chain_db
-      hash block operations
-  else
-    failwith "Fitness too low"
+  assert_fitness_increases ?force w block >>=? fun () ->
+  assert_checkpoint w hash block >>=? fun () ->
+  Block_validator.validate
+    ~canceler:(Worker.canceler w)
+    ~notify_new_block:(notify_new_block w)
+    nv.parameters.block_validator
+    nv.parameters.chain_db
+    hash block operations
 
 let bootstrapped w =
   let { bootstrapped_waiter } = Worker.state w in

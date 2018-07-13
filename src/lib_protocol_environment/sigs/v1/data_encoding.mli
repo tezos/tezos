@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** In memory JSON data *)
 type json =
@@ -17,12 +33,6 @@ type json =
   | `String of string ]
 
 type json_schema
-
-exception No_case_matched
-exception Unexpected_tag of int
-exception Duplicated_tag of int
-exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
-exception Unexpected_enum of string * string list
 
 type 'a t
 type 'a encoding = 'a t
@@ -42,6 +52,8 @@ val uint16 : int encoding
 val int31 : int encoding
 val int32 : int32 encoding
 val int64 : int64 encoding
+val n : Z.t encoding
+val z : Z.t encoding
 val bool : bool encoding
 val string : string encoding
 val bytes : MBytes.t encoding
@@ -52,16 +64,24 @@ val string_enum : (string * 'a) list -> 'a encoding
 module Fixed : sig
   val string : int -> string encoding
   val bytes : int -> MBytes.t encoding
+  val add_padding : 'a encoding -> int -> 'a encoding
 end
 
 module Variable : sig
   val string : string encoding
   val bytes : MBytes.t encoding
-  val array : 'a encoding -> 'a array encoding
-  val list : 'a encoding -> 'a list encoding
+  val array : ?max_length: int -> 'a encoding -> 'a array encoding
+  val list : ?max_length: int -> 'a encoding -> 'a list encoding
 end
 
-val dynamic_size : 'a encoding -> 'a encoding
+module Bounded : sig
+  val string : int -> string encoding
+  val bytes : int -> MBytes.t encoding
+end
+
+val dynamic_size :
+  ?kind: [ `Uint30 | `Uint16 | `Uint8 ] ->
+  'a encoding -> 'a encoding
 
 val json : json encoding
 val json_schema : json_schema encoding
@@ -155,8 +175,8 @@ val tup10 :
 val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
 val merge_tups : 'a1 encoding -> 'a2 encoding -> ('a1 * 'a2) encoding
 
-val array : 'a encoding -> 'a array encoding
-val list : 'a encoding -> 'a list encoding
+val array : ?max_length: int -> 'a encoding -> 'a array encoding
+val list : ?max_length: int -> 'a encoding -> 'a list encoding
 
 val assoc : 'a encoding -> (string * 'a) list encoding
 
@@ -164,22 +184,39 @@ type case_tag = Tag of int | Json_only
 
 type 't case
 val case :
+  title:string ->
+  ?description:string ->
   case_tag -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
+
 val union :
   ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
 
-val describe :
-  ?title:string -> ?description:string ->
+val def :
+  string ->
+  ?title:string ->
+  ?description:string ->
   't encoding ->'t encoding
-
-val def : string -> 'a encoding -> 'a encoding
 
 val conv :
   ('a -> 'b) -> ('b -> 'a) ->
   ?schema:json_schema ->
   'b encoding -> 'a encoding
 
-val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
+val mu :
+  string ->
+  ?title:string ->
+  ?description:string ->
+  ('a encoding -> 'a encoding) -> 'a encoding
+
+type 'a lazy_t
+
+val lazy_encoding : 'a encoding -> 'a lazy_t encoding
+val force_decode : 'a lazy_t -> 'a option
+val force_bytes : 'a lazy_t -> MBytes.t
+val make_lazy : 'a encoding -> 'a -> 'a lazy_t
+val apply_lazy :
+  fun_value:('a -> 'b) -> fun_bytes:(MBytes.t -> 'b) -> fun_combine:('b -> 'b -> 'b) ->
+  'a lazy_t -> 'b
 
 module Json : sig
 
@@ -236,8 +273,18 @@ module Binary : sig
   val length : 'a encoding -> 'a -> int
   val fixed_length : 'a encoding -> int option
   val read : 'a encoding -> MBytes.t -> int -> int -> (int * 'a) option
-  val write : 'a encoding -> 'a -> MBytes.t -> int -> int option
-  val to_bytes : 'a encoding -> 'a -> MBytes.t
+  val write : 'a encoding -> 'a -> MBytes.t -> int -> int -> int option
+  val to_bytes : 'a encoding -> 'a -> MBytes.t option
+  val to_bytes_exn : 'a encoding -> 'a -> MBytes.t
   val of_bytes : 'a encoding -> MBytes.t -> 'a option
 
+  type write_error
+  exception Write_error of write_error
+
 end
+
+(** [check_size size encoding] ensures that the binary encoding
+    of a value will not be allowed to exceed [size] bytes. The reader
+    and the writer fails otherwise. This function do not modify
+    the JSON encoding. *)
+val check_size : int -> 'a encoding -> 'a encoding

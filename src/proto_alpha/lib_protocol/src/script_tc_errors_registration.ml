@@ -1,39 +1,51 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2017.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Alpha_context
-open Micheline
 open Script
-open Script_typed_ir
 open Script_tc_errors
-open Script_ir_translator
 
 (* Helpers for encoding *)
 let type_map_enc =
   let open Data_encoding in
+  let stack_enc = list (tup2 Script.expr_encoding (list string)) in
   list
     (conv
        (fun (loc, (bef, aft)) -> (loc, bef, aft))
        (fun (loc, bef, aft) -> (loc, (bef, aft)))
        (obj3
           (req "location" Script.location_encoding)
-          (req "stackBefore" (list Script.expr_encoding))
-          (req "stackAfter" (list Script.expr_encoding))))
+          (req "stackBefore" stack_enc)
+          (req "stackAfter" stack_enc)))
 
-let ex_ty_enc =
-  Data_encoding.conv
-    (fun (Ex_ty ty) -> strip_locations (unparse_ty None ty))
-    (fun expr ->
-       match parse_ty true (root expr) with
-       | Ok (Ex_ty ty, _) -> Ex_ty ty
-       | _ -> Ex_ty Unit_t (* FIXME: ? *))
-    Script.expr_encoding
+let stack_ty_enc =
+  let open Data_encoding in
+  (list
+     (obj2
+        (req "type" Script.expr_encoding)
+        (dft "annots" (list string) [])))
 
 (* main registration *)
 let () =
@@ -45,8 +57,7 @@ let () =
   let arity_enc =
     int8 in
   let namespace_enc =
-    def "primitiveNamespace" @@
-    describe
+    def "primitiveNamespace"
       ~title: "Primitive namespace"
       ~description:
         "One of the three possible namespaces of primitive \
@@ -55,27 +66,16 @@ let () =
                   "constant", Constant_namespace ;
                   "instruction", Instr_namespace ] in
   let kind_enc =
-    def "expressionKind" @@
-    describe
+    def "expressionKind"
       ~title: "Expression kind"
       ~description:
         "One of the four possible kinds of expression \
          (integer, string, primitive application or sequence)." @@
     string_enum [ "integer", Int_kind ;
                   "string", String_kind ;
+                  "bytes", Bytes_kind ;
                   "primitiveApplication", Prim_kind ;
                   "sequence", Seq_kind ] in
-  let ex_stack_ty_enc =
-    let rec unfold = function
-      | Ex_stack_ty (Item_t (ty, rest, annot)) ->
-          (Ex_ty ty, annot) :: unfold (Ex_stack_ty rest)
-      | Ex_stack_ty Empty_t -> [] in
-    let rec fold = function
-      | (Ex_ty ty, annot) :: rest ->
-          let Ex_stack_ty rest = fold rest in
-          Ex_stack_ty (Item_t (ty, rest, annot))
-      | [] -> Ex_stack_ty Empty_t in
-    conv unfold fold (list (tup2 ex_ty_enc (option string))) in
   (* -- Structure errors ---------------------- *)
   (* Invalid arity *)
   register_error_kind
@@ -176,6 +176,18 @@ let () =
        (req "loc" location_encoding))
     (function Unexpected_big_map loc -> Some loc | _ -> None)
     (fun loc -> Unexpected_big_map loc) ;
+  (* Unexpected operation *)
+  register_error_kind
+    `Permanent
+    ~id:"unexpectedOperation"
+    ~title: "Big map in unauthorized position (type error)"
+    ~description:
+      "When parsing script, a operation type was found \
+       in the storage or parameter field."
+    (obj1
+       (req "loc" location_encoding))
+    (function Unexpected_operation loc -> Some loc | _ -> None)
+    (fun loc -> Unexpected_operation loc) ;
   (* -- Value typing errors ---------------------- *)
   (* Unordered map keys *)
   register_error_kind
@@ -254,13 +266,13 @@ let () =
        over which it is not defined."
     (located (obj3
                 (req "operatorName" prim_encoding)
-                (req "wrongLeftOperandType" ex_ty_enc)
-                (req "wrongRightOperandType" ex_ty_enc)))
+                (req "wrongLeftOperandType" Script.expr_encoding)
+                (req "wrongRightOperandType" Script.expr_encoding)))
     (function
       | Undefined_binop (loc, n, tyl, tyr) ->
-          Some (loc, (n, Ex_ty tyl, Ex_ty tyr))
+          Some (loc, (n, tyl, tyr))
       | _ -> None)
-    (fun (loc, (n, Ex_ty tyl, Ex_ty tyr)) ->
+    (fun (loc, (n, tyl, tyr)) ->
        Undefined_binop (loc, n, tyl, tyr)) ;
   (* Undefined unary operation *)
   register_error_kind
@@ -272,12 +284,12 @@ let () =
        over which it is not defined."
     (located (obj2
                 (req "operatorName" prim_encoding)
-                (req "wrongOperandType" ex_ty_enc)))
+                (req "wrongOperandType" Script.expr_encoding)))
     (function
       | Undefined_unop (loc, n, ty) ->
-          Some (loc, (n, Ex_ty ty))
+          Some (loc, (n, ty))
       | _ -> None)
-    (fun (loc, (n, Ex_ty ty)) ->
+    (fun (loc, (n, ty)) ->
        Undefined_unop (loc, n, ty)) ;
   (* Bad return *)
   register_error_kind
@@ -287,12 +299,12 @@ let () =
     ~description:
       "Unexpected stack at the end of a lambda or script."
     (located (obj2
-                (req "expectedReturnType" ex_ty_enc)
-                (req "wrongStackType" ex_stack_ty_enc)))
+                (req "expectedReturnType" Script.expr_encoding)
+                (req "wrongStackType" stack_ty_enc)))
     (function
-      | Bad_return (loc, sty, ty) -> Some (loc, (Ex_ty ty, Ex_stack_ty sty))
+      | Bad_return (loc, sty, ty) -> Some (loc, (ty, sty))
       | _ -> None)
-    (fun (loc, (Ex_ty ty, Ex_stack_ty sty)) ->
+    (fun (loc, (ty, sty)) ->
        Bad_return (loc, sty, ty)) ;
   (* Bad stack *)
   register_error_kind
@@ -304,11 +316,11 @@ let () =
     (located (obj3
                 (req "primitiveName" prim_encoding)
                 (req "relevantStackPortion" int16)
-                (req "wrongStackType" ex_stack_ty_enc)))
+                (req "wrongStackType" stack_ty_enc)))
     (function
-      | Bad_stack (loc, name, s, sty) -> Some (loc, (name, s, Ex_stack_ty sty))
+      | Bad_stack (loc, name, s, sty) -> Some (loc, (name, s, sty))
       | _ -> None)
-    (fun (loc, (name, s, Ex_stack_ty sty)) ->
+    (fun (loc, (name, s, sty)) ->
        Bad_stack (loc, name, s, sty)) ;
   (* Inconsistent annotations *)
   register_error_kind
@@ -322,6 +334,18 @@ let () =
     (function Inconsistent_annotations (annot1, annot2) -> Some (annot1, annot2)
             | _ -> None)
     (fun (annot1, annot2) -> Inconsistent_annotations (annot1, annot2)) ;
+  (* Inconsistent field annotations *)
+  register_error_kind
+    `Permanent
+    ~id:"inconsistentFieldAnnotations"
+    ~title:"Annotations for field accesses is inconsistent"
+    ~description:"The specified field does not match the field annotation in the type"
+    (obj2
+       (req "annot1" string)
+       (req "annot2" string))
+    (function Inconsistent_field_annotations (annot1, annot2) -> Some (annot1, annot2)
+            | _ -> None)
+    (fun (annot1, annot2) -> Inconsistent_field_annotations (annot1, annot2)) ;
   (* Inconsistent type annotations *)
   register_error_kind
     `Permanent
@@ -329,12 +353,12 @@ let () =
     ~title:"Types contain inconsistent annotations"
     ~description:"The two types contain annotations that do not match"
     (located (obj2
-                (req "type1" ex_ty_enc)
-                (req "type2" ex_ty_enc)))
+                (req "type1" Script.expr_encoding)
+                (req "type2" Script.expr_encoding)))
     (function
-      | Inconsistent_type_annotations (loc, ty1, ty2) -> Some (loc, (Ex_ty ty1, Ex_ty ty2))
+      | Inconsistent_type_annotations (loc, ty1, ty2) -> Some (loc, (ty1, ty2))
       | _ -> None)
-    (fun (loc, (Ex_ty ty1, Ex_ty ty2)) -> Inconsistent_type_annotations (loc, ty1, ty2)) ;
+    (fun (loc, (ty1, ty2)) -> Inconsistent_type_annotations (loc, ty1, ty2)) ;
   (* Unexpected annotation *)
   register_error_kind
     `Permanent
@@ -345,6 +369,16 @@ let () =
     (function Unexpected_annotation loc -> Some (loc, ())
             | _ -> None)
     (fun (loc, ()) -> Unexpected_annotation loc);
+  (* Ungrouped annotations *)
+  register_error_kind
+    `Permanent
+    ~id:"ungroupedAnnotations"
+    ~title:"Annotations of the same kind were found spread apart"
+    ~description:"Annotations of the same kind must be grouped"
+    (located empty)
+    (function Ungrouped_annotations loc -> Some (loc, ())
+            | _ -> None)
+    (fun (loc, ()) -> Ungrouped_annotations loc);
   (* Unmatched branches *)
   register_error_kind
     `Permanent
@@ -354,13 +388,13 @@ let () =
       "At the join point at the end of two code branches \
        the stacks have inconsistent lengths or contents."
     (located (obj2
-                (req "firstStackType" ex_stack_ty_enc)
-                (req "otherStackType" ex_stack_ty_enc)))
+                (req "firstStackType" stack_ty_enc)
+                (req "otherStackType" stack_ty_enc)))
     (function
       | Unmatched_branches (loc, stya, styb) ->
-          Some (loc, (Ex_stack_ty stya, Ex_stack_ty styb))
+          Some (loc, (stya, styb))
       | _ -> None)
-    (fun (loc, (Ex_stack_ty stya, Ex_stack_ty styb)) ->
+    (fun (loc, (stya, styb)) ->
        Unmatched_branches (loc, stya, styb)) ;
   (* Bad stack item *)
   register_error_kind
@@ -376,32 +410,6 @@ let () =
       | _ -> None)
     (fun n ->
        Bad_stack_item n) ;
-  (* TRANSFER_TOKENS in lambda *)
-  register_error_kind
-    `Permanent
-    ~id:"TransferInLambdaTypeError"
-    ~title: "Transfer in lambda (typechecking error)"
-    ~description:
-      "A TRANSFER_TOKENS instruction was encountered in a lambda expression."
-    (located empty)
-    (function
-      | Transfer_in_lambda loc -> Some (loc, ())
-      | _ -> None)
-    (fun (loc, ()) ->
-       Transfer_in_lambda loc) ;
-  (* TRANSFER_TOKENS in DIP *)
-  register_error_kind
-    `Permanent
-    ~id:"TransferInDipTypeError"
-    ~title: "Transfer in DIP (typechecking error)"
-    ~description:
-      "A TRANSFER_TOKENS instruction was encountered in a DIP instruction."
-    (located empty)
-    (function
-      | Transfer_in_dip loc -> Some (loc, ())
-      | _ -> None)
-    (fun (loc, ()) ->
-       Transfer_in_dip loc) ;
   (* SELF in lambda *)
   register_error_kind
     `Permanent
@@ -438,13 +446,13 @@ let () =
     ~description:
       "A data expression was invalid for its expected type."
     (located (obj2
-                (req "expectedType" ex_ty_enc)
+                (req "expectedType" Script.expr_encoding)
                 (req "wrongExpression" Script.expr_encoding)))
     (function
       | Invalid_constant (loc, expr, ty) ->
-          Some (loc, (Ex_ty ty, expr))
+          Some (loc, (ty, expr))
       | _ -> None)
-    (fun (loc, (Ex_ty ty, expr)) ->
+    (fun (loc, (ty, expr)) ->
        Invalid_constant (loc, expr, ty)) ;
   (* Invalid contract *)
   register_error_kind
@@ -469,11 +477,11 @@ let () =
     ~description:
       "A non comparable type was used in a place where \
        only comparable types are accepted."
-    (located (obj1 (req "wrongType" ex_ty_enc)))
+    (located (obj1 (req "wrongType" Script.expr_encoding)))
     (function
-      | Comparable_type_expected (loc, ty) -> Some (loc, Ex_ty ty)
+      | Comparable_type_expected (loc, ty) -> Some (loc, ty)
       | _ -> None)
-    (fun (loc, Ex_ty ty) ->
+    (fun (loc, ty) ->
        Comparable_type_expected (loc, ty)) ;
   (* Inconsistent types *)
   register_error_kind
@@ -486,14 +494,12 @@ let () =
        two types have to be proven, it is always accompanied \
        with another error that provides more context."
     (obj2
-       (req "firstType" ex_ty_enc)
-       (req "otherType" ex_ty_enc))
+       (req "firstType" Script.expr_encoding)
+       (req "otherType" Script.expr_encoding))
     (function
-      | Inconsistent_types (tya, tyb) ->
-          Some (Ex_ty tya, Ex_ty tyb)
+      | Inconsistent_types (tya, tyb) -> Some (tya, tyb)
       | _ -> None)
-    (fun (Ex_ty tya, Ex_ty tyb) ->
-       Inconsistent_types (tya, tyb)) ;
+    (fun (tya, tyb) -> Inconsistent_types (tya, tyb)) ;
   (* -- Instruction typing errors ------------------- *)
   (* Invalid map body *)
   register_error_kind
@@ -504,13 +510,11 @@ let () =
       "The body of a map block did not match the expected type"
     (obj2
        (req "loc" Script.location_encoding)
-       (req "bodyType" ex_stack_ty_enc))
+       (req "bodyType" stack_ty_enc))
     (function
-      | Invalid_map_body (loc, stack) ->
-          Some (loc, Ex_stack_ty stack)
+      | Invalid_map_body (loc, stack) -> Some (loc, stack)
       | _ -> None)
-    (fun (loc, Ex_stack_ty stack) ->
-       Invalid_map_body (loc, stack)) ;
+    (fun (loc, stack) -> Invalid_map_body (loc, stack)) ;
   (* Invalid map block FAIL *)
   register_error_kind
     `Permanent
@@ -533,12 +537,12 @@ let () =
                   the ITER."
     (obj3
        (req "loc" Script.location_encoding)
-       (req "befStack" ex_stack_ty_enc)
-       (req "aftStack" ex_stack_ty_enc))
+       (req "befStack" stack_ty_enc)
+       (req "aftStack" stack_ty_enc))
     (function
-      | Invalid_iter_body (loc, bef, aft) -> Some (loc, Ex_stack_ty bef, Ex_stack_ty aft)
+      | Invalid_iter_body (loc, bef, aft) -> Some (loc, bef, aft)
       | _ -> None)
-    (fun (loc, Ex_stack_ty bef, Ex_stack_ty aft) -> Invalid_iter_body (loc, bef, aft)) ;
+    (fun (loc, bef, aft) -> Invalid_iter_body (loc, bef, aft)) ;
   (* Type too large *)
   register_error_kind
     `Permanent
@@ -565,13 +569,12 @@ let () =
        (always followed by more precise errors)."
     (obj3
        (opt "identifier" string)
-       (req "expectedType" ex_ty_enc)
+       (req "expectedType" Script.expr_encoding)
        (req "illTypedExpression" Script.expr_encoding))
     (function
-      | Ill_typed_data (name, expr, ty) -> Some (name, Ex_ty ty,  expr)
+      | Ill_typed_data (name, expr, ty) -> Some (name, ty,  expr)
       | _ -> None)
-    (fun (name, Ex_ty ty,  expr) ->
-       Ill_typed_data (name, expr, ty)) ;
+    (fun (name, ty,  expr) -> Ill_typed_data (name, expr, ty)) ;
   (* Ill formed type *)
   register_error_kind
     `Permanent
@@ -606,4 +609,14 @@ let () =
           Some (expr, type_map)
       | _ -> None)
     (fun (expr, type_map) ->
-       Ill_typed_contract (expr, type_map))
+       Ill_typed_contract (expr, type_map)) ;
+  (* Cannot serialize error *)
+  register_error_kind
+    `Temporary
+    ~id:"cannotSerializeError"
+    ~title:"Not enough gas to serialize error"
+    ~description:"The error was too big to be serialized with \
+                  the provided gas"
+    Data_encoding.empty
+    (function Cannot_serialize_error -> Some () | _ -> None)
+    (fun () -> Cannot_serialize_error)

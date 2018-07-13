@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Error_monad
 
@@ -33,6 +49,7 @@ val location_encoding : location Data_encoding.encoding
 
 type token_value =
   | String of string
+  | Bytes of string
   | Int of string
   | Ident of string
   | Annot of string
@@ -56,6 +73,8 @@ val min_point : node list -> point
 (** End of a sequence of consecutive primitives *)
 val max_point : node list -> point
 
+val max_annot_length : int
+
 val node_encoding : node Data_encoding.encoding
 
 type error += Invalid_utf8_sequence of point * string
@@ -64,12 +83,14 @@ type error += Undefined_escape_sequence of point * string
 type error += Missing_break_after_number of point
 type error += Unterminated_string of location
 type error += Unterminated_integer of location
+type error += Odd_lengthed_bytes of location
 type error += Unterminated_comment of location
 type error += Unclosed of token
 type error += Unexpected of token
 type error += Extra of token
 type error += Misaligned of node
 type error += Empty
+type error += Annotation_length of location
 
 val parse_toplevel : ?check:bool -> token list -> node list parsing_result
 

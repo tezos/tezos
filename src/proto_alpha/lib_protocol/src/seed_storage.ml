@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Misc
 
@@ -56,7 +72,8 @@ let compute_for_cycle c ~revealed cycle =
             Storage.Seed.Nonce.delete c level >>=? fun c ->
             return (c, random_seed, u :: unrevealed)
       in
-      Storage.Seed.For_cycle.get c previous_cycle >>=? fun seed ->
+      Storage.Seed.For_cycle.get c previous_cycle >>=? fun prev_seed ->
+      let seed = Seed_repr.deterministic_seed prev_seed in
       fold_left_s combine (c, seed, []) levels >>=? fun (c, seed, unrevealed) ->
       Storage.Seed.For_cycle.init c cycle seed >>=? fun c ->
       return (c, unrevealed)
@@ -90,7 +107,7 @@ let init ctxt =
        Storage.Seed.For_cycle.init ctxt cycle seed)
     (return ctxt)
     (0 --> (preserved+1))
-    (Seed_repr.initial_seeds (preserved+1))
+    (Seed_repr.initial_seeds (preserved+2))
 
 let cycle_end ctxt last_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
@@ -102,7 +119,6 @@ let cycle_end ctxt last_cycle =
   end >>=? fun ctxt ->
   match Cycle_repr.pred last_cycle with
   | None -> return (ctxt, [])
-  | Some revealed ->
+  | Some revealed -> (* cycle with revelations *)
       let inited_seed_cycle = Cycle_repr.add last_cycle (preserved+1) in
       compute_for_cycle ctxt ~revealed inited_seed_cycle
-

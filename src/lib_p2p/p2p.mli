@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** Tezos Shell Net - Low level API for the Gossip network
 
@@ -15,14 +31,21 @@
     nodes.
 *)
 
-type 'meta meta_config = {
-  encoding : 'meta Data_encoding.t;
-  initial : 'meta;
-  score : 'meta -> float
+type 'peer_meta peer_meta_config = {
+  peer_meta_encoding : 'peer_meta Data_encoding.t;
+  peer_meta_initial : 'peer_meta;
+  score : 'peer_meta -> float ;
+}
+
+type 'conn_meta conn_meta_config = {
+  conn_meta_encoding : 'conn_meta Data_encoding.t;
+  conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
+  private_node : 'conn_meta -> bool ;
 }
 
 type 'msg app_message_encoding = Encoding : {
     tag: int ;
+    title: string ;
     encoding: 'a Data_encoding.t ;
     wrap: 'a -> 'msg ;
     unwrap: 'msg -> 'a option ;
@@ -52,9 +75,11 @@ type config = {
   (** The path to the JSON file where the metadata associated to
       peer_ids are loaded / stored. *)
 
-  closed_network : bool ;
-  (** If [true], the only accepted connections are from peers whose
-      addresses are in [trusted_peers]. *)
+  private_mode : bool ;
+  (** If [true], only open outgoing/accept incoming connections
+      to/from peers whose addresses are in [trusted_peers], and inform
+      these peers that the identity of this node should be revealed to
+      the rest of the network. *)
 
   identity : P2p_identity.t ;
   (** Cryptographic identity of the peer. *)
@@ -62,6 +87,8 @@ type config = {
   proof_of_work_target : Crypto_box.target ;
   (** Expected level of proof of work of peers' identity. *)
 
+  disable_mempool : bool ;
+  (** If [true], all non-empty mempools will be ignored. *)
 }
 
 (** Network capacities *)
@@ -73,11 +100,14 @@ type limits = {
   authentication_timeout : float ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
+  greylist_timeout : int ;
+  (** GC delay for the grelists tables, in seconds. *)
+
   min_connections : int ;
   (** Strict minimum number of connections (triggers an urgent maintenance) *)
 
   expected_connections : int ;
-  (** Targeted number of connections to reach when bootstraping / maintaining *)
+  (** Targeted number of connections to reach when bootstrapping / maintaining *)
 
   max_connections : int ;
   (** Maximum number of connections (exceeding peers are disconnected) *)
@@ -124,91 +154,133 @@ type limits = {
 
 (** Type of a P2P layer instance, parametrized by:
     ['msg]: type of messages exchanged between peers
-    ['meta]: type of the metadata associated with peers (score, etc.)
+    ['peer_meta]: type of the metadata associated with peers (score, etc.)
+    ['conn_meta]: type of the metadata associated with connection (ack_cfg)
 *)
-type ('msg, 'meta) t
-type ('msg, 'meta) net = ('msg, 'meta) t
+type ('msg, 'peer_meta, 'conn_meta) t
+type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
 (** A faked p2p layer, which do not initiate any connection
     nor open any listening socket *)
-val faked_network : 'meta meta_config -> ('msg, 'meta) net
+val faked_network :
+  'peer_meta peer_meta_config ->
+  'conn_meta ->
+  ('msg, 'peer_meta, 'conn_meta) net
 
 (** Main network initialisation function *)
 val create :
   config:config -> limits:limits ->
-  'meta meta_config -> 'msg message_config ->  ('msg, 'meta) net tzresult Lwt.t
+  'peer_meta peer_meta_config -> 'conn_meta conn_meta_config ->
+  'msg message_config ->  ('msg, 'peer_meta, 'conn_meta) net tzresult Lwt.t
 
 (** Return one's peer_id *)
-val peer_id : ('msg, 'meta) net -> P2p_peer.Id.t
+val peer_id : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t
 
 (** A maintenance operation : try and reach the ideal number of peers *)
-val maintain : ('msg, 'meta) net -> unit Lwt.t
+val maintain : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
 
 (** Voluntarily drop some peers and replace them by new buddies *)
-val roll : ('msg, 'meta) net -> unit Lwt.t
+val roll : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
 
 (** Close all connections properly *)
-val shutdown : ('msg, 'meta) net -> unit Lwt.t
+val shutdown : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
 
 (** A connection to a peer *)
-type ('msg, 'meta) connection
+type ('msg, 'peer_meta, 'conn_meta) connection
 
 (** Access the domain of active peers *)
-val connections : ('msg, 'meta) net -> ('msg, 'meta) connection list
+val connections :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection list
 
 (** Return the active peer with identity [peer_id] *)
-val find_connection : ('msg, 'meta) net -> P2p_peer.Id.t -> ('msg, 'meta) connection option
+val find_connection :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  P2p_peer.Id.t ->
+  ('msg, 'peer_meta, 'conn_meta) connection option
 
 (** Access the info of an active peer, if available *)
 val connection_info :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> P2p_connection.Info.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'conn_meta P2p_connection.Info.t
+val connection_local_metadata :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'conn_meta
+val connection_remote_metadata :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'conn_meta
 val connection_stat :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> P2p_stat.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  P2p_stat.t
 
 (** Cleanly closes a connection. *)
 val disconnect :
-  ('msg, 'meta) net -> ?wait:bool -> ('msg, 'meta) connection -> unit Lwt.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ?wait:bool ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  unit Lwt.t
 
-val global_stat : ('msg, 'meta) net -> P2p_stat.t
+val global_stat : ('msg, 'peer_meta, 'conn_meta) net -> P2p_stat.t
 
 (** Accessors for meta information about a global identifier *)
-val get_metadata : ('msg, 'meta) net -> P2p_peer.Id.t -> 'meta
-val set_metadata : ('msg, 'meta) net -> P2p_peer.Id.t -> 'meta -> unit
+val get_peer_metadata :
+  ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> 'peer_meta
+val set_peer_metadata :
+  ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> 'peer_meta -> unit
 
 (** Wait for a message from a given connection. *)
 val recv :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg tzresult Lwt.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'msg tzresult Lwt.t
 
 (** Wait for a message from any active connections. *)
 val recv_any :
-  ('msg, 'meta) net -> (('msg, 'meta) connection * 'msg) Lwt.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  (('msg, 'peer_meta, 'conn_meta) connection * 'msg) Lwt.t
 
 (** [send net peer msg] is a thread that returns when [msg] has been
     successfully enqueued in the send queue. *)
 val send :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg -> unit tzresult Lwt.t
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'msg ->
+  unit tzresult Lwt.t
 
 (** [try_send net peer msg] is [true] if [msg] has been added to the
     send queue for [peer], [false] otherwise *)
 val try_send :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg -> bool
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) connection ->
+  'msg ->
+  bool
 
 (** Send a message to all peers *)
-val broadcast : ('msg, 'meta) net -> 'msg -> unit
+val broadcast : ('msg, 'peer_meta, 'conn_meta) net -> 'msg -> unit
 
 val fold_connections :
-  ('msg, 'meta) net ->
-  init:'a -> f:(P2p_peer.Id.t -> ('msg, 'meta) connection -> 'a -> 'a) -> 'a
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  init:'a ->
+  f:(P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> 'a -> 'a) ->
+  'a
 
 val iter_connections :
-  ('msg, 'meta) net ->
-  (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
 
 val on_new_connection :
-  ('msg, 'meta) net ->
-  (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
 
-val build_rpc_directory : _ t -> unit RPC_directory.t
+val build_rpc_directory :
+  (_, _, Connection_metadata.t) t -> unit RPC_directory.t
+
+val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
+val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit
 
 (**/**)
 

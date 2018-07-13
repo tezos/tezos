@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** Tezos Protocol Environment - Protocol updater. *)
 
@@ -23,9 +39,6 @@ type validation_result = {
   message: string option ;
   (** An optional informative message to be used as in the 'git
       commit' of the block's context. *)
-
-  max_operation_data_length: int ;
-  (** The maximum size of operations in bytes. *)
 
   max_operations_ttl: int ;
   (** The "time-to-live" of operation for the next block: any
@@ -50,9 +63,7 @@ type quota = {
 
 type rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: Block_header.t ;
-  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-  operations: unit -> Operation.t list list Lwt.t ;
+  block_header: Block_header.shell_header ;
   context: Context.t ;
 }
 
@@ -60,20 +71,61 @@ type rpc_context = {
     access to the standard library and the Environment module. *)
 module type PROTOCOL = sig
 
-  (** The maximum size of block headers in bytes. *)
+  (** The maximum size of a block header in bytes. *)
   val max_block_length: int
+
+  (** The maximum size of an operation in bytes. *)
+  val max_operation_data_length: int
 
   (** The number of validation passes (length of the list) and the
       operation's quota for each pass. *)
   val validation_passes: quota list
 
-  (** The version specific type of operations. *)
-  type operation
+  (** The version specific type of blocks. *)
+  type block_header_data
 
-  (** The parsing / preliminary validation function for
-      operations. Similar to {!parse_block}. *)
-  val parse_operation:
-    Operation_hash.t -> Operation.t -> operation tzresult
+  (** Encoding for version specific part of block headers.  *)
+  val block_header_data_encoding: block_header_data Data_encoding.t
+
+  (** A fully parsed block header. *)
+  type block_header = {
+    shell: Block_header.shell_header ;
+    protocol_data: block_header_data ;
+  }
+
+  (** Version-specific side information computed by the protocol
+      during the validation of a block. Should not include information
+      about the evaluation of operations which is handled separately by
+      {!operation_metadata}. To be used as an execution trace by tools
+      (client, indexer). Not necessary for validation. *)
+  type block_header_metadata
+
+  (** Encoding for version-specific block metadata. *)
+  val block_header_metadata_encoding: block_header_metadata Data_encoding.t
+
+  (** The version specific type of operations. *)
+  type operation_data
+
+  (** Version-specific side information computed by the protocol
+      during the validation of each operation, to be used conjointly
+      with {!block_header_metadata}. *)
+  type operation_receipt
+
+  (** A fully parsed operation. *)
+  type operation = {
+    shell: Operation.shell_header ;
+    protocol_data: operation_data ;
+  }
+
+  (** Encoding for version-specific operation data. *)
+  val operation_data_encoding: operation_data Data_encoding.t
+
+  (** Encoding for version-specific operation receipts. *)
+  val operation_receipt_encoding: operation_receipt Data_encoding.t
+
+  (** Encoding that mixes an operation data and its receipt. *)
+  val operation_data_and_receipt_encoding:
+    (operation_data * operation_receipt) Data_encoding.t
 
   (** The Validation passes in which an operation can appear.
       For instance [[0]] if it only belongs to the first pass.
@@ -102,12 +154,18 @@ module type PROTOCOL = sig
       function should run quickly, as its main use is to reject bad
       blocks from the chain as early as possible. The input context
       is the one resulting of an ancestor block of same protocol
-      version, not necessarily the one of its predecessor. *)
-  val precheck_block:
+      version. This ancestor of the current head is guaranteed to be
+      more recent than `last_allowed_fork_level`.
+
+      The resulting `validation_state` will be used for multi-pass
+      validation. *)
+  val begin_partial_application:
+    chain_id: Chain_id.t ->
     ancestor_context: Context.t ->
-    ancestor_timestamp: Time.t ->
-    Block_header.t ->
-    unit tzresult Lwt.t
+    predecessor_timestamp: Time.t ->
+    predecessor_fitness: Fitness.t ->
+    block_header ->
+    validation_state tzresult Lwt.t
 
   (** The first step in a block validation sequence. Initializes a
       validation context for validating a block. Takes as argument the
@@ -116,10 +174,11 @@ module type PROTOCOL = sig
       [begin_application], so all the check performed by the former
       must be repeated in the latter. *)
   val begin_application:
+    chain_id: Chain_id.t ->
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_fitness: Fitness.t ->
-    Block_header.t ->
+    block_header ->
     validation_state tzresult Lwt.t
 
   (** Initializes a validation context for constructing a new block
@@ -132,28 +191,32 @@ module type PROTOCOL = sig
       block header usually includes a signature, the header provided
       to {!begin_construction} should includes a faked signature. *)
   val begin_construction:
+    chain_id: Chain_id.t ->
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_level: Int32.t ->
     predecessor_fitness: Fitness.t ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
-    ?protocol_data: MBytes.t ->
+    ?protocol_data: block_header_data ->
     unit -> validation_state tzresult Lwt.t
 
   (** Called after {!begin_application} (or {!begin_construction}) and
       before {!finalize_block}, with each operation in the block. *)
   val apply_operation:
-    validation_state -> operation -> validation_state tzresult Lwt.t
+    validation_state ->
+    operation ->
+    (validation_state * operation_receipt) tzresult Lwt.t
 
   (** The last step in a block validation sequence. It produces the
       context that will be used as input for the validation of its
       successor block candidates. *)
   val finalize_block:
-    validation_state -> validation_result tzresult Lwt.t
+    validation_state ->
+    (validation_result * block_header_metadata) tzresult Lwt.t
 
   (** The list of remote procedures exported by this implementation *)
-  val rpc_services: rpc_context Lwt.t RPC_directory.t
+  val rpc_services: rpc_context RPC_directory.t
 
   (** Initialize the context (or upgrade the context after a protocol
       amendment). This function receives the context resulting of the

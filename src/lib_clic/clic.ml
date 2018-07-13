@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Error_monad
 
@@ -30,6 +46,7 @@ type ('a, 'ctx) arg =
   | Switch : { doc : string ;
                parameter : string * char option } ->
     (bool, 'ctx) arg
+  | Constant : 'a  -> ('a, 'ctx) arg
 
 type ('a, 'arg) args =
   | NoArgs : (unit, 'args) args
@@ -115,7 +132,8 @@ let print_options_detailed (type ctx) =
       | Switch { parameter ; doc } ->
           Format.fprintf ppf "@{<opt>%a@}: %a"
             print_parameter parameter
-            print_desc doc in
+            print_desc doc
+      | Constant _ -> () in
   let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
     fun ppf -> function
       | NoArgs -> ()
@@ -144,6 +162,7 @@ let print_options_brief (type ctx) =
       | Switch { parameter ; _ } ->
           Format.fprintf ppf "[@{<opt>%a@}]"
             print_parameter parameter
+      | Constant _ -> ()
   in let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
        fun ppf -> function
          | NoArgs -> ()
@@ -253,18 +272,16 @@ let group_commands commands =
     List.fold_left
       (fun (grouped, ungrouped) (Ex (Command { group ; _ }) as command) ->
          match group with
-         | None ->
-             (grouped, command :: ungrouped)
+         | None -> (grouped, command :: ungrouped)
          | Some group ->
-             try
-               let ({ title ; _ }, r) =
-                 List.find (fun ({ name ; _ }, _) -> group.name = name) grouped in
-               if title <> group.title then
-                 invalid_arg "Clic.usage: duplicate group name" ;
-               r := command :: !r ;
-               (grouped, ungrouped)
-             with Not_found ->
-               ((group, ref [ command ]) :: grouped, ungrouped))
+             match
+               List.find_opt (fun ({ name ; _ }, _) -> group.name = name) grouped with
+             | None -> ((group, ref [ command ]) :: grouped, ungrouped)
+             | Some ({ title ; _ }, r) ->
+                 if title <> group.title then
+                   invalid_arg "Clic.usage: duplicate group name" ;
+                 r := command :: !r ;
+                 (grouped, ungrouped))
       ([], [])
       commands in
   List.map (fun (g, c) -> (g, List.rev !c))
@@ -537,6 +554,8 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights=[]) command
     (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,") ()
     print_groups by_group
 
+let constant c = Constant c
+
 let arg ~doc ?short ~long ~placeholder kind =
   Arg { doc ;
         parameter = (long, short) ;
@@ -558,15 +577,15 @@ let parse_arg :
   fun ?command spec args_dict ctx ->
     match spec with
     | Arg { parameter = (long, _) ; kind = { converter ; _  } ; _ } ->
-        begin match TzString.Map.find long args_dict with
-          | exception Not_found -> return None
-          | [] -> return None
-          | [ s ] ->
+        begin match TzString.Map.find_opt long args_dict with
+          | None
+          | Some [] -> return_none
+          | Some [ s ] ->
               (trace
                  (Bad_option_argument ("--" ^ long, command))
                  (converter ctx s)) >>|? fun x ->
               Some x
-          | _ :: _ ->
+          | Some (_ :: _) ->
               fail (Multiple_occurences ("--" ^ long, command))
         end
     | DefArg { parameter = (long, _) ; kind = { converter ; _ } ; default ; _ } ->
@@ -578,30 +597,31 @@ let parse_arg :
                 (Format.sprintf
                    "Value provided as default for '%s' could not be parsed by converter function."
                    long) end >>=? fun default ->
-        begin match TzString.Map.find long args_dict with
-          | exception Not_found -> return default
-          | [] -> return default
-          | [ s ] ->
+        begin match TzString.Map.find_opt long args_dict with
+          | None
+          | Some [] -> return default
+          | Some [ s ] ->
               (trace
                  (Bad_option_argument (long, command))
                  (converter ctx s))
-          | _ :: _ ->
+          | Some (_ :: _) ->
               fail (Multiple_occurences (long, command))
         end
     | Switch { parameter = (long, _) ; _ } ->
-        begin match TzString.Map.find long args_dict with
-          | exception Not_found -> return false
-          | [] -> return false
-          | [ _ ] -> return true
-          | _ :: _ -> fail (Multiple_occurences (long, command))
+        begin match TzString.Map.find_opt long args_dict with
+          | None
+          | Some [] -> return_false
+          | Some [ _ ] -> return_true
+          | Some (_ :: _) -> fail (Multiple_occurences (long, command))
         end
+    | Constant c -> return c
 
 (* Argument parsing *)
 let rec parse_args :
   type a ctx. ?command:_ command -> (a, ctx) args -> string list TzString.Map.t -> ctx -> a tzresult Lwt.t =
   fun ?command spec args_dict ctx ->
     match spec with
-    | NoArgs -> return ()
+    | NoArgs -> return_unit
     | AddArg (arg, rest) ->
         parse_arg ?command arg args_dict ctx >>=? fun arg ->
         parse_args ?command rest args_dict ctx >>|? fun rest ->
@@ -625,16 +645,18 @@ let rec make_arities_dict :
         | Arg { parameter ; _ } -> recur parameter 1
         | DefArg { parameter ; _ } -> recur parameter 1
         | Switch { parameter ; _ } -> recur parameter 0
+        | Constant _c -> make_arities_dict rest acc
 
 type error += Help : 'a command option -> error
 
 let check_help_flag ?command = function
   | ("-help" | "--help") :: _ -> fail (Help command)
-  | _ -> return ()
+  | _ -> return_unit
 
 let add_occurrence long value acc =
-  try TzString.Map.add long (TzString.Map.find long acc) acc
-  with Not_found -> TzString.Map.add long [ value ] acc
+  match TzString.Map.find_opt long acc with
+  | Some v -> TzString.Map.add long v acc
+  | None -> TzString.Map.add long [ value ] acc
 
 let make_args_dict_consume ?command spec args =
   let rec make_args_dict completing arities acc args =
@@ -722,6 +744,11 @@ let args10 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 =
     { spec = spec1 >> (spec2 >> (spec3 >> (spec4 >> (spec5 >> (spec6 >> (spec7 >> (spec8 >> (spec9 >> (spec10 >> NoArgs))))))))) ;
       converter = fun (arg1, (arg2, (arg3, (arg4, (arg5, (spec6, (spec7, (spec8, (spec9, (spec10, ())))))))))) ->
         arg1, arg2, arg3, arg4, arg5, spec6, spec7, spec8, spec9, spec10 }
+let args11 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11 =
+  Argument
+    { spec = spec1 >> (spec2 >> (spec3 >> (spec4 >> (spec5 >> (spec6 >> (spec7 >> (spec8 >> (spec9 >> (spec10 >> (spec11 >> NoArgs)))))))))) ;
+      converter = fun (arg1, (arg2, (arg3, (arg4, (arg5, (spec6, (spec7, (spec8, (spec9, (spec10, (spec11, ()))))))))))) ->
+        arg1, arg2, arg3, arg4, arg5, spec6, spec7, spec8, spec9, spec10, spec11 }
 
 (* Some combinators for writing commands concisely. *)
 let param ~name ~desc kind next = Param (name, desc, kind, next)
@@ -951,44 +978,46 @@ let find_command tree initial_arguments =
         fail (Command_not_found (List.rev acc, []))
   in traverse tree initial_arguments []
 
-let get_arg
-  : type a ctx. (a, ctx) arg -> string list
-  = fun arg ->
-    let long, short =
-      match arg with
-      | Arg { parameter ; _ } -> parameter
-      | DefArg { parameter ; _ } -> parameter
-      | Switch { parameter ; _ } -> parameter in
-    ("--" ^ long) :: match short with None -> [] | Some c -> [ "-" ^ String.make 1 c ]
-
-let rec list_args : type arg ctx. (arg, ctx) args -> string list = function
-  | NoArgs -> []
-  | AddArg (arg, args) -> get_arg arg @ list_args args
-
-let complete_func autocomplete cctxt =
-  match autocomplete with
-  | None -> return []
-  | Some autocomplete -> autocomplete cctxt
-
-let list_command_args (Command { options = Argument { spec ; _ } ; _ }) =
-  list_args spec
 
 let get_arg_parameter (type a) (arg : (a, _) arg) =
   match arg with
   | Arg { parameter ; _ } -> parameter
   | DefArg { parameter ; _ } -> parameter
   | Switch { parameter ; _ } -> parameter
+  | Constant _ -> assert false
+
+let get_arg
+  : type a ctx. (a, ctx) arg -> string list
+  = fun arg ->
+    let long, short = get_arg_parameter arg in
+    ("--" ^ long) :: match short with None -> [] | Some c -> [ "-" ^ String.make 1 c ]
+
+let rec list_args : type arg ctx. (arg, ctx) args -> string list = function
+  | NoArgs -> []
+  | AddArg (Constant _, args) -> list_args args
+  | AddArg (arg, args) -> get_arg arg @ list_args args
+
+let complete_func autocomplete cctxt =
+  match autocomplete with
+  | None -> return_nil
+  | Some autocomplete -> autocomplete cctxt
+
+let list_command_args (Command { options = Argument { spec ; _ } ; _ }) =
+  list_args spec
 
 let complete_arg : type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t =
   fun ctx -> function
     | Arg { kind = { autocomplete ; _ } ; _ } -> complete_func autocomplete ctx
     | DefArg { kind = { autocomplete ; _ } ; _ } -> complete_func autocomplete ctx
-    | Switch _ -> return []
+    | Switch _ -> return_nil
+    | Constant _ -> return_nil
 
 let rec remaining_spec :
   type a ctx. TzString.Set.t -> (a, ctx) args -> string list =
   fun seen -> function
     | NoArgs -> []
+    | AddArg (Constant _, rest) ->
+        remaining_spec seen rest
     | AddArg (arg, rest) ->
         let (long, _) = get_arg_parameter arg in
         if TzString.Set.mem long seen
@@ -999,7 +1028,9 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   let arities = make_arities_dict args_spec TzString.Map.empty in
   let rec complete_spec : type a. string -> (a, ctx) args -> string list tzresult Lwt.t =
     fun name -> function
-      | NoArgs -> return []
+      | NoArgs -> return_nil
+      | AddArg (Constant _, rest) ->
+          complete_spec name rest
       | AddArg (arg, rest) ->
           if fst (get_arg_parameter arg) = name
           then complete_arg ctx arg
@@ -1041,7 +1072,7 @@ let complete_next_tree cctxt = function
   | TParam { autocomplete ; _ } ->
       complete_func autocomplete cctxt
   | TStop command -> return (list_command_args command)
-  | TEmpty -> return []
+  | TEmpty -> return_nil
 
 let complete_tree cctxt tree index args =
   let rec help tree args ind =
@@ -1053,14 +1084,14 @@ let complete_tree cctxt tree index args =
       | TPrefix { prefix ; _ }, hd :: tl ->
           begin
             try help (List.assoc hd prefix) tl (ind - 1)
-            with Not_found -> return []
+            with Not_found -> return_nil
           end
       | TParam { tree ; _ }, _ :: tl ->
           help tree tl (ind - 1)
       | TStop Command { options = Argument { spec ; _ } ; conv ;_ }, args ->
-          complete_options (fun _ _ -> return []) args spec ind (conv cctxt)
+          complete_options (fun _ _ -> return_nil) args spec ind (conv cctxt)
       | (TParam _ | TPrefix _), []
-      | TEmpty, _ -> return []
+      | TEmpty, _ -> return_nil
   in help tree args index
 
 let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands cctxt =
@@ -1081,7 +1112,7 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands cct
     else
       match ind 0 args with
       | None ->
-          return []
+          return_nil
       | Some index ->
           begin
             let Argument { spec ; _ } = global_options in
@@ -1180,7 +1211,7 @@ let add_manual ~executable_name ~global_options format ppf commands =
                 let commands = List.map (fun c -> Ex c) commands in
                 usage_internal ppf ~executable_name ~global_options ~highlights:keywords commands ;
                 restore_formatter ppf state ;
-                return ()) ]) in
+                return_unit) ]) in
   Lazy.force with_manual
 
 let pp_cli_errors ppf ~executable_name ~global_options ~default errs =

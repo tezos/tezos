@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 include Logging.Make (struct let name = "test-p2p-io-scheduler" end)
 
@@ -37,7 +53,7 @@ let accept main_socket =
 
 let rec accept_n main_socket n =
   if n <= 0 then
-    return []
+    return_nil
   else
     accept_n main_socket (n-1) >>=? fun acc ->
     accept main_socket >>=? fun conn ->
@@ -72,7 +88,7 @@ let receive conn =
     P2p_io_scheduler.read conn buf >>= function
     | Ok _ -> loop ()
     | Error [P2p_errors.Connection_closed] ->
-        Lwt.return ()
+        Lwt.return_unit
     | Error err -> Lwt.fail (Error err)
   in
   loop ()
@@ -100,7 +116,7 @@ let server
   Lwt.join (List.map receive conns) >>= fun () ->
   iter_p P2p_io_scheduler.close conns >>=? fun () ->
   log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
-  return ()
+  return_unit
 
 let max_size ?max_upload_speed () =
   match max_upload_speed with
@@ -131,7 +147,7 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
   P2p_io_scheduler.close conn >>=? fun () ->
   let stat = P2p_io_scheduler.stat conn in
   lwt_log_notice "Client OK %a" P2p_stat.pp stat >>= fun () ->
-  return ()
+  return_unit
 
 let run
     ?display_client_stat

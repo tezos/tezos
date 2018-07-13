@@ -1,4 +1,0 @@
-parameter (map nat nat);
-return (map nat nat);
-storage unit;
-code {}

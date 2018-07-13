@@ -4,16 +4,18 @@
  ((name tezos_stdlib)
   (public_name tezos-stdlib)
   (libraries (ocplib-endian.bigstring
+              bigstring
               cstruct
-              stringext
               hex
+              re
+              zarith
               lwt
               lwt.log))
   (flags (:standard -safe-string))))
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files *.ml*)))
+  (deps ((glob_files *.ml{,i})))
   (action (run bash ${path:test-ocp-indent.sh} ${^}))))
 
 (install

@@ -1,47 +1,37 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Alpha_context
 
-val operations:
-  'a #RPC_context.simple -> 'a -> (Operation_hash.t * Operation.t) list list shell_tzresult Lwt.t
-val header:
-  'a #RPC_context.simple -> 'a -> Block_header.t shell_tzresult Lwt.t
-val priority:
-  'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
-val seed_nonce_hash:
-  'a #RPC_context.simple -> 'a -> Nonce_hash.t shell_tzresult Lwt.t
+module Seed : sig
 
-module Context : sig
-
-  val level:
-    'a #RPC_context.simple -> 'a -> Level.t shell_tzresult Lwt.t
-  (** [level cctxt blk] returns the (protocol view of the) level of
-      [blk]. *)
-
-  val next_level:
-    'a #RPC_context.simple -> 'a -> Level.t shell_tzresult Lwt.t
-  (** [next_level cctxt blk] returns the (protocol view of the) level
-      of the successor of [blk]. *)
-
-  val voting_period_kind:
-    'a #RPC_context.simple -> 'a -> Voting_period.kind shell_tzresult Lwt.t
-    (** [voting_period_kind cctxt blk] returns the voting period kind
-        of [blk]. *)
+  val get: 'a #RPC_context.simple -> 'a -> Seed.seed shell_tzresult Lwt.t
 
 end
 
 module Nonce : sig
-
-  val hash:
-    'a #RPC_context.simple ->
-    'a -> Nonce_hash.t shell_tzresult Lwt.t
 
   type info =
     | Revealed of Nonce.t
@@ -60,3 +50,5 @@ module Delegate = Delegate_services
 module Helpers = Helpers_services
 module Forge = Helpers_services.Forge
 module Parse = Helpers_services.Parse
+
+val register: unit -> unit

@@ -1,4 +1,0 @@
-parameter (map string nat);
-return nat;
-storage unit;
-code {CAR; SIZE; UNIT; SWAP; PAIR}

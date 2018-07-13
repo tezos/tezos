@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (************************ p2p io scheduler ********************************)
 
@@ -144,7 +160,9 @@ type error += Connected
 type error += Connection_refused
 type error += Rejected of P2p_peer.Id.t
 type error += Too_many_connections
-type error += Closed_network
+type error += Private_mode
+type error += Point_banned of P2p_point.Id.t
+type error += Peer_banned of P2p_peer.Id.t
 
 let () =
   (* Pending connection *)
@@ -198,13 +216,39 @@ let () =
     Data_encoding.empty
     (function Too_many_connections -> Some () | _ -> None)
     (fun () -> Too_many_connections) ;
-  (* Closed network *)
+  (* Private mode *)
   register_error_kind
     `Permanent
-    ~id:"node.p2p_pool.closed_network"
-    ~title:"Closed network"
-    ~description:"Network is closed."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Network is closed.")
+    ~id:"node.p2p_pool.private_mode"
+    ~title:"Private mode"
+    ~description:"Node is in private mode."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Node is in private mode.")
     Data_encoding.empty
-    (function Closed_network -> Some () | _ -> None)
-    (fun () -> Closed_network)
+    (function Private_mode -> Some () | _ -> None)
+    (fun () -> Private_mode) ;
+  (* Point Banned *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_pool.point_banned"
+    ~title:"Point Banned"
+    ~description:"The addr you tried to connect is banned."
+    ~pp:(fun ppf (addr, _port) ->
+        Format.fprintf ppf
+          "The addr you tried to connect (%a) is banned."
+          P2p_addr.pp addr)
+    Data_encoding.(obj1 (req "point" P2p_point.Id.encoding))
+    (function Point_banned point -> Some point | _ -> None)
+    (fun point -> Point_banned point) ;
+  (* Peer Banned *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_pool.peer_banned"
+    ~title:"Peer Banned"
+    ~description:"The peer identity you tried to connect is banned."
+    ~pp:(fun ppf peer_id ->
+        Format.fprintf ppf
+          "The peer identity you tried to connect (%a) is banned."
+          P2p_peer.Id.pp peer_id)
+    Data_encoding.(obj1 (req "peer" P2p_peer.Id.encoding))
+    (function Peer_banned peer_id -> Some peer_id | _ -> None)
+    (fun peer_id -> Peer_banned peer_id)

@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Lwt.Infix
 
@@ -41,7 +57,17 @@ let encoding =
   (* TODO add a [description] *)
   (obj2
      (req "current_head" (dynamic_size Block_header.encoding))
-     (req "history" (dynamic_size (list Block_hash.encoding))))
+     (req "history" (Variable.list Block_hash.encoding)))
+
+let bounded_encoding ?max_header_size ?max_length () =
+  let open Data_encoding in
+  (* TODO add a [description] *)
+  (obj2
+     (req "current_head"
+        (dynamic_size
+           (Block_header.bounded_encoding ?max_size:max_header_size ())))
+     (req "history" (Variable.list ?max_length Block_hash.encoding)))
+
 
 type seed = {
   sender_id: P2p_peer.Id.t ;
@@ -65,33 +91,33 @@ module Step : sig
 
 end = struct
 
-  type state = int * int * Cstruct.t
+  type state = Int32.t * int * MBytes.t
 
   let init seed head =
-    let seed =
-      Nocrypto.Hash.digest `SHA256 @@
-      Cstruct.concat
-        [ Cstruct.of_bigarray @@ P2p_peer.Id.to_bytes seed.sender_id ;
-          Cstruct.of_bigarray @@ P2p_peer.Id.to_bytes seed.receiver_id ;
-          Cstruct.of_bigarray @@ Block_hash.to_bytes head ] in
-    (1, 9, seed)
+    let open Hacl.Hash in
+    let st = SHA256.init () in
+    List.iter (SHA256.update st) [
+      P2p_peer.Id.to_bytes seed.sender_id ;
+      P2p_peer.Id.to_bytes seed.receiver_id ;
+      Block_hash.to_bytes head ] ;
+    (1l, 9, SHA256.finish st)
 
   let draw seed n =
-    Int32.to_int (MBytes.get_int32 (Cstruct.to_bigarray seed) 0) mod n,
-    Nocrypto.Hash.digest `SHA256 seed
+    Int32.rem (MBytes.get_int32 seed 0) n,
+    Hacl.Hash.SHA256.digest seed
 
   let next (step, counter, seed) =
     let random_gap, seed =
-      if step <= 1 then
-        0, seed
+      if step <= 1l then
+        0l, seed
       else
-        draw seed (1 + step/2) in
+        draw seed (Int32.succ (Int32.div step 2l)) in
     let new_state =
       if counter = 0 then
-        (step * 2, 9, seed)
+        (Int32.mul step 2l, 9, seed)
       else
         (step, counter - 1, seed) in
-    step - random_gap, new_state
+    Int32.to_int (Int32.sub step random_gap), new_state
 
 end
 
@@ -122,6 +148,8 @@ type step = {
   step: int ;
   strict_step: bool ;
 }
+
+let pp_step ppf step = Format.fprintf ppf "%d%s" step.step (if step.strict_step then "" else " max")
 
 let to_steps seed locator =
   fold locator seed

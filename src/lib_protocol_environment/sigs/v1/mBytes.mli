@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 type t
 
@@ -20,14 +36,11 @@ val sub: t -> int -> int -> t
     and of length [len]. No copying of elements is involved: the
     sub-array and the original array share the same storage space. *)
 
-val shift: t -> int -> t
-(** [shift src ofs] is equivalent to [sub src ofs (length src - ofs)] *)
-
 val blit: t -> int -> t -> int -> int -> unit
 (** [blit src ofs_src dst ofs_dst len] copy [len] bytes from [src]
     starting at [ofs_src] into [dst] starting at [ofs_dst]. *)
 
-val blit_from_string: string -> int -> t -> int -> int -> unit
+val blit_of_string: string -> int -> t -> int -> int -> unit
 (** See [blit] *)
 
 val blit_to_bytes: t -> int -> bytes -> int -> int -> unit
@@ -39,8 +52,8 @@ val of_string: string -> t
 val to_string: t -> string
 (** [to_string b] dump the array content in a [string]. *)
 
-val substring: t -> int -> int -> string
-(** [substring b ofs len] is equivalent to [to_string (sub b ofs len)]. *)
+val sub_string: t -> int -> int -> string
+(** [sub_string b ofs len] is equivalent to [to_string (sub b ofs len)]. *)
 
 
 
@@ -129,7 +142,7 @@ val (>=) : t -> t -> bool
 val (>) : t -> t -> bool
 val compare : t -> t -> int
 
-val concat: t -> t -> t
+val concat: string -> t list -> t
 
 val to_hex: t -> [ `Hex of string ]
 val of_hex: [ `Hex of string ] -> t

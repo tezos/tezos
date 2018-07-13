@@ -1,4 +1,0 @@
-parameter (pair int int);
-storage unit;
-return unit;
-code {CAR; DUP; CAR; DIP{CDR}; COMPARE; ASSERT_GE; UNIT; DUP; PAIR}

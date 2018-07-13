@@ -1,13 +1,31 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
-open Logging.Node.State
+open State_logging
+
+let block_hash_tag = Tag.def ~doc:"Block hash" "block_hash" Block_hash.pp_short
 
 let mempool_encoding = Mempool.encoding
 
@@ -29,7 +47,7 @@ let head chain_state =
 let mem chain_state hash =
   State.read_chain_data chain_state begin fun chain_store data ->
     if Block_hash.equal (State.Block.hash data.current_head) hash then
-      Lwt.return true
+      Lwt.return_true
     else
       Store.Chain_data.In_main_branch.known (chain_store, hash)
   end
@@ -39,6 +57,7 @@ type data = State.chain_data = {
   current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
+  test_chain: Chain_id.t option ;
 }
 
 let data chain_state =
@@ -56,7 +75,10 @@ let locked_set_head chain_store data block =
     if Block_hash.equal hash ancestor then
       Lwt.return_unit
     else
-      lwt_debug "pop_block %a" Block_hash.pp_short hash >>= fun () ->
+      lwt_debug Tag.DSL.(fun f ->
+          f "pop_block %a"
+          -% t event "pop_block"
+          -% a block_hash_tag hash) >>= fun () ->
       Store.Chain_data.In_main_branch.remove (chain_store, hash) >>= fun () ->
       State.Block.predecessor block >>= function
       | Some predecessor ->
@@ -65,7 +87,10 @@ let locked_set_head chain_store data block =
   in
   let push_block pred_hash block =
     let hash = State.Block.hash block in
-    lwt_debug "push_block %a" Block_hash.pp_short hash >>= fun () ->
+    lwt_debug Tag.DSL.(fun f ->
+        f "push_block %a"
+        -% t event "push_block"
+        -% a block_hash_tag hash) >>= fun () ->
     Store.Chain_data.In_main_branch.store
       (chain_store, pred_hash) hash >>= fun () ->
     Lwt.return hash
@@ -87,6 +112,7 @@ let locked_set_head chain_store data block =
                current_mempool = Mempool.empty ;
                live_blocks ;
                live_operations ;
+               test_chain = None ;
              }
 
 let set_head chain_state block =

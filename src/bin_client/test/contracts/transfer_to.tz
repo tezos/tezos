@@ -1,4 +1,5 @@
-parameter (contract unit unit);
-return unit;
+parameter (contract unit);
 storage unit;
-code {CAR; DIP{UNIT}; PUSH tez "100.00"; UNIT; TRANSFER_TOKENS; PAIR};
+code { CAR; DIP{UNIT}; PUSH mutez 100000000; UNIT;
+       TRANSFER_TOKENS;
+       NIL operation; SWAP; CONS; PAIR};

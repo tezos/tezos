@@ -1,9 +1,0 @@
-parameter key_hash;
-return unit;
-storage unit;
-code { CAR; DEFAULT_ACCOUNT; # Create an account for the recipient of the funds
-       DIP{UNIT};             # Push a value of the storage type below the contract
-       PUSH tez "1.00";       # The person can have a ꜩ
-       UNIT;                 # Push the contract's argument type
-       TRANSFER_TOKENS;      # Run the transfer
-       PAIR };                # Cleanup and put the return values

@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Store_sigs
 
@@ -16,10 +32,11 @@ module Make_value (V : ENCODED_VALUE) = struct
     | None -> generic_error "Cannot parse data" (* TODO personalize *)
     | Some v -> ok v
   let to_bytes v =
-    try Data_encoding.Binary.to_bytes V.encoding v
-    with exn ->
-      Logging.Node.State.log_error
-        "Exception while serializing value %a" pp_exn exn ;
+    try Data_encoding.Binary.to_bytes_exn V.encoding v
+    with Data_encoding.Binary.Write_error error ->
+      Store_logging.log_error
+        "Exception while serializing value %a"
+        Data_encoding.Binary.pp_write_error error ;
       MBytes.create 0
 end
 
@@ -200,7 +217,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let read_opt s i =
       read s i >>= function
       | Error _ -> Lwt.return_none
-      | Ok v -> Lwt.return (Some v)
+      | Ok v -> Lwt.return_some v
     let read_exn s i =
       read s i >>= function
       | Error _ -> Lwt.fail Not_found
@@ -304,7 +321,7 @@ module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
   let read_opt s i =
     read s i >>= function
     | Error _ -> Lwt.return_none
-    | Ok v -> Lwt.return (Some v)
+    | Ok v -> Lwt.return_some v
   let read_exn s i =
     read s i >>= function
     | Error _ -> Lwt.fail Not_found

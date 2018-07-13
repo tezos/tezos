@@ -1,0 +1,26 @@
+(jbuild_version 1)
+
+(executable
+ ((name test)
+  (modules (Test))
+  (libraries (alcotest uecc))))
+
+(executable
+ ((name test_vectors)
+  (modules (Vectors Test_vectors))
+  (libraries (cstruct hex alcotest uecc))))
+
+(alias
+ ((name    runtest-uecc)
+  (deps    (test.exe))
+  (action  (run ${<}))))
+
+(alias
+ ((name    runtest-uecc-vectors)
+  (deps    (test_vectors.exe))
+  (action  (run ${<}))))
+
+(alias
+ ((name    runtest)
+  (deps    ((alias runtest-uecc)
+            (alias runtest-uecc-vectors)))))

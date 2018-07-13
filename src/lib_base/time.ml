@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open CalendarLib
 
@@ -78,8 +94,7 @@ module T = struct
   let rfc_encoding =
     let open Data_encoding in
     def
-      "timestamp" @@
-    describe
+      "timestamp.rfc"
       ~title:
         "RFC 3339 formatted timestamp"
       ~description:
@@ -93,15 +108,18 @@ module T = struct
 
   let encoding =
     let open Data_encoding in
+    def "timestamp" @@
     splitted
       ~binary: int64
       ~json:
         (union [
             case Json_only
+              ~title:"RFC encoding"
               rfc_encoding
               (fun i -> Some i)
               (fun i -> i) ;
             case Json_only
+              ~title:"Second since epoch"
               int64
               (fun _ -> None)
               (fun i -> i) ;
@@ -113,10 +131,18 @@ module T = struct
       ~descr:(Format.asprintf "A date in seconds from epoch")
       ~destruct:
         (fun s ->
-           match Int64.of_string s with
-           | exception _ ->
-               Error (Format.asprintf "failed to parse time (epoch): %S" s)
-           | v -> Ok v)
+           if s = "none" || s = "epoch" then
+             Ok epoch
+           else
+             match of_notation s with
+             | None -> begin
+                 match Int64.of_string s with
+                 | exception _ -> begin
+                     Error (Format.asprintf "failed to parse time (epoch): %S" s)
+                   end
+                 | t -> Ok t
+               end
+             | Some t -> Ok t)
       ~construct:Int64.to_string
       ()
 

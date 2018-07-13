@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 let warnings = "+a-4-6-7-9-29-40..42-44-45-48"
 let warn_error = "-a+8"
@@ -116,25 +132,6 @@ let debug fmt =
   if !debug_flag then Format.eprintf fmt
   else Format.ifprintf Format.err_formatter fmt
 
-let hash_file file =
-  let open Blake2 in
-  let buflen = 8092 in
-  let buf = BytesLabels.create buflen in
-  let fd = Unix.openfile file [Unix.O_RDONLY] 0o600 in
-  let state = Blake2b.init 32 in
-  let loop () =
-    match Unix.read fd buf 0 buflen with
-    | 0 -> ()
-    | nb_read ->
-        Blake2b.update state
-          (Cstruct.of_bytes
-             (if nb_read = buflen then buf else BytesLabels.sub buf ~pos:0 ~len:nb_read))
-  in
-  loop () ;
-  Unix.close fd ;
-  let Blake2b.Hash h = Blake2b.final state in
-  Cstruct.to_string h
-
 let mktemp_dir () =
   Filename.get_temp_dir_name () //
   Printf.sprintf "tezos-protocol-build-%06X" (Random.int 0xFFFFFF)
@@ -190,7 +187,7 @@ let main { compile_ml ; pack_objects ; link_shared } =
   (* Generate the 'functor' *)
   let functor_file = build_dir // "functor.ml" in
   let oc = open_out functor_file in
-  Packer.dump oc
+  Packer.dump oc hash
     (Array.map
        begin fun { Protocol.name }  ->
          let name_lowercase = String.uncapitalize_ascii name in
@@ -251,5 +248,7 @@ let main { compile_ml ; pack_objects ; link_shared } =
     Format.printf "let src_digest = %S ;;\n" (Digest.to_hex dsrc) ;
     Format.printf "let impl_digest = %S ;;\n" (Digest.to_hex dimpl) ;
     Format.printf "let intf_digest = %S ;;\n" (Digest.to_hex dintf)
-  end
+  end ;
+
+  Format.printf "Success: %a@." Protocol_hash.pp hash
 

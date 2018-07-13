@@ -1,4 +1,0 @@
-parameter bool;
-storage unit;
-return bool;
-code {CAR; IF {PUSH bool True} {PUSH bool False}; UNIT; SWAP; PAIR};

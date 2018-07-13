@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** Tezos Shell - Abstraction over all the disk storage.
 
@@ -18,18 +34,6 @@
 
 type t
 type global_state = t
-
-(** Read the internal state of the node and initialize
-    the databases. *)
-val read:
-  ?patch_context:(Context.t -> Context.t Lwt.t) ->
-  store_root:string ->
-  context_root:string ->
-  unit ->
-  global_state tzresult Lwt.t
-
-val close:
-  global_state -> unit Lwt.t
 
 (** {2 Network} ************************************************************)
 
@@ -58,6 +62,10 @@ module Chain : sig
 
   (** Look up for a chain by the hash of its genesis block. *)
   val get: global_state -> Chain_id.t -> chain_state tzresult Lwt.t
+  val get_exn: global_state -> Chain_id.t -> chain_state Lwt.t
+
+  val main: global_state -> Chain_id.t
+  val test: chain_state -> Chain_id.t option Lwt.t
 
   (** Returns all the known chains. *)
   val all: global_state -> chain_state list Lwt.t
@@ -78,6 +86,26 @@ module Chain : sig
   (** Return the expiration timestamp of a test chain. *)
   val expiration: chain_state -> Time.t option
   val allow_forked_chain: chain_state -> bool
+
+  val checkpoint: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+
+  (** Update the current checkpoint. The current head should be
+      consistent (i.e. it should either have a lower level or pass
+      through the checkpoint). In the process all the blocks from
+      invalid alternate heads are removed from the disk, either
+      completely (when `level <= checkpoint`) or still tagged as
+      invalid (when `level > checkpoint`). *)
+  val set_checkpoint:
+    chain_state ->
+    Int32.t * Block_hash.t ->
+    unit Lwt.t
+
+  (** Check that a block is compatible with the current checkpoint.
+      This function assumes that the predecessor is known valid. *)
+  val acceptable_block:
+    chain_state ->
+    Block_hash.t -> Block_header.t ->
+    bool Lwt.t
 
 end
 
@@ -102,8 +130,8 @@ module Block : sig
   val store:
     ?dont_enforce_context_hash:bool ->
     Chain.t ->
-    Block_header.t ->
-    Operation.t list list ->
+    Block_header.t -> MBytes.t ->
+    Operation.t list list -> MBytes.t list list ->
     Tezos_protocol_environment_shell.validation_result ->
     block option tzresult Lwt.t
 
@@ -127,11 +155,14 @@ module Block : sig
   val level: t -> Int32.t
   val message: t -> string option
   val max_operations_ttl: t -> int
-  val max_operation_data_length: t -> int
+  val metadata: t -> MBytes.t
+  val last_allowed_fork_level: t -> Int32.t
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t
   val predecessor_n: t -> int -> Block_hash.t option Lwt.t
+
+  val is_valid_for_checkpoint: t -> (Int32.t * Block_hash.t) -> bool Lwt.t
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
@@ -146,15 +177,22 @@ module Block : sig
     t -> int -> (Operation.t list * Operation_list_list_hash.path) Lwt.t
   val all_operations: t -> Operation.t list list Lwt.t
 
+  val operations_metadata:
+    t -> int -> MBytes.t list Lwt.t
+  val all_operations_metadata: t -> MBytes.t list list Lwt.t
+
   val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
   val known_ancestor:
     Chain.t -> Block_locator.t -> (block * Block_locator.t) option Lwt.t
-    (** [known_ancestor chain_state locator] computes the first block of
-        [locator] that is known to be a valid block. It also computes the
-        'prefix' of [locator] with end at the first valid block.  The
-        function returns [None] when no block in the locator are known or
-        if the first known block is invalid. *)
+  (** [known_ancestor chain_state locator] computes the first block of
+      [locator] that is known to be a valid block. It also computes the
+      'prefix' of [locator] with end at the first valid block.  The
+      function returns [None] when no block in the locator are known or
+      if the first known block is invalid. *)
+
+  val get_rpc_directory: block -> block RPC_directory.t option Lwt.t
+  val set_rpc_directory: block -> block RPC_directory.t -> unit Lwt.t
 
 end
 
@@ -163,6 +201,15 @@ val read_block:
 
 val read_block_exn:
   global_state -> ?pred:int -> Block_hash.t -> Block.t Lwt.t
+
+val watcher: t -> Block.t Lwt_stream.t * Lwt_watcher.stopper
+
+(** Computes the block with the best fitness amongst the known blocks
+    which are compatible with the given checkpoint. *)
+val best_known_head_for_checkpoint:
+  Chain.t ->
+  Int32.t * Block_hash.t ->
+  Block.t Lwt.t
 
 val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
@@ -174,6 +221,7 @@ type chain_data = {
   current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
+  test_chain: Chain_id.t option ;
 }
 
 val read_chain_data:
@@ -212,6 +260,8 @@ module Protocol : sig
 
   val list: global_state -> Protocol_hash.Set.t Lwt.t
 
+  val watcher: global_state -> Protocol_hash.t Lwt_stream.t * Lwt_watcher.stopper
+
 end
 
 module Current_mempool : sig
@@ -224,3 +274,17 @@ module Current_mempool : sig
       not the provided one. *)
 
 end
+
+(** Read the internal state of the node and initialize
+    the databases. *)
+val read:
+  ?patch_context:(Context.t -> Context.t Lwt.t) ->
+  ?store_mapsize:int64 ->
+  ?context_mapsize:int64 ->
+  store_root:string ->
+  context_root:string ->
+  Chain.genesis ->
+  (global_state * Chain.t) tzresult Lwt.t
+
+val close:
+  global_state -> unit Lwt.t

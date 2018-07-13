@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** Tezos Protocol Implementation - Typed storage
 
@@ -19,6 +35,12 @@
     collisions. *)
 
 open Storage_sigs
+
+module Last_block_priority : sig
+  val get : Raw_context.t -> int tzresult Lwt.t
+  val set : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
+  val init : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
+end
 
 module Roll : sig
 
@@ -84,9 +106,9 @@ module Contract : sig
       module `Contract`. *)
 
   module Global_counter : sig
-    val get : Raw_context.t -> int32 tzresult Lwt.t
-    val set : Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
-    val init : Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
+    val get : Raw_context.t -> Z.t tzresult Lwt.t
+    val set : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
+    val init : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
   end
 
   (** The domain of alive contracts *)
@@ -153,33 +175,36 @@ module Contract : sig
 
   module Counter : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = int32
+     and type value = Z.t
      and type t := Raw_context.t
 
-  module Code : Indexed_data_storage
+  module Code : Non_iterable_indexed_carbonated_data_storage
     with type key = Contract_repr.t
-     and type value = Script_repr.expr
+     and type value = Script_repr.lazy_expr
      and type t := Raw_context.t
 
-  module Storage : Indexed_data_storage
+  module Storage : Non_iterable_indexed_carbonated_data_storage
     with type key = Contract_repr.t
-     and type value = Script_repr.expr
+     and type value = Script_repr.lazy_expr
      and type t := Raw_context.t
 
-  module Code_fees : Indexed_data_storage
+  (** Current storage space in bytes.
+      Includes code, global storage and big map elements. *)
+  module Used_storage_space : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Tez_repr.t
+     and type value = Z.t
      and type t := Raw_context.t
 
-  module Storage_fees : Indexed_data_storage
+  (** Maximal space available without needing to burn new fees. *)
+  module Paid_storage_space : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Tez_repr.t
+     and type value = Z.t
      and type t := Raw_context.t
 
   type bigmap_key = Raw_context.t * Contract_repr.t
 
-  module Big_map : Indexed_data_storage
-    with type key = string
+  module Big_map : Non_iterable_indexed_carbonated_data_storage
+    with type key = Script_expr_hash.t
      and type value = Script_repr.expr
      and type t := bigmap_key
 
@@ -236,7 +261,6 @@ module Seed : sig
   type unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
     delegate: Signature.Public_key_hash.t ;
-    deposit: Tez_repr.t ;
     rewards: Tez_repr.t ;
     fees: Tez_repr.t ;
   }
@@ -261,6 +285,24 @@ end
 (** Commitments *)
 
 module Commitments : Indexed_data_storage
-  with type key = Unclaimed_public_key_hash.t
-   and type value = Commitment_repr.t
+  with type key = Blinded_public_key_hash.t
+   and type value = Tez_repr.t
    and type t := Raw_context.t
+
+(** Ramp up security deposits... *)
+
+module Ramp_up : sig
+
+  module Rewards :
+    Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t * Tez_repr.t (* baking * endorsement *)
+     and type t := Raw_context.t
+
+  module Security_deposits :
+    Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t * Tez_repr.t (* baking * endorsement *)
+     and type t := Raw_context.t
+
+end

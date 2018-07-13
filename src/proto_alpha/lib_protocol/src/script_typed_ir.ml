@@ -1,26 +1,50 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Alpha_context
 open Script_int
 
-
 (* ---- Auxiliary types -----------------------------------------------------*)
 
+type var_annot = [ `Var_annot of string ]
+type type_annot = [ `Type_annot of string ]
+type field_annot = [ `Field_annot of string ]
+
+type annot = [ var_annot | type_annot | field_annot ]
+
 type 'ty comparable_ty =
-  | Int_key : (z num) comparable_ty
-  | Nat_key : (n num) comparable_ty
-  | String_key : string comparable_ty
-  | Tez_key : Tez.t comparable_ty
-  | Bool_key : bool comparable_ty
-  | Key_hash_key : public_key_hash comparable_ty
-  | Timestamp_key : Script_timestamp.t comparable_ty
+  | Int_key : type_annot option -> (z num) comparable_ty
+  | Nat_key : type_annot option -> (n num) comparable_ty
+  | String_key : type_annot option -> string comparable_ty
+  | Bytes_key : type_annot option -> MBytes.t comparable_ty
+  | Mutez_key : type_annot option -> Tez.t comparable_ty
+  | Bool_key : type_annot option -> bool comparable_ty
+  | Key_hash_key : type_annot option -> public_key_hash comparable_ty
+  | Timestamp_key : type_annot option -> Script_timestamp.t comparable_ty
+  | Address_key : type_annot option -> Contract.t comparable_ty
+
 
 module type Boxed_set = sig
   type elt
@@ -41,12 +65,9 @@ end
 
 type ('key, 'value) map = (module Boxed_map with type key = 'key and type value = 'value)
 
-type annot = string option
-
-type ('arg, 'ret, 'storage) script =
-  { code : (('arg, 'storage) pair, ('ret, 'storage) pair) lambda ;
+type ('arg, 'storage) script =
+  { code : (('arg, 'storage) pair, (packed_internal_operation list, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
-    ret_type : 'ret ty ;
     storage : 'storage ;
     storage_type : 'storage ty }
 
@@ -59,32 +80,38 @@ and end_of_stack = unit
 and ('arg, 'ret) lambda =
     Lam of ('arg * end_of_stack, 'ret * end_of_stack) descr * Script.expr
 
-and ('arg, 'ret) typed_contract =
-  'arg ty * 'ret ty * Contract.t
+and 'arg typed_contract =
+  'arg ty * Contract.t
 
 and 'ty ty =
-  | Unit_t : unit ty
-  | Int_t : z num ty
-  | Nat_t : n num ty
-  | Signature_t : signature ty
-  | String_t : string ty
-  | Tez_t : Tez.t ty
-  | Key_hash_t : public_key_hash ty
-  | Key_t : public_key ty
-  | Timestamp_t : Script_timestamp.t ty
-  | Bool_t : bool ty
-  | Pair_t : ('a ty * annot) * ('b ty * annot) -> ('a, 'b) pair ty
-  | Union_t : ('a ty * annot) * ('b ty * annot) -> ('a, 'b) union ty
-  | Lambda_t : 'arg ty * 'ret ty -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty -> 'v option ty
-  | List_t : 'v ty -> 'v list ty
-  | Set_t : 'v comparable_ty -> 'v set ty
-  | Map_t : 'k comparable_ty * 'v ty -> ('k, 'v) map ty
-  | Big_map_t : 'k comparable_ty * 'v ty -> ('k, 'v) big_map ty
-  | Contract_t : 'arg ty * 'ret ty -> ('arg, 'ret) typed_contract ty
+  | Unit_t : type_annot option -> unit ty
+  | Int_t : type_annot option -> z num ty
+  | Nat_t : type_annot option -> n num ty
+  | Signature_t : type_annot option -> signature ty
+  | String_t : type_annot option -> string ty
+  | Bytes_t : type_annot option -> MBytes.t ty
+  | Mutez_t : type_annot option -> Tez.t ty
+  | Key_hash_t : type_annot option -> public_key_hash ty
+  | Key_t : type_annot option -> public_key ty
+  | Timestamp_t : type_annot option -> Script_timestamp.t ty
+  | Address_t : type_annot option -> Contract.t ty
+  | Bool_t : type_annot option -> bool ty
+  | Pair_t :
+      ('a ty * field_annot option * var_annot option) *
+      ('b ty * field_annot option * var_annot option) *
+      type_annot option -> ('a, 'b) pair ty
+  | Union_t : ('a ty * field_annot option) * ('b ty * field_annot option) * type_annot option  -> ('a, 'b) union ty
+  | Lambda_t : 'arg ty * 'ret ty * type_annot option  -> ('arg, 'ret) lambda ty
+  | Option_t : ('v ty * field_annot option) * field_annot option * type_annot option  -> 'v option ty
+  | List_t : 'v ty * type_annot option -> 'v list ty
+  | Set_t : 'v comparable_ty * type_annot option -> 'v set ty
+  | Map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) map ty
+  | Big_map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) big_map ty
+  | Contract_t : 'arg ty * type_annot option -> 'arg typed_contract ty
+  | Operation_t : type_annot option -> packed_internal_operation ty
 
 and 'ty stack_ty =
-  | Item_t : 'ty ty * 'rest stack_ty * annot -> ('ty * 'rest) stack_ty
+  | Item_t : 'ty ty * 'rest stack_ty * var_annot option -> ('ty * 'rest) stack_ty
   | Empty_t : end_of_stack stack_ty
 
 and ('key, 'value) big_map = { diff : ('key, 'value option) map ;
@@ -138,25 +165,15 @@ and ('bef, 'aft) instr =
       ('rest, ('a list * 'rest)) instr
   | If_cons : ('a * ('a list * 'bef), 'aft) descr * ('bef, 'aft) descr ->
     ('a list * 'bef, 'aft) instr
-  | List_map :
-      (('param, 'ret) lambda * ('param list * 'rest), 'ret list * 'rest) instr
-  | List_map_body : ('a * 'rest, 'b * 'rest) descr ->
+  | List_map : ('a * 'rest, 'b * 'rest) descr ->
     ('a list * 'rest, 'b list * 'rest) instr
-  | List_reduce :
-      (('param * 'res, 'res) lambda *
-       ('param list * ('res * 'rest)), 'res * 'rest) instr
-  | List_size : ('a list * 'rest, n num * 'rest) instr
-  | List_iter :
-      ('a * 'rest, 'rest) descr ->
+  | List_iter : ('a * 'rest, 'rest) descr ->
     ('a list * 'rest, 'rest) instr
+  | List_size : ('a list * 'rest, n num * 'rest) instr
   (* sets *)
   | Empty_set : 'a comparable_ty ->
     ('rest, 'a set * 'rest) instr
-  | Set_reduce :
-      (('param * 'res, 'res) lambda *
-       ('param set * ('res * 'rest)), 'res * 'rest) instr
-  | Set_iter :
-      ('a * 'rest, 'rest) descr ->
+  | Set_iter : ('a * 'rest, 'rest) descr ->
     ('a set * 'rest, 'rest) instr
   | Set_mem :
       ('elt * ('elt set * 'rest), bool * 'rest) instr
@@ -166,13 +183,9 @@ and ('bef, 'aft) instr =
   (* maps *)
   | Empty_map : 'a comparable_ty * 'v ty ->
     ('rest, ('a, 'v) map * 'rest) instr
-  | Map_map :
-      (('a * 'v, 'r) lambda * (('a, 'v) map * 'rest), ('a, 'r) map * 'rest) instr
-  | Map_reduce :
-      ((('a * 'v) * 'res, 'res) lambda *
-       (('a, 'v) map * ('res * 'rest)), 'res * 'rest) instr
-  | Map_iter :
-      (('a * 'v) * 'rest, 'rest) descr ->
+  | Map_map : (('a * 'v) * 'rest, 'r * 'rest) descr ->
+    (('a, 'v) map * 'rest, ('a, 'r) map * 'rest) instr
+  | Map_iter : (('a * 'v) * 'rest, 'rest) descr ->
     (('a, 'v) map * 'rest, 'rest) instr
   | Map_mem :
       ('a * (('a, 'v) map * 'rest), bool * 'rest) instr
@@ -230,6 +243,8 @@ and ('bef, 'aft) instr =
   | Not :
       (bool * 'rest, bool * 'rest) instr
   (* integer operations *)
+  | Is_nat :
+      (z num * 'rest, n num option * 'rest) instr
   | Neg_nat :
       (n num * 'rest, z num * 'rest) instr
   | Neg_int :
@@ -272,6 +287,8 @@ and ('bef, 'aft) instr =
       (n num * (n num * 'rest), n num * 'rest) instr
   | And_nat :
       (n num * (n num * 'rest), n num * 'rest) instr
+  | And_int_nat :
+      (z num * (n num * 'rest), n num * 'rest) instr
   | Xor_nat :
       (n num * (n num * 'rest), n num * 'rest) instr
   | Not_nat :
@@ -293,8 +310,8 @@ and ('bef, 'aft) instr =
       ('arg * (('arg, 'ret) lambda * 'rest), 'ret * 'rest) instr
   | Lambda : ('arg, 'ret) lambda ->
     ('rest, ('arg, 'ret) lambda * 'rest) instr
-  | Fail :
-      ('bef, 'aft) instr
+  | Failwith :
+      'a ty -> ('a * 'rest, 'aft) instr
   | Nop :
       ('rest, 'rest) instr
   (* comparison *)
@@ -315,38 +332,48 @@ and ('bef, 'aft) instr =
       (z num * 'rest, bool * 'rest) instr
 
   (* protocol *)
-  | Manager :
-      (('arg, 'ret) typed_contract * 'rest, public_key_hash * 'rest) instr
-  | Transfer_tokens : 'sto ty ->
-    ('arg * (Tez.t * (('arg, 'ret) typed_contract * ('sto * end_of_stack))), 'ret * ('sto * end_of_stack)) instr
+  | Address :
+      (_ typed_contract * 'rest, Contract.t * 'rest) instr
+  | Contract : 'p ty ->
+    (Contract.t * 'rest, 'p typed_contract option * 'rest) instr
+  | Transfer_tokens :
+      ('arg * (Tez.t * ('arg typed_contract * 'rest)), packed_internal_operation * 'rest) instr
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
-       (unit, unit) typed_contract * 'rest) instr
-  | Default_account :
-      (public_key_hash * 'rest, (unit, unit) typed_contract * 'rest) instr
-  | Create_contract : 'g ty * 'p ty * 'r ty ->
-    (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t *
-                                                                  (('p * 'g, 'r * 'g) lambda * ('g * 'rest)))))),
-     ('p, 'r) typed_contract * 'rest) instr
-  | Create_contract_literal : 'g ty * 'p ty * 'r ty * ('p * 'g, 'r * 'g) lambda  ->
+       packed_internal_operation * (Contract.t * 'rest)) instr
+  | Implicit_account :
+      (public_key_hash * 'rest, unit typed_contract * 'rest) instr
+  | Create_contract : 'g ty * 'p ty * ('p * 'g, packed_internal_operation list * 'g) lambda  ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
-     ('p, 'r) typed_contract * 'rest) instr
+     packed_internal_operation * (Contract.t * 'rest)) instr
+  | Set_delegate :
+      (public_key_hash option * 'rest, packed_internal_operation * 'rest) instr
   | Now :
       ('rest, Script_timestamp.t * 'rest) instr
   | Balance :
       ('rest, Tez.t * 'rest) instr
   | Check_signature :
-      (public_key * ((signature * string) * 'rest), bool * 'rest) instr
+      (public_key * (signature * (MBytes.t * 'rest)), bool * 'rest) instr
   | Hash_key :
       (public_key * 'rest, public_key_hash * 'rest) instr
-  | H : 'a ty ->
-    ('a * 'rest, string * 'rest) instr
+  | Pack : 'a ty ->
+    ('a * 'rest, MBytes.t * 'rest) instr
+  | Unpack : 'a ty ->
+    (MBytes.t * 'rest, 'a option * 'rest) instr
+  | Blake2b :
+      (MBytes.t * 'rest, MBytes.t * 'rest) instr
+  | Sha256 :
+      (MBytes.t * 'rest, MBytes.t * 'rest) instr
+  | Sha512 :
+      (MBytes.t * 'rest, MBytes.t * 'rest) instr
   | Steps_to_quota : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr
-  | Source : 'p ty * 'r ty ->
-    ('rest, ('p, 'r) typed_contract * 'rest) instr
-  | Self : 'p ty * 'r ty ->
-    ('rest, ('p, 'r) typed_contract * 'rest) instr
+  | Source :
+      ('rest, Contract.t * 'rest) instr
+  | Sender :
+      ('rest, Contract.t * 'rest) instr
+  | Self : 'p ty ->
+    ('rest, 'p typed_contract * 'rest) instr
   | Amount :
       ('rest, Tez.t * 'rest) instr
 

@@ -1,0 +1,6 @@
+parameter (pair (pair (pair string (list int)) (set nat)) bytes) ;
+storage unit ;
+code { CAR ; UNPAIR ; DIP { DUP } ;
+       PACK ; ASSERT_CMPEQ ;
+       UNPACK (pair (pair string (list int)) (set nat)) ; ASSERT_SOME ; DROP ;
+       UNIT ; NIL operation ; PAIR }

@@ -66,18 +66,25 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 (defvar michelson-face-constant
   'michelson-face-constant
   "Face name for Michelson constants.")
-
 (defface michelson-face-constant
    '((t (:inherit font-lock-constant-face)))
    "Face for Michelson constants."
    :group 'michelson-faces)
 
-(defvar michelson-face-instruction
-  'michelson-face-instruction
-  "Face name for Michelson instructions.")
-(defface michelson-face-annotation
+(defvar michelson-face-var-annotation
+  'michelson-face-var-annotation
+  "Face name for Michelson variable or binding annotations.")
+(defface michelson-face-var-annotation
+   '((t (:inherit font-lock-variable-name-face)))
+   "Face for Michelson variable or binding annotations."
+   :group 'michelson-faces)
+
+(defvar michelson-face-type-annotation
+  'michelson-face-type-annotation
+  "Face name for Michelson type or field annotations.")
+(defface michelson-face-type-annotation
    '((t (:inherit font-lock-string-face)))
-   "Face for Michelson annotations."
+   "Face for Michelson type or field annotations."
    :group 'michelson-faces)
 
 (defvar michelson-face-comment
@@ -165,10 +172,11 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 (defconst michelson-font-lock-defaults
   (list
    (list
+    '("\\<[@]\\(\\|%\\|%%\\|[A-Za-z-_][A-Za-z-_0-9\.]*\\)\\>" . michelson-face-var-annotation)
+    '("\\<[%:]\\(\\|@\\|[A-Za-z-_][A-Za-z-_0-9\.]*\\)\\>" . michelson-face-type-annotation)
     '("\\<[0-9]+\\>" . michelson-face-constant)
     '("\\<[A-Z][a-z_0-9]+\\>" . michelson-face-constant)
     '("\\<[A-Z][A-Z_0-9]*\\>" . michelson-face-instruction)
-    '("\\<\$[A-Za-z-_0-9]*\\>" . michelson-face-annotation)
     ;; This will have problems if users have whitespace in front of the declarations
     '("^parameter\\|^return\\|^storage\\|^code" . michelson-face-declaration)
     '("\\<[a-z][a-z_0-9]*\\>" . michelson-face-type))
@@ -178,6 +186,9 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 (defconst michelson-mode-syntax-table
   (let ((michelson-mode-syntax-table (make-syntax-table)))
     (modify-syntax-entry ?_ "w" michelson-mode-syntax-table)
+    (modify-syntax-entry ?@ "w" michelson-mode-syntax-table)
+    (modify-syntax-entry ?: "w" michelson-mode-syntax-table)
+    (modify-syntax-entry ?% "w" michelson-mode-syntax-table)
     (modify-syntax-entry ?/ ". 1n4" michelson-mode-syntax-table)
     (modify-syntax-entry ?* ". 23" michelson-mode-syntax-table)
     (modify-syntax-entry ?# "<b" michelson-mode-syntax-table)
@@ -390,7 +401,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
            (append (split-string michelson-client-command " ")
                    (list
                     "typecheck"
-                    "program"
+                    "script"
                     (if michelson-alphanet
                         (concat "container:" tmp-file)
                       tmp-file)
@@ -428,6 +439,18 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
     map)
   "Keymap for types buffer.")
 
+(define-derived-mode michelson-stack-mode fundamental-mode "Michelson-stack"
+  "Major mode for visualizing the Michelson stack."
+  (interactive)
+  (use-local-map michelson-output-buffer-map)
+  (set-syntax-table michelson-mode-syntax-table)
+  (set
+   (make-local-variable 'font-lock-defaults)
+   michelson-font-lock-defaults)
+  (setq major-mode 'michelson-stack-mode)
+  (setq mode-name "Michelson-stack")
+  (setq indent-tabs-mode nil))
+
 (defun michelson-write-output-buffer (data &optional do-not-overwrite)
   "Write the given `DATA' to the output buffer.
 If `DATA' is a string, it is written directly,
@@ -461,7 +484,7 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
                                'face 'michelson-stack-highlight-face))
                 (setq michelson-highlighting (not michelson-highlighting)))))
         (insert data))
-      (use-local-map michelson-output-buffer-map)
+      (with-current-buffer buffer (michelson-stack-mode))
       (read-only-mode 1)
       (goto-char (point-min))
       (while (not (eobp))
@@ -478,7 +501,7 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
   (lexical-let*
       ((pp-no-trailing-newline
         (lambda (sexp)
-          (let* ((str (pp-to-string sexp))
+          (let* ((str (replace-regexp-in-string "\\\\\." "." (pp-to-string sexp)))
                  (len (length str)))
             (if (equal "\n" (substring str (- len 1) len))
                 (substring str 0 (- len 1))
@@ -768,7 +791,7 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
    (michelson-suggest-reorderable '("ADD" "SUB" "MUL") 'tez 'nat)
    (michelson-suggest-literals "EDIV" 'tez 'nat)
    (michelson-suggest-literals "EDIV" 'tez 'tez)
-   (michelson-suggest-literals "DEFAULT_ACCOUNT" 'key)
+   (michelson-suggest-literals "IMPLICIT_ACCOUNT" 'key)
    (michelson-suggest-depth "SWAP" 2)
    (michelson-suggest-depth '("DROP" "H") 1)
    (michelson-suggest-literals "CHECK_SIGNATURE" 'key '(pair signature string))
@@ -878,9 +901,11 @@ Enables or disables stack and error display."
   (setq buffer-file-coding-system 'utf-8-unix)
   (add-hook 'completion-at-point-functions 'michelson-completion-at-point nil 'local)
   (setq-local company-backends '(company-capf))
-  (setq-local process-environment (cons "ALPHANET_EMACS=true"
-                                        (cons "TEZOS_ALPHANET_DO_NOT_PULL=yes"
-                                              process-environment)))
+  (setq-local process-environment
+              (cons "TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y"
+                    (cons "ALPHANET_EMACS=true"
+                          (cons "TEZOS_ALPHANET_DO_NOT_PULL=yes"
+                                process-environment))))
   (run-hooks 'michelson-mode-hook))
 (add-to-list 'auto-mode-alist '("\\.tz\\'" . michelson-mode))
 (add-to-list 'auto-mode-alist '("\\.tez\\'" . michelson-mode))

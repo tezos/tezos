@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 include Logging.Make (struct let name = "p2p.maintenance" end)
 
@@ -16,7 +32,7 @@ type bounds = {
   max_threshold: int ;
 }
 
-type 'meta pool = Pool : ('msg, 'meta) P2p_pool.t -> 'meta pool
+type 'meta pool = Pool : ('msg, 'meta, 'meta_conn) P2p_pool.t -> 'meta pool
 
 type 'meta t = {
   canceler: Lwt_canceler.t ;
@@ -27,11 +43,12 @@ type 'meta t = {
   mutable maintain_worker : unit Lwt.t ;
 }
 
-(** Select [expected] points amongst the disconnected known points.
+(** Select [expected] points among the disconnected known points.
     It ignores points which are greylisted, or for which a connection
-    failed after [start_time]. It first selects points with the oldest
-    last tentative. *)
-let connectable st start_time expected =
+    failed after [start_time] and the pointes that are banned. It
+    first selects points with the oldest last tentative.
+    Non-trusted points are also ignored if option --private-mode is set. *)
+let connectable st start_time expected seen_points =
   let Pool pool = st.pool in
   let now = Time.now () in
   let module Bounded_point_info =
@@ -45,33 +62,50 @@ let connectable st start_time expected =
         | Some t1, Some t2 -> Time.compare t2 t1
     end) in
   let acc = Bounded_point_info.create expected in
-  P2p_pool.Points.fold_known pool ~init:()
-    ~f:begin fun point pi () ->
-      match P2p_point_state.get pi with
-      | Disconnected -> begin
-          match P2p_point_state.Info.last_miss pi with
-          | Some last when Time.(start_time < last)
-                        || P2p_point_state.Info.greylisted ~now pi -> ()
-          | last ->
-              Bounded_point_info.insert (last, point) acc
-        end
-      | _ -> ()
-    end ;
-  List.map snd (Bounded_point_info.get acc)
+  let private_mode = (P2p_pool.config pool).P2p_pool.private_mode in
+  let seen_points =
+    P2p_pool.Points.fold_known pool ~init:seen_points
+      ~f:begin fun point pi seen_points ->
+        (* consider the point only if:
+           - it is not in seen_points and
+           - it is not banned, and
+           - it is trusted if we are in `closed` mode
+        *)
+        if P2p_point.Set.mem point seen_points ||
+           P2p_pool.Points.banned pool point ||
+           (private_mode && not (P2p_point_state.Info.trusted pi))
+        then
+          seen_points
+        else
+          let seen_points = P2p_point.Set.add point seen_points in
+          match P2p_point_state.get pi with
+          | Disconnected -> begin
+              match P2p_point_state.Info.last_miss pi with
+              | Some last when Time.(start_time < last)
+                            || P2p_point_state.Info.greylisted ~now pi ->
+                  seen_points
+              | last ->
+                  Bounded_point_info.insert (last, point) acc ;
+                  seen_points
+            end
+          | _ -> seen_points
+      end
+  in
+  List.map snd (Bounded_point_info.get acc), seen_points
 
 (** Try to create connections to new peers. It tries to create at
     least [min_to_contact] connections, and will never creates more
     than [max_to_contact]. But, if after trying once all disconnected
     peers, it returns [false]. *)
 let rec try_to_contact
-    st ?(start_time = Time.now ())
+    st ?(start_time = Time.now ()) ~seen_points
     min_to_contact max_to_contact =
   let Pool pool = st.pool in
   if min_to_contact <= 0 then
     Lwt.return_true
   else
-    let contactable =
-      connectable st start_time max_to_contact in
+    let contactable, seen_points =
+      connectable st start_time max_to_contact seen_points in
     if contactable = [] then
       Lwt_unix.yield () >>= fun () ->
       Lwt.return_false
@@ -83,14 +117,21 @@ let rec try_to_contact
            | Error _ -> acc)
         (Lwt.return 0)
         contactable >>= fun established ->
-      try_to_contact st ~start_time
+      try_to_contact st ~start_time ~seen_points
         (min_to_contact - established) (max_to_contact - established)
 
 (** Do a maintenance step. It will terminate only when the number
-    of connections is between `min_threshold` and `max_threshold`. *)
+    of connections is between `min_threshold` and `max_threshold`.
+    Do a pass in the list of banned peers and remove all peers that
+    have been banned for more then xxx seconds *)
 let rec maintain st =
   let Pool pool = st.pool in
   let n_connected = P2p_pool.active_connections pool in
+  let pool_cfg = P2p_pool.config pool in
+  let older_than =
+    Time.(add (now ()) (Int64.of_int (- pool_cfg.greylist_timeout)))
+  in
+  P2p_pool.gc_greylist pool ~older_than ;
   if n_connected < st.bounds.min_threshold then
     too_few_connections st n_connected
   else if st.bounds.max_threshold < n_connected then
@@ -99,7 +140,7 @@ let rec maintain st =
     (* end of maintenance when enough users have been reached *)
     Lwt_condition.broadcast st.just_maintained () ;
     lwt_debug "Maintenance step ended" >>= fun () ->
-    return ()
+    return_unit
   end
 
 and too_few_connections st n_connected =
@@ -108,7 +149,9 @@ and too_few_connections st n_connected =
   lwt_log_notice "Too few connections (%d)" n_connected >>= fun () ->
   let min_to_contact = st.bounds.min_target - n_connected in
   let max_to_contact = st.bounds.max_target - n_connected in
-  try_to_contact st min_to_contact max_to_contact >>= fun success ->
+  try_to_contact
+    st min_to_contact max_to_contact ~seen_points:P2p_point.Set.empty >>=
+  fun success ->
   if success then begin
     maintain st
   end else begin
@@ -148,7 +191,7 @@ let rec worker_loop st =
         P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
         P2p_pool.Pool_event.wait_too_many_connections pool
       ] >>= fun () ->
-      return ()
+      return_unit
     end >>=? fun () ->
     let n_connected = P2p_pool.active_connections pool in
     if n_connected < st.bounds.min_threshold
@@ -156,7 +199,7 @@ let rec worker_loop st =
       maintain st
     else begin
       P2p_pool.send_swap_request pool ;
-      return ()
+      return_unit
     end
   end >>= function
   | Ok () -> worker_loop st

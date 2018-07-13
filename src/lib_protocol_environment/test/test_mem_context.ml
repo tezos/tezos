@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Tezos_protocol_environment_memory
 
@@ -55,7 +71,7 @@ let test_simple { block2 = ctxt } =
   Assert.equal_string_option (Some "Novembre") (c novembre) ;
   Context.get ctxt ["a";"c"] >>= fun juin ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let test_continuation { block3a = ctxt } =
   Context.get ctxt ["version"] >>= fun version ->
@@ -66,7 +82,7 @@ let test_continuation { block3a = ctxt } =
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
   Context.get ctxt ["a";"d"] >>= fun mars ->
   Assert.equal_string_option ~msg:__LOC__  (Some "Mars") (c mars) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let test_fork { block3b = ctxt } =
   Context.get ctxt ["version"] >>= fun version ->
@@ -77,7 +93,7 @@ let test_fork { block3b = ctxt } =
   Assert.is_none ~msg:__LOC__ (c juin) ;
   Context.get ctxt ["a";"d"] >>= fun mars ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let test_replay { genesis = ctxt0 }  =
   Context.set ctxt0 ["version"] (MBytes.of_string "0.0") >>= fun ctxt1 ->
@@ -96,7 +112,7 @@ let test_replay { genesis = ctxt0 }  =
   Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
   Context.get ctxt4b ["a";"d"] >>= fun juillet ->
   Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let fold_keys s k ~init ~f =
   let rec loop k acc =
@@ -131,7 +147,7 @@ let test_fold { genesis = ctxt } =
   Assert.equal_string_list_list ~msg:__LOC__ [["g";"h"]] l ;
   keys ctxt ["i"] >>= fun l ->
   Assert.equal_string_list_list ~msg:__LOC__ [] l ;
-  Lwt.return ()
+  Lwt.return_unit
 
 (******************************************************************************)
 

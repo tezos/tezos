@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Error_monad
 
@@ -35,7 +51,6 @@ module Make (Context : CONTEXT) = struct
     context: Context.t ;
     fitness: Fitness.t ;
     message: string option ;
-    max_operation_data_length: int ;
     max_operations_ttl: int ;
     last_allowed_fork_level: Int32.t ;
   }
@@ -47,9 +62,7 @@ module Make (Context : CONTEXT) = struct
 
   type rpc_context = {
     block_hash: Block_hash.t ;
-    block_header: Block_header.t ;
-    operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-    operations: unit -> Operation.t list list Lwt.t ;
+    block_header: Block_header.shell_header ;
     context: Context.t ;
   }
 
@@ -60,39 +73,61 @@ module Make (Context : CONTEXT) = struct
     type rpc_context
     type 'a tzresult
     val max_block_length: int
+    val max_operation_data_length: int
     val validation_passes: quota list
-    type operation
-    val parse_operation:
-      Operation_hash.t -> Operation.t -> operation tzresult
+    type block_header_data
+    val block_header_data_encoding: block_header_data Data_encoding.t
+    type block_header = {
+      shell: Block_header.shell_header ;
+      protocol_data: block_header_data ;
+    }
+    type block_header_metadata
+    val block_header_metadata_encoding: block_header_metadata Data_encoding.t
+    type operation_data
+    type operation_receipt
+    type operation = {
+      shell: Operation.shell_header ;
+      protocol_data: operation_data ;
+    }
+    val operation_data_encoding: operation_data Data_encoding.t
+    val operation_receipt_encoding: operation_receipt Data_encoding.t
+    val operation_data_and_receipt_encoding:
+      (operation_data * operation_receipt) Data_encoding.t
     val acceptable_passes: operation -> int list
     val compare_operations: operation -> operation -> int
     type validation_state
     val current_context: validation_state -> context tzresult Lwt.t
-    val precheck_block:
+    val begin_partial_application:
+      chain_id: Chain_id.t ->
       ancestor_context: context ->
-      ancestor_timestamp: Time.t ->
-      Block_header.t ->
-      unit tzresult Lwt.t
+      predecessor_timestamp: Time.t ->
+      predecessor_fitness: Fitness.t ->
+      block_header ->
+      validation_state tzresult Lwt.t
     val begin_application:
+      chain_id: Chain_id.t ->
       predecessor_context: context ->
       predecessor_timestamp: Time.t ->
       predecessor_fitness: Fitness.t ->
-      Block_header.t ->
+      block_header ->
       validation_state tzresult Lwt.t
     val begin_construction:
+      chain_id: Chain_id.t ->
       predecessor_context: context ->
       predecessor_timestamp: Time.t ->
       predecessor_level: Int32.t ->
       predecessor_fitness: Fitness.t ->
       predecessor: Block_hash.t ->
       timestamp: Time.t ->
-      ?protocol_data: MBytes.t ->
+      ?protocol_data: block_header_data ->
       unit -> validation_state tzresult Lwt.t
     val apply_operation:
-      validation_state -> operation -> validation_state tzresult Lwt.t
+      validation_state -> operation ->
+      (validation_state * operation_receipt) tzresult Lwt.t
     val finalize_block:
-      validation_state -> validation_result tzresult Lwt.t
-    val rpc_services: rpc_context Lwt.t RPC_directory.t
+      validation_state ->
+      (validation_result * block_header_metadata) tzresult Lwt.t
+    val rpc_services: rpc_context RPC_directory.t
     val init:
       context -> Block_header.shell_header -> validation_result tzresult Lwt.t
   end
@@ -109,8 +144,10 @@ module Make (Context : CONTEXT) = struct
     include Tezos_protocol_environment_sigs.V1.T
       with type Format.formatter = Format.formatter
        and type 'a Data_encoding.t = 'a Data_encoding.t
+       and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
+       and type Chain_id.t = Chain_id.t
        and type Block_hash.t = Block_hash.t
        and type Operation_hash.t = Operation_hash.t
        and type Operation_list_hash.t = Operation_list_hash.t
@@ -131,27 +168,37 @@ module Make (Context : CONTEXT) = struct
        and type Secp256k1.Public_key_hash.t = Secp256k1.Public_key_hash.t
        and type Secp256k1.Public_key.t = Secp256k1.Public_key.t
        and type Secp256k1.t = Secp256k1.t
+       and type P256.Public_key_hash.t = P256.Public_key_hash.t
+       and type P256.Public_key.t = P256.Public_key.t
+       and type P256.t = P256.t
        and type Signature.public_key_hash = Signature.public_key_hash
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t
+       and type Signature.watermark = Signature.watermark
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
+       and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
        and type RPC_service.meth = RPC_service.meth
        and type (+'m,'pr,'p,'q,'i,'o) RPC_service.t = ('m,'pr,'p,'q,'i,'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
+       and type Z.t = Z.t
 
     type error += Ecoproto_error of Error_monad.error
     val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
 
     module Lift (P : Updater.PROTOCOL) : PROTOCOL
-      with type operation = P.operation
+      with type block_header_data = P.block_header_data
+       and type block_header = P.block_header
+       and type operation_data = P.operation_data
+       and type operation_receipt = P.operation_receipt
+       and type operation = P.operation
        and type validation_state = P.validation_state
 
-    class ['block] proto_rpc_context :
-      Tezos_rpc.RPC_context.t -> (unit, unit * 'block) RPC_path.t ->
-      ['block] RPC_context.simple
+    class ['chain, 'block] proto_rpc_context :
+      Tezos_rpc.RPC_context.t -> (unit, (unit * 'chain) * 'block) RPC_path.t ->
+      [('chain * 'block)] RPC_context.simple
 
     class ['block] proto_rpc_context_of_directory :
       ('block -> RPC_context.t) -> RPC_context.t RPC_directory.t ->
@@ -184,16 +231,36 @@ module Make (Context : CONTEXT) = struct
     module Buffer = Buffer
     module Format = Format
     module Option = Option
-    module Z = Z
+    module MBytes = MBytes
+    module Raw_hashes = struct
+      let sha256 msg = Hacl.Hash.SHA256.digest msg
+      let sha512 msg = Hacl.Hash.SHA512.digest msg
+      let blake2b msg = Blake2B.to_bytes (Blake2B.hash_bytes [ msg ])
+    end
+    module Z = struct
+      include Z
+      let to_bits ?(pad_to = 0) z =
+        let bits = to_bits z in
+        let len = Pervasives.((numbits z + 7) / 8) in
+        let full_len = Compare.Int.max pad_to len in
+        if full_len = 0 then
+          MBytes.empty
+        else
+          let res = MBytes.make full_len '\000' in
+          MBytes.blit_of_string bits 0 res 0 len ;
+          res
+      let of_bits bytes =
+        of_bits (MBytes.to_string bytes)
+    end
     module Lwt_sequence = Lwt_sequence
     module Lwt = Lwt
     module Lwt_list = Lwt_list
-    module MBytes = MBytes
     module Uri = Uri
     module Data_encoding = Data_encoding
     module Time = Time
     module Ed25519 = Ed25519
     module Secp256k1 = Secp256k1
+    module P256 = P256
     module Signature = Signature
     module S = struct
       module type T = Tezos_base.S.T
@@ -285,6 +352,8 @@ module Make (Context : CONTEXT) = struct
           include ENCODER with type t := t
           include INDEXES with type t := t
 
+          val zero: t
+
         end
 
         module Public_key : sig
@@ -310,8 +379,10 @@ module Make (Context : CONTEXT) = struct
 
         val zero: t
 
+        type watermark
+
         (** Check a signature *)
-        val check: Public_key.t -> t -> MBytes.t -> bool
+        val check: ?watermark:watermark -> Public_key.t -> t -> MBytes.t -> bool
 
       end
 
@@ -346,6 +417,7 @@ module Make (Context : CONTEXT) = struct
       | Ok _ as ok -> ok
       | Error errors -> Error (List.map (fun error -> Ecoproto_error error) errors)
 
+    module Chain_id = Chain_id
     module Block_hash = Block_hash
     module Operation_hash = Operation_hash
     module Operation_list_hash = Operation_list_hash
@@ -466,7 +538,7 @@ module Make (Context : CONTEXT) = struct
     end
     module RPC_context = struct
 
-      type t = rpc_context Lwt.t
+      type t = rpc_context
 
       class type ['pr] simple = object
         method call_proto_service0 :
@@ -537,7 +609,6 @@ module Make (Context : CONTEXT) = struct
         context: Context.t ;
         fitness: Fitness.t ;
         message: string option ;
-        max_operation_data_length: int ;
         max_operations_ttl: int ;
         last_allowed_fork_level: Int32.t ;
       }
@@ -549,9 +620,7 @@ module Make (Context : CONTEXT) = struct
 
       type nonrec rpc_context = rpc_context = {
         block_hash: Block_hash.t ;
-        block_header: Block_header.t ;
-        operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-        operations: unit -> Operation.t list list Lwt.t ;
+        block_header: Block_header.shell_header ;
         context: Context.t ;
       }
 
@@ -593,26 +662,26 @@ module Make (Context : CONTEXT) = struct
 
     module Lift(P : Updater.PROTOCOL) = struct
       include P
-      let precheck_block
-          ~ancestor_context ~ancestor_timestamp
+      let begin_partial_application
+          ~chain_id ~ancestor_context ~predecessor_timestamp ~predecessor_fitness
           raw_block =
-        precheck_block
-          ~ancestor_context ~ancestor_timestamp
+        begin_partial_application
+          ~chain_id ~ancestor_context ~predecessor_timestamp ~predecessor_fitness
           raw_block >|= wrap_error
       let begin_application
-          ~predecessor_context ~predecessor_timestamp
+          ~chain_id ~predecessor_context ~predecessor_timestamp
           ~predecessor_fitness
           raw_block =
         begin_application
-          ~predecessor_context ~predecessor_timestamp
+          ~chain_id ~predecessor_context ~predecessor_timestamp
           ~predecessor_fitness
           raw_block >|= wrap_error
       let begin_construction
-          ~predecessor_context ~predecessor_timestamp
+          ~chain_id ~predecessor_context ~predecessor_timestamp
           ~predecessor_level ~predecessor_fitness
           ~predecessor ~timestamp ?protocol_data () =
         begin_construction
-          ~predecessor_context ~predecessor_timestamp
+          ~chain_id ~predecessor_context ~predecessor_timestamp
           ~predecessor_level ~predecessor_fitness
           ~predecessor ~timestamp ?protocol_data () >|= wrap_error
       let current_context c =
@@ -620,51 +689,50 @@ module Make (Context : CONTEXT) = struct
       let apply_operation c o =
         apply_operation c o >|= wrap_error
       let finalize_block c = finalize_block c >|= wrap_error
-      let parse_operation h b = parse_operation h b |> wrap_error
       let init c bh = init c bh >|= wrap_error
     end
 
-    class ['block] proto_rpc_context
+    class ['chain, 'block] proto_rpc_context
         (t : Tezos_rpc.RPC_context.t)
-        (prefix : (unit, unit * 'block) RPC_path.t) =
+        (prefix : (unit, (unit * 'chain) * 'block) RPC_path.t) =
       object
         method call_proto_service0
           : 'm 'q 'i 'o.
             ([< RPC_service.meth ] as 'm, RPC_context.t,
              RPC_context.t, 'q, 'i, 'o) RPC_service.t ->
-            'block -> 'q -> 'i -> 'o tzresult Lwt.t
-          = fun s block q i ->
+            ('chain * 'block) -> 'q -> 'i -> 'o tzresult Lwt.t
+          = fun s (chain, block) q i ->
             let s = RPC_service.subst0 s in
             let s = RPC_service.prefix prefix s in
-            t#call_service s ((), block) q i
+            t#call_service s (((), chain), block) q i
         method call_proto_service1
           : 'm 'a 'q 'i 'o.
             ([< RPC_service.meth ] as 'm, RPC_context.t,
              RPC_context.t * 'a, 'q, 'i, 'o) RPC_service.t ->
-            'block -> 'a -> 'q -> 'i -> 'o tzresult Lwt.t
-          = fun s block a1 q i ->
+            ('chain * 'block) -> 'a -> 'q -> 'i -> 'o tzresult Lwt.t
+          = fun s (chain, block) a1 q i ->
             let s = RPC_service.subst1 s in
             let s = RPC_service.prefix prefix s in
-            t#call_service s (((), block), a1) q i
+            t#call_service s ((((), chain), block), a1) q i
         method call_proto_service2
           : 'm 'a 'b 'q 'i 'o.
             ([< RPC_service.meth ] as 'm, RPC_context.t,
              (RPC_context.t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
-            'block -> 'a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t
-          = fun s block a1 a2 q i ->
+            ('chain * 'block) -> 'a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t
+          = fun s (chain, block) a1 a2 q i ->
             let s = RPC_service.subst2 s in
             let s = RPC_service.prefix prefix s in
-            t#call_service s ((((), block), a1), a2) q i
+            t#call_service s (((((), chain), block), a1), a2) q i
         method call_proto_service3
           : 'm 'a 'b 'c 'q 'i 'o.
             ([< RPC_service.meth ] as 'm, RPC_context.t,
              ((RPC_context.t * 'a) * 'b) * 'c,
              'q, 'i, 'o) RPC_service.t ->
-            'block -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t
-          = fun s block a1 a2 a3 q i ->
+            ('chain * 'block) -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t
+          = fun s (chain, block) a1 a2 a3 q i ->
             let s = RPC_service.subst3 s in
             let s = RPC_service.prefix prefix s in
-            t#call_service s (((((), block), a1), a2), a3) q i
+            t#call_service s ((((((), chain), block), a1), a2), a3) q i
       end
 
     class ['block] proto_rpc_context_of_directory conv dir : ['block] RPC_context.simple =

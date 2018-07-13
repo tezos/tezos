@@ -19,10 +19,10 @@ configure_client() {
 
 wait_for_the_node_to_be_ready() {
     local count=0
-    if "$client" rpc call /blocks/head/hash >/dev/null 2>&1; then return; fi
+    if "$client" rpc get /chains/main/blocks/head/hash >/dev/null 2>&1; then return; fi
     printf "Waiting for the node to initialize..."
     sleep 1
-    while ! "$client" rpc call /blocks/head/hash >/dev/null 2>&1
+    while ! "$client" rpc get /chains/main/blocks/head/hash >/dev/null 2>&1
     do
         count=$((count+1))
         if [ "$count" -ge 30 ]; then
@@ -45,24 +45,6 @@ launch_node() {
 
     mkdir -p "$node_dir"
 
-    if [ ! -f "$node_dir/config.json" ]; then
-        echo "Configuring the node..."
-        "$node" config init \
-                --data-dir "$node_dir" \
-                --rpc-addr ":$NODE_RPC_PORT" \
-                "$@"
-    else
-        echo "Updating the node configuration..."
-        "$node" config update \
-                --data-dir "$node_dir" \
-                --rpc-addr ":$NODE_RPC_PORT" \
-                "$@"
-    fi
-
-    for i in "$@"; do
-        if [ "$i" = "--help" ] ; then exit 0; fi
-    done
-
     # Check if we have to reset the chain because the image we want to
     # run has a incompatible version with the blockchain we have stored
     # locally on disk
@@ -76,46 +58,76 @@ launch_node() {
     fi
     if [ "$local_data_version" != "$image_version" ]; then
         echo "Removing outdated chain data..."
-        if [ -f "$node_dir/identities.json" ]; then \
-            mv "$node_dir/identities.json" /tmp
+        if [ -f "$node_data_dir/identities.json" ]; then \
+            mv "$node_data_dir/identities.json" /tmp
         fi
-        rm -rf "$node_dir/*"
-        rm -rf "$client_dir/blockss"
-        rm -rf "$client_dir/noncess"
-        rm -rf "$client_dir/endorsementss"
-        rm -rf "$client_dir/endorsed_levels"
+        rm -rf "$node_data_dir"
+        rm -rf "$client_dir/blocks"
+        rm -rf "$client_dir/nonces"
+        rm -rf "$client_dir/endorsements"
         if [ -f "/tmp/identities.json" ]; then \
-            mv /tmp/identities.json "$node_dir/"
+            mv /tmp/identities.json "$node_data_dir/"
         fi
         cp "/usr/local/share/tezos/alphanet_version" \
            "$node_dir/alphanet_version"
     fi
 
+    mkdir -p "$node_data_dir"
+
+    if [ ! -f "$node_data_dir/config.json" ]; then
+        echo "Configuring the node..."
+        "$node" config init \
+                --data-dir "$node_data_dir" \
+                --rpc-addr ":$NODE_RPC_PORT" \
+                "$@"
+    else
+        echo "Updating the node configuration..."
+        "$node" config update \
+                --data-dir "$node_data_dir" \
+                --rpc-addr ":$NODE_RPC_PORT" \
+                "$@"
+    fi
+
+    for i in "$@"; do
+        if [ "$i" = "--help" ] ; then exit 0; fi
+    done
 
     # Generate a new identity if not present
 
-    if [ ! -f "$node_dir/identity.json" ]; then
+    if [ ! -f "$node_data_dir/identity.json" ]; then
         echo "Generating a new node identity..."
-        "$node" identity generate 24. \
-                --data-dir "$node_dir"
+        "$node" identity generate "${IDENTITY_POW:-26}". \
+                --data-dir "$node_data_dir"
     fi
 
     configure_client
 
     # Launching the node
 
-    exec "$node" run --data-dir "$node_dir"
+    exec "$node" run --data-dir "$node_data_dir"
 
 }
 
 launch_baker() {
     configure_client
     wait_for_the_node_to_be_bootstraped
-    exec "$client" launch daemon --baking "$@"
+    exec "$baker" --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 run with local node "$node_data_dir"
 }
 
 launch_endorser() {
     configure_client
     wait_for_the_node_to_be_bootstraped
-    exec "$client" launch daemon --endorsement "$@"
+    exec "$endorser" --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 run --endorsement-delay 10
+}
+
+launch_accuser() {
+    configure_client
+    wait_for_the_node_to_be_bootstraped
+    exec "$accuser" --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 run
 }

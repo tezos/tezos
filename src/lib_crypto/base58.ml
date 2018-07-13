@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Lwt.Infix
 
@@ -112,11 +128,9 @@ let raw_decode ?(alphabet=Alphabet.default) s =
 
 let checksum s =
   let hash =
-    Nocrypto.Hash.digest `SHA256 @@
-    Nocrypto.Hash.digest `SHA256 @@
-    Cstruct.of_string s in
+    Hacl.Hash.SHA256.(digest (digest (Bigstring.of_string s))) in
   let res = Bytes.make 4 '\000' in
-  Cstruct.blit_to_bytes hash 0 res 0 4 ;
+  Bigstring.blit_to_bytes hash 0 res 0 4 ;
   Bytes.to_string res
 
 (* Append a 4-bytes cryptographic checksum before encoding string s *)
@@ -126,10 +140,12 @@ let safe_encode ?alphabet s =
 let safe_decode ?alphabet s =
   raw_decode ?alphabet s |> Option.apply ~f:begin fun s ->
     let len = String.length s in
-    let msg = String.sub s 0 (len-4) in
-    let msg_hash = String.sub s (len-4) 4 in
-    if msg_hash <> checksum msg then None
-    else Some msg
+    if len < 4 then None else
+      (* only if the string is long enough to extract a checksum do we check it *)
+      let msg = String.sub s 0 (len-4) in
+      let msg_hash = String.sub s (len-4) 4 in
+      if msg_hash <> checksum msg then None
+      else Some msg
   end
 
 type data = ..
@@ -308,9 +324,8 @@ module Prefix = struct
 
   (* 20 *)
   let ed25519_public_key_hash = "\006\161\159" (* tz1(36) *)
-
-  (* 20 *)
   let secp256k1_public_key_hash = "\006\161\161" (* tz2(36) *)
+  let p256_public_key_hash = "\006\161\164" (* tz3(36) *)
 
   (* 16 *)
   let cryptobox_public_key_hash = "\153\103" (* id(30) *)
@@ -319,14 +334,22 @@ module Prefix = struct
   let ed25519_seed = "\013\015\058\007" (* edsk(54) *)
   let ed25519_public_key = "\013\015\037\217" (* edpk(54) *)
   let secp256k1_secret_key = "\017\162\224\201" (* spsk(54) *)
+  let p256_secret_key = "\016\081\238\189" (* p2sk(54) *)
+
+  (* 56 *)
+  let ed25519_encrypted_seed = "\007\090\060\179\041" (* edesk(88) *)
+  let secp256k1_encrypted_secret_key = "\009\237\241\174\150" (* spesk(88) *)
+  let p256_encrypted_secret_key = "\009\048\057\115\171" (* p2esk(88) *)
 
   (* 33 *)
   let secp256k1_public_key = "\003\254\226\086" (* sppk(55) *)
+  let p256_public_key = "\003\178\139\127" (* p2pk(55) *)
 
   (* 64 *)
   let ed25519_secret_key = "\043\246\078\007" (* edsk(98) *)
   let ed25519_signature = "\009\245\205\134\018" (* edsig(99) *)
   let secp256k1_signature =  "\013\115\101\019\063" (* spsig1(99) *)
+  let p256_signature =  "\054\240\044\052" (* p2sig(98) *)
   let generic_signature = "\004\130\043" (* sig(96) *)
 
   (* 4 *)

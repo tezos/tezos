@@ -1,4 +1,0 @@
-parameter key;
-return key_hash;
-storage unit;
-code {CAR; HASH_KEY; DIP{UNIT}; PAIR}

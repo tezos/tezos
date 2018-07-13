@@ -1,4 +1,0 @@
-parameter (list string);
-return (list string);
-storage unit;
-code {}

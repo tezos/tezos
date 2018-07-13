@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Error_monad
 open Micheline
@@ -54,6 +70,7 @@ let location_encoding =
 
 type token_value =
   | String of string
+  | Bytes of string
   | Int of string
   | Ident of string
   | Annot of string
@@ -66,16 +83,24 @@ type token_value =
 let token_value_encoding =
   let open Data_encoding in
   union
-    [ case (Tag 0) (obj1 (req "string" string))
+    [ case (Tag 0)
+        ~title:"String"
+        (obj1 (req "string" string))
         (function String s -> Some s | _ -> None)
         (fun s -> String s) ;
-      case (Tag 1) (obj1 (req "int" string))
+      case (Tag 1)
+        ~title:"Int"
+        (obj1 (req "int" string))
         (function Int s -> Some s | _ -> None)
         (fun s -> Int s) ;
-      case (Tag 2) (obj1 (req "annot" string))
+      case (Tag 2)
+        ~title:"Annot"
+        (obj1 (req "annot" string))
         (function Annot s -> Some s | _ -> None)
         (fun s -> Annot s) ;
-      case (Tag 3) (obj2 (req "comment" string) (dft "end_of_line" bool false))
+      case (Tag 3)
+        ~title:"Comment"
+        (obj2 (req "comment" string) (dft "end_of_line" bool false))
         (function
           | Comment s -> Some (s, false)
           | Eol_comment s -> Some (s, true) | _ -> None)
@@ -83,17 +108,25 @@ let token_value_encoding =
           | (s, false) -> Comment s
           | (s, true) -> Eol_comment s) ;
       case (Tag 4)
+        ~title:"Punctuation"
         (obj1 (req "punctuation" (string_enum [
              "(", Open_paren ;
              ")", Close_paren ;
              "{", Open_brace ;
              "}", Close_brace ;
              ";", Semi ])))
-        (fun t -> Some t) (fun t -> t) ]
+        (fun t -> Some t) (fun t -> t) ;
+      case (Tag 5)
+        ~title:"Bytes"
+        (obj1 (req "bytes" string))
+        (function Bytes s -> Some s | _ -> None)
+        (fun s -> Bytes s) ]
 
 type token =
   { token : token_value ;
     loc : location }
+
+let max_annot_length = 255
 
 type error += Invalid_utf8_sequence of point * string
 type error += Unexpected_character of point * string
@@ -101,7 +134,9 @@ type error += Undefined_escape_sequence of point * string
 type error += Missing_break_after_number of point
 type error += Unterminated_string of location
 type error += Unterminated_integer of location
+type error += Odd_lengthed_bytes of location
 type error += Unterminated_comment of location
+type error += Annotation_length of location
 
 let tokenize source =
   let decoder = Uutf.decoder ~encoding:`UTF_8 (`String source) in
@@ -134,13 +169,26 @@ let tokenize source =
       Some (Uchar.to_char c)
     else
       None in
+  let allowed_ident_char c =
+    match uchar_to_char c with
+    | Some ('a'..'z' | 'A'..'Z' | '_' | '0'..'9') -> true
+    | Some _ | None -> false in
+  let allowed_annot_char c =
+    match uchar_to_char c with
+    | Some ('a'..'z' | 'A'..'Z' | '_' | '.' | '%' | '@' | '0'..'9') -> true
+    | Some _ | None -> false in
   let rec skip acc =
     match next () with
     | `End, _ -> List.rev acc
     | `Uchar c, start ->
         begin match uchar_to_char c with
-          | Some ('a'..'z' | 'A'..'Z') -> ident acc start (fun s -> Ident s)
-          | Some '@' -> ident acc start (fun s -> Annot s)
+          | Some ('a'..'z' | 'A'..'Z') -> ident acc start (fun s _ -> Ident s)
+          | Some ('@' | ':' | '$' | '&' | '%' | '!' | '?') ->
+              annot acc start
+                (fun str stop ->
+                   if String.length str > max_annot_length
+                   then errors := (Annotation_length { start ; stop }) :: !errors ;
+                   Annot str)
           | Some '-' ->
               begin match next () with
                 | `End, stop ->
@@ -149,7 +197,7 @@ let tokenize source =
                 | `Uchar c, stop as first ->
                     begin match uchar_to_char c with
                       | Some '0' -> base acc start
-                      | Some ('1'..'9') -> integer `dec acc start false
+                      | Some ('1'..'9') -> integer acc start
                       | Some _ | None ->
                           errors := Unterminated_integer { start ; stop } :: !errors ;
                           back first ;
@@ -157,7 +205,7 @@ let tokenize source =
                     end
               end
           | Some '0' -> base acc start
-          | Some ('1'..'9') -> integer `dec acc start false
+          | Some ('1'..'9') -> integer acc start
           | Some (' ' | '\n') -> skip acc
           | Some ';' -> skip (tok start (here ()) Semi :: acc)
           | Some '{' -> skip (tok start (here ()) Open_brace :: acc)
@@ -185,9 +233,8 @@ let tokenize source =
     match next () with
     | (`Uchar c, stop) as charloc ->
         begin match uchar_to_char c with
-          | Some ('0'.. '9') -> integer `dec acc start false
-          | Some 'x' -> integer `hex acc start true
-          | Some 'b' -> integer `bin acc start true
+          | Some ('0'.. '9') -> integer acc start
+          | Some 'x' -> bytes acc start
           | Some ('a' | 'c'..'w' | 'y' | 'z' | 'A'..'Z') ->
               errors := Missing_break_after_number stop :: !errors ;
               back charloc ;
@@ -199,7 +246,7 @@ let tokenize source =
     | (_, stop) as other ->
         back other ;
         skip (tok start stop (Int "0") :: acc)
-  and integer base acc start first =
+  and integer acc start =
     let tok stop =
       let value =
         String.sub source start.byte (stop.byte - start.byte) in
@@ -210,31 +257,39 @@ let tokenize source =
           errors := Missing_break_after_number stop :: !errors ;
           back charloc ;
           skip (tok stop :: acc) in
-        begin match base, Uchar.to_char c with
-          | `dec, ('0'.. '9') ->
-              integer `dec acc start false
-          | `dec, ('a'..'z' | 'A'..'Z') ->
+        begin match Uchar.to_char c with
+          | ('0'.. '9') ->
+              integer acc start
+          | ('a'..'z' | 'A'..'Z') ->
               missing_break ()
-          | `hex, ('0'..'9' | 'a'..'f' | 'A'..'F') ->
-              integer `hex acc start false
-          | `hex, ('g'..'z' | 'G'..'Z') ->
-              missing_break ()
-          | `bin, ('0' | '1') ->
-              integer `bin acc start false
-          | `bin, ('2'..'9' | 'a'..'z' | 'A'..'Z') ->
-              missing_break ()
-          | (`bin | `hex), _ when first ->
-              errors := Unterminated_integer { start ; stop } :: !errors ;
-              back charloc ;
-              skip (tok stop :: acc)
           | _ ->
               back charloc ;
               skip (tok stop :: acc)
         end
     | (`End, stop) as other ->
-        if first && base = `bin || base = `hex then begin
-          errors := Unterminated_integer { start ; stop } :: !errors
-        end ;
+        back other ;
+        skip (tok stop :: acc)
+  and bytes acc start =
+    let tok stop =
+      let value =
+        String.sub source start.byte (stop.byte - start.byte) in
+      tok start stop (Bytes value) in
+    match next () with
+    | (`Uchar c, stop) as charloc ->
+        let missing_break () =
+          errors := Missing_break_after_number stop :: !errors ;
+          back charloc ;
+          skip (tok stop :: acc) in
+        begin match Uchar.to_char c with
+          | ('0'..'9' | 'a'..'f' | 'A'..'F') ->
+              bytes acc start
+          | ('g'..'z' | 'G'..'Z') ->
+              missing_break ()
+          | _ ->
+              back charloc ;
+              skip (tok stop :: acc)
+        end
+    | (`End, stop) as other ->
         back other ;
         skip (tok stop :: acc)
   and string acc sacc start =
@@ -247,7 +302,7 @@ let tokenize source =
     | `Uchar c, stop ->
         match uchar_to_char c with
         | Some '"' -> skip (tok () :: acc)
-        | Some '\n' ->
+        | Some ('\n' | '\r') ->
             errors := Unterminated_string { start ; stop } :: !errors ;
             skip (tok () :: acc)
         | Some '\\' ->
@@ -273,23 +328,24 @@ let tokenize source =
             let byte = Uutf.decoder_byte_count decoder in
             let s = String.sub source stop.byte (byte - stop.byte) in
             string acc (s :: sacc) start
-  and ident acc start ret =
+  and generic_ident allow_char acc start (ret : string -> point -> token_value) =
     let tok stop =
       let name =
         String.sub source start.byte (stop.byte - start.byte) in
-      tok start stop (ret name) in
+      tok start stop (ret name stop) in
     match next () with
     | (`Uchar c, stop) as charloc ->
-        begin match uchar_to_char c with
-          | Some ('a'..'z' | 'A'..'Z' | '_' | '0'..'9') ->
-              ident acc start ret
-          | Some _ | None ->
-              back charloc ;
-              skip (tok stop :: acc)
+        if allow_char c then
+          generic_ident allow_char acc start ret
+        else begin
+          back charloc ;
+          skip (tok stop :: acc)
         end
     | (_, stop) as other ->
         back other ;
         skip (tok stop :: acc)
+  and ident acc start ret = generic_ident allowed_ident_char acc start ret
+  and annot acc start ret = generic_ident allowed_annot_char acc start ret
   and comment acc start lvl =
     match next () with
     | `End, stop ->
@@ -348,8 +404,9 @@ let min_point : node list -> point = function
   | [] -> point_zero
   | Int ({ start }, _) :: _
   | String ({ start }, _) :: _
+  | Bytes ({ start }, _) :: _
   | Prim ({ start }, _, _, _) :: _
-  | Seq ({ start }, _, _) :: _ -> start
+  | Seq ({ start }, _) :: _ -> start
 
 (* End of a sequence of consecutive primitives *)
 let rec max_point : node list -> point  = function
@@ -357,8 +414,9 @@ let rec max_point : node list -> point  = function
   | _ :: (_ :: _ as rest) -> max_point rest
   | Int ({ stop }, _) :: []
   | String ({ stop }, _) :: []
+  | Bytes ({ stop }, _) :: []
   | Prim ({ stop }, _, _, _) :: []
-  | Seq ({ stop }, _, _) :: [] -> stop
+  | Seq ({ stop }, _) :: [] -> stop
 
 (* An item in the parser's state stack.
    Not every value of type [mode list] is a valid parsing context.
@@ -371,9 +429,9 @@ let rec max_point : node list -> point  = function
 type mode =
   | Toplevel of node list
   | Expression of node option
-  | Sequence of token * node list * string option
-  | Unwrapped of location * string * node list * string option
-  | Wrapped of token * string * node list * string option
+  | Sequence of token * node list
+  | Unwrapped of location * string * node list * string list
+  | Wrapped of token * string * node list * string list
 
 (* Enter a new parsing state. *)
 let push_mode mode stack =
@@ -396,8 +454,8 @@ let fill_mode result = function
       Expression (Some result) :: []
   | Toplevel exprs :: [] ->
       Toplevel (result :: exprs) :: []
-  | Sequence (token, exprs, annot) :: rest ->
-      Sequence (token, result :: exprs, annot) :: rest
+  | Sequence (token, exprs) :: rest ->
+      Sequence (token, result :: exprs) :: rest
   | Wrapped (token, name, exprs, annot) :: rest ->
       Wrapped (token, name, result :: exprs, annot) :: rest
   | Unwrapped (start, name, exprs, annot) :: rest ->
@@ -408,6 +466,12 @@ type error += Unexpected of token
 type error += Extra of token
 type error += Misaligned of node
 type error += Empty
+
+let rec annots = function
+  | { token = Annot annot } :: rest ->
+      let annots, rest = annots rest in
+      annot :: annots, rest
+  | rest -> [], rest
 
 let rec parse ?(check = true) errors tokens stack =
   (* Two steps:
@@ -434,8 +498,8 @@ let rec parse ?(check = true) errors tokens stack =
   | Expression None :: _, [] ->
       let errors = Empty :: errors in
       let ghost = { start = point_zero ; stop = point_zero} in
-      [ Seq (ghost, [], None) ], List.rev errors
-  | Toplevel [ Seq (_, exprs, _) as expr ] :: [],
+      [ Seq (ghost, []) ], List.rev errors
+  | Toplevel [ Seq (_, exprs) as expr ] :: [],
     [] ->
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       exprs, List.rev errors
@@ -443,7 +507,7 @@ let rec parse ?(check = true) errors tokens stack =
     [] ->
       let exprs = List.rev exprs in
       let loc = { start = min_point exprs ; stop = max_point exprs } in
-      let expr = Seq (loc, exprs, None) in
+      let expr = Seq (loc, exprs) in
       let errors = if check then do_check ~toplevel: true errors expr else errors in
       exprs, List.rev errors
   (* Ignore comments *)
@@ -451,7 +515,7 @@ let rec parse ?(check = true) errors tokens stack =
     { token = Eol_comment _ | Comment _ } :: rest ->
       parse ~check errors rest stack
   | (Expression None | Sequence _ | Toplevel _) :: _,
-    ({ token = Int _ | String _ } as token):: { token = Eol_comment _ | Comment _ } :: rest
+    ({ token = Int _ | String _ | Bytes _ } as token):: { token = Eol_comment _ | Comment _ } :: rest
   | (Wrapped _ | Unwrapped _) :: _,
     ({ token = Open_paren } as token)
     :: { token = Eol_comment _ | Comment _ } :: rest ->
@@ -472,9 +536,9 @@ let rec parse ?(check = true) errors tokens stack =
       parse ~check errors (valid (* skip *) :: rem) stack
   | (Wrapped _ | Unwrapped _) :: _ ,
     { token = Open_paren }
-    :: ({ token = Int _ | String _ | Annot _ | Close_paren } as token) :: rem
+    :: ({ token = Int _ | String _ | Bytes _ | Annot _ | Close_paren } as token) :: rem
   | (Expression None | Sequence _ | Toplevel _) :: _,
-    { token = Int _ | String _ } :: ({ token = Ident _ | Int _ | String _ | Annot _ | Close_paren | Open_paren | Open_brace } as token) :: rem
+    { token = Int _ | String _ | Bytes _ } :: ({ token = Ident _ | Int _ | String _ | Bytes _ | Annot _ | Close_paren | Open_paren | Open_brace } as token) :: rem
   | Unwrapped (_, _, _, _) :: Toplevel _ :: _,
     ({ token = Close_brace } as token) :: rem
   | Unwrapped (_, _, _, _) :: _,
@@ -500,25 +564,26 @@ let rec parse ?(check = true) errors tokens stack =
       let fake = { token with token = Close_paren } in
       let tokens = (* insert *) fake :: tokens  in
       parse ~check errors tokens stack
-  | (Sequence (token, _, _) :: _ | Unwrapped _ :: Sequence (token, _, _) :: _), [] ->
+  | (Sequence (token, _) :: _ | Unwrapped _ :: Sequence (token, _) :: _), [] ->
       let errors = Unclosed token :: errors in
       let fake = { token with token = Close_brace } in
       let tokens = (* insert *) fake :: tokens  in
       parse ~check errors tokens stack
   (* Valid states *)
-  | (Toplevel _ | Sequence (_, _, _)) :: _ ,
-    { token = Ident name ; loc } :: { token = Annot annot } :: rest ->
-      let mode = Unwrapped (loc, name, [], Some annot) in
+  | (Toplevel _ | Sequence (_, _)) :: _ ,
+    { token = Ident name ; loc } :: ({ token = Annot _ } :: _ as rest) ->
+      let annots, rest = annots rest in
+      let mode = Unwrapped (loc, name, [], annots) in
       parse ~check errors rest (push_mode mode stack)
-  | (Expression None | Toplevel _ | Sequence (_, _, _)) :: _ ,
+  | (Expression None | Toplevel _ | Sequence (_, _)) :: _ ,
     { token = Ident name ; loc } :: rest ->
-      let mode = Unwrapped (loc, name, [], None) in
+      let mode = Unwrapped (loc, name, [], []) in
       parse ~check errors rest (push_mode mode stack)
   | (Unwrapped _ | Wrapped _) :: _,
     { token = Int value ; loc } :: rest
   | (Expression None | Sequence _ | Toplevel _) :: _,
     { token = Int value ; loc } :: ([] | { token = Semi | Close_brace} :: _ as rest) ->
-      let expr : node = Int (loc, value) in
+      let expr : node = Int (loc, Z.of_string value) in
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr stack)
   | (Unwrapped _ | Wrapped _) :: _,
@@ -528,10 +593,22 @@ let rec parse ?(check = true) errors tokens stack =
       let expr : node = String (loc, contents) in
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr stack)
-  | Sequence ({ loc = { start } }, exprs, annot) :: _ ,
+  | (Unwrapped _ | Wrapped _) :: _,
+    { token = Bytes contents ; loc } :: rest
+  | (Expression None | Sequence _ | Toplevel _) :: _,
+    { token = Bytes contents ; loc } :: ([] | { token = Semi | Close_brace} :: _ as rest) ->
+      let errors, contents = if String.length contents mod 2 <> 0 then
+          Odd_lengthed_bytes loc :: errors, contents ^ "0"
+        else errors, contents in
+      let bytes =
+        MBytes.of_hex (`Hex (String.sub contents 2 (String.length contents - 2))) in
+      let expr : node = Bytes (loc, bytes) in
+      let errors = if check then do_check ~toplevel: false errors expr else errors in
+      parse ~check errors rest (fill_mode expr stack)
+  | Sequence ({ loc = { start } }, exprs) :: _ ,
     { token = Close_brace ; loc = { stop } } :: rest ->
       let exprs = List.rev exprs in
-      let expr = Micheline.Seq ({ start ; stop }, exprs, annot) in
+      let expr = Micheline.Seq ({ start ; stop }, exprs) in
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr (pop_mode stack))
   | (Sequence _ | Toplevel _) :: _ ,
@@ -551,34 +628,31 @@ let rec parse ?(check = true) errors tokens stack =
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr (pop_mode stack))
   | (Wrapped _ | Unwrapped _) :: _ ,
-    ({ token = Open_paren } as token) :: { token = Ident name } :: { token = Annot annot } :: rest ->
-      let mode = Wrapped (token, name, [], Some annot) in
+    ({ token = Open_paren } as token) :: { token = Ident name } :: ({ token = Annot _ } :: _ as rest) ->
+      let annots, rest = annots rest in
+      let mode = Wrapped (token, name, [], annots) in
       parse ~check errors rest (push_mode mode stack)
   | (Wrapped _ | Unwrapped _) :: _ ,
     ({ token = Open_paren } as token) :: { token = Ident name } :: rest ->
-      let mode = Wrapped (token, name, [], None) in
+      let mode = Wrapped (token, name, [], []) in
       parse ~check errors rest (push_mode mode stack)
   | (Wrapped _ | Unwrapped _) :: _ ,
     { token = Ident name ; loc } :: rest ->
-      let expr = Micheline.Prim (loc, name, [], None) in
+      let expr = Micheline.Prim (loc, name, [], []) in
       let errors = if check then do_check ~toplevel: false errors expr else errors in
       parse ~check errors rest (fill_mode expr stack)
   | (Wrapped _ | Unwrapped _ | Toplevel _ | Sequence _ | Expression None) :: _ ,
-    ({ token = Open_brace } as token) :: { token = Annot annot } :: rest ->
-      let mode = Sequence (token, [], Some annot) in
-      parse ~check errors rest (push_mode mode stack)
-  | (Wrapped _ | Unwrapped _ | Toplevel _ | Sequence _ | Expression None) :: _ ,
     ({ token = Open_brace } as token) :: rest ->
-      let mode = Sequence (token, [], None) in
+      let mode = Sequence (token, []) in
       parse ~check errors rest (push_mode mode stack)
 (* indentation checker *)
 and do_check ?(toplevel = false) errors = function
-  | Seq ({ start ; stop }, [], _) as expr ->
+  | Seq ({ start ; stop }, []) as expr ->
       if start.column >= stop.column then
         Misaligned expr :: errors
       else errors
   | Prim ({ start ; stop }, _, first :: rest, _)
-  | Seq ({ start ; stop }, first :: rest, _) as expr ->
+  | Seq ({ start ; stop }, first :: rest) as expr ->
       let { column = first_column ; line = first_line } =
         min_point [ first ] in
       if start.column >= stop.column then
@@ -602,15 +676,16 @@ and do_check ?(toplevel = false) errors = function
                   errors in
               in_line_or_aligned start_line errors rest in
         in_line_or_aligned first_line errors rest
-  | Prim (_, _, [], _) | String _ | Int _ -> errors
+  | Prim (_, _, [], _) | String _ | Int _ | Bytes _ -> errors
 
 let parse_expression ?check tokens =
   let result = match tokens with
-    | ({ token = Open_paren } as token) :: { token = Ident name } :: { token = Annot annot } :: rest ->
-        let mode = Wrapped (token, name, [], Some annot) in
+    | ({ token = Open_paren } as token) :: { token = Ident name } :: { token = Annot _ } :: rest ->
+        let annots, rest = annots rest in
+        let mode = Wrapped (token, name, [], annots) in
         parse ?check [] rest [ mode ; Expression None ]
     | ({ token = Open_paren } as token) :: { token = Ident name } :: rest ->
-        let mode = Wrapped (token, name, [], None) in
+        let mode = Wrapped (token, name, [], []) in
         parse ?check [] rest [ mode ; Expression None ]
     | _ ->
         parse ?check [] tokens [ Expression None ] in
@@ -630,6 +705,7 @@ let print_token_kind ppf = function
   | Open_paren | Close_paren -> Format.fprintf ppf "parenthesis"
   | Open_brace | Close_brace -> Format.fprintf ppf "curly brace"
   | String _ -> Format.fprintf ppf "string constant"
+  | Bytes _ -> Format.fprintf ppf "bytes constant"
   | Int _ -> Format.fprintf ppf "integer constant"
   | Ident _ -> Format.fprintf ppf "identifier"
   | Annot _ -> Format.fprintf ppf "annotation"
@@ -714,6 +790,16 @@ let () =
     (function Unterminated_integer loc -> Some loc | _ -> None)
     (fun loc -> Unterminated_integer loc) ;
   register_error_kind `Permanent
+    ~id: "micheline.parse_error.odd_lengthed_bytes"
+    ~title: "Micheline parser error: odd lengthed bytes"
+    ~description: "While parsing a piece of Micheline source, the \
+                   length of a byte sequence (0x...) was not a \
+                   multiple of two, leaving a trailing half byte."
+    ~pp:(fun ppf loc -> Format.fprintf ppf "%a, odd_lengthed bytes" print_location loc)
+    Data_encoding.(obj1 (req "location" location_encoding))
+    (function Odd_lengthed_bytes loc -> Some loc | _ -> None)
+    (fun loc -> Odd_lengthed_bytes loc) ;
+  register_error_kind `Permanent
     ~id: "micheline.parse_error.unterminated_comment"
     ~title: "Micheline parser error: unterminated comment"
     ~description: "While parsing a piece of Micheline source, \
@@ -722,6 +808,18 @@ let () =
     Data_encoding.(obj1 (req "location" location_encoding))
     (function Unterminated_comment loc -> Some loc | _ -> None)
     (fun loc -> Unterminated_comment loc) ;
+  register_error_kind `Permanent
+    ~id: "micheline.parse_error.annotation_exceeds_max_length"
+    ~title: "Micheline parser error: annotation exceeds max length"
+    ~description: (Format.sprintf
+                     "While parsing a piece of Micheline source, \
+                      an annotation exceeded the maximum length (%d)." max_annot_length)
+    ~pp:(fun ppf loc -> Format.fprintf ppf "%a, annotation exceeded maximum length (%d chars)"
+            print_location
+            loc max_annot_length)
+    Data_encoding.(obj1 (req "location" location_encoding))
+    (function Annotation_length loc -> Some loc | _ -> None)
+    (fun loc -> Annotation_length loc) ;
   register_error_kind `Permanent
     ~id: "micheline.parse_error.unclosed_token"
     ~title: "Micheline parser error: unclosed token"

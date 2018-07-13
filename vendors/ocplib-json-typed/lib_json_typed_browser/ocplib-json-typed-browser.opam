@@ -1,0 +1,18 @@
+opam-version: "1.2"
+name: "ocplib-json-typed-browser"
+version: "0.6"
+maintainer: "Benjamin Canou <benjamin@ocamlpro.com>"
+authors: "Benjamin Canou <benjamin@ocamlpro.com>"
+homepage: "https://github.com/ocamlpro/ocplib-json-typed"
+bug-reports: "https://github.com/ocamlpro/ocplib-json-typed/issues"
+license: "LGPLv3 w/ linking exception"
+dev-repo: "https://github.com/ocamlpro/ocplib-json-typed.git"
+available: [ ocaml-version >= "4.02.0" ]
+
+build: [ "jbuilder" "build" "-j" jobs "-p" name "@install" ]
+build-test: [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+depends: [
+  "jbuilder" {build & >= "1.0+beta20"}
+  "ocplib-json-typed" {= "0.6" }
+  "js_of_ocaml" {>= "3.1.0"}
+]

@@ -1,17 +1,44 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module Id = P2p_peer_id
 
 module Map = Id.Map
 module Set = Id.Set
 module Table = Id.Table
+
+module Filter : sig
+
+  type t =
+    | Accepted
+    | Running
+    | Disconnected
+
+  val rpc_arg : t RPC_arg.t
+
+end
 
 module State : sig
 
@@ -23,13 +50,16 @@ module State : sig
   val pp_digram : Format.formatter -> t -> unit
   val encoding : t Data_encoding.t
 
+  val filter : Filter.t list -> t -> bool
+
 end
 
 module Info : sig
 
-  type t = {
+  type 'conn_meta t = {
     score : float ;
     trusted : bool ;
+    conn_metadata : 'conn_meta option ;
     state : State.t ;
     id_point : P2p_connection.Id.t option ;
     stat : P2p_stat.t ;
@@ -41,7 +71,7 @@ module Info : sig
     last_miss : (P2p_connection.Id.t * Time.t) option ;
   }
 
-  val encoding : t Data_encoding.t
+  val encoding : 'conn_meta Data_encoding.t -> 'conn_meta t Data_encoding.t
 
 end
 

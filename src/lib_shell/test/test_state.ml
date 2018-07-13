@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 let (//) = Filename.concat
 
@@ -40,9 +56,9 @@ let incr_fitness fitness =
           Data_encoding.Binary.of_bytes Data_encoding.int64 fitness
           |> Option.unopt ~default:0L
           |> Int64.succ
-          |> Data_encoding.Binary.to_bytes Data_encoding.int64
+          |> Data_encoding.Binary.to_bytes_exn Data_encoding.int64
         )
-    | _ -> Data_encoding.Binary.to_bytes Data_encoding.int64 1L
+    | _ -> Data_encoding.Binary.to_bytes_exn Data_encoding.int64 1L
   in
   [ new_fitness ]
 
@@ -76,6 +92,15 @@ let block _state ?(context = Context_hash.zero) ?(operations = []) (pred: State.
     protocol_data = MBytes.of_string name ;
   }
 
+let parsed_block ({ shell ; protocol_data } : Block_header.t) =
+  let protocol_data =
+    Data_encoding.Binary.of_bytes_exn
+      Proto.block_header_data_encoding
+      protocol_data in
+  ({ shell ; protocol_data } : Proto.block_header)
+
+let zero = MBytes.create 0
+
 let build_valid_chain state vtbl pred names =
   Lwt_list.fold_left_s
     (fun pred name ->
@@ -88,14 +113,16 @@ let build_valid_chain state vtbl pred names =
            let pred_header = State.Block.header pred in
            begin
              Proto.begin_application
+               ~chain_id: Chain_id.zero
                ~predecessor_context
                ~predecessor_timestamp: pred_header.shell.timestamp
                ~predecessor_fitness: pred_header.shell.fitness
-               block >>=? fun vstate ->
+               (parsed_block block) >>=? fun vstate ->
              (* no operations *)
              Proto.finalize_block vstate
-           end >>=? fun ctxt ->
-           State.Block.store state block [[op]] ctxt >>=? fun _vblock ->
+           end >>=? fun (ctxt, _metadata) ->
+           State.Block.store state
+             block zero [[op]] [[zero]] ctxt >>=? fun _vblock ->
            State.Block.read state hash >>=? fun vblock ->
            Hashtbl.add vtbl name vblock ;
            return vblock
@@ -110,7 +137,7 @@ let build_valid_chain state vtbl pred names =
        attempt None)
     pred
     names >>= fun _ ->
-  Lwt.return ()
+  Lwt.return_unit
 
 let build_example_tree chain =
   let vtbl = Hashtbl.create 23 in
@@ -127,7 +154,6 @@ type state = {
   vblock: (string, State.Block.t) Hashtbl.t ;
   state: State.t ;
   chain: State.Chain.t ;
-  init: unit -> State.t tzresult Lwt.t;
 }
 
 let vblock s = Hashtbl.find s.vblock
@@ -142,20 +168,19 @@ let wrap_state_init f base_dir =
   begin
     let store_root = base_dir // "store" in
     let context_root = base_dir // "context" in
-    let init () =
-      State.read
-        ~store_root
-        ~context_root
-        () in
-    init () >>=? fun state ->
-    State.Chain.create state genesis >>= fun chain ->
+    State.read
+      ~store_mapsize:4_096_000_000L
+      ~context_mapsize:4_096_000_000L
+      ~store_root
+      ~context_root
+      genesis >>=? fun (state, chain) ->
     build_example_tree chain >>= fun vblock ->
-    f { state ; chain ; vblock ; init } >>=? fun () ->
-    return ()
+    f { state ; chain ; vblock } >>=? fun () ->
+    return_unit
   end
 
 let test_init (_ : state) =
-  return ()
+  return_unit
 
 
 
@@ -173,7 +198,7 @@ let test_read_block (s: state) =
           (* FIXME COMPARE read operations ??? *)
           Lwt.return_unit
     ) (vblocks s) >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -201,7 +226,7 @@ let test_path (s: state) =
   check_path "A2" "A6" ["A3"; "A4"; "A5"; "A6"] >>= fun () ->
   check_path "B2" "B6" ["B3"; "B4"; "B5"; "B6"] >>= fun () ->
   check_path "A1" "B3" ["A2"; "A3"; "B1"; "B2"; "B3"] >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -229,7 +254,7 @@ let test_ancestor s =
   check_ancestor "B1" "A3" (vblock s "A3") >>= fun () ->
   check_ancestor "A2" "B1" (vblock s "A2") >>= fun () ->
   check_ancestor "B1" "A2" (vblock s "A2") >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -261,7 +286,7 @@ let test_locator s =
   check_locator 4 "B8" ["B7";"B6";"B5";"B4"] >>= fun () ->
   check_locator 0 "A5" [] >>= fun () ->
   check_locator 100 "A5" ["A4";"A3";"A2";"A1";"Genesis"] >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -283,7 +308,7 @@ let compare s name heads l =
 let test_known_heads s =
   Chain.known_heads s.chain >>= fun heads ->
   compare s "initial" heads ["A8";"B8"] ;
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -298,7 +323,7 @@ let test_head s =
   Chain.head s.chain >>= fun head ->
   if not (Block_hash.equal (State.Block.hash head) (State.Block.hash @@ vblock s "A6")) then
     Assert.fail_msg "unexpected head" ;
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -352,7 +377,7 @@ let test_mem s =
   test_mem s "B1" >>= fun () ->
   test_mem s "B6" >>= fun () ->
   test_mem s "B8" >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -380,7 +405,7 @@ let test_new_blocks s =
   test s "A6" "A6" "A6" [] >>= fun () ->
   test s "A8" "A6" "A6" ["A7";"A8"] >>= fun () ->
   test s "A8" "B7" "A3" ["A4";"A5";"A6";"A7";"A8"] >>= fun () ->
-  return ()
+  return_unit
 
 
 (****************************************************************************)
@@ -408,5 +433,5 @@ let wrap (n, f) =
     end
   end
 
-let tests =List.map wrap tests
+let tests = List.map wrap tests
 

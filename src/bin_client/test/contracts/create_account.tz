@@ -1,5 +1,12 @@
-parameter key_hash;
-return unit;
-storage (contract unit unit);
-code {CAR; DIP{PUSH tez "100.00"; PUSH bool False; NONE key_hash};
-      CREATE_ACCOUNT; UNIT; PAIR};
+parameter (or key_hash address) ;
+storage (option (contract unit)) ;
+code { CAR;
+       IF_LEFT
+         { DIP { PUSH mutez 100000000 ; PUSH bool False ; NONE key_hash };
+           CREATE_ACCOUNT ;
+           DIP { RIGHT key_hash ; DIP { SELF ; PUSH mutez 0 } ; TRANSFER_TOKENS ;
+                 NIL operation ; SWAP ; CONS } ;
+           CONS ; NONE (contract unit) ; SWAP ; PAIR }
+         { SELF ; ADDRESS ; SENDER ; IFCMPNEQ { FAIL } {} ;
+           CONTRACT unit ; DUP ; IF_SOME { DROP } { FAIL } ;
+           NIL operation ; PAIR } } ;

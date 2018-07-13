@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 let dump_file oc file =
   let ic = open_in file in
@@ -46,12 +62,14 @@ let opened_modules = [
   "Logging" ;
 ]
 
-let dump oc files =
+let dump oc hash files =
   Printf.fprintf oc
     "module Make (Tezos_protocol_environment : Tezos_protocol_environment_sigs__V1.T) = struct\n" ;
   Printf.fprintf oc "[@@@ocaml.warning \"-33\"]\n" ;
   List.iter (Printf.fprintf oc "open %s\n") opened_modules ;
   Printf.fprintf oc "[@@@ocaml.warning \"+33\"]\n" ;
+  Printf.fprintf oc "let hash = Protocol_hash.of_b58check_exn %S;;\n"
+    (Protocol_hash.to_b58check hash) ;
   for i = 0 to Array.length files - 1 do
     include_ml oc files.(i) ;
   done ;
@@ -60,6 +78,3 @@ let dump oc files =
        (Filename.basename
           (Filename.chop_extension files.(Array.length files - 1)))) ;
   Printf.fprintf oc "end\n%!"
-
-let main () =
-  dump stdout (Array.sub Sys.argv 1 (Array.length Sys.argv - 2))

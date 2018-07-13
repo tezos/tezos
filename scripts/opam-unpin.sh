@@ -7,11 +7,7 @@ src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/opam-remove.sh
 
-opam pin remove $packages
+echo
+echo "## Unpinning tezos packages..."
 
-### Temporary HACK
-
-## Should be in sync with `opam-pin.sh`
-opam pin remove --no-action leveldb
-
-### End of temporary HACK
+opam pin remove $packages > /dev/null 2>&1

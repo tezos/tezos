@@ -1,23 +1,35 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 
 open Alpha_context
 open Misc
 
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
-type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
-type error += Cannot_freeze_baking_deposit (* `Permanent *)
-type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
-type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
-type error += Empty_endorsement
+type error += Unexpected_endorsement (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t (* `Permanent *)
 type error += Invalid_signature  (* `Permanent *)
 type error += Invalid_stamp  (* `Permanent *)
@@ -52,52 +64,6 @@ let () =
     (fun (m, g) -> Invalid_fitness_gap (m, g)) ;
   register_error_kind
     `Permanent
-    ~id:"baking.invalid_slot"
-    ~title:"Invalid slot"
-    ~description:"The baking slot is out of bounds"
-    ~pp:(fun ppf (m, g) ->
-        Format.fprintf ppf
-          "The baking slot %d is not between 0 and %d" g m)
-    Data_encoding.(obj2
-                     (req "maximum" int16)
-                     (req "provided" int16))
-    (function Invalid_endorsement_slot (m, g)   -> Some (m, g) | _ -> None)
-    (fun (m, g) -> Invalid_endorsement_slot (m, g)) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.cannot_freeze_baking_deposit"
-    ~title:"Cannot freeze baking deposit"
-    ~description:
-      "Impossible to debit the required tokens on the baker's contract"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot freeze the baking deposit")
-    Data_encoding.unit
-    (function Cannot_freeze_baking_deposit -> Some () | _ -> None)
-    (fun () -> Cannot_freeze_baking_deposit) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.cannot_freeze_endorsement_deposit"
-    ~title:"Cannot freeze endorsement deposit"
-    ~description:
-      "Impossible to debit the required tokens on the endorser's contract"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot freeze the endorsement deposit")
-    Data_encoding.unit
-    (function Cannot_freeze_endorsement_deposit -> Some () | _ -> None)
-    (fun () -> Cannot_freeze_endorsement_deposit) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.inconsisten_endorsement"
-    ~title:"Multiple delegates for a single endorsement"
-    ~description:"The operation tries to endorse slots with distinct delegates"
-    ~pp:(fun ppf l ->
-        Format.fprintf ppf
-          "@[<v 2>The endorsement is inconsistent. Delegates:@ %a@]"
-          (Format.pp_print_list Signature.Public_key_hash.pp) l)
-    Data_encoding.(obj1
-                     (req "delegates" (list Signature.Public_key_hash.encoding)))
-    (function Inconsistent_endorsement l -> Some l | _ -> None)
-    (fun l -> Inconsistent_endorsement l) ;
-  register_error_kind
-    `Permanent
     ~id:"baking.invalid_block_signature"
     ~title:"Invalid block signature"
     ~description:
@@ -130,8 +96,18 @@ let () =
         Format.fprintf ppf "Insufficient proof-of-work stamp")
     Data_encoding.empty
     (function Invalid_stamp -> Some () | _ -> None)
-    (fun () -> Invalid_stamp)
-
+    (fun () -> Invalid_stamp) ;
+  register_error_kind
+    `Permanent
+    ~id:"baking.unexpected_endorsement"
+    ~title:"Endorsement from unexpected delegate"
+    ~description:"The operation is signed by a delegate without endorsement rights."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf
+          "The endorsement is signed by a delegate without endorsement rights.")
+    Data_encoding.unit
+    (function Unexpected_endorsement -> Some () | _ -> None)
+    (fun () -> Unexpected_endorsement)
 
 let minimal_time c priority pred_timestamp =
   let priority = Int32.of_int priority in
@@ -151,19 +127,17 @@ let minimal_time c priority pred_timestamp =
     (cumsum_time_between_blocks
        pred_timestamp (Constants.time_between_blocks c) (Int32.succ priority))
 
-let freeze_baking_deposit ctxt { Block_header.priority ; _ } delegate =
-  if Compare.Int.(priority >= Constants.first_free_baking_slot ctxt)
-  then return (ctxt, Tez.zero)
+let earlier_predecessor_timestamp ctxt level =
+  let current = Level.current ctxt in
+  let current_timestamp = Timestamp.current ctxt in
+  let gap = Level.diff level current in
+  let step = List.hd (Constants.time_between_blocks ctxt) in
+  if Compare.Int32.(gap < 1l) then
+    failwith "Baking.earlier_block_timestamp: past block."
   else
-    let deposit = Constants.block_security_deposit ctxt in
-    Delegate.freeze_deposit ctxt delegate deposit
-    |> trace Cannot_freeze_baking_deposit >>=? fun ctxt ->
-    return (ctxt, deposit)
-
-let freeze_endorsement_deposit ctxt delegate =
-  let deposit = Constants.endorsement_security_deposit ctxt in
-  Delegate.freeze_deposit ctxt delegate deposit
-  |> trace Cannot_freeze_endorsement_deposit
+    Lwt.return (Period.mult (Int32.pred gap) step) >>=? fun delay ->
+    Lwt.return Timestamp.(current_timestamp +? delay) >>=? fun result ->
+    return result
 
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp >>=? fun minimal_time ->
@@ -178,30 +152,27 @@ let check_baking_rights c { Block_header.priority ; _ }
   check_timestamp c priority pred_timestamp >>=? fun () ->
   return delegate
 
-let check_endorsements_rights c level slots =
-  map_p (fun slot ->
-      fail_unless Compare.Int.(0 <= slot && slot <= Constants.endorsers_per_block c)
-        (Invalid_endorsement_slot (Constants.endorsers_per_block c, slot)) >>=? fun () ->
-      Roll.endorsement_rights_owner c level ~slot)
-    slots >>=? function
-  | [] -> fail Empty_endorsement
-  | delegate :: delegates as all_delegates ->
-      fail_unless
-        (List.for_all (fun d -> Signature.Public_key.equal d delegate) delegates)
-        (Inconsistent_endorsement (List.map Signature.Public_key.hash all_delegates)) >>=? fun () ->
-      return delegate
+type error += Incorrect_priority (* `Permanent *)
 
-let paying_priorities c =
-  0 --> (Constants.first_free_baking_slot c - 1)
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"incorrect_priority"
+    ~title:"Incorrect priority"
+    ~description:"Block priority must be non-negative."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "The block priority must be non-negative.")
+    Data_encoding.unit
+    (function Incorrect_priority -> Some () | _ -> None)
+    (fun () -> Incorrect_priority)
 
-type error += Incorect_priority
-
-let endorsement_reward ctxt ~block_priority:prio =
+let endorsement_reward ctxt ~block_priority:prio n =
   if Compare.Int.(prio >= 0)
   then
     Lwt.return
-      Tez.(Constants.endorsement_reward ctxt /? (Int64.(succ (of_int prio))))
-  else fail Incorect_priority
+      Tez.(Constants.endorsement_reward ctxt /? (Int64.(succ (of_int prio)))) >>=? fun tez ->
+    Lwt.return Tez.(tez *? Int64.of_int n)
+  else fail Incorrect_priority
 
 let baking_priorities c level =
   let rec f priority =
@@ -210,12 +181,38 @@ let baking_priorities c level =
   in
   f 0
 
-let endorsement_priorities c level =
-  let rec f slot =
-    Roll.endorsement_rights_owner c level ~slot >>=? fun delegate ->
-    return (LCons (delegate, (fun () -> f (succ slot))))
-  in
-  f 0
+let endorsement_rights c level =
+  fold_left_s
+    (fun acc slot ->
+       Roll.endorsement_rights_owner c level ~slot >>=? fun pk ->
+       let pkh = Signature.Public_key.hash pk in
+       let right =
+         match Signature.Public_key_hash.Map.find_opt pkh acc with
+         | None -> (pk, [slot], false)
+         | Some (pk, slots, used) -> (pk, slot :: slots, used) in
+       return (Signature.Public_key_hash.Map.add pkh right acc))
+    Signature.Public_key_hash.Map.empty
+    (0 --> (Constants.endorsers_per_block c - 1))
+
+let check_endorsement_rights ctxt chain_id (op : Kind.endorsement Operation.t) =
+  let current_level = Level.current ctxt in
+  let Single (Endorsement { level ; _ }) = op.protocol_data.contents in
+  begin
+    if Raw_level.(succ level = current_level.level) then
+      return (Alpha_context.allowed_endorsements ctxt)
+    else
+      endorsement_rights ctxt (Level.from_raw ctxt level)
+  end >>=? fun endorsements ->
+  match
+    Signature.Public_key_hash.Map.fold (* no find_first *)
+      (fun pkh (pk, slots, used) acc ->
+         match Operation.check_signature_sync pk chain_id op with
+         | Error _ -> acc
+         | Ok () -> Some (pkh, slots, used))
+      endorsements None
+  with
+  | None -> fail Unexpected_endorsement
+  | Some v -> return v
 
 let select_delegate delegate delegate_list max_priority =
   let rec loop acc l n =
@@ -234,16 +231,9 @@ let select_delegate delegate delegate_list max_priority =
 
 let first_baking_priorities
     ctxt
-    ?(max_priority = Constants.first_free_baking_slot ctxt)
+    ?(max_priority = 32)
     delegate level =
   baking_priorities ctxt level >>=? fun delegate_list ->
-  select_delegate delegate delegate_list max_priority
-
-let first_endorsement_slots
-    ctxt
-    ?(max_priority = Constants.endorsers_per_block ctxt)
-    delegate level =
-  endorsement_priorities ctxt level >>=? fun delegate_list ->
   select_delegate delegate delegate_list max_priority
 
 let check_hash hash stamp_threshold =
@@ -251,28 +241,32 @@ let check_hash hash stamp_threshold =
   let word = MBytes.get_int64 bytes 0 in
   Compare.Uint64.(word <= stamp_threshold)
 
-let check_header_proof_of_work_stamp shell protocol_data stamp_threshold =
+let check_header_proof_of_work_stamp shell contents stamp_threshold =
   let hash =
     Block_header.hash
-      { shell ; protocol_data ; signature = Signature.zero } in
+      { shell ; protocol_data = { contents ; signature = Signature.zero } } in
   check_hash hash stamp_threshold
 
 let check_proof_of_work_stamp ctxt block =
   let proof_of_work_threshold = Constants.proof_of_work_threshold ctxt in
   if check_header_proof_of_work_stamp
       block.Block_header.shell
-      block.protocol_data
+      block.protocol_data.contents
       proof_of_work_threshold then
-    return ()
+    return_unit
   else
     fail Invalid_stamp
 
-let check_signature block key =
-  let check_signature key { Block_header.protocol_data ; shell ; signature } =
-    let unsigned_header = Block_header.forge_unsigned shell protocol_data in
-    Signature.check key signature unsigned_header in
+let check_signature block chain_id key =
+  let check_signature key
+      { Block_header.shell ; protocol_data = { contents ; signature } } =
+    let unsigned_header =
+      Data_encoding.Binary.to_bytes_exn
+        Block_header.unsigned_encoding
+        (shell, contents) in
+    Signature.check ~watermark:(Block_header chain_id) key signature unsigned_header in
   if check_signature key block then
-    return ()
+    return_unit
   else
     fail (Invalid_block_signature (Block_header.hash block,
                                    Signature.Public_key.hash key))
@@ -288,7 +282,7 @@ let check_fitness_gap ctxt (block : Block_header.t) =
   if Compare.Int64.(gap <= 0L || max_fitness_gap ctxt < gap) then
     fail (Invalid_fitness_gap (max_fitness_gap ctxt, gap))
   else
-    return ()
+    return_unit
 
 let last_of_a_cycle ctxt l =
   Compare.Int32.(Int32.succ l.Level.cycle_position =
@@ -297,6 +291,6 @@ let last_of_a_cycle ctxt l =
 let dawn_of_a_new_cycle ctxt =
   let level = Level.current ctxt in
   if last_of_a_cycle ctxt level then
-    return (Some level.cycle)
+    return_some level.cycle
   else
-    return None
+    return_none

@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Alpha_context
 
@@ -101,12 +117,65 @@ let start_new_voting_cycle ctxt =
       Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt ->
       return ctxt
 
-type error +=
+type error += (* `Branch *)
   | Invalid_proposal
   | Unexpected_proposal
   | Unauthorized_proposal
   | Unexpected_ballot
   | Unauthorized_ballot
+
+let () =
+  let open Data_encoding in
+  (* Invalid proposal *)
+  register_error_kind
+    `Branch
+    ~id:"invalid_proposal"
+    ~title:"Invalid proposal"
+    ~description:"Ballot provided for a proposal that is not the current one."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Invalid proposal")
+    empty
+    (function Invalid_proposal -> Some () | _ -> None)
+    (fun () -> Invalid_proposal) ;
+  (* Unexpected proposal *)
+  register_error_kind
+    `Branch
+    ~id:"unexpected_proposal"
+    ~title:"Unexpected proposal"
+    ~description:"Proposal recorded outside of a proposal period."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected proposal")
+    empty
+    (function Unexpected_proposal -> Some () | _ -> None)
+    (fun () -> Unexpected_proposal) ;
+  (* Unauthorized proposal *)
+  register_error_kind
+    `Branch
+    ~id:"unauthorized_proposal"
+    ~title:"Unauthorized proposal"
+    ~description:"The delegate provided for the proposal is not in the voting listings."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Unauthorized proposal")
+    empty
+    (function Unauthorized_proposal -> Some () | _ -> None)
+    (fun () -> Unauthorized_proposal) ;
+  (* Unexpected ballot *)
+  register_error_kind
+    `Branch
+    ~id:"unexpected_ballot"
+    ~title:"Unexpected ballot"
+    ~description:"Ballot recorded outside of a voting period."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected ballot")
+    empty
+    (function Unexpected_ballot -> Some () | _ -> None)
+    (fun () -> Unexpected_ballot) ;
+  (* Unauthorized ballot *)
+  register_error_kind
+    `Branch
+    ~id:"unauthorized_ballot"
+    ~title:"Unauthorized ballot"
+    ~description:"The delegate provided for the ballot is not in the voting listings."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Unauthorized ballot")
+    empty
+    (function Unauthorized_ballot -> Some () | _ -> None)
+    (fun () -> Unauthorized_ballot)
 
 let record_proposals ctxt delegate proposals =
   Vote.get_current_period_kind ctxt >>=? function
@@ -146,4 +215,3 @@ let may_start_new_voting_cycle ctxt =
     start_new_voting_cycle ctxt
   else
     return ctxt
-

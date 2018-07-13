@@ -1,4 +1,3 @@
 parameter unit ;
-storage (contract unit unit) ;
-return unit ;
-code { MAP_CDR { DROP ; SELF } }
+storage (contract unit) ;
+code { DROP ; SELF ; NIL operation ; PAIR }

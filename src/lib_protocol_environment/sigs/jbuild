@@ -6,7 +6,6 @@
    (
     ;; Part of OCaml stdlib
     v1/pervasives.mli
-    v1/array.mli
     v1/list.mli
     v1/string.mli
     v1/int32.mli
@@ -14,12 +13,13 @@
     v1/format.mli
 
     ;; Part of external libraries
+    v1/mBytes.mli
     v1/z.mli
     v1/lwt.mli
     v1/lwt_list.mli
+    v1/raw_hashes.mli
 
     ;; Tezos extended stdlib
-    v1/mBytes.mli
     v1/compare.mli
     v1/data_encoding.mli
     v1/error_monad.mli
@@ -41,6 +41,8 @@
     v1/blake2B.mli
     v1/ed25519.mli
     v1/secp256k1.mli
+    v1/p256.mli
+    v1/chain_id.mli
     v1/signature.mli
     v1/block_hash.mli
     v1/operation_hash.mli

@@ -1,0 +1,23 @@
+parameter unit ;
+storage
+  (pair
+     (pair (timestamp %T) (mutez %N))
+     (pair (contract %A unit) (contract %B unit))) ;
+code
+  { CDR ; DUP ; CAAR %T; # T
+    NOW ; COMPARE ; LE ;
+    IF { DUP ; CADR %N; # N
+         BALANCE ;
+         COMPARE ; LE ;
+         IF { NIL operation ; PAIR }
+            { DUP ; CDDR %B; # B
+              BALANCE ; UNIT ;
+              TRANSFER_TOKENS ;
+              NIL operation ; SWAP ; CONS ;
+              PAIR } }
+       { DUP ; CDAR %A; # A
+         BALANCE ;
+         UNIT ;
+         TRANSFER_TOKENS ;
+         NIL operation ; SWAP ; CONS ;
+         PAIR } }

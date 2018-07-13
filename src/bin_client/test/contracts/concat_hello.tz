@@ -1,5 +1,4 @@
 parameter (list string);
-return (list string);
-storage unit;
-code{ CAR; LAMBDA string string { PUSH @hello string "Hello "; CONCAT };
-      MAP; UNIT; SWAP; PAIR};
+storage (list string);
+code{ CAR;
+      MAP { PUSH @hello string "Hello "; CONCAT }; NIL operation; PAIR};

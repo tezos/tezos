@@ -1,14 +1,30 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Cmdliner
-open Logging.Node.Main
+open Node_logging
 
 let (//) = Filename.concat
 
@@ -27,7 +43,8 @@ type t = {
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
   rpc_listen_addr: string option ;
-  closed: bool ;
+  private_mode: bool ;
+  disable_mempool: bool ;
   cors_origins: string list ;
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;
@@ -39,8 +56,8 @@ let wrap
     data_dir config_file
     connections max_download_speed max_upload_speed binary_chunks_size
     peer_table_size
-    listen_addr peers no_bootstrap_peers bootstrap_threshold closed expected_pow
-    rpc_listen_addr rpc_tls
+    listen_addr peers no_bootstrap_peers bootstrap_threshold private_mode disable_mempool
+    expected_pow rpc_listen_addr rpc_tls
     cors_origins cors_headers log_output =
 
   let actual_data_dir =
@@ -79,7 +96,8 @@ let wrap
     no_bootstrap_peers ;
     listen_addr ;
     rpc_listen_addr ;
-    closed ;
+    private_mode ;
+    disable_mempool ;
     cors_origins ;
     cors_headers ;
     rpc_tls ;
@@ -102,7 +120,7 @@ module Manpage = struct
 
   let bugs = [
     `S "BUGS";
-    `P "Check bug reports at https://github.com/tezos/tezos/issues.";
+    `P "Check bug reports at https://gitlab.com/tezos/tezos/issues.";
   ]
 
 end
@@ -207,10 +225,20 @@ module Term = struct
     Arg.(value & opt (some float) None &
          info ~docs ~doc ~docv:"FLOAT" ["expected-pow"])
 
-  let closed =
+  let private_mode =
     let doc =
-      "Only accept connections from the configured bootstrap peers." in
-    Arg.(value & flag & info ~docs ~doc ["closed"])
+      "Only open outgoing/accept incoming connections to/from peers \
+       listed in 'bootstrap-peers' or provided with '--peer' option." in
+    Arg.(value & flag & info ~docs ~doc ["private-mode"])
+
+  let disable_mempool =
+    let doc =
+      "If set to [true], the node will not participate in the propagation \
+       of pending operations (mempool). \
+       Default value is [false]. \
+       It can be used to decrease the memory and computation footprints \
+       of the node." in
+    Arg.(value & flag & info ~docs ~doc ["disable-mempool"])
 
   (* rpc args *)
   let docs = Manpage.rpc_section
@@ -249,8 +277,9 @@ module Term = struct
     $ connections
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size
-    $ listen_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold $ closed $ expected_pow
-    $ rpc_listen_addr $ rpc_tls
+    $ listen_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold
+    $ private_mode $ disable_mempool
+    $ expected_pow $ rpc_listen_addr $ rpc_tls
     $ cors_origins $ cors_headers
     $ log_output
 
@@ -269,7 +298,8 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         peer_table_size ;
         expected_pow ;
         peers ; no_bootstrap_peers ;
-        listen_addr ; closed ;
+        listen_addr ; private_mode ;
+        disable_mempool ;
         rpc_listen_addr ; rpc_tls ;
         cors_origins ; cors_headers ;
         log_output ;
@@ -286,6 +316,6 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
     ?data_dir ?min_connections ?expected_connections ?max_connections
     ?max_download_speed ?max_upload_speed ?binary_chunks_size
     ?peer_table_size ?expected_pow
-    ~bootstrap_peers ?listen_addr ?rpc_listen_addr
-    ~closed ~cors_origins ~cors_headers ?rpc_tls ?log_output
+    ~bootstrap_peers ?listen_addr ?rpc_listen_addr ~private_mode
+    ~disable_mempool ~cors_origins ~cors_headers ?rpc_tls ?log_output
     ?bootstrap_threshold cfg

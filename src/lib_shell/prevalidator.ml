@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Prevalidator_worker_state
 
@@ -45,6 +61,7 @@ module Types = struct
     mutable validation_result : error Preapply_result.t ;
     mutable validation_state : Prevalidation.prevalidation_state tzresult ;
     mutable advertisement : [ `Pending of Mempool.t | `None ] ;
+    mutable rpc_directory : state RPC_directory.t tzresult Lwt.t lazy_t ;
   }
   type parameters = limits * Distributed_db.chain_db
 
@@ -79,6 +96,58 @@ type error += Closed = Worker.Closed
 
 let debug w =
   Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
+
+let empty_rpc_directory : unit RPC_directory.t =
+  RPC_directory.register
+    RPC_directory.empty
+    (Block_services.Empty.S.Mempool.pending_operations RPC_path.open_root)
+    (fun _pv () () ->
+       return {
+         Block_services.Empty.Mempool.applied = [] ;
+         refused = Operation_hash.Map.empty ;
+         branch_refused = Operation_hash.Map.empty ;
+         branch_delayed = Operation_hash.Map.empty ;
+         unprocessed = Operation_hash.Map.empty ;
+       })
+
+let rpc_directory protocol =
+  begin
+    match Registered_protocol.get protocol with
+    | None ->
+        (* FIXME. *)
+        (* This should not happen: it should be handled in the validator. *)
+        failwith "Prevalidation: missing protocol '%a' for the current block."
+          Protocol_hash.pp_short protocol
+    | Some protocol ->
+        return protocol
+  end >>=? fun (module Proto) ->
+  let module Proto_services = Block_services.Make(Proto)(Proto) in
+  return @@
+  RPC_directory.register
+    RPC_directory.empty
+    (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
+    (fun pv () () ->
+       let map_op op =
+         let protocol_data =
+           Data_encoding.Binary.of_bytes_exn
+             Proto.operation_data_encoding
+             op.Operation.proto in
+         { Proto.shell = op.shell ; protocol_data } in
+       let map_op_error (op, error) = (map_op op, error) in
+       return {
+         Proto_services.Mempool.applied =
+           List.map
+             (fun (hash, op) -> (hash, map_op op))
+             (List.rev pv.validation_result.applied) ;
+         refused =
+           Operation_hash.Map.map map_op_error pv.validation_result.refused ;
+         branch_refused =
+           Operation_hash.Map.map map_op_error pv.validation_result.branch_refused ;
+         branch_delayed =
+           Operation_hash.Map.map map_op_error pv.validation_result.branch_delayed ;
+         unprocessed =
+           Operation_hash.Map.map map_op pv.pending ;
+       })
 
 let list_pendings ?maintain_chain_db  ~from_block ~to_block old_mempool =
   let rec pop_blocks ancestor block mempool =
@@ -197,10 +266,10 @@ let handle_unprocessed w pv =
                 pv.pending Operation_hash.Map.empty } ;
         pv.pending <-
           Operation_hash.Map.empty ;
-        Lwt.return ()
+        Lwt.return_unit
     | Ok validation_state ->
         match Operation_hash.Map.cardinal pv.pending with
-        | 0 -> Lwt.return ()
+        | 0 -> Lwt.return_unit
         | n -> debug w "processing %d operations" n ;
             Prevalidation.prevalidate validation_state ~sort:true
               (Operation_hash.Map.bindings pv.pending)
@@ -233,7 +302,7 @@ let handle_unprocessed w pv =
               Operation_hash.Map.empty ;
             advertise w pv
               (mempool_of_prevalidation_result validation_result) ;
-            Lwt.return ()
+            Lwt.return_unit
   end >>= fun () ->
   pv.mempool <-
     { Mempool.known_valid =
@@ -248,7 +317,7 @@ let handle_unprocessed w pv =
         Operation_hash.Set.empty } ;
   State.Current_mempool.set (Distributed_db.chain_state pv.chain_db)
     ~head:(State.Block.hash pv.predecessor) pv.mempool >>= fun () ->
-  Lwt.return ()
+  Lwt.return_unit
 
 let fetch_operation w pv ?peer oph =
   debug w
@@ -295,7 +364,7 @@ let on_inject pv op =
           return result
   end >>=? fun result ->
   if List.mem_assoc oph result.applied then
-    return ()
+    return_unit
   else
     let try_in_map map proj or_else =
       try
@@ -347,6 +416,8 @@ let on_flush w pv predecessor =
   end >>= fun (validation_state, validation_result) ->
   debug w "%d operations were not washed by the flush"
     (Operation_hash.Map.cardinal pending) ;
+  State.Block.protocol_hash pv.predecessor >>= fun old_protocol ->
+  State.Block.protocol_hash predecessor >>= fun new_protocol ->
   pv.predecessor <- predecessor ;
   pv.live_blocks <- new_live_blocks ;
   pv.live_operations <- new_live_operations ;
@@ -356,7 +427,9 @@ let on_flush w pv predecessor =
   pv.in_mempool <- Operation_hash.Set.empty ;
   pv.validation_result <- validation_result ;
   pv.validation_state <- validation_state ;
-  return ()
+  if not (Protocol_hash.equal old_protocol new_protocol) then
+    pv.rpc_directory <- lazy (rpc_directory new_protocol) ;
+  return_unit
 
 let on_advertise pv =
   match pv.advertisement with
@@ -379,15 +452,15 @@ let on_request
           return (() : r)
       | Request.Notify (peer, mempool) ->
           on_notify w pv peer mempool ;
-          return ()
+          return_unit
       | Request.Inject op ->
           on_inject pv op
       | Request.Arrived (oph, op) ->
           on_operation_arrived pv oph op ;
-          return ()
+          return_unit
       | Request.Advertise ->
           on_advertise pv ;
-          return ()
+          return_unit
     end >>=? fun r ->
     handle_unprocessed w pv >>= fun () ->
     return r
@@ -404,6 +477,7 @@ let on_launch w _ (limits, chain_db) =
   Chain.data chain_state >>= fun
     { current_head = predecessor ; current_mempool = mempool ;
       live_blocks ; live_operations } ->
+  State.Block.protocol_hash predecessor >>= fun protocol ->
   let timestamp = Time.now () in
   Prevalidation.start_prevalidation
     ~predecessor ~timestamp () >>= fun validation_state ->
@@ -429,7 +503,9 @@ let on_launch w _ (limits, chain_db) =
       pending = Operation_hash.Map.empty ;
       in_mempool = Operation_hash.Set.empty ;
       validation_result ; validation_state ;
-      advertisement = `None } in
+      advertisement = `None ;
+      rpc_directory = lazy (rpc_directory protocol) ;
+    } in
   List.iter
     (fun oph -> Lwt.ignore_result (fetch_operation w pv oph))
     mempool.known_valid ;
@@ -438,12 +514,12 @@ let on_launch w _ (limits, chain_db) =
 let on_error w r st errs =
   Worker.record_event w (Event.Request (r, st, Some errs)) ;
   match r with
-  | Request.(View (Inject _)) -> return ()
+  | Request.(View (Inject _)) -> return_unit
   | _ -> Lwt.return (Error errs)
 
 let on_completion w r _ st =
-  Worker.record_event w (Event.Request (Request.view r, st, None )) ;
-  Lwt.return ()
+  Worker.record_event w (Event.Request (Request.view r, st, None)) ;
+  Lwt.return_unit
 
 let table = Worker.create_table Queue
 
@@ -456,7 +532,7 @@ let create limits chain_db =
     let on_close = on_close
     let on_error = on_error
     let on_completion = on_completion
-    let on_no_request _ = return ()
+    let on_no_request _ = return_unit
   end in
   Worker.launch table limits.worker_limits
     (State.Chain.id chain_state)
@@ -491,11 +567,6 @@ let timestamp w =
   let pv = Worker.state w in
   pv.timestamp
 
-let context w =
-  let pv = Worker.state w in
-  Lwt.return pv.validation_state >>=? fun validation_state ->
-  Prevalidation.end_prevalidation validation_state
-
 let inject_operation w op =
   Worker.push_request_and_wait w (Inject op)
 
@@ -508,3 +579,20 @@ let pending_requests t = Worker.pending_requests t
 let current_request t = Worker.current_request t
 
 let last_events = Worker.last_events
+
+let rpc_directory  : t option RPC_directory.t =
+  RPC_directory.register_dynamic_directory
+    RPC_directory.empty
+    (Block_services.mempool_path RPC_path.open_root)
+    (function
+      | None ->
+          Lwt.return
+            (RPC_directory.map (fun _ -> Lwt.return_unit) empty_rpc_directory)
+      | Some w ->
+          let pv = Worker.state w in
+          Lazy.force pv.rpc_directory >>= function
+          | Error _ ->
+              Lwt.return RPC_directory.empty
+          | Ok rpc_directory ->
+              Lwt.return
+                (RPC_directory.map (fun _ -> Lwt.return pv) rpc_directory))

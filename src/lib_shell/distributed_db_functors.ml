@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module type DISTRIBUTED_DB = sig
 
@@ -59,6 +75,7 @@ module type MEMORY_TABLE = sig
   type key
   val create: int -> 'a t
   val find: 'a t -> key -> 'a
+  val find_opt: 'a t -> key -> 'a option
   val add: 'a t -> key -> 'a -> unit
   val replace: 'a t -> key -> 'a -> unit
   val remove: 'a t -> key -> unit
@@ -127,22 +144,22 @@ end = struct
     | Found of value
 
   let known s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> Disk_table.known s.disk k
-    | Pending _ -> Lwt.return_false
-    | Found _ -> Lwt.return_true
+    match Memory_table.find_opt s.memory k with
+    | None -> Disk_table.known s.disk k
+    | Some (Pending _) -> Lwt.return_false
+    | Some (Found _) -> Lwt.return_true
 
   let read_opt s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> Disk_table.read_opt s.disk k
-    | Found v -> Lwt.return (Some v)
-    | Pending _ -> Lwt.return_none
+    match Memory_table.find_opt s.memory k with
+    | None -> Disk_table.read_opt s.disk k
+    | Some (Found v) -> Lwt.return_some v
+    | Some (Pending _) -> Lwt.return_none
 
   let read_exn s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> Disk_table.read_exn s.disk k
-    | Found v -> Lwt.return v
-    | Pending _ -> Lwt.fail Not_found
+    match Memory_table.find_opt s.memory k with
+    | None -> Disk_table.read_exn s.disk k
+    | Some (Found v) -> Lwt.return v
+    | Some (Pending _) -> Lwt.fail Not_found
 
   type error += Missing_data of key
   type error += Canceled of key
@@ -184,20 +201,20 @@ end = struct
       (fun key -> Timeout key)
 
   let read s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found ->
+    match Memory_table.find_opt s.memory k with
+    | None ->
         trace (Missing_data k) @@
         Disk_table.read s.disk k
-    | Found v -> return v
-    | Pending _ -> fail (Missing_data k)
+    | Some (Found v) -> return v
+    | Some (Pending _) -> fail (Missing_data k)
 
   let wrap s k ?timeout t =
     let t = Lwt.protected t in
     Lwt.on_cancel t begin fun () ->
-      match Memory_table.find s.memory k with
-      | exception Not_found -> ()
-      | Found _ -> ()
-      | Pending data ->
+      match Memory_table.find_opt s.memory k with
+      | None -> ()
+      | Some (Found _) -> ()
+      | Some (Pending data) ->
           data.waiters <- data.waiters - 1 ;
           if data.waiters = 0 then begin
             Memory_table.remove s.memory k ;
@@ -212,37 +229,37 @@ end = struct
         Lwt.pick [ t ; timeout ]
 
   let fetch s ?peer ?timeout k param =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> begin
+    match Memory_table.find_opt s.memory k with
+    | None -> begin
         Disk_table.read_opt s.disk k >>= function
         | Some v -> return v
         | None ->
-            match Memory_table.find s.memory k with
-            | exception Not_found -> begin
+            match Memory_table.find_opt s.memory k with
+            | None -> begin
                 let waiter, wakener = Lwt.wait () in
                 Memory_table.add s.memory k
                   (Pending { waiter ; wakener ; waiters =  1 ; param }) ;
                 Scheduler.request s.scheduler peer k ;
                 wrap s k ?timeout waiter
               end
-            | Pending data ->
+            | Some (Pending data) ->
                 Scheduler.request s.scheduler peer k ;
                 data.waiters <- data.waiters + 1 ;
                 wrap s k ?timeout data.waiter
-            | Found v -> return v
+            | Some (Found v) -> return v
       end
-    | Pending data ->
+    | Some (Pending data) ->
         Scheduler.request s.scheduler peer k ;
         data.waiters <- data.waiters + 1 ;
         wrap s k ?timeout data.waiter
-    | Found v -> return v
+    | Some (Found v) -> return v
 
   let prefetch s ?peer ?timeout k param =
     try ignore (fetch s ?peer ?timeout k param) with _ -> ()
 
   let notify s p k v =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> begin
+    match Memory_table.find_opt s.memory k with
+    | None -> begin
         Disk_table.known s.disk k >>= function
         | true ->
             Scheduler.notify_duplicate s.scheduler p k ;
@@ -251,7 +268,7 @@ end = struct
             Scheduler.notify_unrequested s.scheduler p k ;
             Lwt.return_unit
       end
-    | Pending { wakener = w ; param } -> begin
+    | Some (Pending { wakener = w ; param }) -> begin
         match Precheck.precheck k param v with
         | None ->
             Scheduler.notify_invalid s.scheduler p k ;
@@ -265,13 +282,13 @@ end = struct
             Lwt_watcher.notify s.input (k, v) ;
             Lwt.return_unit
       end
-    | Found _ ->
+    | Some (Found _) ->
         Scheduler.notify_duplicate s.scheduler p k ;
         Lwt.return_unit
 
   let inject s k v =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> begin
+    match Memory_table.find_opt s.memory k with
+    | None -> begin
         Disk_table.known s.disk k >>= function
         | true ->
             Lwt.return_false
@@ -279,18 +296,18 @@ end = struct
             Memory_table.add s.memory k (Found v) ;
             Lwt.return_true
       end
-    | Pending _
-    | Found _ ->
+    | Some (Pending _)
+    | Some (Found _) ->
         Lwt.return_false
 
   let clear_or_cancel s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> ()
-    | Pending { wakener = w ; _ } ->
+    match Memory_table.find_opt s.memory k with
+    | None -> ()
+    | Some (Pending { wakener = w ; _ }) ->
         Scheduler.notify_cancelation s.scheduler k ;
         Memory_table.remove s.memory k ;
         Lwt.wakeup_later w (Error [Canceled k])
-    | Found _ -> Memory_table.remove s.memory k
+    | Some (Found _) -> Memory_table.remove s.memory k
 
   let watch s = Lwt_watcher.create_stream s.input
 
@@ -300,10 +317,10 @@ end = struct
     { scheduler ; disk ; memory ; input ; global_input }
 
   let pending s k =
-    match Memory_table.find s.memory k with
-    | exception Not_found -> false
-    | Found _ -> false
-    | Pending _ -> true
+    match Memory_table.find_opt s.memory k with
+    | None -> false
+    | Some (Found _) -> false
+    | Some (Pending _) -> true
 
 end
 
@@ -320,6 +337,10 @@ module Make_request_scheduler
        val name : string
        val encoding : t Data_encoding.t
        val pp : Format.formatter -> t -> unit
+
+       module Logging : sig
+         val tag : t Tag.def
+       end
      end)
     (Table : MEMORY_TABLE with type key := Hash.t)
     (Request : REQUEST with type key := Hash.t) : sig
@@ -331,7 +352,7 @@ module Make_request_scheduler
 
 end = struct
 
-  include Logging.Make(struct let name = "node.distributed_db.scheduler." ^ Hash.name end)
+  include Logging.Make_semantic(struct let name = "node.distributed_db.scheduler." ^ Hash.name end)
 
   type key = Hash.t
 
@@ -363,24 +384,38 @@ end = struct
   let request t p k =
     assert (Lwt_pipe.push_now t.queue (Request (p, k)))
   let notify t p k =
-    debug "push received %a from %a"
-      Hash.pp k P2p_peer.Id.pp_short p ;
+    debug Tag.DSL.(fun f ->
+        f "push received %a from %a"
+        -% t event "push_received"
+        -% a Hash.Logging.tag k
+        -% a P2p_peer.Id.Logging.tag p);
     assert (Lwt_pipe.push_now t.queue (Notify (p, k)))
   let notify_cancelation t k =
-    debug "push cancelation %a"
-      Hash.pp k ;
+    debug Tag.DSL.(fun f ->
+        f "push cancelation %a"
+        -% t event "push_cancelation"
+        -% a Hash.Logging.tag k);
     assert (Lwt_pipe.push_now t.queue (Notify_cancelation k))
   let notify_invalid t p k =
-    debug "push received invalid %a from %a"
-      Hash.pp k P2p_peer.Id.pp_short p ;
+    debug Tag.DSL.(fun f ->
+        f "push received invalid %a from %a"
+        -% t event "push_received_invalid"
+        -% a Hash.Logging.tag k
+        -% a P2p_peer.Id.Logging.tag p);
     assert (Lwt_pipe.push_now t.queue (Notify_invalid (p, k)))
   let notify_duplicate t p k =
-    debug "push received duplicate %a from %a"
-      Hash.pp k P2p_peer.Id.pp_short p ;
+    debug Tag.DSL.(fun f ->
+        f "push received duplicate %a from %a"
+        -% t event "push_received_duplicate"
+        -% a Hash.Logging.tag k
+        -% a P2p_peer.Id.Logging.tag p);
     assert (Lwt_pipe.push_now t.queue (Notify_duplicate (p, k)))
   let notify_unrequested t p k =
-    debug "push received unrequested %a from %a"
-      Hash.pp k P2p_peer.Id.pp_short p ;
+    debug Tag.DSL.(fun f ->
+        f "push received unrequested %a from %a"
+        -% t event "push_received_unrequested"
+        -% a Hash.Logging.tag k
+        -% a P2p_peer.Id.Logging.tag p);
     assert (Lwt_pipe.push_now t.queue (Notify_unrequested (p, k)))
 
   let compute_timeout state =
@@ -401,17 +436,16 @@ end = struct
           Lwt_unix.sleep delay
         end
 
-  let may_pp_peer ppf = function
-    | None -> ()
-    | Some peer -> P2p_peer.Id.pp_short ppf peer
-
   (* TODO should depend on the ressource kind... *)
   let initial_delay = 0.5
 
   let process_event state now = function
     | Request (peer, key) -> begin
-        lwt_debug "registering request %a from %a"
-          Hash.pp key may_pp_peer peer >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "registering request %a from %a"
+            -% t event "registering_request"
+            -% a Hash.Logging.tag key
+            -% a P2p_peer.Id.Logging.tag_opt peer) >>= fun () ->
         try
           let data = Table.find state.pending key in
           let peers =
@@ -423,8 +457,11 @@ end = struct
             next_request = min data.next_request (now +. initial_delay) ;
             peers ;
           } ;
-          lwt_debug "registering request %a from %a -> replaced"
-            Hash.pp key may_pp_peer peer >>= fun () ->
+          lwt_debug Tag.DSL.(fun f ->
+              f "registering request %a from %a -> replaced"
+              -% t event "registering_request_replaced"
+              -% a Hash.Logging.tag key
+              -% a P2p_peer.Id.Logging.tag_opt peer) >>= fun () ->
           Lwt.return_unit
         with Not_found ->
           let peers =
@@ -436,96 +473,121 @@ end = struct
             next_request = now ;
             delay = initial_delay ;
           } ;
-          lwt_debug "registering request %a from %a -> added"
-            Hash.pp key may_pp_peer peer >>= fun () ->
+          lwt_debug Tag.DSL.(fun f ->
+              f "registering request %a from %a -> added"
+              -% t event "registering_request_added"
+              -% a Hash.Logging.tag key
+              -% a P2p_peer.Id.Logging.tag_opt peer) >>= fun () ->
           Lwt.return_unit
       end
     | Notify (peer, key) ->
         Table.remove state.pending key ;
-        lwt_debug "received %a from %a"
-          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "received %a from %a"
+            -% t event "received"
+            -% a Hash.Logging.tag key
+            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
         Lwt.return_unit
     | Notify_cancelation key ->
         Table.remove state.pending key ;
-        lwt_debug "canceled %a"
-          Hash.pp key >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "canceled %a"
+            -% t event "canceled"
+            -% a Hash.Logging.tag key) >>= fun () ->
         Lwt.return_unit
     | Notify_invalid (peer, key) ->
-        lwt_debug "received invalid %a from %a"
-          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "received invalid %a from %a"
+            -% t event "received_invalid"
+            -% a Hash.Logging.tag key
+            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
         (* TODO *)
         Lwt.return_unit
     | Notify_unrequested (peer, key) ->
-        lwt_debug "received unrequested %a from %a"
-          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "received unrequested %a from %a"
+            -% t event "received_unrequested"
+            -% a Hash.Logging.tag key
+            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
         (* TODO *)
         Lwt.return_unit
     | Notify_duplicate (peer, key) ->
-        lwt_debug "received duplicate %a from %a"
-          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
+        lwt_debug Tag.DSL.(fun f ->
+            f "received duplicate %a from %a"
+            -% t event "received_duplicate"
+            -% a Hash.Logging.tag key
+            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
         (* TODO *)
         Lwt.return_unit
 
-  let rec worker_loop state =
-    let shutdown = Lwt_canceler.cancelation state.canceler
-    and timeout = compute_timeout state in
-    Lwt.choose
-      [ (state.events >|= fun _ -> ()) ; timeout ; shutdown ] >>= fun () ->
-    if Lwt.state shutdown <> Lwt.Sleep then
-      lwt_debug "terminating" >>= fun () ->
-      Lwt.return_unit
-    else if Lwt.state state.events <> Lwt.Sleep then
-      let now = Unix.gettimeofday () in
-      state.events >>= fun events ->
-      state.events <- Lwt_pipe.pop_all state.queue ;
-      Lwt_list.iter_s (process_event state now) events >>= fun () ->
-      worker_loop state
-    else
-      lwt_debug "timeout" >>= fun () ->
-      let now = Unix.gettimeofday () in
-      let active_peers = Request.active state.param in
-      let requests =
-        Table.fold
-          (fun key { peers ; next_request ; delay } acc ->
-             if next_request > now +. 0.2 then
-               acc
-             else
-               let remaining_peers =
-                 P2p_peer.Set.inter peers active_peers in
-               if P2p_peer.Set.is_empty remaining_peers &&
-                  not (P2p_peer.Set.is_empty peers) then
-                 ( Table.remove state.pending key ; acc )
+  let worker_loop state =
+    let shutdown = Lwt_canceler.cancelation state.canceler in
+    let rec loop state =
+      let timeout = compute_timeout state in
+      Lwt.choose
+        [ (state.events >|= fun _ -> ()) ; timeout ; shutdown ] >>= fun () ->
+      if Lwt.state shutdown <> Lwt.Sleep then
+        lwt_debug Tag.DSL.(fun f ->
+            f "terminating" -% t event "terminating") >>= fun () ->
+        Lwt.return_unit
+      else if Lwt.state state.events <> Lwt.Sleep then
+        let now = Unix.gettimeofday () in
+        state.events >>= fun events ->
+        state.events <- Lwt_pipe.pop_all state.queue ;
+        Lwt_list.iter_s (process_event state now) events >>= fun () ->
+        loop state
+      else
+        lwt_debug Tag.DSL.(fun f ->
+            f "timeout" -% t event "timeout") >>= fun () ->
+        let now = Unix.gettimeofday () in
+        let active_peers = Request.active state.param in
+        let requests =
+          Table.fold
+            (fun key { peers ; next_request ; delay } acc ->
+               if next_request > now +. 0.2 then
+                 acc
                else
-                 let requested_peer =
-                   P2p_peer.Id.Set.random_elt
-                     (if P2p_peer.Set.is_empty remaining_peers
-                      then active_peers
-                      else remaining_peers) in
-                 let next = { peers = remaining_peers ;
-                              next_request = now +. delay ;
-                              delay = delay *. 1.5 } in
-                 Table.replace state.pending key next ;
-                 let requests =
-                   try key :: P2p_peer.Map.find requested_peer acc
-                   with Not_found -> [key] in
-                 P2p_peer.Map.add requested_peer requests acc)
-          state.pending P2p_peer.Map.empty in
-      P2p_peer.Map.iter (Request.send state.param) requests ;
-      P2p_peer.Map.fold begin fun peer request acc ->
-        acc >>= fun () ->
-        Lwt_list.iter_s (fun key ->
-            lwt_debug "requested %a from %a"
-              Hash.pp key P2p_peer.Id.pp_short peer)
-          request
-      end requests Lwt.return_unit >>= fun () ->
-      worker_loop state
+                 let remaining_peers =
+                   P2p_peer.Set.inter peers active_peers in
+                 if P2p_peer.Set.is_empty remaining_peers &&
+                    not (P2p_peer.Set.is_empty peers) then
+                   ( Table.remove state.pending key ; acc )
+                 else
+                   let requested_peer =
+                     P2p_peer.Id.Set.random_elt
+                       (if P2p_peer.Set.is_empty remaining_peers
+                        then active_peers
+                        else remaining_peers) in
+                   let next = { peers = remaining_peers ;
+                                next_request = now +. delay ;
+                                delay = delay *. 1.5 } in
+                   Table.replace state.pending key next ;
+                   let requests =
+                     try key :: P2p_peer.Map.find requested_peer acc
+                     with Not_found -> [key] in
+                   P2p_peer.Map.add requested_peer requests acc)
+            state.pending P2p_peer.Map.empty in
+        P2p_peer.Map.iter (Request.send state.param) requests ;
+        P2p_peer.Map.fold begin fun peer request acc ->
+          acc >>= fun () ->
+          Lwt_list.iter_s (fun key ->
+              lwt_debug Tag.DSL.(fun f ->
+                  f "requested %a from %a"
+                  -% t event "requested"
+                  -% a Hash.Logging.tag key
+                  -% a P2p_peer.Id.Logging.tag peer))
+            request
+        end requests Lwt.return_unit >>= fun () ->
+        loop state
+    in
+    loop state
 
   let create param =
     let state = {
       param ;
       queue = Lwt_pipe.create () ;
       pending = Table.create 17 ;
-      events = Lwt.return [] ;
+      events = Lwt.return_nil ;
       canceler = Lwt_canceler.create () ;
       worker = Lwt.return_unit ;
     } in

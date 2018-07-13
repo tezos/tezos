@@ -1,0 +1,62 @@
+parameter unit ;
+storage
+  (pair
+     string # S
+     (pair
+        timestamp # T
+        (pair
+           (pair mutez mutez) # P N
+           (pair
+              (contract unit) # X
+              (pair (contract unit) (contract unit)))))) ; # A B
+code
+  { DUP ; CDAR ; # S
+    PUSH string "open" ;
+    COMPARE ; NEQ ;
+    IF { FAIL } # on "success", "timeout" or a bad init value
+       { DUP ; CDDAR ; # T
+         NOW ;
+         COMPARE ; LT ;
+         IF { # Before timeout
+              # We compute (P + N) mutez
+              PUSH mutez 0 ;
+              DIP { DUP ; CDDDAAR } ; ADD ; # P
+              DIP { DUP ; CDDDADR } ; ADD ; # N
+              # We compare to the cumulated amount
+              BALANCE ;
+              COMPARE; LT ;
+              IF { # Not enough cash, we just accept the transaction
+                   # and leave the global untouched
+                   CDR ; NIL operation ; PAIR }
+                 { # Enough cash, successful ending
+                   # We update the global
+                   CDDR ; PUSH string "success" ; PAIR ;
+                   # We transfer the fee to the broker
+                   DUP ; CDDAAR ; # P
+                   DIP { DUP ; CDDDAR } ; # X
+                   UNIT ; TRANSFER_TOKENS ;
+                   # We transfer the rest to A
+                   DIP { DUP ; CDDADR ; # N
+                         DIP { DUP ; CDDDDAR } ; # A
+                         UNIT ; TRANSFER_TOKENS } ;
+                   NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
+                   PAIR } }
+            { # After timeout, we refund
+              # We update the global
+              CDDR ; PUSH string "timeout" ; PAIR ;
+              # We try to transfer the fee to the broker
+              BALANCE ; # available
+              DIP { DUP ; CDDAAR } ; # P
+              COMPARE ; LT ; # available < P
+              IF { BALANCE ; # available
+                   DIP { DUP ; CDDDAR } ; # X
+                   UNIT ; TRANSFER_TOKENS }
+                 { DUP ; CDDAAR ; # P
+                   DIP { DUP ; CDDDAR } ; # X
+                   UNIT ; TRANSFER_TOKENS } ;
+              # We transfer the rest to B
+              DIP { BALANCE ; # available
+                    DIP { DUP ; CDDDDDR } ; # B
+                    UNIT ; TRANSFER_TOKENS } ;
+              NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
+              PAIR } } }

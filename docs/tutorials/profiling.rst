@@ -4,13 +4,13 @@ Profiling the Tezos node
 Memory profiling the OCaml heap
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Install an OCaml switch with the statmemprof patch:
+- Install an OCaml switch with the `statmemprof` patch:
 
   ``4.04.2+statistical-memprof`` or ``4.06.0+statistical-memprof``
 
 - Install ``statmemprof-emacs``.
 
-- Enable loading statmemprof into the node.
+- Enable loading `statmemprof` into the node.
 
   Add the ``statmemprof-emacs`` package as a dependency to the main package, and add
   ``let () = Statmemprof_emacs.start 1E-4 30 5`` to the ``node_main.ml`` file.
@@ -61,15 +61,15 @@ Memory profiling the C heap
 Performance profiling
 ~~~~~~~~~~~~~~~~~~~~~
 
-- Install perf (The ``linux-perf`` package for debian.
+- Install `perf` (the ``linux-perf`` package for debian).
 
   If the package does not exist for your current kernel, a previous
-  version can be used. substitute the ``perf`` command to ``perf_4.9``
+  version can be used. Substitute the ``perf`` command to ``perf_4.9``
   if your kernel is 4.9).
 
 - Run the node, find the pid.
 
-- Attach perf with ``perf record -p pid --call-stack dwarf``.
+- Attach `perf` with ``perf record -p pid --call-stack dwarf``.
 
   Then stop capturing with ``Ctrl-C``. This can represent a lot of
   data. Don't do that for too long. If this is too much you can remove

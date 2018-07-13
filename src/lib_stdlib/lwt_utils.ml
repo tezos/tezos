@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 module LC = Lwt_condition
 
@@ -16,7 +32,7 @@ let may ~f = function
   | None -> Lwt.return_unit
   | Some x -> f x
 
-let never_ending = fst (Lwt.wait ())
+let never_ending () = fst (Lwt.wait ())
 
 type trigger =
   | Absent
@@ -51,19 +67,29 @@ let trigger () : (unit -> unit) * (unit -> unit Lwt.t) =
 let worker name ~run ~cancel =
   let stop = LC.create () in
   let fail e =
-    log_error "%s worker failed with %s" name (Printexc.to_string e) ;
+    log_error Tag.DSL.(fun f ->
+        f "%s worker failed with %a"
+        -% t event "worker_failed"
+        -% s worker name
+        -% a exn e) ;
     cancel ()
   in
   let waiter = LC.wait stop in
-  log_info "%s worker started" name ;
+  log_info Tag.DSL.(fun f ->
+      f "%s worker started"
+      -% t event "worker_started"
+      -% s worker name) ;
   Lwt.async
     (fun () ->
        Lwt.catch run fail >>= fun () ->
        LC.signal stop ();
-       Lwt.return ()) ;
+       Lwt.return_unit) ;
   waiter >>= fun () ->
-  log_info "%s worker ended" name ;
-  Lwt.return ()
+  log_info Tag.DSL.(fun f ->
+      f "%s worker ended"
+      -% t event "worker_finished"
+      -% s worker name) ;
+  Lwt.return_unit
 
 
 let rec chop k l =
@@ -162,6 +188,6 @@ let stable_sort cmp l =
 let sort = stable_sort
 
 let unless cond f =
-  if cond then Lwt.return () else f ()
+  if cond then Lwt.return_unit else f ()
 
 

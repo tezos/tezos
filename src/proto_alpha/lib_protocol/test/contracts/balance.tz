@@ -1,4 +1,0 @@
-parameter unit;
-storage unit;
-return tez;
-code {DROP; UNIT; BALANCE; PAIR};

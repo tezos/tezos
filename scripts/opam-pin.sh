@@ -7,20 +7,10 @@ src_dir="$(dirname "$script_dir")"
 
 export OPAMYES=yes
 
-### Temporary HACK
+echo
+echo "## Pinning tezos packages..."
 
-## Should be in sync with `opam-unpin.sh`
-opam pin add --no-action leveldb git://github.com/chambart/ocaml-leveldb.git#update_4.06
-
-## Unpin package we used to pin...
-opam pin remove --no-action ocp-ocamlres
-opam pin remove --no-action ocplib-resto
-opam pin remove --no-action sodium
-opam pin remove --no-action ocplib-json-typed
-
-### End of temporary HACK
-
-opams=$(find "$src_dir" -name \*.opam -print)
+opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
 
 packages=
 for opam in $opams; do
@@ -28,12 +18,13 @@ for opam in $opams; do
     file=$(basename $opam)
     package=${file%.opam}
     packages="$packages $package"
-    opam pin add --no-action $package $dir
+    opam pin add --no-action $package $dir > /dev/null 2>&1
 done
 
-packages=$(opam list --short --all --sort $packages)
+packages=$(opam list --short --sort --pinned $packages)
 
 echo
-echo "Pinned packages:"
+echo "## Pinned packages:"
+echo
 echo "$packages" | sed 's/^/ /'
 echo

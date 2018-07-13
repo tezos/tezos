@@ -1,17 +1,33 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 open Proto_alpha
 
 let group =
-  { Clic.name = "programs" ;
-    title = "Commands for managing the library of known programs" }
+  { Clic.name = "scripts" ;
+    title = "Commands for managing the library of known scripts" }
 
 open Tezos_micheline
 open Client_proto_programs
@@ -41,23 +57,61 @@ let commands () =
       ~parameter:"amount"
       ~doc:"amount of the transfer in \xEA\x9C\xA9"
       ~default:"0.05" in
+  let custom_gas_flag =
+    arg
+      ~long:"gas"
+      ~short:'G'
+      ~doc:"Initial quantity of gas for typechecking and execution"
+      ~placeholder:"gas"
+      (parameter (fun _ctx str ->
+           try
+             let v = Z.of_string str in
+             assert Compare.Z.(v >= Z.zero) ;
+             return v
+           with _ -> failwith "invalid gas limit (must be a positive number)")) in
+  let resolve_max_gas cctxt block = function
+    | None ->
+        Alpha_services.Constants.all cctxt
+          (`Main, block) >>=? fun { parametric = {
+            hard_gas_limit_per_operation
+          } } ->
+        return hard_gas_limit_per_operation
+    | Some gas -> return gas in
   let data_parameter =
     Clic.parameter (fun _ data ->
         Lwt.return (Micheline_parser.no_parsing_error
                     @@ Michelson_v1_parser.parse_expression data)) in
+  let bytes_parameter ~name ~desc =
+    Clic.param ~name ~desc
+      (parameter (fun (_cctxt : full) s ->
+           try
+             if String.length s < 2
+             || s.[0] <> '0' || s.[1] <> 'x' then
+               raise Exit
+             else
+               return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
+           with _ ->
+             failwith "Invalid bytes, expecting hexadecimal \
+                       notation (e.g. 0x1234abcd)" )) in
+  let signature_parameter =
+    Clic.parameter
+      (fun _cctxt s ->
+         match Signature.of_b58check_opt s with
+         | Some s -> return s
+         | None -> failwith "Not given a valid signature") in
   [
 
-    command ~group ~desc: "Lists all programs in the library."
+    command ~group ~desc: "Lists all scripts in the library."
       no_options
-      (fixed [ "list" ; "known" ; "programs" ])
+      (fixed [ "list" ; "known" ; "scripts" ])
       (fun () (cctxt : Proto_alpha.full) ->
          Program.load cctxt >>=? fun list ->
          Lwt_list.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
-         return ()) ;
+         return_unit) ;
 
-    command ~group ~desc: "Add a program to the library."
+    command ~group ~desc: "Add a script to the library."
       (args1 (Program.force_switch ()))
-      (prefixes [ "remember" ; "program" ]
+      (prefixes [ "remember" ; "script" ]
        @@ Program.fresh_alias_param
        @@ Program.source_param
        @@ stop)
@@ -65,26 +119,26 @@ let commands () =
          Program.of_fresh cctxt force name >>=? fun name ->
          Program.add ~force cctxt name hash) ;
 
-    command ~group ~desc: "Remove a program from the library."
+    command ~group ~desc: "Remove a script from the library."
       no_options
-      (prefixes [ "forget" ; "program" ]
+      (prefixes [ "forget" ; "script" ]
        @@ Program.alias_param
        @@ stop)
       (fun () (name, _) cctxt -> Program.del cctxt name) ;
 
-    command ~group ~desc: "Display a program from the library."
+    command ~group ~desc: "Display a script from the library."
       no_options
-      (prefixes [ "show" ; "known" ; "program" ]
+      (prefixes [ "show" ; "known" ; "script" ]
        @@ Program.alias_param
        @@ stop)
       (fun () (_, program) (cctxt : Proto_alpha.full) ->
          Program.to_source program >>=? fun source ->
          cctxt#message "%s\n" source >>= fun () ->
-         return ()) ;
+         return_unit) ;
 
-    command ~group ~desc: "Ask the node to run a program."
+    command ~group ~desc: "Ask the node to run a script."
       (args3 trace_stack_switch amount_arg no_print_source_flag)
-      (prefixes [ "run" ; "program" ]
+      (prefixes [ "run" ; "script" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
        @@ Clic.param ~name:"storage" ~desc:"the storage data"
@@ -97,21 +151,21 @@ let commands () =
          Lwt.return @@ Micheline_parser.no_parsing_error program >>=? fun program ->
          let show_source = not no_print_source in
          (if trace_exec then
-            trace ~amount ~program ~storage ~input cctxt#block cctxt >>= fun res ->
+            trace cctxt cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
             print_trace_result cctxt ~show_source ~parsed:program res
           else
-            run ~amount ~program ~storage ~input cctxt#block cctxt >>= fun res ->
+            run cctxt cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
             print_run_result cctxt ~show_source ~parsed:program res)) ;
-
-    command ~group ~desc: "Ask the node to typecheck a program."
-      (args3 show_types_switch emacs_mode_switch no_print_source_flag)
-      (prefixes [ "typecheck" ; "program" ]
+    command ~group ~desc: "Ask the node to typecheck a script."
+      (args4 show_types_switch emacs_mode_switch no_print_source_flag custom_gas_flag)
+      (prefixes [ "typecheck" ; "script" ]
        @@ Program.source_param
        @@ stop)
-      (fun (show_types, emacs_mode, no_print_source) program cctxt ->
+      (fun (show_types, emacs_mode, no_print_source, original_gas) program cctxt ->
          match program with
          | program, [] ->
-             typecheck_program program cctxt#block cctxt >>= fun res ->
+             resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
+             typecheck_program cctxt cctxt#block ~gas:original_gas program >>= fun res ->
              print_typecheck_result
                ~emacs:emacs_mode
                ~show_types
@@ -123,7 +177,7 @@ let commands () =
              cctxt#message
                "(@[<v 0>(types . ())@ (errors . %a)@])"
                Michelson_v1_emacs.report_errors res_with_errors >>= fun () ->
-             return ()
+             return_unit
          | (parsed, errors) ->
              cctxt#message "%a"
                (fun ppf () ->
@@ -131,11 +185,11 @@ let commands () =
                     ~details:(not no_print_source) ~parsed
                     ~show_source:(not no_print_source)
                     ppf errors) () >>= fun () ->
-             return ()
+             cctxt#error "syntax error in program"
       ) ;
 
     command ~group ~desc: "Ask the node to typecheck a data expression."
-      (args1 no_print_source_flag)
+      (args2 no_print_source_flag custom_gas_flag)
       (prefixes [ "typecheck" ; "data" ]
        @@ Clic.param ~name:"data" ~desc:"the data to typecheck"
          data_parameter
@@ -143,11 +197,14 @@ let commands () =
        @@ Clic.param ~name:"type" ~desc:"the expected type"
          data_parameter
        @@ stop)
-      (fun no_print_source data ty cctxt ->
-         Client_proto_programs.typecheck_data ~data ~ty cctxt#block cctxt >>= function
-         | Ok () ->
-             cctxt#message "Well typed" >>= fun () ->
-             return ()
+      (fun (no_print_source, custom_gas) data ty cctxt ->
+         resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
+         Client_proto_programs.typecheck_data cctxt cctxt#block
+           ~gas:original_gas ~data ~ty () >>= function
+         | Ok gas ->
+             cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]"
+               Proto_alpha.Alpha_context.Gas.pp gas >>= fun () ->
+             return_unit
          | Error errs ->
              cctxt#warning "%a"
                (Michelson_v1_error_reporter.report_errors
@@ -157,10 +214,12 @@ let commands () =
              cctxt#error "ill-typed data") ;
 
     command ~group
-      ~desc: "Ask the node to hash a data expression.\n\
+      ~desc: "Ask the node to pack a data expression.\n\
               The returned hash is the same as what Michelson \
-              instruction `H` would have produced."
-      no_options
+              instruction `PACK` would have produced.\n\
+              Also displays the result of hashing this packed data \
+              with `BLAKE2B`, `SHA256` or `SHA512` instruction."
+      (args1 custom_gas_flag)
       (prefixes [ "hash" ; "data" ]
        @@ Clic.param ~name:"data" ~desc:"the data to hash"
          data_parameter
@@ -168,39 +227,72 @@ let commands () =
        @@ Clic.param ~name:"type" ~desc:"type of the data"
          data_parameter
        @@ stop)
-      (fun () data typ cctxt ->
-         Alpha_services.Helpers.hash_data cctxt
-           cctxt#block (data.expanded, typ.expanded) >>= function
-         | Ok hash ->
-             cctxt#message "%S" hash >>= fun () ->
-             return ()
+      (fun custom_gas data typ cctxt ->
+         resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
+         Alpha_services.Helpers.Scripts.pack_data cctxt (`Main, cctxt#block)
+           (data.expanded, typ.expanded, Some original_gas) >>= function
+         | Ok (bytes, remaining_gas) ->
+             let hash = Script_expr_hash.hash_bytes [ bytes ] in
+             cctxt#message
+               "Raw packed data: 0x%a@,\
+                Hash: %a@,\
+                Raw Blake2b hash: 0x%a@,\
+                Raw Sha256 hash: 0x%a@,\
+                Raw Sha512 hash: 0x%a@,\
+                Gas remaining: %a"
+               MBytes.pp_hex bytes
+               Script_expr_hash.pp hash
+               MBytes.pp_hex (Script_expr_hash.to_bytes hash)
+               MBytes.pp_hex (Alpha_environment.Raw_hashes.sha256 bytes)
+               MBytes.pp_hex (Alpha_environment.Raw_hashes.sha512 bytes)
+               Proto_alpha.Alpha_context.Gas.pp remaining_gas >>= fun () ->
+             return_unit
          | Error errs ->
-             cctxt#warning "%a" pp_print_error errs  >>= fun () ->
+             cctxt#warning "%a"
+               (Michelson_v1_error_reporter.report_errors
+                  ~details:false
+                  ~show_source:false
+                  ?parsed:None)
+               errs  >>= fun () ->
              cctxt#error "ill-formed data") ;
 
     command ~group
-      ~desc: "Ask the node to hash a data expression.\n\
-              Uses the same algorithm as Michelson instruction `H` to \
-              produce the hash, signs it using a given secret key, and \
-              displays it using the format expected by Michelson \
-              instruction `CHECK_SIGNATURE`."
+      ~desc: "Sign a raw sequence of bytes and display it using the \
+              format expected by Michelson instruction \
+              `CHECK_SIGNATURE`."
       no_options
-      (prefixes [ "hash" ; "and" ; "sign" ; "data" ]
-       @@ Clic.param ~name:"data" ~desc:"the data to hash"
-         data_parameter
-       @@ prefixes [ "of" ; "type" ]
-       @@ Clic.param ~name:"type" ~desc:"type of the data"
-         data_parameter
+      (prefixes [ "sign" ; "bytes" ]
+       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.source_param
        @@ stop)
-      (fun () data typ sk cctxt ->
-         Client_proto_programs.hash_and_sign data typ sk cctxt#block cctxt >>= begin function
-           | Ok (hash, signature) ->
-               cctxt#message "@[<v 0>Hash: %S@,Signature: %S@]" hash signature
-           | Error errs ->
-               cctxt#warning "%a" pp_print_error errs >>= fun () ->
-               cctxt#error "ill-formed data"
-         end >>= return) ;
+      (fun () bytes sk cctxt ->
+         Client_keys.sign cctxt sk bytes >>=? fun signature ->
+         cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
+         return_unit) ;
+
+    command ~group
+      ~desc: "Check the signature of a byte sequence as per Michelson \
+              instruction `CHECK_SIGNATURE`."
+      (args1 (switch ~doc:"Use only exit codes" ~short:'q' ~long:"quiet" ()))
+      (prefixes [ "check" ; "that" ]
+       @@ bytes_parameter ~name:"bytes" ~desc:"the signed data"
+       @@ prefixes [ "was" ; "signed" ; "by" ]
+       @@ Client_keys.Public_key.alias_param
+         ~name:"key"
+       @@ prefixes [ "to" ; "produce" ]
+       @@ Clic.param ~name:"signature" ~desc:"the signature to check"
+         signature_parameter
+       @@ stop)
+      (fun quiet bytes (_, (key_locator, _)) signature (cctxt : #Proto_alpha.full) ->
+         Client_keys.check key_locator signature bytes >>=? function
+         | false -> cctxt#error "invalid signature"
+         | true ->
+             if quiet then
+               return_unit
+             else
+               cctxt#message "Signature check successfull." >>= fun () ->
+               return_unit
+      ) ;
 
   ]

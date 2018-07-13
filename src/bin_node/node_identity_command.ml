@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 let (//) = Filename.concat
 
@@ -16,7 +32,7 @@ let identity_file data_dir = data_dir // Node_data_version.default_identity_file
 let show { Node_config_file.data_dir } =
   Node_identity_file.read (identity_file data_dir) >>=? fun id ->
   Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
-  return ()
+  return_unit
 
 let generate { Node_config_file.data_dir ; p2p } =
   let identity_file = identity_file data_dir in
@@ -31,7 +47,7 @@ let generate { Node_config_file.data_dir ; p2p } =
     Format.eprintf
       "Stored the new identity (%a) into '%s'.@."
       P2p_peer.Id.pp id.peer_id identity_file ;
-    return ()
+    return_unit
 
 let check { Node_config_file.data_dir ; p2p = { expected_pow } } =
   Node_identity_file.read
@@ -39,7 +55,7 @@ let check { Node_config_file.data_dir ; p2p = { expected_pow } } =
   Format.printf
     "Peer_id: %a. Proof of work is higher than %.2f.@."
     P2p_peer.Id.pp id.peer_id expected_pow ;
-  return ()
+  return_unit
 
 (** Main *)
 

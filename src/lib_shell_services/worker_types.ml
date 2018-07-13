@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 let level_encoding =
   let open Logging in
@@ -44,18 +60,21 @@ let worker_status_encoding error_encoding =
   let open Data_encoding in
   union
     [ case (Tag 0)
+        ~title:"Launching"
         (obj2
            (req "phase" (constant "launching"))
            (req "since" Time.encoding))
         (function Launching t -> Some ((), t) | _ -> None)
         (fun ((), t) -> Launching t) ;
       case (Tag 1)
+        ~title:"Running"
         (obj2
            (req "phase" (constant "running"))
            (req "since" Time.encoding))
         (function Running t -> Some ((), t) | _ -> None)
         (fun ((), t) -> Running t) ;
       case (Tag 2)
+        ~title:"Closing"
         (obj3
            (req "phase" (constant "closing"))
            (req "birth" Time.encoding)
@@ -63,6 +82,7 @@ let worker_status_encoding error_encoding =
         (function Closing (t0, t) -> Some ((), t0, t) | _ -> None)
         (fun ((), t0, t) -> Closing (t0, t))  ;
       case (Tag 3)
+        ~title:"Closed"
         (obj3
            (req "phase" (constant "closed"))
            (req "birth" Time.encoding)
@@ -70,6 +90,7 @@ let worker_status_encoding error_encoding =
         (function Closed (t0, t, None) -> Some ((), t0, t) | _ -> None)
         (fun ((), t0, t) -> Closed (t0, t, None)) ;
       case (Tag 4)
+        ~title:"Crashed"
         (obj4
            (req "phase" (constant "crashed"))
            (req "birth" Time.encoding)

@@ -1,11 +1,27 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2018.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
 (** The types for arbitraty precision integers in Michelson.
     The type variable ['t] is always [n] or [z],
@@ -88,6 +104,9 @@ val ediv:  _ num -> _ num -> (z num * n num) option
 (** Compute the absolute value of a relative, turning it into a natural. *)
 val abs : z num -> n num
 
+(** Partial identity over [N]. *)
+val is_nat : z num -> n num option
+
 (** Negates a number. *)
 val neg : _ num -> z num
 
@@ -97,7 +116,6 @@ val int : n num -> z num
 (** Reverses each bit in the representation of the number.
     Also applies to the sign. *)
 val lognot : _ num -> z num
-
 
 (** Shifts the natural to the left of a number of bits between 0 and 256.
     Returns [None] if the amount is too high. *)
@@ -116,10 +134,10 @@ val shift_left : 'a num -> n num -> 'a num option
 val shift_right : 'a num -> n num -> 'a num option
 
 (** Applies a boolean or operation to each bit. *)
-val logor : n num -> n num -> n num
+val logor : 'a num -> 'a num -> 'a num
 
 (** Applies a boolean and operation to each bit. *)
-val logand : n num -> n num -> n num
+val logand : _ num -> n num -> n num
 
 (** Applies a boolean xor operation to each bit. *)
 val logxor : n num -> n num -> n num

@@ -4,32 +4,32 @@
   ---------------------------------------------------------------------------*)
 
 module Blake2b = struct
-  type t = Cstruct.t
+  type t = Bigstring.t
 
   external sizeof_state : unit -> int =
     "sizeof_blake2b_state" [@@noalloc]
 
   let bytes = sizeof_state ()
 
-  external init : Cstruct.buffer -> int -> int =
+  external init : Bigstring.t -> int -> int =
     "ml_blake2b_init" [@@noalloc]
 
-  external outlen : Cstruct.buffer -> int =
+  external outlen : Bigstring.t -> int =
     "blake2b_state_outlen" [@@noalloc]
 
-  let outlen t = outlen t.Cstruct.buffer
+  let outlen t = outlen t
 
-  external init_key : Cstruct.buffer -> int -> Cstruct.buffer -> int =
+  external init_key : Bigstring.t -> int -> Bigstring.t -> int =
     "ml_blake2b_init_key" [@@noalloc]
 
-  external update : Cstruct.buffer -> Cstruct.buffer -> int =
+  external update : Bigstring.t -> Bigstring.t -> int =
     "ml_blake2b_update" [@@noalloc]
 
-  external final : Cstruct.buffer -> Cstruct.buffer -> int =
+  external final : Bigstring.t -> Bigstring.t -> int =
     "ml_blake2b_final" [@@noalloc]
 
   external direct :
-    Cstruct.buffer -> Cstruct.buffer -> Cstruct.buffer -> int =
+    Bigstring.t -> Bigstring.t -> Bigstring.t -> int =
     "ml_blake2b" [@@noalloc]
 
   let or_fail ~msg f =
@@ -40,37 +40,33 @@ module Blake2b = struct
   let init ?key size =
     if size < 1 || size > 64 then
       invalid_arg "Blake2b.init: size must be between 1 and 64" ;
-    let t = Cstruct.create_unsafe bytes in
+    let t = Bigstring.create bytes in
     begin match key with
       | Some key ->
           or_fail ~msg:"Blake2b.init"
-            (fun () -> init_key t.buffer size key.Cstruct.buffer)
+            (fun () -> init_key t size key)
       | None ->
           or_fail ~msg:"Blake2b.init"
-            (fun () -> init t.buffer size)
+            (fun () -> init t size)
     end ;
     t
 
   let update t buf =
-    or_fail ~msg:"Blake2b.update"
-      (fun () -> update t.Cstruct.buffer buf.Cstruct.buffer)
+    or_fail ~msg:"Blake2b.update" (fun () -> update t buf)
 
-  type hash = Hash of Cstruct.t
+  type hash = Hash of Bigstring.t
 
   let final t =
     let len = outlen t in
-    let buf = Cstruct.create_unsafe len in
-    or_fail ~msg:"Blake2b.final"
-      (fun () -> final t.Cstruct.buffer buf.Cstruct.buffer) ;
+    let buf = Bigstring.create len in
+    or_fail ~msg:"Blake2b.final" (fun () -> final t buf) ;
     Hash buf
 
-  let direct ?(key=Cstruct.create_unsafe 0) inbuf len =
+  let direct ?(key=Bigstring.create 0) inbuf len =
     if len < 1 || len > 64 then
       invalid_arg "Blake2b.direct: size must be between 1 and 64" ;
-    let outbuf = Cstruct.create len in
-    or_fail ~msg:"Blake2b.direct"
-      (fun () -> direct outbuf.Cstruct.buffer
-          inbuf.Cstruct.buffer key.buffer) ;
+    let outbuf = Bigstring.create len in
+    or_fail ~msg:"Blake2b.direct" (fun () -> direct outbuf inbuf key) ;
     Hash outbuf
 end
 
