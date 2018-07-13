@@ -1258,7 +1258,7 @@ retrieved from script parameters or globals.
 
 
 Operations on Mutez
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Mutez (micro-Tez) are internally represented by a 64 bit signed
 integers. There are restrictions to prevent creating a negative amount
@@ -1468,7 +1468,7 @@ Special operations
     :: 'S   ->   timestamp : 'S
 
 Operations on bytes
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Bytes are used for serializing data, in order to check signatures and
 compute hashes on them. They can also be used to incorporate data from
@@ -2448,7 +2448,7 @@ treatment of annotations with `.`.
    :: @p.x 'a : @q.y 'b : 'S   ->  (pair ('a %x) ('b %y)) : 'S
 
 XI - JSON syntax
----------------
+----------------
 
 Micheline expressions are encoded in JSON like this:
 
@@ -2479,7 +2479,7 @@ As in the concrete syntax, all domain specific constants are encoded as
 strings.
 
 XII - Examples
--------------
+--------------
 
 Contracts in the system are stored as a piece of code and a global data
 storage. The type of the global data of the storage is fixed for each
