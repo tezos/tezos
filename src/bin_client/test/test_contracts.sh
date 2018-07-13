@@ -581,6 +581,13 @@ bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pa
 bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 400 (Some 1232)) (Pair 400 (Some 1232)))'
 bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 401 (Some 0)) (Pair 400 (Some 1232)))'
 
+# Test for issue #262
+tee /tmp/bug_262.tz <<EOF
+{ parameter unit ; storage unit ; code { DROP ; LAMBDA  unit unit {} ; UNIT ; EXEC ; NIL operation ; PAIR } }
+EOF
+init_with_transfer /tmp/bug_262.tz $key1 'Unit' 1 bootstrap1
+assert_balance bug_262 "1 ꜩ"
+
 printf "\nEnd of test\n"
 
 show_logs="no"

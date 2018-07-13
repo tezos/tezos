@@ -171,14 +171,16 @@ let canonical_encoding ~variant prim_encoding =
       (fun args -> Seq (0, args)) in
   let annots_encoding =
     let split s =
-      let annots = String.split_on_char ' ' s in
-      List.iter (fun a ->
-          if String.length a > 255 then failwith "Oversized annotation"
-        ) annots;
-      if String.concat " " annots <> s then
-        failwith "Invalid annotation string, \
-                  must be a sequence of valid annotations with spaces" ;
-      annots in
+      if s = "" then []
+      else
+        let annots = String.split_on_char ' ' s in
+        List.iter (fun a ->
+            if String.length a > 255 then failwith "Oversized annotation"
+          ) annots;
+        if String.concat " " annots <> s then
+          failwith "Invalid annotation string, \
+                    must be a sequence of valid annotations with spaces" ;
+        annots in
     splitted
       ~json:(list (Bounded.string 255))
       ~binary:(conv (String.concat " ") split string) in
