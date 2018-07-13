@@ -725,7 +725,6 @@ let rec interp
                            Prim (0, K_code, [ Micheline.root code ], []) ])) in
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
             let storage = Micheline.strip_locations storage in
-            Contract.spend_from_script ctxt self credit >>=? fun ctxt ->
             Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
             let operation =
               Origination
