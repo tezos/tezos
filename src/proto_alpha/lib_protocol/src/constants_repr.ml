@@ -90,13 +90,13 @@ type parametric = {
 }
 
 let default = {
-  preserved_cycles = 5 ;
-  blocks_per_cycle = 4096l ;
+  preserved_cycles = 2 ;
+  blocks_per_cycle = 2048l ;
   blocks_per_commitment = 32l ;
   blocks_per_roll_snapshot = 256l ;
   blocks_per_voting_period = 32768l ;
   time_between_blocks =
-    List.map Period_repr.of_seconds_exn [ 60L ; 75L ] ;
+    List.map Period_repr.of_seconds_exn [ 30L ; 20L ] ;
   endorsers_per_block = 32 ;
   hard_gas_limit_per_operation = Z.of_int 400_000 ;
   hard_gas_limit_per_block = Z.of_int 4_000_000 ;
