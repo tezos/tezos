@@ -267,18 +267,10 @@ let pp_document ppf descriptions =
   Format.fprintf ppf "%a@." Rst.pp_raw_html Rst.style ;
   (* Script : hack *)
   Format.fprintf ppf "%a@." Rst.pp_raw_html Rst.script ;
-  (* Page title *)
-  Format.fprintf ppf "%a" Rst.pp_h1 "RPC API" ;
-  (* include/copy usage.rst from input  *)
-  let rec loop () =
-    let s = read_line () in
-    Format.fprintf ppf "%s@\n" s ;
-    loop () in
-  begin try loop () with End_of_file -> () end ;
-  Format.fprintf ppf "@\n" ;
   (* Index *)
   Format.pp_set_margin ppf 10000 ;
   Format.pp_set_max_indent ppf 9000 ;
+  Format.fprintf ppf "%a" Rst.pp_ref "rpc_index" ;
   Rst.pp_h2 ppf "RPCs - Index" ;
   List.iter
     (fun (name, prefix, rpc_dir) ->
