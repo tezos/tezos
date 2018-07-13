@@ -11,18 +11,20 @@ using the following shell commands.
    tezos-client -protocol ProtoALphaALph man -verbosity 3
    tezos-admin-client man -verbosity 3
 
-Command line client
-===================
 
 .. _tezos_client_commands:
+
+Command line client
+===================
 
 .. raw:: html
          :file: tezos-client.html
 
-Administration command line client
-==================================
 
 .. _tezos_admin_client_commands:
+
+Administration command line client
+==================================
 
 .. raw:: html
          :file: tezos-admin-client.html
