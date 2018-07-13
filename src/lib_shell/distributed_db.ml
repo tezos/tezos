@@ -446,19 +446,19 @@ let read_operation { active_chains } h =
 module P2p_reader = struct
 
   let may_activate global_db state chain_id f =
-    match Chain_id.Table.find state.peer_active_chains chain_id with
-    | chain_db ->
+    match Chain_id.Table.find_opt state.peer_active_chains chain_id with
+    | Some chain_db ->
         f chain_db
-    | exception Not_found ->
-        match Chain_id.Table.find global_db.active_chains chain_id with
-        | chain_db ->
+    | None ->
+        match Chain_id.Table.find_opt global_db.active_chains chain_id with
+        | Some chain_db ->
             chain_db.active_peers :=
               P2p_peer.Set.add state.gid !(chain_db.active_peers) ;
             P2p_peer.Table.add chain_db.active_connections
               state.gid state ;
             Chain_id.Table.add state.peer_active_chains chain_id chain_db ;
             f chain_db
-        | exception Not_found ->
+        | None ->
             (* TODO  decrease peer score. *)
             Lwt.return_unit
 
@@ -469,18 +469,18 @@ module P2p_reader = struct
     P2p_peer.Table.remove chain_db.active_connections state.gid
 
   let may_handle state chain_id f =
-    match Chain_id.Table.find state.peer_active_chains chain_id with
-    | exception Not_found ->
+    match Chain_id.Table.find_opt state.peer_active_chains chain_id with
+    | None ->
         (* TODO decrease peer score *)
         Lwt.return_unit
-    | chain_db ->
+    | Some chain_db ->
         f chain_db
 
   let may_handle_global global_db chain_id f =
-    match Chain_id.Table.find global_db.active_chains chain_id with
-    | exception Not_found ->
+    match Chain_id.Table.find_opt global_db.active_chains chain_id with
+    | None ->
         Lwt.return_unit
-    | chain_db ->
+    | Some chain_db ->
         f chain_db
 
   module Handle_msg_Logging =
@@ -787,8 +787,8 @@ let create disk p2p =
 
 let activate ({ p2p ; active_chains } as global_db) chain_state =
   let chain_id = State.Chain.id chain_state in
-  match Chain_id.Table.find active_chains chain_id with
-  | exception Not_found ->
+  match Chain_id.Table.find_opt active_chains chain_id with
+  | None ->
       let active_peers = ref P2p_peer.Set.empty in
       let p2p_request =
         { data = () ;
@@ -817,7 +817,7 @@ let activate ({ p2p ; active_chains } as global_db) chain_state =
           end) ;
       Chain_id.Table.add active_chains chain_id chain ;
       chain
-  | chain ->
+  | Some chain ->
       chain
 
 let set_callback chain_db callback =
@@ -840,8 +840,7 @@ let deactivate chain_db =
   Lwt.return_unit
 
 let get_chain { active_chains } chain_id =
-  try Some (Chain_id.Table.find active_chains chain_id)
-  with Not_found -> None
+  Chain_id.Table.find_opt active_chains chain_id
 
 let greylist { global_db = { p2p } } peer_id =
   Lwt.return (P2p.greylist_peer p2p peer_id)
@@ -984,10 +983,10 @@ let broadcast chain_db msg =
     chain_db.active_connections
 
 let try_send chain_db peer_id msg =
-  try
-    let conn = P2p_peer.Table.find chain_db.active_connections peer_id in
-    ignore (P2p.try_send chain_db.global_db.p2p conn.conn msg : bool)
-  with Not_found -> ()
+  match P2p_peer.Table.find_opt chain_db.active_connections peer_id with
+  | None -> ()
+  | Some conn ->
+      ignore (P2p.try_send chain_db.global_db.p2p conn.conn msg : bool)
 
 let send chain_db ?peer msg =
   match peer with

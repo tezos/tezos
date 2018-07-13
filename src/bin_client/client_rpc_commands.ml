@@ -156,17 +156,17 @@ let editor_fill_in ?(show_optionals=true) schema =
   and edit () =
     (* launch the user's editor on it *)
     let editor_cmd =
-      try let ed = Sys.getenv "EDITOR" in Lwt_process.shell (ed ^ " " ^ tmp)
-      with Not_found ->
-      try let ed = Sys.getenv "VISUAL" in Lwt_process.shell (ed ^ " " ^ tmp)
-      with Not_found ->
-        if Sys.win32 then
-          (* TODO: I have no idea what I'm doing here *)
-          ("", [| "notepad.exe" ; tmp |])
-        else
-          (* TODO: vi on MacOSX ? *)
-          ("", [| "nano" ; tmp |])
-    in
+      let ed =
+        match Sys.getenv_opt "EDITOR", Sys.getenv_opt "VISUAL" with
+        | Some ed, _ -> ed
+        | None, Some ed -> ed
+        | None, None when Sys.win32 ->
+            (* TODO: I have no idea what I'm doing here *)
+            "notepad.exe"
+        | _ ->
+            (* TODO: vi on MacOSX ? *)
+            "nano" in
+      Lwt_process.shell (ed ^ " " ^ tmp) in
     (Lwt_process.open_process_none editor_cmd) # status >>= function
     | Unix.WEXITED 0 ->
         reread () >>= fun json ->
@@ -311,17 +311,17 @@ let schema meth url (cctxt : #Client_context.full) =
   let open RPC_description in
   RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
-      match RPC_service.MethMap.find meth services with
-      | exception Not_found ->
+      match RPC_service.MethMap.find_opt meth services with
+      | None ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
           return_unit
-      | { input = Some input ; output } ->
+      | Some ({ input = Some input ; output }) ->
           let json = `O [ "input", Json_schema.to_json (fst input) ;
                           "output", Json_schema.to_json (fst output) ] in
           cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
           return_unit
-      | { input = None ; output } ->
+      | Some ({ input = None ; output }) ->
           let json = `O [ "output", Json_schema.to_json (fst output) ] in
           cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
           return_unit
@@ -341,12 +341,12 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
       (fun ppf (schema, _) -> Json_schema.pp ppf schema) in
   RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
-      match RPC_service.MethMap.find meth services with
-      | exception Not_found ->
+      match RPC_service.MethMap.find_opt meth services with
+      | None ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
           return_unit
-      | { input = Some input ; output } ->
+      | Some ({ input = Some input ; output }) ->
           cctxt#message
             "@[<v 0>\
              @[<v 2>Input format:@,%a@]@,\
@@ -355,7 +355,7 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
             pp input
             pp output >>= fun () ->
           return_unit
-      | { input = None ; output } ->
+      | Some ({ input = None ; output }) ->
           cctxt#message
             "@[<v 0>\
              @[<v 2>Output format:@,%a@]@,\
@@ -392,16 +392,16 @@ let call meth raw_url (cctxt : #Client_context.full) =
   let args = String.split_path (Uri.path uri) in
   RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
-      match RPC_service.MethMap.find meth services with
-      | exception Not_found ->
+      match RPC_service.MethMap.find_opt meth services with
+      | None ->
           cctxt#message
             "No service found at this URL with this method \
              (but this is a valid prefix)\n%!" >>= fun () ->
           return_unit
-      | { input = None } ->
+      | Some ({ input = None }) ->
           cctxt#generic_json_call meth uri >>=?
           display_answer cctxt
-      | { input = Some input } ->
+      | Some ({ input = Some input }) ->
           fill_in ~show_optionals:false (fst input) >>= function
           | Error msg ->
               cctxt#error "%s" msg >>= fun () ->

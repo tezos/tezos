@@ -1,88 +1,54 @@
-
 variables:
-  opam_image: ${CI_REGISTRY_IMAGE}/opam
-  build_deps_image: ${CI_REGISTRY_IMAGE}/build_deps
-  public_docker_image: docker.io/${CI_PROJECT_PATH}
+  ## Please update `scripts/version.sh` accordingly
+  build_deps_image_version: 63f06ab145e22aef4cc55b5b9557756d4c868843
+  build_deps_image_name: registry.gitlab.com/tezos/opam-repository
+  public_docker_image_name: docker.io/${CI_PROJECT_PATH}
 
 stages:
-  - precheck
-  - prepare
-  - build_deps
   - build
   - test
-  - opam
+  - packaging
   - publish
-  - deploy
-  - cleanup
 
-## Check zeronet/alphanet
 
-precheck:constant:
-  image: ${opam_image}
-  stage: precheck
-  only:
-    - zeronet
-    - alphanet
-  script:
-    - ./scripts/check_patch.sh "${CI_COMMIT_REF_NAME}"
+############################################################
+## Stage: build (only MR)                                 ##
+############################################################
 
-## Template for `docker_in_docker` jobs
-
-.dind_template: &dind_definition
-  image: docker:latest
-  variables:
-    DOCKER_DRIVER: overlay2
-  services:
-    - docker:dind
-  before_script:
-    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
-    - apk add --no-cache curl jq
-    - . ./scripts/version.sh
-  tags:
-    - safe_docker
-
-prepare:opam:
-  <<: *dind_definition
-  stage: prepare
-  only:
-    variables:
-    - $UPDATE_OPAM
-  script:
-    - ./scripts/ci/create_docker_image.opam.sh "${opam_image}"
-    - docker push "${opam_image}:alpine-${alpine_version}_ocaml-${ocaml_version}"
-    - docker tag "${opam_image}:alpine-${alpine_version}_ocaml-${ocaml_version}"
-                 "${opam_image}:latest"
-    - docker push "${opam_image}:latest"
-
-## Tezos build dependencies
-
-build_deps:
-  <<: *dind_definition
-  stage: build_deps
-  script:
-    ## Building dependencies...
-    - ./scripts/ci/create_docker_image.build_deps.sh
-        "${build_deps_image}" "${CI_COMMIT_SHA}"
-        "${opam_image}:alpine-${alpine_version}_ocaml-${ocaml_version}"
-        "yes"
-
-.build_deps_template: &build_deps_definition
-  image: ${build_deps_image}:${CI_COMMIT_SHA}
-  before_script:
-    - opam list
-  tags:
-    - gitlab-org
-
-## Tezos
-
-build:
-  <<: *build_deps_definition
+.build_template: &build_definition
+  image: ${build_deps_image_name}:${build_deps_image_version}
   stage: build
   except:
     - master
     - alphanet
     - zeronet
     - betanet
+    - alphanet-staging
+    - zeronet-staging
+    - betanet-staging
+  before_script:
+    - opam list
+    - . ./scripts/version.sh
+  tags:
+    - gitlab-org
+
+check_opam_deps:
+  <<: *build_definition
+  script:
+    - if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
+        echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab-ci.yml'." ;
+        exit 1 ;
+      fi
+    - ./scripts/opam-check.sh
+    - ./scripts/check_opam_test.sh
+
+check_indentation:
+  <<: *build_definition
+  script:
+    - jbuilder build @runtest_indent
+
+build:
+  <<: *build_definition
   script:
     - make all
     - make build-test
@@ -91,28 +57,17 @@ build:
     - _build
     expire_in: 1 day
 
-## Basic tests (run on merge requests)
+
+
+############################################################
+## Stage: test (only MR)                                  ##
+############################################################
 
 .test_template: &test_definition
-  <<: *build_deps_definition
+  <<: *build_definition
   stage: test
-  except:
-    - master
-    - alphanet
-    - zeronet
-    - betanet
   dependencies:
     - build
-
-test:opam_packaging:
-  <<: *test_definition
-  script:
-    - ./scripts/check_opam_test.sh "$CI_PROJECT_DIR/$CI_CONFIG_PATH"
-
-test:ocp-indent:
-  <<: *test_definition
-  script:
-    - jbuilder build @runtest_indent
 
 test:stdlib:
   <<: *test_definition
@@ -147,17 +102,17 @@ test:shell:
 test:p2p:io-scheduler:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_io_scheduler
+    - jbuilder build @src/lib_p2p/runtest_p2p_io_scheduler_ipv4
 
 test:p2p:socket:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_socket
+    - jbuilder build @src/lib_p2p/runtest_p2p_socket_ipv4
 
 test:p2p:pool:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_pool
+    - jbuilder build @src/lib_p2p/runtest_p2p_pool_ipv4
 
 test:proto_alpha:
   <<: *test_definition
@@ -209,11 +164,22 @@ test:proto:sandbox:
   script:
     - jbuilder build @runtest_sandbox
 
-## Basic tests through opam packaged (run on master only)
+test:documentation:
+  <<: *test_definition
+  script:
+    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - make doc-html
+
+
+
+############################################################
+## Stage: building opam packages (only master and *opam*) ##
+############################################################
 
 .opam_template: &opam_definition
-  image: ${opam_image}
-  stage: opam
+  image: ${build_deps_image_name}:opam--${build_deps_image_version}
+  stage: packaging
   dependencies: []
   only:
     - master
@@ -357,187 +323,187 @@ opam:25:tezos-protocol-environment-sigs:
   variables:
     package: tezos-protocol-environment-sigs
 
-opam:26:tezos-client-base:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-base
-
-opam:27:tezos-protocol-compiler:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-compiler
-
-opam:28:tezos-signer-services:
-  <<: *opam_definition
-  variables:
-    package: tezos-signer-services
-
-opam:29:tezos-protocol-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-alpha
-
-opam:30:tezos-protocol-environment:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-environment
-
-opam:31:tezos-signer-backends:
-  <<: *opam_definition
-  variables:
-    package: tezos-signer-backends
-
-opam:32:tezos-client-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-alpha
-
-opam:33:tezos-client-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-commands
-
-opam:34:tezos-protocol-environment-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-environment-shell
-
-opam:35:tezos-baking-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-baking-alpha
-
-opam:36:tezos-protocol-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-genesis
-
-opam:37:ocplib-resto-json:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-json
-
-opam:38:tezos-protocol-updater:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-updater
-
-opam:39:tezos-p2p:
-  <<: *opam_definition
-  variables:
-    package: tezos-p2p
-
-opam:40:tezos-baking-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baking-alpha-commands
-
-opam:41:tezos-client-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-alpha-commands
-
-opam:42:tezos-client-base-unix:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-base-unix
-
-opam:43:tezos-client-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-genesis
-
-opam:44:ocplib-ezresto:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto
-
-opam:45:ledgerwallet:
+opam:26:ledgerwallet:
   <<: *opam_definition
   variables:
     package: ledgerwallet
 
-opam:46:tezos-embedded-protocol-alpha:
+opam:27:tezos-client-base:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-base
+
+opam:28:tezos-protocol-compiler:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-compiler
+
+opam:29:ledgerwallet-tezos:
+  <<: *opam_definition
+  variables:
+    package: ledgerwallet-tezos
+
+opam:30:tezos-signer-services:
+  <<: *opam_definition
+  variables:
+    package: tezos-signer-services
+
+opam:31:tezos-protocol-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-alpha
+
+opam:32:tezos-protocol-environment:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-environment
+
+opam:33:tezos-signer-backends:
+  <<: *opam_definition
+  variables:
+    package: tezos-signer-backends
+
+opam:34:tezos-client-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-alpha
+
+opam:35:tezos-client-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-commands
+
+opam:36:tezos-protocol-environment-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-environment-shell
+
+opam:37:tezos-baking-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-alpha
+
+opam:38:tezos-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-genesis
+
+opam:39:ocplib-resto-json:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto-json
+
+opam:40:tezos-protocol-updater:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-updater
+
+opam:41:tezos-p2p:
+  <<: *opam_definition
+  variables:
+    package: tezos-p2p
+
+opam:42:tezos-baking-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-alpha-commands
+
+opam:43:tezos-client-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-alpha-commands
+
+opam:44:tezos-client-base-unix:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-base-unix
+
+opam:45:tezos-client-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-genesis
+
+opam:46:ocplib-ezresto:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto
+
+opam:47:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-alpha
 
-opam:47:tezos-embedded-protocol-demo:
+opam:48:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
 
-opam:48:tezos-embedded-protocol-genesis:
+opam:49:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
 
-opam:49:tezos-shell:
+opam:50:tezos-shell:
   <<: *opam_definition
   variables:
     package: tezos-shell
 
-opam:50:tezos-endorser-alpha-commands:
+opam:51:tezos-endorser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha-commands
 
-opam:51:tezos-client:
+opam:52:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
 
-opam:52:tezos-endorser-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-alpha
-
-opam:53:tezos-accuser-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-alpha-commands
-
-opam:54:ocplib-ezresto-directory:
+opam:53:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:55:tezos-accuser-alpha:
+opam:54:tezos-accuser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha
 
-opam:56:tezos-baker-alpha:
+opam:55:tezos-endorser-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-alpha
+
+opam:56:tezos-accuser-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-alpha-commands
+
+opam:57:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:57:tezos-protocol-demo:
+opam:58:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:58:tezos-signer:
+opam:59:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
-
-opam:59:ledgerwallet-tezos:
-  <<: *opam_definition
-  variables:
-    package: ledgerwallet-tezos
 
 opam:60:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:59:ocplib-json-typed-browser:
+opam:61:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
 
-opam:60:tezos-baker-alpha-commands:
+opam:62:tezos-baker-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha-commands
@@ -545,163 +511,67 @@ opam:60:tezos-baker-alpha-commands:
 
 ##END_OPAM##
 
-## Publishing (small) docker images with tezos binaries
 
-publish:docker:minimal:
-  <<: *dind_definition
+
+############################################################
+## Stage: publish                                         ##
+############################################################
+
+publish:docker:
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
   stage: publish
   only:
     - master
     - alphanet
     - zeronet
     - betanet
-  script:
-    - ./scripts/ci/create_docker_image.build.sh
-        "tezos_build" "${CI_COMMIT_REF_NAME}"
-        "${build_deps_image}:${CI_COMMIT_SHA}"
-    - ./scripts/ci/create_docker_image.minimal.sh
-        "${public_docker_image}" "${CI_COMMIT_REF_NAME}"
-        "tezos_build:${CI_COMMIT_REF_NAME}"
-    - mkdir ~/.docker || true
-    - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json ;
-    - docker push "${public_docker_image}:${CI_COMMIT_REF_NAME}"
-
-## Publish to github...
-
-publish:github:
-  image: ${opam_image}
-  stage: publish
-  dependencies: []
-  only:
-    - master@tezos/tezos
-    - alphanet@tezos/tezos
-  script:
-    - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - echo "${CI_PK_GITHUB}" > ~/.ssh/id_rsa
-    - chmod 400 ~/.ssh/id_rsa
-    - rm -fr .git/refs/original
-    - sudo apk add --no-cache openssh
-    - git push git@github.com:tezos/tezos.git -f HEAD:${CI_COMMIT_REF_NAME}
-  tags:
-    - gitlab-org
-
-## Publish docs to gitlab...
-
-pages:
-  image: ${build_deps_image}:${CI_COMMIT_SHA}
-  stage: publish
-  only:
-    - master@tezos/tezos
-  artifacts:
-    paths:
-    - public
-  script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - opam install --yes odoc
-    - make doc-html && sudo mv docs/_build "${CI_PROJECT_DIR}"/public
-  tags:
-    - gitlab-org
-
-documentation:
-  image: ${build_deps_image}:${CI_COMMIT_SHA}
-  stage: test
-  only:
-    - /^.*doc.*$/
-  script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - opam install --yes odoc
-    - make doc-html
-  tags:
-    - gitlab-org
-
-
-## Relaunching the bootstrap servers of the alphanet/zeronet
-
-.bootstrap_template: &bootstrap_definition
-  image: ${opam_image}
-  stage: deploy
-  dependencies: []
+    - alphanet-staging
+    - zeronet-staging
+    - betanet-staging
   before_script:
+    - mkdir ~/.docker || true
+    - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json
+  script:
+    - ./scripts/create_docker_image.sh
+        "${public_docker_image_name}" "${CI_COMMIT_REF_NAME}"
+    - docker push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
+  tags:
+    - safe_docker
+
+publish:doc:
+  image: ${build_deps_image_name}:${build_deps_image_version}
+  stage: publish
+  only:
+    - master
+    - alphanet
+    - zeronet
+    - betanet
+    - alphanet-staging
+    - zeronet-staging
+    - betanet-staging
+  before_script:
+    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
     - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - echo "${CI_PK_ALPHANET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
-    - echo "${CI_SSH_CONFIG}" | tr -d "\r" > ~/.ssh/config
-    - chmod 600 ~/.ssh/id_ed25519
-    - sudo apk add --no-cache openssh
-  allow_failure: true
+    - chmod 400 ~/.ssh/id_ed25519
+  script:
+    - make doc-html
+    - git clone git@gitlab.com:${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAMESPACE}.gitlab.io gitlab.io
+    - rsync --recursive --links --perms --delete --verbose
+        --exclude=.doctrees
+        docs/_build/ gitlab.io/public/"${CI_COMMIT_REF_NAME}"
+    - cd gitlab.io
+    - if [ -z "$(git status -s)" ] ; then
+        echo "Nothing to commit!" ;
+      else
+        git add public/"${CI_COMMIT_REF_NAME}" ;
+        git commit -m "Import doc for ${CI_COMMIT_REF_NAME} (${CI_COMMIT_SHA})" ;
+        git push origin master ;
+      fi
   tags:
     - gitlab-org
-
-deploy:bootstrap1:
-  <<: *bootstrap_definition
-  only:
-    - alphanet@tezos/tezos
-  script:
-    - ssh bootstrap1
-
-deploy:bootstrap2:
-  <<: *bootstrap_definition
-  only:
-    - alphanet@tezos/tezos
-  script:
-    - ssh bootstrap2
-
-deploy:bootstrap3:
-  <<: *bootstrap_definition
-  only:
-    - alphanet@tezos/tezos
-  script:
-    - ssh bootstrap3
-
-deploy:bootstrap4:
-  <<: *bootstrap_definition
-  only:
-    - alphanet@tezos/tezos
-  script:
-    - ssh bootstrap4
-
-deploy:bootstrap5:
-  <<: *bootstrap_definition
-  only:
-    - alphanet@tezos/tezos
-  script:
-    - ssh bootstrap5
-
-deploy:bootstrap6:
-  <<: *bootstrap_definition
-  only:
-    - alphanet@tezos/tezos
-  script:
-    - ssh bootstrap6
-
-
-deploy:zeronet1:
-  <<: *bootstrap_definition
-  only:
-    - zeronet@tezos/tezos
-  script:
-    - ssh zeronet1
-
-deploy:zeronet2:
-  <<: *bootstrap_definition
-  only:
-    - zeronet@tezos/tezos
-  script:
-    - ssh zeronet2
-
-deploy:zeronet3:
-  <<: *bootstrap_definition
-  only:
-    - zeronet@tezos/tezos
-  script:
-    - ssh zeronet3
-
-# cleanup:
-  # <<: *dind_definition
-  # stage: cleanup
-  # dependencies: []
-  # script:
-    # - ./scripts/ci/docker_registry_delete.sh
-         # "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}"
-         # "${build_deps_image}" "${CI_COMMIT_SHA}"

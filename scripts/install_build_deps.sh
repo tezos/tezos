@@ -11,7 +11,7 @@ if [ "$(opam --version)" != "$opam_version" ] ; then
 fi
 
 opam repository set-url tezos --dont-select $opam_repository || \
-    opam repository add tezos --dont-select $opam_repository
+    opam repository add tezos --dont-select $opam_repository > /dev/null 2>&1
 
 if [ ! -d "$src_dir/_opam" ] ; then
     opam switch create "$src_dir" --repositories=tezos ocaml-base-compiler.$ocaml_version
@@ -22,7 +22,7 @@ if [ ! -d "$src_dir/_opam" ] ; then
     exit 1
 fi
 
-eval $(opam env)
+eval $(opam env --shell=sh)
 
 if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
     opam install --unlock-base ocaml-base-compiler.$ocaml_version

@@ -17,6 +17,8 @@ depends: [
   "pbkdf"
   "bip39"
   "ledgerwallet-tezos"
+  "alcotest" {test & >= "0.8.1"}
+  "alcotest-lwt" {test & >= "0.8.0"}
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

@@ -87,9 +87,7 @@ let common_prefix s1 s2 =
   loop 0
 
 let mem_char s c =
-  match String.index s c with
-  | exception Not_found -> false
-  | _ -> true
+  String.index_opt s c <> None
 
 let fold_left f init s =
   let acc = ref init in

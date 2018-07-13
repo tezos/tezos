@@ -2,7 +2,7 @@
 Building documentation locally
 ******************************
 
-The documentation is available online at `doc.tzalpha.net <http://doc.tzalpha.net/>`_,
+The documentation is available online at `tezos.gitlab.io <http://tezos.gitlab.io/master/>`_,
 always up to date with master on `GitLab <https://gitlab.com/tezos/tezos>`_.
 
 Building instructions

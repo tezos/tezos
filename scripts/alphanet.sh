@@ -106,7 +106,7 @@ exec_docker() {
             container_args+=("${arg}");
         fi
     done
-    docker exec "$interactive_flags" "$docker_node_container" "${container_args[*]}"
+    docker exec "$interactive_flags" "$docker_node_container" "${container_args[@]}"
 }
 
 ## Container ###############################################################
