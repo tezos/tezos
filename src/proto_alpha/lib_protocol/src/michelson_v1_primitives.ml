@@ -559,7 +559,7 @@ let () =
     ~description:
       "In a script or data expression, a primitive was unknown."
     ~pp:(fun ppf n -> Format.fprintf ppf "Unknown primitive %s." n)
-    Data_encoding.(obj1 (req "wrongPrimitiveName" string))
+    Data_encoding.(obj1 (req "wrong_primitive_name" string))
     (function
       | Unknown_primitive_name got -> Some got
       | _ -> None)
@@ -573,7 +573,7 @@ let () =
       "In a script or data expression, a primitive name is \
        neither uppercase, lowercase or capitalized."
     ~pp:(fun ppf n -> Format.fprintf ppf "Primitive %s has invalid case." n)
-    Data_encoding.(obj1 (req "wrongPrimitiveName" string))
+    Data_encoding.(obj1 (req "wrong_primitive_name" string))
     (function
       | Invalid_case name -> Some name
       | _ -> None)
