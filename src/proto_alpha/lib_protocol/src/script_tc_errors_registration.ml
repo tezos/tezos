@@ -86,9 +86,9 @@ let () =
       "In a script or data expression, a primitive was applied \
        to an unsupported number of arguments."
     (located (obj3
-                (req "primitiveName" Script.prim_encoding)
-                (req "expectedArity" arity_enc)
-                (req "wrongArity" arity_enc)))
+                (req "primitive_name" Script.prim_encoding)
+                (req "expected_arity" arity_enc)
+                (req "wrong_arity" arity_enc)))
     (function
       | Invalid_arity (loc, name, exp, got) ->
           Some (loc, (name, exp, got))
@@ -113,8 +113,8 @@ let () =
     ~description:
       "In a script or data expression, a primitive was unknown."
     (located (obj2
-                (dft "expectedPrimitiveNames" (list prim_encoding) [])
-                (req "wrongPrimitiveName" prim_encoding)))
+                (dft "expected_primitive_names" (list prim_encoding) [])
+                (req "wrong_primitive_name" prim_encoding)))
     (function
       | Invalid_primitive (loc, exp, got) -> Some (loc, (exp, got))
       | _ -> None)
@@ -129,8 +129,8 @@ let () =
       "In a script or data expression, an expression was of the wrong kind \
        (for instance a string where only a primitive applications can appear)."
     (located (obj2
-                (req "expectedKinds" (list kind_enc))
-                (req "wrongKind" kind_enc)))
+                (req "expected_kinds" (list kind_enc))
+                (req "wrong_kind" kind_enc)))
     (function
       | Invalid_kind (loc, exp, got) -> Some (loc, (exp, got))
       | _ -> None)
@@ -144,9 +144,9 @@ let () =
     ~description:
       "In a script or data expression, a primitive was of the wrong namespace."
     (located (obj3
-                (req "primitiveName" prim_encoding)
-                (req "expectedNamespace" namespace_enc)
-                (req "wrongNamespace" namespace_enc)))
+                (req "primitive_name" prim_encoding)
+                (req "expected_namespace" namespace_enc)
+                (req "wrong_namespace" namespace_enc)))
     (function
       | Invalid_namespace (loc, name, exp, got) -> Some (loc, (name, exp, got))
       | _ -> None)
@@ -265,9 +265,9 @@ let () =
       "A binary operation is called on operands of types \
        over which it is not defined."
     (located (obj3
-                (req "operatorName" prim_encoding)
-                (req "wrongLeftOperandType" Script.expr_encoding)
-                (req "wrongRightOperandType" Script.expr_encoding)))
+                (req "operator_name" prim_encoding)
+                (req "wrong_left_operand_type" Script.expr_encoding)
+                (req "wrong_right_operand_type" Script.expr_encoding)))
     (function
       | Undefined_binop (loc, n, tyl, tyr) ->
           Some (loc, (n, tyl, tyr))
@@ -283,8 +283,8 @@ let () =
       "A unary operation is called on an operand of type \
        over which it is not defined."
     (located (obj2
-                (req "operatorName" prim_encoding)
-                (req "wrongOperandType" Script.expr_encoding)))
+                (req "operator_name" prim_encoding)
+                (req "wrong_operand_type" Script.expr_encoding)))
     (function
       | Undefined_unop (loc, n, ty) ->
           Some (loc, (n, ty))
@@ -299,8 +299,8 @@ let () =
     ~description:
       "Unexpected stack at the end of a lambda or script."
     (located (obj2
-                (req "expectedReturnType" Script.expr_encoding)
-                (req "wrongStackType" stack_ty_enc)))
+                (req "expected_return_type" Script.expr_encoding)
+                (req "wrong_stack_type" stack_ty_enc)))
     (function
       | Bad_return (loc, sty, ty) -> Some (loc, (ty, sty))
       | _ -> None)
@@ -314,9 +314,9 @@ let () =
     ~description:
       "The stack has an unexpected length or contents."
     (located (obj3
-                (req "primitiveName" prim_encoding)
-                (req "relevantStackPortion" int16)
-                (req "wrongStackType" stack_ty_enc)))
+                (req "primitive_name" prim_encoding)
+                (req "relevant_stack_portion" int16)
+                (req "wrong_stack_type" stack_ty_enc)))
     (function
       | Bad_stack (loc, name, s, sty) -> Some (loc, (name, s, sty))
       | _ -> None)
@@ -388,8 +388,8 @@ let () =
       "At the join point at the end of two code branches \
        the stacks have inconsistent lengths or contents."
     (located (obj2
-                (req "firstStackType" stack_ty_enc)
-                (req "otherStackType" stack_ty_enc)))
+                (req "first_stack_type" stack_ty_enc)
+                (req "other_stack_type" stack_ty_enc)))
     (function
       | Unmatched_branches (loc, stya, styb) ->
           Some (loc, (stya, styb))
@@ -404,7 +404,7 @@ let () =
     ~description:
       "The type of a stack item is unexpected \
        (this error is always accompanied by a more precise one)."
-    (obj1 (req "itemLevel" int16))
+    (obj1 (req "item_level" int16))
     (function
       | Bad_stack_item n -> Some n
       | _ -> None)
@@ -446,8 +446,8 @@ let () =
     ~description:
       "A data expression was invalid for its expected type."
     (located (obj2
-                (req "expectedType" Script.expr_encoding)
-                (req "wrongExpression" Script.expr_encoding)))
+                (req "expected_type" Script.expr_encoding)
+                (req "wrong_expression" Script.expr_encoding)))
     (function
       | Invalid_constant (loc, expr, ty) ->
           Some (loc, (ty, expr))
@@ -477,7 +477,7 @@ let () =
     ~description:
       "A non comparable type was used in a place where \
        only comparable types are accepted."
-    (located (obj1 (req "wrongType" Script.expr_encoding)))
+    (located (obj1 (req "wrong_type" Script.expr_encoding)))
     (function
       | Comparable_type_expected (loc, ty) -> Some (loc, ty)
       | _ -> None)
@@ -494,8 +494,8 @@ let () =
        two types have to be proven, it is always accompanied \
        with another error that provides more context."
     (obj2
-       (req "firstType" Script.expr_encoding)
-       (req "otherType" Script.expr_encoding))
+       (req "first_type" Script.expr_encoding)
+       (req "other_type" Script.expr_encoding))
     (function
       | Inconsistent_types (tya, tyb) -> Some (tya, tyb)
       | _ -> None)
@@ -510,7 +510,7 @@ let () =
       "The body of a map block did not match the expected type"
     (obj2
        (req "loc" Script.location_encoding)
-       (req "bodyType" stack_ty_enc))
+       (req "body_type" stack_ty_enc))
     (function
       | Invalid_map_body (loc, stack) -> Some (loc, stack)
       | _ -> None)
@@ -537,8 +537,8 @@ let () =
                   the ITER."
     (obj3
        (req "loc" Script.location_encoding)
-       (req "befStack" stack_ty_enc)
-       (req "aftStack" stack_ty_enc))
+       (req "bef_stack" stack_ty_enc)
+       (req "aft_stack" stack_ty_enc))
     (function
       | Invalid_iter_body (loc, bef, aft) -> Some (loc, bef, aft)
       | _ -> None)
@@ -551,8 +551,8 @@ let () =
     ~description:"An instruction generated a type larger than the limit."
     (obj3
        (req "loc" Script.location_encoding)
-       (req "typeSize" uint16)
-       (req "maximumTypeSize" uint16))
+       (req "type_size" uint16)
+       (req "maximum_type_size" uint16))
     (function
       | Type_too_large (loc, ts, maxts) -> Some (loc, ts, maxts)
       | _ -> None)
@@ -569,8 +569,8 @@ let () =
        (always followed by more precise errors)."
     (obj3
        (opt "identifier" string)
-       (req "expectedType" Script.expr_encoding)
-       (req "illTypedExpression" Script.expr_encoding))
+       (req "expected_type" Script.expr_encoding)
+       (req "ill_typed_expression" Script.expr_encoding))
     (function
       | Ill_typed_data (name, expr, ty) -> Some (name, ty,  expr)
       | _ -> None)
@@ -585,7 +585,7 @@ let () =
        (always followed by more precise errors)."
     (obj3
        (opt "identifier" string)
-       (req "illFormedExpression" Script.expr_encoding)
+       (req "ill_formed_expression" Script.expr_encoding)
        (req "location" Script.location_encoding))
     (function
       | Ill_formed_type (name, expr, loc) -> Some (name, expr, loc)
@@ -602,8 +602,8 @@ let () =
        a contract code against given input, output and storage types \
        (always followed by more precise errors)."
     (obj2
-       (req "illTypedCode" Script.expr_encoding)
-       (req "typeMap" type_map_enc))
+       (req "ill_typed_code" Script.expr_encoding)
+       (req "type_map" type_map_enc))
     (function
       | Ill_typed_contract (expr, type_map) ->
           Some (expr, type_map)

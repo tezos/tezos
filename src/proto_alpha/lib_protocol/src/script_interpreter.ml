@@ -82,8 +82,8 @@ let () =
     ~title: "Script runtime error"
     ~description: "Toplevel error for all runtime script errors"
     (obj2
-       (req "contractHandle" Contract.encoding)
-       (req "contractCode" Script.expr_encoding))
+       (req "contract_handle" Contract.encoding)
+       (req "contract_code" Script.expr_encoding))
     (function
       | Runtime_contract_error (contract, expr) ->
           Some (contract, expr)
