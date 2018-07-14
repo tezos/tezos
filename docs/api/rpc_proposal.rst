@@ -7633,8 +7633,8 @@ Protocol Alpha
     <pre>
     { "type_map":
         [ { "location": $micheline.location,
-            "stackBefore": [ $micheline.michelson_v1.expression ... ],
-            "stackAfter": [ $micheline.michelson_v1.expression ... ] } ... ],
+            "stack_before": [ $micheline.michelson_v1.expression ... ],
+            "stack_after": [ $micheline.michelson_v1.expression ... ] } ... ],
       "gas": $bignum || "unaccounted" }
     $bignum:
       /* Big number

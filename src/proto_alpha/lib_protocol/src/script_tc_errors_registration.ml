@@ -37,8 +37,8 @@ let type_map_enc =
        (fun (loc, bef, aft) -> (loc, (bef, aft)))
        (obj3
           (req "location" Script.location_encoding)
-          (req "stackBefore" stack_enc)
-          (req "stackAfter" stack_enc)))
+          (req "stack_before" stack_enc)
+          (req "stack_after" stack_enc)))
 
 let stack_ty_enc =
   let open Data_encoding in
