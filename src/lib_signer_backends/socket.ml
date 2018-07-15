@@ -136,7 +136,8 @@ module Make(P : sig
             with _ -> "" in
           Lwt.return
             (Signature.Public_key_hash.of_b58check pkh) >>=? fun pkh ->
-          return (Lwt_utils_unix.Socket.Tcp (path, port), pkh)
+          return (Lwt_utils_unix.Socket.Tcp (path, string_of_int port,
+                                             [Lwt_unix.AI_SOCKTYPE SOCK_STREAM]), pkh)
 
     let public_key uri =
       parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) ->
