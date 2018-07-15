@@ -97,19 +97,19 @@ let commands base_dir require_auth =
             ~default: default_tcp_host
             (parameter (fun _ s -> return s)))
          (default_arg
-            ~doc: "listening TCP port"
+            ~doc: "listening TCP port or service name"
             ~short: 'p'
             ~long: "port"
             ~placeholder: "port number"
             ~default: default_tcp_port
-            (parameter
-               (fun _ x ->
-                  try return (int_of_string x)
-                  with Failure _ -> failwith "Invalid port %s" x))))
+            (parameter (fun _ s -> return s))))
       (prefixes [ "launch" ; "socket" ; "signer" ] @@ stop)
       (fun (magic_bytes, host, port) cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Socket_daemon.run cctxt (Tcp (host, port)) ?magic_bytes ~require_auth) ;
+         Socket_daemon.run
+           cctxt (Tcp (host, port, [AI_SOCKTYPE SOCK_STREAM]))
+           ?magic_bytes ~require_auth >>=? fun _ ->
+         return_unit) ;
     command ~group
       ~desc: "Launch a signer daemon over a local Unix socket."
       (args2
@@ -124,7 +124,9 @@ let commands base_dir require_auth =
       (prefixes [ "launch" ; "local" ; "signer" ] @@ stop)
       (fun (magic_bytes, path) cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Socket_daemon.run cctxt (Unix path) ?magic_bytes ~require_auth) ;
+         Socket_daemon.run
+           cctxt (Unix path) ?magic_bytes ~require_auth >>=? fun _ ->
+         return_unit) ;
     command ~group
       ~desc: "Launch a signer daemon over HTTP."
       (args3
