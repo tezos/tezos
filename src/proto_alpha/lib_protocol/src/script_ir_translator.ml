@@ -1002,6 +1002,9 @@ let rec parse_comparable_ty
     | Prim (loc, T_string, [], annot) ->
         parse_type_annot loc annot >|? fun tname ->
         Ex_comparable_ty ( String_key tname ), ctxt
+    | Prim (loc, T_bytes, [], annot) ->
+        parse_type_annot loc annot >|? fun tname ->
+        Ex_comparable_ty ( Bytes_key tname ), ctxt
     | Prim (loc, T_mutez, [], annot) ->
         parse_type_annot loc annot >|? fun tname ->
         Ex_comparable_ty ( Mutez_key tname ), ctxt
