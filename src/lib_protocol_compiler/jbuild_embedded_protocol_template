@@ -15,6 +15,8 @@ let version =
       failwith "unexpected directory name" ;
     String.sub dirname x (n - x)
 
+let lib_version = String.concat "_" (String.split_on_char '-' version)
+
 let () = Format.kasprintf Jbuild_plugin.V1.send {|
 (jbuild_version 1)
 
@@ -64,5 +66,5 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
                     -warn-error -a+8))
   (modules (Registerer))))
 |}
-    version version version version version version version version
-    version version version version
+    version lib_version version lib_version version lib_version version lib_version
+    lib_version lib_version version lib_version

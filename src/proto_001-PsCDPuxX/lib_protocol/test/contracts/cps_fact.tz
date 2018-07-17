@@ -1,0 +1,16 @@
+storage nat ;
+parameter nat ;
+code { UNPAIR ;
+       DIP { SELF ; ADDRESS ; SOURCE;
+             IFCMPEQ {} { DROP ; PUSH @storage nat 1 } };
+       DUP ;
+       PUSH nat 1 ;
+       IFCMPGE
+         { DROP ; NIL operation ; PAIR }
+         { PUSH nat 1 ; SWAP ; SUB @parameter ; ISNAT ;
+           IF_NONE
+             { NIL operation ; PAIR }
+             { DUP ; DIP { PUSH nat 1 ; ADD ; MUL @storage } ; SWAP;
+               DIP { DIP { SELF; PUSH mutez 0 } ;
+                     TRANSFER_TOKENS ; NIL operation ; SWAP ; CONS } ;
+               SWAP ; PAIR } } }

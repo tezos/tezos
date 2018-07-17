@@ -22,7 +22,10 @@ all:
 		src/lib_protocol_compiler/main_native.exe \
 		src/proto_alpha/bin_baker/main_baker_alpha.exe \
 		src/proto_alpha/bin_endorser/main_endorser_alpha.exe \
-		src/proto_alpha/bin_accuser/main_accuser_alpha.exe
+		src/proto_alpha/bin_accuser/main_accuser_alpha.exe \
+		src/proto_001-PsCDPuxX/bin_baker/main_baker_001_PsCDPuxX.exe \
+		src/proto_001-PsCDPuxX/bin_endorser/main_endorser_001_PsCDPuxX.exe \
+		src/proto_001-PsCDPuxX/bin_accuser/main_accuser_001_PsCDPuxX.exe
 	@cp _build/default/src/bin_node/main.exe tezos-node
 	@cp _build/default/src/bin_client/main_client.exe tezos-client
 	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
@@ -31,6 +34,9 @@ all:
 	@cp _build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe tezos-alpha-baker
 	@cp _build/default/src/proto_alpha/bin_endorser/main_endorser_alpha.exe tezos-alpha-endorser
 	@cp _build/default/src/proto_alpha/bin_accuser/main_accuser_alpha.exe tezos-alpha-accuser
+	@cp _build/default/src/proto_001-PsCDPuxX/bin_baker/main_baker_001_PsCDPuxX.exe tezos-001_PsCDPuxX-baker
+	@cp _build/default/src/proto_001-PsCDPuxX/bin_endorser/main_endorser_001_PsCDPuxX.exe tezos-001_PsCDPuxX-endorser
+	@cp _build/default/src/proto_001-PsCDPuxX/bin_accuser/main_accuser_001_PsCDPuxX.exe tezos-001_PsCDPuxX-accuser
 
 all.pkg:
 	@jbuilder build ${DEV} \

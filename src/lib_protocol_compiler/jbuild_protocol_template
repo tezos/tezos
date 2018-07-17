@@ -26,6 +26,8 @@ let version =
       failwith "unexpected directory name" ;
     String.sub dirname x (n - x)
 
+let lib_version = String.concat "_" (String.split_on_char '-' version)
+
 let path =
   match predefined_version with
   | None -> "src/proto_" ^ version ^ "/lib_protocol"
@@ -80,6 +82,6 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
 
 |}
-    version version version
+    lib_version version lib_version
     Format.(pp_print_list (fun ppf -> Format.fprintf ppf "%S"))
     sources
