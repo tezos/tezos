@@ -307,7 +307,7 @@ let storage_error err = fail (Storage_error err)
 (* This key should always be populated for every version of the
    protocol.  It's absence meaning that the context is empty. *)
 let version_key = ["version"]
-let version_value = "alpha"
+let version_value = "alpha_002"
 
 let version = "v1"
 let first_level_key = [ version ; "first_level" ]
@@ -448,28 +448,41 @@ let prepare ~level ~timestamp ~fitness ctxt =
     internal_nonces_used = Int_set.empty ;
   }
 
+type 'a previous_protocol =
+  | Genesis of 'a
+  | Alpha
+
 let check_first_block ctxt =
   Context.get ctxt version_key >>= function
-  | None -> return_unit
+  | None ->
+      failwith "Internal error: un-initialized context in check_first_block."
   | Some bytes ->
       let s = MBytes.to_string bytes in
       if Compare.String.(s = version_value) then
         failwith "Internal error: previously initialized context."
       else if Compare.String.(s = "genesis") then
-        return_unit
+        return (Genesis ())
+      else if Compare.String.(s = "alpha") then
+        return Alpha
       else
         storage_error (Incompatible_protocol_version s)
 
 let prepare_first_block ~level ~timestamp ~fitness ctxt =
-  check_first_block ctxt >>=? fun () ->
-  Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
-  get_proto_param ctxt >>=? fun (param, ctxt) ->
+  check_first_block ctxt >>=? fun previous_protocol ->
+  begin match previous_protocol with
+    | Genesis () ->
+        Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
+        get_proto_param ctxt >>=? fun (param, ctxt) ->
+        set_first_level ctxt first_level >>=? fun ctxt ->
+        set_constants ctxt param.constants >>= fun ctxt ->
+        return (Genesis param, ctxt)
+    | Alpha ->
+        return (Alpha, ctxt)
+  end >>=? fun (previous_proto, ctxt) ->
   Context.set ctxt version_key
     (MBytes.of_string version_value) >>= fun ctxt ->
-  set_first_level ctxt first_level >>=? fun ctxt ->
-  set_constants ctxt param.constants >>= fun ctxt ->
   prepare ctxt ~level ~timestamp ~fitness >>=? fun ctxt ->
-  return (param, ctxt)
+  return (previous_proto, ctxt)
 
 let activate ({ context = c ; _ } as s) h =
   Updater.activate c h >>= fun c -> Lwt.return { s with context = c }

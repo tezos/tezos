@@ -222,7 +222,10 @@ let initial_context
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
   Tezos_protocol_environment_memory.Context.(
-    set empty protocol_param_key proto_params
+    set empty ["version"] (MBytes.of_string "genesis")
+  ) >>= fun ctxt ->
+  Tezos_protocol_environment_memory.Context.(
+    set ctxt protocol_param_key proto_params
   ) >>= fun ctxt ->
   Main.init ctxt header
   >|= Alpha_environment.wrap_error >>=? fun { context; _ } ->
