@@ -91,7 +91,6 @@ explorer for the alphanet. See for instance:
    - https://ostez.com
    - https://tzscan.io
    - https://tezos.id
-   - https://tezoschain.io
 
 .. _faucet:
 

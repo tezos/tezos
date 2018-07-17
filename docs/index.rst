@@ -32,11 +32,10 @@ The Tezos Beta (experimental) network has been live and open since June 2018.
     - http://ostez.com
     - http://tzscan.io
     - https://tezos.id
-    - https://tezoschain.io
 
 - A few community run websites collect useful Tezos links:
 
-    - http://www.tezos.help
+    - https://www.tezos.help
     - https://tezos.rocks
 
  - There is a matrix channel *Tezos* that you can join `here <https://riot.im/app/#/room/#tezos:matrix.org>`_.
