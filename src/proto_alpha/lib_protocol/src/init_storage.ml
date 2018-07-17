@@ -44,7 +44,23 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Last_block_priority.init ctxt 0 >>=? fun ctxt ->
       return ctxt
   | Alpha ->
-      return ctxt
+      Storage.Contract.fold ctxt ~init:(ok ctxt)
+        ~f:(fun contract ctxt ->
+            Lwt.return ctxt >>=? fun ctxt ->
+            match contract with
+            | Implicit _ -> return ctxt
+            | Originated _contract_hash ->
+                Roll_storage.get_contract_delegate ctxt contract >>=? fun delegate ->
+                match delegate with
+                | None -> return ctxt
+                | Some delegate ->
+                    Delegate_storage.registered ctxt delegate >>= fun registered ->
+                    if registered then
+                      return ctxt
+                    else
+                      Delegate_storage.set ctxt
+                        (Contract_repr.implicit_contract delegate)
+                        (Some delegate))
 
 let prepare ctxt ~level ~timestamp ~fitness =
   Raw_context.prepare ~level ~timestamp ~fitness ctxt
