@@ -26,6 +26,7 @@
 open Proto_alpha
 open Alpha_context
 open Test_tez
+open Test_utils
 
 (**************************************************************************)
 (* bootstrap contracts *)
@@ -979,6 +980,97 @@ let double_registration_when_recredited () =
       | Delegate_storage.Active_delegate -> true
       | _ -> false)
 
+(* originate and self-delegation on unrevealed contract *)
+let unregistered_and_unrevealed_self_delegate_key_init_origination ~fee () =
+  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let bootstrap = List.hd bootstrap_contracts in
+  let { Account.pkh ; _ }  = Account.new_account () in
+  let contract = Alpha_context.Contract.implicit_contract pkh in
+  Op.transaction (I i) bootstrap contract (Tez.of_int 10) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  (* origination with delegate argument *)
+  Op.origination ~fee ~delegate:pkh (I i) contract >>=? fun (op, orig_contract) ->
+  Context.Contract.balance (I i) contract >>=? fun balance ->
+  if fee > balance then
+    begin
+      Incremental.add_operation i op >>= fun err ->
+      Assert.proto_error ~loc:__LOC__ err (function
+          | Contract_storage.Balance_too_low _ -> true
+          | _ -> false)
+    end
+  else
+    (* origination did not proceed; fee has been debited *)
+    begin
+      Incremental.add_operation
+        ~expect_failure:(expect_unregistered_key pkh)
+        i op >>=? fun i ->
+      Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee >>=? fun () ->
+      (* originated contract has not been created *)
+      Context.Contract.balance (I i) orig_contract >>= fun err ->
+      Assert.error ~loc:__LOC__ err (function
+          | RPC_context.Not_found _ -> true
+          | _ -> false)
+    end
+
+(* originate and self-delegation on revelead but not registered contract *)
+let unregistered_and_revealed_self_delegate_key_init_origination ~fee () =
+  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let bootstrap = List.hd bootstrap_contracts in
+  let { Account.pkh ; pk ; _ }  = Account.new_account () in
+  let contract = Alpha_context.Contract.implicit_contract pkh in
+  Op.transaction (I i) bootstrap contract (Tez.of_int 10) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.revelation (I i) pk >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  (* origination with delegate argument *)
+  Op.origination ~fee ~delegate:pkh (I i) contract >>=? fun (op, orig_contract) ->
+  Context.Contract.balance (I i) contract >>=? fun balance ->
+  if fee > balance then
+    begin
+      Incremental.add_operation i op >>= fun err ->
+      Assert.proto_error ~loc:__LOC__ err (function
+          | Contract_storage.Balance_too_low _ -> true
+          | _ -> false)
+    end
+  else
+    (* origination did not proceed; fee has been debited *)
+    begin
+      Incremental.add_operation
+        ~expect_failure:(expect_unregistered_key pkh)
+        i op >>=? fun i ->
+      Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee >>=? fun () ->
+      (* originated contract has not been created *)
+      Context.Contract.balance (I i) orig_contract >>= fun err ->
+      Assert.error ~loc:__LOC__ err (function
+          | RPC_context.Not_found _ -> true
+          | _ -> false)
+    end
+
+(* originate and self-delegation on revealed and registered contract *)
+let registered_self_delegate_key_init_origination () =
+  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let bootstrap = List.hd bootstrap_contracts in
+  let { Account.pkh ; pk ; _ }  = Account.new_account () in
+  let contract = Alpha_context.Contract.implicit_contract pkh in
+  Op.transaction (I i) bootstrap contract (Tez.of_int 10) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.revelation (I i) pk >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.delegation (I i) contract (Some pkh) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Context.Contract.balance (I i) contract >>=? fun balance ->
+  Context.get_constants (I i) >>=? fun { parametric = { origination_burn ; _ }} ->
+  (* origination with delegate argument *)
+  Op.origination ~delegate:pkh ~credit:Tez.one (I i) contract >>=? fun (op, orig_contract) ->
+  Tez.(origination_burn +? Tez.one) >>?= fun total_cost ->
+  Incremental.add_operation i op >>=? fun i ->
+  Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance total_cost >>=? fun () ->
+  Assert.balance_is ~loc:__LOC__ (I i) orig_contract Tez.one >>=? fun () ->
+  return_unit
+
 let tests_delegate_registration =
   [
     (*** unregistered delegate key: no self-delegation ***)
@@ -1033,6 +1125,22 @@ let tests_delegate_registration =
       `Quick (unregistered_delegate_key_switch_delegation_credit ~amount:Tez.one_mutez ~fee:Tez.one_mutez) ;
     Test.tztest "unregistered delegate key - credit 1μꜩ (switch with delegation, large fee)"
       `Quick (unregistered_delegate_key_switch_delegation_credit ~amount:Tez.one_mutez ~fee:Tez.max_tez) ;
+
+    (* origination with self_delegation on unrevealed and unregistered contract *)
+    Test.tztest "unregistered and unrevealed self-delegation (origination, small fee)"
+      `Quick (unregistered_and_unrevealed_self_delegate_key_init_origination ~fee:Tez.one_mutez) ;
+    Test.tztest "unregistered and unrevealed self-delegation (origination, large fee)"
+      `Quick (unregistered_and_unrevealed_self_delegate_key_init_origination ~fee:Tez.max_tez) ;
+
+    (* origination with self_delegation on unregistered contract *)
+    Test.tztest "unregistered and revealed self-delegation (origination, small fee)"
+      `Quick (unregistered_and_revealed_self_delegate_key_init_origination ~fee:Tez.one_mutez) ;
+    Test.tztest "unregistered and revealed self-delegation (origination, large fee)"
+      `Quick (unregistered_and_revealed_self_delegate_key_init_origination ~fee:Tez.max_tez) ;
+
+    (* origination with self_delegation on registered contract *)
+    Test.tztest "registered and revelead self-delegation (origination)"
+      `Quick registered_self_delegate_key_init_origination ;
 
     (*** unregistered delegate key: failed self-delegation ***)
     (* no token transfer, self-delegation *)

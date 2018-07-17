@@ -5,7 +5,7 @@ Proof-of-stake in Tezos
 
 This document provides an in-depth description of the Tezos
 proof-of-stake algorithm. **WORK IN PROGRESS, CONSTANTS STILL SUBJECT TO
-ADJUSTMENT.** **THIS DOES NOT CONTAIN CHANGES INTRODUCED BY PVSS.**
+ADJUSTMENT.**
 
 Blocks
 ------
@@ -39,12 +39,8 @@ Protocol header (for tezos.alpha):
 
 -  ``signature``: a digital signature of the shell and protocol headers
    (excluding the signature itself).
--  ``priority``: every block height in tezos.alpha is associated with an
-   ordered list of bakers. The first baker in that list is the first one
-   who can bake a block at that height, one minute after the previous
-   block. The second baker in the list can do so, but only two minutes
-   after the previous block, etc., the third baker three minutes after.
-   This integer is the priority of the block.
+-  ``priority``: the position in the priority list of delegates at which
+   the block was baked.
 -  ``seed_nonce_hash``: a commitment to a random number, used to
    generate entropy on the chain. Present in only one out of
    (``BLOCKS_PER_COMMITMENT`` = 32) blocks.
@@ -183,7 +179,7 @@ before the current one, cycle ``(n-2)`` the one before, cycle ``(n+1)``
 the one after, etc.
 
 At any point, the tezos shell will not implicitly accept a branch whose
-fork point is in a cycle more than ``ALLOWED_FORK`` = 5 cycles in the
+fork point is in a cycle more than ``PRESERVED_CYCLES`` = 5 cycles in the
 past (that is *at least* 14 days, 5 hours, and 20 minutes).
 
 Security deposits
@@ -193,19 +189,16 @@ The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 512 XTZ
 per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 64 XTZ per
 endorsement.
 
-Each delegate key has an attached security deposit account controlled by
-the same key. Delegates can withdraw and deposit in this account, but
-they cannot withdraw more than the "frozen" amount. Each blocks created,
-each endorsement signed increases the amount that is frozen.
+Each delegate key has an associated security deposit account.
+When a delegate bakes or endorses a block the security deposit is
+automatically moved to the deposit account where it is frozen for
+``PRESERVED_CYCLES`` cycles, after which it is automatically moved
+back to the baker's main account.
 
-It is possible to deposit a bond just prior to creating a block
-requiring this deposit. Deposits for blocks and endorsements in cycle
-``n`` are "unfrozen" at the end of cycle ``n+ALLOWED_FORK``.
-
-Since deposits are locked for a period of ``ALLOWED_FORK`` one can
+Since deposits are locked for a period of ``PRESERVED_CYCLES`` one can
 compute that at any given time, about ((``BLOCK_SECURITY_DEPOSIT`` +
 ``ENDORSEMENT_SECURITY_DEPOSIT`` \* ``ENDORSERS_PER_BLOCK``) \*
-(``ALLOWED_FORK`` + 1) \* ``BLOCKS_PER_CYCLE``) / ``763e6`` = 8.25% of
+(``PRESERVED_CYCLES`` + 1) \* ``BLOCKS_PER_CYCLE``) / ``763e6`` = 8.25% of
 all tokens should be held as security deposits. It also means that a
 delegate should own over 8.25% of the amount of token delegated to them
 in order to not miss out on creating any block.
@@ -217,27 +210,26 @@ Baking in tezos.alpha is the action of signing and publishing a block.
 In Bitcoin, the right to publish a block is associated with solving a
 proof-of-work puzzle. In tezos.alpha, the right to publish a block in
 cycle ``n`` is assigned to a randomly selected roll in a randomly
-selected roll snapshot from cycle ``n-ALLOWED_FORK-2``.
+selected roll snapshot from cycle ``n-PRESERVED_CYCLES-2``.
 
 We admit, for the time being, that the protocol generates a random seed
 for each cycle. From this random seed, we can seed a CSPRNG which is
 used to draw baking rights for a cycle.
 
-To each position, or slot, in the cycle, is associated a priority list
-of bakers. This is drawn randomly, with replacement, from the set of
-active rolls. Each roll is associated with the public key of a delegate,
-therefore, for each slot in the cycle, we have an ordered list of public
-keys which may create and sign a block. It is possible that the same
-public key appears multiple times in this list.
+To each position, in the cycle, is associated a priority list of
+delegates.
+This is drawn randomly, with replacement, from the set of active rolls
+so it is possible that the same public key appears multiple times in
+this list.
+The first baker in the list is the first one who can bake a block at
+that level.
+If a delegate is for some reason unable to bake, the next delegate in
+the list can step up and bake the block.
 
 The delegate with the highest priority can bake a block with a timestamp
 greater than ``timestamp_of_previous_block`` plus
 ``TIME_BETWEEN_BLOCKS`` = one minute. The one with the kth highest
-priority, ``TIME_BETWEEN_BLOCKS + k * TIME_DELAY_FOR_PRIORITY`` = (1 +
-k) minutes.
-
-In future versions, ``TIME_DELAY_FOR_PRIORITY`` may be set to a lower
-value than ``TIME_BETWEEN_BLOCKS``.
+priority, ``k * TIME_BETWEEN_BLOCKS`` = k minutes.
 
 Baking a block gives a block reward of ``BLOCK_REWARD`` = 16 XTZ plus
 all fees paid by transactions inside the block.
@@ -249,10 +241,21 @@ To each baking slot, we associate a list of ``ENDORSERS_PER_BLOCK`` = 32
 *endorsers*. Endorsers are drawn from the set of delegates, by randomly
 selecting 32 rolls with replacement.
 
+Each endorser verifies the last block that was baked, say at level
+``n``, and emits an endorsement operation. The endorsement operations
+are then baked in block ``n+1`` and will contribute to the `fitness`
+of block ``n``. Once block ``n+1`` is baked, no other endorsement for
+block ``n`` will be considered valid.
+
 Endorsers receive a reward (at the same time as block creators do). The
 reward is ``ENDORSEMENT_REWARD`` = 2 / ``BLOCK_PRIORITY`` where block
 priority starts at 1. So the endorsement reward is only half if the
 block of priority 2 for a given slot is being endorsed.
+
+It is possible that the same endorser be selected ``k`` times for the
+same block, in this case ``k`` deposits are required and ``k`` rewards
+gained. However a single operation needs to be sent on the network to
+endorse ``k`` times the same block.
 
 Inflation
 ~~~~~~~~~
@@ -265,30 +268,35 @@ Random seed
 ~~~~~~~~~~~
 
 Cycle ``n`` is associated with a random seed, a 256 bit number generated
-at the end of cycle ``(n-ALLOWED_FORK-1)`` using commitments made during
-cycle ``(n-ALLOWED_FORK-2)``, in one out of every
+at the end of cycle ``(n-PRESERVED_CYCLES-1)`` using commitments made during
+cycle ``(n-PRESERVED_CYCLES-2)``, in one out of every
 ``BLOCKS_PER_COMMITMENT`` = 32 blocks.
 
 The commitment must be revealed by the original baker during cycle
-``(n-ALLOWED_FORK-1)`` under penalty of forfeiting the rewards and
+``(n-PRESERVED_CYCLES-1)`` under penalty of forfeiting the rewards and
 fees of the block that included the seed commitment (the associated
 security deposit is not forfeited).
 
 A *revelation* is an operation, and multiple revelations can thus be
-included in a block. The revelations are hashed together to generate a
-random seed at the very end of cycle ``(n-ALLOWED_FORK-1)``.
-
+included in a block. A baker receives a ``seed_nonce_revelation_tip`` =
+1/8 XTZ reward for including a revelation.
 Revelations are free operations which do not compete with transactions
 for block space. Up to ``MAX_REVELATIONS_PER_BLOCK`` = 32 revelations
 can be contained in any given block. Thus, 1 /
 (``MAX_REVELATIONS_PER_BLOCK`` \* ``BLOCKS_PER_COMMITMENT``) = 1/1024 of
 the blocks in the cycle are sufficient to include all revelations.
 
+The revelations are hashed together to generate a random seed at the
+very end of cycle ``(n-PRESERVED_CYCLES-1)``.
+The seed of cycle ``(n-PRESERVED_CYCLES-2)`` is hashed with a constant
+and then with each revelation of cycle ``(n-PRESERVED_CYCLES-1)``.
+Once computed, this new seed is stored and used during cycle ``n``.
+
 Denunciations
 -------------
 
 If two endorsements are made for the same slot or two blocks at the same
-height by a delegate, this can be denounced. The denunciation would be
+height by a delegate, this can be denounced. The denunciation would
 typically be made by the baker, who includes it as a special operation.
 In a first time, denunciation will only forfeit the security deposit
 for the doubly signed operation. However, over time, as the risk of

@@ -395,6 +395,7 @@ let apply_manager_operation_content :
             let result =
               Transaction_result
                 { storage = None ;
+                  big_map_diff = None;
                   balance_updates =
                     Delegate.cleanup_balance_updates
                       [ Contract source, Debited amount ;
@@ -431,6 +432,7 @@ let apply_manager_operation_content :
             let result =
               Transaction_result
                 { storage = Some storage ;
+                  big_map_diff;
                   balance_updates =
                     Delegate.cleanup_balance_updates
                       [ Contract payer, Debited fees ;

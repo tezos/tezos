@@ -11,6 +11,7 @@ depends: [
   "jbuilder" { build & = "1.0+beta20" }
   "tezos-base"
   "lwt" { >= "3.0.0" }
+  "conf-libev"
   "ipaddr"
 ]
 build: [

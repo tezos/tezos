@@ -58,7 +58,7 @@ let init_connection_metadata opt =
       { disable_mempool = c.P2p.disable_mempool ;
         private_node = c.P2p.private_mode }
 
-let init_p2p p2p_params =
+let init_p2p ?(sandboxed = false) p2p_params =
   match p2p_params with
   | None ->
       let c_meta = init_connection_metadata None in
@@ -70,11 +70,21 @@ let init_p2p p2p_params =
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
       lwt_log_notice Tag.DSL.(fun f ->
           f "bootstrapping chain..." -% t event "bootstrapping_chain") >>= fun () ->
+      let message_cfg =
+        if sandboxed then
+          { Distributed_db_message.cfg with
+            versions =
+              List.map
+                (fun v -> { v with P2p_version.name =
+                                     "SANDBOXED_" ^ v.P2p_version.name })
+                Distributed_db_message.cfg.versions }
+        else
+          Distributed_db_message.cfg in
       P2p.create
         ~config ~limits
         peer_metadata_cfg
         conn_metadata_cfg
-        Distributed_db_message.cfg >>=? fun p2p ->
+        message_cfg >>=? fun p2p ->
       Lwt.async (fun () -> P2p.maintain p2p) ;
       return p2p
 
@@ -163,9 +173,11 @@ let may_update_checkpoint chain_state checkpoint =
       Chain.set_head chain_state new_head >>= fun _old_head ->
       State.Chain.set_checkpoint chain_state checkpoint
 
-let create { genesis ; store_root ; context_root ;
-             patch_context ; p2p = p2p_params ;
-             test_chain_max_tll = max_child_ttl ; checkpoint }
+let create
+    ?(sandboxed = false)
+    { genesis ; store_root ; context_root ;
+      patch_context ; p2p = p2p_params ;
+      test_chain_max_tll = max_child_ttl ; checkpoint }
     peer_validator_limits
     block_validator_limits
     prevalidator_limits
@@ -174,7 +186,7 @@ let create { genesis ; store_root ; context_root ;
     match p2p_params with
     | Some (config, _limits) -> not config.P2p.disable_mempool
     | None -> true in
-  init_p2p p2p_params >>=? fun p2p ->
+  init_p2p ~sandboxed p2p_params >>=? fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context genesis >>=? fun (state, mainchain_state) ->
   may_update_checkpoint mainchain_state checkpoint >>= fun () ->

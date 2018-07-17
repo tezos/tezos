@@ -329,14 +329,14 @@ let rec read_rec
     | Union { tag_size ; cases } -> begin
         Atom.tag tag_size resume state @@ fun (ctag, state) ->
         match
-          List.find
+          List.find_opt
             (function
               | Case { tag = Tag tag } -> tag = ctag
               | Case { tag = Json_only } -> false)
             cases
         with
-        | exception Not_found -> Error (Unexpected_tag ctag)
-        | Case { encoding ; inj } ->
+        | None -> Error (Unexpected_tag ctag)
+        | Some (Case { encoding ; inj }) ->
             read_rec whole encoding state @@ fun (v, state) ->
             k (inj v, state)
       end

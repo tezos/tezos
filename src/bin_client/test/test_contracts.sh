@@ -412,12 +412,19 @@ assert_fails $client transfer 0 from bootstrap1 to replay
 
 # Tests create_account
 init_with_transfer $contract_dir/create_account.tz $key2 None 1,000 bootstrap1
-$client transfer 100 from bootstrap1 to create_account \
-           -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' | assert_in_output "New contract"
+assert_balance create_account "1000 ꜩ"
+created_account=\
+`$client transfer 100 from bootstrap1 to create_account -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' \
+| grep 'New contract' \
+| sed -E 's/.*(KT1[a-zA-Z0-9]+).*/\1/' \
+| head -1`
 bake
+assert_balance $created_account "100 ꜩ"
+assert_balance create_account "1000 ꜩ"
 
 # Creates a contract, transfers data to it and stores the data
 init_with_transfer $contract_dir/create_contract.tz $key2 Unit 1,000 bootstrap1
+assert_balance create_contract "1000 ꜩ"
 created_contract=\
 `$client transfer 0 from bootstrap1 to create_contract -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' \
 | grep 'New contract' \
@@ -425,6 +432,8 @@ created_contract=\
 | head -1`
 bake
 assert_storage_contains $created_contract '"abcdefg"'
+assert_balance $created_contract "100 ꜩ"
+assert_balance create_contract "900 ꜩ"
 
 # Test IMPLICIT_ACCOUNT
 init_with_transfer $contract_dir/default_account.tz $key1 \
@@ -487,6 +496,17 @@ assert_storage $contract_dir/hash_consistency_checker.tz '0x00' \
 
 assert_storage $contract_dir/hash_consistency_checker.tz '0x00' \
               '(Pair 22220000000 (Pair "2017-12-13T04:49:00+00:00" 34))' "$hash_result"
+
+# Test goldenbook
+
+init_with_transfer $contract_dir/guestbook.tz $key1\
+                   '{ Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" None }' \
+                   100 bootstrap1
+assert_fails $client transfer 0 from bootstrap2 to guestbook -arg '"Pas moi"'
+bake_after $client transfer 0 from bootstrap1 to guestbook -arg '"Coucou"'
+assert_storage_contains guestbook '{ Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" (Some "Coucou") }'
+assert_fails $client transfer 0 from bootstrap3 to guestbook -arg '"Pas moi non plus"'
+assert_fails $client transfer 0 from bootstrap1 to guestbook -arg '"Recoucou ?"'
 
 # Test for big maps
 init_with_transfer $contract_dir/big_map_mem.tz $key1\

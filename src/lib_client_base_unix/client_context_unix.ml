@@ -66,7 +66,7 @@ class unix_wallet ~base_dir : wallet = object (self)
           "could not read the %s alias file" alias_name >>=? fun json ->
         match Data_encoding.Json.destruct encoding json with
         | exception _ -> (* TODO print_error *)
-            failwith "did not understand the %s alias file" alias_name
+            failwith "did not understand the %s alias file %s" alias_name filename
         | data ->
             return data
 

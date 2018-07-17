@@ -45,6 +45,7 @@ type _ successful_manager_operation_result =
   | Reveal_result : Kind.reveal successful_manager_operation_result
   | Transaction_result :
       { storage : Script.expr option ;
+        big_map_diff : Contract.big_map_diff option ;
         balance_updates : Delegate.balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
@@ -163,8 +164,9 @@ module Manager_result = struct
     make
       ~op_case: Operation.Encoding.Manager_operations.transaction_case
       ~encoding:
-        (obj6
+        (obj7
            (opt "storage" Script.expr_encoding)
+           (opt "big_map_diff" Contract.big_map_diff_encoding)
            (dft "balance_updates" Delegate.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
@@ -184,17 +186,17 @@ module Manager_result = struct
       ~proj:
         (function
           | Transaction_result
-              { storage ; balance_updates ;
+              { storage ; big_map_diff ; balance_updates ;
                 originated_contracts ; consumed_gas ;
                 storage_size ; paid_storage_size_diff } ->
-              (storage, balance_updates,
+              (storage, big_map_diff, balance_updates,
                originated_contracts, consumed_gas,
                storage_size, paid_storage_size_diff))
       ~inj:
-        (fun (storage, balance_updates,
+        (fun (storage, big_map_diff, balance_updates,
               originated_contracts, consumed_gas,
               storage_size, paid_storage_size_diff) ->
-          Transaction_result { storage ; balance_updates ;
+          Transaction_result { storage ; big_map_diff ; balance_updates ;
                                originated_contracts ; consumed_gas ;
                                storage_size ; paid_storage_size_diff })
 

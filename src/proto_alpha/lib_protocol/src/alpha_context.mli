@@ -574,7 +574,13 @@ module Contract : sig
   val fresh_contract_from_current_nonce : context -> (context * t) tzresult Lwt.t
   val originated_from_current_nonce: since: context -> until:context -> contract list tzresult Lwt.t
 
-  type big_map_diff = (Script_expr_hash.t * Script.expr option) list
+  type big_map_diff_item = {
+    diff_key : Script_repr.expr;
+    diff_key_hash : Script_expr_hash.t;
+    diff_value : Script_repr.expr option;
+  }
+  type big_map_diff = big_map_diff_item list
+  val big_map_diff_encoding : big_map_diff Data_encoding.t
 
   val originate:
     context -> contract ->

@@ -14,28 +14,32 @@ tmp_dir=$(mktemp -dt tezos.opam.tezos.XXXXXXXX)
 cleanup () {
     set +e
     echo Cleaning up...
+    rm -rf "$tmp_dir"
     rm -rf Dockerfile
 }
 trap cleanup EXIT INT
 
 image_name="${1:-tezos_build}"
 image_version="${2:-latest}"
-base_image_name="${3-${image_name}_deps:${image_version}}"
+base_image="${3-${image_name}_deps:${image_version}}"
 
-cat <<EOF > "$src_dir"/Dockerfile
-FROM $base_image_name
-COPY Makefile tezos/
-COPY src tezos/src/
-COPY vendors tezos/vendors/
-RUN sudo chown -R opam tezos && \
-    cd tezos && opam exec -- make all build-test
+mkdir -p "$tmp_dir"/tezos/scripts
+cp -a Makefile "$tmp_dir"/tezos
+cp -a scripts/version.sh "$tmp_dir"/tezos/scripts/
+cp -a src "$tmp_dir"/tezos
+cp -a vendors "$tmp_dir"/tezos
+
+cat <<EOF > "$tmp_dir"/Dockerfile
+FROM $base_image
+COPY --chown=tezos:nogroup tezos tezos
+RUN opam exec -- make -C tezos all build-test
 EOF
 
 echo
 echo "### Building tezos..."
 echo
 
-docker build -t "$image_name:$image_version" "$src_dir"
+docker build -t "$image_name:$image_version" "$tmp_dir"
 
 echo
 echo "### Succesfully build docker image: $image_name:$image_version"

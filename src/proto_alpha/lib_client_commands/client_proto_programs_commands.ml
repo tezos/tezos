@@ -257,6 +257,29 @@ let commands () =
              cctxt#error "ill-formed data") ;
 
     command ~group
+      ~desc: "Parse a byte sequence (in hexadecimal notation) as a \
+              data expression, as per Michelson instruction `UNPACK`."
+      Clic.no_options
+      (prefixes [ "unpack" ; "michelson" ; "data" ]
+       @@ bytes_parameter ~name:"bytes" ~desc:"the packed data to parse"
+       @@ stop)
+      (fun () bytes cctxt ->
+         begin
+           if MBytes.get bytes 0 != '\005' then
+             failwith "Not a piece of packed Michelson data (must start with `0x05`)"
+           else return ()
+         end >>=? fun () ->
+         (* Remove first byte *)
+         let bytes = MBytes.sub bytes 1 ((MBytes.length bytes) - 1) in
+         match Data_encoding.Binary.of_bytes Alpha_context.Script.expr_encoding bytes with
+         | None -> failwith "Could not decode bytes"
+         | Some expr ->
+             begin
+               cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr >>= fun () ->
+               return_unit
+             end) ;
+
+    command ~group
       ~desc: "Sign a raw sequence of bytes and display it using the \
               format expected by Michelson instruction \
               `CHECK_SIGNATURE`."

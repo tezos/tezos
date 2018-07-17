@@ -158,10 +158,10 @@ let register_signer signer =
   Hashtbl.replace signers_table Signer.scheme signer
 
 let find_signer_for_key ~scheme =
-  match Hashtbl.find signers_table scheme with
-  | exception Not_found ->
+  match Hashtbl.find_opt signers_table scheme with
+  | None ->
       fail (Unregistered_key_scheme scheme)
-  | signer -> return signer
+  | Some signer -> return signer
 
 let registered_signers () : (string * (module SIGNER)) list =
   Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []

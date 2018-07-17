@@ -33,6 +33,9 @@ val decrypt:
 val decrypt_all:
   #Client_context.io_wallet -> unit tzresult Lwt.t
 
+val decrypt_list:
+  #Client_context.io_wallet -> string list -> unit tzresult Lwt.t
+
 val encrypt:
   #Client_context.io ->
   Signature.secret_key -> Client_keys.sk_uri tzresult Lwt.t

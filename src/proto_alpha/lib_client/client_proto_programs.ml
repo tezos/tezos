@@ -58,16 +58,16 @@ let print_big_map_diff ppf = function
         "@[<v 2>map diff:@,%a@]@,"
         (Format.pp_print_list
            ~pp_sep:Format.pp_print_space
-           (fun ppf (key, value) ->
+           (fun ppf Contract.{ diff_key ; diff_value ; _ } ->
               Format.fprintf ppf "%s %a%a"
-                (match value with
+                (match diff_value with
                  | None -> "-"
                  | Some _ -> "+")
-                Script_expr_hash.pp key
+                print_expr diff_key
                 (fun ppf -> function
                    | None -> ()
                    | Some x -> Format.fprintf ppf "-> %a" print_expr x)
-                value))
+                diff_value))
         diff
 
 let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed = function

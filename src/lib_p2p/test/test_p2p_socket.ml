@@ -25,7 +25,7 @@
 
 include Logging.Make (struct let name = "test.p2p.connection" end)
 
-let default_addr = Ipaddr.V6.localhost
+let addr = ref Ipaddr.V6.localhost
 
 let proof_of_work_target = Crypto_box.make_target 16.
 let id1 = P2p_identity.generate proof_of_work_target
@@ -86,7 +86,7 @@ let sync_nodes nodes =
       Lwt.return err
 
 let run_nodes client server =
-  listen default_addr >>= fun (main_socket, port) ->
+  listen !addr >>= fun (main_socket, port) ->
   Process.detach ~prefix:"server: " begin fun channel ->
     let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
     server channel sched main_socket >>=? fun () ->
@@ -96,7 +96,7 @@ let run_nodes client server =
   Process.detach ~prefix:"client: " begin fun channel ->
     Lwt_utils_unix.safe_close main_socket >>= fun () ->
     let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-    client channel sched default_addr port >>=? fun () ->
+    client channel sched !addr port >>=? fun () ->
     P2p_io_scheduler.shutdown sched >>= fun () ->
     return_unit
   end >>= fun client_node ->
@@ -410,6 +410,9 @@ module Garbled_data = struct
 end
 
 let spec = Arg.[
+
+    "--addr", String (fun p -> addr := Ipaddr.V6.of_string_exn p),
+    " Listening addr";
 
     "-v", Unit (fun () ->
         Lwt_log_core.(add_rule "test.p2p.connection" Info) ;

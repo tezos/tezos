@@ -2,18 +2,19 @@
 DEV ?= --dev
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 
-current_ocaml_version := $(shell ocamlc -version)
 current_opam_version := $(shell opam --version)
 include scripts/version.sh
 
-ifneq (${current_ocaml_version},${ocaml_version})
-$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
-endif
 ifneq (${current_opam_version},${opam_version})
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}))
 endif
 
+current_ocaml_version := $(shell opam exec -- ocamlc -version)
+
 all:
+ifneq (${current_ocaml_version},${ocaml_version})
+	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
+endif
 	@jbuilder build ${DEV} \
 		src/bin_node/main.exe \
 		src/bin_client/main_client.exe \
@@ -52,7 +53,7 @@ $(addsuffix .test,${PACKAGES}): %.test:
 
 doc-html: all
 	@jbuilder build @doc ${DEV}
-	@./tezos-client -protocol ProtoALphaALph man -verbosity 3 -format html | sed "s/$HOME/\$HOME/g" > docs/api/tezos-client.html
+	@./tezos-client -protocol PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY man -verbosity 3 -format html | sed "s/$HOME/\$HOME/g" > docs/api/tezos-client.html
 	@./tezos-admin-client man -verbosity 3 -format html | sed "s/$HOME/\$HOME/g" > docs/api/tezos-admin-client.html
 	@mkdir -p $$(pwd)/docs/_build/api/odoc
 	@rm -rf $$(pwd)/docs/_build/api/odoc/*

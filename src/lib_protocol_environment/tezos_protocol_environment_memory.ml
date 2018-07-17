@@ -54,22 +54,13 @@ module Context = struct
         if m == v then None else Some v
     | [], (Key _ | Dir _), None -> Some empty
     | n :: k, Dir m, _ -> begin
-        match raw_set (StringMap.find n m) k v with
-        | exception Not_found -> begin
-            match raw_set empty k v with
-            | None -> None
-            | Some rm ->
-                if rm = empty then
-                  Some (Dir (StringMap.remove n m))
-                else
-                  Some (Dir (StringMap.add n rm m))
-          end
+        match raw_set (Option.unopt ~default:empty
+                         (StringMap.find_opt n m)) k v with
         | None -> None
+        | Some rm when rm = empty ->
+            Some (Dir (StringMap.remove n m))
         | Some rm ->
-            if rm = empty then
-              Some (Dir (StringMap.remove n m))
-            else
-              Some (Dir (StringMap.add n rm m))
+            Some (Dir (StringMap.add n rm m))
       end
     | _ :: _, Key _, None -> None
     | _ :: _, Key _, Some _ ->

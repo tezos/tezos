@@ -62,6 +62,11 @@ let file_parameter =
       else
         return p)
 
+let data_parameter =
+  Clic.parameter (fun _ data ->
+      Lwt.return (Micheline_parser.no_parsing_error
+                  @@ Michelson_v1_parser.parse_expression data))
+
 let group =
   { Clic.name = "context" ;
     title = "Block contextual commands (see option -block)" }
@@ -130,6 +135,28 @@ let commands version () =
             cctxt#error "This is not a smart contract."
         | Some storage ->
             cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped storage >>= fun () ->
+            return_unit
+      end ;
+
+    command ~group ~desc: "Get the value associated to a key in the big map storage of a contract."
+      no_options
+      (prefixes [ "get" ; "big" ; "map" ; "value" ; "for" ]
+       @@ Clic.param ~name:"key" ~desc:"the key to look for"
+         data_parameter
+       @@ prefixes [ "of" ; "type" ]
+       @@ Clic.param ~name:"type" ~desc:"type of the key"
+         data_parameter
+       @@ prefix "in"
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun () key key_type (_, contract) (cctxt : Proto_alpha.full) ->
+        get_big_map_value cctxt
+          ~chain:`Main ~block:cctxt#block
+          contract (key.expanded, key_type.expanded) >>=? function
+        | None ->
+            cctxt#error "No value associated to this key."
+        | Some value ->
+            cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped value >>= fun () ->
             return_unit
       end ;
 

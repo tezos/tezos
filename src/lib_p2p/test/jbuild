@@ -48,6 +48,25 @@
                    ))))
 
 (alias
+ ((name runtest_p2p_socket_ipv4)
+  (action (run ${exe:test_p2p_socket.exe} -v
+                   --addr "::ffff:127.0.0.1"))))
+
+(alias
+ ((name runtest_p2p_pool_ipv4)
+  (action (run ${exe:test_p2p_pool.exe} --clients 10 --repeat 5 -v
+                   --addr "::ffff:127.0.0.1"))))
+
+(alias
+ ((name runtest_p2p_io_scheduler_ipv4)
+  (action (run ${exe:test_p2p_io_scheduler.exe}
+                   --delay 5 --clients 8
+                   --max-upload-speed 262144 ;; 1 << 18 = 256kB
+                   --max-download-speed 1048576 ;; 1 << 20 = 1MB
+                   --addr "::ffff:127.0.0.1"
+                   ))))
+
+(alias
  ((name runtest_p2p_ipv6set)
   (action (run ${exe:test_p2p_ipv6set.exe} -v))))
 
@@ -61,9 +80,9 @@
 
 (alias
  ((name runtest)
-  (deps ((alias runtest_p2p_socket)
-         (alias runtest_p2p_pool)
-         (alias runtest_p2p_io_scheduler)
+  (deps ((alias runtest_p2p_socket_ipv4)
+         (alias runtest_p2p_pool_ipv4)
+         (alias runtest_p2p_io_scheduler_ipv4)
          (alias runtest_p2p_peerset)
          (alias runtest_p2p_ipv6set)
          (alias runtest_p2p_banned_peers)

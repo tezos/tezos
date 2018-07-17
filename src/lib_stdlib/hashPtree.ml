@@ -246,21 +246,21 @@ end = struct
 
     let leaf ~key ~mask value =
       let l = Leaf { id = 0; key; value; mask } in
-      match WeakTreeTbl.find weak_tree_tbl l with
-      | exception Not_found ->
+      match WeakTreeTbl.find_opt weak_tree_tbl l with
+      | None ->
           set_id l (next ());
           WeakTreeTbl.add weak_tree_tbl l;
           l
-      | l -> l
+      | Some l -> l
 
     let node ~prefix ~mask ~true_ ~false_ =
       let l = Node { id = 0; mask; prefix; true_; false_ } in
-      match WeakTreeTbl.find weak_tree_tbl l with
-      | exception Not_found ->
+      match WeakTreeTbl.find_opt weak_tree_tbl l with
+      | None ->
           set_id l (next ());
           WeakTreeTbl.add weak_tree_tbl l;
           l
-      | l -> l
+      | Some l -> l
 
     let empty = Empty
 
@@ -970,9 +970,9 @@ module Make(P:Ptree_sig.Prefix)(V:Value) = struct
     let cache : M.result Map_cache.t = Map_cache.create 10
 
     let rec map_reduce_ne t =
-      match Map_cache.find cache t with
-      | v -> v
-      | exception Not_found ->
+      match Map_cache.find_opt cache t with
+      | Some v -> v
+      | None ->
           let v =
             match t with
             | T.Leaf leaf ->

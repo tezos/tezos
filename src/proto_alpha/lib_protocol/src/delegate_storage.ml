@@ -253,6 +253,14 @@ let registered c delegate =
     c (Contract_repr.implicit_contract delegate)
 
 let init ctxt contract delegate =
+  known ctxt delegate >>=? fun known_delegate ->
+  fail_unless
+    known_delegate
+    (Roll_storage.Unregistered_delegate delegate) >>=? fun () ->
+  registered ctxt delegate >>= fun is_registered ->
+  fail_unless
+    is_registered
+    (Roll_storage.Unregistered_delegate delegate) >>=? fun () ->
   Storage.Contract.Delegate.init ctxt contract delegate >>=? fun ctxt ->
   Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
   link ctxt contract delegate balance

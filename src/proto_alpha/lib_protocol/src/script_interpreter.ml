@@ -187,7 +187,7 @@ let rec interp
                 log := (descr.loc, Gas.level ctxt, stack) :: !log ;
                 return (ret, ctxt) in
         let get_log (log : execution_trace ref option) =
-          Option.map ~f:(!) log in
+          Option.map ~f:(fun l -> List.rev !l) log in
         let consume_gas_terop : type ret arg1 arg2 arg3 rest.
           (_ * (_ * (_ * rest)), ret * rest) descr ->
           ((arg1 -> arg2 -> arg3 -> ret) * arg1 * arg2 * arg3) ->
@@ -725,7 +725,6 @@ let rec interp
                            Prim (0, K_code, [ Micheline.root code ], []) ])) in
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
             let storage = Micheline.strip_locations storage in
-            Contract.spend_from_script ctxt self credit >>=? fun ctxt ->
             Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
             let operation =
               Origination

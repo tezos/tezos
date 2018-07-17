@@ -901,9 +901,11 @@ Enables or disables stack and error display."
   (setq buffer-file-coding-system 'utf-8-unix)
   (add-hook 'completion-at-point-functions 'michelson-completion-at-point nil 'local)
   (setq-local company-backends '(company-capf))
-  (setq-local process-environment (cons "ALPHANET_EMACS=true"
-                                        (cons "TEZOS_ALPHANET_DO_NOT_PULL=yes"
-                                              process-environment)))
+  (setq-local process-environment
+              (cons "TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y"
+                    (cons "ALPHANET_EMACS=true"
+                          (cons "TEZOS_ALPHANET_DO_NOT_PULL=yes"
+                                process-environment))))
   (run-hooks 'michelson-mode-hook))
 (add-to-list 'auto-mode-alist '("\\.tz\\'" . michelson-mode))
 (add-to-list 'auto-mode-alist '("\\.tez\\'" . michelson-mode))

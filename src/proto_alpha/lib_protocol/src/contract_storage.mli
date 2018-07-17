@@ -77,7 +77,15 @@ val get_script:
 val get_storage:
   Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 
-type big_map_diff = (Script_expr_hash.t * Script_repr.expr option) list
+
+type big_map_diff_item = {
+  diff_key : Script_repr.expr;
+  diff_key_hash : Script_expr_hash.t;
+  diff_value : Script_repr.expr option;
+}
+type big_map_diff = big_map_diff_item list
+
+val big_map_diff_encoding : big_map_diff Data_encoding.t
 
 val update_script_storage:
   Raw_context.t -> Contract_repr.t ->

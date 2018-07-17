@@ -4,7 +4,7 @@ Online OCaml Documentation
 
 .. raw:: html
 
-    <iframe id="docframe" height="100%" width="100%" src="../api/odoc/index.html"></iframe>
+    <iframe id="docframe" height="100%" width="100%" src="../api/odoc/_html/index.html"></iframe>
     <style>
     @media (max-width: 771px) {
          #docframe { border:none; position: fixed; top: 70px; bottom: 0; right: 0; left: 0; }
@@ -15,5 +15,5 @@ Online OCaml Documentation
     </style>
     <script language="JavaScript">
       if (window.location.hash.endsWith(".html"))
-        document.getElementById('docframe').src = "../api/odoc/" + window.location.hash.slice(1)
+        document.getElementById('docframe').src = "../api/odoc/_html/" + window.location.hash.slice(1)
     </script>

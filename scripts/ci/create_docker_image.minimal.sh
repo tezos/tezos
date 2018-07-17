@@ -9,12 +9,12 @@ cd "$src_dir"
 
 . "$script_dir"/version.sh
 
-export build_dir=${build_dir:-_docker_build}
 tmp_dir=$(mktemp -dt tezos.opam.tezos.XXXXXXXX)
 
 image_name="${1:-tezos}"
 image_version="${2:-latest}"
-build_image_name="${3:-${image_name}_build:${image_version}}"
+build_image="${3:-registry.gitlab.com/tezos/opam-repository:${opam_repository_tag}}"
+base_image="${4-registry.gitlab.com/tezos/opam-repository:minimal--${opam_repository_tag}}"
 
 cleanup () {
     set +e
@@ -24,18 +24,13 @@ cleanup () {
 }
 trap cleanup EXIT INT
 
-"$ci_dir"/create_apk.hidapi.sh
-
-cp -a "$build_dir"/hidapi-$hidapi_version-r0.apk \
-      "$build_dir"/keys/ \
-      "$tmp_dir"
-
 mkdir -p "$tmp_dir"/bin
 mkdir -p "$tmp_dir"/scripts
-container=$(docker create $build_image_name)
+container=$(docker create $build_image)
 for bin in tezos-client tezos-admin-client tezos-node \
-	   tezos-alpha-baker tezos-alpha-endorser tezos-alpha-accuser; do
-    docker cp -L $container:/home/opam/tezos/$bin "$tmp_dir"/bin
+	   tezos-alpha-baker tezos-alpha-endorser tezos-alpha-accuser \
+	   tezos-signer; do
+    docker cp -L $container:/home/tezos/tezos/$bin "$tmp_dir"/bin
 done
 cp -a "$script_dir"/docker/entrypoint.sh "$tmp_dir"/bin/
 cp -a "$script_dir"/docker/entrypoint.inc.sh "$tmp_dir"/bin/
@@ -48,28 +43,17 @@ echo "### Building minimal docker image..."
 echo
 
 cat > "$tmp_dir"/Dockerfile <<EOF
-FROM alpine:$alpine_version
+FROM $base_image
 
-LABEL distro_style="apk" distro="alpine" distro_long="alpine-$alpine_version" arch="x86_64" operatingsystem="linux"
+RUN sudo apk --no-cache add vim
+ENV EDITOR=/usr/bin/vi
 
-COPY keys /etc/apk/keys/
-COPY hidapi-$hidapi_version-r0.apk .
-
-RUN apk --no-cache add \
-      libev gmp vim hidapi-$hidapi_version-r0.apk && \
-    rm hidapi-$hidapi_version-r0.apk
+RUN sudo mkdir -p /var/run/tezos/node /var/run/tezos/client && \
+    sudo chown -R tezos /var/run/tezos
 
 COPY bin/* /usr/local/bin/
 
 COPY scripts/* /usr/local/share/tezos/
-
-RUN adduser -S tezos && \
-    mkdir -p /var/run/tezos/node /var/run/tezos/client && \
-    chown -R tezos /var/run/tezos
-
-USER tezos
-
-ENV EDITOR=/usr/bin/vi
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 EOF
