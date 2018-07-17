@@ -62,6 +62,7 @@ val default_block_validator_limits: block_validator_limits
 val default_chain_validator_limits: chain_validator_limits
 
 val create:
+  ?sandboxed:bool ->
   config ->
   peer_validator_limits ->
   block_validator_limits ->

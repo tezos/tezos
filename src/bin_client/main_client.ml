@@ -98,6 +98,9 @@ let check_network ctxt =
       Lwt.return_none
   | Ok versions ->
       match String.split_on_char '_' (List.hd versions).name with
+      | "SANDBOXED" :: _ ->
+          sandbox () ;
+          Lwt.return_some `Sandbox
       | "TEZOS" :: "ZERONET" :: _date :: [] ->
           zeronet () ;
           Lwt.return_some `Zeronet
@@ -107,9 +110,6 @@ let check_network ctxt =
       | "TEZOS" :: "BETANET" :: _date :: [] ->
           betanet () ;
           Lwt.return_some `Betanet
-      | "TEZOS" :: _date :: [] ->
-          sandbox () ;
-          Lwt.return_some `Sandbox
       | _ ->
           default () ;
           Lwt.return_none
