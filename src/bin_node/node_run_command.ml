@@ -200,6 +200,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
     checkpoint ;
   } in
   Node.create
+    ~sandboxed:(sandbox <> None)
     node_config
     config.shell.peer_validator_limits
     config.shell.block_validator_limits
