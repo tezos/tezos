@@ -1143,6 +1143,11 @@ and parse_ty :
         parse_type_annot loc annot >>? fun ty_name ->
         Gas.consume ctxt (Typecheck_costs.type_ 2) >|? fun ctxt ->
         Ex_ty (Map_t (ta, tr, ty_name)), ctxt
+    | Prim (loc, T_big_map, args, annot)
+      when allow_big_map ->
+        parse_big_map_ty ctxt loc args annot >>? fun (big_map_ty, ctxt) ->
+        Gas.consume ctxt (Typecheck_costs.type_ 2) >|? fun ctxt ->
+        big_map_ty, ctxt
     | Prim (loc, T_big_map, _, _) ->
         error (Unexpected_big_map loc)
     | Prim (loc, (T_unit | T_signature
@@ -1164,6 +1169,19 @@ and parse_ty :
             T_string ; T_bytes ; T_mutez ; T_bool ;
             T_key ; T_key_hash ; T_timestamp ]
 
+and parse_big_map_ty ctxt big_map_loc args map_annot =
+  Gas.consume ctxt Typecheck_costs.cycle >>? fun ctxt ->
+  begin match args with
+    | [ key_ty ; value_ty ] ->
+        parse_comparable_ty ctxt key_ty >>? fun (Ex_comparable_ty key_ty, ctxt) ->
+        parse_ty ctxt ~allow_big_map:false ~allow_operation:false value_ty
+        >>? fun (Ex_ty value_ty, ctxt) ->
+        parse_type_annot big_map_loc map_annot >|? fun map_name ->
+        let big_map_ty = Big_map_t (key_ty, value_ty, map_name) in
+        Ex_ty big_map_ty, ctxt
+    | args -> error @@ Invalid_arity (big_map_loc, T_big_map, 2, List.length args)
+  end
+
 and parse_storage_ty :
   context -> Script.node -> (ex_ty * context) tzresult
   = fun ctxt node ->
@@ -1172,24 +1190,16 @@ and parse_storage_ty :
             [ Prim (big_map_loc, T_big_map, args, map_annot) ; remaining_storage ],
             storage_annot) ->
         Gas.consume ctxt Typecheck_costs.cycle >>? fun ctxt ->
-        begin match args with
-          | [ key_ty ; value_ty ] ->
-              parse_comparable_ty ctxt key_ty >>? fun (Ex_comparable_ty key_ty, ctxt) ->
-              parse_ty ctxt ~allow_big_map:false ~allow_operation:false value_ty
-              >>? fun (Ex_ty value_ty, ctxt) ->
-              parse_ty ctxt ~allow_big_map:false ~allow_operation:false remaining_storage
-              >>? fun (Ex_ty remaining_storage, ctxt) ->
-              parse_type_annot big_map_loc map_annot >>? fun map_name ->
-              parse_composed_type_annot loc storage_annot
-              >>? fun (ty_name, map_field, storage_field) ->
-              Gas.consume ctxt (Typecheck_costs.type_ 5) >|? fun ctxt ->
-              let big_map_ty = Big_map_t (key_ty, value_ty, map_name) in
-              Ex_ty (Pair_t ((big_map_ty, map_field, None),
-                             (remaining_storage, storage_field, None),
-                             ty_name)),
-              ctxt
-          | args -> error @@ Invalid_arity (big_map_loc, T_big_map, 2, List.length args)
-        end
+        parse_big_map_ty ctxt big_map_loc args map_annot >>? fun (Ex_ty big_map_ty, ctxt) ->
+        parse_ty ctxt ~allow_big_map:false ~allow_operation:false remaining_storage
+        >>? fun (Ex_ty remaining_storage, ctxt) ->
+        parse_composed_type_annot loc storage_annot
+        >>? fun (ty_name, map_field, storage_field) ->
+        Gas.consume ctxt (Typecheck_costs.type_ 5) >|? fun ctxt ->
+        Ex_ty (Pair_t ((big_map_ty, map_field, None),
+                       (remaining_storage, storage_field, None),
+                       ty_name)),
+        ctxt
     | _ ->
         parse_ty ctxt ~allow_big_map:false ~allow_operation:false node
 
