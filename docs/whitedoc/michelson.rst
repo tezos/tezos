@@ -786,6 +786,10 @@ is, concatenate or splice them, and use them as keys.
 
 ::
 
+    :: string : string : 'S   -> string : 'S
+
+    > CONCAT / s : t : S  =>  (s ^ t) : S
+
     :: string list : 'S   -> string : 'S
 
     > CONCAT / {} : S  =>  "" : S
@@ -1486,6 +1490,10 @@ the wild and untyped outside world.
 -  ``CONCAT``: Byte sequence concatenation.
 
 ::
+
+   :: bytes : bytes : 'S   -> bytes : 'S
+
+    > CONCAT / s : t : S  =>  (s ^ t) : S
 
     :: bytes list : 'S   -> bytes : 'S
 
