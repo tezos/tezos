@@ -156,9 +156,11 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Big_map_update -> 0
   | Big_map_mem -> 0
   | Concat_string -> 0
+  | Concat_string_pair -> 0
   | Slice_string -> 0
   | String_size -> 0
   | Concat_bytes -> 0
+  | Concat_bytes_pair -> 0
   | Slice_bytes -> 0
   | Bytes_size -> 0
   | Add_seconds_to_timestamp -> 0
@@ -2117,6 +2119,12 @@ and parse_instr
           (Item_t (Int_t tname, rest, annot))
     (* string operations *)
     | Prim (loc, I_CONCAT, [], annot),
+      Item_t (String_t tn1, Item_t (String_t tn2, rest, _), _) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
+        typed ctxt loc Concat_string_pair
+          (Item_t (String_t tname, rest, annot))
+    | Prim (loc, I_CONCAT, [], annot),
       Item_t (List_t (String_t tname, _), rest, list_annot) ->
         parse_var_annot ~default:list_annot loc annot >>=? fun annot ->
         typed ctxt loc Concat_string
@@ -2133,6 +2141,12 @@ and parse_instr
         parse_var_annot loc annot >>=? fun annot ->
         typed ctxt loc String_size (Item_t (Nat_t None, rest, annot))
     (* bytes operations *)
+    | Prim (loc, I_CONCAT, [], annot),
+      Item_t (Bytes_t tn1, Item_t (Bytes_t tn2, rest, _), _) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        Lwt.return @@ merge_type_annot tn1 tn2 >>=? fun tname ->
+        typed ctxt loc Concat_bytes_pair
+          (Item_t (Bytes_t tname, rest, annot))
     | Prim (loc, I_CONCAT, [], annot),
       Item_t (List_t (Bytes_t tname, _), rest, list_annot) ->
         parse_var_annot ~default:list_annot loc annot >>=? fun annot ->
