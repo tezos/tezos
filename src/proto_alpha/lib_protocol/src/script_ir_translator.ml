@@ -2892,7 +2892,7 @@ let typecheck_data
   = fun ?type_logger ctxt (data, exp_ty) ->
     trace
       (Ill_formed_type (None, exp_ty, 0))
-      (Lwt.return @@ parse_ty ctxt ~allow_big_map:true ~allow_operation:false (root exp_ty))
+      (Lwt.return @@ parse_ty ctxt ~allow_big_map:false ~allow_operation:false (root exp_ty))
     >>=? fun (Ex_ty exp_ty, ctxt) ->
     trace_eval
       (fun () ->
