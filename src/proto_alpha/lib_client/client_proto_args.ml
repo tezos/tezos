@@ -239,7 +239,7 @@ let endorsement_delay_arg =
     ~doc:"delay before endorsing blocks\n\
           Delay between notifications of new blocks from the node and \
           production of endorsements for these blocks."
-    ~default:"15"
+    ~default:"5"
     (parameter (fun _ s ->
          try return (int_of_string s)
          with _ -> fail (Bad_endorsement_delay s)))
