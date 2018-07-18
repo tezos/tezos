@@ -5,7 +5,7 @@ let dirname = Filename.basename @@ Filename.dirname @@ Filename.dirname @@ Sys.g
 
 let predefined_version = None (* to be substituted in opam packages *)
 
-let version =
+let lib_version =
   match predefined_version with
   | Some version -> version
   | None ->
@@ -14,6 +14,8 @@ let version =
     if not (n >= x && String.sub dirname 0 x = prefix) then
       failwith "unexpected directory name" ;
     String.sub dirname x (n - x)
+
+let version = String.concat "-" (String.split_on_char '_' lib_version)
 
 let () = Format.kasprintf Jbuild_plugin.V1.send {|
 (jbuild_version 1)
@@ -64,5 +66,6 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
                     -warn-error -a+8))
   (modules (Registerer))))
 |}
-    version version version version version version version version
-    version version version version
+    version lib_version lib_version lib_version
+    version lib_version version lib_version
+    lib_version lib_version version lib_version
