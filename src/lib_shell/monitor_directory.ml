@@ -125,7 +125,10 @@ let build_rpc_directory validator mainchain_validator =
            else
              Lwt.return_none)
         block_stream in
-    let first_call = ref true in
+    in_next_protocols head >>= fun first_block_is_among_next_protocols ->
+    let first_call =
+      (* Skip the first block if this is false *)
+      ref first_block_is_among_next_protocols in
     let next () =
       if !first_call then begin
         first_call := false ; Lwt.return_some (State.Block.hash head, State.Block.header head)
