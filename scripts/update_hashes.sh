@@ -29,7 +29,7 @@ then
     find . -type f -exec sed "s/$current_hash_genesis/$new_hash_genesis/g" -i {} \;
     git commit -a -m "Update proto Genesis's hash"
 else
-    "Proto Genesis's hash hasn't changed, nothing to do"
+    echo "Proto Genesis's hash hasn't changed, nothing to do"
 fi
 
 current_hash_alpha=`jq '.hash' < src/proto_alpha/lib_protocol/src/TEZOS_PROTOCOL | tr -d '"'`
@@ -42,8 +42,8 @@ new_hash_alpha=`./tezos-protocol-compiler $alpha_tmpdir/tmp $alpha_tmpdir/src | 
 echo "Alpha's new hash: $new_hash_alpha"
 if [ "$current_hash_alpha" != "$new_hash_alpha" ]
 then
-    find . -type f -exec sed "s/$current_hash_alpha/$new_hash_alpha/g" -i {} \;
+    find src/proto_alpha src/bin_client docs -type f -exec sed "s/$current_hash_alpha/$new_hash_alpha/g" -i {} \;
     git commit -a -m "Update proto Alpha's hash"
 else
-    "Proto Alpha's hash hasn't changed, nothing to do"
+    echo "Proto Alpha's hash hasn't changed, nothing to do"
 fi
