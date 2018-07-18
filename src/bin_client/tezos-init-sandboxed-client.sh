@@ -118,7 +118,7 @@ wait_for_the_node_to_be_bootstraped() {
 ## Baker ###################################################################
 
 check_baker() {
-    pids=$(pgrep -x tezos-alpha-baker 2>/dev/null)
+    pids=$(pgrep -x tezos-baker-alpha 2>/dev/null)
     for pid in $pids; do
         if grep -- "-max-priority" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
             return 0
@@ -137,7 +137,7 @@ run_baker() {
 }
 
 stop_baker() {
-    pids=$(pgrep -x tezos-alpha-baker 2>/dev/null)
+    pids=$(pgrep -x tezos-baker-alpha 2>/dev/null)
     for pid in $pids; do
         if grep -- "-max-priority" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
             echo "Killing the baker..."
@@ -276,9 +276,9 @@ main () {
 	# we assume a clean install with tezos-(admin-)client in the path
         local_client="${local_client:-$(which tezos-client)}"
         local_admin_client="${local_admin_client:-$(which tezos-admin-client)}"
-        local_alpha_baker="${local_alpha_baker:-$(which tezos-alpha-baker)}"
-	local_alpha_endorser="${local_alpha_endorser:-$(which tezos-alpha-endorser)}"
-	local_alpha_accuser="${local_alpha_accuser:-$(which tezos-alpha-accuser)}"
+        local_alpha_baker="${local_alpha_baker:-$(which tezos-baker-alpha)}"
+	local_alpha_endorser="${local_alpha_endorser:-$(which tezos-endorser-alpha)}"
+	local_alpha_accuser="${local_alpha_accuser:-$(which tezos-accuser-alpha)}"
         local_signer="${local_signer:-$(which tezos-signer)}"
     fi
 
@@ -301,17 +301,17 @@ main () {
     echo "exec $admin_client \"\$@\""  >> $client_dir/bin/tezos-admin-client
     chmod +x $client_dir/bin/tezos-admin-client
 
-    echo '#!/bin/sh' > $client_dir/bin/tezos-alpha-baker
-    echo "exec $alpha_baker \"\$@\""  >> $client_dir/bin/tezos-alpha-baker
-    chmod +x $client_dir/bin/tezos-alpha-baker
+    echo '#!/bin/sh' > $client_dir/bin/tezos-baker-alpha
+    echo "exec $alpha_baker \"\$@\""  >> $client_dir/bin/tezos-baker-alpha
+    chmod +x $client_dir/bin/tezos-baker-alpha
 
-    echo '#!/bin/sh' > $client_dir/bin/tezos-alpha-endorser
-    echo "exec $alpha_endorser \"\$@\""  >> $client_dir/bin/tezos-alpha-endorser
-    chmod +x $client_dir/bin/tezos-alpha-endorser
+    echo '#!/bin/sh' > $client_dir/bin/tezos-endorser-alpha
+    echo "exec $alpha_endorser \"\$@\""  >> $client_dir/bin/tezos-endorser-alpha
+    chmod +x $client_dir/bin/tezos-endorser-alpha
 
-    echo '#!/bin/sh' > $client_dir/bin/tezos-alpha-accuser
-    echo "exec $alpha_accuser \"\$@\""  >> $client_dir/bin/tezos-alpha-accuser
-    chmod +x $client_dir/bin/tezos-alpha-accuser
+    echo '#!/bin/sh' > $client_dir/bin/tezos-accuser-alpha
+    echo "exec $alpha_accuser \"\$@\""  >> $client_dir/bin/tezos-accuser-alpha
+    chmod +x $client_dir/bin/tezos-accuser-alpha
 
     echo '#!/bin/sh' > $client_dir/bin/tezos-signer
     echo "exec $signer \"\$@\""  >> $client_dir/bin/tezos-signer

@@ -362,8 +362,9 @@ let gc_peer_ids ({ peer_meta_config = { score } ;
       P2p_peer.Table.iter (fun peer_id peer_info ->
           let created = P2p_peer_state.Info.created peer_info in
           let score = score @@ P2p_peer_state.Info.peer_metadata peer_info in
-          Gc_peer_set.insert (score, created, peer_id) table
-        ) known_peer_ids ;
+          if P2p_peer_state.is_disconnected peer_info then
+            Gc_peer_set.insert (score, created, peer_id) table)
+        known_peer_ids ;
       let to_remove = Gc_peer_set.get table in
       ListLabels.iter to_remove ~f:begin fun (_, _, peer_id) ->
         P2p_peer.Table.remove known_peer_ids peer_id
