@@ -468,6 +468,52 @@ writing your own configuration file if needed.
     }
 
 
+Environment for writing Michelson contracts
+-------------------------------------------
+
+Here is how to setup a practical environment for
+writing, editing and debugging Michelson programs.
+
+Install `Emacs <https://www.gnu.org/software/emacs/>`_ with
+the `deferred <https://github.com/kiwanami/emacs-deferred>`_ and
+`exec-path-from-shell
+<https://github.com/purcell/exec-path-from-shell>`_ packages.
+The packages can be installed from within Emacs with
+``M-x package-install``.
+The last package imports the shell path in Emacs and it is needed
+because we will run a sandboxed node.
+
+Set up the `Michelson mode
+<https://gitlab.com/tezos/tezos/tree/master/emacs>`_ by adding in
+your ``.emacs`` :
+
+::
+
+   (load "~/tezos/tezos/emacs/michelson-mode.el" nil t)
+   (setq michelson-client-command "tezos-client")
+   (setq michelson-alphanet nil)
+
+Note that the Michelson mode will be chosen automatically by Emacs for
+files with a ``.tz`` or ``.tez`` extension.
+
+Run a :ref:`sandboxed node<sandboxed-mode>` (and activate the alphanet
+protocol with ``tezos-activate-alpha``) so that useful information
+about the program can be displayed.
+We can now open our favourite contract ``emacs
+./src/bin_client/test/contracts/id.tz`` and, when moving the cursor on
+a Michelson instruction, in the bottom of the windows Emacs should
+display the state of the stack before (left) and after (right) the
+application of the instruction.
+The Emacs mode automatically type-checks your program and reports
+errors; once you are happy with the result you can ask the client to
+run it locally:
+
+::
+
+   tezos-client run script ./src/bin_client/test/contracts/id.tz \
+                on storage '"hello"' and input '"world"'
+
+
 Debugging
 ---------
 
