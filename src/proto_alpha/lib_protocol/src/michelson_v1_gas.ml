@@ -310,7 +310,9 @@ module Cost_of = struct
         | Big_map_get -> alloc_cost 1
         | Big_map_update -> alloc_cost 1
         | Concat_string -> alloc_cost 1
+        | Concat_string_pair -> alloc_cost 1
         | Concat_bytes -> alloc_cost 1
+        | Concat_bytes_pair -> alloc_cost 1
         | Slice_string -> alloc_cost 1
         | Slice_bytes -> alloc_cost 1
         | String_size -> alloc_cost 1
