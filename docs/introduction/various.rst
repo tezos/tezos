@@ -136,6 +136,81 @@ hardware wallet.
                                   --peer <public-node-ip>
 
 
+.. _signer:
+
+Signer
+------
+
+Another solution to decouple the node from the signing process is to
+use the *remote signer*.
+Among the signing scheme supported by the client, that we can list
+with ``tezos-client list signing schemes``, there are ``unix``,
+``tcp``, ``http`` and ``https``.
+These schemes send signing requests over their respective
+communication channel towards the ``tezos-signer``, which can run on a
+different machine that stores the secret key.
+
+In our home server we can generate a new key pair (or import one from a
+:ref:`Ledger<ledger>`) and launch a signer that signs operations using these
+keys.
+The new keys are store in ``$HOME/.tezos-signer`` in the same format
+as ``tezos-client``.
+On our internet facing vps we can then import a key with the address
+of the signer.
+
+::
+
+   home~$ tezos-signer gen keys alice
+   home~$ cat ~/.tezos-signer/public_key_hashs
+   [ { "name": "alice", "value": "tz1abc..." } ]
+   home~$ tezos-signer launch socket signer -a home-ip
+
+   vps~$ tezos-client import secret key alice tcp://home-ip:7732/tz1abc...
+
+Every time the client on *vps* needs to sing an operation for
+*alice*, it sends a signature request to the remote signer on
+*home*.
+Note that this setup alone is not secure, **the signer accepts
+requests from anybody and happily signs any transaction!**
+
+Secure the connection
+~~~~~~~~~~~~~~~~~~~~~
+
+Improving the security of the communication channel can be done at the
+system level, setting up a tunnel with ``ssh`` or ``wireguard``
+between *home* and *vps*, otherwise the signer already provides an
+additional protection.
+
+With the option ``--require-authentication`` the signer requires the
+client to authenticate before signing any operation.
+First we create a new key on the *vps* and then import it as an
+authorized key on *home* where it is stored under
+``.tezos-signer/authorized_keys`` (similarly to ``ssh``).
+Note that this key is only used to authenticate the client to the
+signer and it is not used as a Tezos account.
+
+::
+
+   vps~$ tezos-client gen keys vps
+   vps~$ cat ~/.tezos-client/public_keys
+   [ { "name": "vps",
+       "value":
+          "unencrypted:edpk123456789" } ]
+
+   home~$ tezos-signer add authorized key edpk123456789 --name vps
+   home~$ tezos-signer --require-authentication launch socket signer -a home-ip
+
+All request are now signed with the *vps* key thus you are
+guaranteed authenticity and integrity.
+This set up **does not guarantee confidentiality**, an evesdropper can
+see the transactions that you sign but on a public blockchain this is
+less of a concern.
+You can still use the ``https`` scheme or the tunnel to encrypt you
+traffic.
+
+
+.. _sandboxed-mode:
+
 Use sandboxed mode
 ------------------
 
