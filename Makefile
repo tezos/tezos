@@ -33,9 +33,9 @@ endif
 	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
 	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
 	@for p in $(active_protocol_directories) ; do \
-	   cp _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-`echo $$p | tr -- _ -`-baker ; \
-	   cp _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-`echo $$p | tr -- _ -`-endorser ; \
-	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-`echo $$p | tr -- _ -`-accuser ; \
+	   cp _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
+	   cp _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
+	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
 	 done
 
 all.pkg:
@@ -93,7 +93,7 @@ clean:
 		tezos-signer \
 		tezos-admin-client \
 		tezos-protocol-compiler \
-	  $(foreach p, $(active_protocol_versions), tezos-$(p)-baker tezos-$(p)-endorser tezos-$(p)-accuser)
+	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p))
 	@-${MAKE} -C docs clean
 
 .PHONY: all test build-deps docker-image clean

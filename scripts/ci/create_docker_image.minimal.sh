@@ -27,7 +27,7 @@ trap cleanup EXIT INT
 mkdir -p "$tmp_dir"/bin
 mkdir -p "$tmp_dir"/scripts
 container=$(docker create $build_image)
-versioned_daemons="$(sed "s/^\(.*\)$/tezos-\1-baker tezos-\1-endorser tezos-\1-accuser/g" "active_protocol_versions")"
+versioned_daemons="$(sed "s/^\(.*\)$/tezos-baker-\1 tezos-endorser-\1 tezos-accuser-\1/g" "active_protocol_versions")"
 for bin in tezos-client tezos-admin-client tezos-node $versioned_daemons tezos-signer; do
     docker cp -L $container:/home/tezos/tezos/$bin "$tmp_dir"/bin
 done
