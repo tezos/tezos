@@ -383,10 +383,10 @@ opam:37:tezos-baking-alpha:
   variables:
     package: tezos-baking-alpha
 
-opam:38:tezos-protocol-genesis:
+opam:38:tezos-protocol-000-Ps9mPmXa:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-genesis
+    package: tezos-protocol-000-Ps9mPmXa
 
 opam:39:ocplib-resto-json:
   <<: *opam_definition
@@ -408,40 +408,40 @@ opam:42:tezos-baking-alpha-commands:
   variables:
     package: tezos-baking-alpha-commands
 
-opam:43:tezos-client-alpha-commands:
+opam:43:tezos-client-000-Ps9mPmXa:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-000-Ps9mPmXa
+
+opam:44:tezos-client-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-alpha-commands
 
-opam:44:tezos-client-base-unix:
+opam:45:tezos-client-base-unix:
   <<: *opam_definition
   variables:
     package: tezos-client-base-unix
-
-opam:45:tezos-client-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-genesis
 
 opam:46:ocplib-ezresto:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto
 
-opam:47:tezos-embedded-protocol-alpha:
+opam:47:tezos-embedded-protocol-000-Ps9mPmXa:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-000-Ps9mPmXa
+
+opam:48:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-alpha
 
-opam:48:tezos-embedded-protocol-demo:
+opam:49:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
-
-opam:49:tezos-embedded-protocol-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-genesis
 
 opam:50:tezos-shell:
   <<: *opam_definition

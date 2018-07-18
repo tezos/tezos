@@ -136,7 +136,7 @@ let activate_alpha ?(vote = false) () =
          "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6") in
   let protocol_parameters =
     if vote then vote_protocol_parameters else protocol_parameters in
-  Tezos_client_genesis.Client_proto_main.bake
+  Tezos_client_000_Ps9mPmXa.Client_proto_main.bake
     (no_write_context ~block:(`Head 0) !rpc_config) (`Head 0)
     (Activate  { protocol = Proto_alpha.hash ;
                  fitness ;

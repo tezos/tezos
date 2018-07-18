@@ -8,7 +8,7 @@
               tezos-rpc-http
               tezos-shell-services
               tezos-client-base
-              tezos-client-genesis
+              tezos-client-000-Ps9mPmXa
               tezos-client-alpha
               tezos-baking-alpha
               tezos-client-base-unix
@@ -19,7 +19,7 @@
                     -open Tezos_rpc_http
                     -open Tezos_shell_services
                     -open Tezos_client_base
-                    -open Tezos_client_genesis
+                    -open Tezos_client_000_Ps9mPmXa
                     -open Tezos_client_alpha
                     -open Tezos_baking_alpha
                     -open Tezos_client_base_unix))))

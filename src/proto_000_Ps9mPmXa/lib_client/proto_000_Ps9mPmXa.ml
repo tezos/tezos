@@ -25,6 +25,6 @@
 
 module Name = struct let name = "genesis" end
 module Genesis_environment = Tezos_protocol_environment_faked.MakeV1(Name)()
-module Proto = Tezos_protocol_genesis.Functor.Make(Genesis_environment)
+module Proto = Tezos_protocol_000_Ps9mPmXa.Functor.Make(Genesis_environment)
 module Genesis_block_services = Block_services.Make(Proto)(Proto)
 include Proto

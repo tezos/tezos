@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_genesis
+open Proto_000_Ps9mPmXa
 
 let protocol =
   Protocol_hash.of_b58check_exn

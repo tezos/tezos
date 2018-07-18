@@ -11,7 +11,7 @@ depends: [
   "jbuilder" { build & = "1.0+beta20" }
   "tezos-base"
   "tezos-client-base"
-  "tezos-client-genesis"
+  "tezos-client-000-Ps9mPmXa"
   "tezos-client-alpha"
   "tezos-client-commands"
   "tezos-client-base-unix"
