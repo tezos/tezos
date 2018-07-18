@@ -12,7 +12,7 @@
               tezos-protocol-updater
               tezos-embedded-protocol-000-Ps9mPmXa
               tezos-embedded-protocol-demo
-              tezos-embedded-protocol-alpha
+              tezos-embedded-protocol-001-PtCJ7pwo
               cmdliner
               tls))
   (flags (:standard -w -9+27-30-32-40@8

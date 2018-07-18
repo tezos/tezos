@@ -348,10 +348,10 @@ opam:30:tezos-signer-services:
   variables:
     package: tezos-signer-services
 
-opam:31:tezos-protocol-alpha:
+opam:31:tezos-protocol-001-PtCJ7pwo:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-alpha
+    package: tezos-protocol-001-PtCJ7pwo
 
 opam:32:tezos-protocol-environment:
   <<: *opam_definition
@@ -363,10 +363,10 @@ opam:33:tezos-signer-backends:
   variables:
     package: tezos-signer-backends
 
-opam:34:tezos-client-alpha:
+opam:34:tezos-client-001-PtCJ7pwo:
   <<: *opam_definition
   variables:
-    package: tezos-client-alpha
+    package: tezos-client-001-PtCJ7pwo
 
 opam:35:tezos-client-commands:
   <<: *opam_definition
@@ -378,10 +378,10 @@ opam:36:tezos-protocol-environment-shell:
   variables:
     package: tezos-protocol-environment-shell
 
-opam:37:tezos-baking-alpha:
+opam:37:tezos-baking-001-PtCJ7pwo:
   <<: *opam_definition
   variables:
-    package: tezos-baking-alpha
+    package: tezos-baking-001-PtCJ7pwo
 
 opam:38:tezos-protocol-000-Ps9mPmXa:
   <<: *opam_definition
@@ -403,20 +403,20 @@ opam:41:tezos-p2p:
   variables:
     package: tezos-p2p
 
-opam:42:tezos-baking-alpha-commands:
+opam:42:tezos-baking-001-PtCJ7pwo-commands:
   <<: *opam_definition
   variables:
-    package: tezos-baking-alpha-commands
+    package: tezos-baking-001-PtCJ7pwo-commands
 
 opam:43:tezos-client-000-Ps9mPmXa:
   <<: *opam_definition
   variables:
     package: tezos-client-000-Ps9mPmXa
 
-opam:44:tezos-client-alpha-commands:
+opam:44:tezos-client-001-PtCJ7pwo-commands:
   <<: *opam_definition
   variables:
-    package: tezos-client-alpha-commands
+    package: tezos-client-001-PtCJ7pwo-commands
 
 opam:45:tezos-client-base-unix:
   <<: *opam_definition
@@ -433,10 +433,10 @@ opam:47:tezos-embedded-protocol-000-Ps9mPmXa:
   variables:
     package: tezos-embedded-protocol-000-Ps9mPmXa
 
-opam:48:tezos-embedded-protocol-alpha:
+opam:48:tezos-embedded-protocol-001-PtCJ7pwo:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-protocol-alpha
+    package: tezos-embedded-protocol-001-PtCJ7pwo
 
 opam:49:tezos-embedded-protocol-demo:
   <<: *opam_definition
@@ -448,65 +448,65 @@ opam:50:tezos-shell:
   variables:
     package: tezos-shell
 
-opam:51:tezos-endorser-alpha-commands:
+opam:51:tezos-baker-001-PtCJ7pwo-commands:
   <<: *opam_definition
   variables:
-    package: tezos-endorser-alpha-commands
+    package: tezos-baker-001-PtCJ7pwo-commands
 
 opam:52:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
 
-opam:53:ocplib-ezresto-directory:
+opam:53:tezos-endorser-001-PtCJ7pwo-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-001-PtCJ7pwo-commands
+
+opam:54:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:54:tezos-accuser-alpha:
+opam:55:tezos-baker-001-PtCJ7pwo:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-alpha
+    package: tezos-baker-001-PtCJ7pwo
 
-opam:55:tezos-endorser-alpha:
+opam:56:tezos-accuser-001-PtCJ7pwo-commands:
   <<: *opam_definition
   variables:
-    package: tezos-endorser-alpha
+    package: tezos-accuser-001-PtCJ7pwo-commands
 
-opam:56:tezos-accuser-alpha-commands:
+opam:57:tezos-accuser-001-PtCJ7pwo:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-alpha-commands
+    package: tezos-accuser-001-PtCJ7pwo
 
-opam:57:tezos-baker-alpha:
+opam:58:tezos-endorser-001-PtCJ7pwo:
   <<: *opam_definition
   variables:
-    package: tezos-baker-alpha
+    package: tezos-endorser-001-PtCJ7pwo
 
-opam:58:tezos-protocol-demo:
+opam:59:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:59:tezos-signer:
+opam:60:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:60:tezos-node:
+opam:61:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:61:ocplib-json-typed-browser:
+opam:62:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
-
-opam:62:tezos-baker-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-alpha-commands
 
 
 ##END_OPAM##

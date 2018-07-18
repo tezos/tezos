@@ -1,12 +1,12 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_alpha_bench_helpers)
+ ((name tezos_001_PtCJ7pwo_bench_helpers)
   (libraries (tezos-base
               tezos-stdlib-unix
               tezos-shell-services
               tezos-protocol-environment
-              tezos-protocol-alpha
+              tezos-protocol-001-PtCJ7pwo
               alcotest-lwt))
   (flags (:standard -w -9-32 -safe-string
           -open Tezos_base__TzPervasives

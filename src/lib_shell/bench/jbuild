@@ -4,24 +4,24 @@
  ((names (bench_simple bench_tool))
   (libraries (tezos-base
               tezos-shell
-              tezos_alpha_bench_helpers))
+              tezos_001_PtCJ7pwo_bench_helpers))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell
-                    -open Tezos_alpha_bench_helpers))))
+                    -open Tezos_001_PtCJ7pwo_bench_helpers))))
 
 (alias
  ((name buildtest)
   (deps (bench_tool.exe bench_simple.exe))))
 
 (alias
- ((name runbench_alpha_simple)
+ ((name runbench_001_PtCJ7pwo_simple)
   (deps (bench_simple.exe))
   (action (chdir ${ROOT} (run ${exe:bench_simple.exe})))))
 
 (alias
- ((name runbench_alpha)
+ ((name runbench_001_PtCJ7pwo)
   (deps (bench_tool.exe))
    (action (chdir ${ROOT} (run ${exe:bench_tool.exe})))))
 
