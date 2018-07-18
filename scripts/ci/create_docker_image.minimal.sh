@@ -27,9 +27,8 @@ trap cleanup EXIT INT
 mkdir -p "$tmp_dir"/bin
 mkdir -p "$tmp_dir"/scripts
 container=$(docker create $build_image)
-for bin in tezos-client tezos-admin-client tezos-node \
-	   tezos-alpha-baker tezos-alpha-endorser tezos-alpha-accuser \
-	   tezos-signer; do
+versioned_daemons="$(sed "s/^\(.*\)$/tezos-\1-baker tezos-\1-endorser tezos-\1-accuser/g" "active_protocol_versions")"
+for bin in tezos-client tezos-admin-client tezos-node $versioned_daemons tezos-signer; do
     docker cp -L $container:/home/tezos/tezos/$bin "$tmp_dir"/bin
 done
 cp -a "$script_dir"/docker/entrypoint.sh "$tmp_dir"/bin/
@@ -37,6 +36,7 @@ cp -a "$script_dir"/docker/entrypoint.inc.sh "$tmp_dir"/bin/
 cp "$script_dir"/alphanet.sh "$tmp_dir"/scripts/
 cp "$script_dir"/alphanet_version "$tmp_dir"/scripts/
 cp "$src_dir"/src/bin_client/bash-completion.sh "$tmp_dir"/scripts/
+cp "$src_dir"/active_protocol_versions "$tmp_dir"/scripts/
 
 echo
 echo "### Building minimal docker image..."
