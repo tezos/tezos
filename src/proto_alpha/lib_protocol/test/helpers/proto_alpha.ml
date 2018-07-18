@@ -37,3 +37,11 @@ end
 include Proto
 
 module M = Alpha_environment.Lift(Main)
+
+let register_error_kind
+    category ~id ~title ~description ?pp
+    encoding from_error to_error =
+  let id = "client." ^ Name.name ^ "." ^ id in
+  register_error_kind
+    category ~id ~title ~description ?pp
+    encoding from_error to_error

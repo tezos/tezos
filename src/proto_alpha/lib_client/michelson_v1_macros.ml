@@ -1092,6 +1092,7 @@ let rec unexpand_rec expr =
 
 let () =
   let open Data_encoding in
+  let open Proto_alpha in
   register_error_kind
     `Permanent
     ~id:"michelson.macros.unexpected_annotation"
