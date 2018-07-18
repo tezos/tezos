@@ -12,19 +12,55 @@ using the following shell commands.
    tezos-admin-client man -verbosity 3
 
 
-.. _tezos_client_commands:
+.. _client_manual:
 
-Command line client
-===================
+Client manual
+=============
 
 .. raw:: html
          :file: tezos-client.html
 
 
-.. _tezos_admin_client_commands:
+.. _admin_client_manual:
 
-Administration command line client
-==================================
+Admin-client manual
+===================
 
 .. raw:: html
          :file: tezos-admin-client.html
+
+
+.. _signer_manual:
+
+Signer manual
+=============
+
+.. raw:: html
+         :file: tezos-signer.html
+
+
+.. _baker_manual:
+
+Baker manual
+============
+
+.. raw:: html
+         :file: tezos-baker-alpha.html
+
+
+.. _endorser_manual:
+
+Endorser manual
+===============
+
+.. raw:: html
+         :file: tezos-endorser-alpha.html
+
+
+.. _accuser_manual:
+
+Accuser manual
+==============
+
+.. raw:: html
+         :file: tezos-accuser-alpha.html
