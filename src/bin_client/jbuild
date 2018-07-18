@@ -10,10 +10,13 @@
               tezos-client-commands
               tezos-client-genesis
               tezos-client-alpha
+              tezos-client-001-PsCDPuxX
               tezos-stdlib-unix
               tezos-client-base-unix
               tezos-client-alpha-commands.registration
               tezos-baking-alpha-commands.registration
+              tezos-client-001-PsCDPuxX-commands.registration
+              tezos-baking-001-PsCDPuxX-commands.registration
               tezos-signer-backends))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string

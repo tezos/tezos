@@ -463,50 +463,110 @@ opam:53:ocplib-ezresto-directory:
   variables:
     package: ocplib-ezresto-directory
 
-opam:54:tezos-accuser-alpha:
+opam:54:tezos-endorser-001-PsCDPuxX-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-001-PsCDPuxX-commands
+
+opam:55:tezos-accuser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha
 
-opam:55:tezos-endorser-alpha:
+opam:56:tezos-accuser-001-PsCDPuxX:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-001-PsCDPuxX
+
+opam:57:tezos-baking-001-PsCDPuxX-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-001-PsCDPuxX-commands
+
+opam:58:tezos-baking-001-PsCDPuxX:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-001-PsCDPuxX
+
+opam:59:tezos-protocol-001-PsCDPuxX:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-001-PsCDPuxX
+
+opam:60:tezos-embedded-protocol-001-PsCDPuxX:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-001-PsCDPuxX
+
+opam:61:tezos-endorser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha
 
-opam:56:tezos-accuser-alpha-commands:
+opam:62:tezos-accuser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha-commands
 
-opam:57:tezos-baker-alpha:
+opam:63:tezos-client-001-PsCDPuxX-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-001-PsCDPuxX-commands
+
+opam:64:tezos-endorser-001-PsCDPuxX:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-001-PsCDPuxX
+
+opam:65:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:58:tezos-protocol-demo:
+opam:66:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:59:tezos-signer:
+opam:67:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:60:tezos-node:
+opam:68:tezos-baker-001-PsCDPuxX:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-001-PsCDPuxX
+
+opam:69:tezos-accuser-001-PsCDPuxX-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-001-PsCDPuxX-commands
+
+opam:70:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:61:ocplib-json-typed-browser:
+opam:71:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
 
-opam:62:tezos-baker-alpha-commands:
+opam:72:tezos-baker-001-PsCDPuxX-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-001-PsCDPuxX-commands
+
+opam:73:tezos-baker-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha-commands
+
+opam:74:tezos-client-001-PsCDPuxX:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-001-PsCDPuxX
 
 
 ##END_OPAM##

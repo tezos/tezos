@@ -12,6 +12,7 @@
               tezos-protocol-updater
               tezos-embedded-protocol-genesis
               tezos-embedded-protocol-demo
+              tezos-embedded-protocol-001-PsCDPuxX
               tezos-embedded-protocol-alpha
               cmdliner
               tls))
