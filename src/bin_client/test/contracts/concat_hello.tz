@@ -1,7 +1,4 @@
 parameter (list string);
 storage (list string);
 code{ CAR;
-      MAP { NIL string ; SWAP ; CONS ;
-            PUSH @hello string "Hello "; CONS ;
-            CONCAT };
-      NIL operation; PAIR};
+      MAP { PUSH @hello string "Hello "; CONCAT }; NIL operation; PAIR};

@@ -465,6 +465,12 @@ assert_success $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg
                '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")'
 bake
 
+# Test comparisons on bytes { EQ ; GT ; LT ; GE ; LE }
+assert_storage $contract_dir/compare_bytes.tz '{}' '(Pair 0x33 0x34)' '{ False ; False ; True ; False ; True }'
+assert_storage $contract_dir/compare_bytes.tz '{}' '(Pair 0x33 0x33aa)' '{ False ; False ; True ; False ; True }'
+assert_storage $contract_dir/compare_bytes.tz '{}' '(Pair 0x33 0x33)' '{ True ; False ; False ; True ; True }'
+assert_storage $contract_dir/compare_bytes.tz '{}' '(Pair 0x34 0x33)' '{ False ; True ; False ; True ; False }'
+
 # Test SLICE and SIZE on bytes
 init_with_transfer $contract_dir/slices.tz bootstrap1 \
 				   '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"' 1,000 bootstrap1
