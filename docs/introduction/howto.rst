@@ -259,7 +259,7 @@ activating the whole network. For instance:
     $ tezos-activate-alpha
     Injected BMBcK869jaHQDc
     $ tezos-client rpc get /chains/main/blocks/head/metadata/next_protocol_hash
-    { "protocol": "Ps38d2VvuYcKddqjYJUPa9MJLnz45AZMJKZ72cpkMsQkMq5Fxgo" }
+    { "protocol": "PscYS2aNZvEpcGBmqhVxequaVEq8L8oZbJTqZqxQathb2PqJE1z" }
 
 Tune protocol alpha parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
