@@ -1,0 +1,11 @@
+parameter (pair bytes signature) ;
+storage key ;
+code { DUP ;
+       CAAR ; DUP ; SIZE ; PUSH nat 128 ; SWAP ; SUB ; ISNAT ; IF_SOME {} { FAIL } ;
+       PUSH nat 128 ; SLICE @payload ; ASSERT_SOME ;
+       DUP ; DIP { DIP { DUP ; CAAR ; PUSH nat 32 ; PUSH nat 0 ; SLICE ; ASSERT_SOME } ; SHA256 ; ASSERT_CMPEQ } ;
+       DUP ; DIP { DIP { DUP ; CAAR ; PUSH nat 32 ; PUSH nat 32 ; SLICE ; ASSERT_SOME } ; BLAKE2B ; ASSERT_CMPEQ } ;
+       DUP ; DIP { DIP { DUP ; CAAR ; PUSH nat 64 ; PUSH nat 64 ; SLICE ; ASSERT_SOME } ; SHA512 ; ASSERT_CMPEQ } ;
+       DIP { DUP ; CDR ; DIP { DUP ; CADR }} ; SWAP ; DIP { SWAP } ; CHECK_SIGNATURE ; ASSERT ;
+       CDR ; DUP ; HASH_KEY ; IMPLICIT_ACCOUNT ; BALANCE ; UNIT ; TRANSFER_TOKENS ;
+       NIL operation ; SWAP ; CONS ; PAIR }

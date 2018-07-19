@@ -25,4 +25,4 @@
 
 module Name = struct let name = "genesis-alpha" end
 module Alpha_environment = Tezos_protocol_environment_faked.MakeV1(Name)()
-include Tezos_protocol_001_PtCJ7pwo.Functor.Make(Alpha_environment)
+include Tezos_protocol_002_PtEmHRqt.Functor.Make(Alpha_environment)

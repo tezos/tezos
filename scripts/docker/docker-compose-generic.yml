@@ -14,9 +14,13 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  baker:
+  ## Duplicate the `baker/endorser/accuser` containers for each PROTOCOL
+  ## in file `active_protocol_versions`
+  baker-alpha:
     image: tezos/tezos:latest
-    hostname: baker
+    hostname: baker-alpha
+    environment:
+      - PROTOCOL=alpha
     command: tezos-baker
     links:
       - node
@@ -24,9 +28,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  endorser:
+  endorser-alpha:
     image: tezos/tezos:latest
-    hostname: endorser
+    hostname: endorser-alpha
+    environment:
+      - PROTOCOL=alpha
     command: tezos-endorser
     links:
       - node
@@ -34,9 +40,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  accuser:
+  accuser-alpha:
     image: tezos/tezos:latest
-    hostname: accuser
+    hostname: accuser-alpha
+    environment:
+      - PROTOCOL=alpha
     command: tezos-accuser
     links:
       - node

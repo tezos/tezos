@@ -16,6 +16,7 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-000-Ps9mPmXa"
   "tezos-protocol-001-PtCJ7pwo"
+  "tezos-protocol-002-PtEmHRqt"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

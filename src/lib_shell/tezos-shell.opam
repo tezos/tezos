@@ -17,7 +17,7 @@ depends: [
   "alcotest-lwt" { test }
   "tezos-embedded-protocol-demo" { test }
   "tezos-protocol-environment" { test }
-  "tezos-protocol-001-PtCJ7pwo" { test }
+  "tezos-protocol-002-PtEmHRqt" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

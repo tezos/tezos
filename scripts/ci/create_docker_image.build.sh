@@ -25,6 +25,7 @@ base_image="${3-${image_name}_deps:${image_version}}"
 
 mkdir -p "$tmp_dir"/tezos/scripts
 cp -a Makefile "$tmp_dir"/tezos
+cp -a active_protocol_versions "$tmp_dir"/tezos
 cp -a scripts/version.sh "$tmp_dir"/tezos/scripts/
 cp -a src "$tmp_dir"/tezos
 cp -a vendors "$tmp_dir"/tezos

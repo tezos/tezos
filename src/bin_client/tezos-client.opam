@@ -16,6 +16,10 @@ depends: [
   "tezos-client-001-PtCJ7pwo-commands"
   "tezos-baking-001-PtCJ7pwo"
   "tezos-baking-001-PtCJ7pwo-commands"
+  "tezos-client-002-PtEmHRqt"
+  "tezos-client-002-PtEmHRqt-commands"
+  "tezos-baking-002-PtEmHRqt"
+  "tezos-baking-002-PtEmHRqt-commands"
   "tezos-client-base-unix"
   "tezos-signer-backends"
   "tezos-node" { test }

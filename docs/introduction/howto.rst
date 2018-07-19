@@ -64,12 +64,14 @@ At last, compile the project:
 
     make
 
-This should produce three binaries:
+This should produce several binaries:
 
 -  ``tezos-node``: the tezos daemon itself;
 -  ``tezos-client``: a command-line client;
 -  ``tezos-admin-client``: a command-line administration tool for the node;
--  ``tezos-alpha-baker``: a client and daemon to bake on the Tezos network;
+-  ``tezos-baker-alpha``: a client and daemon to bake on the Tezos network;
+-  ``tezos-endorser-alpha``: a client and daemon to bake on the Tezos network;
+-  ``tezos-accuser-alpha``: a client and daemon to bake on the Tezos network;
 -  ``tezos-protocol-compiler``: a protocol compiler used for developing
    new version of the economic protocol.
 
@@ -180,7 +182,8 @@ To interact with your node, read the doc of clients:
 
    ./tezos-client man
    ./tezos-admin-client man
-   ./tezos-alpha-baker man
+   ./tezos-baker-alpha man
+   ./tezos-signer man
 
 And read :ref:`this section<faucet>` to learn how to get alphanet tezzies.
 
@@ -256,7 +259,7 @@ activating the whole network. For instance:
     $ tezos-activate-alpha
     Injected BMBcK869jaHQDc
     $ tezos-client rpc get /chains/main/blocks/head/metadata/next_protocol_hash
-    { "protocol": "PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY" }
+    { "protocol": "PtEmHRqt3kXSVZ26NGJGdQem5RbTBWNYqox82VyHvkvXGoCW52C" }
 
 Tune protocol alpha parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

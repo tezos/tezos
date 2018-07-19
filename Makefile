@@ -2,6 +2,9 @@
 DEV ?= --dev
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 
+active_protocol_versions := $(shell cat active_protocol_versions)
+active_protocol_directories := $(shell tr -- - _ < active_protocol_versions)
+
 current_opam_version := $(shell opam --version)
 include scripts/version.sh
 
@@ -21,17 +24,19 @@ endif
 		src/bin_client/main_admin.exe \
 		src/bin_signer/main_signer.exe \
 		src/lib_protocol_compiler/main_native.exe \
-		src/proto_001_PtCJ7pwo/bin_baker/main_baker_001_PtCJ7pwo.exe \
-		src/proto_001_PtCJ7pwo/bin_endorser/main_endorser_001_PtCJ7pwo.exe \
-		src/proto_001_PtCJ7pwo/bin_accuser/main_accuser_001_PtCJ7pwo.exe
+		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_baker/main_baker_$(p).exe) \
+		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_endorser/main_endorser_$(p).exe) \
+		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe)
 	@cp _build/default/src/bin_node/main.exe tezos-node
 	@cp _build/default/src/bin_client/main_client.exe tezos-client
 	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
 	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
 	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
-	@cp _build/default/src/proto_001_PtCJ7pwo/bin_baker/main_baker_001_PtCJ7pwo.exe tezos-baker-001-PtCJ7pwo
-	@cp _build/default/src/proto_001_PtCJ7pwo/bin_endorser/main_endorser_001_PtCJ7pwo.exe tezos-endorser-001-PtCJ7pwo
-	@cp _build/default/src/proto_001_PtCJ7pwo/bin_accuser/main_accuser_001_PtCJ7pwo.exe tezos-accuser-001-PtCJ7pwo
+	@for p in $(active_protocol_directories) ; do \
+	   cp _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
+	   cp _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
+	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
+	 done
 
 all.pkg:
 	@jbuilder build ${DEV} \
@@ -85,11 +90,10 @@ clean:
 	@-rm -f \
 		tezos-node \
 		tezos-client \
+		tezos-signer \
 		tezos-admin-client \
 		tezos-protocol-compiler \
-		tezos-baker-* \
-		tezos-endorser-* \
-		tezos-accuser-*
+	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p))
 	@-${MAKE} -C docs clean
 
 .PHONY: all test build-deps docker-image clean
