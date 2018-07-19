@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let protocols = [
-  "Alpha", "PscYS2aNZvEpcGBmqhVxequaVEq8L8oZbJTqZqxQathb2PqJE1z" ;
+  "Alpha", "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic" ;
 ]
 
 let main _node =
