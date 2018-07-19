@@ -554,8 +554,8 @@ let prim_encoding =
 let () =
   register_error_kind
     `Permanent
-    ~id:"unknownPrimitiveNameTypeError"
-    ~title: "Unknown primitive name (typechecking error)"
+    ~id:"michelson_v1.unknown_primitive_name"
+    ~title: "Unknown primitive name"
     ~description:
       "In a script or data expression, a primitive was unknown."
     ~pp:(fun ppf n -> Format.fprintf ppf "Unknown primitive %s." n)
@@ -567,8 +567,8 @@ let () =
        Unknown_primitive_name got) ;
   register_error_kind
     `Permanent
-    ~id:"invalidPrimitiveNameCaseTypeError"
-    ~title: "Invalid primitive name case (typechecking error)"
+    ~id:"michelson_v1.invalid_primitive_name_case"
+    ~title: "Invalid primitive name case"
     ~description:
       "In a script or data expression, a primitive name is \
        neither uppercase, lowercase or capitalized."
@@ -581,8 +581,8 @@ let () =
        Invalid_case name) ;
   register_error_kind
     `Permanent
-    ~id:"invalidPrimitiveNameTypeErro"
-    ~title: "Invalid primitive name (typechecking error)"
+    ~id:"michelson_v1.invalid_primitive_name"
+    ~title: "Invalid primitive name"
     ~description:
       "In a script or data expression, a primitive name is \
        unknown or has a wrong case."
