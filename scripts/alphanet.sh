@@ -349,9 +349,8 @@ check_endorser() {
     docker_endorser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_endorser-\1_1/g" "$active_protocol_versions")"
     res=$(docker inspect \
                  --format="{{ .State.Running }}" \
-                 --type=container $docker_endorser_containers 2>/dev/null \
-              || echo false)
-    [ "$res" = true ]
+                 --type=container $docker_endorser_containers 2>/dev/null | grep false)
+    [ -z "$res" ]
 }
 
 assert_endorser() {
@@ -415,9 +414,8 @@ check_accuser() {
     docker_accuser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_accuser-\1_1/g" "$active_protocol_versions")"
     res=$(docker inspect \
                  --format="{{ .State.Running }}" \
-                 --type=container $docker_accuser_containers 2>/dev/null \
-              || echo false)
-    [ "$res" = true ]
+                 --type=container $docker_accuser_containers 2>/dev/null | grep false)
+    [ -z "$res" ]
 }
 
 assert_accuser() {
