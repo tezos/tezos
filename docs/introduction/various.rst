@@ -1,6 +1,55 @@
 Various
 =======
 
+.. _activate_fundraiser_account:
+
+Activate fundraiser account - Betanet
+-------------------------------------
+
+If you took part in the fundraiser you can activate your account for
+the Betanet on https://check.tezos.com/.
+This feature is also included in some wallets.
+If you have any question or issue refer to that page or to the `Tezos
+foundation <https://tezosfoundation.ch/>`_ for support.
+
+You may also use ``tezos-client`` to activate your account, **be
+warned that you should have a very good understanding of key
+management in Tezos and be familiar with the command-line.**
+The first step is to recover your private key using the following
+command which will ask for:
+
+- the email address used during the fundraiser
+- the 14 words mnemonic of your paper wallet
+- the password used to protect the paper wallet
+
+::
+
+   tezos-client import fundraiser key alice
+
+Once you insert all the required information, the client computes
+your secret key and it asks to create a new password to store your
+secret key on disk encrypted.
+
+If you haven't already activated your account on the website, you can
+use this command with the activation code obtained from the Tezos
+foundation.
+
+::
+
+   tezos-client activate fundraiser account alice with <code>
+
+Like explained above, your keys are stored under ``~/.tezos-client``.
+We strongly advice you to first **make a backup** and then
+transfer your tokens to a new pair of keys imported from a ledger (see
+`ledger`).
+
+Check the balance with:
+
+::
+
+    tezos-client get balance for alice
+
+
 .. _tezos-admin-client:
 
 Admin Client
