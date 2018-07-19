@@ -69,7 +69,7 @@ let monitor_valid_blocks cctxt ?chains ?protocols ?next_protocols () =
                raw_info cctxt ~chain:(`Hash chain) block shell)
             block_stream)
 
-let monitor_heads cctxt ?next_protocols chain =
+let monitor_heads cctxt ~next_protocols chain =
   Monitor_services.heads
     cctxt ?next_protocols chain >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s

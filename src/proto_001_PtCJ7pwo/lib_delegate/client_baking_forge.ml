@@ -783,10 +783,15 @@ let bake_slot
       None in
   tzforce state.constants >>=? fun Constants.{ parametric = { hard_gas_limit_per_block } } ->
   classify_operations cctxt ?threshold ~hard_gas_limit_per_block ~block operations >>=? fun operations ->
-  (* Don't load an alpha context if the chain is still in genesis *)
-  if Protocol_hash.(Proto_001_PtCJ7pwo.hash <> bi.next_protocol) then
+  let next_version =
+    match Tezos_base.Block_header.get_forced_protocol_upgrade ~level:(Raw_level.to_int32 next_level.Level.level) with
+    | None -> bi.next_protocol
+    | Some hash -> hash
+  in
+  if Protocol_hash.(Proto_001_PtCJ7pwo.hash <> next_version) then
     (* Delegate validation to shell *)
-    shell_prevalidation cctxt ~chain ~block seed_nonce_hash operations slot
+    shell_prevalidation cctxt ~chain ~block seed_nonce_hash
+      (List.sub operations 4) slot
   else
     let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
     filter_and_apply_operations ~timestamp ~protocol_data state bi operations >>= function
