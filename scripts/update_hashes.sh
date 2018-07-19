@@ -42,7 +42,7 @@ new_hash_alpha=`./tezos-protocol-compiler $alpha_tmpdir/tmp $alpha_tmpdir/src | 
 echo "Alpha's new hash: $new_hash_alpha"
 if [ "$current_hash_alpha" != "$new_hash_alpha" ]
 then
-    find src/proto_alpha src/bin_client docs -type f -exec sed "s/$current_hash_alpha/$new_hash_alpha/g" -i {} \;
+    find src/lib_base Makefile src/proto_alpha src/bin_client docs -type f -exec sed "s/$current_hash_alpha/$new_hash_alpha/g" -i {} \;
     git commit -a -m "Update proto Alpha's hash"
 else
     echo "Proto Alpha's hash hasn't changed, nothing to do"
