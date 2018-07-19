@@ -16,16 +16,10 @@ init_sandboxed_client() {
     if [ -n "$USE_TLS" ]; then
         client="$local_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         admin_client="$local_admin_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-        alpha_baker="$local_alpha_baker -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-	alpha_endorser="$local_alpha_endorser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-	alpha_accuser="$local_alpha_accuser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         signer="$local_signer -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
     else
         client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-        alpha_baker="$local_alpha_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-	alpha_endorser="$local_alpha_endorser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-	alpha_accuser="$local_alpha_accuser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         signer="$local_signer -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
     fi
     parameters_file="${parameters_file:-$client_dir/protocol_parameters.json}"
@@ -115,97 +109,6 @@ wait_for_the_node_to_be_bootstraped() {
     $client bootstrapped
 }
 
-## Baker ###################################################################
-
-check_baker() {
-    pids=$(pgrep -x tezos-baker-alpha 2>/dev/null)
-    for pid in $pids; do
-        if grep -- "-max-priority" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
-            return 0
-        fi
-    done
-    return 1
-}
-
-run_baker() {
-    if check_baker; then
-        echo "Cannot run two bakers in the same container."
-        exit 1
-    fi
-    echo "Start baker..."
-    exec $alpha_baker launch daemon -max-priority 64 "$@" > "$client_dir/baker.log"
-}
-
-stop_baker() {
-    pids=$(pgrep -x tezos-baker-alpha 2>/dev/null)
-    for pid in $pids; do
-        if grep -- "-max-priority" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
-            echo "Killing the baker..."
-            kill "$pid"
-        fi
-    done
-}
-
-log_baker() {
-    if ! check_baker ; then
-        echo
-        echo "##############################################"
-        echo "##                                          ##"
-        echo "## Warning: The tezos baker is not running! ##"
-        echo "##                                          ##"
-        echo "##############################################"
-        echo
-        tail "$client_dir/baker.log"
-    else
-        tail -f "$client_dir/baker.log"
-    fi
-}
-
-## Endorser ################################################################
-
-check_endorser() {
-    pids=$(pgrep -x tezos-alpha-endorser 2>/dev/null)
-    for pid in $pids; do
-        if grep -- "tezos-alpha-endorser" "/proc/$pid/cmdline" > /dev/null 2>&1 ; then
-            return 0
-        fi
-    done
-    return 1
-}
-
-run_endorser() {
-    if check_endorser; then
-        echo "Cannot run two endorsers in the same container."
-        exit 1
-    fi
-    echo "Start endorser..."
-    exec $alpha_endorser launch daemon"$@" > "$client_dir/endorser.log"
-}
-
-stop_endorser() {
-    pids=$(pgrep -x tezos-alpha-endorser 2>/dev/null)
-    for pid in $pids; do
-        if grep -- "tezos-alpha-endorser" "/proc/$pid/cmdline" > /dev/null 2>&1 ; then
-            kill "$pid"
-        fi
-    done
-}
-
-log_endorser() {
-    if ! check_endorser ; then
-        echo
-        echo "#################################################"
-        echo "##                                             ##"
-        echo "## Warning: The tezos endorser is not running! ##"
-        echo "##                                             ##"
-        echo "#################################################"
-        echo
-        tail "$client_dir/endorser.log"
-    else
-        tail -f "$client_dir/endorser.log"
-    fi
-}
-
 ## Sandboxed client ########################################################
 
 # key pairs from $src_dir/test/sandbox.json
@@ -267,18 +170,12 @@ main () {
     if [ $(basename "$bin_dir") = "bin_client" ]; then
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
         local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
-        local_alpha_baker="${local_alpha_baker:-$bin_dir/../../_build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe}"
         local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_signer/main_signer.exe}"
-	local_alpha_endorser="${local_alpha_endorser:-$bin_dir/../../_build/default/src/proto_alpha/bin_endorser/main_endorser_alpha.exe}"
-	local_alpha_accuser="${local_alpha_accuser:-$bin_dir/../../_build/default/src/proto_alpha/bin_accuser/main_accuser_alpha.exe}"
         parameters_file="${parameters_file:-$bin_dir/../../scripts/protocol_parameters.json}"
     else
 	# we assume a clean install with tezos-(admin-)client in the path
         local_client="${local_client:-$(which tezos-client)}"
         local_admin_client="${local_admin_client:-$(which tezos-admin-client)}"
-        local_alpha_baker="${local_alpha_baker:-$(which tezos-baker-alpha)}"
-	local_alpha_endorser="${local_alpha_endorser:-$(which tezos-endorser-alpha)}"
-	local_alpha_accuser="${local_alpha_accuser:-$(which tezos-accuser-alpha)}"
         local_signer="${local_signer:-$(which tezos-signer)}"
     fi
 
@@ -301,17 +198,34 @@ main () {
     echo "exec $admin_client \"\$@\""  >> $client_dir/bin/tezos-admin-client
     chmod +x $client_dir/bin/tezos-admin-client
 
-    echo '#!/bin/sh' > $client_dir/bin/tezos-baker-alpha
-    echo "exec $alpha_baker \"\$@\""  >> $client_dir/bin/tezos-baker-alpha
-    chmod +x $client_dir/bin/tezos-baker-alpha
+    for protocol in $(cat $bin_dir/../../active_protocol_versions); do
+        protocol_underscore=$(echo $protocol | tr -- - _)
+        local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
+        local_endorser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_endorser/main_endorser_$protocol_underscore.exe"
+        local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
 
-    echo '#!/bin/sh' > $client_dir/bin/tezos-endorser-alpha
-    echo "exec $alpha_endorser \"\$@\""  >> $client_dir/bin/tezos-endorser-alpha
-    chmod +x $client_dir/bin/tezos-endorser-alpha
+        if [ -n "$USE_TLS" ]; then
+            baker="$local_baker -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+	    endorser="$local_endorser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+	    accuser="$local_accuser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        else
+            baker="$local_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+	    endorser="$local_endorser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+	    accuser="$local_accuser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        fi
 
-    echo '#!/bin/sh' > $client_dir/bin/tezos-accuser-alpha
-    echo "exec $alpha_accuser \"\$@\""  >> $client_dir/bin/tezos-accuser-alpha
-    chmod +x $client_dir/bin/tezos-accuser-alpha
+        echo '#!/bin/sh' > $client_dir/bin/tezos-baker-$protocol
+        echo "exec $baker \"\$@\""  >> $client_dir/bin/tezos-baker-$protocol
+        chmod +x $client_dir/bin/tezos-baker-$protocol
+
+        echo '#!/bin/sh' > $client_dir/bin/tezos-endorser-$protocol
+        echo "exec $endorser \"\$@\""  >> $client_dir/bin/tezos-endorser-$protocol
+        chmod +x $client_dir/bin/tezos-endorser-$protocol
+
+        echo '#!/bin/sh' > $client_dir/bin/tezos-accuser-$protocol
+        echo "exec $accuser \"\$@\""  >> $client_dir/bin/tezos-accuser-$protocol
+        chmod +x $client_dir/bin/tezos-accuser-$protocol
+    done
 
     echo '#!/bin/sh' > $client_dir/bin/tezos-signer
     echo "exec $signer \"\$@\""  >> $client_dir/bin/tezos-signer
