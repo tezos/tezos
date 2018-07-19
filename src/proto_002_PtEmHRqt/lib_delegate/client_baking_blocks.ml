@@ -61,7 +61,7 @@ let info cctxt ?(chain = `Main) block =
     cctxt ~chain ~block () >>=? fun shell_header  ->
   raw_info cctxt ~chain hash shell_header
 
-let monitor_valid_blocks cctxt ?chains ?protocols ?next_protocols () =
+let monitor_valid_blocks cctxt ?chains ?protocols ~next_protocols () =
   Monitor_services.valid_blocks cctxt
     ?chains ?protocols ?next_protocols () >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s

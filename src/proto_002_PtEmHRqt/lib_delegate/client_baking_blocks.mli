@@ -49,7 +49,7 @@ val monitor_valid_blocks:
   #Proto_alpha.rpc_context ->
   ?chains:Chain_services.chain list ->
   ?protocols:Protocol_hash.t list ->
-  ?next_protocols:Protocol_hash.t list ->
+  next_protocols:Protocol_hash.t list option ->
   unit -> block_info tzresult Lwt_stream.t tzresult Lwt.t
 
 val monitor_heads:
