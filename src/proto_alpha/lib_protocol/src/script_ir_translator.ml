@@ -694,6 +694,7 @@ let comparable_ty_eq
     | Int_key _, Int_key _ -> Ok Eq
     | Nat_key _, Nat_key _ -> Ok Eq
     | String_key _, String_key _ -> Ok Eq
+    | Bytes_key _, Bytes_key _ -> Ok Eq
     | Mutez_key _, Mutez_key _ -> Ok Eq
     | Bool_key _, Bool_key _ -> Ok Eq
     | Key_hash_key _, Key_hash_key _ -> Ok Eq
@@ -811,6 +812,9 @@ let merge_comparable_types
     | String_key annot_a, String_key annot_b ->
         merge_type_annot annot_a annot_b >|? fun annot ->
         String_key annot
+    | Bytes_key annot_a, Bytes_key annot_b ->
+        merge_type_annot annot_a annot_b >|? fun annot ->
+        Bytes_key annot
     | Mutez_key annot_a, Mutez_key annot_b ->
         merge_type_annot annot_a annot_b >|? fun annot ->
         Mutez_key annot
