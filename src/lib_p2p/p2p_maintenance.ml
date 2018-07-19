@@ -172,7 +172,7 @@ and too_many_connections st n_connected =
   let Pool pool = st.pool in
   (* too many connections, start the russian roulette *)
   let to_kill = n_connected - st.bounds.max_target in
-  lwt_debug "Too many connections, will kill %d" to_kill >>= fun () ->
+  lwt_log_notice "Too many connections, will kill %d" to_kill >>= fun () ->
   snd @@ P2p_pool.Connection.fold pool
     ~init:(to_kill, Lwt.return_unit)
     ~f:(fun _ conn (i, t) ->
