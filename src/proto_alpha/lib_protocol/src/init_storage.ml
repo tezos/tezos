@@ -58,9 +58,13 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
                     if registered then
                       return ctxt
                     else
-                      Delegate_storage.set ctxt
-                        (Contract_repr.implicit_contract delegate)
-                        (Some delegate))
+                      Contract_storage.get_balance ctxt (Contract_repr.implicit_contract delegate) >>=? fun balance ->
+                      if Tez_repr.(balance <> zero) then
+                        Delegate_storage.set ctxt
+                          (Contract_repr.implicit_contract delegate)
+                          (Some delegate)
+                      else
+                        return ctxt)
 
 let prepare ctxt ~level ~timestamp ~fitness =
   Raw_context.prepare ~level ~timestamp ~fitness ctxt
