@@ -54,7 +54,7 @@ val monitor_valid_blocks:
 
 val monitor_heads:
   #Proto_alpha.rpc_context ->
-  ?next_protocols:Protocol_hash.t list ->
+  next_protocols:Protocol_hash.t list option ->
   Chain_services.chain ->
   block_info tzresult Lwt_stream.t tzresult Lwt.t
 
