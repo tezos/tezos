@@ -70,6 +70,11 @@ sed -i --follow-symlink \
     -e 's/"hash": "[^"]*",/"hash": "'$long_hash'",/' \
     lib_protocol/src/TEZOS_PROTOCOL
 
+sed -i --follow-symlink \
+    -e "s/-genesis/-000-Ps9mPmXa/" \
+    -e "s/_genesis/_000_Ps9mPmXa/" \
+    lib_delegate/test
+
 cd ../..
 
 sed -i --follow-symlink \
