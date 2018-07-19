@@ -36,7 +36,7 @@ echo "Computing the protocol hash..."
 
 cp src/proto_${name}/lib_protocol/src/*.ml src/proto_${name}/lib_protocol/src/*.mli "$alpha_tmpdir"/src/
 grep -v '"hash"' < src/proto_${name}/lib_protocol/src/TEZOS_PROTOCOL > "$alpha_tmpdir"/src/TEZOS_PROTOCOL
-long_hash=`./tezos-protocol-compiler $alpha_tmpdir/tmp $alpha_tmpdir/src | cut -d' ' -f2`
+long_hash=`./tezos-protocol-compiler -hash-only  $alpha_tmpdir/tmp $alpha_tmpdir/src`
 short_hash=$(echo $long_hash | head -c 8)
 
 if [ -d "src/proto_${version}_${short_hash}" ] ; then

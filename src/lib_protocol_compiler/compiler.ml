@@ -150,10 +150,12 @@ let main { compile_ml ; pack_objects ; link_shared } =
   and static = ref false
   and register = ref false
   and build_dir = ref None
-  and output_dep = ref false in
+  and output_dep = ref false
+  and hash_only = ref false in
   let args_spec = [
-    "-static", Arg.Set static, " Only build the static library (no .cmxs)";
-    "-register", Arg.Set register, " Generete the `Registerer` module";
+    "-hash-only", Arg.Set hash_only, " Don't compile" ;
+    "-static", Arg.Set static, " Only build the static library (no .cmxs)" ;
+    "-register", Arg.Set register, " Generete the `Registerer` module" ;
     "-bin-annot", Arg.Set Clflags.binary_annotations, " (see ocamlopt)" ;
     "-g", Arg.Set Clflags.debug, " (see ocamlopt)" ;
     "-output-dep", Arg.Set output_dep, " ..." ;
@@ -182,6 +184,10 @@ let main { compile_ml ; pack_objects ; link_shared } =
     | Error err ->
         Format.kasprintf Pervasives.failwith
           "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err in
+  if !hash_only then begin
+    Format.printf "%a@." Protocol_hash.pp hash ;
+    exit 0
+  end ;
   Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 build_dir) ;
   Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 (Filename.dirname output)) ;
   (* Generate the 'functor' *)
