@@ -1129,8 +1129,14 @@ and swap pool conn current_peer_id new_point =
 
 let accept pool fd point =
   log pool (Incoming_connection point) ;
+  let max_active_conns =
+    if Random.bool () then
+      (* randomly allow one additional incoming connection *)
+      pool.config.max_connections + 1
+    else
+      pool.config.max_connections in
   if pool.config.max_incoming_connections <= P2p_point.Table.length pool.incoming
-  || pool.config.max_connections <= active_connections pool
+  || max_active_conns <= active_connections pool
   (* silently ignore banned points *)
   || (P2p_acl.banned_addr pool.acl (fst point)) then
     Lwt.async (fun () -> P2p_fd.close fd)
