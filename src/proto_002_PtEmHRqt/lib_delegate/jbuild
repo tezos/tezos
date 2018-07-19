@@ -1,14 +1,14 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_baking_alpha)
-  (public_name tezos-baking-alpha)
+ ((name tezos_baking_002_PtEmHRqt)
+  (public_name tezos-baking-002-PtEmHRqt)
   (libraries (tezos-base
-              tezos-protocol-alpha
+              tezos-protocol-002-PtEmHRqt
               tezos-protocol-environment
               tezos-shell-services
               tezos-client-base
-              tezos-client-alpha
+              tezos-client-002-PtEmHRqt
               tezos-client-commands
               tezos-storage
               tezos-rpc))
@@ -21,22 +21,22 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell_services
                     -open Tezos_client_base
-                    -open Tezos_client_alpha
+                    -open Tezos_client_002_PtEmHRqt
                     -open Tezos_client_commands
                     -open Tezos_storage
                     -open Tezos_rpc))))
 
 (library
- ((name tezos_baking_alpha_commands)
-  (public_name tezos-baking-alpha-commands)
+ ((name tezos_baking_002_PtEmHRqt_commands)
+  (public_name tezos-baking-002-PtEmHRqt-commands)
   (libraries (tezos-base
-              tezos-protocol-alpha
+              tezos-protocol-002-PtEmHRqt
               tezos-protocol-environment
               tezos-shell-services
               tezos-client-base
-              tezos-client-alpha
+              tezos-client-002-PtEmHRqt
               tezos-client-commands
-              tezos-baking-alpha))
+              tezos-baking-002-PtEmHRqt))
   (library_flags (:standard -linkall))
   (modules (delegate_commands))
   (flags (:standard -w -9+27-30-32-40@8
@@ -44,23 +44,23 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell_services
                     -open Tezos_client_base
-                    -open Tezos_client_alpha
+                    -open Tezos_client_002_PtEmHRqt
                     -open Tezos_client_commands
-                    -open Tezos_baking_alpha
+                    -open Tezos_baking_002_PtEmHRqt
                     -open Tezos_rpc))))
 
 (library
- ((name tezos_baking_alpha_commands_registration)
-  (public_name tezos-baking-alpha-commands.registration)
+ ((name tezos_baking_002_PtEmHRqt_commands_registration)
+  (public_name tezos-baking-002-PtEmHRqt-commands.registration)
   (libraries (tezos-base
-              tezos-protocol-alpha
+              tezos-protocol-002-PtEmHRqt
               tezos-protocol-environment
               tezos-shell-services
               tezos-client-base
-              tezos-client-alpha
+              tezos-client-002-PtEmHRqt
               tezos-client-commands
-              tezos-baking-alpha
-              tezos-baking-alpha-commands
+              tezos-baking-002-PtEmHRqt
+              tezos-baking-002-PtEmHRqt-commands
               tezos-rpc))
   (library_flags (:standard -linkall))
   (modules (delegate_commands_registration))
@@ -69,10 +69,10 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell_services
                     -open Tezos_client_base
-                    -open Tezos_client_alpha
+                    -open Tezos_client_002_PtEmHRqt
                     -open Tezos_client_commands
-                    -open Tezos_baking_alpha
-                    -open Tezos_baking_alpha_commands
+                    -open Tezos_baking_002_PtEmHRqt
+                    -open Tezos_baking_002_PtEmHRqt_commands
                     -open Tezos_rpc))))
 
 (alias

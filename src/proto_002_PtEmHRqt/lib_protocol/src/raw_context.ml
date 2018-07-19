@@ -307,7 +307,7 @@ let storage_error err = fail (Storage_error err)
 (* This key should always be populated for every version of the
    protocol.  It's absence meaning that the context is empty. *)
 let version_key = ["version"]
-let version_value = "alpha_002"
+let version_value = "${name}_002"
 
 let version = "v1"
 let first_level_key = [ version ; "first_level" ]

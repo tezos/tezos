@@ -8,7 +8,7 @@
     tezos-stdlib-unix
     tezos-shell
     tezos-protocol-updater
-    tezos-embedded-protocol-alpha
+    tezos-embedded-protocol-002-PtEmHRqt
     re))
   (flags (:standard -w -9+27-30-32-40@8
           -safe-string

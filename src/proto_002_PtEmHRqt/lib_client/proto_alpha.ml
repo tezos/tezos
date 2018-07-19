@@ -27,7 +27,7 @@ module Name = struct let name = "alpha" end
 module T = Tezos_protocol_environment.Make(Tezos_storage.Context)
 module Alpha_environment = T.MakeV1(Name)()
 
-module Proto = Tezos_protocol_alpha.Functor.Make(Alpha_environment)
+module Proto = Tezos_protocol_002_PtEmHRqt.Functor.Make(Alpha_environment)
 module Alpha_block_services = Block_services.Make(Proto)(Proto)
 
 include Proto

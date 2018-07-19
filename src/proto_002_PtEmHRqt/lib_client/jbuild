@@ -1,10 +1,10 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_client_alpha)
-  (public_name tezos-client-alpha)
+ ((name tezos_client_002_PtEmHRqt)
+  (public_name tezos-client-002-PtEmHRqt)
   (libraries (tezos-base
-              tezos-protocol-alpha
+              tezos-protocol-002-PtEmHRqt
               tezos-protocol-environment
               tezos-shell-services
               tezos-client-base

@@ -16,7 +16,7 @@ depends: [
   "tezos-protocol-updater"
   "tezos-embedded-protocol-genesis"
   "tezos-embedded-protocol-demo"
-  "tezos-embedded-protocol-alpha"
+  "tezos-embedded-protocol-002-PtEmHRqt"
   "cmdliner"
   "tls"
 ]

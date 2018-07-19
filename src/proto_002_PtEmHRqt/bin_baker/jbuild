@@ -1,17 +1,17 @@
 (jbuild_version 1)
 
 (executable
- ((name main_baker_alpha)
-  (public_name tezos-baker-alpha)
+ ((name main_baker_002_PtEmHRqt)
+  (public_name tezos-baker-002-PtEmHRqt)
   (libraries (tezos-client-base-unix
               tezos-client-commands
-              tezos-baking-alpha-commands))
+              tezos-baking-002-PtEmHRqt-commands))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_client_alpha
+                    -open Tezos_client_002_PtEmHRqt
                     -open Tezos_client_commands
-                    -open Tezos_baking_alpha_commands
+                    -open Tezos_baking_002_PtEmHRqt_commands
                     -open Tezos_client_base_unix))))
 
 (alias
