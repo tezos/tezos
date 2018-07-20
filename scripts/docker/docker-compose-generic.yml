@@ -20,7 +20,7 @@ services:
     image: tezos/tezos:latest
     hostname: baker
     environment:
-      - PROTOCOL=002-PtEmHRqt
+      - PROTOCOL=002-PsYLVpVv
     command: tezos-baker
     links:
       - node
@@ -32,7 +32,7 @@ services:
     image: tezos/tezos:latest
     hostname: endorser
     environment:
-      - PROTOCOL=002-PtEmHRqt
+      - PROTOCOL=002-PsYLVpVv
     command: tezos-endorser
     links:
       - node
@@ -42,9 +42,9 @@ services:
 
   accuser:
     image: tezos/tezos:latest
-    hostname: accuser-PtEmHRqt
+    hostname: accuser-PsYLVpVv
     environment:
-      - PROTOCOL=002-PtEmHRqt
+      - PROTOCOL=002-PsYLVpVv
     command: tezos-accuser
     links:
       - node
