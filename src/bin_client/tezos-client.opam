@@ -19,6 +19,7 @@ depends: [
   "tezos-client-base-unix"
   "tezos-signer-backends"
   "tezos-node" { test }
+  "tezos-protocol-compiler" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]
