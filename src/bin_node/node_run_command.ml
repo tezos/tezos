@@ -33,7 +33,7 @@ let genesis : State.Chain.genesis = {
       "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" ;
   protocol =
     Protocol_hash.of_b58check_exn
-      "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" ;
+      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
 }
 
 type error += Non_private_sandbox of P2p_addr.t

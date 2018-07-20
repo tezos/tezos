@@ -250,7 +250,7 @@ tezos node launched with \`launch-sandboxed-node $1\`. For instance:
   tezos-client rpc get /chains/main/blocks/head/metadata
 
 Note: if the current protocol version, as reported by the previous
-command, is "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P", you
+command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you
 may have to activate in your "sandboxed network" the same economic
 protocol than used by the alphanet by running:
 
