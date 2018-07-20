@@ -17,10 +17,12 @@ init_sandboxed_client() {
         client="$local_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         admin_client="$local_admin_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         signer="$local_signer -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        compiler="$local_compiler"
     else
         client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         signer="$local_signer -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        compiler="$local_compiler"
     fi
     parameters_file="${parameters_file:-$client_dir/protocol_parameters.json}"
 
@@ -172,11 +174,13 @@ main () {
         local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
         local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_signer/main_signer.exe}"
         parameters_file="${parameters_file:-$bin_dir/../../scripts/protocol_parameters.json}"
+        local_compiler="${local_compiler:-$bin_dir/../../_build/default/src/lib_protocol_compiler/main_native.exe}"
     else
 	# we assume a clean install with tezos-(admin-)client in the path
         local_client="${local_client:-$(which tezos-client)}"
         local_admin_client="${local_admin_client:-$(which tezos-admin-client)}"
         local_signer="${local_signer:-$(which tezos-signer)}"
+        local_compiler="${local_compiler:-$(which tezos-protocol-compiler)}"
     fi
 
     if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
