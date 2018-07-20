@@ -10,7 +10,7 @@
               tezos-protocol-environment
               tezos-protocol-000-Ps9mPmXa
               tezos-protocol-001-PtCJ7pwo
-              tezos-protocol-002-PtEmHRqt))
+              tezos-protocol-002-PsYLVpVv))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string

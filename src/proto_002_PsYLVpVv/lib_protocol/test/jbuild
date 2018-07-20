@@ -6,7 +6,7 @@
               tezos-micheline
               tezos-protocol-environment
               alcotest-lwt
-              tezos_002_PtEmHRqt_test_helpers
+              tezos_002_PsYLVpVv_test_helpers
               michelson_parser
               tezos-stdlib-unix
               bip39
@@ -14,30 +14,30 @@
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_micheline
-                    -open Tezos_002_PtEmHRqt_test_helpers
+                    -open Tezos_002_PsYLVpVv_test_helpers
 ))))
 
 (alias
  ((name buildtest)
-  (package tezos-protocol-002-PtEmHRqt)
+  (package tezos-protocol-002-PsYLVpVv)
   (deps (main.exe))))
 
 ; runs only the `Quick tests
 (alias
- ((name runtest_proto_002_PtEmHRqt)
-  (package tezos-protocol-002-PtEmHRqt)
+ ((name runtest_proto_002_PsYLVpVv)
+  (package tezos-protocol-002-PsYLVpVv)
   (action (chdir ${ROOT} (run ${exe:main.exe} -v -q)))))
 
 ; runs both `Quick and `Slow tests
 (alias
  ((name runtest_slow)
-  (package tezos-protocol-002-PtEmHRqt)
+  (package tezos-protocol-002-PsYLVpVv)
   (action (chdir ${ROOT} (run ${exe:main.exe} -v)))))
 
 (alias
  ((name runtest)
-  (package tezos-protocol-002-PtEmHRqt)
-  (deps ((alias runtest_proto_002_PtEmHRqt)))))
+  (package tezos-protocol-002-PsYLVpVv)
+  (deps ((alias runtest_proto_002_PsYLVpVv)))))
 
 (alias
  ((name runtest_indent)

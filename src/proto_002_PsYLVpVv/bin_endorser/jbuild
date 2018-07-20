@@ -1,17 +1,17 @@
 (jbuild_version 1)
 
 (executable
- ((name main_endorser_002_PtEmHRqt)
-  (public_name tezos-endorser-002-PtEmHRqt)
+ ((name main_endorser_002_PsYLVpVv)
+  (public_name tezos-endorser-002-PsYLVpVv)
   (libraries (tezos-client-base-unix
               tezos-client-commands
-              tezos-baking-002-PtEmHRqt-commands))
+              tezos-baking-002-PsYLVpVv-commands))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_client_002_PtEmHRqt
+                    -open Tezos_client_002_PsYLVpVv
                     -open Tezos_client_commands
-                    -open Tezos_baking_002_PtEmHRqt_commands
+                    -open Tezos_baking_002_PsYLVpVv_commands
                     -open Tezos_client_base_unix))))
 
 (alias

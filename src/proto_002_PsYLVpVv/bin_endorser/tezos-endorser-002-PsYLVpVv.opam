@@ -12,11 +12,11 @@ depends: [
   "tezos-base"
   "tezos-client-base"
   "tezos-client-000-Ps9mPmXa"
-  "tezos-client-002-PtEmHRqt"
+  "tezos-client-002-PsYLVpVv"
   "tezos-client-commands"
   "tezos-client-base-unix"
-  "tezos-baking-002-PtEmHRqt"
-  "tezos-baking-002-PtEmHRqt-commands"
+  "tezos-baking-002-PsYLVpVv"
+  "tezos-baking-002-PsYLVpVv-commands"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

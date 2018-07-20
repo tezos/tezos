@@ -4,12 +4,12 @@
  ((name error_doc)
   (libraries
    (tezos-shell
-    tezos-client-002-PtEmHRqt))
+    tezos-client-002-PsYLVpVv))
   (flags (:standard -w -9+27-30-32-40@8
           -open Tezos_base
           -open Tezos_error_monad
           -open Tezos_data_encoding
-          -open Tezos_client_002_PtEmHRqt
+          -open Tezos_client_002_PsYLVpVv
           -safe-string
           -linkall))))
 

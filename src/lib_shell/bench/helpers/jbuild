@@ -1,12 +1,12 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_002_PtEmHRqt_bench_helpers)
+ ((name tezos_002_PsYLVpVv_bench_helpers)
   (libraries (tezos-base
               tezos-stdlib-unix
               tezos-shell-services
               tezos-protocol-environment
-              tezos-protocol-002-PtEmHRqt
+              tezos-protocol-002-PsYLVpVv
               alcotest-lwt))
   (flags (:standard -w -9-32 -safe-string
           -open Tezos_base__TzPervasives

@@ -17,7 +17,7 @@ depends: [
   "tezos-embedded-protocol-000-Ps9mPmXa"
   "tezos-embedded-protocol-demo"
   "tezos-embedded-protocol-001-PtCJ7pwo"
-  "tezos-embedded-protocol-002-PtEmHRqt"
+  "tezos-embedded-protocol-002-PsYLVpVv"
   "cmdliner"
   "tls"
 ]
