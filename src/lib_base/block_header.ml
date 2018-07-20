@@ -110,7 +110,7 @@ let hash block = Block_hash.hash_bytes [to_bytes block]
 let hash_raw bytes = Block_hash.hash_bytes [bytes]
 
 let forced_protocol_upgrades : (Int32.t * Protocol_hash.t) list = [
-  28082l, Protocol_hash.of_b58check_exn "PtEmHRqt3kXSVZ26NGJGdQem5RbTBWNYqox82VyHvkvXGoCW52C" ;
+  28082l, Protocol_hash.of_b58check_exn "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt" ;
 ]
 
 module LevelMap =
