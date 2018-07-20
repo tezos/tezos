@@ -16,11 +16,11 @@ services:
 
   ## Duplicate the `baker/endorser/accuser` containers for each PROTOCOL
   ## in file `active_protocol_versions`
-  baker-alpha:
+  baker:
     image: tezos/tezos:latest
-    hostname: baker-alpha
+    hostname: baker
     environment:
-      - PROTOCOL=alpha
+      - PROTOCOL=002-PtEmHRqt
     command: tezos-baker
     links:
       - node
@@ -28,11 +28,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  endorser-alpha:
+  endorser:
     image: tezos/tezos:latest
-    hostname: endorser-alpha
+    hostname: endorser
     environment:
-      - PROTOCOL=alpha
+      - PROTOCOL=002-PtEmHRqt
     command: tezos-endorser
     links:
       - node
@@ -40,11 +40,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  accuser-alpha:
+  accuser:
     image: tezos/tezos:latest
-    hostname: accuser-alpha
+    hostname: accuser-PtEmHRqt
     environment:
-      - PROTOCOL=alpha
+      - PROTOCOL=002-PtEmHRqt
     command: tezos-accuser
     links:
       - node
