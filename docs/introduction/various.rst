@@ -20,6 +20,90 @@ A useful command to debug a node that is not syncing is:
    tezos-admin-client p2p stat
 
 
+.. _ledger:
+
+Ledger support
+--------------
+
+**Disclaimer:** Ledger support is still in development, **the current app
+doesn't show all the needed information** for signing securely.
+Check frequently for updates.
+
+It is possible and advised to use a hardware wallet to manage your
+keys, Tezos' client supports the Ledger Nano S provided that you have
+the Tezos app installed.
+The app is developed by Obsidian Systems and they provide a comprehensive
+`tutorial on how to install it.
+<https://github.com/obsidiansystems/ledger-app-tezos>`_
+
+Ledger Manager
+~~~~~~~~~~~~~~
+
+The preferred way to set up your Ledger is to install the `Ledger
+Manager extension
+<https://chrome.google.com/webstore/detail/ledger-manager/beimhnaefocolcplfimocfiaiefpkgbf>`_
+on a Chrome browser.
+On Linux makes sure you correctly set up your `udev` rules as explained
+`here <https://github.com/obsidiansystems/ledger-app-tezos#udev-rules-linux-only>`_.
+Connect your ledger, unlock it and go the dashboard.
+In the Ledger Manager enable `developer items` in the bottom right,
+install `Tezos Wallet` from the applications list and open it on the
+device.
+
+
+Tezos Wallet app
+~~~~~~~~~~~~~~~~
+
+Now on the client we can import the keys (make sure the device is
+in the Tezos Wallet app):
+
+::
+
+   ./tezos-client list connected ledgers
+
+You can follow the instructions to import the ledger private key and
+you can choose between the root or a derived address.
+We can confirm the addition by listing known addresses.
+
+::
+
+   ./tezos-client import secret key my_ledger ledger://tz1XXXXXXXXXX
+   ./tezos-client list known addresses
+
+Optional: we can check that our ledger signs correctly using the
+following command and confirming on the device:
+
+::
+
+   tezos-client show ledger path ledger://tz1XXXXXXXXXX
+
+The address can now be used as any other with the exception that
+during an operation the device will prompt you to confirm when it's
+time to sign an operation.
+
+
+Tezos Baking app
+~~~~~~~~~~~~~~~~
+
+In Ledger Manager there is also a `Tezos Baking` app which allows a
+delegate to sign non-interactively e.g. there is no need to
+manually sign every block or endorsement.
+The application however is restricted to sign exclusively blocks and
+endorsement operations; it is not possible to sign for example a
+transfer.
+Furthermore the application keeps track of the last level baked and allows
+only to bake for increasing levels.
+This prevents signing blocks at levels below the latest
+block signed.
+
+If you have tried the app on Alphanet or Zeronet and want to change
+network you might need to reset this level with the command:
+
+::
+
+   tezos-client set ledger high watermark for ledger://tz1XXXXXXXXXX to 0
+
+
 Use sandboxed mode
 ------------------
 
