@@ -68,6 +68,7 @@
                     ${bin:tezos-init-sandboxed-client.sh}
                     ${bin:tezos-client}
                     ${bin:tezos-admin-client}
+                    ${bin:tezos-protocol-compiler}
                     ))))
 
 (alias
