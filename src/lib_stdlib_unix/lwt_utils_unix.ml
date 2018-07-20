@@ -237,12 +237,7 @@ module Protocol = struct
       match meta.expected_env_version with
       | None -> V1
       | Some v -> v in
-    let protocol = { expected_env ; components } in
-    let hash =
-      match meta.hash with
-      | None -> hash protocol
-      | Some hash -> hash in
-    return (hash, protocol)
+    return (meta.hash, { expected_env ; components })
 
   open Lwt.Infix
 

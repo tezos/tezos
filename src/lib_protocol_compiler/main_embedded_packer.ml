@@ -28,7 +28,10 @@ let version = Sys.argv.(2)
 
 let hash, sources =
   match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir srcdir) with
-  | Ok v -> v
+  | Ok (None, proto) ->
+      (Protocol.hash proto, proto)
+  | Ok (Some hash, proto) ->
+      (hash, proto)
   | Error err ->
       Format.kasprintf Pervasives.failwith
         "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err
