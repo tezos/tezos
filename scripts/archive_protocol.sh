@@ -21,27 +21,15 @@ if [ -z "$version" ] ; then
     exit 1
 fi
 
-alpha_tmpdir=`mktemp -d`
-
-cleanup () {
-    set +e
-    echo Cleaning up...
-    [ ! -d "$alpha_tmpdir" ] || rm -rf "$alpha_tmpdir"
-}
-trap cleanup EXIT INT
-
-mkdir "$alpha_tmpdir"/src
-
 current_hash_alpha=`jq '.hash' < src/proto_$dir_name/lib_protocol/src/TEZOS_PROTOCOL | tr -d '"'`
 
 echo "Computing the protocol hash..."
 
-cp src/proto_${dir_name}/lib_protocol/src/*.ml src/proto_${dir_name}/lib_protocol/src/*.mli "$alpha_tmpdir"/src/
 sed -i --follow-symlink \
     -e 's/let version_value = "[^"]*"/let version_value = "'${name}'_'${version}'"/' \
-    "$alpha_tmpdir"/src/raw_context.ml
-grep -v '"hash"' < src/proto_${dir_name}/lib_protocol/src/TEZOS_PROTOCOL > "$alpha_tmpdir"/src/TEZOS_PROTOCOL
-long_hash=`./tezos-protocol-compiler -hash-only  $alpha_tmpdir/tmp $alpha_tmpdir/src`
+    src/proto_${dir_name}/lib_protocol/src/raw_context.ml
+
+long_hash=`./tezos-protocol-compiler -hash-only src/proto_${dir_name}/lib_protocol/src`
 short_hash=$(echo $long_hash | head -c 8)
 
 if [ -d "src/proto_${version}_${short_hash}" ] ; then
@@ -73,11 +61,6 @@ sed -i --follow-symlink \
     $(find -name \*.ml -or -name \*.mli) \
     ../$proto_genesis_dir/lib_client/proto_alpha.ml \
     ../lib_shell/bench/helpers/proto_alpha.ml
-
-sed -i --follow-symlink \
-    -e 's/let name = "[^"]*"/let name = "'${name}'_'${version}'"/' \
-    lib_client/proto_alpha.ml \
-    lib_protocol/test/helpers/proto_alpha.ml
 
 sed -i --follow-symlink \
     -e 's/let version_value = "[^"]*"/let version_value = "'${name}'_'${version}'"/' \
