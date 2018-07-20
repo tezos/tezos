@@ -510,7 +510,6 @@ let prim_encoding =
     ("SOURCE", I_SOURCE) ;
     ("SENDER", I_SENDER) ;
     ("SELF", I_SELF) ;
-    ("SLICE", I_SLICE) ;
     ("STEPS_TO_QUOTA", I_STEPS_TO_QUOTA) ;
     ("SUB", I_SUB) ;
     ("SWAP", I_SWAP) ;
@@ -547,7 +546,9 @@ let prim_encoding =
     ("timestamp", T_timestamp) ;
     ("unit", T_unit) ;
     ("operation", T_operation) ;
-    ("address", T_address) ]
+    ("address", T_address) ;
+    (* Alpha_002 addition *)
+    ("SLICE", I_SLICE) ]
 
 let () =
   register_error_kind
