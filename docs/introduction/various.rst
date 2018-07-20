@@ -104,6 +104,38 @@ network you might need to reset this level with the command:
    tezos-client set ledger high watermark for ledger://tz1XXXXXXXXXX to 0
 
 
+.. _private-mode:
+
+Private node
+------------
+
+The node can be set in private mode with the option ``--private-mode``
+so that:
+
+- it doesn't connects to any peer other than those provided with
+  ``--peer`` or in bootstrap-peers
+- the peers connected to a private node don't include it in the list
+  of peers sent to their neighborhood
+
+This feature is especially useful to hide a sensitive node that signs
+operations.
+
+For example we could have a set up with two nodes, a private one
+connected uniquely with a public one.
+The public node runs on a VPS, connects normally to the network and
+keeps a up to date state of the network while the private node runs at
+your home and is in charge of injecting and signing operations with a
+hardware wallet.
+
+::
+
+   tezos-node run --rpc-addr [::] --private-mode \
+                                  --no-bootstrap-peers \
+                                  --bootstrap-threshold=1 \
+                                  --connections 1 \
+                                  --peer <public-node-ip>
+
+
 Use sandboxed mode
 ------------------
 
