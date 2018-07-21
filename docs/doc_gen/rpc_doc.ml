@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let protocols = [
-  "Alpha", "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic" ;
+  "Alpha", "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" ;
 ]
 
 let pp_name ppf = function

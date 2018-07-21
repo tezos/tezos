@@ -52,7 +52,7 @@ $(addsuffix .test,${PACKAGES}): %.test:
 
 doc-html: all
 	@jbuilder build @doc ${DEV}
-	@./tezos-client -protocol PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic man -verbosity 3 -format html | sed "s/$HOME/\$HOME/g" > docs/api/tezos-client.html
+	@./tezos-client -protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK man -verbosity 3 -format html | sed "s/$HOME/\$HOME/g" > docs/api/tezos-client.html
 	@./tezos-admin-client man -verbosity 3 -format html | sed "s/$HOME/\$HOME/g" > docs/api/tezos-admin-client.html
 	@mkdir -p $$(pwd)/docs/_build/api/odoc
 	@rm -rf $$(pwd)/docs/_build/api/odoc/*

@@ -804,12 +804,12 @@ is, concatenate or splice them, and use them as keys.
 
 -  ``SLICE``: String access.
 
-    :: nat : nat : string : 'S   ->  string : 'S
+    :: nat : nat : string : 'S   ->  option string : 'S
 
-    > SLICE / offset : length : s : S  =>  ss : S
+    > SLICE / offset : length : s : S  =>  Some ss : S
        where ss is the substring of s at the given offset and of the given length
          iff offset and (offset + length) are in bounds
-    > SLICE / offset : length : s : S  =>  "" : S
+    > SLICE / offset : length : s : S  =>  None  : S
          iff offset or (offset + length) are out of bounds
 
 -  ``COMPARE``: Lexicographic comparison.
@@ -1509,12 +1509,12 @@ the wild and untyped outside world.
 
 -  ``SLICE``: Bytes access.
 
-    :: nat : nat : bytes : 'S   -> string : 'S
+    :: nat : nat : bytes : 'S   -> option string : 'S
 
-    > SLICE / offset : length : s : S  =>  ss : S
+    > SLICE / offset : length : s : S  =>  Some ss : S
        where ss is the substring of s at the given offset and of the given length
          iff offset and (offset + length) are in bounds
-    > SLICE / offset : length : s : S  =>  0x : S
+    > SLICE / offset : length : s : S  =>  None : S
          iff offset or (offset + length) are out of bounds
 
 -  ``COMPARE``: Lexicographic comparison.

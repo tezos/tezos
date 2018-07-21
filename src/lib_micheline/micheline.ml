@@ -141,7 +141,9 @@ let rec map_node fl fp = function
   | Prim (loc, name, seq, annots) ->
       Prim (fl loc, fp name, List.map (map_node fl fp) seq, annots)
 
-let canonical_encoding ~variant prim_encoding =
+type semantics = V0 | V1
+
+let internal_canonical_encoding ~semantics ~variant prim_encoding =
   let open Data_encoding in
   let int_encoding =
     obj1 (req "int" z) in
@@ -171,14 +173,16 @@ let canonical_encoding ~variant prim_encoding =
       (fun args -> Seq (0, args)) in
   let annots_encoding =
     let split s =
-      let annots = String.split_on_char ' ' s in
-      List.iter (fun a ->
-          if String.length a > 255 then failwith "Oversized annotation"
-        ) annots;
-      if String.concat " " annots <> s then
-        failwith "Invalid annotation string, \
-                  must be a sequence of valid annotations with spaces" ;
-      annots in
+      if s = "" && semantics <> V0 then []
+      else
+        let annots = String.split_on_char ' ' s in
+        List.iter (fun a ->
+            if String.length a > 255 then failwith "Oversized annotation"
+          ) annots;
+        if String.concat " " annots <> s then
+          failwith "Invalid annotation string, \
+                    must be a sequence of valid annotations with spaces" ;
+        annots in
     splitted
       ~json:(list (Bounded.string 255))
       ~binary:(conv (String.concat " ") split string) in
@@ -267,6 +271,13 @@ let canonical_encoding ~variant prim_encoding =
     (function Canonical node -> node)
     (fun node -> strip_locations node)
     node_encoding
+
+let canonical_encoding ~variant prim_encoding =
+  internal_canonical_encoding ~semantics:V1 ~variant prim_encoding
+let canonical_encoding_v1 ~variant prim_encoding =
+  internal_canonical_encoding ~semantics:V1 ~variant prim_encoding
+let canonical_encoding_v0 ~variant prim_encoding =
+  internal_canonical_encoding ~semantics:V0 ~variant prim_encoding
 
 let table_encoding ~variant location_encoding prim_encoding =
   let open Data_encoding in

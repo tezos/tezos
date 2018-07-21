@@ -51,7 +51,9 @@ end
 module Accuser = struct
 
   let run (cctxt : #Proto_alpha.full) ~preserved_levels =
-    Client_baking_blocks.monitor_valid_blocks cctxt ~chains:[ `Main ] () >>=? fun valid_blocks_stream ->
+    Client_baking_blocks.monitor_valid_blocks
+      ~next_protocols:(Some [Proto_alpha.hash])
+      cctxt ~chains:[ `Main ] () >>=? fun valid_blocks_stream ->
     Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream >>=? fun () ->
     return_unit
 

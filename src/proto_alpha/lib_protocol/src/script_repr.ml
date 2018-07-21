@@ -35,8 +35,10 @@ type lazy_expr = expr Data_encoding.lazy_t
 
 type node = (location, Michelson_v1_primitives.prim) Micheline.node
 
+
+
 let expr_encoding =
-  Micheline.canonical_encoding
+  Micheline.canonical_encoding_v1
     ~variant:"michelson_v1"
     Michelson_v1_primitives.prim_encoding
 

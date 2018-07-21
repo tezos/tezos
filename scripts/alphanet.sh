@@ -349,9 +349,8 @@ check_endorser() {
     docker_endorser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_endorser-\1_1/g" "$active_protocol_versions")"
     res=$(docker inspect \
                  --format="{{ .State.Running }}" \
-                 --type=container $docker_endorser_containers 2>/dev/null \
-              || echo false)
-    [ "$res" = true ]
+                 --type=container $docker_endorser_containers 2>/dev/null | grep false)
+    [ -z "$res" ]
 }
 
 assert_endorser() {
@@ -399,11 +398,11 @@ log_endorser() {
 }
 
 stop_endorser() {
-    if ! check_baker; then
-        echo -e "\033[31mNo baker to kill!\033[0m"
+    if ! check_endorser; then
+        echo -e "\033[31mNo endorser to kill!\033[0m"
         exit 1
     fi
-    echo -e "\033[32mStopping the baker...\033[0m"
+    echo -e "\033[32mStopping the endorser...\033[0m"
     call_docker_compose stop $endorsers
 }
 
@@ -415,9 +414,8 @@ check_accuser() {
     docker_accuser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_accuser-\1_1/g" "$active_protocol_versions")"
     res=$(docker inspect \
                  --format="{{ .State.Running }}" \
-                 --type=container $docker_accuser_containers 2>/dev/null \
-              || echo false)
-    [ "$res" = true ]
+                 --type=container $docker_accuser_containers 2>/dev/null | grep false)
+    [ -z "$res" ]
 }
 
 assert_accuser() {
@@ -465,11 +463,11 @@ log_accuser() {
 }
 
 stop_accuser() {
-    if ! check_baker; then
-        echo -e "\033[31mNo baker to kill!\033[0m"
+    if ! check_accuser; then
+        echo -e "\033[31mNo accuser to kill!\033[0m"
         exit 1
     fi
-    echo -e "\033[32mStopping the baker...\033[0m"
+    echo -e "\033[32mStopping the accuser...\033[0m"
     call_docker_compose stop $accusers
 }
 

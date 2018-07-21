@@ -150,10 +150,16 @@ let main { compile_ml ; pack_objects ; link_shared } =
   and static = ref false
   and register = ref false
   and build_dir = ref None
-  and output_dep = ref false in
+  and output_file = ref None
+  and output_dep = ref false
+  and hash_only = ref false
+  and check_protocol_hash = ref true in
   let args_spec = [
-    "-static", Arg.Set static, " Only build the static library (no .cmxs)";
-    "-register", Arg.Set register, " Generete the `Registerer` module";
+    "-o", Arg.String (fun s -> output_file := Some s), "" ;
+    "-hash-only", Arg.Set hash_only, " Only display the hash of the protocol and don't compile" ;
+    "-no-hash-check", Arg.Clear check_protocol_hash, " Don't check that TEZOS_PROTOCOL declares the expected protocol hash (if existent)" ;
+    "-static", Arg.Set static, " Only build the static library (no .cmxs)" ;
+    "-register", Arg.Set register, " Generete the `Registerer` module" ;
     "-bin-annot", Arg.Set Clflags.binary_annotations, " (see ocamlopt)" ;
     "-g", Arg.Set Clflags.debug, " (see ocamlopt)" ;
     "-output-dep", Arg.Set output_dep, " ..." ;
@@ -162,13 +168,38 @@ let main { compile_ml ; pack_objects ; link_shared } =
   ] in
   let usage_msg =
     Printf.sprintf
-      "Usage: %s [options] <out> <srcdir>\nOptions are:"
+      "Usage: %s [options] <srcdir>\nOptions are:"
       Sys.argv.(0) in
   Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
-  let (output, source_dir) =
+  let source_dir =
     match List.rev !anonymous with
-    | [ output ; protocol_dir ] -> output, protocol_dir
+    | [ protocol_dir ] -> protocol_dir
     | _ -> Arg.usage args_spec usage_msg ; Pervasives.exit 1 in
+  let announced_hash, protocol =
+    match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir source_dir) with
+    | Ok (hash, proto) -> (hash, proto)
+    | Error err ->
+        Format.eprintf
+          "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err ;
+        exit 2 in
+  let real_hash = Protocol.hash protocol in
+  if !hash_only then begin
+    Format.printf "%a@." Protocol_hash.pp real_hash ;
+    exit 0 ;
+  end ;
+  let hash =
+    match announced_hash with
+    | None -> real_hash
+    | Some hash
+      when !check_protocol_hash && not (Protocol_hash.equal real_hash hash) ->
+        Format.eprintf
+          "Inconsistent hash for protocol in TEZOS_PROTOCOL.@\n\
+           Found: %a@\n\
+           Expected: %a@."
+          Protocol_hash.pp hash
+          Protocol_hash.pp real_hash ;
+        exit 2
+    | Some hash -> hash in
   let build_dir =
     match !build_dir with
     | None ->
@@ -176,12 +207,10 @@ let main { compile_ml ; pack_objects ; link_shared } =
         at_exit (fun () -> Lwt_main.run (Lwt_utils_unix.remove_dir dir)) ;
         dir
     | Some dir -> dir in
-  let hash, protocol =
-    match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir source_dir) with
-    | Ok v -> v
-    | Error err ->
-        Format.kasprintf Pervasives.failwith
-          "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err in
+  let output =
+    match !output_file with
+    | Some output -> output
+    | None -> Format.asprintf "proto_%a" Protocol_hash.pp hash in
   Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 build_dir) ;
   Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 (Filename.dirname output)) ;
   (* Generate the 'functor' *)
@@ -250,5 +279,5 @@ let main { compile_ml ; pack_objects ; link_shared } =
     Format.printf "let intf_digest = %S ;;\n" (Digest.to_hex dintf)
   end ;
 
-  Format.printf "Success: %a@." Protocol_hash.pp hash
+  Format.printf "Success: %a.@." Protocol_hash.pp hash
 

@@ -75,6 +75,13 @@ val canonical_location_encoding : canonical_location Data_encoding.encoding
     different primitive encodings are used in the same schema. *)
 val canonical_encoding : variant:string -> 'l Data_encoding.encoding -> 'l canonical Data_encoding.encoding
 
+(** Old version of {!canonical_encoding} for retrocompatibility.
+    Do not use in new code. *)
+val canonical_encoding_v0 : variant:string -> 'l Data_encoding.encoding -> 'l canonical Data_encoding.encoding
+
+(** Alias for {!canonical_encoding}. *)
+val canonical_encoding_v1 : variant:string -> 'l Data_encoding.encoding -> 'l canonical Data_encoding.encoding
+
 (** Compute the canonical form of an expression.
     Drops the concrete locations completely. *)
 val strip_locations : (_, 'p) node -> 'p canonical

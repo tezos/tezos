@@ -255,11 +255,11 @@ activating the whole network. For instance:
 ::
 
     $ tezos-client rpc get /chains/main/blocks/head/metadata/next_protocol_hash
-    { "protocol": "Ps6mwMrF2ER2s51cp9yYpjDcuzQjsc2yAz8bQsRgdaRxw4Fk95H" }
+    { "protocol": "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" }
     $ tezos-activate-alpha
     Injected BMBcK869jaHQDc
     $ tezos-client rpc get /chains/main/blocks/head/metadata/next_protocol_hash
-    { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic" }
+    { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" }
 
 Tune protocol alpha parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

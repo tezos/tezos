@@ -2769,7 +2769,7 @@ Protocol Alpha
             </div>
   <div id="GET_..--block_idoutput" class="GET_..--block_id tabcontent">
     <pre>
-    { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+    { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
       "chain_id": string /* Network identifier (Base58Check-encoded) */,
       "hash": string /* A block identifier (Base58Check-encoded) */,
       "header": $raw_block_header,
@@ -2799,8 +2799,8 @@ Protocol Alpha
           string
           /* A Secp256k1 or Ed25519 signature (Base58Check-encoded) */ }
     $block_header_metadata:
-      { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
-        "next_protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+      { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
+        "next_protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
         "test_chain_status":
           /* Test chain status */
           { "status": "not_running" }
@@ -2962,7 +2962,7 @@ Protocol Alpha
            "args": [ $micheline.michelson_v1.expression ... ],
            "annot"?: string }
     $operation:
-      { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+      { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
         "chain_id": string /* Network identifier (Base58Check-encoded) */,
         "hash": string /* A Tezos operation ID (Base58Check-encoded) */,
         "branch": string /* A block identifier (Base58Check-encoded) */,
@@ -2990,7 +2990,7 @@ Protocol Alpha
       || { "kind": "origination",
            "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -3118,7 +3118,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -4598,7 +4598,7 @@ Protocol Alpha
     <pre>
     $block_header
     $block_header:
-      { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+      { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
         "chain_id": string /* Network identifier (Base58Check-encoded) */,
         "hash": string /* A block identifier (Base58Check-encoded) */,
         "level": integer ∈ [-2^31-2, 2^31+2],
@@ -4640,7 +4640,7 @@ Protocol Alpha
             </div>
   <div id="GET_..--block_id--header--protocol_dataoutput" class="GET_..--block_id--header--protocol_data tabcontent">
     <pre>
-    { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+    { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
       "priority": integer ∈ [0, 2^16-1],
       "proof_of_work_nonce": /^[a-zA-Z0-9]+$/,
       "seed_nonce_hash"?: string /* A nonce hash (Base58Check-encoded) */,
@@ -5187,7 +5187,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -5611,7 +5611,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -5662,7 +5662,7 @@ Protocol Alpha
   <div id="POST_..--block_id--helpers--preapply--blockinput" class="POST_..--block_id--helpers--preapply--block tabcontent">
     <pre>
     { "protocol_data":
-        { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+        { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
           "priority": integer ∈ [0, 2^16-1],
           "proof_of_work_nonce": /^[a-zA-Z0-9]+$/,
           "seed_nonce_hash"?: string /* A nonce hash (Base58Check-encoded) */,
@@ -5812,7 +5812,7 @@ Protocol Alpha
            "annot"?: string }
     $next_operation:
       /* Operations param */
-      { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+      { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
         "branch": string /* A block identifier (Base58Check-encoded) */,
         "contents": [ $operation.alpha.contents ... ],
         "signature"?:
@@ -5898,7 +5898,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -6157,7 +6157,7 @@ Protocol Alpha
            "annot"?: string }
     $next_operation:
       /* Operations param */
-      { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+      { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
         "branch": string /* A block identifier (Base58Check-encoded) */,
         "contents": [ $operation.alpha.contents ... ],
         "signature"?:
@@ -6243,7 +6243,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -6441,7 +6441,7 @@ Protocol Alpha
       || { "kind": "origination",
            "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -6569,7 +6569,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -7150,7 +7150,7 @@ Protocol Alpha
       || { "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
            "kind": "origination",
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -7471,7 +7471,7 @@ Protocol Alpha
       || { "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
            "kind": "origination",
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -7633,8 +7633,8 @@ Protocol Alpha
     <pre>
     { "type_map":
         [ { "location": $micheline.location,
-            "stack_before": [ $micheline.michelson_v1.expression ... ],
-            "stack_after": [ $micheline.michelson_v1.expression ... ] } ... ],
+            "stackBefore": [ $micheline.michelson_v1.expression ... ],
+            "stackAfter": [ $micheline.michelson_v1.expression ... ] } ... ],
       "gas": $bignum || "unaccounted" }
     $bignum:
       /* Big number
@@ -7924,8 +7924,8 @@ Protocol Alpha
     <pre>
     $block_header_metadata
     $block_header_metadata:
-      { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
-        "next_protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+      { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
+        "next_protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
         "test_chain_status":
           /* Test chain status */
           { "status": "not_running" }
@@ -8084,7 +8084,7 @@ Protocol Alpha
             </div>
   <div id="GET_..--block_id--metadata--protocol_dataoutput" class="GET_..--block_id--metadata--protocol_data tabcontent">
     <pre>
-    { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+    { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
       "baker":
         string
         /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
@@ -8375,7 +8375,7 @@ Protocol Alpha
            "args": [ $micheline.michelson_v1.expression ... ],
            "annot"?: string }
     $operation:
-      { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+      { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
         "chain_id": string /* Network identifier (Base58Check-encoded) */,
         "hash": string /* A Tezos operation ID (Base58Check-encoded) */,
         "branch": string /* A block identifier (Base58Check-encoded) */,
@@ -8403,7 +8403,7 @@ Protocol Alpha
       || { "kind": "origination",
            "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -8531,7 +8531,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -8831,7 +8831,7 @@ Protocol Alpha
            "args": [ $micheline.michelson_v1.expression ... ],
            "annot"?: string }
     $operation:
-      { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+      { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
         "chain_id": string /* Network identifier (Base58Check-encoded) */,
         "hash": string /* A Tezos operation ID (Base58Check-encoded) */,
         "branch": string /* A block identifier (Base58Check-encoded) */,
@@ -8859,7 +8859,7 @@ Protocol Alpha
       || { "kind": "origination",
            "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -8987,7 +8987,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -9287,7 +9287,7 @@ Protocol Alpha
            "args": [ $micheline.michelson_v1.expression ... ],
            "annot"?: string }
     $operation:
-      { "protocol": "PtFzWdMuHY3HtXAtn3ejVmn2HPMStisERNp6i72NYyTdsW6YXic",
+      { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
         "chain_id": string /* Network identifier (Base58Check-encoded) */,
         "hash": string /* A Tezos operation ID (Base58Check-encoded) */,
         "branch": string /* A block identifier (Base58Check-encoded) */,
@@ -9315,7 +9315,7 @@ Protocol Alpha
       || { "kind": "origination",
            "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -9443,7 +9443,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "manager_pubkey":
+           "managerPubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":

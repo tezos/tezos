@@ -42,7 +42,6 @@ let run blkid =
   in
 
   (* files and directories that are in context *)
-  let version = Key (MBytes.of_hex (`Hex "616c7068615f303032")) in
   let dir_depth0 = Cut in
   let dir_depth2 = Dir [("02", Dir [("29", Cut)]);
                         ("a9", Dir [("ce", Cut)]);
@@ -51,8 +50,7 @@ let run blkid =
                         ("e7", Dir [("67", Cut)]);
                        ] in
 
-  let tests = [((["version"],1), is_equal version);
-               (([""],0), is_equal dir_depth0);
+  let tests = [(([""],0), is_equal dir_depth0);
                ((["delegates";"ed25519"],2), is_equal dir_depth2);
                (* (([""],-1), is_not_found); *)
                ((["not-existent"],1), is_not_found);

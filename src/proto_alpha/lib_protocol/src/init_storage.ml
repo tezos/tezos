@@ -58,8 +58,9 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
                     if registered then
                       return ctxt
                     else
-                      Contract_storage.get_balance ctxt (Contract_repr.implicit_contract delegate) >>=? fun balance ->
-                      if Tez_repr.(balance <> zero) then
+                      Contract_storage.is_manager_key_revealed
+                        ctxt (Contract_repr.implicit_contract delegate) >>=? fun revealed ->
+                      if revealed then
                         Delegate_storage.set ctxt
                           (Contract_repr.implicit_contract delegate)
                           (Some delegate)

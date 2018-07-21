@@ -13,7 +13,6 @@ $client -w none config update
 sleep 2
 
 #tests for the rpc service raw_context
-$client rpc get '/chains/main/blocks/head/context/raw/bytes/version' | assert '"616c7068615f303032"'
 $client rpc get '/chains/main/blocks/head/context/raw/bytes/non-existent' | assert 'No service found at this URL'
 $client rpc get '/chains/main/blocks/head/context/raw/bytes/delegates/?depth=3' | assert '{ "ed25519":
     { "02": { "29": null }, "a9": { "ce": null }, "c5": { "5c": null },

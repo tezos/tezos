@@ -207,7 +207,7 @@ and ('bef, 'aft) instr =
   | Concat_string_pair :
       (string * (string * 'rest), string * 'rest) instr
   | Slice_string :
-      (n num * (n num * (string * 'rest)), string * 'rest) instr
+      (n num * (n num * (string * 'rest)), string option * 'rest) instr
   | String_size :
       (string * 'rest, n num * 'rest) instr
   (* bytes operations *)
@@ -216,7 +216,7 @@ and ('bef, 'aft) instr =
   | Concat_bytes_pair :
       (MBytes.t * (MBytes.t * 'rest), MBytes.t * 'rest) instr
   | Slice_bytes :
-      (n num * (n num * (MBytes.t * 'rest)), MBytes.t * 'rest) instr
+      (n num * (n num * (MBytes.t * 'rest)), MBytes.t option * 'rest) instr
   | Bytes_size :
       (MBytes.t * 'rest, n num * 'rest) instr
   (* timestamp operations *)

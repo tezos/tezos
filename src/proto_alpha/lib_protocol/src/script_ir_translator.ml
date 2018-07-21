@@ -694,6 +694,7 @@ let comparable_ty_eq
     | Int_key _, Int_key _ -> Ok Eq
     | Nat_key _, Nat_key _ -> Ok Eq
     | String_key _, String_key _ -> Ok Eq
+    | Bytes_key _, Bytes_key _ -> Ok Eq
     | Mutez_key _, Mutez_key _ -> Ok Eq
     | Bool_key _, Bool_key _ -> Ok Eq
     | Key_hash_key _, Key_hash_key _ -> Ok Eq
@@ -811,6 +812,9 @@ let merge_comparable_types
     | String_key annot_a, String_key annot_b ->
         merge_type_annot annot_a annot_b >|? fun annot ->
         String_key annot
+    | Bytes_key annot_a, Bytes_key annot_b ->
+        merge_type_annot annot_a annot_b >|? fun annot ->
+        Bytes_key annot
     | Mutez_key annot_a, Mutez_key annot_b ->
         merge_type_annot annot_a annot_b >|? fun annot ->
         Mutez_key annot
@@ -2135,7 +2139,7 @@ and parse_instr
           ~default:(gen_access_annot string_annot default_slice_annot)
           loc annot >>=? fun annot ->
         typed ctxt loc Slice_string
-          (Item_t (String_t tname, rest, annot))
+          (Item_t (Option_t ((String_t tname, None), None, None), rest, annot))
     | Prim (loc, I_SIZE, [], annot),
       Item_t (String_t _, rest, _) ->
         parse_var_annot loc annot >>=? fun annot ->
@@ -2158,7 +2162,7 @@ and parse_instr
           ~default:(gen_access_annot bytes_annot default_slice_annot)
           loc annot >>=? fun annot ->
         typed ctxt loc Slice_bytes
-          (Item_t (Bytes_t tname, rest, annot))
+          (Item_t (Option_t ((Bytes_t tname, None), None, None), rest, annot))
     | Prim (loc, I_SIZE, [], annot),
       Item_t (Bytes_t _, rest, _) ->
         parse_var_annot loc annot >>=? fun annot ->
