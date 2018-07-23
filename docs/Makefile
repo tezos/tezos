@@ -20,20 +20,20 @@ introduction/readme.rst: ../README.rst
 	sed 's/TEZOS/How to build and run/' $< > $@
 
 api/errors.rst: $(DOCERRORDIR)/error_doc.ml
-	@cd .. && jbuilder build ${DEV} docs/$(DOCERRORDIR)/error_doc.exe
+	@cd .. && dune build ${DEV} docs/$(DOCERRORDIR)/error_doc.exe
 	../_build/default/docs/$(DOCERRORDIR)/error_doc.exe > api/errors.rst
 
 $(DOCGENDIR)/rpc_doc.exe:
-	@cd .. && jbuilder build ${DEV} docs/$(DOCGENDIR)/rpc_doc.exe
+	@cd .. && dune build ${DEV} docs/$(DOCGENDIR)/rpc_doc.exe
 
 api/rpc.rst: $(DOCGENDIR)/rpc_doc.exe api/rpc_usage.rst.inc
-	@jbuilder exec $(DOCGENDIR)/rpc_doc.exe < api/rpc_usage.rst.inc > api/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe < api/rpc_usage.rst.inc > api/rpc.rst
 
 $(DOCGENDIR)/p2p_doc.exe:
-	@cd .. && jbuilder build ${DEV} docs/$(DOCGENDIR)/p2p_doc.exe
+	@cd .. && dune build ${DEV} docs/$(DOCGENDIR)/p2p_doc.exe
 
 api/p2p.rst: $(DOCGENDIR)/p2p_doc.exe api/p2p_usage.rst.inc
-	@jbuilder exec $(DOCGENDIR)/p2p_doc.exe < api/p2p_usage.rst.inc > api/p2p.rst
+	@dune exec $(DOCGENDIR)/p2p_doc.exe < api/p2p_usage.rst.inc > api/p2p.rst
 
 .PHONY: help Makefile
 

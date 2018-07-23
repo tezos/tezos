@@ -8,7 +8,7 @@ dev-repo: "https://gitlab.com/tezos/tezos.git"
 license: "unreleased"
 depends: [
   "ocamlfind" { build }
-  "jbuilder" { build & = "1.0+beta20" }
+  "dune" { build & = "1.0.1" }
   "base-unix"
   "tezos-base"
   "tezos-protocol-environment-sigs"
@@ -17,10 +17,10 @@ depends: [
   "ocp-ocamlres" { >= "0.4" }
 ]
 build: [
-  [ "jbuilder" "build" "-p" name "-j" jobs ]
+  [ "dune" "build" "-p" name "-j" jobs ]
 ]
 build-test: [
-  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+  [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
 ## ocaml-version should be in sync with `script/version.sh`
 available: [ ocaml-version = "4.06.1" ]

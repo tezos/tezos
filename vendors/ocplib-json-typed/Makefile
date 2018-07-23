@@ -1,11 +1,11 @@
 all:
-	jbuilder build @install @runtest --dev
+	dune build @install @runtest --dev
 
 install:
-	jbuilder install
+	dune install
 
 uninstall:
-	jbuilder uninstall
+	dune uninstall
 
 clean:
 	rm -rf _build *~ */*~

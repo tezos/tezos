@@ -1,13 +1,13 @@
 
 all:
-	jbuilder build --dev
+	dune build --dev
 
 .PHONY: test
 test:
-	jbuilder runtest --dev
+	dune runtest --dev
 
 doc-html:
-	jbuilder build @doc --dev
+	dune build @doc --dev
 
 clean:
-	jbuilder clean
+	dune clean

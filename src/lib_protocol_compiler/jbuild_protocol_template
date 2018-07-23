@@ -3,7 +3,7 @@
 (* Build a functorized version of the protocol with the
    `tezos-protocol-compiler` This is bit hackish...
 
-   AFAIK the current version of jbuilder (1.0+beta16) does not allow
+   AFAIK the current version of dune (1.0.1) does not allow
    to compile with a custom `rule` the `(modules)` of a library.
 
    A trick is to provide the `.cmx` through the `(library_flags)` and
