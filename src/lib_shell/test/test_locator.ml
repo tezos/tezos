@@ -274,7 +274,7 @@ let compute_size_chain size_locator =
 (* test if the linear and exponential locator are the same and outputs
    their timing.
    Run the test with:
-   $ jbuilder build @runbench_locator
+   $ dune build @runbench_locator
    Copy the output to a file timing.dat and plot it with:
    $ test_locator_plot.sh timing.dat
 *)
