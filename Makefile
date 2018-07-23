@@ -1,5 +1,4 @@
 
-DEV ?= --dev
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 
 active_protocol_versions := $(shell cat active_protocol_versions)
@@ -18,7 +17,7 @@ all:
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
-	@jbuilder build ${DEV} \
+	@dune build \
 		src/bin_node/main.exe \
 		src/bin_client/main_client.exe \
 		src/bin_client/main_admin.exe \
@@ -39,19 +38,19 @@ endif
 	 done
 
 all.pkg:
-	@jbuilder build ${DEV} \
+	@dune build \
 	    $(patsubst %.opam,%.install, $(shell find src vendors -name \*.opam -print))
 
 $(addsuffix .pkg,${PACKAGES}): %.pkg:
-	@jbuilder build ${DEV} \
+	@dune build \
 	    $(patsubst %.opam,%.install, $(shell find src vendors -name $*.opam -print))
 
 $(addsuffix .test,${PACKAGES}): %.test:
-	@jbuilder build ${DEV} \
+	@dune build \
 	    @$(patsubst %/$*.opam,%,$(shell find src vendors -name $*.opam))/runtest
 
 doc-html: all
-	@jbuilder build @doc ${DEV}
+	@dune build @doc
 	@./tezos-client -protocol PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY man -verbosity 3 -format html | sed "s/$HOME/\$HOME/g" > docs/api/tezos-client.html
 	@./tezos-admin-client man -verbosity 3 -format html | sed "s/$HOME/\$HOME/g" > docs/api/tezos-admin-client.html
 	@mkdir -p $$(pwd)/docs/_build/api/odoc
@@ -60,14 +59,14 @@ doc-html: all
 	@${MAKE} -C docs
 
 build-test:
-	@jbuilder build @buildtest ${DEV}
+	@dune build @buildtest
 
 test:
-	@jbuilder runtest ${DEV}
+	@dune runtest
 	@./scripts/check_opam_test.sh
 
 test-indent:
-	@jbuilder build @runtest_indent ${DEV}
+	@dune build @runtest_indent
 
 fix-indent:
 	@src/lib_stdlib/test-ocp-indent.sh fix
@@ -79,14 +78,14 @@ docker-image:
 	@./scripts/create_docker_image.sh
 
 install:
-	@jbuilder build @install
-	@jbuilder install
+	@dune build @install
+	@dune install
 
 uninstall:
-	@jbuilder uninstall
+	@dune uninstall
 
 clean:
-	@-jbuilder clean
+	@-dune clean
 	@-rm -f \
 		tezos-node \
 		tezos-client \

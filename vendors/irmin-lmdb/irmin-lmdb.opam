@@ -8,13 +8,13 @@ dev-repo:     "https://gitlab.com/tezos/irmin-lmdb.git"
 doc:          "https://tezos.gitlab.io/irmin-lmdb/"
 
 build: [
- ["jbuilder" "subst"] {pinned}
- ["jbuilder" "build" "-p" name "-j" jobs]
+ ["dune" "subst"] {pinned}
+ ["dune" "build" "-p" name "-j" jobs]
 ]
-build-test: ["jbuilder" "runtest" "-p" name]
+build-test: ["dune" "runtest" "-p" name]
 
 depends: [
-  "jbuilder" {build & >= "1.0+beta10"}
+  "dune" {build & >= "1.0.1"}
   "irmin"    {>= "1.4.0"}
   "lmdb"     {>= "0.1"}
 ]

@@ -45,7 +45,7 @@ check_opam_deps:
 check_indentation:
   <<: *build_definition
   script:
-    - jbuilder build @runtest_indent
+    - dune build @runtest_indent
 
 build:
   <<: *build_definition
@@ -72,97 +72,97 @@ build:
 test:stdlib:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_stdlib/runtest
+    - dune build @src/lib_stdlib/runtest
 
 test:stdlib_unix:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_stdlib_unix/runtest
+    - dune build @src/lib_stdlib_unix/runtest
 
 test:data_encoding:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_data_encoding/runtest
+    - dune build @src/lib_data_encoding/runtest
 
 test:storage:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_storage/runtest
+    - dune build @src/lib_storage/runtest
 
 test:crypto:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_crypto/runtest
+    - dune build @src/lib_crypto/runtest
 
 test:shell:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_shell/runtest
+    - dune build @src/lib_shell/runtest
 
 test:p2p:io-scheduler:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_io_scheduler_ipv4
+    - dune build @src/lib_p2p/runtest_p2p_io_scheduler_ipv4
 
 test:p2p:socket:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_socket_ipv4
+    - dune build @src/lib_p2p/runtest_p2p_socket_ipv4
 
 test:p2p:pool:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_pool_ipv4
+    - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
 
 test:proto_alpha:
   <<: *test_definition
   script:
-    - jbuilder build @src/proto_alpha/lib_protocol/runtest
+    - dune build @src/proto_alpha/lib_protocol/runtest
 
 test:p2p:peerset:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_peerset
+    - dune build @src/lib_p2p/runtest_p2p_peerset
 
 test:p2p:ipv6set:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_ipv6set
+    - dune build @src/lib_p2p/runtest_p2p_ipv6set
 
 test:p2p:banned_peers:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_banned_peers
+    - dune build @src/lib_p2p/runtest_p2p_banned_peers
 
 test:client_alpha:vote:
   <<: *test_definition
   script:
-    - jbuilder build @src/proto_alpha/lib_delegate/runtest_vote
+    - dune build @src/proto_alpha/lib_delegate/runtest_vote
 
 test:basic.sh:
   <<: *test_definition
   script:
-    - jbuilder build @src/bin_client/runtest_basic.sh
+    - dune build @src/bin_client/runtest_basic.sh
 
 test:contracts.sh:
   <<: *test_definition
   script:
-    - jbuilder build @src/bin_client/runtest_contracts.sh
+    - dune build @src/bin_client/runtest_contracts.sh
 
 test:multinode.sh:
   <<: *test_definition
   script:
-    - jbuilder build @src/bin_client/runtest_multinode.sh
+    - dune build @src/bin_client/runtest_multinode.sh
 
 test:inject.sh:
   <<: *test_definition
   script:
-    - jbuilder build @src/bin_client/runtest_injection.sh
+    - dune build @src/bin_client/runtest_injection.sh
 
 test:proto:sandbox:
   <<: *test_definition
   script:
-    - jbuilder build @runtest_sandbox
+    - dune build @runtest_sandbox
 
 test:documentation:
   <<: *test_definition
