@@ -12,10 +12,10 @@ available: [
   ocaml-version >= "4.02.0"
 ]
 
-build: [ "jbuilder" "build" "-j" jobs "-p" name "@install" ]
-build-test: [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
+build-test: [ "dune" "runtest" "-p" name "-j" jobs ]
 depends: [
-  "jbuilder" {build & >= "1.0+beta19.1"}
+  "dune" {build & >= "1.0.1"}
   "bigstring" {>= "0.1.1"}
   "alcotest" {test & >= "0.8.1"}
   "cstruct" {test & >= "3.2.1"}

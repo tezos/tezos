@@ -8,15 +8,15 @@ dev-repo: "https://gitlab.com/tezos/tezos.git"
 license: "unreleased"
 depends: [
   "ocamlfind" { build }
-  "jbuilder" { build & = "1.0+beta20" }
+  "dune" { build & = "1.0.1" }
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-shell-services"
   "alcotest-lwt" { test }
 ]
 build: [
-  [ "jbuilder" "build" "-p" name "-j" jobs ]
+  [ "dune" "build" "-p" name "-j" jobs ]
 ]
 build-test: [
-  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+  [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
