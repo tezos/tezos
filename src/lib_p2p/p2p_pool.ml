@@ -633,8 +633,6 @@ module Connection = struct
   let stat { conn } =
     P2p_socket.stat conn
 
-  let score { peer_meta_config = { score }} meta = score meta
-
   let info { conn } =
     P2p_socket.info conn
 
@@ -681,6 +679,8 @@ let pool_stat { io_sched } =
   P2p_io_scheduler.global_stat io_sched
 
 let config { config } = config
+
+let score { peer_meta_config = { score }} meta = score meta
 
 (***************************************************************************)
 

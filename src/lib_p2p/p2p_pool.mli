@@ -184,6 +184,10 @@ val send_swap_request: ('msg, 'peer_meta,'conn_meta) pool -> unit
     <> pj), suggest swap with pi for the peer pj. This behaviour is
     disabled in private mode *)
 
+val score: ('msg, 'peer_meta,'conn_meta) pool -> 'peer_meta -> float
+(** [score pool peer_meta] returns the score of a peer in the pool
+    whose peer_meta is provided *)
+
 (** {2 Pool events} *)
 
 module Pool_event : sig
