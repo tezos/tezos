@@ -172,6 +172,15 @@ test:documentation:
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - make doc-html
 
+test:linkcheck:
+  <<: *test_definition
+  script:
+    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
+    - sudo pip3 install 'idna<2.7'
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - make doc-linkcheck
+  allow_failure: true
 
 
 ############################################################

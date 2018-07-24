@@ -56,7 +56,10 @@ doc-html: all
 	@mkdir -p $$(pwd)/docs/_build/api/odoc
 	@rm -rf $$(pwd)/docs/_build/api/odoc/*
 	@cp -r $$(pwd)/_build/default/_doc/* $$(pwd)/docs/_build/api/odoc/
-	@${MAKE} -C docs
+	@${MAKE} -C docs html
+
+doc-linkcheck:
+	@${MAKE} -C docs linkcheck
 
 build-test:
 	@dune build @buildtest
