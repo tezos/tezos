@@ -5,8 +5,6 @@ src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/version.sh
 
-. "$script_dir"/opam-pin.sh
+opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
 
-opam depext $packages
-
-opam install $packages --deps-only --with-test
+opam install $opams --deps-only --with-test
