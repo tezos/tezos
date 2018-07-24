@@ -616,6 +616,8 @@ publish:doc:
     - betanet-staging
   before_script:
     - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
+    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
+    - sudo pip3 install 'idna<2.7'
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
     - echo "${CI_KH}" > ~/.ssh/known_hosts
