@@ -1,6 +1,6 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: 63f06ab145e22aef4cc55b5b9557756d4c868843
+  build_deps_image_version: 4200cbebcae75562d79898a8e11e9f4dc237cc08
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
 
@@ -51,7 +51,6 @@ build:
   <<: *build_definition
   script:
     - make all
-    - make build-test
   artifacts:
     paths:
     - _build
@@ -168,6 +167,8 @@ test:documentation:
   <<: *test_definition
   script:
     - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
+    - sudo pip3 install 'idna<2.7'
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - make doc-html
 
