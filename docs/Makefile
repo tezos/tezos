@@ -9,8 +9,6 @@ DOCGENDIR     = doc_gen
 DOCERRORDIR   = $(DOCGENDIR)/errors
 DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
-DEV ?= --dev
-
 all: html linkcheck
 
 linkcheck:
@@ -20,17 +18,17 @@ introduction/readme.rst: ../README.rst
 	sed 's/TEZOS/How to build and run/' $< > $@
 
 api/errors.rst: $(DOCERRORDIR)/error_doc.ml
-	@cd .. && dune build ${DEV} docs/$(DOCERRORDIR)/error_doc.exe
+	@cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe
 	../_build/default/docs/$(DOCERRORDIR)/error_doc.exe > api/errors.rst
 
 $(DOCGENDIR)/rpc_doc.exe:
-	@cd .. && dune build ${DEV} docs/$(DOCGENDIR)/rpc_doc.exe
+	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
 api/rpc.rst: $(DOCGENDIR)/rpc_doc.exe api/rpc_usage.rst.inc
 	@dune exec $(DOCGENDIR)/rpc_doc.exe < api/rpc_usage.rst.inc > api/rpc.rst
 
 $(DOCGENDIR)/p2p_doc.exe:
-	@cd .. && dune build ${DEV} docs/$(DOCGENDIR)/p2p_doc.exe
+	@cd .. && dune build docs/$(DOCGENDIR)/p2p_doc.exe
 
 api/p2p.rst: $(DOCGENDIR)/p2p_doc.exe api/p2p_usage.rst.inc
 	@dune exec $(DOCGENDIR)/p2p_doc.exe < api/p2p_usage.rst.inc > api/p2p.rst
