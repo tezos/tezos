@@ -8,9 +8,9 @@
               tezos-rpc-http
               tezos-shell-services
               tezos-client-base
-              tezos-client-000-Ps9mPmXa
-              tezos-client-001-PtCJ7pwo
-              tezos-baking-001-PtCJ7pwo
+              tezos-client-genesis
+              tezos-client-alpha
+              tezos-baking-alpha
               tezos-client-base-unix
               tezos-signer-backends
               alcotest-lwt))
@@ -19,9 +19,9 @@
                     -open Tezos_rpc_http
                     -open Tezos_shell_services
                     -open Tezos_client_base
-                    -open Tezos_client_000_Ps9mPmXa
-                    -open Tezos_client_001_PtCJ7pwo
-                    -open Tezos_baking_001_PtCJ7pwo
+                    -open Tezos_client_genesis
+                    -open Tezos_client_alpha
+                    -open Tezos_baking_alpha
                     -open Tezos_client_base_unix))))
 
 (alias

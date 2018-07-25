@@ -1,23 +1,25 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_client_000_Ps9mPmXa)
-  (public_name tezos-client-000-Ps9mPmXa)
+ ((name tezos_client_alpha)
+  (public_name tezos-client-alpha)
   (libraries (tezos-base
+              tezos-protocol-alpha
+              tezos-protocol-environment
               tezos-shell-services
               tezos-client-base
-              tezos-client-commands
-              tezos-protocol-environment
-              tezos-protocol-000-Ps9mPmXa
-              tezos-protocol-001-PtCJ7pwo
-              tezos-protocol-002-PsYLVpVv))
+              tezos-rpc
+              tezos-storage
+              tezos-signer-backends
+              bip39))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell_services
                     -open Tezos_client_base
-                    -open Tezos_client_commands))))
+                    -open Tezos_storage
+                    -open Tezos_rpc))))
 
 (alias
  ((name runtest_indent)
