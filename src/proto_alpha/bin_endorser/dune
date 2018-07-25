@@ -1,17 +1,17 @@
 (jbuild_version 1)
 
 (executable
- ((name main_accuser_001_PtCJ7pwo)
-  (public_name tezos-accuser-001-PtCJ7pwo)
+ ((name main_endorser_alpha)
+  (public_name tezos-endorser-alpha)
   (libraries (tezos-client-base-unix
               tezos-client-commands
-              tezos-baking-001-PtCJ7pwo-commands))
+              tezos-baking-alpha-commands))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_client_001_PtCJ7pwo
+                    -open Tezos_client_alpha
                     -open Tezos_client_commands
-                    -open Tezos_baking_001_PtCJ7pwo_commands
+                    -open Tezos_baking_alpha_commands
                     -open Tezos_client_base_unix))))
 
 (alias

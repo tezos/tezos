@@ -1,14 +1,14 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_baking_001_PtCJ7pwo)
-  (public_name tezos-baking-001-PtCJ7pwo)
+ ((name tezos_baking_alpha)
+  (public_name tezos-baking-alpha)
   (libraries (tezos-base
-              tezos-protocol-001-PtCJ7pwo
+              tezos-protocol-alpha
               tezos-protocol-environment
               tezos-shell-services
               tezos-client-base
-              tezos-client-001-PtCJ7pwo
+              tezos-client-alpha
               tezos-client-commands
               tezos-storage
               tezos-rpc))
@@ -21,22 +21,22 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell_services
                     -open Tezos_client_base
-                    -open Tezos_client_001_PtCJ7pwo
+                    -open Tezos_client_alpha
                     -open Tezos_client_commands
                     -open Tezos_storage
                     -open Tezos_rpc))))
 
 (library
- ((name tezos_baking_001_PtCJ7pwo_commands)
-  (public_name tezos-baking-001-PtCJ7pwo-commands)
+ ((name tezos_baking_alpha_commands)
+  (public_name tezos-baking-alpha-commands)
   (libraries (tezos-base
-              tezos-protocol-001-PtCJ7pwo
+              tezos-protocol-alpha
               tezos-protocol-environment
               tezos-shell-services
               tezos-client-base
-              tezos-client-001-PtCJ7pwo
+              tezos-client-alpha
               tezos-client-commands
-              tezos-baking-001-PtCJ7pwo))
+              tezos-baking-alpha))
   (library_flags (:standard -linkall))
   (modules (delegate_commands))
   (flags (:standard -w -9+27-30-32-40@8
@@ -44,23 +44,23 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell_services
                     -open Tezos_client_base
-                    -open Tezos_client_001_PtCJ7pwo
+                    -open Tezos_client_alpha
                     -open Tezos_client_commands
-                    -open Tezos_baking_001_PtCJ7pwo
+                    -open Tezos_baking_alpha
                     -open Tezos_rpc))))
 
 (library
- ((name tezos_baking_001_PtCJ7pwo_commands_registration)
-  (public_name tezos-baking-001-PtCJ7pwo-commands.registration)
+ ((name tezos_baking_alpha_commands_registration)
+  (public_name tezos-baking-alpha-commands.registration)
   (libraries (tezos-base
-              tezos-protocol-001-PtCJ7pwo
+              tezos-protocol-alpha
               tezos-protocol-environment
               tezos-shell-services
               tezos-client-base
-              tezos-client-001-PtCJ7pwo
+              tezos-client-alpha
               tezos-client-commands
-              tezos-baking-001-PtCJ7pwo
-              tezos-baking-001-PtCJ7pwo-commands
+              tezos-baking-alpha
+              tezos-baking-alpha-commands
               tezos-rpc))
   (library_flags (:standard -linkall))
   (modules (delegate_commands_registration))
@@ -69,10 +69,10 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell_services
                     -open Tezos_client_base
-                    -open Tezos_client_001_PtCJ7pwo
+                    -open Tezos_client_alpha
                     -open Tezos_client_commands
-                    -open Tezos_baking_001_PtCJ7pwo
-                    -open Tezos_baking_001_PtCJ7pwo_commands
+                    -open Tezos_baking_alpha
+                    -open Tezos_baking_alpha_commands
                     -open Tezos_rpc))))
 
 (alias
