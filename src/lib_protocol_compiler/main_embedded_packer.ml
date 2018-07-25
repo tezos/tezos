@@ -26,6 +26,12 @@
 let srcdir = Sys.argv.(1)
 let version = Sys.argv.(2)
 
+let srcdir =
+  if Filename.basename srcdir = "TEZOS_PROTOCOL" then
+    Filename.dirname srcdir
+  else
+    srcdir
+
 let hash, sources =
   match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir srcdir) with
   | Ok (None, proto) ->

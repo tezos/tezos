@@ -1,127 +1,125 @@
-(jbuild_version 1)
-
 (rule
- ((targets (embedded_cmis.ml))
-  (action
-    (run ${bin:ocp-ocamlres} -format ocaml -o ${@}
-           ${lib:stdlib:camlinternalFormatBasics.cmi}
-           ${path:tezos_protocol_registerer__Registerer.cmi}
-           ${lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}
-           ${lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi}))))
+ (targets embedded_cmis.ml)
+ (action
+  (run %{bin:ocp-ocamlres} -format ocaml -o %{targets}
+       %{lib:stdlib:camlinternalFormatBasics.cmi}
+       %{dep:.tezos_protocol_registerer.objs/tezos_protocol_registerer__Registerer.cmi}
+       %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}
+       %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi})))
 
 (library
- ((name tezos_protocol_registerer)
-  (public_name tezos-protocol-compiler.registerer)
-  (libraries (tezos-base
-              tezos-protocol-environment-sigs))
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -opaque
-                    -open Tezos_base__TzPervasives))
-  (modules (Registerer))))
+ (name tezos_protocol_registerer)
+ (public_name tezos-protocol-compiler.registerer)
+ (libraries tezos-base
+            tezos-protocol-environment-sigs)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -opaque
+                   -open Tezos_base__TzPervasives))
+ (modules Registerer))
 
 (library
- ((name tezos_protocol_compiler)
-  (public_name tezos-protocol-compiler)
-  (libraries (tezos-base
-              tezos-protocol-environment-sigs
-              tezos-stdlib-unix
-              compiler-libs.common
-              lwt.unix
-              ocplib-endian
-              ocplib-ocamlres
-              unix))
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_stdlib_unix))
-  (modules (Embedded_cmis Packer Compiler))))
+ (name tezos_protocol_compiler)
+ (public_name tezos-protocol-compiler)
+ (libraries tezos-base
+            tezos-protocol-environment-sigs
+            tezos-stdlib-unix
+            compiler-libs.common
+            lwt.unix
+            ocplib-endian
+            ocplib-ocamlres
+            unix)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix))
+ (modules Embedded_cmis Packer Compiler))
 
 (library
- ((name tezos_protocol_compiler_byte)
-  (public_name tezos-protocol-compiler.byte)
-  (libraries (tezos-base
-              tezos-protocol-compiler
-              compiler-libs.bytecomp))
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_protocol_compiler))
-  (modules (Byte))))
+ (name tezos_protocol_compiler_byte)
+ (public_name tezos-protocol-compiler.byte)
+ (libraries tezos-base
+            tezos-protocol-compiler
+            compiler-libs.bytecomp)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_compiler))
+ (modules Byte))
 
 (library
- ((name tezos_protocol_compiler_native)
-  (public_name tezos-protocol-compiler.native)
-  (libraries (tezos-base
-              tezos-protocol-compiler
-              compiler-libs.optcomp))
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_protocol_compiler))
-  (modules (Native))))
+ (name tezos_protocol_compiler_native)
+ (public_name tezos-protocol-compiler.native)
+ (libraries tezos-base
+            tezos-protocol-compiler
+            compiler-libs.optcomp)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_compiler))
+ (modules Native))
 
 (executable
- ((name main_byte)
-  (public_name tezos-protocol-compiler-byte)
-  (modes (native))
-  (libraries (tezos_protocol_compiler_byte))
-  (flags (:standard -linkall))
-  (modules (Main_byte))))
+ (name main_byte)
+ (public_name tezos-protocol-compiler-byte)
+ (modes native)
+ (libraries tezos_protocol_compiler_byte)
+ (flags (:standard -linkall))
+ (modules Main_byte))
 
 (executable
- ((name main_native)
-  (public_name tezos-protocol-compiler)
-  (modes (native))
-  (libraries (tezos_protocol_compiler_native))
-  (flags (:standard -linkall))
-  (modules (Main_native))))
+ (name main_native)
+ (public_name tezos-protocol-compiler)
+ (modes native)
+ (libraries tezos_protocol_compiler_native)
+ (flags (:standard -linkall))
+ (modules Main_native))
 
 (executable
- ((name main_packer)
-  (public_name tezos-protocol-compiler.tezos-protocol-packer)
-  (libraries (tezos-base
-              tezos-protocol-compiler
-              tezos-stdlib-unix))
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_stdlib_unix
-                    -open Tezos_protocol_compiler))
-  (modules (Main_packer))))
+ (name main_packer)
+ (public_name tezos-protocol-compiler.tezos-protocol-packer)
+ (libraries tezos-base
+            tezos-protocol-compiler
+            tezos-stdlib-unix)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_protocol_compiler))
+ (modules Main_packer))
 
 (executable
- ((name main_embedded_packer)
-  (public_name tezos-embedded-protocol-packer)
-  (modes (native))
-  (libraries (tezos-base
-              tezos-stdlib-unix))
-  (flags (:standard -linkall
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_stdlib_unix))
-  (modules (Main_embedded_packer))))
+ (name main_embedded_packer)
+ (public_name tezos-embedded-protocol-packer)
+ (modes native)
+ (libraries tezos-base
+            tezos-stdlib-unix)
+ (flags (:standard -linkall
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix))
+ (modules Main_embedded_packer))
 
 (install
- ((section share)
-  (files (jbuild_protocol_template
-          jbuild_embedded_protocol_template))))
+ (section share)
+ (files jbuild_protocol_template
+        jbuild_embedded_protocol_template))
 
 (alias
- ((name runtest_indent)
-  ;; we would like (deps ((glob_files *.ml \ embedded_cmis.ml)))
-  ;; meanwhile, we hardcode the module list
-  (deps ("embedded_cmis.mli"
-         "main_embedded_packer.ml"
-         "main_embedded_packer.mli"
-         "main_byte.ml"
-         "main_native.ml"
-         "native.ml"
-         "native.mli"
-         "byte.ml"
-         "byte.mli"
-         "packer.ml"
-         "packer.mli"
-         "registerer.ml"
-         "registerer.mli"
-         ))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
+ (name runtest_indent)
+ ;; we would like (deps ((glob_files *.ml \ embedded_cmis.ml)))
+ ;; meanwhile, we hardcode the module list
+ (deps "embedded_cmis.mli"
+       "main_embedded_packer.ml"
+       "main_embedded_packer.mli"
+       "main_byte.ml"
+       "main_native.ml"
+       "native.ml"
+       "native.mli"
+       "byte.ml"
+       "byte.mli"
+       "packer.ml"
+       "packer.mli"
+       "registerer.ml"
+       "registerer.mli"
+       )
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

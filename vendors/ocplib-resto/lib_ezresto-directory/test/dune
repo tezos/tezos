@@ -1,14 +1,12 @@
-(jbuild_version 1)
-
 (executable
- ((name ezResto_test)
-  (flags (:standard -safe-string))
-  (libraries (ocplib-ezresto-directory lwt.unix))))
+ (name ezResto_test)
+ (flags (:standard -safe-string))
+ (libraries ocplib-ezresto-directory lwt.unix))
 
 (alias
-((name runtest_ezresto)
- (action (run ${path:ezResto_test.exe}))))
+ (name runtest_ezresto)
+ (action (run %{exe:ezResto_test.exe})))
 
 (alias
-((name runtest)
- (deps ((alias runtest_ezresto)))))
+ (name runtest)
+ (deps (alias runtest_ezresto)))

@@ -1,5 +1,3 @@
-(jbuild_version 1)
-
 (executable
- ((name discover)
-  (libraries (base stdio))))
+ (name discover)
+ (libraries base stdio))

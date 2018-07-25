@@ -1,8 +1,6 @@
-(jbuild_version 1)
-
 (library
- ((name ezresto)
-  (public_name ocplib-ezresto)
-  (libraries (ocplib-resto-json))
-  (wrapped false)
-  (flags (:standard -safe-string))))
+ (name ezresto)
+ (public_name ocplib-ezresto)
+ (libraries ocplib-resto-json)
+ (wrapped false)
+ (flags (:standard -safe-string)))

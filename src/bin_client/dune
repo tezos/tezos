@@ -1,20 +1,18 @@
-(jbuild_version 1)
-
 (executables
- ((names (main_client main_admin))
-  (public_names (tezos-client tezos-admin-client))
-  (libraries (tezos-base
-              tezos-rpc-http
-              tezos-shell-services
-              tezos-client-base
-              tezos-client-commands
-              tezos-client-genesis
-              tezos-client-alpha
-              tezos-stdlib-unix
-              tezos-client-base-unix
-              tezos-client-alpha-commands.registration
-              tezos-baking-alpha-commands.registration
-              tezos-signer-backends))
+ (names main_client main_admin)
+ (public_names tezos-client tezos-admin-client)
+ (libraries tezos-base
+            tezos-rpc-http
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-commands
+            tezos-client-genesis
+            tezos-client-alpha
+            tezos-stdlib-unix
+            tezos-client-base-unix
+            tezos-client-alpha-commands.registration
+            tezos-baking-alpha-commands.registration
+            tezos-signer-backends)
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
@@ -23,13 +21,13 @@
                     -open Tezos_shell_services
                     -open Tezos_client_base
                     -open Tezos_client_commands
-                    -open Tezos_client_base_unix))))
+                    -open Tezos_client_base_unix)))
 
 (install
- ((section bin)
-  (files ((tezos-init-sandboxed-client.sh as tezos-init-sandboxed-client.sh)))))
+ (section bin)
+ (files (tezos-init-sandboxed-client.sh as tezos-init-sandboxed-client.sh)))
 
 (alias
- ((name runtest_indent)
-  (deps ((glob_files *.ml{,i})))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
