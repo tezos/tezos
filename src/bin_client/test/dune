@@ -1,114 +1,105 @@
-(jbuild_version 1)
-
 (alias
- ((name runtest_basic.sh)
-  (deps (sandbox.json
-         protocol_parameters.json
-         king_commitment.json
-         queen_commitment.json
-         test_lib.inc.sh
-         (glob_files contracts/*)
-         ))
-  (locks  (/tcp-port/18731
-           /tcp-port/19731))
-  (action (run bash ${path:test_basic.sh}
-                    ${bin:tezos-sandboxed-node.sh}
-                    ${bin:tezos-node}
-                    ${bin:tezos-init-sandboxed-client.sh}
-                    ${bin:tezos-client}
-                    ${bin:tezos-admin-client}
-                    ))))
-
-(alias
- ((name runtest_contracts.sh)
-  (deps (sandbox.json
-         test_lib.inc.sh
-         (glob_files contracts/*)
-         ))
-  (locks  (/tcp-port/18731
-           /tcp-port/19731))
-  (action (run bash ${path:test_contracts.sh}
-                    ${bin:tezos-sandboxed-node.sh}
-                    ${bin:tezos-node}
-                    ${bin:tezos-init-sandboxed-client.sh}
-                    ${bin:tezos-client}
-                    ${bin:tezos-admin-client}
-                    ))))
-
-(alias
- ((name runtest_multinode.sh)
-  (deps (sandbox.json
-         test_lib.inc.sh
-         (glob_files contracts/*.tz)
-         ))
-  (locks  (/tcp-port/18731 /tcp-port/18732 /tcp-port/18733 /tcp-port/18734
-           /tcp-port/18735 /tcp-port/18736 /tcp-port/18737 /tcp-port/18738
-           /tcp-port/19731 /tcp-port/19732 /tcp-port/19733 /tcp-port/19734
-           /tcp-port/19735 /tcp-port/19736 /tcp-port/19737 /tcp-port/19738))
-  (action (run bash ${path:test_multinode.sh}
-                    ${bin:tezos-sandboxed-node.sh}
-                    ${bin:tezos-node}
-                    ${bin:tezos-init-sandboxed-client.sh}
-                    ${bin:tezos-client}
-                    ${bin:tezos-admin-client}
-                    ))))
-
-(alias
- ((name runtest_injection.sh)
-  (locks  (/tcp-port/18731
-           /tcp-port/19731))
-  (deps (sandbox.json
-         protocol_parameters.json
-         test_lib.inc.sh
-         (glob_files demo/*)
-         ))
-  (action (run bash ${path:test_injection.sh}
-                    ${bin:tezos-sandboxed-node.sh}
-                    ${bin:tezos-node}
-                    ${bin:tezos-init-sandboxed-client.sh}
-                    ${bin:tezos-client}
-                    ${bin:tezos-admin-client}
-                    ${bin:tezos-protocol-compiler}
-                    ))))
-
-(alias
- ((name runtest_tls.sh)
-  (locks  (/tcp-port/18731
-           /tcp-port/19731))
-  (deps (sandbox.json
-         test_lib.inc.sh
-         (glob_files demo/*)
-         ))
+ (name runtest_basic.sh)
+ (deps sandbox.json
+       protocol_parameters.json
+       king_commitment.json
+       queen_commitment.json
+       test_lib.inc.sh
+       (glob_files contracts/*))
+  (locks /tcp-port/18731
+         /tcp-port/19731)
   (action
-   (setenv USE_TLS true (run bash ${path:test_tls.sh}
-                         ${bin:tezos-sandboxed-node.sh}
-                         ${bin:tezos-node}
-                         ${bin:tezos-init-sandboxed-client.sh}
-                         ${bin:tezos-client}
-                         ${bin:tezos-admin-client}
-                         )))))
+   (run bash %{dep:test_basic.sh}
+             %{bin:tezos-sandboxed-node.sh}
+             %{bin:tezos-node}
+             %{bin:tezos-init-sandboxed-client.sh}
+             %{bin:tezos-client}
+             %{bin:tezos-admin-client})))
 
 (alias
- ((name runtest_cors.sh)
-  (locks  (/tcp-port/18731
-           /tcp-port/19731))
-  (deps (sandbox.json
-         test_lib.inc.sh
-         (glob_files demo/*)
-         ))
-  (action (run bash ${path:test_cors.sh}
-           ${bin:tezos-sandboxed-node.sh}
-           ${bin:tezos-node}
-           ${bin:tezos-init-sandboxed-client.sh}
-           ${bin:tezos-client}
-           ${bin:tezos-admin-client}
-           ))))
+ (name runtest_contracts.sh)
+ (deps sandbox.json
+       test_lib.inc.sh
+       (glob_files contracts/*))
+ (locks /tcp-port/18731
+        /tcp-port/19731)
+ (action
+  (run bash %{dep:test_contracts.sh}
+            %{bin:tezos-sandboxed-node.sh}
+            %{bin:tezos-node}
+            %{bin:tezos-init-sandboxed-client.sh}
+            %{bin:tezos-client}
+            %{bin:tezos-admin-client})))
 
 (alias
- ((name runtest)
-  (deps ((alias runtest_basic.sh)
-         (alias runtest_contracts.sh)
-         (alias runtest_multinode.sh)
-         (alias runtest_injection.sh)
-         (alias runtest_tls.sh)
-         (alias runtest_cors.sh)))))
+ (name runtest_multinode.sh)
+ (deps sandbox.json
+       test_lib.inc.sh
+       (glob_files contracts/*.tz))
+ (locks  /tcp-port/18731 /tcp-port/18732 /tcp-port/18733 /tcp-port/18734
+         /tcp-port/18735 /tcp-port/18736 /tcp-port/18737 /tcp-port/18738
+         /tcp-port/19731 /tcp-port/19732 /tcp-port/19733 /tcp-port/19734
+         /tcp-port/19735 /tcp-port/19736 /tcp-port/19737 /tcp-port/19738)
+ (action
+  (run bash %{dep:test_multinode.sh}
+            %{bin:tezos-sandboxed-node.sh}
+            %{bin:tezos-node}
+            %{bin:tezos-init-sandboxed-client.sh}
+            %{bin:tezos-client}
+            %{bin:tezos-admin-client})))
+
+(alias
+ (name runtest_injection.sh)
+ (locks /tcp-port/18731
+        /tcp-port/19731)
+ (deps sandbox.json
+       protocol_parameters.json
+       test_lib.inc.sh
+       (glob_files demo/*))
+ (action
+  (run bash %{dep:test_injection.sh}
+            %{bin:tezos-sandboxed-node.sh}
+            %{bin:tezos-node}
+            %{bin:tezos-init-sandboxed-client.sh}
+            %{bin:tezos-client}
+            %{bin:tezos-admin-client}
+            %{bin:tezos-protocol-compiler})))
+
+(alias
+ (name runtest_tls.sh)
+ (locks /tcp-port/18731
+        /tcp-port/19731)
+ (deps sandbox.json
+       test_lib.inc.sh
+       (glob_files demo/*))
+ (action
+  (run bash %{dep:test_tls.sh}
+            %{bin:tezos-sandboxed-node.sh}
+            %{bin:tezos-node}
+            %{bin:tezos-init-sandboxed-client.sh}
+            %{bin:tezos-client}
+            %{bin:tezos-admin-client})))
+
+(alias
+ (name runtest_cors.sh)
+ (locks /tcp-port/18731
+        /tcp-port/19731)
+ (deps sandbox.json
+       test_lib.inc.sh
+       (glob_files demo/*))
+ (action
+  (run bash %{dep:test_cors.sh}
+            %{bin:tezos-sandboxed-node.sh}
+            %{bin:tezos-node}
+            %{bin:tezos-init-sandboxed-client.sh}
+            %{bin:tezos-client}
+            %{bin:tezos-admin-client})))
+
+(alias
+ (name runtest)
+ (deps (alias runtest_basic.sh)
+       (alias runtest_contracts.sh)
+       (alias runtest_multinode.sh)
+       (alias runtest_injection.sh)
+       (alias runtest_tls.sh)
+       (alias runtest_cors.sh)))

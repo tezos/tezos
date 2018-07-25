@@ -4,6 +4,8 @@
 
 set -e
 
+export USE_TLS=true
+
 test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
 source $test_dir/test_lib.inc.sh "$@"
 

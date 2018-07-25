@@ -1,9 +1,7 @@
-(jbuild_version 1)
-
 (library
- ((name        ocplib_json_typed)
-  (public_name ocplib-json-typed)
-  (flags (:standard -w -9))
-  (synopsis "Reliable manipulation of JSON objects")
-  (libraries (uri))
-  (wrapped false)))
+ (name        ocplib_json_typed)
+ (public_name ocplib-json-typed)
+ (flags (:standard -w -9))
+ (synopsis "Reliable manipulation of JSON objects")
+ (libraries uri)
+ (wrapped false))

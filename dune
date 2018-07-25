@@ -1,9 +1,13 @@
-(jbuild_version 1)
+(env
+ (dev
+  (flags (:standard)))
+ (release
+  (flags (:standard -O3))))
 
 (alias
- ((name runtest)
-  (deps ((alias_rec runtest_indent)))))
+ (name runtest)
+ (deps (alias_rec runtest_indent)))
 
 (alias
- ((name runtest)
-  (deps ((alias_rec runtest_sandbox)))))
+ (name runtest)
+ (deps (alias_rec runtest_sandbox)))

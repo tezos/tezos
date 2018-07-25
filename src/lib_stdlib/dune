@@ -1,23 +1,21 @@
-(jbuild_version 1)
-
 (library
- ((name tezos_stdlib)
-  (public_name tezos-stdlib)
-  (libraries (ocplib-endian.bigstring
-              bigstring
-              cstruct
-              hex
-              re
-              zarith
-              lwt
-              lwt.log))
-  (flags (:standard -safe-string))))
+ (name tezos_stdlib)
+ (public_name tezos-stdlib)
+ (libraries ocplib-endian.bigstring
+            bigstring
+            cstruct
+            hex
+            re
+            zarith
+            lwt
+            lwt.log)
+ (flags (:standard -safe-string)))
 
 (alias
- ((name runtest_indent)
-  (deps ((glob_files *.ml{,i})))
-  (action (run bash ${path:test-ocp-indent.sh} ${^}))))
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{dep:test-ocp-indent.sh} %{deps})))
 
 (install
- ((section libexec)
-  (files ((test-ocp-indent.sh as test-ocp-indent.sh)))))
+ (section libexec)
+ (files (test-ocp-indent.sh as test-ocp-indent.sh)))
