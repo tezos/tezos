@@ -31,6 +31,8 @@ docs/api/p2p.rst
 
 src/bin_client/test/LOG.*
 
+**/dune-project
+
 **/*.install
 **/.merlin
 

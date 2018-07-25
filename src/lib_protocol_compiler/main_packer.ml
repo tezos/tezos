@@ -34,6 +34,8 @@ let () =
   Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
   let source_dir =
     match List.rev !anonymous with
+    | [ source_dir ] when Filename.basename source_dir = "TEZOS_PROTOCOL"->
+        Filename.dirname source_dir
     | [ source_dir ] -> source_dir
     | _ -> Arg.usage args_spec usage_msg ; Pervasives.exit 1 in
   let hash, protocol =

@@ -1,17 +1,16 @@
-(jbuild_version 1)
-
 (library
- ((name        bip39)
-  (public_name bip39)
-  (modules (english bip39))
-  (libraries (nocrypto pbkdf))))
+ (name        bip39)
+ (public_name bip39)
+ (modules english bip39)
+ (libraries nocrypto pbkdf))
 
 (rule
- ((targets (english.ml))
-  (deps    (generator.exe (files_recursively_in ../gen)))
-  (action  (run ${<} ${@}))))
+ (targets english.ml)
+ (deps    (:exe generator.exe)
+          (source_tree ../gen))
+ (action  (run %{exe} %{targets})))
 
 (executable
- ((name generator)
-  (modules (generator))
-  (libraries (stdio))))
+ (name generator)
+ (modules generator)
+ (libraries stdio))

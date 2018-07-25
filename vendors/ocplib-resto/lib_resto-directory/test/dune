@@ -1,14 +1,12 @@
-(jbuild_version 1)
-
 (executable
- ((name resto_test)
-  (flags (:standard -safe-string))
-  (libraries (ocplib-resto-directory ocplib-resto-json lwt.unix))))
+ (name resto_test)
+ (flags (:standard -safe-string))
+ (libraries ocplib-resto-directory ocplib-resto-json lwt.unix))
 
 (alias
-((name runtest_resto)
- (action (run ${path:resto_test.exe}))))
+ (name runtest_resto)
+ (action (run %{exe:resto_test.exe})))
 
 (alias
-((name runtest)
- (deps ((alias runtest_resto)))))
+ (name runtest)
+ (deps (alias runtest_resto)))

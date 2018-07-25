@@ -1,8 +1,8 @@
 (executable
- ((name test)
-  (libraries (bip39 hex alcotest))))
+ (name test)
+ (libraries bip39 hex alcotest))
 
 (alias
- ((name    runtest-bip39)
-  (deps    (test.exe))
-  (action  (run ${<}))))
+ (name    runtest-bip39)
+ (deps    (:exe test.exe))
+ (action  (run %{exe})))
