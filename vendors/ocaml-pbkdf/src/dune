@@ -1,7 +1,5 @@
-(jbuild_version 1)
-
 (library
- ((name        pbkdf)
-  (public_name pbkdf)
-  (synopsis "")
-  (libraries (nocrypto))))
+ (name        pbkdf)
+ (public_name pbkdf)
+ (synopsis "")
+ (libraries nocrypto))

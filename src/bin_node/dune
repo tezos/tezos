@@ -1,36 +1,35 @@
-(jbuild_version 1)
-
 (executable
- ((name main)
-  (public_name tezos-node)
-  (libraries (tezos-base
-              tezos-stdlib-unix
-              tezos-shell-services
-              tezos-rpc-http
-              tezos-p2p
-              tezos-shell
-              tezos-protocol-updater
-              tezos-embedded-protocol-genesis
-              tezos-embedded-protocol-demo
-              tezos-embedded-protocol-alpha
-              cmdliner
-              tls))
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_stdlib_unix
-                    -open Tezos_shell_services
-                    -open Tezos_rpc_http
-                    -open Tezos_p2p
-                    -open Tezos_shell
-                    -open Tezos_protocol_updater
-                    -linkall))))
+ (name main)
+ (public_name tezos-node)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-shell-services
+            tezos-rpc-http
+            tezos-p2p
+            tezos-shell
+            tezos-protocol-updater
+            tezos-embedded-protocol-genesis
+            tezos-embedded-protocol-demo
+            tezos-embedded-protocol-alpha
+            cmdliner
+            tls)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_services
+                   -open Tezos_rpc_http
+                   -open Tezos_p2p
+                   -open Tezos_shell
+                   -open Tezos_protocol_updater
+                   -linkall)))
 
 (install
- ((section bin)
-  (files ((tezos-sandboxed-node.sh as tezos-sandboxed-node.sh)))))
+ (section bin)
+ (files (tezos-sandboxed-node.sh as tezos-sandboxed-node.sh)))
 
 (alias
- ((name runtest_indent)
-  (deps ((glob_files *.ml{,i})))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action
+  (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

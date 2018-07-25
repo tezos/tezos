@@ -1,11 +1,9 @@
-(jbuild_version 1)
-
 (library
- ((name config)
-  (modules config)
-  (c_names (config_stubs))))
+ (name config)
+ (modules config)
+ (c_names config_stubs))
 
 (executable
- ((name discover)
-  (modules discover)
-  (libraries (config))))
+ (name discover)
+ (modules discover)
+ (libraries config))

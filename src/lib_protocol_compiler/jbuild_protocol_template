@@ -1,16 +1,5 @@
 (* -*- tuareg -*- *)
 
-(* Build a functorized version of the protocol with the
-   `tezos-protocol-compiler` This is bit hackish...
-
-   AFAIK the current version of dune (1.0.1) does not allow
-   to compile with a custom `rule` the `(modules)` of a library.
-
-   A trick is to provide the `.cmx` through the `(library_flags)` and
-   to generate a empty `.ml` to correctly handle the dependencies... *)
-
-#require "unix"
-
 let prefix = "proto_"
 let dirname = Filename.basename @@ Filename.dirname @@ Sys.getcwd ()
 
@@ -34,54 +23,39 @@ let path =
   | Some _ -> "."
 
 let sources =
-  let d = Unix.opendir "src" in
-  let rec loop acc =
-    match Unix.readdir d with
-    | exception End_of_file ->
-        Unix.closedir d ;
-        acc
-    | file ->
-        let acc =
-          if Filename.check_suffix file ".mli"
-          || Filename.check_suffix file ".ml" then
-            ("src/" ^ file) :: acc
-          else
-            acc
-        in
-        loop acc in
-  loop []
+  Format.kasprintf
+    Jbuild_plugin.V1.run_and_read_lines
+    "find src -name \\*.ml -or -name \\*.mli"
 
 let () = Format.kasprintf Jbuild_plugin.V1.send {|
 
-(jbuild_version 1)
-
 (rule
-  ((targets (functor.ml))
-   (deps ((glob_files src/*.ml{,i})
-           src/TEZOS_PROTOCOL))
-    (action (with-stdout-to ${path-no-dep:functor.ml}
-             (chdir ${ROOT}
-               (run ${bin:tezos-protocol-compiler.tezos-protocol-packer} ${path-no-dep:src}))))))
+ (targets functor.ml)
+ (deps (glob_files src/*.ml{,i})
+       (:src_dir src/TEZOS_PROTOCOL))
+ (action (with-stdout-to %%{targets}
+                         (chdir %%{workspace_root}
+                                (run %%{bin:tezos-protocol-compiler.tezos-protocol-packer} %%{src_dir})))))
 
 (library
- ((name tezos_protocol_%s)
-  (public_name tezos-protocol-%s)
-  (libraries (tezos-protocol-environment-sigs))
-  (flags (-w "+a-4-6-7-9-29-40..42-44-45-48"
-          -warn-error "-a+8"
-          -safe-string -nopervasives))
-  (modules (Functor))))
+ (name tezos_protocol_%s)
+ (public_name tezos-protocol-%s)
+ (libraries tezos-protocol-environment-sigs)
+ (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
+        -warn-error "-a+8"
+        -safe-string -nopervasives)
+ (modules Functor))
 
 (alias
- ((name runtest_sandbox)
-  (deps (tezos_protocol_%s.cmx))))
+ (name runtest_sandbox)
+ (deps .tezos_protocol_%s.objs/tezos_protocol_%s.cmx))
 
 (alias
- ((name runtest_indent)
-  (deps (@[<v>%a@]))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
+ (name runtest_indent)
+ (deps @[<v>%a@])
+ (action (run bash %%{libexec:tezos-stdlib:test-ocp-indent.sh} %%{deps})))
 
 |}
-    lib_version version lib_version
+    lib_version version lib_version lib_version
     Format.(pp_print_list (fun ppf -> Format.fprintf ppf "%S"))
     sources

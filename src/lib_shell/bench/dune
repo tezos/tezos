@@ -1,31 +1,29 @@
-(jbuild_version 1)
-
 (executables
- ((names (bench_simple bench_tool))
-  (libraries (tezos-base
-              tezos-shell
-              tezos_alpha_bench_helpers))
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_shell
-                    -open Tezos_alpha_bench_helpers))))
+ (names bench_simple bench_tool)
+ (libraries tezos-base
+            tezos-shell
+            tezos_alpha_bench_helpers)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_shell
+                   -open Tezos_alpha_bench_helpers)))
 
 (alias
- ((name buildtest)
-  (deps (bench_tool.exe bench_simple.exe))))
+ (name buildtest)
+ (deps bench_tool.exe bench_simple.exe))
 
 (alias
- ((name runbench_alpha_simple)
-  (deps (bench_simple.exe))
-  (action (chdir ${ROOT} (run ${exe:bench_simple.exe})))))
+ (name runbench_alpha_simple)
+ (deps bench_simple.exe)
+ (action (chdir %{workspace_root} (run %{exe:bench_simple.exe}))))
 
 (alias
- ((name runbench_alpha)
-  (deps (bench_tool.exe))
-   (action (chdir ${ROOT} (run ${exe:bench_tool.exe})))))
+ (name runbench_alpha)
+ (deps bench_tool.exe)
+ (action (chdir %{workspace_root} (run %{exe:bench_tool.exe}))))
 
 (alias
- ((name runtest_indent)
-  (deps ((glob_files *.ml*)))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
+ (name runtest_indent)
+ (deps (glob_files *.ml*))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

@@ -1,10 +1,7 @@
-(jbuild_version 1)
-
 (executable
- ((name pbkdf_tests)
-  (libraries (pbkdf alcotest))))
+ (name pbkdf_tests)
+ (libraries pbkdf alcotest))
 
 (alias
- ((name    runtest-pbkdf)
-  (deps    (pbkdf_tests.exe))
-  (action  (run ${<}))))
+ (name    runtest-pbkdf)
+ (action  (run %{exe:pbkdf_tests.exe})))
