@@ -59,7 +59,7 @@ module Hash : sig
   module HMAC_SHA256 : sig
     val write_hmac :
       key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t -> unit
-    (** @raise [Invalid_argument] if argument is less than 32 bytes long *)
+    (** @raise Invalid_argument if argument is less than 32 bytes long *)
 
     val hmac :
       key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t
@@ -83,10 +83,10 @@ module Secretbox : sig
   val boxzerobytes : int
 
   val unsafe_of_bytes : Bigstring.t -> key
-  (** @raise [Invalid_argument] if argument is not [keybytes] bytes long *)
+  (** @raise Invalid_argument if argument is not [keybytes] bytes long *)
 
   val blit_of_bytes : Bigstring.t -> int -> key
-  (** @raise [Invalid_argument] if argument is not [keybytes] bytes long *)
+  (** @raise Invalid_argument if argument is not [keybytes] bytes long *)
 
   val genkey : unit -> key
 
@@ -121,16 +121,16 @@ module Box : sig
   val blit_to_bytes : _ key -> ?pos:int -> Bigstring.t -> unit
 
   val unsafe_sk_of_bytes : Bigstring.t -> secret key
-  (** @raise [Invalid_argument] if argument is not [skbytes] bytes long *)
+  (** @raise Invalid_argument if argument is not [skbytes] bytes long *)
 
   val unsafe_pk_of_bytes : Bigstring.t -> public key
-  (** @raise [Invalid_argument] if argument is not [pkbytes] bytes long *)
+  (** @raise Invalid_argument if argument is not [pkbytes] bytes long *)
 
   val unsafe_ck_of_bytes : Bigstring.t -> combined key
-  (** @raise [Invalid_argument] if argument is not [ckbytes] bytes long *)
+  (** @raise Invalid_argument if argument is not [ckbytes] bytes long *)
 
   val of_seed : ?pos:int -> Bigstring.t -> secret key
-  (** @raise [Invalid_argument] if [pos] is outside the buffer or the buffer
+  (** @raise Invalid_argument if [pos] is outside the buffer or the buffer
       is less than [skbytes] bytes long *)
 
   val neuterize : secret key -> public key
@@ -156,10 +156,10 @@ module Sign : sig
   val equal : 'a key -> 'a key -> bool
 
   val unsafe_sk_of_bytes : Bigstring.t -> secret key
-  (** @raise [Invalid_argument] if argument is less than [skbytes] bytes long *)
+  (** @raise Invalid_argument if argument is less than [skbytes] bytes long *)
 
   val unsafe_pk_of_bytes : Bigstring.t -> public key
-  (** @raise [Invalid_argument] if argument is less than [pkbytes] bytes long *)
+  (** @raise Invalid_argument if argument is less than [pkbytes] bytes long *)
 
   val unsafe_to_bytes : _ key -> Bigstring.t
   (** [unsafe_to_bytes k] is the internal [Bigstring.t] where the key
@@ -175,7 +175,7 @@ module Sign : sig
   (** [sign sk msg buf] writes the signature of [msg] with [sk] at
       [buf].
 
-      @raises [Invalid_argument] if [buf] is smaller than [bytes]
+      @raises Invalid_argument if [buf] is smaller than [bytes]
       bytes long. *)
 
   val verify :
