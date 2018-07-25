@@ -37,7 +37,7 @@ open Error_monad
     Commands are series of fixed keywords and positional arguments, in
     order to support command lines close to a natural language. *)
 
-(** {2 Argument parsers. *)
+(** {2 Argument parsers.} *)
 
 (** The type for argument parsers, used for both positional and
     optional arguments.
