@@ -2057,9 +2057,7 @@ The stack type contains both the types of each element in the stack, as
 well as an optional variable annotation for each element. In this
 sub-section we note:
 - ``[]`` for the empty stack ;
-- ``@annot (top) : (rest)`` for the stack whose first value has type
-  ``(top)`` and is annotated with variable annotation ``@annot`` and
-  whose queue has stack type ``(rest)``.
+- ``@annot (top) : (rest)`` for the stack whose first value has type ``(top)`` and is annotated with variable annotation ``@annot`` and whose queue has stack type ``(rest)``.
 
 The instructions which do not accept any variable annotations are:
 
@@ -2472,8 +2470,7 @@ Micheline expressions are encoded in JSON like this:
    list of annotations, including their leading ``@``, ``%`` or ``%``
    sign.
 
-   ``{ "prim": "pair", "args": [ { "prim": "nat", "args": [] }, { "prim":
-     "nat", "args": [] } ], "annots": [":t"] }``
+   ``{ "prim": "pair", "args": [ { "prim": "nat", "args": [] }, { "prim": "nat", "args": [] } ], "annots": [":t"] }``
 
 As in the concrete syntax, all domain specific constants are encoded as
 strings.

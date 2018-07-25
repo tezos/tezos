@@ -180,7 +180,7 @@ module Sign : sig
                                   writes signs [msg] with [sk] and writes the signature to [buf] at
                                   [?pos]. It returns the number of bytes written (64).
 
-                                  @raise [Invalid_argument] if [buf] is not long enough to contain
+                                  @raise Invalid_argument if [buf] is not long enough to contain
                                   a signature or signing has failed. *)
 
   val write_sign_recoverable : Context.t -> sk:Key.secret Key.t ->
