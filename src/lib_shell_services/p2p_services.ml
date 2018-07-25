@@ -235,7 +235,8 @@ module Peers = struct
     let info =
       RPC_service.get_service
         ~query: RPC_query.empty
-        ~output: (P2p_peer.Info.encoding Connection_metadata.encoding)
+        ~output: (P2p_peer.Info.encoding Peer_metadata.encoding
+                    Connection_metadata.encoding)
         ~description:"Details about a given peer."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg)
 
@@ -260,7 +261,8 @@ module Peers = struct
         ~output:
           Data_encoding.(list (tup2
                                  P2p_peer.Id.encoding
-                                 (P2p_peer.Info.encoding Connection_metadata.encoding)))
+                                 (P2p_peer.Info.encoding Peer_metadata.encoding
+                                    Connection_metadata.encoding)))
         ~description:"List the peers the node ever met."
         RPC_path.(root / "network" / "peers")
 

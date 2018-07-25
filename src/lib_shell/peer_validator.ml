@@ -165,6 +165,8 @@ let validate_new_head w hash (header : Block_header.t) =
     Block_hash.pp_short hash
     P2p_peer.Id.pp_short pv.peer_id ;
   set_bootstrapped pv ;
+  let meta = Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id in
+  Peer_metadata.incr meta Valid_blocks;
   return_unit
 
 let only_if_fitness_increases w distant_header cont =
@@ -180,6 +182,8 @@ let only_if_fitness_increases w distant_header cont =
       Block_hash.pp_short (Block_header.hash distant_header)
       P2p_peer.Id.pp_short pv.peer_id ;
     (* Don't download a branch that cannot beat the current head. *)
+    let meta = Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id in
+    Peer_metadata.incr meta Old_heads;
     return_unit
   end else cont ()
 

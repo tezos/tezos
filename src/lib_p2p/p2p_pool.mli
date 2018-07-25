@@ -144,7 +144,7 @@ type config = {
 
 type 'peer_meta peer_meta_config = {
   peer_meta_encoding : 'peer_meta Data_encoding.t ;
-  peer_meta_initial : 'peer_meta ;
+  peer_meta_initial : unit -> 'peer_meta ;
   score : 'peer_meta -> float ;
 }
 

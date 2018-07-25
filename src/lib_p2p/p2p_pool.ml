@@ -217,7 +217,7 @@ type config = {
 
 type 'peer_meta peer_meta_config = {
   peer_meta_encoding : 'peer_meta Data_encoding.t ;
-  peer_meta_initial : 'peer_meta ;
+  peer_meta_initial : unit -> 'peer_meta ;
   score : 'peer_meta -> float ;
 }
 
@@ -377,7 +377,7 @@ let register_peer pool peer_id =
       Lwt_condition.broadcast pool.events.new_peer () ;
       let peer =
         P2p_peer_state.Info.create peer_id
-          ~peer_metadata:pool.peer_meta_config.peer_meta_initial in
+          ~peer_metadata:(pool.peer_meta_config.peer_meta_initial ()) in
       Option.iter pool.config.max_known_peer_ids ~f:begin fun (max, _) ->
         if P2p_peer.Table.length pool.known_peer_ids >= max then gc_peer_ids pool
       end ;
@@ -527,7 +527,7 @@ module Peers = struct
 
   let get_peer_metadata pool peer_id =
     try P2p_peer_state.Info.peer_metadata (P2p_peer.Table.find pool.known_peer_ids peer_id)
-    with Not_found -> pool.peer_meta_config.peer_meta_initial
+    with Not_found -> pool.peer_meta_config.peer_meta_initial ()
 
   let get_score pool peer_id =
     pool.peer_meta_config.score (get_peer_metadata pool peer_id)
@@ -1194,11 +1194,23 @@ let create config peer_meta_config conn_meta_config message_config io_sched =
         peer_ids ;
       Lwt.return pool
   | Error err ->
-      log_error "@[Failed to parsed peers file:@ %a@]"
+      log_error "@[Failed to parse peers file:@ %a@]"
         pp_print_error err ;
       Lwt.return pool
 
-let destroy pool =
+let destroy ({ config ; peer_meta_config } as pool) =
+  lwt_log_info "Saving metadata in %s" config.peers_file >>= fun () ->
+  begin
+    P2p_peer_state.Info.File.save
+      config.peers_file
+      peer_meta_config.peer_meta_encoding
+      (P2p_peer.Table.fold (fun _ a b -> a::b) pool.known_peer_ids []) >>= function
+    | Error err ->
+        log_error "@[Failed to save peers file:@ %a@]"
+          pp_print_error err;
+        Lwt.return_unit
+    | Ok ()-> Lwt.return_unit
+  end >>= fun () ->
   P2p_point.Table.fold (fun _point point_info acc ->
       match P2p_point_state.get point_info with
       | Requested { cancel } | Accepted { cancel } ->

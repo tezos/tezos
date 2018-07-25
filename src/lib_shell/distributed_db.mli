@@ -79,6 +79,8 @@ val db: chain_db -> db
 (** Return the peer id of the node *)
 val my_peer_id: chain_db -> P2p_peer.Id.t
 
+val get_peer_metadata: chain_db -> P2p_peer.Id.t -> Peer_metadata.t
+
 (** {1 Sending messages} *)
 
 module Request : sig
