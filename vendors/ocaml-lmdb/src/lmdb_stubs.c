@@ -152,7 +152,7 @@ CAMLprim value stub_mdb_env_set_flags(value env, value flags, value onoff) {
 }
 
 CAMLprim value stub_mdb_env_get_flags(value env) {
-    int flags;
+    unsigned int flags;
     mdb_env_get_flags(Env_val(env), &flags);
     return Val_int(flags);
 }
@@ -434,7 +434,10 @@ CAMLprim value stub_mdb_cursor_renew(value txn, value cursor) {
 }
 
 CAMLprim value stub_mdb_cursor_txn(value cursor) {
-    return (value) mdb_cursor_txn(Cursor_val(cursor));
+    CAMLparam1(cursor);
+    CAMLlocal1(txn);
+    txn = alloc_txn(mdb_cursor_txn(Cursor_val(cursor)));
+    CAMLreturn(txn);
 }
 
 CAMLprim value stub_mdb_cursor_dbi(value cursor) {
