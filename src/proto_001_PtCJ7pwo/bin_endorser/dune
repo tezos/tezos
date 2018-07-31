@@ -1,20 +1,18 @@
-(jbuild_version 1)
-
 (executable
- ((name main_endorser_001_PtCJ7pwo)
-  (public_name tezos-endorser-001-PtCJ7pwo)
-  (libraries (tezos-client-base-unix
-              tezos-client-commands
-              tezos-baking-001-PtCJ7pwo-commands))
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_client_001_PtCJ7pwo
-                    -open Tezos_client_commands
-                    -open Tezos_baking_001_PtCJ7pwo_commands
-                    -open Tezos_client_base_unix))))
+ (name main_endorser_001_PtCJ7pwo)
+ (public_name tezos-endorser-001-PtCJ7pwo)
+ (libraries tezos-client-base-unix
+            tezos-client-commands
+            tezos-baking-001-PtCJ7pwo-commands)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_client_001_PtCJ7pwo
+                   -open Tezos_client_commands
+                   -open Tezos_baking_001_PtCJ7pwo_commands
+                   -open Tezos_client_base_unix)))
 
 (alias
- ((name runtest_indent)
-  (deps ((glob_files *.ml{,i})))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^})))
