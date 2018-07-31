@@ -12,7 +12,6 @@
             tezos-stdlib-unix
             tezos-client-base-unix
             tezos-client-001-PtCJ7pwo-commands.registration
-            tezos-baking-001-PtCJ7pwo-commands.registration
             tezos-client-002-PsYLVpVv-commands.registration
             tezos-baking-002-PsYLVpVv-commands.registration
             tezos-signer-backends)
