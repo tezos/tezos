@@ -6,7 +6,7 @@
                    -open Tezos_base
                    -open Tezos_error_monad
                    -open Tezos_data_encoding
-                   -open Tezos_client_002-PsYLVpVv
+                   -open Tezos_client_002_PsYLVpVv
                    -safe-string
                    -linkall)))
 
