@@ -14,7 +14,7 @@ if ! opam install $opams --deps-only --with-test --show-actions | grep "Nothing 
     echo
     echo 'Failure! Missing actions:'
     echo
-    opam install $packages --deps-only --with-test --show-actions
+    opam install $opams --deps-only --with-test --show-actions
     echo
     echo 'Failed! Please read the doc in `./scripts/update_opam_repo.sh` and act accordingly.'
     echo

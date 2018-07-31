@@ -93,19 +93,25 @@ let run_change_to_demo_proto block
 
   (* Mine blocks to switch to end the vote cycle (back to Proposal) *)
   Format.eprintf "Switching to `demo` protocol@.";
-  Baking.bake (`Hash (head, 0)) b4 operations >>=? fun head ->
+  Baking.bake (`Hash (head, 0)) b4 operations >>= function
+  | Error [Block_validator_errors.Unavailable_protocol { protocol }]
+    when Protocol_hash.equal protocol demo_protocol ->
+      return ()
+  | Error _ as err ->
+      Lwt.return err
+  | Ok head ->
 
-  Assert.check_protocol
-    ~msg:__LOC__ ~block:(`Hash (head, 0)) demo_protocol >>=? fun () ->
+      Assert.check_protocol
+        ~msg:__LOC__ ~block:(`Hash (head, 0)) demo_protocol >>=? fun () ->
 
-  return (`Hash (head, 0))
+      return ()
 
 let exe = try Sys.argv.(1) with _ -> "tezos-node"
 let rpc_port = try int_of_string Sys.argv.(2) with _ -> 18400
 
 let change_to_demo_proto () =
   init ~exe ~vote:true ~rpc_port () >>=? fun (_node_pid, hash) ->
-  run_change_to_demo_proto (`Hash (hash, 0)) Account.bootstrap_accounts >>=? fun _blkh ->
+  run_change_to_demo_proto (`Hash (hash, 0)) Account.bootstrap_accounts >>=? fun () ->
   return_unit
 
 let tests = [

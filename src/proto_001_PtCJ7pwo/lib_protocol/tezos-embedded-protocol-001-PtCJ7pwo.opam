@@ -14,9 +14,9 @@ depends: [
   "tezos-protocol-updater"
 ]
 build: [
-  [ "rm" "jbuild" "src/jbuild" ]
-  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_embedded_protocol_template" "src/jbuild" ]
-  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"alpha\"/" "src/jbuild" ]
+  [ "rm" "dune" "src/dune" ]
+  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_embedded_protocol_template" "src/dune" ]
+  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"001_PtCJ7pwo\"/" "src/dune" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 build-test: [
