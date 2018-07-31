@@ -7,11 +7,9 @@
             tezos-client-base
             tezos-client-commands
             tezos-client-000-Ps9mPmXa
-            tezos-client-001-PtCJ7pwo
             tezos-client-002-PsYLVpVv
             tezos-stdlib-unix
             tezos-client-base-unix
-            tezos-client-001-PtCJ7pwo-commands.registration
             tezos-client-002-PsYLVpVv-commands.registration
             tezos-baking-002-PsYLVpVv-commands.registration
             tezos-signer-backends)

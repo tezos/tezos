@@ -29,7 +29,7 @@ open Proto_alpha_helpers
 
 let demo_protocol =
   Protocol_hash.of_b58check_exn
-    "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
+    "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt"
 
 let print_level head =
   level (`Main, `Hash (head, 0)) >>=? fun lvl ->
