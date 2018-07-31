@@ -200,6 +200,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
     checkpoint ;
   } in
   Node.create
+    ~sandboxed:(sandbox <> None)
     node_config
     config.shell.peer_validator_limits
     config.shell.block_validator_limits
@@ -213,43 +214,45 @@ let sanitize_cors_headers ~default headers =
   String.Set.(union (of_list default)) |>
   String.Set.elements
 
+let launch_rpc_server
+    (rpc_config : Node_config_file.rpc) node (addr, port) =
+  let host = Ipaddr.V6.to_string addr in
+  let dir = Node.build_rpc_directory node in
+  let mode =
+    match rpc_config.tls with
+    | None -> `TCP (`Port port)
+    | Some { cert ; key } ->
+        `TLS (`Crt_file_path cert, `Key_file_path key,
+              `No_password, `Port port) in
+  lwt_log_notice
+    "Starting a RPC server listening on %s:%d%s."
+    host port
+    (if rpc_config.tls = None then "" else " (TLS enabled)") >>= fun () ->
+  let cors_headers =
+    sanitize_cors_headers
+      ~default:["Content-Type"] rpc_config.cors_headers in
+  Lwt.catch begin fun () ->
+    RPC_server.launch ~host mode dir
+      ~media_types:Media_type.all_media_types
+      ~cors:{ allowed_origins = rpc_config.cors_origins ;
+              allowed_headers = cors_headers } >>= return
+  end begin function
+    | Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
+        fail (RPC_Port_already_in_use [(addr,port)])
+    | exn -> Lwt.return (error_exn exn)
+  end
+
 let init_rpc (rpc_config: Node_config_file.rpc) node =
   match rpc_config.listen_addr with
   | None ->
       lwt_log_notice "Not listening to RPC calls." >>= fun () ->
-      return_none
+      return_nil
   | Some addr ->
       Node_config_file.resolve_rpc_listening_addrs addr >>= function
       | [] ->
           failwith "Cannot resolve listening address: %S" addr
-      | (addr, port) :: _ ->
-          let host = Ipaddr.V6.to_string addr in
-          let dir = Node.build_rpc_directory node in
-          let mode =
-            match rpc_config.tls with
-            | None -> `TCP (`Port port)
-            | Some { cert ; key } ->
-                `TLS (`Crt_file_path cert, `Key_file_path key,
-                      `No_password, `Port port) in
-          lwt_log_notice
-            "Starting the RPC server listening on port %d%s."
-            port
-            (if rpc_config.tls = None then "" else " (TLS enabled)") >>= fun () ->
-          let cors_headers =
-            sanitize_cors_headers
-              ~default:["Content-Type"] rpc_config.cors_headers in
-          Lwt.catch
-            (fun () ->
-               RPC_server.launch ~host mode dir
-                 ~media_types:Media_type.all_media_types
-                 ~cors:{ allowed_origins = rpc_config.cors_origins ;
-                         allowed_headers = cors_headers } >>= fun server ->
-               return_some server)
-            (function
-              |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
-                  fail (RPC_Port_already_in_use [(addr,port)])
-              | exn -> Lwt.return (error_exn exn)
-            )
+      | addrs ->
+          map_s (launch_rpc_server rpc_config node) addrs
 
 let init_signal () =
   let handler name id = try
@@ -274,7 +277,7 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   lwt_log_notice "Shutting down the Tezos node..." >>= fun () ->
   Node.shutdown node >>= fun () ->
   lwt_log_notice "Shutting down the RPC server..." >>= fun () ->
-  Lwt_utils.may ~f:RPC_server.shutdown rpc >>= fun () ->
+  Lwt_list.iter_s RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
   Logging_unix.close () >>= fun () ->
   return_unit

@@ -1,0 +1,46 @@
+(executables
+ (names test
+        test_locator)
+ (libraries tezos-base
+            tezos-storage
+            tezos-protocol-updater
+            tezos-shell
+            tezos-shell-services
+            tezos-embedded-protocol-demo
+            tezos-stdlib-unix
+            alcotest-lwt)
+ (flags (:standard -w -9-32
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_storage
+                   -open Tezos_protocol_updater
+                   -open Tezos_shell
+                   -open Tezos_shell_services
+                   -open Tezos_stdlib_unix)))
+
+(alias
+ (name buildtest)
+ (deps test.exe
+       test_locator.exe))
+
+(alias
+ (name runtest_shell)
+ (action (run %{exe:test.exe})))
+
+(alias
+ (name runtest_locator)
+ (action (run %{exe:test_locator.exe} --no-bench)))
+
+(alias
+ (name runbench_locator)
+ (action (run %{exe:test_locator.exe})))
+
+(alias
+ (name runtest)
+ (deps (alias runtest_shell)
+       (alias runtest_locator)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

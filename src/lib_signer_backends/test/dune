@@ -1,0 +1,28 @@
+(executables
+ (names test_encrypted)
+ (libraries tezos-signer-backends
+            alcotest-lwt)
+ (flags (:standard -w -9-32
+                   -safe-string
+                   -open Tezos_error_monad
+                   -open Tezos_stdlib
+                   -open Tezos_crypto
+                   -open Tezos_client_base
+                   -open Tezos_signer_backends)))
+
+(alias
+ (name buildtest)
+ (deps test_encrypted.exe))
+
+(alias
+ (name runtest_signer_encrypted)
+ (action (run %{exe:test_encrypted.exe})))
+
+(alias
+ (name runtest)
+ (deps (alias runtest_signer_encrypted)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

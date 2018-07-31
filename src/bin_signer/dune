@@ -1,0 +1,25 @@
+(executables
+ (names main_signer)
+ (public_names tezos-signer)
+ (libraries tezos-base
+            tezos-client-base
+            tezos-client-base-unix
+            tezos-client-commands
+            tezos-signer-services
+            tezos-rpc-http
+            tezos-stdlib-unix
+            tezos-signer-backends)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_client_base
+                   -open Tezos_client_base_unix
+                   -open Tezos_client_commands
+                   -open Tezos_signer_services
+                   -open Tezos_rpc_http
+                   -open Tezos_stdlib_unix)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

@@ -600,7 +600,11 @@ module Make (Context : CONTEXT) = struct
         | Ok v -> Lwt.return (Ok (Some v))
 
     end
-    module Micheline = Micheline
+    module Micheline = struct
+      include Micheline
+      let canonical_encoding_v1 = canonical_encoding_v1
+      let canonical_encoding = canonical_encoding_v0
+    end
     module Logging = Logging.Make(Param)
 
     module Updater = struct

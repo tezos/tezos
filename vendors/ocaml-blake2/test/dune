@@ -1,0 +1,11 @@
+(executable
+ (name test)
+ (libraries blake2 hex alcotest))
+
+(alias
+ (name    runtest-blake2)
+ (action  (run %{exe:test.exe})))
+
+(alias
+ (name    runtest)
+ (deps    (alias runtest-blake2)))

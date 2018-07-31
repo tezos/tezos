@@ -1,0 +1,10 @@
+(library
+ (name        uecc)
+ (public_name uecc)
+ (synopsis "ECDH and ECDSA for 8-bit, 32-bit, and 64-bit processors.")
+ (c_names uECC uecc_stubs)
+ (c_flags (-O3
+           -DuECC_OPTIMIZATION_LEVEL=3
+           -DuECC_SQUARE_FUNC=1
+           -DuECC_VLI_NATIVE_LITTLE_ENDIAN=0))
+ (libraries bigstring))

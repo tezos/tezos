@@ -1,0 +1,32 @@
+(executables
+ (names test_tzList
+        test_lwt_pipe)
+ (libraries tezos-stdlib
+            alcotest
+            lwt.unix)
+ (flags (:standard -w -9-32
+                   -safe-string
+                   -open Tezos_stdlib)))
+
+(alias
+ (name buildtest)
+ (deps test_tzList.exe
+       test_lwt_pipe.exe))
+
+(alias
+ (name runtest_tzList)
+ (action (run %{exe:test_tzList.exe})))
+
+(alias
+ (name runtest_lwt_pipe)
+ (action (run %{exe:test_lwt_pipe.exe})))
+
+(alias
+ (name runtest)
+ (deps (alias runtest_tzList)
+       (alias runtest_lwt_pipe)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

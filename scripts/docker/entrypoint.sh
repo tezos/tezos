@@ -9,12 +9,14 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 : ${NODE_HOST:="node"}
 : ${NODE_RPC_PORT:="8732"}
 
+: ${PROTOCOL:="unspecified-PROTOCOL-variable"}
+
 node="/usr/local/bin/tezos-node"
 client="/usr/local/bin/tezos-client"
 admin_client="/usr/local/bin/tezos-admin-client"
-baker="/usr/local/bin/tezos-alpha-baker"
-endorser="/usr/local/bin/tezos-alpha-endorser"
-accuser="/usr/local/bin/tezos-alpha-accuser"
+baker="/usr/local/bin/tezos-baker-$PROTOCOL"
+endorser="/usr/local/bin/tezos-endorser-$PROTOCOL"
+accuser="/usr/local/bin/tezos-accuser-$PROTOCOL"
 signer="/usr/local/bin/tezos-signer"
 
 client_dir="$DATA_DIR/client"

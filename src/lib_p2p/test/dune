@@ -1,0 +1,92 @@
+(executables
+ (names test_p2p_socket
+        test_p2p_pool
+        test_p2p_io_scheduler
+        test_p2p_peerset
+        test_p2p_ipv6set
+        test_p2p_banned_peers
+        )
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-shell-services
+            tezos-p2p
+            alcotest-lwt)
+ (flags (:standard -w -9-32
+                   -linkall
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_services
+                   -open Tezos_p2p)))
+
+(alias
+ (name buildtest)
+ (deps test_p2p_socket.exe
+       test_p2p_pool.exe
+       test_p2p_io_scheduler.exe
+       test_p2p_peerset.exe
+       test_p2p_ipv6set.exe
+       test_p2p_banned_peers.exe
+       ))
+
+(alias
+ (name runtest_p2p_socket)
+ (action (run %{exe:test_p2p_socket.exe} -v)))
+
+(alias
+ (name runtest_p2p_pool)
+ (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5 -v)))
+
+(alias
+ (name runtest_p2p_io_scheduler)
+ (action (run %{exe:test_p2p_io_scheduler.exe}
+              --delay 5 --clients 8
+              --max-upload-speed 262144 ;; 1 << 18 = 256kB
+              --max-download-speed 1048576 ;; 1 << 20 = 1MB
+              )))
+
+(alias
+ (name runtest_p2p_socket_ipv4)
+ (action (run %{exe:test_p2p_socket.exe} -v
+              --addr "::ffff:127.0.0.1")))
+
+(alias
+ (name runtest_p2p_pool_ipv4)
+ (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5 -v
+              --addr "::ffff:127.0.0.1")))
+
+(alias
+ (name runtest_p2p_io_scheduler_ipv4)
+ (action (run %{exe:test_p2p_io_scheduler.exe}
+              --delay 5 --clients 8
+              --max-upload-speed 262144 ;; 1 << 18 = 256kB
+              --max-download-speed 1048576 ;; 1 << 20 = 1MB
+              --addr "::ffff:127.0.0.1"
+              )))
+
+(alias
+ (name runtest_p2p_ipv6set)
+ (action (run %{exe:test_p2p_ipv6set.exe} -v)))
+
+(alias
+ (name runtest_p2p_peerset)
+ (action (run %{exe:test_p2p_peerset.exe} -v)))
+
+(alias
+ (name runtest_p2p_banned_peers)
+ (action (run %{exe:test_p2p_banned_peers.exe} -v)))
+
+(alias
+ (name runtest)
+ (deps (alias runtest_p2p_socket_ipv4)
+       (alias runtest_p2p_pool_ipv4)
+       (alias runtest_p2p_io_scheduler_ipv4)
+       (alias runtest_p2p_peerset)
+       (alias runtest_p2p_ipv6set)
+       (alias runtest_p2p_banned_peers)
+       ))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

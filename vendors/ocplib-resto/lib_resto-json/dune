@@ -1,0 +1,6 @@
+(library
+ (name resto_json)
+ (public_name ocplib-resto-json)
+ (libraries ocplib-json-typed ocplib-json-typed-bson ocplib-resto)
+ (flags (:standard -safe-string))
+ (wrapped false))

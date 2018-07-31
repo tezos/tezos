@@ -8,21 +8,22 @@ dev-repo: "https://gitlab.com/tezos/tezos.git"
 license: "unreleased"
 depends: [
   "ocamlfind" { build }
-  "jbuilder" { build & = "1.0+beta20" }
+  "dune" { build & = "1.0.1" }
   "tezos-base"
   "tezos-rpc-http"
   "tezos-p2p"
   "tezos-shell"
   "tezos-protocol-updater"
-  "tezos-embedded-protocol-genesis"
+  "tezos-embedded-protocol-000-Ps9mPmXa"
   "tezos-embedded-protocol-demo"
-  "tezos-embedded-protocol-alpha"
+  "tezos-embedded-protocol-001-PtCJ7pwo"
+  "tezos-embedded-protocol-002-PsYLVpVv"
   "cmdliner"
   "tls"
 ]
 build: [
-  [ "jbuilder" "build" "-p" name "-j" jobs ]
+  [ "dune" "build" "-p" name "-j" jobs ]
 ]
 build-test: [
-  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+  [ "dune" "runtest" "-p" name "-j" jobs ]
 ]

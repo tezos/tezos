@@ -126,7 +126,7 @@ module Encoding: sig
 
   (** Integer with bounds in a given range. Both bounds are inclusive.
 
-      @raise [Invalid_argument] if the bounds are beyond the interval
+      @raise Invalid_argument if the bounds are beyond the interval
       [-2^30; 2^30-1]. These bounds are chosen to be compatible with all versions
       of OCaml.
   *)
@@ -188,7 +188,7 @@ module Encoding: sig
       If [max_length] is passed and the encoding of elements has fixed
       size, a {!check_size} is automatically added for earlier rejection.
 
-      @raise [Invalid_argument] if the inner encoding is variable. *)
+      @raise Invalid_argument if the inner encoding is variable. *)
   val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
   (** List combinator.
@@ -199,7 +199,7 @@ module Encoding: sig
       If [max_length] is passed and the encoding of elements has fixed
       size, a {!check_size} is automatically added for earlier rejection.
 
-      @raise [Invalid_argument] if the inner encoding is also variable. *)
+      @raise Invalid_argument if the inner encoding is also variable. *)
   val list : ?max_length:int -> 'a encoding -> 'a list encoding
 
   (** Provide a transformer from one encoding to a different one.
@@ -262,7 +262,7 @@ module Encoding: sig
       field are 'variable', the first ones should be wrapped with
       [dynamic_size].
 
-      @raise [Invalid_argument] if more than one field is a variable one. *)
+      @raise Invalid_argument if more than one field is a variable one. *)
 
   val obj1 :
     'f1 field -> 'f1 encoding
@@ -298,7 +298,7 @@ module Encoding: sig
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) encoding
 
   (** Create a larger object from the encodings of two smaller ones.
-      @raise [Invalid_argument] if both arguments are not objects  or if both
+      @raise Invalid_argument if both arguments are not objects  or if both
       tuples contains a variable field.. *)
   val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
 
@@ -312,7 +312,7 @@ module Encoding: sig
       are 'variable', the first ones should be wrapped with
       [dynamic_size].
 
-      @raise [Invalid_argument] if more than one field is a variable one. *)
+      @raise Invalid_argument if more than one field is a variable one. *)
 
   val tup1 :
     'f1 encoding ->
@@ -355,7 +355,7 @@ module Encoding: sig
 
 
   (** Create a large tuple encoding from two smaller ones.
-      @raise [Invalid_argument] if both values are not tuples or if both
+      @raise Invalid_argument if both values are not tuples or if both
       tuples contains a variable field. *)
   val merge_tups : 'a1 encoding -> 'a2 encoding -> ('a1 * 'a2) encoding
 
@@ -394,7 +394,7 @@ module Encoding: sig
       cases. The default is [`Uint8] and you must use a [`Uint16] if you are
       going to have more than 256 cases.
 
-      @raise [Invalid_argument] if it is given the empty list
+      @raise Invalid_argument if it is given the empty list
       or if there are more cases than can fit in the tag size. *)
   val union :
     ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
@@ -424,17 +424,17 @@ module Encoding: sig
       See the preamble for an explanation. *)
   module Fixed : sig
 
-    (** @raises [Invalid_argument] if the argument is less or equal to zero. *)
+    (** @raises Invalid_argument if the argument is less or equal to zero. *)
     val string : int -> string encoding
 
-    (** @raises [Invalid_argument] if the argument is less or equal to zero. *)
+    (** @raises Invalid_argument if the argument is less or equal to zero. *)
     val bytes : int -> MBytes.t encoding
 
     (** [add_padding e n] is a padded version of the encoding [e]. In Binary,
         there are [n] null bytes ([\000]) added after the value encoded by [e].
         In JSON, padding is ignored.
 
-        @raises [Invalid_argument] if [n <= 0]. *)
+        @raises Invalid_argument if [n <= 0]. *)
     val add_padding : 'a encoding -> int -> 'a encoding
   end
 
@@ -445,11 +445,11 @@ module Encoding: sig
     val string : string encoding
     val bytes : MBytes.t encoding
 
-    (** @raises [Invalid_argument] if the encoding argument is variable length
+    (** @raises Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
     val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
-    (** @raises [Invalid_argument] if the encoding argument is variable length
+    (** @raises Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
     val list : ?max_length:int -> 'a encoding -> 'a list encoding
 

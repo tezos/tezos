@@ -1,0 +1,11 @@
+(library
+ (name            lmdb)
+ (public_name     lmdb)
+ (libraries       rresult)
+ (c_names         mdb midl lmdb_stubs)
+ (c_flags         (:include c_flags.sexp))
+ (c_library_flags (-lpthread)))
+
+(rule
+ (targets c_flags.sexp)
+ (action  (run %{exe:../config/discover.exe} -ocamlc %{ocamlc})))

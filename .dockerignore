@@ -16,9 +16,9 @@ tezos-node
 tezos-protocol-compiler
 tezos-client
 tezos-admin-client
-tezos-alpha-baker
-tezos-alpha-endorser
-tezos-alpha-accuser
+tezos-baker-*
+tezos-endorser-*
+tezos-accuser-*
 tezos-signer
 
 scripts/opam-test-all.sh.DONE
@@ -30,6 +30,8 @@ docs/api/rpc.rst
 docs/api/p2p.rst
 
 src/bin_client/test/LOG.*
+
+**/dune-project
 
 **/*.install
 **/.merlin

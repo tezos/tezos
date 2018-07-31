@@ -1,0 +1,6 @@
+(library
+ (name ezresto_directory)
+ (public_name ocplib-ezresto-directory)
+ (libraries ocplib-ezresto ocplib-resto-directory)
+ (flags (:standard -safe-string))
+ (wrapped false))

@@ -1,0 +1,9 @@
+(library
+ (name config)
+ (modules config)
+ (c_names config_stubs))
+
+(executable
+ (name discover)
+ (modules discover)
+ (libraries config))

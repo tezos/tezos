@@ -1,0 +1,12 @@
+(executable
+ (name ezResto_test)
+ (flags (:standard -safe-string))
+ (libraries ocplib-ezresto-directory lwt.unix))
+
+(alias
+ (name runtest_ezresto)
+ (action (run %{exe:ezResto_test.exe})))
+
+(alias
+ (name runtest)
+ (deps (alias runtest_ezresto)))

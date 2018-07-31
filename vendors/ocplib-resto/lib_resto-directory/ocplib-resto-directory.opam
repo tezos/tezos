@@ -8,15 +8,15 @@ bug-reports: "https://github.com/OCamlPro/ocplib-resto/issues"
 dev-repo: "git+https://github.com/OCamlPro/ocplib-resto"
 
 build: [
-  [ "jbuilder" "build" "-p" name "-j" jobs ]
+  [ "dune" "build" "-p" name "-j" jobs ]
 ]
 build-test: [
-  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+  [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
 
 depends: [
   "ocamlfind" {build}
-  "jbuilder" {build}
+  "dune" {build}
   "ocplib-resto" {= "dev" }
   "ocplib-resto-json" {= "dev" & test }
   "lwt" { >= "3.0.0" }

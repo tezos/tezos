@@ -1,0 +1,11 @@
+(executable
+ (name test)
+ (libraries hex libsecp256k1 alcotest))
+
+(alias
+ (name    runtest-secp256k1)
+ (action  (run %{exe:test.exe})))
+
+(alias
+ (name    runtest)
+ (deps    (alias runtest-secp256k1)))

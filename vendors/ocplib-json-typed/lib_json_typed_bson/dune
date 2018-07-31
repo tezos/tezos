@@ -1,0 +1,7 @@
+(library
+ (name        ocplib_json_typed_bson)
+ (public_name ocplib-json-typed-bson)
+ (flags (:standard -w -9))
+ (synopsis "BSON representation of JSON documents")
+ (libraries ocplib-json-typed ocplib-endian)
+ (wrapped false))

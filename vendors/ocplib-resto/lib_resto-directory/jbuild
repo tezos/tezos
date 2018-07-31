@@ -1,9 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name resto_directory)
-  (public_name ocplib-resto-directory)
-  (libraries (lwt ocplib-resto))
-  (flags (:standard -safe-string))
-  (wrapped false)))
-

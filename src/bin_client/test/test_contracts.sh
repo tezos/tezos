@@ -114,9 +114,13 @@ assert_storage $contract_dir/list_map_block.tz '{0}' '{ 1 ; 2 ; 3 ; 0 }' '{ 1 ; 
 assert_storage $contract_dir/list_iter.tz 0 '{ 10 ; 2 ; 1 }' 20
 assert_storage $contract_dir/list_iter.tz 0 '{ 3 ; 6 ; 9 }' 162
 
-assert_storage $contract_dir/list_iter2.tz '"?"' '{ "a" ; "b" ; "c" }' '"cba"'
-assert_storage $contract_dir/list_iter2.tz '"?"' '{}' '""'
+assert_storage $contract_dir/list_iter2.tz '"abc"' '{ "d" ; "e" ; "f" }' '"abcdef"'
+assert_storage $contract_dir/list_iter2.tz '"abc"' '{}' '"abc"'
 
+assert_storage $contract_dir/list_iter2_bytes.tz '0x00ab' '{ 0xcd ; 0xef ; 0x00 }' '0x00abcdef00'
+assert_storage $contract_dir/list_iter2_bytes.tz '0x' '{ 0x00 ; 0x11 ; 0x00 }' '0x001100'
+assert_storage $contract_dir/list_iter2_bytes.tz '0xabcd' '{}' '0xabcd'
+assert_storage $contract_dir/list_iter2_bytes.tz '0x' '{}' '0x'
 
 # Identity on sets
 assert_storage $contract_dir/set_id.tz '{}' '{ "a" ; "b" ; "c" }' '{ "a" ; "b" ; "c" }'
@@ -412,12 +416,19 @@ assert_fails $client transfer 0 from bootstrap1 to replay
 
 # Tests create_account
 init_with_transfer $contract_dir/create_account.tz $key2 None 1,000 bootstrap1
-$client transfer 100 from bootstrap1 to create_account \
-           -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' | assert_in_output "New contract"
+assert_balance create_account "1000 ꜩ"
+created_account=\
+`$client transfer 100 from bootstrap1 to create_account -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' \
+| grep 'New contract' \
+| sed -E 's/.*(KT1[a-zA-Z0-9]+).*/\1/' \
+| head -1`
 bake
+assert_balance $created_account "100 ꜩ"
+assert_balance create_account "1000 ꜩ"
 
 # Creates a contract, transfers data to it and stores the data
 init_with_transfer $contract_dir/create_contract.tz $key2 Unit 1,000 bootstrap1
+assert_balance create_contract "1000 ꜩ"
 created_contract=\
 `$client transfer 0 from bootstrap1 to create_contract -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' \
 | grep 'New contract' \
@@ -425,6 +436,8 @@ created_contract=\
 | head -1`
 bake
 assert_storage_contains $created_contract '"abcdefg"'
+assert_balance $created_contract "100 ꜩ"
+assert_balance create_contract "900 ꜩ"
 
 # Test IMPLICIT_ACCOUNT
 init_with_transfer $contract_dir/default_account.tz $key1 \
@@ -451,6 +464,44 @@ assert_fails $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
 assert_success $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
                '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")'
 bake
+
+# Test comparisons on bytes { EQ ; GT ; LT ; GE ; LE }
+assert_storage $contract_dir/compare_bytes.tz '{}' '(Pair 0x33 0x34)' '{ False ; False ; True ; False ; True }'
+assert_storage $contract_dir/compare_bytes.tz '{}' '(Pair 0x33 0x33aa)' '{ False ; False ; True ; False ; True }'
+assert_storage $contract_dir/compare_bytes.tz '{}' '(Pair 0x33 0x33)' '{ True ; False ; False ; True ; True }'
+assert_storage $contract_dir/compare_bytes.tz '{}' '(Pair 0x34 0x33)' '{ False ; True ; False ; True ; False }'
+
+# Test SLICE and SIZE on bytes
+init_with_transfer $contract_dir/slices.tz bootstrap1 \
+				   '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"' 1,000 bootstrap1
+
+assert_fails $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")'
+assert_fails $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xeaa9ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+assert_fails $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2deaad01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+assert_fails $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150733eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+assert_fails $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xe009ab79e8b84ef0 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+assert_success $client transfer 0 from bootstrap1 to slices -arg \
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+bake
+
+init_with_transfer $contract_dir/split_string.tz bootstrap1 '{}' 1,000 bootstrap1
+
+bake_after $client transfer 0 from bootstrap1 to split_string -arg '"abc"'
+assert_storage_contains split_string '{ "a" ; "b" ; "c" }'
+bake_after $client transfer 0 from bootstrap1 to split_string -arg '"def"'
+assert_storage_contains split_string '{ "a" ; "b" ; "c" ; "d" ; "e" ; "f" }'
+
+init_with_transfer $contract_dir/split_bytes.tz bootstrap1 '{}' 1,000 bootstrap1
+
+bake_after $client transfer 0 from bootstrap1 to split_bytes -arg '0xaabbcc'
+assert_storage_contains split_bytes '{ 0xaa ; 0xbb ; 0xcc }'
+bake_after $client transfer 0 from bootstrap1 to split_bytes -arg '0xddeeff'
+assert_storage_contains split_bytes '{ 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }'
 
 # Test SET_DELEGATE
 b2='tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN'
@@ -529,6 +580,13 @@ bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pa
 bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 (Some 2)) (Pair 0 (Some 1)))'
 bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 400 (Some 1232)) (Pair 400 (Some 1232)))'
 bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 401 (Some 0)) (Pair 400 (Some 1232)))'
+
+# Test for issue #262
+tee /tmp/bug_262.tz <<EOF
+{ parameter unit ; storage unit ; code { DROP ; LAMBDA  unit unit {} ; UNIT ; EXEC ; NIL operation ; PAIR } }
+EOF
+init_with_transfer /tmp/bug_262.tz $key1 'Unit' 1 bootstrap1
+assert_balance bug_262 "1 ꜩ"
 
 printf "\nEnd of test\n"
 

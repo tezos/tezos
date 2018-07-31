@@ -8,21 +8,26 @@ dev-repo: "https://gitlab.com/tezos/tezos.git"
 license: "unreleased"
 depends: [
   "ocamlfind" { build }
-  "jbuilder" { build & = "1.0+beta20" }
+  "dune" { build & = "1.0.1" }
   "tezos-base"
   "tezos-client-base"
-  "tezos-client-genesis"
-  "tezos-client-alpha"
-  "tezos-client-alpha-commands"
-  "tezos-baking-alpha"
-  "tezos-baking-alpha-commands"
+  "tezos-client-000-Ps9mPmXa"
+  "tezos-client-001-PtCJ7pwo"
+  "tezos-client-001-PtCJ7pwo-commands"
+  "tezos-baking-001-PtCJ7pwo"
+  "tezos-baking-001-PtCJ7pwo-commands"
+  "tezos-client-002-PsYLVpVv"
+  "tezos-client-002-PsYLVpVv-commands"
+  "tezos-baking-002-PsYLVpVv"
+  "tezos-baking-002-PsYLVpVv-commands"
   "tezos-client-base-unix"
   "tezos-signer-backends"
   "tezos-node" { test }
+  "tezos-protocol-compiler" { test }
 ]
 build: [
-  [ "jbuilder" "build" "-p" name "-j" jobs ]
+  [ "dune" "build" "-p" name "-j" jobs ]
 ]
 build-test: [
-  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+  [ "dune" "runtest" "-p" name "-j" jobs ]
 ]

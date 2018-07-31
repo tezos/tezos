@@ -1,0 +1,22 @@
+(executable
+ (name test)
+ (modules Test)
+ (libraries alcotest uecc))
+
+(executable
+ (name test_vectors)
+ (modules Vectors Test_vectors)
+ (libraries cstruct hex alcotest uecc))
+
+(alias
+ (name    runtest-uecc)
+ (action  (run %{exe:test.exe})))
+
+(alias
+ (name    runtest-uecc-vectors)
+ (action  (run %{exe:test_vectors.exe})))
+
+(alias
+ (name    runtest)
+ (deps    (alias runtest-uecc)
+          (alias runtest-uecc-vectors)))

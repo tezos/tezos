@@ -102,7 +102,7 @@ let default_p2p_limits : P2p.limits = {
 }
 
 let default_p2p = {
-  expected_pow = 24. ;
+  expected_pow = 26. ;
   bootstrap_peers  = [ "boot.tzalpha.net" ] ;
   listen_addr  = Some ("[::]:" ^ string_of_int default_p2p_port) ;
   private_mode  = false ;
@@ -731,8 +731,52 @@ let check_bootstrap_peer addr =
 let check_bootstrap_peers config =
   Lwt_list.iter_p check_bootstrap_peer config.p2p.bootstrap_peers
 
+
+let fail fmt =
+  Format.kasprintf (fun s -> prerr_endline s ; exit 1) fmt
+
+let check_connections config =
+  if config.p2p.limits.min_connections > config.p2p.limits.expected_connections then
+    fail "Error: The minumum number of connections is greater than \
+          the expected number of connections"
+      config.p2p.limits.min_connections
+      config.p2p.limits.expected_connections ;
+  if config.p2p.limits.expected_connections > config.p2p.limits.max_connections then
+    fail "Error: The expected number of connections is greater than \
+          the maximum number of connections"
+      config.p2p.limits.expected_connections
+      config.p2p.limits.max_connections ;
+  begin
+    match config.p2p.limits.max_known_peer_ids with
+    | None -> ()
+    | Some (max_known_peer_ids, target_known_peer_ids) ->
+        if target_known_peer_ids > max_known_peer_ids then
+          fail "Error: The target number of known peer ids is greater than \
+                the maximum number of known peer ids."
+            target_known_peer_ids max_known_peer_ids ;
+        if config.p2p.limits.max_connections > target_known_peer_ids then
+          fail "Error: The target number of known peer ids is lower than \
+                the maximum number of connections."
+            target_known_peer_ids max_known_peer_ids ;
+  end ;
+  begin
+    match config.p2p.limits.max_known_points with
+    | None -> ()
+    | Some (max_known_points, target_known_points) ->
+        if target_known_points > max_known_points then
+          fail "Error: The target number of known points is greater than \
+                the maximum number of known points."
+            target_known_points max_known_points ;
+        if config.p2p.limits.max_connections > target_known_points then
+          fail "Error: The target number of known points is lower than \
+                the maximum number of connections."
+            target_known_points max_known_points ;
+  end
+
+
 let check config =
   check_listening_addr config >>= fun () ->
   check_rpc_listening_addr config >>= fun () ->
   check_bootstrap_peers config >>= fun () ->
+  check_connections config ;
   Lwt.return_unit

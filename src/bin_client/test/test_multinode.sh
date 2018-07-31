@@ -39,7 +39,7 @@ activate_alpha
 
 printf "\n\n"
 
-retry 2 15 assert_protocol "PtRtdqNdrzdh5ePabNxs2ACtb5CMFrDbK3W3Zma6TSQSas1MXpf"
+retry 2 15 assert_protocol "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt"
 
 $client1 bake for bootstrap1 --max-priority 512 --minimal-timestamp
 retry 2 15 assert_propagation_level 2

@@ -1,0 +1,29 @@
+(library
+ (name            hacl)
+ (public_name     hacl)
+ (libraries       bigstring ocplib-endian.bigstring zarith)
+ (c_names         hacl_stubs
+                  kremlib
+                  FStar
+                  Hacl_Policies
+                  AEAD_Poly1305_64
+                  Hacl_Chacha20
+                  Hacl_Chacha20Poly1305
+                  Hacl_Curve25519
+                  Hacl_Ed25519
+                  Hacl_Poly1305_32
+                  Hacl_Poly1305_64
+                  Hacl_SHA2_256
+                  Hacl_SHA2_384
+                  Hacl_SHA2_512
+                  Hacl_HMAC_SHA2_256
+                  Hacl_Salsa20
+                  NaCl
+                  Hacl_Unverified_Random)
+ (c_flags         (:include c_flags.sexp))
+ )
+
+; sets flags for 32/64 bits architectures
+(rule
+ (targets c_flags.sexp)
+ (action  (run %{exe:config/discover.exe} -ocamlc %{ocamlc})))

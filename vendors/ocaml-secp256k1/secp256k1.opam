@@ -11,10 +11,10 @@ available: [
   ocaml-version >= "4.03.0"
 ]
 
-build: [ "jbuilder" "build" "-j" jobs "-p" name "@install" ]
+build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
 depends: [
   "conf-gmp" {build}
-  "jbuilder" {build & >= "1.0+beta20"}
+  "dune" {build & >= "1.0.1"}
   "cstruct" {>= "3.2.1"}
   "bigstring" {>= "0.1.1"}
 ]

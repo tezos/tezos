@@ -66,7 +66,7 @@ end
 
 module Protocol : sig
 
-  val read_dir: string -> (Protocol_hash.t * Protocol.t) tzresult Lwt.t
+  val read_dir: string -> (Protocol_hash.t option * Protocol.t) tzresult Lwt.t
 
   val write_dir: string -> ?hash:Protocol_hash.t -> Protocol.t -> unit tzresult Lwt.t
 
@@ -76,10 +76,11 @@ module Socket : sig
 
   type addr =
     | Unix of string
-    | Tcp of string * int
+    | Tcp of string * string * Unix.getaddrinfo_option list
 
   val connect: addr -> Lwt_unix.file_descr tzresult Lwt.t
-  val bind: ?backlog:int -> addr -> Lwt_unix.file_descr tzresult Lwt.t
+  val bind:
+    ?backlog:int -> addr -> Lwt_unix.file_descr list tzresult Lwt.t
 
   type error +=
     | Encoding_error

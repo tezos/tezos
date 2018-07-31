@@ -1,0 +1,23 @@
+(library
+ (name tezos_micheline)
+ (public_name tezos-micheline)
+ (libraries
+  
+  ;; External
+  uutf
+  zarith
+  ;; Internal
+  tezos-stdlib
+  tezos-error-monad
+  tezos-data-encoding
+  )
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_stdlib
+                   -open Tezos_error_monad
+                   -open Tezos_data_encoding)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

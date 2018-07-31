@@ -1,0 +1,14 @@
+(library
+ (name tezos_error_monad)
+ (public_name tezos-error-monad)
+ (flags (:standard -open Tezos_stdlib
+                   -open Tezos_data_encoding
+                   -safe-string))
+ (libraries tezos-stdlib
+            tezos-data-encoding
+            lwt))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

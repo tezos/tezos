@@ -1,0 +1,6 @@
+(library
+ (name resto)
+ (public_name ocplib-resto)
+ (flags (-w -30 -safe-string))
+ (libraries uri)
+ (wrapped false))

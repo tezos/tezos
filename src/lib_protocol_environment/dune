@@ -1,0 +1,29 @@
+(library
+ (name tezos_protocol_environment)
+ (public_name tezos-protocol-environment)
+ (libraries tezos-base
+            tezos-protocol-environment-sigs
+            tezos-micheline)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_micheline))
+ (wrapped false)
+ (modules Tezos_protocol_environment
+          Tezos_protocol_environment_faked
+          Tezos_protocol_environment_memory))
+
+(library
+ (name tezos_protocol_environment_shell)
+ (public_name tezos-protocol-environment-shell)
+ (libraries tezos-base
+            tezos-protocol-environment
+            tezos-storage)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string))
+ (modules Tezos_protocol_environment_shell))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

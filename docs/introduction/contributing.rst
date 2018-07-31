@@ -7,6 +7,21 @@ Introduction
 The purpose of this document is to help contributors get started with
 the Tezos OCaml codebase.
 
+
+Reporting issues
+----------------
+
+The simplest way to contribute to Tezos is to report issues that you may
+find with the software on `gitlab <https://gitlab.com/tezos/tezos/issues>`__.
+If you are unsure about an issue ask on IRC first and always make sure
+to search the existing issues before reporting a new one.
+Some info that are probably important to include in the description:
+the architecture (e.g. *ARM64*), the operating system (e.g. *Debian
+Stretch*), the network you are connected to (e.g. *Alphanet*), the
+binary or component (e.g. *tezos-node crashes* or *rpc X returns Y
+while Z was expected*).
+
+
 First steps
 -----------
 

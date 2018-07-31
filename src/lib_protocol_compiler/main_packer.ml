@@ -34,11 +34,16 @@ let () =
   Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
   let source_dir =
     match List.rev !anonymous with
+    | [ source_dir ] when Filename.basename source_dir = "TEZOS_PROTOCOL"->
+        Filename.dirname source_dir
     | [ source_dir ] -> source_dir
     | _ -> Arg.usage args_spec usage_msg ; Pervasives.exit 1 in
   let hash, protocol =
     match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir source_dir) with
-    | Ok v -> v
+    | Ok (None, proto) ->
+        (Protocol.hash proto, proto)
+    | Ok (Some hash, proto) ->
+        (hash, proto)
     | Error err ->
         Format.kasprintf Pervasives.failwith
           "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err in

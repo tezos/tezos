@@ -74,13 +74,18 @@ let wrap
   (* when `--expected-connections` is used,
      override all the bounds defined in the configuration file. *)
   let bootstrap_threshold,
-      min_connections, expected_connections, max_connections =
+      min_connections, expected_connections, max_connections,
+      peer_table_size =
     match connections with
-    | None -> bootstrap_threshold, None, None, None
+    | None -> bootstrap_threshold, None, None, None, peer_table_size
     | Some x ->
+        let peer_table_size =
+          match peer_table_size with
+          | None -> Some (8*x)
+          | Some _ -> peer_table_size in
         begin match bootstrap_threshold with
-          | None -> Some (min (x/4) 2), Some (x/2), Some x, Some (3*x/2)
-          | Some bs -> Some bs, Some (x/2), Some x, Some (3*x/2)
+          | None -> Some (min (x/4) 2), Some (x/2), Some x, Some (3*x/2), peer_table_size
+          | Some bs -> Some bs, Some (x/2), Some x, Some (3*x/2), peer_table_size
         end
   in
   { data_dir ;

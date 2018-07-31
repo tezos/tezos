@@ -219,13 +219,13 @@ The Embedded Economic Protocols
 
 Three economic protocols are included in the main Tezos repository.
 
-  - :package:`tezos-protocol-genesis`
-    (:package:`tezos-embedded-protocol-genesis`) is the protocol of
+  - :package:`tezos-protocol-000-Ps9mPmXa`
+    (:package:`tezos-embedded-protocol-000-Ps9mPmXa`) is the protocol of
     the genesis block. It accepts a single block, signed by a activator
     whose public key is hardcoded, that single action is to switch to
     a new protocol chosen by the activator.
-  - :package:`tezos-protocol-alpha`
-    (:package:`tezos-embedded-protocol-alpha`) is the first real
+  - :package:`tezos-protocol-002-PsYLVpVv`
+    (:package:`tezos-embedded-protocol-002-PsYLVpVv`) is the first real
     protocol of Tezos. A :ref:`tutorial<entering_alpha>` is available
     to start reading the protocol's code.
   - :package:`tezos-protocol-demo`
@@ -244,19 +244,19 @@ compatible, and library vs command line interface.
     interacting via the user, making RPC calls, and signing data using
     signer plug-ins. Most of the, including RPC calling functions from
     :package:`tezos-shell-services` and
-    :package:`tezos-protocol-alpha`, are abstracted over this object
+    :package:`tezos-protocol-002-PsYLVpVv`, are abstracted over this object
     type. That way, it is possible to use the same code for different
     platforms or toolkits.
-  - :package:`tezos-client-alpha` provides some functions to perform
+  - :package:`tezos-client-002-PsYLVpVv` provides some functions to perform
     the operations of protocol alpha using the wallet and signers from
     the client context.
   - :package:`tezos-client-commands` plugs the basic context access
     functions from :package:`tezos-client-base` as handlers for the
     commands of the ``tezos-client`` command line wallet.
-  - :package:`tezos-client-alpha-commands` plugs the functions from
-    :package:`tezos-client-alpha` as handlers for the alpha specific
+  - :package:`tezos-client-002-PsYLVpVv-commands` plugs the functions from
+    :package:`tezos-client-002-PsYLVpVv` as handlers for the alpha specific
     commands of the ``tezos-client`` command line wallet.
-  - :package:`tezos-client-genesis` contains the basic activator
+  - :package:`tezos-client-000-Ps9mPmXa` contains the basic activator
     commands available on the genesis protocol.
   - :package:`tezos-client-base-unix` implements configuration file
     and wallet storage in Unix files, user interaction via the Unix
@@ -289,8 +289,8 @@ run them.
  - :package-name:`tezos-storage`
    (in directory :src:`src/lib_storage/test/`):
    tests for the versioned key-value context.
- - :package-name:`tezos-protocol-alpha`
-   (in directory :src:`src/proto_alpha/lib_protocol/test/`):
+ - :package-name:`tezos-protocol-002-PsYLVpVv`
+   (in directory :src:`src/proto_002_PsYLVpVv/lib_protocol/test/`):
    tests of the alpha protocol (without launching a node).
  - :package-name:`tezos-crypto`
    (in directory :src:`src/lib_crypto/test/`):
@@ -312,11 +312,11 @@ The Final Executables
     comand line wallet, the latter an administration tool for the
     node. It also provides a shell script that configures a shell
     environment to interact with a sandboxed node.
-  - :package:`tezos-baker-alpha` provides the ``tezos-alpha-baker``
+  - :package:`tezos-baker-002-PsYLVpVv` provides the ``tezos-baker-002-PsYLVpVv``
     binary.
-  - :package:`tezos-endorser-alpha` provides the ``tezos-alpha-endorser``
+  - :package:`tezos-endorser-002-PsYLVpVv` provides the ``tezos-endorser-002-PsYLVpVv``
     binary.
-  - :package:`tezos-accuser-alpha` provides the ``tezos-alpha-accuser``
+  - :package:`tezos-accuser-002-PsYLVpVv` provides the ``tezos-accuser-002-PsYLVpVv``
     binary.
   - :package:`tezos-protocol-compiler` provides the
     ``tezos-protocol-compiler`` binary that is used by the node to

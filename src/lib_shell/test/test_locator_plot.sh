@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# plots the output of 'jbuilder build @runtest_locator'
+# plots the output of 'dune build @runtest_locator'
 
 set -e
 

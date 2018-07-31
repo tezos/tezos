@@ -7,57 +7,110 @@
 Welcome to the Tezos Developer Documentation!
 =============================================
 
+The Project
+-----------
+
 Tezos is a distributed consensus platform with meta-consensus
 capability. Tezos not only comes to consensus about the state of its ledger,
 like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
 
- - Developer documentation is available online at http://tezos.gitlab.io/master
-   always in sync with the master branch (which may be desynchronized with
-   the code running on the live networks, replace ``master`` in the URL by the
-   branch of your choice: betanet, alphanet, zeronet, to make sure you are
-   consulting the right API version)
- - The official Tezos website https://tezos.com/ contains more information about the
-   project.
- - All development now happens on GitLab at https://gitlab.com/tezos/tezos
+ - Developer documentation is available online at https://tezos.gitlab.io/master
+   The documentation is automatically generated for the master branch and the
+   three official network branches `betanet <https://tezos.gitlab.io/betanet>`_,
+   `alphanet <https://tezos.gitlab.io/alphanet>`_,
+   `zeronet <https://tezos.gitlab.io/zeronet>`_. Make sure you are
+   consulting the right API version.
+ - The website https://tezos.com/ contains more information about the project.
+ - All development happens on GitLab at https://gitlab.com/tezos/tezos
 
-The Tezos Alpha (test) network has been live and open since February 2017.
+The source code of Tezos is placed under the MIT Open Source License.
 
-The Tezos Beta (experimental) network has been live and open since June 2018.
+The Community
+-------------
 
-
- - More information on joining the Alphanet at :ref:`here <alphanet>`.
  - Several community built block explorers are available:
 
-    - http://ostez.com
     - http://tzscan.io
     - https://tezos.id
-    - https://tezoschain.io
+    - https://tezex.info
 
 - A few community run websites collect useful Tezos links:
 
-    - http://www.tezos.help
+    - https://www.tezos.help
     - https://tezos.rocks
 
  - There is a matrix channel *Tezos* that you can join `here <https://riot.im/app/#/room/#tezos:matrix.org>`_.
- - There is a *#tezos* channel on *freenode* that is reserved for technical discussions
+ - There is a sub-reddit at https://www.reddit.com/r/tezos/
  - There is also a community FAQ at https://github.com/tezoscommunity/faq/wiki/Tezos-Technical-FAQ
+ - There is a *#tezos* IRC channel on *freenode* that is reserved for technical discussions
 
-The source code of Tezos is placed under the MIT Open Source License.
+
+The Networks
+------------
+
+.. _alphanet:
+
+Alphanet
+~~~~~~~~
+
+Tezos Alphanet is a test network for the Tezos blockchain with a
+faucet to obtain free tezzies (see :ref:`faucet`).
+It is updated and rebooted rarely and it is either running the same
+code as beta or the next version that will become beta in a few weeks.
+It is the reference network for developers wanting to test their
+software before going to beta and for users who want to familiarize
+themselves with Tezos before using their real tezzies.
+
+We offer support for Alphanet on IRC.
+
+The Tezos Alpha (test) network has been live and open since February 2017.
+
+
+.. _zeronet:
+
+Zeronet
+~~~~~~~
+
+Zeronet is the most cutting-edge development network of Tezos. It is
+restarted without notice, possibly several times a day.
+This network is mostly used internally by the Tezos developers and may
+have *different constants* that Alphanet or Betanet.
+We offer no support for the Zeronet.
+
+
+.. _betanet:
+
+Betanet
+~~~~~~~
+
+The Tezos Beta (experimental) network is the current incarnation of
+the Tezos blockchain.
+There is no faucet but real tezzies that have been allocated to the
+donors of July 2017 ICO (see :ref:`activate_fundraiser_account`).
+It is the step before the full Tezos mainnet, with a `few caveats
+<https://tezosfoundation.ch/news/tezos-betanet-expectations>`_.
+
+The Tezos Beta (experimental) network has been live and open since
+`June 30th 2018 <https://tezosfoundation.ch/news/tezos-betanet-launch>`_.
+
+
+Getting started
+---------------
+
+The best place to start exploring the project is following the How Tos
+in the :ref:`introduction <howtoget>`.
+
 
 .. toctree::
    :maxdepth: 2
    :caption: Introduction:
 
-   introduction/howto
+   introduction/howtoget
+   introduction/howtouse
+   introduction/howtorun
+   introduction/various
    introduction/contributing
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Test Networks:
-
-   introduction/alphanet
-   introduction/zeronet
 
 .. toctree::
    :maxdepth: 2
@@ -73,6 +126,7 @@ The source code of Tezos is placed under the MIT Open Source License.
    :maxdepth: 2
    :caption: Developer Tutorials:
 
+   tutorials/rpc
    tutorials/data_encoding
    tutorials/error_monad
    tutorials/michelson_anti_patterns

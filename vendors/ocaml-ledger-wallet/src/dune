@@ -1,0 +1,13 @@
+(library
+ (name        ledgerwallet)
+ (public_name ledgerwallet)
+ (modules     Apdu Transport)
+ (synopsis "Ledger wallet library for OCaml: common parts")
+ (libraries rresult cstruct hidapi))
+
+(library
+ (name        ledgerwallet_tezos)
+ (public_name ledgerwallet-tezos)
+ (modules     Ledgerwallet_tezos)
+ (synopsis "Ledger wallet library for OCaml: Tezos app")
+ (libraries ledgerwallet))

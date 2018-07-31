@@ -1,0 +1,13 @@
+(library
+ (name            libsecp256k1)
+ (public_name     secp256k1)
+ (modules         internal external)
+ (libraries       bigstring cstruct)
+ (c_names         secp256k1
+                  secp256k1_wrap)
+ (c_flags         (:include c_flags.sexp))
+ (c_library_flags (-lgmp)))
+
+(rule
+ (targets c_flags.sexp)
+ (action  (run %{exe:../config/discover.exe} -ocamlc %{ocaml})))

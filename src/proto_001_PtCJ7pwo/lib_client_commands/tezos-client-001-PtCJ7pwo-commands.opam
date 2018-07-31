@@ -1,0 +1,22 @@
+opam-version: "1.2"
+version: "dev"
+maintainer: "contact@tezos.com"
+authors: [ "Tezos devteam" ]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "https://gitlab.com/tezos/tezos.git"
+license: "unreleased"
+depends: [
+  "ocamlfind" { build }
+  "dune" { build & = "1.0.1" }
+  "tezos-base"
+  "tezos-protocol-environment"
+  "tezos-protocol-001-PtCJ7pwo"
+  "tezos-shell-services"
+  "tezos-client-base"
+  "tezos-client-001-PtCJ7pwo"
+  "tezos-client-commands"
+]
+build: [
+  [ "dune" "build" "-p" name "-j" jobs ]
+]

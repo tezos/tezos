@@ -14,6 +14,7 @@ local_node="${2:-$test_dir/../../../_build/default/src/bin_node/main.exe}"
 tezos_init_sandboxed_client="${3:-$test_dir/../../bin_client/tezos-init-sandboxed-client.sh}"
 local_client="${4:-$test_dir/../../../_build/default/src/bin_client/main_client.exe}"
 local_admin_client="${5:-$test_dir/../../../_build/default/src/bin_client/main_admin.exe}"
+local_compiler="${6:-$test_dir/../../../_build/default/src/lib_protocol_compiler/main_native.exe}"
 
 contract_dir="contracts"
 

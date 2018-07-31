@@ -1,0 +1,5 @@
+(library
+ (name        pbkdf)
+ (public_name pbkdf)
+ (synopsis "")
+ (libraries nocrypto))

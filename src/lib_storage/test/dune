@@ -1,0 +1,24 @@
+(executables
+ (names test)
+ (libraries tezos-base
+            tezos-storage
+            tezos-stdlib-unix
+            alcotest-lwt)
+ (flags (:standard -w -9-32
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_storage
+                   -open Tezos_stdlib_unix)))
+
+(alias
+ (name buildtest)
+ (deps test.exe))
+
+(alias
+ (name runtest)
+ (action (chdir %{workspace_root} (run %{exe:test.exe}))))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

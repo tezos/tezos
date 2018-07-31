@@ -1,6 +1,6 @@
 # 0.3.0 (2018-02-16)
 
-* Build: switch to jbuilder
+* Build: switch to dune
 
 # 0.2.0 (2016-10-31)
 

@@ -1,0 +1,7 @@
+(library
+ (name        ocplib_json_typed_browser)
+ (public_name ocplib-json-typed-browser)
+ (flags (:standard -w -9))
+ (synopsis "Native browser representation of JSON documents")
+ (libraries ocplib-json-typed js_of_ocaml)
+ (wrapped false))

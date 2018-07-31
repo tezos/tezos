@@ -1,0 +1,52 @@
+(library
+ (name tezos_client_002_PsYLVpVv_commands)
+ (public_name tezos-client-002-PsYLVpVv-commands)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-protocol-002-PsYLVpVv
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-002-PsYLVpVv
+            tezos-client-commands
+            tezos-rpc)
+ (library_flags (:standard -linkall))
+ (modules (:standard \ alpha_commands_registration))
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_002_PsYLVpVv
+                   -open Tezos_client_commands
+                   -open Tezos_rpc)))
+
+(library
+ (name tezos_client_002_PsYLVpVv_commands_registration)
+ (public_name tezos-client-002-PsYLVpVv-commands.registration)
+ (libraries tezos-base
+            tezos-protocol-002-PsYLVpVv
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-002-PsYLVpVv
+            tezos-client-commands
+            tezos-client-002-PsYLVpVv-commands
+            tezos-rpc)
+ (library_flags (:standard -linkall))
+ (modules alpha_commands_registration)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_002_PsYLVpVv
+                   -open Tezos_client_commands
+                   -open Tezos_client_002_PsYLVpVv_commands
+                   -open Tezos_rpc)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

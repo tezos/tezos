@@ -776,8 +776,11 @@ Operations on strings
 ~~~~~~~~~~~~~~~~~~~~~
 
 Strings are mostly used for naming things without having to rely on
-external ID databases. So what can be done is basically use string
-constants as is, concatenate them and use them as keys.
+external ID databases. They are restricted to the printable subset of
+7-bit ASCII, plus some escaped characters (see section on
+constants). So what can be done is basically use string constants as
+is, concatenate or splice them, and use them as keys.
+
 
 -  ``CONCAT``: String concatenation.
 
@@ -786,6 +789,28 @@ constants as is, concatenate them and use them as keys.
     :: string : string : 'S   -> string : 'S
 
     > CONCAT / s : t : S  =>  (s ^ t) : S
+
+    :: string list : 'S   -> string : 'S
+
+    > CONCAT / {} : S  =>  "" : S
+    > CONCAT / { s ; <ss> } : S  =>  (s ^ r) : S
+       where CONCAT / { <ss> } : S  =>  r : S
+
+-  ``SIZE``: number of characters in a string.
+
+::
+
+     :: string : 'S   ->   nat : 'S
+
+-  ``SLICE``: String access.
+
+    :: nat : nat : string : 'S   ->  option string : 'S
+
+    > SLICE / offset : length : s : S  =>  Some ss : S
+       where ss is the substring of s at the given offset and of the given length
+         iff offset and (offset + length) are in bounds
+    > SLICE / offset : length : s : S  =>  None  : S
+         iff offset or (offset + length) are out of bounds
 
 -  ``COMPARE``: Lexicographic comparison.
 
@@ -1233,7 +1258,7 @@ retrieved from script parameters or globals.
 
 
 Operations on Mutez
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Mutez (micro-Tez) are internally represented by a 64 bit signed
 integers. There are restrictions to prevent creating a negative amount
@@ -1443,7 +1468,7 @@ Special operations
     :: 'S   ->   timestamp : 'S
 
 Operations on bytes
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Bytes are used for serializing data, in order to check signatures and
 compute hashes on them. They can also be used to incorporate data from
@@ -1461,6 +1486,36 @@ the wild and untyped outside world.
 ::
 
      :: bytes : 'S   ->   option 'a : 'S
+
+-  ``CONCAT``: Byte sequence concatenation.
+
+::
+
+   :: bytes : bytes : 'S   -> bytes : 'S
+
+    > CONCAT / s : t : S  =>  (s ^ t) : S
+
+    :: bytes list : 'S   -> bytes : 'S
+
+    > CONCAT / {} : S  =>  0x : S
+    > CONCAT / { s ; <ss> } : S  =>  (s ^ r) : S
+       where CONCAT / { <ss> } : S  =>  r : S
+
+-  ``SIZE``: size of a sequence of bytes.
+
+::
+
+     :: bytes : 'S   ->   nat : 'S
+
+-  ``SLICE``: Bytes access.
+
+    :: nat : nat : bytes : 'S   -> option string : 'S
+
+    > SLICE / offset : length : s : S  =>  Some ss : S
+       where ss is the substring of s at the given offset and of the given length
+         iff offset and (offset + length) are in bounds
+    > SLICE / offset : length : s : S  =>  None : S
+         iff offset or (offset + length) are out of bounds
 
 -  ``COMPARE``: Lexicographic comparison.
 
@@ -2002,9 +2057,7 @@ The stack type contains both the types of each element in the stack, as
 well as an optional variable annotation for each element. In this
 sub-section we note:
 - ``[]`` for the empty stack ;
-- ``@annot (top) : (rest)`` for the stack whose first value has type
-  ``(top)`` and is annotated with variable annotation ``@annot`` and
-  whose queue has stack type ``(rest)``.
+- ``@annot (top) : (rest)`` for the stack whose first value has type ``(top)`` and is annotated with variable annotation ``@annot`` and whose queue has stack type ``(rest)``.
 
 The instructions which do not accept any variable annotations are:
 
@@ -2393,7 +2446,7 @@ treatment of annotations with `.`.
    :: @p.x 'a : @q.y 'b : 'S   ->  (pair ('a %x) ('b %y)) : 'S
 
 XI - JSON syntax
----------------
+----------------
 
 Micheline expressions are encoded in JSON like this:
 
@@ -2417,14 +2470,13 @@ Micheline expressions are encoded in JSON like this:
    list of annotations, including their leading ``@``, ``%`` or ``%``
    sign.
 
-   ``{ "prim": "pair", "args": [ { "prim": "nat", "args": [] }, { "prim":
-     "nat", "args": [] } ], "annots": [":t"] }``
+   ``{ "prim": "pair", "args": [ { "prim": "nat", "args": [] }, { "prim": "nat", "args": [] } ], "annots": [":t"] }``
 
 As in the concrete syntax, all domain specific constants are encoded as
 strings.
 
 XII - Examples
--------------
+--------------
 
 Contracts in the system are stored as a piece of code and a global data
 storage. The type of the global data of the storage is fixed for each

@@ -1,6 +1,6 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: 63f06ab145e22aef4cc55b5b9557756d4c868843
+  build_deps_image_version: 4200cbebcae75562d79898a8e11e9f4dc237cc08
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
 
@@ -45,13 +45,12 @@ check_opam_deps:
 check_indentation:
   <<: *build_definition
   script:
-    - jbuilder build @runtest_indent
+    - dune build @runtest_indent
 
 build:
   <<: *build_definition
   script:
     - make all
-    - make build-test
   artifacts:
     paths:
     - _build
@@ -72,105 +71,116 @@ build:
 test:stdlib:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_stdlib/runtest
+    - dune build @src/lib_stdlib/runtest
 
 test:stdlib_unix:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_stdlib_unix/runtest
+    - dune build @src/lib_stdlib_unix/runtest
 
 test:data_encoding:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_data_encoding/runtest
+    - dune build @src/lib_data_encoding/runtest
 
 test:storage:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_storage/runtest
+    - dune build @src/lib_storage/runtest
 
 test:crypto:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_crypto/runtest
+    - dune build @src/lib_crypto/runtest
 
 test:shell:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_shell/runtest
+    - dune build @src/lib_shell/runtest
 
 test:p2p:io-scheduler:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_io_scheduler_ipv4
+    - dune build @src/lib_p2p/runtest_p2p_io_scheduler_ipv4
 
 test:p2p:socket:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_socket_ipv4
+    - dune build @src/lib_p2p/runtest_p2p_socket_ipv4
 
 test:p2p:pool:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_pool_ipv4
+    - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
 
 test:proto_alpha:
   <<: *test_definition
   script:
-    - jbuilder build @src/proto_alpha/lib_protocol/runtest
+    - dune build @src/proto_alpha/lib_protocol/runtest
 
 test:p2p:peerset:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_peerset
+    - dune build @src/lib_p2p/runtest_p2p_peerset
 
 test:p2p:ipv6set:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_ipv6set
+    - dune build @src/lib_p2p/runtest_p2p_ipv6set
 
 test:p2p:banned_peers:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_p2p/runtest_p2p_banned_peers
+    - dune build @src/lib_p2p/runtest_p2p_banned_peers
 
 test:client_alpha:vote:
   <<: *test_definition
   script:
-    - jbuilder build @src/proto_alpha/lib_delegate/runtest_vote
+    - dune build @src/proto_alpha/lib_delegate/runtest_vote
 
 test:basic.sh:
   <<: *test_definition
   script:
-    - jbuilder build @src/bin_client/runtest_basic.sh
+    - dune build @src/bin_client/runtest_basic.sh
 
 test:contracts.sh:
   <<: *test_definition
   script:
-    - jbuilder build @src/bin_client/runtest_contracts.sh
+    - dune build @src/bin_client/runtest_contracts.sh
 
 test:multinode.sh:
   <<: *test_definition
   script:
-    - jbuilder build @src/bin_client/runtest_multinode.sh
+    - dune build @src/bin_client/runtest_multinode.sh
 
 test:inject.sh:
   <<: *test_definition
   script:
-    - jbuilder build @src/bin_client/runtest_injection.sh
+    - dune build @src/bin_client/runtest_injection.sh
 
 test:proto:sandbox:
   <<: *test_definition
   script:
-    - jbuilder build @runtest_sandbox
+    - dune build @runtest_sandbox
 
 test:documentation:
   <<: *test_definition
   script:
     - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
+    - sudo pip3 install 'idna<2.7'
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - make doc-html
 
+test:linkcheck:
+  <<: *test_definition
+  script:
+    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
+    - sudo pip3 install 'idna<2.7'
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - make doc-linkcheck
+  allow_failure: true
 
 
 ############################################################
@@ -348,10 +358,10 @@ opam:30:tezos-signer-services:
   variables:
     package: tezos-signer-services
 
-opam:31:tezos-protocol-alpha:
+opam:31:tezos-protocol-001-PtCJ7pwo:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-alpha
+    package: tezos-protocol-001-PtCJ7pwo
 
 opam:32:tezos-protocol-environment:
   <<: *opam_definition
@@ -363,150 +373,170 @@ opam:33:tezos-signer-backends:
   variables:
     package: tezos-signer-backends
 
-opam:34:tezos-client-alpha:
+opam:34:tezos-protocol-002-PsYLVpVv:
   <<: *opam_definition
   variables:
-    package: tezos-client-alpha
+    package: tezos-protocol-002-PsYLVpVv
 
-opam:35:tezos-client-commands:
+opam:35:tezos-client-001-PtCJ7pwo:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-001-PtCJ7pwo
+
+opam:36:tezos-client-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-commands
 
-opam:36:tezos-protocol-environment-shell:
+opam:37:tezos-client-002-PsYLVpVv:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-002-PsYLVpVv
+
+opam:38:tezos-protocol-environment-shell:
   <<: *opam_definition
   variables:
     package: tezos-protocol-environment-shell
 
-opam:37:tezos-baking-alpha:
+opam:39:tezos-baking-002-PsYLVpVv:
   <<: *opam_definition
   variables:
-    package: tezos-baking-alpha
+    package: tezos-baking-002-PsYLVpVv
 
-opam:38:tezos-protocol-genesis:
+opam:40:tezos-protocol-000-Ps9mPmXa:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-genesis
+    package: tezos-protocol-000-Ps9mPmXa
 
-opam:39:ocplib-resto-json:
+opam:41:ocplib-resto-json:
   <<: *opam_definition
   variables:
     package: ocplib-resto-json
 
-opam:40:tezos-protocol-updater:
+opam:42:tezos-protocol-updater:
   <<: *opam_definition
   variables:
     package: tezos-protocol-updater
 
-opam:41:tezos-p2p:
+opam:43:tezos-p2p:
   <<: *opam_definition
   variables:
     package: tezos-p2p
 
-opam:42:tezos-baking-alpha-commands:
+opam:44:tezos-baking-002-PsYLVpVv-commands:
   <<: *opam_definition
   variables:
-    package: tezos-baking-alpha-commands
+    package: tezos-baking-002-PsYLVpVv-commands
 
-opam:43:tezos-client-alpha-commands:
+opam:45:tezos-client-000-Ps9mPmXa:
   <<: *opam_definition
   variables:
-    package: tezos-client-alpha-commands
+    package: tezos-client-000-Ps9mPmXa
 
-opam:44:tezos-client-base-unix:
+opam:46:tezos-client-001-PtCJ7pwo-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-001-PtCJ7pwo-commands
+
+opam:47:tezos-client-002-PsYLVpVv-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-002-PsYLVpVv-commands
+
+opam:48:tezos-client-base-unix:
   <<: *opam_definition
   variables:
     package: tezos-client-base-unix
 
-opam:45:tezos-client-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-genesis
-
-opam:46:ocplib-ezresto:
+opam:49:ocplib-ezresto:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto
 
-opam:47:tezos-embedded-protocol-alpha:
+opam:50:tezos-embedded-protocol-000-Ps9mPmXa:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-protocol-alpha
+    package: tezos-embedded-protocol-000-Ps9mPmXa
 
-opam:48:tezos-embedded-protocol-demo:
+opam:51:tezos-embedded-protocol-001-PtCJ7pwo:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-001-PtCJ7pwo
+
+opam:52:tezos-embedded-protocol-002-PsYLVpVv:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-002-PsYLVpVv
+
+opam:53:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
 
-opam:49:tezos-embedded-protocol-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-genesis
-
-opam:50:tezos-shell:
+opam:54:tezos-shell:
   <<: *opam_definition
   variables:
     package: tezos-shell
 
-opam:51:tezos-endorser-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-alpha-commands
-
-opam:52:tezos-client:
+opam:55:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
 
-opam:53:ocplib-ezresto-directory:
+opam:56:tezos-baker-002-PsYLVpVv:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-002-PsYLVpVv
+
+opam:57:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:54:tezos-accuser-alpha:
+opam:58:tezos-accuser-002-PsYLVpVv-commands:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-alpha
+    package: tezos-accuser-002-PsYLVpVv-commands
 
-opam:55:tezos-endorser-alpha:
+opam:59:tezos-endorser-002-PsYLVpVv-commands:
   <<: *opam_definition
   variables:
-    package: tezos-endorser-alpha
+    package: tezos-endorser-002-PsYLVpVv-commands
 
-opam:56:tezos-accuser-alpha-commands:
+opam:60:tezos-endorser-002-PsYLVpVv:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-alpha-commands
+    package: tezos-endorser-002-PsYLVpVv
 
-opam:57:tezos-baker-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-alpha
-
-opam:58:tezos-protocol-demo:
+opam:61:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:59:tezos-signer:
+opam:62:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:60:tezos-node:
+opam:63:tezos-baker-002-PsYLVpVv-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-002-PsYLVpVv-commands
+
+opam:64:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:61:ocplib-json-typed-browser:
+opam:65:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
 
-opam:62:tezos-baker-alpha-commands:
+opam:66:tezos-accuser-002-PsYLVpVv:
   <<: *opam_definition
   variables:
-    package: tezos-baker-alpha-commands
+    package: tezos-accuser-002-PsYLVpVv
 
 
 ##END_OPAM##
@@ -555,6 +585,8 @@ publish:doc:
     - betanet-staging
   before_script:
     - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
+    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
+    - sudo pip3 install 'idna<2.7'
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
     - echo "${CI_KH}" > ~/.ssh/known_hosts

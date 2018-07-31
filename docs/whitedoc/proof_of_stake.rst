@@ -257,6 +257,17 @@ same block, in this case ``k`` deposits are required and ``k`` rewards
 gained. However a single operation needs to be sent on the network to
 endorse ``k`` times the same block.
 
+Fitness
+~~~~~~~
+
+To each block we associate a measure of `fitness` which determines the
+quality of the chain leading to that block.
+This measure in Bitcoin is simply the length of the chain, in Tezos we
+add also the number of endorsements to each block.
+Given a block at level ``n`` with fitness ``f``, when we receive a new
+head that contains ``e`` endorsements for block ``n``, the fitness of
+the new head is ``f+1+e``.
+
 Inflation
 ~~~~~~~~~
 

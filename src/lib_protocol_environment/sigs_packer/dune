@@ -1,0 +1,9 @@
+(executable
+ (name sigs_packer)
+ (public_name tezos-protocol-environment-sigs.packer)
+ (package tezos-protocol-environment-sigs))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

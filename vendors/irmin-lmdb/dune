@@ -1,0 +1,5 @@
+(library
+ (name        irmin_lmdb)
+ (public_name irmin-lmdb)
+ (libraries   irmin lmdb)
+ (flags (:standard -safe-string)))

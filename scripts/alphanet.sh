@@ -29,6 +29,8 @@ cd "$src_dir"
 
 update_compose_file() {
 
+    update_active_protocol_version
+
     if [ "$#" -ge 2 ] && [ "$1" = "--rpc-port" ] ; then
         export_rpc="
       - \"$2:8732\""
@@ -37,6 +39,11 @@ update_compose_file() {
 
     cat > "$docker_compose_yml" <<EOF
 version: "2"
+
+volumes:
+  node_data:
+  client_data:
+
 services:
 
   node:
@@ -52,9 +59,16 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  baker:
+EOF
+
+for proto in $(cat "$active_protocol_versions") ; do
+
+    cat >> "$docker_compose_yml" <<EOF
+  baker-$proto:
     image: $docker_image
-    hostname: baker
+    hostname: baker-$proto
+    environment:
+      - PROTOCOL=$proto
     command: tezos-baker --max-priority 128
     links:
       - node
@@ -63,9 +77,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  endorser:
+  endorser-$proto:
     image: $docker_image
-    hostname: endorser
+    hostname: endorser-$proto
+    environment:
+      - PROTOCOL=$proto
     command: tezos-endorser
     links:
       - node
@@ -73,10 +89,21 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-volumes:
-  node_data:
-  client_data:
+  accuser-$proto:
+    image: $docker_image
+    hostname: accuser-$proto
+    environment:
+      - PROTOCOL=$proto
+    command: tezos-accuser
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
 EOF
+
+done
 
 }
 
@@ -111,6 +138,17 @@ exec_docker() {
 
 ## Container ###############################################################
 
+update_active_protocol_version() {
+    docker run --entrypoint /bin/cat "$docker_image" \
+           /usr/local/share/tezos/active_protocol_versions > "$active_protocol_versions"
+}
+
+may_update_active_protocol_version() {
+    if [ ! -f "$active_protocol_versions" ] ; then
+        update_active_protocol_version
+    fi
+}
+
 pull_image() {
     if [ "$TEZOS_ALPHANET_DO_NOT_PULL" = "yes" ] \
            || [ "$ALPHANET_EMACS" ] \
@@ -118,6 +156,7 @@ pull_image() {
         return ;
     fi
     docker pull "$docker_image"
+    update_active_protocol_version
     date "+%s" > "$docker_pull_timestamp"
 }
 
@@ -136,6 +175,14 @@ uptodate_container() {
                           --format="{{ .Id }}" \
                           --type=image "$docker_image")
     [ "$latest_image" = "$running_image" ]
+}
+
+uptodate_containers() {
+    container=$1
+    if [ ! -z "$container" ]; then
+        shift 1
+        uptodate_container $container && uptodate_containers $@
+    fi
 }
 
 assert_container() {
@@ -232,11 +279,13 @@ stop_node() {
 ## Baker ###################################################################
 
 check_baker() {
+    update_active_protocol_version
+    bakers="$(sed s/^/baker-/g "$active_protocol_versions")"
+    docker_baker_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_baker-\1_1/g" "$active_protocol_versions")"
     res=$(docker inspect \
                  --format="{{ .State.Running }}" \
-                 --type=container "$docker_baker_container" 2>/dev/null \
-              || echo false)
-    [ "$res" = true ]
+                 --type=container $docker_baker_containers 2>/dev/null | grep false)
+    [ -z "$res" ]
 }
 
 assert_baker() {
@@ -246,15 +295,9 @@ assert_baker() {
     fi
 }
 
-warn_baker_uptodate() {
-    if ! uptodate_container "$docker_baker_container"; then
-        echo -e "\033[33mThe current baker is not the latest available.\033[0m"
-    fi
-}
-
 assert_baker_uptodate() {
     assert_baker
-    if ! uptodate_container "$docker_baker_container"; then
+    if ! uptodate_containers $docker_baker_containers; then
         echo -e "\033[33mThe current baker is not the latest available.\033[0m"
         exit 1
     fi
@@ -264,7 +307,9 @@ status_baker() {
     if check_baker; then
         echo -e "\033[32mBaker is running\033[0m"
         may_pull_image
-        warn_baker_uptodate
+        if ! uptodate_containers $docker_baker_containers; then
+            echo -e "\033[33mThe current baker is not the latest available.\033[0m"
+        fi
     else
         echo -e "\033[33mBaker is not running\033[0m"
     fi
@@ -277,14 +322,14 @@ start_baker() {
     fi
     pull_image
     assert_node_uptodate
-    call_docker_compose start baker
+    call_docker_compose start $bakers
     echo -e "\033[32mThe baker is now running.\033[0m"
 }
 
 log_baker() {
     may_pull_image
     assert_baker_uptodate
-    call_docker_compose logs -f baker
+    call_docker_compose logs -f $bakers
 }
 
 stop_baker() {
@@ -293,17 +338,19 @@ stop_baker() {
         exit 1
     fi
     echo -e "\033[32mStopping the baker...\033[0m"
-    call_docker_compose stop baker
+    call_docker_compose stop $bakers
 }
 
 ## Endorser ###################################################################
 
 check_endorser() {
+    update_active_protocol_version
+    endorsers="$(sed s/^/endorser-/g "$active_protocol_versions")"
+    docker_endorser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_endorser-\1_1/g" "$active_protocol_versions")"
     res=$(docker inspect \
                  --format="{{ .State.Running }}" \
-                 --type=container "$docker_endorser_container" 2>/dev/null \
-              || echo false)
-    [ "$res" = true ]
+                 --type=container $docker_endorser_containers 2>/dev/null | grep false)
+    [ -z "$res" ]
 }
 
 assert_endorser() {
@@ -313,15 +360,9 @@ assert_endorser() {
     fi
 }
 
-warn_endorser_uptodate() {
-    if ! uptodate_container "$docker_endorser_container"; then
-        echo -e "\033[33mThe current endorser is not the latest available.\033[0m"
-    fi
-}
-
 assert_endorser_uptodate() {
     assert_endorser
-    if ! uptodate_container "$docker_endorser_container"; then
+    if ! uptodate_containers $docker_endorser_containers; then
         echo -e "\033[33mThe current endorser is not the latest available.\033[0m"
         exit 1
     fi
@@ -331,7 +372,9 @@ status_endorser() {
     if check_endorser; then
         echo -e "\033[32mEndorser is running\033[0m"
         may_pull_image
-        warn_endorser_uptodate
+        if ! uptodate_containers $docker_endorser_containers; then
+            echo -e "\033[33mThe current endorser is not the latest available.\033[0m"
+        fi
     else
         echo -e "\033[33mEndorser is not running\033[0m"
     fi
@@ -344,23 +387,88 @@ start_endorser() {
     fi
     pull_image
     assert_node_uptodate
-    call_docker_compose start endorser
+    call_docker_compose start $endorsers
     echo -e "\033[32mThe endorser is now running.\033[0m"
 }
 
 log_endorser() {
     may_pull_image
     assert_endorser_uptodate
-    call_docker_compose logs -f endorser
+    call_docker_compose logs -f $endorsers
 }
 
 stop_endorser() {
-    if ! check_baker; then
-        echo -e "\033[31mNo baker to kill!\033[0m"
+    if ! check_endorser; then
+        echo -e "\033[31mNo endorser to kill!\033[0m"
         exit 1
     fi
-    echo -e "\033[32mStopping the baker...\033[0m"
-    call_docker_compose stop endorser
+    echo -e "\033[32mStopping the endorser...\033[0m"
+    call_docker_compose stop $endorsers
+}
+
+## Accuser ###################################################################
+
+check_accuser() {
+    update_active_protocol_version
+    accusers="$(sed s/^/accuser-/g "$active_protocol_versions")"
+    docker_accuser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_accuser-\1_1/g" "$active_protocol_versions")"
+    res=$(docker inspect \
+                 --format="{{ .State.Running }}" \
+                 --type=container $docker_accuser_containers 2>/dev/null | grep false)
+    [ -z "$res" ]
+}
+
+assert_accuser() {
+    if ! check_accuser; then
+        echo -e "\033[31mAccuser is not running!\033[0m"
+        exit 0
+    fi
+}
+
+assert_accuser_uptodate() {
+    assert_accuser
+    if ! uptodate_containers $docker_accuser_containers; then
+        echo -e "\033[33mThe current accuser is not the latest available.\033[0m"
+        exit 1
+    fi
+}
+
+status_accuser() {
+    if check_accuser; then
+        echo -e "\033[32mAccuser is running\033[0m"
+        may_pull_image
+        if ! uptodate_containers $docker_accuser_containers; then
+            echo -e "\033[33mThe current accuser is not the latest available.\033[0m"
+        fi
+    else
+        echo -e "\033[33mAccuser is not running\033[0m"
+    fi
+}
+
+start_accuser() {
+    if check_accuser; then
+        echo -e "\033[31mAccuser is already running\033[0m"
+        exit 1
+    fi
+    pull_image
+    assert_node_uptodate
+    call_docker_compose start $accusers
+    echo -e "\033[32mThe accuser is now running.\033[0m"
+}
+
+log_accuser() {
+    may_pull_image
+    assert_accuser_uptodate
+    call_docker_compose logs -f $accusers
+}
+
+stop_accuser() {
+    if ! check_accuser; then
+        echo -e "\033[31mNo accuser to kill!\033[0m"
+        exit 1
+    fi
+    echo -e "\033[32mStopping the accuser...\033[0m"
+    call_docker_compose stop $accusers
 }
 
 ## Misc ####################################################################
@@ -395,7 +503,7 @@ display_head() {
 start() {
     pull_image
     update_compose_file "$@"
-    call_docker_compose up -d
+    call_docker_compose up -d --remove-orphans
     warn_script_uptodate
 }
 
@@ -540,11 +648,10 @@ fi
 docker_dir="$docker_base_dir$suffix"
 docker_compose_yml="$docker_dir/docker-compose.yml"
 docker_pull_timestamp="$docker_dir/docker_pull.timestamp"
+active_protocol_versions="$docker_dir/active_protocol_versions"
 docker_compose_name="$docker_compose_base_name$suffix"
 
 docker_node_container=${docker_compose_name}_node_1
-docker_baker_container=${docker_compose_name}_baker_1
-docker_endorser_container=${docker_compose_name}_endorser_1
 
 docker_node_volume=${docker_compose_name}_node_data
 docker_client_volume=${docker_compose_name}_client_data
@@ -639,6 +746,29 @@ case "$command" in
                 ;;
             stop)
                 stop_endorser
+                ;;
+            *)
+                usage
+                exit 1
+        esac ;;
+
+    ## Accuser
+
+    accuser)
+        subcommand="$1"
+        if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
+        case "$subcommand" in
+            status)
+                status_accuser
+                ;;
+            start)
+                start_accuser
+                ;;
+            log)
+                log_accuser
+                ;;
+            stop)
+                stop_accuser
                 ;;
             *)
                 usage

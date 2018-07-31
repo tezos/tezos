@@ -1,0 +1,13 @@
+(library
+ (name tezos_shell_services)
+ (public_name tezos-shell-services)
+ (libraries tezos-base)
+ (flags (:standard -w +27@8
+                   -safe-string
+                   -linkall
+                   -open Tezos_base__TzPervasives)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

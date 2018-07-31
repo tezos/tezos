@@ -1,0 +1,26 @@
+(executables
+ (names rpc_doc
+        p2p_doc)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-shell
+            tezos-protocol-updater
+            tezos-embedded-protocol-002-PsYLVpVv
+            re)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell
+                   -open Tezos_protocol_updater
+                   -linkall)))
+
+(alias
+ (name buildtest)
+ (deps rpc_doc.exe
+       p2p_doc.exe))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

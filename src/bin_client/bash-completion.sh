@@ -48,7 +48,7 @@ _tezos-alphanet_complete()
 # Register _pss_complete to provide completion for the following commands
 complete -F _tezos-client_complete tezos-client
 complete -F _tezos-client_complete tezos-admin-client
-complete -F _tezos-client_complete tezos-alpha-baker
-complete -F _tezos-client_complete tezos-alpha-endorser
-complete -F _tezos-client_complete tezos-alpha-accuser
+complete -F _tezos-client_complete tezos-baker-alpha
+complete -F _tezos-client_complete tezos-endorser-alpha
+complete -F _tezos-client_complete tezos-accuser-alpha
 complete -F _tezos-alphanet_complete alphanet.sh
