@@ -8,17 +8,17 @@ dev-repo: "https://gitlab.com/tezos/tezos.git"
 license: "unreleased"
 depends: [
   "ocamlfind" { build }
-  "jbuilder" { build & = "1.0+beta20" }
+  "dune" { build & = "1.0.1" }
   "tezos-base"
   "tezos-protocol-compiler"
   "tezos-protocol-updater"
 ]
 build: [
-  [ "rm" "jbuild" "src/jbuild" ]
-  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_embedded_protocol_template" "src/jbuild" ]
-  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"alpha\"/" "src/jbuild" ]
-  [ "jbuilder" "build" "-p" name "-j" jobs ]
+  [ "rm" "dune" "src/dune" ]
+  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_embedded_protocol_template" "src/dune" ]
+  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"002_PsYLVpVv\"/" "src/dune" ]
+  [ "dune" "build" "-p" name "-j" jobs ]
 ]
 build-test: [
-  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+  [ "dune" "runtest" "-p" name "-j" jobs ]
 ]

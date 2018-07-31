@@ -116,7 +116,7 @@ test:p2p:pool:
 test:proto_alpha:
   <<: *test_definition
   script:
-    - dune build @src/proto_alpha/lib_protocol/runtest
+    - dune build @src/proto_002_PsYLVpVv/lib_protocol/runtest
 
 test:p2p:peerset:
   <<: *test_definition
@@ -136,7 +136,7 @@ test:p2p:banned_peers:
 test:client_alpha:vote:
   <<: *test_definition
   script:
-    - dune build @src/proto_alpha/lib_delegate/runtest_vote
+    - dune build @src/proto_002_PsYLVpVv/lib_delegate/runtest_vote
 
 test:basic.sh:
   <<: *test_definition
@@ -358,30 +358,30 @@ opam:30:tezos-signer-services:
   variables:
     package: tezos-signer-services
 
-opam:31:tezos-protocol-environment:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-environment
-
-opam:32:tezos-signer-backends:
-  <<: *opam_definition
-  variables:
-    package: tezos-signer-backends
-
-opam:33:tezos-protocol-002-PsYLVpVv:
+opam:31:tezos-protocol-002-PsYLVpVv:
   <<: *opam_definition
   variables:
     package: tezos-protocol-002-PsYLVpVv
 
-opam:34:tezos-client-commands:
+opam:32:tezos-protocol-environment:
   <<: *opam_definition
   variables:
-    package: tezos-client-commands
+    package: tezos-protocol-environment
 
-opam:35:tezos-client-002-PsYLVpVv:
+opam:33:tezos-signer-backends:
+  <<: *opam_definition
+  variables:
+    package: tezos-signer-backends
+
+opam:34:tezos-client-002-PsYLVpVv:
   <<: *opam_definition
   variables:
     package: tezos-client-002-PsYLVpVv
+
+opam:35:tezos-client-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-commands
 
 opam:36:tezos-protocol-environment-shell:
   <<: *opam_definition
@@ -448,75 +448,75 @@ opam:48:tezos-embedded-protocol-002-PsYLVpVv:
   variables:
     package: tezos-embedded-protocol-002-PsYLVpVv
 
-opam:49:tezos-embedded-protocol-demo:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-demo
-
-opam:50:tezos-shell:
+opam:49:tezos-shell:
   <<: *opam_definition
   variables:
     package: tezos-shell
 
-opam:51:tezos-client:
+opam:50:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
 
-opam:52:tezos-baker-002-PsYLVpVv:
+opam:51:tezos-baker-002-PsYLVpVv:
   <<: *opam_definition
   variables:
     package: tezos-baker-002-PsYLVpVv
 
-opam:53:ocplib-ezresto-directory:
+opam:52:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:54:tezos-accuser-002-PsYLVpVv-commands:
+opam:53:tezos-accuser-002-PsYLVpVv-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-002-PsYLVpVv-commands
 
-opam:55:tezos-endorser-002-PsYLVpVv-commands:
+opam:54:tezos-endorser-002-PsYLVpVv-commands:
   <<: *opam_definition
   variables:
     package: tezos-endorser-002-PsYLVpVv-commands
 
-opam:56:tezos-endorser-002-PsYLVpVv:
+opam:55:tezos-endorser-002-PsYLVpVv:
   <<: *opam_definition
   variables:
     package: tezos-endorser-002-PsYLVpVv
 
-opam:57:tezos-protocol-demo:
+opam:56:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:58:tezos-signer:
+opam:57:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:59:tezos-baker-002-PsYLVpVv-commands:
+opam:58:tezos-baker-002-PsYLVpVv-commands:
   <<: *opam_definition
   variables:
     package: tezos-baker-002-PsYLVpVv-commands
 
-opam:60:tezos-node:
+opam:59:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:61:ocplib-json-typed-browser:
+opam:60:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
 
-opam:62:tezos-accuser-002-PsYLVpVv:
+opam:61:tezos-accuser-002-PsYLVpVv:
   <<: *opam_definition
   variables:
     package: tezos-accuser-002-PsYLVpVv
+
+opam:62:tezos-embedded-protocol-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-demo
 
 
 ##END_OPAM##

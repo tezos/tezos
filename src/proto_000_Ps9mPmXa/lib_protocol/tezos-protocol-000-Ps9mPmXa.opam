@@ -12,9 +12,9 @@ depends: [
   "tezos-protocol-compiler"
 ]
 build: [
-  [ "rm" "jbuild" "src/jbuild" ]
-  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_protocol_template" "jbuild" ]
-  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"genesis\"/" "jbuild" ]
+  [ "rm" "dune" "src/dune" ]
+  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_protocol_template" "dune" ]
+  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"000_Ps9mPmXa\"/" "dune" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 build-test: [
