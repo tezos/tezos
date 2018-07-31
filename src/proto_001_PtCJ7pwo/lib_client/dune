@@ -1,8 +1,8 @@
 (library
- (name tezos_client_alpha)
- (public_name tezos-client-alpha)
+ (name tezos_client_001_PtCJ7pwo)
+ (public_name tezos-client-001-PtCJ7pwo)
  (libraries tezos-base
-            tezos-protocol-alpha
+            tezos-protocol-001-PtCJ7pwo
             tezos-protocol-environment
             tezos-shell-services
             tezos-client-base

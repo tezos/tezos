@@ -7,8 +7,8 @@
             tezos-shell-services
             tezos-client-base
             tezos-client-genesis
-            tezos-client-alpha
-            tezos-baking-alpha
+            tezos-client-001-PtCJ7pwo
+            tezos-baking-001-PtCJ7pwo
             tezos-client-base-unix
             tezos-signer-backends
             alcotest-lwt)
@@ -18,8 +18,8 @@
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_client_genesis
-                   -open Tezos_client_alpha
-                   -open Tezos_baking_alpha
+                   -open Tezos_client_001_PtCJ7pwo
+                   -open Tezos_baking_001_PtCJ7pwo
                    -open Tezos_client_base_unix)))
 
 (alias

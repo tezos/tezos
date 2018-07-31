@@ -1,12 +1,12 @@
 (library
- (name tezos_client_genesis)
- (public_name tezos-client-genesis)
+ (name tezos_client_000_Ps9mPmXa)
+ (public_name tezos-client-000-Ps9mPmXa)
  (libraries tezos-base
             tezos-shell-services
             tezos-client-base
             tezos-client-commands
             tezos-protocol-environment
-            tezos-protocol-genesis
+            tezos-protocol-000-Ps9mPmXa
             tezos-protocol-alpha)
  (library_flags (:standard -linkall))
  (flags (:standard -w -9+27-30-32-40@8

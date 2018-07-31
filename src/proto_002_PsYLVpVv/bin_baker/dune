@@ -1,20 +1,18 @@
-(jbuild_version 1)
-
 (executable
- ((name main_baker_002_PsYLVpVv)
-  (public_name tezos-baker-002-PsYLVpVv)
-  (libraries (tezos-client-base-unix
-              tezos-client-commands
-              tezos-baking-002-PsYLVpVv-commands))
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_client_002_PsYLVpVv
-                    -open Tezos_client_commands
-                    -open Tezos_baking_002_PsYLVpVv_commands
-                    -open Tezos_client_base_unix))))
+ (name main_baker_002_PsYLVpVv)
+ (public_name tezos-baker-002-PsYLVpVv)
+ (libraries tezos-client-base-unix
+            tezos-client-commands
+            tezos-baking-002-PsYLVpVv-commands)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_client_002_PsYLVpVv
+                   -open Tezos_client_commands
+                   -open Tezos_baking_002_PsYLVpVv_commands
+                   -open Tezos_client_base_unix)))
 
 (alias
- ((name runtest_indent)
-  (deps ((glob_files *.ml{,i})))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

@@ -1,13 +1,13 @@
 (library
- (name tezos_client_alpha_commands)
- (public_name tezos-client-alpha-commands)
+ (name tezos_client_001_PtCJ7pwo_commands)
+ (public_name tezos-client-001-PtCJ7pwo-commands)
  (libraries tezos-base
             tezos-stdlib-unix
-            tezos-protocol-alpha
+            tezos-protocol-001-PtCJ7pwo
             tezos-protocol-environment
             tezos-shell-services
             tezos-client-base
-            tezos-client-alpha
+            tezos-client-001-PtCJ7pwo
             tezos-client-commands
             tezos-rpc)
  (library_flags (:standard -linkall))
@@ -18,21 +18,21 @@
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
                    -open Tezos_client_base
-                   -open Tezos_client_alpha
+                   -open Tezos_client_001_PtCJ7pwo
                    -open Tezos_client_commands
                    -open Tezos_rpc)))
 
 (library
- (name tezos_client_alpha_commands_registration)
- (public_name tezos-client-alpha-commands.registration)
+ (name tezos_client_001_PtCJ7pwo_commands_registration)
+ (public_name tezos-client-001-PtCJ7pwo-commands.registration)
  (libraries tezos-base
-            tezos-protocol-alpha
+            tezos-protocol-001-PtCJ7pwo
             tezos-protocol-environment
             tezos-shell-services
             tezos-client-base
-            tezos-client-alpha
+            tezos-client-001-PtCJ7pwo
             tezos-client-commands
-            tezos-client-alpha-commands
+            tezos-client-001-PtCJ7pwo-commands
             tezos-rpc)
  (library_flags (:standard -linkall))
  (modules alpha_commands_registration)
@@ -41,9 +41,9 @@
                    -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
                    -open Tezos_client_base
-                   -open Tezos_client_alpha
+                   -open Tezos_client_001_PtCJ7pwo
                    -open Tezos_client_commands
-                   -open Tezos_client_alpha_commands
+                   -open Tezos_client_001_PtCJ7pwo_commands
                    -open Tezos_rpc)))
 
 (alias
