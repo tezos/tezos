@@ -41,34 +41,6 @@ let builtin_commands =
          return_unit) ;
   ]
 
-(* Duplicated from the node, here for now since the client still
-   embeds the baker. To be moved where appropriate when the baker is
-   definitively moved/factorized in its own binary. *)
-let find_log_rules () =
-  match Option.try_with (fun () -> Sys.getenv "TEZOS_LOG"),
-        Option.try_with (fun () -> Sys.getenv "LWT_LOG")
-  with
-  | Some rules, None -> "environment variable TEZOS_LOG", Some rules
-  | None, Some rules -> "environment variable LWT_LOG", Some rules
-  | None, None -> "default rules", None
-  | Some rules, Some _ ->
-      Format.eprintf
-        "@[<v 2>@{<warning>@{<title>Warning@}@} \
-         Both environment variables TEZOS_LOG and LWT_LOG \
-         defined, using TEZOS_LOG.@]@\n@." ;
-      "environment varible TEZOS_LOG", Some rules
-
-let init_logger () =
-  Lwt_log_core.add_rule "*" Lwt_log_core.Notice ;
-  let origin, rules = find_log_rules () in
-  Option.iter rules ~f:begin fun rules ->
-    try Lwt_log_core.load_rules rules ~fail_on_error:true
-    with _ ->
-      Pervasives.failwith
-        (Format.asprintf "Incorrect log rules defined in %s." origin)
-  end ;
-  Logging_unix.(init ~template:"$(message)" Stderr)
-
 (* Main (lwt) entry *)
 let main select_commands =
   let executable_name = Filename.basename Sys.executable_name in
@@ -89,7 +61,7 @@ let main select_commands =
                  (if Unix.isatty Unix.stdout then Ansi else Plain) Short) ;
   ignore Clic.(setup_formatter Format.err_formatter
                  (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
-  init_logger () >>= fun () ->
+  Logging_unix.init () >>= fun () ->
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
         (new unix_full

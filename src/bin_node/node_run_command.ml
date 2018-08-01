@@ -89,23 +89,6 @@ let find_log_rules default =
             defined, using TEZOS_LOG." ;
       "environment varible TEZOS_LOG", Some rules
 
-let init_logger ?verbosity (log_config : Node_config_file.log) =
-  begin
-    match verbosity with
-    | Some level ->
-        Lwt_log_core.add_rule "*" level
-    | None ->
-        Lwt_log_core.add_rule "*" log_config.default_level ;
-        let origin, rules = find_log_rules log_config.rules in
-        Option.iter rules ~f:begin fun rules ->
-          try Lwt_log_core.load_rules rules ~fail_on_error:true
-          with _ ->
-            fatal_error "Incorrect log rules defined in %s, exiting." origin ;
-            exit 1
-        end
-  end ;
-  Logging_unix.init ~template:log_config.template log_config.output
-
 let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   let patch_context json ctxt =
     begin
@@ -267,7 +250,11 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Lwt_lock_file.create
     ~unlink_on_exit:true (lock_file config.data_dir) >>=? fun () ->
   init_signal () ;
-  init_logger ?verbosity config.log >>= fun () ->
+  let log_cfg =
+    match verbosity with
+    | None -> config.log
+    | Some default_level -> { config.log with default_level } in
+  Logging_unix.init ~cfg:log_cfg () >>= fun () ->
   Updater.init (protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
   init_node ?sandbox ?checkpoint config >>=? fun node ->

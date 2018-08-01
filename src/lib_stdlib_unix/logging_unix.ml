@@ -113,6 +113,71 @@ module Output = struct
     Format.fprintf fmt "%s" (to_string output)
 end
 
+type cfg = {
+  output : Output.t ;
+  default_level : Logging.level ;
+  rules : string option ;
+  template : Logging.template ;
+}
+
+let create_cfg
+    ?(output = Output.Stderr)
+    ?(default_level = Logging.Notice)
+    ?rules ?(template = Logging.default_template) () =
+  { output ; default_level ; rules ; template }
+
+let default_cfg = create_cfg ()
+
+let level_encoding =
+  let open Logging in
+  let open Data_encoding in
+  conv
+    (function
+      | Fatal -> "fatal"
+      | Error -> "error"
+      | Warning -> "warning"
+      | Notice -> "notice"
+      | Info -> "info"
+      | Debug -> "debug")
+    (function
+      | "error" -> Error
+      | "warn" -> Warning
+      | "notice" -> Notice
+      | "info" -> Info
+      | "debug" -> Debug
+      | "fatal" -> Fatal
+      | _ -> invalid_arg "Logging.level")
+    string
+
+let cfg_encoding =
+  let open Data_encoding in
+  conv
+    (fun {output ; default_level ; rules ; template } ->
+       (output, default_level, rules, template))
+    (fun (output, default_level, rules, template) ->
+       { output ; default_level ; rules ; template })
+    (obj4
+       (dft "output"
+          ~description: "Output for the logging function. Either 'stdout', \
+                         'stderr' or the name of a log file ."
+          Output.encoding default_cfg.output)
+       (dft "level"
+          ~description: "Verbosity level: one of 'fatal', 'error', 'warn',\
+                         'notice', 'info', 'debug'."
+          level_encoding default_cfg.default_level)
+       (opt "rules"
+          ~description: "Fine-grained logging instructions. Same format as \
+                         described in `tezos-node run --help`, DEBUG section. \
+                         In the example below, sections 'p2p' and all sections \
+                         starting by 'client' will have their messages logged \
+                         up to the debug level, whereas the rest of log sections \
+                         will be logged up to the notice level."
+          string)
+       (dft "template"
+          ~description: "Format for the log file, see \
+                         http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates."
+          string default_cfg.template))
+
 let init ?(template = Logging.default_template) output =
   let open Output in
   begin
@@ -134,6 +199,33 @@ let init ?(template = Logging.default_template) output =
   end >>= fun logger ->
   Lwt_log.default := logger ;
   Lwt.return_unit
+
+let find_log_rules default =
+  match Sys.(getenv_opt "TEZOS_LOG", getenv_opt "LWT_LOG") with
+  | Some rules, None -> "environment variable TEZOS_LOG", Some rules
+  | None, Some rules -> "environment variable LWT_LOG", Some rules
+  | None, None -> "configuration file", default
+  | Some rules, Some _ ->
+      Format.eprintf
+        "@[<v 2>@{<warning>@{<title>Warning@}@} \
+         Both environment variables TEZOS_LOG and LWT_LOG \
+         defined, using TEZOS_LOG.@]@\n@." ;
+      "environment varible TEZOS_LOG", Some rules
+
+let init ?(cfg = default_cfg) () =
+  Lwt_log_core.add_rule "*" cfg.default_level ;
+  let origin, rules = find_log_rules cfg.rules in
+  begin match rules with
+    | None -> Lwt.return_unit
+    | Some rules ->
+        try
+          Lwt_log_core.load_rules rules ~fail_on_error:true ;
+          Lwt.return_unit
+        with _ ->
+          Printf.ksprintf Lwt.fail_with
+            "Incorrect log rules defined in %s" origin
+  end >>= fun () ->
+  init ~template:cfg.template cfg.output
 
 let close () =
   Lwt_log.close !Lwt_log.default

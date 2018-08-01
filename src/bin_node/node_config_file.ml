@@ -37,7 +37,7 @@ type t = {
   data_dir : string ;
   p2p : p2p ;
   rpc : rpc ;
-  log : log ;
+  log : Logging_unix.cfg ;
   shell : shell ;
 }
 
@@ -60,13 +60,6 @@ and rpc = {
 and tls = {
   cert : string ;
   key : string ;
-}
-
-and log = {
-  output : Logging_unix.Output.t ;
-  default_level : Logging.level ;
-  rules : string option ;
-  template : Logging.template ;
 }
 
 and shell = {
@@ -117,13 +110,6 @@ let default_rpc = {
   tls = None ;
 }
 
-let default_log = {
-  output = Stderr ;
-  default_level = Notice ;
-  rules = None ;
-  template = Logging.default_template ;
-}
-
 let default_shell = {
   block_validator_limits = Node.default_block_validator_limits ;
   prevalidator_limits = Node.default_prevalidator_limits ;
@@ -135,7 +121,7 @@ let default_config = {
   data_dir = default_data_dir ;
   p2p = default_p2p ;
   rpc = default_rpc ;
-  log = default_log ;
+  log = Logging_unix.default_cfg ;
   shell = default_shell ;
 }
 
@@ -336,58 +322,6 @@ let rpc : rpc Data_encoding.t =
           string)
     )
 
-let level_encoding =
-  let open Logging in
-  let open Data_encoding in
-  conv
-    (function
-      | Fatal -> "fatal"
-      | Error -> "error"
-      | Warning -> "warning"
-      | Notice -> "notice"
-      | Info -> "info"
-      | Debug -> "debug")
-    (function
-      | "error" -> Error
-      | "warn" -> Warning
-      | "notice" -> Notice
-      | "info" -> Info
-      | "debug" -> Debug
-      | "fatal" -> Fatal
-      | _ -> invalid_arg "Logging.level")
-    string
-
-let log =
-  let open Data_encoding in
-  conv
-    (fun {output ; default_level ; rules ; template } ->
-       (output, default_level, rules, template))
-    (fun (output, default_level, rules, template) ->
-       { output ; default_level ; rules ; template })
-    (obj4
-       (dft "output"
-          ~description: "Output for the logging function. Either 'stdout', \
-                         'stderr' or the name of a log file ."
-          Logging_unix.Output.encoding default_log.output)
-       (dft "level"
-          ~description: "Verbosity level: one of 'fatal', 'error', 'warn',\
-                         'notice', 'info', 'debug'."
-          level_encoding default_log.default_level)
-       (opt "rules"
-          ~description: "Fine-grained logging instructions. Same format as \
-                         described in `tezos-node run --help`, DEBUG section. \
-                         In the example below, sections 'p2p' and all sections \
-                         starting by 'client' will have their messages logged \
-                         up to the debug level, whereas the rest of log sections \
-                         will be logged up to the notice level."
-          string)
-       (dft "template"
-          ~description: "Format for the log file, see \
-                         http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates."
-          string default_log.template)
-    )
-
-
 let worker_limits_encoding
     default_size
     default_level
@@ -401,7 +335,7 @@ let worker_limits_encoding
        { backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory })
     (obj4
        (dft "worker_backlog_size" uint16 default_size)
-       (dft "worker_backlog_level" level_encoding default_level)
+       (dft "worker_backlog_level" Logging_unix.level_encoding default_level)
        (dft "worker_zombie_lifetime" float default_zombie_lifetime)
        (dft "worker_zombie_memory" float default_zombie_memory))
 
@@ -525,7 +459,7 @@ let encoding =
           ~description: "Configuration of network parameters" p2p)
        (dft "log"
           ~description: "Configuration of network parameters"
-          log default_log)
+          Logging_unix.cfg_encoding Logging_unix.default_cfg)
        (dft "shell"
           ~description: "Configuration of network parameters"
           shell default_shell))
@@ -624,7 +558,7 @@ let update
     tls =
       Option.first_some rpc_tls cfg.rpc.tls ;
   }
-  and log : log = {
+  and log : Logging_unix.cfg = {
     cfg.log with
     output = Option.unopt ~default:cfg.log.output log_output ;
   }

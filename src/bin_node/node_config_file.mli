@@ -27,7 +27,7 @@ type t = {
   data_dir : string ;
   p2p : p2p ;
   rpc : rpc ;
-  log : log ;
+  log : Logging_unix.cfg ;
   shell : shell ;
 }
 
@@ -50,13 +50,6 @@ and rpc = {
 and tls = {
   cert : string ;
   key : string ;
-}
-
-and log = {
-  output : Logging_unix.Output.t ;
-  default_level : Logging.level ;
-  rules : string option ;
-  template : Logging.template ;
 }
 
 and shell = {
