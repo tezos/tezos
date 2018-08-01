@@ -18,8 +18,13 @@ After a successful compilation, you should have the following binaries:
   and accuse on the Tezos network (see :ref:`howtorun`);
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
-- ``tezos-protocol-compiler``: a protocol compiler used for developing
-  new version of the economic protocol.
+
+Note that Alphanet and Zeronet only support the last version of the
+protocol which is always called `alpha` while Betanet must also
+support all past protocols.
+For this reason the name of the 3 daemons in Betanet contains the
+incremental number and the partial hash of the protocol they are bound
+to, such as ``tezos-{baker,endorser,accuser}-002-PsYLVpVv``.
 
 
 Read The Friendly Manual
@@ -111,12 +116,14 @@ default.  A more detailed documentation can be found in the :ref:`RPC index.
 <rpc>` The RPC interface must be enable in order for the clients
 to communicate with the node, but is should not be publically accessible on the
 internet. With the following command it is available uniquely on the
-`localhost` address of your machine.
+`localhost` address of your machine, on the default port ``8732``.
 
 ::
 
-   tezos-node run --rpc-addr [::]
+   tezos-node run --rpc-addr 127.0.0.1
 
+The node listens by default on port ``19732`` so it is advisable to
+open incoming connections to that port.
 You can read more about the :ref:`node configuration <node-conf>` and
 its :ref:`private mode <private-mode>`.
 
@@ -227,11 +234,21 @@ be included in one block.
 If you want to simulate a transaction without actually sending it to
 the network you can use the ``--dry-run`` option.
 As in any block-chain it is advisable to wait several blocks to
-consider the transaction as final, we can do that with:
+consider the transaction as final, for an important operation we
+advice to wait 60 blocks.
+We can do that with:
 
 ::
 
    tezos-client wait for <operation hash> to be included
+
+In the rare case when an operation is lost, how can we be sure that it
+will not be included in any future block and re-emit it?
+After 60 blocks a transaction is considered invalid and can't be
+included anymore in a block.
+Furthermore each operation has a counter (explained in more detail
+later) that prevents replays so it is usually safe to re-emit an
+operation that seems lost.
 
 
 Receipts for operations and blocks
@@ -256,10 +273,7 @@ signed by that account and enforces some good intuitive properties:
 - each operation is applied once: for example if the transfer above
   reaches two peers and they both send it to a third peer, it will not
   apply the transaction twice.
-- operations are applied in order: if we emit a transaction towards
-  *bob* and a transaction from *bob* to *test3*, we can be sure
-  that the second transaction will be applied only after *bob*
-  received its funds otherwise it may fail for insufficient balance.
+- operations are applied in order.
 - all previous operations have been applied: if we emit operation *n*
   and *n+1*, and *n* gets lost then *n+1* cannot be applied.
 
@@ -419,11 +433,11 @@ It's RPCs all the way down
 The client communicates with the node uniquely through RPC calls so
 make sure that the node is listening and that the ports are
 correct.
-For example the ``bootstrapped`` command above is a shortcut for:
+For example the ``get timestamp`` command above is a shortcut for:
 
 ::
 
-   tezos-client rpc get /monitor/bootstrapped
+   tezos-client rpc get /chains/main/blocks/head/header/shell
 
 The client tries to simplify common tasks as much as possible, however
 if you want to query the node for more specific informations you'll
