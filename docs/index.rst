@@ -49,6 +49,26 @@ The Community
 The Networks
 ------------
 
+.. _betanet:
+
+Betanet
+~~~~~~~
+
+The Tezos Beta (experimental) network is the current incarnation of
+the Tezos blockchain.
+It runs with real tezzies that have been allocated to the
+donors of July 2017 ICO (see :ref:`activate_fundraiser_account`).
+It is the step before the full Tezos mainnet, with a `few caveats
+<https://tezosfoundation.ch/news/tezos-betanet-expectations>`_.
+
+The Tezos Beta (experimental) network has been live and open since
+`June 30th 2018 <https://tezosfoundation.ch/news/tezos-betanet-launch>`_.
+
+All the instructions in this documentation are valid for Betanet
+however we **strongly** encourage users to first try all the
+introduction tutorials on Alphanet to familiarize themselves without
+risks.
+
 .. _alphanet:
 
 Alphanet
@@ -56,8 +76,8 @@ Alphanet
 
 Tezos Alphanet is a test network for the Tezos blockchain with a
 faucet to obtain free tezzies (see :ref:`faucet`).
-It is updated and rebooted rarely and it is either running the same
-code as beta or the next version that will become beta in a few weeks.
+It is updated and rebooted rarely and it is running the same code as
+the Betanet.
 It is the reference network for developers wanting to test their
 software before going to beta and for users who want to familiarize
 themselves with Tezos before using their real tezzies.
@@ -75,24 +95,9 @@ Zeronet
 Zeronet is the most cutting-edge development network of Tezos. It is
 restarted without notice, possibly several times a day.
 This network is mostly used internally by the Tezos developers and may
-have *different constants* that Alphanet or Betanet.
+have *different constants* that Alphanet or Betanet, for example it
+has shorter cycles and a shorter interval between blocks.
 We offer no support for the Zeronet.
-
-
-.. _betanet:
-
-Betanet
-~~~~~~~
-
-The Tezos Beta (experimental) network is the current incarnation of
-the Tezos blockchain.
-There is no faucet but real tezzies that have been allocated to the
-donors of July 2017 ICO (see :ref:`activate_fundraiser_account`).
-It is the step before the full Tezos mainnet, with a `few caveats
-<https://tezosfoundation.ch/news/tezos-betanet-expectations>`_.
-
-The Tezos Beta (experimental) network has been live and open since
-`June 30th 2018 <https://tezosfoundation.ch/news/tezos-betanet-launch>`_.
 
 
 Getting started
