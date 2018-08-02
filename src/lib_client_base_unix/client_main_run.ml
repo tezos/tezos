@@ -67,6 +67,7 @@ let main select_commands =
         (new unix_full
           ~block:Client_config.default_block
           ~confirmations:None
+          ~password_filename:None
           ~base_dir:Client_config.default_base_dir
           ~rpc_config:RPC_client.default_config)
         original_args
@@ -90,6 +91,7 @@ let main select_commands =
         new unix_full
           ~block:parsed_args.block
           ~confirmations:parsed_args.confirmations
+          ~password_filename: parsed_args.password_filename
           ~base_dir:parsed_config_file.base_dir
           ~rpc_config:rpc_config in
       Client_keys.register_signer

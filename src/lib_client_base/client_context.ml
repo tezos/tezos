@@ -65,6 +65,7 @@ class simple_printer log =
   end
 
 class type wallet = object
+  method password_filename : string option
   method with_lock : (unit -> 'a Lwt.t) -> 'a Lwt.t
   method load : string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
   method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
@@ -96,6 +97,7 @@ class type full = object
 end
 
 class proxy_context (obj : full) = object
+  method password_filename = obj#password_filename
   method base = obj#base
   method block = obj#block
   method confirmations = obj#confirmations

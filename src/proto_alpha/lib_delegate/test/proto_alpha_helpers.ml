@@ -56,6 +56,7 @@ let no_write_context ?(block = `Head 0) config : #Client_context.full = object
   method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = fun f -> f ()
   method block = block
   method confirmations = None
+  method password_filename = None
   method prompt : type a. (a, string tzresult) Client_context.lwt_format -> a =
     Format.kasprintf (fun _ -> return "")
   method prompt_password : type a. (a, MBytes.t tzresult) Client_context.lwt_format -> a =

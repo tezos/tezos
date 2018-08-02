@@ -25,6 +25,7 @@
 
 class unix_wallet :
   base_dir:string ->
+  password_filename: string option ->
   Client_context.wallet
 class unix_prompter :
   Client_context.prompter
@@ -35,5 +36,6 @@ class unix_full :
   base_dir:string ->
   block:Shell_services.block ->
   confirmations:int option ->
+  password_filename: string option ->
   rpc_config:RPC_client.config ->
   Client_context.full

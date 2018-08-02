@@ -28,7 +28,9 @@ include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.context.uni
 
 let filename_tag = Tag.def ~doc:"Filename" "filename"  Format.pp_print_string
 
-class unix_wallet ~base_dir : wallet = object (self)
+class unix_wallet ~base_dir ~password_filename : wallet = object (self)
+
+  method password_filename = password_filename
 
   method private filename alias_name =
     Filename.concat
@@ -130,11 +132,11 @@ class unix_logger ~base_dir =
     inherit Client_context.simple_printer log
   end
 
-class unix_full ~base_dir ~block ~confirmations ~rpc_config : Client_context.full =
+class unix_full ~base_dir ~block ~confirmations ~password_filename ~rpc_config : Client_context.full =
   object
     inherit unix_logger ~base_dir
     inherit unix_prompter
-    inherit unix_wallet ~base_dir
+    inherit unix_wallet ~base_dir ~password_filename
     inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
     method block = block
     method confirmations = confirmations
