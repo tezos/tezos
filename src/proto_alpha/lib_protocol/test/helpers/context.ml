@@ -101,7 +101,7 @@ let get_seed_nonce_hash ctxt =
     | B { header } -> header
     | I i -> Incremental.header i in
   match header.protocol_data.contents.seed_nonce_hash with
-  | None -> failwith "Ne committed nonce"
+  | None -> failwith "No committed nonce"
   | Some hash -> return hash
 
 let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
