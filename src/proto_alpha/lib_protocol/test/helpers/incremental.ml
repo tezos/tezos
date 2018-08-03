@@ -30,14 +30,15 @@ type t = {
   predecessor: Block.t ;
   state: M.validation_state ;
   rev_operations: Operation.packed list ;
+  rev_tickets: operation_receipt list ;
   header: Block_header.t ;
   delegate: Account.t ;
 }
 type incremental = t
 
 let predecessor { predecessor ; _ } = predecessor
-let header st = st.header
-
+let header { header ; _ } = header
+let rev_tickets { rev_tickets ; _ } = rev_tickets
 let level st = st.header.shell.level
 
 let rpc_context st =
@@ -69,7 +70,6 @@ let begin_construction ?(priority=0) ?timestamp (predecessor : Block.t) =
       validation_passes = predecessor.header.shell.validation_passes ;
       fitness = predecessor.header.shell.fitness ;
       timestamp ;
-      (* TODO : CHECK THAT OUT -- incoherent level *)
       level = predecessor.header.shell.level ;
       context = Context_hash.zero ;
       operations_hash = Operation_list_list_hash.zero ;
@@ -93,6 +93,7 @@ let begin_construction ?(priority=0) ?timestamp (predecessor : Block.t) =
     predecessor ;
     state ;
     rev_operations = [] ;
+    rev_tickets = [] ;
     header ;
     delegate ;
   }
@@ -137,7 +138,7 @@ let detect_script_failure :
 let add_operation ?expect_failure st op =
   let open Apply_results in
   M.apply_operation st.state op >>=? function
-  | state, Operation_metadata result ->
+  | state, (Operation_metadata result as metadata) ->
       Lwt.return @@ detect_script_failure result >>= fun result ->
       begin match expect_failure with
         | None ->
@@ -149,9 +150,11 @@ let add_operation ?expect_failure st op =
             | Error e ->
                 f e
       end >>=? fun () ->
-      return { st with state ; rev_operations = op :: st.rev_operations }
-  | state, No_operation_metadata ->
-      return { st with state ; rev_operations = op :: st.rev_operations }
+      return { st with state ; rev_operations = op :: st.rev_operations ;
+                       rev_tickets = metadata :: st.rev_tickets }
+  | state, (No_operation_metadata as metadata) ->
+      return { st with state ; rev_operations = op :: st.rev_operations ;
+                       rev_tickets = metadata :: st.rev_tickets }
 
 let finalize_block st =
   M.finalize_block st.state >>=? fun (result, _) ->
