@@ -890,6 +890,25 @@ let rec unpack_contents_list :
       let ops, ress = unpack_contents_list rest in
       Cons (op, ops), Cons_result (res, ress)
 
+let rec to_list = function
+  | Contents_result_list (Single_result o) -> [Contents_result o]
+  | Contents_result_list (Cons_result (o, os)) ->
+      Contents_result o :: to_list (Contents_result_list os)
+
+let rec of_list = function
+  | [] -> assert false
+  | [Contents_result o] -> Contents_result_list (Single_result o)
+  | (Contents_result o) :: os ->
+      let Contents_result_list os = of_list os in
+      match o, os with
+      | Manager_operation_result _, Single_result (Manager_operation_result _) ->
+          Contents_result_list (Cons_result (o, os))
+      | Manager_operation_result _, Cons_result _ ->
+          Contents_result_list (Cons_result (o, os))
+      | _ ->
+          Pervasives.failwith "Operation result list of length > 1 \
+                               should only contains manager operations result."
+
 let operation_data_and_metadata_encoding =
   def "operation.alpha.operation_with_metadata" @@
   union [

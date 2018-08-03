@@ -140,6 +140,12 @@ val unpack_contents_list :
   'kind contents_and_result_list ->
   'kind contents_list * 'kind contents_result_list
 
+val to_list :
+  packed_contents_result_list -> packed_contents_result list
+
+val of_list :
+  packed_contents_result list -> packed_contents_result_list
+
 type ('a, 'b) eq = Eq : ('a, 'a) eq
 val kind_equal_list :
   'kind contents_list -> 'kind2 contents_result_list -> ('kind, 'kind2) eq option
