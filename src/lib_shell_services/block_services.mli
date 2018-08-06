@@ -417,6 +417,18 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
          unit,
          Next_proto.operation list) RPC_service.t
 
+      val get_filter:
+        ('a, 'b) RPC_path.t ->
+        ([ `GET ], 'a,
+         'b , unit, unit,
+         Data_encoding.json) RPC_service.t
+
+      val set_filter:
+        ('a, 'b) RPC_path.t ->
+        ([ `POST ], 'a,
+         'b , unit, Data_encoding.json,
+         unit) RPC_service.t
+
     end
 
     val live_blocks:

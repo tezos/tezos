@@ -66,6 +66,7 @@ module type T = sig
       ) Lwt_watcher.input;
     mutable advertisement : [ `Pending of Mempool.t | `None ] ;
     mutable rpc_directory : types_state RPC_directory.t lazy_t ;
+    mutable filter_config : Data_encoding.json Protocol_hash.Map.t ;
   }
   module Name: Worker.NAME with type t = name_t
   module Types: Worker.TYPES with type state = types_state
@@ -128,6 +129,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       ) Lwt_watcher.input;
     mutable advertisement : [ `Pending of Mempool.t | `None ] ;
     mutable rpc_directory : types_state RPC_directory.t lazy_t ;
+    mutable filter_config : Data_encoding.json Protocol_hash.Map.t ;
   }
 
   module Name = struct
@@ -437,6 +439,25 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
     let module Proto_services = Block_services.Make(Proto)(Proto) in
 
     dir := RPC_directory.register !dir
+        (Proto_services.S.Mempool.get_filter RPC_path.open_root)
+        (fun pv () () ->
+           match Protocol_hash.Map.find_opt Proto.hash pv.filter_config with
+           | Some obj -> return obj
+           | None ->
+               begin match Prevalidator_filters.find Proto.hash with
+                 | None -> return (`O [])
+                 | Some (module Filter) ->
+                     let default = Data_encoding.Json.construct Filter.config_encoding Filter.default_config in
+                     return default
+               end) ;
+
+    dir := RPC_directory.register !dir
+        (Proto_services.S.Mempool.set_filter RPC_path.open_root)
+        (fun pv () obj ->
+           pv.filter_config <- Protocol_hash.Map.add Proto.hash obj pv.filter_config ;
+           return ()) ;
+
+    dir := RPC_directory.register !dir
         (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
         (fun pv () () ->
            let map_op op =
@@ -524,11 +545,35 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
     let on_operation_arrived (pv : state) oph op =
       pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
       if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks) then begin
-        Distributed_db.Operation.clear_or_cancel pv.chain_db oph
+        Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
         (* TODO: put in a specific delayed map ? *)
+        return_unit
       end else if not (already_handled pv oph) (* prevent double inclusion on flush *) then begin
-        pv.pending <- Operation_hash.Map.add oph op pv.pending
-      end
+        State.Block.protocol_hash pv.predecessor >>= fun protocol_hash ->
+        begin match Prevalidator_filters.find protocol_hash with
+          | None -> return true
+          | Some (module Filter) ->
+              let protocol_data =
+                Data_encoding.Binary.of_bytes_exn
+                  Filter.Proto.operation_data_encoding
+                  op.Operation.proto in
+              let op = { Filter.Proto.shell = op.shell ; protocol_data } in
+              try
+                let config =
+                  match Protocol_hash.Map.find_opt protocol_hash pv.filter_config with
+                  | Some config ->
+                      Data_encoding.Json.destruct Filter.config_encoding config
+                  | None ->
+                      Filter.default_config in
+                return (Filter.pre_filter config op.Filter.Proto.protocol_data)
+              with _ ->
+                failwith "invalid mempool filter configuration"
+        end >>=? fun accept ->
+        if accept then
+          (* TODO: should this have an influence on the peer's score ? *)
+          pv.pending <- Operation_hash.Map.add oph op pv.pending ;
+        return_unit
+      end else return_unit
 
     let on_inject pv op =
       let oph = Operation.hash op in
@@ -540,6 +585,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         Prevalidation.apply_operation validation_state parsed_op >>= function
         | Applied (_, _result) ->
             Distributed_db.inject_operation pv.chain_db oph op >>= fun (_ : bool) ->
+            (* we bypass the filter for injected operations *)
             pv.pending <- Operation_hash.Map.add parsed_op.hash op pv.pending ;
             return_unit
         | _ ->
@@ -615,8 +661,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
           | Request.Inject op ->
               on_inject pv op
           | Request.Arrived (oph, op) ->
-              on_operation_arrived pv oph op ;
-              return_unit
+              on_operation_arrived pv oph op
           | Request.Advertise ->
               on_advertise pv ;
               return_unit
@@ -661,6 +706,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
           operation_stream = Lwt_watcher.create_input () ;
           advertisement = `None ;
           rpc_directory = rpc_directory ;
+          filter_config = Protocol_hash.Map.empty (* TODO: initialize from config file *) ;
         } in
       List.iter
         (fun oph -> Lwt.ignore_result (fetch_operation w pv oph))
