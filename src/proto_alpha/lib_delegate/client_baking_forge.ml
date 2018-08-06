@@ -801,9 +801,10 @@ let bake_slot
             -% t event "client_side_validation_error"
             -% a errs_tag errs) >>= fun () ->
         lwt_log_notice Tag.DSL.(fun f ->
-            f "Building an empty block using shell validation"
+            f "Building a block using shell validation"
             -% t event "shell_prevalidation_notice") >>= fun () ->
-        shell_prevalidation cctxt ~chain ~block seed_nonce_hash operations slot
+        shell_prevalidation cctxt ~chain ~block seed_nonce_hash
+          (List.sub operations 4) slot
     | Ok (final_context, validation_result, operations) ->
         lwt_debug Tag.DSL.(fun f ->
             f "Try forging locally the block header for %a (slot %d) for %s (%a)"
