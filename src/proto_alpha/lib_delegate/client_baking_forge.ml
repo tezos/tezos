@@ -380,6 +380,140 @@ let error_of_op (result: error Preapply_result.t) op =
   try Some (Failed_to_preapply (op, snd @@ Operation_hash.Map.find h result.branch_delayed))
   with Not_found -> None
 
+let filter_and_apply_operations
+    state
+    block_info
+    ~timestamp
+    ?protocol_data
+    (operations : packed_operation list list) =
+  let open Client_baking_simulator in
+  lwt_debug Tag.DSL.(fun f ->
+      f "Starting client-side validation %a"
+      -% t event "baking_local_validation_start"
+      -% a Block_hash.Logging.tag block_info.Client_baking_blocks.hash) >>= fun () ->
+  begin begin_construction ~timestamp ?protocol_data state.index block_info >>= function
+    | Ok inc -> return inc
+    | Error errs ->
+        lwt_log_error Tag.DSL.(fun f ->
+            f "Error while fetching current context : %a"
+            -% t event "context_fetch_error"
+            -% a errs_tag errs) >>= fun () ->
+        lwt_log_notice Tag.DSL.(fun f -> f "Retrying to open the context" -% t event "reopen_context") >>= fun () ->
+        Client_baking_simulator.load_context ~context_path:state.context_path >>= fun index ->
+        begin_construction ~timestamp ?protocol_data index block_info >>=? fun inc ->
+        state.index <- index ;
+        return inc
+  end  >>=? fun initial_inc ->
+  let endorsements = List.nth operations endorsements_index in
+  let votes = List.nth operations votes_index in
+  let anonymous = List.nth operations anonymous_index in
+  let managers = List.nth operations managers_index in
+  let bad_managers =
+    if List.length operations > managers_index + 1 then
+      List.nth operations (managers_index + 1)
+    else []
+  in
+  let validate_operation inc op =
+    add_operation inc op >>= function
+    | Error errs ->
+        lwt_log_info Tag.DSL.(fun f ->
+            f "Client-side validation: invalid operation filtered %a\n%a"
+            -% t event "baking_rejected_invalid_operation"
+            -% a Operation_hash.Logging.tag (Operation.hash_packed op)
+            -% a errs_tag errs)
+        >>= fun () ->
+        return_none
+    | Ok inc -> return_some inc
+  in
+  let filter_valid_operations inc ops =
+    fold_left_s (fun (inc, acc) op ->
+        validate_operation inc op >>=? function
+        | None -> return (inc, acc)
+        | Some inc' -> return (inc', op :: acc)
+      ) (inc, []) ops
+  in
+  (* Invalid endorsements are detected during block finalization *)
+  let is_valid_endorsement inc endorsement =
+    validate_operation inc endorsement >>=? function
+    | None -> return_none
+    | Some inc' -> finalize_construction inc' >>= begin function
+        | Ok _ -> return_some endorsement
+        | Error _ -> return_none
+      end
+  in
+  filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
+  (* Retrieve the correct index order *)
+  let managers = List.sort Proto_alpha.compare_operations managers in
+  let bad_managers = List.sort Proto_alpha.compare_operations bad_managers in
+  filter_valid_operations inc (managers @ bad_managers) >>=? fun (inc, managers) ->
+  (* Gives a chance to the endorser to fund their deposit in the current block *)
+  filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
+  finalize_construction inc >>=? fun _ ->
+  let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
+  tzforce state.constants >>=? fun
+    { Constants.parametric = { endorsers_per_block ; hard_gas_limit_per_block ; } } ->
+  let endorsements =
+    List.sub (List.rev endorsements) endorsers_per_block
+  in
+  let votes =
+    retain_operations_up_to_quota
+      (List.rev votes)
+      (List.nth quota votes_index) in
+  let anonymous =
+    retain_operations_up_to_quota
+      (List.rev anonymous)
+      (List.nth quota anonymous_index) in
+  let is_evidence  = function
+    | { protocol_data = Operation_data { contents = Single (Double_baking_evidence _ ) } } -> true
+    | { protocol_data = Operation_data { contents = Single (Double_endorsement_evidence _ ) } } -> true
+    | _ -> false in
+  let evidences, anonymous = List.partition is_evidence anonymous in
+  trim_manager_operations ~max_size:(List.nth quota managers_index).max_size
+    ~hard_gas_limit_per_block managers >>=? fun (accepted_managers, _overflowing_managers) ->
+  (* Retrieve the correct index order *)
+  let accepted_managers = List.sort Proto_alpha.compare_operations accepted_managers in
+  (* Make sure we only keep valid operations *)
+  filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
+  filter_valid_operations inc accepted_managers >>=? fun (inc, accepted_managers) ->
+  filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
+  (* Endorsements won't fail now *)
+  fold_left_s add_operation inc endorsements >>=? fun inc ->
+  (* Endorsement and double baking/endorsement evidence do not commute:
+     we apply denunciation operations after endorsements. *)
+  filter_valid_operations inc evidences >>=? fun (final_inc, evidences) ->
+  let operations = List.map List.rev [ endorsements ; votes ; anonymous @ evidences ; accepted_managers ] in
+  finalize_construction final_inc >>=? fun (validation_result, metadata) ->
+  return @@ (final_inc, (validation_result, metadata), operations)
+
+(* Build the block header : mimics node prevalidation *)
+let finalize_block_header
+    (inc : Client_baking_simulator.incremental)
+    ~timestamp
+    (validation_result, _metadata)
+    operations =
+  let { T.context ; fitness ; message ; _ } = validation_result in
+  let validation_passes = List.length LiftedMain.validation_passes in
+  let operations_hash : Operation_list_list_hash.t =
+    Operation_list_list_hash.compute
+      (List.map
+         (fun sl ->
+            Operation_list_hash.compute
+              (List.map Operation.hash_packed sl)
+         ) operations
+      ) in
+  Context.hash ~time:timestamp ?message context >>= fun context ->
+  let header =
+    { inc.header with
+      level = Raw_level.to_int32 (Raw_level.succ inc.predecessor.level) ;
+      validation_passes ;
+      operations_hash ;
+      fitness ;
+      context ;
+    } in
+  return header
+
 let forge_block cctxt ?(chain = `Main) block
     ?force
     ?operations
@@ -612,146 +746,12 @@ let pop_baking_slots state =
   state.future_slots <- future_slots ;
   slots
 
-let filter_and_apply_operations
-    state
-    block_info
-    ~timestamp
-    ?protocol_data
-    (operations : packed_operation list list) =
-  let open Client_baking_simulator in
-  lwt_debug Tag.DSL.(fun f ->
-      f "Starting client-side validation %a"
-      -% t event "baking_local_validation_start"
-      -% a Block_hash.Logging.tag block_info.Client_baking_blocks.hash) >>= fun () ->
-  begin begin_construction ~timestamp ?protocol_data state.index block_info >>= function
-    | Ok inc -> return inc
-    | Error errs ->
-        lwt_log_error Tag.DSL.(fun f ->
-            f "Error while fetching current context : %a"
-            -% t event "context_fetch_error"
-            -% a errs_tag errs) >>= fun () ->
-        lwt_log_notice Tag.DSL.(fun f -> f "Retrying to open the context" -% t event "reopen_context") >>= fun () ->
-        Client_baking_simulator.load_context ~context_path:state.context_path >>= fun index ->
-        begin_construction ~timestamp ?protocol_data index block_info >>=? fun inc ->
-        state.index <- index ;
-        return inc
-  end  >>=? fun initial_inc ->
-  let endorsements = List.nth operations endorsements_index in
-  let votes = List.nth operations votes_index in
-  let anonymous = List.nth operations anonymous_index in
-  let managers = List.nth operations managers_index in
-  let bad_managers =
-    if List.length operations > managers_index + 1 then
-      List.nth operations (managers_index + 1)
-    else []
-  in
-  let validate_operation inc op =
-    add_operation inc op >>= function
-    | Error errs ->
-        lwt_log_info Tag.DSL.(fun f ->
-            f "Client-side validation: invalid operation filtered %a\n%a"
-            -% t event "baking_rejected_invalid_operation"
-            -% a Operation_hash.Logging.tag (Operation.hash_packed op)
-            -% a errs_tag errs)
-        >>= fun () ->
-        return_none
-    | Ok inc -> return_some inc
-  in
-  let filter_valid_operations inc ops =
-    fold_left_s (fun (inc, acc) op ->
-        validate_operation inc op >>=? function
-        | None -> return (inc, acc)
-        | Some inc' -> return (inc', op :: acc)
-      ) (inc, []) ops
-  in
-  (* Invalid endorsements are detected during block finalization *)
-  let is_valid_endorsement inc endorsement =
-    validate_operation inc endorsement >>=? function
-    | None -> return_none
-    | Some inc' -> finalize_construction inc' >>= begin function
-        | Ok _ -> return_some endorsement
-        | Error _ -> return_none
-      end
-  in
-  filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
-  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
-  (* Retrieve the correct index order *)
-  let managers = List.sort Proto_alpha.compare_operations managers in
-  let bad_managers = List.sort Proto_alpha.compare_operations bad_managers in
-  filter_valid_operations inc (managers @ bad_managers) >>=? fun (inc, managers) ->
-  (* Gives a chance to the endorser to fund their deposit in the current block *)
-  filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
-  finalize_construction inc >>=? fun _ ->
-  let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
-  tzforce state.constants >>=? fun
-    { Constants.parametric = { endorsers_per_block ; hard_gas_limit_per_block ; } } ->
-  let endorsements =
-    List.sub (List.rev endorsements) endorsers_per_block
-  in
-  let votes =
-    retain_operations_up_to_quota
-      (List.rev votes)
-      (List.nth quota votes_index) in
-  let anonymous =
-    retain_operations_up_to_quota
-      (List.rev anonymous)
-      (List.nth quota anonymous_index) in
-  let is_evidence  = function
-    | { protocol_data = Operation_data { contents = Single (Double_baking_evidence _ ) } } -> true
-    | { protocol_data = Operation_data { contents = Single (Double_endorsement_evidence _ ) } } -> true
-    | _ -> false in
-  let evidences, anonymous = List.partition is_evidence anonymous in
-  trim_manager_operations ~max_size:(List.nth quota managers_index).max_size
-    ~hard_gas_limit_per_block managers >>=? fun (accepted_managers, _overflowing_managers) ->
-  (* Retrieve the correct index order *)
-  let accepted_managers = List.sort Proto_alpha.compare_operations accepted_managers in
-  (* Make sure we only keep valid operations *)
-  filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
-  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
-  filter_valid_operations inc accepted_managers >>=? fun (inc, accepted_managers) ->
-  filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
-  (* Endorsements won't fail now *)
-  fold_left_s add_operation inc endorsements >>=? fun inc ->
-  (* Endorsement and double baking/endorsement evidence do not commute:
-     we apply denunciation operations after endorsements. *)
-  filter_valid_operations inc evidences >>=? fun (final_inc, evidences) ->
-  let operations = List.map List.rev [ endorsements ; votes ; anonymous @ evidences ; accepted_managers ] in
-  finalize_construction final_inc >>=? fun (validation_result, metadata) ->
-  return @@ (final_inc, (validation_result, metadata), operations)
-
-(* Build the block header : mimics node prevalidation *)
-let finalize_block_header
-    (inc : Client_baking_simulator.incremental)
-    ~timestamp
-    (validation_result, _metadata)
-    operations =
-  let { T.context ; fitness ; message ; _ } = validation_result in
-  let validation_passes = List.length LiftedMain.validation_passes in
-  let operations_hash : Operation_list_list_hash.t = 
-    Operation_list_list_hash.compute
-      (List.map
-         (fun sl ->
-            Operation_list_hash.compute
-              (List.map Operation.hash_packed sl)
-         ) operations
-      ) in
-  Context.hash ~time:timestamp ?message context >>= fun context ->
-  let header =
-    { inc.header with
-      level = Raw_level.to_int32 (Raw_level.succ inc.predecessor.level) ;
-      validation_passes ;
-      operations_hash ;
-      fitness ;
-      context ;
-    } in
-  return header
-
 let shell_prevalidation
     (cctxt : #Proto_alpha.full)
     ~chain
     ~block
     seed_nonce_hash
-    operations 
+    operations
     (timestamp, (bi, priority, delegate)) =
   let protocol_data =
     forge_faked_protocol_data ~priority ~seed_nonce_hash in
