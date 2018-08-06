@@ -681,20 +681,26 @@ let filter_and_apply_operations
     retain_operations_up_to_quota
       (List.rev anonymous)
       (List.nth quota anonymous_index) in
+  let is_evidence  = function
+    | { protocol_data = Operation_data { contents = Single (Double_baking_evidence _ ) } } -> true
+    | { protocol_data = Operation_data { contents = Single (Double_endorsement_evidence _ ) } } -> true
+    | _ -> false in
+  let evidences, anonymous = List.partition is_evidence anonymous in
   trim_manager_operations ~max_size:(List.nth quota managers_index).max_size
     ~hard_gas_limit_per_block managers >>=? fun (accepted_managers, _overflowing_managers) ->
   (* Retrieve the correct index order *)
   let accepted_managers = List.sort Proto_alpha.compare_operations accepted_managers in
   (* Make sure we only keep valid operations *)
   filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
   filter_valid_operations inc accepted_managers >>=? fun (inc, accepted_managers) ->
   filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
   (* Endorsements won't fail now *)
   fold_left_s add_operation inc endorsements >>=? fun inc ->
   (* Endorsement and double baking/endorsement evidence do not commute:
-     we apply anonymous operations after endorsements. *)
-  filter_valid_operations inc anonymous >>=? fun (final_inc, anonymous) ->
-  let operations = List.map List.rev [ endorsements ; votes ; anonymous ; accepted_managers ] in
+     we apply denunciation operations after endorsements. *)
+  filter_valid_operations inc evidences >>=? fun (final_inc, evidences) ->
+  let operations = List.map List.rev [ endorsements ; votes ; anonymous @ evidences ; accepted_managers ] in
   finalize_construction final_inc >>=? fun (validation_result, metadata) ->
   return @@ (final_inc, (validation_result, metadata), operations)
 
