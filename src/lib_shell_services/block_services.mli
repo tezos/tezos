@@ -400,6 +400,8 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
     module Mempool : sig
 
+      val encoding: Mempool.t Data_encoding.t
+
       val pending_operations:
         ('a, 'b) RPC_path.t ->
         ([ `GET ], 'a,

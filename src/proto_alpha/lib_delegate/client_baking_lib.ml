@@ -29,7 +29,7 @@ open Alpha_context
 let bake_block (cctxt : #Proto_alpha.full)
     ?(chain = `Main) block
     ?fee_threshold
-    ?force ?max_priority ?(minimal_timestamp=false)
+    ?force ?max_priority ?(minimal_timestamp=false) ?mempool
     ?src_sk ?src_pk delegate =
   begin
     match src_sk with
@@ -59,6 +59,7 @@ let bake_block (cctxt : #Proto_alpha.full)
     ?fee_threshold
     ?force
     ?seed_nonce_hash ~src_sk block
+    ?mempool
     ~priority:(`Auto (delegate, max_priority)) () >>=? fun block_hash ->
   let src_pkh = Signature.Public_key.hash src_pk in
   Client_baking_forge.State.record cctxt src_pkh level.level >>=? fun () ->

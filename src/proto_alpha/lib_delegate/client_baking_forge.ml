@@ -291,11 +291,19 @@ let ops_of_mempool (ops : Alpha_block_services.Mempool.t) =
     List.rev_map (fun (_, op) -> op) ops.applied
   )
 
-let unopt_operations cctxt chain = function
-  | None ->
-      Alpha_block_services.Mempool.pending_operations cctxt ~chain () >>=? fun mpool ->
-      let ops = ops_of_mempool mpool in
-      return ops
+let unopt_operations cctxt chain mempool = function
+  | None -> begin
+      match mempool with
+      | None ->
+          Alpha_block_services.Mempool.pending_operations cctxt ~chain () >>=? fun mpool ->
+          let ops = ops_of_mempool mpool in
+          return ops
+      | Some file ->
+          Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file >>=? fun json ->
+          let mpool = Data_encoding.Json.destruct Alpha_block_services.S.Mempool.encoding json in
+          let ops = ops_of_mempool mpool in
+          return ops
+end
   | Some operations ->
       return operations
 
@@ -379,11 +387,12 @@ let forge_block cctxt ?(chain = `Main) block
     ?(sort = best_effort)
     ?(fee_threshold = Tez.zero)
     ?timestamp
+    ?mempool
     ~priority
     ?seed_nonce_hash ~src_sk () =
 
   (* making the arguments usable *)
-  unopt_operations cctxt chain operations >>=? fun operations_arg ->
+  unopt_operations cctxt chain mempool operations >>=? fun operations_arg ->
   decode_priority cctxt chain block priority >>=? fun (priority, minimal_timestamp) ->
   unopt_timestamp timestamp minimal_timestamp >>=? fun timestamp ->
 
