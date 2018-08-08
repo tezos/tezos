@@ -25,7 +25,7 @@
 
 open RPC_context
 
-val identity: #simple -> P2p_peer.Id.t tzresult Lwt.t
+val self: #simple -> P2p_peer.Id.t tzresult Lwt.t
 
 val stat: #simple -> P2p_stat.t tzresult Lwt.t
 
@@ -38,7 +38,7 @@ val connect: #simple -> timeout:float -> P2p_point.Id.t -> unit tzresult Lwt.t
 
 module S : sig
 
-  val identity :
+  val self :
     ([ `GET ], unit,
      unit, unit, unit,
      P2p_peer.Id.t) RPC_service.t
