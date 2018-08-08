@@ -46,9 +46,9 @@ let delegate_commands () =
        @@ Client_keys.Public_key_hash.source_param
          ~name:"baker" ~desc: "name of the delegate owning the baking right"
        @@ stop)
-      (fun (max_priority, threshold, force, minimal_timestamp) delegate cctxt ->
+      (fun (max_priority, fee_threshold, force, minimal_timestamp) delegate cctxt ->
          bake_block cctxt cctxt#block
-           ?threshold ~force ?max_priority ~minimal_timestamp delegate) ;
+           ?fee_threshold ~force ?max_priority ~minimal_timestamp delegate) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation."
       no_options
       (prefixes [ "reveal"; "nonce"; "for" ]
@@ -85,11 +85,11 @@ let baker_commands () =
          ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
          directory_parameter
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun (max_priority, threshold) node_path delegates cctxt ->
+      (fun (max_priority, fee_threshold) node_path delegates cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_list
            cctxt (List.map fst delegates) >>=? fun () ->
          Client_daemon.Baker.run cctxt
-           ?threshold
+           ?fee_threshold
            ?max_priority
            ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
            ~context_path:(Filename.concat node_path "context")

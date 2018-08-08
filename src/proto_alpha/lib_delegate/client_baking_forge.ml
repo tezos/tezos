@@ -48,18 +48,22 @@ type state = {
   (* lazy-initialisation with retry-on-error *)
   constants: Constants.t tzlazy ;
 
+  (* Minimum operation fee required to include in a block *)
+  fee_threshold : Tez.t ;
+
   (* truly mutable *)
   mutable best: Client_baking_blocks.block_info ;
   mutable future_slots:
     (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) list ;
 }
 
-let create_state genesis context_path index delegates constants best =
+let create_state genesis context_path index delegates constants ?(fee_threshold = Tez.zero) best =
   { genesis ;
     context_path ;
     index ;
     delegates ;
     constants ;
+    fee_threshold ;
     best ;
     future_slots = [] ;
   }
@@ -163,7 +167,7 @@ let get_manager_operation_gas_and_fee op =
 let sort_manager_operations
     ~max_size
     ~hard_gas_limit_per_block
-    ?(threshold = Tez.zero)
+    ~fee_threshold
     (operations : Proto_alpha.operation list)
   =
   let compute_weight op (fee, gas) =
@@ -178,7 +182,7 @@ let sort_manager_operations
   filter_map_s
     (fun op ->
        get_manager_operation_gas_and_fee op >>=? fun (fee, gas) ->
-       if Tez.(<) fee threshold then
+       if Tez.(<) fee fee_threshold then
          return_none
        else
          return (Some (op, (compute_weight op (fee, gas))))
@@ -230,9 +234,9 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block manager_operatio
 (* Hypothesis : we suppose that the received manager operations have a valid gas_limit *)
 let classify_operations
     (cctxt : #Proto_alpha.full)
-    ?threshold
     ~block
     ~hard_gas_limit_per_block
+    ~fee_threshold
     (ops: Proto_alpha.operation list) =
   Alpha_block_services.live_blocks cctxt ~chain:`Main ~block ()
   >>=? fun live_blocks ->
@@ -255,7 +259,7 @@ let classify_operations
   let manager_operations = t.(managers_index) in
   let { Alpha_environment.Updater.max_size } =
     List.nth Proto_alpha.Main.validation_passes managers_index in
-  sort_manager_operations ~max_size ~hard_gas_limit_per_block ?threshold manager_operations
+  sort_manager_operations ~max_size ~hard_gas_limit_per_block ~fee_threshold manager_operations
   >>=? fun ordered_operations ->
   (* Greedy heuristic *)
   trim_manager_operations ~max_size ~hard_gas_limit_per_block (List.map fst ordered_operations)
@@ -369,9 +373,11 @@ let error_of_op (result: error Preapply_result.t) op =
   with Not_found -> None
 
 let forge_block cctxt ?(chain = `Main) block
-    ?threshold
     ?force
-    ?operations ?(best_effort = operations = None) ?(sort = best_effort)
+    ?operations
+    ?(best_effort = operations = None)
+    ?(sort = best_effort)
+    ?(fee_threshold = Tez.zero)
     ?timestamp
     ~priority
     ?seed_nonce_hash ~src_sk () =
@@ -385,7 +391,7 @@ let forge_block cctxt ?(chain = `Main) block
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   Alpha_services.Constants.all cctxt (`Main, block) >>=?
   fun Constants.{ parametric = { hard_gas_limit_per_block ; endorsers_per_block } } ->
-  classify_operations cctxt ~hard_gas_limit_per_block ~block:block ?threshold operations_arg >>=? fun operations ->
+  classify_operations cctxt ~hard_gas_limit_per_block ~block:block ~fee_threshold operations_arg >>=? fun operations ->
   (* Ensure that we retain operations up to the quota *)
   let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
   let endorsements = List.sub
@@ -757,10 +763,30 @@ let shell_prevalidation
       return
         (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
 
+(** Retrieve the operations present in the node's mempool and classify
+    them in 5 lists indexed as :
+    - 0 -> Endorsements
+    - 1 -> Votes and proposals
+    - 2 -> Anonymous operations
+    - 3 -> High-priority manager operations
+    - 4 -> Low-priority manager operations
+*)
+let fetch_operations
+    (cctxt : #Proto_alpha.full)
+    state
+    ~chain
+    ~block
+  =
+  (* Retrieve pending operations *)
+  Alpha_block_services.Mempool.pending_operations cctxt ~chain () >>=? fun mpool ->
+  let operations = ops_of_mempool mpool in
+  tzforce state.constants >>=? fun Constants.{ parametric = { hard_gas_limit_per_block } } ->
+  classify_operations cctxt
+    ~hard_gas_limit_per_block ~fee_threshold:state.fee_threshold ~block operations
+
 let bake_slot
     cctxt
     state
-    ?threshold
     seed_nonce_hash
     ((timestamp, (bi, priority, delegate)) as slot)
   =
@@ -768,6 +794,11 @@ let bake_slot
   let block = `Hash (bi.hash, 0) in
   Alpha_services.Helpers.current_level cctxt
     ~offset:1l (chain, block) >>=? fun next_level ->
+  let seed_nonce_hash =
+    if next_level.Level.expected_commitment then
+      Some seed_nonce_hash
+    else
+      None in
   let timestamp =
     if Block_hash.equal bi.Client_baking_blocks.hash state.genesis then
       Time.now ()
@@ -781,16 +812,7 @@ let bake_slot
       -% s bake_priorty_tag priority
       -% s Client_keys.Logging.tag name
       -% a timestamp_tag timestamp) >>= fun () ->
-  (* Retrieve pending operations *)
-  Alpha_block_services.Mempool.pending_operations cctxt ~chain () >>=? fun mpool ->
-  let operations = ops_of_mempool mpool in
-  let seed_nonce_hash =
-    if next_level.expected_commitment then
-      Some seed_nonce_hash
-    else
-      None in
-  tzforce state.constants >>=? fun Constants.{ parametric = { hard_gas_limit_per_block } } ->
-  classify_operations cctxt ?threshold ~hard_gas_limit_per_block ~block operations >>=? fun operations ->
+  fetch_operations cctxt state ~chain ~block >>=? fun operations ->
   let next_version =
     match Tezos_base.Block_header.get_forced_protocol_upgrade ~level:(Raw_level.to_int32 next_level.Level.level) with
     | None -> bi.next_protocol
@@ -852,7 +874,6 @@ let pp_operation_list_list =
 (* [bake] create a single block when woken up to do so. All the necessary
    information (e.g., slot) is available in the [state]. *)
 let bake
-    ?threshold
     ()
     (cctxt : #Proto_alpha.full)
     state
@@ -868,7 +889,7 @@ let bake
 
   (* baking for each slot *)
   filter_map_s
-    (bake_slot cctxt ?threshold state seed_nonce_hash)
+    (bake_slot cctxt state seed_nonce_hash)
     slots >>=? fun candidates ->
 
   (* FIXME: pick one block per-delegate *)
@@ -925,7 +946,7 @@ let bake
    the [delegates] *)
 let create
     (cctxt : #Proto_alpha.full)
-    ?threshold
+    ?fee_threshold
     ?max_priority
     ~(context_path: string)
     (delegates: public_key_hash list)
@@ -936,7 +957,7 @@ let create
     let constants =
       tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Head 0)) in
     Client_baking_simulator.load_context ~context_path >>= fun index ->
-    let state = create_state genesis_hash context_path index delegates constants bi in
+    let state = create_state genesis_hash context_path index delegates constants ?fee_threshold bi in
     return state
   in
 
@@ -947,5 +968,5 @@ let create
     ~state_maker
     ~pre_loop:(insert_block ?max_priority ())
     ~compute_timeout
-    ~timeout_k:(bake ?threshold ())
+    ~timeout_k:(bake ())
     ~event_k:(insert_block ?max_priority ())
