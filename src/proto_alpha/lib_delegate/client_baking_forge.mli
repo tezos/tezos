@@ -62,6 +62,7 @@ val forge_block:
   ?fee_threshold:Tez.t ->
   ?timestamp:Time.t ->
   ?mempool:string ->
+  ?context_path:string ->
   priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
   ?seed_nonce_hash:Nonce_hash.t ->
   src_sk:Client_keys.sk_uri ->

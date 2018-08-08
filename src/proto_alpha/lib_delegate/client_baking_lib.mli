@@ -36,6 +36,7 @@ val bake_block:
   ?max_priority: int ->
   ?minimal_timestamp: bool ->
   ?mempool: string ->
+  ?context_path: string ->
   ?src_sk:Client_keys.sk_uri ->
   ?src_pk:Signature.public_key ->
   public_key_hash ->

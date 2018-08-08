@@ -303,7 +303,7 @@ let unopt_operations cctxt chain mempool = function
           let mpool = Data_encoding.Json.destruct Alpha_block_services.S.Mempool.encoding json in
           let ops = ops_of_mempool mpool in
           return ops
-end
+    end
   | Some operations ->
       return operations
 
@@ -522,6 +522,7 @@ let forge_block cctxt ?(chain = `Main) block
     ?(fee_threshold = Tez.zero)
     ?timestamp
     ?mempool
+    ?context_path
     ~priority
     ?seed_nonce_hash ~src_sk () =
 
@@ -550,15 +551,52 @@ let forge_block cctxt ?(chain = `Main) block
   (* Size/Gas check already occured in classify operations *)
   let managers = List.nth operations managers_index in
   let operations = [ endorsements ; votes ; anonymous ; managers ] in
-  Alpha_block_services.Helpers.Preapply.block
-    cctxt ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, result) ->
+  begin
+    match context_path with
+    | None ->
+        Alpha_block_services.Helpers.Preapply.block
+          cctxt ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, result) ->
+
+        let operations =
+          List.map (fun l -> List.map snd l.Preapply_result.applied) result in
+
+        (* everything went well (or we don't care about errors): GO! *)
+        if best_effort || all_ops_valid result then
+          return (shell_header, operations)
+
+        (* some errors (and we care about them) *)
+        else
+          let result = List.fold_left merge_preapps Preapply_result.empty result in
+          Lwt.return_error @@
+          List.filter_map (error_of_op result) operations_arg
+
+    | Some context_path ->
+        assert sort ;
+        assert best_effort ;
+        Context.init ~readonly:true context_path >>= fun index ->
+        Client_baking_blocks.info cctxt ~chain block >>=? fun bi ->
+        let state = {
+          context_path ;
+          index ;
+          genesis =
+            Block_hash.of_b58check_exn
+              "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" ;
+          constants = tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Head 0)) ;
+          delegates = [] ;
+          future_slots = [] ;
+          best = bi ;
+          fee_threshold = Tez.zero ;
+        } in
+        filter_and_apply_operations ~timestamp ~protocol_data state bi operations >>=? fun (final_context, validation_result, operations) ->
+        finalize_block_header final_context ~timestamp validation_result operations >>=? fun shell_header ->
+        return (shell_header, List.map (List.map forge) operations)
+
+  end >>=? fun (shell_header, operations) ->
 
   (* Now for some logging *)
   let total_op_count = List.length operations_arg in
-  let valid_op_count =
-    List.fold_left
-      (fun acc r -> acc + List.length r.Preapply_result.applied)
-      0 result in
+  let valid_op_count = List.length operations in
+
   lwt_log_info Tag.DSL.(fun f ->
       f "Found %d valid operations (%d refused) for timestamp %a@.Computed fitness %a"
       -% t event "found_valid_operations"
@@ -567,22 +605,9 @@ let forge_block cctxt ?(chain = `Main) block
       -% a timestamp_tag timestamp
       -% a fitness_tag shell_header.fitness) >>= fun () ->
 
-  (* everything went well (or we don't care about errors): GO! *)
-  if best_effort || all_ops_valid result then
-    let operations =
-      if best_effort then
-        List.map (fun l -> List.map snd l.Preapply_result.applied) result
-      else
-        List.map (List.map forge) operations in
-    inject_block cctxt
-      ?force ~chain ~shell_header ~priority ?seed_nonce_hash ~src_sk
-      operations
-
-  (* some errors (and we care about them) *)
-  else
-    let result = List.fold_left merge_preapps Preapply_result.empty result in
-    Lwt.return_error @@
-    List.filter_map (error_of_op result) (List.concat operations)
+  inject_block cctxt
+    ?force ~chain ~shell_header ~priority ?seed_nonce_hash ~src_sk
+    operations
 
 (** Worker *)
 

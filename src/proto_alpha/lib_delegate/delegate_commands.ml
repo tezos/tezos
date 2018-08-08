@@ -44,18 +44,26 @@ let mempool_arg =
     ~doc:"When used the client will read the mempool in the provided file instead of querying the node through an RPC (useful for debugging only)."
     string_parameter
 
+let context_path_arg =
+  Clic.arg
+    ~long:"context"
+    ~placeholder:"path"
+    ~doc:"When use the client will read in the local context at the provided path in order to build the block, instead of relying on the 'preapply' RPC."
+    string_parameter
+
 let delegate_commands () =
   let open Clic in
   [
     command ~group ~desc: "Forge and inject block using the delegate rights."
-      (args5 max_priority_arg fee_threshold_arg force_switch minimal_timestamp_switch mempool_arg)
+      (args6 max_priority_arg fee_threshold_arg force_switch minimal_timestamp_switch mempool_arg context_path_arg)
       (prefixes [ "bake"; "for" ]
        @@ Client_keys.Public_key_hash.source_param
          ~name:"baker" ~desc: "name of the delegate owning the baking right"
        @@ stop)
-      (fun (max_priority, fee_threshold, force, minimal_timestamp, mempool) delegate cctxt ->
+      (fun (max_priority, fee_threshold, force, minimal_timestamp, mempool, context_path) delegate cctxt ->
          bake_block cctxt cctxt#block
-           ?fee_threshold ~force ?max_priority ~minimal_timestamp ?mempool delegate) ;
+           ?fee_threshold ~force ?max_priority ~minimal_timestamp
+           ?mempool ?context_path delegate) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation."
       no_options
       (prefixes [ "reveal"; "nonce"; "for" ]
