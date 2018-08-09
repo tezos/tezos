@@ -97,26 +97,27 @@ module Register_embedded
        val sources: Protocol.t
      end) = struct
 
+  let hash =
+    match Source.hash with
+    | None -> Protocol.hash Source.sources
+    | Some hash -> hash
+  module Name = struct
+    let name = Protocol_hash.to_b58check hash
+  end
+  module Self = struct
+    module P = struct
+      let hash = hash
+      include Env.Lift(Proto)
+    end
+    include P
+    module Block_services = Block_services.Make(P)(P)
+    let complete_b58prefix = Env.Context.complete
+  end
   let () =
-    let hash =
-      match Source.hash with
-      | None -> Protocol.hash Source.sources
-      | Some hash -> hash in
-    let module Name = struct
-      let name = Protocol_hash.to_b58check hash
-    end in
     VersionTable.add
       sources hash Source.sources ;
     VersionTable.add
-      versions hash
-      (module struct
-        module P = struct
-          let hash = hash
-          include Env.Lift(Proto)
-        end
-        include P
-        module Block_services = Block_services.Make(P)(P)
-        let complete_b58prefix = Env.Context.complete
-      end : T)
+      versions hash (module Self : T)
 
+  include Self
 end

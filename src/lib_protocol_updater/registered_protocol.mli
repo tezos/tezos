@@ -54,4 +54,8 @@ module Register_embedded
     (Source : sig
        val hash: Protocol_hash.t option
        val sources: Protocol.t
-     end) : sig end
+     end) :
+  T with type P.block_header_data = Proto.block_header_data
+     and type P.operation_data = Proto.operation_data
+     and type P.operation_receipt = Proto.operation_receipt
+     and type P.validation_state = Proto.validation_state
