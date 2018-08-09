@@ -55,11 +55,10 @@ end
 
 let () =
   Format.printf {|
-let () =
-  let module Ignored = Tezos_protocol_updater.Registered_protocol.Register_embedded
+module Registered =
+  Tezos_protocol_updater.Registered_protocol.Register_embedded
     (Tezos_embedded_protocol_environment_%s.Environment)
     (Tezos_embedded_raw_protocol_%s.Main)
-    (Source) in
-    ()
+    (Source)
 @.|}
     version version

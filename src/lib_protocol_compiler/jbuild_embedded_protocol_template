@@ -28,10 +28,6 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
 ")))
 
 (rule
- (targets registerer.mli)
- (action (write-file %%{targets} "(* empty *)")))
-
-(rule
  (targets registerer.ml)
  (deps tezos_embedded_protocol_environment_%s.cmxa
        (:src_dir TEZOS_PROTOCOL))
