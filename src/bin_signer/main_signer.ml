@@ -302,6 +302,29 @@ let main () =
       Client_keys.register_signer
         (module Tezos_signer_backends.Ledger) ;
       Logging_unix.init () >>= fun () ->
+      let module Remote_params = struct
+        let authenticate pkhs payload =
+          Client_keys.list_keys cctxt >>=? fun keys ->
+          match List.filter_map begin function
+              | (_, known_pkh, _, Some known_sk_uri)
+                when List.exists (fun pkh -> Signature.Public_key_hash.equal pkh known_pkh) pkhs ->
+                  Some known_sk_uri
+              | _ -> None
+            end keys with
+          | sk_uri :: _ ->
+              Client_keys.sign cctxt sk_uri payload
+          | [] -> failwith
+                    "remote signer expects authentication signature, \
+                     but no authorized key was found in the wallet"
+        let logger = RPC_client.full_logger Format.err_formatter
+      end in
+      let module Socket = Tezos_signer_backends.Socket.Make(Remote_params) in
+      let module Http = Tezos_signer_backends.Http.Make(Remote_params) in
+      let module Https = Tezos_signer_backends.Https.Make(Remote_params) in
+      Client_keys.register_signer (module Socket.Unix) ;
+      Client_keys.register_signer (module Socket.Tcp) ;
+      Client_keys.register_signer (module Http) ;
+      Client_keys.register_signer (module Https) ;
       let commands =
         Clic.add_manual
           ~executable_name
