@@ -48,3 +48,15 @@ val preapply :
   Operation.t list list ->
   (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
+val notify_operation :
+  prevalidation_state ->
+  error Preapply_result.t ->
+  unit
+
+val shutdown_operation_input :
+  prevalidation_state ->
+  unit
+
+val build_rpc_directory :
+  Protocol_hash.t ->
+  (prevalidation_state * error Preapply_result.t) RPC_directory.t tzresult Lwt.t
