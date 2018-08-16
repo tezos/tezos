@@ -251,6 +251,15 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
       ?chain:chain ->
       unit -> t tzresult Lwt.t
 
+    val monitor_operations:
+      #streamed ->
+      ?chain:chain ->
+      ?applied:bool ->
+      ?branch_delayed:bool ->
+      ?branch_refused:bool ->
+      ?refused:bool ->
+      unit -> (Next_proto.operation list Lwt_stream.t * stopper) tzresult Lwt.t
+
   end
 
   val live_blocks:
@@ -396,6 +405,14 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
         ([ `GET ], 'a,
          'b , unit, unit,
          Mempool.t) RPC_service.t
+
+      val monitor_operations:
+        ('a, 'b) RPC_path.t ->
+        ([ `GET ], 'a, 'b,
+         < applied : bool ; branch_delayed : bool ;
+           branch_refused : bool ; refused : bool ; >,
+         unit,
+         Next_proto.operation list) RPC_service.t
 
     end
 
