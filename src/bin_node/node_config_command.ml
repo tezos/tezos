@@ -49,7 +49,7 @@ let reset (args : Node_shared_arg.t) =
 let init (args : Node_shared_arg.t) =
   if Sys.file_exists args.config_file then
     failwith
-      "Pre-existant config file at %s, use `reset`."
+      "Pre-existing config file at %s, use `reset`."
       args.config_file
   else
     Node_shared_arg.read_and_patch_config_file args >>=? fun cfg ->

@@ -56,6 +56,7 @@ val revelation:
   Context.t -> public_key -> Operation.packed tzresult Lwt.t
 
 val origination:
+  ?counter: Z.t ->
   ?delegate:public_key_hash ->
   ?script:Script.t ->
   ?spendable:bool ->
@@ -90,6 +91,13 @@ val activation:
   Context.t ->
   Signature.Public_key_hash.t -> Blinded_public_key_hash.activation_code ->
   Operation.packed tzresult Lwt.t
+
+val combine_operations :
+  ?public_key:public_key ->
+  ?counter:counter ->
+  source:Contract.t ->
+  Context.t ->
+  packed_operation list -> packed_operation tzresult Lwt.t
 
 (** Reveals a seed_nonce that was previously committed at a certain level *)
 val seed_nonce_revelation:

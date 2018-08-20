@@ -50,7 +50,7 @@ let () =
         Format.fprintf ppf
           "Invalid data directory '%s'."
           path)
-    Data_encoding.(obj1 (req "datadirPath" string))
+    Data_encoding.(obj1 (req "datadir_path" string))
     (function
       | Invalid_data_dir path ->
           Some path
@@ -66,8 +66,8 @@ let () =
           "Invalid data directory version '%s' (expected '%s')."
           got exp)
     Data_encoding.(obj2
-                     (req "expectedVersion" string)
-                     (req "actualVersion" string))
+                     (req "expected_version" string)
+                     (req "actual_version" string))
     (function
       | Invalid_data_dir_version (expected, actual) ->
           Some (expected, actual)
@@ -78,7 +78,7 @@ let () =
     ~id: "couldNotReadDataDirVersion"
     ~title: "Could not read data directory version file"
     ~description: "Data directory version file was invalid."
-    Data_encoding.(obj1 (req "versionPath" string))
+    Data_encoding.(obj1 (req "version_path" string))
     ~pp:(fun ppf path ->
         Format.fprintf ppf
           "Tried to read version file at '%s', \
@@ -91,7 +91,7 @@ let () =
     ~id: "noDataDirVersionFile"
     ~title: "Data directory version file does not exist"
     ~description: "Data directory version file does not exist"
-    Data_encoding.(obj1 (req "versionPath" string))
+    Data_encoding.(obj1 (req "version_path" string))
     ~pp:(fun ppf path ->
         Format.fprintf ppf
           "Expected to find data directory version file at '%s', \

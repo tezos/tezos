@@ -39,7 +39,7 @@ let default () =
        @,\
       \                 Use your fundraiser keys @{<warning>AT YOUR OWN RISK@}.@,\
        All transactions happening on the Betanet @{<warning>are expected to be valid in the Mainnet@}.@,\
-      \        In doubt, we recommend that you wait for the lunch of the Mainnet.@]@\n@."
+      \        In doubt, we recommend that you wait for the launch of the Mainnet.@]@\n@."
 
 let zeronet () =
   if not disable_disclaimer then
@@ -77,7 +77,7 @@ let betanet () =
       \    Betanet is a pre-release experimental network and comes with no warranty.@,\
       \            Use your fundraiser keys on this network @{<warning>AT YOUR OWN RISK@}.@,\
       \  All transactions happening on the Betanet @{<warning>are expected to be valid in the Mainnet@}.@,\
-      \          If in doubt, we recommend that you wait for the Mainnet lunch.@]@\n@."
+      \          If in doubt, we recommend that you wait for the Mainnet launch.@]@\n@."
 
 let sandbox () =
   if not disable_disclaimer then

@@ -32,7 +32,7 @@ module Rand = struct
 end
 
 module Hash = struct
-  module type S = sig
+  module type HASH = sig
     val init : Bigstring.t -> unit
     val update : Bigstring.t -> Bigstring.t -> unit
     val update_last : Bigstring.t -> Bigstring.t -> int -> unit
@@ -43,12 +43,16 @@ module Hash = struct
     val statebytes : int
   end
 
-  module Make(S: S) = struct
+  module Make(S: HASH) = struct
     type state = {
       state : Bigstring.t ;
       buf : Bigstring.t ;
       mutable pos : int ;
     }
+
+    let bytes = S.bytes
+    let blockbytes = S.blockbytes
+    let statebytes = S.statebytes
 
     let init () =
       let state = Bigstring.create S.statebytes in
@@ -83,66 +87,133 @@ module Hash = struct
       finish st
   end
 
-  module SHA256 = Make(struct
-      (* state -> unit *)
-      external init : Bigstring.t -> unit =
-        "ml_Hacl_SHA2_256_init" [@@noalloc]
+  module type S = sig
+    type state
 
-      (* state -> data -> unit *)
-      external update : Bigstring.t -> Bigstring.t -> unit =
-        "ml_Hacl_SHA2_256_update" [@@noalloc]
+    val bytes : int
+    val blockbytes : int
+    val statebytes : int
 
-      (* state -> data -> datalen -> unit *)
-      external update_last : Bigstring.t -> Bigstring.t -> int -> unit =
-        "ml_Hacl_SHA2_256_update_last" [@@noalloc]
+    (** Incremental Interface *)
 
-      (* state -> hash *)
-      external finish : Bigstring.t -> Bigstring.t -> unit =
-        "ml_Hacl_SHA2_256_finish" [@@noalloc]
+    val init : unit -> state
+    val update : state -> Bigstring.t -> unit
+    val finish : state -> Bigstring.t
 
-      let bytes = 32
-      let blockbytes = 64
-      let statebytes = 137 * 4
-    end)
+    (** Direct Interface *)
 
-  module SHA512 = Make(struct
-      (* state -> unit *)
-      external init : Bigstring.t -> unit =
-        "ml_Hacl_SHA2_512_init" [@@noalloc]
+    val digest : Bigstring.t -> Bigstring.t
 
-      (* state -> data -> unit *)
-      external update : Bigstring.t -> Bigstring.t -> unit =
-        "ml_Hacl_SHA2_512_update" [@@noalloc]
+    module HMAC : sig
+      val write :
+        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t -> unit
+      (** @raise [Invalid_argument] if argument is less than 32 bytes long *)
 
-      (* state -> data -> datalen -> unit *)
-      external update_last : Bigstring.t -> Bigstring.t -> int -> unit =
-        "ml_Hacl_SHA2_512_update_last" [@@noalloc]
+      val digest :
+        key:Bigstring.t -> msg:Bigstring.t -> Bigstring.t
+    end
+  end
 
-      (* state -> hash *)
-      external finish : Bigstring.t -> Bigstring.t -> unit =
-        "ml_Hacl_SHA2_512_finish" [@@noalloc]
+  module SHA256 = struct
+    module H = Make(struct
+        (* state -> unit *)
+        external init : Bigstring.t -> unit =
+          "ml_Hacl_SHA2_256_init" [@@noalloc]
 
-      let bytes = 64
-      let blockbytes = 128
-      let statebytes = 169 * 8
-    end)
+        (* state -> data -> unit *)
+        external update : Bigstring.t -> Bigstring.t -> unit =
+          "ml_Hacl_SHA2_256_update" [@@noalloc]
 
-  module HMAC_SHA256 = struct
-    (* mac -> key -> data *)
-    external hmac :
-      Bigstring.t -> Bigstring.t -> Bigstring.t -> unit =
-      "ml_Hacl_HMAC_SHA2_256_hmac" [@@noalloc]
+        (* state -> data -> datalen -> unit *)
+        external update_last : Bigstring.t -> Bigstring.t -> int -> unit =
+          "ml_Hacl_SHA2_256_update_last" [@@noalloc]
 
-    let write_hmac ~key ~msg buf =
-      if Bigstring.length buf < 32 then
-        invalid_arg (Printf.sprintf "Hash.write_hmac_sha156: invalid len \
-                                     %d" 32) ;
-      hmac buf key msg
+        (* state -> hash *)
+        external finish : Bigstring.t -> Bigstring.t -> unit =
+          "ml_Hacl_SHA2_256_finish" [@@noalloc]
 
-    let hmac ~key ~msg =
-      let buf = Bigstring.create 32 in
-      write_hmac ~key ~msg buf ;
-      buf
+        let bytes = 32
+        let blockbytes = 64
+        let statebytes = 137 * 4
+      end)
+    include H
+
+    module HMAC = struct
+      (* mac -> key -> data *)
+      external hmac :
+        Bigstring.t -> Bigstring.t -> Bigstring.t -> unit =
+        "ml_Hacl_HMAC_SHA2_256_hmac" [@@noalloc]
+
+      let write ~key ~msg buf =
+        let buflen = Bigstring.length buf in
+        if buflen < 32 then
+          invalid_arg (Printf.sprintf "Hash.SHA256.HMAC.write: invalid \
+                                       len (%d), expected %d" buflen bytes) ;
+        hmac buf key msg
+
+      let digest ~key ~msg =
+        let buf = Bigstring.create 32 in
+        write ~key ~msg buf ;
+        buf
+    end
+  end
+
+  module SHA512 = struct
+    module H = Make(struct
+        (* state -> unit *)
+        external init : Bigstring.t -> unit =
+          "ml_Hacl_SHA2_512_init" [@@noalloc]
+
+        (* state -> data -> unit *)
+        external update : Bigstring.t -> Bigstring.t -> unit =
+          "ml_Hacl_SHA2_512_update" [@@noalloc]
+
+        (* state -> data -> datalen -> unit *)
+        external update_last : Bigstring.t -> Bigstring.t -> int -> unit =
+          "ml_Hacl_SHA2_512_update_last" [@@noalloc]
+
+        (* state -> hash *)
+        external finish : Bigstring.t -> Bigstring.t -> unit =
+          "ml_Hacl_SHA2_512_finish" [@@noalloc]
+
+        let bytes = 64
+        let blockbytes = 128
+        let statebytes = 169 * 8
+      end)
+    include H
+
+    module HMAC = struct
+      let derive_key k =
+        let buf = Bigstring.create blockbytes in
+        Bigstring.fill buf '\x00' ;
+        let keylen = Bigstring.length k in
+        let k, keylen =
+          if keylen > blockbytes then H.digest k, bytes else k, keylen in
+        Bigstring.blit k 0 buf 0 keylen ;
+        buf
+
+      let xor_ipad =
+        Bigstring.map ~f:(fun c -> Char.(chr ((code c) lxor 0x36)))
+      let xor_opad =
+        Bigstring.map ~f:(fun c -> Char.(chr ((code c) lxor 0x5c)))
+
+      let digest ~key ~msg =
+        let key = derive_key key in
+        let preimage =
+          Bigstring.concat "" [
+            xor_opad key ;
+            digest (Bigstring.concat "" [xor_ipad key ; msg])
+          ] in
+        digest preimage
+
+      let write ~key ~msg buf =
+        let buflen = Bigstring.length buf in
+        if buflen < bytes then
+          invalid_arg (Printf.sprintf "Hash.SHA512.HMAC.write: invalid \
+                                       len (%d), expected %d" buflen bytes) ;
+        let d = digest ~key ~msg in
+        Bigstring.blit d 0 buf 0 bytes
+    end
   end
 end
 

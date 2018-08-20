@@ -76,10 +76,11 @@ module Socket : sig
 
   type addr =
     | Unix of string
-    | Tcp of string * int
+    | Tcp of string * string * Unix.getaddrinfo_option list
 
   val connect: addr -> Lwt_unix.file_descr tzresult Lwt.t
-  val bind: ?backlog:int -> addr -> Lwt_unix.file_descr tzresult Lwt.t
+  val bind:
+    ?backlog:int -> addr -> Lwt_unix.file_descr list tzresult Lwt.t
 
   type error +=
     | Encoding_error

@@ -37,8 +37,8 @@ let type_map_enc =
        (fun (loc, bef, aft) -> (loc, (bef, aft)))
        (obj3
           (req "location" Script.location_encoding)
-          (req "stackBefore" stack_enc)
-          (req "stackAfter" stack_enc)))
+          (req "stack_before" stack_enc)
+          (req "stack_after" stack_enc)))
 
 let stack_ty_enc =
   let open Data_encoding in
@@ -80,15 +80,15 @@ let () =
   (* Invalid arity *)
   register_error_kind
     `Permanent
-    ~id:"invalidArityTypeError"
-    ~title: "Invalid arity (typechecking error)"
+    ~id:"michelson_v1.invalid_arity"
+    ~title: "Invalid arity"
     ~description:
       "In a script or data expression, a primitive was applied \
        to an unsupported number of arguments."
     (located (obj3
-                (req "primitiveName" Script.prim_encoding)
-                (req "expectedArity" arity_enc)
-                (req "wrongArity" arity_enc)))
+                (req "primitive_name" Script.prim_encoding)
+                (req "expected_arity" arity_enc)
+                (req "wrong_arity" arity_enc)))
     (function
       | Invalid_arity (loc, name, exp, got) ->
           Some (loc, (name, exp, got))
@@ -98,7 +98,7 @@ let () =
   (* Missing field *)
   register_error_kind
     `Permanent
-    ~id:"missingScriptField"
+    ~id:"michelson_v1.missing_script_field"
     ~title:"Script is missing a field (parse error)"
     ~description:
       "When parsing script, a field was expected, but not provided"
@@ -108,13 +108,13 @@ let () =
   (* Invalid primitive *)
   register_error_kind
     `Permanent
-    ~id:"invalidPrimitiveTypeError"
-    ~title: "Invalid primitive (typechecking error)"
+    ~id:"michelson_v1.invalid_primitive"
+    ~title: "Invalid primitive"
     ~description:
       "In a script or data expression, a primitive was unknown."
     (located (obj2
-                (dft "expectedPrimitiveNames" (list prim_encoding) [])
-                (req "wrongPrimitiveName" prim_encoding)))
+                (dft "expected_primitive_names" (list prim_encoding) [])
+                (req "wrong_primitive_name" prim_encoding)))
     (function
       | Invalid_primitive (loc, exp, got) -> Some (loc, (exp, got))
       | _ -> None)
@@ -123,14 +123,14 @@ let () =
   (* Invalid kind *)
   register_error_kind
     `Permanent
-    ~id:"invalidExpressionKindTypeError"
-    ~title: "Invalid expression kind (typechecking error)"
+    ~id:"michelson_v1.invalid_expression_kind"
+    ~title: "Invalid expression kind"
     ~description:
       "In a script or data expression, an expression was of the wrong kind \
        (for instance a string where only a primitive applications can appear)."
     (located (obj2
-                (req "expectedKinds" (list kind_enc))
-                (req "wrongKind" kind_enc)))
+                (req "expected_kinds" (list kind_enc))
+                (req "wrong_kind" kind_enc)))
     (function
       | Invalid_kind (loc, exp, got) -> Some (loc, (exp, got))
       | _ -> None)
@@ -139,14 +139,14 @@ let () =
   (* Invalid namespace *)
   register_error_kind
     `Permanent
-    ~id:"invalidPrimitiveNamespaceTypeError"
-    ~title: "Invalid primitive namespace (typechecking error)"
+    ~id:"michelson_v1.invalid_primitive_namespace"
+    ~title: "Invalid primitive namespace"
     ~description:
       "In a script or data expression, a primitive was of the wrong namespace."
     (located (obj3
-                (req "primitiveName" prim_encoding)
-                (req "expectedNamespace" namespace_enc)
-                (req "wrongNamespace" namespace_enc)))
+                (req "primitive_name" prim_encoding)
+                (req "expected_namespace" namespace_enc)
+                (req "wrong_namespace" namespace_enc)))
     (function
       | Invalid_namespace (loc, name, exp, got) -> Some (loc, (name, exp, got))
       | _ -> None)
@@ -155,7 +155,7 @@ let () =
   (* Duplicate field *)
   register_error_kind
     `Permanent
-    ~id:"duplicateScriptField"
+    ~id:"michelson_v1.duplicate_script_field"
     ~title: "Script has a duplicated field (parse error)"
     ~description:
       "When parsing script, a field was found more than once"
@@ -167,7 +167,7 @@ let () =
   (* Unexpected big_map *)
   register_error_kind
     `Permanent
-    ~id:"unexpectedBigMap"
+    ~id:"michelson_v1.unexpected_bigmap"
     ~title: "Big map in unauthorized position (type error)"
     ~description:
       "When parsing script, a big_map type was found somewhere else \
@@ -179,7 +179,7 @@ let () =
   (* Unexpected operation *)
   register_error_kind
     `Permanent
-    ~id:"unexpectedOperation"
+    ~id:"michelson_v1.unexpected_operation"
     ~title: "Big map in unauthorized position (type error)"
     ~description:
       "When parsing script, a operation type was found \
@@ -192,7 +192,7 @@ let () =
   (* Unordered map keys *)
   register_error_kind
     `Permanent
-    ~id:"unorderedMapLiteral"
+    ~id:"michelson_v1.unordered_map_literal"
     ~title:"Invalid map key order"
     ~description:"Map keys must be in strictly increasing order"
     (obj2
@@ -205,7 +205,7 @@ let () =
   (* Duplicate map keys *)
   register_error_kind
     `Permanent
-    ~id:"duplicateMapKeys"
+    ~id:"michelson_v1.duplicate_map_keys"
     ~title:"Duplicate map keys"
     ~description:"Map literals cannot contain duplicated keys"
     (obj2
@@ -218,7 +218,7 @@ let () =
   (* Unordered set values *)
   register_error_kind
     `Permanent
-    ~id:"unorderedSetLiteral"
+    ~id:"michelson_v1.unordered_set_literal"
     ~title:"Invalid set value order"
     ~description:"Set values must be in strictly increasing order"
     (obj2
@@ -231,7 +231,7 @@ let () =
   (* Duplicate set values *)
   register_error_kind
     `Permanent
-    ~id:"duplicateSetValuesInLiteral"
+    ~id:"michelson_v1.duplicate_set_values_in_literal"
     ~title:"Sets literals cannot contain duplicate elements"
     ~description:"Set literals cannot contain duplicate elements, \
                   but a duplicae was found while parsing."
@@ -246,8 +246,8 @@ let () =
   (* Fail not in tail position *)
   register_error_kind
     `Permanent
-    ~id:"failNotInTailPositionTypeError"
-    ~title: "FAIL not in tail position (typechecking error)"
+    ~id:"michelson_v1.fail_not_in_tail_position"
+    ~title: "FAIL not in tail position"
     ~description:
       "There is non trivial garbage code after a FAIL instruction."
     (located empty)
@@ -259,15 +259,15 @@ let () =
   (* Undefined binary operation *)
   register_error_kind
     `Permanent
-    ~id:"undefinedBinopTypeError"
-    ~title: "Undefined binop (typechecking error)"
+    ~id:"michelson_v1.undefined_binop"
+    ~title: "Undefined binop"
     ~description:
       "A binary operation is called on operands of types \
        over which it is not defined."
     (located (obj3
-                (req "operatorName" prim_encoding)
-                (req "wrongLeftOperandType" Script.expr_encoding)
-                (req "wrongRightOperandType" Script.expr_encoding)))
+                (req "operator_name" prim_encoding)
+                (req "wrong_left_operand_type" Script.expr_encoding)
+                (req "wrong_right_operand_type" Script.expr_encoding)))
     (function
       | Undefined_binop (loc, n, tyl, tyr) ->
           Some (loc, (n, tyl, tyr))
@@ -277,14 +277,14 @@ let () =
   (* Undefined unary operation *)
   register_error_kind
     `Permanent
-    ~id:"undefinedUnopTypeError"
-    ~title: "Undefined unop (typechecking error)"
+    ~id:"michelson_v1.undefined_unop"
+    ~title: "Undefined unop"
     ~description:
       "A unary operation is called on an operand of type \
        over which it is not defined."
     (located (obj2
-                (req "operatorName" prim_encoding)
-                (req "wrongOperandType" Script.expr_encoding)))
+                (req "operator_name" prim_encoding)
+                (req "wrong_operand_type" Script.expr_encoding)))
     (function
       | Undefined_unop (loc, n, ty) ->
           Some (loc, (n, ty))
@@ -294,13 +294,13 @@ let () =
   (* Bad return *)
   register_error_kind
     `Permanent
-    ~id:"badReturnTypeError"
-    ~title: "Bad return (typechecking error)"
+    ~id:"michelson_v1.bad_return"
+    ~title: "Bad return"
     ~description:
       "Unexpected stack at the end of a lambda or script."
     (located (obj2
-                (req "expectedReturnType" Script.expr_encoding)
-                (req "wrongStackType" stack_ty_enc)))
+                (req "expected_return_type" Script.expr_encoding)
+                (req "wrong_stack_type" stack_ty_enc)))
     (function
       | Bad_return (loc, sty, ty) -> Some (loc, (ty, sty))
       | _ -> None)
@@ -309,14 +309,14 @@ let () =
   (* Bad stack *)
   register_error_kind
     `Permanent
-    ~id:"badStackTypeError"
-    ~title: "Bad stack (typechecking error)"
+    ~id:"michelson_v1.bad_stack"
+    ~title: "Bad stack"
     ~description:
       "The stack has an unexpected length or contents."
     (located (obj3
-                (req "primitiveName" prim_encoding)
-                (req "relevantStackPortion" int16)
-                (req "wrongStackType" stack_ty_enc)))
+                (req "primitive_name" prim_encoding)
+                (req "relevant_stack_portion" int16)
+                (req "wrong_stack_type" stack_ty_enc)))
     (function
       | Bad_stack (loc, name, s, sty) -> Some (loc, (name, s, sty))
       | _ -> None)
@@ -325,7 +325,7 @@ let () =
   (* Inconsistent annotations *)
   register_error_kind
     `Permanent
-    ~id:"inconsistentAnnotations"
+    ~id:"michelson_v1.inconsistent_annotations"
     ~title:"Annotations inconsistent between branches"
     ~description:"The annotations on two types could not be merged"
     (obj2
@@ -337,7 +337,7 @@ let () =
   (* Inconsistent field annotations *)
   register_error_kind
     `Permanent
-    ~id:"inconsistentFieldAnnotations"
+    ~id:"michelson_v1.inconsistent_field_annotations"
     ~title:"Annotations for field accesses is inconsistent"
     ~description:"The specified field does not match the field annotation in the type"
     (obj2
@@ -349,7 +349,7 @@ let () =
   (* Inconsistent type annotations *)
   register_error_kind
     `Permanent
-    ~id:"inconsistentTypeAnnotations"
+    ~id:"michelson_v1.inconsistent_type_annotations"
     ~title:"Types contain inconsistent annotations"
     ~description:"The two types contain annotations that do not match"
     (located (obj2
@@ -362,7 +362,7 @@ let () =
   (* Unexpected annotation *)
   register_error_kind
     `Permanent
-    ~id:"unexpectedAnnotation"
+    ~id:"michelson_v1.unexpected_annotation"
     ~title:"An annotation was encountered where no annotation is expected"
     ~description:"A node in the syntax tree was impropperly annotated"
     (located empty)
@@ -372,7 +372,7 @@ let () =
   (* Ungrouped annotations *)
   register_error_kind
     `Permanent
-    ~id:"ungroupedAnnotations"
+    ~id:"michelson_v1.ungrouped_annotations"
     ~title:"Annotations of the same kind were found spread apart"
     ~description:"Annotations of the same kind must be grouped"
     (located empty)
@@ -382,14 +382,14 @@ let () =
   (* Unmatched branches *)
   register_error_kind
     `Permanent
-    ~id:"unmatchedBranchesTypeError"
-    ~title: "Unmatched branches (typechecking error)"
+    ~id:"michelson_v1.unmatched_branches"
+    ~title: "Unmatched branches"
     ~description:
       "At the join point at the end of two code branches \
        the stacks have inconsistent lengths or contents."
     (located (obj2
-                (req "firstStackType" stack_ty_enc)
-                (req "otherStackType" stack_ty_enc)))
+                (req "first_stack_type" stack_ty_enc)
+                (req "other_stack_type" stack_ty_enc)))
     (function
       | Unmatched_branches (loc, stya, styb) ->
           Some (loc, (stya, styb))
@@ -399,12 +399,12 @@ let () =
   (* Bad stack item *)
   register_error_kind
     `Permanent
-    ~id:"badStackItemTypeError"
-    ~title: "Bad stack item (typechecking error)"
+    ~id:"michelson_v1.bad_stack_item"
+    ~title: "Bad stack item"
     ~description:
       "The type of a stack item is unexpected \
        (this error is always accompanied by a more precise one)."
-    (obj1 (req "itemLevel" int16))
+    (obj1 (req "item_level" int16))
     (function
       | Bad_stack_item n -> Some n
       | _ -> None)
@@ -413,8 +413,8 @@ let () =
   (* SELF in lambda *)
   register_error_kind
     `Permanent
-    ~id:"selfInLambda"
-    ~title: "SELF instruction in lambda (typechecking error)"
+    ~id:"michelson_v1.self_in_lambda"
+    ~title: "SELF instruction in lambda"
     ~description:
       "A SELF instruction was encountered in a lambda expression."
     (located empty)
@@ -426,8 +426,8 @@ let () =
   (* Bad stack length *)
   register_error_kind
     `Permanent
-    ~id:"inconsistentStackLengthsTypeError"
-    ~title: "Inconsistent stack lengths (typechecking error)"
+    ~id:"michelson_v1.inconsistent_stack_lengths"
+    ~title: "Inconsistent stack lengths"
     ~description:
       "A stack was of an unexpected length \
        (this error is always in the context of a located error)."
@@ -441,13 +441,13 @@ let () =
   (* Invalid constant *)
   register_error_kind
     `Permanent
-    ~id:"invalidConstantTypeError"
-    ~title: "Invalid constant (typechecking error)"
+    ~id:"michelson_v1.invalid_constant"
+    ~title: "Invalid constant"
     ~description:
       "A data expression was invalid for its expected type."
     (located (obj2
-                (req "expectedType" Script.expr_encoding)
-                (req "wrongExpression" Script.expr_encoding)))
+                (req "expected_type" Script.expr_encoding)
+                (req "wrong_expression" Script.expr_encoding)))
     (function
       | Invalid_constant (loc, expr, ty) ->
           Some (loc, (ty, expr))
@@ -457,8 +457,8 @@ let () =
   (* Invalid contract *)
   register_error_kind
     `Permanent
-    ~id:"invalidContractTypeError"
-    ~title: "Invalid contract (typechecking error)"
+    ~id:"michelson_v1.invalid_contract"
+    ~title: "Invalid contract"
     ~description:
       "A script or data expression references a contract that does not \
        exist or assumes a wrong type for an existing contract."
@@ -472,12 +472,12 @@ let () =
   (* Comparable type expected *)
   register_error_kind
     `Permanent
-    ~id:"comparableTypeExpectedTypeError"
-    ~title: "Comparable type expected (typechecking error)"
+    ~id:"michelson_v1.comparable_type_expected"
+    ~title: "Comparable type expected"
     ~description:
       "A non comparable type was used in a place where \
        only comparable types are accepted."
-    (located (obj1 (req "wrongType" Script.expr_encoding)))
+    (located (obj1 (req "wrong_type" Script.expr_encoding)))
     (function
       | Comparable_type_expected (loc, ty) -> Some (loc, ty)
       | _ -> None)
@@ -486,16 +486,16 @@ let () =
   (* Inconsistent types *)
   register_error_kind
     `Permanent
-    ~id:"InconsistentTypesTypeError"
-    ~title: "Inconsistent types (typechecking error)"
+    ~id:"michelson_v1.inconsistent_types"
+    ~title: "Inconsistent types"
     ~description:
       "This is the basic type clash error, \
        that appears in several places where the equality of \
        two types have to be proven, it is always accompanied \
        with another error that provides more context."
     (obj2
-       (req "firstType" Script.expr_encoding)
-       (req "otherType" Script.expr_encoding))
+       (req "first_type" Script.expr_encoding)
+       (req "other_type" Script.expr_encoding))
     (function
       | Inconsistent_types (tya, tyb) -> Some (tya, tyb)
       | _ -> None)
@@ -504,13 +504,13 @@ let () =
   (* Invalid map body *)
   register_error_kind
     `Permanent
-    ~id:"invalidMapBody"
+    ~id:"michelson_v1.invalid_map_body"
     ~title: "Invalid map body"
     ~description:
       "The body of a map block did not match the expected type"
     (obj2
        (req "loc" Script.location_encoding)
-       (req "bodyType" stack_ty_enc))
+       (req "body_type" stack_ty_enc))
     (function
       | Invalid_map_body (loc, stack) -> Some (loc, stack)
       | _ -> None)
@@ -518,7 +518,7 @@ let () =
   (* Invalid map block FAIL *)
   register_error_kind
     `Permanent
-    ~id:"invalidMapBlockFail"
+    ~id:"michelson_v1.invalid_map_block_fail"
     ~title:"FAIL instruction occurred as body of map block"
     ~description:"FAIL cannot be the only instruction in the body. \
                   The propper type of the return list cannot be inferred."
@@ -530,15 +530,15 @@ let () =
   (* Invalid ITER body *)
   register_error_kind
     `Permanent
-    ~id:"invalidIterBody"
+    ~id:"michelson_v1.invalid_iter_body"
     ~title:"ITER body returned wrong stack type"
     ~description:"The body of an ITER instruction \
                   must result in the same stack type as before \
                   the ITER."
     (obj3
        (req "loc" Script.location_encoding)
-       (req "befStack" stack_ty_enc)
-       (req "aftStack" stack_ty_enc))
+       (req "bef_stack" stack_ty_enc)
+       (req "aft_stack" stack_ty_enc))
     (function
       | Invalid_iter_body (loc, bef, aft) -> Some (loc, bef, aft)
       | _ -> None)
@@ -546,13 +546,13 @@ let () =
   (* Type too large *)
   register_error_kind
     `Permanent
-    ~id:"typeTooLarge"
+    ~id:"michelson_v1.type_too_large"
     ~title:"Stack item type too large"
     ~description:"An instruction generated a type larger than the limit."
     (obj3
        (req "loc" Script.location_encoding)
-       (req "typeSize" uint16)
-       (req "maximumTypeSize" uint16))
+       (req "type_size" uint16)
+       (req "maximum_type_size" uint16))
     (function
       | Type_too_large (loc, ts, maxts) -> Some (loc, ts, maxts)
       | _ -> None)
@@ -561,16 +561,16 @@ let () =
   (* Ill typed data *)
   register_error_kind
     `Permanent
-    ~id:"illTypedDataTypeError"
-    ~title: "Ill typed data (typechecking error)"
+    ~id:"michelson_v1.ill_typed_data"
+    ~title: "Ill typed data"
     ~description:
       "The toplevel error thrown when trying to typecheck \
        a data expression against a given type \
        (always followed by more precise errors)."
     (obj3
        (opt "identifier" string)
-       (req "expectedType" Script.expr_encoding)
-       (req "illTypedExpression" Script.expr_encoding))
+       (req "expected_type" Script.expr_encoding)
+       (req "ill_typed_expression" Script.expr_encoding))
     (function
       | Ill_typed_data (name, expr, ty) -> Some (name, ty,  expr)
       | _ -> None)
@@ -578,14 +578,14 @@ let () =
   (* Ill formed type *)
   register_error_kind
     `Permanent
-    ~id:"illFormedTypeTypeError"
-    ~title: "Ill formed type (typechecking error)"
+    ~id:"michelson_v1.ill_formed_type"
+    ~title: "Ill formed type"
     ~description:
       "The toplevel error thrown when trying to parse a type expression \
        (always followed by more precise errors)."
     (obj3
        (opt "identifier" string)
-       (req "illFormedExpression" Script.expr_encoding)
+       (req "ill_formed_expression" Script.expr_encoding)
        (req "location" Script.location_encoding))
     (function
       | Ill_formed_type (name, expr, loc) -> Some (name, expr, loc)
@@ -595,15 +595,15 @@ let () =
   (* Ill typed contract *)
   register_error_kind
     `Permanent
-    ~id:"illTypedContractTypeError"
-    ~title: "Ill typed contract (typechecking error)"
+    ~id:"michelson_v1.ill_typed_contract"
+    ~title: "Ill typed contract"
     ~description:
       "The toplevel error thrown when trying to typecheck \
        a contract code against given input, output and storage types \
        (always followed by more precise errors)."
     (obj2
-       (req "illTypedCode" Script.expr_encoding)
-       (req "typeMap" type_map_enc))
+       (req "ill_typed_code" Script.expr_encoding)
+       (req "type_map" type_map_enc))
     (function
       | Ill_typed_contract (expr, type_map) ->
           Some (expr, type_map)
@@ -613,7 +613,7 @@ let () =
   (* Cannot serialize error *)
   register_error_kind
     `Temporary
-    ~id:"cannotSerializeError"
+    ~id:"michelson_v1.cannot_serialize_error"
     ~title:"Not enough gas to serialize error"
     ~description:"The error was too big to be serialized with \
                   the provided gas"

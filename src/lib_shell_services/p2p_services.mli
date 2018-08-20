@@ -25,6 +25,8 @@
 
 open RPC_context
 
+val self: #simple -> P2p_peer.Id.t tzresult Lwt.t
+
 val stat: #simple -> P2p_stat.t tzresult Lwt.t
 
 val versions: #simple -> P2p_version.t list tzresult Lwt.t
@@ -35,6 +37,11 @@ val events: #streamed ->
 val connect: #simple -> timeout:float -> P2p_point.Id.t -> unit tzresult Lwt.t
 
 module S : sig
+
+  val self :
+    ([ `GET ], unit,
+     unit, unit, unit,
+     P2p_peer.Id.t) RPC_service.t
 
   val stat :
     ([ `GET ], unit,
@@ -127,7 +134,7 @@ module Points : sig
 
     val events :
       ([ `GET ], unit,
-       unit * P2p_point.Id.t, < monitor: bool>, unit, 
+       unit * P2p_point.Id.t, < monitor: bool>, unit,
        P2p_point.Pool_event.t list) RPC_service.t
 
     val forget :

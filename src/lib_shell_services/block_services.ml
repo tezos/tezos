@@ -673,11 +673,36 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
       let pending_operations path =
         (* TODO: branch_delayed/... *)
         RPC_service.get_service
-          ~description:
-            "List the not-yet-prevalidated operations."
+          ~description: "List the prevalidated operations."
           ~query: RPC_query.empty
           ~output: encoding
-          path
+          RPC_path.(path / "pending_operations")
+
+      let mempool_query =
+        let open RPC_query in
+        query (fun applied refused
+                branch_refused branch_delayed -> object
+                method applied = applied
+                method refused = refused
+                method branch_refused = branch_refused
+                method branch_delayed = branch_delayed
+              end)
+        |+ flag ~descr:"Include applied operations (set by default)"
+          "applied" (fun t -> t#applied)
+        |+ flag ~descr:"Include refused operations"
+          "refused" (fun t -> t#refused)
+        |+ flag ~descr:"Include branch refused operations"
+          "branch_refused" (fun t -> t#branch_refused)
+        |+ flag ~descr:"Include branch delayed operations (set by default)"
+          "branch_delayed" (fun t -> t#branch_delayed)
+        |> seal
+
+      let monitor_operations path =
+        RPC_service.get_service
+          ~description:"Monitor the mempool operations."
+          ~query: mempool_query
+          ~output: (list next_operation_encoding)
+          RPC_path.(path / "monitor_operations")
 
     end
 
@@ -869,6 +894,24 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
     let pending_operations ctxt ?(chain = `Main) () =
       let s = S.Mempool.pending_operations (mempool_path chain_path) in
       RPC_context.make_call1 s ctxt chain () ()
+
+    let monitor_operations ctxt
+        ?(chain = `Main)
+        ?(applied = true)
+        ?(branch_delayed = true)
+        ?(branch_refused = false)
+        ?(refused=false)
+        () =
+      let s = S.Mempool.monitor_operations (mempool_path chain_path) in
+      RPC_context.make_streamed_call s ctxt
+        ((), chain)
+        (object
+          method applied = applied
+          method refused = refused
+          method branch_refused = branch_refused
+          method branch_delayed = branch_delayed
+        end)
+        ()
 
   end
 

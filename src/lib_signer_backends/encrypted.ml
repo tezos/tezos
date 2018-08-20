@@ -43,10 +43,7 @@ module Raw = struct
   let encrypted_size = Crypto_box.boxzerobytes + 32
 
   let pbkdf ~salt ~password =
-    Cstruct.to_bigarray
-      (Pbkdf.pbkdf2 ~prf:`SHA512 ~count:32768 ~dk_len:32l
-         ~salt: (Cstruct.of_bigarray salt)
-         ~password: (Cstruct.of_bigarray password))
+    Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
 
   let encrypt ~password sk =
     let salt = Rand.generate salt_len in
@@ -203,19 +200,19 @@ let decrypt_list (cctxt : #Client_context.io_wallet) keys =
       return_unit
   end sks
 
-let rec read_passphrase (cctxt : #Client_context.io) =
+let rec read_password (cctxt : #Client_context.io) =
   cctxt#prompt_password
-    "Enter passphrase to encrypt your key: " >>=? fun password ->
+    "Enter password to encrypt your key: " >>=? fun password ->
   cctxt#prompt_password
-    "Confirm passphrase: " >>=? fun confirm ->
+    "Confirm password: " >>=? fun confirm ->
   if not (MBytes.equal password confirm) then
-    cctxt#message "Passphrases do not match." >>= fun () ->
-    read_passphrase cctxt
+    cctxt#message "Passwords do not match." >>= fun () ->
+    read_password cctxt
   else
     return password
 
 let encrypt cctxt sk =
-  read_passphrase cctxt >>=? fun password ->
+  read_password cctxt >>=? fun password ->
   let payload = Raw.encrypt ~password sk in
   let encoding = match sk with
     | Ed25519 _ -> Encodings.ed25519
@@ -236,7 +233,7 @@ module Make(C : sig val cctxt: Client_context.prompter end) = struct
   let description =
     "Valid secret key URIs are of the form\n\
     \ - encrypted:<encrypted_key>\n\
-     where <encrypted_key> is the encrypted (passphrase protected \
+     where <encrypted_key> is the encrypted (password protected \
      using Nacl's cryptobox and pbkdf) secret key, formatted in \
      unprefixed Base58.\n\
      Valid public key URIs are of the form\n\

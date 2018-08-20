@@ -121,11 +121,12 @@ let pp_diff ppf (l1, l2) =
 let vectors () =
   ListLabels.iteri vectors ~f:begin fun i { entropy ; words ; seed } ->
     let words = String.split_on_char ' ' words in
-    let mnemonic = Bip39.of_entropy (Cstruct.of_string (Hex.to_string entropy)) in
+    let mnemonic = Bip39.of_entropy (Cstruct.to_bigarray (Hex.to_cstruct entropy)) in
     let words_computed = Bip39.to_words mnemonic in
     assert (words = words_computed) ;
-    let seed_computed = Bip39.to_seed ~passphrase:"TREZOR" mnemonic in
-    assert ((Hex.to_cstruct seed) = seed_computed)
+    let seed_computed =
+      Bip39.to_seed ~passphrase:(Bigstring.of_string "TREZOR") mnemonic in
+    assert (Cstruct.to_bigarray (Hex.to_cstruct seed) = seed_computed)
   end
 
 let basic = [

@@ -14,9 +14,6 @@ all: html linkcheck
 linkcheck:
 	$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)"
 
-introduction/readme.rst: ../README.rst
-	sed 's/TEZOS/How to build and run/' $< > $@
-
 api/errors.rst: $(DOCERRORDIR)/error_doc.ml
 	@cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe
 	../_build/default/docs/$(DOCERRORDIR)/error_doc.exe > api/errors.rst
@@ -24,8 +21,8 @@ api/errors.rst: $(DOCERRORDIR)/error_doc.ml
 $(DOCGENDIR)/rpc_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
-api/rpc.rst: $(DOCGENDIR)/rpc_doc.exe api/rpc_usage.rst.inc
-	@dune exec $(DOCGENDIR)/rpc_doc.exe < api/rpc_usage.rst.inc > api/rpc.rst
+api/rpc.rst: $(DOCGENDIR)/rpc_doc.exe
+	@dune exec $(DOCGENDIR)/rpc_doc.exe > api/rpc.rst
 
 $(DOCGENDIR)/p2p_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/p2p_doc.exe
@@ -42,4 +39,4 @@ html: Makefile api/errors.rst api/rpc.rst api/p2p.rst
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf introduction/readme.rst api/errors.rst api/rpc.rst
+	@-rm -Rf api/errors.rst api/rpc.rst

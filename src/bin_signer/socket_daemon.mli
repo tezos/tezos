@@ -27,5 +27,6 @@ val run:
   #Client_context.io_wallet ->
   Lwt_utils_unix.Socket.addr ->
   ?magic_bytes: int list ->
+  check_high_watermark: bool ->
   require_auth: bool ->
-  'a tzresult Lwt.t
+  'a list tzresult Lwt.t

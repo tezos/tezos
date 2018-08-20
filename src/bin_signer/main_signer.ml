@@ -82,13 +82,25 @@ let magic_bytes_arg =
            failwith "Bad format for magic bytes, a series of numbers \
                      is expected, separated by commas."))
 
+let high_watermark_switch =
+  Clic.switch
+    ~doc: "high watermark restriction\n\
+           Stores the highest level signed for blocks and endorsements \
+           for each address, and forbids to sign a level that is \
+           inferior or equal afterwards, except for the exact same \
+           input data."
+    ~short: 'W'
+    ~long: "check-high-watermark"
+    ()
+
 let commands base_dir require_auth =
   Client_keys_commands.commands None @
   Tezos_signer_backends.Ledger.commands () @
   [ command ~group
       ~desc: "Launch a signer daemon over a TCP socket."
-      (args3
+      (args4
          magic_bytes_arg
+         high_watermark_switch
          (default_arg
             ~doc: "listening address or host name"
             ~short: 'a'
@@ -97,23 +109,24 @@ let commands base_dir require_auth =
             ~default: default_tcp_host
             (parameter (fun _ s -> return s)))
          (default_arg
-            ~doc: "listening TCP port"
+            ~doc: "listening TCP port or service name"
             ~short: 'p'
             ~long: "port"
             ~placeholder: "port number"
             ~default: default_tcp_port
-            (parameter
-               (fun _ x ->
-                  try return (int_of_string x)
-                  with Failure _ -> failwith "Invalid port %s" x))))
+            (parameter (fun _ s -> return s))))
       (prefixes [ "launch" ; "socket" ; "signer" ] @@ stop)
-      (fun (magic_bytes, host, port) cctxt ->
+      (fun (magic_bytes, check_high_watermark, host, port) cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Socket_daemon.run cctxt (Tcp (host, port)) ?magic_bytes ~require_auth) ;
+         Socket_daemon.run
+           cctxt (Tcp (host, port, [AI_SOCKTYPE SOCK_STREAM]))
+           ?magic_bytes ~check_high_watermark ~require_auth >>=? fun _ ->
+         return_unit) ;
     command ~group
       ~desc: "Launch a signer daemon over a local Unix socket."
-      (args2
+      (args3
          magic_bytes_arg
+         high_watermark_switch
          (default_arg
             ~doc: "path to the local socket file"
             ~short: 's'
@@ -122,13 +135,16 @@ let commands base_dir require_auth =
             ~default: (Filename.concat base_dir "socket")
             (parameter (fun _ s -> return s))))
       (prefixes [ "launch" ; "local" ; "signer" ] @@ stop)
-      (fun (magic_bytes, path) cctxt ->
+      (fun (magic_bytes, check_high_watermark, path) cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Socket_daemon.run cctxt (Unix path) ?magic_bytes ~require_auth) ;
+         Socket_daemon.run
+           cctxt (Unix path) ?magic_bytes ~check_high_watermark ~require_auth >>=? fun _ ->
+         return_unit) ;
     command ~group
       ~desc: "Launch a signer daemon over HTTP."
-      (args3
+      (args4
          magic_bytes_arg
+         high_watermark_switch
          (default_arg
             ~doc: "listening address or host name"
             ~short: 'a'
@@ -147,13 +163,14 @@ let commands base_dir require_auth =
                   try return (int_of_string x)
                   with Failure _ -> failwith "Invalid port %s" x))))
       (prefixes [ "launch" ; "http" ; "signer" ] @@ stop)
-      (fun (magic_bytes, host, port) cctxt ->
+      (fun (magic_bytes, check_high_watermark, host, port) cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Http_daemon.run_http cctxt ~host ~port ?magic_bytes ~require_auth) ;
+         Http_daemon.run_http cctxt ~host ~port ?magic_bytes ~check_high_watermark ~require_auth) ;
     command ~group
       ~desc: "Launch a signer daemon over HTTPS."
-      (args3
+      (args4
          magic_bytes_arg
+         high_watermark_switch
          (default_arg
             ~doc: "listening address or host name"
             ~short: 'a'
@@ -188,9 +205,9 @@ let commands base_dir require_auth =
                 failwith "No such TLS key file %s" s
               else
                 return s)) @@ stop)
-      (fun (magic_bytes, host, port) cert key cctxt ->
+      (fun (magic_bytes, check_high_watermark, host, port) cert key cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
-         Http_daemon.run_https cctxt ~host ~port ~cert ~key ?magic_bytes ~require_auth) ;
+         Http_daemon.run_https cctxt ~host ~port ~cert ~key ?magic_bytes ~check_high_watermark ~require_auth) ;
     command ~group
       ~desc: "Authorize a given public key to perform signing requests."
       (args1

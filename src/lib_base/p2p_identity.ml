@@ -33,12 +33,12 @@ type t = {
 let encoding =
   let open Data_encoding in
   conv
-    (fun { public_key ; secret_key ; proof_of_work_stamp ; _ } ->
-       (public_key, secret_key, proof_of_work_stamp))
-    (fun (public_key, secret_key, proof_of_work_stamp) ->
-       let peer_id = Tezos_crypto.Crypto_box.hash public_key in
+    (fun { peer_id ; public_key ; secret_key ; proof_of_work_stamp } ->
+       (peer_id, public_key, secret_key, proof_of_work_stamp))
+    (fun (peer_id, public_key, secret_key, proof_of_work_stamp) ->
        { peer_id ; public_key ; secret_key ; proof_of_work_stamp })
-    (obj3
+    (obj4
+       (req "peer_id" P2p_peer_id.encoding)
        (req "public_key" Crypto_box.public_key_encoding)
        (req "secret_key" Crypto_box.secret_key_encoding)
        (req "proof_of_work_stamp" Crypto_box.nonce_encoding))

@@ -4,6 +4,7 @@ set -e
 
 bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 
+: ${BIN_DIR:="/usr/local/bin"}
 : ${DATA_DIR:="/var/run/tezos"}
 
 : ${NODE_HOST:="node"}
@@ -11,13 +12,13 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 
 : ${PROTOCOL:="unspecified-PROTOCOL-variable"}
 
-node="/usr/local/bin/tezos-node"
-client="/usr/local/bin/tezos-client"
-admin_client="/usr/local/bin/tezos-admin-client"
-baker="/usr/local/bin/tezos-baker-$PROTOCOL"
-endorser="/usr/local/bin/tezos-endorser-$PROTOCOL"
-accuser="/usr/local/bin/tezos-accuser-$PROTOCOL"
-signer="/usr/local/bin/tezos-signer"
+node="$BIN_DIR/tezos-node"
+client="$BIN_DIR/tezos-client"
+admin_client="$BIN_DIR/tezos-admin-client"
+baker="$BIN_DIR/tezos-baker-$PROTOCOL"
+endorser="$BIN_DIR/tezos-endorser-$PROTOCOL"
+accuser="$BIN_DIR/tezos-accuser-$PROTOCOL"
+signer="$BIN_DIR/tezos-signer"
 
 client_dir="$DATA_DIR/client"
 node_dir="$DATA_DIR/node"

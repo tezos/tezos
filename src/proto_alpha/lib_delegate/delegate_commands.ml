@@ -37,18 +37,33 @@ let directory_parameter =
       else
         return p)
 
+let mempool_arg =
+  Clic.arg
+    ~long:"mempool"
+    ~placeholder:"file"
+    ~doc:"When used the client will read the mempool in the provided file instead of querying the node through an RPC (useful for debugging only)."
+    string_parameter
+
+let context_path_arg =
+  Clic.arg
+    ~long:"context"
+    ~placeholder:"path"
+    ~doc:"When use the client will read in the local context at the provided path in order to build the block, instead of relying on the 'preapply' RPC."
+    string_parameter
+
 let delegate_commands () =
   let open Clic in
   [
     command ~group ~desc: "Forge and inject block using the delegate rights."
-      (args4 max_priority_arg fee_threshold_arg force_switch minimal_timestamp_switch)
+      (args6 max_priority_arg fee_threshold_arg force_switch minimal_timestamp_switch mempool_arg context_path_arg)
       (prefixes [ "bake"; "for" ]
        @@ Client_keys.Public_key_hash.source_param
          ~name:"baker" ~desc: "name of the delegate owning the baking right"
        @@ stop)
-      (fun (max_priority, threshold, force, minimal_timestamp) delegate cctxt ->
+      (fun (max_priority, fee_threshold, force, minimal_timestamp, mempool, context_path) delegate cctxt ->
          bake_block cctxt cctxt#block
-           ?threshold ~force ?max_priority ~minimal_timestamp delegate) ;
+           ?fee_threshold ~force ?max_priority ~minimal_timestamp
+           ?mempool ?context_path delegate) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation."
       no_options
       (prefixes [ "reveal"; "nonce"; "for" ]
@@ -85,11 +100,11 @@ let baker_commands () =
          ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
          directory_parameter
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun (max_priority, threshold) node_path delegates cctxt ->
+      (fun (max_priority, fee_threshold) node_path delegates cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_list
            cctxt (List.map fst delegates) >>=? fun () ->
          Client_daemon.Baker.run cctxt
-           ?threshold
+           ?fee_threshold
            ?max_priority
            ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
            ~context_path:(Filename.concat node_path "context")

@@ -61,12 +61,76 @@ let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
 
+let combine_operations
+    ?public_key
+    ?counter
+    ~source ctxt
+    (packed_operations : packed_operation list) =
+  assert (List.length packed_operations > 0);
+  (* Hypothesis : each operation must have the same branch (is this really true?) *)
+  let { Tezos_base.Operation.branch } = (List.hd packed_operations).shell in
+  assert (List.for_all
+            (fun { shell = { Tezos_base.Operation.branch = b } } -> Block_hash.(branch = b))
+            packed_operations) ;
+  (* TODO? : check signatures consistency *)
+  let unpacked_operations =
+    List.map (function
+        | ({ Alpha_context.protocol_data = Operation_data { contents } } ) ->
+            match Contents_list contents with
+            | Contents_list (Single o) -> Contents o
+            | Contents_list (Cons
+                               ((Manager_operation { operation = Reveal _ })
+                               , (Single o))) -> Contents o
+            | _ -> (* TODO : decent error *) assert false
+      ) packed_operations in
+  begin match counter with
+    | Some counter -> return counter
+    | None -> Context.Contract.counter ctxt source
+  end >>=? fun counter ->
+  (* We increment the counter *)
+  let counter = Z.succ counter in
+  Context.Contract.manager ctxt source >>=? fun account ->
+  let public_key = Option.unopt ~default:account.pk public_key in
+  begin Context.Contract.is_manager_key_revealed ctxt source >>=? function
+    | false ->
+        let reveal_op = Manager_operation {
+            source ;
+            fee = Tez.zero ;
+            counter ;
+            operation = Reveal public_key ;
+            gas_limit = Z.of_int 20 ;
+            storage_limit = Z.zero ;
+          } in
+        return (Some (Contents reveal_op), Z.succ counter)
+    | true -> return (None, counter)
+  end >>=? fun (manager_op, counter) ->
+  (* Update counters and transform into a contents_list *)
+  let operations =
+    List.fold_left (fun (counter, acc) -> function
+        | Contents (Manager_operation m) ->
+            (Z.succ counter,
+             (Contents (Manager_operation { m with counter }) :: acc))
+        | x -> counter, x :: acc)
+      (counter, (match manager_op with
+           | None -> []
+           | Some op -> [ op ]))
+      unpacked_operations
+    |> snd |> List.rev
+  in
+
+  let operations = Operation.of_list operations in
+  return @@ sign account.sk ctxt operations
+
 let manager_operation
+    ?counter
     ?(fee = Tez.zero)
     ?(gas_limit = Constants_repr.default.hard_gas_limit_per_operation)
     ?(storage_limit = Constants_repr.default.hard_storage_limit_per_operation)
     ?public_key ~source ctxt operation =
-  Context.Contract.counter ctxt source >>=? fun counter ->
+  begin match counter with
+    | Some counter -> return counter
+    | None ->  Context.Contract.counter ctxt source end
+  >>=? fun counter ->
   Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.unopt ~default:account.pk public_key in
   let counter = Z.succ counter in
@@ -122,13 +186,13 @@ let revelation ctxt public_key =
            })) in
   return @@ sign account.sk ctxt sop
 
-let originated_contract (op: Operation.packed) =
+let originated_contract op =
   let nonce = Contract.initial_origination_nonce (Operation.hash_packed op) in
   Contract.originated_contract nonce
 
 exception Impossible
 
-let origination ?delegate ?script
+let origination ?counter ?delegate ?script
     ?(spendable = true) ?(delegatable = true) ?(preorigination = None)
     ?public_key ?manager ?credit ?fee ?gas_limit ?storage_limit ctxt source =
   Context.Contract.manager ctxt source >>=? fun account ->
@@ -146,7 +210,7 @@ let origination ?delegate ?script
       credit ;
       preorigination ;
     } in
-  manager_operation ?public_key ?fee ?gas_limit ?storage_limit
+  manager_operation ?counter ?public_key ?fee ?gas_limit ?storage_limit
     ~source ctxt operation >>=? fun sop ->
   let op = sign account.sk ctxt sop in
   return (op , originated_contract op)
