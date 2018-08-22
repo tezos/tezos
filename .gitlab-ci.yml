@@ -158,6 +158,11 @@ test:contracts_macros.sh:
   script:
     - dune build @src/bin_client/runtest_contracts_macros.sh
 
+test:contracts_mini_scenarios.sh:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_mini_scenarios.sh
+
 test:multinode.sh:
   <<: *test_definition
   script:
