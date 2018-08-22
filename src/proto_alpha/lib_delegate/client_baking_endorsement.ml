@@ -103,7 +103,6 @@ type state = {
 
 and endorsements = {
   time: Time.t ;
-  timeout: unit Lwt.t ;
   delegates: public_key_hash list ;
   block: Client_baking_blocks.block_info ;
 }
@@ -188,12 +187,10 @@ let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state b
         -% t event "endorsement_got_block"
         -% a Block_hash.Logging.tag bi.hash) >>= fun () ->
     let time = Time.(add (now ()) state.delay) in
-    let timeout = Lwt_unix.sleep (Int64.to_float state.delay) in
     get_delegates cctxt state >>=? fun delegates ->
     filter_p (allowed_to_endorse cctxt bi) delegates >>=? fun delegates ->
     state.pending <- Some {
         time ;
-        timeout ;
         block = bi ;
         delegates ;
       } ;
@@ -202,9 +199,15 @@ let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state b
 let compute_timeout state =
   match state.pending with
   | None -> Lwt_utils.never_ending ()
-  | Some { timeout ; block ; delegates } ->
-      timeout >>= fun () ->
-      Lwt.return (block, delegates)
+  | Some { time ; block ; delegates } ->
+      match Client_baking_scheduling.sleep_until time with
+      | None -> Lwt.return (block, delegates)
+      | Some timeout ->
+          lwt_log_info Tag.DSL.(fun f ->
+              f "Waiting until %a to inject endorsements"
+              -% t event "wait_before_injecting"
+              -% a timestamp_tag time) >>= fun () ->
+          timeout >>= fun () -> Lwt.return (block, delegates)
 
 let create
     (cctxt: #Proto_alpha.full)
@@ -223,6 +226,7 @@ let create
     state.pending <- None ;
     iter_p (endorse_for_delegate cctxt block) delegates
   in
+
   let event_k cctxt state bi =
     state.pending <- None ;
     prepare_endorsement ~max_past () cctxt state bi
