@@ -153,6 +153,11 @@ test:contracts_opcode.sh:
   script:
     - dune build @src/bin_client/runtest_contracts_opcode.sh
 
+test:contracts_macros.sh:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_macros.sh
+
 test:multinode.sh:
   <<: *test_definition
   script:

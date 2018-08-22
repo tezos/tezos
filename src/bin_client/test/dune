@@ -47,6 +47,21 @@
             %{bin:tezos-admin-client})))
 
 (alias
+ (name runtest_contracts_macros.sh)
+ (deps sandbox.json
+       test_lib.inc.sh
+       (glob_files contracts_macros/*))
+ (locks /tcp-port/18731
+        /tcp-port/19731)
+ (action
+ (run bash %{dep:test_contracts_macros.sh}
+           %{bin:tezos-sandboxed-node.sh}
+           %{bin:tezos-node}
+           %{bin:tezos-init-sandboxed-client.sh}
+           %{bin:tezos-client}
+           %{bin:tezos-admin-client})))
+
+(alias
  (name runtest_multinode.sh)
  (deps sandbox.json
        test_lib.inc.sh
@@ -115,6 +130,7 @@
  (deps (alias runtest_basic.sh)
        (alias runtest_contracts.sh)
        (alias runtest_contracts_opcode.sh)
+       (alias runtest_contracts_macros.sh)
        (alias runtest_multinode.sh)
        (alias runtest_injection.sh)
        (alias runtest_tls.sh)
