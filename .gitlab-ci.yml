@@ -148,6 +148,11 @@ test:contracts.sh:
   script:
     - dune build @src/bin_client/runtest_contracts.sh
 
+test:contracts_opcode.sh:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_opcode.sh
+
 test:multinode.sh:
   <<: *test_definition
   script:

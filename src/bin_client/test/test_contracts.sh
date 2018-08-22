@@ -258,60 +258,60 @@ assert_storage $contract_dir/hash_string.tz '0x00' '"abcdefg"' '0x46fdbcb4ea4ead
 assert_storage $contract_dir/hash_string.tz '0x00' '"12345"' '0xb4c26c20de52a4eaf0d8a340db47ad8cb1e74049570859c9a9a3952b204c772f'
 
 # Test ASSERT
-assert_storage $contract_dir/assert.tz Unit True Unit
-assert_fails $client run script $contract_dir/assert.tz on storage Unit and input False
+#assert_storage $contract_dir/assert.tz Unit True Unit
+#assert_fails $client run script $contract_dir/assert.tz on storage Unit and input False
 
 # COMPARE; ASSERT_
-assert_storage $contract_dir/assert_eq.tz Unit '(Pair -1 -1)' Unit
-assert_fails $client run script $contract_dir/assert_eq.tz on storage Unit and input '(Pair 0 -1)'
+#assert_storage $contract_dir/assert_eq.tz Unit '(Pair -1 -1)' Unit
+#assert_fails $client run script $contract_dir/assert_eq.tz on storage Unit and input '(Pair 0 -1)'
 
-assert_storage $contract_dir/assert_eq.tz Unit '(Pair -1 -1)' Unit
-assert_fails $client run script $contract_dir/assert_eq.tz on storage Unit and input '(Pair 0 -1)'
+#assert_storage $contract_dir/assert_eq.tz Unit '(Pair -1 -1)' Unit
+#assert_fails $client run script $contract_dir/assert_eq.tz on storage Unit and input '(Pair 0 -1)'
 
-assert_storage $contract_dir/assert_neq.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run script $contract_dir/assert_neq.tz on storage Unit and input '(Pair -1 -1)'
+#assert_storage $contract_dir/assert_neq.tz Unit '(Pair 0 -1)' Unit
+#assert_fails $client run script $contract_dir/assert_neq.tz on storage Unit and input '(Pair -1 -1)'
 
-assert_storage $contract_dir/assert_lt.tz Unit '(Pair -1 0)' Unit
-assert_fails $client run script $contract_dir/assert_lt.tz on storage Unit and input '(Pair 0 -1)'
-assert_fails $client run script $contract_dir/assert_lt.tz on storage Unit and input '(Pair 0 0)'
+#assert_storage $contract_dir/assert_lt.tz Unit '(Pair -1 0)' Unit
+#assert_fails $client run script $contract_dir/assert_lt.tz on storage Unit and input '(Pair 0 -1)'
+#assert_fails $client run script $contract_dir/assert_lt.tz on storage Unit and input '(Pair 0 0)'
 
-assert_storage $contract_dir/assert_le.tz Unit '(Pair 0 0)' Unit
-assert_storage $contract_dir/assert_le.tz Unit '(Pair -1 0)' Unit
-assert_fails $client run script $contract_dir/assert_le.tz on storage Unit and input '(Pair 0 -1)'
+#assert_storage $contract_dir/assert_le.tz Unit '(Pair 0 0)' Unit
+#assert_storage $contract_dir/assert_le.tz Unit '(Pair -1 0)' Unit
+#assert_fails $client run script $contract_dir/assert_le.tz on storage Unit and input '(Pair 0 -1)'
 
-assert_storage $contract_dir/assert_gt.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run script $contract_dir/assert_gt.tz on storage Unit and input '(Pair -1 0)'
-assert_fails $client run script $contract_dir/assert_gt.tz on storage Unit and input '(Pair 0 0)'
+#assert_storage $contract_dir/assert_gt.tz Unit '(Pair 0 -1)' Unit
+#assert_fails $client run script $contract_dir/assert_gt.tz on storage Unit and input '(Pair -1 0)'
+#assert_fails $client run script $contract_dir/assert_gt.tz on storage Unit and input '(Pair 0 0)'
 
-assert_storage $contract_dir/assert_ge.tz Unit '(Pair 0 0)' Unit
-assert_storage $contract_dir/assert_ge.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run script $contract_dir/assert_ge.tz on storage Unit and input '(Pair -1 0)'
+#assert_storage $contract_dir/assert_ge.tz Unit '(Pair 0 0)' Unit
+#assert_storage $contract_dir/assert_ge.tz Unit '(Pair 0 -1)' Unit
+#assert_fails $client run script $contract_dir/assert_ge.tz on storage Unit and input '(Pair -1 0)'
 
 # ASSERT_CMP
-assert_storage $contract_dir/assert_cmpeq.tz Unit '(Pair -1 -1)' Unit
-assert_fails $client run script $contract_dir/assert_cmpeq.tz on storage Unit and input '(Pair 0 -1)'
+#assert_storage $contract_dir/assert_cmpeq.tz Unit '(Pair -1 -1)' Unit
+#assert_fails $client run script $contract_dir/assert_cmpeq.tz on storage Unit and input '(Pair 0 -1)'
 
-assert_storage $contract_dir/assert_cmpeq.tz Unit '(Pair -1 -1)' Unit
-assert_fails $client run script $contract_dir/assert_cmpeq.tz on storage Unit and input '(Pair 0 -1)'
+#assert_storage $contract_dir/assert_cmpeq.tz Unit '(Pair -1 -1)' Unit
+#assert_fails $client run script $contract_dir/assert_cmpeq.tz on storage Unit and input '(Pair 0 -1)'
 
-assert_storage $contract_dir/assert_cmpneq.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run script $contract_dir/assert_cmpneq.tz on storage Unit and input '(Pair -1 -1)'
+#assert_storage $contract_dir/assert_cmpneq.tz Unit '(Pair 0 -1)' Unit
+#assert_fails $client run script $contract_dir/assert_cmpneq.tz on storage Unit and input '(Pair -1 -1)'
 
-assert_storage $contract_dir/assert_cmplt.tz Unit '(Pair -1 0)' Unit
-assert_fails $client run script $contract_dir/assert_cmplt.tz on storage Unit and input '(Pair 0 -1)'
-assert_fails $client run script $contract_dir/assert_cmplt.tz on storage Unit and input '(Pair 0 0)'
+#assert_storage $contract_dir/assert_cmplt.tz Unit '(Pair -1 0)' Unit
+#assert_fails $client run script $contract_dir/assert_cmplt.tz on storage Unit and input '(Pair 0 -1)'
+#assert_fails $client run script $contract_dir/assert_cmplt.tz on storage Unit and input '(Pair 0 0)'
 
-assert_storage $contract_dir/assert_cmple.tz Unit '(Pair 0 0)' Unit
-assert_storage $contract_dir/assert_cmple.tz Unit '(Pair -1 0)' Unit
-assert_fails $client run script $contract_dir/assert_cmple.tz on storage Unit and input '(Pair 0 -1)'
+#assert_storage $contract_dir/assert_cmple.tz Unit '(Pair 0 0)' Unit
+#assert_storage $contract_dir/assert_cmple.tz Unit '(Pair -1 0)' Unit
+#assert_fails $client run script $contract_dir/assert_cmple.tz on storage Unit and input '(Pair 0 -1)'
 
-assert_storage $contract_dir/assert_cmpgt.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run script $contract_dir/assert_cmpgt.tz on storage Unit and input '(Pair -1 0)'
-assert_fails $client run script $contract_dir/assert_cmpgt.tz on storage Unit and input '(Pair 0 0)'
+#assert_storage $contract_dir/assert_cmpgt.tz Unit '(Pair 0 -1)' Unit
+#assert_fails $client run script $contract_dir/assert_cmpgt.tz on storage Unit and input '(Pair -1 0)'
+#assert_fails $client run script $contract_dir/assert_cmpgt.tz on storage Unit and input '(Pair 0 0)'
 
-assert_storage $contract_dir/assert_cmpge.tz Unit '(Pair 0 0)' Unit
-assert_storage $contract_dir/assert_cmpge.tz Unit '(Pair 0 -1)' Unit
-assert_fails $client run script $contract_dir/assert_cmpge.tz on storage Unit and input '(Pair -1 0)'
+#assert_storage $contract_dir/assert_cmpge.tz Unit '(Pair 0 0)' Unit
+#assert_storage $contract_dir/assert_cmpge.tz Unit '(Pair 0 -1)' Unit
+#assert_fails $client run script $contract_dir/assert_cmpge.tz on storage Unit and input '(Pair -1 0)'
 
 # IF_SOME
 assert_storage $contract_dir/if_some.tz '"?"' '(Some "hello")' '"hello"'
