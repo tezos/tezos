@@ -49,9 +49,9 @@ val inject_block:
   #Proto_alpha.full ->
   ?force:bool ->
   ?chain:Chain_services.chain ->
+  ?seed_nonce_hash:Nonce_hash.t ->
   shell_header:Block_header.shell_header ->
   priority:int ->
-  ?seed_nonce_hash:Nonce_hash.t ->
   src_sk:Client_keys.sk_uri ->
   Operation.raw list list ->
   Block_hash.t tzresult Lwt.t
@@ -67,7 +67,6 @@ type error +=
 val forge_block:
   #Proto_alpha.full ->
   ?chain:Chain_services.chain ->
-  Block_services.block ->
   ?force:bool ->
   ?operations: Operation.packed list ->
   ?best_effort:bool ->
@@ -76,14 +75,14 @@ val forge_block:
   ?timestamp:Time.t ->
   ?mempool:string ->
   ?context_path:string ->
-  priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
   ?seed_nonce_hash:Nonce_hash.t ->
+  priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
   src_sk:Client_keys.sk_uri ->
-  unit ->
+  Block_services.block ->
   Block_hash.t tzresult Lwt.t
-(** [forge_block cctxt parent_blk ?fee_threshold ?force ?operations ?best_effort
+(** [forge_block cctxt ?fee_threshold ?force ?operations ?best_effort
     ?sort ?timestamp ?max_priority ?priority ~seed_nonce ~src_sk
-    pk_hash] injects a block in the node. In addition of inject_block,
+    pk_hash parent_blk] injects a block in the node. In addition of inject_block,
     it will:
 
     * Operations: If [?operations] is [None], it will get pending

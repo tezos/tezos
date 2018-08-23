@@ -78,7 +78,12 @@ let generate_seed_nonce () =
 
 let forge_block_header
     (cctxt : #Proto_alpha.full)
-    ?(chain = `Main) block delegate_sk shell priority seed_nonce_hash =
+    ?(chain = `Main)
+    block
+    delegate_sk
+    shell
+    priority
+    seed_nonce_hash =
   Client_baking_pow.mine
     cctxt chain block shell
     (fun proof_of_work_nonce ->
@@ -111,10 +116,15 @@ let assert_valid_operations_hash shell_header operations =
        operations_hash shell_header.Tezos_base.Block_header.operations_hash)
     (failure "Client_baking_forge.inject_block: inconsistent header.")
 
-
-let inject_block cctxt
-    ?force ?(chain = `Main)
-    ~shell_header ~priority ?seed_nonce_hash ~src_sk operations =
+let inject_block
+    cctxt
+    ?force
+    ?(chain = `Main)
+    ?seed_nonce_hash
+    ~shell_header
+    ~priority
+    ~src_sk
+    operations =
   assert_valid_operations_hash shell_header operations >>=? fun () ->
   let block = `Hash (shell_header.Tezos_base.Block_header.predecessor, 0) in
   forge_block_header cctxt ~chain block
@@ -163,8 +173,7 @@ let sort_manager_operations
     ~max_size
     ~hard_gas_limit_per_block
     ~fee_threshold
-    (operations : Proto_alpha.operation list)
-  =
+    (operations : Proto_alpha.operation list) =
   let compute_weight op (fee, gas) =
     let size = Data_encoding.Binary.length Operation.encoding op in
     let size_f = Q.of_int size in
@@ -515,7 +524,9 @@ let finalize_block_header
     } in
   return header
 
-let forge_block cctxt ?(chain = `Main) block
+let forge_block
+    cctxt
+    ?(chain = `Main)
     ?force
     ?operations
     ?(best_effort = operations = None)
@@ -524,8 +535,10 @@ let forge_block cctxt ?(chain = `Main) block
     ?timestamp
     ?mempool
     ?context_path
+    ?seed_nonce_hash
     ~priority
-    ?seed_nonce_hash ~src_sk () =
+    ~src_sk
+    block =
   (* making the arguments usable *)
   unopt_operations cctxt chain mempool operations >>=? fun operations_arg ->
   decode_priority cctxt chain block priority >>=? fun (priority, minimal_timestamp) ->
@@ -610,7 +623,7 @@ let shell_prevalidation
     ~block
     seed_nonce_hash
     operations
-    (timestamp, (bi, priority, delegate)) =
+    ((timestamp, (bi, priority, delegate)) as _slot) =
   let protocol_data =
     forge_faked_protocol_data ~priority ~seed_nonce_hash in
   Alpha_block_services.Helpers.Preapply.block
@@ -637,7 +650,7 @@ let fetch_operations
     (cctxt : #Proto_alpha.full)
     ~chain
     state
-    (timestamp, (_head, priority, _delegate))
+    (timestamp, (head, priority, _delegate))
   =
   Alpha_block_services.Mempool.monitor_operations cctxt ~chain
     ~applied:true ~branch_delayed:true
@@ -671,6 +684,8 @@ let fetch_operations
               if prio = 0 then first
               else loop (prio - 1) durations
         in
+        (* The "safe" allocated time for injection stops when the next
+           baker's time begins. *)
         let allocated_time = loop (priority + 1) time_between_blocks in
         (* Wait 1/3 of the allocated time *)
         let timespan = Int64.div (Period.to_seconds allocated_time) 3L in
@@ -708,13 +723,13 @@ let fetch_operations
         loop ()
 
 (** Given a delegate baking slot [build_block] constructs a full block
-    with consistent operations and client-side validation *)
+    with consistent operations that went through the client-side
+    validation *)
 let build_block
     cctxt
     state
     seed_nonce_hash
-    ((timestamp, (bi, priority, delegate)) as slot)
-  =
+    ((timestamp, (bi, priority, delegate)) as slot) =
   let chain = `Hash bi.Client_baking_blocks.chain_id in
   let block = `Hash (bi.hash, 0) in
   Alpha_services.Helpers.current_level cctxt
@@ -849,7 +864,6 @@ let bake (cctxt : #Proto_alpha.full) state =
               Client_baking_nonces.add cctxt block_hash seed_nonce
               |> trace_exn (Failure "Error while recording nonce")
             else return_unit end >>=? fun () ->
-
           return_unit
     end
   | None -> (* Error while building a block *)
@@ -863,8 +877,7 @@ let bake (cctxt : #Proto_alpha.full) state =
 let get_baking_slots cctxt
     ?(max_priority = default_max_priority)
     new_head
-    delegates
-  =
+    delegates =
   let chain = `Hash new_head.Client_baking_blocks.chain_id in
   let block = `Hash (new_head.hash, 0) in
   let level = Raw_level.succ new_head.level in
@@ -898,10 +911,9 @@ let compute_best_slot_on_current_level
     ?max_priority
     (cctxt : #Proto_alpha.full)
     state
-    (new_head : Client_baking_blocks.block_info)
-  =
+    new_head =
   get_delegates cctxt state >>=? fun delegates ->
-  let level = Raw_level.succ new_head.level in
+  let level = Raw_level.succ new_head.Client_baking_blocks.level in
   get_baking_slots cctxt ?max_priority new_head delegates >>= function
   | [] ->
       lwt_log_info Tag.DSL.(fun f ->
@@ -984,10 +996,9 @@ let create
     (cctxt : #Proto_alpha.full)
     ?fee_threshold
     ?max_priority
-    ~(context_path: string)
-    (delegates: public_key_hash list)
-    (block_stream: Client_baking_blocks.block_info tzresult Lwt_stream.t)
-  =
+    ~context_path
+    delegates
+    block_stream =
   let state_maker genesis_hash bi =
     let constants =
       tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Hash (bi.Client_baking_blocks.hash, 0))) in
