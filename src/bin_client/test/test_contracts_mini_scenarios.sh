@@ -30,6 +30,18 @@ if [ ! $NO_TYPECHECK ] ; then
     printf "All contracts are well typed\n\n"
 fi
 
+# Tests create_account
+init_with_transfer $contract_scenarios_dir/create_account.tz $key2 None 1,000 bootstrap1
+assert_balance create_account "1000 ꜩ"
+created_account=\
+`$client transfer 100 from bootstrap1 to create_account -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' \
+ | grep 'New contract' \
+ | sed -E 's/.*(KT1[a-zA-Z0-9]+).*/\1/' \
+ | head -1`
+bake
+assert_balance $created_account "100 ꜩ"
+assert_balance create_account "1000 ꜩ"
+
 # Creates a contract, transfers data to it and stores the data
 init_with_transfer $contract_scenarios_dir/create_contract.tz $key2 Unit 1,000 bootstrap1
 assert_balance create_contract "1000 ꜩ"

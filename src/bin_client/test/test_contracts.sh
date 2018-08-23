@@ -379,9 +379,9 @@ bake_after $client transfer 500 from bootstrap1 to store_now -arg Unit
 assert_storage_contains store_now "$($client get timestamp)"
 
 # Test timestamp operations
-assert_storage $contract_dir/add_timestamp_delta.tz None '(Pair 100 100)' '(Some "1970-01-01T00:03:20Z")'
-assert_storage $contract_dir/add_timestamp_delta.tz None '(Pair 100 -100)' '(Some "1970-01-01T00:00:00Z")'
-assert_storage $contract_dir/add_timestamp_delta.tz None '(Pair "1970-01-01T00:00:00Z" 0)' '(Some "1970-01-01T00:00:00Z")'
+#assert_storage $contract_dir/add_timestamp_delta.tz None '(Pair 100 100)' '(Some "1970-01-01T00:03:20Z")'
+#assert_storage $contract_dir/add_timestamp_delta.tz None '(Pair 100 -100)' '(Some "1970-01-01T00:00:00Z")'
+#assert_storage $contract_dir/add_timestamp_delta.tz None '(Pair "1970-01-01T00:00:00Z" 0)' '(Some "1970-01-01T00:00:00Z")'
 
 #assert_storage $contract_dir/add_delta_timestamp.tz None '(Pair 100 100)' '(Some "1970-01-01T00:03:20Z")'
 #assert_storage $contract_dir/add_delta_timestamp.tz None '(Pair -100 100)' '(Some "1970-01-01T00:00:00Z")'
