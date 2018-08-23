@@ -204,9 +204,11 @@ let compute_timeout state =
       | None -> Lwt.return (block, delegates)
       | Some timeout ->
           lwt_log_info Tag.DSL.(fun f ->
-              f "Waiting until %a to inject endorsements"
+              f "Waiting until %a (%a) to inject endorsements"
               -% t event "wait_before_injecting"
-              -% a timestamp_tag time) >>= fun () ->
+              -% a timestamp_tag time
+              -% a timespan_tag (max 0L Time.(diff time (now ())))
+            ) >>= fun () ->
           timeout >>= fun () -> Lwt.return (block, delegates)
 
 let create

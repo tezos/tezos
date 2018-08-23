@@ -134,7 +134,7 @@ let () =
     ~description: ""
     ~pp:(fun ppf (op, err) ->
         let h = Tezos_base.Operation.hash op in
-        Format.fprintf ppf "@[Failed to preapply %a:@ %a@]"
+        Format.fprintf ppf "@[Failed to preapply %a:@ @[<v 4>%a@]@]"
           Operation_hash.pp_short h
           pp_print_error err)
     Data_encoding.
@@ -418,7 +418,7 @@ let filter_and_apply_operations
     add_operation inc op >>= function
     | Error errs ->
         lwt_log_info Tag.DSL.(fun f ->
-            f "Client-side validation: invalid operation filtered %a\n%a"
+            f "Client-side validation: invalid operation filtered %a\n@[<v 4>%a@]"
             -% t event "baking_rejected_invalid_operation"
             -% a Operation_hash.Logging.tag (Operation.hash_packed op)
             -% a errs_tag errs)
@@ -679,7 +679,7 @@ let fetch_operations
             f "No endorsements present in the mempool. Waiting until %a (%a) for new operations."
             -% t event "waiting_operations"
             -% a timestamp_tag limit_date
-            -% a timespan_tag timespan
+            -% a timespan_tag (max 0L Time.(diff limit_date (now ())))
           ) >>= fun () ->
         let timeout = match Client_baking_scheduling.sleep_until limit_date with
           | None -> Lwt.return_unit
@@ -766,8 +766,8 @@ let build_block
         let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
         filter_and_apply_operations ~timestamp ~protocol_data state bi operations >>= function
         | Error errs ->
-            lwt_log_error Tag.DSL.(fun f ->
-                f "Client-side validation: error while filtering invalid operations :@\n@[<v 2]%a@]"
+            lwt_log_info Tag.DSL.(fun f ->
+                f "Client-side validation: error while filtering invalid operations :@\n@[<v 4>%a@]"
                 -% t event "client_side_validation_error"
                 -% a errs_tag errs) >>= fun () ->
             lwt_log_notice Tag.DSL.(fun f ->
