@@ -804,6 +804,8 @@ is, concatenate or splice them, and use them as keys.
 
 -  ``SLICE``: String access.
 
+::
+
     :: nat : nat : string : 'S   ->  option string : 'S
 
     > SLICE / offset : length : s : S  =>  Some ss : S
