@@ -584,6 +584,8 @@ end
 
 module Connection = struct
 
+  let private_node conn = P2p_socket.private_node conn.conn
+
   let fold pool ~init ~f =
     Peers.fold_connected pool ~init ~f:begin fun peer_id peer_info acc ->
       match P2p_peer_state.get peer_info with
@@ -597,7 +599,7 @@ module Connection = struct
   let random ?different_than ~no_private pool =
     let candidates =
       fold pool ~init:[] ~f:begin fun _peer conn acc ->
-        if no_private && (P2p_socket.private_node conn.conn) then
+        if no_private && (private_node conn) then
           acc
         else
           match different_than with
@@ -613,7 +615,7 @@ module Connection = struct
   let random_lowid ?different_than ~no_private pool =
     let candidates =
       fold pool ~init:[] ~f:begin fun _peer conn acc ->
-        if no_private && (P2p_socket.private_node conn.conn) then
+        if no_private && (private_node conn) then
           acc
         else
           match different_than with
@@ -1031,7 +1033,7 @@ and register_new_point pool _source_peer_id point =
     ignore (register_point pool _source_peer_id point)
 
 and list_known_points ?(ignore_private = false) pool conn =
-  if P2p_socket.private_node conn.conn then
+  if Connection.private_node conn then
     private_node_warn "Private peer (%a) asked other peers addresses"
       P2p_peer.Id.pp (P2p_peer_state.Info.peer_id conn.peer_info) >>= fun () ->
     Lwt.return_nil

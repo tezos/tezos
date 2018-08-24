@@ -267,6 +267,10 @@ module Connection : sig
     P2p_peer.Id.t ->
     ('msg, 'peer_meta,'conn_meta) connection option
 
+  val private_node: ('msg, 'peer_meta,'conn_meta) connection -> bool
+  (** [private_node conn] returns 'true' if the node assocoatied to this
+      connection is in private mode *)
+
 end
 
 val on_new_connection:
