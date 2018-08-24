@@ -2425,6 +2425,7 @@ a name for the value on the stack. The following typing rule
 demonstrates their use for instruction ``CAR``.
 
 ::
+
    CAR @%
    :: @p (pair ('a %fst) ('b %snd)) : 'S   ->   @fst 'a : 'S
 
@@ -2438,6 +2439,7 @@ element. Two examples with ``PAIR`` follows, notice the special
 treatment of annotations with `.`.
 
 ::
+
    PAIR %@ %@
    :: @x 'a : @y 'b : 'S   ->   (pair ('a %x) ('b %y)) : 'S
 
