@@ -2260,7 +2260,7 @@ Syntax
 Primitive applications can receive one or many annotations.
 
 An annotation is a sequence of characters that matches the regular
-expression ``[@:%](|@|%|%%|[_a-ZA-Z][_0-9a-zA-Z\.]*)``. They come after
+expression ``[@:%](|@|%|%%|[_a-zA-Z][_0-9a-zA-Z\.]*)``. They come after
 the primitive name and before its potential arguments.
 
 ::
