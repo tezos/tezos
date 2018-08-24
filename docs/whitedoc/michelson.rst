@@ -1954,7 +1954,7 @@ X - Annotations
 ---------------
 
 The annotation mechanism of Michelson provides ways to better track data
-on the stack and to give additional type constraints. Annotaions are
+on the stack and to give additional type constraints. Annotations are
 only here to add constraints, *i.e.* they cannot turn an otherwise
 rejected program into an accepted one.
 
