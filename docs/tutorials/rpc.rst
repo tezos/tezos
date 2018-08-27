@@ -27,14 +27,14 @@ procedures provided by the associated economic protocol version:
 
 ::
 
-    ./tezos-client rpc list chains/main/blocks/genesis
+    ./tezos-client rpc list /chains/main/blocks/genesis
 
 You might also want the JSON schema describing the expected input and
 output of a RPC. For instance:
 
 ::
 
-    ./tezos-client rpc schema get chains/main/blocks/genesis/hash
+    ./tezos-client rpc schema get /chains/main/blocks/genesis/hash
 
 Note: you can get the same information, but as a raw JSON object, with a
 simple HTTP request:
