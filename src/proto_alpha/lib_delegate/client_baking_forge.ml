@@ -33,6 +33,7 @@ open Logging
 (* The index of the different components of the protocol's validation passes *)
 (* TODO: ideally, we would like this to be more abstract and possibly part of
    the protocol, while retaining the generality of lists *)
+(* Hypothesis : we suppose [List.length Proto_alpha.Main.validation_passes = 4] *)
 let endorsements_index = 0
 let votes_index = 1
 let anonymous_index = 2
@@ -253,13 +254,14 @@ let classify_operations
     (ops: Proto_alpha.operation list) =
   Alpha_block_services.live_blocks cctxt ~chain:`Main ~block ()
   >>=? fun live_blocks ->
-  (* Remove operations that are too old for the mempool *)
+  (* Remove operations that are too old *)
   let ops =
     List.filter (fun { shell = { branch } } ->
         Block_hash.Set.mem branch live_blocks
       ) ops
   in
-  let t = Array.make (List.length Proto_alpha.Main.validation_passes) [] in
+  let validation_passes_len = List.length Proto_alpha.Main.validation_passes in
+  let t = Array.make (validation_passes_len + 1) [] in
   List.iter
     (fun (op: Proto_alpha.operation) ->
        List.iter
@@ -278,7 +280,8 @@ let classify_operations
   trim_manager_operations ~max_size ~hard_gas_limit_per_block (List.map fst ordered_operations)
   >>=? fun (desired_manager_operations, overflowing_manager_operations) ->
   t.(managers_index) <- desired_manager_operations ;
-  return @@ (Array.fold_right (fun ops acc -> ops :: acc) t [ overflowing_manager_operations ])
+  t.(validation_passes_len) <- overflowing_manager_operations ;
+  return (Array.to_list t)
 
 let parse (op : Operation.raw) : Operation.packed =
   let protocol_data =
@@ -654,15 +657,14 @@ let fetch_operations
     (cctxt : #Proto_alpha.full)
     ~chain
     state
-    (timestamp, (head, priority, _delegate))
+    (timestamp, (head, _, _delegate))
   =
   Alpha_block_services.Mempool.monitor_operations cctxt ~chain
     ~applied:true ~branch_delayed:true
     ~refused:false ~branch_refused:false () >>=? fun (operation_stream, _stop) ->
-  (* Hypothesis : the first call to the stream returns instantly, even if the mempool is empty *)
+  (* Hypothesis : the first call to the stream returns instantly, even if the mempool is empty. *)
   Lwt_stream.get operation_stream >>= function
-  | None ->
-      (* New head received : should not happen. *)
+  | None -> (* New head received : not supposed to happen. *)
       return_none
   | Some current_mempool ->
       let operations = ref current_mempool in
@@ -745,9 +747,6 @@ let build_block
       -% s Client_keys.Logging.tag name
       -% a timestamp_tag timestamp) >>= fun () ->
 
-  (* (\* Retrieve mempool's pending operations *\)
-   * Alpha_block_services.Mempool.pending_operations cctxt ~chain () >>=? fun mpool -> *)
-
   fetch_operations cctxt ~chain state slot >>=? function
   | None ->
       lwt_log_info Tag.DSL.(fun f ->
@@ -765,7 +764,7 @@ let build_block
         | Some hash -> hash
       in
       if Protocol_hash.(Proto_alpha.hash <> next_version) then
-        (* Delegate validation to shell *)
+        (* Let the shell validate this *)
         shell_prevalidation cctxt ~chain ~block seed_nonce_hash
           (List.sub operations 4) slot
       else
@@ -1018,7 +1017,6 @@ let create
   in
 
   let timeout_k cctxt state () =
-    (* C'est safe ça ? *)
     bake cctxt state >>=? fun () ->
     (* Stopping the timeout and waiting for the next block *)
     state.best_slot <- None ;

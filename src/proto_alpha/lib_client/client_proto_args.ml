@@ -83,7 +83,7 @@ let () =
     `Permanent
     ~id:"badEndorsementDelayArg"
     ~title:"Bad -endorsement-delay arg"
-    ~description:("invalid priority in -endorsement-delay")
+    ~description:("invalid duration in -endorsement-delay")
     ~pp:(fun ppf literal ->
         Format.fprintf ppf "Bad argument value for -endorsement-delay. Expected an integer, but given '%s'" literal)
     Data_encoding.(obj1 (req "parameter" string))
@@ -236,7 +236,7 @@ let max_priority_arg =
 let fee_threshold_arg =
   arg
     ~long:"fee-threshold"
-    ~placeholder:"threshold"
+    ~placeholder:"amount"
     ~doc:"exclude operations with fees lower than this threshold (in mutez)"
     (parameter (fun _ s ->
          match Tez.of_string s with
@@ -267,7 +267,10 @@ let endorsement_delay_arg =
           production of endorsements for these blocks."
     ~default:"15"
     (parameter (fun _ s ->
-         try return (int_of_string s)
+         try
+           let i = int_of_string s in
+           fail_when (i < 0) (Bad_endorsement_delay s) >>=? fun () ->
+           return (int_of_string s)
          with _ -> fail (Bad_endorsement_delay s)))
 
 let preserved_levels_arg =
