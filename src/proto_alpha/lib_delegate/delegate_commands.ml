@@ -93,19 +93,20 @@ let baker_commands () =
   in
   [
     command ~group ~desc: "Launch the baker daemon."
-      (args2 max_priority_arg fee_threshold_arg)
+      (args3 max_priority_arg fee_threshold_arg max_waiting_time_arg)
       (prefixes [ "run" ; "with" ; "local" ; "node" ]
        @@ param
          ~name:"context_path"
          ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
          directory_parameter
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun (max_priority, fee_threshold) node_path delegates cctxt ->
+      (fun (max_priority, fee_threshold, max_waiting_time) node_path delegates cctxt ->
          Tezos_signer_backends.Encrypted.decrypt_list
            cctxt (List.map fst delegates) >>=? fun () ->
          Client_daemon.Baker.run cctxt
            ?fee_threshold
            ?max_priority
+           ~max_waiting_time
            ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
            ~context_path:(Filename.concat node_path "context")
            (List.map snd delegates)

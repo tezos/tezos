@@ -105,6 +105,7 @@ val create:
   #Proto_alpha.full ->
   ?fee_threshold:Tez.t ->
   ?max_priority: int ->
+  max_waiting_time: int ->
   context_path: string ->
   public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->

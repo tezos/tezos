@@ -30,6 +30,7 @@ open Clic
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 type error += Bad_max_priority of string
 type error += Bad_fee_threshold of string
+type error += Bad_max_waiting_time of string
 type error += Bad_endorsement_delay of string
 type error += Bad_preserved_levels of string
 
@@ -68,6 +69,16 @@ let () =
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_fee_threshold parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_fee_threshold parameter) ;
+  register_error_kind
+    `Permanent
+    ~id:"badMaxWaitingTimeArg"
+    ~title:"Bad -max-waiting-time arg"
+    ~description:("invalid duration in -max-waiting-time")
+    ~pp:(fun ppf literal ->
+        Format.fprintf ppf "Bad argument value for -max-waiting-time. Expected an integer, but given '%s'" literal)
+    Data_encoding.(obj1 (req "parameter" string))
+    (function Bad_max_waiting_time parameter -> Some parameter | _ -> None)
+    (fun parameter -> Bad_max_waiting_time parameter) ;
   register_error_kind
     `Permanent
     ~id:"badEndorsementDelayArg"
@@ -231,6 +242,21 @@ let fee_threshold_arg =
          match Tez.of_string s with
          | Some t -> return t
          | None -> fail (Bad_fee_threshold s)))
+
+let max_waiting_time_arg =
+  default_arg
+    ~long:"max-waiting-time"
+    ~placeholder:"seconds"
+    ~doc:"Specify how long the baker is allowed to wait late \
+          endorsements (if necessary) after its delegate's injection \
+          date."
+    ~default:"25"
+    (parameter (fun _ s ->
+         try
+           let i = int_of_string s in
+           fail_when (i < 0) (Bad_max_waiting_time s) >>=? fun () ->
+           return (int_of_string s)
+         with _ -> fail (Bad_max_waiting_time s)))
 
 let endorsement_delay_arg =
   default_arg

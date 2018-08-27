@@ -44,13 +44,20 @@ end
 
 module Baker = struct
 
-  let run (cctxt : #Proto_alpha.full) ?fee_threshold ?max_priority ?min_date ~context_path delegates =
+  let run
+      (cctxt : #Proto_alpha.full)
+      ?fee_threshold
+      ?max_priority
+      ?min_date
+      ~context_path
+      ~max_waiting_time
+      delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt `Main >>=? fun block_stream ->
     Client_baking_forge.create cctxt
-      ?fee_threshold ?max_priority ~context_path delegates block_stream >>=? fun () ->
+      ?fee_threshold ?max_priority ~max_waiting_time ~context_path delegates block_stream >>=? fun () ->
     ignore min_date;
     return_unit
 

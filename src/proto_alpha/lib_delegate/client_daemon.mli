@@ -41,6 +41,7 @@ module Baker : sig
     ?max_priority: int ->
     ?min_date: Time.t ->
     context_path: string ->
+    max_waiting_time: int ->
     public_key_hash list -> unit tzresult Lwt.t
 end
 

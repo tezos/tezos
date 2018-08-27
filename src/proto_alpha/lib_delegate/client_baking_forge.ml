@@ -50,17 +50,20 @@ type state = {
   constants: Constants.t tzlazy ;
   (* Minimum operation fee required to include in a block *)
   fee_threshold : Tez.t ;
+  (* Maximum waiting time allowed for late endorsements *)
+  max_waiting_time : int ;
   (* truly mutable *)
   mutable best_slot: (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) option ;
 }
 
-let create_state ?(fee_threshold = Tez.zero) genesis context_path index delegates constants =
+let create_state ?(fee_threshold = Tez.zero) ~max_waiting_time genesis context_path index delegates constants =
   { genesis ;
     context_path ;
     index ;
     delegates ;
     constants ;
     fee_threshold ;
+    max_waiting_time ;
     best_slot = None ;
   }
 
@@ -594,6 +597,7 @@ let forge_block
           constants = tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Head 0)) ;
           delegates = [] ;
           best_slot = None ;
+          max_waiting_time = 0 ;
           fee_threshold = Tez.zero ;
         } in
         filter_and_apply_operations ~timestamp ~protocol_data state bi operations
@@ -645,7 +649,7 @@ let shell_prevalidation
 
 (** [fetch_operations] retrieve the operations present in the
     mempool. If no endorsements are present in the initial set, it
-    waits until half of its injection range time has passed. *)
+    waits until [state.max_waiting_time] seconds after its injection range start date. *)
 let fetch_operations
     (cctxt : #Proto_alpha.full)
     ~chain
@@ -675,21 +679,8 @@ let fetch_operations
       if contains_head_endorsements !operations then
         return (Some !operations)
       else
-        (* Retrieve time left *)
-        tzforce state.constants >>=? fun Constants.{ parametric = { time_between_blocks ; _ } } ->
-        let rec loop prio = function
-          | [] -> Period.one_minute
-          | [ last ] -> last
-          | first :: durations ->
-              if prio = 0 then first
-              else loop (prio - 1) durations
-        in
-        (* The "safe" allocated time for injection stops when the next
-           baker's time begins. *)
-        let allocated_time = loop (priority + 1) time_between_blocks in
         (* Wait 1/3 of the allocated time *)
-        let timespan = Int64.div (Period.to_seconds allocated_time) 3L in
-        let limit_date = Time.add timestamp timespan in
+        let limit_date = Time.add timestamp (Int64.of_int state.max_waiting_time) in
         lwt_log_notice Tag.DSL.(fun f ->
             f "No endorsements present in the mempool. Waiting until %a (%a) for new operations."
             -% t event "waiting_operations"
@@ -996,6 +987,7 @@ let create
     (cctxt : #Proto_alpha.full)
     ?fee_threshold
     ?max_priority
+    ~max_waiting_time
     ~context_path
     delegates
     block_stream =
@@ -1003,7 +995,7 @@ let create
     let constants =
       tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Hash (bi.Client_baking_blocks.hash, 0))) in
     Client_baking_simulator.load_context ~context_path >>= fun index ->
-    let state = create_state genesis_hash context_path index delegates constants ?fee_threshold in
+    let state = create_state ?fee_threshold  ~max_waiting_time genesis_hash  context_path index delegates constants in
     return state
   in
 

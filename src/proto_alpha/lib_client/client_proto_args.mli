@@ -40,6 +40,7 @@ val delegatable_switch: (bool, Proto_alpha.full) Clic.arg
 val spendable_switch: (bool, Proto_alpha.full) Clic.arg
 val max_priority_arg: (int option, Proto_alpha.full) Clic.arg
 val fee_threshold_arg: (Tez.tez option, Proto_alpha.full) Clic.arg
+val max_waiting_time_arg: (int, Proto_alpha.full) Clic.arg
 val force_switch: (bool, Proto_alpha.full) Clic.arg
 val minimal_timestamp_switch: (bool, Proto_alpha.full) Clic.arg
 val endorsement_delay_arg: (int, Proto_alpha.full) Clic.arg
