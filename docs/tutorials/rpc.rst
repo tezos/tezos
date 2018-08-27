@@ -27,14 +27,14 @@ procedures provided by the associated economic protocol version:
 
 ::
 
-    ./tezos-client rpc list /blocks/genesis/
+    ./tezos-client rpc list chains/main/blocks/genesis
 
 You might also want the JSON schema describing the expected input and
 output of a RPC. For instance:
 
 ::
 
-    ./tezos-client rpc schema /blocks/genesis/hash
+    ./tezos-client rpc schema get chains/main/blocks/genesis/hash
 
 Note: you can get the same information, but as a raw JSON object, with a
 simple HTTP request:
@@ -42,9 +42,9 @@ simple HTTP request:
 ::
 
    curl -s localhost:8732/chains/main/blocks/head~10
-   wget --post-data '{ "recursive": true }' -O - http://localhost:8732/describe
-   wget --post-data '{ "recursive": true }' -O - http://localhost:8732/describe/blocks/genesis
-   wget -O - http://localhost:8732/describe/blocks/genesis/hash
+   wget -O - http://localhost:8732/describe?recurse=true
+   wget -O - http://localhost:8732/describe/chains/main/blocks/genesis?recurse=true
+   wget -O - http://localhost:8732/describe/chains/main/blocks/genesis/hash
 
 
 An online :ref:`index <rpc_index>` of RPC calls is also available.
