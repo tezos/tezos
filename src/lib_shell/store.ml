@@ -97,13 +97,18 @@ module Block = struct
       (Block_hash)
 
   type contents = {
-    header: Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
     last_allowed_fork_level: Int32.t ;
     context: Context_hash.t ;
     metadata: MBytes.t ;
   }
+
+  module Header =
+    Store_helpers.Make_single_store
+      (Indexed_store.Store)
+      (struct let name = ["header"] end)
+      (Store_helpers.Make_value(Block_header))
 
   module Contents =
     Store_helpers.Make_single_store
@@ -114,23 +119,22 @@ module Block = struct
          let encoding =
            let open Data_encoding in
            conv
-             (fun { header ; message ; max_operations_ttl ;
+             (fun { message ; max_operations_ttl ;
                     last_allowed_fork_level ;
                     context ; metadata } ->
                (message, max_operations_ttl, last_allowed_fork_level,
-                context, metadata, header ))
+                context, metadata ))
              (fun (message, max_operations_ttl, last_allowed_fork_level,
-                   context, metadata, header ) ->
-               { header ; message ; max_operations_ttl ;
+                   context, metadata ) ->
+               { message ; max_operations_ttl ;
                  last_allowed_fork_level ;
                  context ; metadata })
-             (obj6
+             (obj5
                 (opt "message" string)
                 (req "max_operations_ttl" uint16)
                 (req "last_allowed_fork_level" int32)
                 (req "context" Context_hash.encoding)
-                (req "metadata" bytes)
-                (req "header" Block_header.encoding))
+                (req "metadata" bytes))
        end))
 
   module Operations_index =
