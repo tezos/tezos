@@ -733,6 +733,14 @@ let rec connect ?timeout pool point =
   end
 
 and authenticate pool ?point_info canceler fd point =
+  let fd = P2p_io_scheduler.register pool.io_sched fd in
+  raw_authenticate pool ?point_info canceler fd point >>= function
+  | Ok connection -> return connection
+  | Error _ as err ->
+      P2p_io_scheduler.close fd >>=? fun () ->
+      Lwt.return err
+
+and raw_authenticate pool ?point_info canceler fd point =
   let incoming = point_info = None in
   lwt_debug "authenticate: %a%s"
     P2p_point.Id.pp point
@@ -740,7 +748,7 @@ and authenticate pool ?point_info canceler fd point =
   protect ~canceler begin fun () ->
     P2p_socket.authenticate
       ~proof_of_work_target:pool.config.proof_of_work_target
-      ~incoming (P2p_io_scheduler.register pool.io_sched fd) point
+      ~incoming fd point
       ?listening_port:pool.config.listening_port
       pool.config.identity pool.message_config.versions
       pool.conn_meta_config
