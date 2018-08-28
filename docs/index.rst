@@ -29,13 +29,13 @@ The source code of Tezos is placed under the MIT Open Source License.
 The Community
 -------------
 
-- Several community built block explorers are available:
+- Several community-built block explorers are available:
 
     - http://tzscan.io
     - https://tezos.id
     - https://tezex.info
 
-- A few community run websites collect useful Tezos links:
+- A few community-run websites collect useful Tezos links:
 
     - https://www.tezos.help
     - https://tezos.rocks
