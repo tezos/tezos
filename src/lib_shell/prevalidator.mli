@@ -54,18 +54,40 @@ type limits = {
 
 type error += Closed of Chain_id.t
 
+(** Creates a new worker. Each chain is associated with a prevalidator. Typically,
+    this is the case for the main chain and a test chain *)
 val create: limits -> Distributed_db.chain_db -> t Lwt.t
+
 val shutdown: t -> unit Lwt.t
+
+(** Notify the prevalidator worker of a set of operations (in the form of a mempool)
+    received from a peer. *)
 val notify_operations: t -> P2p_peer.Id.t -> Mempool.t -> unit
+
+(** Notify the prevalidator worker of a new injected operation. This will be added
+    to the mempool of the worker *)
 val inject_operation: t -> Operation.t -> unit tzresult Lwt.t
+
+(** Notify the prevalidator worker that a new head was received. The new head will
+    cause the reset of the prevalidation context *)
 val flush: t -> Block_hash.t -> unit tzresult Lwt.t
+
+(** Returns the timestamp of the prevalidator worker, that is the timestamp of the last
+    reset of the prevalidation context *)
 val timestamp: t -> Time.t
+
+(** Returns the list of valid operations known to this prevalidation worker *)
 val operations: t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
+
+(** Returns the list of pending operations known to this prevalidation worker *)
 val pending: ?block:State.Block.t -> t -> Operation.t Operation_hash.Map.t Lwt.t
 
+(** Returns the list of prevalidation workers running and their associated chain *)
 val running_workers: unit -> (Chain_id.t * t) list
-val status: t -> Worker_types.worker_status
 
+(** Worker status and events *)
+
+val status: t -> Worker_types.worker_status
 val pending_requests : t -> (Time.t * Prevalidator_worker_state.Request.view) list
 val current_request : t -> (Time.t * Time.t * Prevalidator_worker_state.Request.view) option
 val last_events : t -> (Lwt_log_core.level * Prevalidator_worker_state.Event.t list) list
