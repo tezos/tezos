@@ -69,6 +69,7 @@ val inject_manager_operation:
   fee:Tez.t ->
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
+  ?counter:Z.t ->
   'kind manager_operation ->
   'kind Kind.manager result tzresult Lwt.t
 

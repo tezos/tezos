@@ -162,6 +162,7 @@ val transfer :
   fee:Tez.t ->
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
+  ?counter:Z.t ->
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
 

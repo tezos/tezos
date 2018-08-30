@@ -50,7 +50,7 @@ let transfer (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
     ?dry_run
     ?branch ~source ~src_pk ~src_sk ~destination ?arg
-    ~amount ~fee ?gas_limit ?storage_limit () =
+    ~amount ~fee ?gas_limit ?storage_limit ?counter () =
   begin match arg with
     | Some arg ->
         parse_expression arg >>=? fun { expanded = arg } ->
@@ -62,7 +62,7 @@ let transfer (cctxt : #Proto_alpha.full)
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ?branch ~source ~fee ?gas_limit ?storage_limit
+    ?branch ~source ~fee ?gas_limit ?storage_limit ?counter
     ~src_pk ~src_sk contents >>=? fun (_oph, _op, result as res) ->
   Lwt.return
     (Injection.originated_contracts (Single_result result)) >>=? fun contracts ->

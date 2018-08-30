@@ -224,6 +224,19 @@ let storage_limit_arg =
            return v
          with _ -> failwith "invalid storage limit (must be a positive number of bytes)"))
 
+let counter_arg =
+  arg
+    ~long:"counter"
+    ~short:'C'
+    ~placeholder:"counter"
+    ~doc:"Set the counter to be used by the transaction"
+    (parameter (fun _ s ->
+         try
+           let v = Z.of_string s in
+           assert Compare.Z.(v >= Z.zero) ;
+           return v
+         with _ -> failwith "invalid counter (must be a positive number of bytes)"))
+
 let max_priority_arg =
   arg
     ~long:"max-priority"
