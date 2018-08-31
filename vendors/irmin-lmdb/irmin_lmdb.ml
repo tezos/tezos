@@ -622,7 +622,7 @@ module Make
       type config = {
         root   : string option ;
         mapsize : int64 ;
-	readonly : bool ;
+        readonly : bool ;
         (* TODO *)
         (* ?write_buffer_size:int -> *)
         (* ?max_open_files:int -> *)
@@ -641,7 +641,7 @@ module Make
         let { root ; mapsize ; readonly } = config conf in
         let root = match root with None -> "irmin.ldb" | Some root -> root in
         if not (Sys.file_exists root) then Unix.mkdir root 0o755 ;
-	let flags = Lmdb.NoTLS :: if readonly then [ Lmdb.RdOnly ] else [] in
+        let flags = Lmdb.NoTLS :: if readonly then [ Lmdb.RdOnly ] else [] in
         let file_flags = if readonly then 0o444 else 0o644 in
         match Lmdb.opendir ~mapsize ~flags root file_flags with
         | Error err -> Lwt.fail_with (Lmdb.string_of_error err)

@@ -13,7 +13,7 @@ let cdiv x y =
      exposed _internal_ utility library not for public consumption, hence
      the API break that prompted this copy-pasted function. *)
   if y < 1 then raise Division_by_zero else
-    if x > 0 then 1 + ((x - 1) / y) else 0 [@@inline]
+  if x > 0 then 1 + ((x - 1) / y) else 0 [@@inline]
 
 module type S = sig
   val pbkdf2 : password:Bigstring.t -> salt:Bigstring.t -> count:int -> dk_len:int32 -> Bigstring.t
