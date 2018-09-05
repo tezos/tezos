@@ -289,6 +289,17 @@ module Chain_data = struct
            tup2 int32 Block_hash.encoding
        end))
 
+  module Checkpoint_0_0_1 =
+    Store_helpers.Make_single_store
+      (Chain.Indexed_store.Store)
+      (struct let name = ["checkpoint"] end)
+      (Store_helpers.Make_value(struct
+         type t = Int32.t * Block_hash.t
+         let encoding =
+           let open Data_encoding in
+           tup2 int32 Block_hash.encoding
+       end))
+
   module Caboose =
     Store_helpers.Make_single_store
       (Chain.Indexed_store.Store)
