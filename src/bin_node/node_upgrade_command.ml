@@ -23,24 +23,72 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+let (//) = Filename.concat
 
-type error += Invalid_data_dir_version of t * t
-type error += Could_not_read_data_dir_version of string
+(** Main *)
 
-val data_version : t
-val default_identity_file_name : string
+module Term = struct
 
-val pp : Format.formatter -> t -> unit
+  let process data_dir config_file =
+    let run =
+      begin
+        match data_dir with
+        | Some data_dir -> return data_dir
+        | None ->
+            match config_file with
+            | None ->
+                let default_config =
+                  Node_config_file.default_data_dir // "config.json" in
+                if Sys.file_exists default_config then
+                  Node_config_file.read default_config >>=? fun cfg ->
+                  return cfg.data_dir
+                else
+                  return Node_config_file.default_data_dir
+            | Some config_file ->
+                Node_config_file.read config_file >>=? fun cfg ->
+                return cfg.data_dir
+      end >>=? fun data_dir ->
+      begin
+        trace (failure "Fail to lock the data directory. Is a `tezos-node` running?") @@
+        Lwt_lock_file.create
+          ~unlink_on_exit:true (Node_data_version.lock_file data_dir)
+      end >>=? fun () ->
+      Node_data_version.upgrade_data_dir data_dir in
+    match Lwt_main.run run with
+    | Ok () -> `Ok ()
+    | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
 
-val version_encoding : t Data_encoding.encoding
+  let term =
+    Cmdliner.Term.(ret (const process
+                        $ Node_shared_arg.Term.data_dir
+                        $ Node_shared_arg.Term.config_file))
 
-val ensure_data_dir : string -> unit tzresult Lwt.t
+end
 
-val upgrade_data_dir : string -> unit tzresult Lwt.t
+module Manpage = struct
 
+  let command_description =
+    "The $(b,upgrade_storage) command is meant to manage upgrades \
+     in the node disk storage."
 
-val store_dir: string -> string
-val context_dir: string -> string
-val protocol_dir: string -> string
-val lock_file: string -> string
+  let description = [
+    `S "DESCRIPTION" ;
+    `P command_description ;
+  ]
+
+  let man =
+    description @
+    (* [ `S misc_docs ] @ *)
+    Node_shared_arg.Manpage.bugs
+
+  let info =
+    Cmdliner.Term.info
+      ~doc: "Upgrade of the node disk storage if needed"
+      ~man
+      "upgrade_storage"
+
+end
+
+let cmd =
+  Term.term, Manpage.info
+
