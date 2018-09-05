@@ -94,7 +94,6 @@ module Chain : sig
   val save_point: chain_state -> (Int32.t * Block_hash.t) Lwt.t
   val caboose: chain_state -> (Int32.t * Block_hash.t) Lwt.t
 
-
   (** Update the current checkpoint. The current head should be
       consistent (i.e. it should either have a lower level or pass
       through the checkpoint). In the process all the blocks from
@@ -110,6 +109,9 @@ module Chain : sig
   (** Apply [set_checkpoint] then [purge_rolling] (see {!History_mode.t}). *)
   val set_checkpoint_then_purge_rolling: chain_state -> Block_header.t ->
     unit Lwt.t
+
+  val set_checkpoint:
+    chain_state -> Block_header.t -> unit Lwt.t
 
   (** Check that a block is compatible with the current checkpoint.
       This function assumes that the predecessor is known valid. *)
@@ -369,6 +371,11 @@ module Current_mempool : sig
 end
 
 val history_mode: global_state -> History_mode.t Lwt.t
+
+val upgrade_0_0_1:
+  ?store_mapsize:Int64.t ->
+  store_root:string ->
+  unit -> unit tzresult Lwt.t
 
 (** Read the internal state of the node and initialize
     the databases. *)

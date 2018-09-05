@@ -1665,3 +1665,27 @@ let close { global_data } =
     Store.close global_store ;
     Lwt.return_unit
   end
+
+let upgrade_0_0_1
+    ?(store_mapsize=4_096_000_000_000L)
+    ~store_root () =
+  Store.init ~mapsize:store_mapsize store_root >>=? fun global_store ->
+  Store.Chain.list global_store >>= fun chains ->
+  iter_s
+    begin fun chain_id ->
+      Format.eprintf "Upgrading checkpoint for chain %a...@." Chain_id.pp chain_id ;
+      let chain_store = Store.Chain.get global_store chain_id in
+      let block_store = Store.Block.get chain_store in
+      let chain_data_store = Store.Chain_data.get chain_store in
+      Store.Chain_data.Checkpoint_0_0_1.read_opt chain_data_store >>= function
+      | None ->
+          Store.Chain_data.Checkpoint_0_0_1.remove chain_data_store >>= fun () ->
+          return_unit
+      | Some (_level, hash) ->
+          Store.Block.Header.read (block_store, hash) >>=? fun header ->
+          Store.Chain_data.Checkpoint.store chain_data_store header >>= fun () ->
+          return_unit
+    end
+    chains >>=? fun () ->
+  Store.close global_store ;
+  return_unit
