@@ -191,7 +191,7 @@ let only_if_fitness_increases w distant_header cont =
 let assert_acceptable_head w hash (header: Block_header.t) =
   let pv = Worker.state w in
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Chain.acceptable_block chain_state hash header >>= fun acceptable ->
+  State.Chain.acceptable_block chain_state header >>= fun acceptable ->
   fail_unless acceptable
     (Validation_errors.Checkpoint_error (hash, Some pv.peer_id))
 

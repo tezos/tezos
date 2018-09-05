@@ -75,7 +75,7 @@ and genesis = {
 
 and chain_data_state = {
   mutable data: chain_data ;
-  mutable checkpoint: Int32.t * Block_hash.t ;
+  mutable checkpoint: Block_header.t ;
   chain_data_store: Store.Chain_data.store ;
 }
 
@@ -257,31 +257,31 @@ module Locked_block = struct
     Lwt.return header
 
   (* Will that block is compatible with the current checkpoint. *)
-  let acceptable chain_data hash (header : Block_header.t) =
-    let level, block = chain_data.checkpoint in
-    if level < header.shell.level then
+  let acceptable chain_data (header : Block_header.t) =
+    let checkpoint_level = chain_data.checkpoint.shell.level in
+    if checkpoint_level < header.shell.level then
       (* the predecessor is assumed compatible. *)
       Lwt.return_true
-    else if level = header.shell.level then
-      Lwt.return (Block_hash.equal hash block)
+    else if checkpoint_level = header.shell.level then
+      Lwt.return (Block_header.equal header chain_data.checkpoint)
     else (* header.shell.level < level *)
       (* valid only if the current head is lower than the checkpoint. *)
       let head_level =
         chain_data.data.current_head.header.shell.level in
-      Lwt.return (head_level < level)
+      Lwt.return (head_level < checkpoint_level)
 
   (* Is a block still valid for a given checkpoint ? *)
   let is_valid_for_checkpoint
-      block_store hash (header : Block_header.t) (level, block) =
-    if Compare.Int32.(header.shell.level < level) then
+      block_store hash (header : Block_header.t) (checkpoint : Block_header.t) =
+    if Compare.Int32.(header.shell.level < checkpoint.shell.level) then
       Lwt.return_true
     else
       predecessor_n block_store hash
         (Int32.to_int @@
-         Int32.sub header.shell.level level) >>= function
+         Int32.sub header.shell.level checkpoint.shell.level) >>= function
       | None -> assert false
       | Some pred ->
-          if Block_hash.equal pred block then
+          if Block_hash.equal pred (Block_header.hash checkpoint) then
             Lwt.return_true
           else
             Lwt.return_false
@@ -432,13 +432,11 @@ module Chain = struct
     let chain_store = Store.Chain.get data.global_store chain_id in
     let block_store = Store.Block.get chain_store
     and chain_data_store = Store.Chain_data.get chain_store in
-    let checkpoint = 0l, genesis.block in
     Store.Chain.Genesis_hash.store chain_store genesis.block >>= fun () ->
     Store.Chain.Genesis_time.store chain_store genesis.time >>= fun () ->
     Store.Chain.Genesis_protocol.store chain_store genesis.protocol >>= fun () ->
     Store.Chain_data.Current_head.store chain_data_store genesis.block >>= fun () ->
     Store.Chain_data.Known_heads.store chain_data_store genesis.block >>= fun () ->
-    Store.Chain_data.Checkpoint.store chain_data_store checkpoint >>= fun () ->
     begin
       match expiration with
       | None -> Lwt.return_unit
@@ -452,13 +450,14 @@ module Chain = struct
     end >>= fun () ->
     Locked_block.store_genesis
       block_store genesis commit >>= fun genesis_header ->
+    Store.Chain_data.Checkpoint.store chain_data_store genesis_header >>= fun () ->
     allocate
       ~genesis
       ~faked_genesis_hash:(Block_header.hash genesis_header)
       ~current_head:genesis.block
       ~expiration
       ~allow_forked_chain
-      ~checkpoint
+      ~checkpoint:genesis_header
       global_state
       data.context_index
       chain_data_store
@@ -553,7 +552,7 @@ module Chain = struct
       Lwt.return checkpoint
     end
 
-  let set_checkpoint chain_state ((level, _block) as checkpoint) =
+  let set_checkpoint chain_state checkpoint =
     Shared.use chain_state.block_store begin fun store ->
       Shared.use chain_state.chain_data begin fun data ->
         let head_header =
@@ -564,7 +563,7 @@ module Chain = struct
         assert valid ;
         (* Remove outdated invalid blocks. *)
         Store.Block.Invalid_block.iter store ~f: begin fun hash iblock ->
-          if iblock.level <= level then
+          if iblock.level <= checkpoint.shell.level then
             Store.Block.Invalid_block.remove store hash
           else
             Lwt.return_unit
@@ -574,14 +573,14 @@ module Chain = struct
           locked_valid_heads_for_checkpoint
             store data checkpoint >>= fun (valid_heads, invalid_heads) ->
           tag_invalid_heads store data.chain_data_store
-            invalid_heads level >>= fun outdated_invalid_heads ->
-          if head_header.shell.level < level then
+            invalid_heads checkpoint.shell.level >>= fun outdated_invalid_heads ->
+          if head_header.shell.level < checkpoint.shell.level then
             Lwt.return_unit
           else
             let outdated_valid_heads =
               List.filter
                 (fun (hash, { Block_header.shell } ) ->
-                   shell.level <= level &&
+                   shell.level <= checkpoint.shell.level &&
                    not (Block_hash.equal hash head_hash))
                 valid_heads in
             cut_alternate_heads store data.chain_data_store
@@ -598,9 +597,9 @@ module Chain = struct
       end
     end
 
-  let acceptable_block chain_state hash (header : Block_header.t) =
+  let acceptable_block chain_state (header : Block_header.t) =
     Shared.use chain_state.chain_data begin fun chain_data ->
-      Locked_block.acceptable chain_data hash header
+      Locked_block.acceptable chain_data header
     end
 
   let destroy state chain =
@@ -875,7 +874,7 @@ module Block = struct
             Lwt.return_false
           else
             Shared.use chain_state.chain_data begin fun chain_data ->
-              Locked_block.acceptable chain_data hash block_header
+              Locked_block.acceptable chain_data block_header
             end
         end >>= fun acceptable_block ->
         fail_unless
@@ -1120,7 +1119,7 @@ let fork_testchain block protocol expiration =
     return chain
   end
 
-let best_known_head_for_checkpoint chain_state (level, _ as checkpoint) =
+let best_known_head_for_checkpoint chain_state checkpoint =
   Shared.use chain_state.block_store begin fun store ->
     Shared.use chain_state.chain_data begin fun data ->
       let head_hash = data.data.current_head.hash in
@@ -1133,14 +1132,14 @@ let best_known_head_for_checkpoint chain_state (level, _ as checkpoint) =
         let find_valid_predecessor hash =
           Store.Block.Header.read_exn
             (store, hash) >>= fun header ->
-          if Compare.Int32.(header.shell.level < level) then
+          if Compare.Int32.(header.shell.level < checkpoint.shell.level) then
             Store.Block.Contents.read_exn
               (store, hash) >>= fun contents ->
             Lwt.return { hash ; contents ; chain_state ; header }
           else
             predecessor_n store hash
               (1 + (Int32.to_int @@
-                    Int32.sub header.shell.level level)) >>= function
+                    Int32.sub header.shell.level checkpoint.shell.level)) >>= function
             | None -> assert false
             | Some pred ->
                 Store.Block.Contents.read_exn
@@ -1309,3 +1308,28 @@ let close { global_data } =
     Store.close global_store ;
     Lwt.return_unit
   end
+
+let upgrade_0_0_1
+    ?(store_mapsize=4_096_000_000_000L)
+    ~store_root () =
+  Store.init ~mapsize:store_mapsize store_root >>=? fun global_store ->
+  Store.Chain.list global_store >>= fun chains ->
+  iter_s
+    begin fun chain_id ->
+      Format.eprintf "Upgrading checkpoint for chain %a...@." Chain_id.pp chain_id ;
+      let chain_store = Store.Chain.get global_store chain_id in
+      let block_store = Store.Block.get chain_store in
+      let chain_data_store = Store.Chain_data.get chain_store in
+      Store.Chain_data.Checkpoint_0_0_1.read_opt chain_data_store >>= function
+      | None ->
+          Store.Chain_data.Checkpoint_0_0_1.remove chain_data_store >>= fun () ->
+          return_unit
+      | Some (_level, hash) ->
+          Store.Block.Header.read (block_store, hash) >>=? fun header ->
+          Store.Chain_data.Checkpoint.store chain_data_store header >>= fun () ->
+          return_unit
+    end
+    chains >>=? fun () ->
+  Store.close global_store ;
+  return_unit
+

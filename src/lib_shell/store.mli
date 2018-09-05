@@ -93,6 +93,10 @@ module Chain_data : sig
 
   module Checkpoint : SINGLE_STORE
     with type t := store
+     and type value := Block_header.t
+
+  module Checkpoint_0_0_1 : SINGLE_STORE
+    with type t := store
      and type value := Int32.t * Block_hash.t
 
 end
