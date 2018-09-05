@@ -132,7 +132,7 @@ let new_blocks ~from_block ~to_block =
 
 let live_blocks block n =
   let rec loop bacc oacc chain_state block_head n =
-    Block.Header.all_operation_hashes chain_state block_head >>= fun hashes ->
+    Block.Header.all_operation_hashes block_head >>= fun hashes ->
     let oacc =
       List.fold_left
         (List.fold_left
@@ -141,7 +141,7 @@ let live_blocks block n =
     let bacc = Block_hash.Set.add (Block.Header.hash block_head) bacc in
     if n = 0 then Lwt.return (bacc, oacc)
     else
-      Block.Header.predecessor chain_state block_head >>= function
+      Block.Header.predecessor block_head >>= function
       | None -> Lwt.return (bacc, oacc)
       | Some predecessor -> loop bacc oacc chain_state predecessor (pred n) in
   loop
