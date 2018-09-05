@@ -287,26 +287,10 @@ let process sandbox verbosity checkpoint args =
       match checkpoint with
       | None -> return_none
       | Some s ->
-          match String.split ',' s with
-          | [ lvl ; block ] ->
-              Lwt.return (Block_hash.of_b58check block) >>=? fun block ->
-              begin
-                match Int32.of_string_opt lvl with
-                | None ->
-                    failwith "%s isn't a 32bit integer" lvl
-                | Some lvl ->
-                    return lvl
-              end >>=? fun lvl ->
-              return_some (lvl, block)
-          | [] -> assert false
-          | [_] ->
-              failwith "Checkoints are expected to follow the format \
-                        \"<level>,<block_hash>\". \
-                        The character ',' is not present in %s" s
-          | _ ->
-              failwith "Checkoints are expected to follow the format \
-                        \"<level>,<block_hash>\". \
-                        The character ',' is present more than once in %s" s
+          match Block_header.of_b58check s with
+          | Some b -> return_some b
+          | None ->
+              failwith "Failed to parse the provided checkpoint (Base58Check-encoded)."
     end >>=? fun checkpoint ->
     Lwt_lock_file.is_locked
       (lock_file config.data_dir) >>=? function

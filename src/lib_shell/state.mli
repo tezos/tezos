@@ -29,8 +29,8 @@
 
     - the index of validation contexts; and
     - the persistent state of the node:
-      - the blockchain and its alternate heads ;
-      - the pool of pending operations of a chain. *)
+    - the blockchain and its alternate heads ;
+    - the pool of pending operations of a chain. *)
 
 type t
 type global_state = t
@@ -89,7 +89,7 @@ module Chain : sig
   val expiration: chain_state -> Time.t option
   val allow_forked_chain: chain_state -> bool
 
-  val checkpoint: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+  val checkpoint: chain_state -> Block_header.t Lwt.t
 
   (** Update the current checkpoint. The current head should be
       consistent (i.e. it should either have a lower level or pass
@@ -98,16 +98,11 @@ module Chain : sig
       completely (when `level <= checkpoint`) or still tagged as
       invalid (when `level > checkpoint`). *)
   val set_checkpoint:
-    chain_state ->
-    Int32.t * Block_hash.t ->
-    unit Lwt.t
+    chain_state -> Block_header.t -> unit Lwt.t
 
   (** Check that a block is compatible with the current checkpoint.
       This function assumes that the predecessor is known valid. *)
-  val acceptable_block:
-    chain_state ->
-    Block_hash.t -> Block_header.t ->
-    bool Lwt.t
+  val acceptable_block: chain_state -> Block_header.t -> bool Lwt.t
 
 end
 
@@ -210,7 +205,7 @@ module Block : sig
   val predecessor: t -> block option Lwt.t
   val predecessor_n: t -> int -> Block_hash.t option Lwt.t
 
-  val is_valid_for_checkpoint: t -> (Int32.t * Block_hash.t) -> bool Lwt.t
+  val is_valid_for_checkpoint: t -> Block_header.t -> bool Lwt.t
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
@@ -255,9 +250,7 @@ val watcher: t -> Block.t Lwt_stream.t * Lwt_watcher.stopper
 (** Computes the block with the best fitness amongst the known blocks
     which are compatible with the given checkpoint. *)
 val best_known_head_for_checkpoint:
-  Chain.t ->
-  Int32.t * Block_hash.t ->
-  Block.t Lwt.t
+  Chain.t -> Block_header.t -> Block.t Lwt.t
 
 val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.seed -> Block_locator.t Lwt.t
 

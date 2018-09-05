@@ -170,14 +170,16 @@ let vblocks s =
 
 let build_example_tree chain =
   let vtbl = Hashtbl.create 23 in
-  Chain.genesis chain >>= fun genesis ->
-  Hashtbl.add vtbl "Genesis" genesis ;
-  let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ] in
-  build_valid_chain chain vtbl genesis c >>= fun () ->
-  let a2 = Hashtbl.find vtbl "A2" in
-  let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ] in
-  build_valid_chain chain vtbl a2 c >>= fun () ->
-  Lwt.return vtbl
+  Chain.genesis chain >>= function
+  | None -> assert false
+  | Some genesis ->
+      Hashtbl.add vtbl "Genesis" genesis ;
+      let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ] in
+      build_valid_chain chain vtbl genesis c >>= fun () ->
+      let a2 = Hashtbl.find vtbl "A2" in
+      let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ] in
+      build_valid_chain chain vtbl a2 c >>= fun () ->
+      Lwt.return vtbl
 
 let wrap_state_init f base_dir =
   begin
@@ -188,7 +190,7 @@ let wrap_state_init f base_dir =
       ~context_mapsize:4_096_000_000L
       ~store_root
       ~context_root
-      genesis >>=? fun (state, chain, _index) ->
+      genesis >>=? fun (state, chain, _index, _history_mode) ->
     build_example_tree chain >>= fun vblock ->
     f { state ; chain ; vblock } >>=? fun () ->
     return ()
@@ -209,30 +211,15 @@ does not prevent a future good block from correctly being reached
 
 (* test genesis/basic check point: (level_0, genesis_block) *)
 
-let test_checkpoint_genesis s =
-  Chain.genesis s.chain >>= fun genesis ->
-  let level = State.Block.level genesis in
-  if not (Block_hash.equal (State.Block.hash genesis) genesis_block)
-  then Assert.fail_msg "unexpected head";
-  (* set checkpoint at genesis *)
-  State.Chain.set_checkpoint s.chain (level, genesis_block) >>= fun () ->
-  State.Chain.checkpoint s.chain >>= fun (c_level, c_block) ->
-  (* if the level is equal and not the same hash then fail *)
-  if Int32.equal level c_level &&
-     not (Block_hash.equal c_block (State.Block.hash genesis))
-  then
-    Assert.fail_msg "unexpected checkpoint"
-  else
-    return ()
-
 let test_basic_checkpoint s =
   let block = vblock s "A1" in
-  let level = State.Block.level block in
-  let block_hash = State.Block.hash block in
-  State.Chain.set_checkpoint s.chain (level, block_hash) >>= fun () ->
-  State.Chain.checkpoint s.chain >>= fun (c_level, c_block) ->
-  if not (Block_hash.equal c_block block_hash) &&
-     Int32.equal c_level level
+  let header = State.Block.header block in
+  State.Chain.set_checkpoint s.chain header >>= fun () ->
+  State.Chain.checkpoint s.chain >>= fun checkpoint_header ->
+  let c_level = checkpoint_header.shell.level in
+  let c_block = Block_header.hash checkpoint_header in
+  if not (Block_hash.equal c_block (State.Block.hash block)) &&
+     Int32.equal c_level (State.Block.level block)
   then
     Assert.fail_msg "unexpected checkpoint"
   else return ()
@@ -250,15 +237,15 @@ let test_basic_checkpoint s =
 
 let test_acceptable_block s =
   let block = vblock s "A2" in
-  let level = State.Block.level block in
-  let block_hash = State.Block.hash block  in
-  State.Chain.set_checkpoint s.chain (level, block_hash) >>= fun () ->
+  let header = State.Block.header block in
+  (* let level = State.Block.level block in
+   * let block_hash = State.Block.hash block  in *)
+  State.Chain.set_checkpoint s.chain header >>= fun () ->
   (* it is accepted only if the current head is lower than the checkpoint *)
   let block_1 = vblock s "A1" in
-  let hash = State.Block.hash block_1 in
-  Chain.set_head s.chain block_1 >>= fun head ->
+  Chain.set_head s.chain block_1 >>=? fun head ->
   let header = State.Block.header head in
-  State.Chain.acceptable_block s.chain hash header >>= fun is_accepted_block ->
+  State.Chain.acceptable_block s.chain header >>= fun is_accepted_block ->
   if is_accepted_block
   then return ()
   else Assert.fail_msg "unacceptable block"
@@ -274,15 +261,16 @@ let test_acceptable_block s =
 
 let test_is_valid_checkpoint s =
   let block = vblock s "A2" in
-  let block_hash = State.Block.hash block in
-  let level = State.Block.level block in
-  State.Chain.set_checkpoint s.chain (level, block_hash) >>= fun () ->
-  State.Chain.checkpoint s.chain >>= fun (c_level, c_block) ->
+  let header = State.Block.header block in
+  (* let block_hash = State.Block.hash block in
+   * let level = State.Block.level block in *)
+  State.Chain.set_checkpoint s.chain header >>= fun () ->
+  State.Chain.checkpoint s.chain >>= fun checkpoint_header ->
   (* "b3" is valid because:
      a1 - a2 (checkpoint) - b1 - b2 - b3
      it is not valid when the checkpoint change to a pick different than a2.
   *)
-  State.Block.is_valid_for_checkpoint (vblock s "B3") (c_level, c_block) >>= fun is_valid ->
+  State.Block.is_valid_for_checkpoint (vblock s "B3") checkpoint_header >>= fun is_valid ->
   if is_valid
   then return ()
   else Assert.fail_msg "invalid checkpoint"
@@ -292,9 +280,7 @@ let test_is_valid_checkpoint s =
 
 let test_best_know_head_for_checkpoint s =
   let block = vblock s "A2" in
-  let block_hash = State.Block.hash block in
-  let level = State.Block.level block in
-  let checkpoint = level, block_hash in
+  let checkpoint = State.Block.header block in
   State.Chain.set_checkpoint s.chain checkpoint >>= fun () ->
   Chain.set_head s.chain (vblock s "B3") >>= fun _head ->
   State.best_known_head_for_checkpoint s.chain checkpoint >>= fun _block ->
@@ -313,9 +299,11 @@ let test_future_checkpoint s =
   let block = vblock s "A2" in
   let block_hash = State.Block.hash block in
   let level = State.Block.level block in
-  let checkpoint = level, block_hash in
-  State.Chain.set_checkpoint s.chain checkpoint >>= fun () ->
-  State.Chain.checkpoint s.chain >>= fun (c_level, c_block) ->
+  let header = State.Block.header block in
+  State.Chain.set_checkpoint s.chain header >>= fun () ->
+  State.Chain.checkpoint s.chain >>= fun checkpoint_header ->
+  let c_level = checkpoint_header.shell.level in
+  let c_block = Block_header.hash checkpoint_header in
   if Int32.equal c_level level && not (Block_hash.equal c_block block_hash)
   then Assert.fail_msg "unexpected checkpoint"
   else return ()
@@ -339,14 +327,16 @@ let test_future_checkpoint_bad_good_block s =
   let block = vblock s "A5" in
   let block_hash = State.Block.hash block in
   let level = State.Block.level block in
-  let checkpoint = level, block_hash in
-  State.Chain.set_checkpoint s.chain checkpoint >>= fun () ->
-  State.Chain.checkpoint s.chain >>= fun (c_level, c_block) ->
+  let header = State.Block.header block in
+  State.Chain.set_checkpoint s.chain header >>= fun () ->
+  State.Chain.checkpoint s.chain >>= fun checkpoint_header ->
+  let c_level = checkpoint_header.shell.level in
+  let c_block = Block_header.hash checkpoint_header in
   if Int32.equal c_level level && not (Block_hash.equal c_block block_hash)
   then Assert.fail_msg "unexpected checkpoint"
   else
     State.Block.is_valid_for_checkpoint
-      (vblock s "B2") (c_level, c_block) >>= fun is_valid ->
+      (vblock s "B2") checkpoint_header >>= fun is_valid ->
     if is_valid
     then return ()
     else Assert.fail_msg "invalid checkpoint"
@@ -374,10 +364,10 @@ let test_reach_checkpoint s =
   let block = vblock s "A1" in
   let block_hash = State.Block.hash block in
   let header = State.Block.header block in
-  let level = State.Block.level block in
-  let checkpoint = level, block_hash in
-  State.Chain.set_checkpoint s.chain checkpoint >>= fun () ->
-  State.Chain.checkpoint s.chain >>= fun (c_level, c_block) ->
+  State.Chain.set_checkpoint s.chain header >>= fun () ->
+  State.Chain.checkpoint s.chain >>= fun checkpoint_header ->
+  let c_level = checkpoint_header.shell.level in
+  let c_block = Block_header.hash checkpoint_header in
   let time_now = Time.now () in
   if Time.(add time_now 15L >= header.shell.timestamp)
   then
@@ -423,11 +413,12 @@ let test_reach_checkpoint s =
 *)
 
 let may_update_checkpoint chain_state new_head =
-  State.Chain.checkpoint chain_state >>= fun (old_level, _) ->
+  State.Chain.checkpoint chain_state >>= fun checkpoint_header ->
   (* FIXME: the new level is always return 0l even
      if the new_head is A4 at level 4l
      Or TODO: set a level where allow to have a fork
   *)
+  let old_level = checkpoint_header.shell.level in
   let new_level = State.Block.last_allowed_fork_level new_head in
   if new_level <= old_level then
     Lwt.return_unit
@@ -436,16 +427,15 @@ let may_update_checkpoint chain_state new_head =
     State.Block.predecessor_n new_head
       (Int32.to_int (Int32.sub head_level new_level)) >>= function
     | None -> Assert.fail_msg "Unexpected None in predecessor query"
-    | Some new_block ->
-        State.Chain.set_checkpoint chain_state (new_level, new_block)
+    | Some hash ->
+        State.Block.read_exn chain_state hash >>= fun b ->
+        State.Chain.set_checkpoint chain_state (State.Block.header b)
 
 let test_may_update_checkpoint s =
   let block = vblock s "A3" in
-  let block_hash = State.Block.hash block in
-  let level = State.Block.level block in
-  let checkpoint = level, block_hash in
+  let checkpoint = State.Block.header block in
   State.Chain.set_checkpoint s.chain checkpoint >>= fun () ->
-  State.Chain.checkpoint s.chain >>= fun (_, _) ->
+  State.Chain.checkpoint s.chain >>= fun _ ->
   Chain.set_head s.chain (vblock s "A4") >>= fun _ ->
   Chain.head s.chain >>= fun head ->
   may_update_checkpoint s.chain head >>= fun () ->
@@ -476,22 +466,17 @@ let note_may_update_checkpoint chain_state checkpoint =
 let test_note_may_update_checkpoint s =
   (* set checkpoint at (2l, A2) *)
   let block = vblock s "A2" in
-  let block_hash = State.Block.hash block in
-  let level = State.Block.level block in
-  let checkpoint = level, block_hash in
-  State.Chain.set_checkpoint s.chain checkpoint >>= fun () ->
+  let header = State.Block.header block in
+  State.Chain.set_checkpoint s.chain header >>= fun () ->
   (* set new checkpoint at (3l, A3) *)
-  let block = vblock s "A3" in
-  let block_hash = State.Block.hash block in
-  let level = State.Block.level block in
-  let checkpoint = level, block_hash in
-  note_may_update_checkpoint s.chain (Some checkpoint) >>= fun () ->
+  let new_block = vblock s "A3" in
+  let new_header = State.Block.header new_block in
+  note_may_update_checkpoint s.chain (Some new_header) >>= fun () ->
   return ()
 
 (**********************************************************)
 
 let tests: (string * (state -> unit tzresult Lwt.t)) list = [
-  "checkpoint genesis", test_checkpoint_genesis;
   "basic checkpoint", test_basic_checkpoint;
   "is valid checkpoint", test_is_valid_checkpoint;
   "acceptable block", test_acceptable_block ;

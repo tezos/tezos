@@ -52,25 +52,26 @@ type t = {
 
 let operations_index_tag = Tag.def ~doc:"Operations index" "operations_index" Format.pp_print_int
 
-let assert_acceptable_header pipeline
-    hash (header : Block_header.t) =
+let assert_acceptable_header pipeline hash (header : Block_header.t) =
   let chain_state = Distributed_db.chain_state pipeline.chain_db in
   let time_now = Time.now () in
   fail_unless
     (Time.(add time_now 15L >= header.shell.timestamp))
-    (Future_block_header { block = hash; time = time_now;
+    (Future_block_header { block = hash ;
+                           time = time_now ;
                            block_time = header.shell.timestamp }) >>=? fun () ->
-  State.Chain.checkpoint chain_state >>= fun (checkpoint_level, checkpoint) ->
+  State.Chain.checkpoint chain_state >>= fun checkpoint ->
   fail_when
-    (Int32.equal header.shell.level checkpoint_level &&
-     not (Block_hash.equal checkpoint hash))
+    (Int32.equal header.shell.level checkpoint.shell.level &&
+     not (Block_header.equal checkpoint header))
     (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
   Chain.head chain_state >>= fun head ->
-  let checkpoint_reached = (State.Block.header head).shell.level >= checkpoint_level in
+  let checkpoint_reached =
+    (State.Block.header head).shell.level >= checkpoint.shell.level in
   if checkpoint_reached then
     (* If reached the checkpoint, every block before the checkpoint
        must be part of the chain. *)
-    if header.shell.level <= checkpoint_level then
+    if header.shell.level <= checkpoint.shell.level then
       Chain.mem chain_state hash >>= fun in_chain ->
       fail_unless in_chain
         (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->

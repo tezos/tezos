@@ -25,7 +25,7 @@
 
 type t = string
 
-let data_version = "0.0.1"
+let data_version = "0.0.2"
 
 let default_identity_file_name = "identity.json"
 
