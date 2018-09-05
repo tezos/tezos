@@ -23,57 +23,72 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  if Filename.basename Sys.argv.(0) = Updater.compiler_name then begin
-    try
-      Tezos_protocol_compiler.Compiler.main
-        Tezos_protocol_compiler_native.Native.driver ;
-      Pervasives.exit 0
-    with exn ->
-      Format.eprintf "%a\n%!" Opterrors.report_error exn;
-      Pervasives.exit 1
-  end
+let (//) = Filename.concat
 
-let term =
-  let open Cmdliner.Term in
-  ret (const (`Help (`Pager, None)))
+(** Main *)
 
-let description = [
-  `S "DESCRIPTION" ;
-  `P "Entry point for initializing, configuring and running a Tezos node." ;
-  `P Node_identity_command.Manpage.command_description ;
-  `P Node_run_command.Manpage.command_description ;
-  `P Node_config_command.Manpage.command_description ;
-  `P Node_snapshot_command.Manpage.command_description ;
-  `P Node_upgrade_command.Manpage.command_description ;
-]
+module Term = struct
 
-let man =
-  description @
-  Node_run_command.Manpage.examples
+  let process data_dir config_file =
+    let run =
+      begin
+        match data_dir with
+        | Some data_dir -> return data_dir
+        | None ->
+            match config_file with
+            | None ->
+                let default_config =
+                  Node_config_file.default_data_dir // "config.json" in
+                if Sys.file_exists default_config then
+                  Node_config_file.read default_config >>=? fun cfg ->
+                  return cfg.data_dir
+                else
+                  return Node_config_file.default_data_dir
+            | Some config_file ->
+                Node_config_file.read config_file >>=? fun cfg ->
+                return cfg.data_dir
+      end >>=? fun data_dir ->
+      begin
+        trace (failure "Fail to lock the data directory. Is a `tezos-node` running?") @@
+        Lwt_lock_file.create
+          ~unlink_on_exit:true (Node_data_version.lock_file data_dir)
+      end >>=? fun () ->
+      Node_data_version.upgrade_data_dir data_dir in
+    match Lwt_main.run run with
+    | Ok () -> `Ok ()
+    | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
 
-let info =
-  let version =
-    Tezos_base.Current_git_info.abbreviated_commit_hash ^
-    " ("^Tezos_base.Current_git_info.committer_date^")" in
-  Cmdliner.Term.info
-    ~doc:"The Tezos node"
-    ~man
-    ~version
-    "tezos-node"
+  let term =
+    Cmdliner.Term.(ret (const process
+                        $ Node_shared_arg.Term.data_dir
+                        $ Node_shared_arg.Term.config_file))
 
-let commands = [
-  Node_run_command.cmd ;
-  Node_config_command.cmd ;
-  Node_identity_command.cmd ;
-  Node_snapshot_command.cmd ;
-  Node_upgrade_command.cmd ;
-]
+end
 
-let () =
-  Random.self_init () ;
-  match Cmdliner.Term.eval_choice (term, info) commands with
-  | `Error _ -> exit 1
-  | `Help -> exit 0
-  | `Version -> exit 1
-  | `Ok () -> exit 0
+module Manpage = struct
+
+  let command_description =
+    "The $(b,upgrade_storage) command is meant to manage upgrades \
+     in the node disk storage."
+
+  let description = [
+    `S "DESCRIPTION" ;
+    `P command_description ;
+  ]
+
+  let man =
+    description @
+    (* [ `S misc_docs ] @ *)
+    Node_shared_arg.Manpage.bugs
+
+  let info =
+    Cmdliner.Term.info
+      ~doc: "Upgrade of the node disk storage if needed"
+      ~man
+      "upgrade_storage"
+
+end
+
+let cmd =
+  Term.term, Manpage.info
+

@@ -23,9 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let (//) = Filename.concat
+
 type t = string
 
 let data_version = "0.0.2"
+
+let upgradable_data_version = []
+
+let store_dir data_dir = data_dir // "store"
+let context_dir data_dir = data_dir // "context"
+let protocol_dir data_dir = data_dir // "protocol"
+let lock_file data_dir = data_dir // "lock"
 
 let default_identity_file_name = "identity.json"
 
@@ -39,6 +48,7 @@ type error += Invalid_data_dir_version of t * t
 type error += Invalid_data_dir of string
 type error += No_data_dir_version_file of string
 type error += Could_not_read_data_dir_version of string
+type error += Data_dir_need_upgrade of { expected: t ; actual: t }
 
 let () =
   register_error_kind
@@ -63,8 +73,10 @@ let () =
     ~description: "The data directory version was not the one that was expected"
     ~pp:(fun ppf (exp, got) ->
         Format.fprintf ppf
-          "Invalid data directory version '%s' (expected '%s')."
-          got exp)
+          "Invalid data directory version '%s' (expected '%s').\
+           \
+          \ You may use '%s upgrade_storage' to upgrade the disk storage."
+          got exp Sys.argv.(0))
     Data_encoding.(obj2
                      (req "expected_version" string)
                      (req "actual_version" string))
@@ -98,7 +110,25 @@ let () =
           \ but the file does not exist."
           path)
     (function No_data_dir_version_file path -> Some path | _ -> None)
-    (fun path -> No_data_dir_version_file path)
+    (fun path -> No_data_dir_version_file path) ;
+  register_error_kind
+    `Permanent
+    ~id: "dataDirNeedUpgrade"
+    ~title: "The data directory need to be upgraded"
+    ~description: "The data directory need to be upgraded"
+    ~pp:(fun ppf (exp, got) ->
+        Format.fprintf ppf
+          "The data directory version is too old (%s, expected %s).\n\
+           It need to be upgraded with `tezos-node upgrade`."
+          got exp)
+    Data_encoding.(obj2
+                     (req "expected_version" string)
+                     (req "actual_version" string))
+    (function
+      | Data_dir_need_upgrade { expected ; actual } ->
+          Some (expected, actual)
+      | _ -> None)
+    (fun (expected, actual) -> Data_dir_need_upgrade { expected ; actual })
 
 let version_file data_dir =
   (Filename.concat data_dir version_file_name)
@@ -113,16 +143,23 @@ let check_data_dir_version data_dir =
     try return (Data_encoding.Json.destruct version_encoding json)
     with _ -> fail (Could_not_read_data_dir_version version_file)
   end >>=? fun version ->
-  fail_unless
-    (String.equal data_version version)
-    (Invalid_data_dir_version (data_version, version)) >>=? fun () ->
-  return_unit
+  if String.equal version data_version then
+    return_none
+  else
+    match
+      List.find_opt (fun (v, _) -> String.equal v version) upgradable_data_version
+    with
+    | Some f -> return_some f
+    | None ->
+        fail (Invalid_data_dir_version (data_version, version))
+
+let write_version data_dir =
+  Lwt_utils_unix.Json.write_file
+    (version_file data_dir)
+    (Data_encoding.Json.construct version_encoding data_version)
 
 let ensure_data_dir data_dir =
-  let write_version () =
-    Lwt_utils_unix.Json.write_file
-      (version_file data_dir)
-      (Data_encoding.Json.construct version_encoding data_version) in
+  let write_version () = write_version data_dir >>=? fun () -> return_none in
   try if Sys.file_exists data_dir then
       match Sys.readdir data_dir with
       | [||] -> write_version ()
@@ -134,3 +171,27 @@ let ensure_data_dir data_dir =
     end
   with Sys_error _ | Unix.Unix_error _ ->
     fail (Invalid_data_dir data_dir)
+
+let upgrade_data_dir data_dir =
+  ensure_data_dir data_dir >>=? function
+  | None ->
+      Format.printf "Node data dir is up-to-date.@." ;
+      return_unit
+  | Some (version, upgrade) ->
+      Format.printf
+        "Upgrading node data dir from %s to %s...@."
+        version data_version ;
+      upgrade
+        ~store_dir:(store_dir data_dir)
+        ~context_dir:(context_dir data_dir)
+        ~protocol_dir:(protocol_dir data_dir) >>=? fun () ->
+      write_version data_dir >>=? fun () ->
+      Format.printf "The node data dir is now up-to-date!@." ;
+      write_version data_dir
+
+let ensure_data_dir data_dir =
+  ensure_data_dir data_dir >>=? function
+  | None -> return_unit
+  | Some (version, _) ->
+      fail (Data_dir_need_upgrade { expected = data_version ;
+                                    actual = version })
