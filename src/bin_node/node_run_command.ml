@@ -73,10 +73,17 @@ let () =
 
 let (//) = Filename.concat
 
-let store_dir data_dir = data_dir // "store"
-let context_dir data_dir = data_dir // "context"
-let protocol_dir data_dir = data_dir // "protocol"
-let lock_file data_dir = data_dir // "lock"
+let find_log_rules default =
+  match Option.try_with (fun () -> Sys.getenv "TEZOS_LOG"),
+        Option.try_with (fun () -> Sys.getenv "LWT_LOG")
+  with
+  | Some rules, None -> "environment variable TEZOS_LOG", Some rules
+  | None, Some rules -> "environment variable LWT_LOG", Some rules
+  | None, None -> "configuration file", default
+  | Some rules, Some _ ->
+      warn "Both environment variables TEZOS_LOG and LWT_LOG \
+            defined, using TEZOS_LOG." ;
+      "environment varible TEZOS_LOG", Some rules
 
 let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   let patch_context json ctxt =
@@ -180,8 +187,8 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   let node_config : Node.config = {
     genesis ;
     patch_context = Some (patch_context sandbox_param) ;
-    store_root = store_dir config.data_dir ;
-    context_root = context_dir config.data_dir ;
+    store_root = Node_data_version.store_dir config.data_dir ;
+    context_root = Node_data_version.context_dir config.data_dir ;
     p2p = p2p_config ;
     test_chain_max_tll = Some (48 * 3600) ; (* 2 days *)
     checkpoint ;
@@ -252,14 +259,14 @@ let init_signal () =
 let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   Lwt_lock_file.create
-    ~unlink_on_exit:true (lock_file config.data_dir) >>=? fun () ->
+    ~unlink_on_exit:true (Node_data_version.lock_file config.data_dir) >>=? fun () ->
   init_signal () ;
   let log_cfg =
     match verbosity with
     | None -> config.log
     | Some default_level -> { config.log with default_level } in
   Logging_unix.init ~cfg:log_cfg () >>= fun () ->
-  Updater.init (protocol_dir config.data_dir) ;
+  Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
   init_node ?sandbox ?checkpoint config >>=? fun node ->
   init_rpc config.rpc node >>=? fun rpc ->
@@ -318,7 +325,7 @@ let process sandbox verbosity checkpoint args =
                         The character ',' is present more than once in %s" s
     end >>=? fun checkpoint ->
     Lwt_lock_file.is_locked
-      (lock_file config.data_dir) >>=? function
+      (Node_data_version.lock_file config.data_dir) >>=? function
     | false ->
         Lwt.catch
           (fun () -> run ?sandbox ?verbosity ?checkpoint config)
