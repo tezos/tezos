@@ -170,17 +170,19 @@ let with_activated_peer_validator w peer_id f =
       | Worker_types.Launching _ -> return_unit
 
 let may_update_checkpoint chain_state new_head =
-  State.Chain.checkpoint chain_state >>= fun (old_level, _old_block) ->
+  State.Chain.checkpoint chain_state >>= fun old_checkpoint ->
   let new_level = State.Block.last_allowed_fork_level new_head in
-  if new_level <= old_level then
+  if new_level <= old_checkpoint.shell.level then
     Lwt.return_unit
   else
     let head_level = State.Block.level new_head in
-    State.Block.predecessor_n new_head
-      (Int32.to_int (Int32.sub head_level new_level)) >>= function
+    State.Block.Header.read_opt
+      chain_state
+      ~pred:(Int32.to_int (Int32.sub head_level new_level))
+      (State.Block.hash new_head) >>= function
     | None -> Lwt.return_unit (* should not happen *)
     | Some new_block ->
-        State.Chain.set_checkpoint chain_state (new_level, new_block)
+        State.Chain.set_checkpoint chain_state (State.Block.Header.header new_block)
 
 let may_switch_test_chain w active_chains spawn_child block =
   let nv = Worker.state w in
@@ -576,18 +578,18 @@ let assert_fitness_increases ?(force = false) w distant_header =
        (State.Block.fitness local_header) <= 0)
     (failure "Fitness too low")
 
-let assert_checkpoint w hash (header: Block_header.t) =
+let assert_checkpoint w (header: Block_header.t) =
   let pv = Worker.state w in
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Chain.acceptable_block chain_state hash header >>= fun acceptable ->
+  State.Chain.acceptable_block chain_state header >>= fun acceptable ->
   fail_unless acceptable
-    (Validation_errors.Checkpoint_error (hash, None))
+    (Validation_errors.Checkpoint_error (Block_header.hash header, None))
 
 let validate_block w ?force hash block operations =
   let nv = Worker.state w in
   assert (Block_hash.equal hash (Block_header.hash block)) ;
   assert_fitness_increases ?force w block >>=? fun () ->
-  assert_checkpoint w hash block >>=? fun () ->
+  assert_checkpoint w block >>=? fun () ->
   Block_validator.validate
     ~canceler:(Worker.canceler w)
     ~notify_new_block:(notify_new_block w)
