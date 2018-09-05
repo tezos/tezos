@@ -29,7 +29,11 @@ type t = string
 
 let data_version = "0.0.2"
 
-let upgradable_data_version = []
+let upgradable_data_version = [
+  "0.0.1", begin fun ~store_root ~context_root:_ ~protocol_root:_ ->
+    State.upgrade_0_0_1 ~store_root ()
+  end ;
+]
 
 let store_dir data_dir = data_dir // "store"
 let context_dir data_dir = data_dir // "context"
@@ -182,9 +186,9 @@ let upgrade_data_dir data_dir =
         "Upgrading node data dir from %s to %s...@."
         version data_version ;
       upgrade
-        ~store_dir:(store_dir data_dir)
-        ~context_dir:(context_dir data_dir)
-        ~protocol_dir:(protocol_dir data_dir) >>=? fun () ->
+        ~store_root:(store_dir data_dir)
+        ~context_root:(context_dir data_dir)
+        ~protocol_root:(protocol_dir data_dir) >>=? fun () ->
       write_version data_dir >>=? fun () ->
       Format.printf "The node data dir is now up-to-date!@." ;
       write_version data_dir
