@@ -36,11 +36,6 @@ module Shared = struct
     Lwt_mutex.with_lock lock (fun () -> f data)
 end
 
-type hashed_header = {
-  header: Block_header.t ;
-  hash: Block_hash.t ;
-}
-
 type genesis = {
   time: Time.t ;
   block: Block_hash.t ;
@@ -99,6 +94,11 @@ and block = {
   header: Block_header.t ;
 }
 
+and hashed_header = {
+  chain_state: chain_state ;
+  hash: Block_hash.t ;
+  header: Block_header.t ;
+}
 
 let read_chain_data { chain_data } f =
   Shared.use chain_data begin fun state ->
@@ -645,8 +645,9 @@ module Block = struct
   module Header = struct
 
     type t = hashed_header = {
-      header: Block_header.t ;
+      chain_state: chain_state ;
       hash: Block_hash.t ;
+      header: Block_header.t ;
     }
     type block_header = t
 
@@ -677,7 +678,7 @@ module Block = struct
             | Some hash -> return hash
         end >>=? fun hash ->
         Store.Block.Header.read (store, hash) >>=? fun header ->
-        return { header ; hash }
+        return { chain_state ; hash ; header }
       end
     let read_opt chain_state ?pred hash =
       read chain_state ?pred hash >>= function
@@ -694,25 +695,26 @@ module Block = struct
             | Some hash -> Lwt.return hash
         end >>= fun hash ->
         Store.Block.Header.read_exn (store, hash) >>= fun header ->
-        Lwt.return { header ; hash }
+        Lwt.return { chain_state ; hash ; header }
       end
 
-    let of_block ( { hash ; header } : block ) : t = { hash ; header }
-    let to_block chain_state ( { hash ; header } : t ) : block option Lwt.t =
+    let of_block ( { chain_state ; hash ; header } : block ) : t =
+      { chain_state ; header ; hash }
+    let to_block ( { chain_state ; hash ; header } : t ) : block option Lwt.t =
       Shared.use chain_state.block_store begin fun store ->
         Store.Block.Contents.read_opt (store, hash) >>= function
         | Some contents -> Lwt.return_some { chain_state ; hash ; contents ; header }
         | None -> Lwt.return_none
       end
 
-    let all_operation_hashes chain_state { hash ; header } =
+    let all_operation_hashes { chain_state ; hash ; header } =
       Shared.use chain_state.block_store begin fun store ->
         Lwt_list.map_p
           (Store.Block.Operation_hashes.read_exn (store, hash))
           (0 -- (header.Block_header.shell.validation_passes - 1))
       end
 
-    let predecessor chain_state { hash ; header } =
+    let predecessor { chain_state ; hash ; header } =
       if Block_hash.equal hash header.Block_header.shell.predecessor then
         Lwt.return_none           (* we are at genesis *)
       else
