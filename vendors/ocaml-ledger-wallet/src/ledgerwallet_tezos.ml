@@ -10,7 +10,7 @@ module Version = struct
   type app_class = Tezos | TezBake
   let pp_app_class ppf = function
     | Tezos -> Format.pp_print_string ppf "Tezos Wallet"
-    | TezBake -> Format.pp_print_string ppf "Tezos Baker"
+    | TezBake -> Format.pp_print_string ppf "Tezos Baking"
 
     let class_of_int = function
     | 0 -> Tezos
