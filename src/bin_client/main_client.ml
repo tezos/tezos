@@ -97,7 +97,7 @@ let check_network ctxt =
       default () ;
       Lwt.return_none
   | Ok versions ->
-      match String.split_on_char '_' (List.hd versions).name with
+      match String.split_on_char '_' (P2p_version.best versions).name with
       | "SANDBOXED" :: _ ->
           sandbox () ;
           Lwt.return_some `Sandbox

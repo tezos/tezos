@@ -23,16 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Protocol version *)
+(** Network protocol version. *)
 
+(** Type of a network protocol version. *)
 type t = {
   name : string ;
   major : int ;
   minor : int ;
 }
-(** Type of a protocol version. *)
 
 val pp : Format.formatter -> t -> unit
 val encoding : t Data_encoding.t
+
+(** Selects the prefered common version for a pair of version
+    lists. Used during network protocol negociation. If any, it is the
+    maximum one, in lexicographic order (name, then major, minor). *)
 val common : t list -> t list -> t option
+
+(** Gives the prefered version in a list: the one selected by
+    {!common} among the list of compatible ones. *)
+val best : t list -> t
 
