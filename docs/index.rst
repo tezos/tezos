@@ -17,7 +17,7 @@ protocol and the nodes should adapt and upgrade.
 
  - Developer documentation is available online at https://tezos.gitlab.io/master
    The documentation is automatically generated for the master branch and the
-   three official network branches `betanet <https://tezos.gitlab.io/betanet>`_,
+   three official network branches `mainnet <https://tezos.gitlab.io/mainnet>`_,
    `alphanet <https://tezos.gitlab.io/alphanet>`_,
    `zeronet <https://tezos.gitlab.io/zeronet>`_. Make sure you are
    consulting the right API version.
@@ -49,22 +49,18 @@ The Community
 The Networks
 ------------
 
-.. _betanet:
+.. _mainnet:
 
-Betanet
+Mainnet
 ~~~~~~~
 
-The Tezos Beta (experimental) network is the current incarnation of
-the Tezos blockchain.
+The Tezos network is the current incarnation of the Tezos blockchain.
 It runs with real tez that have been allocated to the
 donors of July 2017 ICO (see :ref:`activate_fundraiser_account`).
-It is the step before the full Tezos mainnet, with a `few caveats
-<https://tezosfoundation.ch/news/tezos-betanet-expectations>`_.
 
-The Tezos Beta (experimental) network has been live and open since
-`June 30th 2018 <https://tezosfoundation.ch/news/tezos-betanet-launch>`_.
+The Tezos network has been live and open since June 30th 2018.
 
-All the instructions in this documentation are valid for Betanet
+All the instructions in this documentation are valid for Mainnet
 however we **strongly** encourage users to first try all the
 introduction tutorials on Alphanet to familiarize themselves without
 risks.
@@ -77,7 +73,7 @@ Alphanet
 Tezos Alphanet is a test network for the Tezos blockchain with a
 faucet to obtain free tez (see :ref:`faucet`).
 It is updated and rebooted rarely and it is running the same code as
-the Betanet.
+the Mainnet.
 It is the reference network for developers wanting to test their
 software before going to beta and for users who want to familiarize
 themselves with Tezos before using their real tez.
@@ -95,7 +91,7 @@ Zeronet
 Zeronet is the most cutting-edge development network of Tezos. It is
 restarted without notice, possibly several times a day.
 This network is mostly used internally by the Tezos developers and may
-have *different constants* that Alphanet or Betanet, for example it
+have *different constants* that Alphanet or Mainnet, for example it
 has shorter cycles and a shorter interval between blocks.
 We offer no support for the Zeronet.
 
