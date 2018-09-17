@@ -344,8 +344,8 @@ let rawtxn_of_txn : type a. a txn -> rawtxn = function
 external txn_begin :
   t -> int -> rawtxn option -> (rawtxn, int) result = "stub_mdb_txn_begin"
 
-let create_rw_txn ?(sync=true) ?(metasync=true) ?parent t =
-  let flags = match sync, metasync with
+let create_rw_txn ?(nosync=false) ?(nometasync=false) ?parent t =
+  let flags = match nosync, nometasync with
     | true, true -> int_of_flags_env [NoSync; NoMetaSync]
     | true, false -> int_of_flag_env NoSync
     | false, true -> int_of_flag_env NoMetaSync
@@ -354,8 +354,8 @@ let create_rw_txn ?(sync=true) ?(metasync=true) ?parent t =
   | Error i -> Error (error_of_int i)
   | Ok tx -> Ok (Txn_rw tx)
 
-let create_ro_txn ?(sync=true) ?(metasync=true) ?parent t =
-  let flags = match sync, metasync with
+let create_ro_txn ?(nosync=false) ?(nometasync=false) ?parent t =
+  let flags = match nosync, nometasync with
     | true, true -> int_of_flags_env [RdOnly; NoSync; NoMetaSync]
     | true, false -> int_of_flags_env [RdOnly; NoSync]
     | false, true -> int_of_flags_env [RdOnly; NoMetaSync]
@@ -420,8 +420,8 @@ external db_drop :
 let db_drop txn dbi =
   return (db_drop (rawtxn_of_txn txn) dbi false) ()
 
-let with_ro_db ?sync ?metasync ?parent ?flags ?name t ~f =
-  create_ro_txn ?sync ?metasync ?parent t >>= fun txn ->
+let with_ro_db ?nosync ?nometasync ?parent ?flags ?name t ~f =
+  create_ro_txn ?nosync ?nometasync ?parent t >>= fun txn ->
   opendb ?flags ?name txn >>= fun db ->
   match f txn db with
   | exception exn ->
@@ -434,8 +434,8 @@ let with_ro_db ?sync ?metasync ?parent ?flags ?name t ~f =
     abort_txn txn ;
     Error err
 
-let with_rw_db ?sync ?metasync ?parent ?flags ?name t ~f =
-  create_rw_txn ?sync ?metasync ?parent t >>= fun txn ->
+let with_rw_db ?nosync ?nometasync ?parent ?flags ?name t ~f =
+  create_rw_txn ?nosync ?nometasync ?parent t >>= fun txn ->
   opendb ?flags ?name txn >>= fun db ->
   match f txn db with
   | exception exn ->
