@@ -30,23 +30,11 @@ let disable_disclaimer =
   | Some ("yes" | "y" | "YES" | "Y") -> true
   | _ -> false
 
-let default () =
-  if not disable_disclaimer then
-    Format.eprintf
-      "@[<v 2>@{<warning>@{<title>Warning@}@}@,@,\
-      \                       This is @{<warning>NOT@} the Tezos Mainnet.@,\
-      \                    The Tezos Mainnet is not yet released.@,\
-       @,\
-      \                 Use your fundraiser keys @{<warning>AT YOUR OWN RISK@}.@,\
-       All transactions happening on the Betanet @{<warning>are expected to be valid in the Mainnet@}.@,\
-      \        In doubt, we recommend that you wait for the lunch of the Mainnet.@]@\n@."
-
 let zeronet () =
   if not disable_disclaimer then
     Format.eprintf
       "@[<v 2>@{<warning>@{<title>Warning@}@}@,@,\
       \               This is @{<warning>NOT@} the Tezos Mainnet.@,\
-      \            The Tezos Mainnet is not yet released.@,\
        @,\
       \    The node you are connecting to claims to be running on the@,\
       \               @{<warning>Tezos Zeronet DEVELOPMENT NETWORK@}.@,\
@@ -58,34 +46,27 @@ let alphanet () =
     Format.eprintf
       "@[<v 2>@{<warning>@{<title>Warning@}@}@,@,\
       \               This is @{<warning>NOT@} the Tezos Mainnet.@,\
-      \            The Tezos Mainnet is not yet released.@,\
        @,\
       \   The node you are connecting to claims to be running on the@,\
       \             @{<warning>Tezos Alphanet DEVELOPMENT NETWORK.@}@,\
       \        Do @{<warning>NOT@} use your fundraiser keys on this network.@,\
       \        Alphanet is a testing network, with free tokens.@]@\n@."
 
-let betanet () =
+let mainnet () =
   if not disable_disclaimer then
     Format.eprintf
-      "@[<v 2>@{<warning>@{<title>Warning@}@}@,@,\
-      \                         This is @{<warning>NOT@} the Tezos Mainnet.@,\
-      \                      The Tezos Mainnet is not yet released.@,\
-       @,\
-      \            The node you are connecting to claims to be running on the@,\
-      \                      @{<warning>Tezos Betanet EXPERIMENTAL NETWORK@}.@,\
-      \    Betanet is a pre-release experimental network and comes with no warranty.@,\
-      \            Use your fundraiser keys on this network @{<warning>AT YOUR OWN RISK@}.@,\
-      \  All transactions happening on the Betanet @{<warning>are expected to be valid in the Mainnet@}.@,\
-      \          If in doubt, we recommend that you wait for the Mainnet lunch.@]@\n@."
+      "@[<v 2>@{<warning>@{<title>Disclaimer@}@}@,\
+       The  Tezos  network  is  a  new  blockchain technology.@,\
+       Users are  solely responsible  for any risks associated@,\
+       with usage of the Tezos network.  Users should do their@,\
+       own  research to determine  if Tezos is the appropriate@,\
+       platform for their needs and should apply judgement and@,\
+       care in their network interactions.@]@\n@."
 
 let sandbox () =
   if not disable_disclaimer then
     Format.eprintf
       "@[<v 2>@{<warning>@{<title>Warning@}@}@,@,\
-      \             This is @{<warning>NOT@} the Tezos Mainnet.@,\
-      \          The Tezos Mainnet is not yet released.@,\
-       @,\
       \ The node you are connecting to claims to be running in a@,\
       \                  @{<warning>Tezos TEST SANDBOX@}.@,\
       \    Do @{<warning>NOT@} use your fundraiser keys on this network.@,\
@@ -94,7 +75,6 @@ let sandbox () =
 let check_network ctxt =
   Shell_services.P2p.versions ctxt >>= function
   | Error _ ->
-      default () ;
       Lwt.return_none
   | Ok versions ->
       match String.split_on_char '_' (P2p_version.best versions).name with
@@ -108,10 +88,9 @@ let check_network ctxt =
           alphanet () ;
           Lwt.return_some `Alphanet
       | "TEZOS" :: "BETANET" :: _date :: [] ->
-          betanet () ;
-          Lwt.return_some `Betanet
+          mainnet () ;
+          Lwt.return_some `Mainnet
       | _ ->
-          default () ;
           Lwt.return_none
 
 let get_commands_for_version ctxt network block protocol =

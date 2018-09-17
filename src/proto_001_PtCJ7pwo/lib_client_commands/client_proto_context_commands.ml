@@ -359,7 +359,7 @@ let commands version () =
         return_unit
       end;
   ] @
-  (if version = (Some `Betanet) then [] else [
+  (if version = (Some `Mainnet) then [] else [
       command ~group ~desc:"Register and activate an Alphanet/Zeronet faucet account."
         (args2
            (Secret_key.force_switch ())
@@ -389,7 +389,7 @@ let commands version () =
                return_unit
         );
     ]) @
-  (if version <> Some `Betanet then [] else [
+  (if version <> Some `Mainnet then [] else [
       command ~group ~desc:"Activate a fundraiser account."
         (args1 dry_run_switch)
         (prefixes [ "activate" ; "fundraiser" ; "account" ]
