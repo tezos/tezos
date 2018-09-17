@@ -24,5 +24,5 @@
 (*****************************************************************************)
 
 val commands:
-  [`Zeronet | `Alphanet | `Betanet | `Sandbox] option ->
+  [`Zeronet | `Alphanet | `Mainnet | `Sandbox] option ->
   Client_context.io_wallet Clic.command list
