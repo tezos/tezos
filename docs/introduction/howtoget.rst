@@ -24,7 +24,7 @@ architecture **x86_64**.
 Although we only officially support Linux, the script has been tested
 with success in the past on windows/mac/linux.
 
-The same script can be used to run Alphanet, Betanet or Zeronet, it
+The same script can be used to run Mainnet, Alphanet or Zeronet, it
 suffices to rename it as it downloads a different image based on its
 name.
 For example, to run Alphanet:
@@ -34,12 +34,12 @@ For example, to run Alphanet:
     wget https://gitlab.com/tezos/tezos/raw/master/scripts/alphanet.sh
     chmod +x alphanet.sh
 
-Alternatively, to run Betanet:
+Alternatively, to run Mainnet:
 
 ::
 
-    wget -O betanet.sh https://gitlab.com/tezos/tezos/raw/master/scripts/alphanet.sh
-    chmod +x betanet.sh
+    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/master/scripts/alphanet.sh
+    chmod +x mainnet.sh
 
 In the following we assume you are running Alphanet.
 You are now one step away from a working node:
@@ -125,7 +125,7 @@ Tezos *git* repository is hosted at `GitLab
 which we don't use anymore and only mirrors what happens on GitLab.
 
 You also need to **choose the branch** of the network you want to connect
-to: *alphanet*, *zeronet* or *betanet*.
+to: *alphanet*, *zeronet* or *mainnet*.
 
 The *master* branch is where code is merged, but there is no test
 network using the master branch directly.
