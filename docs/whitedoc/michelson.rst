@@ -400,6 +400,14 @@ Control structures
     > FAILWITH / a : _  =>  [FAILED]
     > _ / [FAILED]  =>  [FAILED]
 
+-  ``{}``: Empty sequence.
+
+::
+
+    :: 'A   ->   'A
+
+    > {} / SA  =>  SA
+
 -  ``{ I ; C }``: Sequence.
 
 ::
@@ -1399,7 +1407,7 @@ contract, unit for an account.
 
 ::
 
-    :: address : 'S   ->   contract 'p : 'S
+    :: address : 'S   ->   option (contract 'p) : 'S
 
     > CONTRACT / addr : S  =>  Some addr : S
         iff addr exists and is a contract of parameter type 'p
@@ -1511,7 +1519,9 @@ the wild and untyped outside world.
 
 -  ``SLICE``: Bytes access.
 
-    :: nat : nat : bytes : 'S   -> option string : 'S
+::
+
+    :: nat : nat : bytes : 'S   -> option bytes : 'S
 
     > SLICE / offset : length : s : S  =>  Some ss : S
        where ss is the substring of s at the given offset and of the given length
@@ -2013,7 +2023,7 @@ type on top.
    PAIR :t
    :: 'a : 'b : 'S -> (pair :t 'a 'b) : 'S
 
-   SOME t:
+   SOME :t
    :: 'a : 'S -> (option :t 'a) : 'S
 
    NONE :t 'a
@@ -2966,10 +2976,12 @@ XII - Full grammar
       | LEFT <type>
       | RIGHT <type>
       | IF_LEFT { <instruction> ... } { <instruction> ... }
+      | IF_RIGHT { <instruction> ... } { <instruction> ... }
       | NIL <type>
       | CONS
       | IF_CONS { <instruction> ... } { <instruction> ... }
-      | EMPTY_SET <type>
+      | SIZE
+      | EMPTY_SET <comparable type>
       | EMPTY_MAP <comparable type> <type>
       | MAP { <instruction> ... }
       | ITER { <instruction> ... }
@@ -2982,17 +2994,19 @@ XII - Full grammar
       | LAMBDA <type> <type> { <instruction> ... }
       | EXEC
       | DIP { <instruction> ... }
-      | FAILWITH
+      | FAILWITH <data>
       | CAST
       | RENAME
       | CONCAT
+      | SLICE
+      | PACK
+      | UNPACK
       | ADD
       | SUB
       | MUL
-      | DIV
+      | EDIV
       | ABS
       | NEG
-      | MOD
       | LSL
       | LSR
       | OR
@@ -3006,22 +3020,26 @@ XII - Full grammar
       | GT
       | LE
       | GE
-      | INT
       | SELF
+      | CONTRACT <type>
       | TRANSFER_TOKENS
       | SET_DELEGATE
       | CREATE_ACCOUNT
       | CREATE_CONTRACT
+      | CREATE_CONTRACT { <instruction> ... }
       | IMPLICIT_ACCOUNT
       | NOW
       | AMOUNT
       | BALANCE
       | CHECK_SIGNATURE
       | BLAKE2B
+      | SHA256
+      | SHA512
       | HASH_KEY
       | STEPS_TO_QUOTA
       | SOURCE
       | SENDER
+      | ADDRESS
     <type> ::=
       | <comparable type>
       | key
@@ -3031,6 +3049,7 @@ XII - Full grammar
       | list <type>
       | set <comparable type>
       | operation
+      | address
       | contract <type>
       | pair <type> <type>
       | or <type> <type>
@@ -3041,7 +3060,8 @@ XII - Full grammar
       | int
       | nat
       | string
-      | tez
+      | bytes
+      | mutez
       | bool
       | key_hash
       | timestamp
