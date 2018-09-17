@@ -66,7 +66,7 @@ let (>>=?) v f =
 
 let init ?mapsize path =
   if not (Sys.file_exists path) then Unix.mkdir path 0o755 ;
-  match Lmdb.opendir ?mapsize ~flags:[NoTLS] path 0o644 with
+  match Lmdb.opendir ?mapsize ~flags:[NoTLS; NoMetaSync] path 0o644 with
   | Ok dir -> return { dir ; parent = Lwt.new_key () }
   | Error err -> failwith "%a" Lmdb.pp_error err
 
