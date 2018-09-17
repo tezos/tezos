@@ -42,8 +42,6 @@ let encoding =
        (req "major" uint16)
        (req "minor" uint16))
 
-(* the common version for a pair of peers, if any, is the maximum one,
-   in lexicographic order *)
 let common la lb =
   let la = List.sort (fun l r -> compare r l) la in
   let lb = List.sort (fun l r -> compare r l) lb in
@@ -51,6 +49,12 @@ let common la lb =
     | [], _ | _, [] -> None
     | ((a :: ta) as la), ((b :: tb) as lb) ->
         if a = b then Some a
-        else if a < b then find (ta, lb)
+        else if a > b then find (ta, lb)
         else find (la, tb)
   in find (la, lb)
+
+let best lv =
+  if lv = [] then
+    invalid_arg "P2p_version.best"
+  else
+    List.hd (List.sort (fun l r -> compare r l) lv)
