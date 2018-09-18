@@ -22,10 +22,10 @@ stages:
     - master
     - alphanet
     - zeronet
-    - betanet
+    - mainnet
     - alphanet-staging
     - zeronet-staging
-    - betanet-staging
+    - mainnet-staging
   before_script:
     - opam list
     - . ./scripts/version.sh
@@ -538,10 +538,10 @@ publish:docker:
     - master
     - alphanet
     - zeronet
-    - betanet
+    - mainnet
     - alphanet-staging
     - zeronet-staging
-    - betanet-staging
+    - mainnet-staging
   before_script:
     - mkdir ~/.docker || true
     - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json
@@ -559,10 +559,10 @@ publish:doc:
     - master
     - alphanet
     - zeronet
-    - betanet
+    - mainnet
     - alphanet-staging
     - zeronet-staging
-    - betanet-staging
+    - mainnet-staging
   before_script:
     - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
     - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8

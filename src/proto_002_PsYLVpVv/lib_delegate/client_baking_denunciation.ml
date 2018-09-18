@@ -94,7 +94,8 @@ let process_endorsements (cctxt : #Proto_alpha.full) state ~chain
           begin match Delegate_Map.find_opt delegate map with
             | None -> return @@ HLevel.add state.endorsements_table level
                   (Delegate_Map.add delegate new_endorsement map)
-            | Some existing_endorsement ->
+            | Some existing_endorsement when
+                Block_hash.(existing_endorsement.shell.branch <> new_endorsement.shell.branch) ->
                 get_block_offset level >>= fun block ->
                 (* TODO : verify that the chains are coherent *)
                 Alpha_block_services.hash cctxt ~chain:`Main ~block () >>=? fun block_hash ->
@@ -115,6 +116,10 @@ let process_endorsements (cctxt : #Proto_alpha.full) state ~chain
                     -% a Operation_hash.Logging.tag op_hash) >>= fun () ->
                 return @@ HLevel.replace state.endorsements_table level
                   (Delegate_Map.add delegate new_endorsement map)
+            | Some _ ->
+                (* This endorsement is already present in another
+                   block but endorse the same predecessor *)
+                return_unit
           end
       | _ ->
           lwt_log_error Tag.DSL.(fun f ->

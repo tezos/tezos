@@ -24,8 +24,9 @@ architecture **x86_64**.
 Although we only officially support Linux, the script has been tested
 with success in the past on windows/mac/linux.
 
-The same script can be used to run Alphanet or Zeronet, it suffices to
-rename it, it downloads a different image based on its name.
+The same script can be used to run Mainnet, Alphanet or Zeronet, it
+suffices to rename it as it downloads a different image based on its
+name.
 For example, to run Alphanet:
 
 ::
@@ -33,15 +34,14 @@ For example, to run Alphanet:
     wget https://gitlab.com/tezos/tezos/raw/master/scripts/alphanet.sh
     chmod +x alphanet.sh
 
-Alternatively, to run Zeronet:
+Alternatively, to run Mainnet:
 
 ::
 
-    wget -O zeronet.sh https://gitlab.com/tezos/tezos/raw/master/scripts/alphanet.sh
-    chmod +x zeronet.sh
+    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/master/scripts/alphanet.sh
+    chmod +x mainnet.sh
 
 In the following we assume you are running Alphanet.
-
 You are now one step away from a working node:
 
 ::
@@ -83,7 +83,7 @@ Build from sources
 
 ::
 
-   sudo apt install -y git m4 build-essential patch unzip bubblewrap wget
+   sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget
    wget https://github.com/ocaml/opam/releases/download/2.0.0/opam-2.0.0-x86_64-linux
    sudo cp opam-2.0.0-x86_64-linux /usr/local/bin/opam
    sudo chmod a+x /usr/local/bin/opam
@@ -113,6 +113,8 @@ The following OSes are reported to work:
 
 A Windows port is feasible and might be developed in the future.
 
+If ``bubblewrap`` is not available in your distribution you can also
+skip it and init opam with ``--disable-sandbox``.
 
 Get the sources
 ~~~~~~~~~~~~~~~
@@ -123,7 +125,7 @@ Tezos *git* repository is hosted at `GitLab
 which we don't use anymore and only mirrors what happens on GitLab.
 
 You also need to **choose the branch** of the network you want to connect
-to: *alphanet*, *zeronet* or *betanet*.
+to: *alphanet*, *zeronet* or *mainnet*.
 
 The *master* branch is where code is merged, but there is no test
 network using the master branch directly.
@@ -179,4 +181,5 @@ To add the default opam repository at a lower priority (for example to
 install or test other opam packages), you can use the following command:
 
 ::
-  opam repo add default --rank=-1
+
+   opam repo add default --rank=-1
