@@ -192,7 +192,7 @@ let commands () =
          return_unit
       ) ;
 
-    command ~group ~desc: "Clear all ACLs."
+    command ~group ~desc: "Clear all access control rules."
       no_options
       (prefixes [ "clear" ; "acls" ] @@ stop)
       (fun () (cctxt : #Client_context.full) ->

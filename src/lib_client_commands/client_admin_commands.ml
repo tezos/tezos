@@ -29,10 +29,10 @@ let commands () =
                 title = "Commands to perform privileged operations on the node" } in
   [
     command ~group
-      ~desc: "Make the node forget its decision of rejecting a block."
+      ~desc: "Make the node forget its decision of rejecting blocks."
       no_options
       (prefixes [ "unmark" ; "invalid" ]
-       @@ seq_of_param (Block_hash.param ~name:"block" ~desc:"block to remove from invalid list"))
+       @@ seq_of_param (Block_hash.param ~name:"blocks" ~desc:"blocks to remove from invalid list"))
       (fun () blocks (cctxt : #Client_context.full) ->
          iter_s
            (fun block ->
