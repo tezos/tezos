@@ -712,6 +712,16 @@ let build_rpc_directory net =
       end in
 
   let dir =
+    RPC_directory.gen_register1 dir P2p_services.Peers.S.forget
+      begin fun peer_id () () ->
+        match net.pool with
+        | None -> RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.Peers.forget pool peer_id ;
+            RPC_answer.return ()
+      end in
+
+  let dir =
     RPC_directory.gen_register1 dir P2p_services.Peers.S.ban
       begin fun peer_id () () ->
         match net.pool with
@@ -804,6 +814,16 @@ let build_rpc_directory net =
                       Lwt.return_some evts
                     end in
                   RPC_answer.return_stream { next ; shutdown }
+      end in
+
+  let dir =
+    RPC_directory.gen_register1 dir P2p_services.Points.S.forget
+      begin fun point () () ->
+        match net.pool with
+        | None -> RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.Points.forget pool point ;
+            RPC_answer.return ()
       end in
 
   let dir =

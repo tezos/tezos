@@ -109,19 +109,31 @@ let commands () =
        @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
        @@ stop)
       (fun port address (cctxt : #Client_context.full) ->
-         P2p_services.connect cctxt ~timeout:10. (address, port)
+         P2p_services.connect cctxt ~timeout:10. (address, port) >>=? fun () ->
+         cctxt#message "Connection to %a:%d established." P2p_addr.pp address port >>= return
+      ) ;
+
+    command ~group ~desc: "Kick a peer."
+      no_options
+      (prefixes [ "kick" ; "peer" ]
+       @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+       @@ stop)
+      (fun () peer (cctxt : #Client_context.full) ->
+         P2p_services.Connections.kick cctxt peer >>=? fun () ->
+         cctxt#message "Connection to %a interrupted." P2p_peer.Id.pp peer >>= fun () ->
+         return_unit
       ) ;
 
     command ~group ~desc: "Remove an IP address from the blacklist and whitelist."
-      no_options
+      (args1 (port_arg ()))
       (prefixes [ "forget" ; "address" ]
        @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
        @@ stop)
-      (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.forget cctxt (address, 0)
+      (fun port address (cctxt : #Client_context.full) ->
+         P2p_services.Points.forget cctxt (address, port)
       ) ;
 
-    command ~group ~desc: "Add an IP address to the blacklist."
+    command ~group ~desc: "Add an IP address to the blacklist and kicks it."
       no_options
       (prefixes [ "ban" ; "address" ]
        @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
@@ -161,7 +173,7 @@ let commands () =
          P2p_services.Peers.forget cctxt peer
       ) ;
 
-    command ~group ~desc: "Add a peer ID to the blacklist."
+    command ~group ~desc: "Add a peer ID to the blacklist and kicks it."
       no_options
       (prefixes [ "ban" ; "peer" ]
        @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
