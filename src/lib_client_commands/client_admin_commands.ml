@@ -32,7 +32,7 @@ let commands () =
       ~desc: "Make the node forget its decision of rejecting blocks."
       no_options
       (prefixes [ "unmark" ; "invalid" ]
-       @@ seq_of_param (Block_hash.param ~name:"blocks" ~desc:"blocks to remove from invalid list"))
+       @@ seq_of_param (Block_hash.param ~name:"block" ~desc:"blocks to remove from invalid list"))
       (fun () blocks (cctxt : #Client_context.full) ->
          iter_s
            (fun block ->
@@ -42,4 +42,19 @@ let commands () =
                 Block_hash.pp block >>= fun () ->
               return_unit)
            blocks) ;
+
+    command ~group
+      ~desc: "Make the node forget every decision of rejecting blocks."
+      no_options
+      (prefixes [ "unmark" ; "all" ; "invalid" ; "blocks" ]
+       @@ stop)
+      (fun () (cctxt : #Client_context.full) ->
+         Shell_services.Invalid_blocks.list cctxt () >>=? fun invalid_blocks ->
+         iter_s (fun { Chain_services.hash } ->
+             Shell_services.Invalid_blocks.delete cctxt hash >>=? fun () ->
+             cctxt#message
+               "Block %a no longer marked invalid."
+               Block_hash.pp_short hash >>= fun () ->
+             return_unit)
+           invalid_blocks) ;
   ]
