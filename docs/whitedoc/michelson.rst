@@ -1665,7 +1665,7 @@ to increase clarity about illegal states.
 
 ::
 
-    > ASSERT_SOME  =>  IF_SOME {FAIL} {}
+    > ASSERT_SOME  =>  IF_NONE {FAIL} {}
 
 -  ``ASSERT_LEFT``:
 
