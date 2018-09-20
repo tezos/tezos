@@ -27,28 +27,17 @@ let group =
   { Clic.name = "p2p" ;
     title = "Commands for monitoring and controlling p2p-layer state" }
 
-let port_arg () =
-  let open Clic in
-  default_arg
-    ~long:"port"
-    ~placeholder:"IP port"
-    ~doc:"peer-to-peer port of the node"
-    ~default: "9732"
-    (parameter
-       (fun _ x -> try
-           return (int_of_string x)
-         with Failure _ ->
-           failwith "Invalid peer-to-peer port"))
-
 let pp_connection_info ppf conn = P2p_connection.Info.pp (fun _ _ -> ()) ppf conn
+
+let addr_parameter =
+  let open Clic in
+  param ~name:"address"
+    ~desc:"<IPv4>:PORT or <IPV6>:PORT address (PORT defaults to 9732)."
+    (parameter (fun _ x -> return (P2p_point.Id.of_string_exn x)))
 
 let commands () =
   let open Clic in
-  let addr_parameter =
-    parameter (fun _ x -> return (P2p_addr.of_string_exn x))
-  in
   [
-
     command ~group ~desc: "show global network status"
       no_options
       (prefixes ["p2p" ; "stat"] stop) begin fun () (cctxt : #Client_context.full) ->
@@ -104,11 +93,11 @@ let commands () =
     end ;
 
     command ~group ~desc: "Connect to a new point."
-      (args1 (port_arg ()))
+      no_options
       (prefixes [ "connect" ; "address" ]
-       @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
+       @@ addr_parameter
        @@ stop)
-      (fun port address (cctxt : #Client_context.full) ->
+      (fun () (address, port) (cctxt : #Client_context.full) ->
          P2p_services.connect cctxt ~timeout:10. (address, port) >>=? fun () ->
          cctxt#message "Connection to %a:%d established." P2p_addr.pp address port >>= return
       ) ;
@@ -125,39 +114,39 @@ let commands () =
       ) ;
 
     command ~group ~desc: "Remove an IP address from the blacklist and whitelist."
-      (args1 (port_arg ()))
+      no_options
       (prefixes [ "forget" ; "address" ]
-       @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
+       @@ addr_parameter
        @@ stop)
-      (fun port address (cctxt : #Client_context.full) ->
+      (fun () (address, port) (cctxt : #Client_context.full) ->
          P2p_services.Points.forget cctxt (address, port)
       ) ;
 
     command ~group ~desc: "Add an IP address to the blacklist and kicks it."
       no_options
       (prefixes [ "ban" ; "address" ]
-       @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
+       @@ addr_parameter
        @@ stop)
-      (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.ban cctxt (address, 0)
+      (fun () (address, port) (cctxt : #Client_context.full) ->
+         P2p_services.Points.ban cctxt (address, port)
       ) ;
 
     command ~group ~desc: "Add an IP address to the whitelist."
       no_options
       (prefixes [ "trust" ; "address" ]
-       @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
+       @@ addr_parameter
        @@ stop)
-      (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.trust cctxt (address, 0)
+      (fun () (address, port) (cctxt : #Client_context.full) ->
+         P2p_services.Points.trust cctxt (address, port)
       ) ;
 
     command ~group ~desc: "Check if an IP address is banned."
       no_options
       (prefixes [ "is" ; "address" ; "banned" ]
-       @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
+       @@ addr_parameter
        @@ stop)
-      (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.banned cctxt (address, 0) >>=? fun banned ->
+      (fun () (address, port) (cctxt : #Client_context.full) ->
+         P2p_services.Points.banned cctxt (address, port) >>=? fun banned ->
          cctxt#message
            "The given ip address is %s"
            (if banned then "banned" else "not banned") >>= fun () ->
