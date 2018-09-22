@@ -139,14 +139,15 @@ module Ledger = struct
   type t = {
     device_info : Hidapi.device_info ;
     version : Ledgerwallet_tezos.Version.t ;
+    git_commit : string option ;
     of_curve : (Ledgerwallet_tezos.curve * (Signature.Public_key.t *
                                             Signature.Public_key_hash.t)) list ;
     of_pkh : (Signature.Public_key_hash.t * (Signature.Public_key.t *
                                              Ledgerwallet_tezos.curve)) list ;
   }
 
-  let create ~device_info ~version ~of_curve ~of_pkh =
-    { device_info ; version ; of_curve ; of_pkh }
+  let create ?git_commit ~device_info ~version ~of_curve ~of_pkh () =
+    { device_info ; version ; git_commit ; of_curve ; of_pkh }
 
   let curves { Ledgerwallet_tezos.Version.major ; minor ; patch ; _ } =
     let open Ledgerwallet_tezos in
@@ -156,7 +157,7 @@ module Ledger = struct
       [ Ed25519 ; Secp256k1 ; Secp256r1 ]
 
   let of_hidapi ?pkh device_info h =
-    let find_ledgers version =
+    let find_ledgers ?git_commit version =
       fold_left_s begin fun (pkh_found, of_curve, of_pkh) curve ->
         get_public_key h curve [] >>|? fun pk ->
         let cur_pkh = Signature.Public_key.hash pk in
@@ -167,9 +168,12 @@ module Ledger = struct
       end (false, [], []) (curves version)
       >>=? fun (pkh_found, of_curve, of_pkh) ->
       match pkh with
-      | None -> return (Some (create ~device_info ~version ~of_curve ~of_pkh))
+      | None ->
+          return (Some (create ?git_commit ~device_info ~version
+                          ~of_curve ~of_pkh ()))
       | Some _ when pkh_found ->
-          return (Some (create ~device_info ~version ~of_curve ~of_pkh))
+          return (Some (create ?git_commit ~device_info ~version
+                          ~of_curve ~of_pkh ()))
       | _ -> return None
     in
     let buf = Buffer.create 100 in
@@ -194,7 +198,15 @@ module Ledger = struct
           device_info.Hidapi.path
           Ledgerwallet.Transport.pp_error e ;
         return None
-    | Ok version -> find_ledgers version
+    | Ok ({ major; minor; patch; _ } as version) ->
+        begin
+          if (major, minor, patch) >= (1, 4, 0) then
+            wrap_ledger_cmd (fun pp ->
+                Ledgerwallet_tezos.get_git_commit ~pp h) >>=? fun c ->
+            return_some c
+          else return_none
+        end >>=? fun git_commit ->
+        find_ledgers ?git_commit version
 end
 
 let find_ledgers ?pkh () =
@@ -352,11 +364,12 @@ let commands =
                iter_s begin fun { Ledger.device_info = { Hidapi.path ;
                                                          manufacturer_string ;
                                                          product_string ; _ } ;
-                                  of_curve ; version ; _ } ->
+                                  of_curve ; version ; git_commit ; _ } ->
                  let manufacturer = Option.unopt ~default:"(none)" manufacturer_string in
                  let product = Option.unopt ~default:"(none)" product_string in
-                 cctxt#message "Found a %a application running on %s %s at [%s]."
+                 cctxt#message "Found a %a (commit %s) application running on %s %s at [%s]."
                    Ledgerwallet_tezos.Version.pp version
+                   (match git_commit with None -> "unknown" | Some c -> c)
                    manufacturer product path >>= fun () ->
                  let of_curve = List.rev of_curve in
                  cctxt#message

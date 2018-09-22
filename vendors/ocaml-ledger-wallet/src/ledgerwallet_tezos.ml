@@ -55,6 +55,7 @@ end
 
 type ins =
   | Version
+  | Git_commit
   | Authorize_baking
   | Get_public_key
   | Prompt_public_key
@@ -72,6 +73,7 @@ let int_of_ins = function
   | Sign_unsafe -> 0x05
   | Reset_high_watermark -> 0x06
   | Query_high_watermark -> 0x08
+  | Git_commit -> 0x09
 
 type curve =
   | Ed25519
@@ -90,6 +92,11 @@ let get_version ?pp ?buf h =
   let apdu = Apdu.create (wrap_ins Version) in
   Transport.apdu ~msg:"get_version" ?pp ?buf h apdu >>=
   Version.read
+
+let get_git_commit ?pp ?buf h =
+  let apdu = Apdu.create (wrap_ins Git_commit) in
+  Transport.apdu ~msg:"get_git_commit" ?pp ?buf h apdu >>|
+  Cstruct.to_string
 
 let write_path cs path =
   ListLabels.fold_left path ~init:cs ~f:begin fun cs i ->

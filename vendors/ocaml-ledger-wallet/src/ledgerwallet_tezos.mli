@@ -32,6 +32,12 @@ val get_version :
 (** [get_version ?pp ?buf ledger] is the version information of the
     Ledger app running at [ledger]. *)
 
+val get_git_commit :
+  ?pp:Format.formatter -> ?buf:Cstruct.t ->
+  Hidapi.t -> (string, Transport.error) result
+(** [get_git_commit ?pp ?buf ledger] is the git commit information of
+   the Ledger app running at [ledger]. *)
+
 val get_public_key :
   ?prompt:bool ->
   ?pp:Format.formatter ->
