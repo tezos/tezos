@@ -3070,7 +3070,7 @@ The language is implemented in OCaml as follows:
    respects the pre and post stack types declared by the GADT case for
    each instruction.
 
-   The only things that remain to we reviewed are value dependent
+   The only things that remain to be reviewed are value dependent
    choices, such as that we did not swap true and false when
    interpreting the If instruction.
 

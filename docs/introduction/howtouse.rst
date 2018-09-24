@@ -113,8 +113,8 @@ RPC interface
 
 The only interface to the node is through Json RPC calls and it is disabled by
 default.  A more detailed documentation can be found in the :ref:`RPC index.
-<rpc>` The RPC interface must be enable in order for the clients
-to communicate with the node, but is should not be publically accessible on the
+<rpc>` The RPC interface must be enabled in order for the clients
+to communicate with the node, but is should not be publicly accessible on the
 internet. With the following command it is available uniquely on the
 `localhost` address of your machine, on the default port ``8732``.
 
@@ -278,7 +278,7 @@ signed by that account and enforces some good intuitive properties:
   and *n+1*, and *n* gets lost then *n+1* cannot be applied.
 
 Additionally each operation needs to declare a gas and storage limit,
-if an operations consumes more than this limits it will fail.
+if an operation consumes more than these limits it will fail.
 Later we'll learn more about the gas and storage model.
 
 Another interesting field of the receipts are the `balance updates`
@@ -347,10 +347,10 @@ Gas and storage cost model
 A quick look at the balance updates on the receipt shows that on top of
 funding the contract with 1ꜩ, *alice* was also charged an extra cost
 that is burnt.
-This cost comes from the *storage* and it's shown in the line
+This cost comes from the *storage* and is shown in the line
 ``Paid storage size diff: 46 bytes``, 41 for the contract and 5 for
 the string ``"hello"``.
-Given that a contract saves it's data on the public block-chain that
+Given that a contract saves its data on the public block-chain that
 every node stores, it is necessary to charge a fee per byte to avoid
 abuse and encourage lean programs.
 

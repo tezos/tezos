@@ -59,7 +59,7 @@ block and contract, you can call the associated RPC via the command :
 ``$ tezos-admin-client rpc get
 /blocks/<block_id>/proto/context/contracts/<contract_id>/balance``.
 
-A RPC may take an *input* and generates an *output* both in JSON
+An RPC may take an *input* and generate an *output* both in JSON
 format. For example, the previous RPC call, that does not require an
 input, would display on the standard output : ``{ "balance":
 "4000000000000" }``. When calling a RPC that requires an input
