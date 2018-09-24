@@ -66,7 +66,7 @@ let (>>=?) v f =
 
 let init ?mapsize path =
   if not (Sys.file_exists path) then Unix.mkdir path 0o755 ;
-  match Lmdb.opendir ?mapsize ~flags:[NoTLS] path 0o644 with
+  match Lmdb.opendir ?mapsize ~flags:[NoTLS; NoMetaSync] path 0o644 with
   | Ok dir -> return { dir ; parent = Lwt.new_key () }
   | Error err -> failwith "%a" Lmdb.pp_error err
 
@@ -204,13 +204,13 @@ let list_sub l pos len =
         else inner (h :: acc, pred n) t in
   inner ([], len) l
 
-let with_rw_cursor_lwt ?sync ?metasync ?flags ?name { dir ; parent } ~f =
+let with_rw_cursor_lwt ?nosync ?nometasync ?flags ?name { dir ; parent } ~f =
   let local_parent =
     match Lwt.get parent with
     | None -> None
     | Some (txn, _db, _cursor) -> Some txn in
   Lmdb.create_rw_txn
-    ?sync ?metasync ?parent:local_parent dir >>=? fun txn ->
+    ?nosync ?nometasync ?parent:local_parent dir >>=? fun txn ->
   Lmdb.opendb ?flags ?name txn >>=? fun db ->
   Lmdb.opencursor txn db >>=? fun cursor ->
   Lwt.with_value parent (Some (txn, db, cursor)) begin fun () ->

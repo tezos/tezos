@@ -112,11 +112,11 @@ val set_mapsize : t -> int64 -> (unit, error) result
 type _ txn
 
 val create_rw_txn :
-  ?sync:bool -> ?metasync:bool ->
+  ?nosync:bool -> ?nometasync:bool ->
   ?parent:rw txn -> t -> (rw txn, error) result
 
 val create_ro_txn :
-  ?sync:bool -> ?metasync:bool ->
+  ?nosync:bool -> ?nometasync:bool ->
   ?parent:_ txn -> t -> (ro txn, error) result
 
 val get_txn_id : _ txn -> int
@@ -147,13 +147,13 @@ val db_flags : _ txn -> db -> (flag_open list, error) result
 val db_drop : _ txn -> db -> (unit, error) result
 
 val with_ro_db :
-  ?sync:bool -> ?metasync:bool ->
+  ?nosync:bool -> ?nometasync:bool ->
   ?parent:_ txn -> ?flags:flag_open list ->
   ?name:string -> t -> f:(ro txn -> db -> ('a, error) result) ->
   ('a, error) result
 
 val with_rw_db :
-  ?sync:bool -> ?metasync:bool ->
+  ?nosync:bool -> ?nometasync:bool ->
   ?parent:rw txn -> ?flags:flag_open list ->
   ?name:string -> t -> f:(rw txn -> db -> ('a, error) result) ->
   ('a, error) result
