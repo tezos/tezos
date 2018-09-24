@@ -117,7 +117,7 @@ module Header = struct
   let read cs =
     let cslen = Cstruct.len cs in
     begin if cslen < 5 then
-      fail_header_too_short cslen
+        fail_header_too_short cslen
       else R.ok ()
     end >>= fun () ->
     let channel_id = Cstruct.BE.get_uint16 cs 0 in
@@ -129,8 +129,8 @@ module Header = struct
       else R.ok ()
     end >>= fun () ->
     begin match cmd_of_int cmd with
-    | Some cmd -> R.ok cmd
-    | None -> fail_invalid_cmd cmd
+      | Some cmd -> R.ok cmd
+      | None -> fail_invalid_cmd cmd
     end >>= fun cmd ->
     R.ok ({ cmd ; seq }, Cstruct.shift cs 5)
 

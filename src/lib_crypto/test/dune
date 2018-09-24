@@ -2,21 +2,25 @@
  (names test_merkle
         test_base58
         test_ed25519
-        test_blake2b)
+        test_blake2b
+        test_pvss)
  (libraries tezos-stdlib
             tezos-crypto
+            tezos-data-encoding
             alcotest)
  (flags (:standard -w -9-32
                    -safe-string
                    -open Tezos_stdlib
-                   -open Tezos_crypto)))
+                   -open Tezos_crypto
+                   -open Tezos_data_encoding)))
 
 (alias
  (name buildtest)
  (deps test_merkle.exe
        test_base58.exe
        test_ed25519.exe
-       test_blake2b.exe))
+       test_blake2b.exe
+       test_pvss.exe))
 
 (alias
  (name runtest_merkle)
@@ -35,11 +39,16 @@
  (action (run %{exe:test_blake2b.exe})))
 
 (alias
+ (name runtest_pvss)
+ (action (run %{exe:test_pvss.exe})))
+
+(alias
  (name runtest)
  (deps (alias runtest_merkle)
        (alias runtest_base58)
        (alias runtest_ed25519)
-       (alias runtest_blake2b)))
+       (alias runtest_blake2b)
+       (alias runtest_pvss)))
 
 (alias
  (name runtest_indent)

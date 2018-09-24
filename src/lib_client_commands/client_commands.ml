@@ -26,7 +26,7 @@
 open Client_context
 
 type command = full Clic.command
-type network = [ `Betanet | `Alphanet | `Zeronet | `Sandbox ]
+type network = [ `Mainnet | `Alphanet | `Zeronet | `Sandbox ]
 
 exception Version_not_found
 

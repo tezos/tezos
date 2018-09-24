@@ -9,10 +9,10 @@ open Ledgerwallet
 module Version = struct
   type app_class = Tezos | TezBake
   let pp_app_class ppf = function
-    | Tezos -> Format.pp_print_string ppf "Tezos"
-    | TezBake -> Format.pp_print_string ppf "TezBake"
+    | Tezos -> Format.pp_print_string ppf "Tezos Wallet"
+    | TezBake -> Format.pp_print_string ppf "Tezos Baking"
 
-    let class_of_int = function
+  let class_of_int = function
     | 0 -> Tezos
     | 1 -> TezBake
     | _ -> invalid_arg "class_of_int"
@@ -25,7 +25,7 @@ module Version = struct
   }
 
   let pp ppf { app_class ; major ; minor ; patch } =
-    Format.fprintf ppf "%a.%d.%d.%d"
+    Format.fprintf ppf "%a %d.%d.%d"
       pp_app_class app_class major minor patch
 
   let create ~app_class ~major ~minor ~patch = {

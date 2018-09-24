@@ -128,6 +128,7 @@ let pp_string ppf s =
     | '\b' -> Format.fprintf ppf "\\b"
     | '\t' -> Format.fprintf ppf "\\t"
     | '\\' -> Format.fprintf ppf "\\\\"
+    | '\x00' .. '\x1F' as c -> Format.fprintf ppf "\\u%04x" (Char.code c)
     | c -> Format.fprintf ppf "%c" c
   done ;
   Format.fprintf ppf "\""

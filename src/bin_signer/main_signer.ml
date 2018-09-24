@@ -301,6 +301,7 @@ let main () =
         (module Tezos_signer_backends.Unencrypted) ;
       Client_keys.register_signer
         (module Tezos_signer_backends.Ledger) ;
+      Logging_unix.init () >>= fun () ->
       let commands =
         Clic.add_manual
           ~executable_name

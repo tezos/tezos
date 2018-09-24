@@ -107,6 +107,22 @@ module type ENCODER = sig
 
 end
 
+module type PVSS = sig
+
+  type proof
+
+  module Clear_share : sig type t end
+  module Commitment : sig type t end
+  module Encrypted_share : sig type t end
+
+  module Public_key : sig
+    type t
+    include B58_DATA with type t := t
+    include ENCODER with type t := t
+  end
+
+end
+
 module type INDEXES = sig
 
   type t

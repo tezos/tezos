@@ -26,12 +26,13 @@
 val timestamp_tag : Time.t Tag.def
 val valid_ops : int Tag.def
 val refused_ops : int Tag.def
-val bake_priorty_tag : int Tag.def
+val bake_priority_tag : int Tag.def
 val fitness_tag : Fitness.t Tag.def
 val current_slots_tag : int Tag.def
 val future_slots_tag : int Tag.def
+val timespan_tag : int64 Tag.def
 
-val operations_tag : error Preapply_result.t list Tag.def
+val operations_tag : Proto_alpha.Alpha_context.Operation.raw list list Tag.def
 val bake_op_count_tag : int Tag.def
 val endorsement_slot_tag : int Tag.def
 val endorsement_slots_tag : int list Tag.def

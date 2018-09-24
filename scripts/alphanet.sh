@@ -621,9 +621,31 @@ case $(basename $0) in
         default_port=19732
         ;;
     betanet.sh)
+        if [ -d "$HOME/.tezos-mainnet" ] ; then
+            echo 'You already upgraded, please only use `mainnet.sh` now.'
+            exit 1
+        else
+            echo 'A new script `mainnet.sh` is now available.'
+            echo 'The current `betanet.sh` still works, but we recommend that you upgrade.'
+        fi
         docker_base_dir="$HOME/.tezos-betanet"
-        docker_image=tezos/tezos:betanet
+        docker_image=tezos/tezos:mainnet
         docker_compose_base_name=betanet
+        default_port=9732
+        ;;
+    mainnet.sh)
+        if [ -d "$HOME/.tezos-betanet" ] ; then
+            echo 'Folder "'$HOME'/.tezos-betanet" detected.'
+            echo 'To upgrade to the mainnet script, execute the following commands.'
+            echo '  `betanet.sh stop`'
+            echo 'Make sure that your node is stopped using `docker ps`.'
+            echo '  `mv "'$HOME'/.tezos-betanet" "'$HOME'/.tezos-mainnet"`'
+            echo '  `mainnet.sh start`'
+            exit 1
+        fi
+        docker_base_dir="$HOME/.tezos-mainnet"
+        docker_image=tezos/tezos:mainnet
+        docker_compose_base_name=mainnet
         default_port=9732
         ;;
     *)

@@ -241,7 +241,7 @@ let preapply ~predecessor ~timestamp ~protocol_data ~sort_operations:sort ops =
           NewProto.init context shell_header >>=? fun { context ; message ; _ } ->
           return (context, message)
   end >>=? fun (context, message) ->
-  Context.commit ?message ~time:timestamp context >>= fun context ->
+  Context.hash ?message ~time:timestamp context >>= fun context ->
   return ({ shell_header with context }, rs)
 
 let notify_operation (State { proto = (module Proto) ; new_operation_input ; }) result =

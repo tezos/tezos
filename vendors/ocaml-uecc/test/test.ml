@@ -25,18 +25,18 @@ let test_export_curve curve =
   match keypair curve with
   | None -> assert false
   | Some (sk, pk) ->
-    let sk_bytes = to_bytes ~compress:false sk in
-    let pk_bytes = to_bytes ~compress:false pk in
-    checki __LOC__ (sk_size curve) (Bigstring.length sk_bytes) ;
-    checki __LOC__ (pk_size curve + 1) (Bigstring.length pk_bytes) ;
-    match sk_of_bytes curve sk_bytes,
-          pk_of_bytes curve pk_bytes with
-    | Some (sk', pk'), Some pk'' ->
-      assert (equal sk sk') ;
-      assert (equal pk pk') ;
-      assert (equal pk pk'') ;
-      assert (equal pk' pk') ;
-    | _ -> assert false
+      let sk_bytes = to_bytes ~compress:false sk in
+      let pk_bytes = to_bytes ~compress:false pk in
+      checki __LOC__ (sk_size curve) (Bigstring.length sk_bytes) ;
+      checki __LOC__ (pk_size curve + 1) (Bigstring.length pk_bytes) ;
+      match sk_of_bytes curve sk_bytes,
+            pk_of_bytes curve pk_bytes with
+      | Some (sk', pk'), Some pk'' ->
+          assert (equal sk sk') ;
+          assert (equal pk pk') ;
+          assert (equal pk pk'') ;
+          assert (equal pk' pk') ;
+      | _ -> assert false
 
 let test_export_curve curve =
   for _i = 0 to nb_iterations - 1 do
@@ -55,18 +55,18 @@ let test_export_curve_compressed curve =
   match keypair curve with
   | None -> assert false
   | Some (sk, pk) ->
-    let sk_bytes = to_bytes sk in
-    let pk_bytes = to_bytes pk in
-    checki __LOC__ (sk_size curve) (Bigstring.length sk_bytes) ;
-    checki __LOC__ (compressed_size curve) (Bigstring.length pk_bytes) ;
-    match sk_of_bytes curve sk_bytes,
-          pk_of_bytes curve pk_bytes with
-    | Some (sk', pk'), Some pk'' ->
-      assert (equal sk sk') ;
-      assert (equal pk pk') ;
-      assert (equal pk pk'') ;
-      assert (equal pk' pk') ;
-    | _ -> assert false
+      let sk_bytes = to_bytes sk in
+      let pk_bytes = to_bytes pk in
+      checki __LOC__ (sk_size curve) (Bigstring.length sk_bytes) ;
+      checki __LOC__ (compressed_size curve) (Bigstring.length pk_bytes) ;
+      match sk_of_bytes curve sk_bytes,
+            pk_of_bytes curve pk_bytes with
+      | Some (sk', pk'), Some pk'' ->
+          assert (equal sk sk') ;
+          assert (equal pk pk') ;
+          assert (equal pk pk'') ;
+          assert (equal pk' pk') ;
+      | _ -> assert false
 
 let test_export_curve_compressed curve =
   for _i = 0 to nb_iterations - 1 do
@@ -85,10 +85,10 @@ let test_keypair_curve curve =
   match keypair curve with
   | None -> assert false
   | Some (sk, pk) ->
-    assert (equal sk sk) ;
-    assert (equal pk pk) ;
-    let pk' = neuterize sk in
-    assert (equal pk pk')
+      assert (equal sk sk) ;
+      assert (equal pk pk) ;
+      let pk' = neuterize sk in
+      assert (equal pk pk')
 
 let test_keypair_curve curve =
   for _i = 0 to nb_iterations - 1 do
@@ -106,11 +106,11 @@ let test_keypair () =
 let test_dh_curve curve =
   match keypair curve, keypair curve with
   | Some (sk, pk), Some (sk', pk') ->
-    begin match dh sk pk', dh sk' pk with
-      | Some secret, Some secret' ->
-        assert (Bigstring.equal secret secret')
-      | _ -> assert false
-    end
+      begin match dh sk pk', dh sk' pk with
+        | Some secret, Some secret' ->
+            assert (Bigstring.equal secret secret')
+        | _ -> assert false
+      end
   | _ -> assert false
 
 let test_dh_curve curve =
@@ -133,16 +133,16 @@ let test_sign_curve curve =
   match keypair curve with
   | None -> assert false
   | Some (sk, pk) ->
-    let signature = Bigstring.create (pk_size curve) in
-    begin match write_sign sk signature ~msg with
-      | nb_written when nb_written = (pk_size curve) ->
-        assert (verify pk ~msg ~signature)
-      | _ -> assert false
-    end ;
-    match sign sk msg with
-    | None -> assert false
-    | Some signature ->
-      assert (verify pk ~msg ~signature)
+      let signature = Bigstring.create (pk_size curve) in
+      begin match write_sign sk signature ~msg with
+        | nb_written when nb_written = (pk_size curve) ->
+            assert (verify pk ~msg ~signature)
+        | _ -> assert false
+      end ;
+      match sign sk msg with
+      | None -> assert false
+      | Some signature ->
+          assert (verify pk ~msg ~signature)
 
 let test_sign_curve curve =
   for _i = 0 to nb_iterations - 1 do

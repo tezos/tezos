@@ -329,7 +329,7 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Transfer tokens / call a smart contract."
-      (args6 fee_arg dry_run_switch gas_limit_arg storage_limit_arg arg_arg no_print_source_flag)
+      (args7 fee_arg dry_run_switch gas_limit_arg storage_limit_arg counter_arg arg_arg no_print_source_flag)
       (prefixes [ "transfer" ]
        @@ tez_param
          ~name: "qty" ~desc: "amount taken from source"
@@ -340,14 +340,14 @@ let commands version () =
        @@ ContractAlias.destination_param
          ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
-      begin fun (fee, dry_run, gas_limit, storage_limit, arg, no_print_source) amount (_, source) (_, destination) cctxt ->
+      begin fun (fee, dry_run, gas_limit, storage_limit, counter, arg, no_print_source) amount (_, source) (_, destination) cctxt ->
         source_to_keys cctxt
           ~chain:`Main ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
         transfer cctxt
           ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
-          ~source ~fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit () >>=
+          ~source ~fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
         report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
         | None -> return_unit
         | Some (_res, _contracts) ->
@@ -386,7 +386,7 @@ let commands version () =
         return_unit
       end;
   ] @
-  (if version = (Some `Betanet) then [] else [
+  (if version = (Some `Mainnet) then [] else [
       command ~group ~desc:"Register and activate an Alphanet/Zeronet faucet account."
         (args2
            (Secret_key.force_switch ())
@@ -416,7 +416,7 @@ let commands version () =
                return_unit
         );
     ]) @
-  (if version <> Some `Betanet then [] else [
+  (if version <> Some `Mainnet then [] else [
       command ~group ~desc:"Activate a fundraiser account."
         (args1 dry_run_switch)
         (prefixes [ "activate" ; "fundraiser" ; "account" ]

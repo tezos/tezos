@@ -204,7 +204,7 @@ let commands version : Client_context.io_wallet Clic.command list =
            signers >>= return) ;
 
     begin match version with
-      | Some `Betanet ->
+      | Some `Mainnet ->
           command ~group ~desc: "Generate a pair of keys."
             (args2 (Secret_key.force_switch ()) sig_algo_arg)
             (prefixes [ "gen" ; "keys" ]
@@ -236,7 +236,7 @@ let commands version : Client_context.io_wallet Clic.command list =
     end ;
 
     begin match version with
-      | Some `Betanet ->
+      | Some `Mainnet ->
           command ~group ~desc: "Generate keys including the given string."
             (args2
                (switch
@@ -296,7 +296,7 @@ let commands version : Client_context.io_wallet Clic.command list =
            Signature.Public_key_hash.pp pkh >>= fun () ->
          register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name) ;
   ] @
-  (if version <> (Some `Betanet) then [] else [
+  (if version <> (Some `Mainnet) then [] else [
       command ~group ~desc: "Add a fundraiser secret key to the wallet."
         (args1 (Secret_key.force_switch ()))
         (prefix "import"

@@ -29,15 +29,16 @@ open Alpha_context
 let timestamp_tag = Tag.def ~doc:"Timestamp when event occurred" "timestamp" Time.pp_hum
 let valid_ops = Tag.def ~doc:"Valid Operations" "valid_ops" Format.pp_print_int
 let refused_ops = Tag.def ~doc:"Refused Operations" "refused_ops" Format.pp_print_int
-let bake_priorty_tag = Tag.def ~doc:"Baking Priority" "bake_priority" Format.pp_print_int
+let bake_priority_tag = Tag.def ~doc:"Baking priority" "bake_priority" Format.pp_print_int
 let fitness_tag = Tag.def ~doc:"Fitness" "fitness" Fitness.pp
 let current_slots_tag = Tag.def ~doc:"Number of baking slots that can be baked at this time" "current_slots" Format.pp_print_int
 let future_slots_tag = Tag.def ~doc:"Number of baking slots in the foreseeable future but not yet bakeable" "future_slots" Format.pp_print_int
+let timespan_tag = Tag.def ~doc:"Time in seconds" "timespan" (fun fmt i -> Format.fprintf fmt "%Lds" i)
 
 let operations_tag = Tag.def ~doc:"Block Operations" "operations"
     (Format.pp_print_list
        ~pp_sep:(fun ppf () -> Format.fprintf ppf "+")
-       (fun ppf operations -> Format.fprintf ppf "%d" (List.length operations.Preapply_result.applied)))
+       (fun ppf operations -> Format.fprintf ppf "%d" (List.length operations)))
 
 let bake_op_count_tag = Tag.def ~doc:"Bake Operation Count" "operation_count" Format.pp_print_int
 

@@ -546,7 +546,6 @@ module Baking = struct
       Tezos_signer_backends.Unencrypted.make_sk contract.sk in
     Client_baking_forge.forge_block
       ctxt
-      block
       ~operations
       ~force:true
       ~best_effort:false
@@ -554,7 +553,7 @@ module Baking = struct
       ~priority:(`Auto (contract.pkh, Some 1024))
       ?seed_nonce_hash
       ~src_sk
-      ()
+      block
 
 end
 

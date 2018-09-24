@@ -190,7 +190,9 @@ module Ledger = struct
           Ledgerwallet_tezos.Version.pp version ;
         find_ledgers version
     | Error e ->
-        warn "%a" Ledgerwallet.Transport.pp_error e ;
+        warn "WARNING:@ The device at [%s] is not a Tezos application@ (%a)"
+          device_info.Hidapi.path
+          Ledgerwallet.Transport.pp_error e ;
         return None
     | Ok version -> find_ledgers version
 end
