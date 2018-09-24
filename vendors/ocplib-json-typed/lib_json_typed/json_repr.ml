@@ -122,6 +122,7 @@ let pp_string ppf s =
   Format.fprintf ppf "\"" ;
   for i = 0 to String.length s - 1 do
     match String.get s i with
+    | '\000' -> Format.fprintf ppf "\\u0000"
     | '\"' -> Format.fprintf ppf "\\\""
     | '\n' -> Format.fprintf ppf "\\n"
     | '\r' -> Format.fprintf ppf "\\r"
