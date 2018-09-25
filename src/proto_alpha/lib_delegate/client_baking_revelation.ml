@@ -45,7 +45,7 @@ let forge_seed_nonce_revelation
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   match nonces with
   | [] ->
-      lwt_log_info Tag.DSL.(fun f ->
+      lwt_log_notice Tag.DSL.(fun f ->
           f "Nothing to reveal for block %a"
           -% t event "no_nonce_reveal"
           -% a Block_hash.Logging.tag hash

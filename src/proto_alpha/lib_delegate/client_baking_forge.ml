@@ -836,7 +836,7 @@ let bake (cctxt : #Proto_alpha.full) state =
             ~shell_header ~priority ?seed_nonce_hash ~src_sk operations
           |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
 
-          lwt_log_info Tag.DSL.(fun f ->
+          lwt_log_notice Tag.DSL.(fun f ->
               f "Injected block %a for %s after %a (level %a, priority %d, fitness %a, operations %a)."
               -% t event "injected_block"
               -% a Block_hash.Logging.tag block_hash
@@ -906,7 +906,7 @@ let compute_best_slot_on_current_level
   let level = Raw_level.succ new_head.Client_baking_blocks.level in
   get_baking_slots cctxt ?max_priority new_head delegates >>= function
   | [] ->
-      lwt_log_info Tag.DSL.(fun f ->
+      lwt_log_notice Tag.DSL.(fun f ->
           let max_priority = Option.unopt ~default:default_max_priority max_priority in
           f "No slot found at level %a (max_priority = %d)"
           -% t event "no_slot_found"
@@ -923,7 +923,7 @@ let compute_best_slot_on_current_level
           ) h t
       in
       Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-      lwt_log_info Tag.DSL.(fun f ->
+      lwt_log_notice Tag.DSL.(fun f ->
           f "New baking slot found (level %a, priority %d) at %a for %s after %a."
           -% t event "have_baking_slot"
           -% a level_tag level

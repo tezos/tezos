@@ -25,9 +25,11 @@
 
 let await_bootstrapped_node (cctxt: #Proto_alpha.full) =
   (* Waiting for the node to be synchronized *)
-  cctxt#message "Waiting for the node to be synchronized with the its \
+  cctxt#message "Waiting for the node to be synchronized with its \
                  peers..." >>= fun () ->
-  Shell_services.Monitor.bootstrapped cctxt
+  Shell_services.Monitor.bootstrapped cctxt >>=? fun _ ->
+  cctxt#message "Node synchronized." >>= fun () ->
+  return_unit
 
 module Endorser = struct
 
@@ -36,6 +38,7 @@ module Endorser = struct
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt `Main >>=? fun block_stream ->
+    cctxt#message "Endorser started." >>= fun () ->
     Client_baking_endorsement.create cctxt ~delay delegates block_stream >>=? fun () ->
     ignore min_date;
     return_unit
@@ -56,6 +59,7 @@ module Baker = struct
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt `Main >>=? fun block_stream ->
+    cctxt#message "Baker started." >>= fun () ->
     Client_baking_forge.create cctxt
       ?fee_threshold ?max_priority ~max_waiting_time ~context_path delegates block_stream >>=? fun () ->
     ignore min_date;
@@ -70,6 +74,7 @@ module Accuser = struct
     Client_baking_blocks.monitor_valid_blocks
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt ~chains:[ `Main ] () >>=? fun valid_blocks_stream ->
+    cctxt#message "Accuser started." >>= fun () ->
     Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream >>=? fun () ->
     return_unit
 
