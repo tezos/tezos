@@ -324,8 +324,57 @@ For instance:
       "next_protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
     $ tezos-activate-alpha
       Injected BMV9KnSPE1yw
-    $ tezos-client rpc get /chains/main/blocks/head/metadata/next_protocol_hash
+    $ tezos-client rpc get /chains/main/blocks/head/metadata
       "protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
+
+
+We now have the possibility to send transactions to the sandboxed network.
+As the genesis block used to initialize the sandboxed network differs from the
+one used in Alphanet and Zeronet, it is not possible to use the faucet to obtain
+free Tezzies. However, we can use the preconfigured accounts.
+
+Let's check the list of existing accounts:
+
+::
+
+   $ tezos-client list known addresses
+
+     activator: tz1TGu6TN5GSez2ndXXeDX6LgUDvLzPLqgYV (unencrypted sk known)
+     bootstrap5: tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv (unencrypted sk known)
+     bootstrap4: tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv (unencrypted sk known)
+     bootstrap3: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU (unencrypted sk known)
+     bootstrap2: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN (unencrypted sk known)
+     bootstrap1: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx (unencrypted sk known)
+
+We can run the following command to transfer some Tezzies from one account to
+another:
+
+::
+
+   shell1~$ tezos-client transfer 42 from bootstrap1 to bootstrap2
+   ...
+   Waiting for the operation to be included...
+
+
+However, we need one more step to include the transaction in the
+chain, we need somebode to bake it in a block.
+To do so, we can run the following command in a new shell (``shell2``):
+
+::
+
+   shell2~$ tezos-client bake for bootstrap1
+
+If the previous transaction is valid, the operation is baked and included in the
+chain. We obtain the following output in ``shell1``:
+
+::
+
+   shell1~$ ...
+   Operation found in block: BKt5P9WuUcG5CioQbpn13gUiCWEWCEdcG6JGzNFrCHrHtLHVfh8 (pass: 3, offset: 0)
+   This sequence of operations was run:
+   ...
+
+
 
 Tune protocol alpha parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
