@@ -1023,7 +1023,7 @@ let rec remaining_spec :
     | AddArg (Constant _, rest) ->
         remaining_spec seen rest
     | AddArg (arg, rest) ->
-       let { long ; _ } = get_arg_label arg in
+        let { long ; _ } = get_arg_label arg in
         if TzString.Set.mem long seen
         then remaining_spec seen rest
         else get_arg arg @ remaining_spec seen rest
