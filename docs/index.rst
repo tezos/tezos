@@ -32,7 +32,6 @@ The Community
  - Several community built block explorers are available:
 
     - http://tzscan.io
-    - https://tezos.id
     - https://tezex.info
 
 - A few community run websites collect useful Tezos links:
