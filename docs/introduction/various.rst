@@ -327,13 +327,11 @@ For instance:
     $ tezos-client rpc get /chains/main/blocks/head/metadata
       "protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
 
-
 We now have the possibility to send transactions to the sandboxed network.
 As the genesis block used to initialize the sandboxed network differs from the
-one used in Alphanet and Zeronet, it is not possible to use the faucet to obtain
-free Tezzies. However, we can use the preconfigured accounts.
-
-Let's check the list of existing accounts:
+one used in Alphanet and Zeronet, it is not possible to activate
+accounts obtained from the faucet. However, we can use the
+preconfigured accounts which can be listed with:
 
 ::
 
@@ -346,34 +344,30 @@ Let's check the list of existing accounts:
      bootstrap2: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN (unencrypted sk known)
      bootstrap1: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx (unencrypted sk known)
 
-We can run the following command to transfer some Tezzies from one account to
+We can run the following command to transfer some Tez from one account to
 another:
 
 ::
 
-   shell1~$ tezos-client transfer 42 from bootstrap1 to bootstrap2
+   $ tezos-client transfer 42 from bootstrap1 to bootstrap2 &
    ...
    Waiting for the operation to be included...
 
-
-However, we need one more step to include the transaction in the
-chain, we need somebode to bake it in a block.
-To do so, we can run the following command in a new shell (``shell2``):
-
-::
-
-   shell2~$ tezos-client bake for bootstrap1
-
-If the previous transaction is valid, the operation is baked and included in the
-chain. We obtain the following output in ``shell1``:
+You will notice that this command doesn't terminate (hence the ``&``),
+as usual it is waiting for the network to include the transaction in a
+block.
+Given that we are in a sandbox we need to bake a block ourselves and
+we can do so with the following command:
 
 ::
 
-   shell1~$ ...
-   Operation found in block: BKt5P9WuUcG5CioQbpn13gUiCWEWCEdcG6JGzNFrCHrHtLHVfh8 (pass: 3, offset: 0)
-   This sequence of operations was run:
-   ...
+   $ tezos-client bake for bootstrap1
 
+If the previous transaction is valid, the operation is included in the
+chain and the transfer terminates returning the usual ticket.
+Note that the ``bake for`` command of the client is exclusively for
+testing purposes, all baking should be done using the ``tezos-baker``
+binary.
 
 
 Tune protocol alpha parameters
