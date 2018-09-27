@@ -43,7 +43,46 @@ let description =
    all connected devices."
 
 let hard = Int32.logor 0x8000_0000l
+let unhard = Int32.logand 0x7fff_ffffl
+let is_hard n = Int32.logand 0x8000_0000l n <> 0l
 let tezos_root = [hard 44l ; hard 1729l]
+
+module Bip32_path = struct
+  let node_of_string str =
+    match Int32.of_string_opt str with
+    | Some node -> Some node
+    | None ->
+        match Int32.of_string_opt String.(sub str 0 ((length str) - 1)) with
+        | None -> None
+        | Some node -> Some (hard node)
+
+  let node_of_string_exn str =
+    match node_of_string str with
+    | None ->
+        invalid_arg (Printf.sprintf "node_of_string_exn: got %S" str)
+    | Some str -> str
+
+  let pp_node ppf node =
+    match is_hard node with
+    | true -> Fmt.pf ppf "%ld'" (unhard node)
+    | false -> Fmt.pf ppf "%ld" node
+
+  let string_of_node = Fmt.to_to_string pp_node
+
+  let path_of_string_exn s =
+    match String.split_on_char '/' s with
+    | [""] -> []
+    | nodes ->
+        List.map node_of_string_exn nodes
+
+  let path_of_string s =
+    try Some (path_of_string_exn s) with _ -> None
+
+  let pp_path =
+    Fmt.(list ~sep:(const char '/') pp_node)
+
+  let string_of_path = Fmt.to_to_string pp_path
+end
 
 (* Those are always valid on Ledger Nano S with latest firmware. *)
 let vendor_id = 0x2c97
@@ -453,6 +492,30 @@ let commands =
                          Signature.Public_key.pp pk >>= fun () ->
                        return_unit
         ) ;
+
+      Clic.command ~group
+        ~desc: "Query the path of the authorized key"
+        no_options
+        (prefixes [ "get" ; "ledger" ; "authorized" ; "path" ; "for" ]
+         @@ Public_key.alias_param
+         @@ stop)
+        (fun () (name, (pk_uri, _)) (cctxt : Client_context.io_wallet) ->
+           pkh_of_pk_uri pk_uri >>=? fun root_pkh ->
+           with_ledger root_pkh begin fun h _version _of_curve _to_curve ->
+             wrap_ledger_cmd begin fun pp ->
+               Ledgerwallet_tezos.get_authorized_key ~pp h
+             end >>=? function
+             | [] ->
+                 cctxt#message
+                   "@[<v 0>No baking key authorized for %s@]" name
+                 >>= fun () ->
+                 return_unit
+             | path ->
+                 cctxt#message
+                   "@[<v 0>Authorized baking path: %a@]"
+                   Bip32_path.pp_path path >>= fun () ->
+                 return_unit
+           end) ;
 
       Clic.command ~group
         ~desc: "Authorize a Ledger to bake for a key"

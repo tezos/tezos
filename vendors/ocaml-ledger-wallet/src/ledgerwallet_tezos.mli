@@ -36,7 +36,13 @@ val get_git_commit :
   ?pp:Format.formatter -> ?buf:Cstruct.t ->
   Hidapi.t -> (string, Transport.error) result
 (** [get_git_commit ?pp ?buf ledger] is the git commit information of
-   the Ledger app running at [ledger]. *)
+    the Ledger app running at [ledger]. *)
+
+val get_authorized_key :
+  ?pp:Format.formatter -> ?buf:Cstruct.t ->
+  Hidapi.t -> (int32 list, Transport.error) result
+(** [get_authorized_key ?pp ?buf ledger] is the BIP32 path of the key
+    authorized to bake on the Ledger app running at [ledger]. *)
 
 val get_public_key :
   ?prompt:bool ->

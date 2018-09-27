@@ -63,6 +63,7 @@ type ins =
   | Sign_unsafe
   | Reset_high_watermark
   | Query_high_watermark
+  | Get_authorized_key
 
 let int_of_ins = function
   | Version -> 0x00
@@ -74,6 +75,7 @@ let int_of_ins = function
   | Reset_high_watermark -> 0x06
   | Query_high_watermark -> 0x08
   | Git_commit -> 0x09
+  | Get_authorized_key -> 0x07
 
 type curve =
   | Ed25519
@@ -97,6 +99,16 @@ let get_git_commit ?pp ?buf h =
   let apdu = Apdu.create (wrap_ins Git_commit) in
   Transport.apdu ~msg:"get_git_commit" ?pp ?buf h apdu >>|
   Cstruct.to_string
+
+let get_authorized_key ?pp ?buf h =
+  let apdu = Apdu.create (wrap_ins Get_authorized_key) in
+  Transport.apdu ~msg:"get_authorized_key" ?pp ?buf h apdu >>| fun path ->
+  let rec read_numbers acc path =
+    if Cstruct.len path = 0 then List.rev acc
+    else
+      read_numbers (Cstruct.BE.get_uint32 path 0 :: acc)
+        (Cstruct.shift path 4) in
+  read_numbers [] (Cstruct.shift path 1)
 
 let write_path cs path =
   ListLabels.fold_left path ~init:cs ~f:begin fun cs i ->

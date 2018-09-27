@@ -23,6 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Bip32_path : sig
+  val node_of_string : string -> int32 option
+  val node_of_string_exn : string -> int32
+  val pp_node : int32 Fmt.t
+  val string_of_node : int32 -> string
+
+  val path_of_string : string -> int32 list option
+  val path_of_string_exn : string -> int32 list
+  val pp_path : int32 list Fmt.t
+  val string_of_path : int32 list -> string
+end
+
 include Client_keys.SIGNER
 
 val commands : unit -> Client_context.io_wallet Clic.command list
