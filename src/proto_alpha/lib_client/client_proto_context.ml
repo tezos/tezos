@@ -383,3 +383,46 @@ let activate_existing_account
         alias pkh activation_code
   | Some _ -> failwith "Only Ed25519 accounts can be activated"
   | None -> failwith "Unknown account"
+
+let pp_operation formatter (a : Alpha_block_services.operation) =
+  match a.receipt, a.protocol_data with
+  | Apply_results.Operation_metadata omd, Operation_data od -> (
+      match Apply_results.kind_equal_list od.contents omd.contents
+      with
+      | Some Apply_results.Eq ->
+          Operation_result.pp_operation_result formatter 
+            (od.contents, omd.contents) 
+      | None -> Pervasives.failwith "Unexpected result.")
+  | _ -> Pervasives.failwith "Unexpected result."
+
+let get_operation_from_block
+    (cctxt : #Client_context.full)
+    ~chain
+    predecessors
+    operation_hash =
+  Client_confirmations.lookup_operation_in_previous_blocks
+    cctxt 
+    ~chain 
+    ~predecessors 
+    operation_hash
+  >>=? function
+  | None -> return_none
+  | Some (block, i, j) -> 
+      cctxt#message "Operation found in block: %a (pass: %d, offset: %d)"
+        Block_hash.pp block i j >>= fun () ->
+      Proto_alpha.Alpha_block_services.Operations.operation cctxt 
+        ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
+
+let display_receipt_for_operation
+    (cctxt : #Proto_alpha.full)
+    ~chain
+    ?(predecessors = 10)
+    operation_hash =
+  get_operation_from_block cctxt ~chain predecessors operation_hash
+  >>=? function 
+  | None -> 
+      cctxt#message "Couldn't find operation" >>= fun () -> 
+      return_unit
+  | Some op -> 
+      cctxt#message "%a" pp_operation op >>= fun () ->
+      return_unit
