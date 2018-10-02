@@ -324,8 +324,51 @@ For instance:
       "next_protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
     $ tezos-activate-alpha
       Injected BMV9KnSPE1yw
-    $ tezos-client rpc get /chains/main/blocks/head/metadata/next_protocol_hash
+    $ tezos-client rpc get /chains/main/blocks/head/metadata
       "protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
+
+We now have the possibility to send transactions to the sandboxed network.
+As the genesis block used to initialize the sandboxed network differs from the
+one used in Alphanet and Zeronet, it is not possible to activate
+accounts obtained from the faucet. However, we can use the
+preconfigured accounts which can be listed with:
+
+::
+
+   $ tezos-client list known addresses
+
+     activator: tz1TGu6TN5GSez2ndXXeDX6LgUDvLzPLqgYV (unencrypted sk known)
+     bootstrap5: tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv (unencrypted sk known)
+     bootstrap4: tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv (unencrypted sk known)
+     bootstrap3: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU (unencrypted sk known)
+     bootstrap2: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN (unencrypted sk known)
+     bootstrap1: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx (unencrypted sk known)
+
+We can run the following command to transfer some Tez from one account to
+another:
+
+::
+
+   $ tezos-client transfer 42 from bootstrap1 to bootstrap2 &
+   ...
+   Waiting for the operation to be included...
+
+You will notice that this command doesn't terminate (hence the ``&``),
+as usual it is waiting for the network to include the transaction in a
+block.
+Given that we are in a sandbox we need to bake a block ourselves and
+we can do so with the following command:
+
+::
+
+   $ tezos-client bake for bootstrap1
+
+If the previous transaction is valid, the operation is included in the
+chain and the transfer terminates returning the usual ticket.
+Note that the ``bake for`` command of the client is exclusively for
+testing purposes, all baking should be done using the ``tezos-baker``
+binary.
+
 
 Tune protocol alpha parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

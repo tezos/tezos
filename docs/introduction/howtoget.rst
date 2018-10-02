@@ -178,7 +178,8 @@ hundred times you are allowed to disable it with
 ``TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y``.
 
 To add the default opam repository at a lower priority (for example to
-install or test other opam packages), you can use the following command:
+install merlin or test other opam packages), you can use the following
+command:
 
 ::
 
