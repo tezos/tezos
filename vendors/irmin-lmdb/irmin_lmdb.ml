@@ -677,7 +677,19 @@ module Make
         let root = match root with None -> "irmin.ldb" | Some root -> root in
         if not (Sys.file_exists root) then Unix.mkdir root 0o755 ;
         let flags = if readonly then [ Lmdb.RdOnly ] else [] in
-        let flags = Lmdb.NoRdAhead :: Lmdb.NoTLS :: flags in
+        let sync_flag =
+          match Sys.getenv_opt "TEZOS_CONTEXT_SYNC" with
+          | None -> []
+          | Some s ->
+              match String.lowercase_ascii s with
+              | "nosync" -> [ Lmdb.NoSync ]
+              | "nometasync" -> [ Lmdb.NoMetaSync ]
+              | _ ->
+                  Printf.eprintf "Unrecognized TEZOS_SYNC option : %s\n\
+                                  allowed: nosync nometasync" s;
+                  []
+        in
+        let flags = sync_flag @ Lmdb.NoRdAhead :: Lmdb.NoTLS :: flags in
         let file_flags = if readonly then 0o444 else 0o644 in
         match Lmdb.opendir ~mapsize ~flags root file_flags with
         | Error err -> Lwt.fail_with (Lmdb.string_of_error err)
