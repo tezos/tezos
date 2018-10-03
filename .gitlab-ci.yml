@@ -603,7 +603,7 @@ publish:doc:
     - echo "${CI_PK_ALPHANET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
     - echo "${CI_SSH_CONFIG}" | tr -d "\r" > ~/.ssh/config
     - chmod 600 ~/.ssh/id_ed25519
-    - sudo apk add --no-cache openssh
+    - apk add --no-cache openssh
   allow_failure: true
   tags:
     - gitlab-org
