@@ -9,6 +9,7 @@ stages:
   - test
   - packaging
   - publish
+  - deploy
 
 
 ############################################################
@@ -587,3 +588,36 @@ publish:doc:
       fi
   tags:
     - gitlab-org
+
+## Relaunching the bootstrap servers of the zeronet
+
+.deploy_template: &deploy_definition
+  image: ${opam_image}
+  stage: deploy
+  only:
+    - zeronet@tezos/tezos
+  dependencies: []
+  before_script:
+    - echo "${CI_KH}" > ~/.ssh/known_hosts
+    - echo "${CI_PK_ALPHANET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
+    - echo "${CI_SSH_CONFIG}" | tr -d "\r" > ~/.ssh/config
+    - chmod 600 ~/.ssh/id_ed25519
+    - sudo apk add --no-cache openssh
+  allow_failure: true
+  tags:
+    - gitlab-org
+
+deploy:zeronet1:
+  <<: *deploy_definition
+  script:
+    - ssh zeronet1
+
+deploy:zeronet2:
+  <<: *deploy_definition
+  script:
+    - ssh zeronet2
+
+deploy:zeronet3:
+  <<: *deploy_definition
+  script:
+    - ssh zeronet3
