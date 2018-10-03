@@ -592,7 +592,7 @@ publish:doc:
 ## Relaunching the bootstrap servers of the zeronet
 
 .deploy_template: &deploy_definition
-  image: ${opam_image}
+  image: alpine:latest
   stage: deploy
   only:
     - zeronet@tezos/tezos
