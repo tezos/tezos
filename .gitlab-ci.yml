@@ -598,6 +598,7 @@ publish:doc:
     - zeronet@tezos/tezos
   dependencies: []
   before_script:
+    - mkdir -p ~/.ssh
     - echo "${CI_KH}" > ~/.ssh/known_hosts
     - echo "${CI_PK_ALPHANET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
     - echo "${CI_SSH_CONFIG}" | tr -d "\r" > ~/.ssh/config
