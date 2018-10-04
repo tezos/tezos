@@ -477,12 +477,9 @@ let commands =
                       (fun ppf (curve, _) ->
                          Format.fprintf ppf
                            "tezos-client import secret key \
-                            ledger_%s_%a_0_0 \"ledger://%a/0'/0'\" # \
-                            %a signature"
+                            ledger_%s \"ledger://%a/0'/0'\""
                            (Sys.getenv "USER")
-                           Ledgerwallet_tezos.pp_curve_short curve
-                           pp_id (Animals (animals, curve))
-                           Ledgerwallet_tezos.pp_curve curve))
+                           pp_id (Animals (animals, curve))))
                    of_curve >>= fun () ->
                  return_unit
                end ledgers) ;
