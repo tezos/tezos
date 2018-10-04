@@ -82,6 +82,23 @@ type curve =
   | Secp256k1
   | Secp256r1
 
+let pp_curve ppf = function
+  | Ed25519 -> Format.pp_print_string ppf "ed25519"
+  | Secp256k1 -> Format.pp_print_string ppf "secp256k1"
+  | Secp256r1 -> Format.pp_print_string ppf "P-256"
+
+let pp_curve_short ppf = function
+  | Ed25519 -> Format.pp_print_string ppf "ed"
+  | Secp256k1 -> Format.pp_print_string ppf "secp"
+  | Secp256r1 -> Format.pp_print_string ppf "p2"
+
+let curve_of_string str =
+  match String.lowercase_ascii str with
+  | "ed" | "ed25519" -> Some Ed25519
+  | "secp256k1" -> Some Secp256k1
+  | "p256" | "p-256" | "secp256r1" -> Some Secp256r1
+  | _ -> None
+
 let int_of_curve = function
   | Ed25519 -> 0x00
   | Secp256k1 -> 0x01

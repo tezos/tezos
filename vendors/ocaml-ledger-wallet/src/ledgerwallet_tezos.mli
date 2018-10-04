@@ -26,6 +26,10 @@ type curve =
   | Secp256k1
   | Secp256r1
 
+val curve_of_string : string -> curve option
+val pp_curve : Format.formatter -> curve -> unit
+val pp_curve_short : Format.formatter -> curve -> unit
+
 val get_version :
   ?pp:Format.formatter -> ?buf:Cstruct.t ->
   Hidapi.t -> (Version.t, Transport.error) result
