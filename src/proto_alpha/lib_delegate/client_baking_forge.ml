@@ -991,6 +991,7 @@ let create
     let constants =
       tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Hash (bi.Client_baking_blocks.hash, 0))) in
     Client_baking_simulator.load_context ~context_path >>= fun index ->
+    Client_baking_simulator.check_context_consistency index bi.context >>=? fun () ->
     let state = create_state ?fee_threshold  ~max_waiting_time genesis_hash  context_path index delegates constants in
     return state
   in
