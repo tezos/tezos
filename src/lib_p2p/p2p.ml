@@ -718,7 +718,7 @@ let build_rpc_directory net =
         | None -> RPC_answer.not_found
         | Some pool ->
             P2p_pool.Peers.forget pool peer_id ;
-            RPC_answer.return ()
+            RPC_answer.return_unit
       end in
 
   let dir =
@@ -729,7 +729,7 @@ let build_rpc_directory net =
         | Some pool ->
             P2p_pool.Peers.unset_trusted pool peer_id;
             P2p_pool.Peers.ban pool peer_id ;
-            RPC_answer.return ()
+            RPC_answer.return_unit
       end in
 
   let dir =
@@ -739,7 +739,7 @@ let build_rpc_directory net =
         | None -> RPC_answer.not_found
         | Some pool ->
             P2p_pool.Peers.set_trusted pool peer_id ;
-            RPC_answer.return ()
+            RPC_answer.return_unit
       end in
 
   let dir =
@@ -823,7 +823,7 @@ let build_rpc_directory net =
         | None -> RPC_answer.not_found
         | Some pool ->
             P2p_pool.Points.forget pool point ;
-            RPC_answer.return ()
+            RPC_answer.return_unit
       end in
 
   let dir =
@@ -834,7 +834,7 @@ let build_rpc_directory net =
         | Some pool ->
             P2p_pool.Points.unset_trusted pool point;
             P2p_pool.Points.ban pool point;
-            RPC_answer.return ()
+            RPC_answer.return_unit
       end in
 
   let dir =
@@ -844,7 +844,7 @@ let build_rpc_directory net =
         | None -> RPC_answer.not_found
         | Some pool ->
             P2p_pool.Points.set_trusted pool point ;
-            RPC_answer.return ()
+            RPC_answer.return_unit
       end in
 
   let dir =
