@@ -102,6 +102,30 @@ let bytes_jsont =
        (fun h -> `Hex h)
        string)
 
+let check_utf8 s =
+  Uutf.String.fold_utf_8 (fun valid _pos -> function
+      | `Uchar _ -> valid
+      | `Malformed _ -> false)
+    true s
+
+let raw_string_encoding =
+  let open Json_encoding in
+  let utf8_case =
+    case string (fun s -> if check_utf8 s then Some s else None) (fun s -> s)
+  in
+  let obj_case =
+    case
+      (obj1 (req "invalid_utf8_string" (array (ranged_int ~minimum:0 ~maximum:255 "byte"))))
+      (fun s -> Some (Array.init (String.length s) (fun i -> Char.code s.[i])))
+      (fun a -> String.init (Array.length a) (fun i -> Char.chr a.(i)))
+  in
+  def
+    "unistring"
+    ~title:"Universal string representation"
+    ~description:"Either a plain UTF8 string, or a sequence of bytes for strings \
+                  that contain invalid byte sequences."
+    (union [ utf8_case ; obj_case ])
+
 let rec lift_union : type a. a Encoding.t -> a Encoding.t = fun e ->
   let open Encoding in
   match e.encoding with
@@ -200,8 +224,8 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
                     Unexpected (Format.asprintf "string (len %d)" found,
                                 Format.asprintf "string (len %d)" expected))) ;
         s in
-      conv check check string
-  | String _ -> string
+      conv check check raw_string_encoding
+  | String _ -> raw_string_encoding
   | Padded (e, _) -> get_json e
   | Bytes (`Fixed expected) ->
       let check s =

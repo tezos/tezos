@@ -28,13 +28,13 @@ val to_words : t -> string list
 (** [to_words mnemonic] is the list of words corresponding to
     [mnemonic]. *)
 
-val of_entropy : Cstruct.t -> t
+val of_entropy : Bigstring.t -> t
 (** [of_entropy bytes] is the mnemonic derived from [bytes].
 
     @raises [Invalid_argument] is [List.length bytes] is not in { 16,
     20, 24, 28, 32 }. *)
 
-val to_seed : ?passphrase:string -> t -> Cstruct.t
+val to_seed : ?passphrase:Bigstring.t -> t -> Bigstring.t
 (** [to_seed ?passphrase mnemonic] is 64 bytes derived from a BIP39
     mnemonic [mnemonic], using the optional passphrase [passphrase] if
     provided. *)

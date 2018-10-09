@@ -40,6 +40,15 @@ let create_input () =
   { watchers = [];
     cpt = 0 }
 
+let shutdown_input input =
+  let { watchers ; _ } = input in
+  List.iter (fun w ->
+      w.active <- false ;
+      w.push None
+    ) watchers ;
+  input.cpt <- 0 ;
+  input.watchers <- []
+
 let create_fake_stream () =
   let str, push = Lwt_stream.create () in
   str, (fun () -> push None)

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.nonce_revelation" end)
+
 open Proto_alpha
 
 let inject_seed_nonce_revelation rpc_config ?(chain = `Main) block ?async nonces =
@@ -43,8 +45,11 @@ let forge_seed_nonce_revelation
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   match nonces with
   | [] ->
-      cctxt#message "No nonce to reveal for block %a"
-        Block_hash.pp_short hash >>= fun () ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "Nothing to reveal for block %a"
+          -% t event "no_nonce_reveal"
+          -% a Block_hash.Logging.tag hash
+        ) >>= fun () ->
       return_unit
   | _ ->
       inject_seed_nonce_revelation cctxt ~chain block nonces >>=? fun oph ->

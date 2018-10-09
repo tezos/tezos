@@ -344,6 +344,8 @@ module Prefix = struct
   (* 33 *)
   let secp256k1_public_key = "\003\254\226\086" (* sppk(55) *)
   let p256_public_key = "\003\178\139\127" (* p2pk(55) *)
+  let secp256k1_scalar = "\038\248\136" (* SSp(53) *)
+  let secp256k1_element = "\005\092\000" (* GSp(54) *)
 
   (* 64 *)
   let ed25519_secret_key = "\043\246\078\007" (* edsk(98) *)

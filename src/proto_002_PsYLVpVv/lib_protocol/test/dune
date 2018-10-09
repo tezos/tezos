@@ -24,7 +24,7 @@
 (alias
  (name runtest_proto_002_PsYLVpVv)
  (package tezos-protocol-002-PsYLVpVv)
- (action (chdir ${ROOT} (run %{exe:main.exe} -v -q))))
+ (action (chdir %{workspace_root} (run %{exe:main.exe} -v -q))))
 
 ; runs both `Quick and `Slow tests
 (alias

@@ -2,4 +2,4 @@
  (name        pbkdf)
  (public_name pbkdf)
  (synopsis "")
- (libraries nocrypto))
+ (libraries bigstring hacl))

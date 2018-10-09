@@ -109,6 +109,9 @@ module Chain : sig
 
 end
 
+(** {2 Block header manipulation} ******************************************)
+
+
 (** {2 Block database} *****************************************************)
 
 module Block : sig
@@ -140,6 +143,37 @@ module Block : sig
     Block_header.t ->
     error list ->
     bool tzresult Lwt.t
+
+  module Header : sig
+    type t
+    type block_header = t
+
+    val known: Chain.t -> Block_hash.t -> bool Lwt.t
+
+    val read: Chain.t -> ?pred:int -> Block_hash.t -> block_header tzresult Lwt.t
+    val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block_header option Lwt.t
+    val read_exn: Chain.t -> ?pred:int -> Block_hash.t -> block_header Lwt.t
+    val of_block: block -> block_header
+    val to_block: Chain.t -> block_header -> block option Lwt.t
+
+    val compare: t -> t -> int
+    val equal: t -> t -> bool
+
+    val hash: t -> Block_hash.t
+    val header: t -> Block_header.t
+    val shell_header: t -> Block_header.shell_header
+    val timestamp: t -> Time.t
+    val fitness: t -> Fitness.t
+    val validation_passes: t -> int
+    val level: t -> Int32.t
+
+    val all_operation_hashes: Chain.t -> block_header -> Operation_hash.t list list Lwt.t
+
+    val predecessor : Chain.t -> block_header -> block_header option Lwt.t
+    val predecessor_n : Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
+
+  end
+
 
   val compare: t -> t -> int
   val equal: t -> t -> bool

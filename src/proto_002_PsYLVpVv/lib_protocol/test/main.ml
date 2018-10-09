@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let () =
-  Alcotest.run "protocol_alpha" [
+  Alcotest.run "protocol_002_PsYLVpVv" [
     "transfer", Transfer.tests ;
     "origination", Origination.tests ;
     "activation", Activation.tests ;
@@ -35,4 +35,5 @@ let () =
     "baking", Baking.tests ;
     "delegation", Delegation.tests ;
     "rolls", Rolls.tests ;
+    "combined", Combined_operations.tests ;
   ]

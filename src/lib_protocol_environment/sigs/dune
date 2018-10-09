@@ -1,7 +1,7 @@
 (rule
  (targets v1.ml)
  (deps
-  
+
   ;; Part of OCaml stdlib
   v1/pervasives.mli
   v1/list.mli

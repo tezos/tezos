@@ -146,9 +146,9 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       cctxt#prompt_password
         "Enter the password used for the paper wallet: " >>=? fun password ->
       (* TODO: unicode normalization (NFKD)... *)
-      let sk =
-        Bip39.to_seed ~passphrase:(email ^ MBytes.to_string password) t in
-      let sk = Cstruct.(to_bigarray (sub sk 0 32)) in
+      let passphrase = MBytes.(concat "" [of_string email ; password]) in
+      let sk = Bip39.to_seed ~passphrase t in
+      let sk = MBytes.sub sk 0 32 in
       let sk : Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk) in

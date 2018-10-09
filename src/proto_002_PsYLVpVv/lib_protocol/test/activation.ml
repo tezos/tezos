@@ -28,12 +28,11 @@
     a public key hash (pkh) and a secret.
 
     The commitments are composed of :
-    - half a pkh ;
     - a blinded pkh that can be revealed by the secret ;
     - an amount.
 
     The commitments and the secrets are generated from
-    /scripts/create_genesis/create_genenis.py and should be coherent.
+    /scripts/create_000_Ps9mPmXa/create_genenis.py and should be coherent.
 *)
 
 open Proto_alpha
@@ -68,14 +67,18 @@ type secret_account = {
 }
 
 let secrets () =
-  (* Exported from proto_alpha client - TODO : remove when relocated to lib_crypto *)
+  (* Exported from proto_002_PsYLVpVv client - TODO : remove when relocated to lib_crypto *)
   let read_key mnemonic email password =
     match Bip39.of_words mnemonic with
     | None -> assert false
     | Some t ->
         (* TODO: unicode normalization (NFKD)... *)
-        let sk = Bip39.to_seed ~passphrase:(email ^ password) t in
-        let sk = Cstruct.(to_bigarray (sub sk 0 32)) in
+        let passphrase = MBytes.(concat "" [
+            of_string email ;
+            of_string password ;
+          ]) in
+        let sk = Bip39.to_seed ~passphrase t in
+        let sk = MBytes.sub sk 0 32 in
         let sk : Signature.Secret_key.t =
           Ed25519 (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk) in
         let pk = Signature.Secret_key.to_public_key sk in

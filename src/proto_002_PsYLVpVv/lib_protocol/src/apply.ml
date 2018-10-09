@@ -595,27 +595,35 @@ let apply_manager_contents
       Lwt.return
         (`Failure, Failed (manager_kind operation, errors), [])
 
+let skipped_operation_result
+  : type kind. kind manager_operation -> kind manager_operation_result
+  = function operation ->
+  match operation with
+  | Reveal _ ->
+      Applied ( Reveal_result : kind successful_manager_operation_result )
+  | _ -> Skipped (manager_kind operation)
+
 let rec mark_skipped
   : type kind.
     baker : Signature.Public_key_hash.t -> Level.t -> kind Kind.manager contents_list ->
   kind Kind.manager contents_result_list = fun ~baker level -> function
-  | Single (Manager_operation ({ source ; fee } as op)) ->
+  | Single (Manager_operation { source ; fee ; operation } ) ->
       Single_result
         (Manager_operation_result
            { balance_updates =
                Delegate.cleanup_balance_updates
                  [ Contract source, Debited fee ;
                    Fees (baker, level.cycle), Credited fee ] ;
-             operation_result = Skipped (manager_kind op.operation) ;
+             operation_result = skipped_operation_result operation ;
              internal_operation_results = [] })
-  | Cons (Manager_operation ({ source ; fee } as op), rest) ->
+  | Cons (Manager_operation { source ; fee ; operation } , rest) ->
       Cons_result
         (Manager_operation_result {
             balance_updates =
               Delegate.cleanup_balance_updates
                 [ Contract source, Debited fee ;
                   Fees (baker, level.cycle), Credited fee ] ;
-            operation_result = Skipped (manager_kind op.operation) ;
+            operation_result = skipped_operation_result operation ;
             internal_operation_results = [] },
          mark_skipped ~baker level rest)
 
@@ -707,6 +715,7 @@ let mark_backtracked results =
     : type kind. kind manager_operation_result -> kind manager_operation_result
     = function
       | Failed _ | Skipped _ | Backtracked _ as result -> result
+      | Applied Reveal_result as result -> result
       | Applied result -> Backtracked (result, None) in
   mark_contents_list results
 

@@ -187,11 +187,11 @@ For more advanced key management we offer :ref:`ledger support
 
 .. _faucet:
 
-Get free Tezzies
-~~~~~~~~~~~~~~~~
+Get free tez
+~~~~~~~~~~~~
 
 In order to test the networks and help users get familiar with the
-system, on Zeronet and Alphanet you can obtain free Tezzies from a
+system, on Zeronet and Alphanet you can obtain free tez from a
 `faucet <https://faucet.tzalpha.net>`__.
 
 This will provide a wallet in the form of a JSON file
@@ -222,7 +222,7 @@ Please drink carefully and don't abuse the faucet: it only contains
 Transactions
 ~~~~~~~~~~~~
 
-Let's transfer some tezzies to the new account:
+Let's transfer some tez to the new account:
 
 ::
 

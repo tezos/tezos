@@ -18,7 +18,7 @@ delegate, you can always take part in the protocol by delegating your
 coins to one.
 
 Implicit accounts cannot have a delegate, so the first step is to
-originate an account, transfer your tezzies there and set a delegate.
+originate an account, transfer your tez there and set a delegate.
 Notice that an originated account is a special case of a contract
 without code, so it is still necessary to pay for its small storage
 (see `originated_account`).

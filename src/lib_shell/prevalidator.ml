@@ -122,9 +122,12 @@ let rpc_directory protocol =
         return protocol
   end >>=? fun (module Proto) ->
   let module Proto_services = Block_services.Make(Proto)(Proto) in
-  return @@
-  RPC_directory.register
-    RPC_directory.empty
+
+  let dir : state RPC_directory.t ref = ref RPC_directory.empty in
+  let register s f =
+    dir := RPC_directory.register !dir s f in
+
+  register
     (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
     (fun pv () () ->
        let map_op op =
@@ -147,7 +150,17 @@ let rpc_directory protocol =
            Operation_hash.Map.map map_op_error pv.validation_result.branch_delayed ;
          unprocessed =
            Operation_hash.Map.map map_op pv.pending ;
-       })
+       }) ;
+
+  Prevalidation.build_rpc_directory protocol >>=? fun prevalidation_dir ->
+  let prevalidation_dir =
+    RPC_directory.map (fun state ->
+        match state.validation_state with
+        | Error _ -> assert false
+        | Ok pv -> Lwt.return (pv, state.validation_result)
+      ) prevalidation_dir in
+
+  return (RPC_directory.merge !dir prevalidation_dir)
 
 let list_pendings ?maintain_chain_db  ~from_block ~to_block old_mempool =
   let rec pop_blocks ancestor block mempool =
@@ -302,6 +315,7 @@ let handle_unprocessed w pv =
               Operation_hash.Map.empty ;
             advertise w pv
               (mempool_of_prevalidation_result validation_result) ;
+            Prevalidation.notify_operation validation_state validation_result ;
             Lwt.return_unit
   end >>= fun () ->
   pv.mempool <-
@@ -448,6 +462,9 @@ let on_request
           (* TODO: rebase the advertisement instead *)
           let chain_state = Distributed_db.chain_state pv.chain_db in
           State.Block.read chain_state hash >>=? fun block ->
+          begin match pv.validation_state with
+            | Ok pv -> Prevalidation.shutdown_operation_input pv
+            | Error _ -> () end ;
           on_flush w pv block >>=? fun () ->
           return (() : r)
       | Request.Notify (peer, mempool) ->

@@ -29,6 +29,7 @@ type 'a input
 type stopper
 
 val create_input : unit -> 'a input
+val shutdown_input : 'a input -> unit
 val notify : 'a input -> 'a -> unit
 val create_stream : 'a input -> 'a Lwt_stream.t * stopper
 val create_fake_stream : unit -> 'a Lwt_stream.t * stopper

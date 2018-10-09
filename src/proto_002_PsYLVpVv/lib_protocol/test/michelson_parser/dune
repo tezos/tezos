@@ -1,8 +1,7 @@
 (library
  (name michelson_parser)
  (libraries tezos-base
-            tezos_002_PsYLVpVv_test_helpers
-            )
+            tezos_002_PsYLVpVv_test_helpers)
  (flags (:standard -w -9-32 -safe-string
                    -open Tezos_base__TzPervasives
                    -open Tezos_002_PsYLVpVv_test_helpers)))

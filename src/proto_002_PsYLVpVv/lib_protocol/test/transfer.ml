@@ -31,10 +31,22 @@ open Test_tez
 (* Utility functions                                                 *)
 (*********************************************************************)
 
-(** 1- Transfer the amount of tez from a source contract to a
-       destination contract with or without the fee of transfer.
+(**
+   [transfer_and_check_balances b fee src dst amount]
+   this function takes a block, an optional parameter fee if fee does not
+   given it will be set to zero tez, a source contract, a destination contract
+   and the amount that one wants to transfer.
+
+   1- Transfer the amount of tez (w/wo fee) from a source contract to a
+       destination contract.
+
     2- Check the equivalent of the balance of the source/destination
-       contract before and after the transfer *)
+       contract before and after transfer is valided.
+
+   This function returns a pair:
+   - A block that added a valid operation
+   - a valid operation
+*)
 let transfer_and_check_balances ~loc b ?(fee=Tez.zero) ?expect_failure src dst amount =
   Tez.(+?) fee amount >>?= fun amount_fee ->
   Context.Contract.balance (I b) src >>=? fun bal_src ->
@@ -45,10 +57,21 @@ let transfer_and_check_balances ~loc b ?(fee=Tez.zero) ?expect_failure src dst a
   Assert.balance_was_credited ~loc (I b) dst bal_dst amount >>=? fun () ->
   return (b, op)
 
-(** 1- Transfer the amount of tez from/to a contract itself, with or
-       without fee of transfer.
-    2- Check the equivalent of the balance of the contract before
-       and after transfer *)
+(**
+   [transfer_to_itself_and_check_balances b fee contract amount]
+   this function takes a block, an optional parameter fee,
+   a contract that is a source and a destination contract,
+   and an amount of tez that one wants to transfer.
+
+   1- Transfer the amount of tez (w/wo transfer fee) from/to a contract itself.
+
+   2- Check the equivalent of the balance of the contract before
+       and after transfer.
+
+   This function returns a pair:
+   - a block that added the valid transaction
+   - an valid transaction
+*)
 let transfer_to_itself_and_check_balances ~loc b ?(fee=Tez.zero) contract amount =
   Context.Contract.balance (I b) contract >>=? fun bal ->
   Op.transaction (I b) ~fee contract contract amount >>=? fun op ->
@@ -56,7 +79,15 @@ let transfer_to_itself_and_check_balances ~loc b ?(fee=Tez.zero) contract amount
   Assert.balance_was_debited ~loc (I b) contract bal fee >>=? fun () ->
   return (b, op)
 
-(** Apply a transfer n times *)
+(**
+   [n_transactions n b fee source dest amount]
+   this function takes a number of "n" that one wish to transfer,
+   a block, an optional parameter fee, a source contract,
+   a destination contract and an amount one wants to transfer.
+
+   This function will do a transaction from a source contract to
+   a destination contract with the amount "n" times.
+*)
 let n_transactions n b ?fee source dest amount =
   fold_left_s (fun b _ ->
       transfer_and_check_balances ~loc:__LOC__ b ?fee source dest amount >>=? fun (b,_) ->
@@ -75,9 +106,20 @@ let register_two_contracts () =
   let contract_2 = List.nth contracts 1 in
   return (b, contract_1, contract_2)
 
-(** 1- Create a block and two contracts;
-    2- Add a single transfer into this block;
-    3- Bake this block. *)
+
+(** compute half of the balance and divided by nth
+    times *)
+
+let two_nth_of_balance incr contract nth =
+  Context.Contract.balance (I incr) contract >>=? fun balance ->
+  Tez.(/?) balance nth >>?= fun res ->
+  Tez.( *?) res 2L >>?= fun balance ->
+  return balance
+
+(********************)
+(** Single transfer *)
+(********************)
+
 let single_transfer ?fee ?expect_failure amount =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
@@ -90,7 +132,12 @@ let single_transfer ?fee ?expect_failure amount =
 let block_with_a_single_transfer () =
   single_transfer Tez.one
 
+(** single transfer with fee *)
+let block_with_a_single_transfer_with_fee () =
+  single_transfer ~fee:Tez.one Tez.one
+
 (** single transfer without fee *)
+
 let transfer_zero_tez () =
   single_transfer ~expect_failure:(
     function
@@ -100,72 +147,114 @@ let transfer_zero_tez () =
         failwith "Empty transaction should fail")
     Tez.zero
 
-(** single transfer with fee *)
-let block_with_a_single_transfer_with_fee () =
-  single_transfer ~fee:Tez.one Tez.one
+(********************)
+(** Transfer zero tez from an originated/implicit contract *)
+(********************)
 
-(** 1- Create a block, and a single contract;
-    2- Add the originate operation into this block;
-    3- Add a transfer from a contract to a contract created by
-       originate operation, that requires to pay a fee of transfer;
-    4- Bake this block. *)
-let block_originate_and_transfer_with_fee () =
+let transfer_zero_originated () =
+  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Incremental.begin_construction b >>=? fun i ->
+  (* originated the first contract *)
+  Op.origination (I i) contract_1 >>=? fun (operation, orig_contract_1) ->
+  Incremental.add_operation i operation >>=? fun i ->
+  Context.Contract.balance (I i) orig_contract_1 >>=? fun balance_1 ->
+  (* transfer all the tez inside the originated contract *)
+  transfer_and_check_balances ~loc:__LOC__ i
+    orig_contract_1 contract_2 balance_1 >>=? fun (i, _) ->
+  Op.transaction (I i) orig_contract_1 contract_2 Tez.zero >>=? fun op ->
+  Incremental.add_operation i op >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res begin function
+    | Contract_storage.Empty_transaction _ -> true
+    | _ -> false
+  end
+
+let transfer_zero_implicit () =
+  Context.init 1 >>=? fun (b, contracts) ->
+  let dest = List.nth contracts 0 in
+  let account = Account.new_account () in
+  Incremental.begin_construction b >>=? fun i ->
+  let src = Contract.implicit_contract account.Account.pkh in
+  Op.transaction (I i) src dest Tez.zero >>=? fun op ->
+  Incremental.add_operation i op >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res begin function
+    | Contract_storage.Empty_implicit_contract _ -> true
+    | _ -> false
+  end
+
+(********************)
+(** Transfer to originted contract *)
+(********************)
+
+let transfer_to_originate_with_fee () =
   Context.init 1 >>=? fun (b, contracts) ->
   let contract = List.nth contracts 0 in
   Incremental.begin_construction b >>=? fun b ->
+  two_nth_of_balance b contract 10L >>=? fun fee ->
+  (* originated contract, paying a fee to originated this contract *)
   Op.origination (I b) ~fee:ten_tez contract >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
-  transfer_and_check_balances ~loc:__LOC__ b ~fee:ten_tez contract new_contract ten_tez >>=? fun (b, _) ->
+  two_nth_of_balance b contract 3L >>=? fun amount ->
+  transfer_and_check_balances ~loc:__LOC__ b ~fee:fee contract
+    new_contract amount >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
 
-(** 1- Create a block, and two contracts;
-    2- Add a transfer from a current balance of a source contract
-       into this block;
-    3- Bake this block. *)
-let block_transfer_from_contract_balance () =
+(********************)
+(** Transfer from balance *)
+(********************)
+
+let transfer_amount_of_contract_balance () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
+  (* get the balance of the source contract *)
   Context.Contract.balance (I b) contract_1 >>=? fun balance ->
+  (* transfer all the tez inside contract 1 *)
   transfer_and_check_balances ~loc:__LOC__ b contract_1 contract_2 balance >>=? fun (b,_) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
 
-(** 1- Create a block and a single contract;
-    2- Add a transfer to a contract itself without fee into this block;
-    3- Add a transfer to a contract itself with fee into this block;
-    4- Bake this block. *)
-let block_transfers_without_with_fee_to_self () =
+(********************)
+(** Transfer to itself *)
+(********************)
+
+let transfers_to_self () =
   Context.init 1 >>=? fun (b, contracts) ->
   let contract = List.nth contracts 0 in
   Incremental.begin_construction b >>=? fun b ->
-  transfer_to_itself_and_check_balances ~loc:__LOC__ b contract ten_tez
+  two_nth_of_balance b contract 3L >>=? fun amount ->
+  transfer_to_itself_and_check_balances ~loc:__LOC__ b contract amount
   >>=? fun (b, _) ->
-  transfer_to_itself_and_check_balances ~loc:__LOC__ b ~fee:ten_tez contract ten_tez
+  two_nth_of_balance b contract 5L >>=? fun fee ->
+  transfer_to_itself_and_check_balances ~loc:__LOC__ b ~fee:fee contract ten_tez
   >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
 
-(** 1- Create a block, two contracts;
-    2- Add three transfers into the block;
-    3- Do a transfer without adding it to the block;
-    4- Bake the block with three transfers. *)
-let four_transfers_bake_three_transfers () =
+(********************)
+(** Forgot to add the valid transaction into the block *)
+(********************)
+
+let missing_transaction () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
-  n_transactions 3 b contract_1 contract_2 ten_tez >>=? fun b ->
-  Op.transaction (I b) contract_1 contract_2 ten_tez >>=? fun _ ->
+  two_nth_of_balance b contract_1 6L >>=? fun amount ->
+  (* do the transfer 3 times from source contract to destination contract *)
+  n_transactions 3 b contract_1 contract_2 amount >>=? fun b ->
+  (* do the fourth transfer from source contract to destination contract *)
+  Op.transaction (I b) contract_1 contract_2 amount >>=? fun _ ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
 
-(** 1- Create a contract from a bootstrap contract;
-    2- Create two implicit contracts;
-    3- Build a block from genesis;
-    4- Add a transfer with fee for transfer from a bootstrap contract into an
-       implicit contract into this block;
-    5- Add a transfer with fee for transfer, between two implicit contracts
-       into this block;
-    6- Bake this block. *)
+(********************)
+(** These following tests are for different kind of contracts:
+    - implicit to implicit
+    - implicit to originated
+    - originated to implicit
+    - originted to originted *)
+(********************)
+
+(** Implicit to Implicit *)
+
 let transfer_from_implicit_to_implicit_contract () =
   Context.init 1 >>=? fun (b, contracts) ->
   let bootstrap_contract = List.nth contracts 0 in
@@ -173,18 +262,22 @@ let transfer_from_implicit_to_implicit_contract () =
   let account_b = Account.new_account () in
   Incremental.begin_construction b >>=? fun b ->
   let src = Contract.implicit_contract account_a.Account.pkh in
-  transfer_and_check_balances ~loc:__LOC__ ~fee:ten_tez b
-    bootstrap_contract src (Tez.of_int 20) >>=? fun (b, _) ->
+  two_nth_of_balance b bootstrap_contract 3L >>=? fun amount1 ->
+  two_nth_of_balance b bootstrap_contract 10L >>=? fun fee1 ->
+  transfer_and_check_balances ~loc:__LOC__ ~fee:fee1 b
+    bootstrap_contract src amount1 >>=? fun (b, _) ->
+  (* create an implicit contract as a destination contract *)
   let dest = Contract.implicit_contract account_b.pkh in
-  transfer_and_check_balances ~loc:__LOC__ ~fee:(Tez.of_int 3) b
-    src dest ten_tez >>=? fun (b, _) ->
+  two_nth_of_balance b bootstrap_contract 4L >>=? fun amount2 ->
+  two_nth_of_balance b bootstrap_contract 10L >>=? fun fee2 ->
+  (* transfer from implicit contract to another implicit contract *)
+  transfer_and_check_balances ~loc:__LOC__ ~fee:fee2 b
+    src dest amount2 >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
 
-(** 1- Create a block, contract from bootstrap accounts, contract from originate;
-    2- Add a transfer from the bootstract contract into the implicit contract;
-    3- Add a transfer from the impicit contract to the originate contract;
-    4- Bake this block. *)
+(** Implicit to originated *)
+
 let transfer_from_implicit_to_originated_contract () =
   Context.init 1 >>=? fun (b, contracts) ->
   let bootstrap_contract = List.nth contracts 0 in
@@ -192,64 +285,57 @@ let transfer_from_implicit_to_originated_contract () =
   let account = Account.new_account () in
   let src = Contract.implicit_contract account.Account.pkh in
   Incremental.begin_construction b >>=? fun b ->
-  transfer_and_check_balances ~loc:__LOC__ b bootstrap_contract src ten_tez
+  two_nth_of_balance b bootstrap_contract 3L >>=? fun amount1 ->
+  (* transfer the money to implicit contract *)
+  transfer_and_check_balances ~loc:__LOC__ b bootstrap_contract src amount1
   >>=? fun (b, _) ->
+  (* originated contract *)
   Op.origination (I b) contract >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
-  transfer_and_check_balances ~loc:__LOC__ b src new_contract Alpha_context.Tez.one
+  two_nth_of_balance b bootstrap_contract 4L >>=? fun amount2 ->
+  (* transfer from implicit contract to originated contract *)
+  transfer_and_check_balances ~loc:__LOC__ b src new_contract amount2
   >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
 
-(** 1- Create a block with 2 contracts;
-    2- Originate 2 contracts from the previous ones;
-    2- Add a transfer between the two originated contracts;
-    3- Bake this block. *)
+(** Originted to originted *)
+
 let transfer_from_originated_to_originated () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
+  (* originated contract 1 *)
   Op.origination (I b) contract_1 >>=? fun (operation, orig_contract_1) ->
   Incremental.add_operation b operation >>=? fun b ->
+  (* originated contract 2 *)
   Op.origination (I b) contract_2 >>=? fun (operation, orig_contract_2) ->
   Incremental.add_operation b operation >>=? fun b ->
+  (* transfer from originated contract 1 to originated contract 2 *)
   transfer_and_check_balances ~loc:__LOC__ b
     orig_contract_1 orig_contract_2 Alpha_context.Tez.one >>=? fun (b,_) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
 
-(** 1- Create a block, an originate contract, an impicit contract, a contract
-       from bootstrap;
-    2- Add a transfer from the originate contract to impicit contract;
-    3- Bake this block. *)
+(** Originted to impicit *)
+
 let transfer_from_originated_to_implicit () =
   Context.init 1 >>=? fun (b, contracts) ->
   let contract_1 = List.nth contracts 0 in
   let account = Account.new_account () in
   let src = Contract.implicit_contract account.pkh in
   Incremental.begin_construction b >>=? fun b ->
+  (* originated contract 1*)
   Op.origination (I b) contract_1 >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
+  (* transfer from originated contract to implicit contract *)
   transfer_and_check_balances ~loc:__LOC__ b new_contract src Alpha_context.Tez.one
   >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
 
-(** Checking that the sender of a transaction is the actual
-    manager of the contract.
-    Ownership of sender manager key (in case of a contract) *)
-let ownership_sender () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
-  Incremental.begin_construction b >>=? fun b ->
-  (* get the manager of the contract_1 as a sender *)
-  Context.Contract.manager (I b) contract_1 >>=? fun manager ->
-  (* create an implicit_contract *)
-  let imcontract_1 = Alpha_context.Contract.implicit_contract manager.pkh in
-  transfer_and_check_balances ~loc:__LOC__ b imcontract_1 contract_2 Tez.one
-  >>=? fun (b,_) ->
-  Incremental.finalize_block b >>=? fun _ ->
-  return_unit
-
-(* Slow tests case *)
+(********************)
+(** Slow tests case *)
+(********************)
 
 let multiple_transfer n ?fee amount =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
@@ -298,8 +384,10 @@ let block_with_multiple_transfers_with_without_fee () =
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
 
-(** 1- Create a block with two contracts;
-    2- Bake 10 blocks with a transfer each time. *)
+(********************)
+(** Build a chain that has 10 blocks. *)
+(********************)
+
 let build_a_chain () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
   let ten = Tez.of_int 10 in
@@ -315,18 +403,35 @@ let build_a_chain () =
 (* Expected error test cases                                         *)
 (*********************************************************************)
 
-(** 1- Create a block;
-    2- transfer an amount of tez that is bigger than the balance of the source
-       contract;
-    3a- If fee is smaller than the balance:
-        Transfer is accepted but not processed. Fees are taken.
-    3b- If fee higher than the balance: raises an `Balance_too_low` error.
-*)
+(********************)
+(** transfer zero tez is forbidden in implicit contract *)
+(********************)
+
+let empty_implicit () =
+  Context.init 1 >>=? fun (b, contracts) ->
+  let dest = List.nth contracts 0 in
+  let account = Account.new_account () in
+  Incremental.begin_construction b >>=? fun incr ->
+  let src = Contract.implicit_contract account.Account.pkh in
+  two_nth_of_balance incr dest 3L >>=? fun amount ->
+  (* transfer zero tez from an implicit contract *)
+  Op.transaction (I incr) src dest amount >>=? fun op ->
+  Incremental.add_operation incr op >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res begin function
+    | Contract_storage.Empty_implicit_contract _ -> true
+    | _ -> false
+  end
+
+(********************)
+(** Balance is too low to transfer *)
+(********************)
+
 let balance_too_low fee () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun i ->
   Context.Contract.balance (I i) contract_1 >>=? fun balance1 ->
   Context.Contract.balance (I i) contract_2 >>=? fun balance2 ->
+  (* transfer the amount of tez that is bigger than the balance in the source contract *)
   Op.transaction ~fee (I i) contract_1 contract_2 Tez.max_tez >>=? fun op ->
   let expect_failure = function
     | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
@@ -334,10 +439,13 @@ let balance_too_low fee () =
     | _ ->
         failwith "balance too low should fail"
   in
+  (* the fee is higher than the balance then raise an error "Balance_too_low" *)
   if fee > balance1 then begin
     Incremental.add_operation ~expect_failure i op >>= fun _res ->
     return_unit
   end
+  (* the fee is smaller than the balance, then the transfer is accepted
+     but it is not processed, and fees are taken *)
   else begin
     Incremental.add_operation ~expect_failure i op >>=? fun i ->
     (* contract_1 loses the fees *)
@@ -378,10 +486,10 @@ let balance_too_low_two_transfers fee () =
   (* contract_3 is not credited *)
   Assert.balance_was_credited ~loc:__LOC__ (I i) contract_3 balance3 Tez.zero
 
-(** 1- Create a block;
-    2- Do two transfers one after another;
-    3- Add two transfers into the block sequently;
-    4- Catch the expected error: Counter_in_the_past. *)
+(********************)
+(** The counter is already used for the previous operation *)
+(********************)
+
 let invalid_counter () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
@@ -396,11 +504,8 @@ let invalid_counter () =
     | _ -> false
   end
 
-(** 1- Create a block;
-    2- Add a transfer into this block;
-    3- Make another transfer, but did not add this transfer into the block,
-       instead add the previous transfer again into this block;
-    4- Catch the expected error: Counter_in_the_past. *)
+(* same as before but different way to perform this error *)
+
 let add_the_same_operation_twice () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
@@ -413,10 +518,10 @@ let add_the_same_operation_twice () =
     | _ -> false
   end
 
-(** 1- Create a block;
-    2- Originate an unspendable new contract;
-    3- Make a transfer from this contract;
-    4- Catch the expected error: Unspendable_contract. *)
+(********************)
+(** Do the transfer from an "unspendable" contract *)
+(********************)
+
 let unspendable_contract () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
@@ -428,6 +533,22 @@ let unspendable_contract () =
     | Contract_storage.Unspendable_contract _ -> true
     | _ -> false
   end
+
+(********************)
+(** check ownership *)
+(********************)
+
+let ownership_sender () =
+  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Incremental.begin_construction b >>=? fun b ->
+  (* get the manager of the contract_1 as a sender *)
+  Context.Contract.manager (I b) contract_1 >>=? fun manager ->
+  (* create an implicit_contract *)
+  let imcontract_1 = Alpha_context.Contract.implicit_contract manager.pkh in
+  transfer_and_check_balances ~loc:__LOC__ b imcontract_1 contract_2 Tez.one
+  >>=? fun (b,_) ->
+  Incremental.finalize_block b >>=? fun _ ->
+  return ()
 
 (*********************************************************************)
 (** Random transfer *)
@@ -472,35 +593,55 @@ let random_multi_transactions () =
 (*********************************************************************)
 
 let tests = [
-  Test.tztest "block with a single transfer" `Quick block_with_a_single_transfer ;
-  Test.tztest "transfer zero tez" `Quick transfer_zero_tez ;
-  Test.tztest "block with a single transfer with fee" `Quick block_with_a_single_transfer_with_fee ;
-  Test.tztest "block originate and transfer with fee" `Quick block_originate_and_transfer_with_fee ;
-  Test.tztest "block transfer from contract balance" `Quick block_transfer_from_contract_balance ;
-  Test.tztest "block transfers without and with fee to itself" `Quick block_transfers_without_with_fee_to_self ;
-  Test.tztest "four transfers but bake three transfers" `Quick four_transfers_bake_three_transfers ;
+  (* single transfer *)
+  Test.tztest "single transfer" `Quick block_with_a_single_transfer ;
+  Test.tztest "single transfer with fee" `Quick block_with_a_single_transfer_with_fee ;
+
+  (* transfer zero tez *)
+  Test.tztest "single transfer zero tez" `Quick transfer_zero_tez ;
+  Test.tztest "transfer zero tez from originated contract" `Quick transfer_zero_originated;
+  Test.tztest "transfer zero tez from implicit contract" `Quick transfer_zero_implicit;
+
+  (* transfer to originated contract *)
+  Test.tztest "transfer to originated contract paying transaction fee" `Quick transfer_to_originate_with_fee ;
+
+  (* transfer by the balance of contract *)
+  Test.tztest "transfer the amount from source contract balance" `Quick transfer_amount_of_contract_balance ;
+
+  (* transfer to itself *)
+  Test.tztest "transfers to itself" `Quick transfers_to_self ;
+
+  (* missing operation *)
+
+  Test.tztest "missing transaction" `Quick missing_transaction ;
+
+  (* transfer from/to implicit/originted contracts*)
   Test.tztest "transfer from an implicit to implicit contract " `Quick transfer_from_implicit_to_implicit_contract ;
   Test.tztest "transfer from an implicit to an originated contract" `Quick transfer_from_implicit_to_originated_contract ;
   Test.tztest "transfer from an originated to an originated contract" `Quick transfer_from_originated_to_originated ;
   Test.tztest "transfer from an originated to an implicit contract" `Quick transfer_from_originated_to_implicit ;
-  Test.tztest "ownership sender" `Quick  ownership_sender ;
 
   (* Slow tests *)
-  Test.tztest "block with multiple transfers" `Quick block_with_multiple_transfers ;
-  Test.tztest "block with multiple transfer paying fee" `Quick block_with_multiple_transfers_pay_fee ;
-  Test.tztest "block with multiple transfer without paying fee" `Quick block_with_multiple_transfers_with_without_fee ;
+  Test.tztest "block with multiple transfers" `Slow block_with_multiple_transfers ;
+  (* TODO increase the number of transaction times *)
+  Test.tztest "block with multiple transfer paying fee" `Slow block_with_multiple_transfers_pay_fee ;
+  Test.tztest "block with multiple transfer without paying fee" `Slow block_with_multiple_transfers_with_without_fee ;
+
+  (* build the chain *)
   Test.tztest "build a chain" `Quick build_a_chain ;
 
   (* Erroneous *)
-  Test.tztest "balance too low" `Quick (balance_too_low  Tez.zero);
-  Test.tztest "balance too low" `Quick (balance_too_low  Tez.one);
-  Test.tztest "balance too low (max fee)" `Quick (balance_too_low  Tez.max_tez);
-  Test.tztest "balance too low with two transfers" `Quick (balance_too_low_two_transfers Tez.zero);
+  Test.tztest "empty implicit" `Quick empty_implicit;
+  Test.tztest "balance too low - transfer zero" `Quick (balance_too_low Tez.zero);
+  Test.tztest "balance too low" `Quick (balance_too_low Tez.one);
+  Test.tztest "balance too low (max fee)" `Quick (balance_too_low Tez.max_tez);
+  Test.tztest "balance too low with two transfers - transfer zero" `Quick (balance_too_low_two_transfers Tez.zero);
   Test.tztest "balance too low with two transfers" `Quick (balance_too_low_two_transfers Tez.one);
   Test.tztest "invalid_counter" `Quick invalid_counter ;
   Test.tztest "add the same operation twice" `Quick  add_the_same_operation_twice ;
   Test.tztest "unspendable contract" `Quick unspendable_contract ;
 
+  Test.tztest "ownership sender" `Quick  ownership_sender ;
   (* Random tests *)
   Test.tztest "random transfer" `Quick random_transfer ;
   Test.tztest "random multi transfer" `Quick  random_multi_transactions ;

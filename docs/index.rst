@@ -29,12 +29,12 @@ The source code of Tezos is placed under the MIT Open Source License.
 The Community
 -------------
 
- - Several community built block explorers are available:
+- Several community-built block explorers are available:
 
     - http://tzscan.io
     - https://tezex.info
 
-- A few community run websites collect useful Tezos links:
+- A few community-run websites collect useful Tezos links:
 
     - https://www.tezos.help
     - https://tezos.rocks
@@ -54,7 +54,7 @@ Mainnet
 ~~~~~~~
 
 The Tezos network is the current incarnation of the Tezos blockchain.
-It runs with real tezzies that have been allocated to the
+It runs with real tez that have been allocated to the
 donors of July 2017 ICO (see :ref:`activate_fundraiser_account`).
 
 The Tezos network has been live and open since June 30th 2018.
@@ -70,12 +70,12 @@ Alphanet
 ~~~~~~~~
 
 Tezos Alphanet is a test network for the Tezos blockchain with a
-faucet to obtain free tezzies (see :ref:`faucet`).
+faucet to obtain free tez (see :ref:`faucet`).
 It is updated and rebooted rarely and it is running the same code as
 the Mainnet.
 It is the reference network for developers wanting to test their
 software before going to beta and for users who want to familiarize
-themselves with Tezos before using their real tezzies.
+themselves with Tezos before using their real tez.
 
 We offer support for Alphanet on IRC.
 

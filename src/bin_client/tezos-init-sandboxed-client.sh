@@ -16,12 +16,18 @@ init_sandboxed_client() {
     if [ -n "$USE_TLS" ]; then
         client="$local_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         admin_client="$local_admin_client -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-        signer="$local_signer -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        alpha_baker="$local_alpha_baker -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        alpha_endorser="$local_alpha_endorser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        alpha_accuser="$local_alpha_accuser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        signer="$local_signer -S -base-dir $client_dir"
         compiler="$local_compiler"
     else
         client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-        signer="$local_signer -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        alpha_baker="$local_alpha_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        alpha_endorser="$local_alpha_endorser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        alpha_accuser="$local_alpha_accuser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+        signer="$local_signer -base-dir $client_dir"
         compiler="$local_compiler"
     fi
     parameters_file="${parameters_file:-$client_dir/protocol_parameters.json}"

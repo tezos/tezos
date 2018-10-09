@@ -50,7 +50,7 @@ let transfer (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
     ?dry_run
     ?branch ~source ~src_pk ~src_sk ~destination ?arg
-    ~amount ~fee ?gas_limit ?storage_limit () =
+    ~amount ~fee ?gas_limit ?storage_limit ?counter () =
   begin match arg with
     | Some arg ->
         parse_expression arg >>=? fun { expanded = arg } ->
@@ -62,7 +62,7 @@ let transfer (cctxt : #Proto_alpha.full)
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ?branch ~source ~fee ?gas_limit ?storage_limit
+    ?branch ~source ~fee ?gas_limit ?storage_limit ?counter
     ~src_pk ~src_sk contents >>=? fun (_oph, _op, result as res) ->
   Lwt.return
     (Injection.originated_contracts (Single_result result)) >>=? fun contracts ->
@@ -305,8 +305,9 @@ let read_key key =
       failwith ""
   | Some t ->
       (* TODO: unicode normalization (NFKD)... *)
-      let sk = Bip39.to_seed ~passphrase:(key.email ^ key.password) t in
-      let sk = Cstruct.(to_bigarray (sub sk 0 32)) in
+      let passphrase = MBytes.(concat "" [of_string key.email ; of_string key.password]) in
+      let sk = Bip39.to_seed ~passphrase t in
+      let sk = MBytes.sub sk 0 32 in
       let sk : Signature.Secret_key.t =
         Ed25519 (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk) in
       let pk = Signature.Secret_key.to_public_key sk in

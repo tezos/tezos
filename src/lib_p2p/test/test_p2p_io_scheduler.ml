@@ -154,7 +154,7 @@ let run
     ?max_download_speed ?max_upload_speed
     ~read_buffer_size ?read_queue_size ?write_queue_size
     addr port time n =
-  Logging_unix.init Stderr >>= fun () ->
+  Logging_unix.init () >>= fun () ->
   listen ?port addr >>= fun (main_socket, port) ->
   Process.detach ~prefix:"server: " begin fun _ ->
     server

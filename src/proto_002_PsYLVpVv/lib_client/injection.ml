@@ -447,12 +447,19 @@ let inject_operation
 
 let inject_manager_operation
     cctxt ~chain ~block ?branch ?confirmations ?dry_run
-    ~source ~src_pk ~src_sk ~fee ?(gas_limit = Z.minus_one) ?(storage_limit = (Z.of_int (-1)))
+    ~source ~src_pk ~src_sk ~fee ?(gas_limit = Z.minus_one) ?(storage_limit = (Z.of_int (-1))) ?counter
     (type kind) (operation : kind manager_operation)
   : (Operation_hash.t * kind Kind.manager contents *  kind Kind.manager contents_result) tzresult Lwt.t =
-  Alpha_services.Contract.counter
-    cctxt (chain, block) source >>=? fun pcounter ->
-  let counter = Z.succ pcounter in
+  begin
+    match counter with
+    | None ->
+        Alpha_services.Contract.counter
+          cctxt (chain, block) source >>=? fun pcounter ->
+        let counter = Z.succ pcounter in
+        return counter
+    | Some counter ->
+        return counter
+  end >>=? fun counter ->
   Alpha_services.Contract.manager_key
     cctxt (chain, block) source >>=? fun (_, key) ->
   let is_reveal : type kind. kind manager_operation -> bool = function

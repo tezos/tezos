@@ -804,6 +804,8 @@ is, concatenate or splice them, and use them as keys.
 
 -  ``SLICE``: String access.
 
+::
+
     :: nat : nat : string : 'S   ->  option string : 'S
 
     > SLICE / offset : length : s : S  =>  Some ss : S
@@ -1954,7 +1956,7 @@ X - Annotations
 ---------------
 
 The annotation mechanism of Michelson provides ways to better track data
-on the stack and to give additional type constraints. Annotaions are
+on the stack and to give additional type constraints. Annotations are
 only here to add constraints, *i.e.* they cannot turn an otherwise
 rejected program into an accepted one.
 
@@ -2260,7 +2262,7 @@ Syntax
 Primitive applications can receive one or many annotations.
 
 An annotation is a sequence of characters that matches the regular
-expression ``[@:%](|@|%|%%|[_a-ZA-Z][_0-9a-zA-Z\.]*)``. They come after
+expression ``[@:%](|@|%|%%|[_a-zA-Z][_0-9a-zA-Z\.]*)``. They come after
 the primitive name and before its potential arguments.
 
 ::
@@ -2425,6 +2427,7 @@ a name for the value on the stack. The following typing rule
 demonstrates their use for instruction ``CAR``.
 
 ::
+
    CAR @%
    :: @p (pair ('a %fst) ('b %snd)) : 'S   ->   @fst 'a : 'S
 
@@ -2438,6 +2441,7 @@ element. Two examples with ``PAIR`` follows, notice the special
 treatment of annotations with `.`.
 
 ::
+
    PAIR %@ %@
    :: @x 'a : @y 'b : 'S   ->   (pair ('a %x) ('b %y)) : 'S
 

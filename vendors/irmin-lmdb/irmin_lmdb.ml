@@ -657,7 +657,7 @@ module Make
       type config = {
         root   : string option ;
         mapsize : int64 ;
-	readonly : bool ;
+        readonly : bool ;
         (* TODO *)
         (* ?write_buffer_size:int -> *)
         (* ?max_open_files:int -> *)

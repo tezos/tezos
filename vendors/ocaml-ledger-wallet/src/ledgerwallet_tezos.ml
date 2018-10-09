@@ -12,7 +12,7 @@ module Version = struct
     | Tezos -> Format.pp_print_string ppf "Tezos Wallet"
     | TezBake -> Format.pp_print_string ppf "Tezos Baking"
 
-    let class_of_int = function
+  let class_of_int = function
     | 0 -> Tezos
     | 1 -> TezBake
     | _ -> invalid_arg "class_of_int"
