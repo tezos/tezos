@@ -34,11 +34,15 @@ let encoding =
   let open Data_encoding in
   conv
     (fun { peer_id ; public_key ; secret_key ; proof_of_work_stamp } ->
-       (peer_id, public_key, secret_key, proof_of_work_stamp))
-    (fun (peer_id, public_key, secret_key, proof_of_work_stamp) ->
+       (Some peer_id, public_key, secret_key, proof_of_work_stamp))
+    (fun (peer_id_opt, public_key, secret_key, proof_of_work_stamp) ->
+       let peer_id =
+         match peer_id_opt with
+         | Some peer_id -> peer_id
+         | None -> Tezos_crypto.Crypto_box.hash public_key in
        { peer_id ; public_key ; secret_key ; proof_of_work_stamp })
     (obj4
-       (req "peer_id" P2p_peer_id.encoding)
+       (opt "peer_id" P2p_peer_id.encoding)
        (req "public_key" Crypto_box.public_key_encoding)
        (req "secret_key" Crypto_box.secret_key_encoding)
        (req "proof_of_work_stamp" Crypto_box.nonce_encoding))
