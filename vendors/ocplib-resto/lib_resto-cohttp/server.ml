@@ -89,9 +89,10 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
   let callback server (_io, con) req body =
     (* FIXME: check inbound adress *)
     let uri = Request.uri req in
+    let path = Uri.pct_decode (Uri.path uri) in
     lwt_log_info "(%s) receive request to %s"
-      (Connection.to_string con) (Uri.path uri) >>= fun () ->
-    let path = Utils.split_path (Uri.path uri) in
+      (Connection.to_string con) path >>= fun () ->
+    let path = Utils.split_path path in
     let req_headers = Request.headers req in
     begin
       match Request.meth req with
