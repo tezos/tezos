@@ -548,18 +548,17 @@ let prim_encoding =
     ("operation", T_operation) ;
     ("address", T_address) ;
     (* Alpha_002 addition *)
-    ("SLICE", I_SLICE) ;
-  ]
+    ("SLICE", I_SLICE) ]
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"michelson_v1.unknown_primitive_name"
-    ~title: "Unknown primitive name"
+    ~id:"unknownPrimitiveNameTypeError"
+    ~title: "Unknown primitive name (typechecking error)"
     ~description:
       "In a script or data expression, a primitive was unknown."
     ~pp:(fun ppf n -> Format.fprintf ppf "Unknown primitive %s." n)
-    Data_encoding.(obj1 (req "wrong_primitive_name" string))
+    Data_encoding.(obj1 (req "wrongPrimitiveName" string))
     (function
       | Unknown_primitive_name got -> Some got
       | _ -> None)
@@ -567,13 +566,13 @@ let () =
        Unknown_primitive_name got) ;
   register_error_kind
     `Permanent
-    ~id:"michelson_v1.invalid_primitive_name_case"
-    ~title: "Invalid primitive name case"
+    ~id:"invalidPrimitiveNameCaseTypeError"
+    ~title: "Invalid primitive name case (typechecking error)"
     ~description:
       "In a script or data expression, a primitive name is \
        neither uppercase, lowercase or capitalized."
     ~pp:(fun ppf n -> Format.fprintf ppf "Primitive %s has invalid case." n)
-    Data_encoding.(obj1 (req "wrong_primitive_name" string))
+    Data_encoding.(obj1 (req "wrongPrimitiveName" string))
     (function
       | Invalid_case name -> Some name
       | _ -> None)
@@ -581,8 +580,8 @@ let () =
        Invalid_case name) ;
   register_error_kind
     `Permanent
-    ~id:"michelson_v1.invalid_primitive_name"
-    ~title: "Invalid primitive name"
+    ~id:"invalidPrimitiveNameTypeErro"
+    ~title: "Invalid primitive name (typechecking error)"
     ~description:
       "In a script or data expression, a primitive name is \
        unknown or has a wrong case."

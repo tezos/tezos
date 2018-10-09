@@ -38,6 +38,13 @@ open Proto_alpha
 open Test_tez
 open Test_utils
 
+let rec apply_results_to_list = function
+  | Apply_results.Contents_result_list (Apply_results.Single_result o) ->
+      [Apply_results.Contents_result o]
+  | Apply_results.Contents_result_list (Apply_results.Cons_result (o, os)) ->
+      Apply_results.Contents_result o ::
+      apply_results_to_list (Apply_results.Contents_result_list os)
+
 let ten_tez = Tez.of_int 10
 
 (** Groups ten transactions between the same parties. *)
@@ -97,7 +104,7 @@ let multiple_origination_and_delegation () =
     List.fold_left (fun acc -> function
         | No_operation_metadata -> assert false
         | Operation_metadata { contents } ->
-            to_list (Contents_result_list contents) @ acc
+            apply_results_to_list (Contents_result_list contents) @ acc
       ) [] tickets |> List.rev in
   let new_contracts =
     List.map (function
@@ -156,7 +163,7 @@ let failing_operation_in_the_middle () =
     List.fold_left (fun acc -> function
         | No_operation_metadata -> assert false
         | Operation_metadata { contents } ->
-            to_list (Contents_result_list contents) @ acc
+            apply_results_to_list (Contents_result_list contents) @ acc
       ) [] tickets in
   begin match tickets with
     | Contents_result (Manager_operation_result { operation_result = (Backtracked _) }) ::
@@ -199,7 +206,7 @@ let failing_operation_in_the_middle_with_fees () =
     List.fold_left (fun acc -> function
         | No_operation_metadata -> assert false
         | Operation_metadata { contents } ->
-            to_list (Contents_result_list contents) @ acc
+            apply_results_to_list (Contents_result_list contents) @ acc
       ) [] tickets in
   begin match tickets with
     | Contents_result (Manager_operation_result { operation_result = (Backtracked _) }) ::

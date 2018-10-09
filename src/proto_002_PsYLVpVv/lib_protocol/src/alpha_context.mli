@@ -67,7 +67,6 @@ module Period : sig
   type period = t
 
   val of_seconds: int64 -> period tzresult
-  val to_seconds: period -> int64
   val mult: int32 -> period -> period tzresult
 
   val one_second: period
