@@ -61,23 +61,41 @@ let known_bad_tez_litterals =
     "0.0000000" ;
     "9,999,999,999,999.999,999"]
 
+let fail expected given msg =
+  Format.kasprintf Pervasives.failwith
+    "@[%s@ expected: %s@ got: %s@]" msg expected given
+
+let fail_msg fmt = Format.kasprintf (fail "" "") fmt
+
+let default_printer _ = ""
+
+let equal ?(eq=(=)) ?(prn=default_printer) ?(msg="") x y =
+  if not (eq x y) then fail (prn x) (prn y) msg
+
+let is_none ?(msg="") x =
+  if x <> None then fail "None" "Some _" msg
+
+let is_some ?(msg="") x =
+  if x = None then fail "Some _" "None" msg
+
 let test_known_tez_litterals () =
   List.iter
     (fun (v, s) ->
        let vv = Tez_repr.of_mutez v in
        let vs = Tez_repr.of_string s in
        let vs' = Tez_repr.of_string (String.concat "" (String.split_on_char ',' s)) in
-       let vv = match vv with None -> Assert.fail_msg "could not unopt %Ld" v | Some vv -> vv in
-       let vs = match vs with None -> Assert.fail_msg "could not unopt %s" s | Some vs -> vs in
-       let vs' = match vs' with None -> Assert.fail_msg "could not unopt %s" s | Some vs' -> vs' in
-       Assert.equal ~prn:Tez_repr.to_string vv vs ;
-       Assert.equal ~prn:Tez_repr.to_string vv vs' ;
-       Assert.equal ~prn:(fun s -> s) (Tez_repr.to_string vv) s)
+       let vv = match vv with None -> fail_msg "could not unopt %Ld" v | Some vv -> vv in
+       let vs = match vs with None -> fail_msg "could not unopt %s" s | Some vs -> vs in
+       let vs' = match vs' with None -> fail_msg "could not unopt %s" s | Some vs' -> vs' in
+
+       equal ~prn:Tez_repr.to_string vv vs ;
+       equal ~prn:Tez_repr.to_string vv vs' ;
+       equal ~prn:(fun s -> s) (Tez_repr.to_string vv) s)
     known_ok_tez_litterals ;
   List.iter
     (fun s ->
        let vs = Tez_repr.of_string s in
-       Assert.is_none ~msg:("Unexpected successful parsing of " ^ s) vs)
+       is_none ~msg:("Unexpected successful parsing of " ^ s) vs)
     known_bad_tez_litterals ;
   return_unit
 
@@ -85,24 +103,24 @@ let test_random_tez_litterals () =
   for _ = 0 to 100_000 do
     let v = Random.int64 12L in
     let vv = Tez_repr.of_mutez v in
-    let vv = match vv with None -> Assert.fail_msg "could not unopt %Ld" v | Some vv -> vv in
+    let vv = match vv with None -> fail_msg "could not unopt %Ld" v | Some vv -> vv in
     let s = Tez_repr.to_string vv in
     let vs = Tez_repr.of_string s in
     let s' = String.concat "" (String.split_on_char ',' s) in
     let vs' = Tez_repr.of_string s' in
-    Assert.is_some ~msg:("Could not parse " ^ s ^ " back") vs ;
-    Assert.is_some ~msg:("Could not parse " ^ s ^ " back") vs' ;
+    is_some ~msg:("Could not parse " ^ s ^ " back") vs ;
+    is_some ~msg:("Could not parse " ^ s ^ " back") vs' ;
     begin match vs with
       | None -> assert false
       | Some vs ->
           let rev = Tez_repr.to_int64 vs in
-          Assert.equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev
+          equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev
     end ;
     begin match vs' with
       | None -> assert false
       | Some vs' ->
           let rev = Tez_repr.to_int64 vs' in
-          Assert.equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev
+          equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev
     end
   done ;
   return_unit
@@ -120,7 +138,4 @@ let wrap (n, f) =
         Format.kasprintf Pervasives.failwith "%a" pp_print_error error
   end
 
-let () =
-  Alcotest.run ~argv:[|""|] "tezos-lib-protocol" [
-    "Qty_repr", List.map wrap tests
-  ]
+let tests = List.map wrap tests
