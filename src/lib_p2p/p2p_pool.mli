@@ -356,9 +356,10 @@ module Peers : sig
     f:(P2p_peer.Id.t ->  ('msg, 'peer_meta,'conn_meta) info -> 'a -> 'a) ->
     'a
 
-  val forget : ('msg, 'peer_meta,'conn_meta) pool -> P2p_peer.Id.t -> unit
   val ban : ('msg, 'peer_meta,'conn_meta) pool -> P2p_peer.Id.t -> unit
+  val unban : ('msg, 'peer_meta,'conn_meta) pool -> P2p_peer.Id.t -> unit
   val trust : ('msg, 'peer_meta,'conn_meta) pool -> P2p_peer.Id.t -> unit
+  val untrust : ('msg, 'peer_meta,'conn_meta) pool -> P2p_peer.Id.t -> unit
   val banned : ('msg, 'peer_meta,'conn_meta) pool -> P2p_peer.Id.t -> bool
 
 end
@@ -391,9 +392,10 @@ module Points : sig
     f:(P2p_point.Id.t -> ('msg, 'peer_meta,'conn_meta) info  -> 'a -> 'a) ->
     'a
 
-  val forget : ('msg, 'peer_meta,'conn_meta) pool -> P2p_point.Id.t -> unit
   val ban : ('msg, 'peer_meta,'conn_meta) pool -> P2p_point.Id.t -> unit
+  val unban : ('msg, 'peer_meta,'conn_meta) pool -> P2p_point.Id.t -> unit
   val trust : ('msg, 'peer_meta,'conn_meta) pool -> P2p_point.Id.t -> unit
+  val untrust : ('msg, 'peer_meta,'conn_meta) pool -> P2p_point.Id.t -> unit
   val banned : ('msg, 'peer_meta,'conn_meta) pool -> P2p_point.Id.t -> bool
 
 end

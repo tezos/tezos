@@ -450,6 +450,18 @@ let connection_of_peer_id pool peer_id =
     | _ -> None
   end
 
+(* Every running connection matching the point's ip address is returned. *)
+let connections_of_addr pool addr =
+  P2p_point.Table.fold
+    (fun (addr', _) p acc ->
+       if Ipaddr.V6.compare addr addr' = 0
+       then
+         match P2p_point_state.get p with
+         | P2p_point_state.Running { data } -> data :: acc
+         | _ -> acc
+       else acc
+    ) pool.connected_points []
+
 let get_addr pool peer_id =
   Option.map (connection_of_peer_id pool peer_id) ~f:begin fun ci ->
     (P2p_socket.info ci.conn).id_point
@@ -485,14 +497,22 @@ module Points = struct
     P2p_acl.banned_addr pool.acl addr
 
   let ban pool (addr, _port) =
-    P2p_acl.IPBlacklist.add pool.acl addr
+    P2p_acl.IPBlacklist.add pool.acl addr ;
+    (* Kick [addr]:* if it is in `Running` state. *)
+    List.iter (fun conn ->
+        conn.wait_close <- false ;
+        Lwt.async (fun () -> Answerer.shutdown (Lazy.force conn.answerer))
+      ) (connections_of_addr pool addr)
 
-  let trust pool (addr, _port) =
+  let unban pool (addr, _port) =
     P2p_acl.IPBlacklist.remove pool.acl addr
 
-  let forget pool ((addr, _port) as point) =
-    unset_trusted pool point; (* remove from whitelist *)
-    P2p_acl.IPBlacklist.remove pool.acl addr
+  let trust pool ((addr, _port) as point) =
+    P2p_acl.IPBlacklist.remove pool.acl addr ;
+    set_trusted pool point
+
+  let untrust pool point =
+    unset_trusted pool point
 
 end
 
@@ -533,26 +553,23 @@ module Peers = struct
   let fold_connected pool ~init ~f =
     P2p_peer.Table.fold f pool.connected_peer_ids init
 
-  let forget pool peer =
-    Option.iter (get_addr pool peer) ~f:begin fun (addr, _port) ->
-      unset_trusted pool peer; (* remove from whitelist *)
-      P2p_acl.PeerBlacklist.remove pool.acl peer;
-      P2p_acl.IPBlacklist.remove pool.acl addr
-    end
-
   let ban pool peer =
-    Option.iter (get_addr pool peer) ~f:begin fun point ->
-      Points.ban pool point ;
-      P2p_acl.PeerBlacklist.add pool.acl peer ;
-    end ;
+    P2p_acl.PeerBlacklist.add pool.acl peer ;
     (* Kick [peer] if it is in `Running` state. *)
     Option.iter (connection_of_peer_id pool peer) ~f:begin fun conn ->
       conn.wait_close <- false ;
       Lwt.async (fun () -> Answerer.shutdown (Lazy.force conn.answerer))
     end
 
+  let unban pool peer =
+    P2p_acl.PeerBlacklist.remove pool.acl peer
+
   let trust pool peer =
-    Option.iter (get_addr pool peer) ~f:(Points.trust pool)
+    unban pool peer ;
+    set_trusted pool peer
+
+  let untrust pool peer =
+    unset_trusted pool peer
 
   let banned pool peer =
     P2p_acl.banned_peer pool.acl peer

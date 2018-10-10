@@ -712,23 +712,23 @@ let build_rpc_directory net =
       end in
 
   let dir =
-    RPC_directory.gen_register1 dir P2p_services.Peers.S.forget
-      begin fun peer_id () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            P2p_pool.Peers.forget pool peer_id ;
-            RPC_answer.return_unit
-      end in
-
-  let dir =
     RPC_directory.gen_register1 dir P2p_services.Peers.S.ban
       begin fun peer_id () () ->
         match net.pool with
         | None -> RPC_answer.not_found
         | Some pool ->
-            P2p_pool.Peers.unset_trusted pool peer_id;
+            P2p_pool.Peers.untrust pool peer_id ;
             P2p_pool.Peers.ban pool peer_id ;
+            RPC_answer.return_unit
+      end in
+
+  let dir =
+    RPC_directory.gen_register1 dir P2p_services.Peers.S.unban
+      begin fun peer_id () () ->
+        match net.pool with
+        | None -> RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.Peers.unban pool peer_id ;
             RPC_answer.return_unit
       end in
 
@@ -738,7 +738,17 @@ let build_rpc_directory net =
         match net.pool with
         | None -> RPC_answer.not_found
         | Some pool ->
-            P2p_pool.Peers.set_trusted pool peer_id ;
+            P2p_pool.Peers.trust pool peer_id ;
+            RPC_answer.return_unit
+      end in
+
+  let dir =
+    RPC_directory.gen_register1 dir P2p_services.Peers.S.untrust
+      begin fun peer_id () () ->
+        match net.pool with
+        | None -> RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.Peers.untrust pool peer_id ;
             RPC_answer.return_unit
       end in
 
@@ -817,23 +827,23 @@ let build_rpc_directory net =
       end in
 
   let dir =
-    RPC_directory.gen_register1 dir P2p_services.Points.S.forget
-      begin fun point () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            P2p_pool.Points.forget pool point ;
-            RPC_answer.return_unit
-      end in
-
-  let dir =
     RPC_directory.gen_register1 dir P2p_services.Points.S.ban
       begin fun point () () ->
         match net.pool with
         | None -> RPC_answer.not_found
         | Some pool ->
-            P2p_pool.Points.unset_trusted pool point;
+            P2p_pool.Points.untrust pool point;
             P2p_pool.Points.ban pool point;
+            RPC_answer.return_unit
+      end in
+
+  let dir =
+    RPC_directory.gen_register1 dir P2p_services.Points.S.unban
+      begin fun point () () ->
+        match net.pool with
+        | None -> RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.Points.unban pool point;
             RPC_answer.return_unit
       end in
 
@@ -843,7 +853,17 @@ let build_rpc_directory net =
         match net.pool with
         | None -> RPC_answer.not_found
         | Some pool ->
-            P2p_pool.Points.set_trusted pool point ;
+            P2p_pool.Points.trust pool point ;
+            RPC_answer.return_unit
+      end in
+
+  let dir =
+    RPC_directory.gen_register1 dir P2p_services.Points.S.untrust
+      begin fun point () () ->
+        match net.pool with
+        | None -> RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.Points.untrust pool point ;
             RPC_answer.return_unit
       end in
 
