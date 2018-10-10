@@ -28,31 +28,47 @@
     consistency. This module is stateless and creates and manupulates the
     prevalidation_state. *)
 
-type prevalidation_state
+module type T = sig
 
-(** Creates a new prevalidation context w.r.t. the protocol associate to the
-    predecessor block . When ?protocol_data is passed to this function, it will
-    be used to create the new block *)
-val start_prevalidation :
-  ?protocol_data: MBytes.t ->
-  predecessor: State.Block.t ->
-  timestamp: Time.t ->
-  unit -> prevalidation_state tzresult Lwt.t
+  type state
 
-(** Given a prevalidation context applies a list of operations,
-    returns a new prevalidation context plus the preapply result containing the
-    list of operations that cannot be applied to this context *)
-val prevalidate :
-  prevalidation_state -> sort:bool ->
-  (Operation_hash.t * Operation.t) list ->
-  (prevalidation_state * error Preapply_result.t) Lwt.t
+  (** Creates a new prevalidation context w.r.t. the protocol associate to the
+      predecessor block . When ?protocol_data is passed to this function, it will
+      be used to create the new block *)
+  val start_prevalidation :
+    ?protocol_data: MBytes.t ->
+    predecessor: State.Block.t ->
+    timestamp: Time.t ->
+    unit -> state tzresult Lwt.t
 
-val end_prevalidation :
-  prevalidation_state ->
-  Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
+  (** Given a prevalidation context applies a list of operations,
+      returns a new prevalidation context plus the preapply result containing the
+      list of operations that cannot be applied to this context *)
+  val prevalidate :
+    state -> sort:bool ->
+    (Operation_hash.t * Operation.t) list ->
+    (state * error Preapply_result.t) Lwt.t
 
-(** Pre-apply creates a new block ( running start_prevalidation, prevalidate and
-    end_prevalidation), and returns a new block. *)
+  val end_prevalidation :
+    state ->
+    Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
+
+  val notify_operation :
+    state ->
+    error Preapply_result.t ->
+    unit
+
+  val shutdown_operation_input :
+    state ->
+    unit
+
+  val rpc_directory : (state * error Preapply_result.t) RPC_directory.t tzresult Lwt.t
+
+end
+
+module Make(Proto : Registered_protocol.T) : T
+
+(** Pre-apply creates a new block and returns it. *)
 val preapply :
   predecessor:State.Block.t ->
   timestamp:Time.t ->
@@ -60,16 +76,3 @@ val preapply :
   sort_operations:bool ->
   Operation.t list list ->
   (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
-
-val notify_operation :
-  prevalidation_state ->
-  error Preapply_result.t ->
-  unit
-
-val shutdown_operation_input :
-  prevalidation_state ->
-  unit
-
-val build_rpc_directory :
-  Protocol_hash.t ->
-  (prevalidation_state * error Preapply_result.t) RPC_directory.t tzresult Lwt.t

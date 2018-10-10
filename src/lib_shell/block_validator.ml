@@ -333,6 +333,7 @@ let on_request
             (* TODO catch other temporary error (e.g. system errors)
                and do not 'commit' them on disk... *)
             | Error [Canceled | Unavailable_protocol _] as err ->
+                (* FIXME: Canceled can escape. Canceled is not registered. BOOM! *)
                 return err
             | Error errors ->
                 Worker.protect w begin fun () ->

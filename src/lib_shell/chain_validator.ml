@@ -25,6 +25,8 @@
 
 open Chain_validator_worker_state
 
+module Log = Tezos_stdlib.Logging.Make(struct let name = "node.chain_validator" end)
+
 module Name = struct
   type t = Chain_id.t
   let encoding = Chain_id.encoding
@@ -72,7 +74,7 @@ module Types = struct
 
     mutable child:
       (state * (unit -> unit Lwt.t (* shutdown *))) option ;
-    prevalidator: Prevalidator.t option ;
+    mutable prevalidator: Prevalidator.t option ;
     active_peers: Peer_validator.t Lwt.t P2p_peer.Table.t ;
     bootstrapped_peers: unit P2p_peer.Table.t ;
   }
@@ -249,6 +251,16 @@ let broadcast_head w ~previous block =
     end
   end
 
+let safe_get_protocol hash =
+  match Registered_protocol.get hash with
+  | None ->
+      (* FIXME. *)
+      (* This should not happen: it should be handled in the validator. *)
+      failwith "chain_validator: missing protocol '%a' for the current block."
+        Protocol_hash.pp_short hash
+  | Some protocol ->
+      return protocol
+
 let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
   let Request.Validated block = req in
   let nv = Worker.state w in
@@ -266,8 +278,28 @@ let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
     may_update_checkpoint nv.parameters.chain_state block >>= fun () ->
     broadcast_head w ~previous block >>= fun () ->
     begin match nv.prevalidator with
-      | Some prevalidator ->
-          Prevalidator.flush prevalidator block_hash
+      | Some old_prevalidator ->
+          State.Block.protocol_hash block >>= fun new_protocol ->
+          let old_protocol = Prevalidator.protocol_hash old_prevalidator in
+          begin
+            if not (Protocol_hash.equal old_protocol new_protocol) then begin
+              safe_get_protocol new_protocol >>=? fun (module Proto) ->
+              let (limits, chain_db) = Prevalidator.parameters old_prevalidator in
+              (* TODO inject in the new prevalidator the operation
+                 from the previous one. *)
+              Prevalidator.create
+                limits
+                (module Proto)
+                chain_db >>= fun prevalidator ->
+              nv.prevalidator <- Some prevalidator ;
+              Prevalidator.shutdown old_prevalidator >>= fun () ->
+              return_unit
+            end else begin
+              Prevalidator.flush old_prevalidator block_hash >>=? fun () ->
+              return_unit
+            end
+          end >>=? fun () ->
+          return_unit
       | None -> return_unit
     end >>=? fun () ->
     may_switch_test_chain w spawn_child block >>= fun () ->
@@ -302,9 +334,20 @@ let on_close w =
 let on_launch start_prevalidator w _ parameters =
   Chain.init_head parameters.chain_state >>= fun () ->
   (if start_prevalidator then
-     Prevalidator.create
-       parameters.prevalidator_limits parameters.chain_db >>= fun prevalidator ->
-     Lwt.return_some prevalidator
+     State.read_chain_data parameters.chain_state
+       (fun _ {State.current_head} -> Lwt.return current_head) >>= fun head ->
+     State.Block.protocol_hash head >>= fun head_hash ->
+     safe_get_protocol head_hash >>= function
+     | Ok (module Proto) ->
+         Prevalidator.create
+           parameters.prevalidator_limits
+           (module Proto)
+           parameters.chain_db >>= fun prevalor ->
+         Lwt.return_some prevalor
+     | Error err ->
+         Log.lwt_log_error "@[Failed to instantiate prevalidator:@ %a@]"
+           pp_print_error err >>= fun () ->
+         Lwt.return_none
    else Lwt.return_none) >>= fun prevalidator ->
   let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
@@ -336,12 +379,9 @@ let on_launch start_prevalidator w _ parameters =
         may_activate_peer_validator w peer_id >>= fun pv ->
         Peer_validator.notify_head pv block ;
         (* TODO notify prevalidator only if head is known ??? *)
-        begin match nv.prevalidator with
-          | Some prevalidator ->
-              Prevalidator.notify_operations prevalidator peer_id ops
-          | None -> ()
-        end ;
-        Lwt.return_unit
+        match nv.prevalidator with
+        | Some prevalidator -> Prevalidator.notify_operations prevalidator peer_id ops
+        | None -> Lwt.return_unit
       end;
     end ;
     disconnection = begin fun peer_id ->
