@@ -66,6 +66,8 @@ let rec apply_operations apply_operation state r max_ops ~sort ops =
 
 module type T = sig
 
+  module Proto: Registered_protocol.T
+
   type state
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
@@ -98,11 +100,19 @@ module type T = sig
     state ->
     unit
 
-  val rpc_directory : (state * error Preapply_result.t) RPC_directory.t tzresult Lwt.t
+  type new_operation_input =
+    ([ `Applied | `Refused | `Branch_refused | `Branch_delayed ] *
+     Operation.shell_header *
+     Proto.operation_data
+    ) Lwt_watcher.input
+
+  val new_operation_input: state -> new_operation_input
 
 end
 
-module Make(Proto : Registered_protocol.T) : T = struct
+module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struct
+
+  module Proto = Proto
 
   type state =
     { state : Proto.validation_state ;
@@ -230,72 +240,13 @@ module Make(Proto : Registered_protocol.T) : T = struct
   let shutdown_operation_input { new_operation_input } =
     Lwt_watcher.shutdown_input new_operation_input
 
-  let rpc_directory =
-    let module Proto_services = Block_services.Make(Proto)(Proto) in
+  type new_operation_input =
+    ([ `Applied | `Refused | `Branch_refused | `Branch_delayed ] *
+     Operation.shell_header *
+     Proto.operation_data
+    ) Lwt_watcher.input
 
-    let dir : (state * Error_monad.error Preapply_result.t) RPC_directory.t ref =
-      ref RPC_directory.empty in
-
-    let gen_register s f =
-      dir := RPC_directory.gen_register !dir s f in
-
-    gen_register
-      (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
-      begin fun ({ new_operation_input }, current_mempool) params () ->
-        let open Preapply_result in
-        let operation_stream, stopper =
-          Lwt_watcher.create_stream new_operation_input in
-        (* Convert ops *)
-        let map_op op =
-          let protocol_data =
-            Data_encoding.Binary.of_bytes_exn
-              Proto.operation_data_encoding
-              op.Operation.proto in
-          Proto.{ shell = op.shell ; protocol_data } in
-        let fold_op _k (op, _error) acc = map_op op :: acc in
-        (* First call : retrieve the current set of op from the mempool *)
-        let { applied ; refused ; branch_refused ; branch_delayed } = current_mempool in
-        let applied = if params#applied then List.map map_op (List.map snd applied) else [] in
-        let refused = if params#refused then
-            Operation_hash.Map.fold fold_op refused [] else [] in
-        let branch_refused = if params#branch_refused then
-            Operation_hash.Map.fold fold_op branch_refused [] else [] in
-        let branch_delayed = if params#branch_delayed then
-            Operation_hash.Map.fold fold_op branch_delayed [] else [] in
-        let current_mempool = List.concat [ applied ; refused ; branch_refused ; branch_delayed ] in
-        let current_mempool = ref (Some current_mempool) in
-        let filter_result = function
-          | `Applied -> params#applied
-          | `Refused -> params#branch_refused
-          | `Branch_refused -> params#refused
-          | `Branch_delayed -> params#branch_delayed
-        in
-        let next () =
-          match !current_mempool with
-          | Some mempool -> begin
-              current_mempool := None ;
-              Lwt.return_some mempool
-            end
-          | None -> begin
-              Lwt_stream.get operation_stream >>= function
-              | Some (kind, shell, protocol_data) when filter_result kind ->
-                  (* NOTE: Should the protocol change, a new Prevalidation
-                   * context would be created. Thus, we use the same Proto. *)
-                  let bytes = Data_encoding.Binary.to_bytes_exn
-                      Proto.operation_data_encoding
-                      protocol_data in
-                  let protocol_data = Data_encoding.Binary.of_bytes_exn
-                      Proto.operation_data_encoding
-                      bytes in
-                  Lwt.return_some [ { Proto.shell ; protocol_data } ]
-              | _ -> Lwt.return_none
-            end
-        in
-        let shutdown () = Lwt_watcher.shutdown stopper in
-        RPC_answer.return_stream { next ; shutdown }
-      end ;
-
-    return !dir
+  let new_operation_input { new_operation_input } = new_operation_input
 
 end
 

@@ -30,6 +30,8 @@
 
 module type T = sig
 
+  module Proto: Registered_protocol.T
+
   type state
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
@@ -62,11 +64,17 @@ module type T = sig
     state ->
     unit
 
-  val rpc_directory : (state * error Preapply_result.t) RPC_directory.t tzresult Lwt.t
+  type new_operation_input =
+    ([ `Applied | `Refused | `Branch_refused | `Branch_delayed ] *
+     Operation.shell_header *
+     Proto.operation_data
+    ) Lwt_watcher.input
+
+  val new_operation_input: state -> new_operation_input
 
 end
 
-module Make(Proto : Registered_protocol.T) : T
+module Make(Proto : Registered_protocol.T) : T with module Proto = Proto
 
 (** Pre-apply creates a new block and returns it. *)
 val preapply :
