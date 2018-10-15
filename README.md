@@ -1,6 +1,9 @@
 Tezos
 =====
 
+The entire development happens at https://gitlab.com/tezos/tezos
+Github is a mirror that does not represent the current development.
+
 Tezos is a distributed consensus platform with meta-consensus
 capability. Tezos not only comes to consensus about the state of its ledger,
 like Bitcoin or Ethereum. It also attempts to come to consensus about how the
