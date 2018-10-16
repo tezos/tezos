@@ -146,7 +146,7 @@ val commit_block:
   Block_hash.t ->
   Block_header.t -> MBytes.t ->
   Operation.t list list -> MBytes.t list list ->
-  Tezos_protocol_environment_shell.validation_result ->
+  State.Block.validation_store ->
   State.Block.t option tzresult Lwt.t
 
 (** Store on disk all the data associated to an invalid block. *)
