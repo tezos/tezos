@@ -92,3 +92,6 @@ val secret_key_size : int
 val public_key_encoding : public_key Data_encoding.t
 val secret_key_encoding : secret_key Data_encoding.t
 val nonce_encoding : nonce Data_encoding.t
+
+val neuterize : secret_key -> public_key
+val equal : public_key -> public_key -> bool

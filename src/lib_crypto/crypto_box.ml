@@ -208,3 +208,5 @@ let secret_key_encoding =
 
 let nonce_encoding =
   Data_encoding.Fixed.bytes nonce_size
+let neuterize : secret_key -> public_key = Box.neuterize
+let equal : public_key -> public_key -> bool = Box.equal
