@@ -94,11 +94,6 @@ and block = {
   header: Block_header.t ;
 }
 
-and hashed_header = {
-  header: Block_header.t ;
-  hash: Block_hash.t ;
-}
-
 let read_chain_data { chain_data } f =
   Shared.use chain_data begin fun state ->
     f state.chain_data_store state.data
@@ -625,89 +620,6 @@ module Block = struct
   }
   type block = t
 
-  module Header = struct
-
-    type t = hashed_header = {
-      header: Block_header.t ;
-      hash: Block_hash.t ;
-    }
-    type block_header = t
-
-    let compare b1 b2 = Block_hash.compare b1.hash b2.hash
-    let equal b1 b2 = Block_hash.equal b1.hash b2.hash
-
-    let hash { hash } = hash
-    let header { header } = header
-    let shell_header { header = { Block_header.shell } } = shell
-    let timestamp b = (shell_header b).timestamp
-    let fitness b = (shell_header b).fitness
-    let level b = (shell_header b).level
-    let validation_passes b = (shell_header b).validation_passes
-
-    let known chain_state hash =
-      Shared.use chain_state.block_store begin fun store ->
-        Store.Block.Header.known (store, hash)
-      end
-
-    let read chain_state ?(pred = 0) hash =
-      Shared.use chain_state.block_store begin fun store ->
-        begin
-          if pred = 0 then
-            return hash
-          else
-            predecessor_n store hash pred >>= function
-            | None -> return chain_state.genesis.block
-            | Some hash -> return hash
-        end >>=? fun hash ->
-        Store.Block.Header.read (store, hash) >>=? fun header ->
-        return { header ; hash }
-      end
-    let read_opt chain_state ?pred hash =
-      read chain_state ?pred hash >>= function
-      | Error _ -> Lwt.return_none
-      | Ok v -> Lwt.return_some v
-    let read_exn chain_state ?(pred = 0) hash =
-      Shared.use chain_state.block_store begin fun store ->
-        begin
-          if pred = 0 then
-            Lwt.return hash
-          else
-            predecessor_n store hash pred >>= function
-            | None -> Lwt.return chain_state.genesis.block
-            | Some hash -> Lwt.return hash
-        end >>= fun hash ->
-        Store.Block.Header.read_exn (store, hash) >>= fun header ->
-        Lwt.return { header ; hash }
-      end
-
-    let of_block ( { hash ; header } : block ) : t = { hash ; header }
-    let to_block chain_state ( { hash ; header } : t ) : block option Lwt.t =
-      Shared.use chain_state.block_store begin fun store ->
-        Store.Block.Contents.read_opt (store, hash) >>= function
-        | Some contents -> Lwt.return_some { chain_state ; hash ; contents ; header }
-        | None -> Lwt.return_none
-      end
-
-    let all_operation_hashes chain_state { hash ; header } =
-      Shared.use chain_state.block_store begin fun store ->
-        Lwt_list.map_p
-          (Store.Block.Operation_hashes.read_exn (store, hash))
-          (0 -- (header.Block_header.shell.validation_passes - 1))
-      end
-
-    let predecessor chain_state { hash ; header } =
-      if Block_hash.equal hash header.Block_header.shell.predecessor then
-        Lwt.return_none           (* we are at genesis *)
-      else
-        read_exn chain_state header.Block_header.shell.predecessor >>= fun block ->
-        Lwt.return_some block
-
-    let predecessor_n chain_state hash n =
-      Shared.use chain_state.block_store begin fun block_store ->
-        predecessor_n block_store hash n
-      end
-  end
-
   let compare b1 b2 = Block_hash.compare b1.hash b2.hash
   let equal b1 b2 = Block_hash.equal b1.hash b2.hash
 
@@ -807,14 +719,14 @@ module Block = struct
 
   (* Quick accessor to be optimized ?? *)
   let read_predecessor chain_state hash =
-    Header.read chain_state hash >>=? fun { Header.header } ->
+    read chain_state hash >>=? fun { header } ->
     return header.shell.predecessor
   let read_predecessor_opt chain_state hash =
     read_predecessor chain_state hash >>= function
     | Error _ -> Lwt.return_none
     | Ok v -> Lwt.return_some v
   let read_predecessor_exn chain_state hash =
-    Header.read_exn chain_state hash >>= fun { Header.header } ->
+    read_exn chain_state hash >>= fun { header } ->
     Lwt.return header.shell.predecessor
 
   let predecessor { chain_state ; header ; hash } =
