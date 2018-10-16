@@ -449,6 +449,6 @@ let wrap (n, f) =
   end
 
 let () =
-  Alcotest.run ~argv:[|""|] "tezos-client-alpha" [
+  Alcotest.run ~argv:[|""|] "tezos-client-002-PsYLVpVv" [
     "michelson", List.map wrap tests
   ]

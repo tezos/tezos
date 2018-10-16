@@ -128,7 +128,7 @@ let vote_protocol_parameters =
   | Ok json ->
       Data_encoding.Binary.to_bytes_exn Data_encoding.json json
 
-let activate_alpha ?(vote = false) () =
+let activate_002_PsYLVpVv ?(vote = false) () =
   let fitness = Fitness_repr.from_int64 0L in
   let activator_sk =
     Tezos_signer_backends.Unencrypted.make_sk
@@ -158,7 +158,7 @@ let init ?exe ?vote ?rpc_port () =
       ~port:!rpc_config.port
       ~sandbox:sandbox_parameters
       () in
-  activate_alpha ?vote () >>=? fun hash ->
+  activate_002_PsYLVpVv ?vote () >>=? fun hash ->
   return (pid, hash)
 
 let level (chain, block) =
@@ -546,7 +546,6 @@ module Baking = struct
       Tezos_signer_backends.Unencrypted.make_sk contract.sk in
     Client_baking_forge.forge_block
       ctxt
-      block
       ~operations
       ~force:true
       ~best_effort:false
@@ -554,7 +553,7 @@ module Baking = struct
       ~priority:(`Auto (contract.pkh, Some 1024))
       ?seed_nonce_hash
       ~src_sk
-      ()
+      block
 
 end
 

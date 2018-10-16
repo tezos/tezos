@@ -26,11 +26,19 @@
 open Proto_alpha
 open Alpha_context
 
-let bake_block (cctxt : #Proto_alpha.full)
-    ?(chain = `Main) block
-    ?threshold
-    ?force ?max_priority ?(minimal_timestamp=false)
-    ?src_sk ?src_pk delegate =
+let bake_block
+    (cctxt : #Proto_alpha.full)
+    ?(chain = `Main)
+    ?fee_threshold
+    ?force
+    ?max_priority
+    ?(minimal_timestamp=false)
+    ?mempool
+    ?context_path
+    ?src_sk
+    ?src_pk
+    block
+    delegate =
   begin
     match src_sk with
     | None ->
@@ -56,10 +64,14 @@ let bake_block (cctxt : #Proto_alpha.full)
       None, None in
   Client_baking_forge.forge_block cctxt
     ?timestamp:(if minimal_timestamp then None else Some (Time.now ()))
-    ?threshold
+    ?fee_threshold
     ?force
-    ?seed_nonce_hash ~src_sk block
-    ~priority:(`Auto (delegate, max_priority)) () >>=? fun block_hash ->
+    ?seed_nonce_hash
+    ?mempool
+    ?context_path
+    ~priority:(`Auto (delegate, max_priority))
+    ~src_sk
+    block >>=? fun block_hash ->
   let src_pkh = Signature.Public_key.hash src_pk in
   Client_baking_forge.State.record cctxt src_pkh level.level >>=? fun () ->
   begin match seed_nonce with

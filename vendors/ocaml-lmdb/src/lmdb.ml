@@ -253,20 +253,20 @@ let opendir ?maxreaders ?maxdbs ?mapsize ?(flags=[]) path mode =
   match create () with
   | Error v -> Error (error_of_int v)
   | Ok t ->
-    begin match maxreaders with
-      | None -> Ok ()
-      | Some readers -> set_maxreaders t readers
-    end >>= fun () ->
-    begin match maxdbs with
-      | None -> Ok ()
-      | Some dbs -> set_maxdbs t dbs
-    end >>= fun () ->
-    begin match mapsize with
-      | None -> Ok ()
-      | Some size -> set_mapsize t size
-    end >>= fun () ->
-    let ret = opendir t path (int_of_flags_env flags) mode in
-    return ret t ~on_error:(fun () -> closedir t)
+      begin match maxreaders with
+        | None -> Ok ()
+        | Some readers -> set_maxreaders t readers
+      end >>= fun () ->
+      begin match maxdbs with
+        | None -> Ok ()
+        | Some dbs -> set_maxdbs t dbs
+      end >>= fun () ->
+      begin match mapsize with
+        | None -> Ok ()
+        | Some size -> set_mapsize t size
+      end >>= fun () ->
+      let ret = opendir t path (int_of_flags_env flags) mode in
+      return ret t ~on_error:(fun () -> closedir t)
 
 external copy :
   t -> string -> int -> int = "stub_mdb_env_copy2" [@@noalloc]
@@ -425,28 +425,28 @@ let with_ro_db ?nosync ?nometasync ?parent ?flags ?name t ~f =
   opendb ?flags ?name txn >>= fun db ->
   match f txn db with
   | exception exn ->
-    abort_txn txn ;
-    raise exn
+      abort_txn txn ;
+      raise exn
   | Ok res ->
-    commit_txn txn >>= fun () ->
-    Ok res
+      commit_txn txn >>= fun () ->
+      Ok res
   | Error err ->
-    abort_txn txn ;
-    Error err
+      abort_txn txn ;
+      Error err
 
 let with_rw_db ?nosync ?nometasync ?parent ?flags ?name t ~f =
   create_rw_txn ?nosync ?nometasync ?parent t >>= fun txn ->
   opendb ?flags ?name txn >>= fun db ->
   match f txn db with
   | exception exn ->
-    abort_txn txn ;
-    raise exn
+      abort_txn txn ;
+      raise exn
   | Ok res ->
-    commit_txn txn >>= fun () ->
-    Ok res
+      commit_txn txn >>= fun () ->
+      Ok res
   | Error err ->
-    abort_txn txn ;
-    Error err
+      abort_txn txn ;
+      Error err
 
 type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
 
@@ -504,10 +504,10 @@ external opencursor :
 let opencursor :
   type a. a txn -> db -> (a cursor, error) result = fun txn dbi ->
   match txn with
-    | Txn_ro rawtxn ->
+  | Txn_ro rawtxn ->
       R.reword_error error_of_int (opencursor rawtxn dbi) |>
       R.map cursor_ro
-    | Txn_rw rawtxn ->
+  | Txn_rw rawtxn ->
       R.reword_error error_of_int (opencursor rawtxn dbi) |>
       R.map cursor_rw
 
@@ -586,11 +586,11 @@ let cursor_fold_left ~f ~init cursor =
     | Error KeyNotFound -> Ok a
     | Error err -> Error err
     | Ok kv ->
-      f a kv >>= fun a ->
-      match cursor_next cursor with
-      | Error KeyNotFound -> Ok a
-      | Error err -> Error err
-      | Ok () -> inner a
+        f a kv >>= fun a ->
+        match cursor_next cursor with
+        | Error KeyNotFound -> Ok a
+        | Error err -> Error err
+        | Ok () -> inner a
   in
   inner init
 

@@ -23,12 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let await_bootstrapped_node (cctxt: #Proto_alpha.full) =
+  (* Waiting for the node to be synchronized *)
+  cctxt#message "Waiting for the node to be synchronized with its \
+                 peers..." >>= fun () ->
+  Shell_services.Monitor.bootstrapped cctxt >>=? fun _ ->
+  cctxt#message "Node synchronized." >>= fun () ->
+  return_unit
+
 module Endorser = struct
 
   let run (cctxt : #Proto_alpha.full) ~delay ?min_date delegates =
+    await_bootstrapped_node cctxt >>=? fun _ ->
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt `Main >>=? fun block_stream ->
+    cctxt#message "Endorser started." >>= fun () ->
     Client_baking_endorsement.create cctxt ~delay delegates block_stream >>=? fun () ->
     ignore min_date;
     return_unit
@@ -37,12 +47,21 @@ end
 
 module Baker = struct
 
-  let run (cctxt : #Proto_alpha.full) ?threshold ?max_priority ?min_date ~context_path delegates =
+  let run
+      (cctxt : #Proto_alpha.full)
+      ?fee_threshold
+      ?max_priority
+      ?min_date
+      ~context_path
+      ~max_waiting_time
+      delegates =
+    await_bootstrapped_node cctxt >>=? fun _ ->
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt `Main >>=? fun block_stream ->
+    cctxt#message "Baker started." >>= fun () ->
     Client_baking_forge.create cctxt
-      ?threshold ?max_priority ~context_path delegates block_stream >>=? fun () ->
+      ?fee_threshold ?max_priority ~max_waiting_time ~context_path delegates block_stream >>=? fun () ->
     ignore min_date;
     return_unit
 
@@ -51,9 +70,11 @@ end
 module Accuser = struct
 
   let run (cctxt : #Proto_alpha.full) ~preserved_levels =
+    await_bootstrapped_node cctxt >>=? fun _ ->
     Client_baking_blocks.monitor_valid_blocks
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt ~chains:[ `Main ] () >>=? fun valid_blocks_stream ->
+    cctxt#message "Accuser started." >>= fun () ->
     Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream >>=? fun () ->
     return_unit
 

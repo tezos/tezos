@@ -53,6 +53,8 @@ module Prefix : sig
 
   val generic_signature: string
   val chain_id: string
+  val secp256k1_element: string
+  val secp256k1_scalar: string
 
 end
 

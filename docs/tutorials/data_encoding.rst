@@ -37,7 +37,7 @@ For example, an encoding that represents a 31 bit integer has type
 Encoding an object
 ~~~~~~~~~~~~~~~~~~
 
-Encoding a single integer is fairly uninteresting. The `Dataencoding`
+Encoding a single integer is fairly uninteresting. The `Data_encoding`
 library provides a number of combinators that can be used to build more
 complicated objects. Consider the type that represents an interval from
 the first number to the second:
@@ -54,7 +54,8 @@ We can define an encoding for this type as:
       Data_encoding.(obj2 (req "min" int64) (req "max" int64))
 
 In the example above we construct a new value ``interval_encoding`` by
-combining two `int64` integers using the ``obj2`` constructor.
+combining two `int64` integers using the ``obj2`` (object with two fields)
+constructor.
 
 The library provides different constructors, i.e. for objects that have
 no data (``Data_encoding.empty``), constructors for object up to 10
@@ -67,7 +68,7 @@ as a JSON object with field names.
 Lists, arrays, and options
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-List, Arrays and options types can by built on top of ground data types.
+List, arrays and options types can by built on top of ground data types.
 
 .. code:: ocaml
 
@@ -112,7 +113,7 @@ Encoding for this types can be expressed as:
                            (fun s -> S s) ])
 
 This variant encoding is a bit more complicated. Let’s look at the parts
-of the type:
+of the encoding:
 
 -  We include an optimization hint to the binary encoding to inform it
    of the number of elements we expect in the tag. In most cases, we can
@@ -150,7 +151,7 @@ First we define an untyped JSON AST:
       | `Null
       | `String of string ]
 
-This is then parsed into a typed AST ( we eliminate several cases for
+This is then parsed into a typed AST (we eliminate several cases for
 clarity):
 
 .. code:: ocaml
@@ -183,9 +184,9 @@ clarity):
       | Def : { name : string ;
                 encoding : 'a t } -> 'a desc
 
--  The first set of constructors define all ground types.
+-  The first few constructors define all ground types.
 -  The constructors for ``Bytes``, ``String`` and ``String_enum``
-   includes a length fields in order to provide safe binary
+   include a length field in order to provide safe binary
    serialization.
 -  The constructors for ``Array`` and ``List`` are used by the
    combinators we saw earlier.
@@ -203,4 +204,4 @@ The library also provides various wrappers and convenience functions to
 make constructing these objects easier. Reading the documentation in the
 `mli file
 <../api/odoc/tezos-data-encoding/Tezos_data_encoding/Data_encoding/index.html>`__
-should orient you on how to use these functions and their purposes.
+should orient you on how to use these functions.

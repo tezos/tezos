@@ -37,10 +37,11 @@ end
 module Baker : sig
   val run:
     #Proto_alpha.full ->
-    ?threshold: Tez.tez ->
+    ?fee_threshold: Tez.tez ->
     ?max_priority: int ->
     ?min_date: Time.t ->
     context_path: string ->
+    max_waiting_time: int ->
     public_key_hash list -> unit tzresult Lwt.t
 end
 

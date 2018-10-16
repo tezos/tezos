@@ -2990,7 +2990,7 @@ Protocol Alpha
       || { "kind": "origination",
            "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -3118,7 +3118,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -5187,7 +5187,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -5611,7 +5611,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -5898,7 +5898,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -6243,7 +6243,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -6441,7 +6441,7 @@ Protocol Alpha
       || { "kind": "origination",
            "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -6569,7 +6569,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -7150,7 +7150,7 @@ Protocol Alpha
       || { "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
            "kind": "origination",
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -7471,7 +7471,7 @@ Protocol Alpha
       || { "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
            "kind": "origination",
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -7633,8 +7633,8 @@ Protocol Alpha
     <pre>
     { "type_map":
         [ { "location": $micheline.location,
-            "stackBefore": [ $micheline.michelson_v1.expression ... ],
-            "stackAfter": [ $micheline.michelson_v1.expression ... ] } ... ],
+            "stack_before": [ $micheline.michelson_v1.expression ... ],
+            "stack_after": [ $micheline.michelson_v1.expression ... ] } ... ],
       "gas": $bignum || "unaccounted" }
     $bignum:
       /* Big number
@@ -8403,7 +8403,7 @@ Protocol Alpha
       || { "kind": "origination",
            "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -8531,7 +8531,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -8859,7 +8859,7 @@ Protocol Alpha
       || { "kind": "origination",
            "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -8987,7 +8987,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -9315,7 +9315,7 @@ Protocol Alpha
       || { "kind": "origination",
            "source": $contract_id,
            "nonce": integer ∈ [0, 2^16-1],
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":
@@ -9443,7 +9443,7 @@ Protocol Alpha
            "counter": integer ∈ [-2^31-2, 2^31+2],
            "gas_limit": $bignum,
            "storage_limit": integer ∈ [-2^31-2, 2^31+2] || string,
-           "managerPubkey":
+           "manager_pubkey":
              string
              /* A Secp256k1 or Ed25519 public key hash (Base58Check-encoded) */,
            "balance":

@@ -22,7 +22,7 @@ After a successful compilation, you should have the following binaries:
 Note that Alphanet and Zeronet only support the last version of the
 protocol which is always called `alpha` while Mainnet must also
 support all past protocols.
-For this reason the name of the 3 daemons in Betanet contains the
+For this reason the name of the 3 daemons in Mainnet contains the
 incremental number and the partial hash of the protocol they are bound
 to, such as ``tezos-{baker,endorser,accuser}-002-PsYLVpVv``.
 
@@ -187,11 +187,11 @@ For more advanced key management we offer :ref:`ledger support
 
 .. _faucet:
 
-Get free Tezzies
-~~~~~~~~~~~~~~~~
+Get free tez
+~~~~~~~~~~~~
 
 In order to test the networks and help users get familiar with the
-system, on Zeronet and Alphanet you can obtain free Tezzies from a
+system, on Zeronet and Alphanet you can obtain free tez from a
 `faucet <https://faucet.tzalpha.net>`__.
 
 This will provide a wallet in the form of a JSON file
@@ -222,7 +222,7 @@ Please drink carefully and don't abuse the faucet: it only contains
 Transactions
 ~~~~~~~~~~~~
 
-Let's transfer some tezzies to the new account:
+Let's transfer some tez to the new account:
 
 ::
 
@@ -443,7 +443,7 @@ The client tries to simplify common tasks as much as possible, however
 if you want to query the node for more specific informations you'll
 have to resort to RPCs.
 For example to check the value of important constants in Tezos, which
-may differ between Betanet, Alphanet and Zeronet, you can use:
+may differ between Mainnet, Alphanet and Zeronet, you can use:
 
 ::
 

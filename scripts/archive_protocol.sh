@@ -45,7 +45,7 @@ sed -i --follow-symlink \
     -e s/-${lib_name}/-${version}-${short_hash}/g \
     $(find -name jbuild -or -name \*.opam)
 
-if ls src | grep proto_000_ > /dev/null ; then
+if ls src/proto_000_*/lib_protocol/src/TEZOS_PROTOCOL | grep proto_000_ > /dev/null ; then
     proto_genesis_dir="proto_000_`ls src | grep proto_000_ | cut -f3 -d_`"
 else
     proto_genesis_dir="proto_genesis"
@@ -74,7 +74,7 @@ if [ $proto_genesis_dir = "proto_genesis" ] ; then
     sed -i --follow-symlink \
         -e "s/-genesis/-000-Ps9mPmXa/" \
         -e "s/_genesis/_000_Ps9mPmXa/" \
-        lib_delegate/test
+        $(find lib_delegate/test -type f)
 fi
 
 cd ../..

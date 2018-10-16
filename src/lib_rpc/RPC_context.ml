@@ -176,7 +176,7 @@ let () =
     `Branch
     ~id:"RPC_context.Not_found"
     ~title:"RPC lookup failed"
-    ~description:"RPC lookup failed. No RPC exists at the URL or the RPC tried to access non-existant data."
+    ~description:"RPC lookup failed. No RPC exists at the URL or the RPC tried to access non-existent data."
     (obj2
        (req "method" RPC_service.meth_encoding)
        (req "uri" uri_encoding))

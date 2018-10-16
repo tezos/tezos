@@ -26,6 +26,19 @@
 open Proto_alpha
 open Alpha_context
 
+module State : sig
+  val get:
+    #Client_context.wallet ->
+    Signature.Public_key_hash.t ->
+    Raw_level.t option tzresult Lwt.t
+
+  val record:
+    #Client_context.wallet ->
+    Signature.Public_key_hash.t ->
+    Raw_level.t ->
+    unit tzresult Lwt.t
+end
+
 val generate_seed_nonce: unit -> Nonce.t
 (** [generate_seed_nonce ()] is a random nonce that is typically used
     in block headers. When baking, bakers generate random nonces whose
@@ -36,9 +49,9 @@ val inject_block:
   #Proto_alpha.full ->
   ?force:bool ->
   ?chain:Chain_services.chain ->
+  ?seed_nonce_hash:Nonce_hash.t ->
   shell_header:Block_header.shell_header ->
   priority:int ->
-  ?seed_nonce_hash:Nonce_hash.t ->
   src_sk:Client_keys.sk_uri ->
   Operation.raw list list ->
   Block_hash.t tzresult Lwt.t
@@ -54,21 +67,22 @@ type error +=
 val forge_block:
   #Proto_alpha.full ->
   ?chain:Chain_services.chain ->
-  Block_services.block ->
-  ?threshold:Tez.t ->
   ?force:bool ->
   ?operations: Operation.packed list ->
   ?best_effort:bool ->
   ?sort:bool ->
+  ?fee_threshold:Tez.t ->
   ?timestamp:Time.t ->
-  priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
+  ?mempool:string ->
+  ?context_path:string ->
   ?seed_nonce_hash:Nonce_hash.t ->
+  priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
   src_sk:Client_keys.sk_uri ->
-  unit ->
+  Block_services.block ->
   Block_hash.t tzresult Lwt.t
-(** [forge_block cctxt parent_blk ?threshold ?force ?operations ?best_effort
+(** [forge_block cctxt ?fee_threshold ?force ?operations ?best_effort
     ?sort ?timestamp ?max_priority ?priority ~seed_nonce ~src_sk
-    pk_hash] injects a block in the node. In addition of inject_block,
+    pk_hash parent_blk] injects a block in the node. In addition of inject_block,
     it will:
 
     * Operations: If [?operations] is [None], it will get pending
@@ -83,28 +97,15 @@ val forge_block:
       computed baking priority, it will be used. Otherwise, it will be
       set at the best baking priority.
 
-    * Threshold: If [?threshold] is given, operations with fees lower than it
+    * Fee Threshold: If [?fee_threshold] is given, operations with fees lower than it
       are not added to the block.
 *)
 
-module State : sig
-  val get:
-    #Client_context.wallet ->
-    Signature.Public_key_hash.t ->
-    Raw_level.t option tzresult Lwt.t
-
-  val record:
-    #Client_context.wallet ->
-    Signature.Public_key_hash.t ->
-    Raw_level.t ->
-    unit tzresult Lwt.t
-
-end
-
 val create:
   #Proto_alpha.full ->
-  ?threshold:Tez.t ->
+  ?fee_threshold:Tez.t ->
   ?max_priority: int ->
+  max_waiting_time: int ->
   context_path: string ->
   public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->

@@ -39,7 +39,7 @@ let expect_error err = function
   | err0 :: _ when err = err0 -> return_unit
   | _ -> failwith "Unexpected successful result"
 
-let expect_alpha_error err =
+let expect_002_PsYLVpVv_error err =
   expect_error (Alpha_environment.Ecoproto_error err)
 
 let expect_non_delegatable_contract = function

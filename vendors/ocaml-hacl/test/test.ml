@@ -84,11 +84,26 @@ let hmac_sha256 () =
   let key  = Bigstring.of_string "key" in
   let msg = Bigstring.of_string "The quick brown fox jumps over the lazy dog" in
   let resp = of_hex "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8" in
-  let digest = Hash.HMAC_SHA256.hmac ~key ~msg in
+  let digest = Hash.SHA256.HMAC.digest ~key ~msg in
   Alcotest.(check bigstring "hmac_sha256" resp digest)
+
+let hmac_sha512 () =
+  let vectors = [
+    Bigstring.of_string "key",
+    Bigstring.of_string "The quick brown fox jumps over the lazy dog",
+    of_hex "b42af09057bac1e2d41708e48a902e09b5ff7f12ab428a4fe86653c73dd248fb82f948a549f7b791a5b41915ee4d1ec3935357e4e2317250d0372afa2ebeeb3a" ;
+    Bigstring.empty,
+    Bigstring.empty,
+    of_hex "b936cee86c9f87aa5d3c6f2e84cb5a4239a5fe50480a6ec66b70ab5b1f4ac6730c6c515421b327ec1d69402e53dfb49ad7381eb067b338fd7b0cb22247225d47" ;
+  ] in
+  List.iter begin fun (key, msg, resp) ->
+    let digest = Hash.SHA512.HMAC.digest ~key ~msg in
+    Alcotest.(check bigstring "hmac_sha512" resp digest)
+  end vectors
 
 let hash = [
   "hmac_sha256", `Quick, hmac_sha256 ;
+  "hmac_sha512", `Quick, hmac_sha512 ;
 
   "sha256", `Quick, sha256 ;
   "sha256_seq", `Quick, sha256_seq ;

@@ -49,6 +49,13 @@ let timeout_query =
 
 module S = struct
 
+  let self =
+    RPC_service.get_service
+      ~description:"Return the node's peer id"
+      ~query: RPC_query.empty
+      ~output: P2p_peer.Id.encoding
+      RPC_path.(root / "network" / "self")
+
   let versions =
     RPC_service.get_service
       ~description:"Supported network layer versions."
@@ -81,6 +88,7 @@ module S = struct
 end
 
 open RPC_context
+let self ctxt = make_call S.self ctxt () () ()
 let stat ctxt = make_call S.stat ctxt () () ()
 let versions ctxt = make_call S.versions ctxt () () ()
 let events ctxt = make_streamed_call S.events ctxt () () ()

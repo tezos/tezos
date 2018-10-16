@@ -30,13 +30,15 @@ open Alpha_context
 val bake_block:
   #Proto_alpha.full ->
   ?chain:Chain_services.chain ->
-  Block_services.block ->
-  ?threshold:Tez.t ->
+  ?fee_threshold:Tez.t ->
   ?force:bool ->
   ?max_priority: int ->
   ?minimal_timestamp: bool ->
+  ?mempool: string ->
+  ?context_path: string ->
   ?src_sk:Client_keys.sk_uri ->
   ?src_pk:Signature.public_key ->
+  Block_services.block ->
   public_key_hash ->
   unit tzresult Lwt.t
 

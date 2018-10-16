@@ -99,22 +99,22 @@ let equal : type a b. (a, b) key -> (a, b) key -> bool = fun k1 k2 ->
   match k1, k2 with
   | Sk (sk, _), Sk (sk2, _) -> Bigstring.equal sk sk2
   | Pk (pk, c), Pk (pk2, _) ->
-    let len = compressed_size c in
-    let cpk = Bigstring.create len in
-    let cpk2 = Bigstring.create len in
-    compress pk cpk (to_curve c) ;
-    compress pk2 cpk2 (to_curve c) ;
-    Bigstring.equal cpk cpk2
+      let len = compressed_size c in
+      let cpk = Bigstring.create len in
+      let cpk2 = Bigstring.create len in
+      compress pk cpk (to_curve c) ;
+      compress pk2 cpk2 (to_curve c) ;
+      Bigstring.equal cpk cpk2
 
 let neuterize : type a b. (a, b) key -> (a, public) key = function
   | Pk (pk, curve) -> Pk (pk, curve)
   | Sk (sk, curve) ->
-    let pk = Bigstring.create (pk_size curve) in
-    let pk_computed_ok = pk_of_sk sk pk (to_curve curve) in
-    let pk_is_valid = valid_pk pk (to_curve curve) in
-    if not pk_computed_ok && pk_is_valid then
-      invalid_arg "Uecc.neuterize" ;
-    Pk (pk, curve)
+      let pk = Bigstring.create (pk_size curve) in
+      let pk_computed_ok = pk_of_sk sk pk (to_curve curve) in
+      let pk_is_valid = valid_pk pk (to_curve curve) in
+      if not pk_computed_ok && pk_is_valid then
+        invalid_arg "Uecc.neuterize" ;
+      Pk (pk, curve)
 
 let pk_of_bytes :
   type a. a t -> Bigstring.t ->
@@ -216,18 +216,18 @@ external verify :
 
 let write_sign (Sk (_sk, _c)) _buf ~msg:_ =
   failwith "Not implemented"
-  (* if Bigstring.length buf < pk_size c then 0
-   * else
-   *   match sign sk msg buf (to_curve c) with
-   *   | true -> pk_size c
-   *   | false -> 0 *)
+(* if Bigstring.length buf < pk_size c then 0
+ * else
+ *   match sign sk msg buf (to_curve c) with
+ *   | true -> pk_size c
+ *   | false -> 0 *)
 
 let sign (Sk (_sk, _c)) _msg =
   failwith "Not implemented"
-  (* let signature = Bigstring.create (pk_size c) in
-   * match sign sk msg signature (to_curve c) with
-   * | true -> Some signature
-   * | false -> None *)
+(* let signature = Bigstring.create (pk_size c) in
+ * match sign sk msg signature (to_curve c) with
+ * | true -> Some signature
+ * | false -> None *)
 
 let verify (Pk (pk, c)) ~msg ~signature =
   if Bigstring.length signature <> pk_size c then false

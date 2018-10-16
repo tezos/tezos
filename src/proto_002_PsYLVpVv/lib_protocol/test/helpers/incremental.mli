@@ -31,7 +31,7 @@ type incremental = t
 
 val predecessor: incremental -> Block.t
 val header: incremental -> Block_header.t
-
+val rev_tickets: incremental -> operation_receipt list
 val level: incremental -> int32
 
 val begin_construction:
