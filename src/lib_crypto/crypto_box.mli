@@ -95,3 +95,5 @@ val nonce_encoding : nonce Data_encoding.t
 
 val neuterize : secret_key -> public_key
 val equal : public_key -> public_key -> bool
+
+val pp_pk :Format.formatter -> public_key -> unit
