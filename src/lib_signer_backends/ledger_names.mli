@@ -23,18 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Alcotest.run "protocol_alpha" [
-    "transfer", Transfer.tests ;
-    "origination", Origination.tests ;
-    "activation", Activation.tests ;
-    "endorsement", Endorsement.tests ;
-    "double endorsement", Double_endorsement.tests ;
-    "double baking", Double_baking.tests ;
-    "seed", Seed.tests ;
-    "baking", Baking.tests ;
-    "delegation", Delegation.tests ;
-    "rolls", Rolls.tests ;
-    "combined", Combined_operations.tests ;
-    "qty", Qty.tests ;
-  ]
+type t = {
+  c : string ;
+  t : string ;
+  h : string ;
+  d : string ;
+}
+
+val pp : Format.formatter -> t -> unit
+
+val crouching_tiger : string -> t
+(** [crouching_tiger str] is a sentence derived deterministically from
+    [str] with the form adjective-animal-adjective-animal.
+    E.g. crouching-tiger-hidden-dragon *)

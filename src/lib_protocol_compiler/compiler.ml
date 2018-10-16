@@ -159,7 +159,7 @@ let main { compile_ml ; pack_objects ; link_shared } =
     "-hash-only", Arg.Set hash_only, " Only display the hash of the protocol and don't compile" ;
     "-no-hash-check", Arg.Clear check_protocol_hash, " Don't check that TEZOS_PROTOCOL declares the expected protocol hash (if existent)" ;
     "-static", Arg.Set static, " Only build the static library (no .cmxs)" ;
-    "-register", Arg.Set register, " Generete the `Registerer` module" ;
+    "-register", Arg.Set register, " Generate the `Registerer` module" ;
     "-bin-annot", Arg.Set Clflags.binary_annotations, " (see ocamlopt)" ;
     "-g", Arg.Set Clflags.debug, " (see ocamlopt)" ;
     "-output-dep", Arg.Set output_dep, " ..." ;

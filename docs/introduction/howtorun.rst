@@ -26,7 +26,7 @@ without code, so it is still necessary to pay for its small storage
 ::
 
    tezos-client originate account alice_del for alice \
-                                  transfering 1000 from alice \
+                                  transferring 1000 from alice \
                                   --delegate bob
 
 As done before, we originate a contract *alice_del* with manager
@@ -47,7 +47,7 @@ Running a delegate
 ------------------
 
 A delegate is responsible for baking blocks, endorsing blocks and
-accusing other delegates in case their try to double bake or double
+accusing other delegates in case they try to double bake or double
 endorse.
 
 In the network, rights for baking and endorsing are randomly assigned
@@ -127,7 +127,7 @@ We can compute this maximum using the inverse of Cumulative
 Distribution Function of the Binomial where `most cases` is a value of
 confidence that we can put to 95%.
 There a simple `Python
-script<https://gitlab.com/paracetamolo/utils/blob/master/estimated-rights.py>`_
+script <https://gitlab.com/paracetamolo/utils/blob/master/estimated-rights.py>`_
 that does the computation for us and returns the deposits and rewards,
 expected and maximum, for a cycle and for `preserved_cycles`.
 
