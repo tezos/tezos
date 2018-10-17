@@ -342,3 +342,5 @@ let init ?mapsize dir =
   return s
 
 let close = Raw_store.close
+
+let with_atomic_rw = Raw_store.with_atomic_rw

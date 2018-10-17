@@ -31,8 +31,12 @@ type global_store = t
 (** [init ~mapsize path] returns an initialized store at [path] of
     maximum capacity [mapsize] bytes. *)
 val init: ?mapsize:int64 -> string -> t tzresult Lwt.t
-val close : t -> unit
+val close: t -> unit
 
+val with_atomic_rw:
+  ?mapsize:int64 -> string ->
+  (t -> 'a Error_monad.tzresult Lwt.t) ->
+  'a tzresult Lwt.t
 
 (** {2 Chain store} **********************************************************)
 
