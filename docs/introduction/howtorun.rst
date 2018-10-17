@@ -36,8 +36,15 @@ originating a contract the delegate is not set by default.
 If you already own contracts that are delegatable you can change
 the delegate with the command ``set delegate``.
 
+
+Notice that, by default, an originated account is not *delegatable*,
+which means that you can't change the delegate once the contract is
+originated, even if you initially set a delegate.
+To be able to change the delegate latter, add the
+``--delegatable`` flag.
+
 Notice that only implicit accounts can be delegates, so your delegate
-must by a *tz1* address.
+must be a *tz1* address.
 
 Funds in implicit accounts which are not registered as delegates
 do not participate in baking.

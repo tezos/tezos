@@ -92,7 +92,7 @@ The preferred way to set up your Ledger is to install the `Ledger
 Manager extension
 <https://chrome.google.com/webstore/detail/ledger-manager/beimhnaefocolcplfimocfiaiefpkgbf>`_
 on a Chrome browser.
-On Linux makes sure you correctly set up your `udev` rules as explained
+On Linux make sure you correctly set up your `udev` rules as explained
 `here <https://github.com/obsidiansystems/ledger-app-tezos#udev-rules-linux-only>`_.
 Connect your ledger, unlock it and go the dashboard.
 In the Ledger Manager enable `developer items` in the bottom right,
@@ -172,7 +172,7 @@ operations.
 For example we could have a set up with two nodes, a private one
 connected uniquely with a public one.
 The public node runs on a VPS, connects normally to the network and
-keeps a up to date state of the network while the private node runs at
+keeps an up to date state of the network while the private node runs at
 your home and is in charge of injecting and signing operations with a
 hardware wallet.
 
@@ -254,7 +254,7 @@ guaranteed authenticity and integrity.
 This set up **does not guarantee confidentiality**, an evesdropper can
 see the transactions that you sign but on a public blockchain this is
 less of a concern.
-You can still use the ``https`` scheme or the tunnel to encrypt you
+You can still use the ``https`` scheme or the tunnel to encrypt your
 traffic.
 
 
