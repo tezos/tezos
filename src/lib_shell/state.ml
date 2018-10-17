@@ -1669,34 +1669,34 @@ let close { global_data } =
 let upgrade_0_0_1
     ?(store_mapsize=4_096_000_000_000L)
     ~store_root () =
-  Store.init ~mapsize:store_mapsize store_root >>=? fun global_store ->
-  Store.Chain.list global_store >>= fun chains ->
-  iter_s
-    begin fun chain_id ->
-      Format.eprintf "Upgrading block storage for chain %a...@." Chain_id.pp chain_id ;
-      let chain_store = Store.Chain.get global_store chain_id in
-      let block_store = Store.Block.get chain_store in
-      let chain_data_store = Store.Chain_data.get chain_store in
-      Store.Block.fold block_store
-        ~init:(Ok ())
-        ~f: begin fun h acc ->
-          Lwt.return acc >>=? fun () ->
-          Store.Block.Contents_0_0_1.read
-            (block_store, h) >>=? fun (header, contents) ->
-          Store.Block.Header.store (block_store, h) header >>= fun () ->
-          Store.Block.Contents.store (block_store, h) contents >>= fun () ->
-          return_unit
-        end >>=? fun () ->
-      Format.eprintf "Upgrading checkpoint for chain %a...@." Chain_id.pp chain_id ;
-      Store.Chain_data.Checkpoint_0_0_1.read_opt chain_data_store >>= function
-      | None ->
-          Store.Chain_data.Checkpoint_0_0_1.remove chain_data_store >>= fun () ->
-          return_unit
-      | Some (_level, hash) ->
-          Store.Block.Header.read (block_store, hash) >>=? fun header ->
-          Store.Chain_data.Checkpoint.store chain_data_store header >>= fun () ->
-          return_unit
-    end
-    chains >>=? fun () ->
-  Store.close global_store ;
+  Store.open_with_atomic_rw ~mapsize:store_mapsize store_root begin fun global_store ->
+    Store.Chain.list global_store >>= fun chains ->
+    iter_s
+      begin fun chain_id ->
+        Format.eprintf "Upgrading block storage for chain %a...@." Chain_id.pp chain_id ;
+        let chain_store = Store.Chain.get global_store chain_id in
+        let block_store = Store.Block.get chain_store in
+        let chain_data_store = Store.Chain_data.get chain_store in
+        Store.Block.fold block_store
+          ~init:(Ok ())
+          ~f: begin fun h acc ->
+            Lwt.return acc >>=? fun () ->
+            Store.Block.Contents_0_0_1.read
+              (block_store, h) >>=? fun (header, contents) ->
+            Store.Block.Header.store (block_store, h) header >>= fun () ->
+            Store.Block.Contents.store (block_store, h) contents >>= fun () ->
+            return_unit
+          end >>=? fun () ->
+        Format.eprintf "Upgrading checkpoint for chain %a...@." Chain_id.pp chain_id ;
+        Store.Chain_data.Checkpoint_0_0_1.read_opt chain_data_store >>= function
+        | None ->
+            Store.Chain_data.Checkpoint_0_0_1.remove chain_data_store >>= fun () ->
+            return_unit
+        | Some (_level, hash) ->
+            Store.Block.Header.read (block_store, hash) >>=? fun header ->
+            Store.Chain_data.Checkpoint.store chain_data_store header >>= fun () ->
+            return_unit
+      end
+      chains
+  end >>=? fun () ->
   return_unit
