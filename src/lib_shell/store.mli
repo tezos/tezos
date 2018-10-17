@@ -135,6 +135,9 @@ module Block : sig
   type store
   val get: Chain.store -> store
 
+  val fold: store -> init:'a -> f:(Block_hash.t -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val iter: store -> (Block_hash.t -> unit Lwt.t) -> unit Lwt.t
+
   type contents = {
     message: string option ;
     max_operations_ttl: int ;
@@ -150,6 +153,10 @@ module Block : sig
   module Contents : SINGLE_STORE
     with type t = store * Block_hash.t
      and type value := contents
+
+  module Contents_0_0_1 : SINGLE_STORE
+    with type t := store * Block_hash.t
+     and type value := Block_header.t * contents
 
   module Operation_hashes : MAP_STORE
     with type t = store * Block_hash.t
