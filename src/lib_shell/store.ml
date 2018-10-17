@@ -96,6 +96,10 @@ module Block = struct
          (struct let name = ["blocks"] end))
       (Block_hash)
 
+
+  let fold = Indexed_store.fold_indexes
+  let iter t f = fold t ~init:() ~f:(fun k () -> f k)
+
   type contents = {
     message: string option ;
     max_operations_ttl: int ;
@@ -135,6 +139,35 @@ module Block = struct
                 (req "last_allowed_fork_level" int32)
                 (req "context" Context_hash.encoding)
                 (req "metadata" bytes))
+       end))
+
+  module Contents_0_0_1 =
+    Store_helpers.Make_single_store
+      (Indexed_store.Store)
+      (struct let name = ["contents"] end)
+      (Store_helpers.Make_value(struct
+         type t = Block_header.t * contents
+         let encoding =
+           let open Data_encoding in
+           conv
+             (fun (header,
+                   { message ; max_operations_ttl ;
+                     last_allowed_fork_level ;
+                     context ; metadata }) ->
+               (message, max_operations_ttl, last_allowed_fork_level,
+                context, metadata, header ))
+             (fun (message, max_operations_ttl, last_allowed_fork_level,
+                   context, metadata, header ) ->
+               (header, { message ; max_operations_ttl ;
+                          last_allowed_fork_level ;
+                          context ; metadata }))
+             (obj6
+                (opt "message" string)
+                (req "max_operations_ttl" uint16)
+                (req "last_allowed_fork_level" int32)
+                (req "context" Context_hash.encoding)
+                (req "metadata" bytes)
+                (req "header" Block_header.encoding))
        end))
 
   module Operations_index =
