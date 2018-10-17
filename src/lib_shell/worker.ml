@@ -527,7 +527,7 @@ module Make
       let id_name =
         if name_s = "" then base_name else Format.asprintf "%s(%d)" base_name id in
       if Hashtbl.mem table.instances name then
-        invalid_arg (Format.asprintf "Lwt_worker.launch: duplicate worker %s" full_name) ;
+        invalid_arg (Format.asprintf "Worker.launch: duplicate worker %s" full_name) ;
       let canceler = Lwt_canceler.create () in
       let buffer : kind buffer =
         match table.buffer_kind with
@@ -577,13 +577,13 @@ module Make
     | None, Launching _  ->
         invalid_arg
           (Format.asprintf
-             "Lwt_worker.state (%s[%a]): \
+             "Worker.state (%s[%a]): \
               state called before worker was initialized"
              base_name Name.pp w.name)
     | None, (Closing _ | Closed _)  ->
         invalid_arg
           (Format.asprintf
-             "Lwt_worker.state (%s[%a]): \
+             "Worker.state (%s[%a]): \
               state called after worker was terminated"
              base_name Name.pp w.name)
     | None, _  -> assert false
