@@ -23,11 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Shell_services
-
-val echo:
-  Client_rpcs.config ->
-  Blocks.block -> string -> string tzresult Lwt.t
 val failing:
-  Client_rpcs.config ->
-  Blocks.block -> int -> unit tzresult Lwt.t
+  'a #RPC_context.simple -> 'a -> int -> unit shell_tzresult Lwt.t
+
+val echo :
+  'a #RPC_context.simple -> 'a -> string -> string shell_tzresult Lwt.t
+
+val rpc_services : Updater.rpc_context RPC_directory.t

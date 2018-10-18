@@ -548,6 +548,10 @@ opam:63:tezos-baker-alpha-commands:
   variables:
     package: tezos-baker-alpha-commands
 
+opam:63:tezos-client-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-demo
 
 ##END_OPAM##
 
