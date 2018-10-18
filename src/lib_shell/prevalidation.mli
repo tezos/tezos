@@ -32,45 +32,45 @@ module type T = sig
 
   module Proto: Registered_protocol.T
 
-  type state
+  type t
+
+  type operation = private {
+    hash: Operation_hash.t ;
+    raw: Operation.t ;
+    protocol_data: Proto.operation_data ;
+  }
+  val compare: operation -> operation -> int
+
+  val parse: Operation.t -> operation tzresult
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
       predecessor block . When ?protocol_data is passed to this function, it will
       be used to create the new block *)
-  val start_prevalidation :
+  val create :
     ?protocol_data: MBytes.t ->
     predecessor: State.Block.t ->
     timestamp: Time.t ->
-    unit -> state tzresult Lwt.t
+    unit -> t tzresult Lwt.t
 
-  (** Given a prevalidation context applies a list of operations,
-      returns a new prevalidation context plus the preapply result containing the
-      list of operations that cannot be applied to this context *)
-  val prevalidate :
-    state -> sort:bool ->
-    (Operation_hash.t * Operation.t) list ->
-    (state * error Preapply_result.t) Lwt.t
+  type result =
+    | Applied of t * Proto.operation_receipt
+    | Branch_delayed of error list
+    | Branch_refused of error list
+    | Refused of error list
+    | Duplicate
+    | Outdated
 
-  val end_prevalidation :
-    state ->
-    Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
+  val apply_operation: t -> operation -> result Lwt.t
+  val apply_operation_with_preapply_result:
+    error Preapply_result.t -> t -> operation -> (error Preapply_result.t * t) Lwt.t
 
-  val notify_operation :
-    state ->
-    error Preapply_result.t ->
-    unit
+  type status = {
+    applied_operations : (operation * Proto.operation_receipt) list ;
+    block_result : Tezos_protocol_environment_shell.validation_result ;
+    block_metadata : Proto.block_header_metadata ;
+  }
 
-  val shutdown_operation_input :
-    state ->
-    unit
-
-  type new_operation_input =
-    ([ `Applied | `Refused | `Branch_refused | `Branch_delayed ] *
-     Operation.shell_header *
-     Proto.operation_data
-    ) Lwt_watcher.input
-
-  val new_operation_input: state -> new_operation_input
+  val status: t -> status tzresult Lwt.t
 
 end
 
@@ -81,6 +81,5 @@ val preapply :
   predecessor:State.Block.t ->
   timestamp:Time.t ->
   protocol_data:MBytes.t ->
-  sort_operations:bool ->
   Operation.t list list ->
   (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t

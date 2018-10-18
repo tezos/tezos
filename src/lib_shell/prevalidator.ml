@@ -53,7 +53,12 @@ module type T = sig
     mutable mempool : Mempool.t ;
     mutable in_mempool : Operation_hash.Set.t ;
     mutable validation_result : error Preapply_result.t ;
-    mutable validation_state : Prevalidation.state tzresult ;
+    mutable validation_state : Prevalidation.t tzresult ;
+    mutable operation_stream :
+      ([ `Applied | `Refused | `Branch_refused | `Branch_delayed ] *
+       Operation.shell_header *
+       Proto.operation_data
+      ) Lwt_watcher.input;
     mutable advertisement : [ `Pending of Mempool.t | `None ] ;
     mutable rpc_directory : types_state RPC_directory.t lazy_t ;
   }
@@ -103,7 +108,12 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
     mutable mempool : Mempool.t ;
     mutable in_mempool : Operation_hash.Set.t ;
     mutable validation_result : error Preapply_result.t ;
-    mutable validation_state : Prevalidation.state tzresult ;
+    mutable validation_state : Prevalidation.t tzresult ;
+    mutable operation_stream :
+      ([ `Applied | `Refused | `Branch_refused | `Branch_delayed ] *
+       Operation.shell_header *
+       Proto.operation_data
+      ) Lwt_watcher.input;
     mutable advertisement : [ `Pending of Mempool.t | `None ] ;
     mutable rpc_directory : types_state RPC_directory.t lazy_t ;
   }
@@ -170,6 +180,27 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
      and type Types.parameters = Types.parameters
     = Worker.Make (Name) (Prevalidator_worker_state.Event)
       (Prevalidator_worker_state.Request) (Types)
+
+
+  (** Centralised operation stream for the RPCs *)
+  let notify_operation { operation_stream } result =
+    let open Preapply_result in
+    let { applied ; refused ; branch_refused ; branch_delayed } = result in
+    (* Notify new opperations *)
+    let map_op kind { Operation.shell ; proto } =
+      let protocol_data =
+        Data_encoding.Binary.of_bytes_exn
+          Proto.operation_data_encoding
+          proto in
+      kind, shell, protocol_data in
+    let fold_op kind _k (op, _error) acc = map_op kind op :: acc in
+    let applied = List.map (map_op `Applied) (List.map snd applied) in
+    let refused = Operation_hash.Map.fold (fold_op `Refused) refused [] in
+    let branch_refused = Operation_hash.Map.fold (fold_op `Branch_refused) branch_refused [] in
+    let branch_delayed = Operation_hash.Map.fold (fold_op `Branch_delayed) branch_delayed [] in
+    let ops = List.concat [ applied ; refused ; branch_refused ; branch_delayed ] in
+    List.iter (Lwt_watcher.notify operation_stream) ops
+
 
   open Types
 
@@ -296,15 +327,26 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
           pv.pending <-
             Operation_hash.Map.empty ;
           Lwt.return_unit
-      | Ok validation_state ->
+      | Ok state ->
           match Operation_hash.Map.cardinal pv.pending with
           | 0 -> Lwt.return_unit
-          | n -> debug w "processing %d operations" n ;
-              Prevalidation.prevalidate validation_state ~sort:true
-                (Operation_hash.Map.bindings pv.pending)
-              >>= fun (validation_state, validation_result) ->
-              pv.validation_state <-
-                Ok validation_state ;
+          | n ->
+              debug w "processing %d operations" n ;
+              let operations = List.map snd (Operation_hash.Map.bindings pv.pending) in
+              Lwt_list.fold_left_s
+                (fun (acc_validation_result, acc_validation_state) op ->
+                   match Prevalidation.parse op with
+                   | Error _ ->
+                       (* FIXME *)
+                       Lwt.return (acc_validation_result, acc_validation_state)
+                   | Ok op ->
+                       Prevalidation.apply_operation_with_preapply_result
+                         acc_validation_result acc_validation_state op)
+                (pv.validation_result, state)
+                operations
+              >>= fun (new_result, new_state) ->
+              pv.validation_state <- Ok new_state ;
+              pv.validation_result <- new_result ;
               pv.in_mempool <-
                 (Operation_hash.Map.fold
                    (fun h _ in_mempool -> Operation_hash.Set.add h in_mempool)
@@ -323,15 +365,10 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
               Operation_hash.Map.iter
                 (fun oph _ -> Distributed_db.Operation.clear_or_cancel pv.chain_db oph)
                 pv.validation_result.refused ;
-              pv.validation_result <-
-                merge_validation_results
-                  ~old:pv.validation_result
-                  ~neu:validation_result ;
-              pv.pending <-
-                Operation_hash.Map.empty ;
+              pv.pending <- Operation_hash.Map.empty ;
               advertise w pv
-                (mempool_of_prevalidation_result validation_result) ;
-              Prevalidation.notify_operation validation_state validation_result ;
+                (mempool_of_prevalidation_result new_result) ;
+              notify_operation pv new_result ;
               Lwt.return_unit
     end >>= fun () ->
     pv.mempool <-
@@ -399,62 +436,57 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
 
     dir := RPC_directory.gen_register !dir
         (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
-        begin fun { validation_state ; validation_result = current_mempool } params () ->
-          match validation_state with
-          | Error _ -> assert false
-          | Ok pv ->
-              let new_operation_input = Prevalidation.new_operation_input pv in
-              let open Preapply_result in
-              let operation_stream, stopper =
-                Lwt_watcher.create_stream new_operation_input in
-              (* Convert ops *)
-              let map_op op =
-                let protocol_data =
-                  Data_encoding.Binary.of_bytes_exn
-                    Proto.operation_data_encoding
-                    op.Operation.proto in
-                Proto.{ shell = op.shell ; protocol_data } in
-              let fold_op _k (op, _error) acc = map_op op :: acc in
-              (* First call : retrieve the current set of op from the mempool *)
-              let { applied ; refused ; branch_refused ; branch_delayed } = current_mempool in
-              let applied = if params#applied then List.map map_op (List.map snd applied) else [] in
-              let refused = if params#refused then
-                  Operation_hash.Map.fold fold_op refused [] else [] in
-              let branch_refused = if params#branch_refused then
-                  Operation_hash.Map.fold fold_op branch_refused [] else [] in
-              let branch_delayed = if params#branch_delayed then
-                  Operation_hash.Map.fold fold_op branch_delayed [] else [] in
-              let current_mempool = List.concat [ applied ; refused ; branch_refused ; branch_delayed ] in
-              let current_mempool = ref (Some current_mempool) in
-              let filter_result = function
-                | `Applied -> params#applied
-                | `Refused -> params#branch_refused
-                | `Branch_refused -> params#refused
-                | `Branch_delayed -> params#branch_delayed
-              in
-              let next () =
-                match !current_mempool with
-                | Some mempool -> begin
-                    current_mempool := None ;
-                    Lwt.return_some mempool
-                  end
-                | None -> begin
-                    Lwt_stream.get operation_stream >>= function
-                    | Some (kind, shell, protocol_data) when filter_result kind ->
-                        (* NOTE: Should the protocol change, a new Prevalidation
-                         * context would be created. Thus, we use the same Proto. *)
-                        let bytes = Data_encoding.Binary.to_bytes_exn
-                            Proto.operation_data_encoding
-                            protocol_data in
-                        let protocol_data = Data_encoding.Binary.of_bytes_exn
-                            Proto.operation_data_encoding
-                            bytes in
-                        Lwt.return_some [ { Proto.shell ; protocol_data } ]
-                    | _ -> Lwt.return_none
-                  end
-              in
-              let shutdown () = Lwt_watcher.shutdown stopper in
-              RPC_answer.return_stream { next ; shutdown }
+        begin fun { validation_result = current_mempool ; operation_stream } params () ->
+          let open Preapply_result in
+          let op_stream, stopper = Lwt_watcher.create_stream operation_stream in
+          (* Convert ops *)
+          let map_op op =
+            let protocol_data =
+              Data_encoding.Binary.of_bytes_exn
+                Proto.operation_data_encoding
+                op.Operation.proto in
+            Proto.{ shell = op.shell ; protocol_data } in
+          let fold_op _k (op, _error) acc = map_op op :: acc in
+          (* First call : retrieve the current set of op from the mempool *)
+          let { applied ; refused ; branch_refused ; branch_delayed } = current_mempool in
+          let applied = if params#applied then List.map map_op (List.map snd applied) else [] in
+          let refused = if params#refused then
+              Operation_hash.Map.fold fold_op refused [] else [] in
+          let branch_refused = if params#branch_refused then
+              Operation_hash.Map.fold fold_op branch_refused [] else [] in
+          let branch_delayed = if params#branch_delayed then
+              Operation_hash.Map.fold fold_op branch_delayed [] else [] in
+          let current_mempool = List.concat [ applied ; refused ; branch_refused ; branch_delayed ] in
+          let current_mempool = ref (Some current_mempool) in
+          let filter_result = function
+            | `Applied -> params#applied
+            | `Refused -> params#branch_refused
+            | `Branch_refused -> params#refused
+            | `Branch_delayed -> params#branch_delayed
+          in
+          let next () =
+            match !current_mempool with
+            | Some mempool -> begin
+                current_mempool := None ;
+                Lwt.return_some mempool
+              end
+            | None -> begin
+                Lwt_stream.get op_stream >>= function
+                | Some (kind, shell, protocol_data) when filter_result kind ->
+                    (* NOTE: Should the protocol change, a new Prevalidation
+                     * context would be created. Thus, we use the same Proto. *)
+                    let bytes = Data_encoding.Binary.to_bytes_exn
+                        Proto.operation_data_encoding
+                        protocol_data in
+                    let protocol_data = Data_encoding.Binary.of_bytes_exn
+                        Proto.operation_data_encoding
+                        bytes in
+                    Lwt.return_some [ { Proto.shell ; protocol_data } ]
+                | _ -> Lwt.return_none
+              end
+          in
+          let shutdown () = Lwt_watcher.shutdown stopper in
+          RPC_answer.return_stream { next ; shutdown }
         end ;
 
     !dir
@@ -475,38 +507,18 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
 
     let on_inject pv op =
       let oph = Operation.hash op in
-      begin
-        if already_handled pv oph then
-          return pv.validation_result
-        else
-          Lwt.return pv.validation_state >>=? fun validation_state ->
-          Prevalidation.prevalidate
-            validation_state ~sort:false [ (oph, op) ] >>= fun (_, result) ->
-          match result.applied with
-          | [ app_oph, _ ] when Operation_hash.equal app_oph oph ->
-              Distributed_db.inject_operation pv.chain_db oph op >>= fun (_ : bool) ->
-              pv.pending <- Operation_hash.Map.add oph op pv.pending ;
-              return result
-          | _ ->
-              return result
-      end >>=? fun result ->
-      if List.mem_assoc oph result.applied then
-        return_unit
+      if already_handled pv oph then
+        return_unit (* FIXME : is this an error ? *)
       else
-        let try_in_map map proj or_else =
-          try
-            Lwt.return (Error (proj (Operation_hash.Map.find oph map)))
-          with Not_found -> or_else () in
-        try_in_map pv.refusals (fun h -> h) @@ fun () ->
-        try_in_map result.refused snd @@ fun () ->
-        try_in_map result.branch_refused snd @@ fun () ->
-        try_in_map result.branch_delayed snd @@ fun () ->
-        if Operation_hash.Set.mem oph pv.live_operations then
-          failwith "Injected operation %a included in a previous block."
-            Operation_hash.pp oph
-        else
-          failwith "Injected operation %a is not in prevalidation result."
-            Operation_hash.pp oph
+        Lwt.return pv.validation_state >>=? fun validation_state ->
+        Lwt.return (Prevalidation.parse op) >>=? fun parsed_op ->
+        Prevalidation.apply_operation validation_state parsed_op >>= function
+        | Applied (_, _result) ->
+            Distributed_db.inject_operation pv.chain_db oph op >>= fun (_ : bool) ->
+            pv.pending <- Operation_hash.Map.add parsed_op.hash op pv.pending ;
+            return_unit
+        | _ ->
+            failwith "Error while applying operation %a" Operation_hash.pp oph
 
     let on_notify w pv peer mempool =
       let all_ophs =
@@ -526,21 +538,15 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         to_fetch
 
     let on_flush w pv predecessor =
+      Lwt_watcher.shutdown_input pv.operation_stream;
       list_pendings
         ~maintain_chain_db:pv.chain_db
         ~from_block:pv.predecessor ~to_block:predecessor
         (Preapply_result.operations pv.validation_result)
       >>= fun (pending, new_live_blocks, new_live_operations) ->
       let timestamp = Time.now () in
-      Prevalidation.start_prevalidation
-        ~predecessor ~timestamp () >>= fun validation_state ->
-      begin match validation_state with
-        | Error _ -> Lwt.return (validation_state, Preapply_result.empty)
-        | Ok validation_state ->
-            Prevalidation.prevalidate
-              validation_state ~sort:false [] >>= fun (state, result) ->
-            Lwt.return (Ok state, result)
-      end >>= fun (validation_state, validation_result) ->
+      Prevalidation.create ~predecessor ~timestamp () >>= fun validation_state ->
+      let validation_result = Preapply_result.empty in
       debug w "%d operations were not washed by the flush"
         (Operation_hash.Map.cardinal pending) ;
       pv.predecessor <- predecessor ;
@@ -552,6 +558,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       pv.in_mempool <- Operation_hash.Set.empty ;
       pv.validation_result <- validation_result ;
       pv.validation_state <- validation_state ;
+      pv.operation_stream <- Lwt_watcher.create_input () ;
       return_unit
 
     let on_advertise pv =
@@ -571,9 +578,6 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
               (* TODO: rebase the advertisement instead *)
               let chain_state = Distributed_db.chain_state pv.chain_db in
               State.Block.read chain_state hash >>=? fun block ->
-              begin match pv.validation_state with
-                | Ok pv -> Prevalidation.shutdown_operation_input pv
-                | Error _ -> () end ;
               on_flush w pv block >>=? fun () ->
               return (() : r)
           | Request.Notify (peer, mempool) ->
@@ -604,16 +608,8 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         { current_head = predecessor ; current_mempool = mempool ;
           live_blocks ; live_operations } ->
       let timestamp = Time.now () in
-      Prevalidation.start_prevalidation
-        ~predecessor ~timestamp () >>= fun validation_state ->
-      begin match validation_state with
-        | Error _ -> Lwt.return (validation_state, Preapply_result.empty)
-        | Ok validation_state ->
-            Prevalidation.prevalidate validation_state ~sort:false []
-            >>= fun (validation_state, validation_result) ->
-
-            Lwt.return (Ok validation_state, validation_result)
-      end >>= fun (validation_state, validation_result) ->
+      Prevalidation.create ~predecessor ~timestamp () >>= fun validation_state ->
+      let validation_result = Preapply_result.empty in
       let fetching =
         List.fold_left
           (fun s h -> Operation_hash.Set.add h s)
@@ -627,7 +623,9 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
           fetching ;
           pending = Operation_hash.Map.empty ;
           in_mempool = Operation_hash.Set.empty ;
-          validation_result ; validation_state ;
+          validation_result ;
+          validation_state ;
+          operation_stream = Lwt_watcher.create_input () ;
           advertisement = `None ;
           rpc_directory = rpc_directory ;
         } in

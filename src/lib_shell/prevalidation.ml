@@ -68,45 +68,45 @@ module type T = sig
 
   module Proto: Registered_protocol.T
 
-  type state
+  type t
+
+  type operation = private {
+    hash: Operation_hash.t ;
+    raw: Operation.t ;
+    protocol_data: Proto.operation_data ;
+  }
+  val compare: operation -> operation -> int
+
+  val parse: Operation.t -> operation tzresult
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
       predecessor block . When ?protocol_data is passed to this function, it will
       be used to create the new block *)
-  val start_prevalidation :
+  val create :
     ?protocol_data: MBytes.t ->
     predecessor: State.Block.t ->
     timestamp: Time.t ->
-    unit -> state tzresult Lwt.t
+    unit -> t tzresult Lwt.t
 
-  (** Given a prevalidation context applies a list of operations,
-      returns a new prevalidation context plus the preapply result containing the
-      list of operations that cannot be applied to this context *)
-  val prevalidate :
-    state -> sort:bool ->
-    (Operation_hash.t * Operation.t) list ->
-    (state * error Preapply_result.t) Lwt.t
+  type result =
+    | Applied of t * Proto.operation_receipt
+    | Branch_delayed of error list
+    | Branch_refused of error list
+    | Refused of error list
+    | Duplicate
+    | Outdated
 
-  val end_prevalidation :
-    state ->
-    Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
+  val apply_operation: t -> operation -> result Lwt.t
+  val apply_operation_with_preapply_result:
+    error Preapply_result.t -> t -> operation -> (error Preapply_result.t * t) Lwt.t
 
-  val notify_operation :
-    state ->
-    error Preapply_result.t ->
-    unit
+  type status = {
+    applied_operations : (operation * Proto.operation_receipt) list ;
+    block_result : Tezos_protocol_environment_shell.validation_result ;
+    block_metadata : Proto.block_header_metadata ;
+  }
 
-  val shutdown_operation_input :
-    state ->
-    unit
-
-  type new_operation_input =
-    ([ `Applied | `Refused | `Branch_refused | `Branch_delayed ] *
-     Operation.shell_header *
-     Proto.operation_data
-    ) Lwt_watcher.input
-
-  val new_operation_input: state -> new_operation_input
+  val status: t -> status tzresult Lwt.t
 
 end
 
@@ -114,16 +114,49 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
 
   module Proto = Proto
 
-  type state =
+  type operation = {
+    hash: Operation_hash.t ;
+    raw: Operation.t ;
+    protocol_data: Proto.operation_data ;
+  }
+
+
+  type t =
     { state : Proto.validation_state ;
-      max_number_of_operations : int ;
-      new_operation_input : ([ `Applied | `Refused | `Branch_refused | `Branch_delayed ] *
-                             Operation.shell_header * Proto.operation_data) Lwt_watcher.input ;
+      applied : (operation * Proto.operation_receipt) list ;
+      live_blocks : Block_hash.Set.t ;
+      live_operations : Operation_hash.Set.t ;
     }
 
-  let start_prevalidation
-      ?protocol_data
-      ~predecessor ~timestamp () =
+  type result =
+    | Applied of t * Proto.operation_receipt
+    | Branch_delayed of error list
+    | Branch_refused of error list
+    | Refused of error list
+    | Duplicate
+    | Outdated
+
+  let parse (raw : Operation.t) =
+    let hash = Operation.hash raw in
+    let size = Data_encoding.Binary.length Operation.encoding raw in
+    if size > Proto.max_operation_data_length then
+      error
+        (Oversized_operation
+           { size ; max = Proto.max_operation_data_length })
+    else
+      match Data_encoding.Binary.of_bytes
+              Proto.operation_data_encoding
+              raw.Operation.proto with
+      | None -> error Parse_error
+      | Some protocol_data ->
+          ok { hash ; raw ; protocol_data }
+
+  let compare op1 op2 =
+    Proto.compare_operations
+      { shell = op1.raw.shell ; protocol_data = op1.protocol_data }
+      { shell = op2.raw.shell ; protocol_data = op2.protocol_data }
+
+  let create ?protocol_data ~predecessor ~timestamp () =
     let { Block_header.shell =
             { fitness = predecessor_fitness ;
               timestamp = predecessor_timestamp ;
@@ -131,6 +164,14 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
       State.Block.header predecessor in
     State.Block.context predecessor >>= fun predecessor_context ->
     let predecessor_hash = State.Block.hash predecessor in
+    Chain_traversal.live_blocks
+      predecessor
+      (State.Block.max_operations_ttl predecessor)
+    >>= fun (live_blocks, live_operations) ->
+    Context.reset_test_chain
+      predecessor_context predecessor_hash
+      timestamp >>= fun predecessor_context ->
+
     Context.reset_test_chain
       predecessor_context predecessor_hash
       timestamp >>= fun predecessor_context ->
@@ -158,99 +199,79 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
       ()
     >>=? fun state ->
     (* FIXME arbitrary value, to be customisable *)
-    let max_number_of_operations = 1000 in
-    let new_operation_input = Lwt_watcher.create_input () in
-    return { state ; max_number_of_operations ; new_operation_input ; }
+    return {
+      state ;
+      applied = [] ;
+      live_blocks ;
+      live_operations ;
+    }
 
-  let prevalidate
-      { state ; max_number_of_operations ; new_operation_input ; }
-      ~sort (ops : (Operation_hash.t * Operation.t) list) =
-    let ops =
-      List.map
-        (fun (h, op) ->
-           let parsed_op =
-             match Data_encoding.Binary.of_bytes
-                     Proto.operation_data_encoding
-                     op.Operation.proto with
-             | None -> error Parse_error
-             | Some protocol_data ->
-                 Ok ({ shell = op.shell ; protocol_data } : Proto.operation) in
-           (h, op, parsed_op))
-        ops in
-    let invalid_ops =
-      List.filter_map
-        (fun (h, op, parsed_op) -> match parsed_op with
-           | Ok _ -> None
-           | Error err -> Some (h, op, err)) ops
-    and parsed_ops =
-      List.filter_map
-        (fun (h, op, parsed_op) -> match parsed_op with
-           | Ok parsed_op -> Some (h, op, parsed_op)
-           | Error _ -> None) ops in
-    ignore invalid_ops; (* FIXME *)
-    let sorted_ops =
-      if sort then
-        let compare (_, _, op1) (_, _, op2) = Proto.compare_operations op1 op2 in
-        List.sort compare parsed_ops
-      else parsed_ops in
-    let apply_operation state max_ops op (parse_op) =
-      let size = Data_encoding.Binary.length Operation.encoding op in
-      if max_ops <= 0 then
-        fail Too_many_operations
-      else if size > Proto.max_operation_data_length then
-        fail (Oversized_operation { size ; max = Proto.max_operation_data_length })
-      else
-        Proto.apply_operation state parse_op >>=? fun (state, receipt) ->
-        return (state, receipt) in
-    apply_operations
-      apply_operation
-      state Preapply_result.empty max_number_of_operations
-      ~sort sorted_ops >>= fun (state, max_number_of_operations, r) ->
-    let r =
-      { r with
-        applied = List.rev r.applied ;
-        branch_refused =
-          List.fold_left
-            (fun map (h, op, err) -> Operation_hash.Map.add h (op, err) map)
-            r.branch_refused invalid_ops } in
-    Lwt.return ({ state ; max_number_of_operations ; new_operation_input ; }, r)
+  let apply_operation pv op =
+    if Operation_hash.Set.mem op.hash pv.live_operations then
+      Lwt.return Outdated
+    else
+      Proto.apply_operation pv.state
+        { shell = op.raw.shell ; protocol_data = op.protocol_data } >|= function
+      | Ok (state, receipt) ->
+          let pv =
+            { state ;
+              applied = (op, receipt) :: pv.applied ;
+              live_blocks = pv.live_blocks ;
+              live_operations = Operation_hash.Set.add op.hash pv.live_operations ;
+            } in
+          Applied (pv, receipt)
+      | Error errors ->
+          match classify_errors errors with
+          | `Branch -> Branch_refused errors
+          | `Permanent -> Refused errors
+          | `Temporary -> Branch_delayed errors
 
-  let end_prevalidation { state } =
-    Proto.finalize_block state >>=? fun (result, _metadata) ->
-    return result
-
-  let notify_operation { new_operation_input } result =
+  let apply_operation_with_preapply_result preapp t op =
     let open Preapply_result in
-    let { applied ; refused ; branch_refused ; branch_delayed } = result in
-    (* Notify new opperations *)
-    let map_op kind { Operation.shell ; proto } =
-      let protocol_data =
-        Data_encoding.Binary.of_bytes_exn
-          Proto.operation_data_encoding
-          proto in
-      kind, shell, protocol_data in
-    let fold_op kind _k (op, _error) acc = map_op kind op :: acc in
-    let applied = List.map (map_op `Applied) (List.map snd applied) in
-    let refused = Operation_hash.Map.fold (fold_op `Refused) refused [] in
-    let branch_refused = Operation_hash.Map.fold (fold_op `Branch_refused) branch_refused [] in
-    let branch_delayed = Operation_hash.Map.fold (fold_op `Branch_delayed) branch_delayed [] in
-    let ops = List.concat [ applied ; refused ; branch_refused ; branch_delayed ] in
-    List.iter (Lwt_watcher.notify new_operation_input) ops
+    apply_operation t op >>= function
+    | Applied (t, _) ->
+        let applied = (op.hash, op.raw) :: preapp.applied in
+        Lwt.return ({ preapp with applied }, t)
+    | Branch_delayed errors ->
+        let branch_delayed =
+          Operation_hash.Map.add
+            op.hash
+            (op.raw, errors)
+            preapp.branch_delayed in
+        Lwt.return ({ preapp with branch_delayed }, t)
+    | Branch_refused errors ->
+        let branch_refused =
+          Operation_hash.Map.add
+            op.hash
+            (op.raw, errors)
+            preapp.branch_refused in
+        Lwt.return ({ preapp with branch_refused }, t)
+    | Refused errors ->
+        let refused =
+          Operation_hash.Map.add
+            op.hash
+            (op.raw, errors)
+            preapp.refused in
+        Lwt.return ({ preapp with refused }, t)
+    | Duplicate | Outdated -> Lwt.return (preapp, t)
 
-  let shutdown_operation_input { new_operation_input } =
-    Lwt_watcher.shutdown_input new_operation_input
+  type status = {
+    applied_operations : (operation * Proto.operation_receipt) list ;
+    block_result : Tezos_protocol_environment_shell.validation_result ;
+    block_metadata : Proto.block_header_metadata ;
+  }
 
-  type new_operation_input =
-    ([ `Applied | `Refused | `Branch_refused | `Branch_delayed ] *
-     Operation.shell_header *
-     Proto.operation_data
-    ) Lwt_watcher.input
-
-  let new_operation_input { new_operation_input } = new_operation_input
+  let status pv =
+    Proto.finalize_block pv.state >>=? fun (block_result, block_metadata) ->
+    return {
+      block_metadata ;
+      block_result ;
+      applied_operations = pv.applied ;
+    }
 
 end
 
-let preapply ~predecessor ~timestamp ~protocol_data ~sort_operations:sort ops =
+let preapply ~predecessor ~timestamp ~protocol_data operations =
   State.Block.context predecessor >>= fun predecessor_context ->
   Context.get_protocol predecessor_context >>= fun protocol ->
   begin
@@ -264,27 +285,37 @@ let preapply ~predecessor ~timestamp ~protocol_data ~sort_operations:sort ops =
         return protocol
   end >>=? fun (module Proto) ->
   let module Prevalidation = Make(Proto) in
-  Prevalidation.start_prevalidation
+  Prevalidation.create
     ~protocol_data ~predecessor ~timestamp () >>=? fun validation_state ->
-  let ops = List.map (List.map (fun x -> Operation.hash x, x)) ops in
   Lwt_list.fold_left_s
-    (fun (validation_state, rs) ops ->
-       Prevalidation.prevalidate
-         validation_state ~sort ops >>= fun (validation_state, r) ->
-       Lwt.return (validation_state, rs @ [r]))
-    (validation_state, []) ops >>= fun (validation_state, rs) ->
+    (fun (acc_validation_result, acc_validation_state) operations ->
+       Lwt_list.fold_left_s
+         (fun (acc_validation_result, acc_validation_state) op ->
+            match Prevalidation.parse op with
+            | Error _ ->
+                (* FIXME *)
+                Lwt.return (acc_validation_result, acc_validation_state)
+            | Ok op ->
+                Prevalidation.apply_operation_with_preapply_result
+                  acc_validation_result acc_validation_state op)
+         (Preapply_result.empty, acc_validation_state)
+         operations
+       >>= fun (new_validation_result, new_validation_state) ->
+       Lwt.return (acc_validation_result @ [new_validation_result], new_validation_state)
+    ) ([], validation_state) operations
+  >>= fun (validation_result_list, validation_state) ->
   let operations_hash =
     Operation_list_list_hash.compute
-      (List.map
-         (fun r ->
-            Operation_list_hash.compute
-              (List.map fst r.Preapply_result.applied))
-         rs) in
-  Prevalidation.end_prevalidation validation_state >>=? fun validation_result ->
+      (List.map (fun r ->
+           Operation_list_hash.compute
+             (List.map fst r.Preapply_result.applied)
+         ) validation_result_list)
+  in
+  Prevalidation.status validation_state >>=? fun { block_result ; _ } ->
   let pred_shell_header = State.Block.shell_header predecessor in
   let level = Int32.succ pred_shell_header.level in
   Block_validator.may_patch_protocol
-    ~level validation_result >>=? fun { fitness ; context ; message } ->
+    ~level block_result >>=? fun { fitness ; context ; message } ->
   State.Block.protocol_hash predecessor >>= fun pred_protocol ->
   Context.get_protocol context >>= fun protocol ->
   let proto_level =
@@ -297,7 +328,7 @@ let preapply ~predecessor ~timestamp ~protocol_data ~sort_operations:sort ops =
     proto_level ;
     predecessor = State.Block.hash predecessor ;
     timestamp ;
-    validation_passes = List.length rs ;
+    validation_passes = List.length validation_result_list ;
     operations_hash ;
     fitness ;
     context = Context_hash.zero ; (* place holder *)
@@ -315,4 +346,4 @@ let preapply ~predecessor ~timestamp ~protocol_data ~sort_operations:sort ops =
           return (context, message)
   end >>=? fun (context, message) ->
   Context.hash ?message ~time:timestamp context >>= fun context ->
-  return ({ shell_header with context }, rs)
+  return ({ shell_header with context }, validation_result_list)
