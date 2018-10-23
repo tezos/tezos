@@ -53,6 +53,7 @@ module Make_raw
     (Request_message : sig
        type param
        val max_length : int
+       val initial_delay : float
        val forge : param -> Hash.t list -> Message.t
      end)
     (Precheck : Distributed_db_functors.PRECHECK
@@ -62,6 +63,8 @@ module Make_raw
   module Request = struct
     type param = Request_message.param request_param
     let active { active } = active ()
+    let initial_delay  = Request_message.initial_delay
+
     let rec send state gid keys =
       let first_keys, keys = List.split_n Request_message.max_length keys in
       let msg = (Request_message.forge state.data first_keys) in
@@ -78,7 +81,6 @@ module Make_raw
         | _ -> Other in
       let meta = P2p.get_peer_metadata state.p2p gid in
       Peer_metadata.incr meta @@ Scheduled_request req ;
-      (* TODO update peer_metadata *)
       if keys <> [] then send state gid keys
   end
 
@@ -121,6 +123,7 @@ module Raw_operation =
     (struct
       type param = unit
       let max_length = 10
+      let initial_delay = 0.5
       let forge () keys = Message.Get_operations keys
     end)
     (struct
@@ -152,6 +155,7 @@ module Raw_block_header =
     (struct
       type param = unit
       let max_length = 10
+      let initial_delay = 0.5
       let forge () keys = Message.Get_block_headers keys
     end)
     (struct
@@ -208,6 +212,7 @@ module Raw_operation_hashes = struct
       (struct
         type param = unit
         let max_length = 10
+        let initial_delay = 1.
         let forge () keys =
           Message.Get_operation_hashes_for_blocks keys
       end)
@@ -280,6 +285,7 @@ module Raw_operations = struct
       (struct
         type param = unit
         let max_length = 10
+        let initial_delay = 1.
         let forge () keys =
           Message.Get_operations_for_blocks keys
       end)
@@ -329,6 +335,7 @@ module Raw_protocol =
     (Protocol_hash.Table)
     (struct
       type param = unit
+      let initial_delay = 10.
       let max_length = 10
       let forge () keys = Message.Get_protocols keys
     end)
