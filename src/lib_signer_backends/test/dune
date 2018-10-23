@@ -1,5 +1,5 @@
 (executables
- (names test_encrypted)
+ (names test_encrypted test_crouching)
  (libraries tezos-signer-backends
             alcotest-lwt)
  (flags (:standard -w -9-32
@@ -12,15 +12,20 @@
 
 (alias
  (name buildtest)
- (deps test_encrypted.exe))
+ (deps test_encrypted.exe test_crouching.exe))
 
 (alias
  (name runtest_signer_encrypted)
  (action (run %{exe:test_encrypted.exe})))
 
 (alias
+ (name runtest_crouching)
+ (action (run %{exe:test_crouching.exe})))
+
+(alias
  (name runtest)
- (deps (alias runtest_signer_encrypted)))
+ (deps (alias runtest_signer_encrypted)
+       (alias runtest_crouching)))
 
 (alias
  (name runtest_indent)

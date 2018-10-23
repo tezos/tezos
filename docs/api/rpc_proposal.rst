@@ -107,7 +107,7 @@ In the follwing table:
 
 * `chain_id` is a symbolic chain identifier, e.g. `main` or `test`, or their equivalent Base58-encoded hash, e. g. `NetXzGDuYoAawjv`.
 * `block_id` is a symbolic block identifier, e.g. `head` of `genesis`, or any Base58-encoded block hash, e.g. `BKicMfwtgtAL28iD2uZk12PpuS6i2pFysC3syVT44nMNLkGb4QA`. It might also be `head~n` or `<block_hash>~n` to denotes the `n`-th predecessor of `head` or `<block_hash>`.
-* `contract_id` is either a implicit contract identifier, i.e. a Base58-encoded public jye hash `tz1btz2tcu8dTwPrtMpyzh1irGdGkAaSE4bY`, or an originated contract identifier, e.g. `TZ1fyLSGZ7n2QRynStXUf9ihQtH7k4t4vTLe`.
+* `contract_id` is either a implicit contract identifier, i.e. a Base58-encoded public jye hash `tz1btz2tcu8dTwPrtMpyzh1irGdGkAaSE4bY`, or an originated contract identifier, e.g. `KT1fyLSGZ7n2QRynStXUf9ihQtH7k4t4vTLe`.
 * `peer_id` is a cryptographic peer identifier, e.g. `idtpXYaRSBXe6KJU6rk1X9ninWt8Bz`.
 
 +-------------------------------------------------------------------------+------------------+--------------------------------------------------------------------------+
