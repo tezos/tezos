@@ -23,8 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type counter = int
-let counter = Data_encoding.int31
+type counter = Z.t
+let counter = Data_encoding.z
+let ((+) : counter -> counter -> counter) = Z.add
+
+let zero : counter = Z.zero
+let one : counter = Z.one
 
 (* Distributed DB peer metadata *)
 type messages =
@@ -319,18 +323,18 @@ type t = {
 
 let empty () =
   let empty_request () =
-    { branch = 0 ; head = 0 ; block_header = 0 ;
-      operations = 0 ; protocols = 0 ;
-      operation_hashes_for_block = 0 ;
-      operations_for_block = 0 ;
-      other = 0 ;
+    { branch = zero ; head = zero ; block_header = zero ;
+      operations = zero ; protocols = zero ;
+      operation_hashes_for_block = zero ;
+      operations_for_block = zero ;
+      other = zero ;
     } in
   {
     responses = { sent = empty_request () ;
                   failed = empty_request () ;
                   received = empty_request () ;
-                  unexpected = 0 ;
-                  outdated = 0 ;
+                  unexpected = zero ;
+                  outdated = zero ;
                 } ;
     requests =
       { sent = empty_request () ;
@@ -338,20 +342,20 @@ let empty () =
         scheduled = empty_request () ;
         received = empty_request () ;
       } ;
-    valid_blocks = 0 ;
-    old_heads = 0 ;
+    valid_blocks = zero ;
+    old_heads = zero ;
     prevalidator_results =
-      { cannot_download = 0 ; cannot_parse = 0 ;
-        refused_by_prefilter = 0 ; refused_by_postfilter = 0 ;
-        applied  = 0 ; branch_delayed = 0 ; branch_refused = 0 ;
-        refused = 0 ; duplicate = 0 ; outdated = 0
+      { cannot_download = zero ; cannot_parse = zero ;
+        refused_by_prefilter = zero ; refused_by_postfilter = zero ;
+        applied  = zero ; branch_delayed = zero ; branch_refused = zero ;
+        refused = zero ; duplicate = zero ; outdated = zero
       } ;
-    unactivated_chains = 0 ;
-    inactive_chains = 0 ;
-    future_blocks_advertised = 0 ;
-    unadvertised = {block = 0 ; operations = 0 ; protocol = 0 } ;
-    advertisements = { sent = { head = 0 ; branch = 0 ; } ;
-                       received = { head = 0 ; branch = 0 ; } }
+    unactivated_chains = zero ;
+    inactive_chains = zero ;
+    future_blocks_advertised = zero ;
+    unadvertised = {block = zero ; operations = zero ; protocol = zero } ;
+    advertisements = { sent = { head = zero ; branch = zero ; } ;
+                       received = { head = zero ; branch = zero ; } }
   }
 
 
@@ -413,24 +417,24 @@ let encoding =
 
 let incr_requests (msgs : messages) (req : requests_kind) =
   match req with
-  | Branch -> msgs.branch <- msgs.branch + 1
-  | Head -> msgs.head <- msgs.head + 1
-  | Block_header -> msgs.block_header <- msgs.block_header + 1
-  | Operations -> msgs.operations <- msgs.operations + 1
-  | Protocols -> msgs.protocols <- msgs.protocols + 1
+  | Branch -> msgs.branch <- msgs.branch + one
+  | Head -> msgs.head <- msgs.head + one
+  | Block_header -> msgs.block_header <- msgs.block_header + one
+  | Operations -> msgs.operations <- msgs.operations + one
+  | Protocols -> msgs.protocols <- msgs.protocols + one
   | Operation_hashes_for_block ->
-      msgs.operation_hashes_for_block <- msgs.operation_hashes_for_block + 1
+      msgs.operation_hashes_for_block <- msgs.operation_hashes_for_block + one
   | Operations_for_block ->
-      msgs.operations_for_block <- msgs.operations_for_block + 1
+      msgs.operations_for_block <- msgs.operations_for_block + one
   | Other ->
-      msgs.other <- msgs.other + 1
+      msgs.other <- msgs.other + one
 
 
 
 let incr_unadvertised { unadvertised = u ; _ } = function
-  | Block -> u.block <- u.block + 1
-  | Operations -> u.operations <- u.operations + 1
-  | Protocol -> u.protocol <- u.protocol + 1
+  | Block -> u.block <- u.block + one
+  | Operations -> u.operations <- u.operations + one
+  | Protocol -> u.protocol <- u.protocol + one
 
 
 let incr ({responses = rsps ; requests = rqst ; _ } as m) metadata =
@@ -450,77 +454,77 @@ let incr ({responses = rsps ; requests = rqst ; _ } as m) metadata =
   | Sent_response req ->
       incr_requests rsps.sent req
   | Unexpected_response ->
-      rsps.unexpected <- rsps.unexpected + 1
+      rsps.unexpected <- rsps.unexpected + one
   | Outdated_response ->
-      rsps.outdated <- rsps.outdated + 1
+      rsps.outdated <- rsps.outdated + one
   (* Advertisements *)
   | Sent_advertisement ad ->
       begin match ad with
         | Head ->
-            m.advertisements.sent.head <- m.advertisements.sent.head + 1
+            m.advertisements.sent.head <- m.advertisements.sent.head + one
         | Branch ->
-            m.advertisements.sent.branch <- m.advertisements.sent.branch + 1
+            m.advertisements.sent.branch <- m.advertisements.sent.branch + one
       end
   | Received_advertisement ad ->
       begin match ad with
         | Head ->
-            m.advertisements.received.head <- m.advertisements.received.head + 1
+            m.advertisements.received.head <- m.advertisements.received.head + one
         | Branch ->
-            m.advertisements.received.branch <- m.advertisements.received.branch + 1
+            m.advertisements.received.branch <- m.advertisements.received.branch + one
       end
   (* Unexpected erroneous msg *)
   | Unactivated_chain ->
-      m.unactivated_chains <- m.unactivated_chains + 1
+      m.unactivated_chains <- m.unactivated_chains + one
   | Inactive_chain ->
-      m.inactive_chains <- m.inactive_chains + 1
+      m.inactive_chains <- m.inactive_chains + one
   | Future_block ->
-      m.future_blocks_advertised <- m.future_blocks_advertised + 1
+      m.future_blocks_advertised <- m.future_blocks_advertised + one
   | Unadvertised u -> incr_unadvertised m u
   (* Peer validator *)
   | Valid_blocks ->
-      m.valid_blocks <- m.valid_blocks + 1
+      m.valid_blocks <- m.valid_blocks + one
   | Old_heads ->
-      m.old_heads <- m.old_heads + 1
+      m.old_heads <- m.old_heads + one
   (* prevalidation *)
   | Cannot_download ->
       m.prevalidator_results <-
         { m.prevalidator_results with
-          cannot_download = m.prevalidator_results.cannot_download + 1 }
+          cannot_download = m.prevalidator_results.cannot_download + one }
   | Cannot_parse -> m.prevalidator_results <-
         { m.prevalidator_results with
-          cannot_parse = m.prevalidator_results.cannot_parse + 1 }
+          cannot_parse = m.prevalidator_results.cannot_parse + one }
   | Refused_by_prefilter -> m.prevalidator_results <-
         { m.prevalidator_results with
           refused_by_prefilter =
-            m.prevalidator_results.refused_by_prefilter + 1 }
+            m.prevalidator_results.refused_by_prefilter + one }
   | Refused_by_postfilter -> m.prevalidator_results <-
         { m.prevalidator_results with
           refused_by_postfilter =
-            m.prevalidator_results.refused_by_postfilter + 1 }
+            m.prevalidator_results.refused_by_postfilter + one }
   | Applied ->
       m.prevalidator_results <-
         { m.prevalidator_results with
-          applied = m.prevalidator_results.applied + 1 }
+          applied = m.prevalidator_results.applied + one }
   | Branch_delayed ->
       m.prevalidator_results <-
         { m.prevalidator_results with
-          branch_delayed = m.prevalidator_results.branch_delayed + 1 }
+          branch_delayed = m.prevalidator_results.branch_delayed + one }
   | Branch_refused ->
       m.prevalidator_results <-
         { m.prevalidator_results with
-          branch_refused = m.prevalidator_results.branch_refused + 1 }
+          branch_refused = m.prevalidator_results.branch_refused + one }
   | Refused ->
       m.prevalidator_results <-
         { m.prevalidator_results with
-          refused = m.prevalidator_results.refused + 1 }
+          refused = m.prevalidator_results.refused + one }
   | Duplicate ->
       m.prevalidator_results <-
         { m.prevalidator_results with
-          duplicate = m.prevalidator_results.duplicate + 1 }
+          duplicate = m.prevalidator_results.duplicate + one }
   | Outdated ->
       m.prevalidator_results <-
         { m.prevalidator_results with
-          outdated = m.prevalidator_results.outdated + 1 }
+          outdated = m.prevalidator_results.outdated + one }
 
 
 (* shortcuts to update sent/failed requests/responses *)
