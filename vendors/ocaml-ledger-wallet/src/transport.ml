@@ -20,13 +20,18 @@ module Status = struct
   type t +=
     | Invalid_pin of int
     | Incorrect_length
+    | Incorrect_length_for_ins
     | Incompatible_file_structure
     | Security_status_unsatisfied
+    | Hid_required
     | Conditions_of_use_not_satisfied
     | Incorrect_data
     | File_not_found
+    | Parse_error
     | Incorrect_params
+    | Incorrect_class
     | Ins_not_supported
+    | Memory_error
     | Technical_problem of int
     | Ok
     | Unknown of int
@@ -35,12 +40,18 @@ module Status = struct
     | 0x6700 -> Incorrect_length
     | 0x6981 -> Incompatible_file_structure
     | 0x6982 -> Security_status_unsatisfied
+    | 0x6983 -> Hid_required
     | 0x6985 -> Conditions_of_use_not_satisfied
     | 0x6a80 -> Incorrect_data
     | 0x9404 -> File_not_found
+    | 0x9405 -> Parse_error
     | 0x6b00 -> Incorrect_params
+    | 0x6c00 -> Incorrect_length
     | 0x6d00 -> Ins_not_supported
+    | 0x6e00 -> Incorrect_class
     | 0x9000 -> Ok
+    | 0x917e -> Incorrect_length_for_ins
+    | 0x9200 -> Memory_error
     | v when v >= 0x63c0 && v <= 0x63cf -> Invalid_pin (v land 0x0f)
     | v when v >= 0x6f00 && v <= 0x6fff -> Technical_problem (v land 0xff)
     | v -> Unknown v

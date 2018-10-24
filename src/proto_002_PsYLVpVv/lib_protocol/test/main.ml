@@ -36,4 +36,5 @@ let () =
     "delegation", Delegation.tests ;
     "rolls", Rolls.tests ;
     "combined", Combined_operations.tests ;
+    "qty", Qty.tests ;
   ]

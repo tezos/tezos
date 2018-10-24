@@ -607,7 +607,7 @@ fi
 command="$1"
 if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 
-case $(basename $0) in
+case $(basename "$0") in
     localnet.sh)
         docker_base_dir="$HOME/.tezos-localnet"
         docker_image=tezos:latest
