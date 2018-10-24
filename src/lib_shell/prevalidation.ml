@@ -97,8 +97,6 @@ module type T = sig
     | Outdated
 
   val apply_operation: t -> operation -> result Lwt.t
-  val apply_operation_with_preapply_result:
-    error Preapply_result.t -> t -> operation -> (error Preapply_result.t * t) Lwt.t
 
   type status = {
     applied_operations : (operation * Proto.operation_receipt) list ;
@@ -226,35 +224,6 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
           | `Permanent -> Refused errors
           | `Temporary -> Branch_delayed errors
 
-  let apply_operation_with_preapply_result preapp t op =
-    let open Preapply_result in
-    apply_operation t op >>= function
-    | Applied (t, _) ->
-        let applied = (op.hash, op.raw) :: preapp.applied in
-        Lwt.return ({ preapp with applied }, t)
-    | Branch_delayed errors ->
-        let branch_delayed =
-          Operation_hash.Map.add
-            op.hash
-            (op.raw, errors)
-            preapp.branch_delayed in
-        Lwt.return ({ preapp with branch_delayed }, t)
-    | Branch_refused errors ->
-        let branch_refused =
-          Operation_hash.Map.add
-            op.hash
-            (op.raw, errors)
-            preapp.branch_refused in
-        Lwt.return ({ preapp with branch_refused }, t)
-    | Refused errors ->
-        let refused =
-          Operation_hash.Map.add
-            op.hash
-            (op.raw, errors)
-            preapp.refused in
-        Lwt.return ({ preapp with refused }, t)
-    | Duplicate | Outdated -> Lwt.return (preapp, t)
-
   type status = {
     applied_operations : (operation * Proto.operation_receipt) list ;
     block_result : Tezos_protocol_environment_shell.validation_result ;
@@ -285,6 +254,34 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
         return protocol
   end >>=? fun (module Proto) ->
   let module Prevalidation = Make(Proto) in
+  let apply_operation_with_preapply_result preapp t op =
+    let open Preapply_result in
+    Prevalidation.apply_operation t op >>= function
+    | Applied (t, _) ->
+        let applied = (op.hash, op.raw) :: preapp.applied in
+        Lwt.return ({ preapp with applied }, t)
+    | Branch_delayed errors ->
+        let branch_delayed =
+          Operation_hash.Map.add
+            op.hash
+            (op.raw, errors)
+            preapp.branch_delayed in
+        Lwt.return ({ preapp with branch_delayed }, t)
+    | Branch_refused errors ->
+        let branch_refused =
+          Operation_hash.Map.add
+            op.hash
+            (op.raw, errors)
+            preapp.branch_refused in
+        Lwt.return ({ preapp with branch_refused }, t)
+    | Refused errors ->
+        let refused =
+          Operation_hash.Map.add
+            op.hash
+            (op.raw, errors)
+            preapp.refused in
+        Lwt.return ({ preapp with refused }, t)
+    | Duplicate | Outdated -> Lwt.return (preapp, t) in
   Prevalidation.create
     ~protocol_data ~predecessor ~timestamp () >>=? fun validation_state ->
   Lwt_list.fold_left_s
@@ -296,7 +293,7 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
                 (* FIXME *)
                 Lwt.return (acc_validation_result, acc_validation_state)
             | Ok op ->
-                Prevalidation.apply_operation_with_preapply_result
+                apply_operation_with_preapply_result
                   acc_validation_result acc_validation_state op)
          (Preapply_result.empty, acc_validation_state)
          operations

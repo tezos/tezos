@@ -61,8 +61,6 @@ module type T = sig
     | Outdated
 
   val apply_operation: t -> operation -> result Lwt.t
-  val apply_operation_with_preapply_result:
-    error Preapply_result.t -> t -> operation -> (error Preapply_result.t * t) Lwt.t
 
   type status = {
     applied_operations : (operation * Proto.operation_receipt) list ;
