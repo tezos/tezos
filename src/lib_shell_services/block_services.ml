@@ -77,11 +77,12 @@ let parse_block s =
     end in
   try
     match split_on_delim (count_delims s) with
-    | (["genesis"],_) -> Ok `Genesis
-    | (["head"],_) -> Ok (`Head 0)
-    | (["head"; n],'~') -> Ok (`Head (int_of_string n))
-    | (["head"; n],'-') -> Ok (`Head (int_of_string n))
-    | ([hol],_) ->
+    | (["genesis"], _) -> Ok `Genesis
+    | (["genesis"; n], '+') -> Ok (`Level (Int32.of_string n))
+    | (["head"], _) -> Ok (`Head 0)
+    | (["head"; n], '~') | (["head"; n], '-') ->
+        Ok (`Head (int_of_string n))
+    | ([hol], _) ->
         begin
           match Block_hash.of_b58check_opt hol with
             Some h -> Ok (`Hash (h , 0))
@@ -90,9 +91,9 @@ let parse_block s =
               if Int32.(compare l (of_int 0)) < 0 then raise Exit
               else Ok (`Level (Int32.of_string s))
         end
-    | ([h ; n],'~') -> Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
-    | ([h ; n],'-') -> Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
-    | ([h ; n],'+') -> Ok (`Hash (Block_hash.of_b58check_exn h, - int_of_string n))
+    | ([h ; n], '~') | ([h ; n], '-') ->
+        Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
+    | ([h ; n], '+') -> Ok (`Hash (Block_hash.of_b58check_exn h, - int_of_string n))
     | _ -> raise Exit
   with _ -> Error "Cannot parse block identifier."
 
@@ -113,7 +114,7 @@ let blocks_arg =
      one the predefined aliases: 'genesis', 'head' \
      or a block level (index in the chain). \
      One might also use 'head~N' or '<hash>~N' where N is an integer to \
-     denotes the Nth predecessor of the designated block.\
+     denote the Nth predecessor of the designated block.\
      Also, '<hash>+N' denotes the Nth successor of a block." in
   let construct = to_string in
   let destruct = parse_block in
