@@ -345,6 +345,13 @@ let get_block chain_state = function
         State.Block.read_exn chain_state ~pred:n (State.Block.hash head)
   | `Hash (hash, n) ->
       State.Block.read_exn chain_state ~pred:n hash
+  | `Level i ->
+      Chain.head chain_state >>= fun head ->
+      let target = Int32.(to_int (sub (State.Block.level head) i)) in
+      if target < 0 then
+        Lwt.fail Not_found
+      else
+        State.Block.read_exn chain_state ~pred:target (State.Block.hash head)
 
 let build_rpc_directory chain_state block =
   get_block chain_state block >>= fun block ->

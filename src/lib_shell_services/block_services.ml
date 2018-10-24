@@ -57,6 +57,7 @@ type block = [
   | `Genesis
   | `Head of int
   | `Hash of Block_hash.t * int
+  | `Level of Int32.t
 ]
 
 let parse_block s =
@@ -65,7 +66,15 @@ let parse_block s =
     | ["genesis"] -> Ok `Genesis
     | ["head"] -> Ok (`Head 0)
     | ["head"; n] -> Ok (`Head (int_of_string n))
-    | [h] -> Ok (`Hash (Block_hash.of_b58check_exn h, 0))
+    | [hol] ->
+        begin
+          match Block_hash.of_b58check_opt hol with
+            Some h -> Ok (`Hash (h , 0))
+          | None ->
+              let l = Int32.of_string s in
+              if Int32.(compare l (of_int 0)) < 0 then raise Exit
+              else Ok (`Level (Int32.of_string s))
+        end
     | [h ; n] -> Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
     | _ -> raise Exit
   with _ -> Error "Cannot parse block identifier."
@@ -76,12 +85,14 @@ let to_string = function
   | `Head n -> Printf.sprintf "head~%d" n
   | `Hash (h, 0) -> Block_hash.to_b58check h
   | `Hash (h, n) -> Printf.sprintf "%s~%d" (Block_hash.to_b58check h) n
+  | `Level i -> Printf.sprintf "%d" (Int32.to_int i)
 
 let blocks_arg =
   let name = "block_id" in
   let descr =
-    "A block identifier. This is either a block hash in Base58Check notation \
-     or a one the predefined aliases: 'genesis', 'head'. \
+    "A block identifier. This is either a block hash in Base58Check notation, \
+     one the predefined aliases: 'genesis', 'head' \
+     or a block level (index in the chain). \
      One might alse use 'head~N' or '<hash>~N' where N is an integer to \
      denotes the Nth predecessors of the designated block." in
   let construct = to_string in
