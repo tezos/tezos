@@ -47,7 +47,7 @@ let make_sk sk =
   Client_keys.make_sk_uri
     (Uri.make ~scheme ~path:(Signature.Secret_key.to_b58check sk) ())
 
-let public_key pk_uri =
+let public_key ?interactive:(_) pk_uri =
   Lwt.return
     (Signature.Public_key.of_b58check (Uri.path (pk_uri : pk_uri :> Uri.t)))
 
@@ -59,8 +59,8 @@ let neuterize sk_uri =
   secret_key sk_uri >>=? fun sk ->
   return (make_pk (Signature.Secret_key.to_public_key sk))
 
-let public_key_hash pk_uri =
-  public_key pk_uri >>=? fun pk ->
+let public_key_hash ?interactive pk_uri =
+  public_key ?interactive pk_uri >>=? fun pk ->
   return (Signature.Public_key.hash pk, Some pk)
 
 let sign ?watermark sk_uri buf =

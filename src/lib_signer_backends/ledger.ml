@@ -362,7 +362,8 @@ let path_of_pk_uri (uri : pk_uri) =
       List.map int32_of_path_element_exn path
   | path -> List.map int32_of_path_element_exn path
 
-let public_key (pk_uri : pk_uri) =
+let public_key
+    ?(interactive : Client_context.io_wallet option) (pk_uri : pk_uri) =
   let find_ledger of_pkh = function
     | Pkh pkh -> snd (List.assoc pkh of_pkh)
     | Animals (_, curve) -> curve
@@ -374,7 +375,19 @@ let public_key (pk_uri : pk_uri) =
       with_ledger id begin fun ledger _version _of_curve of_pkh  ->
         let curve = find_ledger of_pkh id in
         let path = path_of_pk_uri pk_uri in
-        get_public_key ledger curve path >>=? fun pk ->
+        begin
+          match interactive with
+          | Some cctxt ->
+              get_public_key ~prompt:false ledger curve path >>=? fun pk ->
+              let pkh = Signature.Public_key.hash pk in
+              cctxt#message
+                "Please validate@ (and write down)@ the public key hash\
+                 @ displayed@ on the Ledger,@ it should be equal@ to `%a`:"
+                Signature.Public_key_hash.pp pkh >>= fun () ->
+              get_public_key ~prompt:true ledger curve path
+          | None ->
+              get_public_key ~prompt:false ledger curve path
+        end >>=? fun pk ->
         let pkh = Signature.Public_key.hash pk in
         Hashtbl.replace pks pk_uri pk ;
         Hashtbl.replace pkhs pk_uri pkh ;
@@ -383,11 +396,11 @@ let public_key (pk_uri : pk_uri) =
       | Error err -> failwith "%a" pp_print_error err
       | Ok v -> return v
 
-let public_key_hash pk_uri =
+let public_key_hash ?interactive pk_uri =
   match Hashtbl.find_opt pkhs pk_uri with
   | Some pkh -> return (pkh, None)
   | None ->
-      public_key pk_uri >>=? fun pk ->
+      public_key ?interactive pk_uri >>=? fun pk ->
       return (Hashtbl.find pkhs pk_uri, Some pk)
 
 let curve_of_id = function

@@ -290,7 +290,8 @@ let commands version : Client_context.io_wallet Clic.command list =
                     "public and secret keys '%s' don't correspond, \
                      please don't use --force" name)
          end >>=? fun () ->
-         Client_keys.public_key_hash pk_uri >>=? fun (pkh, public_key) ->
+         Client_keys.public_key_hash ~interactive:cctxt pk_uri
+         >>=? fun (pkh, public_key) ->
          cctxt#message
            "Tezos address added: %a"
            Signature.Public_key_hash.pp pkh >>= fun () ->
