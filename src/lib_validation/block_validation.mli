@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,24 +24,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type kind =
-  | Internal
+val may_patch_protocol:
+  level:Int32.t ->
+  Tezos_protocol_environment_shell.validation_result ->
+  Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
 
-type t
+val check_liveness:
+  live_blocks:Block_hash.Set.t ->
+  live_operations:Operation_hash.Set.t ->
+  Block_hash.t ->
+  Operation.t list list ->
+  unit tzresult Lwt.t
 
-val init : context_root:string -> kind -> t Lwt.t
-val close : t -> unit Lwt.t
-
-type application_result = {
+type result = {
   validation_result: Tezos_protocol_environment_shell.validation_result ;
-  block_data: Secp256k1.watermark ;
-  ops_metadata: Secp256k1.watermark list list ;
+  block_metadata: MBytes.t ;
+  ops_metadata: MBytes.t list list ;
   context_hash: Context_hash.t ;
 }
 
-val apply_block :
-  t ->
-  Block_header.t ->
-  Operation.t list list ->
-  State.Chain.t ->
-  application_result tzresult Lwt.t
+val apply:
+  Chain_id.t ->
+  max_operations_ttl:int ->
+  predecessor_block_header:Block_header.t ->
+  predecessor_context:Context.t ->
+  block_header:Block_header.t ->
+  Operation.t list list -> result tzresult Lwt.t

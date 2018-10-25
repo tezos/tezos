@@ -1299,7 +1299,7 @@ let init
   let main_chain = Chain_id.of_block_hash genesis.Chain.block in
   read global_store context_index main_chain >>=? fun state ->
   may_create_chain state main_chain genesis >>= fun main_chain_state ->
-  return (state, main_chain_state)
+  return (state, main_chain_state, context_index)
 
 let close { global_data } =
   Shared.use global_data begin fun { global_store } ->

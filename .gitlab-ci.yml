@@ -197,6 +197,10 @@ test:linkcheck:
     - make doc-linkcheck
   allow_failure: true
 
+test:validation:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_validation/runtest
 
 ############################################################
 ## Stage: building opam packages (only master and *opam*) ##
@@ -458,20 +462,20 @@ opam:47:tezos-embedded-protocol-alpha:
   variables:
     package: tezos-embedded-protocol-alpha
 
-opam:48:tezos-embedded-protocol-demo:
+opam:48:tezos-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell
+
+opam:49:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
 
-opam:49:tezos-embedded-protocol-genesis:
+opam:50:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
-
-opam:50:tezos-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
 
 opam:51:tezos-endorser-alpha-commands:
   <<: *opam_definition
@@ -488,47 +492,52 @@ opam:53:ocplib-ezresto-directory:
   variables:
     package: ocplib-ezresto-directory
 
-opam:54:tezos-accuser-alpha:
+opam:54:tezos-validation:
+  <<: *opam_definition
+  variables:
+    package: tezos-validation
+
+opam:55:tezos-accuser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha
 
-opam:55:tezos-endorser-alpha:
+opam:56:tezos-endorser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha
 
-opam:56:tezos-accuser-alpha-commands:
+opam:57:tezos-accuser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha-commands
 
-opam:57:tezos-baker-alpha:
+opam:58:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:58:tezos-protocol-demo:
+opam:59:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:59:tezos-signer:
+opam:60:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:60:tezos-node:
+opam:61:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:61:ocplib-json-typed-browser:
+opam:62:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
 
-opam:62:tezos-baker-alpha-commands:
+opam:63:tezos-baker-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha-commands
