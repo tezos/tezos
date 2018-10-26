@@ -60,7 +60,9 @@ let test_overflow _ =
   assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerRing.mem set (a "baz"));
   P2p_acl.PeerRing.add set (a "zor");
   assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerRing.mem set (a "zor"));
-  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerRing.mem set (a "baz"))
+  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerRing.mem set (a "foo"));
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerRing.mem set (a "bar"));
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerRing.mem set (a "baz"))
 
 let () =
   Alcotest.run ~argv:[|""|] "tezos-p2p" [
