@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -152,6 +153,63 @@ module Pool_event = struct
 
     | Disconnection of P2p_peer_id.t
     | External_disconnection of P2p_peer_id.t
+
+  let pp ppf (event:t) =
+    match event with
+    | Too_few_connections -> Format.pp_print_string ppf "Too_few_connections"
+    | Too_many_connections -> Format.pp_print_string ppf "Too_many_connections"
+    | New_point p -> Format.pp_print_string ppf "New_point " ; P2p_point.Id.pp ppf p
+    | New_peer p -> Format.pp_print_string ppf "New_peer " ; P2p_peer_id.pp ppf p
+    | Gc_points -> Format.pp_print_string ppf "Gc_points"
+    | Gc_peer_ids -> Format.pp_print_string ppf "Gc_peer_ids"
+    | Incoming_connection p ->
+        Format.pp_print_string ppf "Incoming_connection " ;
+        P2p_point.Id.pp ppf p
+    | Outgoing_connection p ->
+        Format.pp_print_string ppf "Outgoing_connection " ;
+        P2p_point.Id.pp ppf p
+    | Authentication_failed p ->
+        Format.pp_print_string ppf "Authentication_failed " ;
+        P2p_point.Id.pp ppf p
+    | Accepting_request (pi, _, _) ->
+        Format.pp_print_string ppf "Accepting_request " ;
+        P2p_point.Id.pp ppf pi
+    | Rejecting_request (pi, _, _) ->
+        Format.pp_print_string ppf "Rejecting_request " ;
+        P2p_point.Id.pp ppf pi
+    | Request_rejected (pi, _) ->
+        Format.pp_print_string ppf "Request_rejected " ;
+        P2p_point.Id.pp ppf pi
+    | Connection_established (_, pi) ->
+        Format.pp_print_string ppf "Connection_established " ;
+        P2p_peer_id.pp ppf pi
+    | Swap_request_received { source } ->
+        Format.pp_print_string ppf "Swap_request_received " ;
+        P2p_peer_id.pp ppf source
+    | Swap_ack_received { source } ->
+        Format.pp_print_string ppf "Swap_ack_received " ;
+        P2p_peer_id.pp ppf source
+    | Swap_request_sent { source } ->
+        Format.pp_print_string ppf "Swap_request_sent " ;
+        P2p_peer_id.pp ppf source
+    | Swap_ack_sent { source } ->
+        Format.pp_print_string ppf "Swap_ack_sent " ;
+        P2p_peer_id.pp ppf source
+    | Swap_request_ignored { source } ->
+        Format.pp_print_string ppf "Swap_request_ignored " ;
+        P2p_peer_id.pp ppf source
+    | Swap_success { source } ->
+        Format.pp_print_string ppf "Swap_success " ;
+        P2p_peer_id.pp ppf source
+    | Swap_failure { source } ->
+        Format.pp_print_string ppf "Swap_failure " ;
+        P2p_peer_id.pp ppf source
+    | Disconnection source ->
+        Format.pp_print_string ppf "Disconnection " ;
+        P2p_peer_id.pp ppf source
+    | External_disconnection source ->
+        Format.pp_print_string ppf "External_disconnection " ;
+        P2p_peer_id.pp ppf source
 
   let encoding =
     let open Data_encoding in
