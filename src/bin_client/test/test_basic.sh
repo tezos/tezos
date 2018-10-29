@@ -59,11 +59,11 @@ $client get balance for $key2 | assert "2000 ꜩ"
 
 bake
 
-$client remember script noop file:contracts/noop.tz
-$client typecheck script file:contracts/noop.tz
+$client remember script noop file:contracts_opcode/noop.tz
+$client typecheck script file:contracts_opcode/noop.tz
 bake_after $client originate contract noop \
         for $key1 transferring 1,000 from bootstrap1 \
-        running file:contracts/noop.tz
+        running file:contracts_opcode/noop.tz
 
 bake_after $client transfer 10 from bootstrap1 to noop -arg "Unit"
 
