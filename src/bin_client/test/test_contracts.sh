@@ -105,10 +105,6 @@ assert_storage $contract_dir/map_id.tz '{}' '{ Elt 0 1 }' '{ Elt 0 1 }'
 assert_storage $contract_dir/map_id.tz '{}' '{ Elt 0 0 }' '{ Elt 0 0 }'
 assert_storage $contract_dir/map_id.tz '{}' '{ Elt 0 0 ; Elt 3 4 }' '{ Elt 0 0 ; Elt 3 4 }'
 
-# Map block on lists
-assert_storage $contract_dir/list_map_block.tz '{0}' '{}' '{}'
-assert_storage $contract_dir/list_map_block.tz '{0}' '{ 1 ; 1 ; 1 ; 1 }' '{ 1 ; 2 ; 3 ; 4 }'
-assert_storage $contract_dir/list_map_block.tz '{0}' '{ 1 ; 2 ; 3 ; 0 }' '{ 1 ; 3 ; 5 ; 3 }'
 
 # List iter
 assert_storage $contract_dir/list_iter.tz 0 '{ 10 ; 2 ; 1 }' 20
@@ -200,14 +196,8 @@ assert_storage $contract_dir/swap_left_right.tz '(Left "X")' '(Left True)' '(Rig
 assert_storage $contract_dir/swap_left_right.tz '(Left "X")' '(Right "a")' '(Left "a")'
 
 # Reverse a list
-assert_storage $contract_dir/reverse.tz '{""}' '{}' '{}'
-assert_storage $contract_dir/reverse.tz '{""}' '{ "c" ; "b" ; "a" }' '{ "a" ; "b" ; "c" }'
 assert_storage $contract_dir/reverse_loop.tz '{""}' '{}' '{}'
 assert_storage $contract_dir/reverse_loop.tz '{""}' '{ "c" ; "b" ; "a" }' '{ "a" ; "b" ; "c" }'
-
-# Reverse using LOOP_LEFT
-assert_storage $contract_dir/loop_left.tz '{""}' '{}' '{}'
-assert_storage $contract_dir/loop_left.tz '{""}' '{ "c" ; "b" ; "a" }' '{ "a" ; "b" ; "c" }'
 
 # Exec concat contract
 #assert_storage $contract_dir/exec_concat.tz '"?"' '""' '"_abc"'

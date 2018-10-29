@@ -20,6 +20,7 @@ contract_dir="contracts"
 contract_op_dir="contracts_opcode"
 contract_macros_dir="contracts_macros"
 contract_scenarios_dir="contracts_mini_scenarios"
+contract_attic_dir="contracts_attic"
 
 source $tezos_sandboxed_node
 source $tezos_init_sandboxed_client
