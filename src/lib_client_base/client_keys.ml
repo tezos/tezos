@@ -153,6 +153,8 @@ module type SIGNER = sig
   val sign :
     ?watermark: Signature.watermark ->
     sk_uri -> MBytes.t -> Signature.t tzresult Lwt.t
+  val deterministic_nonce : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  val deterministic_nonce_hash : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
 end
 
 let signers_table : (string, (module SIGNER)) Hashtbl.t = Hashtbl.create 13
@@ -231,6 +233,18 @@ let append cctxt ?watermark loc buf =
 let check ?watermark pk_uri signature buf =
   public_key pk_uri >>=? fun pk ->
   return (Signature.check ?watermark pk signature buf)
+
+let deterministic_nonce sk_uri data =
+  let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
+  find_signer_for_key ~scheme >>=? fun signer ->
+  let module Signer = (val signer : SIGNER) in
+  Signer.deterministic_nonce sk_uri data
+
+let deterministic_nonce_hash sk_uri data =
+  let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
+  find_signer_for_key ~scheme >>=? fun signer ->
+  let module Signer = (val signer : SIGNER) in
+  Signer.deterministic_nonce_hash sk_uri data
 
 let register_key cctxt ?(force=false) (public_key_hash, pk_uri, sk_uri) ?public_key name =
   Public_key.add ~force cctxt name (pk_uri, public_key) >>=? fun () ->

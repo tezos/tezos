@@ -105,6 +105,7 @@ let secp256k1_ctx =
 
 type error +=
   | LedgerError of Ledgerwallet.Transport.error
+  | Ledger_deterministic_nonce_not_implemented
 
 let error_encoding =
   let open Data_encoding in
@@ -124,6 +125,20 @@ let () =
     error_encoding
     (function LedgerError e -> Some e | _ -> None)
     (fun e -> LedgerError e)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id: "signer.ledger.deterministic_nonce_not_implemented"
+    ~title: "Ledger deterministic_nonce(_hash) not implemented"
+    ~description: "The deterministic_nonce(_hash) functionality \
+                   is not implemented by the ledger"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Asked the ledger to generate a  deterministic nonce (hash), \
+                            but this functionality is not yet implemented")
+    Data_encoding.unit
+    (function Ledger_deterministic_nonce_not_implemented -> Some () | _ -> None)
+    (fun () -> Ledger_deterministic_nonce_not_implemented)
 
 type id =
   | Animals of Ledger_names.t * Ledgerwallet_tezos.curve option
@@ -480,6 +495,10 @@ let sign ?watermark sk_uri msg =
         let signature = P256.of_bytes_exn buf in
         return (Signature.of_p256 signature)
   end
+
+let deterministic_nonce _ _ = fail Ledger_deterministic_nonce_not_implemented
+let deterministic_nonce_hash _ _ = fail Ledger_deterministic_nonce_not_implemented
+let supports_deterministic_nonces _ = return_false
 
 let commands =
   let open Clic in

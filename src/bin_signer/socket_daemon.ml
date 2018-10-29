@@ -36,6 +36,18 @@ let handle_client ?magic_bytes ~check_high_watermark ~require_auth cctxt fd =
       Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
       Lwt_unix.close fd >>= fun () ->
       return_unit
+  | Deterministic_nonce req ->
+      let encoding = result_encoding Deterministic_nonce.Response.encoding in
+      Handler.deterministic_nonce cctxt req ~require_auth >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
+      Lwt_unix.close fd >>= fun () ->
+      return_unit
+  | Deterministic_nonce_hash req ->
+      let encoding = result_encoding Deterministic_nonce_hash.Response.encoding in
+      Handler.deterministic_nonce_hash cctxt req ~require_auth >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
+      Lwt_unix.close fd >>= fun () ->
+      return_unit
   | Public_key pkh ->
       let encoding = result_encoding Public_key.Response.encoding in
       Handler.public_key cctxt pkh >>= fun res ->

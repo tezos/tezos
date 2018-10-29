@@ -224,7 +224,7 @@ let commands base_dir require_auth =
       (prefixes [ "launch" ; "https" ; "signer" ] @@
        param
          ~name:"cert"
-         ~desc: "path to th TLS certificate"
+         ~desc: "path to the TLS certificate"
          (parameter (fun _ s ->
               if not (Sys.file_exists s) then
                 failwith "No such TLS certificate file %s" s
@@ -232,7 +232,7 @@ let commands base_dir require_auth =
                 return s)) @@
        param
          ~name:"key"
-         ~desc: "path to th TLS key"
+         ~desc: "path to the TLS key"
          (parameter (fun _ s ->
               if not (Sys.file_exists s) then
                 failwith "No such TLS key file %s" s

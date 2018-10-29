@@ -97,6 +97,16 @@ module Make(S : sig
       (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
       msg
 
+  let deterministic_nonce sk_uri msg =
+    Remote.deterministic_nonce
+      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
+      msg
+
+  let deterministic_nonce_hash sk_uri msg =
+    Remote.deterministic_nonce_hash
+      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
+      msg
+
 end
 
 let make_sk sk =
@@ -186,4 +196,3 @@ let parse_base_uri s =
     | Some scheme -> failwith "Unknown scheme: %s" scheme
     | None -> failwith "Unknown scheme: <empty>"
   with Invalid_argument msg -> failwith "Malformed URI: %s" msg
-

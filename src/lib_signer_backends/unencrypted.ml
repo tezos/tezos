@@ -66,3 +66,11 @@ let public_key_hash ?interactive pk_uri =
 let sign ?watermark sk_uri buf =
   secret_key sk_uri >>=? fun sk ->
   return (Signature.sign ?watermark sk buf)
+
+let deterministic_nonce sk_uri buf =
+  secret_key sk_uri >>=? fun sk ->
+  return (Signature.deterministic_nonce sk buf)
+
+let deterministic_nonce_hash sk_uri buf =
+  secret_key sk_uri >>=? fun sk ->
+  return (Signature.deterministic_nonce_hash sk buf)

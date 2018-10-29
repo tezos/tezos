@@ -23,22 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+
+let query =
+  let open RPC_query in
+  query (fun signature -> signature)
+  |+ opt_field
+    ~descr: "Must be provided if the signer requires \
+             authentication. In this case, it must be the signature \
+             of the public key hash and message concatenated, by one \
+             of the keys authorized by the signer."
+    "authentication" Signature.rpc_arg (fun signature -> signature)
+  |> seal
+
 let sign =
-  let query =
-    let open RPC_query in
-    query (fun signature -> signature)
-    |+ opt_field
-      ~descr: "Must be provided if the signer requires \
-               authentication. In this case, it must be the signature \
-               of the public key hash and message concatenated, by one \
-               of the keys authorized by the signer."
-      "authentication" Signature.rpc_arg (fun signature -> signature)
-    |> seal in
   RPC_service.post_service
     ~description: "Sign a piece of data with a given remote key"
     ~query
     ~input: Data_encoding.bytes
     ~output: Data_encoding.(obj1 (req "signature" Signature.encoding))
+    RPC_path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
+
+let deterministic_nonce =
+  RPC_service.post_service
+    ~description: "Obtain some random data generated deterministically from some piece of data with a given remote key"
+    ~query
+    ~input: Data_encoding.bytes
+    ~output: Data_encoding.(obj1 (req "deterministic_nonce" bytes))
+    RPC_path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
+
+let deterministic_nonce_hash =
+  RPC_service.post_service
+    ~description: "Obtain the hash of some random data generated deterministically from some piece of data with a given remote key"
+    ~query
+    ~input: Data_encoding.bytes
+    ~output: Data_encoding.(obj1 (req "deterministic_nonce_hash" bytes))
     RPC_path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
 
 let public_key =

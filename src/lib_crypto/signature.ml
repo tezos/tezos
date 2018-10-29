@@ -601,3 +601,15 @@ let generate_key ?(algo = Ed25519) ?seed () =
       let pkh, pk, sk = P256.generate_key ?seed () in
       (Public_key_hash.P256 pkh,
        Public_key.P256 pk, Secret_key.P256 sk)
+
+let deterministic_nonce sk msg =
+  match sk with
+  | Secret_key.Ed25519 sk   -> Ed25519.deterministic_nonce sk msg
+  | Secret_key.Secp256k1 sk -> Secp256k1.deterministic_nonce sk msg
+  | Secret_key.P256 sk      -> P256.deterministic_nonce sk msg
+
+let deterministic_nonce_hash sk msg =
+  match sk with
+  | Secret_key.Ed25519 sk   -> Ed25519.deterministic_nonce_hash sk msg
+  | Secret_key.Secp256k1 sk -> Secp256k1.deterministic_nonce_hash sk msg
+  | Secret_key.P256 sk      -> P256.deterministic_nonce_hash sk msg

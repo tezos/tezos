@@ -40,3 +40,18 @@ val sign :
   check_high_watermark:bool -> require_auth:bool -> Signature.t tzresult Lwt.t
 (** [sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth]
     signs [req] and returns a signature. *)
+
+val deterministic_nonce :
+  #Client_context.wallet ->
+  Signer_messages.Deterministic_nonce.Request.t ->
+  require_auth:bool -> MBytes.t tzresult Lwt.t
+(** [deterministic_nonce cctxt req ~require_auth] generates
+    deterministically a nonce from [req.data]. *)
+
+val deterministic_nonce_hash :
+  #Client_context.wallet ->
+  Signer_messages.Deterministic_nonce_hash.Request.t ->
+  require_auth:bool -> MBytes.t tzresult Lwt.t
+(** [deterministic_nonce_hash cctxt req ~require_auth] generates
+    deterministically a nonce from [req.data] and returns the hash of
+    this nonce. *)

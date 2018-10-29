@@ -262,12 +262,23 @@ module Make(C : sig val cctxt: Client_context.prompter end) = struct
      where <public_key> is the public key in Base58."
 
   let public_key = Unencrypted.public_key
+
   let public_key_hash = Unencrypted.public_key_hash
+
   let neuterize sk_uri =
     decrypt C.cctxt sk_uri >>=? fun sk ->
     return (Unencrypted.make_pk (Signature.Secret_key.to_public_key sk))
+
   let sign ?watermark sk_uri buf =
     decrypt C.cctxt sk_uri >>=? fun sk ->
     return (Signature.sign ?watermark sk buf)
+
+  let deterministic_nonce sk_uri buf =
+    decrypt C.cctxt sk_uri >>=? fun sk ->
+    return (Signature.deterministic_nonce sk buf)
+
+  let deterministic_nonce_hash sk_uri buf =
+    decrypt C.cctxt sk_uri >>=? fun sk ->
+    return (Signature.deterministic_nonce_hash sk buf)
 
 end

@@ -343,6 +343,14 @@ let generate_key ?seed () =
       let pk = Sign.neuterize sk in
       Public_key.hash pk, pk, sk
 
+
+let deterministic_nonce sk msg =
+  Hash.SHA256.HMAC.digest ~key: (Secret_key.to_bytes sk) ~msg
+
+let deterministic_nonce_hash sk msg =
+  Blake2B.to_bytes (Blake2B.hash_bytes [deterministic_nonce sk msg])
+
+
 include Compare.Make(struct
     type nonrec t = t
     let compare = MBytes.compare
