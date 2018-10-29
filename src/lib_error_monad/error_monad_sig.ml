@@ -64,13 +64,24 @@ module type S = sig
 
   (** {2 Error classification} ***********************************************)
 
-  (** For other modules to register specialized error serializers *)
+  (** The error data type is extensible. Each module can register specialized
+      error serializers
+      [id] unique name of this error. Ex.: overflow_time_counter
+      [title] human readable description. Ex.: The time counter overflown while computing delta increase
+      [description] formatter use to pretty print additional arguments. Ex.: The time counter overflown while computing delta increase. Previsous value %d. Delta: %d
+      [pp] data encoding for this error. If the error has no value, specify Data_encoding.empty
+      [encoder]
+      [decoder]
+  *)
   val register_error_kind :
     error_category ->
-    id:string -> title:string -> description:string ->
+    id:string ->
+    title:string ->
+    description:string ->
     ?pp:(Format.formatter -> 'err -> unit) ->
     'err Data_encoding.t ->
-    (error -> 'err option) -> ('err -> error) ->
+    (error -> 'err option) ->
+    ('err -> error) ->
     unit
 
   (** Classify an error using the registered kinds *)
