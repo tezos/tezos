@@ -30,6 +30,15 @@ if [ ! $NO_TYPECHECK ] ; then
     printf "All contracts are well typed\n\n"
 fi
 
+# FORMAT: assert_output contract_file storage input expected_result
+
+# TODO lockup, originator, parameterized_multisig, reservoir, scrutable_reservoir,
+# TODO weather_insurance, xcat_dapp, xcat
+
+# Test replay prevention
+init_with_transfer $contract_scenarios_dir/replay.tz $key2 Unit 0 bootstrap1
+assert_fails $client transfer 0 from bootstrap1 to replay
+
 # Tests create_account
 init_with_transfer $contract_scenarios_dir/create_account.tz $key2 None 1,000 bootstrap1
 assert_balance create_account "1000 ꜩ"
@@ -64,6 +73,17 @@ account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
 bake_after $client transfer 0 from bootstrap1 to default_account  -arg "\"$account\""
 assert_balance $account "100 ꜩ"
 
+# Test bytes, SHA256, CHECK_SIGNATURE
+init_with_transfer $contract_scenarios_dir/reveal_signed_preimage.tz bootstrap1 \
+				   '(Pair 0x9995c2ef7bcc7ae3bd15bdd9b02dc6e877c27b26732340d641a4cbc6524813bb "p2pk66uq221795tFxT7jfNmXtBMdjMf6RAaxRTwv1dbuSHbH6yfqGwz")' 1,000 bootstrap1
+assert_fails $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
+             '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972 "p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8")'
+assert_fails $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
+             '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8")'
+assert_success $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
+               '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")'
+bake
+
 # Test SET_DELEGATE
 b2='tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN'
 b3='tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU'
@@ -83,3 +103,8 @@ assert_storage_contains vote_for_delegate "\"$b2\""
 $client get delegate for vote_for_delegate | assert_in_output none
 bake_after $client transfer 0 from bootstrap4 to vote_for_delegate -arg "(Some \"$b5\")"
 $client get delegate for vote_for_delegate | assert_in_output "$b5"
+
+
+printf "\nEnd of test\n"
+
+show_logs="no"

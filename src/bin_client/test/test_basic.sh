@@ -70,7 +70,7 @@ bake_after $client transfer 10 from bootstrap1 to noop -arg "Unit"
 
 bake_after $client originate contract hardlimit \
         for $key1 transferring 1,000 from bootstrap1 \
-        running file:contracts/hardlimit.tz -init "3"
+        running file:contracts_mini_scenarios/hardlimit.tz -init "3"
 bake_after $client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
 bake_after $client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
 
