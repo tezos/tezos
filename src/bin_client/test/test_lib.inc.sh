@@ -17,10 +17,10 @@ local_admin_client="${5:-$test_dir/../../../_build/default/src/bin_client/main_a
 local_compiler="${6:-$test_dir/../../../_build/default/src/lib_protocol_compiler/main_native.exe}"
 
 contract_dir="contracts"
-contract_op_dir="contracts_opcode"
-contract_macros_dir="contracts_macros"
-contract_scenarios_dir="contracts_mini_scenarios"
-contract_attic_dir="contracts_attic"
+contract_op_dir="contracts/opcodes"
+contract_macros_dir="contracts/macros"
+contract_scenarios_dir="contracts/mini_scenarios"
+contract_attic_dir="contracts/attic"
 
 source $tezos_sandboxed_node
 source $tezos_init_sandboxed_client

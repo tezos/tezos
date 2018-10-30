@@ -5,7 +5,8 @@
        king_commitment.json
        queen_commitment.json
        test_lib.inc.sh
-       (glob_files contracts/*))
+       (glob_files contracts/opcodes/*)
+       (glob_files contracts/mini_scenarios/*))
   (locks /tcp-port/18731
          /tcp-port/19731)
   (action
@@ -35,7 +36,7 @@
  (name runtest_contracts_opcode.sh)
  (deps sandbox.json
        test_lib.inc.sh
-       (glob_files contracts_opcode/*))
+       (glob_files contracts/opcodes/*))
   (locks /tcp-port/18731
          /tcp-port/19731)
   (action
@@ -50,7 +51,7 @@
  (name runtest_contracts_macros.sh)
  (deps sandbox.json
        test_lib.inc.sh
-       (glob_files contracts_macros/*))
+       (glob_files contracts/macros/*))
  (locks /tcp-port/18731
         /tcp-port/19731)
  (action
@@ -65,7 +66,7 @@
  (name runtest_contracts_mini_scenarios.sh)
  (deps sandbox.json
        test_lib.inc.sh
-       (glob_files contracts_mini_scenarios/*))
+       (glob_files contracts/mini_scenarios/*))
  (locks /tcp-port/18731
         /tcp-port/19731)
  (action
@@ -80,7 +81,7 @@
  (name runtest_contracts_attic.sh)
  (deps sandbox.json
        test_lib.inc.sh
-       (glob_files contracts_attic/*))
+       (glob_files contracts/attic/*))
  (locks /tcp-port/18731
         /tcp-port/19731)
  (action
