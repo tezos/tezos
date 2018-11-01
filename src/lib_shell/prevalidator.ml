@@ -82,6 +82,8 @@ module type T = sig
     Operation.t Operation_hash.Map.t ->
     (Operation.t Operation_hash.Map.t * Block_hash.Set.t * Operation_hash.Set.t) Lwt.t
   val validation_result: types_state -> error Preapply_result.t
+
+  val fitness: unit -> Fitness.t Lwt.t
   val worker: worker Lwt.t
 
 end
@@ -691,6 +693,18 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       (Arg.limits, Arg.chain_db)
       (module Handlers)
 
+  let fitness () =
+    worker >>= fun w ->
+    let pv = Worker.state w in
+    begin
+      Lwt.return pv.validation_state >>=? fun state ->
+      Prevalidation.status state >>=? fun status ->
+      return status.block_result.fitness
+    end >>= function
+    | Ok fitness -> Lwt.return fitness
+    | Error _ ->
+        Lwt.return (State.Block.fitness pv.predecessor)
+
 end
 
 module ChainProto_registry =
@@ -768,6 +782,10 @@ let timestamp (t:t) =
   Prevalidator.worker >>= fun w ->
   let pv = Prevalidator.Worker.state w in
   Lwt.return pv.timestamp
+
+let fitness (t:t) =
+  let module Prevalidator: T = (val t) in
+  Prevalidator.fitness ()
 
 let inject_operation (t:t) op =
   let module Prevalidator: T = (val t) in

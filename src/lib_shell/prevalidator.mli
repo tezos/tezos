@@ -78,6 +78,9 @@ val flush: t -> Block_hash.t -> unit tzresult Lwt.t
     reset of the prevalidation context *)
 val timestamp: t -> Time.t Lwt.t
 
+(** Returns the fitness of the current prevalidation context *)
+val fitness: t -> Fitness.t Lwt.t
+
 (** Returns the list of valid operations known to this prevalidation worker *)
 val operations: t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
 
