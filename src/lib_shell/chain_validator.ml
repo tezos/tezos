@@ -269,9 +269,21 @@ let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
   and head_hash = State.Block.hash head
   and block_header = State.Block.header block
   and block_hash = State.Block.hash block in
-  if
-    Fitness.(block_header.shell.fitness <= head_header.shell.fitness)
-  then
+  begin
+    match nv.prevalidator with
+    | None ->
+        Lwt.return head_header.shell.fitness
+    | Some pv ->
+        Prevalidator.fitness pv
+  end >>= fun context_fitness ->
+  let head_fitness = head_header.shell.fitness in
+  let new_fitness = block_header.shell.fitness in
+  let accepted_head =
+    if Fitness.(context_fitness = head_fitness) then
+      Fitness.(new_fitness > head_fitness)
+    else
+      Fitness.(new_fitness >= context_fitness) in
+  if not accepted_head then
     return Event.Ignored_head
   else begin
     Chain.set_head nv.parameters.chain_state block >>= fun previous ->
