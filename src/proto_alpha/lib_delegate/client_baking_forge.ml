@@ -932,13 +932,21 @@ let compute_best_slot_on_current_level
       (* Found at least a slot *)
       return_some best_slot
 
+module Nonces_map = Map.Make(Block_hash)
+
 (** [get_unrevealed_nonces] retrieve registered nonces *)
 let get_unrevealed_nonces
     (cctxt : #Proto_alpha.full) ?(force = false) ?(chain = `Main) block =
+  cctxt#with_lock begin fun () ->
+    Client_baking_nonces.load cctxt
+  end >>=? fun nonces ->
+  let nonces = List.fold_left
+      (fun map (hash, nonce) -> Nonces_map.add hash nonce map)
+      Nonces_map.empty nonces in
   Client_baking_blocks.blocks_from_current_cycle
     cctxt block ~offset:(-1l) () >>=? fun blocks ->
   filter_map_s (fun hash ->
-      Client_baking_nonces.find cctxt hash >>=? function
+      match Nonces_map.find_opt hash nonces with
       | None -> return_none
       | Some nonce ->
           Alpha_block_services.metadata
@@ -950,14 +958,19 @@ let get_unrevealed_nonces
               cctxt (chain, block) level.level >>=? function
             | Missing nonce_hash
               when Nonce.check_hash nonce nonce_hash ->
-                cctxt#warning "Found nonce for %a (level: %a)@."
-                  Block_hash.pp_short hash
-                  Level.pp level >>= fun () ->
+                lwt_log_notice Tag.DSL.(fun f ->
+                    f "Found nonce to reveal for %a (level: %a)"
+                    -% t event "found_nonce"
+                    -% a Block_hash.Logging.tag hash
+                    -% a level_tag level.level)
+                >>= fun () ->
                 return_some (hash, (level.level, nonce))
             | Missing _nonce_hash ->
-                cctxt#error "Incoherent nonce for level %a"
-                  Raw_level.pp level.level >>= fun () ->
-                return_none
+                lwt_log_error Tag.DSL.(fun f ->
+                    f "Incoherent nonce for level %a"
+                    -% t event "bad_nonce"
+                    -% a level_tag level.level)
+                >>= fun () -> return_none
             | Forgotten -> return_none
             | Revealed _ -> return_none)
     blocks
@@ -970,7 +983,7 @@ let reveal_potential_nonces cctxt block =
         cctxt block (List.map snd nonces)
   | Error err ->
       lwt_warn Tag.DSL.(fun f ->
-          f "Cannot read nonces: %a@."
+          f "Cannot read nonces: %a"
           -% t event "read_nonce_fail"
           -% a errs_tag err)
       >>= fun () ->

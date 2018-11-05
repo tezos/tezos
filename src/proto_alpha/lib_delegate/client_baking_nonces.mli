@@ -26,6 +26,11 @@
 open Proto_alpha
 open Alpha_context
 
+type t = (Block_hash.t * Nonce.t) list
+
+val load:
+  #Client_context.wallet ->
+  t tzresult Lwt.t
 val mem:
   #Client_context.wallet ->
   Block_hash.t -> bool tzresult Lwt.t
