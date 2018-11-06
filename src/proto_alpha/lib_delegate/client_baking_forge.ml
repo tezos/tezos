@@ -57,7 +57,10 @@ type state = {
   mutable best_slot: (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) option ;
 }
 
-let create_state ?(fee_threshold = Tez.zero) ~max_waiting_time genesis context_path index delegates constants =
+let create_state
+    ?(fee_threshold = Tez.zero) ~max_waiting_time
+    genesis context_path index
+    delegates constants =
   { genesis ;
     context_path ;
     index ;
@@ -944,8 +947,8 @@ let filter_outdated_nonces
     cctxt ~chain ~block:head () >>=? fun { protocol_data = { level = current_level } } ->
   let current_cycle = Cycle.to_int32 current_level.Level.cycle in
   let is_older_than_5_cycles block_cycle =
-    let i = Int32.sub current_cycle block_cycle in
-    i > 5l
+    let delta = Int32.sub current_cycle block_cycle in
+    delta > 5l
   in
   filter_map_s (fun (hash, _) ->
       Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) () >>=?
