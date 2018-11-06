@@ -110,6 +110,9 @@ let do_reveal cctxt block blocks =
   return_unit
 
 let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
+  cctxt#with_lock begin fun () ->
+    Client_baking_nonces.load cctxt
+  end >>=? fun nonces ->
   Lwt_list.filter_map_p
     (fun hash ->
        Lwt.catch
@@ -125,7 +128,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
   filter_map_s (fun (bi : Client_baking_blocks.block_info) ->
-      Client_baking_nonces.find cctxt bi.hash >>=? function
+      match List.assoc_opt bi.hash nonces with
       | None ->
           cctxt#warning "Cannot find nonces for block %a (ignoring)@."
             Block_hash.pp_short bi.hash >>= fun () ->
