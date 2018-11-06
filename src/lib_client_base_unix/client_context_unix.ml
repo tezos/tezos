@@ -24,6 +24,9 @@
 (*****************************************************************************)
 
 open Client_context
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.context.unix" end)
+
+let filename_tag = Tag.def ~doc:"Filename" "filename"  Format.pp_print_string
 
 class unix_wallet ~base_dir : wallet = object (self)
 
@@ -63,7 +66,13 @@ class unix_wallet ~base_dir : wallet = object (self)
         |> generic_trace
           "could not read the %s alias file" alias_name >>=? fun json ->
         match Data_encoding.Json.destruct encoding json with
-        | exception _ -> (* TODO print_error *)
+        | exception e ->
+            lwt_log_error Tag.DSL.(fun f ->
+                f "did not understand the %s alias file %s : %a"
+                -% t event "load error"
+                -% s filename_tag alias_name
+                -% s filename_tag filename
+                -% a exn e) >>= fun () ->
             failwith "did not understand the %s alias file %s" alias_name filename
         | data ->
             return data
