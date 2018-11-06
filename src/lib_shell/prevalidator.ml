@@ -354,7 +354,6 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
                   | Error errors ->
                       refused (Operation.hash op) op errors
                   | Ok op ->
-                      let open Preapply_result in
                       Prevalidation.apply_operation state op >>= function
                       | Applied (new_acc_validation_state, _) ->
                           if pv.applied_count <= 2000 (* this test is a quick fix while we wait for the new mempool *)
@@ -463,7 +462,6 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
     dir := RPC_directory.gen_register !dir
         (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
         begin fun { applied ; refusals = refused ; branch_refusals = branch_refused ; branch_delays = branch_delayed ; operation_stream } params () ->
-          let open Preapply_result in
           let op_stream, stopper = Lwt_watcher.create_stream operation_stream in
           (* Convert ops *)
           let map_op op =
