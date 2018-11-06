@@ -181,9 +181,9 @@ let commands version () =
             match Script_repr.force_decode code with
             | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Alpha_environment.Error_monad.pp) errs
             | Ok (code, _) ->
-                begin cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped code >>= fun () ->
-                  return_unit
-                end
+                let { Michelson_v1_parser.source } =
+                  Michelson_v1_printer.unparse_toplevel code in
+                cctxt#answer "%a" Format.pp_print_text source >>= return
       end ;
 
     command ~group ~desc: "Get the manager of a contract."
