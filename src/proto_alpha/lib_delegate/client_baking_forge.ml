@@ -935,14 +935,11 @@ let compute_best_slot_on_current_level
       (* Found at least a slot *)
       return_some best_slot
 
-module Nonces_map = Map.Make(Block_hash)
-
 (** [filter_outdated_nonces] removes nonces older than 5 cycles in the nonce file *)
 let filter_outdated_nonces
     (cctxt : #Proto_alpha.full)
     ?(chain = `Main)
-    head
-    nonces =
+    head =
   Alpha_block_services.metadata
     cctxt ~chain ~block:head () >>=? fun { protocol_data = { level = current_level } } ->
   let current_cycle = Cycle.to_int32 current_level.Level.cycle in
@@ -950,16 +947,23 @@ let filter_outdated_nonces
     let delta = Int32.sub current_cycle block_cycle in
     delta > 5l
   in
-  filter_map_s (fun (hash, _) ->
-      Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) () >>=?
-      fun { protocol_data = { level = { Level.cycle } } } ->
-      let i = Cycle.to_int32 cycle in
-      if is_older_than_5_cycles i then
-        return_some hash
-      else
-        return_none
-    ) nonces >>=? fun outdated_nonces ->
-  Client_baking_nonces.dels cctxt outdated_nonces
+  cctxt#with_lock begin fun () ->
+    Client_baking_nonces.load cctxt >>=? fun nonces ->
+    Block_hash.Map.fold
+      begin fun hash nonce acc ->
+        acc >>=? fun acc ->
+        Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) () >>=?
+        fun { protocol_data = { level = { Level.cycle } } } ->
+        let i = Cycle.to_int32 cycle in
+        if is_older_than_5_cycles i then
+          return acc
+        else
+          return (Block_hash.Map.add hash nonce acc)
+      end
+      nonces
+      (return Block_hash.Map.empty) >>=? fun new_nonces ->
+    Client_baking_nonces.save cctxt new_nonces
+  end
 
 (** [get_unrevealed_nonces] retrieve registered nonces *)
 let get_unrevealed_nonces
@@ -967,13 +971,10 @@ let get_unrevealed_nonces
   cctxt#with_lock begin fun () ->
     Client_baking_nonces.load cctxt
   end >>=? fun nonces ->
-  let nonces_map = List.fold_left
-      (fun map (hash, nonce) -> Nonces_map.add hash nonce map)
-      Nonces_map.empty nonces in
   Client_baking_blocks.blocks_from_current_cycle
     cctxt head ~offset:(-1l) () >>=? fun blocks ->
   filter_map_s (fun hash ->
-      match Nonces_map.find_opt hash nonces_map with
+      match Block_hash.Map.find_opt hash nonces with
       | None -> return_none
       | Some nonce ->
           Alpha_block_services.metadata
@@ -1007,7 +1008,7 @@ let get_unrevealed_nonces
          - We entered a new cycle and we can clear old nonces ;
          - A revelation was not included yet in the cycle beggining.
          So, it is safe to only filter outdated_nonces there *)
-      filter_outdated_nonces cctxt ~chain head nonces >>=? fun () ->
+      filter_outdated_nonces cctxt ~chain head >>=? fun () ->
       return x
 
 (** [reveal_potential_nonces] reveal registered nonces *)
