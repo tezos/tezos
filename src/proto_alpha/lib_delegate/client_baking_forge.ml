@@ -944,9 +944,7 @@ let filter_outdated_nonces
     cctxt ~chain ~block:head () >>=? fun { protocol_data = { level = current_level } } ->
   let current_cycle = Cycle.to_int32 current_level.Level.cycle in
   let is_older_than_5_cycles block_cycle =
-    let delta = Int32.sub current_cycle block_cycle in
-    delta > 5l
-  in
+    Int32.sub current_cycle (Cycle.to_int32 block_cycle) > 5l in
   cctxt#with_lock begin fun () ->
     Client_baking_nonces.load cctxt >>=? fun nonces ->
     Block_hash.Map.fold
@@ -954,8 +952,7 @@ let filter_outdated_nonces
         acc >>=? fun acc ->
         Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) () >>=?
         fun { protocol_data = { level = { Level.cycle } } } ->
-        let i = Cycle.to_int32 cycle in
-        if is_older_than_5_cycles i then
+        if is_older_than_5_cycles cycle then
           return acc
         else
           return (Block_hash.Map.add hash nonce acc)
