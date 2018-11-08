@@ -53,8 +53,6 @@ module type T = sig
    * from a previous protocol, etc. *)
   val bypass_peer_workers: Mempool_worker.t -> input -> output Lwt.t
 
-  val rpc_directory : t RPC_directory.t
-
 end
 
 module Make (Mempool_worker: Mempool_worker.T) : T with module Proto = Mempool_worker.Proto = struct
@@ -72,6 +70,8 @@ module Make (Mempool_worker: Mempool_worker.T) : T with module Proto = Mempool_w
     | Cannot_validate of error list
     | Mempool_result of Mempool_worker.result
   type output = result Operation_hash.Map.t
+
+  let pp_input = Format.pp_print_list Operation_hash.pp
 
   module Log = Tezos_stdlib.Logging.Make(struct
       let name = "node.mempool.peer_worker"
@@ -139,6 +139,12 @@ module Make (Mempool_worker: Mempool_worker.T) : T with module Proto = Mempool_w
         applying = Queue.create ();
         results = Operation_hash.Map.empty;
       }
+
+    let cancel pipeline =
+      let cancel_snd (_, p) = Lwt.cancel p in
+      Queue.iter cancel_snd pipeline.downloading;
+      Queue.iter cancel_snd pipeline.parsing;
+      Queue.iter cancel_snd pipeline.applying
 
 
     (* Exported interactions *)
@@ -208,12 +214,7 @@ module Make (Mempool_worker: Mempool_worker.T) : T with module Proto = Mempool_w
           loop ()
       in
       let work = loop () in
-      Lwt.on_cancel work
-        (fun () ->
-           let cancel_snd (_, p) = Lwt.cancel p in
-           Queue.iter cancel_snd pipeline.downloading;
-           Queue.iter cancel_snd pipeline.parsing;
-           Queue.iter cancel_snd pipeline.applying);
+      Lwt.on_cancel work (fun () -> cancel pipeline);
       work
 
   end
@@ -280,7 +281,7 @@ module Make (Mempool_worker: Mempool_worker.T) : T with module Proto = Mempool_w
       | Start input ->
           Format.fprintf ppf
             "@[<v 0>Starting: %a@]"
-            (Format.pp_print_list Operation_hash.pp)
+            pp_input
             input
       | End_ok (view, _) ->
           Format.fprintf ppf
@@ -349,12 +350,9 @@ module Make (Mempool_worker: Mempool_worker.T) : T with module Proto = Mempool_w
     Worker.push_request_and_wait t (Request.Batch (mempool_worker, os))
 
   let bypass_peer_workers mempool_worker input =
-    (* TODO: log, but not through the Worker's event system because no worker is available. *)
-    Work.work mempool_worker input
-
-
-  (* 5. Introspection *)
-
-  let rpc_directory = Pervasives.failwith "TODO"
+    Log.lwt_log_info "Bypassing workers to work on: %a" pp_input input >>= fun () ->
+    Work.work mempool_worker input >>= fun output ->
+    Log.lwt_log_info "Finished work" >>= fun () ->
+    Lwt.return output
 
 end

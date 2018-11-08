@@ -82,8 +82,6 @@ module type T = sig
    * calls to [bypass_peer_workers] is not sequentialised. *)
   val bypass_peer_workers: Mempool_worker.t -> input -> output Lwt.t
 
-  val rpc_directory : t RPC_directory.t
-
 end
 
 
