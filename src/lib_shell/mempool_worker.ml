@@ -471,7 +471,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
   (* this function update the internal state of the worker *)
   let validate_helper w parsed_op =
     let state = Worker.state w in
-    apply_operation state parsed_op >>= fun (validation_state,result) ->
+    apply_operation state parsed_op >>= fun (validation_state, result) ->
     begin
       match validation_state with
       | Some validation_state -> state.validation_state <- validation_state
@@ -493,12 +493,12 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
     let state = Worker.state w in
     match Cache.find_validated_opt state.cache parsed_op with
     | None | Some (Branch_delayed _) ->
-        validate_helper w parsed_op >>=? fun result ->
+        validate_helper w parsed_op >>= fun result ->
         Cache.add_validated state.cache parsed_op result;
         (* operations are notified only the first time *)
         notify_helper w result parsed_op.raw ;
-        return result
-    | Some result -> return result
+        Lwt.return result
+    | Some result -> Lwt.return result
 
   let on_parse w raw_op =
     let state = Worker.state w in
@@ -513,6 +513,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
   let on_request :
     type r. t -> r Request.t -> r tzresult Lwt.t = fun w request ->
     match request with
+    | Request.Parse raw_op -> on_parse w raw_op
     | Request.Validate parsed_op -> on_validate w parsed_op >>= return
 
   let on_launch (_ : t) (_ : Name.t) ( { chain_db ; validation_state } as parameters ) =
