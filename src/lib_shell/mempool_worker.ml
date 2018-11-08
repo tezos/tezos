@@ -45,6 +45,7 @@ module type T = sig
     | Refused of error list
     | Duplicate
     | Not_in_branch
+  val result_encoding : result Data_encoding.t
 
   (** Creates/tear-down a new mempool validator context. *)
   val create : limits -> Distributed_db.chain_db -> t tzresult Lwt.t
