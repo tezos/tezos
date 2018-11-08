@@ -30,8 +30,7 @@ type limits = {
 }
 
 module type T = sig
-  module Proto: Registered_protocol.T
-  module Mempool_worker: Mempool_worker.T with module Proto = Proto
+  module Mempool_worker: Mempool_worker.T
 
   (** The type of a peer worker. Each peer worker should be used for treating
    * all the operations from a given peer. *)
@@ -44,45 +43,25 @@ module type T = sig
    * their validity before gossiping them furhter. *)
   type input = Operation_hash.t list
 
-  (** [result] are the different possible outcome of the validation of a single
-   * operation. It signals either errors in the validation process, or results
-   * from further down the validation system. *)
-  type result =
-    | Cannot_download of error list
-    | Cannot_parse of error list
-    | Cannot_validate of error list
-    | Mempool_result of Mempool_worker.result
+  (** [create limits peer_id mempool_worker input] creates a peer worker meant
+   * to be used for validating batches of operations sent by the peer [peer_id].
+   * The [mempool_worker] the underlying worker that individual validations of
+   * singular operations are delegated to. The [input[] argument is for recycled
+   * operations that are carried over when the protocol updates. *)
+  val create: limits -> P2p_peer.Id.t -> Mempool_worker.t -> input -> t Lwt.t
 
-  (** [output] are the outcome of the validation of a batch of operations. *)
-  type output = result Operation_hash.Map.t
-
-  (** [create limits peer_id] creates a peer worker meant to be used for
-   * validating operations sent by the peer [peer_id]. *)
-  val create: limits -> P2p_peer.Id.t -> t Lwt.t
-
-  (** [shutdown t] closes the peer worker [t]. *)
-  val shutdown: t -> unit Lwt.t
+  (** [shutdown t] closes the peer worker [t]. It returns a list of operation
+   * hashes that can be recycled when a new worker is created for the same peer.
+   * *)
+  val shutdown: t -> input Lwt.t
 
   (** [validate mempool_worker worker input] validates the batch of operations
    * [input]. The work is performed by [worker] and the underlying validation of
    * each operation is performed by [mempool_worker]. *)
-  val validate: Mempool_worker.t -> t -> input -> output tzresult Lwt.t
-
-  (** [bypass_peer_workers mempool_worker input] validates the batch of
-   * operations [input]. Unlike [validate] above, the work is not performed by a
-   * specific worker.
-   *
-   * This is intended to be used for cases where the [input] cannot be
-   * attributed to a specific peer. Typically, this happens when injecting an
-   * operation from the local client, or when recycling pending operations after
-   * a protocol change.
-   *
-   * Note that, unlike [validate], this bypasses the worker mechanics entirely.
-   * As a result, there is no possible introspection and the work from spearate
-   * calls to [bypass_peer_workers] is not sequentialised. *)
-  val bypass_peer_workers: Mempool_worker.t -> input -> output Lwt.t
+  val validate: Mempool_worker.t -> t -> input -> unit tzresult Lwt.t
 
 end
 
 
-module Make (Mempool_worker : Mempool_worker.T) : T with module Proto = Mempool_worker.Proto
+module Make (Mempool_worker : Mempool_worker.T)
+  : T with module Mempool_worker = Mempool_worker
