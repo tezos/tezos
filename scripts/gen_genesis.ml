@@ -52,7 +52,7 @@ let sed =
 
 let () =
   Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed) >>= fun _ ->
-               Lwt_unix.unlink "../src/bin_node/node_run_command.ml.old")
+                Lwt_unix.unlink "../src/bin_node/node_run_command.ml.old")
 
 let sed =
   Format.sprintf
@@ -63,4 +63,4 @@ let sed =
 
 let () =
   Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed) >>= fun _ ->
-               Lwt_unix.unlink "../src/lib_shell/distributed_db_message.ml.old")
+                Lwt_unix.unlink "../src/lib_shell/distributed_db_message.ml.old")

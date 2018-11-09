@@ -49,7 +49,7 @@ module type T = sig
       to be used for validating batches of operations sent by the peer
       [peer_id]. The validation of each operations is delegated to the
       associated [mempool_worker]. *)
-  val create: limits -> P2p_peer.Id.t -> Mempool_worker.t -> t Lwt.t
+  val create: limits -> P2p_peer.Id.t -> Mempool_worker.t -> t tzresult Lwt.t
 
   (** [shutdown t] closes the peer worker [t]. It returns a list of operation
       hashes that can be recycled when a new worker is created for the same peer.

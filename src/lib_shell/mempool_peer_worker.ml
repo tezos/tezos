@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -37,7 +38,7 @@ module type T = sig
   type t
   type input = Operation_hash.t list
 
-  val create: limits -> P2p_peer.Id.t -> Mempool_worker.t -> t Lwt.t
+  val create: limits -> P2p_peer.Id.t -> Mempool_worker.t -> t tzresult Lwt.t
   val shutdown: t -> input Lwt.t
 
   val validate: t -> input -> unit tzresult Lwt.t
@@ -336,7 +337,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
     type self = t
 
     let on_launch _ _ (mempool_worker, pool_size) =
-      Lwt.return Types.{ mempool_worker; pool_size }
+      return Types.{ mempool_worker; pool_size }
 
     let on_request : type a. self -> a Request.t -> a tzresult Lwt.t
       = fun t (Request.Batch os) ->

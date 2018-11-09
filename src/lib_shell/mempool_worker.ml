@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -515,7 +516,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
     Operation_hash.Set.iter (fun hash ->
         ParsedCache.rem parsed_cache hash
       ) live_operations;
-    Lwt.return {
+    return {
       validation_state ;
       cache = ValidatedCache.create () ;
       live_blocks ;
@@ -559,12 +560,12 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
     Chain.data chain_state >>= fun { current_head = predecessor } ->
     let timestamp = Time.now () in
     create ~predecessor ~timestamp () >>=? fun validation_state ->
-    (Worker.launch
-       table
-       limits.worker_limits
-       chain_id
-       { limits ; chain_db ; validation_state }
-       (module Handlers) >>= return)
+    Worker.launch
+      table
+      limits.worker_limits
+      chain_id
+      { limits ; chain_db ; validation_state }
+      (module Handlers)
 
   (* Exporting functions *)
 

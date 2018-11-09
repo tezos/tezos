@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -61,7 +62,7 @@ val create:
   limits ->
   (module Registered_protocol.T) ->
   Distributed_db.chain_db ->
-  t Lwt.t
+  t tzresult Lwt.t
 val shutdown: t -> unit Lwt.t
 
 (** Notify the prevalidator that the identified peer has sent a bunch of
@@ -76,13 +77,13 @@ val flush: t -> Block_hash.t -> unit tzresult Lwt.t
 
 (** Returns the timestamp of the prevalidator worker, that is the timestamp of the last
     reset of the prevalidation context *)
-val timestamp: t -> Time.t Lwt.t
+val timestamp: t -> Time.t
 
 (** Returns the fitness of the current prevalidation context *)
 val fitness: t -> Fitness.t Lwt.t
 
 (** Returns the list of valid operations known to this prevalidation worker *)
-val operations: t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
+val operations: t -> (error Preapply_result.t * Operation.t Operation_hash.Map.t)
 
 (** Returns the list of pending operations known to this prevalidation worker *)
 val pending: ?block:State.Block.t -> t -> Operation.t Operation_hash.Map.t Lwt.t
@@ -102,7 +103,7 @@ val parameters: t -> limits * Distributed_db.chain_db
 (** Worker status and events *)
 
 (* None indicates the there are no workers for the current protocol. *)
-val status: t -> Worker_types.worker_status Lwt.t
+val status: t -> Worker_types.worker_status
 val pending_requests : t -> (Time.t * Prevalidator_worker_state.Request.view) list
 val current_request : t -> (Time.t * Time.t * Prevalidator_worker_state.Request.view) option
 val last_events : t -> (Lwt_log_core.level * Prevalidator_worker_state.Event.t list) list
