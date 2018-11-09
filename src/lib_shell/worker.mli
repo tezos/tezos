@@ -122,11 +122,12 @@ end
     At that point, all the types are fixed and introspectable,
     but the actual parameters and event handlers can be tweaked
     for each individual worker. *)
-module Make
-    (Name : NAME)
-    (Event : EVENT)
-    (Request : REQUEST)
-    (Types : TYPES) : sig
+module type T = sig
+
+  module Name: NAME
+  module Event: EVENT
+  module Request: REQUEST
+  module Types: TYPES
 
   (** A handle to a specific worker, parameterized by the type of
       internal message buffer. *)
@@ -288,5 +289,11 @@ module Make
       After they are killed, workers are kept in the table
       for a number of seconds given in the {!Worker_types.limits}. *)
   val list : 'a table -> (Name.t * 'a t) list
-
 end
+
+
+module Make (Name : NAME) (Event : EVENT) (Request : REQUEST) (Types : TYPES)
+  : T with module Name = Name
+       and module Event = Event
+       and module Request = Request
+       and module Types = Types

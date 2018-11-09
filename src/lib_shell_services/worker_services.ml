@@ -42,7 +42,7 @@ module Prevalidators = struct
 
     let state =
       RPC_service.get_service
-        ~description:"Introspect the state of a prevalidator worker."
+        ~description:"Introspect the state of prevalidator workers."
         ~query: RPC_query.empty
         ~output:
           (Worker_types.full_status_encoding

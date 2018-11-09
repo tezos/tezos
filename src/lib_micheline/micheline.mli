@@ -26,7 +26,7 @@
 type annot = string list
 
 (** The abstract syntax tree of Micheline expressions. The first
-    parameter is used to conatin locations, but can also embed custom
+    parameter is used to contain locations, but can also embed custom
     data. The second parameter is the type of primitive names. *)
 type ('l, 'p) node =
   | Int of 'l * Z.t

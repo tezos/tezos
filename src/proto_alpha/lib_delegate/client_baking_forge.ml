@@ -57,7 +57,10 @@ type state = {
   mutable best_slot: (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) option ;
 }
 
-let create_state ?(fee_threshold = Tez.zero) ~max_waiting_time genesis context_path index delegates constants =
+let create_state
+    ?(fee_threshold = Tez.zero) ~max_waiting_time
+    genesis context_path index
+    delegates constants =
   { genesis ;
     context_path ;
     index ;
@@ -932,13 +935,43 @@ let compute_best_slot_on_current_level
       (* Found at least a slot *)
       return_some best_slot
 
+(** [filter_outdated_nonces] removes nonces older than 5 cycles in the nonce file *)
+let filter_outdated_nonces
+    (cctxt : #Proto_alpha.full)
+    ?(chain = `Main)
+    head =
+  Alpha_block_services.metadata
+    cctxt ~chain ~block:head () >>=? fun { protocol_data = { level = current_level } } ->
+  let current_cycle = Cycle.to_int32 current_level.Level.cycle in
+  let is_older_than_5_cycles block_cycle =
+    Int32.sub current_cycle (Cycle.to_int32 block_cycle) > 5l in
+  cctxt#with_lock begin fun () ->
+    Client_baking_nonces.load cctxt >>=? fun nonces ->
+    Block_hash.Map.fold
+      begin fun hash nonce acc ->
+        acc >>=? fun acc ->
+        Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) () >>=?
+        fun { protocol_data = { level = { Level.cycle } } } ->
+        if is_older_than_5_cycles cycle then
+          return acc
+        else
+          return (Block_hash.Map.add hash nonce acc)
+      end
+      nonces
+      (return Block_hash.Map.empty) >>=? fun new_nonces ->
+    Client_baking_nonces.save cctxt new_nonces
+  end
+
 (** [get_unrevealed_nonces] retrieve registered nonces *)
 let get_unrevealed_nonces
-    (cctxt : #Proto_alpha.full) ?(force = false) ?(chain = `Main) block =
+    (cctxt : #Proto_alpha.full) ?(force = false) ?(chain = `Main) head =
+  cctxt#with_lock begin fun () ->
+    Client_baking_nonces.load cctxt
+  end >>=? fun nonces ->
   Client_baking_blocks.blocks_from_current_cycle
-    cctxt block ~offset:(-1l) () >>=? fun blocks ->
+    cctxt head ~offset:(-1l) () >>=? fun blocks ->
   filter_map_s (fun hash ->
-      Client_baking_nonces.find cctxt hash >>=? function
+      match Block_hash.Map.find_opt hash nonces with
       | None -> return_none
       | Some nonce ->
           Alpha_block_services.metadata
@@ -947,30 +980,43 @@ let get_unrevealed_nonces
             return_some (hash, (level.level, nonce))
           else
             Alpha_services.Nonce.get
-              cctxt (chain, block) level.level >>=? function
+              cctxt (chain, head) level.level >>=? function
             | Missing nonce_hash
               when Nonce.check_hash nonce nonce_hash ->
-                cctxt#warning "Found nonce for %a (level: %a)@."
-                  Block_hash.pp_short hash
-                  Level.pp level >>= fun () ->
+                lwt_log_notice Tag.DSL.(fun f ->
+                    f "Found nonce to reveal for %a (level: %a)"
+                    -% t event "found_nonce"
+                    -% a Block_hash.Logging.tag hash
+                    -% a level_tag level.level)
+                >>= fun () ->
                 return_some (hash, (level.level, nonce))
             | Missing _nonce_hash ->
-                cctxt#error "Incoherent nonce for level %a"
-                  Raw_level.pp level.level >>= fun () ->
-                return_none
+                lwt_log_error Tag.DSL.(fun f ->
+                    f "Incoherent nonce for level %a"
+                    -% t event "bad_nonce"
+                    -% a level_tag level.level)
+                >>= fun () -> return_none
             | Forgotten -> return_none
             | Revealed _ -> return_none)
-    blocks
+    blocks >>=? function
+  | [] -> return_nil
+  | x ->
+      (* If some nonces are to be revealed it means :
+         - We entered a new cycle and we can clear old nonces ;
+         - A revelation was not included yet in the cycle beggining.
+         So, it is safe to only filter outdated_nonces there *)
+      filter_outdated_nonces cctxt ~chain head >>=? fun () ->
+      return x
 
 (** [reveal_potential_nonces] reveal registered nonces *)
-let reveal_potential_nonces cctxt block =
-  get_unrevealed_nonces cctxt block >>= function
+let reveal_potential_nonces cctxt new_head =
+  get_unrevealed_nonces cctxt new_head >>= function
   | Ok nonces ->
       Client_baking_revelation.forge_seed_nonce_revelation
-        cctxt block (List.map snd nonces)
+        cctxt new_head (List.map snd nonces)
   | Error err ->
       lwt_warn Tag.DSL.(fun f ->
-          f "Cannot read nonces: %a@."
+          f "Cannot read nonces: %a"
           -% t event "read_nonce_fail"
           -% a errs_tag err)
       >>= fun () ->

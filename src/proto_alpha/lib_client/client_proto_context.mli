@@ -211,3 +211,12 @@ val activate_existing_account:
   string ->
   Blinded_public_key_hash.activation_code ->
   Kind.activate_account Injection.result tzresult Lwt.t
+
+(** lookup an operation in [predecessors] previous blocks, and print the
+    receipt if found *)
+val display_receipt_for_operation: 
+  #Proto_alpha.full ->
+  chain:Block_services.chain ->
+  ?predecessors:int -> 
+  Operation_list_hash.elt -> 
+  unit tzresult Lwt.t

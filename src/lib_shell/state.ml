@@ -625,6 +625,13 @@ module Block = struct
   }
   type block = t
 
+  type validation_store = {
+    context_hash: Context_hash.t;
+    message: string option;
+    max_operations_ttl: int;
+    last_allowed_fork_level: Int32.t;
+  }
+
   module Header = struct
 
     type t = hashed_header = {
@@ -833,8 +840,7 @@ module Block = struct
       ?(dont_enforce_context_hash = false)
       chain_state block_header block_header_metadata
       operations operations_metadata
-      { Tezos_protocol_environment_shell.context ; message ;
-        max_operations_ttl ; last_allowed_fork_level } =
+      { context_hash ; message ; max_operations_ttl ; last_allowed_fork_level } =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     fail_unless
@@ -872,8 +878,12 @@ module Block = struct
         fail_unless
           acceptable_block
           (Checkpoint_error (hash, None)) >>=? fun () ->
-        Context.commit
-          ~time:block_header.shell.timestamp ?message context >>= fun commit ->
+        let commit = context_hash in
+        Context.exists chain_state.context_index.data commit
+        >>= fun exists ->
+        fail_unless exists
+          (failure "State.Block.store: context hash not found in context")
+        >>=? fun _ ->
         fail_unless
           (dont_enforce_context_hash
            || Context_hash.equal block_header.shell.context commit)
@@ -1257,6 +1267,25 @@ let may_create_chain state chain genesis =
         state genesis
 
 let read
+    global_store
+    context_index
+    main_chain =
+  let global_data = {
+    chains = Chain_id.Table.create 17 ;
+    global_store ;
+    context_index ;
+  } in
+  let state = {
+    global_data = Shared.create global_data ;
+    protocol_store = Shared.create @@ Store.Protocol.get global_store ;
+    main_chain ;
+    protocol_watcher = Lwt_watcher.create_input () ;
+    block_watcher = Lwt_watcher.create_input () ;
+  } in
+  Chain.read_all state >>=? fun () ->
+  return state
+
+let init
     ?patch_context
     ?(store_mapsize=4_096_000_000_000L)
     ?(context_mapsize=40_960_000_000L)
@@ -1267,20 +1296,8 @@ let read
   Context.init
     ~mapsize:context_mapsize ?patch_context
     context_root >>= fun context_index ->
-  let global_data = {
-    chains = Chain_id.Table.create 17 ;
-    global_store ;
-    context_index ;
-  } in
   let main_chain = Chain_id.of_block_hash genesis.Chain.block in
-  let state = {
-    global_data = Shared.create global_data ;
-    protocol_store = Shared.create @@ Store.Protocol.get global_store ;
-    main_chain ;
-    protocol_watcher = Lwt_watcher.create_input () ;
-    block_watcher = Lwt_watcher.create_input () ;
-  } in
-  Chain.read_all state >>=? fun () ->
+  read global_store context_index main_chain >>=? fun state ->
   may_create_chain state main_chain genesis >>= fun main_chain_state ->
   return (state, main_chain_state)
 

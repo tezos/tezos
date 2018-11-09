@@ -165,8 +165,19 @@ and print_expr ppf = function
       Format.fprintf ppf "(%a)" print_expr_unwrapped expr
   | expr -> print_expr_unwrapped ppf expr
 
+let with_unbounded_formatter ppf f x =
+  let buf = Buffer.create 10000 in
+  let sppf = Format.formatter_of_buffer buf in
+  Format.pp_set_margin sppf 199999 ;
+  Format.pp_set_max_indent sppf 99999 ;
+  Format.pp_set_max_boxes sppf 99999 ;
+  f sppf x ;
+  Format.fprintf sppf "%!" ;
+  let lines = String.split_on_char '\n' (Buffer.contents buf) in
+  Format.pp_print_list ~pp_sep:Format.pp_force_newline Format.pp_print_string ppf lines
+
 let print_expr_unwrapped ppf expr =
-  print_expr_unwrapped ppf (preformat expr)
+  with_unbounded_formatter ppf print_expr_unwrapped (preformat expr)
 
 let print_expr ppf expr =
-  print_expr ppf (preformat expr)
+  with_unbounded_formatter ppf print_expr (preformat expr)

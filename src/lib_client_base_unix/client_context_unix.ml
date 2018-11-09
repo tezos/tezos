@@ -24,6 +24,9 @@
 (*****************************************************************************)
 
 open Client_context
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.context.unix" end)
+
+let filename_tag = Tag.def ~doc:"Filename" "filename"  Format.pp_print_string
 
 class unix_wallet ~base_dir : wallet = object (self)
 
@@ -32,27 +35,25 @@ class unix_wallet ~base_dir : wallet = object (self)
       base_dir
       (Str.(global_replace (regexp_string " ") "_" alias_name) ^ "s")
 
-  method with_lock : type a. ( unit -> a Lwt.t) -> a Lwt.t =
+  method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t =
     (fun f ->
        let unlock fd =
          let fd = Lwt_unix.unix_file_descr fd in
-         Unix.lockf fd Unix.F_ULOCK 0;
-         Unix.close fd
-       in
+         Unix.lockf fd Unix.F_ULOCK 0 ;
+         Unix.close fd in
        let lock () =
          Lwt_unix.openfile (Filename.concat base_dir "wallet_lock")
-           Lwt_unix.[O_CREAT; O_WRONLY] 0o644 >>= fun fd ->
+           Lwt_unix.[ O_CREAT ; O_WRONLY ] 0o644 >>= fun fd ->
          Lwt_unix.lockf fd Unix.F_LOCK 0 >>= fun () ->
-         Lwt.return (fd,(Lwt_unix.on_signal Sys.sigint
-                           (fun _s ->
-                              unlock fd;
-                              exit 0 (* exit code? *)  )))
-       in
-       lock () >>= fun (fd,sh) ->
+         Lwt.return (fd, (Lwt_unix.on_signal Sys.sigint
+                            (fun _s ->
+                               unlock fd ;
+                               exit 0 (* exit code? *) ))) in
+       lock () >>= fun (fd, sh) ->
        (* catch might be useless if f always uses the error monad *)
-       Lwt.catch f  (function e -> Lwt.return (unlock fd; raise e))  >>= fun res ->
+       Lwt.catch f (function e -> Lwt.return (unlock fd ; raise e)) >>= fun res ->
        Lwt.return (unlock fd) >>= fun () ->
-       Lwt_unix.disable_signal_handler sh;
+       Lwt_unix.disable_signal_handler sh ;
        Lwt.return res)
 
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t =
@@ -65,7 +66,13 @@ class unix_wallet ~base_dir : wallet = object (self)
         |> generic_trace
           "could not read the %s alias file" alias_name >>=? fun json ->
         match Data_encoding.Json.destruct encoding json with
-        | exception _ -> (* TODO print_error *)
+        | exception e ->
+            lwt_log_error Tag.DSL.(fun f ->
+                f "did not understand the %s alias file %s : %a"
+                -% t event "load error"
+                -% s filename_tag alias_name
+                -% s filename_tag filename
+                -% a exn e) >>= fun () ->
             failwith "did not understand the %s alias file %s" alias_name filename
         | data ->
             return data

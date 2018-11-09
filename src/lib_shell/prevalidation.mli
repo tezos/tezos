@@ -28,48 +28,56 @@
     consistency. This module is stateless and creates and manupulates the
     prevalidation_state. *)
 
-type prevalidation_state
+module type T = sig
 
-(** Creates a new prevalidation context w.r.t. the protocol associate to the
-    predecessor block . When ?protocol_data is passed to this function, it will
-    be used to create the new block *)
-val start_prevalidation :
-  ?protocol_data: MBytes.t ->
-  predecessor: State.Block.t ->
-  timestamp: Time.t ->
-  unit -> prevalidation_state tzresult Lwt.t
+  module Proto: Registered_protocol.T
 
-(** Given a prevalidation context applies a list of operations,
-    returns a new prevalidation context plus the preapply result containing the
-    list of operations that cannot be applied to this context *)
-val prevalidate :
-  prevalidation_state -> sort:bool ->
-  (Operation_hash.t * Operation.t) list ->
-  (prevalidation_state * error Preapply_result.t) Lwt.t
+  type t
 
-val end_prevalidation :
-  prevalidation_state ->
-  Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
+  type operation = private {
+    hash: Operation_hash.t ;
+    raw: Operation.t ;
+    protocol_data: Proto.operation_data ;
+  }
+  val compare: operation -> operation -> int
 
-(** Pre-apply creates a new block ( running start_prevalidation, prevalidate and
-    end_prevalidation), and returns a new block. *)
+  val parse: Operation.t -> operation tzresult
+
+  (** Creates a new prevalidation context w.r.t. the protocol associate to the
+      predecessor block . When ?protocol_data is passed to this function, it will
+      be used to create the new block *)
+  val create :
+    ?protocol_data: MBytes.t ->
+    predecessor: State.Block.t ->
+    timestamp: Time.t ->
+    unit -> t tzresult Lwt.t
+
+  type result =
+    | Applied of t * Proto.operation_receipt
+    | Branch_delayed of error list
+    | Branch_refused of error list
+    | Refused of error list
+    | Duplicate
+    | Outdated
+
+  val apply_operation: t -> operation -> result Lwt.t
+
+  type status = {
+    applied_operations : (operation * Proto.operation_receipt) list ;
+    block_result : Tezos_protocol_environment_shell.validation_result ;
+    block_metadata : Proto.block_header_metadata ;
+  }
+
+  val status: t -> status tzresult Lwt.t
+
+end
+
+module Make(Proto : Registered_protocol.T) : T with module Proto = Proto
+
+(** Pre-apply creates a new block and returns it. *)
 val preapply :
   predecessor:State.Block.t ->
   timestamp:Time.t ->
   protocol_data:MBytes.t ->
-  sort_operations:bool ->
   Operation.t list list ->
   (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
-
-val notify_operation :
-  prevalidation_state ->
-  error Preapply_result.t ->
-  unit
-
-val shutdown_operation_input :
-  prevalidation_state ->
-  unit
-
-val build_rpc_directory :
-  Protocol_hash.t ->
-  (prevalidation_state * error Preapply_result.t) RPC_directory.t tzresult Lwt.t

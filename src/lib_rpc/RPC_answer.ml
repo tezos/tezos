@@ -42,6 +42,7 @@ and 'a stream = 'a Resto_directory.Answer.stream = {
 }
 
 let return x = Lwt.return (`Ok x)
+let return_unit = Lwt.return (`Ok ())
 let return_stream x = Lwt.return (`OkStream x)
 
 let not_found = Lwt.return (`Not_found None)

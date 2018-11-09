@@ -42,6 +42,7 @@ and 'a stream = 'a Resto_directory.Answer.stream = {
 }
 
 val return: 'o -> 'o t Lwt.t
+val return_unit: unit t Lwt.t
 val return_stream: 'o stream -> 'o t Lwt.t
 val not_found: 'o t Lwt.t
 

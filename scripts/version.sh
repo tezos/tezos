@@ -4,7 +4,7 @@
 ## `lib.protocol-compiler/tezos-protocol-compiler.opam`
 
 ocaml_version=4.06.1
-opam_version=2.0.0
+opam_version=2.0
 
 ## Please update `.gitlab-ci.yml` accordingly
 opam_repository_tag=4200cbebcae75562d79898a8e11e9f4dc237cc08

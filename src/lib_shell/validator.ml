@@ -43,12 +43,15 @@ type t = {
 let create state db
     peer_validator_limits
     block_validator_limits
+    validation_process
     prevalidator_limits
-    chain_validator_limits =
-  Block_validator.create block_validator_limits db >>= fun block_validator ->
+    chain_validator_limits
+  =
+  Block_validator.create block_validator_limits db validation_process >>= fun block_validator ->
   let valid_block_input = Lwt_watcher.create_input () in
   Lwt.return
-    { state ; db ; block_validator ;
+    { state ; db ;
+      block_validator ;
       block_validator_limits ; prevalidator_limits ;
       peer_validator_limits ; chain_validator_limits ;
       valid_block_input ;
@@ -67,7 +70,8 @@ let activate v ?max_child_ttl ~start_prevalidator chain_state =
         ?max_child_ttl
         ~start_prevalidator
         v.peer_validator_limits v.prevalidator_limits
-        v.block_validator v.valid_block_input v.db chain_state
+        v.block_validator
+        v.valid_block_input v.db chain_state
         v.chain_validator_limits in
     Chain_id.Table.add v.active_chains chain_id nv ;
     nv

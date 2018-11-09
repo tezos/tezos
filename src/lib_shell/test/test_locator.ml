@@ -39,8 +39,8 @@ let genesis_time = Time.of_seconds 0L
 
 let state_genesis_block =
   {
-    State.Chain.time = genesis_time;
-    State.Chain.block= genesis_hash;
+    State.Chain.time = genesis_time ;
+    State.Chain.block= genesis_hash ;
     State.Chain.protocol = genesis_protocol
   }
 
@@ -70,7 +70,7 @@ let incr_fitness fitness =
 let init_chain base_dir : State.Chain.t Lwt.t =
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in
-  State.read
+  State.init
     ~store_root ~context_root state_genesis_block >>= function
   | Error _ -> Pervasives.failwith "read err"
   | Ok (_state, chain) ->
@@ -105,12 +105,15 @@ let make_empty_chain (chain:State.Chain.t) n : Block_hash.t Lwt.t =
   State.Block.read_exn chain genesis_hash >>= fun genesis ->
   State.Block.context genesis >>= fun empty_context ->
   let header = State.Block.header genesis in
+  let timestamp = State.Block.timestamp genesis in
+  Context.hash ~time:timestamp empty_context
+  >>= fun empty_context_hash ->
   Context.commit
     ~time:header.shell.timestamp empty_context >>= fun context ->
   let header = { header with shell = { header.shell with context } } in
-  let empty_result : Tezos_protocol_environment_shell.validation_result = {
-    context = empty_context ;
-    fitness = [] ;
+  let empty_result = {
+    State.Block.
+    context_hash = empty_context_hash ;
     message = None ;
     max_operations_ttl = 0 ;
     last_allowed_fork_level = 0l ;

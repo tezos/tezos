@@ -67,6 +67,12 @@ let data_parameter =
       Lwt.return (Micheline_parser.no_parsing_error
                   @@ Michelson_v1_parser.parse_expression data))
 
+let non_negative_param = 
+  Clic.parameter (fun _ s ->
+      match int_of_string_opt s with
+      | Some i when i >= 0 -> return i
+      | _ -> failwith "Parameter should be a non-negative integer literal") 
+
 let group =
   { Clic.name = "context" ;
     title = "Block contextual commands (see option -block)" }
@@ -175,9 +181,9 @@ let commands version () =
             match Script_repr.force_decode code with
             | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Alpha_environment.Error_monad.pp) errs
             | Ok (code, _) ->
-                begin cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped code >>= fun () ->
-                  return_unit
-                end
+                let { Michelson_v1_parser.source } =
+                  Michelson_v1_printer.unparse_toplevel code in
+                cctxt#answer "%a" Format.pp_print_text source >>= return
       end ;
 
     command ~group ~desc: "Get the manager of a contract."
@@ -438,24 +444,19 @@ let commands version () =
     ]) @
   [
     command ~desc:"Wait until an operation is included in a block"
-      (let int_param =
-         parameter
-           (fun _ s ->
-              try return (int_of_string s)
-              with _ -> failwith "Given an invalid integer literal: '%s'" s) in
-       args2
+      (args2
          (default_arg
-            ~long:"-confirmations"
+            ~long:"confirmations"
             ~placeholder:"num_blocks"
             ~doc:"do not end until after 'N' additional blocks after the operation appears"
             ~default:"0"
-            int_param)
+            non_negative_param)
          (default_arg
-            ~long:"-check-previous"
+            ~long:"check-previous"
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            int_param))
+            non_negative_param))
       (prefixes [ "wait" ; "for" ]
        @@ param
          ~name:"operation"
@@ -468,12 +469,32 @@ let commands version () =
        @@ prefixes [ "to" ; "be" ; "included" ]
        @@ stop)
       begin fun (confirmations, predecessors) operation_hash (ctxt : Proto_alpha.full) ->
-        fail_when (confirmations < 0)
-          (failure "confirmations cannot be negative") >>=? fun () ->
-        fail_when (predecessors < 0)
-          (failure "check-previous cannot be negative") >>=? fun () ->
         Client_confirmations.wait_for_operation_inclusion ctxt
           ~chain:`Main ~confirmations ~predecessors operation_hash >>=? fun _ ->
+        return_unit
+      end ;
+
+    command ~desc:"Get receipt for past operation"
+      (args1
+         (default_arg
+            ~long:"check-previous"
+            ~placeholder:"num_blocks"
+            ~doc:"number of previous blocks to check"
+            ~default:"10"
+            non_negative_param))
+      (prefixes [ "get" ; "receipt"; "for" ]
+       @@ param
+         ~name:"operation"
+         ~desc:"Operation to be looked up"
+         (parameter
+            (fun _ x ->
+               match Operation_hash.of_b58check_opt x with
+               | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
+               | Some hash -> return hash))
+       @@ stop)
+      begin fun predecessors operation_hash (ctxt : Proto_alpha.full) ->
+        display_receipt_for_operation ctxt
+          ~chain:`Main ~predecessors operation_hash >>=? fun _ ->
         return_unit
       end ;
 
