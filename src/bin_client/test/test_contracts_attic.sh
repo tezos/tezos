@@ -44,24 +44,16 @@ assert_storage $contract_attic_dir/reverse.tz '{""}' '{ "c" ; "b" ; "a" }' '{ "a
 assert_storage $contract_attic_dir/loop_left.tz '{""}' '{}' '{}'
 assert_storage $contract_attic_dir/loop_left.tz '{""}' '{ "c" ; "b" ; "a" }' '{ "a" ; "b" ; "c" }'
 
-
-# TODO [a-k] contracts in attic
-
-# List of transactions
-# TODO
-
-
-# Queue
-# TODO
-
-# Reduce map
-# TODO
-
-# Reentrancy
-# TODO
-
-# Spawn identities
-# TODO
+# TODO add tests for
+# accounts.tz, add1_list.tz, add1.tz, after_strategy.tz, always.tz,
+# append.tz, at_least.tz, auction.tz, bad_lockup.tz,
+# big_map_union.tz, cadr_annotation.tz, concat.tz, conditionals.tz,
+# cons_twice.tz, cps_fact.tz, create_add1_lists.tz,
+# data_publisher.tz, dispatch.tz, empty.tz, fail_amount.tz,
+# faucet.tz, forward.tz, id.tz, infinite_loop.tz,
+# insertion_sort.tz, int_publisher.tz, king_of_tez.tz,
+# list_of_transactions.tz, queue.tz, reduce_map.tz, reentrancy.tz,
+# spawn_identities.tz
 
 printf "\nEnd of test\n"
 

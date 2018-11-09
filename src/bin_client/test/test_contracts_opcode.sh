@@ -32,6 +32,9 @@ fi
 
 # FORMAT: assert_output contract_file storage input expected_result
 
+# TODO add tests for map_car.tz, subset.tz
+# NB: noop.tz is tested in test_basic.sh
+
 assert_storage $contract_op_dir/ret_int.tz None Unit '(Some 300)'
 
 

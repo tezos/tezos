@@ -1,5 +1,0 @@
-parameter unit;
-storage unit;
-code
-  { # This contract will never accept a incoming transaction
-    FAIL};

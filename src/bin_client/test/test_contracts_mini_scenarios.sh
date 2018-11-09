@@ -32,8 +32,10 @@ fi
 
 # FORMAT: assert_output contract_file storage input expected_result
 
-# TODO lockup, originator, parameterized_multisig, reservoir, scrutable_reservoir,
-# TODO weather_insurance, xcat_dapp, xcat
+# TODO add tests for the following contracts
+# lockup, originator, parameterized_multisig, reservoir, scrutable_reservoir,
+# weather_insurance, xcat_dapp, xcat
+# NB: hardlimit.tz is tested in test_basic.sh
 
 # Test replay prevention
 init_with_transfer $contract_scenarios_dir/replay.tz $key2 Unit 0 bootstrap1

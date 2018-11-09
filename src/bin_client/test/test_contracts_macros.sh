@@ -30,7 +30,7 @@ if [ ! $NO_TYPECHECK ] ; then
     printf "All contracts are well typed\n\n"
 fi
 
-# TODO macro_annotations.tz, min.tz, pair_macro.tz, take_my_money.tz, unpair_macro.tz
+# TODO add tests for fail.tz, macro_annotations.tz, min.tz, pair_macro.tz, take_my_money.tz, unpair_macro.tz
 
 # FORMAT: assert_output contract_file storage input expected_result
 
