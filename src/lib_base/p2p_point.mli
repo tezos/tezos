@@ -32,6 +32,7 @@ module Id : sig
 
   val pp : Format.formatter -> t -> unit
   val pp_opt : Format.formatter -> t option -> unit
+  val pp_list : Format.formatter -> t list -> unit
 
   val of_string_exn : string -> t
   val of_string : string -> (t, string) result
