@@ -37,6 +37,18 @@ fi
 
 assert_storage $contract_op_dir/ret_int.tz None Unit '(Some 300)'
 
+# Map block on lists
+assert_storage $contract_op_dir/list_map_block.tz '{0}' '{}' '{}'
+assert_storage $contract_op_dir/list_map_block.tz '{0}' '{ 1 ; 1 ; 1 ; 1 }' '{ 1 ; 2 ; 3 ; 4 }'
+assert_storage $contract_op_dir/list_map_block.tz '{0}' '{ 1 ; 2 ; 3 ; 0 }' '{ 1 ; 3 ; 5 ; 3 }'
+
+# Reverse a list
+assert_storage $contract_op_dir/reverse.tz '{""}' '{}' '{}'
+assert_storage $contract_op_dir/reverse.tz '{""}' '{ "c" ; "b" ; "a" }' '{ "a" ; "b" ; "c" }'
+
+# Reverse using LOOP_LEFT
+assert_storage $contract_op_dir/loop_left.tz '{""}' '{}' '{}'
+assert_storage $contract_op_dir/loop_left.tz '{""}' '{ "c" ; "b" ; "a" }' '{ "a" ; "b" ; "c" }'
 
 # Identity on strings
 assert_storage $contract_op_dir/str_id.tz None '"Hello"' '(Some "Hello")'

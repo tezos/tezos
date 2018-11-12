@@ -16,7 +16,6 @@ local_client="${4:-$test_dir/../../../_build/default/src/bin_client/main_client.
 local_admin_client="${5:-$test_dir/../../../_build/default/src/bin_client/main_admin.exe}"
 local_compiler="${6:-$test_dir/../../../_build/default/src/lib_protocol_compiler/main_native.exe}"
 
-contract_dir="contracts"
 contract_op_dir="contracts/opcodes"
 contract_macros_dir="contracts/macros"
 contract_scenarios_dir="contracts/mini_scenarios"

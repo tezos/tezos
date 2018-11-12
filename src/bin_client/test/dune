@@ -21,7 +21,7 @@
  (name runtest_contracts.sh)
  (deps sandbox.json
        test_lib.inc.sh
-       (glob_files contracts/*))
+       (glob_files contracts/attic/*))
  (locks /tcp-port/18731
         /tcp-port/19731)
  (action
@@ -78,25 +78,9 @@
            %{bin:tezos-admin-client})))
 
 (alias
- (name runtest_contracts_attic.sh)
- (deps sandbox.json
-       test_lib.inc.sh
-       (glob_files contracts/attic/*))
- (locks /tcp-port/18731
-        /tcp-port/19731)
- (action
- (run bash %{dep:test_contracts_attic.sh}
-           %{bin:tezos-sandboxed-node.sh}
-           %{bin:tezos-node}
-           %{bin:tezos-init-sandboxed-client.sh}
-           %{bin:tezos-client}
-           %{bin:tezos-admin-client})))
-	   
-(alias
  (name runtest_multinode.sh)
  (deps sandbox.json
-       test_lib.inc.sh
-       (glob_files contracts/*.tz))
+       test_lib.inc.sh)
  (locks  /tcp-port/18731 /tcp-port/18732 /tcp-port/18733 /tcp-port/18734
          /tcp-port/18735 /tcp-port/18736 /tcp-port/18737 /tcp-port/18738
          /tcp-port/19731 /tcp-port/19732 /tcp-port/19733 /tcp-port/19734
