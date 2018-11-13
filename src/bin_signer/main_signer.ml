@@ -94,7 +94,7 @@ let high_watermark_switch =
     ()
 
 let commands base_dir require_auth =
-  Client_keys_commands.commands None @
+  Client_keys_commands.commands (Some `Mainnet) @
   Tezos_signer_backends.Ledger.commands () @
   [ command ~group
       ~desc: "Launch a signer daemon over a TCP socket."
