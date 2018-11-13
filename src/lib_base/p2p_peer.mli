@@ -56,10 +56,11 @@ end
 
 module Info : sig
 
-  type 'conn_meta t = {
+  type ('peer_meta, 'conn_meta) t = {
     score : float ;
     trusted : bool ;
     conn_metadata : 'conn_meta option ;
+    peer_metadata : 'peer_meta ;
     state : State.t ;
     id_point : P2p_connection.Id.t option ;
     stat : P2p_stat.t ;
@@ -71,7 +72,8 @@ module Info : sig
     last_miss : (P2p_connection.Id.t * Time.t) option ;
   }
 
-  val encoding : 'conn_meta Data_encoding.t -> 'conn_meta t Data_encoding.t
+  val encoding : 'peer_meta Data_encoding.t ->
+    'conn_meta Data_encoding.t -> ('peer_meta, 'conn_meta) t Data_encoding.t
 
 end
 

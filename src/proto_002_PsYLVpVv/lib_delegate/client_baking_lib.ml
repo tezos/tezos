@@ -104,12 +104,14 @@ let get_predecessor_cycle (cctxt : #Client_context.printer) cycle =
 
 let do_reveal cctxt block blocks =
   let nonces = List.map snd blocks in
-  Client_baking_revelation.forge_seed_nonce_revelation cctxt
-    block nonces >>=? fun () ->
-  Client_baking_nonces.dels cctxt (List.map fst blocks) >>=? fun () ->
+  Client_baking_revelation.forge_seed_nonce_revelation
+    cctxt block nonces >>=? fun () ->
   return_unit
 
 let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
+  cctxt#with_lock begin fun () ->
+    Client_baking_nonces.load cctxt
+  end >>=? fun nonces ->
   Lwt_list.filter_map_p
     (fun hash ->
        Lwt.catch
@@ -125,7 +127,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
   filter_map_s (fun (bi : Client_baking_blocks.block_info) ->
-      Client_baking_nonces.find cctxt bi.hash >>=? function
+      match Block_hash.Map.find_opt bi.hash nonces with
       | None ->
           cctxt#warning "Cannot find nonces for block %a (ignoring)@."
             Block_hash.pp_short bi.hash >>= fun () ->
@@ -138,4 +140,6 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
 let reveal_nonces cctxt () =
   Client_baking_forge.get_unrevealed_nonces
     cctxt cctxt#block >>=? fun nonces ->
-  do_reveal cctxt cctxt#block nonces
+  do_reveal cctxt cctxt#block nonces >>=? fun () ->
+  Client_baking_forge.filter_outdated_nonces cctxt cctxt#block >>=? fun () ->
+  return_unit

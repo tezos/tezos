@@ -29,9 +29,12 @@ The source code of Tezos is placed under the MIT Open Source License.
 The Community
 -------------
 
+- The website of the `Tezos Foundation <https://tezos.foundation/>`_.
+- `Tezos sub-reddit <https://www.reddit.com/r/tezos/>`_ is an
+  important meeting point of the community.
 - Several community-built block explorers are available:
 
-    - http://tzscan.io
+    - https://tzscan.io
     - https://tezex.info
 
 - A few community-run websites collect useful Tezos links:
@@ -39,11 +42,7 @@ The Community
     - https://www.tezos.help
     - https://tezos.rocks
 
- - There is a matrix channel *Tezos* that you can join `here <https://riot.im/app/#/room/#tezos:matrix.org>`_.
- - There is a sub-reddit at https://www.reddit.com/r/tezos/
- - There is also a community FAQ at https://github.com/tezoscommunity/faq/wiki/Tezos-Technical-FAQ
- - There is a *#tezos* IRC channel on *freenode* that is reserved for technical discussions
-
+- More resources can be found in the :ref:`support` page.
 
 The Networks
 ------------
@@ -110,6 +109,7 @@ in the :ref:`introduction <howtoget>`.
    introduction/howtouse
    introduction/howtorun
    introduction/various
+   introduction/support
    introduction/contributing
 
 .. toctree::

@@ -179,6 +179,7 @@ end
 module type REQUEST = sig
   type key
   type param
+  val initial_delay : float
   val active : param -> P2p_peer.Set.t
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end

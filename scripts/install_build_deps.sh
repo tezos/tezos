@@ -5,11 +5,6 @@ src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/version.sh
 
-if [ "$(opam --version)" != "$opam_version" ] ; then
-    echo "Unexpected opam version (found: $(opam -version), expected: $opam_version)"
-    exit 1
-fi
-
 opam repository set-url tezos --dont-select $opam_repository || \
     opam repository add tezos --dont-select $opam_repository > /dev/null 2>&1
 

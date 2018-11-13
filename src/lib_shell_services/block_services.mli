@@ -41,6 +41,7 @@ type block = [
   | `Genesis
   | `Head of int
   | `Hash of Block_hash.t * int
+  | `Level of Int32.t
 ]
 val parse_block: string -> (block, string) result
 val to_string: block -> string

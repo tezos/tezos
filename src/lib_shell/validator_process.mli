@@ -23,38 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let commands () =
-  let open Clic in
-  let group = { name = "admin" ;
-                title = "Commands to perform privileged operations on the node" } in
-  [
-    command ~group
-      ~desc: "Make the node forget its decision of rejecting blocks."
-      no_options
-      (prefixes [ "unmark" ; "invalid" ]
-       @@ seq_of_param (Block_hash.param ~name:"block" ~desc:"blocks to remove from invalid list"))
-      (fun () blocks (cctxt : #Client_context.full) ->
-         iter_s
-           (fun block ->
-              Shell_services.Invalid_blocks.delete cctxt block >>=? fun () ->
-              cctxt#message
-                "Block %a no longer marked invalid."
-                Block_hash.pp block >>= fun () ->
-              return_unit)
-           blocks) ;
+type kind =
+  | Internal
 
-    command ~group
-      ~desc: "Make the node forget every decision of rejecting blocks."
-      no_options
-      (prefixes [ "unmark" ; "all" ; "invalid" ; "blocks" ]
-       @@ stop)
-      (fun () (cctxt : #Client_context.full) ->
-         Shell_services.Invalid_blocks.list cctxt () >>=? fun invalid_blocks ->
-         iter_s (fun { Chain_services.hash } ->
-             Shell_services.Invalid_blocks.delete cctxt hash >>=? fun () ->
-             cctxt#message
-               "Block %a no longer marked invalid."
-               Block_hash.pp_short hash >>= fun () ->
-             return_unit)
-           invalid_blocks) ;
-  ]
+type t
+
+val init : context_root:string -> kind -> t Lwt.t
+val close : t -> unit Lwt.t
+
+type application_result = {
+  validation_result: Tezos_protocol_environment_shell.validation_result ;
+  block_data: Secp256k1.watermark ;
+  ops_metadata: Secp256k1.watermark list list ;
+  context_hash: Context_hash.t ;
+}
+
+val apply_block :
+  t ->
+  Block_header.t ->
+  Operation.t list list ->
+  State.Chain.t ->
+  application_result tzresult Lwt.t

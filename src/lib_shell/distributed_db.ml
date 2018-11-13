@@ -29,6 +29,7 @@ type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 type connection = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.connection
 
 type 'a request_param = {
+  p2p : (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.t ;
   data: 'a ;
   active: unit -> P2p_peer.Set.t ;
   send: P2p_peer.Id.t -> Message.t -> unit ;
@@ -52,6 +53,7 @@ module Make_raw
     (Request_message : sig
        type param
        val max_length : int
+       val initial_delay : float
        val forge : param -> Hash.t list -> Message.t
      end)
     (Precheck : Distributed_db_functors.PRECHECK
@@ -61,9 +63,24 @@ module Make_raw
   module Request = struct
     type param = Request_message.param request_param
     let active { active } = active ()
+    let initial_delay  = Request_message.initial_delay
+
     let rec send state gid keys =
       let first_keys, keys = List.split_n Request_message.max_length keys in
-      state.send gid (Request_message.forge state.data first_keys) ;
+      let msg = (Request_message.forge state.data first_keys) in
+      state.send gid msg ;
+      let open Peer_metadata in
+      let (req : requests_kind) = match msg with
+        | Get_current_branch _ -> Branch
+        | Get_current_head _ -> Head
+        | Get_block_headers _ -> Block_header
+        | Get_operations _ -> Operations
+        | Get_protocols _ -> Protocols
+        | Get_operation_hashes_for_blocks _ -> Operation_hashes_for_block
+        | Get_operations_for_blocks _ -> Operations_for_block
+        | _ -> Other in
+      let meta = P2p.get_peer_metadata state.p2p gid in
+      Peer_metadata.incr meta @@ Scheduled_request req ;
       if keys <> [] then send state gid keys
   end
 
@@ -106,6 +123,7 @@ module Raw_operation =
     (struct
       type param = unit
       let max_length = 10
+      let initial_delay = 0.5
       let forge () keys = Message.Get_operations keys
     end)
     (struct
@@ -137,6 +155,7 @@ module Raw_block_header =
     (struct
       type param = unit
       let max_length = 10
+      let initial_delay = 0.5
       let forge () keys = Message.Get_block_headers keys
     end)
     (struct
@@ -193,6 +212,7 @@ module Raw_operation_hashes = struct
       (struct
         type param = unit
         let max_length = 10
+        let initial_delay = 1.
         let forge () keys =
           Message.Get_operation_hashes_for_blocks keys
       end)
@@ -265,6 +285,7 @@ module Raw_operations = struct
       (struct
         type param = unit
         let max_length = 10
+        let initial_delay = 1.
         let forge () keys =
           Message.Get_operations_for_blocks keys
       end)
@@ -314,6 +335,7 @@ module Raw_protocol =
     (Protocol_hash.Table)
     (struct
       type param = unit
+      let initial_delay = 10.
       let max_length = 10
       let forge () keys = Message.Get_protocols keys
     end)
@@ -374,6 +396,8 @@ let chain_state { chain_state } = chain_state
 let db { global_db } = global_db
 
 let my_peer_id chain_db = P2p.peer_id chain_db.global_db.p2p
+
+let get_peer_metadata chain_db = P2p.get_peer_metadata chain_db.global_db.p2p
 
 let read_block_header { disk } h =
   State.read_block disk h >>= function
@@ -459,7 +483,8 @@ module P2p_reader = struct
             Chain_id.Table.add state.peer_active_chains chain_id chain_db ;
             f chain_db
         | None ->
-            (* TODO  decrease peer score. *)
+            let meta = P2p.get_peer_metadata global_db.p2p state.gid in
+            Peer_metadata.incr meta Unactivated_chain ;
             Lwt.return_unit
 
   let deactivate state chain_db =
@@ -468,10 +493,12 @@ module P2p_reader = struct
       P2p_peer.Set.remove state.gid !(chain_db.active_peers) ;
     P2p_peer.Table.remove chain_db.active_connections state.gid
 
-  let may_handle state chain_id f =
+  (* check if the chain advertized by a peer is (still) active *)
+  let may_handle global_db state chain_id f =
     match Chain_id.Table.find_opt state.peer_active_chains chain_id with
     | None ->
-        (* TODO decrease peer score *)
+        let meta = P2p.get_peer_metadata global_db.p2p state.gid in
+        Peer_metadata.incr meta Inactive_chain ;
         Lwt.return_unit
     | Some chain_db ->
         f chain_db
@@ -490,6 +517,7 @@ module P2p_reader = struct
 
     let open Message in
     let open Handle_msg_Logging in
+    let meta = P2p.get_peer_metadata global_db.p2p state.gid in
 
     lwt_debug Tag.DSL.(fun f ->
         f "Read message from %a: %a"
@@ -498,20 +526,20 @@ module P2p_reader = struct
         -% a Message.Logging.tag msg) >>= fun () ->
 
     match msg with
-
     | Get_current_branch chain_id ->
+        Peer_metadata.incr meta @@ Received_request Branch;
         may_handle_global global_db chain_id @@ fun chain_db ->
         if not (Chain_id.Table.mem state.peer_active_chains chain_id) then
-          ignore
-          @@ P2p.try_send global_db.p2p state.conn
-          @@ Get_current_branch chain_id ;
+          Peer_metadata.update_requests meta Branch @@
+          P2p.try_send global_db.p2p state.conn @@
+          Get_current_branch chain_id ;
         let seed = {
           Block_locator.receiver_id=state.gid;
           sender_id=(my_peer_id chain_db) } in
         (Chain.locator chain_db.chain_state seed) >>= fun locator ->
-        ignore
-        @@ P2p.try_send global_db.p2p state.conn
-        @@ Current_branch (chain_id, locator) ;
+        Peer_metadata.update_responses meta Branch @@
+        P2p.try_send global_db.p2p state.conn @@
+        Current_branch (chain_id, locator)  ;
         Lwt.return_unit
 
     | Current_branch (chain_id, locator) ->
@@ -521,11 +549,11 @@ module P2p_reader = struct
           (State.Block.known_invalid chain_db.chain_state)
           (Block_header.hash head :: hist) >>= fun known_invalid ->
         if known_invalid then begin
-          (* TODO Kick *)
+          P2p.disconnect global_db.p2p state.conn >>= fun () ->
           P2p.greylist_peer global_db.p2p state.gid ;
           Lwt.return_unit
         end else if Time.(add (now ()) 15L < head.shell.timestamp) then begin
-          (* TODO some penalty *)
+          Peer_metadata.incr meta Future_block ;
           lwt_log_notice Tag.DSL.(fun f ->
               f "Received future block %a from peer %a."
               -% t event "received_future_block"
@@ -534,17 +562,21 @@ module P2p_reader = struct
           Lwt.return_unit
         end else begin
           chain_db.callback.notify_branch state.gid locator ;
+          (* TODO discriminate between received advertisements
+             and responses? *)
+          Peer_metadata.incr meta @@ Received_advertisement Branch ;
           Lwt.return_unit
         end
 
     | Deactivate chain_id ->
-        may_handle state chain_id @@ fun chain_db ->
+        may_handle global_db state chain_id @@ fun chain_db ->
         deactivate state chain_db ;
         Chain_id.Table.remove state.peer_active_chains chain_id ;
         Lwt.return_unit
 
     | Get_current_head chain_id ->
-        may_handle state chain_id @@ fun chain_db ->
+        may_handle global_db state chain_id @@ fun chain_db ->
+        Peer_metadata.incr meta @@ Received_request Head ;
         let { Connection_metadata.disable_mempool } =
           P2p.connection_remote_metadata chain_db.global_db.p2p state.conn in
         begin
@@ -555,13 +587,13 @@ module P2p_reader = struct
             State.Current_mempool.get chain_db.chain_state
         end >>= fun (head, mempool) ->
         (* TODO bound the sent mempool size *)
-        ignore
-        @@ P2p.try_send global_db.p2p state.conn
-        @@ Current_head (chain_id, head, mempool) ;
+        Peer_metadata.update_responses meta Head @@
+        P2p.try_send global_db.p2p state.conn @@
+        Current_head (chain_id, head, mempool) ;
         Lwt.return_unit
 
     | Current_head (chain_id, header, mempool) ->
-        may_handle state chain_id @@ fun chain_db ->
+        may_handle global_db state chain_id @@ fun chain_db ->
         let head = Block_header.hash header in
         State.Block.known_invalid chain_db.chain_state head >>= fun known_invalid ->
         let { Connection_metadata.disable_mempool } =
@@ -574,11 +606,11 @@ module P2p_reader = struct
                This should probably warrant a reduction of the sender's score. *)
         in
         if known_invalid then begin
-          (* TODO Kick *)
+          P2p.disconnect global_db.p2p state.conn >>= fun () ->
           P2p.greylist_peer global_db.p2p state.gid ;
           Lwt.return_unit
         end else if Time.(add (now ()) 15L < header.shell.timestamp) then begin
-          (* TODO some penalty *)
+          Peer_metadata.incr meta Future_block ;
           lwt_log_notice Tag.DSL.(fun f ->
               f "Received future block %a from peer %a."
               -% t event "received_future_block"
@@ -587,44 +619,51 @@ module P2p_reader = struct
           Lwt.return_unit
         end else begin
           chain_db.callback.notify_head state.gid header mempool ;
+          (* TODO discriminate between received advertisements
+             and responses? *)
+          Peer_metadata.incr meta @@ Received_advertisement Head ;
           Lwt.return_unit
         end
 
     | Get_block_headers hashes ->
+        Peer_metadata.incr meta @@ Received_request Block_header ;
         Lwt_list.iter_p
           (fun hash ->
              read_block_header global_db hash >>= function
              | None ->
-                 (* TODO: Blame request of unadvertised blocks ? *)
+                 Peer_metadata.incr meta @@ Unadvertised Block ;
                  Lwt.return_unit
              | Some (_chain_id, header) ->
-                 ignore @@
-                 P2p.try_send global_db.p2p state.conn (Block_header header) ;
+                 Peer_metadata.update_responses meta Block_header @@
+                 P2p.try_send global_db.p2p state.conn @@
+                 Block_header header ;
                  Lwt.return_unit)
           hashes
-
     | Block_header block -> begin
         let hash = Block_header.hash block in
         match find_pending_block_header state hash with
         | None ->
-            (* TODO some penalty. *)
+            Peer_metadata.incr meta Unexpected_response ;
             Lwt.return_unit
         | Some chain_db ->
             Raw_block_header.Table.notify
               chain_db.block_header_db.table state.gid hash block >>= fun () ->
+            Peer_metadata.incr meta @@ Received_response Block_header ;
             Lwt.return_unit
       end
 
     | Get_operations hashes ->
+        Peer_metadata.incr meta @@ Received_request Operations ;
         Lwt_list.iter_p
           (fun hash ->
              read_operation global_db hash >>= function
              | None ->
-                 (* TODO: Blame request of unadvertised operations ? *)
+                 Peer_metadata.incr meta @@ Unadvertised Operations ;
                  Lwt.return_unit
              | Some (_chain_id, op) ->
-                 ignore @@
-                 P2p.try_send global_db.p2p state.conn (Operation op) ;
+                 Peer_metadata.update_responses meta Operations @@
+                 P2p.try_send global_db.p2p state.conn @@
+                 Operation op ;
                  Lwt.return_unit)
           hashes
 
@@ -632,24 +671,27 @@ module P2p_reader = struct
         let hash = Operation.hash operation in
         match find_pending_operation state hash with
         | None ->
-            (* TODO some penalty. *)
+            Peer_metadata.incr meta Unexpected_response ;
             Lwt.return_unit
         | Some chain_db ->
             Raw_operation.Table.notify
               chain_db.operation_db.table state.gid hash operation >>= fun () ->
+            Peer_metadata.incr meta @@ Received_response Operations ;
             Lwt.return_unit
       end
 
     | Get_protocols hashes ->
+        Peer_metadata.incr meta @@ Received_request Protocols ;
         Lwt_list.iter_p
           (fun hash ->
              State.Protocol.read_opt global_db.disk hash >>= function
              | None ->
-                 (* TODO: Blame request of unadvertised protocol ? *)
+                 Peer_metadata.incr meta @@ Unadvertised Protocol ;
                  Lwt.return_unit
              | Some p ->
-                 ignore @@
-                 P2p.try_send global_db.p2p state.conn (Protocol p) ;
+                 Peer_metadata.update_responses meta Protocols @@
+                 P2p.try_send global_db.p2p state.conn @@
+                 Protocol p ;
                  Lwt.return_unit)
           hashes
 
@@ -657,9 +699,12 @@ module P2p_reader = struct
         let hash = Protocol.hash protocol in
         Raw_protocol.Table.notify
           global_db.protocol_db.table state.gid hash protocol >>= fun () ->
+        Peer_metadata.incr meta @@ Received_response Protocols ;
         Lwt.return_unit
 
     | Get_operation_hashes_for_blocks blocks ->
+        Peer_metadata.incr meta @@
+        Received_request Operation_hashes_for_block ;
         Lwt_list.iter_p
           (fun (hash, ofs) ->
              State.read_block global_db.disk hash >>= function
@@ -667,7 +712,8 @@ module P2p_reader = struct
              | Some block ->
                  State.Block.operation_hashes
                    block ofs >>= fun (hashes, path) ->
-                 ignore @@
+                 Peer_metadata.update_responses meta
+                   Operation_hashes_for_block @@
                  P2p.try_send global_db.p2p state.conn @@
                  Operation_hashes_for_block (hash, ofs, hashes, path) ;
                  Lwt.return_unit)
@@ -676,16 +722,20 @@ module P2p_reader = struct
     | Operation_hashes_for_block (block, ofs, ops, path) -> begin
         match find_pending_operation_hashes state block ofs with
         | None ->
-            (* TODO some penalty. *)
+            Peer_metadata.incr meta Unexpected_response ;
             Lwt.return_unit
         | Some chain_db ->
             Raw_operation_hashes.Table.notify
               chain_db.operation_hashes_db.table state.gid
               (block, ofs) (ops, path) >>= fun () ->
+            Peer_metadata.incr meta @@
+            Received_response Operation_hashes_for_block ;
             Lwt.return_unit
       end
 
     | Get_operations_for_blocks blocks ->
+        Peer_metadata.incr meta @@
+        Received_request Operations_for_block ;
         Lwt_list.iter_p
           (fun (hash, ofs) ->
              State.read_block global_db.disk hash >>= function
@@ -693,7 +743,8 @@ module P2p_reader = struct
              | Some block ->
                  State.Block.operations
                    block ofs >>= fun (ops, path) ->
-                 ignore @@
+                 Peer_metadata.update_responses meta
+                   Operations_for_block @@
                  P2p.try_send global_db.p2p state.conn @@
                  Operations_for_block (hash, ofs, ops, path) ;
                  Lwt.return_unit)
@@ -702,12 +753,14 @@ module P2p_reader = struct
     | Operations_for_block (block, ofs, ops, path) -> begin
         match find_pending_operations state block ofs with
         | None ->
-            (* TODO some penalty. *)
+            Peer_metadata.incr meta Unexpected_response ;
             Lwt.return_unit
         | Some chain_db ->
             Raw_operations.Table.notify
               chain_db.operations_db.table state.gid
               (block, ofs) (ops, path) >>= fun () ->
+            Peer_metadata.incr meta @@
+            Received_response Operations_for_block ;
             Lwt.return_unit
       end
 
@@ -734,6 +787,8 @@ module P2p_reader = struct
     } in
     Chain_id.Table.iter (fun chain_id _chain_db ->
         Lwt.async begin fun () ->
+          let meta = P2p.get_peer_metadata db.p2p gid in
+          Peer_metadata.incr meta (Sent_request Branch) ;
           P2p.send db.p2p conn (Get_current_branch chain_id)
         end)
       db.active_chains ;
@@ -767,7 +822,8 @@ let raw_try_send p2p peer_id msg =
 
 let create disk p2p =
   let global_request =
-    { data = () ;
+    { p2p ;
+      data = () ;
       active = active_peer_ids p2p ;
       send = raw_try_send p2p ;
     } in
@@ -791,7 +847,8 @@ let activate ({ p2p ; active_chains } as global_db) chain_state =
   | None ->
       let active_peers = ref P2p_peer.Set.empty in
       let p2p_request =
-        { data = () ;
+        { p2p ;
+          data = () ;
           active = (fun () -> !active_peers) ;
           send = raw_try_send p2p ;
         } in
@@ -997,10 +1054,22 @@ module Request = struct
 
   let current_head chain_db ?peer () =
     let chain_id = State.Chain.id chain_db.chain_state in
+    begin match peer with
+      |Some peer ->
+          let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
+          Peer_metadata.incr meta (Sent_request Head)
+      |None -> ()
+    end ;
     send chain_db ?peer @@ Get_current_head chain_id
 
   let current_branch chain_db ?peer () =
     let chain_id = State.Chain.id chain_db.chain_state in
+    begin match peer with
+      |Some peer ->
+          let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
+          Peer_metadata.incr meta (Sent_request Head)
+      |None -> ()
+    end ;
     send chain_db ?peer @@ Get_current_branch chain_id
 
 end
@@ -1010,6 +1079,12 @@ module Advertise = struct
   let current_head chain_db ?peer ?(mempool = Mempool.empty) head =
     let chain_id = State.Chain.id chain_db.chain_state in
     assert (Chain_id.equal chain_id (State.Block.chain_id head)) ;
+    begin match peer with
+      | Some peer ->
+          let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
+          Peer_metadata.incr meta (Sent_advertisement Head)
+      | None -> ()
+    end ;
     let msg_mempool =
       Message.Current_head (chain_id, State.Block.header head, mempool) in
     if mempool = Mempool.empty then
@@ -1035,6 +1110,13 @@ module Advertise = struct
     let chain_id = State.Chain.id chain_db.chain_state in
     let chain_state = chain_state chain_db in
     let sender_id = my_peer_id chain_db in
+    begin match peer with
+      | Some peer ->
+          let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
+          Peer_metadata.incr meta (Sent_advertisement Branch)
+      | None -> ()
+    end ;
+
     match peer with
     | Some receiver_id ->
         let seed = {

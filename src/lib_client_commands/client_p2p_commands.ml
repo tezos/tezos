@@ -27,28 +27,17 @@ let group =
   { Clic.name = "p2p" ;
     title = "Commands for monitoring and controlling p2p-layer state" }
 
-let port_arg () =
-  let open Clic in
-  default_arg
-    ~long:"port"
-    ~placeholder:"IP port"
-    ~doc:"peer-to-peer port of the node"
-    ~default: "9732"
-    (parameter
-       (fun _ x -> try
-           return (int_of_string x)
-         with Failure _ ->
-           failwith "Invalid peer-to-peer port"))
-
 let pp_connection_info ppf conn = P2p_connection.Info.pp (fun _ _ -> ()) ppf conn
+
+let addr_parameter =
+  let open Clic in
+  param ~name:"address"
+    ~desc:"<IPv4>:PORT or <IPV6>:PORT address (PORT defaults to 9732)."
+    (parameter (fun _ x -> return (P2p_point.Id.of_string_exn x)))
 
 let commands () =
   let open Clic in
-  let addr_parameter =
-    parameter (fun _ x -> return (P2p_addr.of_string_exn x))
-  in
   [
-
     command ~group ~desc: "show global network status"
       no_options
       (prefixes ["p2p" ; "stat"] stop) begin fun () (cctxt : #Client_context.full) ->
@@ -104,79 +93,90 @@ let commands () =
     end ;
 
     command ~group ~desc: "Connect to a new point."
-      (args1 (port_arg ()))
-      (prefixes [ "connect" ; "address" ]
-       @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
-       @@ stop)
-      (fun port address (cctxt : #Client_context.full) ->
-         P2p_services.connect cctxt ~timeout:10. (address, port)
-      ) ;
-
-    command ~group ~desc: "Remove an IP address from the blacklist and whitelist."
       no_options
-      (prefixes [ "forget" ; "address" ]
-       @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
+      (prefixes [ "connect" ; "address" ]
+       @@ addr_parameter
        @@ stop)
-      (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.forget cctxt (address, 0)
+      (fun () (address, port) (cctxt : #Client_context.full) ->
+         P2p_services.connect cctxt ~timeout:10. (address, port) >>=? fun () ->
+         cctxt#message "Connection to %a:%d established." P2p_addr.pp address port >>= fun () ->
+         return_unit
       ) ;
 
-    command ~group ~desc: "Add an IP address to the blacklist."
+    command ~group ~desc: "Kick a peer."
+      no_options
+      (prefixes [ "kick" ; "peer" ]
+       @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+       @@ stop)
+      (fun () peer (cctxt : #Client_context.full) ->
+         P2p_services.Connections.kick cctxt peer >>=? fun () ->
+         cctxt#message "Connection to %a interrupted." P2p_peer.Id.pp peer >>= fun () ->
+         return_unit
+      ) ;
+
+    command ~group ~desc: "Add an IP address and all its ports to the \
+                           blacklist and kicks it. Remove the address \
+                           from the whitelist if it was previously in \
+                           it."
       no_options
       (prefixes [ "ban" ; "address" ]
-       @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
+       @@ addr_parameter
        @@ stop)
-      (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.ban cctxt (address, 0)
+      (fun () (address, _port) (cctxt : #Client_context.full) ->
+         P2p_services.Points.ban cctxt (address, 0) >>=? fun () ->
+         cctxt#message "Address %a:* is now banned." P2p_addr.pp address >>= fun () ->
+         return_unit
       ) ;
 
-    command ~group ~desc: "Add an IP address to the whitelist."
+    command ~group ~desc: "Remove an IP address and all its ports \
+                           from the blacklist."
+      no_options
+      (prefixes [ "unban" ; "address" ]
+       @@ addr_parameter
+       @@ stop)
+      (fun () (address, _port) (cctxt : #Client_context.full) ->
+         P2p_services.Points.unban cctxt (address, 0) >>=? fun () ->
+         cctxt#message "Address %a:* is now unbanned." P2p_addr.pp address >>= fun () ->
+         return_unit
+      ) ;
+
+    command ~group ~desc: "Add an IP address to the whitelist. Remove \
+                           the address from the blacklist if it was \
+                           previously in it."
       no_options
       (prefixes [ "trust" ; "address" ]
-       @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
+       @@ addr_parameter
        @@ stop)
-      (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.trust cctxt (address, 0)
+      (fun () (address, port) (cctxt : #Client_context.full) ->
+         P2p_services.Points.trust cctxt (address, port) >>=? fun () ->
+         cctxt#message "Address %a:%d is now trusted."
+           P2p_addr.pp address port >>= fun () ->
+         return_unit
+      ) ;
+
+    command ~group ~desc: "Removes an IP address from the whitelist."
+      no_options
+      (prefixes [ "untrust" ; "address" ]
+       @@ addr_parameter
+       @@ stop)
+      (fun () (address, port) (cctxt : #Client_context.full) ->
+         P2p_services.Points.untrust cctxt (address, port) >>=? fun () ->
+         cctxt#message "Address %a:%d is now untrusted."
+           P2p_addr.pp address port >>= fun () ->
+         return_unit
       ) ;
 
     command ~group ~desc: "Check if an IP address is banned."
       no_options
       (prefixes [ "is" ; "address" ; "banned" ]
-       @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
+       @@ addr_parameter
        @@ stop)
-      (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.banned cctxt (address, 0) >>=? fun banned ->
+      (fun () (address, port) (cctxt : #Client_context.full) ->
+         P2p_services.Points.banned cctxt (address, port) >>=? fun banned ->
          cctxt#message
            "The given ip address is %s"
            (if banned then "banned" else "not banned") >>= fun () ->
          return_unit
-      ) ;
-
-    command ~group ~desc: "Remove a peer ID from the blacklist and whitelist."
-      no_options
-      (prefixes [ "forget" ; "peer" ]
-       @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
-       @@ stop)
-      (fun () peer (cctxt : #Client_context.full) ->
-         P2p_services.Peers.forget cctxt peer
-      ) ;
-
-    command ~group ~desc: "Add a peer ID to the blacklist."
-      no_options
-      (prefixes [ "ban" ; "peer" ]
-       @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
-       @@ stop)
-      (fun () peer (cctxt : #Client_context.full) ->
-         P2p_services.Peers.ban cctxt peer
-      ) ;
-
-    command ~group ~desc: "Add a peer ID to the whitelist."
-      no_options
-      (prefixes [ "trust" ; "peer" ]
-       @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
-       @@ stop)
-      (fun () peer (cctxt : #Client_context.full) ->
-         P2p_services.Peers.trust cctxt peer
       ) ;
 
     command ~group ~desc: "Check if a peer ID is banned."
@@ -192,10 +192,64 @@ let commands () =
          return_unit
       ) ;
 
-    command ~group ~desc: "Clear all ACLs."
+    command ~group ~desc: "Add a peer ID to the blacklist and kicks \
+                           it. Remove the peer ID from the blacklist \
+                           if was previously in it."
+      no_options
+      (prefixes [ "ban" ; "peer" ]
+       @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+       @@ stop)
+      (fun () peer (cctxt : #Client_context.full) ->
+         P2p_services.Peers.ban cctxt peer >>=? fun () ->
+         cctxt#message "The peer %a is now banned."
+           P2p_peer.Id.pp_short peer >>= fun () ->
+         return_unit
+      ) ;
+
+    command ~group ~desc: "Removes a peer ID from the blacklist."
+      no_options
+      (prefixes [ "unban" ; "peer" ]
+       @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+       @@ stop)
+      (fun () peer (cctxt : #Client_context.full) ->
+         P2p_services.Peers.unban cctxt peer >>=? fun () ->
+         cctxt#message "The peer %a is now unbanned."
+           P2p_peer.Id.pp_short peer >>= fun () ->
+         return_unit
+      ) ;
+
+    command ~group ~desc: "Add a peer ID to the whitelist. Remove the \
+                           peer ID from the blacklist if it was \
+                           previously in it."
+      no_options
+      (prefixes [ "trust" ; "peer" ]
+       @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+       @@ stop)
+      (fun () peer (cctxt : #Client_context.full) ->
+         P2p_services.Peers.trust cctxt peer >>=? fun () ->
+         cctxt#message "The peer %a is now trusted."
+           P2p_peer.Id.pp_short peer >>= fun () ->
+         return_unit
+      ) ;
+
+    command ~group ~desc: "Remove a peer ID from the whitelist."
+      no_options
+      (prefixes [ "untrust" ; "peer" ]
+       @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+       @@ stop)
+      (fun () peer (cctxt : #Client_context.full) ->
+         P2p_services.Peers.untrust cctxt peer >>=? fun () ->
+         cctxt#message "The peer %a is now untrusted."
+           P2p_peer.Id.pp_short peer >>= fun () ->
+         return_unit
+      ) ;
+
+    command ~group ~desc: "Clear all access control rules."
       no_options
       (prefixes [ "clear" ; "acls" ] @@ stop)
       (fun () (cctxt : #Client_context.full) ->
-         P2p_services.ACL.clear cctxt ()
+         P2p_services.ACL.clear cctxt () >>=? fun () ->
+         cctxt#message "The access control rules are now cleared." >>= fun () ->
+         return_unit
       ) ;
   ]

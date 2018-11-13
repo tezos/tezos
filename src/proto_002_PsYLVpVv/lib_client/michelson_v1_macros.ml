@@ -530,26 +530,31 @@ let expand_compare original =
   | _ -> ok None
 
 let expand_asserts original =
-  let fail_false loc =
-    [ Seq(loc, []) ; Seq(loc, [ Prim (loc, "FAIL", [], []) ]) ] in
-  let fail_true loc =
-    [ Seq(loc, [ Prim (loc, "FAIL", [], []) ]) ; Seq(loc, []) ] in
+  let may_rename loc = function
+    | [] -> Seq (loc, [])
+    | annot -> Seq (loc, [ Prim (loc, "RENAME", [], annot) ])
+  in
+  let fail_false ?(annot=[]) loc =
+    [may_rename loc annot; Seq (loc, [ Prim (loc, "FAIL", [], []) ])]
+  in
+  let fail_true ?(annot=[]) loc =
+    [Seq (loc, [ Prim (loc, "FAIL", [], []) ]); may_rename loc annot]
+  in
   match original with
   | Prim (loc, "ASSERT", [], []) ->
       ok @@ Some (Seq (loc, [ Prim (loc, "IF", fail_false loc, []) ]))
   | Prim (loc, "ASSERT_NONE", [], []) ->
       ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_false loc, []) ]))
-  | Prim (loc, "ASSERT_SOME", [], []) ->
-      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_true loc, []) ]))
-  | Prim (loc, "ASSERT_LEFT", [], []) ->
-      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_false loc, []) ]))
-  | Prim (loc, "ASSERT_RIGHT", [], []) ->
-      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_true loc, []) ]))
+  | Prim (loc, "ASSERT_SOME", [], annot) ->
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_true ~annot loc, []) ]))
+  | Prim (loc, "ASSERT_LEFT", [], annot) ->
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_false ~annot loc, []) ]))
+  | Prim (loc, "ASSERT_RIGHT", [], annot) ->
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_true ~annot loc, []) ]))
   | Prim (_, ("ASSERT" | "ASSERT_NONE" | "ASSERT_SOME"
              | "ASSERT_LEFT" | "ASSERT_RIGHT" as str), args, []) ->
       error (Invalid_arity (str, List.length args, 0))
-  | Prim (_, ("ASSERT" | "ASSERT_NONE" | "ASSERT_SOME"
-             | "ASSERT_LEFT" | "ASSERT_RIGHT" as str), [], _ :: _) ->
+  | Prim (_, ( "ASSERT" | "ASSERT_NONE" as str), [], _ :: _) ->
       error (Unexpected_macro_annotation str)
   | Prim (loc, s, args, annot)
     when String.(length s >  7 && equal (sub s 0 7) "ASSERT_") ->
@@ -559,9 +564,10 @@ let expand_asserts original =
       end >>? fun () ->
       begin match annot with
         | _ :: _ -> (error (Unexpected_macro_annotation s))
-        | [] -> ok () end >>? fun () ->
+        | [] -> ok ()
+      end >>? fun () ->
       begin
-        let remaining = String.(sub s 7 ((length s) - 7)) in
+        let remaining = String.(sub s 7 (length s - 7)) in
         let remaining_prim = Prim (loc, remaining, [], []) in
         match remaining with
         | "EQ" | "NEQ" | "LT" | "LE" | "GE" | "GT" ->
@@ -1012,6 +1018,13 @@ let unexpand_asserts expanded =
                                          Prim (_, "FAILWITH", [], []) ]) ]) ],
                       []) ]) ->
       Some (Prim (loc, "ASSERT_" ^ comparison, [], []))
+  | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, [ Prim (_, "RENAME", [], annot) ]) ;
+                                      Seq (_, [
+                                          Seq (_, [
+                                              Prim (_, "UNIT", [], []) ;
+                                              Prim (_, "FAILWITH", [], []) ]) ]) ],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT_NONE", [], annot))
   | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, []) ;
                                       Seq (_, [
                                           Seq (_, [
@@ -1024,6 +1037,11 @@ let unexpand_asserts expanded =
                                       Seq (_, [])],
                       []) ]) ->
       Some (Prim (loc, "ASSERT_SOME", [], []))
+  | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, [ Seq (_, [ Prim (_, "UNIT", [], []) ;
+                                                          Prim (_, "FAILWITH", [], []) ]) ]) ;
+                                      Seq (_, [ Prim (_, "RENAME", [], annot) ])],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT_SOME", [], annot))
   | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, []) ;
                                       Seq (_, [
                                           Seq (_, [
@@ -1031,11 +1049,23 @@ let unexpand_asserts expanded =
                                               Prim (_, "FAILWITH", [], []) ]) ]) ],
                       []) ]) ->
       Some (Prim (loc, "ASSERT_LEFT", [], []))
+  | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, [ Prim (_, "RENAME", [], annot) ]) ;
+                                      Seq (_, [
+                                          Seq (_, [
+                                              Prim (_, "UNIT", [], []) ;
+                                              Prim (_, "FAILWITH", [], []) ]) ]) ],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT_LEFT", [], annot))
   | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, [ Seq (_, [ Prim (_, "UNIT", [], []) ;
                                                           Prim (_, "FAILWITH", [], []) ]) ]) ;
                                       Seq (_, []) ],
                       []) ]) ->
       Some (Prim (loc, "ASSERT_RIGHT", [], []))
+  | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, [ Seq (_, [ Prim (_, "UNIT", [], []) ;
+                                                          Prim (_, "FAILWITH", [], []) ]) ]) ;
+                                      Seq (_, [ Prim (_, "RENAME", [], annot) ]) ],
+                      []) ]) ->
+      Some (Prim (loc, "ASSERT_RIGHT", [], annot))
   | _ -> None
 
 

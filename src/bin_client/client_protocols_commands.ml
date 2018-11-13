@@ -49,7 +49,7 @@ let commands () =
     command ~group ~desc: "Inject a new protocol into the node."
       no_options
       (prefixes [ "inject" ; "protocol" ]
-       @@ param ~name:"dir" ~desc:"directory containing a protocol" check_dir_parameter
+       @@ param ~name:"dir" ~desc:"directory containing the sources of a protocol" check_dir_parameter
        @@ stop)
       (fun () dirname (cctxt : #Client_context.full) ->
          Lwt.catch

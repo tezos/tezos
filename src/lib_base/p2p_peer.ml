@@ -89,10 +89,11 @@ end
 
 module Info = struct
 
-  type 'conn_meta t = {
+  type ('peer_meta, 'conn_meta) t = {
     score : float ;
     trusted : bool ;
-    conn_metadata : 'conn_meta option;
+    conn_metadata : 'conn_meta option ;
+    peer_metadata : 'peer_meta ;
     state : State.t ;
     id_point : P2p_connection.Id.t option ;
     stat : P2p_stat.t ;
@@ -104,31 +105,36 @@ module Info = struct
     last_miss : (P2p_connection.Id.t * Time.t) option ;
   }
 
-  let encoding conn_metadata_encoding =
+  let encoding peer_metadata_encoding conn_metadata_encoding =
     let open Data_encoding in
     conv
       (fun (
-         { score ; trusted ; conn_metadata ; state ; id_point ; stat ;
+         { score ; trusted ; conn_metadata ; peer_metadata ;
+           state ; id_point ; stat ;
            last_failed_connection ; last_rejected_connection ;
            last_established_connection ; last_disconnection ;
            last_seen ; last_miss }) ->
-         ((score, trusted, conn_metadata, state, id_point, stat),
+         ((score, trusted, conn_metadata, peer_metadata,
+           state, id_point, stat),
           (last_failed_connection, last_rejected_connection,
            last_established_connection, last_disconnection,
            last_seen, last_miss)))
-      (fun ((score, trusted, conn_metadata, state, id_point, stat),
+      (fun ((score, trusted, conn_metadata, peer_metadata,
+             state, id_point, stat),
             (last_failed_connection, last_rejected_connection,
              last_established_connection, last_disconnection,
              last_seen, last_miss)) ->
-        { score ; trusted ; conn_metadata ; state ; id_point ; stat ;
+        { score ; trusted ; conn_metadata ; peer_metadata ;
+          state ; id_point ; stat ;
           last_failed_connection ; last_rejected_connection ;
           last_established_connection ; last_disconnection ;
           last_seen ; last_miss })
       (merge_objs
-         (obj6
+         (obj7
             (req "score" float)
             (req "trusted" bool)
             (opt "conn_metadata" conn_metadata_encoding)
+            (req "peer_metadata" peer_metadata_encoding)
             (req "state" State.encoding)
             (opt "reachable_at" P2p_connection.Id.encoding)
             (req "stat" P2p_stat.encoding))

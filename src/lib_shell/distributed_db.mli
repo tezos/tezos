@@ -79,6 +79,8 @@ val db: chain_db -> db
 (** Return the peer id of the node *)
 val my_peer_id: chain_db -> P2p_peer.Id.t
 
+val get_peer_metadata: chain_db -> P2p_peer.Id.t -> Peer_metadata.t
+
 (** {1 Sending messages} *)
 
 module Request : sig
@@ -146,7 +148,7 @@ val commit_block:
   Block_hash.t ->
   Block_header.t -> MBytes.t ->
   Operation.t list list -> MBytes.t list list ->
-  Tezos_protocol_environment_shell.validation_result ->
+  State.Block.validation_store ->
   State.Block.t option tzresult Lwt.t
 
 (** Store on disk all the data associated to an invalid block. *)

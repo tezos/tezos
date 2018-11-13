@@ -33,7 +33,11 @@ module Ring = struct
 
   type 'a t = 'a raw ref
 
-  let create size = ref (Empty size)
+  let create size =
+    if size <= 0 then
+      invalid_arg "Ring.create: size must be positive"
+    else
+      ref (Empty size)
 
   let add r v =
     match !r with
@@ -52,7 +56,7 @@ module Ring = struct
       | Empty _ -> None
       | Inited s ->
           if s.pos >= Array.length s.data - 1 then
-            Some (s.data.(s.pos mod Array.length s.data))
+            Some (s.data.((s.pos + 1) mod Array.length s.data))
           else
             None in
     add r v ; replaced

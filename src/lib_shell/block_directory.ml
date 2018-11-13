@@ -264,7 +264,6 @@ let build_raw_rpc_directory
       ~predecessor:block
       ~timestamp
       ~protocol_data
-      ~sort_operations:q#sort_operations
       operations
   end ;
 
@@ -340,12 +339,33 @@ let get_block chain_state = function
       Chain.genesis chain_state
   |  `Head n ->
       Chain.head chain_state >>= fun head ->
-      if n = 0 then
+      if n < 0 then
+        Lwt.fail Not_found
+      else if n = 0 then
         Lwt.return head
       else
         State.Block.read_exn chain_state ~pred:n (State.Block.hash head)
   | `Hash (hash, n) ->
-      State.Block.read_exn chain_state ~pred:n hash
+      if n < 0 then
+        State.Block.read_exn chain_state hash >>= fun block ->
+        Chain.head chain_state >>= fun head ->
+        let head_level = State.Block.level head in
+        let block_level = State.Block.level block in
+        let target =
+          Int32.(to_int (sub head_level (sub block_level (of_int n)))) in
+        if target < 0 then
+          Lwt.fail Not_found
+        else
+          State.Block.read_exn chain_state ~pred:target (State.Block.hash head)
+      else
+        State.Block.read_exn chain_state ~pred:n hash
+  | `Level i ->
+      Chain.head chain_state >>= fun head ->
+      let target = Int32.(to_int (sub (State.Block.level head) i)) in
+      if target < 0 then
+        Lwt.fail Not_found
+      else
+        State.Block.read_exn chain_state ~pred:target (State.Block.hash head)
 
 let build_rpc_directory chain_state block =
   get_block chain_state block >>= fun block ->
