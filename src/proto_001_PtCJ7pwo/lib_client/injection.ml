@@ -35,6 +35,7 @@ let get_branch (rpc_config: #Proto_001_PtCJ7pwo.full)
     | `Head n -> return (`Head (n+branch))
     | `Hash (h,n) -> return (`Hash (h,n+branch))
     | `Genesis -> return `Genesis
+    | `Level i -> return (`Level i)
   end >>=? fun block ->
   Shell_services.Blocks.hash rpc_config ~chain ~block () >>=? fun hash ->
   Shell_services.Chain.chain_id rpc_config ~chain () >>=? fun chain_id ->
