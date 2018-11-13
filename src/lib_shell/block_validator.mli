@@ -33,9 +33,7 @@ type limits = {
 type error += Closed of unit
 
 val create:
-  limits ->  Distributed_db.t ->
-  Validator_process.t ->
-  t Lwt.t
+  limits -> Distributed_db.t -> t Lwt.t
 
 val validate:
   t ->

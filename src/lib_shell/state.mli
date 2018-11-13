@@ -116,13 +116,6 @@ module Block : sig
   type t
   type block = t
 
-  type validation_store = {
-    context_hash: Context_hash.t ;
-    message: string option ;
-    max_operations_ttl: int ;
-    last_allowed_fork_level: Int32.t ;
-  }
-
   val known: Chain.t -> Block_hash.t -> bool Lwt.t
   val known_valid: Chain.t -> Block_hash.t -> bool Lwt.t
   val known_invalid: Chain.t -> Block_hash.t -> bool Lwt.t
@@ -139,7 +132,7 @@ module Block : sig
     Chain.t ->
     Block_header.t -> MBytes.t ->
     Operation.t list list -> MBytes.t list list ->
-    validation_store ->
+    Tezos_protocol_environment_shell.validation_result ->
     block option tzresult Lwt.t
 
   val store_invalid:
@@ -284,7 +277,7 @@ end
 
 (** Read the internal state of the node and initialize
     the databases. *)
-val init:
+val read:
   ?patch_context:(Context.t -> Context.t Lwt.t) ->
   ?store_mapsize:int64 ->
   ?context_mapsize:int64 ->
