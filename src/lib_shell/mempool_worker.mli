@@ -52,7 +52,7 @@ module type T = sig
   val shutdown : t -> unit Lwt.t
 
   (** parse a new operation and add it to the mempool context *)
-  val parse : t -> Operation.t -> operation tzresult Lwt.t
+  val parse : t -> Operation.t -> operation tzresult
 
   (** validate a new operation and add it to the mempool context *)
   val validate : t -> operation -> result tzresult Lwt.t
