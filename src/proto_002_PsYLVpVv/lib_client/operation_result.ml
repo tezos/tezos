@@ -77,10 +77,12 @@ let pp_manager_operation_content
                 Option.unopt_exn
                   (Failure "ill-serialized storage")
                   (Data_encoding.force_decode storage) in
+              let { Michelson_v1_parser.source } =
+                Michelson_v1_printer.unparse_toplevel code in
               Format.fprintf ppf
-                "@,@[<hv 2>Script:@ %a\
+                "@,@[<hv 2>Script:@ @[<h>%a@]\
                  @,@[<hv 2>Initial storage:@ %a@]"
-                Michelson_v1_printer.print_expr code
+                Format.pp_print_text source
                 Michelson_v1_printer.print_expr storage
         end ;
         begin match delegate with

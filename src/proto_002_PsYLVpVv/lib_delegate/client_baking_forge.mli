@@ -117,3 +117,9 @@ val get_unrevealed_nonces:
   ?chain:Chain_services.chain ->
   Block_services.block ->
   (Block_hash.t * (Raw_level.t * Nonce.t)) list tzresult Lwt.t
+
+val filter_outdated_nonces:
+  #Proto_alpha.full ->
+  ?chain:Block_services.chain ->
+  Shell_services.block ->
+  unit tzresult Lwt.t

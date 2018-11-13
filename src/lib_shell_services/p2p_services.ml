@@ -171,28 +171,37 @@ module Points = struct
                       used for establishing P2P connections."
         RPC_path.(root / "network" / "points")
 
-    let forget =
-      RPC_service.get_service
-        ~query: RPC_query.empty
-        ~output: Data_encoding.empty
-        ~description:"Remove the given address from the whitelist/blacklist."
-        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "forget" )
-
     let ban =
       RPC_service.get_service
         ~query: RPC_query.empty
         ~output: Data_encoding.empty
-        ~description:"Blacklist the given address."
+        ~description:"Blacklist the given address and remove it from the \
+                      whitelist if present."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "ban" )
+
+    let unban =
+      RPC_service.get_service
+        ~query: RPC_query.empty
+        ~output: Data_encoding.empty
+        ~description:"Remove an address from the blacklist."
+        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "unban" )
 
     let trust =
       RPC_service.get_service
         ~query: RPC_query.empty
         ~output: Data_encoding.empty
-        ~description:"Trust a given address permanently. \
-                      Connections from this address can still be closed \
-                      on authentication if the peer is blacklisted or greylisted."
+        ~description:"Trust a given address permanently and remove it \
+                      from the blacklist if present. Connections from \
+                      this address can still be closed on \
+                      authentication if the peer is greylisted."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "trust" )
+
+    let untrust =
+      RPC_service.get_service
+        ~query: RPC_query.empty
+        ~output: Data_encoding.empty
+        ~description:"Remove an address from the whitelist."
+        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "untrust" )
 
     let banned =
       RPC_service.get_service
@@ -211,9 +220,10 @@ module Points = struct
       (object method monitor = true end) ()
   let list ?(filter = []) ctxt = make_call S.list ctxt ()
       (object method filters = filter end) ()
-  let forget ctxt peer_id = make_call1 S.forget ctxt peer_id () ()
   let ban ctxt peer_id = make_call1 S.ban ctxt peer_id () ()
+  let unban ctxt peer_id = make_call1 S.unban ctxt peer_id () ()
   let trust ctxt peer_id = make_call1 S.trust ctxt peer_id () ()
+  let untrust ctxt peer_id = make_call1 S.untrust ctxt peer_id () ()
   let banned ctxt peer_id = make_call1 S.banned ctxt peer_id () ()
 
 end
@@ -225,7 +235,8 @@ module Peers = struct
     let info =
       RPC_service.get_service
         ~query: RPC_query.empty
-        ~output: (P2p_peer.Info.encoding Connection_metadata.encoding)
+        ~output: (P2p_peer.Info.encoding Peer_metadata.encoding
+                    Connection_metadata.encoding)
         ~description:"Details about a given peer."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg)
 
@@ -250,31 +261,41 @@ module Peers = struct
         ~output:
           Data_encoding.(list (tup2
                                  P2p_peer.Id.encoding
-                                 (P2p_peer.Info.encoding Connection_metadata.encoding)))
+                                 (P2p_peer.Info.encoding Peer_metadata.encoding
+                                    Connection_metadata.encoding)))
         ~description:"List the peers the node ever met."
         RPC_path.(root / "network" / "peers")
-
-    let forget =
-      RPC_service.get_service
-        ~query: RPC_query.empty
-        ~output: Data_encoding.empty
-        ~description:"Remove the given peer from the whitelist/blacklist."
-        RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "forget" )
 
     let ban =
       RPC_service.get_service
         ~query: RPC_query.empty
         ~output: Data_encoding.empty
-        ~description:"Blacklist the given peer."
+        ~description:"Blacklist the given peer and remove it from the \
+                      whitelist if present."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "ban" )
+
+    let unban =
+      RPC_service.get_service
+        ~query: RPC_query.empty
+        ~output: Data_encoding.empty
+        ~description:"Remove the given peer from the blacklist."
+        RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "unban" )
 
     let trust =
       RPC_service.get_service
         ~query: RPC_query.empty
         ~output: Data_encoding.empty
-        ~description:"Trust a given peer permanently: the peer cannot \
+        ~description:"Whitelist a given peer permanently and remove it \
+                      from the blacklist if present. The peer cannot \
                       be blocked (but its host IP still can)."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "trust" )
+
+    let untrust =
+      RPC_service.get_service
+        ~query: RPC_query.empty
+        ~output: Data_encoding.empty
+        ~description:"Remove a given peer from the whitelist."
+        RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "untrust" )
 
     let banned =
       RPC_service.get_service
@@ -292,9 +313,10 @@ module Peers = struct
       (object method monitor = true end) ()
   let list ?(filter = []) ctxt =
     make_call S.list ctxt () (object method filters = filter end) ()
-  let forget ctxt point_id = make_call1 S.forget ctxt point_id () ()
   let ban ctxt point_id = make_call1 S.ban ctxt point_id () ()
+  let unban ctxt point_id = make_call1 S.unban ctxt point_id () ()
   let trust ctxt point_id = make_call1 S.trust ctxt point_id () ()
+  let untrust ctxt point_id = make_call1 S.untrust ctxt point_id () ()
   let banned ctxt point_id = make_call1 S.banned ctxt point_id () ()
 
 end

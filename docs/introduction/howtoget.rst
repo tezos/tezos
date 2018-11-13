@@ -84,8 +84,8 @@ Build from sources
 ::
 
    sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget
-   wget https://github.com/ocaml/opam/releases/download/2.0.0/opam-2.0.0-x86_64-linux
-   sudo cp opam-2.0.0-x86_64-linux /usr/local/bin/opam
+   wget https://github.com/ocaml/opam/releases/download/2.0.1/opam-2.0.1-x86_64-linux
+   sudo cp opam-2.0.1-x86_64-linux /usr/local/bin/opam
    sudo chmod a+x /usr/local/bin/opam
    git clone https://gitlab.com/tezos/tezos.git
    cd tezos
@@ -135,9 +135,7 @@ Install OPAM
 ~~~~~~~~~~~~
 
 To compile Tezos, you need the `OPAM <https://opam.ocaml.org/>`__
-package manager, version *2.0.0*. This is the current latest
-version of OPAM and our build script will always use the latest
-released version (or prerelease) of OPAM. The build script will take
+package manager, version *2.0*. The build script will take
 care of setting-up OPAM, download the right version of the OCaml
 compiler, and so on.
 

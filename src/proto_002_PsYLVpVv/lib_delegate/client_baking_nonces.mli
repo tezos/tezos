@@ -26,6 +26,14 @@
 open Proto_alpha
 open Alpha_context
 
+type t = Nonce.t Block_hash.Map.t
+
+val load:
+  #Client_context.wallet ->
+  t tzresult Lwt.t
+val save:
+  #Client_context.wallet ->
+  t -> unit tzresult Lwt.t
 val mem:
   #Client_context.wallet ->
   Block_hash.t -> bool tzresult Lwt.t

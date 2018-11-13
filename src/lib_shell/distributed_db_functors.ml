@@ -327,6 +327,7 @@ end
 module type REQUEST = sig
   type key
   type param
+  val initial_delay : float
   val active : param -> P2p_peer.Set.t
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end
@@ -436,8 +437,6 @@ end = struct
           Lwt_unix.sleep delay
         end
 
-  (* TODO should depend on the ressource kind... *)
-  let initial_delay = 0.5
 
   let process_event state now = function
     | Request (peer, key) -> begin
@@ -453,8 +452,8 @@ end = struct
             | None -> data.peers
             | Some peer -> P2p_peer.Set.add peer data.peers in
           Table.replace state.pending key {
-            delay = initial_delay ;
-            next_request = min data.next_request (now +. initial_delay) ;
+            delay = Request.initial_delay ;
+            next_request = min data.next_request (now +. Request.initial_delay) ;
             peers ;
           } ;
           lwt_debug Tag.DSL.(fun f ->
@@ -471,7 +470,7 @@ end = struct
           Table.add state.pending key {
             peers ;
             next_request = now ;
-            delay = initial_delay ;
+            delay = Request.initial_delay ;
           } ;
           lwt_debug Tag.DSL.(fun f ->
               f "registering request %a from %a -> added"

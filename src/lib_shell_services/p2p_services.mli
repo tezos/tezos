@@ -112,11 +112,13 @@ module Points : sig
     P2p_point.Id.t ->
     (P2p_point.Pool_event.t list Lwt_stream.t * stopper) tzresult Lwt.t
 
-  val forget : #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
-
   val ban: #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
 
+  val unban: #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
+
   val trust: #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
+
+  val untrust: #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
 
   val banned: #simple -> P2p_point.Id.t -> bool tzresult Lwt.t
 
@@ -137,17 +139,22 @@ module Points : sig
        unit * P2p_point.Id.t, < monitor: bool>, unit,
        P2p_point.Pool_event.t list) RPC_service.t
 
-    val forget :
-      ([ `GET ], unit,
-       unit * P2p_point.Id.t, unit, unit,
-       unit) RPC_service.t
-
     val ban :
       ([ `GET ], unit,
        unit * P2p_point.Id.t, unit, unit,
        unit) RPC_service.t
 
+    val unban :
+      ([ `GET ], unit,
+       unit * P2p_point.Id.t, unit, unit,
+       unit) RPC_service.t
+
     val trust :
+      ([ `GET ], unit,
+       unit * P2p_point.Id.t, unit, unit,
+       unit) RPC_service.t
+
+    val untrust :
       ([ `GET ], unit,
        unit * P2p_point.Id.t, unit, unit,
        unit) RPC_service.t
@@ -166,21 +173,23 @@ module Peers : sig
   val list:
     ?filter:(P2p_peer.Filter.t list) ->
     #simple ->
-    (P2p_peer.Id.t * Connection_metadata.t P2p_peer.Info.t) list tzresult Lwt.t
+    (P2p_peer.Id.t * (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t) list tzresult Lwt.t
 
   val info:
     #simple -> P2p_peer.Id.t ->
-    Connection_metadata.t P2p_peer.Info.t tzresult Lwt.t
+    (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t tzresult Lwt.t
 
   val events:
     #streamed -> P2p_peer.Id.t ->
     (P2p_peer.Pool_event.t list Lwt_stream.t * stopper) tzresult Lwt.t
 
-  val forget : #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
-
   val ban: #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
 
+  val unban: #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
+
   val trust: #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
+
+  val untrust: #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
 
   val banned: #simple -> P2p_peer.Id.t -> bool tzresult Lwt.t
 
@@ -189,29 +198,34 @@ module Peers : sig
     val list :
       ([ `GET ], unit,
        unit, < filters: P2p_peer.Filter.t list >, unit,
-       (P2p_peer.Id.t * Connection_metadata.t P2p_peer.Info.t) list) RPC_service.t
+       (P2p_peer.Id.t * (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t) list) RPC_service.t
 
     val info :
       ([ `GET ], unit,
        unit * P2p_peer.Id.t, unit, unit,
-       Connection_metadata.t P2p_peer.Info.t) RPC_service.t
+       (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t) RPC_service.t
 
     val events :
       ([ `GET ], unit,
        unit * P2p_peer.Id.t, < monitor: bool>, unit,
        P2p_peer.Pool_event.t list) RPC_service.t
 
-    val forget :
-      ([ `GET ], unit,
-       unit * P2p_peer.Id.t, unit, unit,
-       unit) RPC_service.t
-
     val ban :
       ([ `GET ], unit,
        unit * P2p_peer.Id.t, unit, unit,
        unit) RPC_service.t
 
+    val unban :
+      ([ `GET ], unit,
+       unit * P2p_peer.Id.t, unit, unit,
+       unit) RPC_service.t
+
     val trust :
+      ([ `GET ], unit,
+       unit * P2p_peer.Id.t, unit, unit,
+       unit) RPC_service.t
+
+    val untrust :
       ([ `GET ], unit,
        unit * P2p_peer.Id.t, unit, unit,
        unit) RPC_service.t

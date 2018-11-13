@@ -27,11 +27,18 @@ open Proto_alpha
 open Alpha_context
 
 
-type t = (Block_hash.t * Nonce.t) list
+type t = Nonce.t Block_hash.Map.t
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   def "seed_nonce" @@
+  conv
+    (fun m ->
+       Block_hash.Map.fold (fun hash nonce acc -> (hash, nonce) :: acc) m [])
+    (fun l ->
+       List.fold_left
+         (fun map (hash, nonce) -> Block_hash.Map.add hash nonce map)
+         Block_hash.Map.empty l) @@
   list
     (obj2
        (req "block" Block_hash.encoding)
@@ -40,39 +47,44 @@ let encoding : t Data_encoding.t =
 let name = "nonce"
 
 let load (wallet : #Client_context.wallet) =
-  wallet#load ~default:[] name encoding
+  wallet#load ~default:Block_hash.Map.empty name encoding
 
 let save (wallet : #Client_context.wallet) list =
-  wallet#with_lock (fun () ->
-      wallet#write name list encoding)
+  wallet#with_lock begin fun () ->
+    wallet#write name list encoding
+  end
 
 let mem (wallet : #Client_context.wallet) block_hash =
-  wallet#with_lock (fun () ->
-      load wallet >>|? fun data ->
-      List.mem_assoc block_hash data)
+  wallet#with_lock begin fun () ->
+    load wallet >>|? fun data ->
+    Block_hash.Map.mem block_hash data
+  end
 
 let find (wallet : #Client_context.wallet) block_hash =
-  wallet#with_lock ( fun () ->
-      load wallet >>|? fun data ->
-      try Some (List.assoc block_hash data)
-      with Not_found -> None)
+  wallet#with_lock begin fun () ->
+    load wallet >>|? fun data ->
+    try Some (Block_hash.Map.find block_hash data)
+    with Not_found -> None
+  end
 
 
 let add (wallet : #Client_context.wallet) block_hash nonce =
-  wallet#with_lock ( fun () ->
-      load wallet >>=? fun data ->
-      save wallet ((block_hash, nonce) ::
-                   List.remove_assoc block_hash data))
+  wallet#with_lock begin fun () ->
+    load wallet >>=? fun data ->
+    save wallet (Block_hash.Map.add block_hash nonce data)
+  end
 
 let del (wallet : #Client_context.wallet) block_hash =
-  wallet#with_lock ( fun () ->
-      load wallet >>=? fun data ->
-      save wallet (List.remove_assoc block_hash data))
+  wallet#with_lock begin fun () ->
+    load wallet >>=? fun data ->
+    save wallet (Block_hash.Map.remove block_hash data)
+  end
 
 let dels (wallet : #Client_context.wallet) hashes =
-  wallet#with_lock ( fun () ->
-      load wallet >>=? fun data ->
-      save wallet @@
-      List.fold_left
-        (fun data hash -> List.remove_assoc hash data)
-        data hashes)
+  wallet#with_lock begin fun () ->
+    load wallet >>=? fun data ->
+    save wallet @@
+    List.fold_left
+      (fun data hash -> Block_hash.Map.remove hash data)
+      data hashes
+  end

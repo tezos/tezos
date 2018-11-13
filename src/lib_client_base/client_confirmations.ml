@@ -23,6 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let in_block operation_hash operations =
+  let exception Found of int * int in
+  try
+    List.iteri
+      (fun i ops ->
+         List.iteri (fun j op ->
+             if Operation_hash.equal operation_hash op then
+               raise (Found (i,j))) ops)
+      operations ;
+    None
+  with Found (i,j) -> Some (i, j) 
+
 let wait_for_bootstrapped (ctxt : #Client_context.full) =
   let display = ref false in
   Lwt.async begin fun () ->
@@ -103,18 +115,7 @@ let wait_for_operation_inclusion
     | None ->
         Shell_services.Blocks.Operation_hashes.operation_hashes
           ctxt ~chain ~block () >>=? fun operations ->
-        let in_block =
-          let exception Found of int * int in
-          try
-            List.iteri
-              (fun i ops ->
-                 List.iteri (fun j op ->
-                     if Operation_hash.equal operation_hash op then
-                       raise (Found (i,j))) ops)
-              operations ;
-            None
-          with Found (i,j) -> Some (i, j) in
-        match in_block with
+        match in_block operation_hash operations with
         | None ->
             Block_hash.Table.add blocks hash None ;
             return_none
@@ -173,3 +174,30 @@ let wait_for_operation_inclusion
         ctxt ~block:(`Hash (head, predecessors+1)) () >>=? fun oldest ->
       Block_hash.Table.add blocks oldest None ;
       loop predecessors
+
+let lookup_operation_in_previous_block ctxt chain operation_hash i =
+  Block_services.Empty.hash ctxt ~block:(`Head i) () 
+  >>=? fun block ->
+  Shell_services.Blocks.Operation_hashes.operation_hashes ctxt ~chain 
+    ~block:(`Hash (block, 0)) ()
+  >>=? fun operations -> 
+  match in_block operation_hash operations with
+  | None -> return_none
+  | Some (a, b) -> return_some (block, a, b) 
+
+let lookup_operation_in_previous_blocks
+    (ctxt : #Client_context.full)
+    ~chain
+    ~predecessors
+    operation_hash =
+  let rec loop i = 
+    if i = predecessors + 1 then
+      return_none 
+    else begin
+      lookup_operation_in_previous_block ctxt chain operation_hash i >>=?
+      function
+      | None -> loop (i + 1)
+      | Some (block, a, b) -> return_some (block, a, b)
+    end
+  in
+  loop 0

@@ -7,8 +7,8 @@ active_protocol_directories := $(shell tr -- - _ < active_protocol_versions)
 current_opam_version := $(shell opam --version)
 include scripts/version.sh
 
-ifneq (${current_opam_version},${opam_version})
-$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}))
+ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
+$(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
 endif
 
 current_ocaml_version := $(shell opam exec -- ocamlc -version)

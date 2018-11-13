@@ -23,38 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let commands () =
-  let open Clic in
-  let group = { name = "admin" ;
-                title = "Commands to perform privileged operations on the node" } in
-  [
-    command ~group
-      ~desc: "Make the node forget its decision of rejecting blocks."
-      no_options
-      (prefixes [ "unmark" ; "invalid" ]
-       @@ seq_of_param (Block_hash.param ~name:"block" ~desc:"blocks to remove from invalid list"))
-      (fun () blocks (cctxt : #Client_context.full) ->
-         iter_s
-           (fun block ->
-              Shell_services.Invalid_blocks.delete cctxt block >>=? fun () ->
-              cctxt#message
-                "Block %a no longer marked invalid."
-                Block_hash.pp block >>= fun () ->
-              return_unit)
-           blocks) ;
+module Authorized_key :
+  Client_aliases.Alias with type t := Signature.public_key
+(** Storage for keys that have been authorized for baking. *)
 
-    command ~group
-      ~desc: "Make the node forget every decision of rejecting blocks."
-      no_options
-      (prefixes [ "unmark" ; "all" ; "invalid" ; "blocks" ]
-       @@ stop)
-      (fun () (cctxt : #Client_context.full) ->
-         Shell_services.Invalid_blocks.list cctxt () >>=? fun invalid_blocks ->
-         iter_s (fun { Chain_services.hash } ->
-             Shell_services.Invalid_blocks.delete cctxt hash >>=? fun () ->
-             cctxt#message
-               "Block %a no longer marked invalid."
-               Block_hash.pp_short hash >>= fun () ->
-             return_unit)
-           invalid_blocks) ;
-  ]
+val public_key :
+  #Client_context.wallet ->
+  Signature.public_key_hash -> Signature.public_key tzresult Lwt.t
+(** [public_key cctxt pkh] returns the public key whose hash is [pkh]
+    iff it is present if [cctxt]. *)
+
+val sign :
+  #Client_context.wallet ->
+  Signer_messages.Sign.Request.t ->
+  ?magic_bytes:int list ->
+  check_high_watermark:bool -> require_auth:bool -> Signature.t tzresult Lwt.t
+(** [sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth]
+    signs [req] and returns a signature. *)

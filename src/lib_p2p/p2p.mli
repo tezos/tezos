@@ -33,7 +33,7 @@
 
 type 'peer_meta peer_meta_config = {
   peer_meta_encoding : 'peer_meta Data_encoding.t;
-  peer_meta_initial : 'peer_meta;
+  peer_meta_initial : unit -> 'peer_meta;
   score : 'peer_meta -> float ;
 }
 
@@ -277,7 +277,7 @@ val on_new_connection :
   (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
 
 val build_rpc_directory :
-  (_, _, Connection_metadata.t) t -> unit RPC_directory.t
+  (_, Peer_metadata.t , Connection_metadata.t) t -> unit RPC_directory.t
 
 val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
 val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit

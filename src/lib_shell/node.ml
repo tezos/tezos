@@ -38,8 +38,8 @@ type t = {
 
 let peer_metadata_cfg : _ P2p.peer_meta_config = {
   peer_meta_encoding = Peer_metadata.encoding ;
-  peer_meta_initial = () ;
-  score = fun _ -> 0. ;
+  peer_meta_initial = Peer_metadata.empty ;
+  score = Peer_metadata.score ;
 }
 
 let connection_metadata_cfg cfg : _ P2p.conn_meta_config = {
