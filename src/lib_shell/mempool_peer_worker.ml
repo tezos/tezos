@@ -226,7 +226,12 @@ module Make (Mempool_worker: Mempool_worker.T)
   module Name = struct
     type t = P2p_peer.Id.t
     let encoding = P2p_peer.Id.encoding
-    let base = [ "node.mempool.peer_worker" ]
+    let base =
+      let proto_hash =
+        let _: string = Format.flush_str_formatter () in
+        Format.fprintf Format.str_formatter "%a" Protocol_hash.pp Proto.hash;
+        Format.flush_str_formatter () in
+      [ "node"; "mempool"; "peer_worker"; proto_hash ]
     let pp = P2p_peer.Id.pp
   end
 

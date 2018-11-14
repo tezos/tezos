@@ -142,16 +142,15 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
     end)
 
   module Name = struct
-    type t = Chain_id.t * Protocol_hash.t
-    let encoding =
-      Data_encoding.tup2
-        Chain_id.encoding
-        Protocol_hash.encoding
-    let base = [ "validator.mempool" ]
-    let pp fmt (chain_id, proto_hash) =
-      Chain_id.pp_short fmt chain_id;
-      Format.pp_print_string fmt ".";
-      Protocol_hash.pp_short fmt proto_hash
+    type t = Chain_id.t
+    let encoding = Chain_id.encoding
+    let base =
+      let proto_hash =
+        let _: string = Format.flush_str_formatter () in
+        Format.fprintf Format.str_formatter "%a" Protocol_hash.pp Proto.hash;
+        Format.flush_str_formatter () in
+      [ "node"; "mempool"; "worker"; proto_hash ]
+    let pp = Chain_id.pp_short
   end
 
   module Request = struct
@@ -563,7 +562,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
     (Worker.launch
        table
        limits.worker_limits
-       (chain_id, Proto.hash)
+       chain_id
        { limits ; chain_db ; validation_state }
        (module Handlers) >>= return)
 
