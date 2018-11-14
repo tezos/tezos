@@ -51,8 +51,8 @@ module type T = sig
   val create : limits -> Distributed_db.chain_db -> t tzresult Lwt.t
   val shutdown : t -> unit Lwt.t
 
-  (** parse a new operation and add it to the mempool context *)
-  val parse : t -> Operation.t -> operation tzresult
+  (** parse a new operation *)
+  val parse : Operation.t -> operation tzresult
 
   (** validate a new operation and add it to the mempool context *)
   val validate : t -> operation -> result tzresult Lwt.t
