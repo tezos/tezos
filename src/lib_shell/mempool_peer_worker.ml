@@ -68,7 +68,11 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
     | Mempool_result of Mempool_worker.result
   type output = result Operation_hash.Map.t
 
-  let pp_input = Format.pp_print_list Operation_hash.pp
+  let pp_input ppf input =
+    Format.fprintf ppf
+      "@[<v 0>%a@]"
+      (Format.pp_print_list Operation_hash.pp)
+      input
   let result_encoding =
     let open Data_encoding in
     union
@@ -257,7 +261,11 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
     let encoding =
       let open Data_encoding in
       list Operation_hash.encoding
-    let pp = Format.pp_print_list Operation_hash.pp
+    let pp ppf os =
+      Format.fprintf ppf
+        "@[<v 2>Request:@,%a@]"
+        (Format.pp_print_list Operation_hash.pp)
+        os
   end
 
   module Event = struct

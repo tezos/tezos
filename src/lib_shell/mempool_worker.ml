@@ -126,6 +126,14 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
           (fun () -> Not_in_branch) ;
       ]
 
+  let pp_result ppf = function
+    | Applied _ -> Format.pp_print_string ppf "applied"
+    | Branch_delayed _ -> Format.pp_print_string ppf "branch delayed"
+    | Branch_refused _ -> Format.pp_print_string ppf "branch refused"
+    | Refused _ -> Format.pp_print_string ppf "refused"
+    | Duplicate -> Format.pp_print_string ppf "duplicate"
+    | Not_in_branch -> Format.pp_print_string ppf "not in branch"
+
   let operation_encoding =
     let open Data_encoding in
     conv
@@ -211,15 +219,12 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
       | Debug msg -> Format.fprintf ppf "%s" msg
       | Request (view, { pushed ; treated ; completed }, None)  ->
           Format.fprintf ppf
-            "@[<v 0>%a@,\
-             Pushed: %a, Treated: %a, Completed: %a@]"
+            "@[<v 0>%a@,Pushed: %a, Treated: %a, Completed: %a@]"
             Request.pp view
             Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
       | Request (view, { pushed ; treated ; completed }, Some errors)  ->
           Format.fprintf ppf
-            "@[<v 0>%a@,\
-             Pushed: %a, Treated: %a, Failed: %a@,\
-             %a@]"
+            "@[<v 0>%a@,Pushed: %a, Treated: %a, Failed: %a@,Errors: %a@]"
             Request.pp view
             Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
             (Format.pp_print_list Error_monad.pp) errors
@@ -271,6 +276,17 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
           result_encoding
           Operation.encoding
       )
+
+    let pp break ppf table =
+      let open Format in
+      Operation_hash.Table.iter
+        (fun h (r, _) ->
+           fprintf ppf "Operation %a: %a"
+             Operation_hash.pp_short h
+             pp_result r;
+           break ppf
+        )
+        table
 
     let create () = Operation_hash.Table.create 1000
 
@@ -377,8 +393,13 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
         (fun cache -> { cache })
         ValidatedCache.encoding
 
-    let pp ppf _view =
-      Format.fprintf ppf "lots of operations"
+    let pp ppf { cache } =
+      ValidatedCache.pp
+        (fun ppf ->
+           Format.pp_print_string ppf ";";
+           Format.pp_print_space ppf ())
+        ppf
+        cache
 
   end
 
