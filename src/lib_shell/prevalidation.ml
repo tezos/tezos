@@ -106,6 +106,7 @@ module type T = sig
 
   val status: t -> status tzresult Lwt.t
 
+  val validation_state: t -> Proto.validation_state
 end
 
 module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struct
@@ -238,6 +239,7 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
       applied_operations = pv.applied ;
     }
 
+  let validation_state { state } = state
 end
 
 let preapply ~predecessor ~timestamp ~protocol_data operations =

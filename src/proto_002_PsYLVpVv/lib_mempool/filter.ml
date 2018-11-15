@@ -101,31 +101,32 @@ let pre_filter config (Operation_data { contents } : Operation.packed_protocol_d
 open Apply_results
 
 let rec post_filter_manager
-  : type t. t Kind.manager contents_result_list -> bool
+  : type t. t Kind.manager contents_result_list -> bool Lwt.t
   = fun op -> match op with
     | Single_result (Manager_operation_result { operation_result }) ->
         begin match operation_result with
-          | Applied _ -> true
-          | Skipped _ | Failed _ | Backtracked _ -> false
+          | Applied _ -> Lwt.return_true
+          | Skipped _ | Failed _ | Backtracked _ -> Lwt.return_false
         end
     | Cons_result (Manager_operation_result res, rest) ->
-        post_filter_manager (Single_result (Manager_operation_result res))
-        && post_filter_manager rest
+        post_filter_manager (Single_result (Manager_operation_result res)) >>= function
+        | false -> Lwt.return_false
+        | true -> post_filter_manager rest
 
-let post_filter config (_op, receipt) =
+let post_filter config ~validation_state_before:_ ~validation_state_after:_ (_op, receipt) =
   match receipt with
   | No_operation_metadata -> assert false (* only for multipass validator *)
   | Operation_metadata { contents } ->
       if config.allow_script_failure then
-        true
+        Lwt.return_true
       else
         match contents with
-        | Single_result (Endorsement_result _) -> true
-        | Single_result (Seed_nonce_revelation_result _) -> true
-        | Single_result (Double_endorsement_evidence_result _) -> true
-        | Single_result (Double_baking_evidence_result _) -> true
-        | Single_result (Activate_account_result _) -> true
-        | Single_result (Proposals_result) -> true
-        | Single_result (Ballot_result) -> true
+        | Single_result (Endorsement_result _) -> Lwt.return_true
+        | Single_result (Seed_nonce_revelation_result _) -> Lwt.return_true
+        | Single_result (Double_endorsement_evidence_result _) -> Lwt.return_true
+        | Single_result (Double_baking_evidence_result _) -> Lwt.return_true
+        | Single_result (Activate_account_result _) -> Lwt.return_true
+        | Single_result (Proposals_result) -> Lwt.return_true
+        | Single_result (Ballot_result) -> Lwt.return_true
         | Single_result (Manager_operation_result _) as op -> post_filter_manager op
         | Cons_result (Manager_operation_result _, _) as op -> post_filter_manager op

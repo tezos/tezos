@@ -386,10 +386,14 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
                   | Ok op ->
                       Prevalidation.apply_operation state op >>= function
                       | Applied (new_acc_validation_state, receipt) ->
-                          let accept = post_filter w pv op.protocol_data receipt in
-                          if not accept
-                          || pv.applied_count <= 2000 (* this test is a quick fix while we wait for the new mempool *)
-                          || Proto.acceptable_passes { shell = op.raw.shell ; protocol_data = op.protocol_data } = [0] then begin
+                          post_filter w pv
+                            ~validation_state_before: (Prevalidation.validation_state acc_validation_state)
+                            ~validation_state_after: (Prevalidation.validation_state new_acc_validation_state)
+                            op.protocol_data receipt >>= fun accept ->
+                          if accept
+                          && (pv.applied_count <= 2000 (* this test is a quick fix while we wait for the new mempool *)
+                              || Proto.acceptable_passes { shell = op.raw.shell ; protocol_data = op.protocol_data } = [0])
+                          then begin
                             notify_operation pv `Applied op.raw ;
                             let new_mempool = Mempool.{ acc_mempool with known_valid = op.hash :: acc_mempool.known_valid } in
                             pv.applied <- (op.hash, op.raw) :: pv.applied ;
@@ -592,8 +596,11 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
         Lwt.return (Prevalidation.parse op) >>=? fun parsed_op ->
         if pre_filter w pv op then
           Prevalidation.apply_operation validation_state parsed_op >>= function
-          | Applied (_, result) ->
-              let post_accept = post_filter w pv parsed_op.protocol_data result in
+          | Applied (new_validation_state, result) ->
+              post_filter w pv
+                ~validation_state_before: (Prevalidation.validation_state validation_state)
+                ~validation_state_after: (Prevalidation.validation_state new_validation_state)
+                parsed_op.protocol_data result >>= fun post_accept ->
               if post_accept then
                 Distributed_db.inject_operation pv.chain_db oph op >>= fun (_ : bool) ->
                 pv.pending <- Operation_hash.Map.add parsed_op.hash op pv.pending ;
