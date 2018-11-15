@@ -190,7 +190,8 @@ assert_container() {
 }
 
 container_name() {
-    docker ps --filter "name=$1" --format "{{.Names}}"
+    local name="$(docker ps --filter "name=$1" --format "{{.Names}}")"
+    if [ -n "$name" ]; then echo "$name"; else echo "$1"; fi
 }
 
 ## Node ####################################################################
@@ -215,8 +216,8 @@ clear_node_volume() {
 check_node() {
     res=$(docker inspect \
                  --format="{{ .State.Running }}" \
-                 --type=container "$(container_name "$docker_node_container")" 2>/dev/null)
-    [ -n "$res" ]
+                 --type=container "$(container_name "$docker_node_container")" 2>/dev/null || echo false)
+    [ "$res" = "true" ]
 }
 
 assert_node() {
@@ -287,8 +288,8 @@ check_baker() {
     docker_baker_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_baker-\1_1/g" "$active_protocol_versions")"
     res=$(docker inspect \
                  --format="{{ .State.Running }}" \
-                 --type=container "$(container_name "$docker_baker_containers")" 2>/dev/null)
-    [ -n "$res" ]
+                 --type=container "$(container_name "$docker_baker_containers")" 2>/dev/null || echo false)
+    [ "$res" = "true" ]
 }
 
 assert_baker() {
@@ -352,8 +353,8 @@ check_endorser() {
     docker_endorser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_endorser-\1_1/g" "$active_protocol_versions")"
     res=$(docker inspect \
                  --format="{{ .State.Running }}" \
-                 --type=container "$(container_name "$docker_endorser_containers")" 2>/dev/null)
-    [ -n "$res" ]
+                 --type=container "$(container_name "$docker_endorser_containers")" 2>/dev/null || echo false)
+    [ "$res" = "true" ]
 }
 
 assert_endorser() {
@@ -417,8 +418,8 @@ check_accuser() {
     docker_accuser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_accuser-\1_1/g" "$active_protocol_versions")"
     res=$(docker inspect \
                  --format="{{ .State.Running }}" \
-                 --type=container "$(container_name "$docker_accuser_containers")" 2>/dev/null)
-    [ -n "$res" ]
+                 --type=container "$(container_name "$docker_accuser_containers")" 2>/dev/null || echo false)
+    [ "$res" = "true" ]
 }
 
 assert_accuser() {
