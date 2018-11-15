@@ -315,18 +315,12 @@ let find_ledgers ?id () =
   log_info "Found %d Ledger(s)" (List.length ledgers) ;
   filter_map_s begin fun device_info ->
     log_info "Processing Ledger at path [%s]" device_info.Hidapi.path ;
-    if device_info.Hidapi.interface_number <> 0
-    then
-      (* HID interfaces get number 0:
-         https://github.com/LedgerHQ/ledger-nano-s/issues/48 *)
-      return_none
-    else
-      match Hidapi.(open_path device_info.path) with
-      | None -> return_none
-      | Some h ->
-          Lwt.finalize
-            (fun () -> Ledger.of_hidapi ?id device_info h)
-            (fun () -> Hidapi.close h ; Lwt.return_unit)
+    match Hidapi.(open_path device_info.path) with
+    | None -> return_none
+    | Some h ->
+        Lwt.finalize
+          (fun () -> Ledger.of_hidapi ?id device_info h)
+          (fun () -> Hidapi.close h ; Lwt.return_unit)
   end ledgers
 
 let with_ledger id f =
