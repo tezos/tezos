@@ -32,6 +32,15 @@ module type FILTER = sig
   val post_filter : config -> Proto.operation_data * Proto.operation_receipt -> bool
 end
 
+module No_filter (Proto : Registered_protocol.T) = struct
+  type config = unit
+  let config_encoding = Data_encoding.empty
+  let default_config = ()
+  module Proto = Proto
+  let pre_filter _ _ = true
+  let post_filter _ _ = true
+end
+
 let table : (module FILTER) Protocol_hash.Table.t =
   Protocol_hash.Table.create 5
 

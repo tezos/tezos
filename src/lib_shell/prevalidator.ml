@@ -36,6 +36,7 @@ type name_t = (Chain_id.t * Protocol_hash.t)
 module type T = sig
 
   module Proto: Registered_protocol.T
+  module Filter: Prevalidator_filters.FILTER with module Proto = Proto
   val name: name_t
   val parameters: limits *  Distributed_db.chain_db
   module Prevalidation: Prevalidation.T with module Proto = Proto
@@ -97,8 +98,9 @@ end
 
 type t = (module T)
 
-module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
-  module Proto = Proto
+module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
+  module Filter = Filter
+  module Proto = Filter.Proto
   let name = (Arg.chain_id, Proto.hash)
   let parameters = (Arg.limits, Arg.chain_db)
   module Prevalidation = Prevalidation.Make(Proto)
@@ -322,6 +324,30 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
             Worker.push_request_now w Advertise ;
             Lwt.return_unit)
 
+  let filter_config w pv =
+    try
+      match Protocol_hash.Map.find_opt Proto.hash pv.filter_config with
+      | Some config ->
+          Data_encoding.Json.destruct Filter.config_encoding config
+      | None ->
+          Filter.default_config
+    with _ ->
+      debug w "invalid mempool filter configuration" ;
+      Filter.default_config
+
+  let pre_filter w pv op =
+    let protocol_data =
+      Data_encoding.Binary.of_bytes_exn
+        Proto.operation_data_encoding
+        op.Operation.proto in
+    let op = { Filter.Proto.shell = op.shell ; protocol_data } in
+    let config = filter_config w pv in
+    Filter.pre_filter config op.Filter.Proto.protocol_data
+
+  let post_filter w pv op receipt =
+    let config = filter_config w pv in
+    Filter.post_filter config (op, receipt)
+
   let handle_unprocessed w pv =
     begin match pv.validation_state with
       | Error err ->
@@ -359,8 +385,10 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
                       refused (Operation.hash op) op errors
                   | Ok op ->
                       Prevalidation.apply_operation state op >>= function
-                      | Applied (new_acc_validation_state, _) ->
-                          if pv.applied_count <= 2000 (* this test is a quick fix while we wait for the new mempool *)
+                      | Applied (new_acc_validation_state, receipt) ->
+                          let accept = post_filter w pv op.protocol_data receipt in
+                          if not accept
+                          || pv.applied_count <= 2000 (* this test is a quick fix while we wait for the new mempool *)
                           || Proto.acceptable_passes { shell = op.raw.shell ; protocol_data = op.protocol_data } = [0] then begin
                             notify_operation pv `Applied op.raw ;
                             let new_mempool = Mempool.{ acc_mempool with known_valid = op.hash :: acc_mempool.known_valid } in
@@ -542,59 +570,40 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
 
     type self = worker
 
-    let filter pv op =
-      State.Block.protocol_hash pv.predecessor >>= fun protocol_hash ->
-      match Prevalidator_filters.find protocol_hash with
-      | None -> return true
-      | Some (module Filter) ->
-          let protocol_data =
-            Data_encoding.Binary.of_bytes_exn
-              Filter.Proto.operation_data_encoding
-              op.Operation.proto in
-          let op = { Filter.Proto.shell = op.shell ; protocol_data } in
-          try
-            let config =
-              match Protocol_hash.Map.find_opt protocol_hash pv.filter_config with
-              | Some config ->
-                  Data_encoding.Json.destruct Filter.config_encoding config
-              | None ->
-                  Filter.default_config in
-            return (Filter.pre_filter config op.Filter.Proto.protocol_data)
-          with _ ->
-            failwith "invalid mempool filter configuration"
-
-    let on_operation_arrived (pv : state) oph op =
+    let on_operation_arrived w (pv : state) oph op =
       pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
       if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks) then begin
         Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
         (* TODO: put in a specific delayed map ? *)
         return_unit
       end else if not (already_handled pv oph) (* prevent double inclusion on flush *) then begin
-        filter pv op >>=? fun accept ->
-        if accept then
+        if pre_filter w pv op then
           (* TODO: should this have an influence on the peer's score ? *)
           pv.pending <- Operation_hash.Map.add oph op pv.pending ;
         return_unit
       end else return_unit
 
-    let on_inject pv op =
+    let on_inject w pv op =
       let oph = Operation.hash op in
       if already_handled pv oph then
         return_unit (* FIXME : is this an error ? *)
       else
         Lwt.return pv.validation_state >>=? fun validation_state ->
         Lwt.return (Prevalidation.parse op) >>=? fun parsed_op ->
-        Prevalidation.apply_operation validation_state parsed_op >>= function
-        | Applied (_, _result) ->
-            filter pv op >>=? fun accept ->
-            if accept then
-              Distributed_db.inject_operation pv.chain_db oph op >>= fun (_ : bool) ->
-              pv.pending <- Operation_hash.Map.add parsed_op.hash op pv.pending ;
-              return_unit
-            else
-              failwith "Operation %a rejected by the mempool filter" Operation_hash.pp oph
-        | _ ->
-            failwith "Error while applying operation %a" Operation_hash.pp oph
+        if pre_filter w pv op then
+          Prevalidation.apply_operation validation_state parsed_op >>= function
+          | Applied (_, result) ->
+              let post_accept = post_filter w pv parsed_op.protocol_data result in
+              if post_accept then
+                Distributed_db.inject_operation pv.chain_db oph op >>= fun (_ : bool) ->
+                pv.pending <- Operation_hash.Map.add parsed_op.hash op pv.pending ;
+                return_unit
+              else
+                failwith "Operation %a rejected by the mempool pre filter" Operation_hash.pp oph
+          | _ ->
+              failwith "Error while applying operation %a" Operation_hash.pp oph
+        else
+          failwith "Operation %a rejected by the mempool post filter" Operation_hash.pp oph
 
     let on_notify w pv peer mempool =
       let all_ophs =
@@ -664,9 +673,9 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
               on_notify w pv peer mempool ;
               return_unit
           | Request.Inject op ->
-              on_inject pv op
+              on_inject w pv op
           | Request.Arrived (oph, op) ->
-              on_operation_arrived pv oph op
+              on_operation_arrived w pv oph op
           | Request.Advertise ->
               on_advertise pv ;
               return_unit
@@ -771,13 +780,13 @@ module ChainProto_registry =
   end)
 
 
-let create limits (module Proto: Registered_protocol.T) chain_db =
+let create limits (module Filter: Prevalidator_filters.FILTER) chain_db =
   let chain_state = Distributed_db.chain_state chain_db in
   let chain_id = State.Chain.id chain_state in
-  match ChainProto_registry.query (chain_id, Proto.hash) with
+  match ChainProto_registry.query (chain_id, Filter.Proto.hash) with
   | None ->
       let module Prevalidator =
-        Make(Proto)(struct
+        Make(Filter)(struct
           let limits = limits
           let chain_db = chain_db
           let chain_id = chain_id

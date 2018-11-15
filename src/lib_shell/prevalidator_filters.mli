@@ -46,6 +46,9 @@ module type FILTER = sig
   val post_filter : config -> Proto.operation_data * Proto.operation_receipt -> bool
 end
 
+(** Dummy filter that does nothing *)
+module No_filter (Proto : Registered_protocol.T) : FILTER with module Proto = Proto
+
 (** Registers a mempool plug-in for a specific protocol (according to its [Proto.hash]). *)
 val register : (module FILTER) -> unit
 

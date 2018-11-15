@@ -59,7 +59,7 @@ type limits = {
 (** Creates/tear-down a new prevalidator context. *)
 val create:
   limits ->
-  (module Registered_protocol.T) ->
+  (module Prevalidator_filters.FILTER) ->
   Distributed_db.chain_db ->
   t Lwt.t
 val shutdown: t -> unit Lwt.t
