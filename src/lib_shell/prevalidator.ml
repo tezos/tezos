@@ -606,11 +606,11 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
                 pv.pending <- Operation_hash.Map.add parsed_op.hash op pv.pending ;
                 return_unit
               else
-                failwith "Operation %a rejected by the mempool pre filter" Operation_hash.pp oph
+                failwith "Operation %a rejected by the mempool post filter" Operation_hash.pp oph
           | _ ->
               failwith "Error while applying operation %a" Operation_hash.pp oph
         else
-          failwith "Operation %a rejected by the mempool post filter" Operation_hash.pp oph
+          failwith "Operation %a rejected by the mempool pre filter" Operation_hash.pp oph
 
     let on_notify w pv peer mempool =
       let all_ophs =

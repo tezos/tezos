@@ -29,7 +29,8 @@ type config =
   { minimal_fees : Alpha_context.Tez.t ;
     minimal_fees_per_gas_unit : Alpha_context.Tez.t ;
     minimal_fees_per_byte : Alpha_context.Tez.t ;
-    allow_script_failure : bool }
+    allow_script_failure : bool ;
+    implicit_account_minimal_balance : Alpha_context.Tez.t }
 
 let config_encoding : config Data_encoding.t =
   let open Data_encoding in
@@ -37,30 +38,36 @@ let config_encoding : config Data_encoding.t =
     (fun { minimal_fees ;
            minimal_fees_per_gas_unit ;
            minimal_fees_per_byte ;
-           allow_script_failure } ->
+           allow_script_failure ;
+           implicit_account_minimal_balance } ->
       (minimal_fees,
        minimal_fees_per_gas_unit,
        minimal_fees_per_byte,
-       allow_script_failure))
+       allow_script_failure,
+       implicit_account_minimal_balance))
     (fun (minimal_fees,
           minimal_fees_per_gas_unit,
           minimal_fees_per_byte,
-          allow_script_failure) ->
+          allow_script_failure,
+          implicit_account_minimal_balance) ->
       { minimal_fees ;
         minimal_fees_per_gas_unit ;
         minimal_fees_per_byte ;
-        allow_script_failure })
-    (obj4
+        allow_script_failure ;
+        implicit_account_minimal_balance })
+    (obj5
        (dft "minimal_fees" Tez.encoding Tez.zero)
        (dft "minimal_fees_per_gas_unit" Tez.encoding Tez.zero)
        (dft "minimal_fees_per_byte" Tez.encoding Tez.zero)
-       (dft "allow_script_failure" bool true))
+       (dft "allow_script_failure" bool true)
+       (dft "implicit_account_minimal_balance" Tez.encoding Tez.zero))
 
 let default_config =
   { minimal_fees = Tez.zero ;
     minimal_fees_per_gas_unit = Tez.zero ;
     minimal_fees_per_byte = Tez.zero ;
-    allow_script_failure = true }
+    allow_script_failure = true ;
+    implicit_account_minimal_balance = Tez.one_mutez }
 
 module Proto = Tezos_embedded_protocol_002_PsYLVpVv.Registerer.Registered
 
@@ -76,11 +83,12 @@ let rec pre_filter_manager
           | Ok fee_per_byte -> Tez.(fee_per_byte >= config.minimal_fees_per_byte)
           | Error _ -> false
         end
-        && begin match Tez.(fee /? Z.to_int64 gas_limit) with
-          | Ok fee_per_gas_unit -> Tez.(fee_per_gas_unit >= config.minimal_fees_per_gas_unit)
-          | Error _ -> false
-          | exception _ -> false
-        end
+        && (Z.equal gas_limit Z.zero || begin match Tez.(fee /? Z.to_int64 gas_limit) with
+            | Ok fee_per_gas_unit ->
+                Tez.(fee_per_gas_unit >= config.minimal_fees_per_gas_unit)
+            | Error _ -> false
+            | exception _ -> false
+          end)
         && Tez.(fee >= config.minimal_fees)
     | Cons (Manager_operation op, rest) ->
         pre_filter_manager config (Single (Manager_operation op))
@@ -100,33 +108,102 @@ let pre_filter config (Operation_data { contents } : Operation.packed_protocol_d
 
 open Apply_results
 
+let apply_results_to_list contents_result =
+  let open Apply_results in
+  let rec to_list acc = function
+    | Contents_result_list (Single_result o) -> [Contents_result o]
+    | Contents_result_list (Cons_result (o, os)) ->
+        to_list (Contents_result o :: acc) (Contents_result_list os)
+  in
+  List.rev (to_list [] contents_result)
+
+let ensure_reserve post_ctxt contents min_amount =
+  (* Ensure that it is a transaction *)
+  let balances = Signature.Public_key_hash.Map.empty in
+  let open Apply_results in
+  let collect_balances balances balance_updates =
+    fold_left_s (fun balances ->
+        let open Delegate in function
+          | (Contract c, _) ->
+              begin match Contract.is_implicit c with
+                | Some pkh ->
+                    begin match Signature.Public_key_hash.Map.find_opt pkh balances with
+                      | Some _ -> return balances
+                      | None -> Alpha_context.Delegate.full_balance post_ctxt pkh >|=
+                          Environment.wrap_error >>=? fun final_balance ->
+                          return (Signature.Public_key_hash.Map.add pkh final_balance balances)
+                    end
+                | None -> return balances end
+          | _ -> return balances)
+      balances balance_updates
+  in
+  let results = apply_results_to_list (Contents_result_list contents) in
+  begin fold_left_s (fun balances -> function
+      | Contents_result
+          (Manager_operation_result
+             {balance_updates ; operation_result ; internal_operation_results }) ->
+
+          collect_balances balances balance_updates >>=? fun balances ->
+
+          begin match operation_result with
+            | Applied (Transaction_result { balance_updates }) ->
+                collect_balances balances balance_updates
+            | _ -> return balances
+          end >>=? fun balances ->
+
+          fold_left_s (fun balances -> function
+              | Internal_operation_result (_, Applied (Transaction_result { balance_updates })) ->
+                  collect_balances balances balance_updates
+              | _ -> return balances
+            ) balances internal_operation_results
+
+      | _ -> return balances
+    ) balances results
+  end >>=? fun balances ->
+  let insufficient_reserve_pkh_list =
+    Signature.Public_key_hash.Map.fold (fun pkh resulting_balance acc ->
+        if Tez.(resulting_balance > zero && resulting_balance < min_amount) then
+          pkh :: acc
+        else
+          acc
+      ) balances []
+  in
+  return insufficient_reserve_pkh_list
+
 let rec post_filter_manager
-  : type t. t Kind.manager contents_result_list -> bool Lwt.t
-  = fun op -> match op with
+  : type t. Alpha_context.t -> t Kind.manager contents_result_list -> config -> bool Lwt.t
+  = fun ctxt op config -> match op with
     | Single_result (Manager_operation_result { operation_result }) ->
         begin match operation_result with
-          | Applied _ -> Lwt.return_true
-          | Skipped _ | Failed _ | Backtracked _ -> Lwt.return_false
+          | Applied _ ->
+              ensure_reserve ctxt op config.implicit_account_minimal_balance >>= begin function
+                | Ok [] ->
+                    Lwt.return_true
+                | Ok (_ :: _) | Error _ ->
+                    Lwt.return_false
+              end
+          | Skipped _ | Failed _ | Backtracked _ ->
+              Lwt.return config.allow_script_failure
         end
     | Cons_result (Manager_operation_result res, rest) ->
-        post_filter_manager (Single_result (Manager_operation_result res)) >>= function
+        post_filter_manager ctxt (Single_result (Manager_operation_result res)) config >>= function
         | false -> Lwt.return_false
-        | true -> post_filter_manager rest
+        | true -> post_filter_manager ctxt rest config
 
-let post_filter config ~validation_state_before:_ ~validation_state_after:_ (_op, receipt) =
+let post_filter config
+    ~validation_state_before:_
+    ~validation_state_after: ({ Main.ctxt } : Proto.validation_state)
+    (_op, receipt) =
   match receipt with
   | No_operation_metadata -> assert false (* only for multipass validator *)
   | Operation_metadata { contents } ->
-      if config.allow_script_failure then
-        Lwt.return_true
-      else
-        match contents with
-        | Single_result (Endorsement_result _) -> Lwt.return_true
-        | Single_result (Seed_nonce_revelation_result _) -> Lwt.return_true
-        | Single_result (Double_endorsement_evidence_result _) -> Lwt.return_true
-        | Single_result (Double_baking_evidence_result _) -> Lwt.return_true
-        | Single_result (Activate_account_result _) -> Lwt.return_true
-        | Single_result (Proposals_result) -> Lwt.return_true
-        | Single_result (Ballot_result) -> Lwt.return_true
-        | Single_result (Manager_operation_result _) as op -> post_filter_manager op
-        | Cons_result (Manager_operation_result _, _) as op -> post_filter_manager op
+      match contents with
+      | Single_result (Endorsement_result _) -> Lwt.return_true
+      | Single_result (Seed_nonce_revelation_result _) -> Lwt.return_true
+      | Single_result (Double_endorsement_evidence_result _) -> Lwt.return_true
+      | Single_result (Double_baking_evidence_result _) -> Lwt.return_true
+      | Single_result (Activate_account_result _) -> Lwt.return_true
+      | Single_result (Proposals_result) -> Lwt.return_true
+      | Single_result (Ballot_result) -> Lwt.return_true
+      | Single_result (Manager_operation_result _) as op -> post_filter_manager ctxt op config
+      | Cons_result (Manager_operation_result _, _) as op -> post_filter_manager ctxt op config
