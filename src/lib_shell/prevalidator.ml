@@ -542,6 +542,27 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
 
     type self = worker
 
+    let filter pv op =
+      State.Block.protocol_hash pv.predecessor >>= fun protocol_hash ->
+      match Prevalidator_filters.find protocol_hash with
+      | None -> return true
+      | Some (module Filter) ->
+          let protocol_data =
+            Data_encoding.Binary.of_bytes_exn
+              Filter.Proto.operation_data_encoding
+              op.Operation.proto in
+          let op = { Filter.Proto.shell = op.shell ; protocol_data } in
+          try
+            let config =
+              match Protocol_hash.Map.find_opt protocol_hash pv.filter_config with
+              | Some config ->
+                  Data_encoding.Json.destruct Filter.config_encoding config
+              | None ->
+                  Filter.default_config in
+            return (Filter.pre_filter config op.Filter.Proto.protocol_data)
+          with _ ->
+            failwith "invalid mempool filter configuration"
+
     let on_operation_arrived (pv : state) oph op =
       pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
       if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks) then begin
@@ -549,26 +570,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         (* TODO: put in a specific delayed map ? *)
         return_unit
       end else if not (already_handled pv oph) (* prevent double inclusion on flush *) then begin
-        State.Block.protocol_hash pv.predecessor >>= fun protocol_hash ->
-        begin match Prevalidator_filters.find protocol_hash with
-          | None -> return true
-          | Some (module Filter) ->
-              let protocol_data =
-                Data_encoding.Binary.of_bytes_exn
-                  Filter.Proto.operation_data_encoding
-                  op.Operation.proto in
-              let op = { Filter.Proto.shell = op.shell ; protocol_data } in
-              try
-                let config =
-                  match Protocol_hash.Map.find_opt protocol_hash pv.filter_config with
-                  | Some config ->
-                      Data_encoding.Json.destruct Filter.config_encoding config
-                  | None ->
-                      Filter.default_config in
-                return (Filter.pre_filter config op.Filter.Proto.protocol_data)
-              with _ ->
-                failwith "invalid mempool filter configuration"
-        end >>=? fun accept ->
+        filter pv op >>=? fun accept ->
         if accept then
           (* TODO: should this have an influence on the peer's score ? *)
           pv.pending <- Operation_hash.Map.add oph op pv.pending ;
@@ -584,10 +586,13 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         Lwt.return (Prevalidation.parse op) >>=? fun parsed_op ->
         Prevalidation.apply_operation validation_state parsed_op >>= function
         | Applied (_, _result) ->
-            Distributed_db.inject_operation pv.chain_db oph op >>= fun (_ : bool) ->
-            (* we bypass the filter for injected operations *)
-            pv.pending <- Operation_hash.Map.add parsed_op.hash op pv.pending ;
-            return_unit
+            filter pv op >>=? fun accept ->
+            if accept then
+              Distributed_db.inject_operation pv.chain_db oph op >>= fun (_ : bool) ->
+              pv.pending <- Operation_hash.Map.add parsed_op.hash op pv.pending ;
+              return_unit
+            else
+              failwith "Operation %a rejected by the mempool filter" Operation_hash.pp oph
         | _ ->
             failwith "Error while applying operation %a" Operation_hash.pp oph
 
