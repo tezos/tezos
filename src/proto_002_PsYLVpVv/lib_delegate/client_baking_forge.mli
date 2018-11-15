@@ -76,6 +76,7 @@ val forge_block:
   ?mempool:string ->
   ?context_path:string ->
   ?seed_nonce_hash:Nonce_hash.t ->
+  ?minimum_allowed_reserve: Tez.t ->
   priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
   src_sk:Client_keys.sk_uri ->
   Block_services.block ->
@@ -104,6 +105,7 @@ val forge_block:
 val create:
   #Proto_alpha.full ->
   ?fee_threshold:Tez.t ->
+  ?minimum_allowed_reserve:Tez.t ->
   ?max_priority: int ->
   max_waiting_time: int ->
   context_path: string ->

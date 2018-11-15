@@ -40,6 +40,8 @@ let anonymous_index = 2
 let managers_index = 3
 
 let default_max_priority = 64
+let default_minimum_allowed_reserve =
+  Option.unopt_exn (Invalid_argument "Tez conversion") (Tez.of_mutez 257_000L)
 
 type state = {
   genesis: Block_hash.t ;
@@ -51,22 +53,23 @@ type state = {
   constants: Constants.t tzlazy ;
   (* Minimum operation fee required to include in a block *)
   fee_threshold : Tez.t ;
+  (* Minimum balance contracts should preserve after a transaction *)
+  minimum_allowed_reserve : Tez.t ;
   (* Maximum waiting time allowed for late endorsements *)
   max_waiting_time : int ;
   (* truly mutable *)
   mutable best_slot: (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) option ;
 }
 
-let create_state
-    ?(fee_threshold = Tez.zero) ~max_waiting_time
-    genesis context_path index
-    delegates constants =
+let create_state ?(fee_threshold = Tez.zero) ?(minimum_allowed_reserve=default_minimum_allowed_reserve) ~max_waiting_time
+    genesis context_path index delegates constants =
   { genesis ;
     context_path ;
     index ;
     delegates ;
     constants ;
     fee_threshold ;
+    minimum_allowed_reserve ;
     max_waiting_time ;
     best_slot = None ;
   }
@@ -399,6 +402,68 @@ let error_of_op (result: error Preapply_result.t) op =
   try Some (Failed_to_preapply (op, snd @@ Operation_hash.Map.find h result.branch_delayed))
   with Not_found -> None
 
+let apply_results_to_list contents_result =
+  let open Apply_results in
+  let rec to_list acc = function
+    | Contents_result_list (Single_result o) -> [Contents_result o]
+    | Contents_result_list (Cons_result (o, os)) ->
+        to_list (Contents_result o :: acc) (Contents_result_list os)
+  in
+  List.rev (to_list [] contents_result)
+
+let ensure_reserve post_ctxt receipt min_amount =
+  let balances = Signature.Public_key_hash.Map.empty in
+  let open Apply_results in
+  let collect_balances balances balance_updates =
+    fold_left_s (fun balances ->
+        let open Delegate in function
+          | (Contract c, _) ->
+              begin match Contract.is_implicit c with
+                | Some pkh ->
+                    begin match Signature.Public_key_hash.Map.find_opt pkh balances with
+                      | Some _ -> return balances
+                      | None -> Alpha_context.Delegate.full_balance post_ctxt pkh >|=
+                          Alpha_environment.wrap_error >>=? fun final_balance ->
+                          return (Signature.Public_key_hash.Map.add pkh final_balance balances)
+                    end
+                | None -> return balances end
+          | _ -> return balances)
+      balances balance_updates
+  in
+  begin match receipt with
+    | No_operation_metadata -> return balances
+    | Operation_metadata { contents } ->
+        let results = apply_results_to_list (Contents_result_list contents) in
+        fold_left_s (fun balances -> function
+            | Contents_result
+                (Manager_operation_result
+                   {balance_updates ; operation_result ; internal_operation_results }) ->
+                collect_balances balances balance_updates >>=? fun balances ->
+                begin match operation_result with
+                  | Applied (Transaction_result { balance_updates }) ->
+                      collect_balances balances balance_updates
+                  | _ -> return balances
+                end >>=? fun balances ->
+
+                fold_left_s (fun balances -> function
+                    | Internal_operation_result (_, Applied (Transaction_result { balance_updates })) ->
+                        collect_balances balances balance_updates
+                    | _ -> return balances
+                  ) balances internal_operation_results
+
+            | _ -> return balances
+          ) balances results
+  end >>=? fun balances ->
+  let insufficient_reserve_pkh_list =
+    Signature.Public_key_hash.Map.fold (fun pkh resulting_balance acc ->
+        if Tez.(resulting_balance > zero && resulting_balance < min_amount) then
+          pkh :: acc
+        else
+          acc
+      ) balances []
+  in
+  return insufficient_reserve_pkh_list
+
 let filter_and_apply_operations
     state
     block_info
@@ -437,8 +502,24 @@ let filter_and_apply_operations
             -% a errs_tag errs)
         >>= fun () ->
         return_none
-    | Ok inc -> return_some inc
+    | Ok (resulting_state, receipt) ->
+        if Tez.(state.minimum_allowed_reserve > zero) then
+          ensure_reserve resulting_state.state.Main.ctxt
+            receipt state.minimum_allowed_reserve >>=? function
+          | [] -> return_some resulting_state
+          | insufficient_reserve_contracts ->
+              lwt_log_info Tag.DSL.(fun f ->
+                  f "Client-side validation: invalid operation filtered \
+                     %a. After application, the following contracts would have an \
+                     unsufficient reserve : %a"
+                  -% t event "baking_rejected_operation_insufficient_reserve"
+                  -% a Operation_hash.Logging.tag (Operation.hash_packed op)
+                  -% a pkh_list_tag insufficient_reserve_contracts) >>= fun () ->
+              return_none
+        else
+          return_some resulting_state
   in
+
   let filter_valid_operations inc ops =
     fold_left_s (fun (inc, acc) op ->
         validate_operation inc op >>=? function
@@ -446,6 +527,7 @@ let filter_and_apply_operations
         | Some inc' -> return (inc', op :: acc)
       ) (inc, []) ops
   in
+
   (* Invalid endorsements are detected during block finalization *)
   let is_valid_endorsement inc endorsement =
     validate_operation inc endorsement >>=? function
@@ -455,6 +537,7 @@ let filter_and_apply_operations
         | Error _ -> return_none
       end
   in
+
   filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
   filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
   (* Retrieve the correct index order *)
@@ -493,7 +576,9 @@ let filter_and_apply_operations
   filter_valid_operations inc accepted_managers >>=? fun (inc, accepted_managers) ->
   filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
   (* Endorsements won't fail now *)
-  fold_left_s add_operation inc endorsements >>=? fun inc ->
+  fold_left_s
+    (fun acc op -> add_operation acc op >>=? fun (inc, _) -> return inc)
+    inc endorsements >>=? fun inc ->
   (* Endorsement and double baking/endorsement evidence do not commute:
      we apply denunciation operations after endorsements. *)
   filter_valid_operations inc evidences >>=? fun (final_inc, evidences) ->
@@ -540,6 +625,7 @@ let forge_block
     ?mempool
     ?context_path
     ?seed_nonce_hash
+    ?(minimum_allowed_reserve = default_minimum_allowed_reserve)
     ~priority
     ~src_sk
     block =
@@ -601,6 +687,7 @@ let forge_block
           best_slot = None ;
           max_waiting_time = 0 ;
           fee_threshold = Tez.zero ;
+          minimum_allowed_reserve ;
         } in
         filter_and_apply_operations ~timestamp ~protocol_data state bi (operations, overflowing_ops)
         >>=? fun (final_context, validation_result, operations) ->
@@ -1030,6 +1117,7 @@ let reveal_potential_nonces cctxt new_head =
 let create
     (cctxt : #Proto_alpha.full)
     ?fee_threshold
+    ?minimum_allowed_reserve
     ?max_priority
     ~max_waiting_time
     ~context_path
@@ -1040,7 +1128,8 @@ let create
       tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Hash (bi.Client_baking_blocks.hash, 0))) in
     Client_baking_simulator.load_context ~context_path >>= fun index ->
     Client_baking_simulator.check_context_consistency index bi.context >>=? fun () ->
-    let state = create_state ?fee_threshold  ~max_waiting_time genesis_hash  context_path index delegates constants in
+    let state = create_state ?fee_threshold ?minimum_allowed_reserve
+        ~max_waiting_time genesis_hash context_path index delegates constants in
     return state
   in
 

@@ -33,6 +33,7 @@ val future_slots_tag : int Tag.def
 val timespan_tag : int64 Tag.def
 
 val operations_tag : Proto_alpha.Alpha_context.Operation.raw list list Tag.def
+val pkh_list_tag : Signature.Public_key_hash.t list Tag.def
 val bake_op_count_tag : int Tag.def
 val endorsement_slot_tag : int Tag.def
 val endorsement_slots_tag : int list Tag.def

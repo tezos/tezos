@@ -50,6 +50,7 @@ module Baker = struct
   let run
       (cctxt : #Proto_alpha.full)
       ?fee_threshold
+      ?minimum_allowed_reserve
       ?max_priority
       ?min_date
       ~context_path
@@ -61,7 +62,7 @@ module Baker = struct
       cctxt `Main >>=? fun block_stream ->
     cctxt#message "Baker started." >>= fun () ->
     Client_baking_forge.create cctxt
-      ?fee_threshold ?max_priority ~max_waiting_time ~context_path delegates block_stream >>=? fun () ->
+      ?fee_threshold ?minimum_allowed_reserve ?max_priority ~max_waiting_time ~context_path delegates block_stream >>=? fun () ->
     ignore min_date;
     return_unit
 

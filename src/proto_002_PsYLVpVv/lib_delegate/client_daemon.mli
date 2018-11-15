@@ -38,6 +38,7 @@ module Baker : sig
   val run:
     #Proto_alpha.full ->
     ?fee_threshold: Tez.tez ->
+    ?minimum_allowed_reserve: Tez.t ->
     ?max_priority: int ->
     ?min_date: Time.t ->
     context_path: string ->

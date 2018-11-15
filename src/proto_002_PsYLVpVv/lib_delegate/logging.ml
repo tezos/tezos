@@ -40,6 +40,11 @@ let operations_tag = Tag.def ~doc:"Block Operations" "operations"
        ~pp_sep:(fun ppf () -> Format.fprintf ppf "+")
        (fun ppf operations -> Format.fprintf ppf "%d" (List.length operations)))
 
+let pkh_list_tag = Tag.def ~doc:"Public key hash list" "pkhs"
+    (Format.pp_print_list
+       ~pp_sep:(fun ppf () -> Format.fprintf ppf " ; ")
+       Signature.Public_key_hash.pp)
+
 let bake_op_count_tag = Tag.def ~doc:"Bake Operation Count" "operation_count" Format.pp_print_int
 
 let endorsement_slot_tag = Tag.def ~doc:"Endorsement Slot" "endorsement_slot" Format.pp_print_int
