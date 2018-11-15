@@ -63,5 +63,9 @@ module type T = sig
 end
 
 
-module Make (Mempool_worker : Mempool_worker.T)
+module type STATIC = sig
+  val max_pending_requests : int
+end
+
+module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
   : T with module Mempool_worker = Mempool_worker

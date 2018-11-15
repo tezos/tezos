@@ -44,7 +44,12 @@ module type T = sig
 
 end
 
-module Make (Mempool_worker: Mempool_worker.T)
+
+module type STATIC = sig
+  val max_pending_requests : int
+end
+
+module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
   : T with module Mempool_worker = Mempool_worker
 = struct
 
@@ -318,8 +323,10 @@ module Make (Mempool_worker: Mempool_worker.T)
   end
 
   module Worker = Worker.Make (Name) (Event) (Request) (Types)
-  type t = Worker.infinite Worker.queue Worker.t
-  let table = Worker.create_table Queue
+  type t = Worker.bounded Worker.queue Worker.t
+  let table =
+    let open Worker in
+    create_table (Bounded { size = Static.max_pending_requests })
 
 
   (* 3. Workers' work: setting workers' callbacks to perform core work *)
