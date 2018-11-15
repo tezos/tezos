@@ -950,12 +950,14 @@ let filter_outdated_nonces
     Block_hash.Map.fold
       begin fun hash nonce acc ->
         acc >>=? fun acc ->
-        Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) () >>=?
-        fun { protocol_data = { level = { Level.cycle } } } ->
-        if is_older_than_5_cycles cycle then
-          return acc
-        else
-          return (Block_hash.Map.add hash nonce acc)
+        Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) () >>=
+        function
+        | Result.Error _ -> return acc
+        | Result.Ok { protocol_data = { level = { Level.cycle } } } ->
+            if is_older_than_5_cycles cycle then
+              return acc
+            else
+              return (Block_hash.Map.add hash nonce acc)
       end
       nonces
       (return Block_hash.Map.empty) >>=? fun new_nonces ->
