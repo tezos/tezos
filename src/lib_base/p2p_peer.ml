@@ -185,6 +185,6 @@ module Pool_event = struct
          (req "kind" kind_encoding)
          (req "timestamp" Time.encoding)
          (req "addr" P2p_addr.encoding)
-         (opt "port" int16))
+         (opt "port" uint16))
 
 end
