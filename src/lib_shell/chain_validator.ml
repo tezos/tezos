@@ -301,13 +301,17 @@ let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
               let (limits, chain_db) = Prevalidator.parameters old_prevalidator in
               (* TODO inject in the new prevalidator the operation
                  from the previous one. *)
-              Prevalidator.create
-                limits
-                (module Proto)
-                chain_db >>=? fun prevalidator ->
-              nv.prevalidator <- Some prevalidator ;
-              Prevalidator.shutdown old_prevalidator >>= fun () ->
-              return_unit
+              Prevalidator.create limits (module Proto) chain_db >>= function
+              | Error errs ->
+                  Log.lwt_log_error "@[Failed to reinstantiate prevalidator:@ %a@]"
+                    pp_print_error errs >>= fun () ->
+                  nv.prevalidator <- None ;
+                  Prevalidator.shutdown old_prevalidator >>= fun () ->
+                  return_unit
+              | Ok prevalidator ->
+                  nv.prevalidator <- Some prevalidator ;
+                  Prevalidator.shutdown old_prevalidator >>= fun () ->
+                  return_unit
             end else begin
               Prevalidator.flush old_prevalidator block_hash >>=? fun () ->
               return_unit
