@@ -26,6 +26,7 @@
 (** Distributing validation work between different workers, one for each peer. *)
 
 type limits = {
+  max_promises_per_request : int ;
   worker_limits : Worker_types.limits ;
 }
 
@@ -57,7 +58,7 @@ module type T = sig
   (** [validate mempool_worker worker input] validates the batch of operations
    * [input]. The work is performed by [worker] and the underlying validation of
    * each operation is performed by [mempool_worker]. *)
-  val validate: Mempool_worker.t -> t -> input -> unit tzresult Lwt.t
+  val validate: t -> input -> unit tzresult Lwt.t
 
 end
 
