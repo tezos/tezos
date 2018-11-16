@@ -23,53 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val record_proposal:
-  Raw_context.t -> Protocol_hash.t -> Signature.Public_key_hash.t ->
-  Raw_context.t Lwt.t
+open Alpha_context
 
-val get_proposals:
-  Raw_context.t -> int32 Protocol_hash.Map.t Lwt.t
+val ballots :
+  'a #RPC_context.simple -> 'a -> Vote.ballots shell_tzresult Lwt.t
 
-val clear_proposals: Raw_context.t -> Raw_context.t Lwt.t
+val ballot_list :
+  'a #RPC_context.simple -> 'a -> (Signature.Public_key_hash.t * Vote.ballot) list shell_tzresult Lwt.t
 
-type ballots = {
-  yay: int32 ;
-  nay: int32 ;
-  pass: int32 ;
-}
+val current_period_kind :
+  'a #RPC_context.simple -> 'a -> Voting_period.kind shell_tzresult Lwt.t
 
-val ballots_encoding : ballots Data_encoding.t
+val current_quorum :
+  'a #RPC_context.simple -> 'a -> Int32.t shell_tzresult Lwt.t
 
-val record_ballot:
-  Raw_context.t -> Signature.Public_key_hash.t -> Vote_repr.ballot ->
-  Raw_context.t Lwt.t
-val get_ballots: Raw_context.t -> ballots tzresult Lwt.t
-val get_ballot_list :
-  Raw_context.t -> (Signature.Public_key_hash.t * Vote_repr.ballot) list Lwt.t
-val clear_ballots: Raw_context.t -> Raw_context.t Lwt.t
+val listings :
+  'a #RPC_context.simple -> 'a -> (Signature.Public_key_hash.t * int32) list shell_tzresult Lwt.t
 
-val listings_encoding : (Signature.Public_key_hash.t * int32) list Data_encoding.t
+val proposals :
+  'a #RPC_context.simple -> 'a -> Int32.t Protocol_hash.Map.t shell_tzresult Lwt.t
 
-val freeze_listings: Raw_context.t -> Raw_context.t tzresult Lwt.t
-val clear_listings: Raw_context.t -> Raw_context.t tzresult Lwt.t
+val current_proposal :
+  'a #RPC_context.simple -> 'a -> Protocol_hash.t option shell_tzresult Lwt.t
 
-val listing_size: Raw_context.t -> int32 tzresult Lwt.t
-val in_listings:
-  Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
-val get_listings : Raw_context.t -> (Signature.Public_key_hash.t * int32) list Lwt.t
-
-val get_current_quorum: Raw_context.t -> int32 tzresult Lwt.t
-val set_current_quorum: Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
-
-val get_current_period_kind:
-  Raw_context.t -> Voting_period_repr.kind tzresult Lwt.t
-val set_current_period_kind:
-  Raw_context.t -> Voting_period_repr.kind -> Raw_context.t tzresult Lwt.t
-
-val get_current_proposal:
-  Raw_context.t -> Protocol_hash.t tzresult Lwt.t
-val init_current_proposal:
-  Raw_context.t -> Protocol_hash.t -> Raw_context.t tzresult Lwt.t
-val clear_current_proposal: Raw_context.t -> Raw_context.t tzresult Lwt.t
-
-val init: Raw_context.t -> Raw_context.t tzresult Lwt.t
+val register : unit -> unit

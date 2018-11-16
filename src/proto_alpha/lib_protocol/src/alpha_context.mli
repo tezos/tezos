@@ -736,12 +736,15 @@ module Vote : sig
     context -> int32 Protocol_hash.Map.t Lwt.t
   val clear_proposals: context -> context Lwt.t
 
+  val listings_encoding : (Signature.Public_key_hash.t * int32) list Data_encoding.t
   val freeze_listings: context -> context tzresult Lwt.t
   val clear_listings: context -> context tzresult Lwt.t
   val listing_size: context -> int32 tzresult Lwt.t
   val in_listings: context -> public_key_hash -> bool Lwt.t
+  val get_listings : context -> (public_key_hash * int32) list Lwt.t
 
   type ballot = Yay | Nay | Pass
+  val ballot_encoding : ballot Data_encoding.t
 
   type ballots = {
     yay: int32 ;
@@ -749,9 +752,12 @@ module Vote : sig
     pass: int32 ;
   }
 
+  val ballots_encoding : ballots Data_encoding.t
+
   val record_ballot:
     context -> public_key_hash -> ballot -> context Lwt.t
   val get_ballots: context -> ballots tzresult Lwt.t
+  val get_ballot_list: context -> (Signature.Public_key_hash.t * ballot) list Lwt.t
   val clear_ballots: context -> context Lwt.t
 
   val get_current_period_kind:

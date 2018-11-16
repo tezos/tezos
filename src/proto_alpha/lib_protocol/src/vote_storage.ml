@@ -45,6 +45,16 @@ type ballots = {
   pass: int32 ;
 }
 
+let ballots_encoding =
+  let open Data_encoding in
+  conv
+    (fun { yay ; nay ; pass } -> ( yay , nay , pass ))
+    (fun ( yay , nay , pass ) -> { yay ; nay ; pass })
+  @@ obj3
+    (req "yay"  int32)
+    (req "nay"  int32)
+    (req "pass" int32)
+
 let record_ballot = Storage.Vote.Ballots.init_set
 
 let get_ballots ctxt =
@@ -61,7 +71,14 @@ let get_ballots ctxt =
         end)
     ~init:(ok { yay = 0l ; nay = 0l; pass = 0l })
 
+let get_ballot_list = Storage.Vote.Ballots.bindings
+
 let clear_ballots = Storage.Vote.Ballots.clear
+
+let listings_encoding =
+  Data_encoding.(list (obj2
+                         (req "pkh" Signature.Public_key_hash.encoding)
+                         (req "rolls" int32)))
 
 let freeze_listings ctxt =
   Roll_storage.fold ctxt (ctxt, 0l)
@@ -81,6 +98,7 @@ let freeze_listings ctxt =
 
 let listing_size = Storage.Vote.Listings_size.get
 let in_listings = Storage.Vote.Listings.mem
+let get_listings = Storage.Vote.Listings.bindings
 
 let clear_listings ctxt =
   Storage.Vote.Listings.clear ctxt >>= fun ctxt ->
