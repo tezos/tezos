@@ -109,6 +109,46 @@ let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
 let get_constants b =
   Alpha_services.Constants.all rpc_ctxt b
 
+(* Voting *)
+
+module Vote = struct
+
+  let get_ballots b =
+    Alpha_services.Voting.ballots rpc_ctxt b
+
+  let get_ballot_list b =
+    Alpha_services.Voting.ballot_list rpc_ctxt b
+
+  let get_voting_period b =
+    Alpha_services.Helpers.current_level rpc_ctxt b >>=? fun l ->
+    return l.voting_period
+
+  let get_voting_period_position b =
+    Alpha_services.Helpers.current_level rpc_ctxt b >>=? fun l ->
+    return l.voting_period_position
+
+  let get_current_period_kind b =
+    Alpha_services.Voting.current_period_kind rpc_ctxt b
+
+  let get_current_quorum b =
+    Alpha_services.Voting.current_quorum rpc_ctxt b
+
+  let get_listings b =
+    Alpha_services.Voting.listings rpc_ctxt b
+
+  let get_proposals b =
+    Alpha_services.Voting.proposals rpc_ctxt b
+
+  let get_current_proposal b =
+    Alpha_services.Voting.current_proposal rpc_ctxt b
+
+  let get_protocol (b:Block.t) =
+    Alpha_environment.Context.get b.context ["protocol"] >>= function
+    | None -> assert false
+    | Some p -> Lwt.return (Protocol_hash.of_bytes_exn p)
+
+end
+
 module Contract = struct
 
   let pp = Alpha_context.Contract.pp
@@ -203,6 +243,7 @@ let init
         ~blocks_per_cycle:32l
         ~blocks_per_commitment:4l
         ~blocks_per_roll_snapshot:8l
+        ~blocks_per_voting_period:(Int32.mul 32l 8l)
         ?endorsers_per_block
         ?commitments
         accounts

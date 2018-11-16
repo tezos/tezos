@@ -102,3 +102,12 @@ val combine_operations :
 (** Reveals a seed_nonce that was previously committed at a certain level *)
 val seed_nonce_revelation:
   Context.t -> Raw_level.t -> Nonce.t -> Operation.packed tzresult Lwt.t
+
+(** Propose a list of protocol hashes during the approval voting *)
+val proposals : Context.t -> Contract.t -> Protocol_hash.t list ->
+  Operation.packed tzresult Lwt.t
+
+(** Cast a vote yay, nay or pass *)
+val ballot : Context.t ->
+  Contract.t -> Protocol_hash.t -> Vote.ballot ->
+  Operation.packed tzresult Lwt.t

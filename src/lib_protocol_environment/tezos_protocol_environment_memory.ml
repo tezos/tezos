@@ -127,9 +127,20 @@ module Context = struct
 
   let dump m = Format.eprintf "@[<v>%a@]" pp m
 
-  let set_protocol _ _ = assert false
+  let current_protocol_key = ["protocol"]
 
-  let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
+  let get_protocol v =
+    raw_get v current_protocol_key |> function
+    | Some (Key data) -> Lwt.return (Protocol_hash.of_bytes_exn data)
+    | _ -> assert false
+
+  let set_protocol v key =
+    raw_set v current_protocol_key (Some (Key (Protocol_hash.to_bytes key))) |> function
+    | Some m -> Lwt.return m
+    | None -> assert false
+
+
+  let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
 
 end
 

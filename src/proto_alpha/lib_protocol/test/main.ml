@@ -37,4 +37,5 @@ let () =
     "rolls", Rolls.tests ;
     "combined", Combined_operations.tests ;
     "qty", Qty.tests ;
+    "voting", Voting.tests ;
   ]
