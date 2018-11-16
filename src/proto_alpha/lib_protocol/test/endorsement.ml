@@ -164,7 +164,7 @@ let consistent_priorities () =
         (B b) ~nb_endorsement:(List.length endorser.slots) endorser.delegate balance
     ) priorities
 
-(** Check that after a cycle the endorser gets his reward *)
+(** Check that after [preserved_cycles] cycles the endorser gets his reward *)
 let reward_retrieval () =
   Context.init 5 >>=? fun (b, _) ->
   Context.get_constants (B b) >>=? fun Constants.
@@ -182,6 +182,74 @@ let reward_retrieval () =
 
   Lwt.return Tez.(endorsement_reward *? Int64.of_int (List.length slots)) >>=? fun reward ->
   Assert.balance_was_credited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser) balance reward
+
+
+(** Check that after [preserved_cycles] cycles endorsers get their
+    reward. Two endorsers are used and they endorse in different
+    cycles. *)
+let reward_retrieval_two_endorsers () =
+  Context.init 5 >>=? fun (b, _) ->
+  Context.get_constants (B b) >>=? fun Constants.
+    { parametric = { preserved_cycles ; endorsement_reward ; endorsement_security_deposit ; _ } ; _ } ->
+
+  Context.get_endorsers (B b) >>=? fun endorsers ->
+  let endorser1 = List.hd endorsers in
+  let endorser2 = List.hd (List.tl endorsers) in
+
+  let policy = Block.Excluding [ endorser1.delegate ; endorser2.delegate ] in
+
+  Context.Contract.balance (B b) (Contract.implicit_contract endorser1.delegate) >>=? fun balance1 ->
+  Context.Contract.balance (B b) (Contract.implicit_contract endorser2.delegate) >>=? fun balance2 ->
+
+  Lwt.return Tez.(endorsement_security_deposit *? Int64.of_int (List.length endorser1.slots)) >>=? fun security_deposit1 ->
+  Lwt.return Tez.(endorsement_reward *? Int64.of_int (List.length endorser1.slots)) >>=? fun reward1 ->
+
+  (* endorser1 endorses the genesis block in cycle 0 *)
+  Op.endorsement ~delegate:endorser1.delegate (B b) () >>=? fun operation1 ->
+
+  (* bake next block, include endorsement of endorser1 *)
+  Block.bake ~policy ~operation:(Operation.pack operation1) b >>=? fun b ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser1.delegate) balance1 security_deposit1 >>=? fun () ->
+  Assert.balance_is ~loc:__LOC__ (B b) (Contract.implicit_contract endorser2.delegate) balance2  >>=? fun () ->
+
+  (* complete cycle 0 *)
+  Block.bake_until_cycle_end ~policy b >>=? fun b ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser1.delegate) balance1 security_deposit1 >>=? fun () ->
+  Assert.balance_is ~loc:__LOC__ (B b) (Contract.implicit_contract endorser2.delegate) balance2  >>=? fun () ->
+
+  (* get the slots of endorser2 for the current block *)
+  Context.get_endorsers (B b) >>=? fun endorsers ->
+  let same_endorser2 endorser = Signature.Public_key_hash.compare endorser.Delegate_services.Endorsing_rights.delegate endorser2.delegate = 0 in
+  let endorser2 = List.find same_endorser2 endorsers in (* No exception raised: in sandboxed mode endorsers do not change between blocks *)
+  Lwt.return Tez.(endorsement_security_deposit *? Int64.of_int (List.length endorser2.slots)) >>=? fun security_deposit2 ->
+
+  (* endorser2 endorses the last block in cycle 0 *)
+  Op.endorsement ~delegate:endorser2.delegate (B b) () >>=? fun operation2 ->
+  let priority = b.header.protocol_data.contents.priority in
+  Tez.(endorsement_reward /? Int64.(succ (of_int priority))) >>?= fun reward_per_slot ->
+  Lwt.return Tez.(reward_per_slot *? Int64.of_int (List.length endorser2.slots)) >>=? fun reward2 ->
+
+  (* bake first block in cycle 1, include endorsement of endorser2 *)
+  Block.bake ~policy ~operation:(Operation.pack operation2) b >>=? fun b ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser1.delegate) balance1 security_deposit1 >>=? fun () ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser2.delegate) balance2 security_deposit2 >>=? fun () ->
+
+  (* bake [preserved_cycles] cycles *)
+  fold_left_s (fun b _ ->
+      Assert.balance_was_debited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser1.delegate) balance1 security_deposit1 >>=? fun () ->
+      Assert.balance_was_debited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser2.delegate) balance2 security_deposit2 >>=? fun () ->
+      Block.bake_until_cycle_end ~policy b
+    ) b (1 -- preserved_cycles) >>=? fun b ->
+
+  Assert.balance_was_credited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser1.delegate) balance1 reward1 >>=? fun () ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser2.delegate) balance2 security_deposit2 >>=? fun () ->
+
+  (* bake cycle [preserved_cycle + 1] *)
+  Block.bake_until_cycle_end ~policy b >>=? fun b ->
+  Assert.balance_was_credited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser1.delegate) balance1 reward1 >>=? fun () ->
+  Assert.balance_was_credited ~loc:__LOC__ (B b) (Contract.implicit_contract endorser2.delegate) balance2 reward2
+
+
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)
@@ -270,6 +338,7 @@ let tests = [
   Test.tztest "Consistent priority" `Quick consistent_priority ;
   Test.tztest "Consistent priorities" `Quick consistent_priorities ;
   Test.tztest "Reward retrieval" `Quick reward_retrieval ;
+  Test.tztest "Reward retrieval two endorsers" `Quick reward_retrieval_two_endorsers ;
 
   (* Fail scenarios *)
   Test.tztest "Wrong endorsement predecessor" `Quick wrong_endorsement_predecessor ;
