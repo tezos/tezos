@@ -63,5 +63,9 @@ module type T = sig
 
 end
 
-module Make (Proto : Registered_protocol.T) : T
+module type STATIC = sig
+  val max_size_parsed_cache: int
+end
+
+module Make (Static : STATIC) (Proto : Registered_protocol.T) : T with module Proto = Proto
 
