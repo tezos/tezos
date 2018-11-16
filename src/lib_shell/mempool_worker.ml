@@ -263,9 +263,6 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
     let add t parsed_op result =
       Operation_hash.Table.replace t parsed_op.hash result
 
-    let mem t parsed_op =
-      Operation_hash.Table.mem t parsed_op.hash
-
     let find_opt t parsed_op =
       Operation_hash.Table.find_opt t parsed_op.hash
 
