@@ -14,6 +14,7 @@ depends: [
   "tezos-p2p"
   "tezos-shell-services"
   "tezos-protocol-updater"
+  "tezos-validation"
   "alcotest-lwt" { test }
   "tezos-embedded-protocol-demo" { test }
   "tezos-protocol-environment" { test }
