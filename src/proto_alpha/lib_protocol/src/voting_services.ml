@@ -101,7 +101,7 @@ let register () =
   end;
 
   register0 S.proposals begin fun ctxt () () ->
-    Vote.get_proposals ctxt >|= ok
+    Vote.get_proposals ctxt
   end;
 
   register0 S.listings begin fun ctxt () () ->

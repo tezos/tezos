@@ -733,7 +733,7 @@ module Vote : sig
     context -> Protocol_hash.t -> public_key_hash ->
     context Lwt.t
   val get_proposals:
-    context -> int32 Protocol_hash.Map.t Lwt.t
+    context -> int32 Protocol_hash.Map.t tzresult Lwt.t
   val clear_proposals: context -> context Lwt.t
 
   val listings_encoding : (Signature.Public_key_hash.t * int32) list Data_encoding.t

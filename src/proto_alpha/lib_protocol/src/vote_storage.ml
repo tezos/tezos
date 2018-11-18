@@ -28,13 +28,18 @@ let record_proposal ctxt delegate proposal =
 
 let get_proposals ctxt =
   Storage.Vote.Proposals.fold ctxt
-    ~init:Protocol_hash.Map.empty
-    ~f:(fun (proposal, _delegate) acc ->
-        let previous =
-          match Protocol_hash.Map.find_opt proposal acc with
-          | None -> 0l
-          | Some x -> x in
-        Lwt.return (Protocol_hash.Map.add proposal (Int32.succ previous) acc))
+    ~init:(ok Protocol_hash.Map.empty)
+    ~f:(fun (proposal, delegate) acc ->
+        (* Assuming the same listings is used at votings *)
+        Storage.Vote.Listings.get ctxt delegate >>=? fun weight ->
+        Lwt.return begin acc >>? fun acc ->
+          let previous =
+            match Protocol_hash.Map.find_opt proposal acc with
+            | None -> 0l
+            | Some x -> x
+          in
+          ok (Protocol_hash.Map.add proposal (Int32.add weight previous) acc)
+        end)
 
 let clear_proposals ctxt =
   Storage.Vote.Proposals.clear ctxt
@@ -60,6 +65,7 @@ let record_ballot = Storage.Vote.Ballots.init_set
 let get_ballots ctxt =
   Storage.Vote.Ballots.fold ctxt
     ~f:(fun delegate ballot (ballots: ballots tzresult) ->
+        (* Assuming the same listings is used at votings *)
         Storage.Vote.Listings.get ctxt delegate >>=? fun weight ->
         let count = Int32.add weight in
         Lwt.return begin

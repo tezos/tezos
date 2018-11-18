@@ -28,7 +28,7 @@ val record_proposal:
   Raw_context.t Lwt.t
 
 val get_proposals:
-  Raw_context.t -> int32 Protocol_hash.Map.t Lwt.t
+  Raw_context.t -> int32 Protocol_hash.Map.t tzresult Lwt.t
 
 val clear_proposals: Raw_context.t -> Raw_context.t Lwt.t
 

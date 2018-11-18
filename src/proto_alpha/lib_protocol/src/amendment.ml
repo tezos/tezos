@@ -67,7 +67,7 @@ let check_approval_and_update_quorum ctxt =
 let start_new_voting_cycle ctxt =
   Vote.get_current_period_kind ctxt >>=? function
   | Proposal -> begin
-      Vote.get_proposals ctxt >>= fun proposals ->
+      Vote.get_proposals ctxt >>=? fun proposals ->
       Vote.clear_proposals ctxt >>= fun ctxt ->
       Vote.clear_listings ctxt >>=? fun ctxt ->
       match select_winning_proposal proposals with
