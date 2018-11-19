@@ -67,7 +67,8 @@ let default_config =
     minimal_fees_per_gas_unit = Tez.zero ;
     minimal_fees_per_byte = Tez.zero ;
     allow_script_failure = true ;
-    implicit_account_minimal_balance = Tez.one_mutez }
+    implicit_account_minimal_balance =
+      Option.unopt_exn (Failure "tez invalid conversion") (Tez.of_mutez 256L) }
 
 module Proto = Tezos_embedded_protocol_002_PsYLVpVv.Registerer.Registered
 
