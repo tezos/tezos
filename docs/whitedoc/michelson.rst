@@ -1019,7 +1019,7 @@ Operations on maps
 ::
 
     :: (map 'elt 'val) : 'A   ->  'A
-       iff   body :: [ (pair 'elt 'val) : 'A -> 'A ]
+       iff   body :: [ (pair 'elt 'val : 'A) -> 'A ]
 
     > ITER body / {} : S  =>  S
     > ITER body / { Elt k v ; <tl> } : S  =>  body ; ITER body / (Pair k v) : { <tl> } : S
@@ -1344,7 +1344,7 @@ argument the transferred amount plus an ad-hoc argument and returns an
 ad-hoc value. The code also takes the global data and returns it to be
 stored and retrieved on the next transaction. These data are initialized
 by another parameter. The calling convention for the code is as follows:
-``(Pair arg globals)) -> (Pair operations globals)``, as extrapolated from
+``(Pair arg globals) -> (Pair operations globals)``, as extrapolated from
 the instruction type. The first parameters are the manager, optional
 delegate, then spendable and delegatable flags and finally the initial
 amount taken from the currently executed contract. The contract is
@@ -1370,7 +1370,7 @@ currently executed contract.
 ::
 
     :: key_hash : option key_hash : bool : mutez : 'S
-       ->   operation : contract unit : 'S
+       ->   operation : address : 'S
 
 Take as argument the manager, optional delegate, the delegatable flag
 and finally the initial amount taken from the currently executed
