@@ -235,7 +235,7 @@ let tokenize source =
         begin match uchar_to_char c with
           | Some ('0'.. '9') -> integer acc start
           | Some 'x' -> bytes acc start
-          | Some ('a' | 'c'..'w' | 'y' | 'z' | 'A'..'Z') ->
+          | Some ('a'..'w' | 'y' | 'z' | 'A'..'Z') ->
               errors := Missing_break_after_number stop :: !errors ;
               back charloc ;
               skip (tok start stop (Int "0") :: acc)
