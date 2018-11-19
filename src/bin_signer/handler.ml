@@ -69,10 +69,12 @@ module High_watermark = struct
               | Some (previous_level, previous_hash, Some signature) ->
                   if previous_level > level then
                     failwith "%s level %ld below high watermark %ld" name level previous_level
-                  else if previous_level = level && previous_hash <> hash then
-                    failwith "%s level %ld already signed with different data" name level
-                  else
-                    return (Some signature)
+                  else if previous_level = level then
+                    if previous_hash <> hash then
+                      failwith "%s level %ld already signed with different data" name level
+                    else
+                      return (Some signature)
+                  else return_none
         end >>=? function
         | Some signature -> return signature
         | None ->
