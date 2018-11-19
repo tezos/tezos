@@ -253,10 +253,15 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
   (* validated operations' cache. used for memoization *)
   module ValidatedCache = struct
 
-    type t = result Operation_hash.Table.t
+    type t = (result * Operation.t) Operation_hash.Table.t
 
     let encoding =
-      Operation_hash.Table.encoding result_encoding
+      let open Data_encoding in
+      Operation_hash.Table.encoding (
+        tup2
+          result_encoding
+          Operation.encoding
+      )
 
     let create () = Operation_hash.Table.create 1000
 
@@ -269,7 +274,7 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
     let iter f t =
       Operation_hash.Table.iter f t
 
-    let to_mempool t parsed_cache =
+    let to_mempool t =
       let empty = {
         Proto_services.Mempool.applied = [] ;
         refused = Operation_hash.Map.empty ;
@@ -284,44 +289,40 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
             op.Operation.proto in
         { Proto.shell = op.shell ; protocol_data } in
       Operation_hash.Table.fold
-        (fun hash result acc ->
-           match ParsedCache.find_hash_opt parsed_cache hash with
-           (* XXX this invariant should be better enforced *)
-           | None | Some (Error _) -> assert false
-           | Some (Ok op) -> begin
-               match result with
-               | Applied _ -> {
-                   acc with
-                   Proto_services.Mempool.applied =
-                     (hash, map_op op.raw)::acc.Proto_services.Mempool.applied
-                 }
-               | Branch_refused err -> {
-                   acc with
-                   Proto_services.Mempool.branch_refused =
-                     Operation_hash.Map.add
-                       hash
-                       (map_op op.raw,err)
-                       acc.Proto_services.Mempool.branch_refused
-                 }
-               | Branch_delayed err -> {
-                   acc with
-                   Proto_services.Mempool.branch_delayed =
-                     Operation_hash.Map.add
-                       hash
-                       (map_op op.raw,err)
-                       acc.Proto_services.Mempool.branch_delayed
-                 }
-               | Refused err -> {
-                   acc with
-                   Proto_services.Mempool.refused =
-                     Operation_hash.Map.add
-                       hash
-                       (map_op op.raw,err)
-                       acc.Proto_services.Mempool.refused
-                 }
-               | _ -> acc
-             end)
-        t empty
+        (fun hash (result,raw_op) acc ->
+           let proto_op = map_op raw_op in
+           match result with
+           | Applied _ -> {
+               acc with
+               Proto_services.Mempool.applied =
+                 (hash, proto_op)::acc.Proto_services.Mempool.applied
+             }
+           | Branch_refused err -> {
+               acc with
+               Proto_services.Mempool.branch_refused =
+                 Operation_hash.Map.add
+                   hash
+                   (proto_op,err)
+                   acc.Proto_services.Mempool.branch_refused
+             }
+           | Branch_delayed err -> {
+               acc with
+               Proto_services.Mempool.branch_delayed =
+                 Operation_hash.Map.add
+                   hash
+                   (proto_op,err)
+                   acc.Proto_services.Mempool.branch_delayed
+             }
+           | Refused err -> {
+               acc with
+               Proto_services.Mempool.refused =
+                 Operation_hash.Map.add
+                   hash
+                   (proto_op,err)
+                   acc.Proto_services.Mempool.refused
+             }
+           | _ -> acc
+        ) t empty
 
     let clear t = Operation_hash.Table.clear t
 
@@ -483,13 +484,13 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
   let on_validate w parsed_op =
     let state = Worker.state w in
     match ValidatedCache.find_opt state.cache parsed_op with
-    | None | Some (Branch_delayed _) ->
+    | None | Some ((Branch_delayed _),_) ->
         validate_helper w parsed_op >>= fun result ->
-        ValidatedCache.add state.cache parsed_op result;
+        ValidatedCache.add state.cache parsed_op (result, parsed_op.raw);
         (* operations are notified only the first time *)
         notify_helper w result parsed_op.raw ;
         Lwt.return result
-    | Some result -> Lwt.return result
+    | Some (result,_) -> Lwt.return result
 
   (* worker's handlers *)
   let on_request :
@@ -582,7 +583,7 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
       (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
       (fun w () () ->
          let state = Worker.state w in
-         RPC_answer.return (ValidatedCache.to_mempool state.cache parsed_cache)
+         RPC_answer.return (ValidatedCache.to_mempool state.cache)
       )
 
   let monitor_rpc_directory : t RPC_directory.t =
