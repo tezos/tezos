@@ -30,6 +30,6 @@ let tztest name speed f =
     | Ok () -> Lwt.return_unit
     | Error err ->
         Tezos_stdlib_unix.Logging_unix.close () >>= fun () ->
-        Format.eprintf "WWW %a@." pp_print_error err ;
+        Format.printf "WWW %a@." pp_print_error err ;
         Lwt.fail Alcotest.Test_error
   end

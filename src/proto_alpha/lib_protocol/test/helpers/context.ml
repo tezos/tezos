@@ -106,41 +106,41 @@ let get_seed_nonce_hash ctxt =
 
 let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
 
-let get_constants b =
-  Alpha_services.Constants.all rpc_ctxt b
+let get_constants ctxt =
+  Alpha_services.Constants.all rpc_ctxt ctxt
 
 (* Voting *)
 
 module Vote = struct
 
-  let get_ballots b =
-    Alpha_services.Voting.ballots rpc_ctxt b
+  let get_ballots ctxt =
+    Alpha_services.Voting.ballots rpc_ctxt ctxt
 
-  let get_ballot_list b =
-    Alpha_services.Voting.ballot_list rpc_ctxt b
+  let get_ballot_list ctxt =
+    Alpha_services.Voting.ballot_list rpc_ctxt ctxt
 
-  let get_voting_period b =
-    Alpha_services.Helpers.current_level rpc_ctxt b >>=? fun l ->
+  let get_voting_period ctxt =
+    Alpha_services.Helpers.current_level rpc_ctxt ctxt >>=? fun l ->
     return l.voting_period
 
-  let get_voting_period_position b =
-    Alpha_services.Helpers.current_level rpc_ctxt b >>=? fun l ->
+  let get_voting_period_position ctxt =
+    Alpha_services.Helpers.current_level rpc_ctxt ctxt >>=? fun l ->
     return l.voting_period_position
 
-  let get_current_period_kind b =
-    Alpha_services.Voting.current_period_kind rpc_ctxt b
+  let get_current_period_kind ctxt =
+    Alpha_services.Voting.current_period_kind rpc_ctxt ctxt
 
-  let get_current_quorum b =
-    Alpha_services.Voting.current_quorum rpc_ctxt b
+  let get_current_quorum ctxt =
+    Alpha_services.Voting.current_quorum rpc_ctxt ctxt
 
-  let get_listings b =
-    Alpha_services.Voting.listings rpc_ctxt b
+  let get_listings ctxt =
+    Alpha_services.Voting.listings rpc_ctxt ctxt
 
-  let get_proposals b =
-    Alpha_services.Voting.proposals rpc_ctxt b
+  let get_proposals ctxt =
+    Alpha_services.Voting.proposals rpc_ctxt ctxt
 
-  let get_current_proposal b =
-    Alpha_services.Voting.current_proposal rpc_ctxt b
+  let get_current_proposal ctxt =
+    Alpha_services.Voting.current_proposal rpc_ctxt ctxt
 
   let get_protocol (b:Block.t) =
     Alpha_environment.Context.get b.context ["protocol"] >>= function

@@ -32,6 +32,29 @@ let ballots_equal b1 b2 =
 let ballots_pp ppf v = Alpha_context.Vote.(
     Format.fprintf ppf "{ yay = %ld ; nay = %ld ; pass = %ld" v.yay v.nay v.pass)
 
+let protos = Array.map (fun s -> Protocol_hash.of_b58check_exn s)
+    [| "ProtoALphaALphaALphaALphaALphaALphaALpha61322gcLUGH" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALphabc2a7ebx6WB" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha84efbeiF6cm" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha91249Z65tWS" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha537f5h25LnN" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha5c8fefgDYkr" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha3f31feSSarC" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALphabe31ahnkxSC" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALphabab3bgRb7zQ" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALphaf8d39cctbpk" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha3b981byuYxD" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALphaa116bccYowi" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALphacce68eHqboj" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha225c7YrWwR7" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha58743cJL6FG" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALphac91bcdvmJFR" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha1faaadhV7oW" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha98232gD94QJ" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha9d1d8cijvAh" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALphaeec52dKF6Gx" ;
+       "ProtoALphaALphaALphaALphaALphaALphaALpha841f2cQqajX" ; |]
+
 let test_voting () =
   Context.init 5 >>=? fun (b,delegates) ->
 
@@ -89,7 +112,8 @@ let test_voting () =
 
   let del1 = List.nth delegates 0 in
   let del2 = List.nth delegates 1 in
-  Op.proposals (B b) del1 [Protocol_hash.zero] >>=? fun ops1 ->
+  let props = List.map (fun i -> protos.(i)) (2--Constants.max_proposals_per_delegate) in
+  Op.proposals (B b) del1 (Protocol_hash.zero::props) >>=? fun ops1 ->
   Op.proposals (B b) del2 [Protocol_hash.zero] >>=? fun ops2 ->
   Block.bake ~operations:[ops1;ops2] b >>=? fun b ->
 
@@ -112,6 +136,22 @@ let test_voting () =
     | Some v -> if v = weight then return_unit
         else failwith "%s - Wrong count %ld is not %ld" __LOC__ v weight
     | None -> failwith "%s - Missing proposal" __LOC__
+  end >>=? fun () ->
+
+  (* proposing more than maximum_proposals fails *)
+  Op.proposals (B b) del1 (Protocol_hash.zero::props) >>=? fun ops ->
+  Block.bake ~operations:[ops] b >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res begin function
+    | Amendment.Too_many_proposals -> true
+    | _ -> false
+  end >>=? fun () ->
+
+  (* proposing less than one proposal fails *)
+  Op.proposals (B b) del1 [] >>=? fun ops ->
+  Block.bake ~operations:[ops] b >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res begin function
+    | Amendment.Empty_proposal -> true
+    | _ -> false
   end >>=? fun () ->
 
   (* skip to vote_testing period
