@@ -346,6 +346,7 @@ module Constants : sig
     nonce_length : int ;
     max_revelations_per_block : int ;
     max_operation_data_length : int ;
+    max_proposals_per_delegate : int ;
   }
   val fixed_encoding: fixed Data_encoding.t
   val fixed: fixed
@@ -354,6 +355,7 @@ module Constants : sig
   val nonce_length: int
   val max_revelations_per_block: int
   val max_operation_data_length: int
+  val max_proposals_per_delegate: int
 
   (** Constants parameterized by context *)
   type parametric = {
@@ -731,10 +733,13 @@ module Vote : sig
 
   val record_proposal:
     context -> Protocol_hash.t -> public_key_hash ->
-    context Lwt.t
+    context tzresult Lwt.t
   val get_proposals:
     context -> int32 Protocol_hash.Map.t tzresult Lwt.t
   val clear_proposals: context -> context Lwt.t
+
+  val recorded_proposal_count_for_delegate:
+    context -> public_key_hash -> int tzresult Lwt.t
 
   val listings_encoding : (Signature.Public_key_hash.t * int32) list Data_encoding.t
   val freeze_listings: context -> context tzresult Lwt.t

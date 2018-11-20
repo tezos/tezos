@@ -121,6 +121,8 @@ type error += (* `Branch *)
   | Invalid_proposal
   | Unexpected_proposal
   | Unauthorized_proposal
+  | Too_many_proposals
+  | Empty_proposal
   | Unexpected_ballot
   | Unauthorized_ballot
 
@@ -175,17 +177,45 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Unauthorized ballot")
     empty
     (function Unauthorized_ballot -> Some () | _ -> None)
-    (fun () -> Unauthorized_ballot)
+    (fun () -> Unauthorized_ballot) ;
+  (* Too many proposals *)
+  register_error_kind
+    `Branch
+    ~id:"too_many_proposals"
+    ~title:"Too many proposals"
+    ~description:"The delegate reached the maximum number of allowed proposals."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Too many proposals")
+    empty
+    (function Too_many_proposals -> Some () | _ -> None)
+    (fun () -> Too_many_proposals) ;
+  (* Empty proposal *)
+  register_error_kind
+    `Branch
+    ~id:"empty_proposal"
+    ~title:"Empty proposal"
+    ~description:"Proposal lists cannot be empty."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Empty proposal")
+    empty
+    (function Empty_proposal -> Some () | _ -> None)
+    (fun () -> Empty_proposal)
 
 let record_proposals ctxt delegate proposals =
+  begin match proposals with
+    | [] -> fail Empty_proposal
+    | _ :: _ -> return ()
+  end >>=? fun () ->
   Vote.get_current_period_kind ctxt >>=? function
   | Proposal ->
       Vote.in_listings ctxt delegate >>= fun in_listings ->
       if in_listings then
-        Lwt_list.fold_left_s
+        fold_left_s
           (fun ctxt proposal ->
              Vote.record_proposal ctxt proposal delegate)
-          ctxt proposals >>= return
+          ctxt proposals >>=? fun ctxt ->
+        Vote.recorded_proposal_count_for_delegate ctxt delegate >>=? fun count ->
+        if Compare.Int.(count > Constants.max_proposals_per_delegate) then
+          fail Too_many_proposals
+        else return ctxt
       else
         fail Unauthorized_proposal
   | Testing_vote | Testing | Promotion_vote ->

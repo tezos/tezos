@@ -159,6 +159,11 @@ module Contract = struct
       (struct let name = ["counter"] end)
       (Z)
 
+  module Proposals =
+    Indexed_context.Make_map
+      (struct let name = ["proposals"] end)
+      (Int)
+
   (* Consume gas for serilization and deserialization of expr in this
      module *)
   module Make_carbonated_map_expr (N : Storage_sigs.NAME) = struct

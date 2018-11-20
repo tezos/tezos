@@ -31,6 +31,8 @@ val may_start_new_voting_cycle:
 type error +=
   | Unexpected_proposal
   | Unauthorized_proposal
+  | Too_many_proposals
+  | Empty_proposal
 
 val record_proposals:
   context ->

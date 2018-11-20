@@ -23,9 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Records a proposal per delegate *)
 val record_proposal:
   Raw_context.t -> Protocol_hash.t -> Signature.Public_key_hash.t ->
-  Raw_context.t Lwt.t
+  Raw_context.t tzresult Lwt.t
+
+val recorded_proposal_count_for_delegate:
+  Raw_context.t -> Signature.Public_key_hash.t ->
+  int tzresult Lwt.t
 
 val get_proposals:
   Raw_context.t -> int32 Protocol_hash.Map.t tzresult Lwt.t

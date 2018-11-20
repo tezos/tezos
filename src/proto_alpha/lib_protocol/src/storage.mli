@@ -178,6 +178,11 @@ module Contract : sig
      and type value = Z.t
      and type t := Raw_context.t
 
+  module Proposals : Indexed_data_storage
+    with type key = Contract_repr.t
+     and type value = int
+     and type t := Raw_context.t
+
   module Code : Non_iterable_indexed_carbonated_data_storage
     with type key = Contract_repr.t
      and type value = Script_repr.lazy_expr
