@@ -88,8 +88,8 @@ let list_blocks chain_state ?(length = 1) ?min_date heads =
        | None -> Lwt.return (ignored, [])
        | Some block ->
            predecessors ignored length block >>= fun predecessors ->
-           let ignored =
-             List.fold_right Block_hash.Set.add predecessors ignored in
+           let ignored = List.fold_left (fun acc v -> Block_hash.Set.add v acc)
+               ignored predecessors in
            Lwt.return (ignored, predecessors :: acc))
     (Block_hash.Set.empty, [])
     requested_heads >>= fun (_, blocks) ->
@@ -169,6 +169,3 @@ let build_rpc_directory validator =
 
   RPC_directory.prefix Chain_services.path @@
   RPC_directory.map (fun ((), chain) -> get_chain state chain) !dir
-
-
-
