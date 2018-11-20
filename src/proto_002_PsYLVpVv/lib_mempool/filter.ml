@@ -131,9 +131,11 @@ let ensure_reserve post_ctxt contents min_amount =
                 | Some pkh ->
                     begin match Signature.Public_key_hash.Map.find_opt pkh balances with
                       | Some _ -> return balances
-                      | None -> Alpha_context.Delegate.full_balance post_ctxt pkh >|=
-                          Environment.wrap_error >>=? fun final_balance ->
-                          return (Signature.Public_key_hash.Map.add pkh final_balance balances)
+                      | None -> Alpha_context.Delegate.full_balance post_ctxt pkh >>=
+                          function
+                          | Ok final_balance ->
+                              return (Signature.Public_key_hash.Map.add pkh final_balance balances)
+                          | Error _ -> return balances
                     end
                 | None -> return balances end
           | _ -> return balances)
@@ -164,7 +166,7 @@ let ensure_reserve post_ctxt contents min_amount =
   end >>=? fun balances ->
   let insufficient_reserve_pkh_list =
     Signature.Public_key_hash.Map.fold (fun pkh resulting_balance acc ->
-        if Tez.(resulting_balance > zero && resulting_balance < min_amount) then
+        if Tez.(resulting_balance < min_amount) then
           pkh :: acc
         else
           acc
