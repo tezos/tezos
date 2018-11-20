@@ -578,15 +578,15 @@ let apply_manager_contents
   | Ok (ctxt, operation_results, internal_operations) -> begin
       apply_internal_manager_operations
         ctxt mode ~payer:source internal_operations >>= function
-      | (`Success ctxt, internal_operations_results) ->
-          Fees.burn_storage_fees ctxt ~storage_limit ~payer:source >>= begin function
-            | Ok ctxt ->
-                Lwt.return
-                  (`Success ctxt, Applied operation_results, internal_operations_results)
-            | Error errors ->
-                Lwt.return
-                  (`Failure, Backtracked (operation_results, Some errors), internal_operations_results)
-          end
+      | (`Success ctxt, internal_operations_results) -> begin
+          Fees.burn_storage_fees ctxt ~storage_limit ~payer:source >>= function
+          | Ok ctxt ->
+              Lwt.return
+                (`Success ctxt, Applied operation_results, internal_operations_results)
+          | Error errors ->
+              Lwt.return
+                (`Failure, Backtracked (operation_results, Some errors), internal_operations_results)
+        end
       | (`Failure, internal_operations_results) ->
           Lwt.return
             (`Failure, Applied operation_results, internal_operations_results)
