@@ -403,7 +403,11 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
                             Lwt.return (acc_validation_state, acc_mempool)
                       | Branch_delayed errors ->
                           notify_operation pv `Branch_delayed op.raw ;
-                          let new_mempool = Mempool.{ acc_mempool with pending = Operation_hash.Set.add op.hash acc_mempool.pending } in
+                          let new_mempool =
+                            if Proto.acceptable_passes { shell = op.raw.shell ; protocol_data = op.protocol_data } = [0] then
+                              Mempool.{ acc_mempool with pending = Operation_hash.Set.add op.hash acc_mempool.pending }
+                            else
+                              acc_mempool in
                           Option.iter (Ring.add_and_return_erased pv.branch_delayed op.hash)
                             ~f:(fun e ->
                                 pv.branch_delays <- Operation_hash.Map.remove e pv.branch_delays ;
@@ -413,7 +417,11 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
                           Lwt.return (acc_validation_state, new_mempool)
                       | Branch_refused errors ->
                           notify_operation pv `Branch_refused op.raw ;
-                          let new_mempool = Mempool.{ acc_mempool with pending = Operation_hash.Set.add op.hash acc_mempool.pending } in
+                          let new_mempool =
+                            if Proto.acceptable_passes { shell = op.raw.shell ; protocol_data = op.protocol_data } = [0] then
+                              Mempool.{ acc_mempool with pending = Operation_hash.Set.add op.hash acc_mempool.pending }
+                            else
+                              acc_mempool in
                           Option.iter (Ring.add_and_return_erased pv.branch_refused op.hash)
                             ~f:(fun e ->
                                 pv.branch_refusals <- Operation_hash.Map.remove e pv.branch_refusals ;
