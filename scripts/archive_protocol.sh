@@ -43,7 +43,7 @@ git commit -m "Archive_protocol: rename proto_${dir_name} into proto_${version}_
 sed -i --follow-symlink \
     -e s/_${dir_name}/_${version}_${short_hash}/g \
     -e s/-${lib_name}/-${version}-${short_hash}/g \
-    $(find -name jbuild -or -name \*.opam)
+    dune $(find src vendors docs -name dune -or -name \*.opam)
 
 if ls src/proto_000_*/lib_protocol/src/TEZOS_PROTOCOL | grep proto_000_ > /dev/null ; then
     proto_genesis_dir="proto_000_`ls src | grep proto_000_ | cut -f3 -d_`"
@@ -70,12 +70,10 @@ sed -i --follow-symlink \
     -e 's/"hash": "[^"]*",/"hash": "'$long_hash'",/' \
     lib_protocol/src/TEZOS_PROTOCOL
 
-if [ $proto_genesis_dir = "proto_genesis" ] ; then
-    sed -i --follow-symlink \
-        -e "s/-genesis/-000-Ps9mPmXa/" \
-        -e "s/_genesis/_000_Ps9mPmXa/" \
-        $(find lib_delegate/test -type f)
-fi
+sed -i --follow-symlink \
+    -e "s/-genesis/-000-Ps9mPmXa/" \
+    -e "s/_genesis/_000_Ps9mPmXa/" \
+    $(find lib_delegate/test -type f)
 
 cd ../..
 
