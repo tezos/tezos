@@ -719,7 +719,7 @@ module Delegate : sig
 
   val deactivated:
     context -> Signature.Public_key_hash.t ->
-    bool Lwt.t
+    bool tzresult Lwt.t
 
   val grace_period:
     context -> Signature.Public_key_hash.t ->

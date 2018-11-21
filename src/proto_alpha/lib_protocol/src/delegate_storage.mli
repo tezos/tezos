@@ -180,7 +180,7 @@ val delegated_balance:
 
 val deactivated:
   Raw_context.t -> Signature.Public_key_hash.t ->
-  bool Lwt.t
+  bool tzresult Lwt.t
 
 val grace_period:
   Raw_context.t -> Signature.Public_key_hash.t ->

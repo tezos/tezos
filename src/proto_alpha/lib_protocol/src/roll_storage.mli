@@ -61,6 +61,9 @@ val endorsement_rights_owner :
 
 module Delegate : sig
 
+  val is_inactive :
+    Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+
   val add_amount :
     Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 

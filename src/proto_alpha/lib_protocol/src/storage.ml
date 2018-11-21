@@ -306,6 +306,11 @@ module Delegates =
     (Make_subcontext(Raw_context)(struct let name = ["delegates"] end))
     (Make_index(Signature.Public_key_hash))
 
+module Active_delegates_with_rolls =
+  Make_data_set_storage
+    (Make_subcontext(Raw_context)(struct let name = ["active_delegates_with_rolls"] end))
+    (Make_index(Signature.Public_key_hash))
+
 (** Rolls *)
 
 module Cycle = struct

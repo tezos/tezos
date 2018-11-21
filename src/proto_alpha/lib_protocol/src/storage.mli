@@ -220,6 +220,11 @@ module Delegates : Data_set_storage
   with type t := Raw_context.t
    and type elt = Signature.Public_key_hash.t
 
+(** Set of all active delegates with rolls. *)
+module Active_delegates_with_rolls : Data_set_storage
+  with type t := Raw_context.t
+   and type elt = Signature.Public_key_hash.t
+
 (** Votes *)
 
 module Vote : sig
