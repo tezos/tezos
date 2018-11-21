@@ -315,12 +315,28 @@ let find_ledgers ?id () =
   log_info "Found %d Ledger(s)" (List.length ledgers) ;
   filter_map_s begin fun device_info ->
     log_info "Processing Ledger at path [%s]" device_info.Hidapi.path ;
-    match Hidapi.(open_path device_info.path) with
-    | None -> return_none
-    | Some h ->
-        Lwt.finalize
-          (fun () -> Ledger.of_hidapi ?id device_info h)
-          (fun () -> Hidapi.close h ; Lwt.return_unit)
+    (* HID interfaces get the number 0
+       (cf. https://github.com/LedgerHQ/ledger-nano-s/issues/48)
+       *BUT* on MacOSX the Hidapi library does not report the interface-number
+       so we look at the usage-page (which is even more unspecified but used by
+       prominent Ledger users:
+       https://github.com/LedgerHQ/ledgerjs/commit/333ade0d55dc9c59bcc4b451cf7c976e78629681).
+    *)
+    if
+      (device_info.Hidapi.interface_number = 0)
+      ||
+      (device_info.Hidapi.interface_number = -1
+       && device_info.Hidapi.usage_page = 0xffa0)
+    then
+      begin match Hidapi.(open_path device_info.path) with
+        | None -> return_none
+        | Some h ->
+            Lwt.finalize
+              (fun () -> Ledger.of_hidapi ?id device_info h)
+              (fun () -> Hidapi.close h ; Lwt.return_unit)
+      end
+    else
+      return_none
   end ledgers
 
 let with_ledger id f =
