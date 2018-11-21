@@ -45,9 +45,10 @@ type ballots = {
 
 val ballots_encoding : ballots Data_encoding.t
 
+val has_recorded_ballot : Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
 val record_ballot:
   Raw_context.t -> Signature.Public_key_hash.t -> Vote_repr.ballot ->
-  Raw_context.t Lwt.t
+  Raw_context.t tzresult Lwt.t
 val get_ballots: Raw_context.t -> ballots tzresult Lwt.t
 val get_ballot_list :
   Raw_context.t -> (Signature.Public_key_hash.t * Vote_repr.ballot) list Lwt.t

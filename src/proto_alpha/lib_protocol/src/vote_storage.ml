@@ -74,7 +74,8 @@ let ballots_encoding =
     (req "nay"  int32)
     (req "pass" int32)
 
-let record_ballot = Storage.Vote.Ballots.init_set
+let has_recorded_ballot = Storage.Vote.Ballots.mem
+let record_ballot = Storage.Vote.Ballots.init
 
 let get_ballots ctxt =
   Storage.Vote.Ballots.fold ctxt

@@ -759,8 +759,10 @@ module Vote : sig
 
   val ballots_encoding : ballots Data_encoding.t
 
+  val has_recorded_ballot :
+    context -> public_key_hash -> bool Lwt.t
   val record_ballot:
-    context -> public_key_hash -> ballot -> context Lwt.t
+    context -> public_key_hash -> ballot -> context tzresult Lwt.t
   val get_ballots: context -> ballots tzresult Lwt.t
   val get_ballot_list: context -> (Signature.Public_key_hash.t * ballot) list Lwt.t
   val clear_ballots: context -> context Lwt.t

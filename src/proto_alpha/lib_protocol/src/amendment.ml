@@ -227,9 +227,11 @@ let record_ballot ctxt delegate proposal ballot =
       Vote.get_current_proposal ctxt >>=? fun current_proposal ->
       fail_unless (Protocol_hash.equal proposal current_proposal)
         Invalid_proposal >>=? fun () ->
+      Vote.has_recorded_ballot ctxt delegate >>= fun has_ballot ->
+      fail_when has_ballot Unauthorized_ballot >>=? fun () ->
       Vote.in_listings ctxt delegate >>= fun in_listings ->
       if in_listings then
-        Vote.record_ballot ctxt delegate ballot >>= return
+        Vote.record_ballot ctxt delegate ballot
       else
         fail Unauthorized_ballot
   | Testing | Proposal ->

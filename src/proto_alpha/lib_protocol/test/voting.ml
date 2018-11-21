@@ -201,6 +201,13 @@ let test_voting () =
     delegates >>=? fun operations ->
   Block.bake ~operations b >>=? fun b ->
 
+  Op.ballot (B b) del1 Protocol_hash.zero Vote.Nay >>=? fun op ->
+  Block.bake ~operations:[op] b >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res begin function
+    | Amendment.Unauthorized_ballot -> true
+    | _ -> false
+  end >>=? fun () ->
+
   fold_left_s (fun v acc -> return Int32.(add v acc))
     0l rolls >>=? fun rolls_sum ->
 
