@@ -27,6 +27,8 @@ val may: f:('a -> unit Lwt.t) -> 'a option -> unit Lwt.t
 
 val never_ending: unit -> 'a Lwt.t
 
+(** [worker name ~run ~cancel] runs worker [run], and logs worker
+    creation, ending or failure. [cancel] is called if worker fails. *)
 val worker:
   string ->
   run:(unit -> unit Lwt.t) ->
@@ -34,8 +36,8 @@ val worker:
   unit Lwt.t
 
 val trigger: unit -> (unit -> unit) * (unit -> unit Lwt.t)
-val sort: ('a -> 'a -> int Lwt.t) -> 'a list -> 'a list Lwt.t
 
+val sort: ('a -> 'a -> int Lwt.t) -> 'a list -> 'a list Lwt.t
 
 val unless: bool -> (unit -> unit Lwt.t) -> unit Lwt.t
 

@@ -71,6 +71,18 @@ type error += Exn of exn
 
 type error += Canceled
 
+(** [protect] is a wrapper around [Lwt.catch] where the error handler operates
+    over `error list` instead of `exn`. Besides, [protect ~on_error ~canceler ~f]
+    may *cancel* [f] via a [Lwt_canceler.t].
+
+    More precisely, [protect ~on_error ~canceler f] runs [f ()]. An Lwt failure
+    triggered by [f ()] is wrapped into an [Exn]. If a [canceler] is given and
+    [Lwt_canceler.cancelation canceler] is determined before [f ()],
+    a [Canceled] error is returned.
+
+    Errors are caught by [~on_error] (if given), otherwise the previous value
+    is returned. An Lwt failure triggered by [~on_error] is wrapped into an
+    [Exn] *)
 val protect :
   ?on_error:(error list -> 'a tzresult Lwt.t) ->
   ?canceler:Lwt_canceler.t ->
