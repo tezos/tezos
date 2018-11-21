@@ -47,13 +47,21 @@ open Test_tez
    - A block that added a valid operation
    - a valid operation
 *)
-let transfer_and_check_balances ~loc b ?(fee=Tez.zero) ?expect_failure src dst amount =
+let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee=Tez.zero) ?expect_failure src dst amount =
   Tez.(+?) fee amount >>?= fun amount_fee ->
   Context.Contract.balance (I b) src >>=? fun bal_src ->
   Context.Contract.balance (I b) dst >>=? fun bal_dst ->
   Op.transaction (I b) ~fee src dst amount >>=? fun op ->
   Incremental.add_operation ?expect_failure b op >>=? fun b ->
-  Assert.balance_was_debited  ~loc (I b) src bal_src amount_fee >>=? fun () ->
+  Context.get_constants (I b) >>=? fun { parametric = { origination_burn } } ->
+  let amount_fee_maybe_burn =
+    if with_burn then
+      match Tez.(amount_fee +? origination_burn) with
+      | Ok r -> r
+      | Error _ -> assert false
+    else
+      amount_fee in
+  Assert.balance_was_debited  ~loc (I b) src bal_src amount_fee_maybe_burn >>=? fun () ->
   Assert.balance_was_credited ~loc (I b) dst bal_dst amount >>=? fun () ->
   return (b, op)
 
@@ -264,14 +272,14 @@ let transfer_from_implicit_to_implicit_contract () =
   let src = Contract.implicit_contract account_a.Account.pkh in
   two_nth_of_balance b bootstrap_contract 3L >>=? fun amount1 ->
   two_nth_of_balance b bootstrap_contract 10L >>=? fun fee1 ->
-  transfer_and_check_balances ~loc:__LOC__ ~fee:fee1 b
+  transfer_and_check_balances ~with_burn:true ~loc:__LOC__ ~fee:fee1 b
     bootstrap_contract src amount1 >>=? fun (b, _) ->
   (* create an implicit contract as a destination contract *)
   let dest = Contract.implicit_contract account_b.pkh in
   two_nth_of_balance b bootstrap_contract 4L >>=? fun amount2 ->
   two_nth_of_balance b bootstrap_contract 10L >>=? fun fee2 ->
   (* transfer from implicit contract to another implicit contract *)
-  transfer_and_check_balances ~loc:__LOC__ ~fee:fee2 b
+  transfer_and_check_balances ~with_burn:true ~loc:__LOC__ ~fee:fee2 b
     src dest amount2 >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
@@ -287,7 +295,7 @@ let transfer_from_implicit_to_originated_contract () =
   Incremental.begin_construction b >>=? fun b ->
   two_nth_of_balance b bootstrap_contract 3L >>=? fun amount1 ->
   (* transfer the money to implicit contract *)
-  transfer_and_check_balances ~loc:__LOC__ b bootstrap_contract src amount1
+  transfer_and_check_balances ~with_burn:true ~loc:__LOC__ b bootstrap_contract src amount1
   >>=? fun (b, _) ->
   (* originated contract *)
   Op.origination (I b) contract >>=? fun (operation, new_contract) ->
@@ -328,7 +336,7 @@ let transfer_from_originated_to_implicit () =
   Op.origination (I b) contract_1 >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
   (* transfer from originated contract to implicit contract *)
-  transfer_and_check_balances ~loc:__LOC__ b new_contract src Alpha_context.Tez.one
+  transfer_and_check_balances ~with_burn:true ~loc:__LOC__ b new_contract src Alpha_context.Tez.one_mutez
   >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit

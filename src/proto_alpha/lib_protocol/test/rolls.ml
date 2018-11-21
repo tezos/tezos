@@ -153,7 +153,9 @@ let deactivation_then_empty_then_self_delegation () =
   Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
   let sink_account = Account.new_account () in
   let sink_contract = Contract.implicit_contract sink_account.pkh in
-  Op.transaction (B b) deactivated_contract sink_contract balance >>=? fun empty_contract ->
+  Context.get_constants (B b) >>=? fun { parametric = { origination_burn } } ->
+  let amount = match Tez.(balance -? origination_burn) with Ok r -> r | Error _ -> assert false in
+  Op.transaction (B b) deactivated_contract sink_contract amount >>=? fun empty_contract ->
   Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b >>=? fun b ->
   (* self delegation *)
   Op.delegation (B b) deactivated_contract (Some deactivated_account.pkh) >>=? fun self_delegation ->
@@ -166,24 +168,25 @@ let deactivation_then_empty_then_self_delegation () =
 
 let deactivation_then_empty_then_self_delegation_then_recredit () =
   run_until_deactivation () >>=?
-  fun (b, ((deactivated_contract, deactivated_account) as deactivated, start_balance),
+  fun (b, ((deactivated_contract, deactivated_account) as deactivated, balance),
        (_a2, m2)) ->
   (* empty the contract *)
-  Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
   let sink_account = Account.new_account () in
   let sink_contract = Contract.implicit_contract sink_account.pkh in
-  Op.transaction (B b) deactivated_contract sink_contract balance >>=? fun empty_contract ->
+  Context.get_constants (B b) >>=? fun { parametric = { origination_burn } } ->
+  let amount = match Tez.(balance -? origination_burn) with Ok r -> r | Error _ -> assert false in
+  Op.transaction (B b) deactivated_contract sink_contract amount >>=? fun empty_contract ->
   Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b >>=? fun b ->
   (* self delegation *)
   Op.delegation (B b) deactivated_contract (Some deactivated_account.pkh) >>=? fun self_delegation ->
   Block.bake ~policy:(By_account m2.pkh) ~operation:self_delegation b >>=? fun b ->
   (* recredit *)
-  Op.transaction (B b) sink_contract deactivated_contract balance >>=? fun recredit_contract ->
+  Op.transaction (B b) sink_contract deactivated_contract amount >>=? fun recredit_contract ->
   Block.bake ~policy:(By_account m2.pkh) ~operation:recredit_contract b >>=? fun b ->
 
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:false b deactivated >>=? fun () ->
   Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
-  Assert.equal_tez ~loc:__LOC__ start_balance balance >>=? fun () ->
+  Assert.equal_tez ~loc:__LOC__ amount balance >>=? fun () ->
   check_rolls b deactivated_account
 
 let delegation () =
@@ -192,7 +195,6 @@ let delegation () =
   let m3 = Account.new_account () in
   Account.add_account m3;
 
-  Context.Contract.balance (B b) a1 >>=? fun balance ->
   Context.Contract.manager (B b) a1 >>=? fun m1 ->
   Context.Contract.manager (B b) a2 >>=? fun m2 ->
   let a3 = Contract.implicit_contract m3.pkh in
@@ -205,7 +207,7 @@ let delegation () =
         assert (Signature.Public_key_hash.equal pkh m1.pkh)
   end;
 
-  Op.transaction (B b) a1 a3 balance >>=? fun transact ->
+  Op.transaction (B b) a1 a3 Tez.fifty_cents >>=? fun transact ->
 
   Block.bake ~policy:(By_account m2.pkh) b ~operation:transact >>=? fun b ->
 
