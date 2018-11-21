@@ -43,29 +43,44 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Vote_storage.init ctxt >>=? fun ctxt ->
       Storage.Last_block_priority.init ctxt 0 >>=? fun ctxt ->
       return ctxt
-  | Alpha ->
-      Storage.Contract.fold ctxt ~init:(ok ctxt)
-        ~f:(fun contract ctxt ->
-            Lwt.return ctxt >>=? fun ctxt ->
-            match contract with
-            | Implicit _ -> return ctxt
-            | Originated _contract_hash ->
-                Roll_storage.get_contract_delegate ctxt contract >>=? fun delegate ->
-                match delegate with
-                | None -> return ctxt
-                | Some delegate ->
-                    Delegate_storage.registered ctxt delegate >>= fun registered ->
-                    if registered then
-                      return ctxt
-                    else
-                      Contract_storage.is_manager_key_revealed
-                        ctxt (Contract_repr.implicit_contract delegate) >>=? fun revealed ->
-                      if revealed then
-                        Delegate_storage.set ctxt
-                          (Contract_repr.implicit_contract delegate)
-                          (Some delegate)
-                      else
-                        return ctxt)
+  | Alpha_002 ->
+      Storage.Delegates.fold ctxt ~init:(Ok ctxt) ~f:begin fun delegate ctxt ->
+        Lwt.return ctxt >>=? fun ctxt ->
+        Storage.Contract.Inactive_delegate.mem ctxt
+          (Contract_repr.implicit_contract delegate) >>= fun inactive ->
+        if inactive then
+          return ctxt
+        else
+          Storage.Roll.Delegate_roll_list.get_option ctxt delegate >>=? function
+          | None ->
+              return ctxt
+          | Some _ ->
+              Storage.Active_delegates_with_rolls.add ctxt delegate >>= fun ctxt ->
+              return ctxt
+      end >>=? fun ctxt ->
+      let { Level_repr.cycle = current_cycle } = Raw_context.current_level ctxt in
+      let { Constants_repr.preserved_cycles } = Raw_context.constants ctxt in
+      let first_cycle =
+        match Cycle_repr.sub current_cycle preserved_cycles with
+        | None -> Cycle_repr.root
+        | Some first_cycle -> first_cycle in
+      Storage.Delegates.fold ctxt ~init:(Ok ctxt) ~f:begin fun delegate ctxt ->
+        Lwt.return ctxt >>=? fun ctxt ->
+        let rec loop ctxt cycle =
+          if Cycle_repr.(cycle > current_cycle) then
+            return ctxt
+          else
+            Delegate_storage.has_frozen_balance ctxt delegate cycle >>=? fun has_frozen_balance ->
+            begin
+              if has_frozen_balance then
+                Storage.Delegates_with_frozen_balance.add (ctxt, cycle) delegate
+              else
+                Lwt.return ctxt
+            end >>= fun ctxt ->
+            loop ctxt (Cycle_repr.succ cycle) in
+        loop ctxt first_cycle
+      end >>=? fun ctxt ->
+      return ctxt
 
 let prepare ctxt ~level ~timestamp ~fitness =
   Raw_context.prepare ~level ~timestamp ~fitness ctxt

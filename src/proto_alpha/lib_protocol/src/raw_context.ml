@@ -307,7 +307,7 @@ let storage_error err = fail (Storage_error err)
 (* This key should always be populated for every version of the
    protocol.  It's absence meaning that the context is empty. *)
 let version_key = ["version"]
-let version_value = "alpha_002"
+let version_value = "alpha_003"
 
 let version = "v1"
 let first_level_key = [ version ; "first_level" ]
@@ -450,7 +450,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
 
 type 'a previous_protocol =
   | Genesis of 'a
-  | Alpha
+  | Alpha_002
 
 let check_first_block ctxt =
   Context.get ctxt version_key >>= function
@@ -462,8 +462,8 @@ let check_first_block ctxt =
         failwith "Internal error: previously initialized context."
       else if Compare.String.(s = "genesis") then
         return (Genesis ())
-      else if Compare.String.(s = "alpha") then
-        return Alpha
+      else if Compare.String.(s = "alpha_002") then
+        return Alpha_002
       else
         storage_error (Incompatible_protocol_version s)
 
@@ -476,8 +476,8 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
         set_first_level ctxt first_level >>=? fun ctxt ->
         set_constants ctxt param.constants >>= fun ctxt ->
         return (Genesis param, ctxt)
-    | Alpha ->
-        return (Alpha, ctxt)
+    | Alpha_002 ->
+        return (Alpha_002, ctxt)
   end >>=? fun (previous_proto, ctxt) ->
   Context.set ctxt version_key
     (MBytes.of_string version_value) >>= fun ctxt ->
