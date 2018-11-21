@@ -90,8 +90,17 @@ let get_delegates cctxt state =
       return (List.map (fun (_,pkh,_,_) -> pkh) keys)
   | _ -> return state.delegates
 
+let is_updated_constant = "\x00\x00\x00\x03"
+let is_updated_cstruct = MBytes.of_string is_updated_constant
+let is_updated_constant_len = String.length is_updated_constant
+
 let generate_seed_nonce () =
-  match Nonce.of_bytes (Rand.generate Constants.nonce_length) with
+  let bytes =
+    MBytes.concat ""
+      [is_updated_cstruct;
+       Rand.generate (Constants.nonce_length - is_updated_constant_len)]
+  in
+  match Nonce.of_bytes bytes with
   | Error _errs -> assert false
   | Ok nonce -> nonce
 
