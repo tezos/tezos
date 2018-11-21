@@ -250,7 +250,7 @@ let fee_threshold_arg =
   arg
     ~long:"fee-threshold"
     ~placeholder:"amount"
-    ~doc:"exclude operations with fees lower than this threshold (in mutez)"
+    ~doc:"exclude operations with fees lower than this threshold (in tz)"
     (parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t
