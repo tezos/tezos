@@ -311,6 +311,17 @@ module Active_delegates_with_rolls =
     (Make_subcontext(Raw_context)(struct let name = ["active_delegates_with_rolls"] end))
     (Make_index(Signature.Public_key_hash))
 
+module Delegates_with_frozen_balance_index =
+  Make_indexed_subcontext
+    (Make_subcontext(Raw_context)
+       (struct let name = ["delegates_with_frozen_balance"] end))
+    (Make_index(Cycle_repr.Index))
+
+module Delegates_with_frozen_balance =
+  Make_data_set_storage
+    (Delegates_with_frozen_balance_index.Raw_context)
+    (Make_index(Signature.Public_key_hash))
+
 (** Rolls *)
 
 module Cycle = struct

@@ -123,7 +123,8 @@ module Contract : sig
      and type value = Tez_repr.t
      and type t := Raw_context.t
 
-  (** Frozen balance, see 'delegate_storage.mli' for more explanation *)
+  (** Frozen balance, see 'delegate_storage.mli' for more explanation.
+      Always update `Delegates_with_frozen_balance` accordingly. *)
   module Frozen_deposits : Indexed_data_storage
     with type key = Cycle_repr.t
      and type value = Tez_repr.t
@@ -223,6 +224,11 @@ module Delegates : Data_set_storage
 (** Set of all active delegates with rolls. *)
 module Active_delegates_with_rolls : Data_set_storage
   with type t := Raw_context.t
+   and type elt = Signature.Public_key_hash.t
+
+(** Set of all the delegates with frozen rewards/bonds/fees for a given cycle. *)
+module Delegates_with_frozen_balance : Data_set_storage
+  with type t = Raw_context.t * Cycle_repr.t
    and type elt = Signature.Public_key_hash.t
 
 (** Votes *)
