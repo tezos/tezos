@@ -24,15 +24,13 @@
 (*****************************************************************************)
 
 let recorded_proposal_count_for_delegate ctxt proposer =
-  let delegate = Contract_repr.implicit_contract proposer in
-  Storage.Contract.Proposals.get_option ctxt delegate >>=? function
+  Storage.Vote.Proposals_count.get_option ctxt proposer >>=? function
   | None -> return 0
   | Some count -> return count
 
 let record_proposal ctxt proposal proposer =
   recorded_proposal_count_for_delegate ctxt proposer >>=? fun count ->
-  let delegate = Contract_repr.implicit_contract proposer in
-  Storage.Contract.Proposals.init_set ctxt delegate (count + 1) >>= fun ctxt ->
+  Storage.Vote.Proposals_count.init_set ctxt proposer (count + 1) >>= fun ctxt ->
   Storage.Vote.Proposals.add ctxt (proposal, proposer) >>= fun ctxt ->
   return ctxt
 
@@ -52,10 +50,7 @@ let get_proposals ctxt =
         end)
 
 let clear_proposals ctxt =
-  Storage.Delegates.fold ctxt ~init:ctxt ~f:begin fun proposer ctxt ->
-    let delegate = Contract_repr.implicit_contract proposer in
-    Storage.Contract.Proposals.remove ctxt delegate
-  end >>= fun ctxt ->
+  Storage.Vote.Proposals_count.clear ctxt >>= fun ctxt ->
   Storage.Vote.Proposals.clear ctxt
 
 type ballots = {

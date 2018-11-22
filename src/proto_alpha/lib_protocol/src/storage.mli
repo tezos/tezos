@@ -179,11 +179,6 @@ module Contract : sig
      and type value = Z.t
      and type t := Raw_context.t
 
-  module Proposals : Indexed_data_storage
-    with type key = Contract_repr.t
-     and type value = int
-     and type t := Raw_context.t
-
   module Code : Non_iterable_indexed_carbonated_data_storage
     with type key = Contract_repr.t
      and type value = Script_repr.lazy_expr
@@ -258,6 +253,11 @@ module Vote : sig
 
   module Proposals : Data_set_storage
     with type elt = Protocol_hash.t * Signature.Public_key_hash.t
+     and type t := Raw_context.t
+
+  module Proposals_count : Indexed_data_storage
+    with type key = Signature.Public_key_hash.t
+     and type value = int
      and type t := Raw_context.t
 
   module Ballots : Indexed_data_storage

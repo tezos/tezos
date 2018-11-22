@@ -159,11 +159,6 @@ module Contract = struct
       (struct let name = ["counter"] end)
       (Z)
 
-  module Proposals =
-    Indexed_context.Make_map
-      (struct let name = ["proposals"] end)
-      (Int)
-
   (* Consume gas for serilization and deserialization of expr in this
      module *)
   module Make_carbonated_map_expr (N : Storage_sigs.NAME) = struct
@@ -530,6 +525,13 @@ module Vote = struct
     Make_data_set_storage
       (Make_subcontext(Raw_context)(struct let name = ["proposals"] end))
       (Pair(Make_index(Protocol_hash))(Make_index(Signature.Public_key_hash)))
+
+  module Proposals_count =
+    Make_indexed_data_storage
+      (Make_subcontext(Raw_context)
+         (struct let name = ["proposals_count"] end))
+      (Make_index(Signature.Public_key_hash))
+      (Int)
 
   module Ballots =
     Make_indexed_data_storage
