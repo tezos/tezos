@@ -48,7 +48,7 @@ module type T = sig
     | Not_in_branch
 
   (** Creates/tear-down a new mempool validator context. *)
-  val create : limits -> Distributed_db.chain_db -> t Lwt.t
+  val create : limits -> Distributed_db.chain_db -> t tzresult Lwt.t
   val shutdown : t -> unit Lwt.t
 
   (** parse a new operation and add it to the mempool context *)
@@ -57,7 +57,7 @@ module type T = sig
   (** validate a new operation and add it to the mempool context *)
   val validate : t -> operation -> result tzresult Lwt.t
 
-  val chain_db : t -> Distributed_db.chain_db tzresult
+  val chain_db : t -> Distributed_db.chain_db
 
   val rpc_directory : t RPC_directory.t
 

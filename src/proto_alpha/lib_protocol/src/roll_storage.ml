@@ -283,6 +283,22 @@ module Delegate = struct
     | false ->
         Storage.Roll.Delegate_change.init c delegate Tez_repr.zero
 
+  let is_inactive c delegate =
+    Storage.Contract.Inactive_delegate.mem c
+      (Contract_repr.implicit_contract delegate) >>= fun inactive ->
+    if inactive then
+      return inactive
+    else
+      Storage.Contract.Delegate_desactivation.get_option c
+        (Contract_repr.implicit_contract delegate) >>=? function
+      | Some last_active_cycle ->
+          let { Level_repr.cycle = current_cycle } = Raw_context.current_level c in
+          return Cycle_repr.(last_active_cycle < current_cycle)
+      | None ->
+          (* This case is only when called from `set_active`, when creating
+             a contract. *)
+          return false
+
   let add_amount c delegate amount =
     ensure_inited c delegate >>=? fun c ->
     let tokens_per_roll = Constants_storage.tokens_per_roll c in
@@ -297,9 +313,18 @@ module Delegate = struct
         Lwt.return Tez_repr.(change -? tokens_per_roll) >>=? fun  change ->
         create_roll_in_delegate c delegate delegate_pk >>=? fun c ->
         loop c change in
-    Storage.Contract.Inactive_delegate.mem c
-      (Contract_repr.implicit_contract delegate) >>= fun inactive ->
-    if inactive then return c else loop c change
+    is_inactive c delegate >>=? fun inactive ->
+    if inactive then
+      return c
+    else
+      loop c change >>=? fun c ->
+      Storage.Roll.Delegate_roll_list.get_option c delegate >>=? fun rolls ->
+      match rolls with
+      | None ->
+          return c
+      | Some _ ->
+          Storage.Active_delegates_with_rolls.add c delegate >>= fun c ->
+          return c
 
   let remove_amount c delegate amount =
     let tokens_per_roll = Constants_storage.tokens_per_roll c in
@@ -311,10 +336,19 @@ module Delegate = struct
         Lwt.return Tez_repr.(change +? tokens_per_roll) >>=? fun change ->
         loop c change in
     Storage.Roll.Delegate_change.get c delegate >>=? fun change ->
-    Storage.Contract.Inactive_delegate.mem c
-      (Contract_repr.implicit_contract delegate) >>= fun inactive ->
+    is_inactive c delegate >>=? fun inactive ->
     begin
-      if inactive then return (c, change) else loop c change
+      if inactive then
+        return (c, change)
+      else
+        loop c change >>=? fun (c, change) ->
+        Storage.Roll.Delegate_roll_list.get_option c delegate >>=? fun rolls ->
+        match rolls with
+        | None ->
+            Storage.Active_delegates_with_rolls.del c delegate >>= fun c ->
+            return (c, change)
+        | Some _ ->
+            return (c, change)
     end >>=? fun (c, change) ->
     Lwt.return Tez_repr.(change -? amount) >>=? fun change ->
     Storage.Roll.Delegate_change.set c delegate change
@@ -325,6 +359,7 @@ module Delegate = struct
     Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
     Storage.Contract.Inactive_delegate.add ctxt
       (Contract_repr.implicit_contract delegate) >>= fun ctxt ->
+    Storage.Active_delegates_with_rolls.del ctxt delegate >>= fun ctxt ->
     let rec loop ctxt change =
       Storage.Roll.Delegate_roll_list.get_option ctxt delegate >>=? function
       | None -> return (ctxt, change)
@@ -337,8 +372,7 @@ module Delegate = struct
     return ctxt
 
   let set_active ctxt delegate =
-    Storage.Contract.Inactive_delegate.mem ctxt
-      (Contract_repr.implicit_contract delegate) >>= fun inactive ->
+    is_inactive ctxt delegate >>=? fun inactive ->
     let current_cycle = (Raw_context.current_level ctxt).cycle in
     let preserved_cycles = Constants_storage.preserved_cycles ctxt in
     (* When the delegate is new or inactive, she will become active in
@@ -377,7 +411,13 @@ module Delegate = struct
           create_roll_in_delegate ctxt delegate delegate_pk >>=? fun ctxt ->
           loop ctxt change in
       loop ctxt change >>=? fun ctxt ->
-      return ctxt
+      Storage.Roll.Delegate_roll_list.get_option ctxt delegate >>=? fun rolls ->
+      match rolls with
+      | None ->
+          return ctxt
+      | Some _ ->
+          Storage.Active_delegates_with_rolls.add ctxt delegate >>= fun ctxt ->
+          return ctxt
     end
 
 end

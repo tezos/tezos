@@ -271,6 +271,23 @@ let commands version : Client_context.io_wallet Clic.command list =
                gen_keys_containing ~encrypted ~force ~prefix ~containing ~name cctxt)
     end ;
 
+    command ~group ~desc: "Encrypt an unencrypted secret key."
+      no_options
+      (prefixes [ "encrypt" ; "secret" ; "key" ]
+       @@ stop)
+      (fun () (cctxt : Client_context.io_wallet) ->
+         cctxt#prompt_password "Enter unencrypted secret key: " >>=? fun sk_uri ->
+         let sk_uri = Uri.of_string (MBytes.to_string sk_uri) in
+         begin match Uri.scheme sk_uri with
+           | None | Some "unencrypted" -> return_unit
+           | _ -> failwith "This command can only be used with the \"unencrypted\" scheme"
+         end >>=? fun () ->
+         Lwt.return (Signature.Secret_key.of_b58check (Uri.path sk_uri)) >>=? fun sk ->
+         Tezos_signer_backends.Encrypted.encrypt cctxt sk >>=? fun sk_uri ->
+         cctxt#message "Encrypted secret key %a" Uri.pp_hum (sk_uri :> Uri.t) >>= fun () ->
+         return_unit
+      ) ;
+
     command ~group ~desc: "Add a secret key to the wallet."
       (args1 (Secret_key.force_switch ()))
       (prefix "import"
@@ -290,7 +307,8 @@ let commands version : Client_context.io_wallet Clic.command list =
                     "public and secret keys '%s' don't correspond, \
                      please don't use --force" name)
          end >>=? fun () ->
-         Client_keys.public_key_hash pk_uri >>=? fun (pkh, public_key) ->
+         Client_keys.public_key_hash ~interactive:cctxt pk_uri
+         >>=? fun (pkh, public_key) ->
          cctxt#message
            "Tezos address added: %a"
            Signature.Public_key_hash.pp pkh >>= fun () ->

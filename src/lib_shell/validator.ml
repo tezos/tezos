@@ -43,11 +43,11 @@ type t = {
 let create state db
     peer_validator_limits
     block_validator_limits
-    validation_process
+    block_validator_kind
     prevalidator_limits
     chain_validator_limits
   =
-  Block_validator.create block_validator_limits db validation_process >>= fun block_validator ->
+  Block_validator.create block_validator_limits db block_validator_kind >>= fun block_validator ->
   let valid_block_input = Lwt_watcher.create_input () in
   Lwt.return
     { state ; db ;

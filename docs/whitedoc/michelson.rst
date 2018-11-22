@@ -1019,7 +1019,7 @@ Operations on maps
 ::
 
     :: (map 'elt 'val) : 'A   ->  'A
-       iff   body :: [ (pair 'elt 'val) : 'A -> 'A ]
+       iff   body :: [ (pair 'elt 'val : 'A) -> 'A ]
 
     > ITER body / {} : S  =>  S
     > ITER body / { Elt k v ; <tl> } : S  =>  body ; ITER body / (Pair k v) : { <tl> } : S
@@ -1344,7 +1344,7 @@ argument the transferred amount plus an ad-hoc argument and returns an
 ad-hoc value. The code also takes the global data and returns it to be
 stored and retrieved on the next transaction. These data are initialized
 by another parameter. The calling convention for the code is as follows:
-``(Pair arg globals)) -> (Pair operations globals)``, as extrapolated from
+``(Pair arg globals) -> (Pair operations globals)``, as extrapolated from
 the instruction type. The first parameters are the manager, optional
 delegate, then spendable and delegatable flags and finally the initial
 amount taken from the currently executed contract. The contract is
@@ -1370,7 +1370,7 @@ currently executed contract.
 ::
 
     :: key_hash : option key_hash : bool : mutez : 'S
-       ->   operation : contract unit : 'S
+       ->   operation : address : 'S
 
 Take as argument the manager, optional delegate, the delegatable flag
 and finally the initial amount taken from the currently executed
@@ -2167,11 +2167,11 @@ annotations will see only their top-most stack type elements annotated.
 ::
 
    CREATE_ACCOUNT @op @addr
-   :: key_hash : option key_hash : bool : tez : 'S
+   :: key_hash : option key_hash : bool : mutez : 'S
       ->  @op operation : @addr address : 'S
 
    CREATE_ACCOUNT @op
-   :: key_hash : option key_hash : bool : tez : 'S
+   :: key_hash : option key_hash : bool : mutez : 'S
       ->  @op operation : address : 'S
 
 A no-op instruction ``RENAME`` allows to rename variables in the stack
@@ -2403,7 +2403,7 @@ A similar mechanism is used for context dependent instructions:
 
    CONTRACT 'p  :: @a address : 'S   ->   @a.contract contract 'p : 'S
 
-   BALANCE :: 'S   ->   @balance tez : 'S
+   BALANCE :: 'S   ->   @balance mutez : 'S
 
    SOURCE  :: 'S   ->   @source address : 'S
 
@@ -2411,7 +2411,7 @@ A similar mechanism is used for context dependent instructions:
 
    SELF  :: 'S   ->   @self contract 'p : 'S
 
-   AMOUNT  :: 'S   ->   @amount tez : 'S
+   AMOUNT  :: 'S   ->   @amount mutez : 'S
 
    STEPS_TO_QUOTA  :: 'S   ->  @steps nat : 'S
 
@@ -2536,7 +2536,7 @@ Hence, the global data of the contract has the following type
 
     'g =
       pair
-        (pair timestamp tez)
+        (pair timestamp mutez)
         (pair (contract unit) (contract unit))
 
 Following the contract calling convention, the code is a lambda of type
@@ -2555,12 +2555,12 @@ written as
       (pair
          unit
          (pair
-           (pair timestamp tez)
+           (pair timestamp mutez)
            (pair (contract unit) (contract unit))))
       (pair
          (list operation)
          (pair
-            (pair timestamp tez)
+            (pair timestamp mutez)
             (pair (contract unit) (contract unit))))
 
 The complete source ``reservoir.tz`` is:
@@ -2570,7 +2570,7 @@ The complete source ``reservoir.tz`` is:
     parameter unit ;
     storage
       (pair
-         (pair (timestamp %T) (tez %N)) # T N
+         (pair (timestamp %T) (mutez %N)) # T N
          (pair (contract %A unit) (contract %B unit))) ; # A B
     code
       { CDR ; DUP ; CAAR %T; # T
@@ -2710,7 +2710,7 @@ of type
     pair
       (pair nat (pair timestamp timestamp))
       (pair
-         (pair tez tez)
+         (pair mutez mutez)
          (pair (pair account account) account))
 
 The 24 hours after timestamp ``Z`` are for the buyer and seller to store
@@ -2718,7 +2718,7 @@ their collateral ``(Q * C)``. For this, the contract takes a string as
 parameter, matching ``"buyer"`` or ``"seller"`` indicating the party for
 which the tokens are transferred. At the end of this day, each of them
 can send a transaction to send its tokens back. For this, we need to
-store who already paid and how much, as a ``(pair tez tez)`` where the
+store who already paid and how much, as a ``(pair mutez mutez)`` where the
 left component is the buyer and the right one the seller.
 
 After the first day, nothing cam happen until ``T``.
@@ -2758,11 +2758,11 @@ of type
 ::
 
     pair
-      (pair nat (pair tez tez))
+      (pair nat (pair mutez mutez))
       (pair
          (pair nat (pair timestamp timestamp))
          (pair
-            (pair tez tez)
+            (pair mutez mutez)
             (pair (pair account account) account)))
 
 The parameter of the transaction will be either a transfer from the
@@ -2793,11 +2793,11 @@ The complete source ``forward.tz`` is:
       (or string nat) ;
     storage
       (pair
-         (pair nat (pair tez tez)) # counter from_buyer from_seller
+         (pair nat (pair mutez mutez)) # counter from_buyer from_seller
          (pair
             (pair nat (pair timestamp timestamp)) # Q T Z
             (pair
-               (pair tez tez) # K C
+               (pair mutez mutez) # K C
                (pair
                   (pair (contract unit) (contract unit)) # B S
                   (contract unit))))) ; # W
@@ -2947,7 +2947,7 @@ XII - Full grammar
       | <signature string constant>
       | <key string constant>
       | <key_hash string constant>
-      | <tez string constant>
+      | <mutez string constant>
       | <contract string constant>
       | Unit
       | True

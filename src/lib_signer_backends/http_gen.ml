@@ -85,7 +85,7 @@ module Make(N : sig val scheme : string end) = struct
       Lwt.return (Signature.Public_key_hash.of_b58check pkh) >>=? fun pkh ->
       return (base, pkh)
 
-    let public_key uri =
+    let public_key ?interactive:_ uri =
       parse (uri : pk_uri :> Uri.t) >>=? fun (base, pkh) ->
       RPC_client.call_service
         ~logger: P.logger
@@ -96,8 +96,8 @@ module Make(N : sig val scheme : string end) = struct
     let neuterize uri =
       return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
 
-    let public_key_hash uri =
-      public_key uri >>=? fun pk ->
+    let public_key_hash ?interactive uri =
+      public_key ?interactive uri >>=? fun pk ->
       return (Signature.Public_key.hash pk, Some pk)
 
     let sign ?watermark uri msg =

@@ -32,7 +32,7 @@ val create:
   Distributed_db.t ->
   Peer_validator.limits ->
   Block_validator.limits ->
-  Validator_process.t ->
+  Block_validator.validator_kind ->
   Prevalidator.limits ->
   Chain_validator.limits ->
   t Lwt.t

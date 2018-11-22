@@ -106,8 +106,48 @@ let get_seed_nonce_hash ctxt =
 
 let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
 
-let get_constants b =
-  Alpha_services.Constants.all rpc_ctxt b
+let get_constants ctxt =
+  Alpha_services.Constants.all rpc_ctxt ctxt
+
+(* Voting *)
+
+module Vote = struct
+
+  let get_ballots ctxt =
+    Alpha_services.Voting.ballots rpc_ctxt ctxt
+
+  let get_ballot_list ctxt =
+    Alpha_services.Voting.ballot_list rpc_ctxt ctxt
+
+  let get_voting_period ctxt =
+    Alpha_services.Helpers.current_level rpc_ctxt ctxt >>=? fun l ->
+    return l.voting_period
+
+  let get_voting_period_position ctxt =
+    Alpha_services.Helpers.current_level rpc_ctxt ctxt >>=? fun l ->
+    return l.voting_period_position
+
+  let get_current_period_kind ctxt =
+    Alpha_services.Voting.current_period_kind rpc_ctxt ctxt
+
+  let get_current_quorum ctxt =
+    Alpha_services.Voting.current_quorum rpc_ctxt ctxt
+
+  let get_listings ctxt =
+    Alpha_services.Voting.listings rpc_ctxt ctxt
+
+  let get_proposals ctxt =
+    Alpha_services.Voting.proposals rpc_ctxt ctxt
+
+  let get_current_proposal ctxt =
+    Alpha_services.Voting.current_proposal rpc_ctxt ctxt
+
+  let get_protocol (b:Block.t) =
+    Alpha_environment.Context.get b.context ["protocol"] >>= function
+    | None -> assert false
+    | Some p -> Lwt.return (Protocol_hash.of_bytes_exn p)
+
+end
 
 module Contract = struct
 
@@ -203,6 +243,7 @@ let init
         ~blocks_per_cycle:32l
         ~blocks_per_commitment:4l
         ~blocks_per_roll_snapshot:8l
+        ~blocks_per_voting_period:(Int32.mul 32l 8l)
         ?endorsers_per_block
         ?commitments
         accounts

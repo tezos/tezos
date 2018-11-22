@@ -293,3 +293,25 @@ let seed_nonce_revelation ctxt level nonce =
           signature = None ;
         } ;
     }
+
+let proposals ctxt (pkh: Contract.t) proposals =
+  Context.Contract.pkh pkh >>=? fun source ->
+  Context.Vote.get_voting_period ctxt >>=? fun period ->
+  let op =
+    Proposals { source ;
+                period ;
+                proposals } in
+  Account.find source >>=? fun account ->
+  return (sign account.sk ctxt (Contents_list (Single op)))
+
+let ballot ctxt (pkh: Contract.t) proposal ballot =
+  Context.Contract.pkh pkh >>=? fun source ->
+  Context.Vote.get_voting_period ctxt >>=? fun period ->
+  let op =
+    Ballot { source ;
+             period ;
+             proposal ;
+             ballot
+           } in
+  Account.find source >>=? fun account ->
+  return (sign account.sk ctxt (Contents_list (Single op)))

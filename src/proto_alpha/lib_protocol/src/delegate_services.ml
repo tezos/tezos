@@ -183,13 +183,19 @@ let register () =
     if q.active && q.inactive then
       return delegates
     else if q.active then
-      Lwt_list.filter_p
-        (fun pkh -> Delegate.deactivated ctxt pkh >|= not)
-        delegates >>= return
+      filter_map_s
+        (fun pkh ->
+           Delegate.deactivated ctxt pkh >>=? function
+           | true -> return_none
+           | false -> return_some pkh)
+        delegates
     else if q.inactive then
-      Lwt_list.filter_p
-        (fun pkh -> Delegate.deactivated ctxt pkh)
-        delegates >>= return
+      filter_map_s
+        (fun pkh ->
+           Delegate.deactivated ctxt pkh >>=? function
+           | false -> return_none
+           | true -> return_some pkh)
+        delegates
     else
       return_nil
   end ;
@@ -200,7 +206,7 @@ let register () =
     Delegate.staking_balance ctxt pkh >>=? fun staking_balance ->
     Delegate.delegated_contracts ctxt pkh >>= fun delegated_contracts ->
     Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
-    Delegate.deactivated ctxt pkh >>= fun deactivated ->
+    Delegate.deactivated ctxt pkh >>=? fun deactivated ->
     Delegate.grace_period ctxt pkh >>=? fun grace_period ->
     return {
       balance ; frozen_balance ; frozen_balance_by_cycle ;
@@ -227,7 +233,7 @@ let register () =
     Delegate.delegated_balance ctxt pkh
   end ;
   register1 S.deactivated begin fun ctxt pkh () () ->
-    Delegate.deactivated ctxt pkh >>= return
+    Delegate.deactivated ctxt pkh
   end ;
   register1 S.grace_period begin fun ctxt pkh () () ->
     Delegate.grace_period ctxt pkh

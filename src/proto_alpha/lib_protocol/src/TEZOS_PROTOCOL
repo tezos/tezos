@@ -73,6 +73,7 @@
         "Contract_services",
         "Delegate_services",
         "Helpers_services",
+        "Voting_services",
         "Alpha_services",
 
         "Main"

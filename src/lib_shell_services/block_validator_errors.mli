@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -57,3 +58,6 @@ type error +=
       { block: Block_hash.t ;
         expected: Operation_list_list_hash.t ;
         found: Operation_list_list_hash.t }
+  | Failed_to_checkout_context of Context_hash.t
+
+val invalid_block : Block_hash.t -> block_error -> error

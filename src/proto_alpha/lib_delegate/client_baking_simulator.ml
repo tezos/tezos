@@ -109,8 +109,8 @@ let begin_construction ~timestamp ?protocol_data index predecessor =
       }
 
 let add_operation st ( op : Operation.packed ) =
-  LiftedMain.apply_operation st.state op >>=? fun (state, _) ->
-  return { st with state ; rev_operations = op :: st.rev_operations }
+  LiftedMain.apply_operation st.state op >>=? fun (state, receipt) ->
+  return ({ st with state ; rev_operations = op :: st.rev_operations }, receipt)
 
 let finalize_construction inc =
   LiftedMain.finalize_block inc.state

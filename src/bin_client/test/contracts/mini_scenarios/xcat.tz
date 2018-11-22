@@ -1,0 +1,46 @@
+parameter (bytes);
+storage (unit);
+code {
+       # Extract parameter from initial stack.
+       CAR @preimage;
+       DIP {
+             # Push contract constants to the stack.
+             #
+             # There's a temptation to use @storage to parametrize
+             # a contract but, in general, there's no reason to encumber
+             # @storage with immutable values.
+             PUSH @from (contract unit) "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"; #changeme
+             PUSH @to   (contract unit) "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"; #changeme
+             PUSH @target_hash bytes 0x123456; #changeme
+             PUSH @deadline timestamp "2018-08-08 00:00:00Z"; #changeme
+           };
+       # Test if the deadline has passed.
+       SWAP; NOW;
+       IFCMPLT
+         # In case the deadline did pass:
+         {
+           # Ignore parameter, just transfer xtz balance back to @from
+           DROP; DROP; DROP; BALANCE; UNIT; TRANSFER_TOKENS;
+         }
+         # In case the deadline hasn't passed yet:
+         {
+           # Test length of parameter.
+           DUP; SIZE;
+           PUSH @max_length nat 32;
+           IFCMPLT
+             { PUSH string "preimage too long"; FAILWITH; }
+             {
+               # Test if it's a preimage of @target_hash.
+               SHA256 @candidate_hash;
+               IFCMPNEQ
+                 { PUSH string "invalid preimage"; FAILWITH; }
+                 {
+                   # Transfer xtz balance to @to.
+                   BALANCE; UNIT; TRANSFER_TOKENS; DIP { DROP };
+                 };
+             };
+         };
+       # Transform single operation into a list.
+       NIL operation; SWAP; CONS;
+       UNIT; SWAP; PAIR
+     }

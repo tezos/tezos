@@ -373,6 +373,15 @@ let apply_manager_operation_content :
           (ctxt, (Reveal_result : kind successful_manager_operation_result), [])
     | Transaction { amount ; parameters ; destination } -> begin
         spend ctxt source amount >>=? fun ctxt ->
+        begin match Contract.is_implicit destination with
+          | None -> return (ctxt, [])
+          | Some _ ->
+              Contract.allocated ctxt destination >>=? function
+              | true -> return (ctxt, [])
+              | false ->
+                  Fees.origination_burn ctxt ~payer >>=? fun (ctxt, orignation_burn) ->
+                  return (ctxt, [ Delegate.Contract payer, Delegate.Debited orignation_burn ])
+        end >>=? fun (ctxt, maybe_burn_balance_update) ->
         Contract.credit ctxt destination amount >>=? fun ctxt ->
         Contract.get_script ctxt destination >>=? fun (ctxt, script) ->
         match script with
@@ -398,8 +407,9 @@ let apply_manager_operation_content :
                   big_map_diff = None;
                   balance_updates =
                     Delegate.cleanup_balance_updates
-                      [ Contract source, Debited amount ;
-                        Contract destination, Credited amount ] ;
+                      ([ Delegate.Contract source, Delegate.Debited amount ;
+                         Contract destination, Credited amount ]
+                       @ maybe_burn_balance_update) ;
                   originated_contracts = [] ;
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
                   storage_size = Z.zero ;
@@ -578,15 +588,15 @@ let apply_manager_contents
   | Ok (ctxt, operation_results, internal_operations) -> begin
       apply_internal_manager_operations
         ctxt mode ~payer:source internal_operations >>= function
-      | (`Success ctxt, internal_operations_results) ->
-          Fees.burn_storage_fees ctxt ~storage_limit ~payer:source >>= begin function
-            | Ok ctxt ->
-                Lwt.return
-                  (`Success ctxt, Applied operation_results, internal_operations_results)
-            | Error errors ->
-                Lwt.return
-                  (`Failure, Backtracked (operation_results, Some errors), internal_operations_results)
-          end
+      | (`Success ctxt, internal_operations_results) -> begin
+          Fees.burn_storage_fees ctxt ~storage_limit ~payer:source >>= function
+          | Ok ctxt ->
+              Lwt.return
+                (`Success ctxt, Applied operation_results, internal_operations_results)
+          | Error errors ->
+              Lwt.return
+                (`Failure, Backtracked (operation_results, Some errors), internal_operations_results)
+        end
       | (`Failure, internal_operations_results) ->
           Lwt.return
             (`Failure, Applied operation_results, internal_operations_results)

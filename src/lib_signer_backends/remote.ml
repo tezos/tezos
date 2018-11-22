@@ -80,12 +80,12 @@ module Make(S : sig
            | path -> Uri.with_path S.default (path ^ "/" ^ key))
     | _ -> assert false
 
-  let public_key pk_uri =
-    Remote.public_key
+  let public_key ?interactive pk_uri =
+    Remote.public_key ?interactive
       (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
 
-  let public_key_hash pk_uri =
-    Remote.public_key_hash
+  let public_key_hash ?interactive pk_uri =
+    Remote.public_key_hash ?interactive
       (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
 
   let neuterize sk_uri =

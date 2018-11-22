@@ -23,24 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type kind =
-  | Internal
+open Alpha_context
 
-type t
+val ballots :
+  'a #RPC_context.simple -> 'a -> Vote.ballots shell_tzresult Lwt.t
 
-val init : context_root:string -> kind -> t Lwt.t
-val close : t -> unit Lwt.t
+val ballot_list :
+  'a #RPC_context.simple -> 'a -> (Signature.Public_key_hash.t * Vote.ballot) list shell_tzresult Lwt.t
 
-type application_result = {
-  validation_result: Tezos_protocol_environment_shell.validation_result ;
-  block_data: Secp256k1.watermark ;
-  ops_metadata: Secp256k1.watermark list list ;
-  context_hash: Context_hash.t ;
-}
+val current_period_kind :
+  'a #RPC_context.simple -> 'a -> Voting_period.kind shell_tzresult Lwt.t
 
-val apply_block :
-  t ->
-  Block_header.t ->
-  Operation.t list list ->
-  State.Chain.t ->
-  application_result tzresult Lwt.t
+val current_quorum :
+  'a #RPC_context.simple -> 'a -> Int32.t shell_tzresult Lwt.t
+
+val listings :
+  'a #RPC_context.simple -> 'a -> (Signature.Public_key_hash.t * int32) list shell_tzresult Lwt.t
+
+val proposals :
+  'a #RPC_context.simple -> 'a -> Int32.t Protocol_hash.Map.t shell_tzresult Lwt.t
+
+val current_proposal :
+  'a #RPC_context.simple -> 'a -> Protocol_hash.t option shell_tzresult Lwt.t
+
+val register : unit -> unit

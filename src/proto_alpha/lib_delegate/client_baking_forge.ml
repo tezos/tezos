@@ -40,6 +40,11 @@ let anonymous_index = 2
 let managers_index = 3
 
 let default_max_priority = 64
+let default_minimal_fees = Tez.zero
+let default_minimal_fees_per_gas_unit =
+  Option.unopt_exn (Failure "bad conversion") (Tez.of_mutez 10L)
+let default_minimal_fees_per_byte = Tez.zero
+let default_await_endorsements = true
 
 type state = {
   genesis: Block_hash.t ;
@@ -49,25 +54,33 @@ type state = {
   delegates: public_key_hash list ;
   (* lazy-initialisation with retry-on-error *)
   constants: Constants.t tzlazy ;
-  (* Minimum operation fee required to include in a block *)
-  fee_threshold : Tez.t ;
-  (* Maximum waiting time allowed for late endorsements *)
-  max_waiting_time : int ;
+  (* Minimal operation fee required to include an operation in a block *)
+  minimal_fees : Tez.t ;
+  (* Minimal operation fee per gas required to include an operation in a block *)
+  minimal_fees_per_gas_unit : Tez.t ;
+  (* Minimal operation fee per byte required to include an operation in a block *)
+  minimal_fees_per_byte : Tez.t ;
+  (* Await endorsements *)
+  await_endorsements: bool ;
   (* truly mutable *)
   mutable best_slot: (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) option ;
 }
 
 let create_state
-    ?(fee_threshold = Tez.zero) ~max_waiting_time
-    genesis context_path index
-    delegates constants =
+    ?(minimal_fees = default_minimal_fees)
+    ?(minimal_fees_per_gas_unit = default_minimal_fees_per_gas_unit)
+    ?(minimal_fees_per_byte = default_minimal_fees_per_byte)
+    ?(await_endorsements = default_await_endorsements)
+    genesis context_path index delegates constants =
   { genesis ;
     context_path ;
     index ;
     delegates ;
     constants ;
-    fee_threshold ;
-    max_waiting_time ;
+    minimal_fees ;
+    minimal_fees_per_gas_unit ;
+    minimal_fees_per_byte ;
+    await_endorsements ;
     best_slot = None ;
   }
 
@@ -140,8 +153,7 @@ let inject_block
     ?force ~chain signed_header operations >>=? fun block_hash ->
   return block_hash
 
-type error +=
-  | Failed_to_preapply of Tezos_base.Operation.t * error list
+type error += Failed_to_preapply of Tezos_base.Operation.t * error list
 
 let () =
   register_error_kind
@@ -179,7 +191,9 @@ let get_manager_operation_gas_and_fee op =
 let sort_manager_operations
     ~max_size
     ~hard_gas_limit_per_block
-    ~fee_threshold
+    ~minimal_fees
+    ~minimal_fees_per_gas_unit
+    ~minimal_fees_per_byte
     (operations : Proto_alpha.operation list) =
   let compute_weight op (fee, gas) =
     let size = Data_encoding.Binary.length Operation.encoding op in
@@ -193,10 +207,23 @@ let sort_manager_operations
   filter_map_s
     (fun op ->
        get_manager_operation_gas_and_fee op >>=? fun (fee, gas) ->
-       if Tez.(<) fee fee_threshold then
+       if Tez.(fee < minimal_fees) then
          return_none
        else
-         return (Some (op, (compute_weight op (fee, gas))))
+         let (size, gas, _ratio) as weight = compute_weight op (fee, gas) in
+         let open Alpha_environment in
+         let enough_gas_fees =
+           match Tez.(minimal_fees_per_gas_unit *? Z.to_int64 gas) with
+           | Ok expected_fees -> Tez.(expected_fees <= fee)
+           | _ -> false in
+         let enough_size_fees =
+           match Tez.(minimal_fees_per_byte *? Int64.of_int size) with
+           | Ok fee_per_byte -> Tez.(fee_per_byte >= minimal_fees_per_byte)
+           | Error _ -> false in
+         if enough_size_fees && enough_gas_fees then
+           return_some (op, weight)
+         else
+           return_none
     ) operations >>=? fun operations ->
   (* We sort by the biggest weight *)
   return
@@ -255,7 +282,9 @@ let classify_operations
     (cctxt : #Proto_alpha.full)
     ~block
     ~hard_gas_limit_per_block
-    ~fee_threshold
+    ~minimal_fees
+    ~minimal_fees_per_gas_unit
+    ~minimal_fees_per_byte
     (ops: Proto_alpha.operation list) =
   Alpha_block_services.live_blocks cctxt ~chain:`Main ~block ()
   >>=? fun live_blocks ->
@@ -278,7 +307,13 @@ let classify_operations
   let manager_operations = t.(managers_index) in
   let { Alpha_environment.Updater.max_size } =
     List.nth Proto_alpha.Main.validation_passes managers_index in
-  sort_manager_operations ~max_size ~hard_gas_limit_per_block ~fee_threshold manager_operations
+  sort_manager_operations
+    ~max_size
+    ~hard_gas_limit_per_block
+    ~minimal_fees
+    ~minimal_fees_per_gas_unit
+    ~minimal_fees_per_byte
+    manager_operations
   >>=? fun ordered_operations ->
   (* Greedy heuristic *)
   trim_manager_operations ~max_size ~hard_gas_limit_per_block (List.map fst ordered_operations)
@@ -430,14 +465,15 @@ let filter_and_apply_operations
   let validate_operation inc op =
     add_operation inc op >>= function
     | Error errs ->
-        lwt_log_info Tag.DSL.(fun f ->
+        lwt_debug Tag.DSL.(fun f ->
             f "Client-side validation: invalid operation filtered %a\n@[<v 4>%a@]"
             -% t event "baking_rejected_invalid_operation"
             -% a Operation_hash.Logging.tag (Operation.hash_packed op)
             -% a errs_tag errs)
         >>= fun () ->
         return_none
-    | Ok inc -> return_some inc
+    | Ok (resulting_state, _receipt) ->
+        return_some resulting_state
   in
   let filter_valid_operations inc ops =
     fold_left_s (fun (inc, acc) op ->
@@ -493,7 +529,9 @@ let filter_and_apply_operations
   filter_valid_operations inc accepted_managers >>=? fun (inc, accepted_managers) ->
   filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
   (* Endorsements won't fail now *)
-  fold_left_s add_operation inc endorsements >>=? fun inc ->
+  fold_left_s (fun inc op ->
+      add_operation inc op >>=? fun (inc, _receipt) ->
+      return inc) inc endorsements >>=? fun inc ->
   (* Endorsement and double baking/endorsement evidence do not commute:
      we apply denunciation operations after endorsements. *)
   filter_valid_operations inc evidences >>=? fun (final_inc, evidences) ->
@@ -535,7 +573,10 @@ let forge_block
     ?operations
     ?(best_effort = operations = None)
     ?(sort = best_effort)
-    ?(fee_threshold = Tez.zero)
+    ?(minimal_fees = default_minimal_fees)
+    ?(minimal_fees_per_gas_unit = default_minimal_fees_per_gas_unit)
+    ?(minimal_fees_per_byte = default_minimal_fees_per_byte)
+    ?(await_endorsements = default_await_endorsements)
     ?timestamp
     ?mempool
     ?context_path
@@ -552,7 +593,14 @@ let forge_block
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   Alpha_services.Constants.all cctxt (`Main, block) >>=?
   fun Constants.{ parametric = { hard_gas_limit_per_block ; endorsers_per_block } } ->
-  classify_operations cctxt ~hard_gas_limit_per_block ~block:block ~fee_threshold operations_arg
+  classify_operations
+    cctxt
+    ~hard_gas_limit_per_block
+    ~block:block
+    ~minimal_fees
+    ~minimal_fees_per_gas_unit
+    ~minimal_fees_per_byte
+    operations_arg
   >>=? fun (operations, overflowing_ops) ->
   (* Ensure that we retain operations up to the quota *)
   let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
@@ -599,8 +647,10 @@ let forge_block
           constants = tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Head 0)) ;
           delegates = [] ;
           best_slot = None ;
-          max_waiting_time = 0 ;
-          fee_threshold = Tez.zero ;
+          await_endorsements ;
+          minimal_fees = default_minimal_fees ;
+          minimal_fees_per_gas_unit = default_minimal_fees_per_gas_unit ;
+          minimal_fees_per_byte = default_minimal_fees_per_byte ;
         } in
         filter_and_apply_operations ~timestamp ~protocol_data state bi (operations, overflowing_ops)
         >>=? fun (final_context, validation_result, operations) ->
@@ -649,6 +699,59 @@ let shell_prevalidation
       return
         (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
 
+let filter_outdated_endorsements expected_level ops =
+  List.filter (function
+      | { Alpha_context.protocol_data =
+            Operation_data { contents = Single (Endorsement { level }) }} ->
+          Raw_level.equal expected_level level
+      | _ -> true
+    ) ops
+
+let next_baking_delay state priority =
+  tzforce state.constants >>=? fun { Constants.parametric = { time_between_blocks }} ->
+  let rec associated_period durations prio =
+    if List.length durations = 0 then
+      (* Mimic [Baking.minimal_time] behaviour *)
+      associated_period [ Period.one_minute ] prio
+    else
+      match durations with
+      | [] -> assert false
+      | [ last ] ->
+          Period.to_seconds last
+      | first :: durations ->
+          if prio = 0 then
+            Period.to_seconds first
+          else
+            associated_period durations (prio - 1)
+  in
+  let span = associated_period time_between_blocks (priority + 1) in
+  return span
+
+let count_slots_endorsements inc (_timestamp, (head, _priority, _delegate)) operations =
+  fold_left_s (fun acc -> function
+      | { Alpha_context.protocol_data =
+            Operation_data { contents = Single (Endorsement { level }) }} as op
+        when Raw_level.(level = head.Client_baking_blocks.level) ->
+          begin
+            let open Apply_results in
+            Client_baking_simulator.add_operation inc op >>= function
+            | Ok (_inc,
+                  Operation_metadata
+                    { contents = Single_result (Endorsement_result { slots })} ) ->
+                return (acc + List.length slots)
+            | Error _ | _ ->
+                (* We do not handle errors here *)
+                return acc
+          end
+      | _ -> return acc
+    ) 0 operations
+
+let rec filter_limits tnow limits =
+  match limits with
+  | [] -> []
+  | (time, _) :: _ as limits when Time.(tnow < time) -> limits
+  | _ :: limits -> filter_limits tnow limits
+
 (** [fetch_operations] retrieve the operations present in the
     mempool. If no endorsements are present in the initial set, it
     waits until [state.max_waiting_time] seconds after its injection range start date. *)
@@ -656,7 +759,7 @@ let fetch_operations
     (cctxt : #Proto_alpha.full)
     ~chain
     state
-    (timestamp, (head, _, _delegate))
+    (timestamp, (head, priority, _delegate) as slot)
   =
   Alpha_block_services.Mempool.monitor_operations cctxt ~chain
     ~applied:true ~branch_delayed:true
@@ -666,28 +769,36 @@ let fetch_operations
   | None -> (* New head received : not supposed to happen. *)
       return_none
   | Some current_mempool ->
-      let operations = ref current_mempool in
-      let head_level = head.Client_baking_blocks.level in
-      let contains_head_endorsements operations =
-        List.exists (function
-            | { Alpha_context.protocol_data =
-                  Operation_data { contents = Single (Endorsement { level }) }} ->
-                Raw_level.(level = head_level)
-            | _ -> false
-          ) operations in
-      (* If the list already contains valid endorsements, we do not
-         need to wait. *)
-      if contains_head_endorsements !operations then
-        return (Some !operations)
+      let operations = ref (filter_outdated_endorsements head.Client_baking_blocks.level current_mempool) in
+      Client_baking_simulator.begin_construction ~timestamp state.index head >>=? fun inc ->
+      count_slots_endorsements inc slot !operations >>=? fun nb_arrived_endorsements ->
+      tzforce state.constants >>=? fun { Constants.parametric = { endorsers_per_block }} ->
+      (* If 100% of the endorsements arrived, we don't need to wait *)
+      if (not state.await_endorsements) || nb_arrived_endorsements = endorsers_per_block then
+        return_some !operations
       else
-        (* Wait 1/3 of the allocated time *)
-        let limit_date = Time.add timestamp (Int64.of_int state.max_waiting_time) in
+        next_baking_delay state priority >>=? fun next_slot_delay ->
+        let hard_delay = Int64.div next_slot_delay 2L in
+        (* The time limit is defined as 1/2 of the next baking slot's time *)
+        let limit_date = Time.add timestamp hard_delay in
+        (* Time limits :
+           - We expect all of the endorsements until 1/3 of the time limit has passed ;
+           - We expect 2/3 of the endorsements until 2/3 of the time limit has passed ;
+           - We expect 1/3 of the endorsements until the time limit has passed ;
+           - We bake with what we have when the time limit has been reached.
+        *)
+        let limits =
+          [ (Time.add timestamp (Int64.div hard_delay 3L), endorsers_per_block) ;
+            (Time.add timestamp (Int64.div (Int64.mul hard_delay 2L) 3L), 2 * endorsers_per_block / 3) ;
+            (limit_date, endorsers_per_block / 3) ]
+        in
         lwt_log_notice Tag.DSL.(fun f ->
             f "No endorsements present in the mempool. Waiting until %a (%a) for new operations."
             -% t event "waiting_operations"
             -% a timestamp_tag limit_date
             -% a timespan_tag (max 0L Time.(diff limit_date (now ())))
           ) >>= fun () ->
+        Shell_services.Mempool.request_operations cctxt ~chain () >>=? fun () ->
         let timeout = match Client_baking_scheduling.sleep_until limit_date with
           | None -> Lwt.return_unit
           | Some timeout -> timeout in
@@ -699,20 +810,33 @@ let fetch_operations
               last_get_event := Some t ;
               t
           | Some t -> t in
-        let rec loop () =
+        let rec loop nb_arrived_endorsements limits =
           Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
                        (get_event () >|= fun e -> `Event e) ; ]
           >>= function
           | `Event (Some op_list) -> begin
               last_get_event := None ;
               operations := op_list @ !operations ;
-              loop () end
+              count_slots_endorsements inc slot op_list >>=? fun new_endorsements ->
+              let nb_arrived_endorsements = nb_arrived_endorsements + new_endorsements in
+              let limits = filter_limits (Time.now ()) limits in
+              let required =
+                match limits with
+                | [] -> 0 (* If we are late, we do not require endorsements *)
+                | (_time, required) :: _ -> required in
+              let enough = nb_arrived_endorsements >= required in
+              if enough then
+                return_some !operations
+              else
+                loop nb_arrived_endorsements limits
+            end
           | `Timeout -> return_some !operations
           | `Event None ->
-              (* New head received : should not happen. *)
+              (* New head received. Should not happen : let the
+                 caller handle this case. *)
               return_none
         in
-        loop ()
+        loop nb_arrived_endorsements limits
 
 (** Given a delegate baking slot [build_block] constructs a full block
     with consistent operations that went through the client-side
@@ -751,11 +875,15 @@ let build_block
       lwt_log_info Tag.DSL.(fun f ->
           f "Received a new head while waiting for operations. Aborting this block."
           -% t event "new_head_received") >>= fun () ->
-      return None
+      return_none
   | Some operations ->
       tzforce state.constants >>=? fun Constants.{ parametric = { hard_gas_limit_per_block } } ->
       classify_operations cctxt
-        ~hard_gas_limit_per_block ~fee_threshold:state.fee_threshold ~block operations
+        ~hard_gas_limit_per_block
+        ~minimal_fees:state.minimal_fees
+        ~minimal_fees_per_gas_unit:state.minimal_fees_per_gas_unit
+        ~minimal_fees_per_byte:state.minimal_fees_per_byte
+        ~block operations
       >>=? fun (operations, overflowing_ops) ->
       let next_version =
         match Tezos_base.Block_header.get_forced_protocol_upgrade ~level:(Raw_level.to_int32 next_level.Level.level) with
@@ -950,12 +1078,14 @@ let filter_outdated_nonces
     Block_hash.Map.fold
       begin fun hash nonce acc ->
         acc >>=? fun acc ->
-        Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) () >>=?
-        fun { protocol_data = { level = { Level.cycle } } } ->
-        if is_older_than_5_cycles cycle then
-          return acc
-        else
-          return (Block_hash.Map.add hash nonce acc)
+        Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) () >>=
+        function
+        | Result.Error _ -> return (Block_hash.Map.add hash nonce acc)
+        | Result.Ok { protocol_data = { level = { Level.cycle } } } ->
+            if is_older_than_5_cycles cycle then
+              return acc
+            else
+              return (Block_hash.Map.add hash nonce acc)
       end
       nonces
       (return Block_hash.Map.empty) >>=? fun new_nonces ->
@@ -1027,9 +1157,11 @@ let reveal_potential_nonces cctxt new_head =
     the [delegates] *)
 let create
     (cctxt : #Proto_alpha.full)
-    ?fee_threshold
+    ?minimal_fees
+    ?minimal_fees_per_gas_unit
+    ?minimal_fees_per_byte
+    ?await_endorsements
     ?max_priority
-    ~max_waiting_time
     ~context_path
     delegates
     block_stream =
@@ -1038,7 +1170,10 @@ let create
       tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Hash (bi.Client_baking_blocks.hash, 0))) in
     Client_baking_simulator.load_context ~context_path >>= fun index ->
     Client_baking_simulator.check_context_consistency index bi.context >>=? fun () ->
-    let state = create_state ?fee_threshold  ~max_waiting_time genesis_hash  context_path index delegates constants in
+    let state = create_state
+        ?minimal_fees ?minimal_fees_per_gas_unit ?minimal_fees_per_byte
+        ?await_endorsements
+        genesis_hash context_path index delegates constants in
     return state
   in
 

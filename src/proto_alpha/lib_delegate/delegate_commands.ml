@@ -55,15 +55,32 @@ let delegate_commands () =
   let open Clic in
   [
     command ~group ~desc: "Forge and inject block using the delegate rights."
-      (args6 max_priority_arg fee_threshold_arg force_switch minimal_timestamp_switch mempool_arg context_path_arg)
+      (args9
+         max_priority_arg
+         minimal_fees_arg
+         minimal_fees_per_gas_unit_arg
+         minimal_fees_per_byte_arg
+         await_endorsements_arg
+         force_switch
+         minimal_timestamp_switch
+         mempool_arg
+         context_path_arg)
       (prefixes [ "bake"; "for" ]
        @@ Client_keys.Public_key_hash.source_param
          ~name:"baker" ~desc: "name of the delegate owning the baking right"
        @@ stop)
-      (fun (max_priority, fee_threshold, force, minimal_timestamp, mempool, context_path) delegate cctxt ->
-         bake_block cctxt cctxt#block
-           ?fee_threshold ~force ?max_priority ~minimal_timestamp
-           ?mempool ?context_path delegate) ;
+      (fun (max_priority, minimal_fees,
+            minimal_fees_per_gas_unit, minimal_fees_per_byte,
+            await_endorsements, force,
+            minimal_timestamp, mempool, context_path)
+        delegate cctxt ->
+        bake_block cctxt cctxt#block
+          ?minimal_fees
+          ?minimal_fees_per_gas_unit
+          ?minimal_fees_per_byte
+          ~await_endorsements
+          ~force ?max_priority ~minimal_timestamp
+          ?mempool ?context_path delegate) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation."
       no_options
       (prefixes [ "reveal"; "nonce"; "for" ]
@@ -93,23 +110,31 @@ let baker_commands () =
   in
   [
     command ~group ~desc: "Launch the baker daemon."
-      (args3 max_priority_arg fee_threshold_arg max_waiting_time_arg)
+      (args5
+         max_priority_arg
+         minimal_fees_arg
+         minimal_fees_per_gas_unit_arg
+         minimal_fees_per_byte_arg
+         no_waiting_for_endorsements_arg)
       (prefixes [ "run" ; "with" ; "local" ; "node" ]
        @@ param
          ~name:"context_path"
          ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
          directory_parameter
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun (max_priority, fee_threshold, max_waiting_time) node_path delegates cctxt ->
-         Tezos_signer_backends.Encrypted.decrypt_list
-           cctxt (List.map fst delegates) >>=? fun () ->
-         Client_daemon.Baker.run cctxt
-           ?fee_threshold
-           ?max_priority
-           ~max_waiting_time
-           ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
-           ~context_path:(Filename.concat node_path "context")
-           (List.map snd delegates)
+      (fun (max_priority, minimal_fees, minimal_fees_per_gas_unit,
+            minimal_fees_per_byte, no_waiting_for_endorsements)
+        node_path delegates cctxt ->
+        Tezos_signer_backends.Encrypted.decrypt_list
+          cctxt (List.map fst delegates) >>=? fun () ->
+        Client_daemon.Baker.run cctxt
+          ?minimal_fees
+          ?minimal_fees_per_gas_unit
+          ?minimal_fees_per_byte
+          ?max_priority
+          ~await_endorsements:(not no_waiting_for_endorsements)
+          ~context_path:(Filename.concat node_path "context")
+          (List.map snd delegates)
       )
   ]
 
@@ -129,7 +154,6 @@ let endorser_commands () =
            cctxt (List.map fst delegates) >>=? fun () ->
          Client_daemon.Endorser.run cctxt
            ~delay:endorsement_delay
-           ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
            (List.map snd delegates)
       )
   ]

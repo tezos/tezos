@@ -29,7 +29,7 @@ open Clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 type error += Bad_max_priority of string
-type error += Bad_fee_threshold of string
+type error += Bad_minimal_fees of string
 type error += Bad_max_waiting_time of string
 type error += Bad_endorsement_delay of string
 type error += Bad_preserved_levels of string
@@ -61,14 +61,14 @@ let () =
     (fun parameter -> Bad_max_priority parameter) ;
   register_error_kind
     `Permanent
-    ~id:"badFeeThresholdArg"
-    ~title:"Bad -fee-threshold arg"
+    ~id:"badMinimalFeesArg"
+    ~title:"Bad -minimal-fees arg"
     ~description:("invalid fee threshold in -fee-threshold")
     ~pp:(fun ppf literal ->
-        Format.fprintf ppf "invalid fee threshold '%s' in -fee-threshold" literal)
+        Format.fprintf ppf "invalid minimal fees '%s'" literal)
     Data_encoding.(obj1 (req "parameter" string))
-    (function Bad_fee_threshold parameter -> Some parameter | _ -> None)
-    (fun parameter -> Bad_fee_threshold parameter) ;
+    (function Bad_minimal_fees parameter -> Some parameter | _ -> None)
+    (fun parameter -> Bad_minimal_fees parameter) ;
   register_error_kind
     `Permanent
     ~id:"badMaxWaitingTimeArg"
@@ -246,30 +246,47 @@ let max_priority_arg =
          try return (int_of_string s)
          with _ -> fail (Bad_max_priority s)))
 
-let fee_threshold_arg =
+let minimal_fees_arg =
   arg
-    ~long:"fee-threshold"
+    ~long:"minimal-fees"
     ~placeholder:"amount"
-    ~doc:"exclude operations with fees lower than this threshold (in mutez)"
+    ~doc:"exclude operations with fees lower than this threshold (in tez)"
     (parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t
-         | None -> fail (Bad_fee_threshold s)))
+         | None -> fail (Bad_minimal_fees s)))
 
-let max_waiting_time_arg =
-  default_arg
-    ~long:"max-waiting-time"
-    ~placeholder:"seconds"
-    ~doc:"Specify how long the baker is allowed to wait late \
-          endorsements (if necessary) after its delegate's injection \
-          date."
-    ~default:"25"
+let minimal_fees_per_gas_unit_arg =
+  arg
+    ~long:"minimal-fees-per-gas-unit"
+    ~placeholder:"amount"
+    ~doc:"exclude operations with fees per gas lower than this threshold (in tez)"
     (parameter (fun _ s ->
-         try
-           let i = int_of_string s in
-           fail_when (i < 0) (Bad_max_waiting_time s) >>=? fun () ->
-           return (int_of_string s)
-         with _ -> fail (Bad_max_waiting_time s)))
+         match Tez.of_string s with
+         | Some t -> return t
+         | None -> fail (Bad_minimal_fees s)))
+
+let minimal_fees_per_byte_arg =
+  arg
+    ~long:"minimal-fees-per-byte"
+    ~placeholder:"amount"
+    ~doc:"exclude operations with fees per byte lower than this threshold (in tez)"
+    (parameter (fun _ s ->
+         match Tez.of_string s with
+         | Some t -> return t
+         | None -> fail (Bad_minimal_fees s)))
+
+let no_waiting_for_endorsements_arg =
+  switch
+    ~long:"no-waiting-for-late-endorsements"
+    ~doc:"Disable waiting for late endorsements"
+    ()
+
+let await_endorsements_arg =
+  switch
+    ~long:"await-late-endorsements"
+    ~doc:"Await late endorsements when baking a block"
+    ()
 
 let endorsement_delay_arg =
   default_arg

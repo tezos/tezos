@@ -1,0 +1,79 @@
+parameter (or
+             # First possible action is funding, to create an xcat
+             (pair %fund
+                (address %dest)
+                (pair %settings (bytes %target_hash) (timestamp %deadline)))
+
+             # Other possible action is to claim the tokens (or ask a refund)
+             (or %claim_refund
+                (bytes %preimage_claim)
+                (bytes %refund_hash)));
+
+storage (pair
+           (big_map
+              bytes # The target hash is used as a key
+              (pair
+                 # We store in %from the person who funded the xcat
+                 (pair %recipients (address %from) (address %dest))
+                 (pair %settings (mutez %amount) (timestamp %deadline)))
+           )
+           unit);
+
+code {
+       NIL @operations operation; SWAP;
+       UNPAPAIR @% @% @%; DIP {DUP};
+       IF_LEFT  # Let's fund a new xcat!
+         {
+           # Unpack the parameters
+           UNPAIR @% @%;
+           # Assert that the destination address is of type unit.
+           # This costs a bit more gas but limits foot-shooting.
+           DUP; CONTRACT @dest unit; ASSERT_SOME; DROP;
+           SWAP; UNPAIR @% @%;
+           DIP
+             {
+               AMOUNT @amount;
+               SENDER;
+               DUP; CONTRACT @from unit; ASSERT_SOME; DROP;
+               DIP { PAIR; SWAP; }; PAIR; PAIR; SOME @xcat;
+               SWAP;
+             };
+           DUP; DIP { MEM; NOT; ASSERT }; # Assert that this target hash isn't already in the map
+           UPDATE; PAIR @new_storage; SWAP; PAIR;
+         }
+         {
+           # Let's process a claim or a refund
+           IF_LEFT
+             { # It's a claim!
+               DUP; SIZE; PUSH nat 32; ASSERT_CMPGE;
+               SHA256 @hash; DUP; DIP {SWAP};
+               DIIP {
+                      GET; ASSERT_SOME;
+                      # Check deadline and prepare transaction.
+                      DUP; CADR @%; CONTRACT @dest unit; ASSERT_SOME;
+                      SWAP; CDR @%;
+                      UNPAIR @% @%; SWAP;
+                      # The deadline must not have passed
+                      NOW; ASSERT_CMPLT;
+                      # prepare transaction
+                      UNIT; TRANSFER_TOKENS;
+                    };
+             }
+             { # It's a refund!
+               DUP;
+               DIP
+                 {
+                   GET; ASSERT_SOME;
+                   DUP; CAAR @%; CONTRACT @from unit; ASSERT_SOME; SWAP; CDR;
+                   UNPAIR @% @%; SWAP;
+                   # The deadline must not HAVE passed
+                   NOW; ASSERT_CMPGE;
+                   UNIT; TRANSFER_TOKENS; SWAP;
+                 };
+             };
+           # Clear the big map
+           NONE @none (pair (pair address address) (pair mutez timestamp));
+           SWAP; UPDATE @cleared_map; SWAP; DIP { PAIR; SWAP };
+           CONS; PAIR;
+         }
+     }

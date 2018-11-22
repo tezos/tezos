@@ -23,20 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let record_proposal ctxt delegate proposal =
-  Storage.Vote.Proposals.add ctxt (delegate, proposal)
+let recorded_proposal_count_for_delegate ctxt proposer =
+  Storage.Vote.Proposals_count.get_option ctxt proposer >>=? function
+  | None -> return 0
+  | Some count -> return count
+
+let record_proposal ctxt proposal proposer =
+  recorded_proposal_count_for_delegate ctxt proposer >>=? fun count ->
+  Storage.Vote.Proposals_count.init_set ctxt proposer (count + 1) >>= fun ctxt ->
+  Storage.Vote.Proposals.add ctxt (proposal, proposer) >>= fun ctxt ->
+  return ctxt
 
 let get_proposals ctxt =
   Storage.Vote.Proposals.fold ctxt
-    ~init:Protocol_hash.Map.empty
-    ~f:(fun (proposal, _delegate) acc ->
-        let previous =
-          match Protocol_hash.Map.find_opt proposal acc with
-          | None -> 0l
-          | Some x -> x in
-        Lwt.return (Protocol_hash.Map.add proposal (Int32.succ previous) acc))
+    ~init:(ok Protocol_hash.Map.empty)
+    ~f:(fun (proposal, delegate) acc ->
+        (* Assuming the same listings is used at votings *)
+        Storage.Vote.Listings.get ctxt delegate >>=? fun weight ->
+        Lwt.return begin acc >>? fun acc ->
+          let previous =
+            match Protocol_hash.Map.find_opt proposal acc with
+            | None -> 0l
+            | Some x -> x
+          in
+          ok (Protocol_hash.Map.add proposal (Int32.add weight previous) acc)
+        end)
 
 let clear_proposals ctxt =
+  Storage.Vote.Proposals_count.clear ctxt >>= fun ctxt ->
   Storage.Vote.Proposals.clear ctxt
 
 type ballots = {
@@ -45,11 +59,23 @@ type ballots = {
   pass: int32 ;
 }
 
-let record_ballot = Storage.Vote.Ballots.init_set
+let ballots_encoding =
+  let open Data_encoding in
+  conv
+    (fun { yay ; nay ; pass } -> ( yay , nay , pass ))
+    (fun ( yay , nay , pass ) -> { yay ; nay ; pass })
+  @@ obj3
+    (req "yay"  int32)
+    (req "nay"  int32)
+    (req "pass" int32)
+
+let has_recorded_ballot = Storage.Vote.Ballots.mem
+let record_ballot = Storage.Vote.Ballots.init
 
 let get_ballots ctxt =
   Storage.Vote.Ballots.fold ctxt
     ~f:(fun delegate ballot (ballots: ballots tzresult) ->
+        (* Assuming the same listings is used at votings *)
         Storage.Vote.Listings.get ctxt delegate >>=? fun weight ->
         let count = Int32.add weight in
         Lwt.return begin
@@ -61,7 +87,14 @@ let get_ballots ctxt =
         end)
     ~init:(ok { yay = 0l ; nay = 0l; pass = 0l })
 
+let get_ballot_list = Storage.Vote.Ballots.bindings
+
 let clear_ballots = Storage.Vote.Ballots.clear
+
+let listings_encoding =
+  Data_encoding.(list (obj2
+                         (req "pkh" Signature.Public_key_hash.encoding)
+                         (req "rolls" int32)))
 
 let freeze_listings ctxt =
   Roll_storage.fold ctxt (ctxt, 0l)
@@ -81,6 +114,7 @@ let freeze_listings ctxt =
 
 let listing_size = Storage.Vote.Listings_size.get
 let in_listings = Storage.Vote.Listings.mem
+let get_listings = Storage.Vote.Listings.bindings
 
 let clear_listings ctxt =
   Storage.Vote.Listings.clear ctxt >>= fun ctxt ->

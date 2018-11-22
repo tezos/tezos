@@ -346,6 +346,7 @@ module Constants : sig
     nonce_length : int ;
     max_revelations_per_block : int ;
     max_operation_data_length : int ;
+    max_proposals_per_delegate : int ;
   }
   val fixed_encoding: fixed Data_encoding.t
   val fixed: fixed
@@ -354,6 +355,7 @@ module Constants : sig
   val nonce_length: int
   val max_revelations_per_block: int
   val max_operation_data_length: int
+  val max_proposals_per_delegate: int
 
   (** Constants parameterized by context *)
   type parametric = {
@@ -717,7 +719,7 @@ module Delegate : sig
 
   val deactivated:
     context -> Signature.Public_key_hash.t ->
-    bool Lwt.t
+    bool tzresult Lwt.t
 
   val grace_period:
     context -> Signature.Public_key_hash.t ->
@@ -731,17 +733,23 @@ module Vote : sig
 
   val record_proposal:
     context -> Protocol_hash.t -> public_key_hash ->
-    context Lwt.t
+    context tzresult Lwt.t
   val get_proposals:
-    context -> int32 Protocol_hash.Map.t Lwt.t
+    context -> int32 Protocol_hash.Map.t tzresult Lwt.t
   val clear_proposals: context -> context Lwt.t
 
+  val recorded_proposal_count_for_delegate:
+    context -> public_key_hash -> int tzresult Lwt.t
+
+  val listings_encoding : (Signature.Public_key_hash.t * int32) list Data_encoding.t
   val freeze_listings: context -> context tzresult Lwt.t
   val clear_listings: context -> context tzresult Lwt.t
   val listing_size: context -> int32 tzresult Lwt.t
   val in_listings: context -> public_key_hash -> bool Lwt.t
+  val get_listings : context -> (public_key_hash * int32) list Lwt.t
 
   type ballot = Yay | Nay | Pass
+  val ballot_encoding : ballot Data_encoding.t
 
   type ballots = {
     yay: int32 ;
@@ -749,9 +757,14 @@ module Vote : sig
     pass: int32 ;
   }
 
+  val ballots_encoding : ballots Data_encoding.t
+
+  val has_recorded_ballot :
+    context -> public_key_hash -> bool Lwt.t
   val record_ballot:
-    context -> public_key_hash -> ballot -> context Lwt.t
+    context -> public_key_hash -> ballot -> context tzresult Lwt.t
   val get_ballots: context -> ballots tzresult Lwt.t
+  val get_ballot_list: context -> (Signature.Public_key_hash.t * ballot) list Lwt.t
   val clear_ballots: context -> context Lwt.t
 
   val get_current_period_kind:

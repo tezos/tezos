@@ -29,10 +29,11 @@ The shell header contains
 -  ``fitness``: a sequence of sequences of unsigned bytes, ordered by
    length and then lexicographically. It represents the claimed fitness
    of the chain ending in this block.
--  ``operations_hash`` The root hash of a merkle tree of a list of root
-   hashes of merkle trees for various sets of operations in the block.
+-  ``operations_hash`` The hash of a list of root hashes of merkle
+      trees of operations. There is one list of operations per
+      validation pass
 -  ``context`` Hash of the state of the context after application of
-   this block. Useful for light clients.
+   this block.
 
 Protocol header (for tezos.alpha):
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

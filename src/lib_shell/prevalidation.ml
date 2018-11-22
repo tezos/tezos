@@ -311,7 +311,7 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
   Prevalidation.status validation_state >>=? fun { block_result ; _ } ->
   let pred_shell_header = State.Block.shell_header predecessor in
   let level = Int32.succ pred_shell_header.level in
-  Block_validator.may_patch_protocol
+  Block_validation.may_patch_protocol
     ~level block_result >>=? fun { fitness ; context ; message } ->
   State.Block.protocol_hash predecessor >>= fun pred_protocol ->
   Context.get_protocol context >>= fun protocol ->

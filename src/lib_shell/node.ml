@@ -189,14 +189,14 @@ let create
     | None -> true in
   init_p2p ~sandboxed p2p_params >>=? fun p2p ->
   State.init
-    ~store_root ~context_root ?patch_context genesis >>=? fun (state, mainchain_state) ->
+    ~store_root ~context_root ?patch_context
+    genesis >>=? fun (state, mainchain_state, context_index) ->
   may_update_checkpoint mainchain_state checkpoint >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
-  Validator_process.(init ~context_root Internal) >>= fun validation_process ->
   Validator.create state distributed_db
     peer_validator_limits
     block_validator_limits
-    validation_process
+    (Block_validator.Internal context_index)
     prevalidator_limits
     chain_validator_limits
   >>= fun validator ->

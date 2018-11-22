@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -254,6 +255,7 @@ type error +=
       { block: Block_hash.t ;
         expected: Operation_list_list_hash.t ;
         found: Operation_list_list_hash.t }
+  | Failed_to_checkout_context of Context_hash.t
 
 let () =
   Error_monad.register_error_kind
@@ -319,5 +321,20 @@ let () =
           Some (block, expected, found)
       | _ -> None)
     (fun (block, expected, found) ->
-       Inconsistent_operations_hash { block ; expected ; found })
+       Inconsistent_operations_hash { block ; expected ; found });
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"Validator_process.failed_to_checkout_context"
+    ~title: "Fail during checkout context"
+    ~description: "The context checkout failed using a given hash"
+    ~pp:(fun ppf (hash:Context_hash.t) ->
+        Format.fprintf ppf
+          "@[Failed to checkout the context with hash %a@]"
+          Context_hash.pp_short hash)
+    Data_encoding.(obj1 (req "hash" Context_hash.encoding))
+    (function
+      | Failed_to_checkout_context h -> Some h
+      | _ -> None)
+    (fun h -> Failed_to_checkout_context h)
 
+let invalid_block block error = Invalid_block { block ; error }
