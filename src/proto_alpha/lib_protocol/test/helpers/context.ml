@@ -120,11 +120,11 @@ module Vote = struct
     Alpha_services.Voting.ballot_list rpc_ctxt ctxt
 
   let get_voting_period ctxt =
-    Alpha_services.Helpers.current_level rpc_ctxt ctxt >>=? fun l ->
+    Alpha_services.Helpers.current_level rpc_ctxt ~offset:1l ctxt >>=? fun l ->
     return l.voting_period
 
   let get_voting_period_position ctxt =
-    Alpha_services.Helpers.current_level rpc_ctxt ctxt >>=? fun l ->
+    Alpha_services.Helpers.current_level rpc_ctxt ~offset:1l ctxt >>=? fun l ->
     return l.voting_period_position
 
   let get_current_period_kind ctxt =
@@ -141,6 +141,11 @@ module Vote = struct
 
   let get_current_proposal ctxt =
     Alpha_services.Voting.current_proposal rpc_ctxt ctxt
+
+  let get_protocol (b:Block.t) =
+    Alpha_environment.Context.get b.context ["protocol"] >>= function
+    | None -> assert false
+    | Some p -> Lwt.return (Protocol_hash.of_bytes_exn p)
 
   let get_protocol (b:Block.t) =
     Alpha_environment.Context.get b.context ["protocol"] >>= function
