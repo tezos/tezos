@@ -348,6 +348,16 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
     let config = filter_config w pv in
     Filter.post_filter config (op, receipt)
 
+  let is_endorsement ( op : Prevalidation.operation ) =
+    Proto.acceptable_passes {
+      shell = op.raw.shell ;
+      protocol_data = op.protocol_data } = [0]
+
+  let is_endorsement_raw op =
+    match Prevalidation.parse op with
+    |Ok op -> is_endorsement op
+    |Error _ -> false
+
   let handle_unprocessed w pv =
     begin match pv.validation_state with
       | Error err ->
@@ -392,7 +402,7 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
                             op.protocol_data receipt >>= fun accept ->
                           if accept
                           && (pv.applied_count <= 2000 (* this test is a quick fix while we wait for the new mempool *)
-                              || Proto.acceptable_passes { shell = op.raw.shell ; protocol_data = op.protocol_data } = [0])
+                              || is_endorsement op)
                           then begin
                             notify_operation pv `Applied op.raw ;
                             let new_mempool = Mempool.{ acc_mempool with known_valid = op.hash :: acc_mempool.known_valid } in
@@ -445,12 +455,19 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
           List.rev_map fst pv.applied ;
         pending =
           Operation_hash.Map.fold
-            (fun k _ s -> Operation_hash.Set.add k s)
+            (fun k (op,_) s ->
+               if is_endorsement_raw op then
+                 Operation_hash.Set.add k s
+               else s)
             pv.branch_delays @@
           Operation_hash.Map.fold
-            (fun k _ s -> Operation_hash.Set.add k s)
+            (fun k (op,_) s ->
+               if is_endorsement_raw op then
+                 Operation_hash.Set.add k s
+               else s)
             pv.branch_refusals @@
-          Operation_hash.Set.empty } ;
+          Operation_hash.Set.empty
+      } ;
     State.Current_mempool.set (Distributed_db.chain_state pv.chain_db)
       ~head:(State.Block.hash pv.predecessor) pv.mempool >>= fun () ->
     Lwt.return_unit
