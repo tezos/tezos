@@ -261,6 +261,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
       ?refused:bool ->
       unit -> (Next_proto.operation list Lwt_stream.t * stopper) tzresult Lwt.t
 
+    val request_operations:
+      #simple ->
+      ?chain:chain ->
+      unit -> unit tzresult Lwt.t
+
   end
 
   val live_blocks:
@@ -428,6 +433,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
         ([ `POST ], 'a,
          'b , unit, Data_encoding.json,
          unit) RPC_service.t
+
+      val request_operations :
+        ('a, 'b) RPC_path.t ->
+        ([ `POST ], 'a,
+         'b , unit, unit, unit) RPC_service.t
 
     end
 

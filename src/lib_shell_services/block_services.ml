@@ -751,6 +751,14 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
           ~output: unit
           RPC_path.(path / "filter")
 
+      let request_operations path =
+        RPC_service.post_service
+          ~description:"Request the operations of your peers."
+          ~input: Data_encoding.empty
+          ~query: RPC_query.empty
+          ~output: Data_encoding.empty
+          RPC_path.(path / "request_operations")
+
     end
 
     let live_blocks =
@@ -960,6 +968,9 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
         end)
         ()
 
+    let request_operations ctxt ?(chain = `Main) () =
+      let s = S.Mempool.request_operations (mempool_path chain_path) in
+      RPC_context.make_call1 s ctxt chain () ()
   end
 
   let live_blocks ctxt =
