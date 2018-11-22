@@ -30,7 +30,10 @@ open Alpha_context
 val bake_block:
   #Proto_alpha.full ->
   ?chain:Chain_services.chain ->
-  ?fee_threshold:Tez.t ->
+  ?minimal_fees: Tez.t ->
+  ?minimal_fees_per_gas_unit: Tez.t ->
+  ?minimal_fees_per_byte: Tez.t ->
+  ?await_endorsements: bool ->
   ?force:bool ->
   ?max_priority: int ->
   ?minimal_timestamp: bool ->

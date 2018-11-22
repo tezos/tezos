@@ -29,10 +29,13 @@ open Alpha_context
 let bake_block
     (cctxt : #Proto_alpha.full)
     ?(chain = `Main)
-    ?fee_threshold
+    ?minimal_fees
+    ?minimal_fees_per_gas_unit
+    ?minimal_fees_per_byte
+    ?(await_endorsements = false)
     ?force
     ?max_priority
-    ?(minimal_timestamp=false)
+    ?(minimal_timestamp = false)
     ?mempool
     ?context_path
     ?src_sk
@@ -63,9 +66,12 @@ let bake_block
     else
       None, None in
   Client_baking_forge.forge_block cctxt
-    ?timestamp:(if minimal_timestamp then None else Some (Time.now ()))
-    ?fee_threshold
     ?force
+    ?minimal_fees
+    ?minimal_fees_per_gas_unit
+    ?minimal_fees_per_byte
+    ~await_endorsements
+    ?timestamp:(if minimal_timestamp then None else Some (Time.now ()))
     ?seed_nonce_hash
     ?mempool
     ?context_path

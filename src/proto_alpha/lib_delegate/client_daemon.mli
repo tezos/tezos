@@ -30,18 +30,18 @@ module Endorser : sig
   val run:
     #Proto_alpha.full ->
     delay: int ->
-    ?min_date: Time.t ->
     public_key_hash list -> unit tzresult Lwt.t
 end
 
 module Baker : sig
   val run:
     #Proto_alpha.full ->
-    ?fee_threshold: Tez.tez ->
+    ?minimal_fees: Tez.t ->
+    ?minimal_fees_per_gas_unit: Tez.t ->
+    ?minimal_fees_per_byte: Tez.t ->
+    ?await_endorsements: bool ->
     ?max_priority: int ->
-    ?min_date: Time.t ->
     context_path: string ->
-    max_waiting_time: int ->
     public_key_hash list -> unit tzresult Lwt.t
 end
 

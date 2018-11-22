@@ -71,7 +71,10 @@ val forge_block:
   ?operations: Operation.packed list ->
   ?best_effort:bool ->
   ?sort:bool ->
-  ?fee_threshold:Tez.t ->
+  ?minimal_fees: Tez.t ->
+  ?minimal_fees_per_gas_unit: Tez.t ->
+  ?minimal_fees_per_byte: Tez.t ->
+  ?await_endorsements: bool ->
   ?timestamp:Time.t ->
   ?mempool:string ->
   ?context_path:string ->
@@ -103,9 +106,11 @@ val forge_block:
 
 val create:
   #Proto_alpha.full ->
-  ?fee_threshold:Tez.t ->
+  ?minimal_fees: Tez.t ->
+  ?minimal_fees_per_gas_unit: Tez.t ->
+  ?minimal_fees_per_byte: Tez.t ->
+  ?await_endorsements: bool ->
   ?max_priority: int ->
-  max_waiting_time: int ->
   context_path: string ->
   public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->
