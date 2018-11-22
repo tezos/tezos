@@ -372,7 +372,7 @@ module Constants : sig
     tokens_per_roll: Tez.t ;
     michelson_maximum_type_size: int;
     seed_nonce_revelation_tip: Tez.t ;
-    origination_burn: Tez.t ;
+    origination_size: int ;
     block_security_deposit: Tez.t ;
     endorsement_security_deposit: Tez.t ;
     block_reward: Tez.t ;
@@ -399,7 +399,7 @@ module Constants : sig
   val block_reward: context -> Tez.t
   val endorsement_reward: context -> Tez.t
   val seed_nonce_revelation_tip: context -> Tez.t
-  val origination_burn: context -> Tez.t
+  val origination_size: context -> int
   val block_security_deposit: context -> Tez.t
   val endorsement_security_deposit: context -> Tez.t
 
@@ -950,7 +950,7 @@ val manager_kind: 'kind manager_operation -> 'kind Kind.manager
 module Fees : sig
 
   val origination_burn:
-    context -> payer:Contract.t -> (context * Tez.t) tzresult Lwt.t
+    context -> (context * Tez.t) tzresult Lwt.t
 
   val record_paid_storage_space:
     context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t

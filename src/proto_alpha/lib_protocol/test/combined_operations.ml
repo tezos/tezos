@@ -70,7 +70,7 @@ let multiple_origination_and_delegation () =
   Context.init 2 >>=? fun (blk, contracts) ->
   let c1 = List.nth contracts 0 in
   let n = 10 in
-  Context.get_constants (B blk) >>=? fun { parametric = { origination_burn } } ->
+  Context.get_constants (B blk) >>=? fun { parametric = { origination_size ; cost_per_byte } } ->
   Context.Contract.pkh c1 >>=? fun delegate_pkh ->
 
   let new_accounts = List.map (fun _ -> Account.new_account ()) (1 -- n) in
@@ -111,6 +111,7 @@ let multiple_origination_and_delegation () =
       ) tickets in
 
   (* Previous balance - (Credit (n * 10tz) + Origination cost (n tz)) *)
+  Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Tez.(origination_burn *? (Int64.of_int n)) >>?= fun origination_total_cost ->
   Tez.((Tez.of_int (10 * n)) +? origination_total_cost) >>?= fun total_cost ->
   Assert.balance_was_debited ~loc:__LOC__

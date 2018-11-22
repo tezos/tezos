@@ -374,14 +374,14 @@ let apply_manager_operation_content :
     | Transaction { amount ; parameters ; destination } -> begin
         spend ctxt source amount >>=? fun ctxt ->
         begin match Contract.is_implicit destination with
-          | None -> return (ctxt, [])
+          | None -> return (ctxt, [], false)
           | Some _ ->
               Contract.allocated ctxt destination >>=? function
-              | true -> return (ctxt, [])
+              | true -> return (ctxt, [], false)
               | false ->
-                  Fees.origination_burn ctxt ~payer >>=? fun (ctxt, orignation_burn) ->
-                  return (ctxt, [ Delegate.Contract payer, Delegate.Debited orignation_burn ])
-        end >>=? fun (ctxt, maybe_burn_balance_update) ->
+                  Fees.origination_burn ctxt >>=? fun (ctxt, origination_burn) ->
+                  return (ctxt, [ Delegate.Contract payer, Delegate.Debited origination_burn ], true)
+        end >>=? fun (ctxt, maybe_burn_balance_update, allocated_destination_contract) ->
         Contract.credit ctxt destination amount >>=? fun ctxt ->
         Contract.get_script ctxt destination >>=? fun (ctxt, script) ->
         match script with
@@ -414,6 +414,7 @@ let apply_manager_operation_content :
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
                   storage_size = Z.zero ;
                   paid_storage_size_diff = Z.zero ;
+                  allocated_destination_contract ;
                 } in
             return (ctxt, result, [])
         | Some script ->
@@ -451,7 +452,8 @@ let apply_manager_operation_content :
                   originated_contracts ;
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
                   storage_size = new_size ;
-                  paid_storage_size_diff } in
+                  paid_storage_size_diff ;
+                  allocated_destination_contract } in
             return (ctxt, result, operations)
       end
     | Origination { manager ; delegate ; script ; preorigination ;
@@ -482,14 +484,14 @@ let apply_manager_operation_content :
           ~manager ~delegate ~balance:credit
           ?script
           ~spendable ~delegatable >>=? fun ctxt ->
-        Fees.origination_burn ctxt ~payer >>=? fun (ctxt, orignation_burn) ->
+        Fees.origination_burn ctxt >>=? fun (ctxt, origination_burn) ->
         Fees.record_paid_storage_space ctxt contract >>=? fun (ctxt, size, paid_storage_size_diff, fees) ->
-        Lwt.return Tez.(orignation_burn +? fees) >>=? fun all_fees ->
         let result =
           Origination_result
             { balance_updates =
                 Delegate.cleanup_balance_updates
-                  [ Contract payer, Debited all_fees ;
+                  [ Contract payer, Debited fees ;
+                    Contract payer, Debited origination_burn ;
                     Contract source, Debited credit ;
                     Contract contract, Credited credit ] ;
               originated_contracts = [ contract ] ;

@@ -25,6 +25,8 @@
 
 open Proto_alpha
 open Alpha_context
+open Test_tez
+open Test_utils
 
 let account_pair = function
   | [a1; a2] -> (a1, a2)
@@ -153,7 +155,8 @@ let deactivation_then_empty_then_self_delegation () =
   Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
   let sink_account = Account.new_account () in
   let sink_contract = Contract.implicit_contract sink_account.pkh in
-  Context.get_constants (B b) >>=? fun { parametric = { origination_burn } } ->
+  Context.get_constants (B b) >>=? fun { parametric = { origination_size ; cost_per_byte } } ->
+  Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   let amount = match Tez.(balance -? origination_burn) with Ok r -> r | Error _ -> assert false in
   Op.transaction (B b) deactivated_contract sink_contract amount >>=? fun empty_contract ->
   Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b >>=? fun b ->
@@ -173,7 +176,8 @@ let deactivation_then_empty_then_self_delegation_then_recredit () =
   (* empty the contract *)
   let sink_account = Account.new_account () in
   let sink_contract = Contract.implicit_contract sink_account.pkh in
-  Context.get_constants (B b) >>=? fun { parametric = { origination_burn } } ->
+  Context.get_constants (B b) >>=? fun { parametric = { origination_size ; cost_per_byte } } ->
+  Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   let amount = match Tez.(balance -? origination_burn) with Ok r -> r | Error _ -> assert false in
   Op.transaction (B b) deactivated_contract sink_contract amount >>=? fun empty_contract ->
   Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b >>=? fun b ->

@@ -58,10 +58,14 @@ let () =
     (function Storage_limit_too_high -> Some () | _ -> None)
     (fun () -> Storage_limit_too_high)
 
-let origination_burn c ~payer =
-  let origination_burn = Constants_storage.origination_burn c in
-  Contract_storage.spend_from_script c payer origination_burn >>=? fun c ->
-  return (c, origination_burn)
+let origination_burn c =
+  let origination_size = Constants_storage.origination_size c in
+  let cost_per_byte = Constants_storage.cost_per_byte c in
+  (* the origination burn, measured in bytes *)
+  Lwt.return
+    Tez_repr.(cost_per_byte *? (Int64.of_int origination_size)) >>=? fun to_be_paid ->
+  return (Raw_context.update_allocated_contracts_count c,
+          to_be_paid)
 
 let record_paid_storage_space c contract =
   Contract_storage.used_storage_space c contract >>=? fun size ->
@@ -72,13 +76,19 @@ let record_paid_storage_space c contract =
   return (c, size, to_be_paid, to_burn)
 
 let burn_storage_fees c ~storage_limit ~payer =
-  let c, storage_space_to_pay = Raw_context.clear_storage_space_to_pay c in
-  let remaining = Z.sub storage_limit storage_space_to_pay in
+  let origination_size = Constants_storage.origination_size c in
+  let c, storage_space_to_pay, allocated_contracts =
+    Raw_context.clear_storage_space_to_pay c in
+  let storage_space_for_allocated_contracts =
+    Z.mul (Z.of_int allocated_contracts) (Z.of_int origination_size) in
+  let consumed =
+    Z.add storage_space_to_pay storage_space_for_allocated_contracts in
+  let remaining = Z.sub storage_limit consumed in
   if Compare.Z.(remaining < Z.zero) then
     fail Operation_quota_exceeded
   else
     let cost_per_byte = Constants_storage.cost_per_byte c in
-    Lwt.return (Tez_repr.(cost_per_byte *? (Z.to_int64 storage_space_to_pay))) >>=? fun to_burn ->
+    Lwt.return (Tez_repr.(cost_per_byte *? (Z.to_int64 consumed))) >>=? fun to_burn ->
     (* Burning the fees... *)
     if Tez_repr.(to_burn = Tez_repr.zero) then
       (* If the payer was was deleted by transfering all its balance, and no space was used,

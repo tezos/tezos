@@ -87,7 +87,7 @@ type parametric = {
   tokens_per_roll: Tez_repr.t ;
   michelson_maximum_type_size: int;
   seed_nonce_revelation_tip: Tez_repr.t ;
-  origination_burn: Tez_repr.t ;
+  origination_size: int ;
   block_security_deposit: Tez_repr.t ;
   endorsement_security_deposit: Tez_repr.t ;
   block_reward: Tez_repr.t ;
@@ -117,7 +117,7 @@ let default = {
     | Ok c -> c
     | Error _ -> assert false
   end ;
-  origination_burn = Tez_repr.of_mutez_exn 257_000L ;
+  origination_size = 257 ;
   block_security_deposit = Tez_repr.(mul_exn one 512) ;
   endorsement_security_deposit = Tez_repr.(mul_exn one 64) ;
   block_reward = Tez_repr.(mul_exn one 16) ;
@@ -145,7 +145,7 @@ let parametric_encoding =
           c.tokens_per_roll,
           c.michelson_maximum_type_size,
           c.seed_nonce_revelation_tip,
-          c.origination_burn,
+          c.origination_size,
           c.block_security_deposit,
           c.endorsement_security_deposit,
           c.block_reward),
@@ -165,7 +165,7 @@ let parametric_encoding =
             tokens_per_roll,
             michelson_maximum_type_size,
             seed_nonce_revelation_tip,
-            origination_burn,
+            origination_size,
             block_security_deposit,
             endorsement_security_deposit,
             block_reward),
@@ -185,7 +185,7 @@ let parametric_encoding =
         tokens_per_roll ;
         michelson_maximum_type_size ;
         seed_nonce_revelation_tip ;
-        origination_burn ;
+        origination_size ;
         block_security_deposit ;
         endorsement_security_deposit ;
         block_reward ;
@@ -210,7 +210,7 @@ let parametric_encoding =
              (req "tokens_per_roll" Tez_repr.encoding)
              (req "michelson_maximum_type_size" uint16)
              (req "seed_nonce_revelation_tip" Tez_repr.encoding)
-             (req "origination_burn" Tez_repr.encoding)
+             (req "origination_size" int31)
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
              (req "block_reward" Tez_repr.encoding))

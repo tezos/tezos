@@ -51,6 +51,7 @@ type _ successful_manager_operation_result =
         consumed_gas : Z.t ;
         storage_size : Z.t ;
         paid_storage_size_diff : Z.t ;
+        allocated_destination_contract : bool ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
       { balance_updates : Delegate.balance_updates ;
@@ -164,14 +165,15 @@ module Manager_result = struct
     make
       ~op_case: Operation.Encoding.Manager_operations.transaction_case
       ~encoding:
-        (obj7
+        (obj8
            (opt "storage" Script.expr_encoding)
            (opt "big_map_diff" Contract.big_map_diff_encoding)
            (dft "balance_updates" Delegate.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
            (dft "storage_size" z Z.zero)
-           (dft "paid_storage_size_diff" z Z.zero))
+           (dft "paid_storage_size_diff" z Z.zero)
+           (dft "allocated_destination_contract" bool false))
       ~iselect:
         (function
           | Internal_operation_result
@@ -188,17 +190,21 @@ module Manager_result = struct
           | Transaction_result
               { storage ; big_map_diff ; balance_updates ;
                 originated_contracts ; consumed_gas ;
-                storage_size ; paid_storage_size_diff } ->
+                storage_size ; paid_storage_size_diff ;
+                allocated_destination_contract } ->
               (storage, big_map_diff, balance_updates,
                originated_contracts, consumed_gas,
-               storage_size, paid_storage_size_diff))
+               storage_size, paid_storage_size_diff,
+               allocated_destination_contract))
       ~inj:
         (fun (storage, big_map_diff, balance_updates,
               originated_contracts, consumed_gas,
-              storage_size, paid_storage_size_diff) ->
+              storage_size, paid_storage_size_diff,
+              allocated_destination_contract) ->
           Transaction_result { storage ; big_map_diff ; balance_updates ;
                                originated_contracts ; consumed_gas ;
-                               storage_size ; paid_storage_size_diff })
+                               storage_size ; paid_storage_size_diff ;
+                               allocated_destination_contract })
 
   let origination_case =
     make

@@ -95,6 +95,7 @@ and _ successful_manager_operation_result =
         consumed_gas : Z.t ;
         storage_size : Z.t ;
         paid_storage_size_diff : Z.t ;
+        allocated_destination_contract : bool ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
       { balance_updates : Delegate.balance_updates ;
