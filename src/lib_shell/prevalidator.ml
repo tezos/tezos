@@ -461,6 +461,13 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
                Operation_hash.Map.map map_op pv.pending ;
            }) ;
 
+    dir := RPC_directory.register !dir
+        (Proto_services.S.Mempool.request_operations RPC_path.open_root)
+        (fun pv () () ->
+           Distributed_db.Request.current_head pv.chain_db () ;
+           return_unit
+        ) ;
+
     dir := RPC_directory.gen_register !dir
         (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
         begin fun { applied ; refusals = refused ; branch_refusals = branch_refused ; branch_delays = branch_delayed ; operation_stream } params () ->
