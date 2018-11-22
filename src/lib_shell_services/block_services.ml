@@ -744,6 +744,14 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
           ~output: Data_encoding.empty
           RPC_path.(path / "request_operations")
 
+      let request_operations path =
+        RPC_service.post_service
+          ~description:"Request the operations of your peers."
+          ~input: Data_encoding.empty
+          ~query: RPC_query.empty
+          ~output: Data_encoding.empty
+          RPC_path.(path / "request_operations")
+
     end
 
     let live_blocks =
