@@ -1,10 +1,10 @@
 (library
- (name tezos_002_PsYLVpVv_bench_helpers)
+ (name tezos_003_PsddFKi3_bench_helpers)
  (libraries tezos-base
             tezos-stdlib-unix
             tezos-shell-services
             tezos-protocol-environment
-            tezos-protocol-002-PsYLVpVv
+            tezos-protocol-003-PsddFKi3
             alcotest-lwt)
  (flags (:standard -w -9-32 -safe-string
                    -open Tezos_base__TzPervasives

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Name = struct let name = "alpha" end
+module Name = struct let name = "002-PsYLVpVv" end
 module T = Tezos_protocol_environment.Make(Tezos_storage.Context)
 module Alpha_environment = T.MakeV1(Name)()
 

@@ -74,7 +74,7 @@ let default_config =
     allow_script_failure = true ;
   }
 
-module Proto = Tezos_embedded_protocol_alpha.Registerer.Registered
+module Proto = Tezos_embedded_protocol_003_PsddFKi3.Registerer.Registered
 
 let get_manager_operation_gas_and_fee contents =
   let open Operation in
