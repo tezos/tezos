@@ -68,9 +68,9 @@ let michelson_maximum_type_size c =
 let seed_nonce_revelation_tip c =
   let constants = Raw_context.constants c in
   constants.seed_nonce_revelation_tip
-let origination_burn c =
+let origination_size c =
   let constants = Raw_context.constants c in
-  constants.origination_burn
+  constants.origination_size
 let block_security_deposit c =
   let constants = Raw_context.constants c in
   constants.block_security_deposit

@@ -192,7 +192,13 @@ let apply_operation
         | Partial_construction { predecessor }
           -> predecessor, Signature.Public_key_hash.zero
       in
-      Apply.apply_operation ctxt chain_id Optimized predecessor baker
+      let partial =
+        match mode with
+        | Partial_construction _ -> true
+        | Application _
+        | Full_construction _
+        | Partial_application _ -> false in
+      Apply.apply_operation ~partial ctxt chain_id Optimized predecessor baker
         (Alpha_context.Operation.hash operation)
         operation >>=? fun (ctxt, result) ->
       let op_count = op_count + 1 in

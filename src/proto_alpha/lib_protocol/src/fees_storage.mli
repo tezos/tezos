@@ -27,8 +27,9 @@ type error += Cannot_pay_storage_fee (* `Temporary *)
 type error += Operation_quota_exceeded (* `Temporary *)
 type error += Storage_limit_too_high (* `Permanent *)
 
+(** Does not burn, only adds the burn to storage space to be paid *)
 val origination_burn:
-  Raw_context.t -> payer:Contract_repr.t -> (Raw_context.t * Tez_repr.t) tzresult Lwt.t
+  Raw_context.t -> (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 
 (** The returned Tez quantity is for logging purpose only *)
 val record_paid_storage_space:

@@ -119,7 +119,8 @@ val block_gas_level: t -> Z.t
 
 val init_storage_space_to_pay: t -> t
 val update_storage_space_to_pay: t -> Z.t -> t
-val clear_storage_space_to_pay: t -> t * Z.t
+val update_allocated_contracts_count: t -> t
+val clear_storage_space_to_pay: t -> t * Z.t * int
 
 type error += Undefined_operation_nonce (* `Permanent *)
 

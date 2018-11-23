@@ -207,7 +207,7 @@ module Cost_of = struct
     (len *@ (log2 len *@ (alloc_cost 3 +@ step_cost 1)))
 
   let address = step_cost 1
-  let contract = Gas.read_bytes_cost Z.zero +@ step_cost 100
+  let contract = Gas.read_bytes_cost Z.zero +@ step_cost 10000
   let transfer = step_cost 10
   let create_account = step_cost 10
   let create_contract = step_cost 10
@@ -234,6 +234,8 @@ module Cost_of = struct
   let compare_key_hash _ _ = alloc_bytes_cost 36
   let compare_timestamp t1 t2 = compare_zint (Script_timestamp.to_zint t1) (Script_timestamp.to_zint t2)
   let compare_address _ _ = step_cost 20
+
+  let manager_operation = step_cost 10_000
 
   module Typechecking = struct
     let cycle = step_cost 1

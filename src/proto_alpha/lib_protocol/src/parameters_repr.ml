@@ -135,9 +135,9 @@ let constants_encoding =
        and seed_nonce_revelation_tip =
          opt Tez_repr.(=)
            default.seed_nonce_revelation_tip c.seed_nonce_revelation_tip
-       and origination_burn =
-         opt Tez_repr.(=)
-           default.origination_burn c.origination_burn
+       and origination_size =
+         opt Compare.Int.(=)
+           default.origination_size c.origination_size
        and block_security_deposit =
          opt Tez_repr.(=)
            default.block_security_deposit c.block_security_deposit
@@ -170,7 +170,7 @@ let constants_encoding =
           tokens_per_roll,
           michelson_maximum_type_size,
           seed_nonce_revelation_tip,
-          origination_burn,
+          origination_size,
           block_security_deposit,
           endorsement_security_deposit,
           block_reward),
@@ -190,7 +190,7 @@ let constants_encoding =
             tokens_per_roll,
             michelson_maximum_type_size,
             seed_nonce_revelation_tip,
-            origination_burn,
+            origination_size,
             block_security_deposit,
             endorsement_security_deposit,
             block_reward),
@@ -226,8 +226,8 @@ let constants_encoding =
           unopt default.michelson_maximum_type_size michelson_maximum_type_size ;
         seed_nonce_revelation_tip =
           unopt default.seed_nonce_revelation_tip seed_nonce_revelation_tip ;
-        origination_burn =
-          unopt default.origination_burn origination_burn ;
+        origination_size =
+          unopt default.origination_size origination_size ;
         block_security_deposit =
           unopt default.block_security_deposit block_security_deposit ;
         endorsement_security_deposit =
@@ -258,7 +258,7 @@ let constants_encoding =
              (opt "tokens_per_roll" Tez_repr.encoding)
              (opt "michelson_maximum_type_size" uint16)
              (opt "seed_nonce_revelation_tip" Tez_repr.encoding)
-             (opt "origination_burn" Tez_repr.encoding)
+             (opt "origination_size" int31)
              (opt "block_security_deposit" Tez_repr.encoding)
              (opt "endorsement_security_deposit" Tez_repr.encoding)
              (opt "block_reward" Tez_repr.encoding))

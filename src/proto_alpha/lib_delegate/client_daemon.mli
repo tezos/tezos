@@ -37,8 +37,8 @@ module Baker : sig
   val run:
     #Proto_alpha.full ->
     ?minimal_fees: Tez.t ->
-    ?minimal_fees_per_gas_unit: Tez.t ->
-    ?minimal_fees_per_byte: Tez.t ->
+    ?minimal_picotez_per_gas_unit: Z.t ->
+    ?minimal_picotez_per_byte: Z.t ->
     ?await_endorsements: bool ->
     ?max_priority: int ->
     context_path: string ->

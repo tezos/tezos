@@ -367,21 +367,22 @@ let apply_manager_operation_content :
     let set_delegate =
       (* Ignore the delegatable flag for smart contracts. *)
       if internal then Delegate.set_from_script else Delegate.set in
+    Lwt.return (Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation) >>=? fun ctxt ->
     match operation with
     | Reveal _ ->
         return (* No-op: action already performed by `precheck_manager_contents`. *)
-          (ctxt, (Reveal_result : kind successful_manager_operation_result), [])
+          (ctxt, (Reveal_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt } : kind successful_manager_operation_result), [])
     | Transaction { amount ; parameters ; destination } -> begin
         spend ctxt source amount >>=? fun ctxt ->
         begin match Contract.is_implicit destination with
-          | None -> return (ctxt, [])
+          | None -> return (ctxt, [], false)
           | Some _ ->
               Contract.allocated ctxt destination >>=? function
-              | true -> return (ctxt, [])
+              | true -> return (ctxt, [], false)
               | false ->
-                  Fees.origination_burn ctxt ~payer >>=? fun (ctxt, orignation_burn) ->
-                  return (ctxt, [ Delegate.Contract payer, Delegate.Debited orignation_burn ])
-        end >>=? fun (ctxt, maybe_burn_balance_update) ->
+                  Fees.origination_burn ctxt >>=? fun (ctxt, origination_burn) ->
+                  return (ctxt, [ Delegate.Contract payer, Delegate.Debited origination_burn ], true)
+        end >>=? fun (ctxt, maybe_burn_balance_update, allocated_destination_contract) ->
         Contract.credit ctxt destination amount >>=? fun ctxt ->
         Contract.get_script ctxt destination >>=? fun (ctxt, script) ->
         match script with
@@ -414,6 +415,7 @@ let apply_manager_operation_content :
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
                   storage_size = Z.zero ;
                   paid_storage_size_diff = Z.zero ;
+                  allocated_destination_contract ;
                 } in
             return (ctxt, result, [])
         | Some script ->
@@ -451,7 +453,8 @@ let apply_manager_operation_content :
                   originated_contracts ;
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt ;
                   storage_size = new_size ;
-                  paid_storage_size_diff } in
+                  paid_storage_size_diff ;
+                  allocated_destination_contract } in
             return (ctxt, result, operations)
       end
     | Origination { manager ; delegate ; script ; preorigination ;
@@ -482,14 +485,14 @@ let apply_manager_operation_content :
           ~manager ~delegate ~balance:credit
           ?script
           ~spendable ~delegatable >>=? fun ctxt ->
-        Fees.origination_burn ctxt ~payer >>=? fun (ctxt, orignation_burn) ->
+        Fees.origination_burn ctxt >>=? fun (ctxt, origination_burn) ->
         Fees.record_paid_storage_space ctxt contract >>=? fun (ctxt, size, paid_storage_size_diff, fees) ->
-        Lwt.return Tez.(orignation_burn +? fees) >>=? fun all_fees ->
         let result =
           Origination_result
             { balance_updates =
                 Delegate.cleanup_balance_updates
-                  [ Contract payer, Debited all_fees ;
+                  [ Contract payer, Debited fees ;
+                    Contract payer, Debited origination_burn ;
                     Contract source, Debited credit ;
                     Contract contract, Credited credit ] ;
               originated_contracts = [ contract ] ;
@@ -499,7 +502,7 @@ let apply_manager_operation_content :
         return (ctxt, result, [])
     | Delegation delegate ->
         set_delegate ctxt source delegate >>=? fun ctxt ->
-        return (ctxt, Delegation_result, [])
+        return (ctxt, Delegation_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt }, [])
 
 let apply_internal_manager_operations ctxt mode ~payer ops =
   let rec apply ctxt applied worklist =
@@ -610,7 +613,7 @@ let skipped_operation_result
   = function operation ->
   match operation with
   | Reveal _ ->
-      Applied ( Reveal_result : kind successful_manager_operation_result )
+      Applied ( Reveal_result { consumed_gas = Z.zero } : kind successful_manager_operation_result )
   | _ -> Skipped (manager_kind operation)
 
 let rec mark_skipped
@@ -725,7 +728,7 @@ let mark_backtracked results =
     : type kind. kind manager_operation_result -> kind manager_operation_result
     = function
       | Failed _ | Skipped _ | Backtracked _ as result -> result
-      | Applied Reveal_result as result -> result
+      | Applied (Reveal_result _) as result -> result
       | Applied result -> Backtracked (result, None) in
   mark_contents_list results
 
@@ -736,7 +739,7 @@ let apply_manager_contents_list ctxt mode baker contents_list =
   | `Success ctxt -> Lwt.return (ctxt, results)
 
 let apply_contents_list
-    (type kind) ctxt chain_id mode pred_block baker
+    (type kind) ctxt ~partial chain_id mode pred_block baker
     (operation : kind operation)
     (contents_list : kind contents_list)
   : (context * kind contents_result_list) tzresult Lwt.t =
@@ -759,7 +762,12 @@ let apply_contents_list
         Lwt.return
           Tez.(Constants.endorsement_security_deposit ctxt *?
                Int64.of_int gap) >>=? fun deposit ->
-        add_deposit ctxt delegate deposit >>=? fun ctxt ->
+        begin
+          if partial then
+            Delegate.freeze_deposit ctxt delegate deposit
+          else
+            add_deposit ctxt delegate deposit
+        end >>=? fun ctxt ->
         Global.get_last_block_priority ctxt >>=? fun block_priority ->
         Baking.endorsement_reward ctxt ~block_priority gap >>=? fun reward ->
         Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
@@ -910,10 +918,10 @@ let apply_contents_list
       apply_manager_contents_list ctxt mode baker op >>= fun (ctxt, result) ->
       return (ctxt, result)
 
-let apply_operation ctxt chain_id mode pred_block baker hash operation =
+let apply_operation ctxt ~partial chain_id mode pred_block baker hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash in
   apply_contents_list
-    ctxt chain_id mode pred_block baker operation
+    ctxt ~partial chain_id mode pred_block baker operation
     operation.protocol_data.contents >>=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
   let ctxt = Contract.unset_origination_nonce ctxt in

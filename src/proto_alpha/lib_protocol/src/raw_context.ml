@@ -40,6 +40,7 @@ type t = {
   block_gas: Z.t ;
   operation_gas: Gas_limit_repr.t ;
   storage_space_to_pay: Z.t option ;
+  allocated_contracts: int option ;
   origination_nonce: Contract_repr.origination_nonce option ;
   internal_nonce: int ;
   internal_nonces_used: Int_set.t ;
@@ -203,7 +204,7 @@ let init_storage_space_to_pay ctxt =
   | Some _ ->
       assert false
   | None ->
-      { ctxt with storage_space_to_pay = Some Z.zero }
+      { ctxt with storage_space_to_pay = Some Z.zero ; allocated_contracts = Some 0 }
 
 let update_storage_space_to_pay ctxt n =
   match ctxt.storage_space_to_pay with
@@ -212,12 +213,22 @@ let update_storage_space_to_pay ctxt n =
   | Some storage_space_to_pay ->
       { ctxt with storage_space_to_pay = Some (Z.add n storage_space_to_pay) }
 
-let clear_storage_space_to_pay ctxt =
-  match ctxt.storage_space_to_pay with
+let update_allocated_contracts_count ctxt =
+  match ctxt.allocated_contracts with
   | None ->
       assert false
-  | Some storage_space_to_pay ->
-      { ctxt with storage_space_to_pay = None }, storage_space_to_pay
+  | Some allocated_contracts ->
+      { ctxt with allocated_contracts = Some (succ allocated_contracts) }
+
+let clear_storage_space_to_pay ctxt =
+  match ctxt.storage_space_to_pay, ctxt.allocated_contracts with
+  | None, _ | _, None ->
+      assert false
+  | Some storage_space_to_pay, Some allocated_contracts ->
+      { ctxt with storage_space_to_pay = None ;
+                  allocated_contracts = None},
+      storage_space_to_pay,
+      allocated_contracts
 
 type storage_error =
   | Incompatible_protocol_version of string
@@ -442,6 +453,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
     deposits = Signature.Public_key_hash.Map.empty ;
     operation_gas = Unaccounted ;
     storage_space_to_pay = None ;
+    allocated_contracts = None ;
     block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
     origination_nonce = None ;
     internal_nonce = 0 ;
@@ -502,6 +514,7 @@ let register_resolvers enc resolve =
       fitness = 0L ;
       allowed_endorsements = Signature.Public_key_hash.Map.empty ;
       storage_space_to_pay = None ;
+      allocated_contracts = None ;
       fees = Tez_repr.zero ;
       rewards = Tez_repr.zero ;
       deposits = Signature.Public_key_hash.Map.empty ;

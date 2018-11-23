@@ -86,7 +86,9 @@ and 'kind manager_operation_result =
 (** Result of applying a {!manager_operation_content}, either internal
     or external. *)
 and _ successful_manager_operation_result =
-  | Reveal_result : Kind.reveal successful_manager_operation_result
+  | Reveal_result :
+      { consumed_gas : Z.t
+      } -> Kind.reveal successful_manager_operation_result
   | Transaction_result :
       { storage : Script.expr option ;
         big_map_diff : Contract.big_map_diff option ;
@@ -95,6 +97,7 @@ and _ successful_manager_operation_result =
         consumed_gas : Z.t ;
         storage_size : Z.t ;
         paid_storage_size_diff : Z.t ;
+        allocated_destination_contract : bool ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
       { balance_updates : Delegate.balance_updates ;
@@ -103,7 +106,9 @@ and _ successful_manager_operation_result =
         storage_size : Z.t ;
         paid_storage_size_diff : Z.t ;
       } -> Kind.origination successful_manager_operation_result
-  | Delegation_result : Kind.delegation successful_manager_operation_result
+  | Delegation_result :
+      { consumed_gas : Z.t
+      } -> Kind.delegation successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :

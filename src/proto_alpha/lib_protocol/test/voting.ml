@@ -156,11 +156,7 @@ let test_voting () =
 
   (* skip to vote_testing period
      -1 because we already baked one block with the proposal *)
-  (* TODO BUG -2 causes period_kind to change but not period *)
-  (* Context.Vote.get_voting_period (B b) >>=? fun p ->
-   * Context.Vote.get_voting_period_position (B b) >>=? fun pp ->
-   * let _ = Format.printf "\n%a %ld\n" Alpha_context.Voting_period.pp p pp in *)
-  Block.bake_n ((Int32.to_int blocks_per_voting_period)-1) b >>=? fun b ->
+  Block.bake_n ((Int32.to_int blocks_per_voting_period)-2) b >>=? fun b ->
 
   (* we moved to a testing_vote period with one proposal *)
   Context.Vote.get_current_period_kind (B b) >>=? begin function

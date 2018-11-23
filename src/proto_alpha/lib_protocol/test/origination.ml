@@ -43,8 +43,10 @@ let register_origination ?(fee=Tez.zero) ?(credit=Tez.zero) ?spendable ?delegata
   >>=? fun (operation, originated) ->
   Block.bake ~operation b >>=? fun b ->
   (* fee + credit + block security deposit were debited from source *)
-  Context.get_constants (B b) >>=? fun {parametric = {origination_burn ;
-                                                      block_security_deposit}} ->
+  Context.get_constants (B b) >>=? fun {parametric = { origination_size ;
+                                                       cost_per_byte ;
+                                                       block_security_deposit }} ->
+  Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (
     Tez.(+?) credit block_security_deposit >>?
     Tez.(+?) fee >>?
@@ -78,10 +80,12 @@ let test_origination_balances ~loc ?(fee=Tez.zero) ?(credit=Tez.zero)
      tests.*)
   Context.get_constants (B b) >>=? fun
     { parametric =
-        { origination_burn ;
+        { origination_size ;
+          cost_per_byte ;
           block_security_deposit
         }
     } ->
+  Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (
     Tez.(+?) credit block_security_deposit >>?
     Tez.(+?) fee >>?
@@ -259,7 +263,9 @@ let register_origination_inc ~credit () =
   Context.init 1 >>=? fun (b, contracts) ->
   let source_contract = List.hd contracts in
   Incremental.begin_construction b >>=? fun inc ->
-  Op.origination (I inc) ~credit source_contract >>=? fun (operation, new_contract) ->
+  Op.origination (I inc)
+    ~storage_limit:(Z.of_int Constants_repr.default.origination_size)
+    ~credit source_contract >>=? fun (operation, new_contract) ->
   Incremental.add_operation inc operation >>=? fun inc ->
   return (inc, source_contract, new_contract)
 
@@ -274,10 +280,11 @@ let origination_contract_from_origination_contract_not_enough_fund fee () =
   (* contract's balance is not enough to afford origination burn  *)
   Op.origination ~fee (I inc) ~credit:amount contract >>=? fun (operation, orig_contract) ->
   let expect_failure = function
-    | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+    | Alpha_environment.Ecoproto_error (Alpha_context.Fees.Cannot_pay_storage_fee) :: _ ->
         return_unit
-    | _ ->
-        failwith "The contract has not enough funds, it fails!"
+    | e ->
+        failwith "The contract has not enough funds, it fails! %a"
+          Error_monad.pp_print_error e
   in
   Incremental.add_operation ~expect_failure inc operation >>=? fun inc ->
   Context.Contract.balance (I inc) contract >>=? fun balance_aft ->

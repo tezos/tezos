@@ -53,7 +53,8 @@ let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee=Tez.zero) ?exp
   Context.Contract.balance (I b) dst >>=? fun bal_dst ->
   Op.transaction (I b) ~fee src dst amount >>=? fun op ->
   Incremental.add_operation ?expect_failure b op >>=? fun b ->
-  Context.get_constants (I b) >>=? fun { parametric = { origination_burn } } ->
+  Context.get_constants (I b) >>=? fun { parametric = { origination_size ; cost_per_byte } } ->
+  Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   let amount_fee_maybe_burn =
     if with_burn then
       match Tez.(amount_fee +? origination_burn) with

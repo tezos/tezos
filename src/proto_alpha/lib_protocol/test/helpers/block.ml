@@ -245,7 +245,7 @@ let genesis
     ?(tokens_per_roll = Constants_repr.default.tokens_per_roll)
     ?(michelson_maximum_type_size = Constants_repr.default.michelson_maximum_type_size)
     ?(seed_nonce_revelation_tip = Constants_repr.default.seed_nonce_revelation_tip)
-    ?(origination_burn = Constants_repr.default.origination_burn)
+    ?(origination_size = Constants_repr.default.origination_size)
     ?(block_security_deposit = Constants_repr.default.block_security_deposit)
     ?(endorsement_security_deposit = Constants_repr.default.endorsement_security_deposit)
     ?(block_reward = Constants_repr.default.block_reward)
@@ -288,7 +288,7 @@ let genesis
     tokens_per_roll ;
     michelson_maximum_type_size ;
     seed_nonce_revelation_tip ;
-    origination_burn ;
+    origination_size ;
     block_security_deposit ;
     endorsement_security_deposit ;
     block_reward ;

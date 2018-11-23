@@ -150,7 +150,8 @@ let delegate_to_bootstrap_by_origination ~fee () =
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   (* originate a contract with bootstrap's manager as delegate *)
   Op.origination ~fee ~credit:Tez.zero ~delegate:manager.pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Context.get_constants (I i) >>=? fun { parametric = { origination_burn ; _ }} -> (* 0.257tz *)
+  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }} -> (* 0.257tz *)
+  Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (Tez.(+?) fee origination_burn) >>=? fun total_fee ->
   if fee > balance then
     begin
@@ -258,7 +259,7 @@ let tests_bootstrap_contracts = [
   Test.tztest "bootstrap keys are already registered as delegate keys (max fee)" `Quick (bootstrap_manager_already_registered_delegate ~fee:Tez.max_tez) ;
   Test.tztest "bootstrap manager can be delegate (init origination, small fee)" `Quick (delegate_to_bootstrap_by_origination ~fee:Tez.one_mutez) ;
   (* balance enough for fee but not for fee + origination burn *)
-  Test.tztest "bootstrap manager can be delegate (init origination, edge case)" `Quick (delegate_to_bootstrap_by_origination ~fee:(Tez.of_mutez_exn 3_999_999_750_000L)) ;
+  Test.tztest "bootstrap manager can be delegate (init origination, edge case)" `Quick (delegate_to_bootstrap_by_origination ~fee:(Tez.of_mutez_exn 3_999_999_743_000L)) ;
   (* fee bigger than bootstrap's initial balance*)
   Test.tztest "bootstrap manager can be delegate (init origination, large fee)" `Quick (delegate_to_bootstrap_by_origination ~fee:(Tez.of_int 10_000_000)) ;
   Test.tztest "bootstrap manager can be delegate (init delegation, small fee)" `Quick (delegate_to_bootstrap_by_delegation ~fee:Tez.one_mutez) ;
@@ -337,7 +338,8 @@ let unregistered_delegate_key_init_origination ~fee () =
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   (* origination with delegate argument *)
   Op.origination ~fee ~delegate:unregistered_pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Context.get_constants (I i) >>=? fun { parametric = { origination_burn ; _ }} ->
+  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }} ->
+  Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (Tez.(+?) fee origination_burn) >>=? fun _total_fee -> (* FIXME unused variable *)
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   if fee > balance then
@@ -1062,7 +1064,8 @@ let registered_self_delegate_key_init_origination () =
   Op.delegation (I i) contract (Some pkh) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   Context.Contract.balance (I i) contract >>=? fun balance ->
-  Context.get_constants (I i) >>=? fun { parametric = { origination_burn ; _ }} ->
+  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }} ->
+  Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   (* origination with delegate argument *)
   Op.origination ~delegate:pkh ~credit:Tez.one (I i) contract >>=? fun (op, orig_contract) ->
   Tez.(origination_burn +? Tez.one) >>?= fun total_cost ->

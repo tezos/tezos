@@ -117,8 +117,8 @@ let estimated_gas_single
     match result with
     | Applied (Transaction_result { consumed_gas }) -> Ok consumed_gas
     | Applied (Origination_result { consumed_gas }) -> Ok consumed_gas
-    | Applied Reveal_result -> Ok Z.zero
-    | Applied Delegation_result -> Ok Z.zero
+    | Applied (Reveal_result { consumed_gas }) -> Ok consumed_gas
+    | Applied (Delegation_result { consumed_gas }) -> Ok consumed_gas
     | Skipped _ -> assert false
     | Backtracked (_, None) -> Ok Z.zero (* there must be another error for this to happen *)
     | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
@@ -141,15 +141,21 @@ let rec estimated_gas :
 
 let estimated_storage_single
     (type kind)
+    origination_size
     (Manager_operation_result { operation_result ;
                                 internal_operation_results }
      : kind Kind.manager contents_result) =
   let storage_size_diff (type kind) (result : kind manager_operation_result) =
     match result with
-    | Applied (Transaction_result { paid_storage_size_diff }) -> Ok paid_storage_size_diff
-    | Applied (Origination_result { paid_storage_size_diff }) -> Ok paid_storage_size_diff
-    | Applied Reveal_result -> Ok Z.zero
-    | Applied Delegation_result -> Ok Z.zero
+    | Applied (Transaction_result { paid_storage_size_diff ; allocated_destination_contract }) ->
+        if allocated_destination_contract then
+          Ok (Z.add paid_storage_size_diff origination_size)
+        else
+          Ok paid_storage_size_diff
+    | Applied (Origination_result { paid_storage_size_diff }) ->
+        Ok (Z.add paid_storage_size_diff origination_size)
+    | Applied (Reveal_result _)-> Ok Z.zero
+    | Applied (Delegation_result _) -> Ok Z.zero
     | Skipped _ -> assert false
     | Backtracked (_, None) -> Ok Z.zero (* there must be another error for this to happen *)
     | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
@@ -161,13 +167,13 @@ let estimated_storage_single
        Ok (Z.add acc storage))
     (storage_size_diff operation_result) internal_operation_results
 
-let estimated_storage res =
+let estimated_storage origination_size res =
   let rec estimated_storage :
     type kind. kind Kind.manager contents_result_list -> _ =
     function
-    | Single_result res -> estimated_storage_single res
+    | Single_result res -> estimated_storage_single origination_size res
     | Cons_result (res, rest) ->
-        estimated_storage_single res >>? fun storage1 ->
+        estimated_storage_single origination_size res >>? fun storage1 ->
         estimated_storage rest >>? fun storage2 ->
         Ok (Z.add storage1 storage2) in
   estimated_storage res >>? fun diff ->
@@ -182,8 +188,8 @@ let originated_contracts_single
     match result with
     | Applied (Transaction_result { originated_contracts }) -> Ok originated_contracts
     | Applied (Origination_result { originated_contracts }) -> Ok originated_contracts
-    | Applied Reveal_result -> Ok []
-    | Applied Delegation_result -> Ok []
+    | Applied (Reveal_result _) -> Ok []
+    | Applied (Delegation_result _) -> Ok []
     | Skipped _ -> assert false
     | Backtracked (_, None) -> Ok [] (* there must be another error for this to happen *)
     | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
@@ -254,6 +260,7 @@ let may_patch_limits
     (chain, block) >>=? fun { parametric = {
       hard_gas_limit_per_operation = gas_limit ;
       hard_storage_limit_per_operation = storage_limit ;
+      origination_size ;
     } } ->
   let may_need_patching_single
     : type kind. kind contents -> kind contents option = function
@@ -309,7 +316,7 @@ let may_patch_limits
         end >>=? fun gas_limit ->
         begin
           if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
-            Lwt.return (estimated_storage_single result) >>=? fun storage ->
+            Lwt.return (estimated_storage_single (Z.of_int origination_size) result) >>=? fun storage ->
             begin
               if Z.equal storage Z.zero then
                 cctxt#message "Estimated storage: no bytes added" >>= fun () ->
@@ -471,7 +478,7 @@ let inject_manager_operation
       let contents =
         Cons
           (Manager_operation { source ; fee = Tez.zero ; counter ;
-                               gas_limit = Z.zero ; storage_limit = Z.zero ;
+                               gas_limit = Z.of_int 10_000 ; storage_limit = Z.zero ;
                                operation = Reveal src_pk },
            Single (Manager_operation { source ; fee ; counter = Z.succ counter ;
                                        gas_limit ; storage_limit ; operation })) in

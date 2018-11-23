@@ -49,11 +49,11 @@ let inject_endorsement
     ~branch:hash
     ~level:level
     () >>=? fun bytes ->
+  State.record cctxt pkh level >>=? fun () ->
   Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
   Client_keys.append cctxt
     src_sk ~watermark:(Endorsement chain_id) bytes >>=? fun signed_bytes ->
   Shell_services.Injection.operation cctxt ?async ~chain signed_bytes >>=? fun oph ->
-  State.record cctxt pkh level >>=? fun () ->
   return oph
 
 let check_endorsement cctxt level pkh =
