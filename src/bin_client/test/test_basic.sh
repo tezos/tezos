@@ -8,6 +8,8 @@ source $test_dir/test_lib.inc.sh "$@"
 start_node 1
 activate_alpha
 
+$client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "0", "minimal_picotez_per_byte": "0", "minimal_picotez_per_gas_unit": "0"  }'
+
 $client -w none config update
 
 sleep 2
@@ -45,6 +47,8 @@ bake_after $client transfer 3,000 from bootstrap1 to $key3
 $client get balance for $key1 | assert "1000 ꜩ"
 $client get balance for $key2 | assert "2000 ꜩ"
 $client get balance for $key3 | assert "3000 ꜩ"
+
+$client rpc get /chains/main/mempool/filter
 
 bake_after $client transfer 1,000 from $key2 to $key1 -fee 0
 $client get balance for $key1 | assert "2000 ꜩ"

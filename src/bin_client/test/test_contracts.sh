@@ -9,6 +9,8 @@ source $test_dir/test_lib.inc.sh "$@"
 start_node 1
 activate_alpha
 
+$client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "0", "minimal_picotez_per_byte": "0", "minimal_picotez_per_gas_unit": "0"  }'
+
 $client -w none config update
 
 bake

@@ -158,7 +158,7 @@ activate_alpha() {
 
     ${client} \
         -block genesis \
-        activate protocol PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt \
+        activate protocol PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP \
         with fitness 1 \
         and key activator \
 	and parameters "${parameters_file}" \
