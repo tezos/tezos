@@ -110,7 +110,7 @@ val genesis:
   ?tokens_per_roll:Tez_repr.tez ->
   ?michelson_maximum_type_size:int ->
   ?seed_nonce_revelation_tip:Tez_repr.tez ->
-  ?origination_burn:Tez_repr.tez ->
+  ?origination_size:int ->
   ?block_security_deposit:Tez_repr.tez ->
   ?endorsement_security_deposit:Tez_repr.tez ->
   ?block_reward:Tez_repr.tez ->

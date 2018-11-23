@@ -17,7 +17,7 @@ depends: [
   "tezos-client-commands"
   "tezos-client-003-PsddFKi3"
   "tezos-node" { test }
-  "tezos-client-genesis" { test }
+  "tezos-client-000-Ps9mPmXa" { test }
   "tezos-client-base-unix" { test }
   "alcotest-lwt" { test }
 ]
