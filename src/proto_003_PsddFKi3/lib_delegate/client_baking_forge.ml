@@ -961,6 +961,9 @@ let bake (cctxt : #Proto_alpha.full) state =
               -% t event "double_bake_near_miss"
               -% a level_tag level)  >>= return
       | false ->
+          (* Record baked blocks to prevent double baking and nonces to reveal later *)
+          State.record cctxt src_pkh level >>=? fun () ->
+
           inject_block cctxt ~chain ~force:true
             ~shell_header ~priority ?seed_nonce_hash ~src_sk operations
           |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
@@ -977,8 +980,6 @@ let bake (cctxt : #Proto_alpha.full) state =
               -% a operations_tag operations
             ) >>= fun () ->
 
-          (* Record baked blocks to prevent double baking and nonces to reveal later *)
-          State.record cctxt src_pkh level >>=? fun () ->
           begin if seed_nonce_hash <> None then
               Client_baking_nonces.add cctxt block_hash seed_nonce
               |> trace_exn (Failure "Error while recording nonce")
