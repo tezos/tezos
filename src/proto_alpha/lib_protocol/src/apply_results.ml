@@ -42,7 +42,9 @@ let error_encoding =
     ~binary:Error_monad.error_encoding
 
 type _ successful_manager_operation_result =
-  | Reveal_result : Kind.reveal successful_manager_operation_result
+  | Reveal_result :
+      { consumed_gas : Z.t
+      } -> Kind.reveal successful_manager_operation_result
   | Transaction_result :
       { storage : Script.expr option ;
         big_map_diff : Contract.big_map_diff option ;
@@ -60,7 +62,9 @@ type _ successful_manager_operation_result =
         storage_size : Z.t ;
         paid_storage_size_diff : Z.t ;
       } -> Kind.origination successful_manager_operation_result
-  | Delegation_result : Kind.delegation successful_manager_operation_result
+  | Delegation_result :
+      { consumed_gas : Z.t
+      } -> Kind.delegation successful_manager_operation_result
 
 type packed_successful_manager_operation_result =
   | Successful_manager_result :
@@ -146,7 +150,8 @@ module Manager_result = struct
   let reveal_case =
     make
       ~op_case: Operation.Encoding.Manager_operations.reveal_case
-      ~encoding: Data_encoding.empty
+      ~encoding: Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
+
       ~iselect:
         (function
           | Internal_operation_result
@@ -155,11 +160,11 @@ module Manager_result = struct
           | _ -> None)
       ~select:
         (function
-          | Successful_manager_result (Reveal_result as op) -> Some op
+          | Successful_manager_result (Reveal_result _ as op) -> Some op
           | _ -> None)
       ~kind: Kind.Reveal_manager_kind
-      ~proj: (function Reveal_result -> ())
-      ~inj: (fun () -> Reveal_result)
+      ~proj: (function Reveal_result { consumed_gas } -> consumed_gas)
+      ~inj: (fun consumed_gas -> Reveal_result { consumed_gas })
 
   let transaction_case =
     make
@@ -248,7 +253,7 @@ module Manager_result = struct
   let delegation_case =
     make
       ~op_case: Operation.Encoding.Manager_operations.delegation_case
-      ~encoding: Data_encoding.empty
+      ~encoding: Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
       ~iselect:
         (function
           | Internal_operation_result
@@ -257,11 +262,11 @@ module Manager_result = struct
           | _ -> None)
       ~select:
         (function
-          | Successful_manager_result (Delegation_result as op) -> Some op
+          | Successful_manager_result (Delegation_result _ as op) -> Some op
           | _ -> None)
       ~kind: Kind.Delegation_manager_kind
-      ~proj: (function Delegation_result -> ())
-      ~inj: (fun () -> Delegation_result)
+      ~proj: (function Delegation_result { consumed_gas } -> consumed_gas)
+      ~inj: (fun consumed_gas -> Delegation_result { consumed_gas })
 
 end
 
@@ -770,11 +775,11 @@ let kind_equal
     | Manager_operation
         { operation = Reveal _ ; _ },
       Manager_operation_result
-        { operation_result = Applied Reveal_result ; _ } -> Some Eq
+        { operation_result = Applied (Reveal_result _); _ } -> Some Eq
     | Manager_operation
         { operation = Reveal _ ; _ },
       Manager_operation_result
-        { operation_result = Backtracked (Reveal_result, _) ; _ } -> Some Eq
+        { operation_result = Backtracked (Reveal_result _, _) ; _ } -> Some Eq
     | Manager_operation
         { operation = Reveal _ ; _ },
       Manager_operation_result
@@ -827,11 +832,11 @@ let kind_equal
     | Manager_operation
         { operation = Delegation _ ; _ },
       Manager_operation_result
-        { operation_result = Applied Delegation_result ; _ } -> Some Eq
+        { operation_result = Applied (Delegation_result _) ; _ } -> Some Eq
     | Manager_operation
         { operation = Delegation _ ; _ },
       Manager_operation_result
-        { operation_result = Backtracked (Delegation_result, _) ; _ } -> Some Eq
+        { operation_result = Backtracked (Delegation_result _, _) ; _ } -> Some Eq
     | Manager_operation
         { operation = Delegation _ ; _ },
       Manager_operation_result

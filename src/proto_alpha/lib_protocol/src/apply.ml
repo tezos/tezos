@@ -367,10 +367,11 @@ let apply_manager_operation_content :
     let set_delegate =
       (* Ignore the delegatable flag for smart contracts. *)
       if internal then Delegate.set_from_script else Delegate.set in
+    Lwt.return (Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation) >>=? fun ctxt ->
     match operation with
     | Reveal _ ->
         return (* No-op: action already performed by `precheck_manager_contents`. *)
-          (ctxt, (Reveal_result : kind successful_manager_operation_result), [])
+          (ctxt, (Reveal_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt } : kind successful_manager_operation_result), [])
     | Transaction { amount ; parameters ; destination } -> begin
         spend ctxt source amount >>=? fun ctxt ->
         begin match Contract.is_implicit destination with
@@ -501,7 +502,7 @@ let apply_manager_operation_content :
         return (ctxt, result, [])
     | Delegation delegate ->
         set_delegate ctxt source delegate >>=? fun ctxt ->
-        return (ctxt, Delegation_result, [])
+        return (ctxt, Delegation_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt }, [])
 
 let apply_internal_manager_operations ctxt mode ~payer ops =
   let rec apply ctxt applied worklist =
@@ -612,7 +613,7 @@ let skipped_operation_result
   = function operation ->
   match operation with
   | Reveal _ ->
-      Applied ( Reveal_result : kind successful_manager_operation_result )
+      Applied ( Reveal_result { consumed_gas = Z.zero } : kind successful_manager_operation_result )
   | _ -> Skipped (manager_kind operation)
 
 let rec mark_skipped
@@ -727,7 +728,7 @@ let mark_backtracked results =
     : type kind. kind manager_operation_result -> kind manager_operation_result
     = function
       | Failed _ | Skipped _ | Backtracked _ as result -> result
-      | Applied Reveal_result as result -> result
+      | Applied (Reveal_result _) as result -> result
       | Applied result -> Backtracked (result, None) in
   mark_contents_list results
 

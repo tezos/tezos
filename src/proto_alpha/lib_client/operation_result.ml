@@ -235,17 +235,23 @@ let pp_manager_operation_contents_and_result ppf
     | Failed (_, _errs) ->
         Format.fprintf ppf
           "This operation FAILED."
-    | Applied Reveal_result ->
+    | Applied (Reveal_result { consumed_gas }) ->
         Format.fprintf ppf
-          "This revelation was successfully applied"
-    | Backtracked (Reveal_result, _) ->
+          "This revelation was successfully applied" ;
+        Format.fprintf ppf
+          "@,Consumed gas: %s"
+          (Z.to_string consumed_gas)
+    | Backtracked (Reveal_result _, _) ->
         Format.fprintf ppf
           "@[<v 0>This revelation was BACKTRACKED, \
            its expected effects were NOT applied.@]" ;
-    | Applied Delegation_result ->
+    | Applied (Delegation_result { consumed_gas })->
         Format.fprintf ppf
-          "This delegation was successfully applied"
-    | Backtracked (Delegation_result, _) ->
+          "This delegation was successfully applied" ;
+        Format.fprintf ppf
+          "@,Consumed gas: %s"
+          (Z.to_string consumed_gas)
+    | Backtracked (Delegation_result _, _) ->
         Format.fprintf ppf
           "@[<v 0>This delegation was BACKTRACKED, \
            its expected effects were NOT applied.@]" ;

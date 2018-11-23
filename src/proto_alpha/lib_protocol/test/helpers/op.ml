@@ -98,7 +98,7 @@ let combine_operations
             fee = Tez.zero ;
             counter ;
             operation = Reveal public_key ;
-            gas_limit = Z.of_int 20 ;
+            gas_limit = Z.of_int 10000 ;
             storage_limit = Z.zero ;
           } in
         return (Some (Contents reveal_op), Z.succ counter)
@@ -153,7 +153,7 @@ let manager_operation
           fee = Tez.zero ;
           counter ;
           operation = Reveal public_key ;
-          gas_limit = Z.of_int 20 ;
+          gas_limit = Z.of_int 10000 ;
           storage_limit = Z.zero ;
         } in
       let op =
@@ -181,7 +181,7 @@ let revelation ctxt public_key =
              fee = Tez.zero ;
              counter ;
              operation = Reveal public_key ;
-             gas_limit = Z.of_int 20 ;
+             gas_limit = Z.of_int 10000 ;
              storage_limit = Z.zero ;
            })) in
   return @@ sign account.sk ctxt sop

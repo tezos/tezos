@@ -117,8 +117,8 @@ let estimated_gas_single
     match result with
     | Applied (Transaction_result { consumed_gas }) -> Ok consumed_gas
     | Applied (Origination_result { consumed_gas }) -> Ok consumed_gas
-    | Applied Reveal_result -> Ok Z.zero
-    | Applied Delegation_result -> Ok Z.zero
+    | Applied (Reveal_result { consumed_gas }) -> Ok consumed_gas
+    | Applied (Delegation_result { consumed_gas }) -> Ok consumed_gas
     | Skipped _ -> assert false
     | Backtracked (_, None) -> Ok Z.zero (* there must be another error for this to happen *)
     | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
@@ -154,8 +154,8 @@ let estimated_storage_single
           Ok paid_storage_size_diff
     | Applied (Origination_result { paid_storage_size_diff }) ->
         Ok (Z.add paid_storage_size_diff origination_size)
-    | Applied Reveal_result -> Ok Z.zero
-    | Applied Delegation_result -> Ok Z.zero
+    | Applied (Reveal_result _)-> Ok Z.zero
+    | Applied (Delegation_result _) -> Ok Z.zero
     | Skipped _ -> assert false
     | Backtracked (_, None) -> Ok Z.zero (* there must be another error for this to happen *)
     | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
@@ -188,8 +188,8 @@ let originated_contracts_single
     match result with
     | Applied (Transaction_result { originated_contracts }) -> Ok originated_contracts
     | Applied (Origination_result { originated_contracts }) -> Ok originated_contracts
-    | Applied Reveal_result -> Ok []
-    | Applied Delegation_result -> Ok []
+    | Applied (Reveal_result _) -> Ok []
+    | Applied (Delegation_result _) -> Ok []
     | Skipped _ -> assert false
     | Backtracked (_, None) -> Ok [] (* there must be another error for this to happen *)
     | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
@@ -478,7 +478,7 @@ let inject_manager_operation
       let contents =
         Cons
           (Manager_operation { source ; fee = Tez.zero ; counter ;
-                               gas_limit = Z.zero ; storage_limit = Z.zero ;
+                               gas_limit = Z.of_int 10_000 ; storage_limit = Z.zero ;
                                operation = Reveal src_pk },
            Single (Manager_operation { source ; fee ; counter = Z.succ counter ;
                                        gas_limit ; storage_limit ; operation })) in

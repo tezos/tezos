@@ -235,6 +235,8 @@ module Cost_of = struct
   let compare_timestamp t1 t2 = compare_zint (Script_timestamp.to_zint t1) (Script_timestamp.to_zint t2)
   let compare_address _ _ = step_cost 20
 
+  let manager_operation = step_cost 10_000
+
   module Typechecking = struct
     let cycle = step_cost 1
     let bool = free

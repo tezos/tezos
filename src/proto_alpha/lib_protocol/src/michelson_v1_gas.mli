@@ -111,6 +111,8 @@ module Cost_of : sig
   val compare_timestamp : Script_timestamp.t -> Script_timestamp.t -> Gas.cost
   val compare_address : Contract.t -> Contract.t -> Gas.cost
 
+  val manager_operation : Gas.cost
+
   module Typechecking : sig
     val cycle : Gas.cost
     val unit : Gas.cost
