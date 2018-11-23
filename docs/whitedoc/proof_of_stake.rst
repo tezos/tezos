@@ -304,14 +304,21 @@ The seed of cycle ``(n-PRESERVED_CYCLES-2)`` is hashed with a constant
 and then with each revelation of cycle ``(n-PRESERVED_CYCLES-1)``.
 Once computed, this new seed is stored and used during cycle ``n``.
 
-Denunciations
--------------
+Accusations
+-----------
 
 If two endorsements are made for the same slot or two blocks at the same
-height by a delegate, this can be denounced. The denunciation would
-typically be made by the baker, who includes it as a special operation.
-In a first time, denunciation will only forfeit the security deposit
-for the doubly signed operation. However, over time, as the risk of
-accidental double signing becomes small enough, denunciation will
-forfeit the entirety of the safety deposits. Half is burned, and half is
-added to the block reward.
+height by a delegate, the evidence can be collected by an accurser and included
+in a block for a period of PRESERVED_CYCLES, including the current cycle.
+
+This accusation forfeits the entirety of the safety deposit and future reward up
+to that point in the cycle. Half is burned, half goes to the accuser in the form
+of a block reward.
+
+In the current protocol, accusations for the *same* incident can be made several
+times after the fact. This means that the deposits and rewards for the entire
+cycle are forfeited, including any deposit made, or reward earned, after
+he incident.
+
+Pragmatically, any baker who either double bakes or endorses in a given cycle
+should immediately stop both baking and endorsing for the rest of that cycle.
