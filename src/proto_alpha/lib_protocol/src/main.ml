@@ -194,10 +194,10 @@ let apply_operation
       in
       let partial =
         match mode with
-        | Partial_construction _
-        | Partial_application _ -> true
+        | Partial_construction _ -> true
         | Application _
-        | Full_construction _ -> false in
+        | Full_construction _
+        | Partial_application _ -> false in
       Apply.apply_operation ~partial ctxt chain_id Optimized predecessor baker
         (Alpha_context.Operation.hash operation)
         operation >>=? fun (ctxt, result) ->

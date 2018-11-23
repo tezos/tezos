@@ -427,11 +427,6 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
         ([ `POST ], 'a,
          'b , unit, unit, unit) RPC_service.t
 
-      val request_operations :
-        ('a, 'b) RPC_path.t ->
-        ([ `POST ], 'a,
-         'b , unit, unit, unit) RPC_service.t
-
     end
 
     val live_blocks:
