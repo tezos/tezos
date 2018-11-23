@@ -41,9 +41,8 @@ let managers_index = 3
 
 let default_max_priority = 64
 let default_minimal_fees = Tez.zero
-let default_minimal_fees_per_gas_unit =
-  Option.unopt_exn (Failure "bad conversion") (Tez.of_mutez 10L)
-let default_minimal_fees_per_byte = Tez.zero
+let default_minimal_picotez_per_gas_unit = Z.of_int 10000
+let default_minimal_picotez_per_byte = Z.zero
 let default_await_endorsements = true
 
 type state = {
@@ -57,9 +56,9 @@ type state = {
   (* Minimal operation fee required to include an operation in a block *)
   minimal_fees : Tez.t ;
   (* Minimal operation fee per gas required to include an operation in a block *)
-  minimal_fees_per_gas_unit : Tez.t ;
+  minimal_picotez_per_gas_unit : Z.t ;
   (* Minimal operation fee per byte required to include an operation in a block *)
-  minimal_fees_per_byte : Tez.t ;
+  minimal_picotez_per_byte : Z.t ;
   (* Await endorsements *)
   await_endorsements: bool ;
   (* truly mutable *)
@@ -68,8 +67,8 @@ type state = {
 
 let create_state
     ?(minimal_fees = default_minimal_fees)
-    ?(minimal_fees_per_gas_unit = default_minimal_fees_per_gas_unit)
-    ?(minimal_fees_per_byte = default_minimal_fees_per_byte)
+    ?(minimal_picotez_per_gas_unit = default_minimal_picotez_per_gas_unit)
+    ?(minimal_picotez_per_byte = default_minimal_picotez_per_byte)
     ?(await_endorsements = default_await_endorsements)
     genesis context_path index delegates constants =
   { genesis ;
@@ -78,8 +77,8 @@ let create_state
     delegates ;
     constants ;
     minimal_fees ;
-    minimal_fees_per_gas_unit ;
-    minimal_fees_per_byte ;
+    minimal_picotez_per_gas_unit ;
+    minimal_picotez_per_byte ;
     await_endorsements ;
     best_slot = None ;
   }
@@ -192,8 +191,8 @@ let sort_manager_operations
     ~max_size
     ~hard_gas_limit_per_block
     ~minimal_fees
-    ~minimal_fees_per_gas_unit
-    ~minimal_fees_per_byte
+    ~minimal_picotez_per_gas_unit
+    ~minimal_picotez_per_byte
     (operations : Proto_alpha.operation list) =
   let compute_weight op (fee, gas) =
     let size = Data_encoding.Binary.length Operation.encoding op in
@@ -212,15 +211,17 @@ let sort_manager_operations
        else
          let (size, gas, _ratio) as weight = compute_weight op (fee, gas) in
          let open Alpha_environment in
-         let enough_gas_fees =
-           match Tez.(minimal_fees_per_gas_unit *? Z.to_int64 gas) with
-           | Ok expected_fees -> Tez.(expected_fees <= fee)
-           | _ -> false in
-         let enough_size_fees =
-           match Tez.(minimal_fees_per_byte *? Int64.of_int size) with
-           | Ok fee_per_byte -> Tez.(fee_per_byte >= minimal_fees_per_byte)
-           | Error _ -> false in
-         if enough_size_fees && enough_gas_fees then
+         let fees_in_picotez =
+           Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000) in
+         let enough_fees_for_gas =
+           let minimal_fees_in_picotez =
+             Z.mul minimal_picotez_per_gas_unit gas in
+           Z.compare minimal_fees_in_picotez fees_in_picotez  <= 0 in
+         let enough_fees_for_size =
+           let minimal_fees_in_picotez =
+             Z.mul minimal_picotez_per_byte (Z.of_int size) in
+           Z.compare minimal_fees_in_picotez fees_in_picotez  <= 0 in
+         if enough_fees_for_size && enough_fees_for_gas then
            return_some (op, weight)
          else
            return_none
@@ -283,8 +284,8 @@ let classify_operations
     ~block
     ~hard_gas_limit_per_block
     ~minimal_fees
-    ~minimal_fees_per_gas_unit
-    ~minimal_fees_per_byte
+    ~minimal_picotez_per_gas_unit
+    ~minimal_picotez_per_byte
     (ops: Proto_alpha.operation list) =
   Alpha_block_services.live_blocks cctxt ~chain:`Main ~block ()
   >>=? fun live_blocks ->
@@ -311,8 +312,8 @@ let classify_operations
     ~max_size
     ~hard_gas_limit_per_block
     ~minimal_fees
-    ~minimal_fees_per_gas_unit
-    ~minimal_fees_per_byte
+    ~minimal_picotez_per_gas_unit
+    ~minimal_picotez_per_byte
     manager_operations
   >>=? fun ordered_operations ->
   (* Greedy heuristic *)
@@ -574,8 +575,8 @@ let forge_block
     ?(best_effort = operations = None)
     ?(sort = best_effort)
     ?(minimal_fees = default_minimal_fees)
-    ?(minimal_fees_per_gas_unit = default_minimal_fees_per_gas_unit)
-    ?(minimal_fees_per_byte = default_minimal_fees_per_byte)
+    ?(minimal_picotez_per_gas_unit = default_minimal_picotez_per_gas_unit)
+    ?(minimal_picotez_per_byte = default_minimal_picotez_per_byte)
     ?(await_endorsements = default_await_endorsements)
     ?timestamp
     ?mempool
@@ -598,8 +599,8 @@ let forge_block
     ~hard_gas_limit_per_block
     ~block:block
     ~minimal_fees
-    ~minimal_fees_per_gas_unit
-    ~minimal_fees_per_byte
+    ~minimal_picotez_per_gas_unit
+    ~minimal_picotez_per_byte
     operations_arg
   >>=? fun (operations, overflowing_ops) ->
   (* Ensure that we retain operations up to the quota *)
@@ -649,8 +650,8 @@ let forge_block
           best_slot = None ;
           await_endorsements ;
           minimal_fees = default_minimal_fees ;
-          minimal_fees_per_gas_unit = default_minimal_fees_per_gas_unit ;
-          minimal_fees_per_byte = default_minimal_fees_per_byte ;
+          minimal_picotez_per_gas_unit = default_minimal_picotez_per_gas_unit ;
+          minimal_picotez_per_byte = default_minimal_picotez_per_byte ;
         } in
         filter_and_apply_operations ~timestamp ~protocol_data state bi (operations, overflowing_ops)
         >>=? fun (final_context, validation_result, operations) ->
@@ -881,8 +882,8 @@ let build_block
       classify_operations cctxt
         ~hard_gas_limit_per_block
         ~minimal_fees:state.minimal_fees
-        ~minimal_fees_per_gas_unit:state.minimal_fees_per_gas_unit
-        ~minimal_fees_per_byte:state.minimal_fees_per_byte
+        ~minimal_picotez_per_gas_unit:state.minimal_picotez_per_gas_unit
+        ~minimal_picotez_per_byte:state.minimal_picotez_per_byte
         ~block operations
       >>=? fun (operations, overflowing_ops) ->
       let next_version =
@@ -1158,8 +1159,8 @@ let reveal_potential_nonces cctxt new_head =
 let create
     (cctxt : #Proto_alpha.full)
     ?minimal_fees
-    ?minimal_fees_per_gas_unit
-    ?minimal_fees_per_byte
+    ?minimal_picotez_per_gas_unit
+    ?minimal_picotez_per_byte
     ?await_endorsements
     ?max_priority
     ~context_path
@@ -1171,7 +1172,7 @@ let create
     Client_baking_simulator.load_context ~context_path >>= fun index ->
     Client_baking_simulator.check_context_consistency index bi.context >>=? fun () ->
     let state = create_state
-        ?minimal_fees ?minimal_fees_per_gas_unit ?minimal_fees_per_byte
+        ?minimal_fees ?minimal_picotez_per_gas_unit ?minimal_picotez_per_byte
         ?await_endorsements
         genesis_hash context_path index delegates constants in
     return state

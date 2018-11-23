@@ -49,8 +49,8 @@ module Baker = struct
   let run
       (cctxt : #Proto_alpha.full)
       ?minimal_fees
-      ?minimal_fees_per_gas_unit
-      ?minimal_fees_per_byte
+      ?minimal_picotez_per_gas_unit
+      ?minimal_picotez_per_byte
       ?await_endorsements
       ?max_priority
       ~context_path
@@ -62,8 +62,8 @@ module Baker = struct
     cctxt#message "Baker started." >>= fun () ->
     Client_baking_forge.create cctxt
       ?minimal_fees
-      ?minimal_fees_per_gas_unit
-      ?minimal_fees_per_byte
+      ?minimal_picotez_per_gas_unit
+      ?minimal_picotez_per_byte
       ?await_endorsements
       ?max_priority
       ~context_path delegates block_stream >>=? fun () ->

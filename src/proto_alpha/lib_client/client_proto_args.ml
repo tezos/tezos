@@ -256,25 +256,23 @@ let minimal_fees_arg =
          | Some t -> return t
          | None -> fail (Bad_minimal_fees s)))
 
-let minimal_fees_per_gas_unit_arg =
+let minimal_picotez_per_gas_unit_arg =
   arg
-    ~long:"minimal-fees-per-gas-unit"
+    ~long:"minimal-picotez-per-gas-unit"
     ~placeholder:"amount"
-    ~doc:"exclude operations with fees per gas lower than this threshold (in tez)"
+    ~doc:"exclude operations with fees per gas lower than this threshold (in picotez)"
     (parameter (fun _ s ->
-         match Tez.of_string s with
-         | Some t -> return t
-         | None -> fail (Bad_minimal_fees s)))
+         try return (Z.of_string s)
+         with _ -> fail (Bad_minimal_fees s)))
 
-let minimal_fees_per_byte_arg =
+let minimal_picotez_per_byte_arg =
   arg
-    ~long:"minimal-fees-per-byte"
+    ~long:"minimal-picotez-per-byte"
     ~placeholder:"amount"
     ~doc:"exclude operations with fees per byte lower than this threshold (in tez)"
     (parameter (fun _ s ->
-         match Tez.of_string s with
-         | Some t -> return t
-         | None -> fail (Bad_minimal_fees s)))
+         try return (Z.of_string s)
+         with _ -> fail (Bad_minimal_fees s)))
 
 let no_waiting_for_endorsements_arg =
   switch
