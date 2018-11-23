@@ -398,7 +398,8 @@ let burn_fees ctxt delegate cycle amount =
           ctxt delegate old_amount >>=? fun ctxt ->
         return (Tez_repr.zero, ctxt)
   end >>=? fun (new_amount, ctxt) ->
-  Storage.Contract.Frozen_fees.set (ctxt, contract) cycle new_amount
+  Storage.Contract.Frozen_fees.init_set (ctxt, contract) cycle new_amount >>= fun ctxt ->
+  return ctxt
 
 
 let get_frozen_rewards ctxt contract cycle =
@@ -426,7 +427,8 @@ let burn_rewards ctxt delegate cycle amount =
     match Tez_repr.(old_amount -? amount) with
     | Error _ -> Tez_repr.zero
     | Ok new_amount -> new_amount in
-  Storage.Contract.Frozen_rewards.set (ctxt, contract) cycle new_amount
+  Storage.Contract.Frozen_rewards.init_set (ctxt, contract) cycle new_amount >>= fun ctxt ->
+  return ctxt
 
 
 
