@@ -207,7 +207,7 @@ module Cost_of = struct
     (len *@ (log2 len *@ (alloc_cost 3 +@ step_cost 1)))
 
   let address = step_cost 1
-  let contract = Gas.read_bytes_cost Z.zero +@ step_cost 100
+  let contract = Gas.read_bytes_cost Z.zero +@ step_cost 10000
   let transfer = step_cost 10
   let create_account = step_cost 10
   let create_contract = step_cost 10
