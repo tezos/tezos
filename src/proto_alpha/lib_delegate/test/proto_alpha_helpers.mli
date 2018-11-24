@@ -85,6 +85,7 @@ module Account : sig
     account:t ->
     destination:Contract.t ->
     amount: Tez.t ->
+    ?fee_parameter:Injection.fee_parameter ->
     unit ->
     (Operation_hash.t * Contract.t list) tzresult Lwt.t
 
@@ -95,6 +96,7 @@ module Account : sig
     src:t ->
     manager_pkh:public_key_hash ->
     balance: Tez.t ->
+    ?fee_parameter:Injection.fee_parameter ->
     unit -> (Operation_hash.t * Contract.t) tzresult Lwt.t
 
   val set_delegate :
@@ -103,6 +105,7 @@ module Account : sig
     contract:Contract.t ->
     manager_sk:Client_keys.sk_uri ->
     src_pk:public_key ->
+    ?fee_parameter:Injection.fee_parameter ->
     public_key_hash option ->
     Operation_hash.t tzresult Lwt.t
 
