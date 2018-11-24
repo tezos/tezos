@@ -146,12 +146,12 @@ let () =
        hash was not the one computed at commit time."
     ~pp: (fun ppf (got, exp) ->
         Format.fprintf ppf
-          "@[<v 2>Inconsistant hash:@ got: %a@ expected: %a"
+          "@[<v 2>Inconsistent hash:@ local: %a@ block_header: %a"
           Context_hash.pp got
           Context_hash.pp exp)
     Data_encoding.(obj2
-                     (req "wrong_context_hash" Context_hash.encoding)
-                     (req "expected_context_hash" Context_hash.encoding))
+                     (req "local_context_hash" Context_hash.encoding)
+                     (req "block_header_context_hash" Context_hash.encoding))
     (function Inconsistent_hash (got, exp) -> Some (got, exp) | _ -> None)
     (fun (got, exp) -> Inconsistent_hash (got, exp))
 
