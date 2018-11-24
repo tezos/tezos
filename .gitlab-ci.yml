@@ -5,6 +5,7 @@ variables:
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
 
 stages:
+  - doc
   - build
   - test
   - packaging
@@ -578,7 +579,7 @@ publish:docker:
 
 publish:doc:
   image: ${build_deps_image_name}:${build_deps_image_version}
-  stage: publish
+  stage: doc
   only:
     - master
     - alphanet
