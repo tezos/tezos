@@ -8,8 +8,6 @@ source $test_dir/test_lib.inc.sh "$@"
 start_node 1
 activate_alpha
 
-$client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "0", "minimal_picotez_per_byte": "0", "minimal_picotez_per_gas_unit": "0"  }'
-
 $client -w none config update
 
 sleep 2
@@ -48,11 +46,12 @@ $client get balance for $key1 | assert "1000 ꜩ"
 $client get balance for $key2 | assert "2000 ꜩ"
 $client get balance for $key3 | assert "3000 ꜩ"
 
-$client rpc get /chains/main/mempool/filter
-
+$client rpc post /chains/main/mempool/filter with \
+        '{ "minimal_fees": "0", "minimal_picotez_per_byte": "0", "minimal_picotez_per_gas_unit": "0"  }'
 bake_after $client transfer 1,000 from $key2 to $key1 --fee 0 --force-low-fee
 $client get balance for $key1 | assert "2000 ꜩ"
 $client get balance for $key2 | assert "1000 ꜩ"
+$client rpc post /chains/main/mempool/filter with '{}'
 
 bake_after $client transfer 1,000 from $key1 to $key2 --fee 0.05
 $client get balance for $key1 | assert "999.95 ꜩ"
@@ -86,10 +85,13 @@ bake_after $client register key $key2 as delegate
 bake_after $client set delegate for free_account to $key2
 $client get delegate for free_account
 
+$client rpc post /chains/main/mempool/filter with \
+        '{ "minimal_fees": "0", "minimal_picotez_per_byte": "0", "minimal_picotez_per_gas_unit": "0"  }'
 $client get balance for bootstrap5 | assert "4000000 ꜩ"
 bake_after $client transfer 400,000 from bootstrap5 to bootstrap1 --fee 0 --force-low-fee
 bake_after $client transfer 400,000 from bootstrap1 to bootstrap5 --fee 0 --force-low-fee
 $client get balance for bootstrap5 | assert "4000000 ꜩ"
+$client rpc post /chains/main/mempool/filter with '{}'
 
 bake_after $client activate account $key4 with king_commitment.json
 bake_after $client activate account $key5 with queen_commitment.json

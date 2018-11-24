@@ -36,7 +36,6 @@ done
 
 activate_alpha
 
-$client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "0", "minimal_picotez_per_byte": "0", "minimal_picotez_per_gas_unit": "0"  }'
 
 printf "\n\n"
 
