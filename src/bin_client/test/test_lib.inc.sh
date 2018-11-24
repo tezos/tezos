@@ -147,7 +147,7 @@ init_with_transfer () {
     echo "Originating [$NAME]"
     $client originate contract ${NAME} \
             for ${KEY} transferring "${TRANSFER_AMT}" \
-            from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}"
+            from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}" --burn-cap 10
     bake
 }
 

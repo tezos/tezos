@@ -30,10 +30,22 @@ open Apply_results
 type 'kind preapply_result =
   Operation_hash.t * 'kind operation * 'kind operation_metadata
 
+type fee_parameter = {
+  minimal_fees: Tez.t ;
+  minimal_picotez_per_byte: Z.t ;
+  minimal_picotez_per_gas_unit: Z.t ;
+  force_low_fee: bool ;
+  fee_cap: Tez.t ;
+  burn_cap: Tez.t ;
+}
+
+val dummy_fee_parameter: fee_parameter
+
 val preapply:
   #Proto_alpha.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
+  ?fee_parameter:fee_parameter ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
   'kind contents_list ->
@@ -50,6 +62,8 @@ val inject_operation:
   ?dry_run:bool ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
+  fee_parameter:fee_parameter ->
+  ?compute_fee:bool ->
   'kind contents_list ->
   'kind result_list tzresult Lwt.t
 
@@ -66,10 +80,11 @@ val inject_manager_operation:
   source:Contract.t ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
-  fee:Tez.t ->
+  ?fee:Tez.t ->
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
+  fee_parameter:fee_parameter ->
   'kind manager_operation ->
   'kind Kind.manager result tzresult Lwt.t
 

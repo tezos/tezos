@@ -75,9 +75,9 @@ let delegate_commands () =
             minimal_timestamp, mempool, context_path)
         delegate cctxt ->
         bake_block cctxt cctxt#block
-          ?minimal_fees
-          ?minimal_picotez_per_gas_unit
-          ?minimal_picotez_per_byte
+          ~minimal_fees
+          ~minimal_picotez_per_gas_unit
+          ~minimal_picotez_per_byte
           ~await_endorsements
           ~force ?max_priority ~minimal_timestamp
           ?mempool ?context_path delegate) ;
@@ -128,9 +128,9 @@ let baker_commands () =
         Tezos_signer_backends.Encrypted.decrypt_list
           cctxt (List.map fst delegates) >>=? fun () ->
         Client_daemon.Baker.run cctxt
-          ?minimal_fees
-          ?minimal_picotez_per_gas_unit
-          ?minimal_picotez_per_byte
+          ~minimal_fees
+          ~minimal_picotez_per_gas_unit
+          ~minimal_picotez_per_byte
           ?max_priority
           ~await_endorsements:(not no_waiting_for_endorsements)
           ~context_path:(Filename.concat node_path "context")

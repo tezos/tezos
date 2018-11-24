@@ -29,7 +29,7 @@ open Alpha_context
 val tez_sym: string
 
 val init_arg: (string, Proto_alpha.full) Clic.arg
-val fee_arg: (Tez.t, Proto_alpha.full) Clic.arg
+val fee_arg: (Tez.t option, Proto_alpha.full) Clic.arg
 val counter_arg: (Z.t option, Proto_alpha.full) Clic.arg
 val gas_limit_arg: (Z.t option, Proto_alpha.full) Clic.arg
 val storage_limit_arg: (Z.t option, Proto_alpha.full) Clic.arg
@@ -40,9 +40,12 @@ val delegate_arg: (Signature.Public_key_hash.t option, Proto_alpha.full) Clic.ar
 val delegatable_switch: (bool, Proto_alpha.full) Clic.arg
 val spendable_switch: (bool, Proto_alpha.full) Clic.arg
 val max_priority_arg: (int option, Proto_alpha.full) Clic.arg
-val minimal_fees_arg: (Tez.tez option, Proto_alpha.full) Clic.arg
-val minimal_picotez_per_gas_unit_arg: (Z.t option, Proto_alpha.full) Clic.arg
-val minimal_picotez_per_byte_arg: (Z.t option, Proto_alpha.full) Clic.arg
+val minimal_fees_arg: (Tez.tez, Proto_alpha.full) Clic.arg
+val minimal_picotez_per_gas_unit_arg: (Z.t, Proto_alpha.full) Clic.arg
+val minimal_picotez_per_byte_arg: (Z.t, Proto_alpha.full) Clic.arg
+val force_low_fee_arg: (bool, Proto_alpha.full) Clic.arg
+val fee_cap_arg: (Tez.t, Proto_alpha.full) Clic.arg
+val burn_cap_arg: (Tez.t, Proto_alpha.full) Clic.arg
 val no_waiting_for_endorsements_arg: (bool, Proto_alpha.full) Clic.arg
 val await_endorsements_arg: (bool, Proto_alpha.full) Clic.arg
 val force_switch: (bool, Proto_alpha.full) Clic.arg

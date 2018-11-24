@@ -191,10 +191,11 @@ let tez_param ~name ~desc next =
     next
 
 let fee_arg =
-  tez_arg
-    ~default:"0.05"
-    ~parameter:"fee"
+  arg
+    ~long:"fee"
+    ~placeholder:"amount"
     ~doc:"fee in \xEA\x9C\xA9 to pay to the baker"
+    (tez_parameter ("--fee"))
 
 let gas_limit_arg =
   arg
@@ -246,33 +247,69 @@ let max_priority_arg =
          try return (int_of_string s)
          with _ -> fail (Bad_max_priority s)))
 
+
+let default_minimal_fees = match Tez.of_mutez 100L with None -> assert false | Some t -> t
+let default_minimal_picotez_per_gas_unit = Z.of_int 100
+let default_minimal_picotez_per_byte = Z.of_int 1000
+
 let minimal_fees_arg =
-  arg
+  default_arg
     ~long:"minimal-fees"
     ~placeholder:"amount"
     ~doc:"exclude operations with fees lower than this threshold (in tez)"
+    ~default:(Tez.to_string default_minimal_fees)
     (parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t
          | None -> fail (Bad_minimal_fees s)))
 
 let minimal_picotez_per_gas_unit_arg =
-  arg
+  default_arg
     ~long:"minimal-picotez-per-gas-unit"
     ~placeholder:"amount"
     ~doc:"exclude operations with fees per gas lower than this threshold (in picotez)"
+    ~default:(Z.to_string default_minimal_picotez_per_gas_unit)
     (parameter (fun _ s ->
          try return (Z.of_string s)
          with _ -> fail (Bad_minimal_fees s)))
 
 let minimal_picotez_per_byte_arg =
-  arg
+  default_arg
     ~long:"minimal-picotez-per-byte"
     ~placeholder:"amount"
+    ~default:(Z.to_string default_minimal_picotez_per_byte)
     ~doc:"exclude operations with fees per byte lower than this threshold (in tez)"
     (parameter (fun _ s ->
          try return (Z.of_string s)
          with _ -> fail (Bad_minimal_fees s)))
+
+let force_low_fee_arg =
+  switch
+    ~long:"force-low-fee"
+    ~doc:"Don't check that the fee is lower than the estimated default value"
+    ()
+
+let fee_cap_arg =
+  default_arg
+    ~long:"fee-cap"
+    ~placeholder:"amount"
+    ~default:"1.0"
+    ~doc:"Set the fee cap"
+    (parameter (fun _ s ->
+         match Tez.of_string s with
+         | Some t -> return t
+         | None -> failwith "Bad fee cap"))
+
+let burn_cap_arg =
+  default_arg
+    ~long:"burn-cap"
+    ~placeholder:"amount"
+    ~default:"0"
+    ~doc:"Set the burn cap"
+    (parameter (fun _ s ->
+         match Tez.of_string s with
+         | Some t -> return t
+         | None -> failwith "Bad burn cap"))
 
 let no_waiting_for_endorsements_arg =
   switch

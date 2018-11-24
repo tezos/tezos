@@ -75,10 +75,11 @@ val set_delegate:
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
-  fee:Tez.tez ->
+  ?fee:Tez.tez ->
   Contract.t ->
   src_pk:public_key ->
   manager_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
   public_key_hash option ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
 
@@ -88,8 +89,9 @@ val register_as_delegate:
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
-  fee:Tez.tez ->
+  ?fee:Tez.tez ->
   manager_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
   public_key ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
 
@@ -114,7 +116,8 @@ val originate_account :
   ?delegatable:bool ->
   ?delegate:public_key_hash ->
   balance:Tez.tez ->
-  fee:Tez.tez ->
+  ?fee:Tez.tez ->
+  fee_parameter:Injection.fee_parameter ->
   unit -> (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
 
 val save_contract :
@@ -131,7 +134,7 @@ val originate_contract:
   ?confirmations:int ->
   ?dry_run:bool ->
   ?branch:int ->
-  fee:Tez.t ->
+  ?fee:Tez.t ->
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
   delegate:public_key_hash option ->
@@ -144,6 +147,7 @@ val originate_contract:
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   code:Script.expr ->
+  fee_parameter:Injection.fee_parameter ->
   unit -> (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
 
 val transfer :
@@ -159,10 +163,11 @@ val transfer :
   destination:Contract.t ->
   ?arg:string ->
   amount:Tez.t ->
-  fee:Tez.t ->
+  ?fee:Tez.t ->
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
+  fee_parameter:Injection.fee_parameter ->
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
 
@@ -176,7 +181,8 @@ val reveal :
   source:Contract.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  fee:Tez.t ->
+  ?fee:Tez.t ->
+  fee_parameter:Injection.fee_parameter ->
   unit -> Kind.reveal Kind.manager Injection.result tzresult Lwt.t
 
 type activation_key =

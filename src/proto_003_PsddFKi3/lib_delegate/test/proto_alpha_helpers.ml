@@ -266,7 +266,9 @@ module Account = struct
       ?(fee = Tez.fifty_cents)
       ~(account:t)
       ~destination
-      ~amount () =
+      ~amount
+      ?(fee_parameter = Injection.dummy_fee_parameter)
+      () =
     let src_sk =
       Tezos_signer_backends.Unencrypted.make_sk account.sk in
     Client_proto_context.transfer
@@ -278,7 +280,9 @@ module Account = struct
       ~src_sk
       ~destination
       ~amount
-      ~fee () >>=? fun ((oph, _, _), contracts) ->
+      ~fee
+      ~fee_parameter
+      () >>=? fun ((oph, _, _), contracts) ->
     return (oph, contracts)
 
   let originate
@@ -288,6 +292,7 @@ module Account = struct
       ~(src:t)
       ~manager_pkh
       ~balance
+      ?(fee_parameter = Injection.dummy_fee_parameter)
       () =
     let delegatable, delegate = match delegate with
       | None -> false, None
@@ -306,6 +311,7 @@ module Account = struct
       ~delegatable
       ?delegate
       ~fee
+      ~fee_parameter
       () >>=? fun ((oph, _, _), contracts) ->
     return (oph, contracts)
 
@@ -315,6 +321,7 @@ module Account = struct
       ~contract
       ~manager_sk
       ~src_pk
+      ?(fee_parameter = Injection.dummy_fee_parameter)
       delegate_opt =
     Client_proto_context.set_delegate
       (new wrap_full (no_write_context ~block !rpc_config))
@@ -324,6 +331,7 @@ module Account = struct
       contract
       ~src_pk
       ~manager_sk
+      ~fee_parameter
       delegate_opt >>=? fun (oph, _, _) ->
     return oph
 

@@ -50,8 +50,86 @@ type 'kind result_list =
 type 'kind result =
   Operation_hash.t * 'kind contents * 'kind contents_result
 
+let get_manager_operation_gas_and_fee contents =
+  let open Operation in
+  let l = to_list (Contents_list contents) in
+  List.fold_left
+    (fun acc -> function
+       | Contents (Manager_operation { fee ; gas_limit ; _ }) -> begin
+           match acc with
+           | Error _ as e -> e
+           | Ok (total_fee, total_gas) ->
+               match Tez.(total_fee +? fee) with
+               | Ok total_fee -> Ok (total_fee, (Z.add total_gas gas_limit))
+               | Error _ as e -> e
+         end
+       | _ -> acc)
+    (Ok (Tez.zero, Z.zero))
+    l
+
+type fee_parameter = {
+  minimal_fees: Tez.t ;
+  minimal_picotez_per_byte: Z.t ;
+  minimal_picotez_per_gas_unit: Z.t ;
+  force_low_fee: bool ;
+  fee_cap: Tez.t ;
+  burn_cap: Tez.t ;
+}
+
+let dummy_fee_parameter = {
+  minimal_fees = Tez.zero ;
+  minimal_picotez_per_byte = Z.zero ;
+  minimal_picotez_per_gas_unit = Z.zero ;
+  force_low_fee = false ;
+  fee_cap = Tez.one ;
+  burn_cap = Tez.zero ;
+}
+
+let check_fees
+  : type t. #Proto_alpha.full -> fee_parameter -> t contents_list -> int -> unit Lwt.t
+  = fun cctxt config op size ->
+    match get_manager_operation_gas_and_fee op with
+    | Error _ -> assert false (* FIXME *)
+    | Ok (fee, gas) ->
+        if Tez.compare fee config.fee_cap > 0 then
+          cctxt#error "The proposed fee (%s%a) are higher than the configured fee cap (%s%a).@\n\
+                      \ Use `--fee-cap %a` to emit this operation anyway."
+            Client_proto_args.tez_sym Tez.pp fee
+            Client_proto_args.tez_sym Tez.pp config.fee_cap
+            Tez.pp fee >>= fun () ->
+          exit 1
+        else begin (* *)
+          let fees_in_picotez =
+            Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000) in
+          let minimal_fees_in_picotez =
+            Z.mul (Z.of_int64 (Tez.to_mutez config.minimal_fees)) (Z.of_int 1000) in
+          let minimal_fees_for_gas_in_picotez =
+            Z.mul config.minimal_picotez_per_gas_unit gas in
+          let minimal_fees_for_size_in_picotez =
+            Z.mul config.minimal_picotez_per_byte (Z.of_int size) in
+          let estimated_fees_in_picotez =
+            Z.add
+              minimal_fees_in_picotez
+              (Z.add minimal_fees_for_gas_in_picotez minimal_fees_for_size_in_picotez) in
+          let estimated_fees =
+            match Tez.of_mutez (Z.to_int64 (Z.div (Z.add (Z.of_int 999) estimated_fees_in_picotez) (Z.of_int 1000))) with
+            | None -> assert false
+            | Some fee -> fee in
+          if not config.force_low_fee &&
+             Z.compare fees_in_picotez estimated_fees_in_picotez < 0 then begin
+            cctxt#error "The proposed fee (%s%a) are lower than the fee that baker \
+                         expect by default (%s%a).@\n\
+                        \ Use `--force-low-fee` to emit this operation anyway."
+              Client_proto_args.tez_sym Tez.pp fee
+              Client_proto_args.tez_sym Tez.pp estimated_fees >>= fun () ->
+            exit 1
+          end else
+            Lwt.return_unit
+        end
+
 let preapply (type t)
     (cctxt: #Proto_alpha.full) ~chain ~block
+    ?fee_parameter
     ?branch ?src_sk (contents : t contents_list) =
   get_branch cctxt ~chain ~block branch >>=? fun (chain_id, branch) ->
   let bytes =
@@ -76,6 +154,13 @@ let preapply (type t)
     { shell = { branch } ;
       protocol_data = { contents ; signature } } in
   let oph = Operation.hash op in
+  let size = MBytes.length bytes + Signature.size in
+  begin
+    match fee_parameter with
+    | Some fee_parameter ->
+        check_fees cctxt fee_parameter contents size
+    | None -> Lwt.return_unit
+  end >>= fun () ->
   Alpha_block_services.Helpers.Preapply.operations
     cctxt ~chain ~block [Operation.pack op] >>=? function
   | [(Operation_data op', Operation_metadata result)] -> begin
@@ -169,9 +254,10 @@ let estimated_storage_single
 
 let estimated_storage origination_size res =
   let rec estimated_storage :
-    type kind. kind Kind.manager contents_result_list -> _ =
+    type kind. kind contents_result_list -> _ =
     function
-    | Single_result res -> estimated_storage_single origination_size res
+    | Single_result (Manager_operation_result _ as res) -> estimated_storage_single origination_size res
+    | Single_result _ -> Ok Z.zero
     | Cons_result (res, rest) ->
         estimated_storage_single origination_size res >>? fun storage1 ->
         estimated_storage rest >>? fun storage2 ->
@@ -252,20 +338,22 @@ let detect_script_failure :
         detect_script_failure rest in
   fun { contents } -> detect_script_failure contents
 
-
 let may_patch_limits
-    (type kind) (cctxt : #Proto_alpha.full) ~chain ~block ?branch
+    (type kind) (cctxt : #Proto_alpha.full)
+    ~fee_parameter
+    ~chain ~block ?branch ?(compute_fee = false)
     (contents: kind contents_list) : kind contents_list tzresult Lwt.t =
   Alpha_services.Constants.all cctxt
     (chain, block) >>=? fun { parametric = {
       hard_gas_limit_per_operation = gas_limit ;
       hard_storage_limit_per_operation = storage_limit ;
       origination_size ;
+      cost_per_byte ;
     } } ->
   let may_need_patching_single
     : type kind. kind contents -> kind contents option = function
     | Manager_operation c
-      when c.gas_limit < Z.zero || gas_limit <= c.gas_limit
+      when compute_fee || c.gas_limit < Z.zero || gas_limit <= c.gas_limit
            || c.storage_limit < Z.zero || storage_limit <= c.storage_limit ->
         let gas_limit =
           if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
@@ -297,8 +385,8 @@ let may_patch_limits
       end in
 
   let patch :
-    type kind. kind contents * kind contents_result -> kind contents tzresult Lwt.t = function
-    | Manager_operation c, (Manager_operation_result _ as result) ->
+    type kind. bool -> kind contents * kind contents_result -> kind contents tzresult Lwt.t = fun first -> function
+    | Manager_operation c as op, (Manager_operation_result _ as result) ->
         begin
           if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
             Lwt.return (estimated_gas_single result) >>=? fun gas ->
@@ -329,21 +417,51 @@ let may_patch_limits
             end
           else return c.storage_limit
         end >>=? fun storage_limit ->
-        return (Manager_operation { c with gas_limit ; storage_limit })
+        begin
+          if compute_fee then
+            let size =
+              if first then
+                Data_encoding.Binary.fixed_length_exn
+                  Tezos_base.Operation.shell_header_encoding +
+                Data_encoding.Binary.length
+                  Operation.contents_encoding
+                  (Contents op) +
+                Signature.size
+              else
+                Data_encoding.Binary.length
+                  Operation.contents_encoding
+                  (Contents op)
+            in
+            let minimal_fees_in_picotez =
+              Z.mul (Z.of_int64 (Tez.to_mutez fee_parameter.minimal_fees)) (Z.of_int 1000) in
+            let minimal_fees_for_gas_in_picotez =
+              Z.mul fee_parameter.minimal_picotez_per_gas_unit gas_limit in
+            let minimal_fees_for_size_in_picotez =
+              Z.mul fee_parameter.minimal_picotez_per_byte (Z.of_int size) in
+            let fees_in_picotez =
+              Z.add minimal_fees_in_picotez @@
+              Z.add minimal_fees_for_gas_in_picotez minimal_fees_for_size_in_picotez in
+            match Tez.of_mutez (Z.to_int64 (Z.div (Z.add (Z.of_int 999) fees_in_picotez) (Z.of_int 1000))) with
+            | None -> assert false
+            | Some fee -> return fee
+          else
+            return c.fee
+        end >>=? fun fee ->
+        return (Manager_operation { c with gas_limit ; storage_limit ; fee })
     | (c, _) -> return c in
   let rec patch_list :
-    type kind. kind contents_and_result_list -> kind contents_list tzresult Lwt.t =
-    function
-    | Single_and_result
-        ((Manager_operation _ as op), (Manager_operation_result _ as res)) ->
-        patch (op, res) >>=? fun op -> return (Single op)
-    | Single_and_result (op, _) -> return (Single op)
-    | Cons_and_result ((Manager_operation _ as op),
-                       (Manager_operation_result _ as res), rest) -> begin
-        patch (op, res) >>=? fun op ->
-        patch_list rest >>=? fun rest ->
-        return (Cons (op, rest))
-      end in
+    type kind. bool -> kind contents_and_result_list -> kind contents_list tzresult Lwt.t =
+    fun first -> function
+      | Single_and_result
+          ((Manager_operation _ as op), (Manager_operation_result _ as res)) ->
+          patch first (op, res) >>=? fun op -> return (Single op)
+      | Single_and_result (op, _) -> return (Single op)
+      | Cons_and_result ((Manager_operation _ as op),
+                         (Manager_operation_result _ as res), rest) -> begin
+          patch first (op, res) >>=? fun op ->
+          patch_list false rest >>=? fun rest ->
+          return (Cons (op, rest))
+        end in
   match may_need_patching contents with
   | Some contents ->
       simulate cctxt ~chain ~block ?branch contents >>=? fun (_, _, result) ->
@@ -356,8 +474,21 @@ let may_patch_limits
               (contents, result.contents) >>= fun () ->
             return_unit
       end >>=? fun () ->
+      begin
+        Lwt.return (estimated_storage (Z.of_int origination_size) result.contents) >>=? fun storage ->
+        Lwt.return (Alpha_environment.wrap_error Tez.(cost_per_byte *? Z.to_int64 storage)) >>=? fun burn ->
+        if Tez.(burn > fee_parameter.burn_cap) then
+          cctxt#error "The operation will burn %s%a which is higher than the configured burn cap (%s%a).@\n\
+                      \ Use `--burn-cap %a` to emit this operation."
+            Client_proto_args.tez_sym Tez.pp burn
+            Client_proto_args.tez_sym Tez.pp fee_parameter.burn_cap
+            Tez.pp burn >>= fun () ->
+          exit 1
+        else
+          return_unit
+      end >>=? fun () ->
       let res = pack_contents_list contents result.contents in
-      patch_list res
+      patch_list true res
   | None -> return contents
 
 let inject_operation
@@ -365,11 +496,16 @@ let inject_operation
     ?confirmations
     ?(dry_run = false)
     ?branch ?src_sk
+    ~fee_parameter
+    ?compute_fee
     (contents: kind contents_list)  =
   Client_confirmations.wait_for_bootstrapped cctxt >>=? fun () ->
   may_patch_limits
-    cctxt ~chain ~block ?branch contents >>=? fun contents ->
-  preapply cctxt ~chain ~block
+    cctxt ~chain ~block ?branch
+    ~fee_parameter
+    ?compute_fee
+    contents >>=? fun contents ->
+  preapply cctxt ~chain ~block ~fee_parameter
     ?branch ?src_sk contents >>=? fun (_oph, op, result) ->
   begin match detect_script_failure result with
     | Ok () -> return_unit
@@ -453,9 +589,10 @@ let inject_operation
     end >>= fun () ->
     return (oph, op.protocol_data.contents, result.contents)
 
+
 let inject_manager_operation
     cctxt ~chain ~block ?branch ?confirmations ?dry_run
-    ~source ~src_pk ~src_sk ~fee ?(gas_limit = Z.minus_one) ?(storage_limit = (Z.of_int (-1))) ?counter
+    ~source ~src_pk ~src_sk ?fee ?(gas_limit = Z.minus_one) ?(storage_limit = (Z.of_int (-1))) ?counter ~fee_parameter
     (type kind) (operation : kind manager_operation)
   : (Operation_hash.t * kind Kind.manager contents *  kind Kind.manager contents_result) tzresult Lwt.t =
   begin
@@ -473,6 +610,10 @@ let inject_manager_operation
   let is_reveal : type kind. kind manager_operation -> bool = function
     | Reveal _ -> true
     | _ -> false in
+  let compute_fee, fee =
+    match fee with
+    | None -> true, Tez.zero
+    | Some fee -> false, fee in
   match key with
   | None when not (is_reveal operation) -> begin
       let contents =
@@ -483,6 +624,8 @@ let inject_manager_operation
            Single (Manager_operation { source ; fee ; counter = Z.succ counter ;
                                        gas_limit ; storage_limit ; operation })) in
       inject_operation cctxt ~chain ~block ?confirmations ?dry_run
+        ~fee_parameter
+        ~compute_fee
         ?branch ~src_sk contents >>=? fun (oph, op, result) ->
       match pack_contents_list op result with
       | Cons_and_result (_, _, Single_and_result (op, result)) ->
@@ -495,7 +638,7 @@ let inject_manager_operation
         Single (Manager_operation { source ; fee ; counter ;
                                     gas_limit ; storage_limit ; operation }) in
       inject_operation cctxt ~chain ~block ?confirmations ?dry_run
-        ?branch ~src_sk contents >>=? fun (oph, op, result) ->
+        ~compute_fee ~fee_parameter ?branch ~src_sk contents >>=? fun (oph, op, result) ->
       match pack_contents_list op result with
       | Single_and_result (Manager_operation _ as op, result) ->
           return (oph, op, result)
