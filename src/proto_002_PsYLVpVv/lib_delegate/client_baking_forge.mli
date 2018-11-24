@@ -115,10 +115,15 @@ val create:
 
 val get_unrevealed_nonces:
   #Proto_alpha.full ->
+  ?silent:bool ->
   ?force:bool ->
   ?chain:Chain_services.chain ->
   Block_services.block ->
   (Block_hash.t * (Raw_level.t * Nonce.t)) list tzresult Lwt.t
+
+val reveal_potential_nonces:
+  ?silent:bool ->
+  #Proto_alpha.full -> Shell_services.block -> unit tzresult Lwt.t
 
 val filter_outdated_nonces:
   #Proto_alpha.full ->

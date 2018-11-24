@@ -1096,7 +1096,7 @@ let filter_outdated_nonces
 
 (** [get_unrevealed_nonces] retrieve registered nonces *)
 let get_unrevealed_nonces
-    (cctxt : #Proto_alpha.full) ?(force = false) ?(chain = `Main) head =
+    (cctxt : #Proto_alpha.full) ?(silent = false) ?(force = false) ?(chain = `Main) head =
   cctxt#with_lock begin fun () ->
     Client_baking_nonces.load cctxt
   end >>=? fun nonces ->
@@ -1106,30 +1106,37 @@ let get_unrevealed_nonces
       match Block_hash.Map.find_opt hash nonces with
       | None -> return_none
       | Some nonce ->
-          Alpha_block_services.metadata
-            cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
-          if force then
-            return_some (hash, (level.level, nonce))
-          else
-            Alpha_services.Nonce.get
-              cctxt (chain, head) level.level >>=? function
-            | Missing nonce_hash
-              when Nonce.check_hash nonce nonce_hash ->
-                lwt_log_notice Tag.DSL.(fun f ->
-                    f "Found nonce to reveal for %a (level: %a)"
-                    -% t event "found_nonce"
-                    -% a Block_hash.Logging.tag hash
-                    -% a level_tag level.level)
-                >>= fun () ->
-                return_some (hash, (level.level, nonce))
-            | Missing _nonce_hash ->
-                lwt_log_error Tag.DSL.(fun f ->
-                    f "Incoherent nonce for level %a"
-                    -% t event "bad_nonce"
-                    -% a level_tag level.level)
-                >>= fun () -> return_none
-            | Forgotten -> return_none
-            | Revealed _ -> return_none)
+          begin
+            Alpha_block_services.metadata
+              cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
+            if force then
+              return_some (hash, (level.level, nonce))
+            else
+              Alpha_services.Nonce.get
+                cctxt (chain, head) level.level >>=? function
+              | Missing nonce_hash
+                when Nonce.check_hash nonce nonce_hash ->
+                  lwt_log_notice Tag.DSL.(fun f ->
+                      f "Found nonce to reveal for %a (level: %a)"
+                      -% t event "found_nonce"
+                      -% a Block_hash.Logging.tag hash
+                      -% a level_tag level.level)
+                  >>= fun () ->
+                  return_some (hash, (level.level, nonce))
+              | Missing _nonce_hash ->
+                  lwt_log_error Tag.DSL.(fun f ->
+                      f "Incoherent nonce for level %a"
+                      -% t event "bad_nonce"
+                      -% a level_tag level.level)
+                  >>= fun () -> return_none
+              | Forgotten -> return_none
+              | Revealed _ -> return_none
+          end >>= function
+          | Error _ when silent -> return_none
+          | Error err ->
+              cctxt#error "RPC error: %a" pp_print_error err >>= fun () ->
+              return_none
+          | Ok _ as res -> Lwt.return res)
     blocks >>=? function
   | [] -> return_nil
   | x ->
@@ -1141,8 +1148,8 @@ let get_unrevealed_nonces
       return x
 
 (** [reveal_potential_nonces] reveal registered nonces *)
-let reveal_potential_nonces cctxt new_head =
-  get_unrevealed_nonces cctxt new_head >>= function
+let reveal_potential_nonces ?silent cctxt new_head =
+  get_unrevealed_nonces ?silent cctxt new_head >>= function
   | Ok nonces ->
       Client_baking_revelation.forge_seed_nonce_revelation
         cctxt new_head (List.map snd nonces)
@@ -1181,6 +1188,8 @@ let create
 
   let event_k cctxt state new_head =
     reveal_potential_nonces cctxt (`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
+    Tezos_baking_002_PsYLVpVv.Client_baking_forge.reveal_potential_nonces
+      ~silent:true cctxt (`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
     compute_best_slot_on_current_level ?max_priority cctxt state new_head >>=? fun slot ->
     state.best_slot <- slot ;
     return_unit
