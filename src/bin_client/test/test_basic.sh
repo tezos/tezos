@@ -47,7 +47,7 @@ $client get balance for $key2 | assert "2000 ꜩ"
 $client get balance for $key3 | assert "3000 ꜩ"
 
 $client rpc post /chains/main/mempool/filter with \
-        '{ "minimal_fees": "0", "minimal_picotez_per_byte": "0", "minimal_picotez_per_gas_unit": "0"  }'
+        '{ "minimal_fees": "0", "minimal_nanotez_per_byte": "0", "minimal_nanotez_per_gas_unit": "0"  }'
 bake_after $client transfer 1,000 from $key2 to $key1 --fee 0 --force-low-fee
 $client get balance for $key1 | assert "2000 ꜩ"
 $client get balance for $key2 | assert "1000 ꜩ"
@@ -86,7 +86,7 @@ bake_after $client set delegate for free_account to $key2
 $client get delegate for free_account
 
 $client rpc post /chains/main/mempool/filter with \
-        '{ "minimal_fees": "0", "minimal_picotez_per_byte": "0", "minimal_picotez_per_gas_unit": "0"  }'
+        '{ "minimal_fees": "0", "minimal_nanotez_per_byte": "0", "minimal_nanotez_per_gas_unit": "0"  }'
 $client get balance for bootstrap5 | assert "4000000 ꜩ"
 bake_after $client transfer 400,000 from bootstrap5 to bootstrap1 --fee 0 --force-low-fee
 bake_after $client transfer 400,000 from bootstrap1 to bootstrap5 --fee 0 --force-low-fee

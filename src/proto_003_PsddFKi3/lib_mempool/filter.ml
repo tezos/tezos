@@ -25,52 +25,52 @@
 
 open Alpha_context
 
-type picotez = Z.t
-let picotez_enc =
-  Data_encoding.def "picotez"
+type nanotez = Z.t
+let nanotez_enc =
+  Data_encoding.def "nanotez"
     ~title:"Thousandths of tez"
-    ~description:"One thousand picotez make a tez"
+    ~description:"One thousand nanotez make a tez"
     Data_encoding.z
 
 type config =
   { minimal_fees : Tez.t ;
-    minimal_picotez_per_gas_unit : picotez ;
-    minimal_picotez_per_byte : picotez ;
+    minimal_nanotez_per_gas_unit : nanotez ;
+    minimal_nanotez_per_byte : nanotez ;
     allow_script_failure : bool }
 
 let default_minimal_fees = match Tez.of_mutez 100L with None -> assert false | Some t -> t
-let default_minimal_picotez_per_gas_unit = Z.of_int 100
-let default_minimal_picotez_per_byte = Z.of_int 1000
+let default_minimal_nanotez_per_gas_unit = Z.of_int 100
+let default_minimal_nanotez_per_byte = Z.of_int 1000
 
 let config_encoding : config Data_encoding.t =
   let open Data_encoding in
   conv
     (fun { minimal_fees ;
-           minimal_picotez_per_gas_unit ;
-           minimal_picotez_per_byte ;
+           minimal_nanotez_per_gas_unit ;
+           minimal_nanotez_per_byte ;
            allow_script_failure } ->
       (minimal_fees,
-       minimal_picotez_per_gas_unit,
-       minimal_picotez_per_byte,
+       minimal_nanotez_per_gas_unit,
+       minimal_nanotez_per_byte,
        allow_script_failure))
     (fun (minimal_fees,
-          minimal_picotez_per_gas_unit,
-          minimal_picotez_per_byte,
+          minimal_nanotez_per_gas_unit,
+          minimal_nanotez_per_byte,
           allow_script_failure) ->
       { minimal_fees ;
-        minimal_picotez_per_gas_unit ;
-        minimal_picotez_per_byte ;
+        minimal_nanotez_per_gas_unit ;
+        minimal_nanotez_per_byte ;
         allow_script_failure })
     (obj4
        (dft "minimal_fees" Tez.encoding default_minimal_fees)
-       (dft "minimal_picotez_per_gas_unit" picotez_enc default_minimal_picotez_per_gas_unit)
-       (dft "minimal_picotez_per_byte" picotez_enc default_minimal_picotez_per_byte)
+       (dft "minimal_nanotez_per_gas_unit" nanotez_enc default_minimal_nanotez_per_gas_unit)
+       (dft "minimal_nanotez_per_byte" nanotez_enc default_minimal_nanotez_per_byte)
        (dft "allow_script_failure" bool true))
 
 let default_config =
   { minimal_fees = default_minimal_fees ;
-    minimal_picotez_per_gas_unit = default_minimal_picotez_per_gas_unit ;
-    minimal_picotez_per_byte = default_minimal_picotez_per_byte ;
+    minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit ;
+    minimal_nanotez_per_byte = default_minimal_nanotez_per_byte ;
     allow_script_failure = true ;
   }
 
@@ -99,19 +99,19 @@ let pre_filter_manager
     match get_manager_operation_gas_and_fee op with
     | Error _ -> false
     | Ok (fee, gas) ->
-        let fees_in_picotez =
+        let fees_in_nanotez =
           Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000) in
-        let minimal_fees_in_picotez =
+        let minimal_fees_in_nanotez =
           Z.mul (Z.of_int64 (Tez.to_mutez config.minimal_fees)) (Z.of_int 1000) in
-        let minimal_fees_for_gas_in_picotez =
-          Z.mul config.minimal_picotez_per_gas_unit gas in
-        let minimal_fees_for_size_in_picotez =
-          Z.mul config.minimal_picotez_per_byte (Z.of_int size) in
+        let minimal_fees_for_gas_in_nanotez =
+          Z.mul config.minimal_nanotez_per_gas_unit gas in
+        let minimal_fees_for_size_in_nanotez =
+          Z.mul config.minimal_nanotez_per_byte (Z.of_int size) in
         Z.compare
-          fees_in_picotez
+          fees_in_nanotez
           (Z.add
-             minimal_fees_in_picotez
-             (Z.add minimal_fees_for_gas_in_picotez minimal_fees_for_size_in_picotez))
+             minimal_fees_in_nanotez
+             (Z.add minimal_fees_for_gas_in_nanotez minimal_fees_for_size_in_nanotez))
         >= 0
 
 let pre_filter config (Operation_data { contents } as op : Operation.packed_protocol_data) =

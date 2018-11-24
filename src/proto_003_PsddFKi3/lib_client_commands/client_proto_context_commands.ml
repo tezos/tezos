@@ -226,8 +226,8 @@ let commands version () =
       (args8
          fee_arg dry_run_switch
          minimal_fees_arg
-         minimal_picotez_per_byte_arg
-         minimal_picotez_per_gas_unit_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
@@ -238,13 +238,13 @@ let commands version () =
          ~name: "mgr" ~desc: "new delegate of the contract"
        @@ stop)
       begin fun
-        (fee, dry_run, minimal_fees, minimal_picotez_per_byte,
-         minimal_picotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
+        (fee, dry_run, minimal_fees, minimal_nanotez_per_byte,
+         minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         (_, contract) (_, delegate) (cctxt : Proto_alpha.full) ->
         let fee_parameter = {
           Injection.minimal_fees ;
-          minimal_picotez_per_byte ;
-          minimal_picotez_per_gas_unit ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
           force_low_fee ;
           fee_cap ;
           burn_cap ;
@@ -265,24 +265,24 @@ let commands version () =
       (args8
          fee_arg dry_run_switch
          minimal_fees_arg
-         minimal_picotez_per_byte_arg
-         minimal_picotez_per_gas_unit_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
       (prefixes [ "withdraw" ; "delegate" ; "from" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun (fee, dry_run, minimal_fees, minimal_picotez_per_byte,
-                 minimal_picotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
+      begin fun (fee, dry_run, minimal_fees, minimal_nanotez_per_byte,
+                 minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         (_, contract) (cctxt : Proto_alpha.full) ->
         source_to_keys cctxt
           ~chain:`Main ~block:cctxt#block
           contract >>=? fun (src_pk, manager_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
-          minimal_picotez_per_byte ;
-          minimal_picotez_per_gas_unit ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
           force_low_fee ;
           fee_cap ;
           burn_cap ;
@@ -298,8 +298,8 @@ let commands version () =
     command ~group ~desc:"Open a new account."
       (args11 fee_arg dry_run_switch delegate_arg delegatable_switch (Client_keys.force_switch ())
          minimal_fees_arg
-         minimal_picotez_per_byte_arg
-         minimal_picotez_per_gas_unit_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
@@ -316,8 +316,8 @@ let commands version () =
        @@ ContractAlias.destination_param
          ~name:"src" ~desc: "name of the source contract"
        @@ stop)
-      begin fun (fee, dry_run, delegate, delegatable, force, minimal_fees, minimal_picotez_per_byte,
-                 minimal_picotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
+      begin fun (fee, dry_run, delegate, delegatable, force, minimal_fees, minimal_nanotez_per_byte,
+                 minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         new_contract manager_pkh balance (_, source) (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
         source_to_keys cctxt
@@ -325,8 +325,8 @@ let commands version () =
           source >>=? fun (src_pk, src_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
-          minimal_picotez_per_byte ;
-          minimal_picotez_per_gas_unit ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
           force_low_fee ;
           fee_cap ;
           burn_cap ;
@@ -350,8 +350,8 @@ let commands version () =
          dry_run_switch gas_limit_arg storage_limit_arg delegate_arg (Client_keys.force_switch ())
          delegatable_switch spendable_switch init_arg no_print_source_flag
          minimal_fees_arg
-         minimal_picotez_per_byte_arg
-         minimal_picotez_per_gas_unit_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
@@ -372,7 +372,7 @@ let commands version () =
          ~name:"prg" ~desc: "script of the account\n\
                              Combine with -init if the storage type is not unit."
        @@ stop)
-      begin fun (fee, dry_run, gas_limit, storage_limit, delegate, force, delegatable, spendable, initial_storage, no_print_source, minimal_fees, minimal_picotez_per_byte, minimal_picotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
+      begin fun (fee, dry_run, gas_limit, storage_limit, delegate, force, delegatable, spendable, initial_storage, no_print_source, minimal_fees, minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         alias_name manager balance (_, source) program (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
@@ -381,8 +381,8 @@ let commands version () =
           source >>=? fun (src_pk, src_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
-          minimal_picotez_per_byte ;
-          minimal_picotez_per_gas_unit ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
           force_low_fee ;
           fee_cap ;
           burn_cap ;
@@ -407,8 +407,8 @@ let commands version () =
     command ~group ~desc: "Transfer tokens / call a smart contract."
       (args13 fee_arg dry_run_switch gas_limit_arg storage_limit_arg counter_arg arg_arg no_print_source_flag
          minimal_fees_arg
-         minimal_picotez_per_byte_arg
-         minimal_picotez_per_gas_unit_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
@@ -422,14 +422,14 @@ let commands version () =
        @@ ContractAlias.destination_param
          ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
-      begin fun (fee, dry_run, gas_limit, storage_limit, counter, arg, no_print_source, minimal_fees, minimal_picotez_per_byte, minimal_picotez_per_gas_unit, force_low_fee, fee_cap, burn_cap) amount (_, source) (_, destination) cctxt ->
+      begin fun (fee, dry_run, gas_limit, storage_limit, counter, arg, no_print_source, minimal_fees, minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap) amount (_, source) (_, destination) cctxt ->
         source_to_keys cctxt
           ~chain:`Main ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
-          minimal_picotez_per_byte ;
-          minimal_picotez_per_gas_unit ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
           force_low_fee ;
           fee_cap ;
           burn_cap ;
@@ -448,8 +448,8 @@ let commands version () =
     command ~group ~desc: "Reveal the public key of the contract manager."
       (args7 fee_arg
          minimal_fees_arg
-         minimal_picotez_per_byte_arg
-         minimal_picotez_per_gas_unit_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
@@ -457,15 +457,15 @@ let commands version () =
        @@ ContractAlias.alias_param
          ~name: "src" ~desc: "name of the source contract"
        @@ stop)
-      begin fun (fee, minimal_fees, minimal_picotez_per_byte,
-                 minimal_picotez_per_gas_unit, force_low_fee, fee_cap, burn_cap) (_, source) cctxt ->
+      begin fun (fee, minimal_fees, minimal_nanotez_per_byte,
+                 minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap) (_, source) cctxt ->
         source_to_keys cctxt
           ~chain:`Main ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
-          minimal_picotez_per_byte ;
-          minimal_picotez_per_gas_unit ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
           force_low_fee ;
           fee_cap ;
           burn_cap ;
@@ -481,8 +481,8 @@ let commands version () =
     command ~group ~desc: "Register the public key hash as a delegate."
       (args8 fee_arg dry_run_switch
          minimal_fees_arg
-         minimal_picotez_per_byte_arg
-         minimal_picotez_per_gas_unit_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
@@ -491,13 +491,13 @@ let commands version () =
          ~name: "mgr" ~desc: "the delegate key"
        @@ prefixes [ "as" ; "delegate" ]
        @@ stop)
-      begin fun (fee, dry_run, minimal_fees, minimal_picotez_per_byte,
-                 minimal_picotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)  src_pkh cctxt ->
+      begin fun (fee, dry_run, minimal_fees, minimal_nanotez_per_byte,
+                 minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)  src_pkh cctxt ->
         Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
-          minimal_picotez_per_byte ;
-          minimal_picotez_per_gas_unit ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
           force_low_fee ;
           fee_cap ;
           burn_cap ;

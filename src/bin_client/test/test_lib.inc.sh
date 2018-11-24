@@ -129,7 +129,7 @@ init_contract_from_file () {
 }
 
 bake () {
-    $client bake for bootstrap1 --max-priority 512 --minimal-timestamp --minimal-fees 0 --minimal-picotez-per-byte 0 --minimal-picotez-per-gas-unit 0
+    $client bake for bootstrap1 --max-priority 512 --minimal-timestamp --minimal-fees 0 --minimal-nanotez-per-byte 0 --minimal-nanotez-per-gas-unit 0
 }
 
 bake_after () {
