@@ -25,8 +25,16 @@
 
 open Proto_alpha
 
+
+let is_updated_constant = "\x00\x00\x00\x03"
+let is_updated_cstruct = MBytes.of_string is_updated_constant
+let is_updated_constant_len = String.length is_updated_constant
+
 let generate_proof_of_work_nonce () =
-  Rand.generate Alpha_context.Constants.proof_of_work_nonce_size
+  MBytes.concat ""
+    [is_updated_cstruct ;
+     Rand.generate
+       (Alpha_context.Constants.proof_of_work_nonce_size - is_updated_constant_len)]
 
 let empty_proof_of_work_nonce =
   MBytes.of_string
