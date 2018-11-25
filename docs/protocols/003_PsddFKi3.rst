@@ -6,28 +6,31 @@ Protocol 003_PsddFKi3
 Description of the patch
 ------------------------
 
-1. Fix to prevent account creation spam
+Fix to prevent account creation spam
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   While creating accounts currently requires a .257 tez burn, there is
-   currently no cost to create implicit accounts, despite them occupying
-   space in the context.
-   This patch adjusts the cost to .257 tez for both regular (KT1) and
-   implicit (tz1) accounts.
+While creating accounts currently requires a .257 tez burn, there is
+currently no cost to create implicit accounts, despite them occupying
+space in the context.
+This patch adjusts the cost to .257 tez for both regular (KT1) and
+implicit (tz1) accounts.
 
-2. Error handling for nonce revelation
+Error handling for nonce revelation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   In cycle 48, a baker who lost their deposits and rewards due to double
-   baking also did not inject nonce revelation. The protocol reached an
-   error condition after trying to take away rewards from an account for
-   which rewards had already been slashed. As a result, no new blocks
-   could be accepted unless the nonces were revealed. The patch ensures
-   correct handling of this scenario.
+In cycle 48, a baker who lost their deposits and rewards due to double
+baking also did not inject nonce revelation. The protocol reached an
+error condition after trying to take away rewards from an account for
+which rewards had already been slashed. As a result, no new blocks
+could be accepted unless the nonces were revealed. The patch ensures
+correct handling of this scenario.
 
-3. Add RPCs for voting
+Add RPCs for voting
+~~~~~~~~~~~~~~~~~~~
 
-   This patch introduces RPCs to query ballot status, functionality
-   needed by bakers to interact with proposals to amend the protocol.
-   They are the following:
+This patch introduces RPCs to query ballot status, functionality
+needed by bakers to interact with proposals to amend the protocol.
+They are the following:
 
 ::
 
@@ -52,11 +55,11 @@ Description of the patch
    Current proposal under evaluation.
    GET /chains/<chain_id>/blocks/<block_id>/votes/current_proposal
 
+Correct accounting for approval voting
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-4. Correct accounting for approval voting
-
-   The current protocol does not properly count baking rolls during the
-   approval voting phase. This is corrected in this version.
+The current protocol does not properly count baking rolls during the
+approval voting phase. This is corrected in this version.
 
 
 How to apply the patch
@@ -73,7 +76,7 @@ https://gitlab.com/tezos/tezos, simply do ``./mainnet.sh restart`` as
 every call to mainnet.sh checks for updates and updates if necessary.
 
 The node will automatically switch over to the new protocol at block
-height 204762 expected to occur after 2018-11-26T17:30:00 UTC.
+height **204762** expected to occur after 2018-11-26T17:30:00 UTC.
 
 After updating, all processes (the node, baker, endorser, and accuser)
 should be restarted. The updated node handles multiple protocols but
@@ -96,6 +99,7 @@ FAQ
 ---
 
 Q. Who should  apply this patch?
+
 A. Anyone running a node needs to update. If you are using a wallet
    that connects to a third party node, you do not need to apply a
    patch, but you can inquire with the wallet developers to make sure
@@ -104,31 +108,40 @@ A. Anyone running a node needs to update. If you are using a wallet
    node in order not to miss any reward.
 
 Q. What are the risks and impact of account creation spam?
+
 A. Over time, account creation spam can make it uneconomical to run a
    node due to the amount of disk space required. This would make it
    harder for people to participate in the ecosystem.
 
 Q. What happens if I apply the patch early?
+
 A. The patch will automatically activate at a set block-height.
    Specifically, block height 204762 (approximately Monday Nov 26 1730
    UTC)
 
 Q. What happens if I don't apply the patch?
+
 A. Your node will continue tracking a branch with a known bug which
    does not represent the consensus among network participants.
 
 Q. Why not use the governance mechanism to correct these issues?
+
 A. The governance mechanism is a slow, deliberative, procedure for
    deciding on the evolution of the code. It is not a substitute for
    security patches which require quick deployment.
 
 Q. Why not mandate minimal transaction fees in the protocol?
+
 A. Transaction fees solve a slightly different problem, but they can
    help. If bakers wish to filter out transaction with low fees, they
    can run the process by passing the flag:
-   --minimal-fees (default 0.0001)
-   --minimal-nanotez-per-byte (default 1000)
-   --minimal-nanotez-per-gaz-unit (default 100)
+
+   ::
+
+      --minimal-fees (default 0.0001)
+      --minimal-nanotez-per-byte (default 1000)
+      --minimal-nanotez-per-gaz-unit (default 100)
+
    1 mutez is equivalent to 1000 nanotez. The patch does include
    default minimal fees in the mempool, but individual bakers can
    choose to override these.
