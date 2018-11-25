@@ -149,12 +149,12 @@ operations, still including header and signature.
 
 By default:
 ::
-   minimal_fees = 0.0001 ꜩ (100 µꜩ)
-   minimal_nanotez_per_gas_unit = 100 nꜩ/gu (0.0000001 ꜩ/gu)
-   minimal_nanotez_per_byte = 1000 nꜩ/B (0.000001 ꜩ/B)
+   minimal_fees = 0.000 1 ꜩ (100 µꜩ)
+   minimal_nanotez_per_gas_unit = 100 nꜩ/gu (0.000 000 1 ꜩ/gu)
+   minimal_nanotez_per_byte = 1000 nꜩ/B (0.000 001 ꜩ/B)
 
 For instance, a single transaction to an existing implict address
-will require a transaction fee of at least `0.001273 ꜩ`
+will require a transaction fee of at least `0.001 273 ꜩ`
 to be included by bakers who choose to follow the default settings.
 
 These settings may be changed by passing the following flags to the baker
@@ -233,7 +233,7 @@ A. Transaction fees solve a slightly different problem, but they can
 
    ::
 
-      --minimal-fees (default 0.0001)
+      --minimal-fees (default 0.000 1)
       --minimal-nanotez-per-byte (default 1000)
       --minimal-nanotez-per-gaz-unit (default 100)
 
