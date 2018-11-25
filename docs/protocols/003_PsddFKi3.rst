@@ -101,10 +101,11 @@ More details on fees and cost model
 Protocol:
 ~~~~~~~~~
 
-The creation of a tz{1,2,3} address now requires a burn of `ꜩ0.257`.
+The creation of a new tz{1,2,3} address now requires a burn of `ꜩ0.257`,
+in-line with the creation of KT account.
 
-Every manager operation now costs ``10000`` in gas, a transaction that
-creates a contract has a default cost of ``10100`` in gas.
+Every manager operation now costs at least ``10000`` in gas,
+a transaction that creates an address has a default cost of ``10100`` in gas.
 
 Example:
 ::
@@ -125,12 +126,16 @@ Example:
 Baker
 ~~~~~
 
-With newly introduced default settings, the bakers daemon will now
-require a minimal amount of fees per operation to accept manager
-operations such as transactions, revelations or originations.
-The expected amount depends on the operation sent. When considering
-the injection of an operation in a block, the baker will check its
-size and gas and reject it if the associated fees are too low.
+The baker and mempool filters now require a minimal fee to propagate
+and include operations into blocks. This default is not set at the
+protocol level but rather in the configuration of the node and the baker.
+Bakers can thus decide of the settings that work best for them
+
+The minimal fee depends on the operation sent (transaction, origination,
+revelation, etc)
+
+When considering the injection of an operation in a block, the
+baker will check its size and gas and reject it if the associated fees are too low.
 The expected fees are computed using this formula:
 ::
     fees >= (minimal_fees + minimal_nanotez_per_byte * size + minimal_nanotez_per_gas_unit * gas)
@@ -144,46 +149,43 @@ operations, still including header and signature.
 
 By default:
 ::
-   minimal_fees = ꜩ0.000 1
-   minimal_nanotez_per_gas_unit = ꜩ0.000 000 1
-   minimal_nanotez_per_byte = ꜩ0.000 001
+   minimal_fees = 0.0001 ꜩ (100 µꜩ)
+   minimal_nanotez_per_gas_unit = 100 nꜩ/gu (0.0000001 ꜩ/gu)
+   minimal_nanotez_per_byte = 1000 nꜩ/B (0.000001 ꜩ/B)
 
-For instance, a single transaction to an existing tz1 will require
-`ꜩ0.001 273` to be included.
+For instance, a single transaction to an existing implict address
+will require a transaction fee of at least `0.001273 ꜩ`
+to be included by bakers who choose to follow the default settings.
 
-These settings may be changed by giving the options when starting a
-baker (``--minimal-fees <amount in tez>``,
+These settings may be changed by passing the following flags to the baker
+(``--minimal-fees <amount in tez>``,
 ``--minimal-nanotez-per-gas-unit <amount in nanotez>``,
 ``--minimal-nanotez-per-byte <amount in nanotez>``).
-Note that most bakers, such as the tezos foundation's ones, may use
-the default options and sending operations that does not respect the
-default limits are not expected to be included in blocks.
 
-These changes are especially important to delegates for rewards
-distribution. The safest way to send rewards is now to include the
-corresponding fees.
+Delegates distributing rewards should be aware of these thresholds
+for their transactions to be succesfully included.
 
 Node
 ~~~~
 
-The node now filters operations following the same principles as
-above. If an operation doesn't have enough fees to cover the above
-formula with the default values it is rejected and not included in the
+The node also filters operations following the same principles as
+above. If an operation does not carry sufficient fees, a node
+following the default setting will not include it in its mempool.
 mempool. Hence an operation without fee won't even propagate through
-the network. The constant might be changed with the following RPC
+the network. The constant can be changed with the following RPC
 call:
 
 ::
 
    ./tezos-client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "0", "minimal_nanotez_per_gas_unit": "0", "minimal_nanotez_per_byte": "0" }'
 
-The constants used by the node and the baker are not necessarily equal.
-Still, the node needs to be less restrictive than the baker, otherwise
+The constants used by the node and the baker do not need to be equal,
+but the node needs to be less restrictive than the baker, otherwise
 the baker won't even see the operations.
 
 An injection node (i.e. a specific node targeted by wallet for
 injection operation) might deactivate the filter (by using the
-previous RPC call), in order to accept any operation and give them a
+previous RPC call) in order to accept any operation and give them a
 chance to be propagated to a baker that is willing to accept fee-less
 operations.
 
