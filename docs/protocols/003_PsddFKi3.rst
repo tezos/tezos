@@ -95,10 +95,103 @@ hardware key or a remote-signer with a high water-mark, you may
 consider waiting until the target block height to shut down the old
 process and start the new one.)
 
+More details on fees and cost model
+-----------------------------------
+
+Protocol:
+~~~~~~~~~
+
+The creation of a tz{1,2,3} address now requires a burn of `ꜩ0.257`.
+
+Every manager operation now costs ``10000`` in gas, a transaction that
+creates a contract has a default cost of ``10100`` in gas.
+
+Example:
+::
+
+   Reveal:
+   Consumed gas: 10000
+   Consumed storage: 0 bytes
+
+   Transaction (when the target tz{1,2.3} is empty).
+   Consumed gas: 10100
+   Consumed storage: 277 bytes
+
+   Transaction (when the target tz{1,2.3} is not empty).
+   Consumed gas: 10000
+   Consumed storage: 0 bytes
+
+
+Baker
+~~~~~
+
+With newly introduced default settings, the bakers daemon will now
+require a minimal amount of fees per operation to accept manager
+operations such as transactions, revelations or originations.
+The expected amount depends on the operation sent. When considering
+the injection of an operation in a block, the baker will check its
+size and gas and reject it if the associated fees are too low.
+The expected fees are computed using this formula:
+::
+    fees >= (minimal_fees + minimal_nanotez_per_byte * size + minimal_nanotez_per_gas_unit * gas)
+
+Where the size is the number of bytes of the complete serialized
+operation, i.e. including header and signature.
+When sending multiple transactions at once (i.e. packed operations),
+the baker will require the summed fees of all the operations to match
+the summed gas of all the operations and the total size of the packed
+operations, still including header and signature.
+
+By default:
+::
+   minimal_fees = ꜩ0.000 1
+   minimal_nanotez_per_gas_unit = ꜩ0.000 000 1
+   minimal_nanotez_per_byte = ꜩ0.000 001
+
+For instance, a single transaction to an existing tz1 will require
+`ꜩ0.001 273` to be included.
+
+These settings may be changed by giving the options when starting a
+baker (``--minimal-fees <amount in tez>``,
+``--minimal-nanotez-per-gas-unit <amount in nanotez>``,
+``--minimal-nanotez-per-byte <amount in nanotez>``).
+Note that most bakers, such as the tezos foundation's ones, may use
+the default options and sending operations that does not respect the
+default limits are not expected to be included in blocks.
+
+These changes are especially important to delegates for rewards
+distribution. The safest way to send rewards is now to include the
+corresponding fees.
+
+Node
+~~~~
+
+The node now filters operations following the same principles as
+above. If an operation doesn't have enough fees to cover the above
+formula with the default values it is rejected and not included in the
+mempool. Hence an operation without fee won't even propagate through
+the network. The constant might be changed with the following RPC
+call:
+
+::
+
+   ./tezos-client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "0", "minimal_nanotez_per_gas_unit": "0", "minimal_nanotez_per_byte": "0" }'
+
+The constants used by the node and the baker are not necessarily equal.
+Still, the node needs to be less restrictive than the baker, otherwise
+the baker won't even see the operations.
+
+An injection node (i.e. a specific node targeted by wallet for
+injection operation) might deactivate the filter (by using the
+previous RPC call), in order to accept any operation and give them a
+chance to be propagated to a baker that is willing to accept fee-less
+operations.
+
+
 FAQ
 ---
 
-Q. Who should  apply this patch?
+Q. Who should apply this patch?
 
 A. Anyone running a node needs to update. If you are using a wallet
    that connects to a third party node, you do not need to apply a
