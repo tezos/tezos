@@ -702,7 +702,7 @@ let forge_block
 
   (* Now for some logging *)
   let total_op_count = List.length operations_arg in
-  let valid_op_count = List.length operations in
+  let valid_op_count = List.length (List.concat operations) in
   lwt_log_info Tag.DSL.(fun f ->
       f "Found %d valid operations (%d refused) for timestamp %a@.Computed fitness %a"
       -% t event "found_valid_operations"
