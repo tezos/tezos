@@ -153,7 +153,7 @@ By default:
    minimal_nanotez_per_gas_unit = 100 nꜩ/gu (0.000 000 1 ꜩ/gu)
    minimal_nanotez_per_byte = 1000 nꜩ/B (0.000 001 ꜩ/B)
 
-For instance, a single transaction to an existing implict address
+For instance, a single transaction to an existing implicit address
 will require a transaction fee of at least `0.001 273 ꜩ`
 to be included by bakers who choose to follow the default settings.
 
@@ -163,7 +163,7 @@ These settings may be changed by passing the following flags to the baker
 ``--minimal-nanotez-per-byte <amount in nanotez>``).
 
 Delegates distributing rewards should be aware of these thresholds
-for their transactions to be succesfully included.
+for their transactions to be successfully included.
 
 Node
 ~~~~
@@ -171,7 +171,7 @@ Node
 The node also filters operations following the same principles as
 above. If an operation does not carry sufficient fees, a node
 following the default setting will not include it in its mempool.
-mempool. Hence an operation without fee won't even propagate through
+Hence an operation without fee won't even propagate through
 the network. The constant can be changed with the following RPC
 call:
 
