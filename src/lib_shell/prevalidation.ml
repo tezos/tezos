@@ -300,6 +300,9 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
          (Preapply_result.empty, acc_validation_state)
          operations
        >>= fun (new_validation_result, new_validation_state) ->
+       (* Applied operations are reverted ; revert to the initial ordering *)
+       let new_validation_result =
+         { new_validation_result with applied = List.rev new_validation_result.applied } in
        Lwt.return (acc_validation_result @ [new_validation_result], new_validation_state)
     ) ([], validation_state) operations
   >>= fun (validation_result_list, validation_state) ->
