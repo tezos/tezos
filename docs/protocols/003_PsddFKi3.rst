@@ -103,7 +103,7 @@ The creation of a new tz{1,2,3} address now requires a burn of `ꜩ0.257`,
 in-line with the creation of KT account.
 
 Every manager operation now costs at least ``10000`` in gas,
-a transaction that creates an address has a default cost of ``10100`` in gas.
+a transaction has a default cost of ``10100`` in gas.
 
 Example::
 
@@ -116,7 +116,7 @@ Example::
    Consumed storage: 277 bytes
 
    Transaction (when the target tz{1,2.3} is not empty).
-   Consumed gas: 10000
+   Consumed gas: 10100
    Consumed storage: 0 bytes
 
 
