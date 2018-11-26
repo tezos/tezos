@@ -585,9 +585,6 @@ publish:doc:
     - alphanet
     - zeronet
     - mainnet
-    - alphanet-staging
-    - zeronet-staging
-    - mainnet-staging
   before_script:
     - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
     - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
