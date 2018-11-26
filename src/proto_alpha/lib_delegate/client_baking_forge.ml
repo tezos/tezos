@@ -467,7 +467,7 @@ let filter_and_apply_operations
     add_operation inc op >>= function
     | Error errs ->
         lwt_debug Tag.DSL.(fun f ->
-            f "Client-side validation: invalid operation filtered %a\n@[<v 4>%a@]"
+            f "@[<v 4>Client-side validation: invalid operation filtered %a@\n%a@]"
             -% t event "baking_rejected_invalid_operation"
             -% a Operation_hash.Logging.tag (Operation.hash_packed op)
             -% a errs_tag errs)
@@ -672,7 +672,16 @@ let forge_block
 
   inject_block cctxt
     ?force ~chain ~shell_header ~priority ?seed_nonce_hash ~src_sk
-    operations
+    operations >>= function
+  | Ok hash -> return hash
+  | Error errs as error ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "@[<v 4>Error while injecting block@ @[Included operations : %a@]@ %a@]"
+          -% t event "block_injection_failed"
+          -% a raw_operations_tag (List.concat operations)
+          -% a errs_tag errs
+        ) >>= fun () ->
+      Lwt.return error
 
 let shell_prevalidation
     (cctxt : #Proto_alpha.full)
@@ -965,26 +974,33 @@ let bake (cctxt : #Proto_alpha.full) state =
           State.record cctxt src_pkh level >>=? fun () ->
 
           inject_block cctxt ~chain ~force:true
-            ~shell_header ~priority ?seed_nonce_hash ~src_sk operations
-          |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
+            ~shell_header ~priority ?seed_nonce_hash ~src_sk operations >>= function
+          | Error errs ->
+              lwt_log_error Tag.DSL.(fun f ->
+                  f "@[<v 4>Error while injecting block@ @[Included operations : %a@]@ %a@]"
+                  -% t event "block_injection_failed"
+                  -% a raw_operations_tag (List.concat operations)
+                  -% a errs_tag errs
+                ) >>= fun () -> return_unit
 
-          lwt_log_notice Tag.DSL.(fun f ->
-              f "Injected block %a for %s after %a (level %a, priority %d, fitness %a, operations %a)."
-              -% t event "injected_block"
-              -% a Block_hash.Logging.tag block_hash
-              -% s Client_keys.Logging.tag name
-              -% a Block_hash.Logging.tag shell_header.predecessor
-              -% a level_tag level
-              -% s bake_priority_tag priority
-              -% a fitness_tag shell_header.fitness
-              -% a operations_tag operations
-            ) >>= fun () ->
+          | Ok block_hash ->
+              lwt_log_notice Tag.DSL.(fun f ->
+                  f "Injected block %a for %s after %a (level %a, priority %d, fitness %a, operations %a)."
+                  -% t event "injected_block"
+                  -% a Block_hash.Logging.tag block_hash
+                  -% s Client_keys.Logging.tag name
+                  -% a Block_hash.Logging.tag shell_header.predecessor
+                  -% a level_tag level
+                  -% s bake_priority_tag priority
+                  -% a fitness_tag shell_header.fitness
+                  -% a operations_tag operations
+                ) >>= fun () ->
 
-          begin if seed_nonce_hash <> None then
-              Client_baking_nonces.add cctxt block_hash seed_nonce
-              |> trace_exn (Failure "Error while recording nonce")
-            else return_unit end >>=? fun () ->
-          return_unit
+              begin if seed_nonce_hash <> None then
+                  Client_baking_nonces.add cctxt block_hash seed_nonce
+                  |> trace_exn (Failure "Error while recording nonce")
+                else return_unit end >>=? fun () ->
+              return_unit
     end
   | None -> (* Error while building a block *)
       lwt_log_error Tag.DSL.(fun f ->
