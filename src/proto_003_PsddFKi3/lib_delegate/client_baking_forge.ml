@@ -1151,7 +1151,10 @@ let get_unrevealed_nonces
           end >>= function
           | Error _ when silent -> return_none
           | Error err ->
-              cctxt#error "RPC error: %a" pp_print_error err >>= fun () ->
+              lwt_log_error Tag.DSL.(fun f ->
+                  f "RPC error: %a"
+                  -% t event "rpc_error_nonces"
+                  -% a errs_tag err) >>= fun () ->
               return_none
           | Ok _ as res -> Lwt.return res)
     blocks >>=? function
@@ -1204,7 +1207,7 @@ let create
   in
 
   let event_k cctxt state new_head =
-    reveal_potential_nonces cctxt (`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
+    reveal_potential_nonces ~silent:true cctxt (`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
     Tezos_baking_002_PsYLVpVv.Client_baking_forge.reveal_potential_nonces
       ~silent:true cctxt (`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
     compute_best_slot_on_current_level ?max_priority cctxt state new_head >>=? fun slot ->

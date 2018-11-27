@@ -1096,7 +1096,10 @@ let get_unrevealed_nonces
           end >>= function
           | Error _ when silent -> return_none
           | Error err ->
-              cctxt#error "RPC error: %a" pp_print_error err >>= fun () ->
+              lwt_log_error Tag.DSL.(fun f ->
+                  f "RPC error: %a"
+                  -% t event "rpc_error_nonces"
+                  -% a errs_tag err) >>= fun () ->
               return_none
           | Ok _ as res -> Lwt.return res)
     blocks >>=? function
