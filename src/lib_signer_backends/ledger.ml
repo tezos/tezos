@@ -271,7 +271,7 @@ module Ledger = struct
         return_some
           (create ?git_commit ~device_info ~version
              ~of_curve ~of_pkh ())
-    | _ -> return None
+    | _ -> return_none
 
   let of_hidapi ?id device_info h =
     let buf = Buffer.create 100 in
@@ -296,7 +296,7 @@ module Ledger = struct
               %a"
           device_info.Hidapi.path
           Ledgerwallet.Transport.pp_error e ;
-        return None
+        return_none
     | Ok ({ major; minor; patch; _ } as version) ->
         log_info "Found a %a application at [%s]"
           Ledgerwallet_tezos.Version.pp version device_info.path ;
