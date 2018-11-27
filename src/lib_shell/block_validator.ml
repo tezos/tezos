@@ -75,7 +75,6 @@ end
 module Worker = Worker.Make (Name) (Event) (Request) (Types)
 
 type t = Worker.infinite Worker.queue Worker.t
-type error += Closed = Worker.Closed
 
 let debug w =
   Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))

@@ -119,6 +119,11 @@ end
 
 (** {2 Worker group maker} *)
 
+(** An error returned when trying to communicate with a worker that
+    has been closed. *)
+type worker_name = {base: string; name:string}
+type Error_monad.error += Closed of worker_name
+
 (** Functor to build a group of workers.
     At that point, all the types are fixed and introspectable,
     but the actual parameters and event handlers can be tweaked
@@ -156,10 +161,6 @@ module type T = sig
 
   (** Create a table of workers. *)
   val create_table : 'kind buffer_kind -> 'kind table
-
-  (** An error returned when trying to communicate with a worker that
-      has been closed. *)
-  type Error_monad.error += Closed of Name.t
 
   (** The callback handlers specific to each worker instance. *)
   module type HANDLERS = sig
