@@ -973,7 +973,8 @@ let bake (cctxt : #Proto_alpha.full) state =
           lwt_log_error Tag.DSL.(fun f ->
               f "Level %a : previously baked"
               -% t event "double_bake_near_miss"
-              -% a level_tag level)  >>= return
+              -% a level_tag level) >>= fun () ->
+          return_unit
       | false ->
           (* Record baked blocks to prevent double baking and nonces to reveal later *)
           State.record cctxt src_pkh level >>=? fun () ->
@@ -985,8 +986,8 @@ let bake (cctxt : #Proto_alpha.full) state =
                   f "@[<v 4>Error while injecting block@ @[Included operations : %a@]@ %a@]"
                   -% t event "block_injection_failed"
                   -% a raw_operations_tag (List.concat operations)
-                  -% a errs_tag errs
-                ) >>= fun () -> return_unit
+                  -% a errs_tag errs) >>= fun () ->
+              return_unit
 
           | Ok block_hash ->
               lwt_log_notice Tag.DSL.(fun f ->
@@ -998,8 +999,7 @@ let bake (cctxt : #Proto_alpha.full) state =
                   -% a level_tag level
                   -% s bake_priority_tag priority
                   -% a fitness_tag shell_header.fitness
-                  -% a operations_tag operations
-                ) >>= fun () ->
+                  -% a operations_tag operations) >>= fun () ->
 
               begin if seed_nonce_hash <> None then
                   Client_baking_nonces.add cctxt block_hash seed_nonce
@@ -1171,8 +1171,7 @@ let reveal_potential_nonces cctxt new_head =
       lwt_warn Tag.DSL.(fun f ->
           f "Cannot read nonces: %a"
           -% t event "read_nonce_fail"
-          -% a errs_tag err)
-      >>= fun () ->
+          -% a errs_tag err) >>= fun () ->
       return_unit
 
 (** [create] starts the main loop of the baker. The loop monitors new blocks and
