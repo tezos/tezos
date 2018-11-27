@@ -478,34 +478,34 @@ let filter_and_apply_operations
             -% a Operation_hash.Logging.tag (Operation.hash_packed op)
             -% a errs_tag errs)
         >>= fun () ->
-        return_none
+        Lwt.return_none
     | Ok (resulting_state, _receipt) ->
-        return_some resulting_state
+        Lwt.return_some resulting_state
   in
   let filter_valid_operations inc ops =
-    fold_left_s (fun (inc, acc) op ->
-        validate_operation inc op >>=? function
-        | None -> return (inc, acc)
-        | Some inc' -> return (inc', op :: acc)
+    Lwt_list.fold_left_s (fun (inc, acc) op ->
+        validate_operation inc op >>= function
+        | None -> Lwt.return (inc, acc)
+        | Some inc' -> Lwt.return (inc', op :: acc)
       ) (inc, []) ops
   in
   (* Invalid endorsements are detected during block finalization *)
   let is_valid_endorsement inc endorsement =
-    validate_operation inc endorsement >>=? function
-    | None -> return_none
+    validate_operation inc endorsement >>= function
+    | None -> Lwt.return_none
     | Some inc' -> finalize_construction inc' >>= begin function
-        | Ok _ -> return_some endorsement
-        | Error _ -> return_none
+        | Ok _ -> Lwt.return_some endorsement
+        | Error _ -> Lwt.return_none
       end
   in
-  filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
-  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
+  filter_valid_operations initial_inc votes >>= fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>= fun (inc, anonymous) ->
   (* Retrieve the correct index order *)
   let managers = List.sort Proto_alpha.compare_operations managers in
   let overflowing_operations = List.sort Proto_alpha.compare_operations overflowing_operations in
-  filter_valid_operations inc (managers @  overflowing_operations) >>=? fun (inc, managers) ->
+  filter_valid_operations inc (managers @  overflowing_operations) >>= fun (inc, managers) ->
   (* Gives a chance to the endorser to fund their deposit in the current block *)
-  filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
+  Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements >>= fun endorsements ->
   finalize_construction inc >>=? fun _ ->
   let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
   tzforce state.constants >>=? fun
@@ -531,17 +531,17 @@ let filter_and_apply_operations
   (* Retrieve the correct index order *)
   let accepted_managers = List.sort Proto_alpha.compare_operations accepted_managers in
   (* Make sure we only keep valid operations *)
-  filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
-  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
-  filter_valid_operations inc accepted_managers >>=? fun (inc, accepted_managers) ->
-  filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
+  filter_valid_operations initial_inc votes >>= fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>= fun (inc, anonymous) ->
+  filter_valid_operations inc accepted_managers >>= fun (inc, accepted_managers) ->
+  Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements >>= fun endorsements ->
   (* Endorsements won't fail now *)
   fold_left_s (fun inc op ->
       add_operation inc op >>=? fun (inc, _receipt) ->
       return inc) inc endorsements >>=? fun inc ->
   (* Endorsement and double baking/endorsement evidence do not commute:
      we apply denunciation operations after endorsements. *)
-  filter_valid_operations inc evidences >>=? fun (final_inc, evidences) ->
+  filter_valid_operations inc evidences >>= fun (final_inc, evidences) ->
   let operations = List.map List.rev [ endorsements ; votes ; anonymous @ evidences ; accepted_managers ] in
   finalize_construction final_inc >>=? fun (validation_result, metadata) ->
   return (final_inc, (validation_result, metadata), operations)
@@ -743,7 +743,7 @@ let next_baking_delay state priority =
   return span
 
 let count_slots_endorsements inc (_timestamp, (head, _priority, _delegate)) operations =
-  fold_left_s (fun acc -> function
+  Lwt_list.fold_left_s (fun acc -> function
       | { Alpha_context.protocol_data =
             Operation_data { contents = Single (Endorsement { level }) }} as op
         when Raw_level.(level = head.Client_baking_blocks.level) ->
@@ -753,12 +753,12 @@ let count_slots_endorsements inc (_timestamp, (head, _priority, _delegate)) oper
             | Ok (_inc,
                   Operation_metadata
                     { contents = Single_result (Endorsement_result { slots })} ) ->
-                return (acc + List.length slots)
+                Lwt.return (acc + List.length slots)
             | Error _ | _ ->
                 (* We do not handle errors here *)
-                return acc
+                Lwt.return acc
           end
-      | _ -> return acc
+      | _ -> Lwt.return acc
     ) 0 operations
 
 let rec filter_limits tnow limits =
@@ -786,7 +786,7 @@ let fetch_operations
   | Some current_mempool ->
       let operations = ref (filter_outdated_endorsements head.Client_baking_blocks.level current_mempool) in
       Client_baking_simulator.begin_construction ~timestamp state.index head >>=? fun inc ->
-      count_slots_endorsements inc slot !operations >>=? fun nb_arrived_endorsements ->
+      count_slots_endorsements inc slot !operations >>= fun nb_arrived_endorsements ->
       tzforce state.constants >>=? fun { Constants.parametric = { endorsers_per_block }} ->
       (* If 100% of the endorsements arrived, we don't need to wait *)
       if (not state.await_endorsements) || nb_arrived_endorsements = endorsers_per_block then
@@ -832,7 +832,7 @@ let fetch_operations
           | `Event (Some op_list) -> begin
               last_get_event := None ;
               operations := op_list @ !operations ;
-              count_slots_endorsements inc slot op_list >>=? fun new_endorsements ->
+              count_slots_endorsements inc slot op_list >>= fun new_endorsements ->
               let nb_arrived_endorsements = nb_arrived_endorsements + new_endorsements in
               let limits = filter_limits (Time.now ()) limits in
               let required =
