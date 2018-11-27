@@ -30,9 +30,7 @@ Add RPCs for voting
 
 This patch introduces RPCs to query ballot status, functionality
 needed by bakers to interact with proposals to amend the protocol.
-They are the following:
-
-::
+They are the following::
 
    Sum of ballots cast so far during a voting period.
    GET /chains/<chain_id>/blocks/<block_id>/votes/ballots
@@ -107,8 +105,7 @@ in-line with the creation of KT account.
 Every manager operation now costs at least ``10000`` in gas,
 a transaction that creates an address has a default cost of ``10100`` in gas.
 
-Example:
-::
+Example::
 
    Reveal:
    Consumed gas: 10000
@@ -134,11 +131,12 @@ Bakers can thus decide of the settings that work best for them
 The minimal fee depends on the operation sent (transaction, origination,
 revelation, etc)
 
-When considering the injection of an operation in a block, the
-baker will check its size and gas and reject it if the associated fees are too low.
-The expected fees are computed using this formula:
-::
-    fees >= (minimal_fees + minimal_nanotez_per_byte * size + minimal_nanotez_per_gas_unit * gas)
+When considering the injection of an operation in a block, the baker
+will check its size and gas and reject it if the associated fees are
+too low.
+The expected fees are computed using this formula::
+
+   fees >= (minimal_fees + minimal_nanotez_per_byte * size + minimal_nanotez_per_gas_unit * gas)
 
 Where the size is the number of bytes of the complete serialized
 operation, i.e. including header and signature.
@@ -147,8 +145,8 @@ the baker will require the summed fees of all the operations to match
 the summed gas of all the operations and the total size of the packed
 operations, still including header and signature.
 
-By default:
-::
+By default::
+
    minimal_fees = 0.000 1 ꜩ (100 µꜩ)
    minimal_nanotez_per_gas_unit = 100 nꜩ/gu (0.000 000 1 ꜩ/gu)
    minimal_nanotez_per_byte = 1000 nꜩ/B (0.000 001 ꜩ/B)
@@ -173,9 +171,7 @@ above. If an operation does not carry sufficient fees, a node
 following the default setting will not include it in its mempool.
 Hence an operation without fee won't even propagate through
 the network. The constant can be changed with the following RPC
-call:
-
-::
+call::
 
    ./tezos-client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "0", "minimal_nanotez_per_gas_unit": "0", "minimal_nanotez_per_byte": "0" }'
 
@@ -229,9 +225,7 @@ Q. Why not mandate minimal transaction fees in the protocol?
 
 A. Transaction fees solve a slightly different problem, but they can
    help. If bakers wish to filter out transaction with low fees, they
-   can run the process by passing the flag:
-
-   ::
+   can run the process by passing the flag::
 
       --minimal-fees (default 0.000 1)
       --minimal-nanotez-per-byte (default 1000)
