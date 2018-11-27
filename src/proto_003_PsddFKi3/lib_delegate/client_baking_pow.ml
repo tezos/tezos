@@ -35,9 +35,6 @@ let generate_proof_of_work_nonce () =
      Rand.generate
        (Alpha_context.Constants.proof_of_work_nonce_size - is_updated_constant_len)]
 
-let generate_proof_of_work_nonce () =
-  Rand.generate Alpha_context.Constants.proof_of_work_nonce_size
-
 let empty_proof_of_work_nonce =
   MBytes.of_string
     (String.make Constants_repr.proof_of_work_nonce_size  '\000')
