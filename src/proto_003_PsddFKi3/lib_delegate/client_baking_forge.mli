@@ -118,7 +118,6 @@ val create:
 
 val get_unrevealed_nonces:
   #Proto_alpha.full ->
-  ?silent:bool ->
   ?force:bool ->
   ?chain:Chain_services.chain ->
   Block_services.block ->

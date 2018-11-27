@@ -1113,7 +1113,7 @@ let filter_outdated_nonces
 
 (** [get_unrevealed_nonces] retrieve registered nonces *)
 let get_unrevealed_nonces
-    (cctxt : #Proto_alpha.full) ?(silent = false) ?(force = false) ?(chain = `Main) head =
+    (cctxt : #Proto_alpha.full) ?(force = false) ?(chain = `Main) head =
   cctxt#with_lock begin fun () ->
     Client_baking_nonces.load cctxt
   end >>=? fun nonces ->
@@ -1124,36 +1124,103 @@ let get_unrevealed_nonces
       | None -> return_none
       | Some nonce ->
           begin
-            Alpha_block_services.metadata
-              cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
-            if force then
-              return_some (hash, (level.level, nonce))
-            else
-              Alpha_services.Nonce.get
-                cctxt (chain, head) level.level >>=? function
-              | Missing nonce_hash
-                when Nonce.check_hash nonce nonce_hash ->
-                  lwt_log_notice Tag.DSL.(fun f ->
-                      f "Found nonce to reveal for %a (level: %a)"
-                      -% t event "found_nonce"
-                      -% a Block_hash.Logging.tag hash
-                      -% a level_tag level.level)
-                  >>= fun () ->
-                  return_some (hash, (level.level, nonce))
-              | Missing _nonce_hash ->
+            Chain_services.Blocks.protocols
+              cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { next_protocol } ->
+            if Protocol_hash.equal next_protocol Tezos_client_003_PsddFKi3.Proto_alpha.hash then
+              Alpha_block_services.metadata
+                cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
+              if force then
+                return_some (hash, (level.level, nonce))
+              else
+                Alpha_services.Nonce.get
+                  cctxt (chain, head) level.level >>=? function
+                | Missing nonce_hash
+                  when Nonce.check_hash nonce nonce_hash ->
+                    lwt_log_notice Tag.DSL.(fun f ->
+                        f "Found nonce to reveal for %a (level: %a)"
+                        -% t event "found_nonce"
+                        -% a Block_hash.Logging.tag hash
+                        -% a level_tag level.level)
+                    >>= fun () ->
+                    return_some (hash, (level.level, nonce))
+                | Missing _nonce_hash ->
+                    lwt_log_error Tag.DSL.(fun f ->
+                        f "Incoherent nonce for level %a"
+                        -% t event "bad_nonce"
+                        -% a level_tag level.level)
+                    >>= fun () -> return_none
+                | Forgotten -> return_none
+                | Revealed _ -> return_none
+            else if Protocol_hash.equal next_protocol Tezos_client_002_PsYLVpVv.Proto_alpha.hash then
+              Tezos_client_002_PsYLVpVv.Proto_alpha.Alpha_block_services.metadata
+                cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
+              let level_003 =
+                let bytes =
+                  Data_encoding.Binary.to_bytes
+                    Tezos_client_002_PsYLVpVv.Proto_alpha.Alpha_context.Raw_level.encoding
+                    level.level in
+                match bytes with
+                | None -> None
+                | Some bytes -> Data_encoding.Binary.of_bytes Raw_level.encoding bytes in
+              match level_003 with
+              | None ->
                   lwt_log_error Tag.DSL.(fun f ->
-                      f "Incoherent nonce for level %a"
-                      -% t event "bad_nonce"
-                      -% a level_tag level.level)
+                      f "Could not convert level for block %a from proto 002 to proto 003"
+                      -% t event "inconvertible_nonce_level"
+                      -% a Block_hash.Logging.tag hash)
                   >>= fun () -> return_none
-              | Forgotten -> return_none
-              | Revealed _ -> return_none
+              | Some level_003 ->
+                  if force then
+                    return_some (hash, (level_003, nonce))
+                  else
+                    Tezos_client_002_PsYLVpVv.Proto_alpha.Alpha_services.Nonce.get
+                      cctxt (chain, head) level.level >>=? function
+                    | Missing nonce_hash ->
+                        let nonce_hash_003 =
+                          let bytes =
+                            Data_encoding.Binary.to_bytes
+                              Tezos_client_002_PsYLVpVv.Proto_alpha.Nonce_hash.encoding
+                              nonce_hash in
+                          match bytes with
+                          | None -> None
+                          | Some bytes -> Data_encoding.Binary.of_bytes Nonce_hash.encoding bytes in
+                        begin match nonce_hash_003 with
+                          | None ->
+                              lwt_log_error Tag.DSL.(fun f ->
+                                  f "Could not convert nonce for block %a from proto 002 to proto 003"
+                                  -% t event "inconvertible_nonce"
+                                  -% a Block_hash.Logging.tag hash)
+                              >>= fun () -> return_none
+                          | Some nonce_hash_003 ->
+                              if Nonce.check_hash nonce nonce_hash_003 then
+                                lwt_log_notice Tag.DSL.(fun f ->
+                                    f "Found nonce to reveal for %a (level: %a)"
+                                    -% t event "found_nonce"
+                                    -% a Block_hash.Logging.tag hash
+                                    -% a level_tag level_003)
+                                >>= fun () ->
+                                return_some (hash, (level_003, nonce))
+                              else
+                                lwt_log_error Tag.DSL.(fun f ->
+                                    f "Incoherent nonce for level %a"
+                                    -% t event "bad_nonce"
+                                    -% a level_tag level_003)
+                                >>= fun () -> return_none
+                        end
+                    | Forgotten -> return_none
+                    | Revealed _ -> return_none
+            else
+              lwt_log_error Tag.DSL.(fun f ->
+                  f "Unexpected protocol when revealing nonce for block %a"
+                  -% t event "nonce_from_an_unexpected_protocol"
+                  -% a Block_hash.Logging.tag hash)
+              >>= fun () -> return_none
           end >>= function
-          | Error _ when silent -> return_none
           | Error err ->
               lwt_log_error Tag.DSL.(fun f ->
-                  f "RPC error: %a"
-                  -% t event "rpc_error_nonces"
+                  f "@[<v 4>Error while revealing nonce for block %a@ %a@]"
+                  -% t event "error_revealing_nonces"
+                  -% a Block_hash.Logging.tag hash
                   -% a errs_tag err) >>= fun () ->
               return_none
           | Ok _ as res -> Lwt.return res)
@@ -1168,8 +1235,8 @@ let get_unrevealed_nonces
       return x
 
 (** [reveal_potential_nonces] reveal registered nonces *)
-let reveal_potential_nonces ?silent cctxt new_head =
-  get_unrevealed_nonces ?silent cctxt new_head >>= function
+let reveal_potential_nonces cctxt new_head =
+  get_unrevealed_nonces cctxt new_head >>= function
   | Ok nonces ->
       Client_baking_revelation.forge_seed_nonce_revelation
         cctxt new_head (List.map snd nonces)
@@ -1207,9 +1274,7 @@ let create
   in
 
   let event_k cctxt state new_head =
-    reveal_potential_nonces ~silent:true cctxt (`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
-    Tezos_baking_002_PsYLVpVv.Client_baking_forge.reveal_potential_nonces
-      ~silent:true cctxt (`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
+    reveal_potential_nonces cctxt (`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
     compute_best_slot_on_current_level ?max_priority cctxt state new_head >>=? fun slot ->
     state.best_slot <- slot ;
     return_unit
