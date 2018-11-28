@@ -149,6 +149,7 @@ in the :ref:`introduction <howtoget>`.
    api/cli-commands
    api/rpc
    api/errors
+   api/p2p
 
 Indices and tables
 ==================
