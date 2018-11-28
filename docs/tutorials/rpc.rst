@@ -48,9 +48,6 @@ simple HTTP request:
 
 
 An online :ref:`index <rpc_index>` of RPC calls is also available.
-The changes made in June 2018 for pre-Betanet are recapitulated in
-:ref:`this page<rpc_changes_june_2018>`.
-
 
 The general call of an RPC from the client is ``tezos-admin-client rpc
 (get|post) <url>``.

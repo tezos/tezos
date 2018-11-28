@@ -323,7 +323,7 @@ encoding type and a function to take a value of the encoded type and
 create an error value. A pretty printer can optionally be specified, but
 may also be omitted.
 
-The actual error monad and it’s tracing features can be seen in this
+The actual error monad and its tracing features can be seen in this
 function which parses contracts:
 
 .. code:: ocaml

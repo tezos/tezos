@@ -16,7 +16,7 @@ are immutable and garbage collected.
 
 A Michelson program receives as input a single element stack containing
 an input value and the contents of a storage space. It must return a
-single element stack containing aa output value a list of internal
+single element stack containing an output value, a list of internal
 operations, and the new contents of the storage space. Alternatively,
 a Michelson program can fail, explicitly using a specific opcode,
 or because something went wrong that could not be caught by the type
@@ -764,7 +764,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     :: nat : nat : 'S   ->   nat : 'S
 
-    > LSR / x : s : S  =>  (x >>> s) : S
+    > LSR / x : s : S  =>  (x >> s) : S
 
 -  ``COMPARE``: Integer/natural comparison
 
@@ -1019,7 +1019,7 @@ Operations on maps
 ::
 
     :: (map 'elt 'val) : 'A   ->  'A
-       iff   body :: [ (pair 'elt 'val) : 'A -> 'A ]
+       iff   body :: [ (pair 'elt 'val : 'A) -> 'A ]
 
     > ITER body / {} : S  =>  S
     > ITER body / { Elt k v ; <tl> } : S  =>  body ; ITER body / (Pair k v) : { <tl> } : S
@@ -1112,7 +1112,7 @@ Operations on unions
 
     > RIGHT / v : S  =>  (Right v) : S
 
--  ``IF_LEFT bt bf``: Inspect a value of a variant type.
+-  ``IF_LEFT bt bf``: Inspect a value of a union.
 
 ::
 
@@ -1123,7 +1123,7 @@ Operations on unions
     > IF_LEFT bt bf / (Left a) : S  =>  bt / a : S
     > IF_LEFT bt bf / (Right b) : S  =>  bf / b : S
 
--  ``IF_RIGHT bt bf``: Inspect a value of a variant type.
+-  ``IF_RIGHT bt bf``: Inspect a value of a union.
 
 ::
 
@@ -1153,7 +1153,7 @@ Operations on lists
 
     > NIL / S  =>  {} : S
 
--  ``IF_CONS bt bf``: Inspect an optional value.
+-  ``IF_CONS bt bf``: Inspect a list.
 
 ::
 
@@ -1344,7 +1344,7 @@ argument the transferred amount plus an ad-hoc argument and returns an
 ad-hoc value. The code also takes the global data and returns it to be
 stored and retrieved on the next transaction. These data are initialized
 by another parameter. The calling convention for the code is as follows:
-``(Pair arg globals)) -> (Pair operations globals)``, as extrapolated from
+``(Pair arg globals) -> (Pair operations globals)``, as extrapolated from
 the instruction type. The first parameters are the manager, optional
 delegate, then spendable and delegatable flags and finally the initial
 amount taken from the currently executed contract. The contract is
@@ -1370,7 +1370,7 @@ currently executed contract.
 ::
 
     :: key_hash : option key_hash : bool : mutez : 'S
-       ->   operation : contract unit : 'S
+       ->   operation : address : 'S
 
 Take as argument the manager, optional delegate, the delegatable flag
 and finally the initial amount taken from the currently executed
@@ -1917,7 +1917,7 @@ formats. Some have two variants accepted by the data type checker: a
 readable one in a string and an optimized.
 
 -  ``mutez`` amounts are written as naturals.
--  ``timestamp``\ s are written either using ``RFC 339`` notation
+-  ``timestamp``\ s are written either using ``RFC3339`` notation
    in a string (readable), or as the number of seconds since Epoch
    in a natural (optimized).
 -  ``contract``\ s, ``address``\ es, ``key``\ s and ``signature``\ s
@@ -2167,11 +2167,11 @@ annotations will see only their top-most stack type elements annotated.
 ::
 
    CREATE_ACCOUNT @op @addr
-   :: key_hash : option key_hash : bool : tez : 'S
+   :: key_hash : option key_hash : bool : mutez : 'S
       ->  @op operation : @addr address : 'S
 
    CREATE_ACCOUNT @op
-   :: key_hash : option key_hash : bool : tez : 'S
+   :: key_hash : option key_hash : bool : mutez : 'S
       ->  @op operation : address : 'S
 
 A no-op instruction ``RENAME`` allows to rename variables in the stack
@@ -2239,7 +2239,7 @@ and variable annotations).
 ::
 
    PAIR %fst %snd
-   :: 'a : 'b : 'S -> (pair ('a %fst) ('b %fst)) : 'S
+   :: 'a : 'b : 'S -> (pair ('a %fst) ('b %snd)) : 'S
 
    LEFT %left %right 'b
    :: 'a : 'S -> (or ('a %left) ('b %right)) : 'S
@@ -2403,7 +2403,7 @@ A similar mechanism is used for context dependent instructions:
 
    CONTRACT 'p  :: @a address : 'S   ->   @a.contract contract 'p : 'S
 
-   BALANCE :: 'S   ->   @balance tez : 'S
+   BALANCE :: 'S   ->   @balance mutez : 'S
 
    SOURCE  :: 'S   ->   @source address : 'S
 
@@ -2411,7 +2411,7 @@ A similar mechanism is used for context dependent instructions:
 
    SELF  :: 'S   ->   @self contract 'p : 'S
 
-   AMOUNT  :: 'S   ->   @amount tez : 'S
+   AMOUNT  :: 'S   ->   @amount mutez : 'S
 
    STEPS_TO_QUOTA  :: 'S   ->  @steps nat : 'S
 
@@ -2536,7 +2536,7 @@ Hence, the global data of the contract has the following type
 
     'g =
       pair
-        (pair timestamp tez)
+        (pair timestamp mutez)
         (pair (contract unit) (contract unit))
 
 Following the contract calling convention, the code is a lambda of type
@@ -2555,12 +2555,12 @@ written as
       (pair
          unit
          (pair
-           (pair timestamp tez)
+           (pair timestamp mutez)
            (pair (contract unit) (contract unit))))
       (pair
          (list operation)
          (pair
-            (pair timestamp tez)
+            (pair timestamp mutez)
             (pair (contract unit) (contract unit))))
 
 The complete source ``reservoir.tz`` is:
@@ -2570,7 +2570,7 @@ The complete source ``reservoir.tz`` is:
     parameter unit ;
     storage
       (pair
-         (pair (timestamp %T) (tez %N)) # T N
+         (pair (timestamp %T) (mutez %N)) # T N
          (pair (contract %A unit) (contract %B unit))) ; # A B
     code
       { CDR ; DUP ; CAAR %T; # T
@@ -2710,7 +2710,7 @@ of type
     pair
       (pair nat (pair timestamp timestamp))
       (pair
-         (pair tez tez)
+         (pair mutez mutez)
          (pair (pair account account) account))
 
 The 24 hours after timestamp ``Z`` are for the buyer and seller to store
@@ -2718,10 +2718,10 @@ their collateral ``(Q * C)``. For this, the contract takes a string as
 parameter, matching ``"buyer"`` or ``"seller"`` indicating the party for
 which the tokens are transferred. At the end of this day, each of them
 can send a transaction to send its tokens back. For this, we need to
-store who already paid and how much, as a ``(pair tez tez)`` where the
+store who already paid and how much, as a ``(pair mutez mutez)`` where the
 left component is the buyer and the right one the seller.
 
-After the first day, nothing cam happen until ``T``.
+After the first day, nothing can happen until ``T``.
 
 During the 24 hours after ``T``, the buyer must pay ``(Q * K)`` to the
 contract, minus the amount already sent.
@@ -2758,11 +2758,11 @@ of type
 ::
 
     pair
-      (pair nat (pair tez tez))
+      (pair nat (pair mutez mutez))
       (pair
          (pair nat (pair timestamp timestamp))
          (pair
-            (pair tez tez)
+            (pair mutez mutez)
             (pair (pair account account) account)))
 
 The parameter of the transaction will be either a transfer from the
@@ -2793,11 +2793,11 @@ The complete source ``forward.tz`` is:
       (or string nat) ;
     storage
       (pair
-         (pair nat (pair tez tez)) # counter from_buyer from_seller
+         (pair nat (pair mutez mutez)) # counter from_buyer from_seller
          (pair
             (pair nat (pair timestamp timestamp)) # Q T Z
             (pair
-               (pair tez tez) # K C
+               (pair mutez mutez) # K C
                (pair
                   (pair (contract unit) (contract unit)) # B S
                   (contract unit))))) ; # W
@@ -2947,7 +2947,7 @@ XII - Full grammar
       | <signature string constant>
       | <key string constant>
       | <key_hash string constant>
-      | <tez string constant>
+      | <mutez string constant>
       | <contract string constant>
       | Unit
       | True

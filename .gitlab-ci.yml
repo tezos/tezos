@@ -179,7 +179,7 @@ test:linkcheck:
     - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
     - sudo pip3 install 'idna<2.7'
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - make doc-linkcheck
+    - make doc-html-and-linkcheck
   allow_failure: true
 
 

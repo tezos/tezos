@@ -4,8 +4,8 @@ Proof-of-stake in Tezos
 =======================
 
 This document provides an in-depth description of the Tezos
-proof-of-stake algorithm. **WORK IN PROGRESS, CONSTANTS STILL SUBJECT TO
-ADJUSTMENT.**
+proof-of-stake algorithm as implemented in
+PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt
 
 Blocks
 ------
@@ -317,7 +317,7 @@ of a block reward.
 In the current protocol, accusations for the *same* incident can be made several
 times after the fact. This means that the deposits and rewards for the entire
 cycle are forfeited, including any deposit made, or reward earned, after
-he incident.
+the incident.
 
 Pragmatically, any baker who either double bakes or endorses in a given cycle
 should immediately stop both baking and endorsing for the rest of that cycle.

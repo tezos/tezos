@@ -122,11 +122,12 @@ that are used everywhere for basic operations.
    services: the structure of URLs and the expected formats for input
    and output bodies, via the use of ``data_encoding``.
  - :package:`tezos-crypto` wraps the external cryptography
-   libraries that we use. We try to use minimal references
-   implementations, with as thin as possible bindings. A possible plan
-   is to use libraries from the HACL project, so that all of our crypto
-   is extracted from Fstar, either with thin C bindings or directly in
-   OCaml.
+   libraries that we use. We try to use minimal reference
+   implementations, with as thin as possible bindings, and
+   rely on libraries from the
+   `HACL* project <https://github.com/project-everest/hacl-star>`_,
+   written and verified in the F* programming language, and extracted
+   to C.
  - :package:`tezos-micheline` is the concrete syntax used by
    Michelson, the language of smart contracts. It mostly contains the
    generic, untyped AST, a printer and a parser.
