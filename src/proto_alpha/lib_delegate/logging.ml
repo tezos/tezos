@@ -40,6 +40,14 @@ let operations_tag = Tag.def ~doc:"Block Operations" "operations"
        ~pp_sep:(fun ppf () -> Format.fprintf ppf "+")
        (fun ppf operations -> Format.fprintf ppf "%d" (List.length operations)))
 
+let raw_operations_tag = Tag.def ~doc:"Raw operations" "raw_operations"
+    (fun fmt raw_ops ->
+       let pp_op fmt op =
+         let json = Data_encoding.Json.construct Operation.raw_encoding op in
+         Format.fprintf fmt "%a" Data_encoding.Json.pp json
+       in
+       Format.fprintf fmt "@[<v>%a@]" (Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_op) raw_ops)
+
 let bake_op_count_tag = Tag.def ~doc:"Bake Operation Count" "operation_count" Format.pp_print_int
 
 let endorsement_slot_tag = Tag.def ~doc:"Endorsement Slot" "endorsement_slot" Format.pp_print_int

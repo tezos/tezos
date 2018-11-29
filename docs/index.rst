@@ -15,12 +15,12 @@ capability. Tezos not only comes to consensus about the state of its ledger,
 like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
 
- - Developer documentation is available online at https://tezos.gitlab.io/master
-   The documentation is automatically generated for the master branch and the
-   three official network branches `mainnet <https://tezos.gitlab.io/mainnet>`_,
-   `alphanet <https://tezos.gitlab.io/alphanet>`_,
-   `zeronet <https://tezos.gitlab.io/zeronet>`_. Make sure you are
-   consulting the right API version.
+ - Developer documentation is available online at
+   https://tezos.gitlab.io/master . The documentation is automatically
+   generated for the master branch, the main network `mainnet
+   <https://tezos.gitlab.io/mainnet>`_ and the test network `alphanet
+   <https://tezos.gitlab.io/alphanet>`_.
+   Make sure you are consulting the right version.
  - The website https://tezos.com/ contains more information about the project.
  - All development happens on GitLab at https://gitlab.com/tezos/tezos
 
@@ -121,6 +121,12 @@ in the :ref:`introduction <howtoget>`.
    whitedoc/validation
    whitedoc/michelson
    whitedoc/proof_of_stake
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Protocols:
+
+   protocols/003_PsddFKi3
 
 .. toctree::
    :maxdepth: 2

@@ -5,6 +5,7 @@ variables:
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
 
 stages:
+  - doc
   - build
   - test
   - packaging
@@ -579,15 +580,12 @@ publish:docker:
 
 publish:doc:
   image: ${build_deps_image_name}:${build_deps_image_version}
-  stage: publish
+  stage: doc
   only:
     - master
     - alphanet
     - zeronet
     - mainnet
-    - alphanet-staging
-    - zeronet-staging
-    - mainnet-staging
   before_script:
     - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
     - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8

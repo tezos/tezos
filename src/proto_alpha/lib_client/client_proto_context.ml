@@ -50,7 +50,9 @@ let transfer (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
     ?dry_run
     ?branch ~source ~src_pk ~src_sk ~destination ?arg
-    ~amount ~fee ?gas_limit ?storage_limit ?counter () =
+    ~amount ?fee ?gas_limit ?storage_limit ?counter
+    ~fee_parameter
+    () =
   begin match arg with
     | Some arg ->
         parse_expression arg >>=? fun { expanded = arg } ->
@@ -62,8 +64,10 @@ let transfer (cctxt : #Proto_alpha.full)
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ?branch ~source ~fee ?gas_limit ?storage_limit ?counter
-    ~src_pk ~src_sk contents >>=? fun (_oph, _op, result as res) ->
+    ?branch ~source ?fee ?gas_limit ?storage_limit ?counter
+    ~src_pk ~src_sk
+    ~fee_parameter
+    contents >>=? fun (_oph, _op, result as res) ->
   Lwt.return
     (Injection.originated_contracts (Single_result result)) >>=? fun contracts ->
   return (res, contracts)
@@ -71,7 +75,13 @@ let transfer (cctxt : #Proto_alpha.full)
 let reveal cctxt
     ~chain ~block ?confirmations
     ?dry_run
-    ?branch ~source ~src_pk ~src_sk ~fee () =
+    ?branch ~source ~src_pk ~src_sk ?fee
+    ~fee_parameter
+    () =
+  let compute_fee, fee =
+    match fee with
+    | None -> true, Tez.zero
+    | Some fee -> false, fee in
   Alpha_services.Contract.counter
     cctxt (chain, block) source >>=? fun pcounter ->
   let counter = Z.succ pcounter in
@@ -84,11 +94,13 @@ let reveal cctxt
       let contents =
         Single
           (Manager_operation { source ; fee ; counter ;
-                               gas_limit = Z.of_int 10_000 ; storage_limit = Z.zero ;
+                               gas_limit = Z.of_int ~- 1 ; storage_limit = Z.zero ;
                                operation = Reveal src_pk }) in
       Injection.inject_operation cctxt ~chain ~block ?confirmations
-        ?dry_run
-        ?branch ~src_sk contents >>=? fun (oph, op, result) ->
+        ?dry_run ?branch ~src_sk
+        ~compute_fee
+        ~fee_parameter
+        contents >>=? fun (oph, op, result) ->
       match Apply_results.pack_contents_list op result with
       | Apply_results.Single_and_result
           (Manager_operation _ as op, result) ->
@@ -98,13 +110,17 @@ let reveal cctxt
 let originate
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ?branch ~source ~src_pk ~src_sk ~fee
-    ?gas_limit ?storage_limit contents =
+    ?branch ~source ~src_pk ~src_sk ?fee
+    ?gas_limit ?storage_limit
+    ~fee_parameter
+    contents =
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ?branch ~source ~fee ?gas_limit ?storage_limit
-    ~src_pk ~src_sk contents >>=? fun (_oph, _op, result as res) ->
+    ?branch ~source ?fee ?gas_limit ?storage_limit
+    ~src_pk ~src_sk
+    ~fee_parameter
+    contents >>=? fun (_oph, _op, result as res) ->
   Lwt.return
     (Injection.originated_contracts (Single_result result)) >>=? function
   | [ contract ] -> return (res, contract)
@@ -117,7 +133,9 @@ let originate_account
     cctxt ~chain ~block ?confirmations
     ?dry_run
     ?branch ~source ~src_pk ~src_sk ~manager_pkh
-    ?(delegatable = false) ?delegate ~balance ~fee () =
+    ?(delegatable = false) ?delegate ~balance ?fee
+    ~fee_parameter
+    () =
   let origination =
     Origination { manager = manager_pkh ;
                   delegate ;
@@ -129,19 +147,25 @@ let originate_account
   originate
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ?branch ~source ~gas_limit:(Z.of_int 10_000) ~src_pk ~src_sk ~fee origination
+    ?branch ~source ~src_pk ~src_sk ?fee
+    ~fee_parameter
+    origination
 
 let delegate_contract cctxt
     ~chain ~block ?branch ?confirmations
     ?dry_run
     ~source ~src_pk ~src_sk
-    ~fee delegate_opt =
+    ?fee
+    ~fee_parameter
+    delegate_opt =
   let operation = Delegation delegate_opt in
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ?branch ~source ~fee ~gas_limit:(Z.of_int 10_000) ~storage_limit:Z.zero
-    ~src_pk ~src_sk operation >>=? fun res ->
+    ?branch ~source ?fee ~storage_limit:Z.zero
+    ~src_pk ~src_sk
+    ~fee_parameter
+    operation >>=? fun res ->
   return res
 
 let list_contract_labels
@@ -185,21 +209,28 @@ let get_manager
 let set_delegate
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ~fee contract ~src_pk ~manager_sk opt_delegate =
+    ?fee contract ~src_pk ~manager_sk
+    ~fee_parameter
+    opt_delegate =
   delegate_contract
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ~source:contract ~src_pk ~src_sk:manager_sk ~fee opt_delegate
+    ~source:contract ~src_pk ~src_sk:manager_sk ?fee
+    ~fee_parameter
+    opt_delegate
 
 let register_as_delegate
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ~fee ~manager_sk src_pk =
+    ?fee ~manager_sk
+    ~fee_parameter
+    src_pk =
   let source = Signature.Public_key.hash src_pk in
   delegate_contract
     cctxt ~chain ~block ?confirmations
     ?dry_run
-    ~source:(Contract.implicit_contract source) ~src_pk ~src_sk:manager_sk ~fee
+    ~source:(Contract.implicit_contract source) ~src_pk ~src_sk:manager_sk ?fee
+    ~fee_parameter
     (Some source)
 
 let source_to_keys (wallet : #Proto_alpha.full) ~chain ~block source =
@@ -218,7 +249,7 @@ let originate_contract
     ~chain ~block ?confirmations
     ?dry_run
     ?branch
-    ~fee
+    ?fee
     ?gas_limit
     ?storage_limit
     ~delegate
@@ -231,6 +262,7 @@ let originate_contract
     ~src_pk
     ~src_sk
     ~code
+    ~fee_parameter
     () =
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage) >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
@@ -246,7 +278,9 @@ let originate_contract
                   preorigination = None } in
   originate cctxt ~chain ~block ?confirmations
     ?dry_run
-    ?branch ~source ~src_pk ~src_sk ~fee ?gas_limit ?storage_limit origination
+    ?branch ~source ~src_pk ~src_sk ?fee ?gas_limit ?storage_limit
+    ~fee_parameter
+    origination
 
 type activation_key =
   { pkh : Ed25519.Public_key_hash.t ;
@@ -324,6 +358,7 @@ let inject_activate_operation
     cctxt ?confirmations
     ?dry_run
     ~chain ~block
+    ~fee_parameter:Injection.dummy_fee_parameter
     contents >>=? fun (oph, op, result) ->
   begin
     match confirmations with
@@ -349,7 +384,8 @@ let activate_account
     (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
     ?dry_run
-    ?(encrypted = false) ?force key name =
+    ?(encrypted = false) ?force
+    key name =
   read_key key >>=? fun (pkh, pk, sk) ->
   fail_unless (Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
     (failure "@[<v 2>Inconsistent activation key:@ \
