@@ -106,6 +106,7 @@ module type T = sig
 
   val status: t -> status tzresult Lwt.t
 
+  val validation_state: t -> Proto.validation_state
 end
 
 module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struct
@@ -238,6 +239,7 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
       applied_operations = pv.applied ;
     }
 
+  let validation_state { state } = state
 end
 
 let preapply ~predecessor ~timestamp ~protocol_data operations =
@@ -298,6 +300,9 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
          (Preapply_result.empty, acc_validation_state)
          operations
        >>= fun (new_validation_result, new_validation_state) ->
+       (* Applied operations are reverted ; revert to the initial ordering *)
+       let new_validation_result =
+         { new_validation_result with applied = List.rev new_validation_result.applied } in
        Lwt.return (acc_validation_result @ [new_validation_result], new_validation_state)
     ) ([], validation_state) operations
   >>= fun (validation_result_list, validation_state) ->

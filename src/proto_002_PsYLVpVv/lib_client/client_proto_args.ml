@@ -30,6 +30,7 @@ open Clic
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 type error += Bad_max_priority of string
 type error += Bad_fee_threshold of string
+type error += Bad_minimum_allowed_reserve of string
 type error += Bad_max_waiting_time of string
 type error += Bad_endorsement_delay of string
 type error += Bad_preserved_levels of string
@@ -69,6 +70,16 @@ let () =
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_fee_threshold parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_fee_threshold parameter) ;
+  register_error_kind
+    `Permanent
+    ~id:"badMinimumAllowedReserveArg"
+    ~title:"Bad -minimum-allowed-reserve arg"
+    ~description:("invalid amount in -minimum-allowed-reserve")
+    ~pp:(fun ppf literal ->
+        Format.fprintf ppf "invalid amount '%s' in -minimum-allowed-reserve" literal)
+    Data_encoding.(obj1 (req "parameter" string))
+    (function Bad_minimum_allowed_reserve parameter -> Some parameter | _ -> None)
+    (fun parameter -> Bad_minimum_allowed_reserve parameter) ;
   register_error_kind
     `Permanent
     ~id:"badMaxWaitingTimeArg"
@@ -255,6 +266,16 @@ let fee_threshold_arg =
          match Tez.of_string s with
          | Some t -> return t
          | None -> fail (Bad_fee_threshold s)))
+
+let minimum_allowed_reserve_arg =
+  arg
+    ~long:"minimum-allowed-reserve"
+    ~placeholder:"amount"
+    ~doc:"exclude operations that leaves a balance between 1 mutez and this threshold (in mutez)"
+    (parameter (fun _ s ->
+         match Tez.of_string s with
+         | Some t -> return t
+         | None -> fail (Bad_minimum_allowed_reserve s)))
 
 let max_waiting_time_arg =
   default_arg

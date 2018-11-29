@@ -190,6 +190,39 @@ val args11 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) ar
   ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k, 'ctx) options
 
+(** Include 12 optional parameters *)
+val args12 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
+  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
+  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l, 'ctx) options
+
+(** Include 13 optional parameters *)
+val args13 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
+  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
+  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg -> ('m, 'ctx) arg ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm, 'ctx) options
+
+(** Include 14 optional parameters *)
+val args14 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
+  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
+  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg ->
+  ('m, 'ctx) arg -> ('n, 'ctx) arg ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n, 'ctx) options
+
+(** Include 15 optional parameters *)
+val args15 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
+  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
+  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg ->
+  ('m, 'ctx) arg -> ('n, 'ctx) arg -> ('o, 'ctx) arg ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n * 'o, 'ctx) options
+
+(** Include 16 optional parameters *)
+val args16 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
+  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
+  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg ->
+  ('m, 'ctx) arg -> ('n, 'ctx) arg -> ('o, 'ctx) arg -> ('p, 'ctx) arg ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n * 'o * 'p, 'ctx) options
+
 (** {2 Parameter based command lines} *)
 
 (** Type of parameters for a command *)

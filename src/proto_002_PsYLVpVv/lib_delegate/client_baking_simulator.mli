@@ -41,6 +41,6 @@ val check_context_consistency : Context.index -> Context_hash.t -> unit tzresult
 
 val begin_construction : timestamp:Time.t -> ?protocol_data: block_header_data -> Context.index -> Client_baking_blocks.block_info -> incremental tzresult Lwt.t
 
-val add_operation : incremental -> Operation.packed -> incremental tzresult Lwt.t
+val add_operation : incremental -> Operation.packed -> (incremental * operation_receipt) tzresult Lwt.t
 
-val finalize_construction : incremental -> (T.validation_result * LiftedMain.block_header_metadata) tzresult Lwt.t 
+val finalize_construction : incremental -> (T.validation_result * LiftedMain.block_header_metadata) tzresult Lwt.t

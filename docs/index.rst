@@ -124,6 +124,12 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
+   :caption: Protocols:
+
+   protocols/003_PsddFKi3
+
+.. toctree::
+   :maxdepth: 2
    :caption: Developer Tutorials:
 
    tutorials/rpc

@@ -1,0 +1,16 @@
+(library
+ (name tezos_mempool_002_PsYLVpVv)
+ (public_name tezos-mempool-002-PsYLVpVv)
+ (libraries tezos-base
+            tezos-embedded-protocol-002-PsYLVpVv)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_raw_protocol_002_PsYLVpVv
+                   -open Tezos_embedded_protocol_002_PsYLVpVv
+                   -open Tezos_embedded_protocol_environment_002_PsYLVpVv)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

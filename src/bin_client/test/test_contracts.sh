@@ -9,6 +9,7 @@ source $test_dir/test_lib.inc.sh "$@"
 start_node 1
 activate_alpha
 
+
 $client -w none config update
 
 bake
@@ -226,7 +227,7 @@ assert_storage $contract_dir/steps_to_quota.tz 111 Unit 399813
 # Typing gas bounds checks
 assert_fails $client originate contract first_explosion for bootstrap1 \
              transferring 0 from bootstrap1 \
-             running '{parameter unit;storage unit;code{DROP;PUSH nat 0;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;}}' -G 8000
+             running '{parameter unit;storage unit;code{DROP;PUSH nat 0;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;DUP;PAIR;}}' -G 8000 --burn-cap 10
 
 # Serialization gas bounds checks
 assert_success $client run script  '{parameter (list int);storage (list (list (list int)));code{CAR;DIP{NIL (list int)};DUP;ITER{DROP;DUP;DIP{CONS}};DROP;DIP{NIL (list (list int))};DUP;ITER{DROP;DUP;DIP{CONS}};DROP;NIL operation;PAIR}}' \
@@ -354,22 +355,22 @@ assert_storage $contract_dir/hash_key.tz None '"edpkuJqtDcA2m2muMxViSM47MPsGQzmy
                '(Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k")'
 
 
-bake_after $client transfer 1,000 from bootstrap1 to $key1
-bake_after $client transfer 2,000 from bootstrap1 to $key2
+bake_after $client transfer 1,000 from bootstrap1 to $key1 --burn-cap 0.257
+bake_after $client transfer 2,000 from bootstrap1 to $key2 --burn-cap 0.257
 
 assert_balance $key1 "1000 ꜩ"
 assert_balance $key2 "2000 ꜩ"
 
 # Create a contract and transfer 100 ꜩ to it
 init_with_transfer $contract_dir/store_input.tz $key1 '""' 100 bootstrap1
-bake_after $client transfer 100 from bootstrap1 to store_input -arg '"abcdefg"'
+bake_after $client transfer 100 from bootstrap1 to store_input -arg '"abcdefg"' --burn-cap 0.007
 assert_balance store_input "200 ꜩ"
 assert_storage_contains store_input '"abcdefg"'
 bake_after $client transfer 100 from bootstrap1 to store_input -arg '"xyz"'
 assert_storage_contains store_input '"xyz"'
 
 init_with_transfer $contract_dir/transfer_amount.tz $key1 '0' "100" bootstrap1
-bake_after $client transfer 500 from bootstrap1 to transfer_amount -arg Unit
+bake_after $client transfer 500 from bootstrap1 to transfer_amount -arg Unit --burn-cap 0.004
 assert_storage_contains transfer_amount 500
 
 # This tests the `NOW` instruction.
@@ -398,8 +399,8 @@ assert_storage $contract_dir/diff_timestamps.tz 111 '(Pair "1970-01-01T00:03:20Z
 
 
 # Tests TRANSFER_TO
-bake_after $client originate account "test_transfer_account1" for $key1 transferring 100 from bootstrap1
-bake_after $client originate account "test_transfer_account2" for $key1 transferring 20 from bootstrap1
+bake_after $client originate account "test_transfer_account1" for $key1 transferring 100 from bootstrap1 --burn-cap 10
+bake_after $client originate account "test_transfer_account2" for $key1 transferring 20 from bootstrap1 --burn-cap 10
 init_with_transfer $contract_dir/transfer_to.tz $key2 Unit 1,000 bootstrap1
 assert_balance test_transfer_account1 "100 ꜩ"
 bake_after $client transfer 100 from bootstrap1 to transfer_to \
@@ -412,13 +413,13 @@ assert_balance test_transfer_account2 "120 ꜩ" # Why isn't this 120 ꜩ? Baking
 
 # Test replay prevention
 init_with_transfer $contract_dir/replay.tz $key2 Unit 0 bootstrap1
-assert_fails $client transfer 0 from bootstrap1 to replay
+assert_fails $client transfer 0 from bootstrap1 to replay --burn-cap 1
 
 # Tests create_account
 init_with_transfer $contract_dir/create_account.tz $key2 None 1,000 bootstrap1
 assert_balance create_account "1000 ꜩ"
 created_account=\
-`$client transfer 100 from bootstrap1 to create_account -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' \
+`$client transfer 100 from bootstrap1 to create_account -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' --burn-cap 0.284 \
 | grep 'New contract' \
 | sed -E 's/.*(KT1[a-zA-Z0-9]+).*/\1/' \
 | head -1`
@@ -427,10 +428,10 @@ assert_balance $created_account "100 ꜩ"
 assert_balance create_account "1000 ꜩ"
 
 # Creates a contract, transfers data to it and stores the data
-init_with_transfer $contract_dir/create_contract.tz $key2 Unit 1,000 bootstrap1
+init_with_transfer $contract_dir/create_contract.tz $key2 Unit 1,000 bootstrap1 --burn-cap 0.004
 assert_balance create_contract "1000 ꜩ"
 created_contract=\
-`$client transfer 0 from bootstrap1 to create_contract -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' \
+`$client transfer 0 from bootstrap1 to create_contract -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' --burn-cap 0.305 \
 | grep 'New contract' \
 | sed -E 's/.*(KT1[a-zA-Z0-9]+).*/\1/' \
 | head -1`
@@ -445,7 +446,7 @@ init_with_transfer $contract_dir/default_account.tz $key1 \
 bake_after $client transfer 0 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\""
 assert_balance $BOOTSTRAP4_IDENTITY "4000100 ꜩ"
 account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
-bake_after $client transfer 0 from bootstrap1 to default_account  -arg "\"$account\""
+bake_after $client transfer 0 from bootstrap1 to default_account  -arg "\"$account\"" --burn-cap 0.257
 assert_balance $account "100 ꜩ"
 
 # Test SELF
@@ -458,11 +459,11 @@ assert_storage_contains self "\"$(get_contract_addr self)\""
 init_with_transfer $contract_dir/reveal_signed_preimage.tz bootstrap1 \
 				   '(Pair 0x9995c2ef7bcc7ae3bd15bdd9b02dc6e877c27b26732340d641a4cbc6524813bb "p2pk66uq221795tFxT7jfNmXtBMdjMf6RAaxRTwv1dbuSHbH6yfqGwz")' 1,000 bootstrap1
 assert_fails $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
-             '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972 "p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8")'
+             '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972 "p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8")' --burn-cap 1
 assert_fails $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
-             '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8")'
+             '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8")' --burn-cap 1
 assert_success $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
-               '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")'
+               '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972203f "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")' --burn-cap 1
 bake
 
 # Test comparisons on bytes { EQ ; GT ; LT ; GE ; LE }
@@ -476,31 +477,31 @@ init_with_transfer $contract_dir/slices.tz bootstrap1 \
 				   '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"' 1,000 bootstrap1
 
 assert_fails $client transfer 0 from bootstrap1 to slices -arg \
-        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")'
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")' --burn-cap 1
 assert_fails $client transfer 0 from bootstrap1 to slices -arg \
-        '(Pair 0xeaa9ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+        '(Pair 0xeaa9ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")' --burn-cap 1
 assert_fails $client transfer 0 from bootstrap1 to slices -arg \
-        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2deaad01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2deaad01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")' --burn-cap 1
 assert_fails $client transfer 0 from bootstrap1 to slices -arg \
-        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150733eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150733eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")' --burn-cap 1
 assert_fails $client transfer 0 from bootstrap1 to slices -arg \
-        '(Pair 0xe009ab79e8b84ef0 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+        '(Pair 0xe009ab79e8b84ef0 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")' --burn-cap 1
 assert_success $client transfer 0 from bootstrap1 to slices -arg \
-        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")'
+        '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")' --burn-cap 1
 bake
 
 init_with_transfer $contract_dir/split_string.tz bootstrap1 '{}' 1,000 bootstrap1
 
-bake_after $client transfer 0 from bootstrap1 to split_string -arg '"abc"'
+bake_after $client transfer 0 from bootstrap1 to split_string -arg '"abc"' --burn-cap 0.018
 assert_storage_contains split_string '{ "a" ; "b" ; "c" }'
-bake_after $client transfer 0 from bootstrap1 to split_string -arg '"def"'
+bake_after $client transfer 0 from bootstrap1 to split_string -arg '"def"' --burn-cap 0.018
 assert_storage_contains split_string '{ "a" ; "b" ; "c" ; "d" ; "e" ; "f" }'
 
 init_with_transfer $contract_dir/split_bytes.tz bootstrap1 '{}' 1,000 bootstrap1
 
-bake_after $client transfer 0 from bootstrap1 to split_bytes -arg '0xaabbcc'
+bake_after $client transfer 0 from bootstrap1 to split_bytes -arg '0xaabbcc' --burn-cap 0.018
 assert_storage_contains split_bytes '{ 0xaa ; 0xbb ; 0xcc }'
-bake_after $client transfer 0 from bootstrap1 to split_bytes -arg '0xddeeff'
+bake_after $client transfer 0 from bootstrap1 to split_bytes -arg '0xddeeff' --burn-cap 0.018
 assert_storage_contains split_bytes '{ 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }'
 
 # Test SET_DELEGATE
@@ -512,15 +513,15 @@ init_with_transfer $contract_dir/vote_for_delegate.tz bootstrap1 \
 				   "(Pair (Pair \"$b3\" None) (Pair \"$b4\" None))" 1,000 bootstrap1
 $client get delegate for vote_for_delegate | assert_in_output none
 
-assert_fails $client transfer 0 from bootstrap1 to vote_for_delegate -arg None
-assert_fails $client transfer 0 from bootstrap2 to vote_for_delegate -arg None
-bake_after $client transfer 0 from bootstrap3 to vote_for_delegate -arg "(Some \"$b5\")"
+assert_fails $client transfer 0 from bootstrap1 to vote_for_delegate -arg None --burn-cap 1
+assert_fails $client transfer 0 from bootstrap2 to vote_for_delegate -arg None --burn-cap 1
+bake_after $client transfer 0 from bootstrap3 to vote_for_delegate -arg "(Some \"$b5\")" --burn-cap 0.026
 assert_storage_contains vote_for_delegate "\"$b5\""
 $client get delegate for vote_for_delegate | assert_in_output none
-bake_after $client transfer 0 from bootstrap4 to vote_for_delegate -arg "(Some \"$b2\")"
+bake_after $client transfer 0 from bootstrap4 to vote_for_delegate -arg "(Some \"$b2\")" --burn-cap 0.026
 assert_storage_contains vote_for_delegate "\"$b2\""
 $client get delegate for vote_for_delegate | assert_in_output none
-bake_after $client transfer 0 from bootstrap4 to vote_for_delegate -arg "(Some \"$b5\")"
+bake_after $client transfer 0 from bootstrap4 to vote_for_delegate -arg "(Some \"$b5\")" --burn-cap 0.026
 $client get delegate for vote_for_delegate | assert_in_output "$b5"
 
 # Test sets and map literals
@@ -544,26 +545,26 @@ assert_storage $contract_dir/hash_consistency_checker.tz '0x00' \
 init_with_transfer $contract_dir/guestbook.tz $key1\
                    '{ Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" None }' \
                    100 bootstrap1
-assert_fails $client transfer 0 from bootstrap2 to guestbook -arg '"Pas moi"'
-bake_after $client transfer 0 from bootstrap1 to guestbook -arg '"Coucou"'
+assert_fails $client transfer 0 from bootstrap2 to guestbook -arg '"Pas moi"' --burn-cap 1
+bake_after $client transfer 0 from bootstrap1 to guestbook -arg '"Coucou"' --burn-cap 1
 assert_storage_contains guestbook '{ Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" (Some "Coucou") }'
-assert_fails $client transfer 0 from bootstrap3 to guestbook -arg '"Pas moi non plus"'
-assert_fails $client transfer 0 from bootstrap1 to guestbook -arg '"Recoucou ?"'
+assert_fails $client transfer 0 from bootstrap3 to guestbook -arg '"Pas moi non plus"' --burn-cap 1
+assert_fails $client transfer 0 from bootstrap1 to guestbook -arg '"Recoucou ?"' --burn-cap 1
 
 # Test for big maps
 init_with_transfer $contract_dir/big_map_mem.tz $key1\
                    '(Pair { Elt 1 Unit ; Elt 2 Unit ; Elt 3 Unit } Unit)' \
                    100 bootstrap1
-bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 False)'
-assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 True)'
-bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 True)'
-assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 False)'
-bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 True)'
-assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 False)'
-bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 True)'
-assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 False)'
-bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 False)'
-assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 True)'
+bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 False)' --burn-cap 1
+assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 True)' --burn-cap 1
+bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 True)' --burn-cap 1
+assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 False)' --burn-cap 1
+bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 True)' --burn-cap 1
+assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 False)' --burn-cap 1
+bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 True)' --burn-cap 1
+assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 False)' --burn-cap 1
+bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 False)' --burn-cap 1
+assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 True)' --burn-cap 1
 assert_fails $client typecheck data '3' against type \
              '(int @aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'
 $client typecheck data '3' against type \
@@ -573,13 +574,13 @@ init_with_transfer $contract_dir/big_map_get_add.tz $key1\
                    '(Pair { Elt 0 1 ; Elt 1 2 ; Elt 2 3 } Unit)' \
                    100 bootstrap1
 
-bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 (Some 2)) (Pair 200 (Some 2)))'
-bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 200 None))'
-bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 300 None))'
-bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 None) (Pair 200 None))'
-bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 (Some 2)) (Pair 0 (Some 1)))'
-bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 400 (Some 1232)) (Pair 400 (Some 1232)))'
-bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 401 (Some 0)) (Pair 400 (Some 1232)))'
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 (Some 2)) (Pair 200 (Some 2)))' --burn-cap 1
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 200 None))' --burn-cap 1
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 300 None))' --burn-cap 1
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 None) (Pair 200 None))' --burn-cap 1
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 (Some 2)) (Pair 0 (Some 1)))' --burn-cap 1
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 400 (Some 1232)) (Pair 400 (Some 1232)))' --burn-cap 1
+bake_after $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 401 (Some 0)) (Pair 400 (Some 1232)))' --burn-cap 1
 
 # Test for issue #262
 tee /tmp/bug_262.tz <<EOF

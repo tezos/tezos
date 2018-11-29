@@ -129,7 +129,7 @@ init_contract_from_file () {
 }
 
 bake () {
-    $client bake for bootstrap1 --max-priority 512 --minimal-timestamp
+    $client bake for bootstrap1 --max-priority 512 --minimal-timestamp --minimal-fees 0 --minimal-nanotez-per-byte 0 --minimal-nanotez-per-gas-unit 0
 }
 
 bake_after () {
@@ -147,7 +147,7 @@ init_with_transfer () {
     echo "Originating [$NAME]"
     $client originate contract ${NAME} \
             for ${KEY} transferring "${TRANSFER_AMT}" \
-            from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}"
+            from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}" --burn-cap 10
     bake
 }
 
