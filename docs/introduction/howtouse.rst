@@ -24,7 +24,7 @@ protocol which is always called `alpha` while Mainnet must also
 support all past protocols.
 For this reason the name of the 3 daemons in Mainnet contains the
 incremental number and the partial hash of the protocol they are bound
-to, such as ``tezos-{baker,endorser,accuser}-002-PsYLVpVv``.
+to, such as ``tezos-{baker,endorser,accuser}-003-PsddFKi3``.
 
 
 Read The Friendly Manual

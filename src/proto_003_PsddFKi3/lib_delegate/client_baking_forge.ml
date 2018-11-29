@@ -1151,64 +1151,6 @@ let get_unrevealed_nonces
                     >>= fun () -> return_none
                 | Forgotten -> return_none
                 | Revealed _ -> return_none
-            else if Protocol_hash.equal next_protocol Tezos_client_002_PsYLVpVv.Proto_alpha.hash then
-              Tezos_client_002_PsYLVpVv.Proto_alpha.Alpha_block_services.metadata
-                cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
-              let level_003 =
-                let bytes =
-                  Data_encoding.Binary.to_bytes
-                    Tezos_client_002_PsYLVpVv.Proto_alpha.Alpha_context.Raw_level.encoding
-                    level.level in
-                match bytes with
-                | None -> None
-                | Some bytes -> Data_encoding.Binary.of_bytes Raw_level.encoding bytes in
-              match level_003 with
-              | None ->
-                  lwt_log_error Tag.DSL.(fun f ->
-                      f "Could not convert level for block %a from proto 002 to proto 003"
-                      -% t event "inconvertible_nonce_level"
-                      -% a Block_hash.Logging.tag hash)
-                  >>= fun () -> return_none
-              | Some level_003 ->
-                  if force then
-                    return_some (hash, (level_003, nonce))
-                  else
-                    Tezos_client_002_PsYLVpVv.Proto_alpha.Alpha_services.Nonce.get
-                      cctxt (chain, head) level.level >>=? function
-                    | Missing nonce_hash ->
-                        let nonce_hash_003 =
-                          let bytes =
-                            Data_encoding.Binary.to_bytes
-                              Tezos_client_002_PsYLVpVv.Proto_alpha.Nonce_hash.encoding
-                              nonce_hash in
-                          match bytes with
-                          | None -> None
-                          | Some bytes -> Data_encoding.Binary.of_bytes Nonce_hash.encoding bytes in
-                        begin match nonce_hash_003 with
-                          | None ->
-                              lwt_log_error Tag.DSL.(fun f ->
-                                  f "Could not convert nonce for block %a from proto 002 to proto 003"
-                                  -% t event "inconvertible_nonce"
-                                  -% a Block_hash.Logging.tag hash)
-                              >>= fun () -> return_none
-                          | Some nonce_hash_003 ->
-                              if Nonce.check_hash nonce nonce_hash_003 then
-                                lwt_log_notice Tag.DSL.(fun f ->
-                                    f "Found nonce to reveal for %a (level: %a)"
-                                    -% t event "found_nonce"
-                                    -% a Block_hash.Logging.tag hash
-                                    -% a level_tag level_003)
-                                >>= fun () ->
-                                return_some (hash, (level_003, nonce))
-                              else
-                                lwt_log_error Tag.DSL.(fun f ->
-                                    f "Incoherent nonce for level %a"
-                                    -% t event "bad_nonce"
-                                    -% a level_tag level_003)
-                                >>= fun () -> return_none
-                        end
-                    | Forgotten -> return_none
-                    | Revealed _ -> return_none
             else
               lwt_log_error Tag.DSL.(fun f ->
                   f "Unexpected protocol when revealing nonce for block %a"
