@@ -20,7 +20,7 @@ depends: [
 build: [
   [ "rm" "dune" "src/dune" ]
   [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_protocol_template" "dune" ]
-  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"alpha\"/" "dune" ]
+  [ "sed" "-i.old" "s/let predefined_version = None/let predefined_version = Some \"003_PsddFKi3\"/" "dune" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 build-test: [
