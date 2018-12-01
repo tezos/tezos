@@ -104,7 +104,7 @@ module Conf = struct
 
   let root = Irmin.Private.Conf.root
   let mapsize =
-    Irmin.Private.Conf.key "mapsize" int64_converter 40_960_000_000L
+    Irmin.Private.Conf.key "mapsize" int64_converter 400_960_000_000L
   let readonly = 
     Irmin.Private.Conf.key "readonly" bool_converter false 
 
