@@ -821,6 +821,14 @@ let roman_of_decimal decimal =
       digit "I" "V" "X" x in
   String.concat "" (to_roman decimal)
 
+let dxiiivp_roman_of_decimal decimal =
+  let roman = roman_of_decimal decimal in
+  if String.length roman = 1 then
+    (* too short for D*P, fall back to IIIII... *)
+    String.concat "" (List.init decimal (fun _ -> "I"))
+  else
+    roman
+
 let unexpand_dxiiivp expanded =
   match expanded with
   | Seq (loc,
@@ -831,7 +839,7 @@ let unexpand_dxiiivp expanded =
         | Seq (_, [ Prim (_, "DIP", [ sub ], []) ]) -> count (acc + 1) sub
         | sub -> (acc, sub) in
       let depth, sub = count 1 sub in
-      let name = "D" ^ roman_of_decimal depth ^ "P" in
+      let name = "D" ^ dxiiivp_roman_of_decimal depth ^ "P" in
       Some (Prim (loc, name, [ sub ], []))
   | _ -> None
 
