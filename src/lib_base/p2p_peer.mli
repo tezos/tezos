@@ -87,7 +87,7 @@ module Pool_event : sig
     | Request_rejected
     (** The remote peer rejected our connection. *)
     | Connection_established
-    (** We succesfully established a authentified connection. *)
+    (** We successfully established a authentified connection. *)
     | Disconnection
     (** We decided to close the connection. *)
     | External_disconnection

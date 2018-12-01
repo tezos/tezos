@@ -202,7 +202,7 @@ module Pool_event : sig
 
   val wait_new_connection: ('msg, 'peer_meta,'conn_meta) pool -> unit Lwt.t
   (** [wait_new_connection pool] is determined when a new connection is
-      succesfully established in the pool. *)
+      successfully established in the pool. *)
 
 end
 

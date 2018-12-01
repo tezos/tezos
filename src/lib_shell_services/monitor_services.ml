@@ -60,7 +60,7 @@ module S = struct
 
   let valid_blocks =
     RPC_service.get_service
-      ~description:"Monitor all blocks that are succesfully validated \
+      ~description:"Monitor all blocks that are successfully validated \
                     by the node, disregarding whether they were \
                     selected as the new head or not."
       ~query: valid_blocks_query
@@ -82,7 +82,7 @@ module S = struct
 
   let heads =
     RPC_service.get_service
-      ~description:"Monitor all blocks that are succesfully validated \
+      ~description:"Monitor all blocks that are successfully validated \
                     by the node and selected as the new head of the \
                     given chain."
       ~query: heads_query
@@ -95,7 +95,7 @@ module S = struct
   let protocols =
     RPC_service.get_service
       ~description:"Monitor all economic protocols that are retrieved \
-                    and succesfully loaded and compiled by the node."
+                    and successfully loaded and compiled by the node."
       ~query: RPC_query.empty
       ~output: Protocol_hash.encoding
       RPC_path.(path / "protocols")
