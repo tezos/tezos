@@ -72,8 +72,8 @@ val forge_block:
   ?best_effort:bool ->
   ?sort:bool ->
   ?minimal_fees: Tez.t ->
-  ?minimal_picotez_per_gas_unit: Z.t ->
-  ?minimal_picotez_per_byte: Z.t ->
+  ?minimal_nanotez_per_gas_unit: Z.t ->
+  ?minimal_nanotez_per_byte: Z.t ->
   ?await_endorsements: bool ->
   ?timestamp:Time.t ->
   ?mempool:string ->
@@ -107,8 +107,8 @@ val forge_block:
 val create:
   #Proto_alpha.full ->
   ?minimal_fees: Tez.t ->
-  ?minimal_picotez_per_gas_unit: Z.t ->
-  ?minimal_picotez_per_byte: Z.t ->
+  ?minimal_nanotez_per_gas_unit: Z.t ->
+  ?minimal_nanotez_per_byte: Z.t ->
   ?await_endorsements: bool ->
   ?max_priority: int ->
   context_path: string ->
