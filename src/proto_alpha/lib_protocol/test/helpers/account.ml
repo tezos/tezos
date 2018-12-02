@@ -63,12 +63,16 @@ let find_alternate pkh =
 
 let dummy_account = new_account ()
 
-let generate_accounts n : (t * Tez_repr.t) list =
+let generate_accounts ?(initial_balances = []) n : (t * Tez_repr.t) list =
   Signature.Public_key_hash.Table.clear known_accounts ;
-  let amount = Tez_repr.of_mutez_exn 4_000_000_000_000L in
-  List.map (fun _ ->
+  let default_amount = Tez_repr.of_mutez_exn 4_000_000_000_000L in
+  let amount i = match List.nth_opt initial_balances i with
+    | None -> default_amount
+    | Some a -> Tez_repr.of_mutez_exn a
+  in
+  List.map (fun i ->
       let (pkh, pk, sk) = Signature.generate_key () in
       let account = { pkh ; pk ; sk } in
       Signature.Public_key_hash.Table.add known_accounts pkh account ;
-      account, amount)
+      account, amount i)
     (0--(n-1))

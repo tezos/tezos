@@ -231,8 +231,9 @@ let init
     ?preserved_cycles
     ?endorsers_per_block
     ?commitments
+    ?(initial_balances = [])
     n =
-  let accounts = Account.generate_accounts n in
+  let accounts = Account.generate_accounts ~initial_balances n in
   let contracts = List.map (fun (a, _) ->
       Alpha_context.Contract.implicit_contract Account.(a.pkh)) accounts in
   begin

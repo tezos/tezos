@@ -107,4 +107,5 @@ val init:
   ?preserved_cycles:int ->
   ?endorsers_per_block:int ->
   ?commitments:Commitment_repr.t list ->
+  ?initial_balances: int64 list ->
   int -> (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
