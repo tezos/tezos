@@ -420,6 +420,127 @@ let activate_existing_account
   | Some _ -> failwith "Only Ed25519 accounts can be activated"
   | None -> failwith "Unknown account"
 
+type vote_info = {
+  current_period_kind     : Voting_period.kind ;
+  voting_period_position  : int32 ;
+  voting_period_remaining : int32 ;
+  current_quorum          : Int32.t ;
+  listings                : (public_key_hash * int32) list ;
+  (* The equality between Alpha_environment.Protocol_hash.t
+     and Protocol_hash.t is dropped at Tezos_protocol_environment.Make(_).V1 *)
+  proposals               : Int32.t Alpha_environment.Protocol_hash.Map.t ;
+  current_proposal        : Protocol_hash.t option ;
+  ballots                 : Vote.ballots ;
+  ballot_list             : (public_key_hash * Vote.ballot) list ;
+}
+
+(* Should be moved to src/proto_alpha/lib_protocol/src/vote_storage.ml *)
+let ballot_list_encoding = 
+  Data_encoding.(list (obj2
+                         (req "pkh" Signature.Public_key_hash.encoding)
+                         (req "balllot" Vote.ballot_encoding)))
+
+let vote_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun { current_period_kind ;
+           voting_period_position ;
+           voting_period_remaining ;
+           current_quorum ;
+           listings ;
+           proposals ;
+           current_proposal ;
+           ballots ;
+           ballot_list } ->
+      ( current_period_kind ,
+        voting_period_position ,
+        voting_period_remaining ,
+        current_quorum ,
+        listings ,
+        proposals ,
+        current_proposal ,
+        ballots ,
+        ballot_list ))
+    (fun ( current_period_kind ,
+           voting_period_position ,
+           voting_period_remaining ,
+           current_quorum ,
+           listings ,
+           proposals ,
+           current_proposal ,
+           ballots ,
+           ballot_list ) ->
+      { current_period_kind ;
+        voting_period_position ;
+        voting_period_remaining ;
+        current_quorum ;
+        listings ;
+        proposals ;
+        current_proposal ;
+        ballots ;
+        ballot_list })
+  @@ obj9
+    (req "current_period_kind" Voting_period.kind_encoding)
+    (req "voting_period_position" Data_encoding.int32)
+    (req "voting_period_remaining" Data_encoding.int32)
+    (req "current_quorum" Data_encoding.int32)
+    (req "listings" Vote.listings_encoding)
+    (req "proposals" (Alpha_environment.Protocol_hash.Map.encoding Data_encoding.int32))
+    (req "current_proposal" (Data_encoding.option Protocol_hash.encoding))
+    (req "ballots" Vote.ballots_encoding)
+    (req "ballot_list" ballot_list_encoding)
+
+let get_vote_info
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block =
+  (* Get the next level, not the current *)
+  let cb = (chain, block) in
+  Alpha_services.Helpers.current_level cctxt ~offset:1l cb >>=? fun level ->
+  Alpha_services.Constants.all cctxt cb >>=? fun constants ->
+  let voting_period_position = level.voting_period_position in
+  let voting_period_remaining =
+    Int32.(sub constants.parametric.blocks_per_voting_period voting_period_position) in
+  Alpha_services.Voting.ballots             cctxt cb >>=? fun ballots ->
+  Alpha_services.Voting.ballot_list         cctxt cb >>=? fun ballot_list ->
+  Alpha_services.Voting.current_period_kind cctxt cb >>=? fun current_period_kind ->
+  Alpha_services.Voting.current_quorum      cctxt cb >>=? fun current_quorum ->
+  Alpha_services.Voting.listings            cctxt cb >>=? fun listings ->
+  Alpha_services.Voting.proposals           cctxt cb >>=? fun proposals ->
+  Alpha_services.Voting.current_proposal    cctxt cb >>=? fun current_proposal ->
+  return { voting_period_position ;
+           voting_period_remaining ;
+           ballots ;
+           ballot_list ;
+           current_period_kind ;
+           current_quorum ;
+           listings ;
+           proposals ;
+           current_proposal }
+
+let submit_proposals
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block ?confirmations ~src_sk source proposals =
+  (* We need the next level, not the current *)
+  Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block) >>=? fun (level : Level.t) ->
+  let period = level.voting_period in
+  let contents = Single ( Proposals { source ; period ; proposals } ) in
+  Injection.inject_operation cctxt ~chain ~block ?confirmations
+    ~fee_parameter:Injection.dummy_fee_parameter
+    ~src_sk contents
+
+let submit_ballot
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block ?confirmations ~src_sk source proposal ballot =
+  (* The user must provide the proposal explicitly to make himself sure 
+     for what he is voting.
+  *)
+  Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block) >>=? fun (level : Level.t) ->
+  let period = level.voting_period in
+  let contents = Single ( Ballot { source ; period ; proposal ; ballot } ) in
+  Injection.inject_operation cctxt ~chain ~block ?confirmations
+    ~fee_parameter:Injection.dummy_fee_parameter
+    ~src_sk contents
+
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match a.receipt, a.protocol_data with
   | Apply_results.Operation_metadata omd, Operation_data od -> (

@@ -218,6 +218,37 @@ val activate_existing_account:
   Blinded_public_key_hash.activation_code ->
   Kind.activate_account Injection.result tzresult Lwt.t
 
+type vote_info
+
+val vote_info_encoding : vote_info Data_encoding.t
+
+val get_vote_info : 
+  #Proto_alpha.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  vote_info tzresult Lwt.t
+
+val submit_proposals:
+  #Proto_alpha.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  src_sk:Client_keys.sk_uri ->
+  public_key_hash ->
+  Protocol_hash.t list ->
+  Kind.proposals Injection.result_list tzresult Lwt.t
+
+val submit_ballot:
+  #Proto_alpha.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  src_sk:Client_keys.sk_uri ->
+  public_key_hash ->
+  Protocol_hash.t ->
+  Proto_alpha.Alpha_context.Vote.ballot ->
+  Kind.ballot Injection.result_list tzresult Lwt.t
+
 (** lookup an operation in [predecessors] previous blocks, and print the
     receipt if found *)
 val display_receipt_for_operation: 

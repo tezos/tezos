@@ -641,6 +641,73 @@ let commands version () =
           (Data_encoding.Binary.describe
              Alpha_context.Operation.unsigned_encoding) >>= fun () ->
         return_unit
-      end
+      end ;
 
+    command ~group ~desc: "Submit protocol proposals."
+      no_options
+      (prefixes [ "submit" ; "proposals" ]
+       @@ prefix "for"
+       @@ ContractAlias.destination_param
+         ~name: "src" ~desc: "name of the source contract"
+       @@ seq_of_param (param
+                          ~name:"proposal"
+                          ~desc:"Proposal to be submitted"
+                          (parameter
+                             (fun _ x ->
+                                match Protocol_hash.of_b58check_opt x with
+                                | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
+                                | Some hash -> return hash)))
+      )
+      (fun () (_name, source) proposals cctxt ->
+         Client_proto_context.get_manager
+           cctxt ~chain:`Main ~block:cctxt#block
+           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
+         submit_proposals cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh proposals >>=? fun _res ->
+         return_unit
+      );
+
+    command ~group ~desc: "Submit a ballot."
+      no_options
+      (prefixes [ "submit" ; "ballot" ]
+       @@ prefix "for"
+       @@ ContractAlias.destination_param
+         ~name: "src" ~desc: "name of the source contract"
+       @@ param
+         ~name:"proposal"
+         ~desc:"Proposal"
+         (parameter
+            (fun _ x ->
+               match Protocol_hash.of_b58check_opt x with
+               | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
+               | Some hash -> return hash))
+       @@ param
+         ~name:"ballot"
+         ~desc:"Ballot(yay/nay/pass)"
+         (parameter
+            (fun _ s ->
+               let fail () = Error_monad.failwith "Invalid ballot: '%s'" s in
+               match Data_encoding.Json.from_string ("\"" ^ s ^ "\"") with
+               | Error _ -> fail ()
+               | Ok j -> 
+                   match Data_encoding.Json.destruct Vote.ballot_encoding j with
+                   | exception _ -> fail ()
+                   | b -> return b))
+       @@ stop
+      )
+      (fun () (_name, source) proposal ballot cctxt ->
+         Client_proto_context.get_manager
+           cctxt ~chain:`Main ~block:cctxt#block
+           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
+         submit_ballot cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh proposal ballot >>=? fun _res ->
+         return_unit
+      );
+
+    command ~group ~desc: "Summarize the current voting information."
+      no_options
+      (fixed [ "show" ; "votes" ])
+      (fun () cctxt ->
+         get_vote_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun vote_info ->
+         cctxt#message "%a" (Json_repr.pp_any ()) (Json_repr.(to_any (Data_encoding.Json.construct vote_info_encoding vote_info))) >>= fun () ->
+         return_unit
+      )
   ]
