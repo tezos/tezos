@@ -16,7 +16,7 @@ are immutable and garbage collected.
 
 A Michelson program receives as input a single element stack containing
 an input value and the contents of a storage space. It must return a
-single element stack containing aa output value a list of internal
+single element stack containing an output value, a list of internal
 operations, and the new contents of the storage space. Alternatively,
 a Michelson program can fail, explicitly using a specific opcode,
 or because something went wrong that could not be caught by the type
@@ -764,7 +764,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     :: nat : nat : 'S   ->   nat : 'S
 
-    > LSR / x : s : S  =>  (x >>> s) : S
+    > LSR / x : s : S  =>  (x >> s) : S
 
 -  ``COMPARE``: Integer/natural comparison
 
@@ -1112,7 +1112,7 @@ Operations on unions
 
     > RIGHT / v : S  =>  (Right v) : S
 
--  ``IF_LEFT bt bf``: Inspect a value of a variant type.
+-  ``IF_LEFT bt bf``: Inspect a value of a union.
 
 ::
 
@@ -1123,7 +1123,7 @@ Operations on unions
     > IF_LEFT bt bf / (Left a) : S  =>  bt / a : S
     > IF_LEFT bt bf / (Right b) : S  =>  bf / b : S
 
--  ``IF_RIGHT bt bf``: Inspect a value of a variant type.
+-  ``IF_RIGHT bt bf``: Inspect a value of a union.
 
 ::
 
@@ -1153,7 +1153,7 @@ Operations on lists
 
     > NIL / S  =>  {} : S
 
--  ``IF_CONS bt bf``: Inspect an optional value.
+-  ``IF_CONS bt bf``: Inspect a list.
 
 ::
 
@@ -1917,7 +1917,7 @@ formats. Some have two variants accepted by the data type checker: a
 readable one in a string and an optimized.
 
 -  ``mutez`` amounts are written as naturals.
--  ``timestamp``\ s are written either using ``RFC 339`` notation
+-  ``timestamp``\ s are written either using ``RFC3339`` notation
    in a string (readable), or as the number of seconds since Epoch
    in a natural (optimized).
 -  ``contract``\ s, ``address``\ es, ``key``\ s and ``signature``\ s
@@ -2721,7 +2721,7 @@ can send a transaction to send its tokens back. For this, we need to
 store who already paid and how much, as a ``(pair mutez mutez)`` where the
 left component is the buyer and the right one the seller.
 
-After the first day, nothing cam happen until ``T``.
+After the first day, nothing can happen until ``T``.
 
 During the 24 hours after ``T``, the buyer must pay ``(Q * K)`` to the
 contract, minus the amount already sent.
