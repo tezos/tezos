@@ -126,14 +126,17 @@ let () =
     (fun e -> LedgerError e)
 
 type id =
-  | Animals of Ledger_names.t * Ledgerwallet_tezos.curve
+  | Animals of Ledger_names.t * Ledgerwallet_tezos.curve option
   | Pkh of Signature.Public_key_hash.t
 
 let pp_id ppf = function
   | Pkh pkh -> Signature.Public_key_hash.pp ppf pkh
   | Animals (cthd, curve) ->
-      Format.fprintf ppf "%a/%a" Ledger_names.pp cthd
-        Ledgerwallet_tezos.pp_curve curve
+      Format.fprintf ppf "%a%a" Ledger_names.pp cthd
+        (fun fmt -> function
+           | None -> Format.fprintf fmt ""
+           | Some a -> Format.fprintf fmt "/%a" Ledgerwallet_tezos.pp_curve a)
+        curve
 
 let parse_animals animals =
   match String.split '-' animals with
@@ -149,11 +152,19 @@ let id_of_uri uri =
       match Option.apply host ~f:parse_animals,
             Option.apply (List.hd_opt (String.split '/' (Uri.path uri)))
               ~f:Ledgerwallet_tezos.curve_of_string with
-      | Some animals, Some curve ->
+      | Some animals, curve ->
           return (Animals (animals, curve))
-      | _ ->
-          failwith "No public key hash or animal names in %a"
+      | (ann, curr) ->
+          failwith "No public key hash or animal names in %a (%a, %a)"
             Uri.pp_hum uri
+            (fun fmt -> function
+               | None -> Format.fprintf fmt "NONE"
+               | Some a -> Format.fprintf fmt "%a" Ledger_names.pp a)
+            ann
+            (fun fmt -> function
+               | None -> Format.fprintf fmt "NONE"
+               | Some a -> Format.fprintf fmt "%a" Ledgerwallet_tezos.pp_curve a)
+            curr
 
 let id_of_pk_uri (uri : pk_uri) = id_of_uri (uri :> Uri.t)
 let id_of_sk_uri (uri : sk_uri) = id_of_uri (uri :> Uri.t)
@@ -362,18 +373,25 @@ let path_of_pk_uri (uri : pk_uri) =
       List.map int32_of_path_element_exn path
   | path -> List.map int32_of_path_element_exn path
 
+let unopt_curve annimal = function
+  | Some curve -> return curve
+  | None ->
+      failwith "A curve specification is required for this operation,@ e.g.@ \
+                \"ledger://%a/{ed25519,...}\"" Ledger_names.pp annimal
+
 let public_key
     ?(interactive : Client_context.io_wallet option) (pk_uri : pk_uri) =
-  let find_ledger of_pkh = function
-    | Pkh pkh -> snd (List.assoc pkh of_pkh)
-    | Animals (_, curve) -> curve
+  let find_curve of_pkh = function
+    | Pkh pkh ->
+        protect (fun () -> return (snd (List.assoc pkh of_pkh)))
+    | Animals (a, curve_opt) -> unopt_curve a curve_opt
   in
   match Hashtbl.find_opt pks pk_uri with
   | Some pk -> return pk
   | None ->
       id_of_pk_uri pk_uri >>=? fun id ->
       with_ledger id begin fun ledger _version _of_curve of_pkh  ->
-        let curve = find_ledger of_pkh id in
+        find_curve of_pkh id >>=? fun curve  ->
         let path = path_of_pk_uri pk_uri in
         begin
           match interactive with
@@ -404,8 +422,8 @@ let public_key_hash ?interactive pk_uri =
       return (Hashtbl.find pkhs pk_uri, Some pk)
 
 let curve_of_id = function
-  | Pkh pkh -> curve_of_pkh pkh
-  | Animals (_, curve) -> curve
+  | Pkh pkh -> return (curve_of_pkh pkh)
+  | Animals (a,  curve_opt) -> unopt_curve a curve_opt
 
 let sign ?watermark sk_uri msg =
   id_of_sk_uri sk_uri >>=? fun id ->
@@ -415,7 +433,7 @@ let sign ?watermark sk_uri msg =
         MBytes.concat "" [Signature.bytes_of_watermark watermark ;
                           msg]
       end in
-    let curve = curve_of_id id in
+    curve_of_id id >>=? fun curve ->
     let path = tezos_root @ path_of_sk_uri sk_uri in
     let msg_len = MBytes.length msg in
     wrap_ledger_cmd begin fun pp ->
@@ -498,7 +516,7 @@ let commands =
                            "tezos-client import secret key \
                             ledger_%s \"ledger://%a/0'/0'\""
                            (Sys.getenv "USER")
-                           pp_id (Animals (animals, curve))))
+                           pp_id (Animals (animals, Some curve))))
                    of_curve >>= fun () ->
                  return_unit
                end ledgers) ;
@@ -578,7 +596,7 @@ let commands =
            id_of_pk_uri pk_uri >>=? fun root_id ->
            with_ledger root_id begin fun h _version _of_curve _of_pkh ->
              let path = path_of_pk_uri pk_uri in
-             let curve = curve_of_id root_id in
+             curve_of_id root_id >>=? fun curve ->
              get_public_key ~authorize_baking:true h curve path >>=? fun pk ->
              let pkh = Signature.Public_key.hash pk in
              cctxt#message
@@ -645,4 +663,3 @@ let commands =
            end
         ) ;
     ]
-
