@@ -522,12 +522,12 @@ let commands =
                end ledgers) ;
 
       Clic.command ~group
-        ~desc: "Show BIP32 derivation at path for Ledger"
-        no_options
-        (prefixes [ "show" ; "ledger" ; "path" ]
+        ~desc: "Display version/public-key/address information for a Ledger URI"
+        (args1 (switch ~doc:"Test signing operation" ~long:"test-sign" ()))
+        (prefixes [ "show" ; "ledger" ]
          @@ Client_keys.sk_uri_param
          @@ stop)
-        (fun () sk_uri (cctxt : Client_context.io_wallet) ->
+        (fun test_sign sk_uri (cctxt : Client_context.io_wallet) ->
            neuterize sk_uri >>=? fun pk_uri ->
            id_of_pk_uri pk_uri >>=? fun id ->
            find_ledgers ~id () >>=? function
@@ -538,28 +538,55 @@ let commands =
                  Option.unopt ~default:"(none)" device_info.manufacturer_string in
                let product =
                  Option.unopt ~default:"(none)" device_info.product_string in
-               cctxt#message "Found a valid Tezos application running on %s %s at [%s]."
+               cctxt#message
+                 "Found a %a application running on a \
+                  %s %s at [%s]."
+                 Ledgerwallet_tezos.Version.pp version
                  manufacturer product device_info.path >>= fun () ->
-               public_key pk_uri >>=? fun pk ->
-               public_key_hash pk_uri >>=? fun (pkh, _) ->
-               let pkh_bytes = Signature.Public_key_hash.to_bytes pkh in
-               match version.app_class with
-               | TezBake -> return_unit
-               | Tezos ->
-                   sign ~watermark:Generic_operation
-                     sk_uri pkh_bytes >>=? fun signature ->
-                   match Signature.check ~watermark:Generic_operation
-                           pk signature pkh_bytes with
-                   | false ->
-                       failwith "Fatal: Ledger cannot sign with %a"
-                         Signature.Public_key_hash.pp pkh
-                   | true ->
-                       cctxt#message
-                         "@[<v 0>Tezos address at this path: %a@,\
-                          Corresponding full public key: %a@]"
-                         Signature.Public_key_hash.pp pkh
-                         Signature.Public_key.pp pk >>= fun () ->
-                       return_unit
+               begin match id with
+                 | (Pkh _ | Animals (_, Some _)) -> (* → Can public keys. *)
+                     public_key pk_uri >>=? fun pk ->
+                     public_key_hash pk_uri >>=? fun (pkh, _) ->
+                     cctxt#message
+                       "@[<v 0>Tezos address at this path/curve: %a@,\
+                        Corresponding full public key: %a@]"
+                       Signature.Public_key_hash.pp pkh
+                       Signature.Public_key.pp pk >>= fun () ->
+                     begin match test_sign, version.app_class with
+                       | true, Tezos ->
+                           let pkh_bytes = Signature.Public_key_hash.to_bytes pkh in
+                           (* Signing requires validation on the device.  *)
+                           cctxt#message "Attempting a signature, please \
+                                          validate on the ledger." >>= fun () ->
+                           sign ~watermark:Generic_operation
+                             sk_uri pkh_bytes >>=? fun signature ->
+                           begin match Signature.check ~watermark:Generic_operation
+                                         pk signature pkh_bytes with
+                           | false ->
+                               failwith "Fatal: Ledger cannot sign with %a"
+                                 Signature.Public_key_hash.pp pkh
+                           | true ->
+                               cctxt#message "Tezos Wallet successfully signed."
+                               >>= fun () ->
+                               return_unit
+                           end
+                       | true, TezBake ->
+                           failwith "Option --test-sign only works \
+                                     for the Tezos Wallet app."
+                       | false, _ ->
+                           return_unit
+                     end
+                 | Animals (_, None) when test_sign ->
+                     failwith "Option --test-sign only works \
+                               for the Tezos Wallet app with a \
+                               curve/path specification."
+                 | Animals (_, None) ->
+                     cctxt#message "No curve was provided, \
+                                    there is no Tezos-address/public-key \
+                                    to show/test."
+                     >>= fun () ->
+                     return_unit
+               end
         ) ;
 
       Clic.command ~group
