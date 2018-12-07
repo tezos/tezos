@@ -121,6 +121,7 @@ in the :ref:`introduction <howtoget>`.
    whitedoc/validation
    whitedoc/michelson
    whitedoc/proof_of_stake
+   whitedoc/voting
 
 .. toctree::
    :maxdepth: 2
