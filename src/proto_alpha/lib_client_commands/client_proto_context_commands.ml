@@ -659,6 +659,24 @@ let commands version () =
                                 | Some hash -> return hash)))
       )
       (fun () (_name, source) proposals cctxt ->
+         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
+         let check_proposals proposals =
+           let n = List.length proposals in
+           if n = 0 then generic_error "Empty proposal"
+           else if n > Constants.fixed.max_proposals_per_delegate then
+             generic_error "Too many proposals"
+           else
+             (* Why we do not have Error_monad.iter ? *)
+             let rec iter f = function
+               | [] -> ok ()
+               | p::ps -> f p >>? fun () -> iter f ps
+             in
+             iter (fun p -> 
+                 if List.mem p known_protos then ok ()
+                 else generic_error "Protocol %a is not injected in the node" Protocol_hash.pp p)
+               proposals
+         in
+         Lwt.return (check_proposals proposals) >>=? fun () ->
          Client_proto_context.get_manager
            cctxt ~chain:`Main ~block:cctxt#block
            source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
