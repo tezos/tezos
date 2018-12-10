@@ -145,6 +145,7 @@
  (locks /tcp-port/18731
         /tcp-port/19731)
  (deps sandbox.json
+       protocol_parameters.json
        test_lib.inc.sh
        (glob_files demo/*))
  (action

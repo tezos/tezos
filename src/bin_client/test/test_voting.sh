@@ -66,7 +66,7 @@ cp -r demo $tempdir/proto3
 echo '(* 3 *)' >> $tempdir/proto3/main.ml
 $admin_client inject protocol $tempdir/proto3
 
-proto_str=`$admin_client list protocols | head -3` # assuming new protocols listed first
+proto_str=`$admin_client list protocols | grep "P" | head -3` # assuming new protocols listed first
 echo New protocols: $proto_str
 proto=($proto_str)
 
@@ -108,13 +108,13 @@ echo $res
     || { echo "strange listings" ; exit 1 ; }
 [ `echo $res | jq .current_proposal` = '"'${proto[1]}'"' ] \
     || { echo "strange current_proposal" ; exit 1 ; }
- 
+
 echo Ballots 1
 $client submit ballot for bootstrap1 ${proto[1]} yay
 $client submit ballot for bootstrap2 ${proto[1]} yay
 $client submit ballot for bootstrap3 ${proto[1]} yay
 $client submit ballot for bootstrap4 ${proto[1]} yay
- 
+
 bake # pos=1
 
 # They cannot change their mind.
@@ -126,9 +126,9 @@ bake # pos=2
 bake # pos=3
 
 $client show votes
- 
+
 bake # new period pos=0
- 
+
 echo Testing vote should be done
 res=`$client show votes`
 [ `echo $res | jq .voting_period_position` = '0' ] \
@@ -148,7 +148,7 @@ bake # pos=1
 bake # pos=2
 bake # pos=3
 bake # new period pos=0
- 
+
 echo Testing should be done
 res=`$client show votes`
 [ `echo $res | jq .voting_period_position` = '0' ] \
@@ -163,7 +163,7 @@ res=`$client show votes`
     || { echo "strange current_proposal" ; exit 1 ; }
 [ `echo $res | jq .ballot_list` = '[]' ] \
     || { echo "strange ballot_list" ; exit 1 ; }
- 
+
 $client submit ballot for bootstrap1 ${proto[1]} yay
 $client submit ballot for bootstrap2 ${proto[1]} yay
 $client submit ballot for bootstrap3 ${proto[1]} yay
@@ -176,7 +176,7 @@ bake # pos=3
 $client show votes
 
 bake # new period pos=0
- 
+
 echo 'Promotion vote should be over now negatively'
 res=`$client show votes`
 [ `echo $res | jq .voting_period_position` = '0' ] \

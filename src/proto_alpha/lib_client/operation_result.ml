@@ -396,12 +396,12 @@ let rec pp_contents_and_result_list :
            From: %a@,\
            Period: %a@,\
            Protocol: %a@,\
-           Vote: %s@]"
+           Vote: %a@]"
           Signature.Public_key_hash.pp source
           Voting_period.pp period
           Protocol_hash.pp proposal
-          (* FIXME We should use ballot_encoding? *)
-          (match ballot with Yay -> "YAY" | Pass -> "PASS" | Nay -> "NAY")
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct Vote.ballot_encoding ballot)
     | Single_and_result (Manager_operation _ as op,
                          (Manager_operation_result _ as res))->
         Format.fprintf ppf "%a"

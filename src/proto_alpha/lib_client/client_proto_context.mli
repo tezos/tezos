@@ -222,7 +222,7 @@ type vote_info
 
 val vote_info_encoding : vote_info Data_encoding.t
 
-val get_vote_info : 
+val get_vote_info :
   #Proto_alpha.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -251,9 +251,9 @@ val submit_ballot:
 
 (** lookup an operation in [predecessors] previous blocks, and print the
     receipt if found *)
-val display_receipt_for_operation: 
+val display_receipt_for_operation:
   #Proto_alpha.full ->
   chain:Block_services.chain ->
-  ?predecessors:int -> 
-  Operation_list_hash.elt -> 
+  ?predecessors:int ->
+  Operation_list_hash.elt ->
   unit tzresult Lwt.t

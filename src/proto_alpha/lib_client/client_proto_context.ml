@@ -435,10 +435,10 @@ type vote_info = {
 }
 
 (* Should be moved to src/proto_alpha/lib_protocol/src/vote_storage.ml *)
-let ballot_list_encoding = 
+let ballot_list_encoding =
   Data_encoding.(list (obj2
                          (req "pkh" Signature.Public_key_hash.encoding)
-                         (req "balllot" Vote.ballot_encoding)))
+                         (req "ballot" Vote.ballot_encoding)))
 
 let vote_info_encoding =
   let open Data_encoding in
@@ -531,7 +531,7 @@ let submit_proposals
 let submit_ballot
     (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations ~src_sk source proposal ballot =
-  (* The user must provide the proposal explicitly to make himself sure 
+  (* The user must provide the proposal explicitly to make himself sure
      for what he is voting.
   *)
   Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block) >>=? fun (level : Level.t) ->
@@ -547,8 +547,8 @@ let pp_operation formatter (a : Alpha_block_services.operation) =
       match Apply_results.kind_equal_list od.contents omd.contents
       with
       | Some Apply_results.Eq ->
-          Operation_result.pp_operation_result formatter 
-            (od.contents, omd.contents) 
+          Operation_result.pp_operation_result formatter
+            (od.contents, omd.contents)
       | None -> Pervasives.failwith "Unexpected result.")
   | _ -> Pervasives.failwith "Unexpected result."
 
@@ -558,16 +558,16 @@ let get_operation_from_block
     predecessors
     operation_hash =
   Client_confirmations.lookup_operation_in_previous_blocks
-    cctxt 
-    ~chain 
-    ~predecessors 
+    cctxt
+    ~chain
+    ~predecessors
     operation_hash
   >>=? function
   | None -> return_none
-  | Some (block, i, j) -> 
+  | Some (block, i, j) ->
       cctxt#message "Operation found in block: %a (pass: %d, offset: %d)"
         Block_hash.pp block i j >>= fun () ->
-      Proto_alpha.Alpha_block_services.Operations.operation cctxt 
+      Proto_alpha.Alpha_block_services.Operations.operation cctxt
         ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
 
 let display_receipt_for_operation
@@ -576,10 +576,10 @@ let display_receipt_for_operation
     ?(predecessors = 10)
     operation_hash =
   get_operation_from_block cctxt ~chain predecessors operation_hash
-  >>=? function 
-  | None -> 
-      cctxt#message "Couldn't find operation" >>= fun () -> 
+  >>=? function
+  | None ->
+      cctxt#message "Couldn't find operation" >>= fun () ->
       return_unit
-  | Some op -> 
+  | Some op ->
       cctxt#message "%a" pp_operation op >>= fun () ->
       return_unit

@@ -67,11 +67,11 @@ let data_parameter =
       Lwt.return (Micheline_parser.no_parsing_error
                   @@ Michelson_v1_parser.parse_expression data))
 
-let non_negative_param = 
+let non_negative_param =
   Clic.parameter (fun _ s ->
       match int_of_string_opt s with
       | Some i when i >= 0 -> return i
-      | _ -> failwith "Parameter should be a non-negative integer literal") 
+      | _ -> failwith "Parameter should be a non-negative integer literal")
 
 let group =
   { Clic.name = "context" ;
@@ -645,49 +645,44 @@ let commands version () =
 
     command ~group ~desc: "Submit protocol proposals."
       no_options
-      (prefixes [ "submit" ; "proposals" ]
-       @@ prefix "for"
+      (prefixes [ "submit" ; "proposals" ; "for" ]
        @@ ContractAlias.destination_param
          ~name: "src" ~desc: "name of the source contract"
-       @@ seq_of_param (param
-                          ~name:"proposal"
-                          ~desc:"Proposal to be submitted"
-                          (parameter
-                             (fun _ x ->
-                                match Protocol_hash.of_b58check_opt x with
-                                | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
-                                | Some hash -> return hash)))
-      )
-      (fun () (_name, source) proposals cctxt ->
-         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
-         let check_proposals proposals =
-           let n = List.length proposals in
-           if n = 0 then generic_error "Empty proposal"
-           else if n > Constants.fixed.max_proposals_per_delegate then
-             generic_error "Too many proposals"
-           else
-             (* Why we do not have Error_monad.iter ? *)
-             let rec iter f = function
-               | [] -> ok ()
-               | p::ps -> f p >>? fun () -> iter f ps
-             in
-             iter (fun p -> 
-                 if List.mem p known_protos then ok ()
-                 else generic_error "Protocol %a is not injected in the node" Protocol_hash.pp p)
-               proposals
-         in
-         Lwt.return (check_proposals proposals) >>=? fun () ->
-         Client_proto_context.get_manager
-           cctxt ~chain:`Main ~block:cctxt#block
-           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
-         submit_proposals cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh proposals >>=? fun _res ->
-         return_unit
-      );
+       @@ seq_of_param
+         (param
+            ~name:"proposal"
+            ~desc:"Proposal to be submitted"
+            (parameter
+               (fun _ x ->
+                  match Protocol_hash.of_b58check_opt x with
+                  | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
+                  | Some hash -> return hash))))
+      begin fun () (_name, source) proposals (cctxt : Proto_alpha.full) ->
+        Shell_services.Protocol.list cctxt >>=? fun known_protos ->
+        let check_proposals proposals : unit tzresult Lwt.t =
+          let n = List.length proposals in
+          if n = 0 then cctxt#error "Empty proposal"
+          else if n > Constants.fixed.max_proposals_per_delegate then
+            cctxt#error "Too many proposals"
+          else
+            iter_s (fun p ->
+                if List.mem p known_protos then
+                  cctxt#message "All proposals are valid" >>= fun () -> return_unit
+                else cctxt#error "Protocol %a is not known by the node"
+                    Protocol_hash.pp p)
+              proposals
+        in
+        check_proposals proposals >>=? fun () ->
+        Client_proto_context.get_manager
+          cctxt ~chain:`Main ~block:cctxt#block
+          source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
+        submit_proposals cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh proposals >>=? fun _res ->
+        return_unit
+      end ;
 
     command ~group ~desc: "Submit a ballot."
       no_options
-      (prefixes [ "submit" ; "ballot" ]
-       @@ prefix "for"
+      (prefixes [ "submit" ; "ballot" ; "for" ]
        @@ ContractAlias.destination_param
          ~name: "src" ~desc: "name of the source contract"
        @@ param
@@ -696,36 +691,38 @@ let commands version () =
          (parameter
             (fun _ x ->
                match Protocol_hash.of_b58check_opt x with
-               | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
+               | None -> failwith "Invalid proposal hash: '%s'" x
                | Some hash -> return hash))
        @@ param
          ~name:"ballot"
          ~desc:"Ballot(yay/nay/pass)"
          (parameter
             (fun _ s ->
-               let fail () = Error_monad.failwith "Invalid ballot: '%s'" s in
+               let fail () = failwith "Invalid ballot: '%s'" s in
                match Data_encoding.Json.from_string ("\"" ^ s ^ "\"") with
                | Error _ -> fail ()
-               | Ok j -> 
+               | Ok j ->
                    match Data_encoding.Json.destruct Vote.ballot_encoding j with
                    | exception _ -> fail ()
                    | b -> return b))
-       @@ stop
-      )
-      (fun () (_name, source) proposal ballot cctxt ->
-         Client_proto_context.get_manager
-           cctxt ~chain:`Main ~block:cctxt#block
-           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
-         submit_ballot cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh proposal ballot >>=? fun _res ->
-         return_unit
-      );
+       @@ stop)
+      begin fun () (_name, source) proposal ballot (cctxt : Proto_alpha.full) ->
+        Client_proto_context.get_manager
+          cctxt ~chain:`Main ~block:cctxt#block
+          source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
+        submit_ballot cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh
+          proposal ballot >>=? fun _res ->
+        return_unit
+      end ;
 
     command ~group ~desc: "Summarize the current voting information."
       no_options
       (fixed [ "show" ; "votes" ])
-      (fun () cctxt ->
-         get_vote_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun vote_info ->
-         cctxt#message "%a" (Json_repr.pp_any ()) (Json_repr.(to_any (Data_encoding.Json.construct vote_info_encoding vote_info))) >>= fun () ->
-         return_unit
-      )
+      begin fun () (cctxt : Proto_alpha.full) ->
+        get_vote_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun vote_info ->
+        cctxt#message "%a" Data_encoding.Json.pp
+          (Data_encoding.Json.construct vote_info_encoding vote_info) >>= fun () ->
+        return_unit
+      end ;
+
   ]

@@ -21,7 +21,7 @@
   "time_between_blocks" : [ "1", "0" ],
   "blocks_per_cycle" : 128,
   "blocks_per_roll_snapshot" : 32,
-  "blocks_per_voting_period" : 64,
+  "blocks_per_voting_period" : 256,
   "preserved_cycles" : 1,
   "proof_of_work_threshold": "-1"
 }
