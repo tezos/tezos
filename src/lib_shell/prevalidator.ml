@@ -470,7 +470,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
                  (fun (hash, op) -> (hash, map_op op))
                  (List.rev pv.applied) ;
              refused =
-               Operation_hash.Map.map map_op_error pv.branch_refusals ;
+               Operation_hash.Map.map map_op_error pv.refusals ;
              branch_refused =
                Operation_hash.Map.map map_op_error pv.branch_refusals ;
              branch_delayed =
@@ -510,11 +510,11 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
           let current_mempool = ref (Some current_mempool) in
           let filter_result = function
             | `Applied -> params#applied
-            | `Refused -> params#branch_refused
-            | `Branch_refused -> params#refused
+            | `Refused -> params#refused
+            | `Branch_refused -> params#branch_refused
             | `Branch_delayed -> params#branch_delayed
           in
-          let next () =
+          let rec next () =
             match !current_mempool with
             | Some mempool -> begin
                 current_mempool := None ;
@@ -532,7 +532,8 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
                         Proto.operation_data_encoding
                         bytes in
                     Lwt.return_some [ { Proto.shell ; protocol_data } ]
-                | _ -> Lwt.return_none
+                | Some _ -> next ()
+                | None -> Lwt.return_none
               end
           in
           let shutdown () = Lwt_watcher.shutdown stopper in

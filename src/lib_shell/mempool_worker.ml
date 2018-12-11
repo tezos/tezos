@@ -602,18 +602,19 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
          let state = Worker.state w in
          let filter_result = function
            | Applied _ -> params#applied
-           | Refused _ -> params#branch_refused
-           | Branch_refused _ -> params#refused
+           | Refused _ -> params#refused
+           | Branch_refused _ -> params#branch_refused
            | Branch_delayed _ -> params#branch_delayed
            | _ -> false in
 
          let op_stream, stopper = Lwt_watcher.create_stream state.operation_stream in
          let shutdown () = Lwt_watcher.shutdown stopper in
-         let next () =
+         let rec next () =
            Lwt_stream.get op_stream >>= function
            | Some (kind, shell, protocol_data) when filter_result kind ->
                Lwt.return_some [ { Proto.shell ; protocol_data } ]
-           | _ -> Lwt.return_none in
+           | Some _ -> next ()
+           | None -> Lwt.return_none in
          RPC_answer.return_stream { next ; shutdown }
       )
 
