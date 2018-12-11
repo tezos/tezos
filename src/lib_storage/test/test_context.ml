@@ -112,6 +112,7 @@ let wrap_context_init f _ () =
     create_block3a idx block2 >>= fun block3a ->
     create_block3b idx block2  >>= fun block3b ->
     f { idx; genesis; block2 ; block3a; block3b } >>= fun result ->
+    Context.close () >>= fun () ->
     Lwt.return result
   end
 

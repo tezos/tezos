@@ -247,7 +247,59 @@ let init_signal () =
   ignore (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
   ignore (Lwt_unix.on_signal Sys.sigterm (handler "TERM") : Lwt_unix.signal_handler_id)
 
-let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
+let known_heads store chain_id =
+  let chain = Store.Chain.get store chain_id in
+  Store.Chain_data.(Known_heads.read_all @@ get chain)
+
+let predecessors store max_level head =
+  let rec aux acc hash =
+    Store.Block.Header.read_exn (store, hash) >>= fun h ->
+    if h.shell.level < max_level then Lwt.return acc
+    else
+      Store.Block.Predecessors.read_exn (store, hash) 0 >>= fun pred ->
+      let acc = Context_hash.Set.add h.shell.context acc in
+      aux acc pred
+  in
+  aux Context_hash.Set.empty head
+
+let genesis_block store id =
+  let store = Store.Chain.get store id in
+  Store.Chain.Genesis_hash.read_exn store >>= fun genesis ->
+  Store.Block.Header.read_exn (Store.Block.get store, genesis) >|= fun h ->
+  h.shell.context
+
+let run_gc (config : Node_config_file.t) checkpoint =
+  Store.init ~mapsize:4_000_000_000_000L (store_dir config.data_dir)
+  >>= function
+  | Error _e -> Lwt.fail_with "Store.init" (* XXX: use the error monad *)
+  | Ok store ->
+      let alive_in_chain acc id =
+        genesis_block store id >>= fun genesis ->
+        known_heads store id >>= fun heads ->
+        let chain_t = Store.Chain.get store id in
+        let block_t = Store.Block.get chain_t in
+        let chain_data_t = Store.Chain_data.get chain_t in
+        (match checkpoint with
+         | Some (n, _) -> Lwt.return n
+         | None -> Store.Chain_data.Checkpoint.read_exn chain_data_t >|= fst)
+        >>= fun max_level ->
+        Lwt_list.fold_left_s (fun acc head ->
+            predecessors block_t max_level head >|= fun hashes ->
+            Context_hash.Set.union acc hashes
+          ) acc (Block_hash.Set.elements heads)
+        >|= fun hashes ->
+        (* Always promote the genesis block *)
+        Context_hash.Set.add genesis hashes
+      in
+      Store.Chain.list store >>= fun ids ->
+      Lwt_list.fold_left_s alive_in_chain Context_hash.Set.empty ids
+      >>= fun roots ->
+      Tezos_storage.Context.init
+        ~mapsize:4_000_000_000_000L (context_dir config.data_dir)
+      >>= fun context ->
+      Tezos_storage.Context.gc context ~roots
+
+let run ?verbosity ?sandbox ?checkpoint ~gc (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   Lwt_lock_file.create
     ~unlink_on_exit:true (Node_data_version.lock_file config.data_dir) >>=? fun () ->
@@ -257,6 +309,7 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
     | None -> config.log
     | Some default_level -> { config.log with default_level } in
   Logging_unix.init ~cfg:log_cfg () >>= fun () ->
+  (if not gc then Lwt.return () else run_gc config checkpoint) >>= fun () ->
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
   init_node ?sandbox ?checkpoint config >>=? fun node ->
@@ -271,7 +324,7 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Logging_unix.close () >>= fun () ->
   return_unit
 
-let process sandbox verbosity checkpoint args =
+let process sandbox verbosity checkpoint gc args =
   let verbosity =
     match verbosity with
     | [] -> None
@@ -303,7 +356,7 @@ let process sandbox verbosity checkpoint args =
       (Node_data_version.lock_file config.data_dir) >>=? function
     | false ->
         Lwt.catch
-          (fun () -> run ?sandbox ?verbosity ?checkpoint config)
+          (fun () -> run ?sandbox ?verbosity ?checkpoint ~gc config)
           (function
             |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
                 begin match config.rpc.listen_addr with
@@ -356,8 +409,19 @@ module Term = struct
          info ~docs:Node_shared_arg.Manpage.misc_section
            ~doc ~docv:"<level>,<block_hash>" ["checkpoint"])
 
+  let gc =
+    let open Cmdliner in
+    let doc =
+      "Run the GC and exit. Use 0 to use the last-fork point, \
+       otherwise keep the latest $(b, N) contexts."
+    in
+    Arg.(value
+         & flag
+         & info ~doc ~docv:"N" ~docs:Node_shared_arg.Manpage.misc_section
+           ["gc"])
+
   let term =
-    Cmdliner.Term.(ret (const process $ sandbox $ verbosity $ checkpoint $
+    Cmdliner.Term.(ret (const process $ sandbox $ verbosity $ checkpoint $ gc $
                         Node_shared_arg.Term.args))
 
 end

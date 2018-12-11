@@ -40,6 +40,10 @@ val init:
   string ->
   index Lwt.t
 
+val close: unit -> unit Lwt.t
+
+val gc: index -> roots:Context_hash.Set.t -> unit Lwt.t
+
 val commit_genesis:
   index ->
   chain_id:Chain_id.t ->

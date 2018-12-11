@@ -1583,6 +1583,7 @@ let history_mode { global_data } =
   end
 
 let close { global_data } =
+  Context.close () >>= fun () ->
   Shared.use global_data begin fun { global_store } ->
     Store.close global_store ;
     Lwt.return_unit

@@ -340,9 +340,24 @@ let hash ~time ?(message = "") context =
   Lwt.return x
 
 let commit ~time ?message context =
-  raw_commit ~time ?message context >>= fun commit ->
-  let h = GitStore.Commit.hash commit in
-  Lwt.return h
+  raw_commit ~time ?message context >|= fun commit ->
+  GitStore.Commit.hash commit
+
+let gc_in_progress = ref None
+
+let gc index ~roots =
+  let roots = Context_hash.Set.elements roots in
+  let switch = Lwt_switch.create () in
+  gc_in_progress := Some switch;
+  GitStore.gc ~repo:index.repo ~switch roots >|= fun stats ->
+  gc_in_progress := None;
+  Fmt.pr "GC: live objects: %a\n%!" GitStore.pp_stats stats
+
+
+let close () =
+  match !gc_in_progress with
+  | None   -> Lwt.return ()
+  | Some s -> Lwt_switch.turn_off s
 
 (*-- Generic Store Primitives ------------------------------------------------*)
 
