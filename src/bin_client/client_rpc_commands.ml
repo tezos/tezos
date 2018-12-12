@@ -383,7 +383,13 @@ let display_answer (cctxt : #Client_context.full) = function
   | `Not_found _ ->
       cctxt#message "No service found at this URL\n%!" >>= fun () ->
       return_unit
-  | `Unauthorized _ | `Error _ | `Forbidden _ | `Conflict _ ->
+  | `Error (Some json) ->
+      cctxt#message "@[<v 2>Command failed :@[ %a@]@]@."
+        (Format.pp_print_list  Error_monad.pp)
+        (Data_encoding.Json.destruct
+           (Data_encoding.list Error_monad.error_encoding) json) >>= fun () ->
+      return_unit
+  | `Error None | `Unauthorized _ | `Forbidden _ | `Conflict _ ->
       cctxt#message "Unexpected server answer\n%!" >>= fun () ->
       return_unit
 
