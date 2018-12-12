@@ -510,7 +510,7 @@ let commands = [
 
   command ~group
     ~desc: "Call an RPC with the POST method.\n\
-            If input data is needed, a text editor will be popped up."
+            It invokes $EDITOR if input data is needed."
     no_options
     (prefixes [ "rpc" ; "post" ] @@ string ~name: "url" ~desc: "the RPC URL" @@ stop)
     (fun () -> call `POST) ;
@@ -526,6 +526,32 @@ let commands = [
               For instance, use `{}` to send the empty document.\n\
               Alternatively, use `file:path` to read the JSON data from a file."
      @@ stop)
-    (fun () -> call_with_file_or_json `POST)
+    (fun () -> call_with_file_or_json `POST) ;
+
+  command ~group
+    ~desc: "Call an RPC with the PUT method.\n\
+            It invokes $EDITOR if input data is needed."
+    no_options
+    (prefixes [ "rpc" ; "put" ] @@ string ~name: "url" ~desc: "the RPC URL" @@ stop)
+    (fun () -> call `PUT) ;
+
+  command ~group
+    ~desc: "Call an RPC with the PUT method, \
+           \ providing input data via the command line."
+    no_options
+    (prefixes [ "rpc" ; "put" ] @@ string ~name: "url" ~desc: "the RPC URL"
+     @@ prefix "with"
+     @@ string ~name:"input"
+       ~desc:"the raw JSON input to the RPC\n\
+              For instance, use `{}` to send the empty document.\n\
+              Alternatively, use `file:path` to read the JSON data from a file."
+     @@ stop)
+    (fun () -> call_with_file_or_json `PUT) ;
+
+  command ~group
+    ~desc: "Call an RPC with the DELETE method."
+    no_options
+    (prefixes [ "rpc" ; "delete" ] @@ string ~name: "url" ~desc: "the RPC URL" @@ stop)
+    (fun () -> call `DELETE) ;
 
 ]
