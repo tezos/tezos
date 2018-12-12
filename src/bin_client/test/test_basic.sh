@@ -17,7 +17,7 @@ $client rpc get '/chains/main/blocks/head/context/raw/bytes/non-existent' | asse
 $client rpc get '/chains/main/blocks/head/context/raw/bytes/delegates/?depth=3' | assert '{ "ed25519":
     { "02": { "29": null }, "a9": { "ce": null }, "c5": { "5c": null },
       "da": { "c9": null }, "e7": { "67": null } } }'
-$client rpc get '/chains/main/blocks/head/context/raw/bytes/non-existent?depth=-1' | assert 'Unexpected server answer'
+$client rpc get '/chains/main/blocks/head/context/raw/bytes/non-existent?depth=-1' | assert 'Command failed : Extraction depth -1 is invalid'
 $client rpc get '/chains/main/blocks/head/context/raw/bytes/non-existent?depth=0' | assert 'No service found at this URL'
 
 bake
