@@ -100,7 +100,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
   (* 1. Core: the carefully scheduled work performed by the worker *)
 
   module Work : sig
-    val work: Mempool_worker.t -> int -> input -> output Lwt.t
+    val process_batch: Mempool_worker.t -> int -> input -> output Lwt.t
   end = struct
     type t = {
       pool: unit Lwt_pool.t;
@@ -217,7 +217,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
         select pipeline >>= fun () ->
         Lwt.return_unit
 
-    let work mempool_worker pool_size input =
+    let process_batch mempool_worker pool_size input =
       let pipeline = create pool_size input in
       let rec loop () =
         if is_empty pipeline then
@@ -342,7 +342,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
       = fun t (Request.Batch os) ->
         let st = Worker.state t in
         Worker.record_event t (Event.Start os) ;
-        Work.work st.mempool_worker st.pool_size os >>= fun r ->
+        Work.process_batch st.mempool_worker st.pool_size os >>= fun r ->
         return r
 
     let on_no_request _ = return_unit

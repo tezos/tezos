@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -46,8 +47,7 @@ module type T = sig
 
   (** [create limits peer_id mempool_worker] creates a peer worker meant
    * to be used for validating batches of operations sent by the peer [peer_id].
-   * The [mempool_worker] the underlying worker that individual validations of
-   * singular operations are delegated to. *)
+   * The validation of each operations is delegated to the associated [mempool_worker]. *)
   val create: limits -> P2p_peer.Id.t -> Mempool_worker.t -> t Lwt.t
 
   (** [shutdown t] closes the peer worker [t]. It returns a list of operation
