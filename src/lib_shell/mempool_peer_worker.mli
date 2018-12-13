@@ -35,29 +35,31 @@ module type T = sig
   module Mempool_worker: Mempool_worker.T
 
   (** The type of a peer worker. Each peer worker should be used for treating
-   * all the operations from a given peer. *)
+      all the operations from a given peer. *)
   type t
 
   (** Types for calls into this module *)
 
   (** [input] are the batches of operations that are given to a peer worker to
-   * validate. These hashes are gossiped on the network, and the mempool checks
-   * their validity before gossiping them furhter. *)
+      validate. These hashes are gossiped on the network, and the mempool checks
+      their validity before gossiping them furhter. *)
   type input = Operation_hash.t list
 
   (** [create limits peer_id mempool_worker] creates a peer worker meant
-   * to be used for validating batches of operations sent by the peer [peer_id].
-   * The validation of each operations is delegated to the associated [mempool_worker]. *)
+      to be used for validating batches of operations sent by the peer
+      [peer_id]. The validation of each operations is delegated to the
+      associated [mempool_worker]. *)
   val create: limits -> P2p_peer.Id.t -> Mempool_worker.t -> t Lwt.t
 
   (** [shutdown t] closes the peer worker [t]. It returns a list of operation
-   * hashes that can be recycled when a new worker is created for the same peer.
-   * *)
+      hashes that can be recycled when a new worker is created for the same peer.
+  *)
   val shutdown: t -> input Lwt.t
 
-  (** [validate mempool_worker worker input] validates the batch of operations
-   * [input]. The work is performed by [worker] and the underlying validation of
-   * each operation is performed by [mempool_worker]. *)
+  (** [validate worker input] validates the batch of operations [input]. The
+      work is performed by [worker] and the underlying validation of each
+      operation is performed by the [mempool_worker] that was used to [create]
+      [worker]. *)
   val validate: t -> input -> unit tzresult Lwt.t
 
 end
