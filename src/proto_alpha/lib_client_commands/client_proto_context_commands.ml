@@ -505,8 +505,14 @@ let commands version () =
         register_as_delegate cctxt
           ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run ~fee_parameter
-          ?fee ~manager_sk:src_sk src_pk >>=? fun _res ->
-        return_unit
+          ?fee ~manager_sk:src_sk src_pk
+        >>= function
+        | Ok _ -> return_unit
+        | Error (Alpha_environment.Ecoproto_error
+                   Proto_alpha.Proto.Delegate_storage.Active_delegate  :: []) ->
+            cctxt#message "Delegate already activated." >>= fun () ->
+            return_unit
+        | Error el -> Lwt.return (Error el)
       end;
   ] @
   (if version = (Some `Mainnet) then [] else [
