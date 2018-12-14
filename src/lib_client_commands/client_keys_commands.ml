@@ -443,4 +443,40 @@ let commands version : Client_context.io_wallet Clic.command list =
          Secret_key.set cctxt [] >>=? fun () ->
          Public_key_hash.set cctxt []) ;
 
+    command ~group ~desc: "Compute deterministic nonce."
+      no_options
+      (prefixes [ "generate" ; "nonce"; "for" ]
+       @@ Public_key_hash.alias_param
+       @@ prefixes [ "from" ]
+       @@ string
+         ~name: "data"
+         ~desc: "string from which to deterministically generate the nonce"
+       @@ stop)
+      (fun () (name, _pkh) data (cctxt : Client_context.io_wallet) ->
+         let data = MBytes.of_string data in
+         Secret_key.mem cctxt name >>=? fun sk_present ->
+         fail_unless sk_present
+           (failure "secret key not present for %s" name) >>=? fun () ->
+         Secret_key.find cctxt name >>=? fun sk_uri ->
+         Client_keys.deterministic_nonce sk_uri data >>=? fun nonce ->
+         cctxt#message "%a" MBytes.pp_hex nonce >>= fun () -> return_unit) ;
+
+    command ~group ~desc: "Compute deterministic nonce hash."
+      no_options
+      (prefixes [ "generate" ; "nonce"; "hash"; "for" ]
+       @@ Public_key_hash.alias_param
+       @@ prefixes [ "from" ]
+       @@ string
+         ~name: "data"
+         ~desc: "string from which to deterministically generate the nonce hash"
+       @@ stop)
+      (fun () (name, _pkh) data (cctxt : Client_context.io_wallet) ->
+         let data = MBytes.of_string data in
+         Secret_key.mem cctxt name >>=? fun sk_present ->
+         fail_unless sk_present
+           (failure "secret key not present for %s" name) >>=? fun () ->
+         Secret_key.find cctxt name >>=? fun sk_uri ->
+         Client_keys.deterministic_nonce_hash sk_uri data >>=? fun nonce_hash ->
+         cctxt#message "%a" MBytes.pp_hex nonce_hash >>= fun () -> return_unit) ;
+
   ]
