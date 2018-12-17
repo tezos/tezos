@@ -605,7 +605,7 @@ let forge_block
     cctxt
     ~chain
     ~hard_gas_limit_per_block
-    ~block:block
+    ~block
     ~minimal_fees
     ~minimal_nanotez_per_gas_unit
     ~minimal_nanotez_per_byte
