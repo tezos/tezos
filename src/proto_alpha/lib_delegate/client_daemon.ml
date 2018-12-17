@@ -35,11 +35,15 @@ module Endorser = struct
 
   let run (cctxt : #Proto_alpha.full) ~delay delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
+    let chain = `Main in
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
-      cctxt `Main >>=? fun block_stream ->
+      cctxt chain >>=? fun block_stream ->
     cctxt#message "Endorser started." >>= fun () ->
-    Client_baking_endorsement.create cctxt ~delay delegates block_stream >>=? fun () ->
+    Client_baking_endorsement.create cctxt
+      ~delay
+      delegates
+      block_stream >>=? fun () ->
     return_unit
 
 end
