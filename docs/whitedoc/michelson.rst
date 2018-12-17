@@ -2239,7 +2239,7 @@ and variable annotations).
 ::
 
    PAIR %fst %snd
-   :: 'a : 'b : 'S -> (pair ('a %fst) ('b %fst)) : 'S
+   :: 'a : 'b : 'S -> (pair ('a %fst) ('b %snd)) : 'S
 
    LEFT %left %right 'b
    :: 'a : 'S -> (or ('a %left) ('b %right)) : 'S
