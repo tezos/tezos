@@ -48,6 +48,7 @@ val bake_block:
 (** Endorse a block *)
 val endorse_block:
   #Proto_alpha.full ->
+  ?chain: Chain_services.chain ->
   Client_keys.Public_key_hash.t ->
   unit Error_monad.tzresult Lwt.t
 

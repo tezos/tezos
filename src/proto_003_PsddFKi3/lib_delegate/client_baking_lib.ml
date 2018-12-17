@@ -89,10 +89,11 @@ let bake_block
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return_unit
 
-let endorse_block cctxt delegate =
+let endorse_block cctxt ?(chain = `Main) delegate =
   Client_keys.get_key cctxt delegate >>=? fun (_src_name, src_pk, src_sk) ->
   Client_baking_endorsement.forge_endorsement cctxt
-    cctxt#block ~src_sk src_pk >>=? fun oph ->
+    ~chain ~block:cctxt#block
+    ~src_sk src_pk >>=? fun oph ->
   cctxt#answer "Operation successfully injected in the node." >>= fun () ->
   cctxt#answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return_unit
