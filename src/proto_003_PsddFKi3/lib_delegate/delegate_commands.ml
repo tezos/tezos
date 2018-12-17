@@ -88,13 +88,15 @@ let delegate_commands () =
             await_endorsements, force,
             minimal_timestamp, mempool, context_path)
         delegate cctxt ->
-        bake_block cctxt cctxt#block
+        bake_block cctxt
           ~minimal_fees
           ~minimal_nanotez_per_gas_unit
           ~minimal_nanotez_per_byte
           ~await_endorsements
           ~force ?max_priority ~minimal_timestamp
-          ?mempool ?context_path delegate) ;
+          ?mempool ?context_path
+          ~chain:`Main ~head:cctxt#block
+          delegate) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation."
       no_options
       (prefixes [ "reveal"; "nonce"; "for" ]
@@ -106,14 +108,14 @@ let delegate_commands () =
       (prefixes [ "reveal"; "nonces" ]
        @@ stop)
       (fun () cctxt ->
-         reveal_nonces cctxt ()) ;
+         reveal_nonces ~chain:`Main cctxt ()) ;
     command ~group ~desc: "Forge and inject an endorsement operation."
       no_options
       (prefixes [ "endorse"; "for" ]
        @@ Client_keys.Public_key_hash.source_param
          ~name:"baker" ~desc: "name of the delegate owning the endorsement right"
        @@ stop)
-      (fun () delegate cctxt -> endorse_block cctxt delegate) ;
+      (fun () delegate cctxt -> endorse_block cctxt ~chain:`Main delegate) ;
   ]
 
 let init_signal () =
@@ -154,6 +156,7 @@ let baker_commands () =
         Tezos_signer_backends.Encrypted.decrypt_list
           cctxt (List.map fst delegates) >>=? fun () ->
         Client_daemon.Baker.run cctxt
+          ~chain:`Main
           ~minimal_fees
           ~minimal_nanotez_per_gas_unit
           ~minimal_nanotez_per_byte
@@ -181,6 +184,7 @@ let endorser_commands () =
          Tezos_signer_backends.Encrypted.decrypt_list
            cctxt (List.map fst delegates) >>=? fun () ->
          Client_daemon.Endorser.run cctxt
+           ~chain:`Main
            ~delay:endorsement_delay
            (List.map snd delegates)
       )
@@ -200,5 +204,5 @@ let accuser_commands () =
       (fun (pidfile, preserved_levels) cctxt ->
          init_signal () ;
          may_lock_pidfile pidfile >>=? fun () ->
-         Client_daemon.Accuser.run ~preserved_levels cctxt) ;
+         Client_daemon.Accuser.run ~chains:[ `Main ] ~preserved_levels cctxt) ;
   ]

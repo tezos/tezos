@@ -29,26 +29,26 @@ open Alpha_context
 (** Mine a block *)
 val bake_block:
   #Proto_alpha.full ->
-  ?chain:Chain_services.chain ->
   ?minimal_fees: Tez.t ->
   ?minimal_nanotez_per_gas_unit: Z.t ->
   ?minimal_nanotez_per_byte: Z.t ->
   ?await_endorsements: bool ->
-  ?force:bool ->
+  ?force: bool ->
   ?max_priority: int ->
   ?minimal_timestamp: bool ->
   ?mempool: string ->
   ?context_path: string ->
-  ?src_sk:Client_keys.sk_uri ->
-  ?src_pk:Signature.public_key ->
-  Block_services.block ->
+  ?src_sk: Client_keys.sk_uri ->
+  ?src_pk: Signature.public_key ->
+  chain: Chain_services.chain ->
+  head: Block_services.block ->
   public_key_hash ->
   unit tzresult Lwt.t
 
 (** Endorse a block *)
 val endorse_block:
   #Proto_alpha.full ->
-  ?chain: Chain_services.chain ->
+  chain: Chain_services.chain ->
   Client_keys.Public_key_hash.t ->
   unit Error_monad.tzresult Lwt.t
 
@@ -67,6 +67,6 @@ val reveal_block_nonces :
 (** Reveal all unrevealed nonces *)
 val reveal_nonces :
   #Proto_alpha.full ->
-  ?chain: Chain_services.chain ->
+  chain: Chain_services.chain ->
   unit ->
   unit Error_monad.tzresult Lwt.t
