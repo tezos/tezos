@@ -67,5 +67,6 @@ val reveal_block_nonces :
 (** Reveal all unrevealed nonces *)
 val reveal_nonces :
   #Proto_alpha.full ->
+  ?chain: Chain_services.chain ->
   unit ->
   unit Error_monad.tzresult Lwt.t
