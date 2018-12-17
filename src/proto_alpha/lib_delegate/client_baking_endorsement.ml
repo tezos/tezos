@@ -32,7 +32,7 @@ open Logging
 
 module State = Daemon_state.Make(struct let name = "endorsement" end)
 
-let get_signing_slots cctxt ?(chain = `Main) block delegate level =
+let get_signing_slots cctxt ~chain ~block delegate level =
   Alpha_services.Delegate.Endorsing_rights.get cctxt
     ~levels:[level]
     ~delegates:[delegate]
@@ -42,17 +42,19 @@ let get_signing_slots cctxt ?(chain = `Main) block delegate level =
 
 let inject_endorsement
     (cctxt : #Proto_alpha.full)
-    ?(chain = `Main) block hash level ?async
-    src_sk pkh =
+    ?async
+    ~chain ~block
+    hash level
+    delegate_sk delegate_pkh =
   Alpha_services.Forge.endorsement cctxt
     (chain, block)
     ~branch:hash
     ~level:level
     () >>=? fun bytes ->
-  State.record cctxt pkh level >>=? fun () ->
-  Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
+  State.record cctxt delegate_pkh level >>=? fun () ->
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Client_keys.append cctxt
-    src_sk ~watermark:(Endorsement chain_id) bytes >>=? fun signed_bytes ->
+    delegate_sk ~watermark:(Endorsement chain_id) bytes >>=? fun signed_bytes ->
   Shell_services.Injection.operation cctxt ?async ~chain signed_bytes >>=? fun oph ->
   return oph
 
@@ -71,8 +73,10 @@ let previously_endorsed_level cctxt pkh new_lvl  =
   | Some last_lvl ->
       return (Raw_level.(last_lvl >= new_lvl))
 
-let forge_endorsement (cctxt : #Proto_alpha.full)
-    ?(chain = `Main) block ?async
+let forge_endorsement
+    (cctxt : #Proto_alpha.full)
+    ?async
+    ~chain ~block
     ~src_sk src_pk =
   let src_pkh = Signature.Public_key.hash src_pk in
   Alpha_block_services.metadata cctxt
@@ -84,7 +88,7 @@ let forge_endorsement (cctxt : #Proto_alpha.full)
         Raw_level.pp level
   | false ->
       Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-      inject_endorsement cctxt ~chain ?async block hash level src_sk src_pkh >>=? fun oph ->
+      inject_endorsement cctxt ?async ~chain ~block hash level src_sk src_pkh >>=? fun oph ->
       Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
       cctxt#message
         "Injected endorsement level %a, contract %s '%a'"
@@ -117,19 +121,21 @@ let get_delegates cctxt state = match state.delegates with
       return delegates
   | (_ :: _) as delegates -> return delegates
 
-let endorse_for_delegate cctxt block delegate =
-  let { Client_baking_blocks.hash ; level } = block in
-  let b = `Hash (hash, 0) in
-  Client_keys.get_key cctxt delegate >>=? fun (name, _pk, sk) ->
+let endorse_for_delegate cctxt block delegate_pkh =
+  let { Client_baking_blocks.hash ; level ; chain_id } = block in
+  Client_keys.get_key cctxt delegate_pkh >>=? fun (name, _pk, delegate_sk) ->
   lwt_debug Tag.DSL.(fun f ->
       f "Endorsing %a for %s (level %a)!"
       -% t event "endorsing"
       -% a Block_hash.Logging.tag hash
       -% s Client_keys.Logging.tag name
       -% a level_tag level) >>= fun () ->
+  let chain = `Hash chain_id in
+  let block = `Hash (hash, 0) in
   inject_endorsement cctxt
-    b hash level
-    sk delegate >>=? fun oph ->
+    ~chain ~block
+    hash level
+    delegate_sk delegate_pkh >>=? fun oph ->
   lwt_log_notice Tag.DSL.(fun f ->
       f "Injected endorsement for block '%a' \
          (level %a, contract %s) '%a'"
@@ -137,7 +143,7 @@ let endorse_for_delegate cctxt block delegate =
       -% a Block_hash.Logging.tag hash
       -% a level_tag level
       -% s Client_keys.Logging.tag name
-      -% t Signature.Public_key_hash.Logging.tag delegate
+      -% t Signature.Public_key_hash.Logging.tag delegate_pkh
       -% a Operation_hash.Logging.tag oph) >>= fun () ->
   return_unit
 
@@ -148,9 +154,10 @@ let allowed_to_endorse cctxt bi delegate  =
       -% t event "check_endorsement_ok"
       -% a Block_hash.Logging.tag bi.Client_baking_blocks.hash
       -% s Client_keys.Logging.tag name) >>= fun () ->
-  let b = `Hash (bi.hash, 0) in
+  let chain = `Hash bi.chain_id in
+  let block = `Hash (bi.hash, 0) in
   let level = bi.level in
-  get_signing_slots cctxt b delegate level >>=? function
+  get_signing_slots cctxt ~chain ~block delegate level >>=? function
   | None | Some [] ->
       lwt_debug Tag.DSL.(fun f ->
           f "No slot found for %a/%s"
