@@ -29,6 +29,7 @@ open Alpha_context
 module Endorser : sig
   val run:
     #Proto_alpha.full ->
+    chain: Chain_services.chain ->
     delay: int ->
     public_key_hash list -> unit tzresult Lwt.t
 end
@@ -41,6 +42,7 @@ module Baker : sig
     ?minimal_nanotez_per_byte: Z.t ->
     ?await_endorsements: bool ->
     ?max_priority: int ->
+    chain: Chain_services.chain ->
     context_path: string ->
     public_key_hash list -> unit tzresult Lwt.t
 end
@@ -48,6 +50,7 @@ end
 module Accuser : sig
   val run:
     #Proto_alpha.full ->
+    chains: Chain_services.chain list ->
     preserved_levels: int ->
     unit tzresult Lwt.t
 end

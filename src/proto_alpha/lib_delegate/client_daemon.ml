@@ -33,9 +33,8 @@ let await_bootstrapped_node (cctxt: #Proto_alpha.full) =
 
 module Endorser = struct
 
-  let run (cctxt : #Proto_alpha.full) ~delay delegates =
+  let run (cctxt : #Proto_alpha.full) ~chain ~delay delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
-    let chain = `Main in
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt chain >>=? fun block_stream ->
@@ -57,10 +56,10 @@ module Baker = struct
       ?minimal_nanotez_per_byte
       ?await_endorsements
       ?max_priority
+      ~chain
       ~context_path
       delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
-    let chain = `Main in
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt chain >>=? fun block_stream ->
@@ -80,11 +79,11 @@ end
 
 module Accuser = struct
 
-  let run (cctxt : #Proto_alpha.full) ~preserved_levels =
+  let run (cctxt : #Proto_alpha.full) ~chains ~preserved_levels =
     await_bootstrapped_node cctxt >>=? fun _ ->
     Client_baking_blocks.monitor_valid_blocks
       ~next_protocols:(Some [Proto_alpha.hash])
-      cctxt ~chains:[ `Main ] () >>=? fun valid_blocks_stream ->
+      cctxt ~chains () >>=? fun valid_blocks_stream ->
     cctxt#message "Accuser started." >>= fun () ->
     Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream >>=? fun () ->
     return_unit

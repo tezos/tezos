@@ -28,7 +28,6 @@ open Alpha_context
 
 let bake_block
     (cctxt : #Proto_alpha.full)
-    ?(chain = `Main)
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
@@ -40,7 +39,8 @@ let bake_block
     ?context_path
     ?src_sk
     ?src_pk
-    block
+    ~chain
+    ~head
     delegate =
   begin
     match src_sk with
@@ -57,7 +57,7 @@ let bake_block
     | Some pk -> return pk
   end >>=? fun src_pk ->
   Alpha_services.Helpers.current_level
-    cctxt ~offset:1l (chain, block) >>=? fun level ->
+    cctxt ~offset:1l (chain, head) >>=? fun level ->
   let seed_nonce, seed_nonce_hash =
     if level.expected_commitment then
       let seed_nonce = Client_baking_forge.generate_seed_nonce () in
@@ -78,7 +78,7 @@ let bake_block
     ~chain
     ~priority:(`Auto (delegate, max_priority))
     ~src_sk
-    block >>=? fun block_hash ->
+    head >>=? fun block_hash ->
   let src_pkh = Signature.Public_key.hash src_pk in
   Client_baking_forge.State.record cctxt src_pkh level.level >>=? fun () ->
   begin match seed_nonce with
@@ -90,7 +90,7 @@ let bake_block
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return_unit
 
-let endorse_block cctxt ?(chain = `Main) delegate =
+let endorse_block cctxt ~chain delegate =
   Client_keys.get_key cctxt delegate >>=? fun (_src_name, src_pk, src_sk) ->
   Client_baking_endorsement.forge_endorsement cctxt
     ~chain ~block:cctxt#block
@@ -145,7 +145,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
     block_infos >>=? fun blocks ->
   do_reveal cctxt cctxt#block blocks
 
-let reveal_nonces cctxt ?(chain = `Main) () =
+let reveal_nonces cctxt ~chain () =
   Client_baking_forge.get_unrevealed_nonces
     cctxt ~chain cctxt#block >>=? fun nonces ->
   do_reveal cctxt cctxt#block nonces >>=? fun () ->
