@@ -32,8 +32,10 @@ open Client_baking_blocks
 open Logging
 
 module HLevel = Hashtbl.Make(struct
-    include Raw_level
-    let hash lvl = Int32.to_int (to_int32 lvl)
+    type t = Chain_id.t * Raw_level.t
+    let equal (c, l) (c', l') =
+      Chain_id.equal c c' && Raw_level.equal l l'
+    let hash (c, lvl) = Hashtbl.hash (c, lvl)
   end)
 
 module Delegate_Map = Map.Make(Signature.Public_key_hash)
@@ -78,29 +80,29 @@ let get_block_offset level =
           -% a errs_tag errs) >>= fun () ->
       Lwt.return (`Head 0)
 
-let process_endorsements (cctxt : #Proto_alpha.full) state ~chain
+let process_endorsements (cctxt : #Proto_alpha.full) state
     (endorsements : Alpha_block_services.operation list) level =
-  iter_s (fun { Alpha_block_services.shell ; receipt ; hash ; protocol_data ; _ } ->
+  iter_s (fun { Alpha_block_services.shell ; chain_id ; receipt ; hash ; protocol_data ; _ } ->
+      let chain = `Hash chain_id in
       match protocol_data, receipt with
       | (Operation_data ({ contents = Single (Endorsement _) ; _ } as protocol_data)),
         Apply_results.(
           Operation_metadata { contents = Single_result (Endorsement_result { delegate ; _ }) }) ->
           let new_endorsement : Kind.endorsement Alpha_context.operation = { shell ; protocol_data } in
-          let map = match HLevel.find_opt state.endorsements_table level with
+          let map = match HLevel.find_opt state.endorsements_table (chain_id, level) with
             | None -> Delegate_Map.empty
             | Some x -> x in
           (* If a previous endorsement made by this pkh is found for
              the same level we inject a double_endorsement *)
           begin match Delegate_Map.find_opt delegate map with
-            | None -> return @@ HLevel.add state.endorsements_table level
+            | None -> return @@ HLevel.add state.endorsements_table (chain_id, level)
                   (Delegate_Map.add delegate new_endorsement map)
             | Some existing_endorsement when
                 Block_hash.(existing_endorsement.shell.branch <> new_endorsement.shell.branch) ->
                 get_block_offset level >>= fun block ->
-                (* TODO : verify that the chains are coherent *)
-                Alpha_block_services.hash cctxt ~chain:`Main ~block () >>=? fun block_hash ->
+                Alpha_block_services.hash cctxt ~chain ~block () >>=? fun block_hash ->
                 Alpha_services.Forge.double_endorsement_evidence
-                  cctxt (`Main, block) ~branch:block_hash
+                  cctxt (`Hash chain_id, block) ~branch:block_hash
                   ~op1:existing_endorsement
                   ~op2:new_endorsement () >>=? fun bytes ->
                 let bytes = Signature.concat bytes Signature.zero in
@@ -115,7 +117,7 @@ let process_endorsements (cctxt : #Proto_alpha.full) state ~chain
                     -% t event "double_endorsement_denounced"
                     -% t signed_operation_tag bytes
                     -% a Operation_hash.Logging.tag op_hash) >>= fun () ->
-                return @@ HLevel.replace state.endorsements_table level
+                return @@ HLevel.replace state.endorsements_table (chain_id, level)
                   (Delegate_Map.add delegate new_endorsement map)
             | Some _ ->
                 (* This endorsement is already present in another
@@ -131,33 +133,39 @@ let process_endorsements (cctxt : #Proto_alpha.full) state ~chain
     ) endorsements >>=? fun () ->
   return_unit
 
-let process_block (cctxt : #Proto_alpha.full) state ~chain (header : Alpha_block_services.block_info) =
-  let { Alpha_block_services.hash ; metadata = { protocol_data = { baker ; level = { level } } } } = header in
-  let map = match HLevel.find_opt state.blocks_table level with
+let process_block (cctxt : #Proto_alpha.full) state (header : Alpha_block_services.block_info) =
+  let { Alpha_block_services.chain_id ; hash ;
+        metadata = { protocol_data = { baker ; level = { level } } } } = header in
+  let chain = `Hash chain_id in
+  let map = match HLevel.find_opt state.blocks_table (chain_id, level) with
     | None -> Delegate_Map.empty
     | Some x -> x in
   begin match Delegate_Map.find_opt baker map with
-    | None -> return @@ HLevel.add state.blocks_table level
+    | None -> return @@ HLevel.add state.blocks_table (chain_id, level)
           (Delegate_Map.add baker hash map)
     | Some existing_hash when Block_hash.(=) existing_hash hash ->
         (* This case should never happen *)
         lwt_debug Tag.DSL.(fun f -> f "Double baking detected but block hashes are equivalent. Skipping..." -% t event "double_baking_but_not") >>= fun () ->
-        return @@ HLevel.replace state.blocks_table level
+        return @@ HLevel.replace state.blocks_table (chain_id, level)
           (Delegate_Map.add baker hash map)
     | Some existing_hash ->
         (* If a previous endorsement made by this pkh is found for
            the same level we inject a double_endorsement *)
-        (* TODO : verify that the chains are coherent *)
         Alpha_block_services.header cctxt ~chain ~block:(`Hash (existing_hash, 0)) () >>=?
         fun ( { shell ; protocol_data } : Alpha_block_services.block_header) ->
         let bh1 = { Alpha_context.Block_header.shell = shell ; protocol_data = protocol_data } in
         Alpha_block_services.header cctxt ~chain ~block:(`Hash (hash, 0)) () >>=?
         fun ( { shell ; protocol_data } : Alpha_block_services.block_header) ->
         let bh2 = { Alpha_context.Block_header.shell = shell ; protocol_data = protocol_data } in
+        (* If the blocks are on different chains then skip it *)
         get_block_offset level >>= fun block ->
-        Alpha_block_services.hash cctxt ~chain:`Main ~block () >>=? fun block_hash ->
-        Alpha_services.Forge.double_baking_evidence cctxt (`Main, block) ~branch:block_hash
-          ~bh1 ~bh2 () >>=? fun bytes ->
+        Alpha_block_services.hash cctxt ~chain ~block () >>=? fun block_hash ->
+        Alpha_services.Forge.double_baking_evidence
+          cctxt
+          (chain, block)
+          ~branch:block_hash
+          ~bh1 ~bh2
+          () >>=? fun bytes ->
         let bytes = Signature.concat bytes Signature.zero in
         lwt_log_notice Tag.DSL.(fun f ->
             f "Double baking detected"
@@ -169,7 +177,7 @@ let process_block (cctxt : #Proto_alpha.full) state ~chain (header : Alpha_block
             -% t event "double_baking_denounced"
             -% t signed_operation_tag bytes
             -% a Operation_hash.Logging.tag op_hash) >>= fun () ->
-        return @@ HLevel.replace state.blocks_table level
+        return @@ HLevel.replace state.blocks_table (chain_id, level)
           (Delegate_Map.add baker hash map)
   end
 
@@ -187,7 +195,7 @@ let cleanup_old_operations state =
       | Error _ -> Raw_level.root
   end in
   let filter hmap =
-    HLevel.filter_map_inplace (fun level x ->
+    HLevel.filter_map_inplace (fun (_, level) x ->
         if Raw_level.(level < threshold) then
           None
         else
@@ -223,7 +231,7 @@ let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; leve
     begin
       Alpha_block_services.info cctxt ~chain ~block () >>= function
       | Ok block_info ->
-          process_block cctxt state ~chain block_info
+          process_block cctxt state block_info
       | Error errs ->
           lwt_log_error Tag.DSL.(fun f ->
               f "Error while fetching operations in block %a@\n%a"
@@ -237,7 +245,7 @@ let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; leve
       | Ok operations ->
           if List.length operations > endorsements_index then
             let endorsements = List.nth operations endorsements_index in
-            process_endorsements cctxt state ~chain endorsements level
+            process_endorsements cctxt state endorsements level
           else return_unit
       | Error errs ->
           lwt_log_error Tag.DSL.(fun f ->
