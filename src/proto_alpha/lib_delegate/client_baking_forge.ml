@@ -97,7 +97,7 @@ let generate_seed_nonce () =
 
 let forge_block_header
     (cctxt : #Proto_alpha.full)
-    ?(chain = `Main)
+    ~chain
     block
     delegate_sk
     shell
@@ -138,8 +138,8 @@ let assert_valid_operations_hash shell_header operations =
 let inject_block
     cctxt
     ?force
-    ?(chain = `Main)
     ?seed_nonce_hash
+    ~chain
     ~shell_header
     ~priority
     ~src_sk
@@ -287,13 +287,14 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block manager_operatio
     - Potentially overflowing operations *)
 let classify_operations
     (cctxt : #Proto_alpha.full)
+    ~chain
     ~block
     ~hard_gas_limit_per_block
     ~minimal_fees
     ~minimal_nanotez_per_gas_unit
     ~minimal_nanotez_per_byte
     (ops: Proto_alpha.operation list) =
-  Alpha_block_services.live_blocks cctxt ~chain:`Main ~block ()
+  Alpha_block_services.live_blocks cctxt ~chain ~block ()
   >>=? fun live_blocks ->
   (* Remove operations that are too old *)
   let ops =
@@ -575,7 +576,6 @@ let finalize_block_header
 
 let forge_block
     cctxt
-    ?(chain = `Main)
     ?force
     ?operations
     ?(best_effort = operations = None)
@@ -588,6 +588,7 @@ let forge_block
     ?mempool
     ?context_path
     ?seed_nonce_hash
+    ~chain
     ~priority
     ~src_sk
     block =
@@ -598,10 +599,11 @@ let forge_block
 
   (* get basic building blocks *)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
-  Alpha_services.Constants.all cctxt (`Main, block) >>=?
+  Alpha_services.Constants.all cctxt (chain, block) >>=?
   fun Constants.{ parametric = { hard_gas_limit_per_block ; endorsers_per_block } } ->
   classify_operations
     cctxt
+    ~chain
     ~hard_gas_limit_per_block
     ~block:block
     ~minimal_fees
@@ -629,7 +631,7 @@ let forge_block
     match context_path with
     | None ->
         Alpha_block_services.Helpers.Preapply.block
-          cctxt ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, result) ->
+          cctxt ~chain ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, result) ->
         let operations =
           List.map (fun l -> List.map snd l.Preapply_result.applied) result in
         (* everything went well (or we don't care about errors): GO! *)
@@ -651,7 +653,7 @@ let forge_block
           genesis =
             Block_hash.of_b58check_exn
               "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" ;
-          constants = tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Head 0)) ;
+          constants = tzlazy (fun () -> Alpha_services.Constants.all cctxt (chain, `Head 0)) ;
           delegates = [] ;
           best_slot = None ;
           await_endorsements ;
@@ -894,6 +896,7 @@ let build_block
   | Some operations ->
       tzforce state.constants >>=? fun Constants.{ parametric = { hard_gas_limit_per_block } } ->
       classify_operations cctxt
+        ~chain
         ~hard_gas_limit_per_block
         ~minimal_fees:state.minimal_fees
         ~minimal_nanotez_per_gas_unit:state.minimal_nanotez_per_gas_unit
@@ -1089,7 +1092,7 @@ let compute_best_slot_on_current_level
 (** [filter_outdated_nonces] removes nonces older than 5 cycles in the nonce file *)
 let filter_outdated_nonces
     (cctxt : #Proto_alpha.full)
-    ?(chain = `Main)
+    ~chain
     head =
   Alpha_block_services.metadata
     cctxt ~chain ~block:head () >>=? fun { protocol_data = { level = current_level } } ->
@@ -1117,12 +1120,17 @@ let filter_outdated_nonces
 
 (** [get_unrevealed_nonces] retrieve registered nonces *)
 let get_unrevealed_nonces
-    (cctxt : #Proto_alpha.full) ?(force = false) ?(chain = `Main) head =
+    (cctxt : #Proto_alpha.full) ?(force = false)
+    ~chain head =
   cctxt#with_lock begin fun () ->
     Client_baking_nonces.load cctxt
   end >>=? fun nonces ->
   Client_baking_blocks.blocks_from_current_cycle
-    cctxt head ~offset:(-1l) () >>=? fun blocks ->
+    cctxt
+    ~chain
+    head
+    ~offset:(-1l)
+    () >>=? fun blocks ->
   filter_map_s (fun hash ->
       match Block_hash.Map.find_opt hash nonces with
       | None -> return_none
@@ -1162,11 +1170,11 @@ let get_unrevealed_nonces
       return x
 
 (** [reveal_potential_nonces] reveal registered nonces *)
-let reveal_potential_nonces cctxt new_head =
-  get_unrevealed_nonces cctxt new_head >>= function
+let reveal_potential_nonces cctxt ~chain new_head =
+  get_unrevealed_nonces cctxt ~chain new_head >>= function
   | Ok nonces ->
       Client_baking_revelation.forge_seed_nonce_revelation
-        cctxt new_head (List.map snd nonces)
+        cctxt ~chain new_head (List.map snd nonces)
   | Error err ->
       lwt_warn Tag.DSL.(fun f ->
           f "Cannot read nonces: %a"
@@ -1188,8 +1196,9 @@ let create
     delegates
     block_stream =
   let state_maker genesis_hash bi =
+    let chain = `Hash bi.Client_baking_blocks.chain_id in
     let constants =
-      tzlazy (fun () -> Alpha_services.Constants.all cctxt (`Main, `Hash (bi.Client_baking_blocks.hash, 0))) in
+      tzlazy (fun () -> Alpha_services.Constants.all cctxt (chain, `Hash (bi.Client_baking_blocks.hash, 0))) in
     Client_baking_simulator.load_context ~context_path >>= fun index ->
     Client_baking_simulator.check_context_consistency index bi.context >>=? fun () ->
     let state = create_state
@@ -1200,7 +1209,10 @@ let create
   in
 
   let event_k cctxt state new_head =
-    reveal_potential_nonces cctxt (`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
+    let chain = `Hash new_head.Client_baking_blocks.chain_id in
+    let block = `Hash (new_head.Client_baking_blocks.hash, 0) in
+    reveal_potential_nonces cctxt
+      ~chain block >>= fun _ignore_nonce_err ->
     compute_best_slot_on_current_level ?max_priority cctxt state new_head >>=? fun slot ->
     state.best_slot <- slot ;
     return_unit

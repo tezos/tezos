@@ -75,6 +75,7 @@ let bake_block
     ?seed_nonce_hash
     ?mempool
     ?context_path
+    ~chain
     ~priority:(`Auto (delegate, max_priority))
     ~src_sk
     block >>=? fun block_hash ->
@@ -144,9 +145,9 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
     block_infos >>=? fun blocks ->
   do_reveal cctxt cctxt#block blocks
 
-let reveal_nonces cctxt () =
+let reveal_nonces cctxt ?(chain = `Main) () =
   Client_baking_forge.get_unrevealed_nonces
-    cctxt cctxt#block >>=? fun nonces ->
+    cctxt ~chain cctxt#block >>=? fun nonces ->
   do_reveal cctxt cctxt#block nonces >>=? fun () ->
-  Client_baking_forge.filter_outdated_nonces cctxt cctxt#block >>=? fun () ->
+  Client_baking_forge.filter_outdated_nonces cctxt ~chain cctxt#block >>=? fun () ->
   return_unit

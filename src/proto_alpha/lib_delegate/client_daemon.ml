@@ -82,9 +82,10 @@ module Baker = struct
       ~context_path
       delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
+    let chain = `Main in
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
-      cctxt `Main >>=? fun block_stream ->
+      cctxt chain >>=? fun block_stream ->
     cctxt#message "Baker started." >>= fun () ->
     Client_baking_forge.create cctxt
       ?minimal_fees
@@ -92,7 +93,9 @@ module Baker = struct
       ?minimal_nanotez_per_byte
       ?await_endorsements
       ?max_priority
-      ~context_path delegates block_stream >>=? fun () ->
+      ~context_path
+      delegates
+      block_stream >>=? fun () ->
     return_unit
 
 end
