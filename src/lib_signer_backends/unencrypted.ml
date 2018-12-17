@@ -74,3 +74,5 @@ let deterministic_nonce sk_uri buf =
 let deterministic_nonce_hash sk_uri buf =
   secret_key sk_uri >>=? fun sk ->
   return (Signature.deterministic_nonce_hash sk buf)
+
+let supports_deterministic_nonces _ = return_true

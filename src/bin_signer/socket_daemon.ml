@@ -48,6 +48,12 @@ let handle_client ?magic_bytes ~check_high_watermark ~require_auth cctxt fd =
       Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
       Lwt_unix.close fd >>= fun () ->
       return_unit
+  | Supports_deterministic_nonces req ->
+      let encoding = result_encoding Supports_deterministic_nonces.Response.encoding in
+      Handler.supports_deterministic_nonces cctxt req >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
+      Lwt_unix.close fd >>= fun () ->
+      return_unit
   | Public_key pkh ->
       let encoding = result_encoding Public_key.Response.encoding in
       Handler.public_key cctxt pkh >>= fun res ->

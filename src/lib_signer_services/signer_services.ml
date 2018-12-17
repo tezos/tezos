@@ -59,6 +59,13 @@ let deterministic_nonce_hash =
     ~output: Data_encoding.(obj1 (req "deterministic_nonce_hash" bytes))
     RPC_path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
 
+let supports_deterministic_nonces =
+  RPC_service.get_service
+    ~description: "Obtain whether the signing service suppports the determinstic nonces functionality"
+    ~query: RPC_query.empty
+    ~output: Data_encoding.(obj1 (req "supports_deterministic_nonces" bool))
+    RPC_path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
+
 let public_key =
   RPC_service.get_service
     ~description: "Retrieve the public key of a given remote key"

@@ -116,6 +116,27 @@ module Deterministic_nonce_hash = struct
 
 end
 
+module Supports_deterministic_nonces = struct
+
+  module Request = struct
+
+    type t = Signature.Public_key_hash.t
+
+    let encoding =
+      Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
+
+  end
+
+  module Response = struct
+
+    type t = bool
+
+    let encoding = Data_encoding.(obj1 (req "bool" bool))
+  end
+
+end
+
+
 
 module Public_key = struct
 
@@ -173,6 +194,7 @@ module Request = struct
     | Authorized_keys
     | Deterministic_nonce of Deterministic_nonce.Request.t
     | Deterministic_nonce_hash of Deterministic_nonce_hash.Request.t
+    | Supports_deterministic_nonces of Supports_deterministic_nonces.Request.t
 
   let encoding =
     let open Data_encoding in
@@ -210,6 +232,13 @@ module Request = struct
            Deterministic_nonce_hash.Request.encoding)
         (function Deterministic_nonce_hash req -> Some ((), req) | _ -> None)
         (fun ((), req) -> Deterministic_nonce_hash req) ;
+      case (Tag 5)
+        ~title:"Supports_deterministic_nonces"
+        (merge_objs
+           (obj1 (req "kind" (constant "supports_deterministic_nonces")))
+           Supports_deterministic_nonces.Request.encoding)
+        (function Supports_deterministic_nonces req -> Some ((), req) | _ -> None)
+        (fun ((), req) -> Supports_deterministic_nonces req) ;
     ]
 
 end

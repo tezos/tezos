@@ -189,6 +189,18 @@ let deterministic_nonce_hash
       -% s Client_keys.Logging.tag name) >>= fun () ->
   Client_keys.deterministic_nonce_hash sk_uri data
 
+let supports_deterministic_nonces (cctxt : #Client_context.wallet) pkh =
+  log Tag.DSL.(fun f ->
+      f "Request for checking whether the signer supports deterministic nonces for key %a"
+      -% t event "request_for_supports_deterministic_nonces"
+      -% a Signature.Public_key_hash.Logging.tag pkh) >>= fun () ->
+  Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
+  log Tag.DSL.(fun f ->
+      f "Returns true if and only if signer can generate determinstic nonces for key %s"
+      -% t event "supports_deterministic_nonces"
+      -% s Client_keys.Logging.tag name) >>= fun () ->
+  Client_keys.supports_deterministic_nonces sk_uri
+
 let public_key (cctxt : #Client_context.wallet) pkh =
   log Tag.DSL.(fun f ->
       f "Request for public key %a"

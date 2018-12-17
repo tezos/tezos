@@ -100,8 +100,13 @@ module type SIGNER = sig
 
   val deterministic_nonce_hash :
     sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
-    (** [deterministic_nonce_hash sk data] is a nonce hash obtained
-        deterministically from [data] and [sk]. *)
+  (** [deterministic_nonce_hash sk data] is a nonce hash obtained
+      deterministically from [data] and [sk]. *)
+
+  val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
+  (** [supports_deterministic_nonces] indicates whether the
+      [deterministic_nonce] functionality is supported. *)
+
 end
 
 val register_signer : (module SIGNER) -> unit
@@ -139,6 +144,9 @@ val deterministic_nonce :
 
 val deterministic_nonce_hash :
   sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+
+val supports_deterministic_nonces :
+  sk_uri -> bool tzresult Lwt.t
 
 val register_key :
   #Client_context.wallet ->

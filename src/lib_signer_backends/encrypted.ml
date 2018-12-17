@@ -281,4 +281,6 @@ module Make(C : sig val cctxt: Client_context.prompter end) = struct
     decrypt C.cctxt sk_uri >>=? fun sk ->
     return (Signature.deterministic_nonce_hash sk buf)
 
+  let supports_deterministic_nonces _ = return_true
+
 end

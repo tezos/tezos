@@ -55,3 +55,10 @@ val deterministic_nonce_hash :
 (** [deterministic_nonce_hash cctxt req ~require_auth] generates
     deterministically a nonce from [req.data] and returns the hash of
     this nonce. *)
+
+val supports_deterministic_nonces :
+  #Client_context.wallet ->
+  Signature.public_key_hash ->
+  bool tzresult Lwt.t
+(** [supports_deterministic_nonces cctxt pkh] determines whether the
+    the signer provides the determinsitic nonce functionality. *)

@@ -152,6 +152,18 @@ module Make(N : sig val scheme : string end) = struct
         signature
         msg
 
+    let supports_deterministic_nonces uri =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
+      RPC_client.call_service
+        ~logger: P.logger
+        ?headers
+        Media_type.all_media_types
+        ~base Signer_services.supports_deterministic_nonces ((), pkh) () () >>= function
+      | Ok ans -> return ans
+      | Error ((RPC_context.Not_found _) :: _) -> return false
+      | Error _ as res -> Lwt.return res
+
+
   end
 
   let make_base host port =

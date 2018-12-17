@@ -35,6 +35,10 @@ val deterministic_nonce_hash :
   ([ `POST ], unit, unit * Signature.Public_key_hash.t,
    Signature.t option, MBytes.t, MBytes.t) RPC_service.t
 
+val supports_deterministic_nonces :
+  ([ `GET ], unit, unit * Signature.Public_key_hash.t,
+   unit, unit, bool) RPC_service.t
+
 val public_key :
   ([ `GET ], unit, unit * Signature.Public_key_hash.t,
    unit, unit, Signature.Public_key.t) RPC_service.t

@@ -96,6 +96,15 @@ module Make(P : sig
     Lwt_unix.close conn >>= fun () ->
     Lwt.return res
 
+  let supports_deterministic_nonces path pkh =
+    Lwt_utils_unix.Socket.connect path >>=? fun conn ->
+    Lwt_utils_unix.Socket.send
+      conn Request.encoding (Request.Supports_deterministic_nonces pkh) >>=? fun () ->
+    Lwt_utils_unix.Socket.recv conn
+      (result_encoding Supports_deterministic_nonces.Response.encoding) >>=? fun res ->
+    Lwt_unix.close conn >>= fun () ->
+    Lwt.return res
+
   let public_key path pkh =
     Lwt_utils_unix.Socket.connect path >>=? fun conn ->
     Lwt_utils_unix.Socket.send
@@ -147,6 +156,10 @@ module Make(P : sig
     let deterministic_nonce_hash uri msg =
       parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
       deterministic_nonce_hash path pkh msg
+
+    let supports_deterministic_nonces uri =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      supports_deterministic_nonces path pkh
 
   end
 
@@ -201,6 +214,10 @@ module Make(P : sig
     let deterministic_nonce_hash uri msg =
       parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
       deterministic_nonce_hash path pkh msg
+
+    let supports_deterministic_nonces uri =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      supports_deterministic_nonces path pkh
 
   end
 

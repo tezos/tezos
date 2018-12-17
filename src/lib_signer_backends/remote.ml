@@ -107,6 +107,10 @@ module Make(S : sig
       (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
       msg
 
+  let supports_deterministic_nonces sk_uri =
+    Remote.supports_deterministic_nonces
+      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
+
 end
 
 let make_sk sk =

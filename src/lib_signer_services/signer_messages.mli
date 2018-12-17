@@ -69,6 +69,20 @@ module Deterministic_nonce_hash : sig
 
 end
 
+module Supports_deterministic_nonces : sig
+
+  module Request : sig
+    type t = Signature.Public_key_hash.t
+    val encoding : t Data_encoding.t
+  end
+
+  module Response : sig
+    type t = bool
+    val encoding : t Data_encoding.t
+  end
+
+end
+
 module Public_key : sig
 
   module Request : sig
@@ -103,6 +117,7 @@ module Request : sig
     | Authorized_keys
     | Deterministic_nonce of Deterministic_nonce.Request.t
     | Deterministic_nonce_hash of Deterministic_nonce_hash.Request.t
+    | Supports_deterministic_nonces of Supports_deterministic_nonces.Request.t
   val encoding : t Data_encoding.t
 
 end

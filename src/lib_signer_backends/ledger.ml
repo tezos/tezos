@@ -496,6 +496,7 @@ let sign ?watermark sk_uri msg =
         return (Signature.of_p256 signature)
   end
 
+
 let deterministic_nonce _ _ = fail Ledger_deterministic_nonce_not_implemented
 let deterministic_nonce_hash _ _ = fail Ledger_deterministic_nonce_not_implemented
 let supports_deterministic_nonces _ = return_false
