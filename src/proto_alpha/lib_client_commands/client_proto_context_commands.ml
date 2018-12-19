@@ -658,6 +658,11 @@ let commands version () =
                   | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
                   | Some hash -> return hash))))
       begin fun () (_name, source) proposals (cctxt : Proto_alpha.full) ->
+        get_period_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun info ->
+        begin match info.current_period_kind with
+          | Proposal -> return_unit
+          | _ -> cctxt#error "Not in a proposal period"
+        end >>=? fun () ->
         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
         let check_proposals proposals : unit tzresult Lwt.t =
           let n = List.length proposals in
@@ -676,7 +681,8 @@ let commands version () =
         Client_proto_context.get_manager
           cctxt ~chain:`Main ~block:cctxt#block
           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
-        submit_proposals cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh proposals >>=? fun _res ->
+        submit_proposals cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh
+          proposals >>=? fun _res ->
         return_unit
       end ;
 
@@ -707,6 +713,11 @@ let commands version () =
                    | b -> return b))
        @@ stop)
       begin fun () (_name, source) proposal ballot (cctxt : Proto_alpha.full) ->
+        get_period_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun info ->
+        begin match info.current_period_kind with
+          | Testing_vote | Promotion_vote -> return_unit
+          | _ -> cctxt#error "Not in a Testing_vote or Promotion_vote period"
+        end >>=? fun () ->
         Client_proto_context.get_manager
           cctxt ~chain:`Main ~block:cctxt#block
           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
@@ -715,14 +726,51 @@ let commands version () =
         return_unit
       end ;
 
-    command ~group ~desc: "Summarize the current voting information."
+    command ~group ~desc: "Summarize the current voting period."
       no_options
-      (fixed [ "show" ; "votes" ])
+      (fixed [ "show" ; "voting" ; "period" ])
       begin fun () (cctxt : Proto_alpha.full) ->
-        get_vote_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun vote_info ->
-        cctxt#message "%a" Data_encoding.Json.pp
-          (Data_encoding.Json.construct vote_info_encoding vote_info) >>= fun () ->
-        return_unit
+        get_period_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun info ->
+        cctxt#message "Current period: %a\n\
+                       Blocks remaining until end of period: %ld"
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct
+             Proto_alpha.Alpha_context.Voting_period.kind_encoding
+             info.current_period_kind)
+          info.remaining >>= fun () ->
+        get_proposals ~chain:`Main ~block:cctxt#block cctxt >>=? fun props ->
+        let ranks = Alpha_environment.Protocol_hash.Map.bindings props |>
+                    List.sort (fun (_,v1) (_,v2) -> Int32.(compare v2 v1)) in
+        let print_proposal = function
+          | None -> assert false (* not called during proposal phase *)
+          | Some proposal -> cctxt#message "Current proposal: %a"
+                               Protocol_hash.pp proposal
+        in
+        match info.current_period_kind with
+        | Proposal ->
+            (* TODO improve printing of proposals *)
+            let proposals_string =
+              if List.length ranks = 0 then " none" else
+                List.fold_left (fun acc (p,w) ->
+                    Format.asprintf "%s\n%a %ld" acc Protocol_hash.pp p w) "" ranks
+            in
+            cctxt#answer "Current proposals:%s" proposals_string
+            >>= fun () -> return_unit
+        | Testing_vote | Promotion_vote ->
+            print_proposal info.current_proposal >>= fun () ->
+            get_ballots_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun ballots_info ->
+            cctxt#answer "Ballots: %a@,\
+                          Current participation %.2f%%, necessary quorum %.2f%%@,\
+                          Current in favor %ld, needed supermajority %ld"
+              Data_encoding.Json.pp (Data_encoding.Json.construct
+                                       Vote.ballots_encoding ballots_info.ballots)
+              ((Int32.to_float ballots_info.current_quorum) /. 100.)
+              ((Int32.to_float ballots_info.participation) /. 100.)
+              ballots_info.ballots.yay
+              ballots_info.supermajority
+            >>= fun () -> return_unit
+        | Testing -> print_proposal info.current_proposal >>= fun () ->
+            return_unit
       end ;
 
   ]

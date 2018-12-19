@@ -218,15 +218,37 @@ val activate_existing_account:
   Blinded_public_key_hash.activation_code ->
   Kind.activate_account Injection.result tzresult Lwt.t
 
-type vote_info
+type period_info = {
+  current_period_kind : Voting_period.kind ;
+  position : Int32.t ;
+  remaining : Int32.t ;
+  current_proposal : Protocol_hash.t option ;
+}
 
-val vote_info_encoding : vote_info Data_encoding.t
+type ballots_info = {
+  current_quorum : Int32.t ;
+  participation : Int32.t ;
+  supermajority : Int32.t ;
+  ballots : Vote.ballots ;
+}
 
-val get_vote_info :
+val get_period_info :
   #Proto_alpha.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  vote_info tzresult Lwt.t
+  period_info tzresult Lwt.t
+
+val get_ballots_info :
+  #Proto_alpha.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ballots_info tzresult Lwt.t
+
+val get_proposals :
+  #Proto_alpha.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Int32.t Alpha_environment.Protocol_hash.Map.t tzresult Lwt.t
 
 val submit_proposals:
   #Proto_alpha.full ->

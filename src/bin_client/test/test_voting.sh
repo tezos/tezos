@@ -20,35 +20,52 @@ activate_alpha
 
 echo Alpha activated
 
-res=`$client show votes`
-echo $res
+function get_ballot_list() {
+    $client rpc get /chains/main/blocks/head/votes/ballot_list
+}
+function get_ballots() {
+    $client rpc get /chains/main/blocks/head/votes/ballots
+}
+function get_current_period_kind() {
+    $client rpc get /chains/main/blocks/head/votes/current_period_kind
+}
+function get_current_proposal() {
+    $client rpc get /chains/main/blocks/head/votes/current_proposal
+}
+function get_current_quorum() {
+    $client rpc get /chains/main/blocks/head/votes/current_quorum
+}
+function get_listings() {
+    $client rpc get /chains/main/blocks/head/votes/listings
+}
+function get_proposals() {
+    $client rpc get /chains/main/blocks/head/votes/proposals
+}
+function get_period_position() {
+    #TODO why offset 1?
+    $client rpc get /chains/main/blocks/head/helpers/current_level?offset=1 | jq .voting_period_position
+}
 
-[ `echo $res | jq .voting_period_position` = '1' ] \
+$client show voting period
+
+[ `get_period_position` = '1' ] \
     || { echo "strange voting_period_position" ; exit 1 ; }
-[ `echo $res | jq .voting_period_remaining` = '3' ] \
-    || { echo "strange voting_period_remaining" ; exit 1 ; }
 echo Checking the bug of the empty listing in the first voting period...
-[ `echo $res | jq .listings` = '[]' ] \
+[ `get_listings` = '[]' ] \
     || { echo "empty listings bug was fixed?!" ; exit 1 ; }
 
 bake # pos=2
 
-res=`$client show votes`
-[ `echo $res | jq .voting_period_position` = '2' ] \
+[ `get_period_position` = '2' ] \
     || { echo "strange voting_period_position" ; exit 1 ; }
-[ `echo $res | jq .voting_period_remaining` = '2' ] \
-    || { echo "strange voting_period_remaining" ; exit 1 ; }
 
 bake # pos=3
 bake # new period, pos=0
 
 echo 'Checking the current period = proposal with non empty listings'
-res=`$client show votes`
-[ `echo $res | jq .voting_period_position` = '0' ] \
+[ `get_period_position` = '0' ] \
     || { echo "strange voting_period_position" ; exit 1 ; }
-[ `echo $res | jq .voting_period_remaining` = '4' ] \
-    || { echo "strange voting_period_remaining" ; exit 1 ; }
-[ "`echo $res | jq .listings`" != '[]' ] \
+[ "`get_listings`" != '[]' ] \
     || { echo "strange listings" ; exit 1 ; }
 
 # Prepare 3 different protocol sources
@@ -72,7 +89,12 @@ proto=($proto_str)
 
 # Proposals
 
+[ `get_proposals` == '[]' ] \
+    || { echo "strange proposals" ; exit 1 ; }
+
 echo 'Proposal voting...'
+
+$client show voting period
 
 $client submit proposals for bootstrap1 ${proto[0]}
 $client submit proposals for bootstrap2 ${proto[0]} ${proto[1]}
@@ -81,8 +103,9 @@ $client submit proposals for bootstrap4 ${proto[2]}
 
 bake
 
-res=`$client show votes`
-[ "`echo $res | jq .proposals`" != '[]' ] \
+$client show voting period
+
+[ "`get_proposals`" != '[]' ] \
     || { echo "strange proposals" ; exit 1 ; }
 
 bake # pos=2
@@ -90,23 +113,20 @@ bake # pos=2
 echo 'Breaking the tie'
 
 $client submit proposals for bootstrap4 ${proto[1]} # To make ${proto[1]} win
-$client show votes
+$client show voting period
 
 bake # pos=3
 bake # new period! pos=0
 
 echo The phase must be testing_vote...
-res=`$client show votes`
-echo $res
-[ `echo $res | jq .voting_period_position` = '0' ] \
+
+[ `get_period_position` = '0' ] \
     || { echo "strange voting_period_position" ; exit 1 ; }
-[ `echo $res | jq .voting_period_remaining` = '4' ] \
-    || { echo "strange voting_period_remaining" ; exit 1 ; }
-[ `echo $res | jq .current_period_kind` = '"testing_vote"' ] \
+[ `get_current_period_kind` = '"testing_vote"' ] \
     || { echo "strange current_period_kind" ; exit 1 ; }
-[ "`echo $res | jq .listings`" != '[]' ] \
+[ "`get_listings`" != '[]' ] \
     || { echo "strange listings" ; exit 1 ; }
-[ `echo $res | jq .current_proposal` = '"'${proto[1]}'"' ] \
+[ `get_current_proposal` = '"'${proto[1]}'"' ] \
     || { echo "strange current_proposal" ; exit 1 ; }
 
 echo Ballots 1
@@ -125,23 +145,20 @@ $client submit ballot for bootstrap1 ${proto[1]} yay \
 bake # pos=2
 bake # pos=3
 
-$client show votes
+$client show voting period
 
 bake # new period pos=0
 
 echo Testing vote should be done
-res=`$client show votes`
-[ `echo $res | jq .voting_period_position` = '0' ] \
+[ `get_period_position` = '0' ] \
     || { echo "strange voting_period_position" ; exit 1 ; }
-[ `echo $res | jq .voting_period_remaining` = '4' ] \
-    || { echo "strange voting_period_remaining" ; exit 1 ; }
-[ `echo $res | jq .current_period_kind` = '"testing"' ] \
+[ `get_current_period_kind` = '"testing"' ] \
     || { echo "strange current_period_kind" ; exit 1 ; }
-[ "`echo $res | jq .listings`" = '[]' ] \
+[ "`get_listings`" = '[]' ] \
     || { echo "strange listings" ; exit 1 ; }
-[ `echo $res | jq .current_proposal` = '"'${proto[1]}'"' ] \
+[ `get_current_proposal` = '"'${proto[1]}'"' ] \
     || { echo "strange current_proposal" ; exit 1 ; }
-[ `echo $res | jq .ballot_list` = '[]' ] \
+[ `get_ballot_list` = '[]' ] \
     || { echo "strange ballot_list" ; exit 1 ; }
 
 bake # pos=1
@@ -150,18 +167,15 @@ bake # pos=3
 bake # new period pos=0
 
 echo Testing should be done
-res=`$client show votes`
-[ `echo $res | jq .voting_period_position` = '0' ] \
+[ `get_period_position` = '0' ] \
     || { echo "strange voting_period_position" ; exit 1 ; }
-[ `echo $res | jq .voting_period_remaining` = '4' ] \
-    || { echo "strange voting_period_remaining" ; exit 1 ; }
-[ `echo $res | jq .current_period_kind` = '"promotion_vote"' ] \
+[ `get_current_period_kind` = '"promotion_vote"' ] \
     || { echo "strange current_period_kind" ; exit 1 ; }
-[ "`echo $res | jq .listings`" != '[]' ] \
+[ "`get_listings`" != '[]' ] \
     || { echo "strange listings" ; exit 1 ; }
-[ `echo $res | jq .current_proposal` = '"'${proto[1]}'"' ] \
+[ `get_current_proposal` = '"'${proto[1]}'"' ] \
     || { echo "strange current_proposal" ; exit 1 ; }
-[ `echo $res | jq .ballot_list` = '[]' ] \
+[ `get_ballot_list` = '[]' ] \
     || { echo "strange ballot_list" ; exit 1 ; }
 
 $client submit ballot for bootstrap1 ${proto[1]} yay
@@ -173,21 +187,18 @@ bake # pos=1
 bake # pos=2
 bake # pos=3
 
-$client show votes
+$client show voting period
 
 bake # new period pos=0
 
 echo 'Promotion vote should be over now negatively'
-res=`$client show votes`
-[ `echo $res | jq .voting_period_position` = '0' ] \
+[ `get_period_position` = '0' ] \
     || { echo "strange voting_period_position" ; exit 1 ; }
-[ `echo $res | jq .voting_period_remaining` = '4' ] \
-    || { echo "strange voting_period_remaining" ; exit 1 ; }
-[ `echo $res | jq .current_period_kind` = '"proposal"' ] \
+[ `get_current_period_kind` = '"proposal"' ] \
     || { echo "strange current_period_kind" ; exit 1 ; }
-[ "`echo $res | jq .listings`" != '[]' ] \
+[ "`get_listings`" != '[]' ] \
     || { echo "strange listings" ; exit 1 ; }
-[ `echo $res | jq .current_proposal` = 'null' ] \
+[ `get_current_proposal` = 'null' ] \
     || { echo "strange current_proposal" ; exit 1 ; }
-[ `echo $res | jq .ballot_list` = '[]' ] \
+[ `get_ballot_list` = '[]' ] \
     || { echo "strange ballot_list" ; exit 1 ; }
