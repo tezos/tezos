@@ -245,6 +245,21 @@ let cursor_next_lwt cursor acc f =
   | Error err -> lwt_fail_error err
   | Ok () -> Lwt.bind acc f
 
+let cursor_at_lwt cursor k acc f =
+  match Lmdb.cursor_at cursor (concat k) with
+  | Error KeyNotFound -> acc
+  | Error err -> lwt_fail_error err
+  | Ok () -> Lwt.bind acc f
+
+(* assumption: store path segments have only characters different than
+   the separator '/', which immediately precedes '0' *)
+let zero_char_str = String.make 1 (Char.chr (Char.code '/' + 1))
+let next_key_after_subdirs = function
+  | [] -> [ zero_char_str ]
+  | (_ :: _) as path ->
+      List.sub path (List.length path - 1) @
+      [List.last_exn path ^ zero_char_str]
+
 let fold t k ~init ~f =
   let base_len = List.length k in
   let rec inner ht cursor acc =
@@ -261,35 +276,33 @@ let fold t k ~init ~f =
         else begin
           let dir = list_sub kk_split 0 (succ base_len) in
           if Hashtbl.mem ht dir then
-            cursor_next_lwt cursor (Lwt.return acc) (inner ht cursor)
+            cursor_at_lwt cursor (next_key_after_subdirs dir)
+              (Lwt.return acc) (inner ht cursor)
           else begin
             Hashtbl.add ht dir () ;
             cursor_next_lwt cursor (f (`Dir dir) acc) (inner ht cursor)
           end
         end in
   with_rw_cursor_lwt t ~f:begin fun cursor ->
-    match Lmdb.cursor_at cursor (concat k) with
-    | Error KeyNotFound -> Lwt.return init
-    | Error err -> lwt_fail_error err
-    | Ok () ->
-        let ht = Hashtbl.create 31 in
-        inner ht cursor init
+    cursor_at_lwt cursor k
+      (Lwt.return init)
+      (fun acc ->
+         let ht = Hashtbl.create 31 in
+         inner ht cursor acc)
   end
 
 let fold_keys t k ~init ~f =
   with_rw_cursor_lwt t ~f:begin fun cursor ->
-    match Lmdb.cursor_at cursor (concat k) with
-    | Error KeyNotFound -> Lwt.return init
-    | Error err -> lwt_fail_error err
-    | Ok () ->
-        let rec inner acc =
-          Lmdb.cursor_get cursor >>=? fun (kk, _v) ->
-          let kk = MBytes.to_string kk in
-          let kk_split = split kk in
-          match is_child ~child:kk_split ~parent:k with
-          | false -> Lwt.return acc
-          | true -> cursor_next_lwt cursor (f kk_split acc) inner
-        in inner init
+    cursor_at_lwt cursor k
+      (Lwt.return init)
+      (let rec inner acc =
+         Lmdb.cursor_get cursor >>=? fun (kk, _v) ->
+         let kk = MBytes.to_string kk in
+         let kk_split = split kk in
+         match is_child ~child:kk_split ~parent:k with
+         | false -> Lwt.return acc
+         | true -> cursor_next_lwt cursor (f kk_split acc) inner
+       in inner)
   end
 
 let keys t =

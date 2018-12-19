@@ -26,4 +26,5 @@
 let () =
   Alcotest.run "tezos-storage" [
     "context", Test_context.tests ;
+    "raw_store", Test_raw_store.tests ;
   ]
