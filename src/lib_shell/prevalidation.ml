@@ -130,10 +130,6 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
     Context.reset_test_chain
       predecessor_context predecessor_hash
       timestamp >>= fun predecessor_context ->
-
-    Context.reset_test_chain
-      predecessor_context predecessor_hash
-      timestamp >>= fun predecessor_context ->
     begin
       match protocol_data with
       | None -> return_none
