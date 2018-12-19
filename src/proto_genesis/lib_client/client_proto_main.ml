@@ -113,13 +113,26 @@ let commands () =
       args
       (prefixes [ "fork" ; "test" ; "protocol" ]
        @@ Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)"
-       @@ prefixes [ "with" ; "key" ]
+       @@ prefixes [ "with" ; "fitness" ]
+       @@ param ~name:"fitness"
+         ~desc:"Hardcoded fitness of the first block of the testchain (integer)"
+         int64_parameter
+       @@ prefixes [ "and" ; "key" ]
        @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"Activator's key"
+       @@ prefixes [ "and" ; "parameters" ]
+       @@ param ~name:"parameters"
+         ~desc:"Testchain protocol parameters (as JSON file)"
+         file_parameter
        @@ stop)
-      begin fun timestamp hash sk cctxt ->
+      begin fun timestamp hash fitness sk param_json_file cctxt ->
+        let fitness = Proto_alpha.Fitness_repr.from_int64 fitness in
+        Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file >>=? fun json ->
+        let protocol_parameters = Data_encoding.Binary.to_bytes_exn Data_encoding.json json in
         bake cctxt ?timestamp cctxt#block
           (Activate_testchain { protocol = hash ;
+                                fitness ;
+                                protocol_parameters ;
                                 delay = Int64.mul 24L 3600L })
           sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->

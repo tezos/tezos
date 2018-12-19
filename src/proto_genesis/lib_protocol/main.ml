@@ -91,6 +91,8 @@ let max_block_length =
   Data_encoding.Binary.length
     Data.Command.encoding
     (Activate_testchain { protocol = Protocol_hash.zero ;
+                          fitness = [ MBytes.create 1 ] ;
+                          protocol_parameters = MBytes.create 1 ;
                           delay = 0L })
   + Signature.size
 
@@ -111,7 +113,7 @@ let current_context ({ context ; _ } : validation_state) =
 (* temporary hardcoded key to be removed... *)
 let protocol_parameters_key = [ "protocol_parameters" ]
 
-let prepare_application ctxt command level timestamp fitness =
+let prepare_application ctxt command level timestamp _fitness =
   match command with
   | Data.Command.Activate { protocol = hash ; fitness ; protocol_parameters } ->
       let message =
@@ -122,14 +124,15 @@ let prepare_application ctxt command level timestamp fitness =
                fitness ; max_operations_ttl = 0 ;
                last_allowed_fork_level = level ;
              }
-  | Activate_testchain { protocol = hash ; delay } ->
+  | Activate_testchain { protocol = hash ; fitness ; protocol_parameters ; delay } ->
       let message =
         Some (Format.asprintf "activate testchain %a" Protocol_hash.pp_short hash) in
+      Context.set ctxt protocol_parameters_key protocol_parameters >>= fun ctxt ->
       let expiration = Time.add timestamp delay in
       Updater.fork_test_chain ctxt ~protocol:hash ~expiration >>= fun ctxt ->
       return { Updater.message ; context = ctxt ; fitness ;
                max_operations_ttl = 0 ;
-               last_allowed_fork_level = Int32.succ level ;
+               last_allowed_fork_level = level ;
              }
 
 let begin_application

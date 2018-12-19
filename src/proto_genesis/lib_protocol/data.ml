@@ -36,6 +36,8 @@ module Command = struct
     (* Activate a protocol as a testchain *)
     | Activate_testchain of {
         protocol: Protocol_hash.t ;
+        fitness: Fitness.t ;
+        protocol_parameters : MBytes.t ;
         delay: Int64.t ;
       }
 
@@ -68,15 +70,17 @@ module Command = struct
       case (Tag 1)
         ~title:"Activate_testchain"
         (mk_case "activate_testchain"
-           (obj2
+           (obj4
               (req "hash" Protocol_hash.encoding)
+              (req "fitness" Fitness.encoding)
+              (req "protocol_parameters" Variable.bytes)
               (req "validity_time" int64)))
         (function
-          | Activate_testchain { protocol ; delay } ->
-              Some (protocol, delay)
+          | Activate_testchain { protocol ; fitness ; protocol_parameters ; delay } ->
+              Some (protocol, fitness, protocol_parameters, delay)
           | _ -> None)
-        (fun (protocol, delay) ->
-           Activate_testchain { protocol ; delay }) ;
+        (fun (protocol, fitness, protocol_parameters, delay) ->
+           Activate_testchain { protocol ; fitness ; protocol_parameters ; delay }) ;
     ]
 
   let signed_encoding =

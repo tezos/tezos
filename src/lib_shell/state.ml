@@ -1112,6 +1112,8 @@ let fork_testchain block protocol expiration =
     Proto_test.init context block.header.Block_header.shell >>=? fun { context } ->
     Context.set_test_chain context Not_running >>= fun context ->
     Context.set_protocol context protocol >>= fun context ->
+    let (module Proto : Registered_protocol.T) = Registered_protocol.get_exn protocol in
+    Proto.init context block.header.Block_header.shell >>=? fun { context } ->
     Context.commit_test_chain_genesis
       data.context_index block.hash block.header.shell.timestamp
       context >>=? fun (chain_id, genesis, commit) ->
