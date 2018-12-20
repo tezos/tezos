@@ -35,13 +35,6 @@ module Make(M: Hashtbl.HashedType) = struct
 
   let create n = { table = Table.create n ; ring = Ring.create n }
 
-  (* IDEA:
-   * - `create` takes an additional `v -> k` function which is used to
-   * generate the key (typically `HashTbl.hash` or `SomeModule.hash`)
-   * - `add` returns that key so that the caller can either
-   *     - keep it to gain some control over the lifetime of the table entry
-   *     - throw it away to let the GC do its thing
-   * *)
   let add { ring ; table } k v =
     Ring.add ring k ;
     Table.replace table k v
