@@ -34,6 +34,7 @@ type limits = {
 val create:
   ?max_child_ttl:int ->
   start_prevalidator:bool ->
+  active_chains: t Chain_id.Table.t ->
   Peer_validator.limits ->
   Prevalidator.limits ->
   Block_validator.t ->

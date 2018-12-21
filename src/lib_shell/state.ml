@@ -516,7 +516,9 @@ module Chain = struct
       global_state
       data.context_index
       chain_data_store
-      block_store
+      block_store >>= fun chain ->
+    Chain_id.Table.add data.chains chain_id chain ;
+    Lwt.return chain
 
   let create state ?allow_forked_chain genesis  =
     let chain_id = Chain_id.of_block_hash genesis.block in
@@ -531,7 +533,6 @@ module Chain = struct
           ~protocol:genesis.protocol >>= fun commit ->
         locked_create
           state data ?allow_forked_chain chain_id genesis commit >>= fun chain ->
-        Chain_id.Table.add data.chains chain_id chain ;
         Lwt.return chain
     end
 
@@ -1306,6 +1307,13 @@ let read_block_exn t hash =
 let fork_testchain block protocol expiration =
   Shared.use block.chain_state.global_state.global_data begin fun data ->
     Block.context block >>= fun context ->
+    begin match Registered_protocol.get protocol with
+      | Some proto -> return proto
+      | None ->
+          failwith "State.fork_testchain: missing protocol '%a' for the current block."
+            Protocol_hash.pp_short protocol
+    end >>=? fun (module Proto_test) ->
+    Proto_test.init context block.header.Block_header.shell >>=? fun { context } ->
     Context.set_test_chain context Not_running >>= fun context ->
     Context.set_protocol context protocol >>= fun context ->
     Context.commit_test_chain_genesis
