@@ -65,17 +65,17 @@ let activate v ?max_child_ttl ~start_prevalidator chain_state =
       -% t event "active_chain"
       -% a State_logging.chain_id chain_id) >>= fun () ->
   match Chain_id.Table.find_opt v.active_chains chain_id with
-  |Some nv -> return nv
-  |None ->
+  | Some chain -> return chain
+  | None ->
       Chain_validator.create
         ?max_child_ttl
         ~start_prevalidator
+        ~active_chains:v.active_chains
         v.peer_validator_limits v.prevalidator_limits
         v.block_validator
         v.valid_block_input v.db chain_state
-        v.chain_validator_limits >>=? fun nv ->
-      Chain_id.Table.add v.active_chains chain_id nv ;
-      return nv
+        v.chain_validator_limits
+
 
 let get_exn { active_chains } chain_id =
   Chain_id.Table.find active_chains chain_id

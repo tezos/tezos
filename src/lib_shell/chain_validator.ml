@@ -100,8 +100,10 @@ let table = Worker.create_table Queue
 let shutdown w =
   Worker.shutdown w
 
-let shutdown_child nv =
-  Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child
+let shutdown_child nv active_chains =
+  Lwt_utils.may ~f:(fun ({ parameters = { chain_state } }, shutdown) ->
+      Chain_id.Table.remove active_chains (State.Chain.id chain_state) ;
+      shutdown ()) nv.child
 
 let notify_new_block w block =
   let nv = Worker.state w in
@@ -172,11 +174,11 @@ let may_update_checkpoint chain_state new_head =
     | Some new_block ->
         State.Chain.set_checkpoint chain_state (new_level, new_block)
 
-let may_switch_test_chain w spawn_child block =
+let may_switch_test_chain w active_chains spawn_child block =
   let nv = Worker.state w in
   let create_child genesis protocol expiration =
     if State.Chain.allow_forked_chain nv.parameters.chain_state then begin
-      shutdown_child nv >>= fun () ->
+      shutdown_child nv active_chains >>= fun () ->
       begin
         let chain_id = Chain_id.of_block_hash (State.Block.hash genesis) in
         State.Chain.get
@@ -190,6 +192,9 @@ let may_switch_test_chain w spawn_child block =
             Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
             return chain_state
       end >>=? fun chain_state ->
+      (* [spawn_child] is a callback to [create_node]. Thus, it takes care of
+         global initialization boilerplate (e.g. notifying [global_chains_input],
+         adding the chain to the correct tables, ...) *)
       spawn_child
         ~parent:(State.Chain.id chain_state)
         nv.parameters.peer_validator_limits
@@ -224,7 +229,7 @@ let may_switch_test_chain w spawn_child block =
     end >>= fun local_expiration ->
     let expired = Time.(local_expiration <= current_time) in
     if expired && activated then
-      shutdown_child nv >>= return
+      shutdown_child nv active_chains >>= return
     else if not activated && not expired then
       create_child genesis protocol expiration
     else
@@ -233,7 +238,7 @@ let may_switch_test_chain w spawn_child block =
   begin
     let block_header = State.Block.header block in
     State.Block.test_chain block >>= function
-    | Not_running -> shutdown_child nv >>= return
+    | Not_running -> shutdown_child nv active_chains >>= return
     | Running { genesis ; protocol ; expiration } ->
         check_child genesis protocol expiration
           block_header.shell.timestamp
@@ -275,7 +280,7 @@ let safe_get_protocol hash =
   | Some protocol ->
       return protocol
 
-let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
+let on_request (type a) w active_chains spawn_child (req : a Request.t) : a tzresult Lwt.t =
   let Request.Validated block = req in
   let nv = Worker.state w in
   Chain.head nv.parameters.chain_state >>= fun head ->
@@ -332,7 +337,7 @@ let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
           return_unit
       | None -> return_unit
     end >>=? fun () ->
-    may_switch_test_chain w spawn_child block >>= fun () ->
+    may_switch_test_chain w active_chains spawn_child block >>= fun () ->
     Lwt_watcher.notify nv.new_head_input block ;
     if Block_hash.equal head_hash block_header.shell.predecessor then
       return Event.Head_incrememt
@@ -451,17 +456,16 @@ let on_launch start_prevalidator w _ parameters =
   return nv
 
 let rec create
-    ?max_child_ttl ~start_prevalidator ?parent
+    ?max_child_ttl ~start_prevalidator ~active_chains ?parent
     peer_validator_limits prevalidator_limits block_validator
     global_valid_block_input db chain_state limits =
   let spawn_child ~parent pvl pl bl gvbi db n l =
-    create ~start_prevalidator ~parent pvl pl bl gvbi db n l >>=? fun w ->
-    return (Worker.state w, (fun () -> Worker.shutdown w))
-  in
+    create ~start_prevalidator ~active_chains ~parent pvl pl bl gvbi db n l >>=? fun w ->
+    return (Worker.state w, (fun () -> Worker.shutdown w)) in
   let module Handlers = struct
     type self = t
     let on_launch = on_launch start_prevalidator
-    let on_request w = on_request w spawn_child
+    let on_request w = on_request w active_chains spawn_child
     let on_close = on_close
     let on_error _ _ _ errs = Lwt.return (Error errs)
     let on_completion = on_completion
@@ -482,19 +486,23 @@ let rec create
     prevalidator_limits.worker_limits
     (State.Chain.id chain_state)
     parameters
-    (module Handlers)
+    (module Handlers) >>=? fun w ->
+  Chain_id.Table.add active_chains (State.Chain.id chain_state) w ;
+  return w
 
 (** Current block computation *)
 
 let create
     ?max_child_ttl
     ~start_prevalidator
+    ~active_chains
     peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_db state limits =
   (* hide the optional ?parent *)
   create
     ?max_child_ttl
     ~start_prevalidator
+    ~active_chains
     peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_db state limits
 

@@ -201,6 +201,7 @@ let create
     prevalidator_limits
     chain_validator_limits
   >>=? fun validator ->
+  (* TODO : Check that the testchain is correctly activated after a node restart *)
   Validator.activate validator
     ?max_child_ttl ~start_prevalidator mainchain_state >>=? fun mainchain_validator ->
   let shutdown () =
