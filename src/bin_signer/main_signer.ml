@@ -339,6 +339,7 @@ let main () =
       let cctxt =
         new Client_context_unix.unix_full
           ~block:Client_config.default_block
+          ~chain:Client_config.default_chain
           ~confirmations:None
           ~password_filename
           ~base_dir

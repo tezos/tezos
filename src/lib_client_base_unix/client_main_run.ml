@@ -66,6 +66,7 @@ let main select_commands =
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
         (new unix_full
+          ~chain:Client_config.default_chain
           ~block:Client_config.default_block
           ~confirmations:None
           ~password_filename:None
@@ -90,6 +91,7 @@ let main select_commands =
       in
       let client_config =
         new unix_full
+          ~chain:parsed_args.chain
           ~block:parsed_args.block
           ~confirmations:parsed_args.confirmations
           ~password_filename: parsed_args.password_filename
