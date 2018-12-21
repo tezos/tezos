@@ -39,6 +39,7 @@ sig
     #Tezos_client_base.Client_context.full ->
     string list ->
     (Client_config.parsed_config_args * string list) tzresult Lwt.t
+  val default_chain : Chain_services.chain
   val default_block : [> `Head of int ]
   val default_base_dir :
     (* You may use the default base directory in [Client_config] or
