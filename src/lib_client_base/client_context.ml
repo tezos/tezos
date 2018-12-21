@@ -72,6 +72,10 @@ class type wallet = object
   method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
 end
 
+class type chain = object
+  method chain : Shell_services.chain
+end
+
 class type block = object
   method block : Shell_services.block
   method confirmations : int option
@@ -94,12 +98,14 @@ class type full = object
   inherit prompter
   inherit wallet
   inherit RPC_context.json
+  inherit chain
   inherit block
 end
 
 class proxy_context (obj : full) = object
   method password_filename = obj#password_filename
   method base = obj#base
+  method chain = obj#chain
   method block = obj#block
   method confirmations = obj#confirmations
   method answer : type a. (a, unit) lwt_format -> a = obj#answer

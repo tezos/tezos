@@ -93,8 +93,8 @@ let check_network ctxt =
       | _ ->
           Lwt.return_none
 
-let get_commands_for_version ctxt network block protocol =
-  Shell_services.Blocks.protocols ctxt ~block () >>= function
+let get_commands_for_version ctxt network chain block protocol =
+  Shell_services.Blocks.protocols ctxt ~chain ~block () >>= function
   | Ok { next_protocol = version } -> begin
       match protocol with
       | None ->
@@ -123,9 +123,9 @@ let get_commands_for_version ctxt network block protocol =
           return (Some version, Client_commands.commands_for_version version network)
     end
 
-let select_commands ctxt { block ; protocol } =
+let select_commands ctxt { chain ; block ; protocol } =
   check_network ctxt >>= fun network ->
-  get_commands_for_version ctxt network block protocol >>|? fun (_, commands_for_version)  ->
+  get_commands_for_version ctxt network chain block protocol >>|? fun (_, commands_for_version)  ->
   Client_rpc_commands.commands @
   Tezos_signer_backends.Ledger.commands () @
   Client_keys_commands.commands network @

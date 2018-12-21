@@ -52,6 +52,7 @@ sig
     #Tezos_client_base.Client_context.full ->
     string list ->
     (Client_config.parsed_config_args * string list) tzresult Lwt.t
+  val default_chain : Chain_services.chain
   val default_block : [> `Head of int ]
   val default_base_dir : string
   val other_registrations :
@@ -96,6 +97,7 @@ let main
     begin
       C.parse_config_args
         (new unix_full
+          ~chain:C.default_chain
           ~block:C.default_block
           ~confirmations:None
           ~password_filename:None
@@ -136,6 +138,9 @@ let main
       in
       let client_config =
         new unix_full
+          ~chain:(match parsed_args with
+              | Some p -> p.Client_config.chain
+              | None -> Client_config.default_chain)
           ~block:(match parsed_args with
               | Some p -> p.Client_config.block
               | None -> Client_config.default_block)

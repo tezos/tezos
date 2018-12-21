@@ -35,6 +35,7 @@ class unix_logger :
   Client_context.printer
 class unix_full :
   base_dir:string ->
+  chain:Shell_services.chain ->
   block:Shell_services.block ->
   confirmations:int option ->
   password_filename: string option ->

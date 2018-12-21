@@ -45,7 +45,7 @@ let build_rpc_context config =
 let rpc_ctxt = ref (build_rpc_context !rpc_config)
 
 (* Context that does not write to alias files *)
-let no_write_context ?(block = `Head 0) config : #Client_context.full = object
+let no_write_context ?(chain = `Main) ?(block = `Head 0) config : #Client_context.full = object
   inherit RPC_client.http_ctxt config Media_type.all_media_types
   inherit Client_context.simple_printer (fun _ _ -> Lwt.return_unit)
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a Error_monad.tzresult Lwt.t =
@@ -55,6 +55,7 @@ let no_write_context ?(block = `Head 0) config : #Client_context.full = object
     a Data_encoding.encoding -> unit Error_monad.tzresult Lwt.t =
     fun _ _ _ -> return_unit
   method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = fun f -> f ()
+  method chain = chain
   method block = block
   method confirmations = None
   method password_filename = None
@@ -560,6 +561,7 @@ module Baking = struct
       ~force:true
       ~best_effort:false
       ~sort:false
+      ~chain:`Main
       ~priority:(`Auto (contract.pkh, Some 1024))
       ?seed_nonce_hash
       ~src_sk

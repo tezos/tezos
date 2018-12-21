@@ -26,12 +26,24 @@
 
 (* Tezos Command line interface - Configuration and Arguments Parsing *)
 
+type error += Invalid_chain_argument of string
 type error += Invalid_block_argument of string
 type error += Invalid_protocol_argument of string
 type error += Invalid_port_arg of string
 type error += Invalid_remote_signer_argument of string
 type error += Invalid_wait_arg of string
 let () =
+  register_error_kind
+    `Branch
+    ~id: "badChainArgument"
+    ~title: "Bad Chain Argument"
+    ~description: "Chain argument could not be parsed"
+    ~pp:
+      (fun ppf s ->
+         Format.fprintf ppf "Value %s is not a value chain reference." s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_chain_argument s -> Some s | _ -> None)
+    (fun s -> Invalid_chain_argument s) ;
   register_error_kind
     `Branch
     ~id: "badBlockArgument"
@@ -93,6 +105,7 @@ let home = try Sys.getenv "HOME" with Not_found -> "/root"
 let default_base_dir =
   Filename.concat home ".tezos-client"
 
+let default_chain = `Main
 let default_block = `Head 0
 
 let (//) = Filename.concat
@@ -162,6 +175,7 @@ module Cfg_file = struct
 end
 
 type cli_args = {
+  chain: Chain_services.chain ;
   block: Shell_services.block ;
   confirmations: int option ;
   password_filename: string option ;
@@ -171,6 +185,7 @@ type cli_args = {
 }
 
 let default_cli_args = {
+  chain = default_chain ;
   block = default_block ;
   confirmations = Some 0 ;
   password_filename = None ;
@@ -184,6 +199,13 @@ open Clic
 
 let string_parameter () : (string, #Client_context.full) parameter =
   parameter (fun _ x -> return x)
+
+let chain_parameter () =
+  parameter
+    (fun _ chain ->
+       match Chain_services.parse_chain chain with
+       | Error _ -> fail (Invalid_chain_argument chain)
+       | Ok chain -> return chain)
 
 let block_parameter () =
   parameter
@@ -243,6 +265,14 @@ let timings_switch () =
     ~short:'t'
     ~doc:"show RPC request times"
     ()
+let chain_arg () =
+  default_arg
+    ~long:"chain"
+    ~short:'b'
+    ~placeholder:"hash|tag"
+    ~doc:"chain on which to apply contextual commands"
+    ~default:(Chain_services.to_string default_cli_args.chain)
+    (chain_parameter ())
 let block_arg () =
   default_arg
     ~long:"block"
@@ -387,10 +417,11 @@ let commands config_file cfg =
 
 
 let global_options () =
-  args12
+  args13
     (base_dir_arg ())
     (config_file_arg ())
     (timings_switch ())
+    (chain_arg ())
     (block_arg ())
     (wait_arg ())
     (protocol_arg ())
@@ -427,6 +458,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
   fun ((base_dir,
         config_file,
         timings,
+        chain,
         block,
         confirmations,
         protocol,
@@ -492,7 +524,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
     ({ default_parsed_config_args with
        parsed_config_file = Some cfg ;
        parsed_args =
-         Some { block ;
+         Some { chain ; block ;
                 confirmations ;
                 print_timings = timings ;
                 log_requests ;
@@ -506,6 +538,7 @@ type t =
   string option *
   string option *
   bool *
+  Shell_services.chain *
   Shell_services.block *
   int option option *
   Protocol_hash.t option option *

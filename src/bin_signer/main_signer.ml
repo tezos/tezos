@@ -308,7 +308,6 @@ let global_options () =
     (require_auth_arg ())
     (password_filename_arg ())
 
-
 module C =
 struct
   type t = string option * bool * string option
@@ -324,6 +323,7 @@ struct
        },
        remaining)
 
+  let default_chain = Client_config.default_chain
   let default_block = Client_config.default_block
   let default_base_dir = default_base_dir
   let other_registrations = None
