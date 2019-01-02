@@ -643,15 +643,16 @@ let commands version () =
         return_unit
       end ;
 
-    command ~group ~desc: "Submit protocol proposals."
+    command ~group ~desc: "Submit protocol proposals"
       no_options
       (prefixes [ "submit" ; "proposals" ; "for" ]
        @@ ContractAlias.destination_param
-         ~name: "src" ~desc: "name of the source contract"
+         ~name: "delegate"
+         ~desc: "the delegate who makes the proposal"
        @@ seq_of_param
          (param
             ~name:"proposal"
-            ~desc:"Proposal to be submitted"
+            ~desc:"the protocol hash proposal to be submitted"
             (parameter
                (fun _ x ->
                   match Protocol_hash.of_b58check_opt x with
@@ -686,14 +687,15 @@ let commands version () =
         return_unit
       end ;
 
-    command ~group ~desc: "Submit a ballot."
+    command ~group ~desc: "Submit a ballot"
       no_options
       (prefixes [ "submit" ; "ballot" ; "for" ]
        @@ ContractAlias.destination_param
-         ~name: "src" ~desc: "name of the source contract"
+         ~name: "delegate"
+         ~desc: "the delegate who votes"
        @@ param
          ~name:"proposal"
-         ~desc:"Proposal"
+         ~desc:"the protocol hash proposal to vote for"
          (parameter
             (fun _ x ->
                match Protocol_hash.of_b58check_opt x with
@@ -701,16 +703,15 @@ let commands version () =
                | Some hash -> return hash))
        @@ param
          ~name:"ballot"
-         ~desc:"Ballot(yay/nay/pass)"
+         ~desc:"the ballot value (yay, nay or pass)"
          (parameter
-            (fun _ s ->
-               let fail () = failwith "Invalid ballot: '%s'" s in
-               match Data_encoding.Json.from_string ("\"" ^ s ^ "\"") with
-               | Error _ -> fail ()
-               | Ok j ->
-                   match Data_encoding.Json.destruct Vote.ballot_encoding j with
-                   | exception _ -> fail ()
-                   | b -> return b))
+            ~autocomplete: (fun _ -> return [ "yea" ; "nay" ; "pass" ])
+            (fun _ s -> (* We should have [Vote.of_string]. *)
+               match String.lowercase_ascii s with
+               | "yay" | "yea" -> return Vote.Yay
+               | "nay" -> return Vote.Nay
+               | "pass" -> return Vote.Pass
+               | s -> failwith "Invalid ballot: '%s'" s))
        @@ stop)
       begin fun () (_name, source) proposal ballot (cctxt : Proto_alpha.full) ->
         get_period_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun info ->
@@ -726,7 +727,7 @@ let commands version () =
         return_unit
       end ;
 
-    command ~group ~desc: "Summarize the current voting period."
+    command ~group ~desc: "Summarize the current voting period"
       no_options
       (fixed [ "show" ; "voting" ; "period" ])
       begin fun () (cctxt : Proto_alpha.full) ->

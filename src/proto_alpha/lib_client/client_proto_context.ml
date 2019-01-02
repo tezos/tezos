@@ -437,7 +437,7 @@ type ballots_info = {
 (* Should be moved to src/proto_alpha/lib_protocol/src/vote_storage.ml *)
 let ballot_list_encoding =
   Data_encoding.(list (obj2
-                         (req "pkh" Signature.Public_key_hash.encoding)
+                         (req "delegate" Signature.Public_key_hash.encoding)
                          (req "ballot" Vote.ballot_encoding)))
 
 let get_ballots_info
