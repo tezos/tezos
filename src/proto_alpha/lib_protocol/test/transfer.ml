@@ -557,7 +557,7 @@ let ownership_sender () =
   transfer_and_check_balances ~loc:__LOC__ b imcontract_1 contract_2 Tez.one
   >>=? fun (b,_) ->
   Incremental.finalize_block b >>=? fun _ ->
-  return ()
+  return_unit
 
 (*********************************************************************)
 (** Random transfer *)

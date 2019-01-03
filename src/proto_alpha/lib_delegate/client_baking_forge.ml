@@ -707,13 +707,12 @@ let shell_prevalidation
           f "Shell-side validation: error while prevalidating operations:@\n%a"
           -% t event "built_invalid_block_error"
           -% a errs_tag errs) >>= fun () ->
-      return None
+      return_none
   | Ok (shell_header, operations) ->
       let raw_ops =
         List.map (fun l ->
             List.map snd l.Preapply_result.applied) operations in
-      return
-        (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
+      return_some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
 
 let filter_outdated_endorsements expected_level ops =
   List.filter (function
@@ -934,7 +933,7 @@ let build_block
                 -% a timestamp_tag timestamp) >>= fun () ->
             finalize_block_header final_context ~timestamp validation_result operations >>=? fun shell_header ->
             let raw_ops = List.map (List.map forge) operations in
-            return (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
+            return_some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
 
 let previously_baked_level cctxt pkh new_lvl =
   State.get cctxt pkh  >>=? function
