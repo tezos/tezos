@@ -49,7 +49,7 @@ let inject_seed_nonce_revelation rpc_config ?(chain = `Main) block ?async nonces
 
 let forge_seed_nonce_revelation
     (cctxt: #Proto_alpha.full)
-    ?(chain = `Main)
+    ?(chain = cctxt#chain)
     block nonces =
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   match nonces with
