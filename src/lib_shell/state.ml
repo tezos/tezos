@@ -1250,9 +1250,11 @@ module Block = struct
             Lwt.return_some locator
       end
 
+  (* Hypothesis : genesis' predecessor is itself. *)
   let get_rpc_directory ({ chain_state ; _ } as block) =
     read_opt chain_state block.header.shell.predecessor >>= function
-    | None -> Lwt.return_none (* genesis *)
+    | None -> Lwt.return_none (* assert false *)
+    | Some pred when equal pred block -> Lwt.return_none (* genesis *)
     | Some pred ->
         protocol_hash pred >>= fun protocol ->
         match
