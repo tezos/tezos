@@ -102,7 +102,7 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   | Error _ as err -> Lwt.return err
   | Ok (first, last) ->
       let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in
-      Shell_services.Blocks.list cctxt ~heads:[hash] ~length () >>=? fun blocks ->
+      Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length () >>=? fun blocks ->
       let blocks =
         List.remove
           (length - (Int32.to_int (Raw_level.diff last first)))
