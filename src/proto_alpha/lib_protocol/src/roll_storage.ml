@@ -297,7 +297,7 @@ module Delegate = struct
       | None ->
           (* This case is only when called from `set_active`, when creating
              a contract. *)
-          return_false
+          return false
 
   let add_amount c delegate amount =
     ensure_inited c delegate >>=? fun c ->

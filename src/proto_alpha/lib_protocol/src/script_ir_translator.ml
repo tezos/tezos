@@ -1617,7 +1617,7 @@ and parse_instr
     let log_stack ctxt loc stack_ty aft =
       match type_logger, script_instr with
       | None, _
-      | Some _, (Seq (-1, _) | Int _ | String _ | Bytes _) -> return_unit
+      | Some _, (Seq (-1, _) | Int _ | String _ | Bytes _) -> return ()
       | Some log, (Prim _ | Seq _) ->
           (* Unparsing for logging done in an unlimited context as this
              is used only by the client and not the protocol *)
@@ -1625,7 +1625,7 @@ and parse_instr
           unparse_stack ctxt stack_ty >>=? fun (stack_ty, _) ->
           unparse_stack ctxt aft >>=? fun (aft, _) ->
           log loc stack_ty aft;
-          return_unit
+          return ()
     in
     let return :
       context -> bef judgement -> (bef judgement * context) tzresult Lwt.t = fun ctxt judgement ->
