@@ -68,22 +68,31 @@ let fitness_from_int64 fitness =
   [ MBytes.of_string version_number ;
     int64_to_bytes fitness ]
 
+let timestamp_arg =
+  Clic.arg
+    ~long:"timestamp"
+    ~placeholder:"date"
+    ~doc:"Set the timestamp of the block (and initial time of the chain)"
+    (Clic.parameter (fun _ t ->
+         match (Time.of_notation t) with
+         | None -> Error_monad.failwith "Could not parse value provided to -timestamp option"
+         | Some t -> return t))
+
+let test_delay_arg =
+  Clic.default_arg
+    ~long:"delay"
+    ~placeholder:"time"
+    ~doc:"Set the life span of the test chain (in seconds)"
+    ~default: (Int64.to_string (Int64.mul 24L 3600L))
+    (Clic.parameter (fun _ t ->
+         match Int64.of_string_opt t with
+         | None -> Error_monad.failwith "Could not parse value provided to -delay option"
+         | Some t -> return t))
+
 let commands () =
   let open Clic in
-  let args =
-    args1
-      (arg
-         ~long:"timestamp"
-         ~placeholder:"date"
-         ~doc:"Set the timestamp of the block (and initial time of the chain)"
-         (parameter (fun _ t ->
-              match (Time.of_notation t) with
-              | None -> Error_monad.failwith "Could not parse value provided to -timestamp option"
-              | Some t -> return t))) in
-  [
-
-    command ~desc: "Activate a protocol"
-      args
+  [ command ~desc: "Activate a protocol"
+      (args1 timestamp_arg)
       (prefixes [ "activate" ; "protocol" ]
        @@ Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)"
        @@ prefixes [ "with" ; "fitness" ]
@@ -110,7 +119,7 @@ let commands () =
       end ;
 
     command ~desc: "Fork a test protocol"
-      args
+      (args2 timestamp_arg test_delay_arg)
       (prefixes [ "fork" ; "test" ; "protocol" ]
        @@ Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)"
        @@ prefixes [ "with" ; "fitness" ]
@@ -125,15 +134,15 @@ let commands () =
          ~desc:"Testchain protocol parameters (as JSON file)"
          file_parameter
        @@ stop)
-      begin fun timestamp hash fitness sk param_json_file cctxt ->
-        let fitness = Proto_alpha.Fitness_repr.from_int64 fitness in
+      begin fun (timestamp, delay) hash fitness sk param_json_file cctxt ->
+        let fitness = fitness_from_int64 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file >>=? fun json ->
         let protocol_parameters = Data_encoding.Binary.to_bytes_exn Data_encoding.json json in
         bake cctxt ?timestamp cctxt#block
           (Activate_testchain { protocol = hash ;
                                 fitness ;
                                 protocol_parameters ;
-                                delay = Int64.mul 24L 3600L })
+                                delay })
           sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return_unit
