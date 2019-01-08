@@ -25,6 +25,13 @@
 
 open RPC_context
 
+type chain_status =
+  | Active_main of Chain_id.t
+  | Active_test of { chain : Chain_id.t ;
+                     protocol : Protocol_hash.t ;
+                     expiration_date : Time.t }
+  | Stopping of Chain_id.t
+
 val bootstrapped:
   #streamed -> ((Block_hash.t * Time.t) Lwt_stream.t * stopper) tzresult Lwt.t
 
@@ -46,6 +53,10 @@ val protocols:
   (Protocol_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
 
 val commit_hash: #simple -> string tzresult Lwt.t
+
+val active_chains:
+  #streamed ->
+  (chain_status list Lwt_stream.t * stopper) tzresult Lwt.t
 
 module S : sig
 
@@ -74,5 +85,10 @@ module S : sig
 
   val commit_hash:
     ([ `GET ], unit, unit, unit, unit, string) RPC_service.t
-end
 
+  val active_chains:
+    ([ `GET ], unit,
+     unit, unit, unit,
+     chain_status list) RPC_service.t
+
+end

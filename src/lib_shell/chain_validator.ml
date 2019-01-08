@@ -57,6 +57,7 @@ module Types = struct
     chain_db: Distributed_db.chain_db ;
     block_validator: Block_validator.t ;
     global_valid_block_input: State.Block.t Lwt_watcher.input ;
+    global_chains_input: (Chain_id.t * bool) Lwt_watcher.input ;
 
     prevalidator_limits: Prevalidator.limits ;
     peer_validator_limits: Peer_validator.limits ;
@@ -101,7 +102,8 @@ let shutdown w =
   Worker.shutdown w
 
 let shutdown_child nv active_chains =
-  Lwt_utils.may ~f:(fun ({ parameters = { chain_state } }, shutdown) ->
+  Lwt_utils.may ~f:(fun ({ parameters = { chain_state ; global_chains_input ; } }, shutdown) ->
+      Lwt_watcher.notify global_chains_input (State.Chain.id chain_state, false) ;
       Chain_id.Table.remove active_chains (State.Chain.id chain_state) ;
       shutdown ()) nv.child
 
@@ -201,6 +203,7 @@ let may_switch_test_chain w active_chains spawn_child block =
         nv.parameters.prevalidator_limits
         nv.parameters.block_validator
         nv.parameters.global_valid_block_input
+        nv.parameters.global_chains_input
         nv.parameters.db chain_state
         nv.parameters.limits (* TODO: different limits main/test ? *) >>=? fun child ->
       nv.child <- Some child ;
@@ -287,7 +290,8 @@ let safe_get_prevalidator_filter hash =
           let module Filter = Prevalidator_filters.No_filter (Proto) in
           return (module Filter : Prevalidator_filters.FILTER)
 
-let on_request (type a) w active_chains spawn_child (req : a Request.t) : a tzresult Lwt.t =
+let on_request (type a) w
+    active_chains spawn_child (req : a Request.t) : a tzresult Lwt.t =
   let Request.Validated block = req in
   let nv = Worker.state w in
   Chain.head nv.parameters.chain_state >>= fun head ->
@@ -465,9 +469,11 @@ let on_launch start_prevalidator w _ parameters =
 let rec create
     ?max_child_ttl ~start_prevalidator ~active_chains ?parent
     peer_validator_limits prevalidator_limits block_validator
-    global_valid_block_input db chain_state limits =
-  let spawn_child ~parent pvl pl bl gvbi db n l =
-    create ~start_prevalidator ~active_chains ~parent pvl pl bl gvbi db n l >>=? fun w ->
+    global_valid_block_input
+    global_chains_input
+    db chain_state limits =
+  let spawn_child ~parent pvl pl bl gvbi gci db n l =
+    create ~start_prevalidator ~active_chains ~parent pvl pl bl gvbi gci db n l >>=? fun w ->
     return (Worker.state w, (fun () -> Worker.shutdown w)) in
   let module Handlers = struct
     type self = t
@@ -485,6 +491,7 @@ let rec create
       prevalidator_limits ;
       block_validator ;
       global_valid_block_input ;
+      global_chains_input ;
       db ;
       chain_db = Distributed_db.activate db chain_state ;
       chain_state ;
@@ -495,6 +502,7 @@ let rec create
     parameters
     (module Handlers) >>=? fun w ->
   Chain_id.Table.add active_chains (State.Chain.id chain_state) w ;
+  Lwt_watcher.notify global_chains_input (State.Chain.id chain_state, true) ;
   return w
 
 (** Current block computation *)
@@ -504,14 +512,18 @@ let create
     ~start_prevalidator
     ~active_chains
     peer_validator_limits prevalidator_limits
-    block_validator global_valid_block_input global_db state limits =
+    block_validator global_valid_block_input
+    global_chains_input
+    global_db state limits =
   (* hide the optional ?parent *)
   create
     ?max_child_ttl
     ~start_prevalidator
     ~active_chains
     peer_validator_limits prevalidator_limits
-    block_validator global_valid_block_input global_db state limits
+    block_validator global_valid_block_input
+    global_chains_input
+    global_db state limits
 
 let chain_id w =
   let { parameters = { chain_state } } = Worker.state w in
