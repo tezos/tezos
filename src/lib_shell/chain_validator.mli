@@ -39,6 +39,7 @@ val create:
   Prevalidator.limits ->
   Block_validator.t ->
   State.Block.t Lwt_watcher.input ->
+  (Chain_id.t * bool) Lwt_watcher.input ->
   Distributed_db.t ->
   State.Chain.t ->
   limits ->

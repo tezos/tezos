@@ -148,7 +148,43 @@ let build_rpc_directory validator mainchain_validator =
   end ;
 
   gen_register0 Monitor_services.S.commit_hash begin fun () () ->
-    RPC_answer.return Tezos_base.Current_git_info.commit_hash
+    RPC_answer.return Tezos_base.Current_git_info.commit_hash end ;
+
+  gen_register0 Monitor_services.S.active_chains begin fun () () ->
+    let stream, stopper = Validator.chains_watcher validator in
+    let shutdown () = Lwt_watcher.shutdown stopper in
+    let first_call =
+      (* Only notify the newly created chains if this is false *)
+      ref true
+    in
+    let next () =
+      let convert (chain_id, b) =
+        if not b then
+          Lwt.return (Monitor_services.Stopping chain_id)
+        else if Chain_id.equal (State.Chain.main state) chain_id then
+          Lwt.return (Monitor_services.Active_main chain_id)
+        else
+          State.Chain.get_exn state chain_id >>= fun chain_state ->
+          let { State.Chain.protocol } = State.Chain.genesis chain_state in
+          let expiration_date = Option.unopt_exn
+              (Invalid_argument
+                 (Format.asprintf "Monitor.active_chains: no expiration date for the chain %a"
+                    Chain_id.pp chain_id))
+              (State.Chain.expiration chain_state)
+          in
+          Lwt.return
+            (Monitor_services.Active_test { chain = chain_id ; protocol ; expiration_date })
+      in
+      if !first_call then begin
+        first_call := false ;
+        Lwt_list.map_p (fun c -> convert (c, true)) (Validator.get_active_chains validator) >>= fun l ->
+        Lwt.return_some l
+      end else
+        Lwt_stream.get stream >>= function
+        | None -> Lwt.return_none
+        | Some c -> convert c >>= fun status -> Lwt.return_some [ status ]
+    in
+    RPC_answer.return_stream { next ; shutdown }
   end ;
 
   !dir
