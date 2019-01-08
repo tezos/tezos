@@ -48,6 +48,7 @@ val activate:
 
 val get: t -> Chain_id.t -> Chain_validator.t tzresult
 val get_exn: t -> Chain_id.t -> Chain_validator.t
+val get_active_chains: t -> Chain_id.t list
 
 (** Force the validation of a block. *)
 val validate_block:
@@ -59,6 +60,7 @@ val validate_block:
 
 (** Monitor all the valid block (for all activate chains). *)
 val watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
+val chains_watcher: t -> (Chain_id.t * bool) Lwt_stream.t * Lwt_watcher.stopper
 
 val inject_operation:
   t ->

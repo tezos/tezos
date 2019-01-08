@@ -23,6 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type chain_status =
+  | Active_main of Chain_id.t
+  | Active_test of { chain : Chain_id.t ;
+                     protocol : Protocol_hash.t ;
+                     expiration_date : Time.t }
+  | Stopping of Chain_id.t
+
+let chain_status_encoding =
+  let open Data_encoding in
+  union ~tag_size:`Uint8
+    [ (case
+         (Tag 0)
+         ~title:"Main"
+         (obj1 (req "chain_id" Chain_id.encoding))
+         (function Active_main chain_id -> Some chain_id | _ -> None)
+         (fun chain_id -> Active_main chain_id)) ;
+      (case
+         (Tag 1)
+         ~title:"Test"
+         (obj3
+            (req "chain_id" Chain_id.encoding)
+            (req "test_protocol" Protocol_hash.encoding)
+            (req "expiration_date" Time.encoding)
+         )
+         (function | Active_test { chain ; protocol ; expiration_date } -> Some (chain, protocol, expiration_date)
+                   | _ -> None)
+         (fun (chain, protocol, expiration_date) -> Active_test { chain ; protocol ; expiration_date })) ;
+      (case
+         (Tag 2)
+         ~title:"Stopping"
+         (obj1 (req "stopping" Chain_id.encoding))
+         (function Stopping chain_id -> Some chain_id | _ -> None)
+         (fun chain_id -> Stopping chain_id))
+    ]
+
 module S = struct
 
   open Data_encoding
@@ -107,6 +142,15 @@ module S = struct
       ~output: string
       RPC_path.(path / "commit_hash")
 
+  let active_chains =
+    RPC_service.get_service
+      ~description:"Monitor every chain creation and \
+                    destruction. Currently active chains will be given \
+                    as first elements"
+      ~query: RPC_query.empty
+      ~output: (Data_encoding.list chain_status_encoding)
+      RPC_path.(path / "active_chains")
+
 end
 
 open RPC_context
@@ -132,3 +176,6 @@ let protocols ctxt =
 
 let commit_hash ctxt =
   make_call S.commit_hash ctxt () () ()
+
+let active_chains ctxt =
+  make_streamed_call S.active_chains ctxt () () ()
