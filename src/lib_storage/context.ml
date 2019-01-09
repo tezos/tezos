@@ -469,13 +469,30 @@ let compute_testchain_genesis forked_block =
   let chain_id = Chain_id.of_block_hash genesis in
   chain_id, genesis
 
-let commit_test_chain_genesis index forked_block time ctxt =
-  let chain_id, genesis = compute_testchain_genesis forked_block in
+let commit_test_chain_genesis forked_header_hash (forked_header : Block_header.shell_header) ctxt =
+  let message =
+    Format.asprintf "Forking testchain after block %a."
+      Block_hash.pp forked_header_hash in
+  raw_commit ~time:forked_header.timestamp ~message ctxt >>= fun commit ->
+  let faked_shell_header : Block_header.shell_header = {
+    forked_header with
+    proto_level = succ forked_header.proto_level ;
+    predecessor = Block_hash.zero ;
+    validation_passes = 0 ;
+    operations_hash = Operation_list_list_hash.empty ;
+    context = GitStore.Commit.hash commit ;
+  } in
+  let genesis_hash =
+    Block_header.hash
+      { shell = faked_shell_header ;
+        protocol_data = MBytes.create 0 } in
+  let genesis_header : Block_header.t =
+    { shell = { faked_shell_header with predecessor = genesis_hash } ;
+      protocol_data = MBytes.create 0 } in
+  let chain_id = Chain_id.of_block_hash genesis_hash in
   let branch = get_branch chain_id in
-  let message = Format.asprintf "Forking testchain: %s." branch in
-  raw_commit ~time ~message ctxt >>= fun commit ->
-  GitStore.Branch.set index.repo branch commit >>= fun () ->
-  return (chain_id, genesis, GitStore.Commit.hash commit)
+  GitStore.Branch.set ctxt.index.repo branch commit >>= fun () ->
+  return (chain_id, genesis_hash, genesis_header)
 
 let reset_test_chain ctxt forked_block timestamp =
   get_test_chain ctxt >>= function

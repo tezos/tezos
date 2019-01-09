@@ -52,8 +52,8 @@ val commit_genesis:
   Context_hash.t Lwt.t
 
 val commit_test_chain_genesis:
-  index -> Block_hash.t -> Time.t -> context ->
-  (Chain_id.t * Block_hash.t * Context_hash.t) tzresult Lwt.t
+  Block_hash.t -> Block_header.shell_header -> context ->
+  (Chain_id.t * Block_hash.t * Block_header.t) tzresult Lwt.t
 
 (** {2 Generic interface} ****************************************************)
 
