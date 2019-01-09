@@ -42,10 +42,42 @@ let builtin_commands =
          return_unit) ;
   ]
 
+
+module type M =
+sig
+  type t
+  val global_options :
+    (unit -> (t, Client_context_unix.unix_full) Clic.options)
+  val parse_config_args :
+    #Tezos_client_base.Client_context.full ->
+    string list ->
+    (Client_config.parsed_config_args * string list) tzresult Lwt.t
+  val default_block : [> `Head of int ]
+  val default_base_dir : string
+  val other_registrations :
+    (Client_config.Cfg_file.t -> (module Client_config.Remote_params) -> unit)
+      option
+  type 'a c = Tezos_client_base.Client_context.full Clic.command
+  val clic_commands :
+    base_dir:string ->
+    config_commands:'a c list ->
+    builtin_commands:'a c list ->
+    other_commands:'a c list ->
+    require_auth:bool ->
+    'a c list
+end
+
+
 (* Main (lwt) entry *)
-let main select_commands =
+let main
+    (module C: M)
+    ~select_commands
+    ?logger
+    ?(other_registrations = fun _ (module Remote_params: Client_config.Remote_params) -> ())
+    ()
+  =
+  let global_options = C.global_options in
   let executable_name = Filename.basename Sys.executable_name in
-  let global_options = Client_config.global_options () in
   let original_args, autocomplete =
     (* for shell aliases *)
     let rec move_autocomplete_token_upfront acc = function
@@ -63,44 +95,61 @@ let main select_commands =
   ignore Clic.(setup_formatter Format.err_formatter
                  (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
   Logging_unix.init () >>= fun () ->
-  Lwt.catch begin fun () -> begin
-      Client_config.parse_config_args
+  Lwt.catch begin fun () ->
+    begin
+      C.parse_config_args
         (new unix_full
-          ~block:Client_config.default_block
+          ~block:C.default_block
           ~confirmations:None
           ~password_filename:None
-          ~base_dir:Client_config.default_base_dir
+          ~base_dir:C.default_base_dir
           ~rpc_config:RPC_client.default_config)
         original_args
-      >>=? fun (parsed_config_file, parsed_args, config_commands, remaining) ->
-      let rpc_config : RPC_client.config = {
-        RPC_client.default_config with
-        host = parsed_config_file.node_addr ;
-        port = parsed_config_file.node_port ;
-        tls = parsed_config_file.tls ;
-      } in
-      let ctxt = new RPC_client.http_ctxt rpc_config Media_type.all_media_types in
+      >>=? fun (parsed, remaining) ->
+      let parsed_config_file = parsed.Client_config.parsed_config_file
+      and parsed_args = parsed.Client_config.parsed_args
+      and config_commands = parsed.Client_config.config_commands in
+      let base_dir : string = match parsed.Client_config.base_dir with
+        | Some p -> p
+        | None -> match parsed_config_file with
+          | None -> C.default_base_dir
+          | Some p -> p.Client_config.Cfg_file.base_dir
+      and require_auth = parsed.Client_config.require_auth in
       let rpc_config =
-        if parsed_args.print_timings then
-          { rpc_config with
-            logger = RPC_client.timings_logger Format.err_formatter }
-        else if parsed_args.log_requests
-        then { rpc_config with logger = RPC_client.full_logger Format.err_formatter }
-        else rpc_config
+        let rpc_config : RPC_client.config = match parsed_config_file with
+          | None -> RPC_client.default_config
+          | Some parsed_config_file ->
+              {
+                RPC_client.default_config with
+                host = parsed_config_file.Client_config.Cfg_file.node_addr ;
+                port = parsed_config_file.Client_config.Cfg_file.node_port ;
+                tls = parsed_config_file.Client_config.Cfg_file.tls ;
+              } in
+        match parsed_args with
+        | Some parsed_args ->
+            if parsed_args.Client_config.print_timings then
+              { rpc_config with
+                logger = RPC_client.timings_logger Format.err_formatter }
+            else if parsed_args.Client_config.log_requests then
+              { rpc_config with
+                logger = RPC_client.full_logger Format.err_formatter }
+            else rpc_config
+        | None ->
+            rpc_config
       in
       let client_config =
         new unix_full
-          ~block:parsed_args.block
-          ~confirmations:parsed_args.confirmations
-          ~password_filename: parsed_args.password_filename
-          ~base_dir:parsed_config_file.base_dir
+          ~block:(match parsed_args with
+              | Some p -> p.Client_config.block
+              | None -> Client_config.default_block)
+          ~confirmations:(match parsed_args with
+              | Some p -> p.Client_config.confirmations
+              | None -> None)
+          ~password_filename:(match parsed_args with
+              | Some p -> p.Client_config.password_filename
+              | None -> None)
+          ~base_dir
           ~rpc_config:rpc_config in
-      Client_keys.register_signer
-        (module Tezos_signer_backends.Unencrypted) ;
-      Client_keys.register_signer
-        (module Tezos_signer_backends.Encrypted.Make(struct
-             let cctxt = (client_config :> Client_context.prompter)
-           end)) ;
       let module Remote_params = struct
         let authenticate pkhs payload =
           Client_keys.list_keys client_config >>=? fun keys ->
@@ -116,40 +165,60 @@ let main select_commands =
           | [] -> failwith
                     "remote signer expects authentication signature, \
                      but no authorized key was found in the wallet"
-        let logger = rpc_config.logger
+        let logger =
+          (* overriding the logger we might already have with the one given
+             as argument *)
+          match logger with Some logger -> logger | None -> rpc_config.logger
       end in
-      let module Https = Tezos_signer_backends.Https.Make(Remote_params) in
       let module Http = Tezos_signer_backends.Http.Make(Remote_params) in
+      let module Https = Tezos_signer_backends.Https.Make(Remote_params) in
       let module Socket = Tezos_signer_backends.Socket.Make(Remote_params) in
-      Client_keys.register_signer (module Https) ;
-      Client_keys.register_signer (module Http) ;
+      Client_keys.register_signer
+        (module Tezos_signer_backends.Encrypted.Make(struct
+             let cctxt = (client_config :> Client_context.prompter)
+           end)) ;
+      Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
+      Client_keys.register_signer (module Tezos_signer_backends.Ledger) ;
       Client_keys.register_signer (module Socket.Unix) ;
       Client_keys.register_signer (module Socket.Tcp) ;
-      Option.iter parsed_config_file.remote_signer ~f: begin fun signer ->
-        Client_keys.register_signer
-          (module Tezos_signer_backends.Remote.Make(struct
-               let default = signer
-               include Remote_params
-             end))
+      Client_keys.register_signer (module Http) ;
+      Client_keys.register_signer (module Https) ;
+      begin
+        match parsed_config_file with
+        | Some parsed_config_file ->
+            other_registrations parsed_config_file (module Remote_params)
+        | None -> ()
       end ;
-      Client_keys.register_signer (module Tezos_signer_backends.Ledger) ;
-      select_commands ctxt parsed_args >>=? fun commands ->
-      let commands =
-        Clic.add_manual
-          ~executable_name
-          ~global_options
-          (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
-          Format.std_formatter
-          (config_commands @ builtin_commands @ commands) in
-      begin match autocomplete with
-        | Some (prev_arg, cur_arg, script) ->
-            Clic.autocompletion
-              ~script ~cur_arg ~prev_arg ~args:original_args ~global_options
-              commands client_config >>=? fun completions ->
-            List.iter print_endline completions ;
-            return_unit
-        | None ->
-            Clic.dispatch commands client_config remaining
+      begin
+        (match parsed_args with
+         | Some parsed_args ->
+             select_commands (client_config :> RPC_client.http_ctxt) parsed_args
+         | None -> return [])
+        >>=? fun other_commands ->
+        let commands =
+          Clic.add_manual
+            ~executable_name
+            ~global_options:(global_options ())
+            (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
+            Format.std_formatter
+            (C.clic_commands
+               ~base_dir
+               ~config_commands
+               ~builtin_commands
+               ~other_commands
+               ~require_auth
+            )
+        in
+        begin match autocomplete with
+          | Some (prev_arg, cur_arg, script) ->
+              Clic.autocompletion
+                ~script ~cur_arg ~prev_arg ~args:original_args ~global_options:(global_options ())
+                commands client_config >>=? fun completions ->
+              List.iter print_endline completions ;
+              return_unit
+          | None ->
+              Clic.dispatch commands client_config remaining
+        end
       end
     end >>= function
     | Ok () ->
@@ -158,14 +227,14 @@ let main select_commands =
         Clic.usage
           Format.std_formatter
           ~executable_name
-          ~global_options
+          ~global_options:(global_options ())
           (match command with None -> [] | Some c -> [ c ]) ;
         Lwt.return 0
     | Error errs ->
         Clic.pp_cli_errors
           Format.err_formatter
           ~executable_name
-          ~global_options
+          ~global_options:(global_options ())
           ~default:Error_monad.pp
           errs ;
         Lwt.return 1
@@ -189,6 +258,24 @@ let main select_commands =
   Logging_unix.close () >>= fun () ->
   Lwt.return retcode
 
+
 (* Where all the user friendliness starts *)
-let run select_commands =
-  Pervasives.exit (Lwt_main.run (main select_commands))
+let run
+    (module M:M)
+    ~(select_commands :
+        (RPC_client.http_ctxt ->
+         Client_config.cli_args ->
+         Client_context.full Clic.command list tzresult Lwt.t))
+    ?logger
+    ()
+  =
+  Pervasives.exit
+    (Lwt_main.run
+       (main
+          (module M)
+          ~select_commands
+          ?logger
+          ?other_registrations:M.other_registrations
+          ()
+       )
+    )
