@@ -29,6 +29,11 @@ val may_patch_protocol:
   Tezos_protocol_environment_shell.validation_result ->
   Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
 
+val reset_test_chain:
+  Context.t ->
+  Block_header.shell_header ->
+  Context.t tzresult Lwt.t
+
 val check_liveness:
   live_blocks:Block_hash.Set.t ->
   live_operations:Operation_hash.Set.t ->

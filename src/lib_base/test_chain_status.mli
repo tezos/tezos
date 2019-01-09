@@ -32,6 +32,7 @@ type t =
   | Running of {
       chain_id: Chain_id.t ;
       genesis: Block_hash.t ;
+      genesis_header: Block_header.t ;
       protocol: Protocol_hash.t ;
       expiration: Time.t ;
     }
