@@ -107,15 +107,14 @@ let locked_set_head chain_store data block live_blocks live_operations =
      new head is a direct successor of the current head...
      Make sure to do the live blocks computation in `init_head`
      when this TODO is resolved. *)
-  Lwt.return {
-    current_head = block  ;
-    current_mempool = Mempool.empty ;
-    live_blocks ;
-    live_operations ;
-    test_chain = None ;
-    save_point = data.save_point ;
-    caboose = data.caboose ;
-  }
+  Lwt.return { current_head = block  ;
+               current_mempool = Mempool.empty ;
+               live_blocks ;
+               live_operations ;
+               test_chain = data.test_chain ;
+               save_point = data.save_point ;
+               caboose = data.caboose ;
+             }
 
 let set_head chain_state block =
   Chain_traversal.live_blocks

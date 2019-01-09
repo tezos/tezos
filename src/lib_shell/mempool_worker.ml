@@ -428,12 +428,6 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
       State.Block.header predecessor in
     State.Block.context predecessor >>= fun predecessor_context ->
     let predecessor_hash = State.Block.hash predecessor in
-    Context.reset_test_chain
-      predecessor_context predecessor_hash
-      timestamp >>= fun predecessor_context ->
-    Context.reset_test_chain
-      predecessor_context predecessor_hash
-      timestamp >>= fun predecessor_context ->
     begin
       match protocol_data with
       | None -> return_none

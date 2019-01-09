@@ -52,8 +52,10 @@ val commit_genesis:
   Context_hash.t Lwt.t
 
 val commit_test_chain_genesis:
-  Block_hash.t -> Block_header.shell_header -> context ->
-  (Chain_id.t * Block_hash.t * Block_header.t) tzresult Lwt.t
+  Block_header.shell_header ->
+  context ->
+  (Chain_id.t * Block_hash.t * Block_header.t) Lwt.t
+
 
 (** {2 Generic interface} ****************************************************)
 
@@ -104,8 +106,6 @@ val get_test_chain: context -> Test_chain_status.t Lwt.t
 val set_test_chain: context -> Test_chain_status.t -> context Lwt.t
 
 val del_test_chain: context -> context Lwt.t
-
-val reset_test_chain: context -> Block_hash.t -> Time.t -> context Lwt.t
 
 val fork_test_chain:
   context -> protocol:Protocol_hash.t -> expiration:Time.t -> context Lwt.t
