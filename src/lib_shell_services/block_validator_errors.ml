@@ -215,6 +215,19 @@ let block_error_encoding =
         (fun ((), operation, originating_block) ->
            Outdated_operation { operation ; originating_block }) ;
       case (Tag 8)
+        ~title:"Expired_chain"
+        (obj4
+           (req "error" (constant "expired_chain"))
+           (req "chain_id" Chain_id.encoding)
+           (req "expiration" Time.encoding)
+           (req "timestamp" Time.encoding))
+        (function
+          | Expired_chain { chain_id ; expiration ; timestamp } ->
+              Some ((), chain_id, expiration, timestamp)
+          | _ -> None)
+        (fun ((), chain_id, expiration, timestamp) ->
+           Expired_chain { chain_id ; expiration ; timestamp }) ;
+      case (Tag 9)
         ~title:"Unexpected_number_of_validation_passes"
         (obj2
            (req "error" (constant "unexpected_number_of_passes"))
@@ -223,7 +236,7 @@ let block_error_encoding =
           | Unexpected_number_of_validation_passes n -> Some ((), n)
           | _ -> None)
         (fun ((), n) -> Unexpected_number_of_validation_passes n) ;
-      case (Tag 9)
+      case (Tag 10)
         ~title:"Too_many_operations"
         (obj4
            (req "error" (constant "too_many_operations"))
@@ -236,7 +249,7 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), pass, found, max) ->
            Too_many_operations { pass ; found ; max }) ;
-      case (Tag 10)
+      case (Tag 11)
         ~title:"Oversized_operation"
         (obj4
            (req "error" (constant "oversized_operation"))
@@ -249,7 +262,7 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), operation, size, max) ->
            Oversized_operation { operation ; size ; max }) ;
-      case (Tag 11)
+      case (Tag 12)
         ~title:"Unallowed_pass"
         (obj4
            (req "error" (constant "invalid_pass"))
@@ -262,6 +275,16 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), operation, pass, allowed_pass) ->
            Unallowed_pass { operation ; pass ; allowed_pass }) ;
+      case (Tag 13)
+        ~title:"Cannot_parse_block_header"
+        (obj1
+           (req "error" (constant "cannot_parse_bock_header")))
+        (function
+          | Cannot_parse_block_header ->
+              Some ()
+          | _ -> None)
+        (fun () ->
+           Cannot_parse_block_header) ;
     ]
 
 let pp_block_error ppf = function
