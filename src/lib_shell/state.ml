@@ -428,7 +428,7 @@ module Chain = struct
 
   let locked_create
       global_state data ?expiration ?(allow_forked_chain = false)
-      chain_id genesis commit =
+      chain_id genesis (genesis_header : Block_header.t) =
     let chain_store = Store.Chain.get data.global_store chain_id in
     let block_store = Store.Block.get chain_store
     and chain_data_store = Store.Chain_data.get chain_store in
@@ -450,8 +450,6 @@ module Chain = struct
       else
         Lwt.return_unit
     end >>= fun () ->
-    Locked_block.store_genesis
-      block_store genesis commit >>= fun genesis_header ->
     allocate
       ~genesis
       ~faked_genesis_hash:(Block_header.hash genesis_header)
@@ -469,6 +467,8 @@ module Chain = struct
   let create state ?allow_forked_chain genesis  =
     let chain_id = Chain_id.of_block_hash genesis.block in
     Shared.use state.global_data begin fun data ->
+      let chain_store = Store.Chain.get data.global_store chain_id in
+      let block_store = Store.Block.get chain_store in
       if Chain_id.Table.mem data.chains chain_id then
         Pervasives.failwith "State.Chain.create"
       else
@@ -477,8 +477,11 @@ module Chain = struct
           ~chain_id
           ~time:genesis.time
           ~protocol:genesis.protocol >>= fun commit ->
+        Locked_block.store_genesis
+          block_store genesis commit >>= fun genesis_header ->
         locked_create
-          state data ?allow_forked_chain chain_id genesis commit >>= fun chain ->
+          state data ?allow_forked_chain
+          chain_id genesis genesis_header >>= fun chain ->
         Lwt.return chain
     end
 
@@ -1115,15 +1118,24 @@ let fork_testchain block protocol expiration =
     let (module Proto : Registered_protocol.T) = Registered_protocol.get_exn protocol in
     Proto.init context block.header.Block_header.shell >>=? fun { context } ->
     Context.commit_test_chain_genesis
-      data.context_index block.hash block.header.shell.timestamp
-      context >>=? fun (chain_id, genesis, commit) ->
-    let genesis = {
-      block = genesis ;
-      time = Time.add block.header.shell.timestamp 1L ;
-      protocol ;
-    } in
+      block.hash
+      block.header.shell
+      context >>=? fun (chain_id, genesis_hash, genesis_header) ->
+    let chain_store = Store.Chain.get data.global_store chain_id in
+    let block_store = Store.Block.get chain_store in
+    Store.Block.Header.store (block_store, genesis_hash) genesis_header >>= fun () ->
+    Store.Block.Contents.store (block_store, genesis_hash)
+      { Store.Block.message = Some "Genesis" ;
+        max_operations_ttl = 0 ; context = genesis_header.shell.context ;
+        metadata = MBytes.create 0 ;
+        last_allowed_fork_level = 0l ;
+      } >>= fun () ->
+    let genesis =
+      { block = genesis_hash ;
+        time = genesis_header.shell.timestamp ;
+        protocol } in
     Chain.locked_create block.chain_state.global_state data
-      chain_id ~expiration genesis commit >>= fun chain ->
+      chain_id ~expiration genesis genesis_header >>= fun chain ->
     update_chain_data block.chain_state begin fun _ chain_data ->
       Lwt.return (Some { chain_data with test_chain = Some chain.chain_id }, ())
     end >>= fun () ->
