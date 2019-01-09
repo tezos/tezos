@@ -34,4 +34,4 @@ let select_commands _ _ =
        (Clic.map_command (new Proto_alpha.wrap_full))
        (Delegate_commands.baker_commands ()))
 
-let () = Client_main_run.run select_commands
+let () = Client_main_run.run (module Client_config) ~select_commands ()

@@ -385,6 +385,7 @@ let commands config_file cfg =
          else failwith "Config file already exists at location") ;
   ]
 
+
 let global_options () =
   args12
     (base_dir_arg ())
@@ -399,6 +400,24 @@ let global_options () =
     (tls_switch ())
     (remote_signer_arg ())
     (password_filename_arg ())
+
+
+type parsed_config_args = {
+  parsed_config_file : Cfg_file.t option ;
+  parsed_args : cli_args option ;
+  config_commands : Client_context.full command list ;
+  base_dir : string option ;
+  require_auth : bool ;
+  password_filename : string option ;
+}
+let default_parsed_config_args = {
+  parsed_config_file = None ;
+  parsed_args = None ;
+  config_commands = [] ;
+  base_dir = None ;
+  require_auth = false ;
+  password_filename = None ;
+}
 
 let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options
@@ -470,7 +489,53 @@ let parse_config_args (ctx : #Client_context.full) argv =
   end ;
   Lwt_utils_unix.create_dir config_dir >>= fun () ->
   return
-    (cfg,
-     { block ; confirmations ; password_filename ;
-       print_timings = timings ; log_requests ; protocol },
-     commands config_file cfg, remaining)
+    ({ default_parsed_config_args with
+       parsed_config_file = Some cfg ;
+       parsed_args =
+         Some { block ;
+                confirmations ;
+                print_timings = timings ;
+                log_requests ;
+                password_filename ;
+                protocol } ;
+       config_commands = commands config_file cfg
+     },
+     remaining)
+
+type t =
+  string option *
+  string option *
+  bool *
+  Shell_services.block *
+  int option option *
+  Protocol_hash.t option option *
+  bool *
+  string option *
+  int option *
+  bool *
+  Uri.t option *
+  string option
+
+module type Remote_params =
+sig
+  val authenticate: Signature.public_key_hash list ->
+    MBytes.t -> Signature.t tzresult Lwt.t
+  val logger : RPC_client.logger
+end
+
+let other_registrations : (_ -> (module Remote_params) -> _) option  =
+  Some (fun parsed_config_file (module Remote_params) ->
+      Option.iter parsed_config_file.Cfg_file.remote_signer ~f:(fun signer ->
+          Client_keys.register_signer
+            (module Tezos_signer_backends.Remote.Make(struct
+                 let default = signer
+                 include Remote_params
+               end))
+        ))
+
+
+type 'a c = Tezos_client_base.Client_context.full Clic.command
+
+let clic_commands ~base_dir:_ ~config_commands ~builtin_commands
+    ~other_commands ~require_auth:_ =
+  config_commands @ builtin_commands @ other_commands

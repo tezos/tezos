@@ -37,6 +37,4 @@ end
 
 include Client_keys.SIGNER
 
-
-
 val commands : unit -> Client_context.full Clic.command list

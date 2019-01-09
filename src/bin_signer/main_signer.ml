@@ -311,111 +311,36 @@ let global_options () =
     (require_auth_arg ())
     (password_filename_arg ())
 
-(* Main (lwt) entry *)
-let main () =
-  let executable_name = Filename.basename Sys.executable_name in
-  let original_args, autocomplete =
-    (* for shell aliases *)
-    let rec move_autocomplete_token_upfront acc = function
-      | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: args ->
-          let args = List.rev acc @ args in
-          args, Some (prev_arg, cur_arg, script)
-      | x :: rest -> move_autocomplete_token_upfront (x :: acc) rest
-      | [] -> List.rev acc, None in
-    match Array.to_list Sys.argv with
-    | _ :: args -> move_autocomplete_token_upfront [] args
-    | [] -> [], None in
-  Random.self_init () ;
-  ignore Clic.(setup_formatter Format.std_formatter
-                 (if Unix.isatty Unix.stdout then Ansi else Plain) Short) ;
-  ignore Clic.(setup_formatter Format.err_formatter
-                 (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
-  begin
-    begin
-      parse_global_options
-        (global_options ()) () original_args >>=?
-      fun ((base_dir, require_auth, password_filename), remaining) ->
-      let base_dir = Option.unopt ~default:default_base_dir base_dir in
-      let cctxt =
-        new Client_context_unix.unix_full
-          ~block:Client_config.default_block
-          ~confirmations:None
-          ~password_filename
-          ~base_dir
-          ~rpc_config:RPC_client.default_config in
-      Client_keys.register_signer
-        (module Tezos_signer_backends.Encrypted.Make(struct
-             let cctxt = new Client_context_unix.unix_prompter
-           end)) ;
-      Client_keys.register_signer
-        (module Tezos_signer_backends.Unencrypted) ;
-      Client_keys.register_signer
-        (module Tezos_signer_backends.Ledger) ;
-      Logging_unix.init () >>= fun () ->
-      let module Remote_params = struct
-        let authenticate pkhs payload =
-          Client_keys.list_keys cctxt >>=? fun keys ->
-          match List.filter_map begin function
-              | (_, known_pkh, _, Some known_sk_uri)
-                when List.exists (fun pkh -> Signature.Public_key_hash.equal pkh known_pkh) pkhs ->
-                  Some known_sk_uri
-              | _ -> None
-            end keys with
-          | sk_uri :: _ ->
-              Client_keys.sign cctxt sk_uri payload
-          | [] -> failwith
-                    "remote signer expects authentication signature, \
-                     but no authorized key was found in the wallet"
-        let logger = RPC_client.full_logger Format.err_formatter
-      end in
-      let module Socket = Tezos_signer_backends.Socket.Make(Remote_params) in
-      let module Http = Tezos_signer_backends.Http.Make(Remote_params) in
-      let module Https = Tezos_signer_backends.Https.Make(Remote_params) in
-      Client_keys.register_signer (module Socket.Unix) ;
-      Client_keys.register_signer (module Socket.Tcp) ;
-      Client_keys.register_signer (module Http) ;
-      Client_keys.register_signer (module Https) ;
-      let commands =
-        Clic.add_manual
-          ~executable_name
-          ~global_options:(global_options ())
-          (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
-          Format.std_formatter
-          (commands base_dir require_auth) in
-      begin match autocomplete with
-        | Some (prev_arg, cur_arg, script) ->
-            Clic.autocompletion
-              ~script ~cur_arg ~prev_arg ~args:original_args
-              ~global_options:(global_options ())
-              commands cctxt >>=? fun completions ->
-            List.iter print_endline completions ;
-            return_unit
-        | None ->
-            Clic.dispatch commands cctxt remaining
-      end
-    end >>= function
-    | Ok () ->
-        Lwt.return 0
-    | Error [ Clic.Help command ] ->
-        Clic.usage
-          Format.std_formatter
-          ~executable_name
-          ~global_options:(global_options ())
-          (match command with None -> [] | Some c -> [ c ]) ;
-        Lwt.return 0
-    | Error errs ->
-        Clic.pp_cli_errors
-          Format.err_formatter
-          ~executable_name
-          ~global_options:(global_options ())
-          ~default:Error_monad.pp
-          errs ;
-        Lwt.return 1
-  end >>= fun retcode ->
-  Format.pp_print_flush Format.err_formatter () ;
-  Format.pp_print_flush Format.std_formatter () ;
-  Logging_unix.close () >>= fun () ->
-  Lwt.return retcode
+
+module C =
+struct
+  type t = string option * bool * string option
+  let global_options = global_options
+  let parse_config_args ctx argv =
+    Clic.parse_global_options (global_options ()) ctx argv
+    >>=? fun ((base_dir, require_auth, password_filename), remaining) ->
+    return
+      ({Client_config.default_parsed_config_args with
+        base_dir ;
+        require_auth ;
+        password_filename
+       },
+       remaining)
+
+  let default_block = Client_config.default_block
+  let default_base_dir = default_base_dir
+  let other_registrations = None
+
+  type 'a c = Tezos_client_base.Client_context.full Clic.command
+
+  let clic_commands ~base_dir ~config_commands:_ ~builtin_commands:_
+      ~other_commands ~require_auth =
+    commands base_dir require_auth @ other_commands
+end
 
 let () =
-  Pervasives.exit (Lwt_main.run (main ()))
+  Client_main_run.run
+    (module C)
+    ~select_commands:(fun _ _ -> return [])
+    ~logger:(RPC_client.full_logger Format.err_formatter)
+    ()

@@ -130,9 +130,9 @@ let select_commands ctxt { block ; protocol } =
   Tezos_signer_backends.Ledger.commands () @
   List.map
     (Clic.map_command
-       (fun (o : Client_context.full) -> (o :> Client_context.io_wallet)))
+       (fun (o : Client_context.full) -> o))
     (Client_keys_commands.commands network) @
   Client_helpers_commands.commands () @
   commands_for_version
 
-let () = Client_main_run.run select_commands
+let () = Client_main_run.run (module Client_config) ~select_commands ()
