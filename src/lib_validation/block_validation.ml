@@ -33,6 +33,33 @@ type result = {
   context_hash: Context_hash.t ;
 }
 
+let reset_test_chain
+    ctxt (forked_header : Block_header.shell_header) =
+  Context.get_test_chain ctxt >>= function
+  | Not_running -> return ctxt
+  | Running { expiration } ->
+      if Time.(expiration <= forked_header.timestamp) then
+        Context.set_test_chain ctxt Not_running >>= fun ctxt ->
+        return ctxt
+      else
+        return ctxt
+  | Forking { protocol ; expiration } ->
+      begin match Registered_protocol.get protocol with
+        | Some proto -> return proto
+        | None ->
+            (* FIXME Proper error *)
+            failwith "State.fork_testchain: missing protocol '%a' for the current block."
+              Protocol_hash.pp_short protocol
+      end >>=? fun (module Proto_test) ->
+      Proto_test.init ctxt forked_header >>=? fun { context = test_ctxt } ->
+      Context.set_test_chain test_ctxt Not_running >>= fun test_ctxt ->
+      Context.set_protocol test_ctxt protocol >>= fun test_ctxt ->
+      Context.commit_test_chain_genesis forked_header test_ctxt >>= fun (chain_id, genesis, genesis_header) ->
+      Context.set_test_chain ctxt
+        (Running { chain_id ; genesis ; genesis_header ;
+                   protocol ; expiration }) >>= fun ctxt ->
+      return ctxt
+
 let may_patch_protocol
     ~level
     (validation_result : Tezos_protocol_environment_shell.validation_result) =
@@ -137,19 +164,16 @@ module Make(Proto : Registered_protocol.T) = struct
       operations =
     let block_hash = Block_header.hash block_header in
     let invalid_block = invalid_block block_hash in
-    let pred_hash = Block_header.hash predecessor_block_header in
     check_block_header
       ~predecessor_block_header
       block_hash block_header >>=? fun () ->
     parse_block_header block_hash block_header >>=? fun block_header ->
     check_operation_quota block_hash operations >>=? fun () ->
-    Context.reset_test_chain
-      predecessor_context pred_hash block_header.shell.timestamp >>= fun context ->
     parse_operations block_hash operations >>=? fun operations ->
     (* TODO wrap 'proto_error' into 'block_error' *)
     Proto.begin_application
       ~chain_id
-      ~predecessor_context:context
+      ~predecessor_context
       ~predecessor_timestamp:predecessor_block_header.shell.timestamp
       ~predecessor_fitness:predecessor_block_header.shell.fitness
       block_header >>=? fun state ->
@@ -212,10 +236,11 @@ module Make(Proto : Registered_protocol.T) = struct
            (Data_encoding.Binary.to_bytes_exn
               Proto.operation_receipt_encoding))
         ops_metadata in
+    reset_test_chain validation_result.context block_header.shell >>=? fun context ->
     Context.commit
       ~time:block_header.shell.timestamp
       ?message:validation_result.message
-      validation_result.context >>= fun context_hash ->
+      context >>= fun context_hash ->
     return ({ validation_result ; block_metadata ;
               ops_metadata ; context_hash })
 

@@ -255,7 +255,9 @@ val best_known_head_for_checkpoint:
 val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
 val fork_testchain:
-  Block.t -> Protocol_hash.t -> Time.t -> Chain.t tzresult Lwt.t
+  Block.t ->
+  Chain_id.t -> Block_hash.t -> Block_header.t ->
+  Protocol_hash.t -> Time.t -> Chain.t tzresult Lwt.t
 
 type chain_data = {
   current_head: Block.t ;

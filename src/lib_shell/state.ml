@@ -1103,22 +1103,8 @@ let read_block_exn t ?pred hash =
   | None -> Lwt.fail Not_found
   | Some b -> Lwt.return b
 
-let fork_testchain block protocol expiration =
+let fork_testchain block chain_id genesis_hash genesis_header protocol expiration =
   Shared.use block.chain_state.global_state.global_data begin fun data ->
-    Block.context block >>= fun context ->
-    begin match Registered_protocol.get protocol with
-      | Some proto -> return proto
-      | None ->
-          failwith "State.fork_testchain: missing protocol '%a' for the current block."
-            Protocol_hash.pp_short protocol
-    end >>=? fun (module Proto_test) ->
-    Proto_test.init context block.header.Block_header.shell >>=? fun { context } ->
-    Context.set_test_chain context Not_running >>= fun context ->
-    Context.set_protocol context protocol >>= fun context ->
-    Context.commit_test_chain_genesis
-      block.hash
-      block.header.shell
-      context >>=? fun (chain_id, genesis_hash, genesis_header) ->
     let chain_store = Store.Chain.get data.global_store chain_id in
     let block_store = Store.Block.get chain_store in
     Store.Block.Header.store (block_store, genesis_hash) genesis_header >>= fun () ->

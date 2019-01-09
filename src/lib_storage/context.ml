@@ -451,15 +451,9 @@ let commit_genesis index ~chain_id ~time ~protocol =
   GitStore.Branch.set index.repo (get_branch chain_id) commit >>= fun () ->
   Lwt.return (GitStore.Commit.hash commit)
 
-let compute_testchain_genesis forked_block =
-  let genesis = Block_hash.hash_bytes [Block_hash.to_bytes forked_block] in
-  let chain_id = Chain_id.of_block_hash genesis in
-  chain_id, genesis
-
-let commit_test_chain_genesis forked_header_hash (forked_header : Block_header.shell_header) ctxt =
+let commit_test_chain_genesis (forked_header : Block_header.shell_header) ctxt =
   let message =
-    Format.asprintf "Forking testchain after block %a."
-      Block_hash.pp forked_header_hash in
+    Format.asprintf "Forking testchain at level %ld." forked_header.level in
   raw_commit ~time:forked_header.timestamp ~message ctxt >>= fun commit ->
   let faked_shell_header : Block_header.shell_header = {
     forked_header with
@@ -479,21 +473,7 @@ let commit_test_chain_genesis forked_header_hash (forked_header : Block_header.s
   let chain_id = Chain_id.of_block_hash genesis_hash in
   let branch = get_branch chain_id in
   GitStore.Branch.set ctxt.index.repo branch commit >>= fun () ->
-  return (chain_id, genesis_hash, genesis_header)
-
-let reset_test_chain ctxt forked_block timestamp =
-  get_test_chain ctxt >>= function
-  | Not_running -> Lwt.return ctxt
-  | Running { expiration } ->
-      if Time.(expiration <= timestamp) then
-        set_test_chain ctxt Not_running
-      else
-        Lwt.return ctxt
-  | Forking { protocol ; expiration } ->
-      let chain_id, genesis = compute_testchain_genesis forked_block in
-      set_test_chain ctxt
-        (Running { chain_id ; genesis ;
-                   protocol ; expiration })
+  Lwt.return (chain_id, genesis_hash, genesis_header)
 
 let clear_test_chain index chain_id =
   (* TODO remove commits... ??? *)

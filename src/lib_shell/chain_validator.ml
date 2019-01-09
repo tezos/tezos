@@ -105,6 +105,9 @@ let shutdown_child nv active_chains =
   Lwt_utils.may ~f:(fun ({ parameters = { chain_state ; global_chains_input ; } }, shutdown) ->
       Lwt_watcher.notify global_chains_input (State.Chain.id chain_state, false) ;
       Chain_id.Table.remove active_chains (State.Chain.id chain_state) ;
+      State.update_chain_data nv.parameters.chain_state begin fun _ chain_data ->
+        Lwt.return (Some { chain_data with test_chain = None }, ())
+      end >>= fun () ->
       shutdown ()) nv.child
 
 let notify_new_block w block =
@@ -178,75 +181,64 @@ let may_update_checkpoint chain_state new_head =
 
 let may_switch_test_chain w active_chains spawn_child block =
   let nv = Worker.state w in
-  let create_child genesis protocol expiration =
-    if State.Chain.allow_forked_chain nv.parameters.chain_state then begin
-      shutdown_child nv active_chains >>= fun () ->
-      begin
-        let chain_id = Chain_id.of_block_hash (State.Block.hash genesis) in
-        State.Chain.get
-          (State.Chain.global_state nv.parameters.chain_state) chain_id >>= function
-        | Ok chain_state -> return chain_state
-        | Error _ ->
-            State.fork_testchain
-              genesis protocol expiration >>=? fun chain_state ->
-            Chain.head chain_state >>= fun new_genesis_block ->
-            Lwt_watcher.notify nv.parameters.global_valid_block_input new_genesis_block ;
-            Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
-            return chain_state
-      end >>=? fun chain_state ->
-      (* [spawn_child] is a callback to [create_node]. Thus, it takes care of
-         global initialization boilerplate (e.g. notifying [global_chains_input],
-         adding the chain to the correct tables, ...) *)
-      spawn_child
-        ~parent:(State.Chain.id chain_state)
-        nv.parameters.peer_validator_limits
-        nv.parameters.prevalidator_limits
-        nv.parameters.block_validator
-        nv.parameters.global_valid_block_input
-        nv.parameters.global_chains_input
-        nv.parameters.db chain_state
-        nv.parameters.limits (* TODO: different limits main/test ? *) >>=? fun child ->
-      nv.child <- Some child ;
-      return_unit
-    end else begin
-      (* Ignoring request... *)
-      return_unit
-    end in
-
-  let check_child genesis protocol expiration current_time =
-    let activated =
-      match nv.child with
-      | None -> false
-      | Some (child , _) ->
-          Block_hash.equal
-            (State.Chain.genesis child.parameters.chain_state).block
-            genesis in
-    State.Block.read nv.parameters.chain_state genesis >>=? fun genesis ->
-    begin
-      match nv.parameters.max_child_ttl with
-      | None -> Lwt.return expiration
-      | Some ttl ->
-          Lwt.return
-            (Time.min expiration
-               (Time.add (State.Block.timestamp genesis) (Int64.of_int ttl)))
-    end >>= fun local_expiration ->
-    let expired = Time.(local_expiration <= current_time) in
-    if expired && activated then
-      shutdown_child nv active_chains >>= return
-    else if not activated && not expired then
-      create_child genesis protocol expiration
-    else
-      return_unit in
-
   begin
     let block_header = State.Block.header block in
     State.Block.test_chain block >>= function
     | Not_running -> shutdown_child nv active_chains >>= return
-    | Running { genesis ; protocol ; expiration } ->
-        check_child genesis protocol expiration
-          block_header.shell.timestamp
-    | Forking { protocol ; expiration } ->
-        create_child block protocol expiration
+    | Forking _ -> assert false (* should not happen *)
+    | Running { genesis ; genesis_header ; protocol ; expiration } ->
+        let activated =
+          match nv.child with
+          | None -> false
+          | Some (child , _) ->
+              Block_hash.equal
+                (State.Chain.genesis child.parameters.chain_state).block
+                genesis in
+        begin
+          match nv.parameters.max_child_ttl with
+          | None -> Lwt.return false
+          | Some ttl ->
+              Lwt.return
+                Time.(min expiration
+                        (add genesis_header.shell.timestamp (Int64.of_int ttl))
+                      < block_header.shell.timestamp)
+        end >>= fun locally_expired ->
+        if locally_expired && activated then
+          shutdown_child nv active_chains >>= return
+        else if activated
+             || locally_expired
+             || not (State.Chain.allow_forked_chain nv.parameters.chain_state) then
+          return_unit
+        else begin
+          begin
+            let chain_id = Chain_id.of_block_hash genesis in
+            State.Chain.get
+              (State.Chain.global_state nv.parameters.chain_state)
+              chain_id >>= function
+            | Ok chain_state -> return chain_state
+            | Error _ -> (* TODO proper error matching (Not_found ?) or use `get_opt` ? *)
+                State.fork_testchain
+                  block chain_id genesis genesis_header protocol expiration >>=? fun chain_state ->
+                Chain.head chain_state >>= fun new_genesis_block ->
+                Lwt_watcher.notify nv.parameters.global_valid_block_input new_genesis_block ;
+                Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
+                return chain_state
+          end >>=? fun chain_state ->
+          (* [spawn_child] is a callback to [create_node]. Thus, it takes care of
+             global initialization boilerplate (e.g. notifying [global_chains_input],
+             adding the chain to the correct tables, ...) *)
+          spawn_child
+            ~parent:(State.Chain.id chain_state)
+            nv.parameters.peer_validator_limits
+            nv.parameters.prevalidator_limits
+            nv.parameters.block_validator
+            nv.parameters.global_valid_block_input
+            nv.parameters.global_chains_input
+            nv.parameters.db chain_state
+            nv.parameters.limits (* TODO: different limits main/test ? *) >>=? fun child ->
+          nv.child <- Some child ;
+          return_unit
+        end
   end >>= function
   | Ok () -> Lwt.return_unit
   | Error err ->
