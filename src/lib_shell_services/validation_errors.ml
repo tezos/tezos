@@ -146,7 +146,7 @@ let () =
        hash was not the one computed at commit time."
     ~pp: (fun ppf (got, exp) ->
         Format.fprintf ppf
-          "@[<v 2>Inconsistent hash:@ local: %a@ block_header: %a"
+          "@[<v 2>Inconsistent hash:@ got: %a@ expected: %a"
           Context_hash.pp got
           Context_hash.pp exp)
     Data_encoding.(obj2
@@ -302,4 +302,3 @@ let () =
                      (opt "peer" P2p_peer.Id.encoding))
     (function Checkpoint_error (block, peer) -> Some (block, peer) | _ -> None)
     (fun (block, peer) -> Checkpoint_error (block, peer))
-
