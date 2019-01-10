@@ -491,7 +491,7 @@ module Make
       | Ok () ->
           loop ()
       | Error [Canceled | Exn Lwt_pipe.Closed | Exn Lwt_dropbox.Closed ] ->
-          Logger.lwt_log_notice "Worker terminated"  >>= fun () ->
+          Logger.lwt_log_notice "@[Worker terminated [%a] @]" Name.pp w.name  >>= fun () ->
           do_close None
       | Error errs ->
           begin match w.current_request with
