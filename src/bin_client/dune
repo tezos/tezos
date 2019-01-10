@@ -4,18 +4,18 @@
  (libraries tezos-base
             tezos-rpc-http
             tezos-shell-services
+            tezos-stdlib-unix
+            tezos-client-base-unix
             tezos-client-base
             tezos-client-commands
             tezos-client-000-Ps9mPmXa
             tezos-client-001-PtCJ7pwo
             tezos-client-002-PsYLVpVv
             tezos-client-003-PsddFKi3
-            tezos-stdlib-unix
-            tezos-client-base-unix
             tezos-client-001-PtCJ7pwo-commands.registration
             tezos-client-002-PsYLVpVv-commands.registration
-            tezos-baking-002-PsYLVpVv-commands.registration
             tezos-client-003-PsddFKi3-commands.registration
+            tezos-baking-002-PsYLVpVv-commands.registration
             tezos-baking-003-PsddFKi3-commands.registration
             tezos-signer-backends)
   (flags (:standard -w -9+27-30-32-40@8

@@ -16,8 +16,6 @@ depends: [
   "tezos-protocol-updater"
   "alcotest-lwt" { test }
   "tezos-embedded-protocol-demo" { test }
-  "tezos-protocol-environment" { test }
-  "tezos-protocol-002-PsYLVpVv" { test }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
