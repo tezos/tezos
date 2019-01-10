@@ -12,7 +12,7 @@ tags: []
 available: [ ocaml-version >= "4.03.0" ]
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
 depends: [
-  "dune" {build & = "1.0.1"}
+  "dune" {build & >= "1.0.1"}
   "base" {build & >= "v0.10.0"}
   "stdio" {build & >= "v0.10.0"}
   "hacl"
