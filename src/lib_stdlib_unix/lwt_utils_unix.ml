@@ -109,7 +109,14 @@ let rec create_dir ?(perm = 0o755) dir =
   Lwt_unix.file_exists dir >>= function
   | false ->
       create_dir (Filename.dirname dir) >>= fun () ->
-      Lwt_unix.mkdir dir perm
+      Lwt.catch
+        (fun () -> Lwt_unix.mkdir dir perm)
+        (function
+          | Unix.Unix_error (Unix.EEXIST, _, _) ->
+              (* This is the case where the directory has been created
+                 by another Lwt.t, after the call to Lwt_unix.file_exists. *)
+              Lwt.return_unit
+          | e -> Lwt.fail e)
   | true ->
       Lwt_unix.stat dir >>= function
       | { st_kind = S_DIR ; _ } -> Lwt.return_unit
