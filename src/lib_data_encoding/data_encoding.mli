@@ -531,6 +531,32 @@ module Encoding: sig
     fun_value:('a -> 'b) -> fun_bytes:(MBytes.t -> 'b) -> fun_combine:('b -> 'b -> 'b) ->
     'a lazy_t -> 'b
 
+  (** Create a {!Data_encoding.t} value which records knowledge of
+      older versions of a given encoding as long as one can “upgrade”
+      from an older version to the next (if upgrade is impossible one
+      should consider that the encoding is completely different).
+
+      See the module [Documented_example] in ["./test/versioned.ml"]
+      for a tutorial.
+  *)
+  module With_version: sig
+
+    (** An encapsulation of consecutive encoding versions. *)
+    type _ t
+
+    (** [first_version enc] records that [enc] is the first (known)
+        version of the object. *)
+    val first_version : 'a encoding -> 'a t
+
+    (** [next_version enc upgrade prev] constructs a new version from
+        the previous version [prev] and an [upgrade] function. *)
+    val next_version : 'a encoding -> ('b -> 'a) -> 'b t -> 'a t
+
+    (** Make an encoding from an encapsulation of versions; the
+        argument [~name] is used to prefix the version “tag” in the
+        encoding, it should not change from one version to the next. *)
+    val encoding : name: string -> 'a t -> 'a encoding
+  end
 end
 
 include module type of Encoding with type 'a t = 'a Encoding.t
