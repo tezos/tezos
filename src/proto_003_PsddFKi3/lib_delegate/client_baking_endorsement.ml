@@ -30,8 +30,6 @@ include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.endorsement
 
 open Logging
 
-module State = Daemon_state.Make(struct let name = "endorsement" end)
-
 let get_signing_slots cctxt ~chain ~block delegate level =
   Alpha_services.Delegate.Endorsing_rights.get cctxt
     ~levels:[level]
@@ -51,27 +49,24 @@ let inject_endorsement
     ~branch:hash
     ~level:level
     () >>=? fun bytes ->
-  State.record cctxt delegate_pkh level >>=? fun () ->
+  let wallet = (cctxt :> Client_context.wallet) in
+  wallet#with_lock begin fun () ->
+    Daemon_state.may_inject_endorsement cctxt ~chain ~delegate:delegate_pkh level >>=? function
+    | true ->
+        Daemon_state.record_endorsement cctxt ~chain ~delegate:delegate_pkh level >>=? fun () ->
+        return_unit
+    | false ->
+        lwt_log_error Tag.DSL.(fun f ->
+            f "Level %a : previously endorsed."
+            -% t event "double_endorsement_near_miss"
+            -% a level_tag level) >>= fun () ->
+        fail (Daemon_state.Level_previously_endorsed level)
+  end >>=? fun () ->
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Client_keys.append cctxt
     delegate_sk ~watermark:(Endorsement chain_id) bytes >>=? fun signed_bytes ->
   Shell_services.Injection.operation cctxt ?async ~chain signed_bytes >>=? fun oph ->
   return oph
-
-let check_endorsement cctxt level pkh =
-  State.get cctxt pkh >>=? function
-  | None -> return_unit
-  | Some recorded_level ->
-      if Raw_level.(level = recorded_level) then
-        Error_monad.failwith "Level %a already endorsed" Raw_level.pp recorded_level
-      else
-        return_unit
-
-let previously_endorsed_level cctxt pkh new_lvl  =
-  State.get cctxt pkh >>=? function
-  | None -> return_false
-  | Some last_lvl ->
-      return (Raw_level.(last_lvl >= new_lvl))
 
 let forge_endorsement
     (cctxt : #Proto_alpha.full)
@@ -81,21 +76,15 @@ let forge_endorsement
   let src_pkh = Signature.Public_key.hash src_pk in
   Alpha_block_services.metadata cctxt
     ~chain ~block () >>=? fun { protocol_data = { level = { level } } } ->
-  check_endorsement cctxt level src_pkh >>=? fun () ->
-  previously_endorsed_level cctxt src_pkh level >>=? function
-  | true ->
-      cctxt#error "Level %a : previously endorsed."
-        Raw_level.pp level
-  | false ->
-      Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-      inject_endorsement cctxt ?async ~chain ~block hash level src_sk src_pkh >>=? fun oph ->
-      Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
-      cctxt#message
-        "Injected endorsement level %a, contract %s '%a'"
-        Raw_level.pp level
-        name
-        Operation_hash.pp_short oph >>= fun () ->
-      return oph
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
+  inject_endorsement cctxt ?async ~chain ~block hash level src_sk src_pkh >>=? fun oph ->
+  Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
+  cctxt#message
+    "Injected endorsement level %a, contract %s '%a'"
+    Raw_level.pp level
+    name
+    Operation_hash.pp_short oph >>= fun () ->
+  return oph
 
 (** Worker *)
 
@@ -172,15 +161,16 @@ let allowed_to_endorse cctxt bi delegate  =
           -% a Block_hash.Logging.tag bi.hash
           -% s Client_keys.Logging.tag name
           -% a endorsement_slots_tag slots) >>= fun () ->
-      previously_endorsed_level cctxt delegate level >>=? function
-      | true ->
+      cctxt#with_lock begin fun () ->
+        Daemon_state.may_inject_endorsement cctxt ~chain ~delegate level
+      end >>=? function
+      | false ->
           lwt_debug Tag.DSL.(fun f ->
               f "Level %a (or higher) previously endorsed: do not endorse."
               -% t event "previously_endorsed"
               -% a level_tag level) >>= fun () ->
           return_false
-      | false ->
-          return_true
+      | true -> return_true
 
 let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state bi =
   if Time.diff (Time.now ()) bi.Client_baking_blocks.timestamp > max_past then
@@ -234,7 +224,18 @@ let create
 
   let timeout_k cctxt state (block, delegates) =
     state.pending <- None ;
-    iter_p (endorse_for_delegate cctxt block) delegates
+    iter_s
+      (fun delegate -> endorse_for_delegate cctxt block delegate >>= function
+         | Ok () -> return_unit
+         | Error errs ->
+             lwt_log_error Tag.DSL.(fun f ->
+                 f "@[<v 2>Error while injecting endorsement for delegate %a : @[%a@]@]@."
+                 -% t event "error_while_endorsing"
+                 -% a Signature.Public_key_hash.Logging.tag delegate
+                 -% a errs_tag errs) >>= fun () ->
+             (* We continue anyway *)
+             return_unit
+      ) delegates
   in
 
   let event_k cctxt state bi =
