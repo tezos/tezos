@@ -1,20 +1,20 @@
-opam-version: "1.2"
+opam-version: "2.0"
 name:         "pbkdf"
 version:      "0.3.0"
 homepage:     "https://github.com/abeaumont/ocaml-pbkdf"
-dev-repo:     "https://github.com/abeaumont/ocaml-pbkdf.git"
+dev-repo:     "git+https://github.com/abeaumont/ocaml-pbkdf.git"
 bug-reports:  "https://github.com/abeaumont/ocaml-pbkdf/issues"
 authors:      ["Alfredo Beaumont <alfredo.beaumont@gmail.com>" "Sonia Meruelo <smeruelo@gmail.com>"]
 maintainer:   ["Alfredo Beaumont <alfredo.beaumont@gmail.com>"]
 license:      "BSD2"
 
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
-build-test: [ "dune" "runtest" "-p" name "-j" jobs ]
+run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
 depends: [
   "dune" { build & >= "1.0.1" }
   "hacl"
   "bigstring" {>= "0.2"}
   "ocplib-endian" {>= "1.0"}
-  "alcotest" {test & >= "0.8.1"}
-  "hex" {test & >= "1.2.0"}
+  "alcotest" {with-test & >= "0.8.1"}
+  "hex" {with-test & >= "1.2.0"}
 ]
