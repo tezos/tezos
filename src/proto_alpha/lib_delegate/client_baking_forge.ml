@@ -159,6 +159,7 @@ let inject_block
   return block_hash
 
 type error += Failed_to_preapply of Tezos_base.Operation.t * error list
+type error += Forking_test_chain
 
 let () =
   register_error_kind
@@ -563,6 +564,18 @@ let finalize_block_header
               (List.map Operation.hash_packed sl)
          ) operations
       ) in
+
+  begin Context.get_test_chain context >>= function
+    | Not_running -> return context
+    | Running { expiration } ->
+        if Time.(expiration <= timestamp) then
+          Context.set_test_chain context Not_running >>= fun context ->
+          return context
+        else
+          return context
+    | Forking _ -> fail Forking_test_chain
+  end >>=? fun context ->
+
   Context.hash ~time:timestamp ?message context >>= fun context ->
   let header =
     { inc.header with
@@ -663,8 +676,14 @@ let forge_block
         } in
         filter_and_apply_operations ~timestamp ~protocol_data state bi (operations, overflowing_ops)
         >>=? fun (final_context, validation_result, operations) ->
-        finalize_block_header final_context ~timestamp validation_result operations >>=? fun shell_header ->
-        return (shell_header, List.map (List.map forge) operations)
+
+        finalize_block_header final_context ~timestamp validation_result operations >>= function
+        | Error [ Forking_test_chain ] ->
+            Alpha_block_services.Helpers.Preapply.block
+              cctxt ~chain ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, _result) ->
+            return (shell_header, List.map (List.map forge) operations)
+        | Error _ as errs -> Lwt.return errs
+        | Ok shell_header -> return (shell_header, List.map (List.map forge) operations)
   end >>=? fun (shell_header, operations) ->
 
   (* Now for some logging *)
@@ -934,9 +953,14 @@ let build_block
                 -% s bake_priority_tag priority
                 -% s Client_keys.Logging.tag name
                 -% a timestamp_tag timestamp) >>= fun () ->
-            finalize_block_header final_context ~timestamp validation_result operations >>=? fun shell_header ->
-            let raw_ops = List.map (List.map forge) operations in
-            return_some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
+            finalize_block_header final_context ~timestamp validation_result operations >>= function
+            | Error [ Forking_test_chain ] ->
+                shell_prevalidation cctxt ~chain ~block seed_nonce_hash
+                  operations slot
+            | Error _ as errs -> Lwt.return errs
+            | Ok shell_header ->
+                let raw_ops = List.map (List.map forge) operations in
+                return (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
 
 let previously_baked_level cctxt pkh new_lvl =
   State.get cctxt pkh  >>=? function
