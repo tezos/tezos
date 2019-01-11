@@ -12,6 +12,7 @@ depends: [
   "tezos-crypto"
   "tezos-data-encoding"
   "tezos-error-monad"
+  "tezos-event-logging"
   "tezos-micheline"
   "tezos-rpc"
   "calendar"

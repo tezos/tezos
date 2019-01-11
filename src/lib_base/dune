@@ -10,11 +10,13 @@
                    -open Tezos_rpc
                    -open Tezos_clic
                    -open Tezos_micheline
+                   -open Tezos_event_logging
                    -safe-string))
  (libraries tezos-stdlib
             tezos-crypto
             tezos-data-encoding
             tezos-error-monad
+            tezos-event-logging
             tezos-rpc
             tezos-clic
             tezos-micheline

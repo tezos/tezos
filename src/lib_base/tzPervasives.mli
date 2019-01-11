@@ -65,3 +65,5 @@ module Lwt_exit = Lwt_exit
 
 include (module type of (struct include Utils.Infix end))
 include (module type of (struct include Error_monad end))
+
+module Internal_event = Internal_event

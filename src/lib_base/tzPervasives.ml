@@ -68,3 +68,5 @@ module Lwt_exit = Lwt_exit
 
 include Utils.Infix
 include Error_monad
+
+module Internal_event = Internal_event
