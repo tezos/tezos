@@ -39,7 +39,6 @@ val bake_block:
   ?mempool: string ->
   ?context_path: string ->
   ?src_sk: Client_keys.sk_uri ->
-  ?src_pk: Signature.public_key ->
   chain: Chain_services.chain ->
   head: Block_services.block ->
   public_key_hash ->

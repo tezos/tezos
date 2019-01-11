@@ -26,19 +26,6 @@
 open Proto_alpha
 open Alpha_context
 
-module State : sig
-  val get:
-    #Client_context.wallet ->
-    Signature.Public_key_hash.t ->
-    Raw_level.t option tzresult Lwt.t
-
-  val record:
-    #Client_context.wallet ->
-    Signature.Public_key_hash.t ->
-    Raw_level.t ->
-    unit tzresult Lwt.t
-end
-
 val generate_seed_nonce: unit -> Nonce.t
 (** [generate_seed_nonce ()] is a random nonce that is typically used
     in block headers. When baking, bakers generate random nonces whose
@@ -52,7 +39,9 @@ val inject_block:
   chain:Chain_services.chain ->
   shell_header:Block_header.shell_header ->
   priority:int ->
-  src_sk:Client_keys.sk_uri ->
+  delegate_pkh:Signature.Public_key_hash.t ->
+  delegate_sk:Client_keys.sk_uri ->
+  level: Raw_level.t ->
   Operation.raw list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
@@ -80,7 +69,8 @@ val forge_block:
   ?seed_nonce_hash:Nonce_hash.t ->
   chain:Chain_services.chain ->
   priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
-  src_sk:Client_keys.sk_uri ->
+  delegate_pkh: Signature.Public_key_hash.t ->
+  delegate_sk: Client_keys.sk_uri ->
   Block_services.block ->
   Block_hash.t tzresult Lwt.t
 (** [forge_block cctxt ?fee_threshold ?force ?operations ?best_effort

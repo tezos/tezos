@@ -62,9 +62,8 @@ launch_node() {
             mv "$node_data_dir/identities.json" /tmp
         fi
         rm -rf "$node_data_dir"
-        rm -rf "$client_dir/blocks"
         rm -rf "$client_dir/nonces"
-        rm -rf "$client_dir/endorsements"
+        rm -rf "$client_dir/highwatermarks"
         if [ -f "/tmp/identities.json" ]; then \
             mv /tmp/identities.json "$node_data_dir/"
         fi

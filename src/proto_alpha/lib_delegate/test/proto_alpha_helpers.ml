@@ -553,7 +553,7 @@ module Baking = struct
         Some (Nonce.hash seed_nonce)
       else
         None in
-    let src_sk =
+    let delegate_sk =
       Tezos_signer_backends.Unencrypted.make_sk contract.sk in
     Client_baking_forge.forge_block
       ctxt
@@ -564,7 +564,8 @@ module Baking = struct
       ~chain:`Main
       ~priority:(`Auto (contract.pkh, Some 1024))
       ?seed_nonce_hash
-      ~src_sk
+      ~delegate_sk
+      ~delegate_pkh:contract.pkh
       block
 
 end
