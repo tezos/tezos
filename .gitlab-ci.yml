@@ -1,6 +1,6 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: ebc2de016e52e8b77f250df174512a793b2fb0e5
+  build_deps_image_version: fdc1ab3f23d1601f00a2165e02fcd9fa3ddd8514
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
 
@@ -225,6 +225,41 @@ test:proto:sandbox:
   <<: *integration_definition
   script:
     - dune build @runtest_sandbox
+
+############################################################
+## Stage: run OCaml integration tests                     ##
+############################################################
+
+test:sandboxes:voting:
+  <<: *integration_definition
+  script:
+    - ROOT_PATH=$PWD/flextesa-voting-demo dune build @src/bin_flextesa/runtest_sandbox_voting_demo
+  artifacts:
+    paths:
+    - flextesa-voting-demo
+    expire_in: 1 day
+    when: on_failure
+  allow_failure: true # This test uses too much resources for GitLab's workers
+
+test:sandboxes:acc-baking:
+  <<: *integration_definition
+  script:
+    - ROOT_PATH=$PWD/flextesa-acc-sdb dune build @src/bin_flextesa/runtest_sandbox_accusations_simple_double_baking
+  artifacts:
+    paths:
+    - flextesa-acc-sdb
+    expire_in: 1 day
+    when: on_failure
+
+test:sandboxes:acc-endorsement:
+  <<: *integration_definition
+  script:
+    - ROOT_PATH=$PWD/flextesa-acc-sde dune build @src/bin_flextesa/runtest_sandbox_accusations_simple_double_endorsing
+  artifacts:
+    paths:
+    - flextesa-acc-sde
+    expire_in: 1 day
+    when: on_failure
 
 ############################################################
 ## Stage: run python integration tests                    ##
@@ -589,72 +624,82 @@ opam:50:ocplib-ezresto:
   variables:
     package: ocplib-ezresto
 
-opam:51:tezos-embedded-protocol-alpha:
+opam:51:tezos-network-sandbox:
+  <<: *opam_definition
+  variables:
+    package: tezos-network-sandbox
+
+opam:52:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-alpha
 
-opam:52:tezos-embedded-protocol-demo:
+opam:53:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
 
-opam:53:tezos-embedded-protocol-genesis:
+opam:54:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
 
-opam:54:tezos-shell:
+opam:55:tezos-shell:
   <<: *opam_definition
   variables:
     package: tezos-shell
 
-opam:55:tezos-endorser-alpha-commands:
+opam:56:tezos-endorser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha-commands
 
-opam:56:tezos-client:
+opam:57:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
 
-opam:57:ocplib-ezresto-directory:
+opam:58:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:58:tezos-accuser-alpha:
+opam:59:tezos-accuser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha
 
-opam:59:tezos-endorser-alpha:
+opam:60:flextesa:
+  <<: *opam_definition
+  variables:
+    package: flextesa
+
+opam:61:tezos-endorser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha
 
-opam:60:tezos-accuser-alpha-commands:
+opam:62:tezos-accuser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha-commands
 
-opam:61:tezos-baker-alpha:
+opam:63:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:62:tezos-signer:
+opam:64:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:63:tezos-node:
+opam:65:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:64:ocplib-json-typed-browser:
+opam:66:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser

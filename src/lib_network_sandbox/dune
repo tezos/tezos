@@ -1,0 +1,16 @@
+(library
+ (name tezos_network_sandbox)
+ (public_name tezos-network-sandbox)
+ (flags (:standard -safe-string))
+ (libraries
+    lwt.unix
+    cmdliner
+    easy-format
+    tezos-stdlib-unix
+    dum
+    base
+    genspio
+    ezjsonm
+    tezos-signer-backends
+    tezos-client-alpha))
+

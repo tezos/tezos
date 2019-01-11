@@ -24,6 +24,7 @@ __pycache__
 /tezos-endorser-*
 /tezos-accuser-*
 /tezos-signer
+/tezos-sandbox
 
 /scripts/opam-test-all.sh.DONE
 /scripts/create_genesis/src
