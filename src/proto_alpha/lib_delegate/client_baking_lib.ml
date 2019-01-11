@@ -38,7 +38,6 @@ let bake_block
     ?mempool
     ?context_path
     ?src_sk
-    ?src_pk
     ~chain
     ~head
     delegate =
@@ -49,13 +48,6 @@ let bake_block
         return src_sk
     | Some sk -> return sk
   end >>=? fun src_sk ->
-  begin
-    match src_pk with
-    | None ->
-        Client_keys.get_key cctxt delegate >>=? fun (_, src_pk, _) ->
-        return src_pk
-    | Some pk -> return pk
-  end >>=? fun src_pk ->
   Alpha_services.Helpers.current_level
     cctxt ~offset:1l (chain, head) >>=? fun level ->
   let seed_nonce, seed_nonce_hash =
@@ -77,10 +69,9 @@ let bake_block
     ?context_path
     ~chain
     ~priority:(`Auto (delegate, max_priority))
-    ~src_sk
+    ~delegate_pkh:delegate
+    ~delegate_sk:src_sk
     head >>=? fun block_hash ->
-  let src_pkh = Signature.Public_key.hash src_pk in
-  Client_baking_forge.State.record cctxt src_pkh level.level >>=? fun () ->
   begin match seed_nonce with
     | None -> return_unit
     | Some seed_nonce ->

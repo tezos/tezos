@@ -27,7 +27,6 @@ open Proto_alpha
 open Alpha_context
 
 include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.baking" end)
-module State = Daemon_state.Make(struct let name = "block" end)
 open Logging
 
 (* The index of the different components of the protocol's validation passes *)
@@ -142,26 +141,43 @@ let inject_block
     ~chain
     ~shell_header
     ~priority
-    ~src_sk
+    ~delegate_pkh
+    ~delegate_sk
+    ~level
     operations =
   assert_valid_operations_hash shell_header operations >>=? fun () ->
   let block = `Hash (shell_header.Tezos_base.Block_header.predecessor, 0) in
   forge_block_header cctxt ~chain block
-    src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
-  Shell_services.Injection.block cctxt
-    ?force ~chain signed_header operations >>=? fun block_hash ->
-  lwt_log_info Tag.DSL.(fun f ->
-      f "Client_baking_forge.inject_block: inject %a"
-      -% t event "inject_baked_block"
-      -% a Block_hash.Logging.tag block_hash
-      -% t signed_header_tag signed_header
-      -% t operations_tag operations) >>= fun () ->
-  return block_hash
+    delegate_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
+  (* Record baked blocks to prevent double baking  *)
+  cctxt#with_lock begin fun () ->
+    Daemon_state.may_inject_block cctxt ~chain ~delegate:delegate_pkh level >>=? function
+    | true ->
+        Daemon_state.record_block cctxt ~chain ~delegate:delegate_pkh level >>=? fun () ->
+        return_true
+    | false ->
+        lwt_log_error Tag.DSL.(fun f ->
+            f "Level %a : previously baked"
+            -% t event "double_bake_near_miss"
+            -% a level_tag level)
+        >>= fun () -> return_false
+  end >>=? function
+  | false -> fail (Daemon_state.Level_previously_baked level)
+  | true ->
+      Shell_services.Injection.block cctxt
+        ?force ~chain signed_header operations >>=? fun block_hash ->
+      lwt_log_info Tag.DSL.(fun f ->
+          f "Client_baking_forge.inject_block: inject %a"
+          -% t event "inject_baked_block"
+          -% a Block_hash.Logging.tag block_hash
+          -% t signed_header_tag signed_header
+          -% t operations_tag operations) >>= fun () ->
+      return block_hash
 
 type error += Failed_to_preapply of Tezos_base.Operation.t * error list
 type error += Forking_test_chain
 
-let () =
+let () = begin
   register_error_kind
     `Permanent
     ~id:"Client_baking_forge.failed_to_preapply"
@@ -180,6 +196,7 @@ let () =
       | Failed_to_preapply (hash, err) -> Some (hash, err)
       | _ -> None)
     (fun (hash, err) -> Failed_to_preapply (hash, err))
+end
 
 let get_manager_operation_gas_and_fee op =
   let { protocol_data = Operation_data { contents } ; _ } = op in
@@ -603,7 +620,8 @@ let forge_block
     ?seed_nonce_hash
     ~chain
     ~priority
-    ~src_sk
+    ~delegate_pkh
+    ~delegate_sk
     block =
   (* making the arguments usable *)
   unopt_operations cctxt chain mempool operations >>=? fun operations_arg ->
@@ -697,8 +715,14 @@ let forge_block
       -% a timestamp_tag timestamp
       -% a fitness_tag shell_header.fitness) >>= fun () ->
 
+  let level = Raw_level.of_int32 shell_header.level |> function
+    | Ok level -> level
+    | _ -> assert false (* TODO *) in
   inject_block cctxt
-    ?force ~chain ~shell_header ~priority ?seed_nonce_hash ~src_sk
+    ?force ~chain ~shell_header ~priority ?seed_nonce_hash
+    ~delegate_pkh
+    ~delegate_sk
+    ~level
     operations >>= function
   | Ok hash -> return hash
   | Error errs as error ->
@@ -962,11 +986,6 @@ let build_block
                 let raw_ops = List.map (List.map forge) operations in
                 return (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
 
-let previously_baked_level cctxt pkh new_lvl =
-  State.get cctxt pkh  >>=? function
-  | None -> return_false
-  | Some last_lvl -> return (Raw_level.(last_lvl >= new_lvl))
-
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
     [state.best_slot]. *)
@@ -974,7 +993,7 @@ let bake (cctxt : #Proto_alpha.full) state =
   begin match state.best_slot with
     | None -> assert false (* unreachable *)
     | Some slot -> return slot end >>=? fun slot ->
-
+  let chain = cctxt#chain in
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
 
@@ -991,48 +1010,35 @@ let bake (cctxt : #Proto_alpha.full) state =
           -% a Block_hash.Logging.predecessor_tag shell_header.predecessor
           -% t Signature.Public_key_hash.Logging.tag delegate) >>= fun () ->
 
-      Client_keys.get_key cctxt delegate >>=? fun (_, src_pk, src_sk) ->
-      let src_pkh = Signature.Public_key.hash src_pk in
-      let chain = `Hash head.Client_baking_blocks.chain_id in
-      (* avoid double baking *)
-      previously_baked_level cctxt src_pkh level >>=? function
-      | true ->
+      Client_keys.get_key cctxt delegate >>=? fun (_, _, delegate_sk) ->
+      inject_block cctxt ~chain ~force:false
+        ~shell_header ~priority ?seed_nonce_hash ~delegate_pkh:delegate ~delegate_sk ~level operations >>= function
+      | Error errs ->
           lwt_log_error Tag.DSL.(fun f ->
-              f "Level %a : previously baked"
-              -% t event "double_bake_near_miss"
-              -% a level_tag level) >>= fun () ->
+              f "@[<v 4>Error while injecting block@ @[Included operations : %a@]@ %a@]"
+              -% t event "block_injection_failed"
+              -% a raw_operations_tag (List.concat operations)
+              -% a errs_tag errs
+            ) >>= fun () -> return_unit
+
+      | Ok block_hash ->
+          lwt_log_notice Tag.DSL.(fun f ->
+              f "Injected block %a for %s after %a (level %a, priority %d, fitness %a, operations %a)."
+              -% t event "injected_block"
+              -% a Block_hash.Logging.tag block_hash
+              -% s Client_keys.Logging.tag name
+              -% a Block_hash.Logging.tag shell_header.predecessor
+              -% a level_tag level
+              -% s bake_priority_tag priority
+              -% a fitness_tag shell_header.fitness
+              -% a operations_tag operations
+            ) >>= fun () ->
+
+          begin if seed_nonce_hash <> None then
+              Client_baking_nonces.add cctxt block_hash seed_nonce
+              |> trace_exn (Failure "Error while recording nonce")
+            else return_unit end >>=? fun () ->
           return_unit
-      | false ->
-          (* Record baked blocks to prevent double baking and nonces to reveal later *)
-          State.record cctxt src_pkh level >>=? fun () ->
-
-          inject_block cctxt ~chain ~force:true
-            ~shell_header ~priority ?seed_nonce_hash ~src_sk operations >>= function
-          | Error errs ->
-              lwt_log_error Tag.DSL.(fun f ->
-                  f "@[<v 4>Error while injecting block@ @[Included operations : %a@]@ %a@]"
-                  -% t event "block_injection_failed"
-                  -% a raw_operations_tag (List.concat operations)
-                  -% a errs_tag errs) >>= fun () ->
-              return_unit
-
-          | Ok block_hash ->
-              lwt_log_notice Tag.DSL.(fun f ->
-                  f "Injected block %a for %s after %a (level %a, priority %d, fitness %a, operations %a)."
-                  -% t event "injected_block"
-                  -% a Block_hash.Logging.tag block_hash
-                  -% s Client_keys.Logging.tag name
-                  -% a Block_hash.Logging.tag shell_header.predecessor
-                  -% a level_tag level
-                  -% s bake_priority_tag priority
-                  -% a fitness_tag shell_header.fitness
-                  -% a operations_tag operations) >>= fun () ->
-
-              begin if seed_nonce_hash <> None then
-                  Client_baking_nonces.add cctxt block_hash seed_nonce
-                  |> trace_exn (Failure "Error while recording nonce")
-                else return_unit end >>=? fun () ->
-              return_unit
     end
   | None -> (* Error while building a block *)
       lwt_log_error Tag.DSL.(fun f ->
@@ -1220,9 +1226,8 @@ let create
     delegates
     block_stream =
   let state_maker genesis_hash bi =
-    let chain = `Hash bi.Client_baking_blocks.chain_id in
     let constants =
-      tzlazy (fun () -> Alpha_services.Constants.all cctxt (chain, `Hash (bi.Client_baking_blocks.hash, 0))) in
+      tzlazy (fun () -> Alpha_services.Constants.all cctxt (cctxt#chain, `Hash (bi.Client_baking_blocks.hash, 0))) in
     Client_baking_simulator.load_context ~context_path >>= fun index ->
     Client_baking_simulator.check_context_consistency index bi.context >>=? fun () ->
     let state = create_state
@@ -1233,10 +1238,9 @@ let create
   in
 
   let event_k cctxt state new_head =
-    let chain = `Hash new_head.Client_baking_blocks.chain_id in
     let block = `Hash (new_head.Client_baking_blocks.hash, 0) in
     reveal_potential_nonces cctxt
-      ~chain block >>= fun _ignore_nonce_err ->
+      ~chain:cctxt#chain block >>= fun _ignore_nonce_err ->
     compute_best_slot_on_current_level ?max_priority cctxt state new_head >>=? fun slot ->
     state.best_slot <- slot ;
     return_unit
