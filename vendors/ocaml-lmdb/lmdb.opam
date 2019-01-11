@@ -1,4 +1,4 @@
-opam-version: "1.2"
+opam-version: "2.0"
 name: "lmdb"
 version: "0.1"
 authors: "Vincent Bernardoff <vb@luminar.eu.org>"
@@ -7,15 +7,10 @@ license: "ISC"
 homepage: "https://github.com/vbmithr/ocaml-lmdb"
 bug-reports: "https://github.com/vbmithr/ocaml-lmdb/issues"
 dev-repo: "git://github.com/vbmithr/ocaml-lmdb"
-
-available: [
-  ocaml-version >= "4.02.0"
-]
-
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
 depends: [
   "dune" {build & >= "1.0.1"}
   "rresult" {>= "0.5.0"}
-  "cstruct" {test & >= "3.2.1"}
-  "alcotest" {test & >= "0.8.1"}
+  "cstruct" {with-test & >= "3.2.1"}
+  "alcotest" {with-test & >= "0.8.1"}
 ]

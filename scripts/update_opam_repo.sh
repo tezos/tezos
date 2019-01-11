@@ -42,7 +42,7 @@ cleanup () {
     rm -rf "$tmp_dir"
     rm -rf Dockerfile
 }
-# trap cleanup EXIT INT
+trap cleanup EXIT INT
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
@@ -71,12 +71,12 @@ for opam in $opams; do
     ## install`), so we manually remove the tag the most
     ## ugliest-possible way...
 
-    sed -e "s/{ *test *}//" \
-        -e "s/test \& //" \
-        -e "s/\& test//" \
-        -e "s/{ *doc *}//" \
-        -e "s/doc \& //" \
-        -e "s/\& doc//" \
+    sed -e "s/{ *with-test *}//" \
+        -e "s/with-test \& //" \
+        -e "s/\& with-test//" \
+        -e "s/{ *with-doc *}//" \
+        -e "s/with-doc \& //" \
+        -e "s/\& with-doc//" \
         $opam > "$tmp_dir"/packages/$package/$package.dev/opam
 
 done

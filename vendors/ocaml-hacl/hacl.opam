@@ -1,22 +1,20 @@
-opam-version: "1.2"
+opam-version: "2.0"
 name: "hacl"
-version: "dev"
 authors: [ "Vincent Bernardoff <vb@luminar.eu.org>" "Marco Stronati <marco@stronati.org>" ]
 maintainer: "Vincent Bernardoff <vb@luminar.eu.org>"
 homepage: "https://gitlab.com/tezos/tezos"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
-dev-repo: "https://gitlab.com/tezos/tezos.git"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" {build & >= "1.0.1"}
   "bigstring" {>= "0.1.1"}
   "ocplib-endian" {>= "1.0"}
   "zarith" {>= "1.7"}
-  "alcotest" {test & >= "0.8.1"}
-  "hex" {test & >= "1.2.0"}
+  "alcotest" {with-test & >= "0.8.1"}
+  "hex" {with-test & >= "1.2.0"}
   "base"
   "stdio"
 ]
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
-build-test: [ "dune" "runtest" "-p" name "-j" jobs ]
-available: [ ocaml-version >= "4.02.0" ]
+run-test: [ "dune" "runtest" "-p" name "-j" jobs ]

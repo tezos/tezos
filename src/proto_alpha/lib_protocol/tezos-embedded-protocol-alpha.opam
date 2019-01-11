@@ -1,10 +1,9 @@
-opam-version: "1.2"
-version: "dev"
+opam-version: "2.0"
 maintainer: "contact@tezos.com"
 authors: [ "Tezos devteam" ]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
-dev-repo: "https://gitlab.com/tezos/tezos.git"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
@@ -19,6 +18,6 @@ build: [
   [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"alpha\"/" "src/dune" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
-build-test: [
+run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
