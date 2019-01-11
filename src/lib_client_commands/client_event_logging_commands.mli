@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.SEMLOG
+val commands: unit -> Client_commands.command list

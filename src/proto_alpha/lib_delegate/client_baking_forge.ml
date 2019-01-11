@@ -26,7 +26,7 @@
 open Proto_alpha
 open Alpha_context
 
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.baking" end)
+include Internal_event.Legacy_logging.Make_semantic(struct let name = "client.baking" end)
 open Logging
 
 (* The index of the different components of the protocol's validation passes *)

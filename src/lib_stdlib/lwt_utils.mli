@@ -27,10 +27,13 @@ val may: f:('a -> unit Lwt.t) -> 'a option -> unit Lwt.t
 
 val never_ending: unit -> 'a Lwt.t
 
-(** [worker name ~run ~cancel] runs worker [run], and logs worker
-    creation, ending or failure. [cancel] is called if worker fails. *)
+(** [worker name ~on_event ~run ~cancel] runs worker [run], and logs worker
+    creation, ending or failure using [~on_event].
+    [cancel] is called if worker fails. *)
 val worker:
   string ->
+  on_event:(string ->
+            [ `Ended | `Failed of string | `Started ] -> unit Lwt.t) ->
   run:(unit -> unit Lwt.t) ->
   cancel:(unit -> unit Lwt.t) ->
   unit Lwt.t

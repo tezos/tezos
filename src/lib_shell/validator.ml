@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make_semantic(struct let name = "node.validator" end)
+include Internal_event.Legacy_logging.Make_semantic(struct let name = "node.validator" end)
 
 type t = {
 

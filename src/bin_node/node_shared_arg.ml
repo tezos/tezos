@@ -51,7 +51,7 @@ type t = {
   cors_origins: string list ;
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;
-  log_output: Logging_unix.Output.t option ;
+  log_output: Lwt_log_sink_unix.Output.t option ;
   bootstrap_threshold: int option ;
 }
 
@@ -139,10 +139,10 @@ end
 module Term = struct
 
   let log_output_converter =
-    (fun s -> match Logging_unix.Output.of_string s with
+    (fun s -> match Lwt_log_sink_unix.Output.of_string s with
        | Some res -> `Ok res
        | None -> `Error s),
-    Logging_unix.Output.pp
+    Lwt_log_sink_unix.Output.pp
 
   (* misc args *)
 

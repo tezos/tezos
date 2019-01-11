@@ -27,7 +27,7 @@
 type limits =
   { backlog_size : int
   (** Number of event stored in the backlog for each debug level. *) ;
-    backlog_level : Logging.level
+    backlog_level : Internal_event.level
   (** Stores events at least as important as this value. *) ;
     zombie_lifetime : float
   (** How long dead workers are kept in the introspection table. *) ;
@@ -57,7 +57,7 @@ val request_status_encoding : request_status Data_encoding.t
 type ('req, 'evt) full_status =
   { status : worker_status ;
     pending_requests : (Time.t * 'req) list ;
-    backlog : (Logging.level * 'evt list) list ;
+    backlog : (Internal_event.level * 'evt list) list ;
     current_request : (Time.t * Time.t * 'req) option }
 
 (** Full worker status serializer for RPCs. *)

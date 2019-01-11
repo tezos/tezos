@@ -58,7 +58,7 @@ module type EVENT = sig
       Events can be ignored for logging w.r.t. the global node configuration.
       Events can be ignored for introspection w.r.t. to the worker's
       {!Worker_types.limits}. *)
-  val level : t -> Logging.level
+  val level : t -> Internal_event.level
 
   (** Serializer for the introspection RPCs *)
   val encoding : t Data_encoding.t
@@ -271,7 +271,7 @@ module type T = sig
   val state : _ t -> Types.state
 
   (** Access the event backlog. *)
-  val last_events : _ t -> (Logging.level * Event.t list) list
+  val last_events : _ t -> (Internal_event.level * Event.t list) list
 
   (** Introspect the message queue, gives the times requests were pushed. *)
   val pending_requests : _ queue t -> (Time.t * Request.view) list

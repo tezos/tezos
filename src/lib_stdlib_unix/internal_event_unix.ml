@@ -56,7 +56,9 @@ end
 
 let env_var_name = "TEZOS_EVENTS_CONFIG"
 
-let init ?(configuration = Configuration.default) () =
+let init ?lwt_log_sink ?(configuration = Configuration.default) () =
+  Lwt_log_sink_unix.initialize ?cfg:lwt_log_sink ()
+  >>= fun () ->
   begin
     begin match Sys.(getenv_opt env_var_name) with
       | None ->

@@ -24,7 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "test.p2p.connection" end)
+include
+  Internal_event.Legacy_logging.Make
+    (struct let name = "test.p2p.connection" end)
 
 let addr = ref Ipaddr.V6.localhost
 

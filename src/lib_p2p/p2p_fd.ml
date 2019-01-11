@@ -35,7 +35,7 @@ let () =
     Sys.(set_signal sigpipe Signal_ignore)
 
 (* Logging facility for the P2P layer *)
-module Log = Logging.Make(struct let name = "p2p.fd" end)
+module Log = Internal_event.Legacy_logging.Make(struct let name = "p2p.fd" end)
 
 type t = {
   fd : Lwt_unix.file_descr ;

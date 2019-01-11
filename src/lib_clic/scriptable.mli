@@ -23,4 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "node.worker" end)
+open Error_monad
+
+(** Manage a common ["--for-script <FORMAT>"] option to make the
+    output of certain commands script-friendly. *)
+
+type output_format
+(** A representation of the output format. *)
+
+val clic_arg : unit -> (output_format option, _) Clic.arg
+(** Command line argument for {!Clic.command} (and the [Clic.args*]
+    functions). *)
+
+val output :
+  ?channel: Lwt_io.output_channel ->
+  output_format option ->
+  for_human:(unit -> unit tzresult Lwt.t) ->
+  for_script:(unit -> string list list) ->
+  unit tzresult Lwt.t
+(** Output a list of rows of data (the result of [for_script ()]) to
+    [formatter] (default: {!Format.std_formatter}) if the ["--for-script"]
+    option has been set (is [Some _]), if the format is [None] the function
+    [~for_human] is called instead. *)
+
+val output_row :
+  ?channel: Lwt_io.output_channel ->
+  output_format option ->
+  for_human:(unit -> unit tzresult Lwt.t) ->
+  for_script:(unit -> string list) ->
+  unit tzresult Lwt.t
+(** Same as {!output} but for a single row of data. *)
+
+val output_for_human :
+  output_format option -> (unit -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+(** [output_for_human fmt_opt for_human] calls [for_human] when
+    [fmt_opt] is [None]. *)

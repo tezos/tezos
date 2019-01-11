@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "p2p.maintenance" end)
+include Internal_event.Legacy_logging.Make (struct let name = "p2p.maintenance" end)
 
 type bounds = {
   min_threshold: int ;
@@ -236,6 +236,7 @@ let create ?discovery config bounds pool = {
 let activate st =
   st.maintain_worker <-
     Lwt_utils.worker "maintenance"
+      ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop st)
       ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
   Option.iter st.discovery ~f:P2p_discovery.activate

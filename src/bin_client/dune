@@ -4,6 +4,7 @@
  (libraries tezos-base
             tezos-rpc-http
             tezos-shell-services
+            tezos-shell
             tezos-client-base
             tezos-client-commands
             tezos-client-genesis
@@ -22,7 +23,8 @@
                     -open Tezos_shell_services
                     -open Tezos_client_base
                     -open Tezos_client_commands
-                    -open Tezos_client_base_unix)))
+                    -open Tezos_client_base_unix
+                    -linkall)))
 
 (install
  (section bin)

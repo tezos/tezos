@@ -509,7 +509,6 @@ let wrap (n, f) =
       wrap_state_init f dir >>= function
       | Ok () -> Lwt.return_unit
       | Error error ->
-          Tezos_stdlib_unix.Logging_unix.close () >>= fun () ->
           Format.eprintf "WWW %a@." pp_print_error error ;
           Lwt.fail Alcotest.Test_error
     end

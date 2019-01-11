@@ -34,10 +34,16 @@ let () =
       | Exit -> ()
       | e ->
           let backtrace = Printexc.get_backtrace () in
-          Base_logging.(fatal_error Tag.DSL.(fun f ->
-              f "@[<v 2>@[Uncaught (asynchronous) exception (%d):@ %a@]%a@]"
-              -% t event "uncaught_async_exception"
-              -% s pid (Unix.getpid ())
-              -% a exn e
-              -% a exn_trace backtrace)) ;
+          let pp_exn_trace ppf backtrace =
+            if String.length backtrace <> 0 then
+              Format.fprintf ppf
+                "@,Backtrace:@,  @[<h>%a@]"
+                Format.pp_print_text backtrace
+          in
+          (* TODO Improve this *)
+          Format.eprintf
+            "@[<v 2>@[Uncaught (asynchronous) exception (%d):@ %s@]%a@]@.%!"
+            (Unix.getpid ())
+            (Printexc.to_string e)
+            pp_exn_trace backtrace ;
           Lwt.wakeup exit_wakener 1)

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "p2p.welcome" end)
+include Internal_event.Legacy_logging.Make (struct let name = "p2p.welcome" end)
 
 type pool = Pool : ('msg, 'meta, 'meta_conn) P2p_pool.t -> pool
 
@@ -86,6 +86,7 @@ let create ?addr ~backlog pool port =
 let activate st =
   st.worker <-
     Lwt_utils.worker "welcome"
+      ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop st)
       ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
 

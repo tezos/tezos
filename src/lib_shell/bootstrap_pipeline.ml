@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make_semantic(struct let name = "node.validator.bootstrap_pipeline" end)
+include Internal_event.Legacy_logging.Make_semantic
+    (struct let name = "node.validator.bootstrap_pipeline" end)
 
 let node_time_tag = Tag.def ~doc:"local time at this node" "node_time" Time.pp_hum
 let block_time_tag = Tag.def ~doc:"claimed creation time of block" "block_time" Time.pp_hum
@@ -316,18 +317,21 @@ let create
     Lwt_utils.worker
       (Format.asprintf "bootstrap_pipeline-headers_fetch.%a.%a"
          P2p_peer.Id.pp_short peer_id Block_hash.pp_short hash)
+      ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> headers_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
   pipeline.operations_fetch_worker <-
     Lwt_utils.worker
       (Format.asprintf "bootstrap_pipeline-operations_fetch.%a.%a"
          P2p_peer.Id.pp_short peer_id Block_hash.pp_short hash)
+      ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> operations_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
   pipeline.validation_worker <-
     Lwt_utils.worker
       (Format.asprintf "bootstrap_pipeline-validation.%a.%a"
          P2p_peer.Id.pp_short peer_id Block_hash.pp_short hash)
+      ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> validation_worker_loop pipeline)
       ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
   pipeline

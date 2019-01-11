@@ -39,21 +39,23 @@ end
 
 type cfg = {
   output : Output.t ;
-  default_level : Logging.level ;
+  default_level : Internal_event.level ;
   rules : string option ;
-  template : Logging.template ;
+  template : Lwt_log_core.template ;
 }
 
 val default_cfg : cfg
 
 val create_cfg :
   ?output:Output.t ->
-  ?default_level:Logging.level ->
+  ?default_level:Internal_event.level ->
   ?rules:string ->
-  ?template:Logging.template -> unit -> cfg
+  ?template:Lwt_log_core.template -> unit -> cfg
 
-val level_encoding : Logging.level Data_encoding.t
 val cfg_encoding : cfg Data_encoding.t
 
-val init: ?cfg:cfg -> unit -> unit Lwt.t
-val close: unit -> unit Lwt.t
+val initialize: ?cfg:cfg -> unit -> unit Lwt.t
+(** Configure the event-logging sink defined in
+    {!Internal_event.Lwt_log_sink} by merging the contents of [?cfg]
+    (default: {!default_cfg}) and the value of the ["TEZOS_LOG"]
+    environment variable. *)

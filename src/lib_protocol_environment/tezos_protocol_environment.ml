@@ -605,7 +605,7 @@ module Make (Context : CONTEXT) = struct
       let canonical_encoding_v1 = canonical_encoding_v1
       let canonical_encoding = canonical_encoding_v0
     end
-    module Logging = Logging.Make(Param)
+    module Logging = Internal_event.Legacy_logging.Make(Param)
 
     module Updater = struct
 

@@ -109,12 +109,12 @@ module Event = struct
   let level req =
     let open Request in
     match req with
-    | Debug _ -> Logging.Debug
-    | Request (View (Flush _), _, _) -> Logging.Notice
-    | Request (View (Notify _), _, _) -> Logging.Debug
-    | Request (View (Inject _), _, _) -> Logging.Notice
-    | Request (View (Arrived _), _, _) -> Logging.Debug
-    | Request (View Advertise, _, _) -> Logging.Debug
+    | Debug _ -> Internal_event.Debug
+    | Request (View (Flush _), _, _) -> Internal_event.Notice
+    | Request (View (Notify _), _, _) -> Internal_event.Debug
+    | Request (View (Inject _), _, _) -> Internal_event.Notice
+    | Request (View (Arrived _), _, _) -> Internal_event.Debug
+    | Request (View Advertise, _, _) -> Internal_event.Debug
 
   let encoding =
     let open Data_encoding in

@@ -26,7 +26,7 @@
 open Proto_alpha
 open Alpha_context
 
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.endorsement" end)
+include Internal_event.Legacy_logging.Make_semantic(struct let name = "client.endorsement" end)
 
 open Logging
 

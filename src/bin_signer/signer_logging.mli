@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.SEMLOG
+include Internal_event.Legacy_logging.SEMLOG
 
 val host_name: string Tag.def
 val service_name: string Tag.def

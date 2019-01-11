@@ -32,7 +32,9 @@ let get_context index hash =
 (** The standard block validation method *)
 module Seq_validator = struct
 
-  include Logging.Make (struct let name = "validation_process.sequential" end)
+  include Internal_event.Legacy_logging.Make (struct
+      let name = "validation_process.sequential"
+    end)
 
   type validation_context = {
     context_index : Context.index ;

@@ -23,6 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.SEMLOG
+include Internal_event.Legacy_logging.SEMLOG
 
 val chain_id: Chain_id.t Tag.def

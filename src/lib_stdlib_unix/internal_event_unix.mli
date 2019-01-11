@@ -46,6 +46,7 @@ module Configuration : sig
 end
 
 val init :
+  ?lwt_log_sink:Lwt_log_sink_unix.cfg ->
   ?configuration:Configuration.t ->
   unit ->
   unit Lwt.t
@@ -56,6 +57,9 @@ val init :
     JSON file (cf. {!Configuration.of_file}), e.g.:
     [export TEZOS_EVENTS_CONFIG="unix-files:///tmp/events-unix debug://"], or
     [export TEZOS_EVENTS_CONFIG="debug://  /path/to/config.json"].
+
+    The function also initializes the {!Lwt_log_sink_unix} module
+    (corresponding to the ["TEZOS_LOG"] environment variable).
 *)
 
 val close : unit -> unit Lwt.t

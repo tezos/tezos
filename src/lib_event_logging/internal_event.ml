@@ -23,10 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* open TzPervasives → circular dependencies because of legacy-logging usage *)
-open Tezos_error_monad
 open Error_monad
-module Data_encoding = Tezos_data_encoding.Data_encoding
 module List = struct
   include List
   include Tezos_stdlib.TzList
