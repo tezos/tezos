@@ -64,30 +64,37 @@ module Level = struct
 end
 
 module Section: sig
-  type t = private string
-  val make : string -> t
-  val make_sanitized : string -> t
+  type t = private string list
+  val empty : t
+  val make : string list -> t
+  val make_sanitized : string list -> t
   val to_lwt_log : t -> Lwt_log_core.section
   val encoding : t Data_encoding.t
-  val to_string : t -> string 
+  val to_string_list : t -> string list
 end = struct
-  type t = string
-  let make s =
-    check_name_exn s (fun name char ->
-        Printf.ksprintf Pervasives.invalid_arg
-          "Internal_event.Section: invalid name %S (contains %c)" name char) ;
-    s
+  type t = string list
+  let empty = []
 
-  let make_sanitized s =
-    String.map (fun c -> if valid_char c then c else '_') s |> make
+  let make sl =
+    List.iter
+      (fun s ->
+         check_name_exn s (fun name char ->
+             Printf.ksprintf Pervasives.invalid_arg
+               "Internal_event.Section: invalid name %S (contains %c)" name char))
+      sl;
+    sl
 
-  let to_lwt_log s = Lwt_log_core.Section.make s
+  let make_sanitized sl =
+    List.map
+      (String.map (fun c -> if valid_char c then c else '_')) sl |> make
 
-  let to_string t = t
+  let to_lwt_log s = Lwt_log_core.Section.make (String.concat "." s)
+
+  let to_string_list t = t
 
   let encoding =
     let open Data_encoding in
-    string
+    list string
 end
 
 module type EVENT_DEFINITION = sig
@@ -436,7 +443,7 @@ module Legacy_logging = struct
       let level { level ; _ } = level
     end
 
-    let section = Section.make P.name
+    let section = Section.make (String.split_on_char '.' P.name)
 
     let () = sections := P.name :: !sections
 
@@ -645,7 +652,7 @@ module Lwt_worker_event = struct
   include (Make (Definition) : EVENT with type t := t)
 
   let on_event name event =
-    let section = Printf.ksprintf Section.make_sanitized "lwt-worker-%s" name in
+    let section = Section.make_sanitized [ "lwt-worker"; name ] in
     Error_event.to_lwt
       ~message:(Printf.sprintf "Trying to emit worker event for %S" name)
       ~severity:`Fatal

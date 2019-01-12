@@ -61,10 +61,10 @@ module Event_filter = struct
     | Name of string
     | Name_matches of Re.re
     | Level_in of Internal_event.level list
-    | Section_in of Internal_event.Section.t option list
+    | Section_in of Internal_event.Section.t list
 
-  let rec run ~section_option ~level ~name filter =
-    let continue = run ~section_option ~level ~name in
+  let rec run ~section ~level ~name filter =
+    let continue = run ~section ~level ~name in
     match filter with
     | True -> true
     | False -> false
@@ -73,7 +73,7 @@ module Event_filter = struct
     | Name s -> String.equal s name
     | Name_matches re -> Re.execp re name
     | Level_in l -> List.mem level l
-    | Section_in l -> List.mem section_option l
+    | Section_in l -> List.mem section l
 
   let rec pp fmt filter =
     let open Format in
@@ -94,10 +94,9 @@ module Event_filter = struct
     | Section_in l ->
         fprintf fmt "(section-in@ [%a])"
           (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ",@ ")
-             (fun fmt -> function
-                | None -> fprintf fmt "None"
-                | Some s -> fprintf fmt "(Some %s)"
-                              (Internal_event.Section.to_string s)))
+             (fun fmt s -> fprintf fmt "(Some %s)"
+                 (String.concat ","
+                    (Internal_event.Section.to_string_list s))))
           l
   [@@warning "-32"] (* -> The "unused value" warning. *)
 
@@ -139,7 +138,7 @@ type t = {
 
 type 'event wrapped =
   { time_stamp : Micro_seconds.t ;
-    section : Internal_event.Section.t option ;
+    section : Internal_event.Section.t ;
     event : 'event }
 
 let wrap time_stamp section event = { time_stamp ; section ; event }
@@ -152,16 +151,15 @@ let wrapped_encoding event_encoding =
       (fun (time_stamp, section, event) -> { time_stamp ; section ; event })
       (obj3
          (req "time_stamp" Micro_seconds.encoding)
-         (req "section" (option Internal_event.Section.encoding))
+         (req "section" Internal_event.Section.encoding)
          (req "event" event_encoding))
   in
   With_version.(encoding ~name:"file-event-sink-item" (first_version v0))
 
 module Section_dir = struct
 
-  let of_section (section : Internal_event.Section.t option) =
-    Option.unopt_map (section :> string option)
-      ~default:"no-section" ~f:(Printf.sprintf "section-%s")
+  let of_section (section : Internal_event.Section.t) =
+    String.concat "." (Internal_event.Section.to_string_list section)
 
   let section_name =
     function
@@ -198,11 +196,13 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
       let sections =
         let somes =
           Uri.get_query_param' uri "section" |> Option.unopt ~default:[]
-          |> List.map (fun s -> Some (Internal_event.Section.make_sanitized s))
+          |> List.map (fun s ->
+              (Internal_event.Section.make_sanitized
+                 (String.split_on_char '.' s)))
         in
         let none =
           match Uri.get_query_param uri "no-section" with
-          | Some "true" -> [None]
+          | Some "true" -> [Internal_event.Section.empty]
           | _ -> []
         in
         match somes @ none with
@@ -243,7 +243,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
 
   let handle
       (type a) { path ; lwt_bad_citizen_hack ; event_filter }
-      m ?section (v : unit -> a) =
+      m ?(section = Internal_event.Section.empty) (v : unit -> a) =
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Micro_seconds.now () in
     let date, time = Micro_seconds.date_string now in
@@ -251,7 +251,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
     let level = M.level forced in
     match
       Event_filter.run
-        ~section_option:section ~level ~name:M.name event_filter
+        ~section:section ~level ~name:M.name event_filter
     with
     | true ->
         let event_json =

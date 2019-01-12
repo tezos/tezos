@@ -64,16 +64,20 @@ end
 (** Sections are a simple way of classifying events at the time of
     their emission. *)
 module Section: sig
-  type t = private string
+  type t = private string list
 
-  val make_sanitized : string -> t
+  val empty : t
+
+  val make_sanitized : string list -> t
   (** Build a {!Section.t} by replacing special characters with ['_']. *)
 
   val to_lwt_log : t -> Lwt_log_core.section
   (** Make the equivalent {!Lwt_log} section.  *)
 
   val encoding : t Data_encoding.t
-  val to_string : t -> string
+
+  val to_string_list : t -> string list
+
 end
 
 (** Parameters defining an inspectable type of events. *)
