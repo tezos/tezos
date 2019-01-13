@@ -37,7 +37,7 @@ end
 let valid_char c =
   match c with
   | '0' .. '9' | 'a' .. 'z' | 'A' .. 'Z'
-  | '.' | '@' | '-' | '_' | '+' | '=' | '~' -> true
+  | '@' | '-' | '_' | '+' | '=' | '~' -> true
   | _ -> false
 
 let check_name_exn name or_fail =
@@ -397,19 +397,21 @@ module Legacy_logging = struct
   end
 
   module Make_event (P : sig val name : string end) = struct
+    let name_split = String.split_on_char '.' P.name
+    let section = Section.make name_split
 
     module Definition = struct
-      let name = "legacy-logging-event." ^ P.name
+      let name = "legacy_logging_event-" ^ String.concat "-" name_split
 
       type t = {
         message : string ;
-        section : string ;
+        section : Section.t ;
         level : level ;
         tags : Tag.set ;
       }
 
       let make ?(tags = Tag.empty) level message =
-        { message ; section = P.name ; level ; tags }
+        { message ; section ; level ; tags }
 
 
       let v0_encoding =
@@ -421,7 +423,7 @@ module Legacy_logging = struct
              { message ; section ; level ; tags })
           (obj4
              (req "message" string)
-             (req "section" string)
+             (req "section" Section.encoding)
              (req "level" Level.encoding)
              (dft "tags"
                 (conv
@@ -443,7 +445,6 @@ module Legacy_logging = struct
       let level { level ; _ } = level
     end
 
-    let section = Section.make (String.split_on_char '.' P.name)
 
     let () = sections := P.name :: !sections
 
