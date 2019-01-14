@@ -35,7 +35,7 @@ let inject_seed_nonce_revelation rpc_config ?(chain = `Main) block ?async nonces
          (chain, block) ~branch ~level ~nonce () >>=? fun bytes ->
        let bytes = Signature.concat bytes Signature.zero in
        Shell_services.Injection.operation rpc_config ?async ~chain bytes >>=? fun oph ->
-       lwt_debug Tag.DSL.(fun f ->
+       lwt_log_notice Tag.DSL.(fun f ->
            f "Revealing nonce %a from level %a at chain %a, block %a with operation %a"
            -% t event "reveal_nonce"
            -% a Logging.nonce_tag nonce
