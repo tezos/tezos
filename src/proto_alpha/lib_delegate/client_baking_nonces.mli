@@ -26,26 +26,47 @@
 open Proto_alpha
 open Alpha_context
 
-type t = Nonce.t Block_hash.Map.t
+type t
+
+val encoding: t Data_encoding.t
+
+val name: string
 
 val load:
   #Client_context.wallet ->
   t tzresult Lwt.t
+
 val save:
   #Client_context.wallet ->
-  t -> unit tzresult Lwt.t
+  t ->
+  unit tzresult Lwt.t
+
 val mem:
-  #Client_context.wallet ->
-  Block_hash.t -> bool tzresult Lwt.t
-val find:
-  #Client_context.wallet ->
-  Block_hash.t -> Nonce.t option tzresult Lwt.t
+  t ->
+  Chain_services.chain ->
+  Block_hash.t ->
+  bool
+
+val find_opt:
+  t ->
+  Chain_services.chain ->
+  Block_hash.t ->
+  Nonce.t option
+
 val add:
-  #Client_context.wallet ->
-  Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
-val del:
-  #Client_context.wallet ->
-  Block_hash.t -> unit tzresult Lwt.t
-val dels:
-  #Client_context.wallet ->
-  Block_hash.t list -> unit tzresult Lwt.t
+  t ->
+  Chain_services.chain ->
+  Block_hash.t ->
+  Nonce.t ->
+  t
+
+val remove:
+  t ->
+  Chain_services.chain ->
+  Block_hash.t ->
+  t
+
+val find_chain_nonces_opt:
+  t ->
+  Chain_services.chain ->
+  Nonce.t Block_hash.Map.t option
