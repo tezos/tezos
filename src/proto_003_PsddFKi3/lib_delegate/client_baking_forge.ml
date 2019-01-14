@@ -1035,7 +1035,12 @@ let bake (cctxt : #Proto_alpha.full) state =
             ) >>= fun () ->
 
           begin if seed_nonce_hash <> None then
-              Client_baking_nonces.add cctxt block_hash seed_nonce
+              cctxt#with_lock begin fun () ->
+                let open Client_baking_nonces in
+                load cctxt >>=? fun nonces ->
+                let nonces = add nonces chain block_hash seed_nonce in
+                save cctxt nonces
+              end
               |> trace_exn (Failure "Error while recording nonce")
             else return_unit end >>=? fun () ->
           return_unit
@@ -1130,39 +1135,37 @@ let filter_outdated_nonces
   let is_older_than_5_cycles block_cycle =
     Int32.sub current_cycle (Cycle.to_int32 block_cycle) > 5l in
   cctxt#with_lock begin fun () ->
-    Client_baking_nonces.load cctxt >>=? fun nonces ->
-    Block_hash.Map.fold
-      begin fun hash nonce acc ->
-        acc >>=? fun acc ->
-        Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) () >>=
-        function
-        | Result.Error _ -> return (Block_hash.Map.add hash nonce acc)
-        | Result.Ok { protocol_data = { level = { Level.cycle } } } ->
-            if is_older_than_5_cycles cycle then
-              return acc
-            else
-              return (Block_hash.Map.add hash nonce acc)
-      end
-      nonces
-      (return Block_hash.Map.empty) >>=? fun new_nonces ->
-    Client_baking_nonces.save cctxt new_nonces
+    let open Client_baking_nonces in
+    load cctxt >>=? fun chain_nonces ->
+    match find_chain_nonces_opt chain_nonces chain with
+    | None -> return_unit
+    | Some nonces ->
+        Block_hash.Map.fold (fun (hash : Block_hash.t) _ acc ->
+            acc >>=? fun acc ->
+            Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) ()
+            >>= function
+            | Result.Error _ -> return acc
+            | Result.Ok { protocol_data = { level = { Level.cycle } } } ->
+                if is_older_than_5_cycles cycle then
+                  return (remove chain_nonces chain hash)
+                else
+                  return acc
+          )
+          nonces (return chain_nonces) >>=? fun new_nonces ->
+        Client_baking_nonces.save cctxt new_nonces
   end
 
 (** [get_unrevealed_nonces] retrieve registered nonces *)
 let get_unrevealed_nonces
     (cctxt : #Proto_alpha.full) ?(force = false)
     ~chain head =
+  Client_baking_blocks.blocks_from_current_cycle cctxt ~chain
+    head ~offset:(-1l) () >>=? fun blocks ->
   cctxt#with_lock begin fun () ->
     Client_baking_nonces.load cctxt
   end >>=? fun nonces ->
-  Client_baking_blocks.blocks_from_current_cycle
-    cctxt
-    ~chain
-    head
-    ~offset:(-1l)
-    () >>=? fun blocks ->
   filter_map_s (fun hash ->
-      match Block_hash.Map.find_opt hash nonces with
+      match Client_baking_nonces.find_opt nonces chain hash with
       | None -> return_none
       | Some nonce ->
           Alpha_block_services.metadata
