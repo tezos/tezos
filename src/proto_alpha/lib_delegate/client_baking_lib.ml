@@ -75,7 +75,12 @@ let bake_block
   begin match seed_nonce with
     | None -> return_unit
     | Some seed_nonce ->
-        Client_baking_nonces.add cctxt block_hash seed_nonce
+        cctxt#with_lock begin fun () ->
+          let open Client_baking_nonces in
+          load cctxt >>=? fun nonces ->
+          let nonces = add nonces chain block_hash seed_nonce in
+          save cctxt nonces
+        end
         |> trace_exn (Failure "Error while recording block")
   end >>=? fun () ->
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
@@ -126,7 +131,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
   filter_map_s (fun (bi : Client_baking_blocks.block_info) ->
-      match Block_hash.Map.find_opt bi.hash nonces with
+      match Client_baking_nonces.find_opt nonces cctxt#chain bi.hash with
       | None ->
           cctxt#warning "Cannot find nonces for block %a (ignoring)@."
             Block_hash.pp_short bi.hash >>= fun () ->
