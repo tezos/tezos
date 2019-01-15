@@ -400,7 +400,7 @@ val any_schema : Json_schema.schema encoding
 
 (** Describe an encoding in JSON schema format.
     May raise {!Bad_schema}. *)
-val schema : 't encoding -> Json_schema.schema
+val schema : ?definitions_path:string -> 't encoding -> Json_schema.schema
 
 (** Name a definition so its occurences can be shared in the JSON
     schema.  The first parameter is a path, that must be unique and
