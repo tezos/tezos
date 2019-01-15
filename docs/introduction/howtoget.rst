@@ -48,11 +48,12 @@ You are now one step away from a working node:
 
     ./alphanet.sh start
 
-This will download the right docker image for your chosen network,
-launch 3 docker containers running the node, the baker and the
-endorser.
-The first launch might take a few minutes to download the
-docker images and synchronize the chain.
+This will download the right docker image for your chosen network, launch 3
+docker containers running the node, the baker and the endorser. Keep in mind
+that when a tezos node is launched, it needs to connect to new peers and
+synchronize the chain. This can be *lengthy* on the first launch
+considering the chain takes up several gigabytes of data. See
+:ref:`how to use Tezos<howtouse>` for more details.
 
 Every call to ``alphanet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
@@ -72,8 +73,9 @@ set an environment variable:
 See ``./alphanet.sh --help`` for more informations about the
 script. In particular see ``./alphanet.sh client --help`` or the
 :ref:`online manual<client_manual>` for more information about
-the client. Every command to the ``tezos-client`` can be
-equivalently executed using ``./alphanet.sh client``.
+the client. Every command to the ``tezos-client`` can be equivalently
+executed using ``./alphanet.sh client``. Similary, ``tezos-admin-client``
+can be executed using ``./alphanet.sh admin-client``.
 
 
 Build from sources
