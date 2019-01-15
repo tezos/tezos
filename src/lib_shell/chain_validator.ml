@@ -108,7 +108,10 @@ let shutdown_child nv active_chains =
       State.update_chain_data nv.parameters.chain_state begin fun _ chain_data ->
         Lwt.return (Some { chain_data with test_chain = None }, ())
       end >>= fun () ->
-      shutdown ()) nv.child
+      shutdown () >>= fun () ->
+      nv.child <- None ;
+      Lwt.return_unit
+    ) nv.child
 
 let notify_new_block w block =
   let nv = Worker.state w in
