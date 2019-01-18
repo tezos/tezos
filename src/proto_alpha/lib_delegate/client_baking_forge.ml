@@ -1206,8 +1206,8 @@ let get_unrevealed_nonces
 let reveal_potential_nonces cctxt ~chain new_head =
   get_unrevealed_nonces cctxt ~chain new_head >>= function
   | Ok nonces ->
-      Client_baking_revelation.forge_seed_nonce_revelation
-        cctxt ~chain new_head (List.map snd nonces)
+      Client_baking_revelation.inject_seed_nonce_revelation
+        cctxt ~chain ~block:new_head (List.map snd nonces)
   | Error err ->
       lwt_warn Tag.DSL.(fun f ->
           f "Cannot read nonces: %a"
