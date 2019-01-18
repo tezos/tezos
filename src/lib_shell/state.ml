@@ -1677,16 +1677,30 @@ let upgrade_0_0_1
         let chain_store = Store.Chain.get global_store chain_id in
         let block_store = Store.Block.get chain_store in
         let chain_data_store = Store.Chain_data.get chain_store in
+        let processed = ref 0 in
+        Format.eprintf "Processing blocks..." ;
+        if Unix.isatty Unix.stderr then
+          Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
+        else Format.eprintf "\n%!" ;
         Store.Block.fold block_store
           ~init:(Ok ())
           ~f: begin fun h acc ->
             Lwt.return acc >>=? fun () ->
+            trace (failure "Could not convert block %a." Block_hash.pp h) @@
             Store.Block.Contents_0_0_1.read
               (block_store, h) >>=? fun (header, contents) ->
             Store.Block.Header.store (block_store, h) header >>= fun () ->
             Store.Block.Contents.store (block_store, h) contents >>= fun () ->
+            incr processed ;
+            if !processed mod 1000 = 0 then begin
+              Format.eprintf "%dK blocks processed..." (!processed / 1000);
+              if Unix.isatty Unix.stderr then
+                Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
+              else Format.eprintf "\n%!"
+            end ;
             return_unit
           end >>=? fun () ->
+        Format.eprintf "Done Processing blocks.\n%!" ;
         Format.eprintf "Upgrading checkpoint for chain %a...@." Chain_id.pp chain_id ;
         Store.Chain_data.Checkpoint_0_0_1.read_opt chain_data_store >>= function
         | None ->
