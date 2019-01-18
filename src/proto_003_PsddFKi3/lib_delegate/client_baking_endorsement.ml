@@ -50,23 +50,26 @@ let inject_endorsement
     ~level:level
     () >>=? fun bytes ->
   let wallet = (cctxt :> Client_context.wallet) in
+  (* Double-check the right to inject an endorsement *)
   wallet#with_lock begin fun () ->
     Daemon_state.may_inject_endorsement cctxt ~chain ~delegate:delegate_pkh level >>=? function
     | true ->
         Daemon_state.record_endorsement cctxt ~chain ~delegate:delegate_pkh level >>=? fun () ->
-        return_unit
-    | false ->
-        lwt_log_error Tag.DSL.(fun f ->
-            f "Level %a : previously endorsed."
-            -% t event "double_endorsement_near_miss"
-            -% a level_tag level) >>= fun () ->
-        fail (Daemon_state.Level_previously_endorsed level)
-  end >>=? fun () ->
-  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Client_keys.append cctxt
-    delegate_sk ~watermark:(Endorsement chain_id) bytes >>=? fun signed_bytes ->
-  Shell_services.Injection.operation cctxt ?async ~chain signed_bytes >>=? fun oph ->
-  return oph
+        return_true
+    | false -> return_false
+  end >>=? fun is_allowed_to_endorse ->
+  if is_allowed_to_endorse then
+    Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+    Client_keys.append cctxt
+      delegate_sk ~watermark:(Endorsement chain_id) bytes >>=? fun signed_bytes ->
+    Shell_services.Injection.operation cctxt ?async ~chain signed_bytes >>=? fun oph ->
+    return oph
+  else
+    lwt_log_error Tag.DSL.(fun f ->
+        f "Level %a : previously endorsed."
+        -% t event "double_endorsement_near_miss"
+        -% a level_tag level) >>= fun () ->
+    fail (Daemon_state.Level_previously_endorsed level)
 
 let forge_endorsement
     (cctxt : #Proto_alpha.full)
@@ -79,11 +82,15 @@ let forge_endorsement
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   inject_endorsement cctxt ?async ~chain ~block hash level src_sk src_pkh >>=? fun oph ->
   Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
-  cctxt#message
-    "Injected endorsement level %a, contract %s '%a'"
-    Raw_level.pp level
-    name
-    Operation_hash.pp_short oph >>= fun () ->
+  lwt_log_notice Tag.DSL.(fun f ->
+      f "Injected endorsement for block '%a' \
+         (level %a, contract %s) '%a'"
+      -% t event "injected_endorsement"
+      -% a Block_hash.Logging.tag hash
+      -% a level_tag level
+      -% s Client_keys.Logging.tag name
+      -% t Signature.Public_key_hash.Logging.tag src_pkh
+      -% a Operation_hash.Logging.tag oph) >>= fun () ->
   return oph
 
 (** Worker *)
