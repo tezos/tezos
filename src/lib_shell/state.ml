@@ -1312,7 +1312,7 @@ let close { global_data } =
 let upgrade_0_0_1
     ?(store_mapsize=4_096_000_000_000L)
     ~store_root () =
-  Store.with_atomic_rw ~mapsize:store_mapsize store_root begin fun global_store ->
+  Store.open_with_atomic_rw ~mapsize:store_mapsize store_root begin fun global_store ->
     Store.Chain.list global_store >>= fun chains ->
     iter_s
       begin fun chain_id ->

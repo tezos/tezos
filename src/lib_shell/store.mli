@@ -33,9 +33,14 @@ type global_store = t
 val init: ?mapsize:int64 -> string -> t tzresult Lwt.t
 val close: t -> unit
 
-val with_atomic_rw:
+val open_with_atomic_rw:
   ?mapsize:int64 -> string ->
   (t -> 'a Error_monad.tzresult Lwt.t) ->
+  'a tzresult Lwt.t
+
+val with_atomic_rw:
+  t ->
+  (unit -> 'a Error_monad.tzresult Lwt.t) ->
   'a tzresult Lwt.t
 
 (** {2 Chain store} **********************************************************)
