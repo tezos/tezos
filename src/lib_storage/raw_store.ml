@@ -308,9 +308,12 @@ let fold_keys t k ~init ~f =
 let keys t =
   fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
-let with_atomic_rw ?mapsize path f =
+let open_with_atomic_rw ?mapsize path f =
   let open Error_monad in
   init ?mapsize path >>=? fun state ->
   with_rw_cursor_lwt state ~f:(fun _c -> f state) >>=? fun res ->
   close state ;
   return res
+
+let with_atomic_rw state f =
+  with_rw_cursor_lwt state ~f:(fun _c -> f ())
