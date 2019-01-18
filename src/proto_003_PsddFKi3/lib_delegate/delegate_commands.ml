@@ -102,13 +102,13 @@ let delegate_commands () =
       (prefixes [ "reveal"; "nonce"; "for" ]
        @@ seq_of_param Block_hash.param)
       (fun () block_hashes cctxt ->
-         reveal_block_nonces cctxt block_hashes) ;
+         reveal_block_nonces cctxt ~chain:cctxt#chain ~block:cctxt#block block_hashes) ;
     command ~group ~desc: "Forge and inject all the possible seed-nonce revelation operations."
       no_options
       (prefixes [ "reveal"; "nonces" ]
        @@ stop)
       (fun () cctxt ->
-         reveal_nonces ~chain:cctxt#chain cctxt ()) ;
+         reveal_nonces ~chain:cctxt#chain ~block:cctxt#block cctxt ()) ;
     command ~group ~desc: "Forge and inject an endorsement operation."
       no_options
       (prefixes [ "endorse"; "for" ]

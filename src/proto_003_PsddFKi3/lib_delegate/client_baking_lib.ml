@@ -106,13 +106,12 @@ let get_predecessor_cycle (cctxt : #Client_context.printer) cycle =
           Cycle.pp cycle
   | Some cycle -> Lwt.return cycle
 
-let do_reveal cctxt block blocks =
-  let nonces = List.map snd blocks in
-  Client_baking_revelation.forge_seed_nonce_revelation
-    cctxt block nonces >>=? fun () ->
+let do_reveal cctxt ~chain ~block nonces =
+  Client_baking_revelation.inject_seed_nonce_revelation
+    cctxt ~chain ~block nonces >>=? fun () ->
   return_unit
 
-let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
+let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
   cctxt#with_lock begin fun () ->
     Client_baking_nonces.load cctxt
   end >>=? fun nonces ->
@@ -138,12 +137,14 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
           return_none
       | Some nonce ->
           return_some (bi.hash, (bi.level, nonce)))
-    block_infos >>=? fun blocks ->
-  do_reveal cctxt cctxt#block blocks
+    block_infos >>=? fun nonces ->
+  let nonces = List.map snd nonces in
+  do_reveal cctxt ~chain ~block nonces
 
-let reveal_nonces cctxt ~chain () =
+let reveal_nonces cctxt ~chain ~block () =
   Client_baking_forge.get_unrevealed_nonces
-    cctxt ~chain cctxt#block >>=? fun nonces ->
-  do_reveal cctxt cctxt#block nonces >>=? fun () ->
+    cctxt ~chain cctxt#block >>=? fun blocks ->
+  let nonces = List.map snd blocks in
+  do_reveal cctxt ~chain ~block nonces >>=? fun () ->
   Client_baking_forge.filter_outdated_nonces cctxt ~chain cctxt#block >>=? fun () ->
   return_unit

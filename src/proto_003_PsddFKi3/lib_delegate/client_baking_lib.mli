@@ -60,6 +60,8 @@ val get_predecessor_cycle:
 (** Reveal the nonces used to bake each block in the given list *)
 val reveal_block_nonces :
   #Proto_alpha.full ->
+  chain: Chain_services.chain ->
+  block: Block_services.block ->
   Block_hash.t list ->
   unit Error_monad.tzresult Lwt.t
 
@@ -67,5 +69,6 @@ val reveal_block_nonces :
 val reveal_nonces :
   #Proto_alpha.full ->
   chain: Chain_services.chain ->
+  block: Block_services.block ->
   unit ->
   unit Error_monad.tzresult Lwt.t

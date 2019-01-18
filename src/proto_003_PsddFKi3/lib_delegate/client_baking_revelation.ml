@@ -27,30 +27,9 @@ include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.nonce_revel
 
 open Proto_alpha
 
-let inject_seed_nonce_revelation rpc_config ?(chain = `Main) block ?async nonces =
-  Alpha_block_services.hash rpc_config ~chain ~block () >>=? fun branch ->
-  map_p
-    (fun (level, nonce) ->
-       Alpha_services.Forge.seed_nonce_revelation rpc_config
-         (chain, block) ~branch ~level ~nonce () >>=? fun bytes ->
-       let bytes = Signature.concat bytes Signature.zero in
-       Shell_services.Injection.operation rpc_config ?async ~chain bytes >>=? fun oph ->
-       lwt_log_notice Tag.DSL.(fun f ->
-           f "Revealing nonce %a from level %a at chain %a, block %a with operation %a"
-           -% t event "reveal_nonce"
-           -% a Logging.nonce_tag nonce
-           -% a Logging.level_tag level
-           -% a Logging.chain_tag chain
-           -% a Logging.block_tag block
-           -% a Operation_hash.Logging.tag oph) >>= fun () ->
-       return oph)
-    nonces >>=? fun ophs ->
-  return ophs
-
-let forge_seed_nonce_revelation
+let inject_seed_nonce_revelation
     (cctxt: #Proto_alpha.full)
-    ?(chain = cctxt#chain)
-    block nonces =
+    ~chain ~block ?async nonces =
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   match nonces with
   | [] ->
@@ -61,11 +40,18 @@ let forge_seed_nonce_revelation
         ) >>= fun () ->
       return_unit
   | _ ->
-      inject_seed_nonce_revelation cctxt ~chain block nonces >>=? fun oph ->
-      cctxt#answer
-        "Operation successfully injected %d revelation(s) for %a."
-        (List.length nonces)
-        Block_hash.pp_short hash >>= fun () ->
-      cctxt#answer "@[<v 2>Operation hash are:@ %a@]"
-        (Format.pp_print_list Operation_hash.pp_short) oph >>= fun () ->
-      return_unit
+      iter_s (fun (level, nonce) ->
+          Alpha_services.Forge.seed_nonce_revelation cctxt
+            (chain, block) ~branch:hash ~level ~nonce () >>=? fun bytes ->
+          let bytes = Signature.concat bytes Signature.zero in
+          Shell_services.Injection.operation cctxt ?async ~chain bytes >>=? fun oph ->
+          lwt_log_notice Tag.DSL.(fun f ->
+              f "Revealing nonce %a from level %a for chain %a, block %a with operation %a"
+              -% t event "reveal_nonce"
+              -% a Logging.nonce_tag nonce
+              -% a Logging.level_tag level
+              -% a Logging.chain_tag chain
+              -% a Logging.block_tag block
+              -% a Operation_hash.Logging.tag oph) >>= fun () ->
+          return_unit
+        ) nonces
