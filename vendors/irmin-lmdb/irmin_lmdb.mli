@@ -39,10 +39,6 @@ module Make
 
   type stats
 
-  val promoted_contents: stats -> int
-  val promoted_nodes: stats -> int
-  val promoted_commits: stats -> int
-
   val pp_stats: stats Fmt.t
 
   val gc:

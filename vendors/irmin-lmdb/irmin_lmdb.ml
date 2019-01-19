@@ -325,6 +325,32 @@ module Irmin_value_store
         |+ field "node" H.t (fun { node ; _ } -> node)
         |> sealr
 
+      let hash_v2_t =
+        let open Irmin_v2_type in
+        like ~cli:(H.pp, H.of_string)
+          (string_of (`Fixed H.digest_size))
+          (fun x -> H.of_raw (Cstruct.of_string x))
+          (fun x -> Cstruct.to_string (H.to_raw x))
+
+      let metadata_v2_t =
+        Irmin_v2_type.(like unit) (fun _ -> M.default) (fun _ -> ())
+
+      let entry_v2_t =
+        let open Irmin_v2_type in
+        record "Tree.entry"
+          (fun kind name node ->
+             let kind =
+               match kind with
+               | None -> `Node
+               | Some m -> `Contents m in
+             { kind ; name ; node } )
+        |+ field "kind" (option metadata_v2_t) (function
+            | { kind = `Node ; _ } -> None
+            | { kind = `Contents m ; _ } -> Some m)
+        |+ field "name" (string_of `Int8) (fun { name ; _ } -> name)
+        |+ field "node" hash_v2_t (fun { node ; _ } -> node)
+        |> sealr
+
       let value_t =
         let open Irmin.Type in
         variant "Tree.value" (fun node contents -> function
@@ -515,18 +541,40 @@ module Irmin_value_store
       let t = Irmin.Type.like N.t of_n to_n
     end
 
+    let v1_t = Irmin.Type.list Val.entry_t
+
+    type entries = { version: int; entries: Val.entry list }
+
+    let v2_t =
+      let open Irmin_v2_type in
+      record "entries" (fun v entries -> { version = Char.code v; entries })
+      |+ field "version" char (fun t -> Char.chr t.version)
+      |+ field "entries" (list ~len:`Int16 Val.entry_v2_t) (fun t -> t.entries)
+      |> sealr
+
+    let version v = match Cstruct.get_uint8 v 0 with
+      | 0 -> `V1
+      | 1 -> `V2
+      | n -> Fmt.failwith "Unsuppported node version: %d" n
+
     include AO (Key) (Val) (struct
 
         let of_key h = "node/" ^ Cstruct.to_string (H.to_raw h)
 
-        let to_value v =
-          Irmin.Type.decode_cstruct (Irmin.Type.list Val.entry_t) v
+        let to_value v = match version v with
+          | `V1 -> Irmin.Type.decode_cstruct v1_t v
+          | `V2 ->
+              match Irmin_v2_type.decode_bin v2_t (Cstruct.to_string v) with
+              | Ok t -> Ok t.entries
+              | Error _ as e -> e
 
         let of_value v =
-          let c = Irmin.Type.encode_cstruct (Irmin.Type.list Val.entry_t) v in
-          `Cstruct c
+          (* always use v2 encoding to write new values *)
+          let c = Irmin_v2_type.encode_bin v2_t { entries = v; version = 1 } in
+          `String c
 
         let digest v =
+          (* use v1 encoding for the digest *)
           let v = Irmin.Type.encode_cstruct (Irmin.Type.list Val.entry_t) v in
           H.digest Irmin.Type.cstruct v
 
@@ -747,18 +795,16 @@ module Make
     mutable promoted_contents: int;
     mutable promoted_nodes  : int;
     mutable promoted_commits: int;
+    mutable upgraded_nodes : int;
     mutable width: int;
     mutable depth: int;
   }
 
-  let promoted_contents t = t.promoted_contents
-  let promoted_nodes t = t.promoted_nodes
-  let promoted_commits t = t.promoted_commits
-
   let pp_stats ppf t =
-    Fmt.pf ppf "[%d blobs/%d nodes/%d commits] depth:%d width:%d"
+    Fmt.pf ppf "[%d blobs/%d nodes (%d upgrades)/%d commits] depth:%d width:%d"
       t.promoted_contents
       t.promoted_nodes
+      t.upgraded_nodes
       t.promoted_commits
       t.depth
       t.width
@@ -767,6 +813,7 @@ module Make
     promoted_contents = 0;
     promoted_nodes = 0;
     promoted_commits = 0;
+    upgraded_nodes = 0;
     width = 0;
     depth = 0;
   }
@@ -776,6 +823,7 @@ module Make
 
     let incr_contents s = s.promoted_contents <- s.promoted_contents + 1
     let incr_nodes s = s.promoted_nodes <- s.promoted_nodes + 1
+    let incr_upgraded_nodes s = s.upgraded_nodes <- s.upgraded_nodes + 1
     let incr_commits s = s.promoted_commits <- s.promoted_commits + 1
     let update_width s c = s.width <- max s.width (List.length c)
     let update_depth s n = s.depth <- max s.depth n
@@ -818,9 +866,23 @@ module Make
     let promote_val t k v =
       Raw.add_cstruct t.new_db k v
 
+    let is_node k = String.length k > 4 && String.sub k 0 4 = "node"
+
+    let upgrade_node t v = match P.XNode.version v with
+      | `V2 -> `Cstruct v
+      | `V1 ->
+          incr_upgraded_nodes t.stats;
+          match P.XNode.to_value v with
+          | Ok v -> P.XNode.of_value v
+          | Error (`Msg e) ->
+              Fmt.failwith "Cannot upgrade node %S: %s\n%!"
+                (Cstruct.to_string v) e
+
     let promote msg t k =
       Raw.find t.old_db k (fun x -> Ok x) >>= function
-      | Some v -> promote_val t k v
+      | Some v ->
+          if is_node k then Raw.add t.new_db k( upgrade_node t v)
+          else promote_val t k v
       | None   ->
           let k = H.of_raw (Cstruct.of_string k) in
           Fmt.failwith "promote %s: cannot promote key %a\n%!" msg H.pp k
