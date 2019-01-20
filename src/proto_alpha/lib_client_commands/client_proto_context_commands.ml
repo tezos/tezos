@@ -765,8 +765,8 @@ let commands version () =
                           Current in favor %ld, needed supermajority %ld"
               Data_encoding.Json.pp (Data_encoding.Json.construct
                                        Vote.ballots_encoding ballots_info.ballots)
-              ((Int32.to_float ballots_info.current_quorum) /. 100.)
-              ((Int32.to_float ballots_info.participation) /. 100.)
+              (Int32.to_float ballots_info.participation /. 100.)
+              (Int32.to_float ballots_info.current_quorum /. 100.)
               ballots_info.ballots.yay
               ballots_info.supermajority
             >>= fun () -> return_unit
