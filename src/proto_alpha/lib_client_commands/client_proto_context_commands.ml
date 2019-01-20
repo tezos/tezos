@@ -665,20 +665,32 @@ let commands version () =
           | _ -> cctxt#error "Not in a proposal period"
         end >>=? fun () ->
         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
-        let check_proposals proposals : unit tzresult Lwt.t =
+        get_proposals ~chain:`Main ~block:cctxt#block cctxt >>=? fun known_proposals ->
+        (* for a proposal to be valid it must either a protocol that was already
+           proposed by somebody else or a protocol known by the node, because
+           the user is the first proposer and just injected it with
+           tezos-admin-client *)
+        let check_proposals proposals : bool tzresult Lwt.t =
           let n = List.length proposals in
           if n = 0 then cctxt#error "Empty proposal"
           else if n > Constants.fixed.max_proposals_per_delegate then
             cctxt#error "Too many proposals"
           else
-            iter_s (fun p ->
-                if List.mem p known_protos then
-                  cctxt#message "All proposals are valid" >>= fun () -> return_unit
-                else cctxt#error "Protocol %a is not known by the node"
-                    Protocol_hash.pp p)
-              proposals
+            fold_left_s (fun acc (p : Protocol_hash.t) ->
+                if (List.mem p known_protos) ||
+                   (Alpha_environment.Protocol_hash.Map.mem p known_proposals)
+                then return acc
+                else cctxt#message "Protocol %a is not a known proposal"
+                    Protocol_hash.pp p >>= fun () ->
+                  return false)
+              true proposals
         in
-        check_proposals proposals >>=? fun () ->
+        check_proposals proposals >>=? fun all_valid ->
+        begin if all_valid then
+            cctxt#message "All proposals are valid"
+          else
+            cctxt#error "Submission failed because of invalid proposals"
+        end >>= fun () ->
         Client_proto_context.get_manager
           cctxt ~chain:`Main ~block:cctxt#block
           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
