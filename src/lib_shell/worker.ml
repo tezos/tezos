@@ -504,6 +504,9 @@ module Make
           end >>= function
           | Ok () ->
               loop ()
+          | Error ([Timeout] as errs) ->
+              Logger.lwt_log_notice "Worker terminated with timeout" >>= fun () ->
+              do_close (Some errs)
           | Error errs ->
               Logger.lwt_log_error
                 "@[<v 0>Worker crashed:@,%a@]"
