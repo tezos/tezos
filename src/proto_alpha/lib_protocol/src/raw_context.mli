@@ -60,7 +60,7 @@ val prepare:
 
 type 'a previous_protocol =
   | Genesis of 'a
-  | Alpha_002
+  | Alpha_previous
 
 val prepare_first_block:
   level:int32 ->
