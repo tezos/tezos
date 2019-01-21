@@ -50,7 +50,7 @@ let () =
         "The node is configured to listen on a public address (%a), \
          while only 'private' networks are authorised with `--sandbox`.
            See `%s run --help` on how to change the listening address."
-        Ipaddr.V6.pp_hum addr Sys.argv.(0)
+        Ipaddr.V6.pp addr Sys.argv.(0)
     end
     Data_encoding.(obj1 (req "addr" P2p_addr.encoding))
     (function Non_private_sandbox addr -> Some addr | _ -> None)

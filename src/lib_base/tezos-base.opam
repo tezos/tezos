@@ -16,7 +16,7 @@ depends: [
   "tezos-rpc"
   "calendar"
   "ezjsonm" { >= "0.5.0" }
-  "ipaddr"
+  "ipaddr" { >= "3.0.0" }
   "mtime" { >= "1.0.0" }
   "re" { >= "1.7.2" }
 ]

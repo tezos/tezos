@@ -11,7 +11,7 @@ depends: [
   "tezos-base"
   "lwt" { >= "3.0.0" }
   "conf-libev"
-  "ipaddr"
+  "ipaddr" { >= "3.0.0" }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
