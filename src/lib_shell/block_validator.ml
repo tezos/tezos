@@ -132,11 +132,23 @@ let on_request
                   chain_state header.shell.predecessor >>=? fun pred ->
                 (* TODO also protect with [Worker.canceler w]. *)
                 protect ?canceler begin fun () ->
-                  Block_validator_process.apply_block
-                    bv.validation_process
-                    ~predecessor:pred
-                    header operations >>=? fun { validation_result ; block_metadata ;
-                                                 ops_metadata ; context_hash } ->
+                  begin Block_validator_process.apply_block
+                      bv.validation_process
+                      ~predecessor:pred
+                      header operations >>= function
+                    | Ok x -> return x
+                    | Error [ Missing_test_protocol protocol ] ->
+                        Protocol_validator.fetch_and_compile_protocol
+                          bv.protocol_validator
+                          ?peer ~timeout:bv.limits.protocol_timeout
+                          protocol >>=? fun _ ->
+                        Block_validator_process.apply_block
+                          bv.validation_process
+                          ~predecessor:pred
+                          header operations
+                    | Error _ as x -> Lwt.return x
+                  end >>=? fun { validation_result ; block_metadata ;
+                                 ops_metadata ; context_hash } ->
                   let validation_store =
                     ({ context_hash ;
                        message = validation_result.message ;
@@ -158,7 +170,7 @@ let on_request
                     block ;
                   notify_new_block block ;
                   return (Ok (Some block))
-              | Error [ Canceled | Unavailable_protocol _ | System_error _ ] as err ->
+              | Error [Canceled | Unavailable_protocol _ | Missing_test_protocol _ | System_error _ ] as err ->
                   (* FIXME: Canceled can escape. Canceled is not registered. BOOM! *)
                   return err
               | Error errors ->
