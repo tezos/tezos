@@ -367,6 +367,7 @@ type error +=
   | System_error of { errno: Unix.error ;
                       fn: string ;
                       msg: string }
+  | Missing_test_protocol of Protocol_hash.t
 
 let () =
   Error_monad.register_error_kind
@@ -463,6 +464,19 @@ let () =
     (function
       | System_error { errno ; fn ; msg } -> Some (errno, fn, msg)
       | _ -> None)
-    (fun (errno, fn, msg) -> System_error { errno ; fn ; msg })
+    (fun (errno, fn, msg) -> System_error { errno ; fn ; msg }) ;
+  Error_monad.register_error_kind
+    `Temporary
+    ~id:"validator.missing_test_protocol"
+    ~title:"Missing test protocol"
+    ~description:
+      "Missing test protocol when forking the test chain"
+    ~pp: (fun ppf protocol ->
+        Format.fprintf ppf
+          "Missing test protocol %a when forking the test chain."
+          Protocol_hash.pp protocol)
+    Data_encoding.(obj1 (req "test_protocol" Protocol_hash.encoding))
+    (function Missing_test_protocol protocol -> Some protocol | _ -> None)
+    (fun protocol -> Missing_test_protocol protocol)
 
 let invalid_block block error = Invalid_block { block ; error }

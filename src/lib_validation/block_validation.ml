@@ -47,9 +47,7 @@ let reset_test_chain
       begin match Registered_protocol.get protocol with
         | Some proto -> return proto
         | None ->
-            (* FIXME Proper error *)
-            failwith "State.fork_testchain: missing protocol '%a' for the current block."
-              Protocol_hash.pp_short protocol
+            fail (Missing_test_protocol protocol)
       end >>=? fun (module Proto_test) ->
       Proto_test.init ctxt forked_header >>=? fun { context = test_ctxt } ->
       Context.set_test_chain test_ctxt Not_running >>= fun test_ctxt ->
