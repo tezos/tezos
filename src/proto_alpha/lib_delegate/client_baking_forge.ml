@@ -567,9 +567,9 @@ let filter_and_apply_operations
 
 (* Build the block header : mimics node prevalidation *)
 let finalize_block_header
-    (inc : Client_baking_simulator.incremental)
+    pred_shell_header
     ~timestamp
-    (validation_result, _metadata)
+    validation_result
     operations =
   let { T.context ; fitness ; message ; _ } = validation_result in
   let validation_passes = List.length LiftedMain.validation_passes in
@@ -581,7 +581,6 @@ let finalize_block_header
               (List.map Operation.hash_packed sl)
          ) operations
       ) in
-
   begin Context.get_test_chain context >>= function
     | Not_running -> return context
     | Running { expiration } ->
@@ -592,16 +591,16 @@ let finalize_block_header
           return context
     | Forking _ -> fail Forking_test_chain
   end >>=? fun context ->
-
   Context.hash ~time:timestamp ?message context >>= fun context ->
   let header =
-    { inc.header with
-      level = Raw_level.to_int32 (Raw_level.succ inc.predecessor.level) ;
-      validation_passes ;
-      operations_hash ;
-      fitness ;
-      context ;
-    } in
+    Tezos_base.Block_header.
+      { pred_shell_header with
+        level = Int32.succ pred_shell_header.level ;
+        validation_passes ;
+        operations_hash ;
+        fitness ;
+        context ;
+      } in
   return header
 
 let forge_block
@@ -693,15 +692,26 @@ let forge_block
           minimal_nanotez_per_byte = default_minimal_nanotez_per_byte ;
         } in
         filter_and_apply_operations ~timestamp ~protocol_data state bi (operations, overflowing_ops)
-        >>=? fun (final_context, validation_result, operations) ->
-
-        finalize_block_header final_context ~timestamp validation_result operations >>= function
-        | Error [ Forking_test_chain ] ->
-            Alpha_block_services.Helpers.Preapply.block
-              cctxt ~chain ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, _result) ->
-            return (shell_header, List.map (List.map forge) operations)
-        | Error _ as errs -> Lwt.return errs
-        | Ok shell_header -> return (shell_header, List.map (List.map forge) operations)
+        >>=? fun (final_context, (validation_result, _), operations) ->
+        let current_protocol = bi.next_protocol in
+        Context.get_protocol validation_result.context >>= fun next_protocol ->
+        if Protocol_hash.equal current_protocol next_protocol then begin
+          finalize_block_header final_context.header ~timestamp
+            validation_result operations >>= function
+          | Error [ Forking_test_chain ] ->
+              Alpha_block_services.Helpers.Preapply.block
+                cctxt ~chain ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, _result) ->
+              return (shell_header, List.map (List.map forge) operations)
+          | Error _ as errs -> Lwt.return errs
+          | Ok shell_header -> return (shell_header, List.map (List.map forge) operations)
+        end else begin
+          lwt_log_notice Tag.DSL.(fun f ->
+              f "New protocol detected: using shell validation"
+              -% t event "shell_prevalidation_notice") >>= fun () ->
+          Alpha_block_services.Helpers.Preapply.block
+            cctxt ~chain ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, _result) ->
+          return (shell_header, List.map (List.map forge) operations)
+        end
   end >>=? fun (shell_header, operations) ->
 
   (* Now for some logging *)
@@ -947,7 +957,8 @@ let build_block
         ~block operations
       >>=? fun (operations, overflowing_ops) ->
       let next_version =
-        match Tezos_base.Block_header.get_forced_protocol_upgrade ~level:(Raw_level.to_int32 next_level.Level.level) with
+        match Tezos_base.Block_header.get_forced_protocol_upgrade
+                ~level:(Raw_level.to_int32 next_level.Level.level) with
         | None -> bi.next_protocol
         | Some hash -> hash
       in
@@ -969,7 +980,7 @@ let build_block
                 -% t event "shell_prevalidation_notice") >>= fun () ->
             shell_prevalidation cctxt ~chain ~block seed_nonce_hash
               operations slot
-        | Ok (final_context, validation_result, operations) ->
+        | Ok (final_context, (validation_result, _), operations) ->
             lwt_debug Tag.DSL.(fun f ->
                 f "Try forging locally the block header for %a (slot %d) for %s (%a)"
                 -% t event "try_forging"
@@ -977,14 +988,23 @@ let build_block
                 -% s bake_priority_tag priority
                 -% s Client_keys.Logging.tag name
                 -% a timestamp_tag timestamp) >>= fun () ->
-            finalize_block_header final_context ~timestamp validation_result operations >>= function
-            | Error [ Forking_test_chain ] ->
-                shell_prevalidation cctxt ~chain ~block seed_nonce_hash
-                  operations slot
-            | Error _ as errs -> Lwt.return errs
-            | Ok shell_header ->
-                let raw_ops = List.map (List.map forge) operations in
-                return (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
+            let current_protocol = bi.next_protocol in
+            Context.get_protocol validation_result.context >>= fun next_protocol ->
+            if Protocol_hash.equal current_protocol next_protocol then begin
+              finalize_block_header final_context.header ~timestamp validation_result operations >>= function
+              | Error [ Forking_test_chain ] ->
+                  shell_prevalidation cctxt ~chain ~block seed_nonce_hash
+                    operations slot
+              | Error _ as errs -> Lwt.return errs
+              | Ok shell_header ->
+                  let raw_ops = List.map (List.map forge) operations in
+                  return (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
+            end else begin
+              lwt_log_notice Tag.DSL.(fun f ->
+                  f "New protocol detected: using shell validation"
+                  -% t event "shell_prevalidation_notice") >>= fun () ->
+              shell_prevalidation cctxt ~chain ~block seed_nonce_hash
+                operations slot end
 
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
