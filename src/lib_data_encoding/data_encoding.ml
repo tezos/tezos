@@ -147,7 +147,7 @@ struct
     let next_version encoding upgrade previous =
       Version_S { encoding ; upgrade ; previous }
 
-    let encoding : type a. name: _ -> a t -> a encoding =
+    let encoding : type a. name : string -> a t -> a encoding =
       fun ~name version ->
         match version with
         | Version_0 e ->
