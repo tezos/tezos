@@ -20,7 +20,6 @@ depends: [
   "tezos-client-001-PtCJ7pwo-commands"
   "tezos-client-002-PsYLVpVv-commands"
   "tezos-client-003-PsddFKi3-commands"
-  "tezos-baking-002-PsYLVpVv-commands"
   "tezos-baking-003-PsddFKi3-commands"
   "tezos-signer-backends"
   "tezos-node" { test }
