@@ -228,7 +228,7 @@ module Error_event : sig
 
   include EVENT with type t := t
 
-  val to_lwt :
+  val log_error_and_recover :
     ?section:Section.t ->
     ?message:string ->
     ?severity:[ `Fatal | `Recoverable ] ->

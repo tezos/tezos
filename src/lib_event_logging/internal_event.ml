@@ -552,7 +552,7 @@ module Error_event = struct
 
   include (Make (Definition) : EVENT with type t := t)
 
-  let to_lwt ?section ?message ?severity f =
+  let log_error_and_recover ?section ?message ?severity f =
     f ()
     >>= function
     | Ok () -> Lwt.return_unit
@@ -656,7 +656,7 @@ module Lwt_worker_event = struct
 
   let on_event name event =
     let section = Section.make_sanitized [ "lwt-worker"; name ] in
-    Error_event.to_lwt
+    Error_event.log_error_and_recover
       ~message:(Printf.sprintf "Trying to emit worker event for %S" name)
       ~severity:`Fatal
       (fun () -> emit ~section (fun () -> { name ; event }))
