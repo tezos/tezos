@@ -155,6 +155,11 @@ struct
               [ version_case e (fun x -> Some x) (fun x -> x) ]
         | Version_S { previous ; encoding ; upgrade } ->
             let rec mk_nones :
+              (* This function generates encoding cases for all the
+                 outdated versions.
+                 These versions are never encoded to
+                 (hence [fun _ -> None]) but are safely decoded with
+                 the use of the upgrade functions. *)
               type b. (b -> a) -> b t -> (string -> int -> a case) list =
               fun upgr -> function
                 | Version_0 e ->
