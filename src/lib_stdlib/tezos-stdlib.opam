@@ -12,7 +12,7 @@ depends: [
   "hex"
   "ocplib-endian"
   "re"
-  "lwt"
+  "lwt" { < "4" }
   "zarith"
   "alcotest" { with-test }
   "ocp-indent" { with-test & = "1.6.1" }
