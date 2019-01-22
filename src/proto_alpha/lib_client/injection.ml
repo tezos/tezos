@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -533,7 +534,7 @@ let inject_operation
     let oph = Operation_hash.hash_bytes [bytes] in
     cctxt#message
       "@[<v 0>Operation: 0x%a@,\
-       Operation hash: %a@]"
+       Operation hash is '%a'@]"
       MBytes.pp_hex bytes
       Operation_hash.pp oph >>= fun () ->
     cctxt#message
@@ -544,7 +545,7 @@ let inject_operation
   else
     Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
     cctxt#message "Operation successfully injected in the node." >>= fun () ->
-    cctxt#message "Operation hash: %a" Operation_hash.pp oph >>= fun () ->
+    cctxt#message "Operation hash is '%a'" Operation_hash.pp oph >>= fun () ->
     begin
       match confirmations with
       | None ->
