@@ -8,6 +8,8 @@ src_dir="$(dirname "$script_dir")"
 opam repository set-url tezos --dont-select $opam_repository || \
     opam repository add tezos --dont-select $opam_repository > /dev/null 2>&1
 
+opam update --repositories --development
+
 if [ ! -d "$src_dir/_opam" ] ; then
     opam switch create "$src_dir" --repositories=tezos ocaml-base-compiler.$ocaml_version
 fi

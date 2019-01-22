@@ -8,7 +8,7 @@ dev-repo: "https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
-  "dune" { build & = "1.0.1" }
+  "dune" { build & >= "1.0.1" }
   "tezos-stdlib"
   "tezos-crypto"
   "tezos-data-encoding"
@@ -17,7 +17,7 @@ depends: [
   "tezos-rpc"
   "calendar"
   "ezjsonm" { >= "0.5.0" }
-  "ipaddr"
+  "ipaddr" { >= "3.0.0" }
   "mtime" { >= "1.0.0" }
   "re" { >= "1.7.2" }
 ]

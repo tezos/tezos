@@ -11,7 +11,7 @@ license:      "BSD2"
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
 build-test: [ "dune" "runtest" "-p" name "-j" jobs ]
 depends: [
-  "dune" {build & = "1.0.1"}
+  "dune" { build & >= "1.0.1" }
   "hacl"
   "bigstring" {>= "0.2"}
   "ocplib-endian" {>= "1.0"}

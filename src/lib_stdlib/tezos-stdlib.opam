@@ -8,15 +8,15 @@ dev-repo: "https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
-  "dune" { build & = "1.0.1" }
+  "dune" { build & >= "1.0.1" }
   "bigstring"
   "hex"
   "ocplib-endian"
   "re"
-  "lwt"
+  "lwt" { < "4" }
   "zarith"
-  "alcotest" { test }
-  "ocp-indent" { test }
+  "alcotest" { with-test }
+  "ocp-indent" { with-test & = "1.6.1" }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
