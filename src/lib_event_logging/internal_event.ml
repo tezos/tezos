@@ -40,11 +40,12 @@ let valid_char c =
   | '@' | '-' | '_' | '+' | '=' | '~' -> true
   | _ -> false
 
-let check_name_exn name or_fail =
-  String.iter
-    (fun c -> if valid_char c then () else or_fail name c)
-    name ;
-  ()
+let check_name_exn : string -> (string -> char -> exn) -> unit =
+  fun name make_exn ->
+    String.iter
+      (fun c -> if valid_char c then () else raise (make_exn name c))
+      name ;
+    ()
 
 
 type level = Lwt_log_core.level =
@@ -79,7 +80,7 @@ end = struct
     List.iter
       (fun s ->
          check_name_exn s (fun name char ->
-             Printf.ksprintf Pervasives.invalid_arg
+             Printf.ksprintf (fun s -> Invalid_argument s)
                "Internal_event.Section: invalid name %S (contains %c)" name char))
       sl;
     sl
@@ -316,20 +317,21 @@ module All_definitions = struct
 
   let all : definition list ref = ref []
 
-  let fail_registration fmt =
-    Format.kasprintf (fun s ->
-        (* This should be considered a programming error: *)
-        Pervasives.invalid_arg ("Internal_event registration error: " ^ s))
+  let registration_exn fmt =
+    Format.kasprintf
+      (fun s ->
+         (* This should be considered a programming error: *)
+         Invalid_argument ("Internal_event registration error: " ^ s))
       fmt
 
   let add (type a) ev =
     let module E = (val ev : EVENT_DEFINITION with type t = a) in
     match List.find (function Definition (n, _) -> E.name = n) !all with
     | _ ->
-        fail_registration "duplicate Event name: %S" E.name
+        raise (registration_exn "duplicate Event name: %S" E.name)
     | exception _ ->
         check_name_exn E.name
-          (fail_registration "invalid event name: %S contains '%c'") ;
+          (registration_exn "invalid event name: %S contains '%c'") ;
         all := Definition (E.name, ev) :: !all
 
   let get () = !all
