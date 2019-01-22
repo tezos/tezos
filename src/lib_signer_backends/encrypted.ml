@@ -156,25 +156,15 @@ let rec interactive_decrypt_loop
   | None ->
       interactive_decrypt_loop cctxt ?name ~encrypted_sk algo
 
-(* FixMe : this could be done more elegantly *)
-let read_all_lines filename =
-  let lines = ref [] in
-  let chan = open_in filename in
-  try
-    while true; do
-      lines := input_line chan :: !lines
-    done; !lines
-  with End_of_file ->
-    close_in chan;
-    List.rev !lines
-
 (* add all passwords in [filename] to the list of known passwords *)
 let password_file_load = function
   |Some filename ->
       if Sys.file_exists filename then begin
-        let l = read_all_lines filename in
-        let l = List.map MBytes.of_string l in
-        passwords := !passwords @ l ;
+        let stream = Lwt_io.lines_of_file filename in
+        Lwt_stream.iter
+          (fun p ->
+             passwords := MBytes.of_string p :: !passwords)
+          stream >>= fun () ->
         return_unit
       end
       else
