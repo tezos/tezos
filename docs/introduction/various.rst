@@ -88,10 +88,9 @@ The app is developed by Obsidian Systems and they provide a comprehensive
 Ledger Manager
 ~~~~~~~~~~~~~~
 
-The preferred way to set up your Ledger is to install the `Ledger
-Manager extension
-<https://chrome.google.com/webstore/detail/ledger-manager/beimhnaefocolcplfimocfiaiefpkgbf>`_
-on a Chrome browser.
+The preferred way to set up your Ledger is to install `Ledger
+Live
+<https://www.ledger.com/pages/ledger-live>`_.
 On Linux make sure you correctly set up your `udev` rules as explained
 `here <https://github.com/obsidiansystems/ledger-app-tezos#udev-rules-linux-only>`_.
 Connect your ledger, unlock it and go the dashboard.
