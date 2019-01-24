@@ -490,7 +490,7 @@ module Make
       end >>= function
       | Ok () ->
           loop ()
-      | Error [Canceled | Exn Lwt_pipe.Closed | Exn Lwt_dropbox.Closed ] ->
+      | Error [Canceled | Exn Lwt.Canceled | Exn Lwt_pipe.Closed | Exn Lwt_dropbox.Closed ] ->
           Logger.lwt_log_notice
             "@[Worker terminated [%a] @]"
             Name.pp w.name  >>= fun () ->
