@@ -1669,40 +1669,73 @@ let close { global_data } =
 let upgrade_0_0_1
     ?(store_mapsize=4_096_000_000_000L)
     ~store_root () =
-  Store.open_with_atomic_rw ~mapsize:store_mapsize store_root begin fun global_store ->
-    Store.Chain.list global_store >>= fun chains ->
-    iter_s
-      begin fun chain_id ->
-        Format.eprintf "Upgrading block storage for chain %a...@." Chain_id.pp chain_id ;
-        let chain_store = Store.Chain.get global_store chain_id in
-        let block_store = Store.Block.get chain_store in
-        let chain_data_store = Store.Chain_data.get chain_store in
-        let processed = ref 0 in
-        Format.eprintf "Processing blocks..." ;
-        if Unix.isatty Unix.stderr then
-          Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
-        else Format.eprintf "\n%!" ;
-        Store.Block.fold block_store
-          ~init:(Ok ())
-          ~f: begin fun h acc ->
-            Lwt.return acc >>=? fun () ->
-            trace (failure "Could not convert block %a." Block_hash.pp h) @@
-            Store.Block.Contents_0_0_1.read
-              (block_store, h) >>=? fun (header, contents) ->
-            Store.Block.Header.store (block_store, h) header >>= fun () ->
-            Store.Block.Contents.store (block_store, h) contents >>= fun () ->
-            incr processed ;
-            if !processed mod 1000 = 0 then begin
-              Format.eprintf "%dK blocks processed..." (!processed / 1000);
-              if Unix.isatty Unix.stderr then
-                Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
-              else Format.eprintf "\n%!"
-            end ;
-            return_unit
-          end >>=? fun () ->
-        Format.eprintf "Done Processing blocks.\n%!" ;
-        Format.eprintf "Upgrading checkpoint for chain %a...@." Chain_id.pp chain_id ;
-        Store.Chain_data.Checkpoint_0_0_1.read_opt chain_data_store >>= function
+  Store.init ~mapsize:store_mapsize store_root >>=? fun global_store ->
+  Store.Chain.list global_store >>= fun chains ->
+  iter_s
+    begin fun chain_id ->
+      Format.eprintf "Upgrading block storage for chain %a...@." Chain_id.pp chain_id ;
+      let chain_store = Store.Chain.get global_store chain_id in
+      let block_store = Store.Block.get chain_store in
+      let chain_data_store = Store.Chain_data.get chain_store in
+      Format.eprintf "Listing blocks..." ;
+      if Unix.isatty Unix.stderr then
+        Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
+      else Format.eprintf "\n%!" ;
+      Store.Block.fold ~init:(0, []) ~f:begin fun h (listed, acc) ->
+        if listed mod 1000 = 0 then begin
+          Format.eprintf "%dK blocks listed..." (listed / 1000);
+          if Unix.isatty Unix.stderr then
+            Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
+          else Format.eprintf "\n%!"
+        end ;
+        Lwt.return (listed + 1, h :: acc)
+      end block_store >>= fun (_, blocks) ->
+      Format.eprintf "Processing blocks..." ;
+      if Unix.isatty Unix.stderr then
+        Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
+      else Format.eprintf "\n%!" ;
+      let rec loop_on_chunks blocks (erroneous, skipped, processed) =
+        let blocks, rest = List.split_n 1000 blocks in
+        Store.with_atomic_rw global_store begin fun () ->
+          fold_left_s begin fun (erroneous, skipped, processed) h ->
+            begin
+              Store.Block.Contents_0_0_1.read
+                (block_store, h) >>=? fun (header, contents) ->
+              Store.Block.Header.store (block_store, h) header >>= fun () ->
+              Store.Block.Contents.store (block_store, h) contents >>= fun () ->
+              if (processed + skipped) mod 1000 = 0 then begin
+                Format.eprintf "%dK blocks processed..." ((processed + skipped) / 1000);
+                if Unix.isatty Unix.stderr then
+                  Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
+                else Format.eprintf "\n%!"
+              end ;
+              return ()
+            end >>= function
+            | Ok () -> return (erroneous, skipped, processed + 1)
+            | Error _ ->
+                Store.Block.Header.read_opt (block_store, h) >>= fun header ->
+                Store.Block.Contents.read_opt (block_store, h) >>= fun contents ->
+                match header, contents with
+                | Some _, Some _ -> (* already converted *) return (erroneous, skipped + 1, processed)
+                | _ -> return (h :: erroneous, skipped, processed)
+          end (erroneous, skipped, processed) blocks
+        end >>=? fun (erroneous, skipped, processed) ->
+        if rest = [] then return (erroneous, skipped, processed)
+        else loop_on_chunks rest (erroneous, skipped, processed) in
+      loop_on_chunks blocks ([], 0, 0) >>=? fun (erroneous, skipped, processed) ->
+      Format.eprintf
+        "Done Processing %d blocks (%d already converted were skipped).\n%!"
+        processed skipped ;
+      begin match erroneous with
+        | [] -> ()
+        | blocks ->
+            Format.eprintf
+              "Some blocks were corrupted. Consider resynchronizing.@.\
+               @[<v 0>%a@]@."
+              (Format.pp_print_list Block_hash.pp) blocks
+      end ;
+      Format.eprintf "Upgrading checkpoint for chain %a...@." Chain_id.pp chain_id ;
+      Store.Chain_data.Checkpoint_0_0_1.read_opt chain_data_store >>= begin function
         | None ->
             Store.Chain_data.Checkpoint_0_0_1.remove chain_data_store >>= fun () ->
             return_unit
@@ -1710,7 +1743,14 @@ let upgrade_0_0_1
             Store.Block.Header.read (block_store, hash) >>=? fun header ->
             Store.Chain_data.Checkpoint.store chain_data_store header >>= fun () ->
             return_unit
-      end
-      chains
-  end >>=? fun () ->
+      end >>=? fun () ->
+      Store.Chain.Genesis_hash.read chain_store >>=? fun genesis_hash ->
+      Store.Chain_data.Save_point.store chain_data_store (0l, genesis_hash) >>= fun () ->
+      Store.Chain_data.Caboose.store chain_data_store (0l, genesis_hash) >>= fun () ->
+      return_unit
+    end
+    chains >>=? fun () ->
+  Format.eprintf "Initializing partial mode to: %a@." History_mode.pp History_mode.Full ;
+  Store.Configuration.History_mode.store global_store History_mode.Full >>= fun () ->
+  Store.close global_store ;
   return_unit
