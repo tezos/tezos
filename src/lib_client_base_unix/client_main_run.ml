@@ -76,7 +76,7 @@ let main
     ?(other_registrations = fun _ (module Remote_params: Client_config.Remote_params) -> ())
     ()
   =
-  let global_options = C.global_options in
+  let global_options = C.global_options () in
   let executable_name = Filename.basename Sys.executable_name in
   let original_args, autocomplete =
     (* for shell aliases *)
@@ -198,7 +198,7 @@ let main
         let commands =
           Clic.add_manual
             ~executable_name
-            ~global_options:(global_options ())
+            ~global_options
             (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
             Format.std_formatter
             (C.clic_commands
@@ -212,7 +212,7 @@ let main
         begin match autocomplete with
           | Some (prev_arg, cur_arg, script) ->
               Clic.autocompletion
-                ~script ~cur_arg ~prev_arg ~args:original_args ~global_options:(global_options ())
+                ~script ~cur_arg ~prev_arg ~args:original_args ~global_options
                 commands client_config >>=? fun completions ->
               List.iter print_endline completions ;
               return_unit
@@ -227,14 +227,14 @@ let main
         Clic.usage
           Format.std_formatter
           ~executable_name
-          ~global_options:(global_options ())
+          ~global_options
           (match command with None -> [] | Some c -> [ c ]) ;
         Lwt.return 0
     | Error errs ->
         Clic.pp_cli_errors
           Format.err_formatter
           ~executable_name
-          ~global_options:(global_options ())
+          ~global_options
           ~default:Error_monad.pp
           errs ;
         Lwt.return 1
