@@ -83,7 +83,7 @@ module type Dump_interface = sig
   val make_context : index -> context
   val update_context : context -> tree -> context
   val add_hash : index -> tree -> key -> hash -> tree option Lwt.t
-  val add_mbytes : tree -> key -> MBytes.t -> tree Lwt.t
+  val add_mbytes : index -> tree -> key -> MBytes.t -> tree Lwt.t
   val add_dir : index -> tree -> key -> ( step * hash ) list -> tree option Lwt.t
 
 end

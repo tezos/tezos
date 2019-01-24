@@ -628,7 +628,9 @@ module Dumpable_context = struct
     | `Contents _ -> assert false
 
   let context_tree ctxt = ctxt.tree
-  let tree_hash ctxt tree =  GitStore.Tree.hash ctxt.index.repo tree
+  let tree_hash ctxt = function
+    | `Node _ as node -> GitStore.Tree.hash ctxt.index.repo node
+    | contents -> Lwt.return (tree_hash contents)
   let sub_tree tree key = GitStore.Tree.find_tree tree key
   let tree_list tree = GitStore.Tree.list tree []
   let tree_content tree = GitStore.Tree.find tree []
@@ -644,7 +646,9 @@ module Dumpable_context = struct
         Lwt.return_some
 
 
-  let add_mbytes tree key bytes = GitStore.Tree.add tree key bytes
+  let add_mbytes index tree key bytes =
+    GitStore.Tree.hash index.repo (`Contents (bytes, ())) >>= fun _ignored  ->
+    GitStore.Tree.add tree key bytes
 
   let add_dir index tree key l =
     let rec fold_list sub_tree = function

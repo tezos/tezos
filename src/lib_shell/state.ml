@@ -547,10 +547,8 @@ module Chain = struct
     let genesis = { time ; protocol ; block = genesis_hash } in
     Store.Chain_data.Current_head.read chain_data_store >>=? fun current_head ->
     Store.Chain_data.Checkpoint.read chain_data_store >>=? fun checkpoint ->
-    Store.Chain_data.Save_point.read_opt chain_data_store >>= fun save_point ->
-    let save_point = Option.unopt save_point ~default:(0l, genesis_hash) in
-    Store.Chain_data.Rock_bottom.read_opt chain_data_store >>= fun rock_bottom ->
-    let rock_bottom = Option.unopt rock_bottom ~default:(0l, genesis_hash) in
+    Store.Chain_data.Save_point.read chain_data_store >>=? fun save_point ->
+    Store.Chain_data.Rock_bottom.read chain_data_store >>=? fun rock_bottom ->
     begin
       match expiration with
       | None -> Lwt.return_unit
@@ -1050,7 +1048,7 @@ module Block = struct
            with the current checkpoint.  *)
         begin
           let predecessor = block_header.shell.predecessor in
-          Store.Block.Contents.known
+          Store.Block.Header.known
             (store, predecessor) >>= fun valid_predecessor ->
           if not valid_predecessor then
             Lwt.return_false

@@ -83,7 +83,7 @@ module type Dump_interface = sig
   val make_context : index -> context
   val update_context : context -> tree -> context
   val add_hash : index -> tree -> key -> hash -> tree option Lwt.t
-  val add_mbytes : tree -> key -> MBytes.t -> tree Lwt.t
+  val add_mbytes : index -> tree -> key -> MBytes.t -> tree Lwt.t
   val add_dir : index -> tree -> key -> ( step * hash ) list -> tree option Lwt.t
 
 end
@@ -478,37 +478,45 @@ module Make (I:Dump_interface)
     let set_visit h = Hashtbl.add visited_hash h () in
 
     (* Folding through a node *)
-    let rec fold_tree_path ctxt path_rev tree =
-      I.tree_list tree >>= fun keys ->
-      let keys = List.sort (fun (a,_) (b,_) -> String.compare a b) keys in
-      Lwt_list.fold_left_s
-        begin fun acc (name,kind) ->
-          let path_rev = name :: path_rev in
-          I.sub_tree tree [name] >>= function
-          | None -> assert false
-          | Some sub_tree ->
-              I.tree_hash ctxt sub_tree >>= fun hash ->
-              begin
-                if visited hash
-                then Lwt.return_unit
-                else
-                  begin
-                    set_visit hash; (* There cannot be a cycle *)
-                    match kind with
-                    | `Contents ->
-                        begin
-                          I.tree_content sub_tree >>= function
-                          | None -> assert false
-                          | Some data -> set_blob fd hash path_rev data
-                        end
-                    | `Node -> fold_tree_path ctxt path_rev sub_tree
-                  end
-              end >>= fun () ->
-              Lwt.return ( (name,hash)::acc )
-        end
-        [] keys >>= fun sub_keys_rev ->
-      I.tree_hash ctxt tree >>= fun hash ->
-      set_dir fd hash path_rev (List.rev sub_keys_rev)
+    let fold_tree_path ctxt path_rev tree =
+      let cpt = ref 0 in
+      let rec fold_tree_path ctxt path_rev tree =
+        I.tree_list tree >>= fun keys ->
+        let keys = List.sort (fun (a,_) (b,_) -> String.compare a b) keys in
+        Lwt_list.fold_left_s
+          begin fun acc (name,kind) ->
+            let path_rev = name :: path_rev in
+            I.sub_tree tree [name] >>= function
+            | None -> assert false
+            | Some sub_tree ->
+                I.tree_hash ctxt sub_tree >>= fun hash ->
+                begin
+                  if visited hash
+                  then Lwt.return_unit
+                  else
+                    begin
+                      set_visit hash; (* There cannot be a cycle *)
+                      match kind with
+                      | `Contents ->
+                          begin
+                            I.tree_content sub_tree >>= function
+                            | None -> assert false
+                            | Some data ->
+                                if !cpt mod 1000 = 0 then
+                                  Format.eprintf ".%!" ;
+                                incr cpt ;
+                                set_blob fd hash path_rev data
+                          end
+                      | `Node -> fold_tree_path ctxt path_rev sub_tree
+                    end
+                end >>= fun () ->
+                Lwt.return ( (name,hash)::acc )
+          end
+          [] keys >>= fun sub_keys_rev ->
+        I.tree_hash ctxt tree >>= fun hash ->
+        set_dir fd hash path_rev (List.rev sub_keys_rev)
+      in
+      fold_tree_path ctxt path_rev tree
     in
 
     (* Meta table initialisation *)
@@ -566,7 +574,7 @@ module Make (I:Dump_interface)
 
     (* Editing the repository *)
     let add_blob ctxt path hash blob =
-      I.add_mbytes (I.context_tree ctxt) path blob >>= fun tree ->
+      I.add_mbytes index (I.context_tree ctxt) path blob >>= fun tree ->
       I.sub_tree tree path >>= function
       | None -> assert false
       | Some sub_tree -> begin
