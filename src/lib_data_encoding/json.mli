@@ -37,7 +37,7 @@ type t = json
 type schema = Json_schema.schema
 
 val convert : 'a Encoding.t -> 'a Json_encoding.encoding
-val schema : 'a Encoding.t -> schema
+val schema : ?definitions_path:string -> 'a Encoding.t -> schema
 val encoding: json Encoding.t
 val schema_encoding: schema Encoding.t
 val construct : 't Encoding.t -> 't -> json

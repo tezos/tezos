@@ -36,9 +36,9 @@ module Id = struct
   let pp ppf (addr, port) =
     match Ipaddr.v4_of_v6 addr with
     | Some addr ->
-        Format.fprintf ppf "%a:%d" Ipaddr.V4.pp_hum addr port
+        Format.fprintf ppf "%a:%d" Ipaddr.V4.pp addr port
     | None ->
-        Format.fprintf ppf "[%a]:%d" Ipaddr.V6.pp_hum addr port
+        Format.fprintf ppf "[%a]:%d" Ipaddr.V6.pp addr port
   let pp_opt ppf = function
     | None -> Format.pp_print_string ppf "none"
     | Some point -> pp ppf point

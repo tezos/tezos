@@ -420,14 +420,98 @@ let activate_existing_account
   | Some _ -> failwith "Only Ed25519 accounts can be activated"
   | None -> failwith "Unknown account"
 
+type period_info = {
+  current_period_kind : Voting_period.kind ;
+  position : Int32.t ;
+  remaining : Int32.t ;
+  current_proposal : Protocol_hash.t option ;
+}
+
+type ballots_info = {
+  current_quorum : Int32.t ;
+  participation : Int32.t ;
+  supermajority : Int32.t ;
+  ballots : Vote.ballots ;
+}
+
+(* Should be moved to src/proto_alpha/lib_protocol/src/vote_storage.ml *)
+let ballot_list_encoding =
+  Data_encoding.(list (obj2
+                         (req "delegate" Signature.Public_key_hash.encoding)
+                         (req "ballot" Vote.ballot_encoding)))
+
+let get_ballots_info
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block =
+  (* Get the next level, not the current *)
+  let cb = (chain, block) in
+  Alpha_services.Voting.ballots          cctxt cb >>=? fun ballots ->
+  Alpha_services.Voting.current_quorum   cctxt cb >>=? fun current_quorum ->
+  Alpha_services.Voting.listings         cctxt cb >>=? fun listings ->
+  let max_participation =
+    List.fold_left (fun acc (_, w) -> Int32.add w acc) 0l listings in
+  let all_votes = Int32.(add (add ballots.yay ballots.nay) ballots.pass) in
+  let participation = Int32.(div (mul all_votes 100_00l) max_participation) in
+  let supermajority = Int32.(div (mul 8l (add ballots.yay ballots.nay)) 10l) in
+  return { current_quorum ;
+           participation ;
+           supermajority ;
+           ballots }
+
+let get_period_info
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block =
+  (* Get the next level, not the current *)
+  let cb = (chain, block) in
+  Alpha_services.Helpers.current_level cctxt ~offset:1l cb >>=? fun level ->
+  Alpha_services.Constants.all cctxt cb >>=? fun constants ->
+  Alpha_services.Voting.current_proposal cctxt cb >>=? fun current_proposal ->
+  let position = level.voting_period_position in
+  let remaining =
+    Int32.(sub constants.parametric.blocks_per_voting_period position) in
+  Alpha_services.Voting.current_period_kind cctxt cb >>=? fun current_period_kind ->
+  return { current_period_kind ;
+           position ;
+           remaining ;
+           current_proposal }
+
+let get_proposals
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block =
+  let cb = (chain, block) in
+  Alpha_services.Voting.proposals cctxt cb
+
+let submit_proposals
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block ?confirmations ~src_sk source proposals =
+  (* We need the next level, not the current *)
+  Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block) >>=? fun (level : Level.t) ->
+  let period = level.voting_period in
+  let contents = Single ( Proposals { source ; period ; proposals } ) in
+  Injection.inject_operation cctxt ~chain ~block ?confirmations
+    ~fee_parameter:Injection.dummy_fee_parameter
+    ~src_sk contents
+
+let submit_ballot
+    (cctxt : #Proto_alpha.full)
+    ~chain ~block ?confirmations ~src_sk source proposal ballot =
+  (* The user must provide the proposal explicitly to make himself sure
+     for what he is voting. *)
+  Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block) >>=? fun (level : Level.t) ->
+  let period = level.voting_period in
+  let contents = Single ( Ballot { source ; period ; proposal ; ballot } ) in
+  Injection.inject_operation cctxt ~chain ~block ?confirmations
+    ~fee_parameter:Injection.dummy_fee_parameter
+    ~src_sk contents
+
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match a.receipt, a.protocol_data with
   | Apply_results.Operation_metadata omd, Operation_data od -> (
       match Apply_results.kind_equal_list od.contents omd.contents
       with
       | Some Apply_results.Eq ->
-          Operation_result.pp_operation_result formatter 
-            (od.contents, omd.contents) 
+          Operation_result.pp_operation_result formatter
+            (od.contents, omd.contents)
       | None -> Pervasives.failwith "Unexpected result.")
   | _ -> Pervasives.failwith "Unexpected result."
 
@@ -437,16 +521,16 @@ let get_operation_from_block
     predecessors
     operation_hash =
   Client_confirmations.lookup_operation_in_previous_blocks
-    cctxt 
-    ~chain 
-    ~predecessors 
+    cctxt
+    ~chain
+    ~predecessors
     operation_hash
   >>=? function
   | None -> return_none
-  | Some (block, i, j) -> 
+  | Some (block, i, j) ->
       cctxt#message "Operation found in block: %a (pass: %d, offset: %d)"
         Block_hash.pp block i j >>= fun () ->
-      Proto_alpha.Alpha_block_services.Operations.operation cctxt 
+      Proto_alpha.Alpha_block_services.Operations.operation cctxt
         ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
 
 let display_receipt_for_operation
@@ -455,10 +539,10 @@ let display_receipt_for_operation
     ?(predecessors = 10)
     operation_hash =
   get_operation_from_block cctxt ~chain predecessors operation_hash
-  >>=? function 
-  | None -> 
-      cctxt#message "Couldn't find operation" >>= fun () -> 
+  >>=? function
+  | None ->
+      cctxt#message "Couldn't find operation" >>= fun () ->
       return_unit
-  | Some op -> 
+  | Some op ->
       cctxt#message "%a" pp_operation op >>= fun () ->
       return_unit

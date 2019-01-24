@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -171,7 +172,7 @@ module type T = sig
         It is possible to initialize the message queue.
         Of course calling {!state} will fail at that point. *)
     val on_launch :
-      self -> Name.t -> Types.parameters -> Types.state Lwt.t
+      self -> Name.t -> Types.parameters -> Types.state tzresult Lwt.t
 
     (** The main request processor, i.e. the body of the event loop. *)
     val on_request :
@@ -215,7 +216,7 @@ module type T = sig
     'kind table -> ?timeout:float ->
     Worker_types.limits -> Name.t -> Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
-    'kind t Lwt.t
+    'kind t tzresult Lwt.t
 
   (** Triggers a worker termination and waits for its completion.
       Cannot be called from within the handlers.  *)

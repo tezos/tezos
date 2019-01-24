@@ -190,6 +190,10 @@ let test_unexpansion_consistency () =
   assert_unexpansion_consistent (Prim (zero_loc, "UNPAPAPAIR", [], [])) >>? fun () ->
   assert_unexpansion_consistent
     (Prim (zero_loc, "DIIIP", [ Seq (zero_loc, [ Prim (zero_loc, "DROP", [], []) ]) ], [])) >>? fun () ->
+  assert_unexpansion_consistent
+    (Prim (zero_loc, "DIVP", [ Seq (zero_loc, [ Prim (zero_loc, "DROP", [], []) ]) ], [])) >>? fun () ->
+  assert_unexpansion_consistent
+    (Prim (zero_loc, "DIIIIIP", [ Seq (zero_loc, [ Prim (zero_loc, "DROP", [], []) ]) ], [])) >>? fun () ->
   assert_unexpansion_consistent (Prim (zero_loc, "SET_CAR", [], [])) >>? fun () ->
   assert_unexpansion_consistent (Prim (zero_loc, "SET_CDR", [], [])) >>? fun () ->
   assert_unexpansion_consistent (Prim (zero_loc, "DUP", [], [])) >>? fun () ->

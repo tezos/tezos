@@ -141,6 +141,22 @@
             %{bin:tezos-admin-client})))
 
 (alias
+ (name runtest_voting.sh)
+ (locks /tcp-port/18731
+        /tcp-port/19731)
+ (deps sandbox.json
+       protocol_parameters.json
+       test_lib.inc.sh
+       (glob_files demo/*))
+ (action
+  (run bash %{dep:test_voting.sh}
+            %{bin:tezos-sandboxed-node.sh}
+            %{bin:tezos-node}
+            %{bin:tezos-init-sandboxed-client.sh}
+            %{bin:tezos-client}
+            %{bin:tezos-admin-client})))
+
+(alias
  (name runtest)
  (deps (alias runtest_basic.sh)
        (alias runtest_contracts.sh)
@@ -150,4 +166,5 @@
        (alias runtest_multinode.sh)
        (alias runtest_injection.sh)
        (alias runtest_tls.sh)
-       (alias runtest_cors.sh)))
+       (alias runtest_cors.sh)
+       (alias runtest_voting.sh)))

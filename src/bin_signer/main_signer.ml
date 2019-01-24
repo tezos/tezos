@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -259,10 +260,19 @@ let require_auth_arg () =
     ~doc:"Require a signature from the caller to sign."
     ()
 
+let password_filename_arg () =
+  arg
+    ~long:"password-file"
+    ~short:'f'
+    ~placeholder:"filename"
+    ~doc:"Absolute path of the password file"
+    (string_parameter ())
+
 let global_options () =
-  args2
+  args3
     (base_dir_arg ())
     (require_auth_arg ())
+    (password_filename_arg ())
 
 (* Main (lwt) entry *)
 let main () =
@@ -286,12 +296,13 @@ let main () =
   begin
     begin
       parse_global_options
-        (global_options ()) () original_args >>=? fun ((base_dir, require_auth), remaining) ->
+        (global_options ()) () original_args >>=?
+      fun ((base_dir, require_auth, password_filename), remaining) ->
       let base_dir = Option.unopt ~default:default_base_dir base_dir in
       let cctxt = object
         inherit Client_context_unix.unix_logger ~base_dir
         inherit Client_context_unix.unix_prompter
-        inherit Client_context_unix.unix_wallet ~base_dir
+        inherit Client_context_unix.unix_wallet ~base_dir ~password_filename
       end in
       Client_keys.register_signer
         (module Tezos_signer_backends.Encrypted.Make(struct

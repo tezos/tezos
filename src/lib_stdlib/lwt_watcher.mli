@@ -23,14 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {1 Notification callbacks} *)
+(** This module implements a one-to-many publish/suscribe pattern.
+
+    Clients can register/unregister to an [input]. Events notified to the input
+    (through [notify]) are dispatched asynchronously to all registered clients
+    through an [Lwt_stream]. A client receives only events sent after
+    registration and before unregistration. *)
 
 type 'a input
-type stopper
 
 val create_input : unit -> 'a input
-val shutdown_input : 'a input -> unit
+
+(** [notify t v] publishes value v to the input t *)
 val notify : 'a input -> 'a -> unit
+
+type stopper
+
+(** [create_stream t] registers a new client which can read published
+    values via a stream. A [stopper] is used to shutdown the client. *)
 val create_stream : 'a input -> 'a Lwt_stream.t * stopper
+
+(** A fake stream never receives any value. *)
 val create_fake_stream : unit -> 'a Lwt_stream.t * stopper
+
+(** [shutdown s] unregisters the client associated to [s]. [None] is pushed
+    to the stream. *)
 val shutdown : stopper -> unit
+
+(** Shutdowns all the clients of this input *)
+val shutdown_input : 'a input -> unit

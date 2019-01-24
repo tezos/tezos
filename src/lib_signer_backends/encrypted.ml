@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -132,6 +133,9 @@ module Encodings = struct
 end
 
 let decrypted = Hashtbl.create 13
+
+(* we cache the password in this list to avoid
+   asking the user all the time *)
 let passwords = ref []
 
 let rec interactive_decrypt_loop
@@ -151,6 +155,21 @@ let rec interactive_decrypt_loop
       return sk
   | None ->
       interactive_decrypt_loop cctxt ?name ~encrypted_sk algo
+
+(* add all passwords in [filename] to the list of known passwords *)
+let password_file_load = function
+  |Some filename ->
+      if Sys.file_exists filename then begin
+        let stream = Lwt_io.lines_of_file filename in
+        Lwt_stream.iter
+          (fun p ->
+             passwords := MBytes.of_string p :: !passwords)
+          stream >>= fun () ->
+        return_unit
+      end
+      else
+        return_unit
+  | None -> return_unit
 
 let rec noninteractive_decrypt_loop algo ~encrypted_sk = function
   | [] -> return_none
@@ -181,6 +200,7 @@ let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
 
 let decrypt_all (cctxt : #Client_context.io_wallet) =
   Secret_key.load cctxt >>=? fun sks ->
+  password_file_load cctxt#password_filename >>=? fun () ->
   iter_s begin fun (name, sk_uri) ->
     if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then
       return_unit
@@ -191,6 +211,7 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
 
 let decrypt_list (cctxt : #Client_context.io_wallet) keys =
   Secret_key.load cctxt >>=? fun sks ->
+  password_file_load cctxt#password_filename >>=? fun () ->
   iter_s begin fun (name, sk_uri) ->
     if Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme &&
        (keys = [] || List.mem name keys) then

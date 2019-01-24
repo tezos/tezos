@@ -3,14 +3,14 @@ Various
 
 .. _activate_fundraiser_account:
 
-Activate fundraiser account - Betanet
+Activate fundraiser account - Mainnet
 -------------------------------------
 
 If you took part in the fundraiser you can activate your account for
-the Betanet on https://check.tezos.com/.
+the Mainnet on https://check.tezos.com/.
 This feature is also included in some wallets.
 If you have any question or issue refer to that page or to the `Tezos
-foundation <https://tezosfoundation.ch/>`_ for support.
+foundation <https://tezos.foundation/>`_ for support.
 
 You may also use ``tezos-client`` to activate your account, **be
 warned that you should have a very good understanding of key
@@ -88,15 +88,13 @@ The app is developed by Obsidian Systems and they provide a comprehensive
 Ledger Manager
 ~~~~~~~~~~~~~~
 
-The preferred way to set up your Ledger is to install the `Ledger
-Manager extension
-<https://chrome.google.com/webstore/detail/ledger-manager/beimhnaefocolcplfimocfiaiefpkgbf>`_
-on a Chrome browser.
+The preferred way to set up your Ledger is to install `Ledger
+Live
+<https://www.ledger.com/pages/ledger-live>`_.
 On Linux make sure you correctly set up your `udev` rules as explained
 `here <https://github.com/obsidiansystems/ledger-app-tezos#udev-rules-linux-only>`_.
 Connect your ledger, unlock it and go the dashboard.
-In the Ledger Manager enable `developer items` in the bottom right,
-install `Tezos Wallet` from the applications list and open it on the
+In Ledger Live `install Tezos Wallet` from the applications list and open it on the
 device.
 
 
@@ -134,7 +132,7 @@ time to sign an operation.
 Tezos Baking app
 ~~~~~~~~~~~~~~~~
 
-In Ledger Manager there is also a `Tezos Baking` app which allows a
+In Ledger Live there is also a `Tezos Baking` app which allows a
 delegate to sign non-interactively e.g. there is no need to
 manually sign every block or endorsement.
 The application however is restricted to sign exclusively blocks and

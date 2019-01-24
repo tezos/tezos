@@ -1,6 +1,6 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: 4200cbebcae75562d79898a8e11e9f4dc237cc08
+  build_deps_image_version: bb57cca4069add53f85f26794971581be8e77e3d
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
 
@@ -175,6 +175,11 @@ test:inject.sh:
   script:
     - dune build @src/bin_client/runtest_injection.sh
 
+test:voting.sh:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest_voting.sh
+
 test:proto:sandbox:
   <<: *test_definition
   script:
@@ -196,7 +201,7 @@ test:linkcheck:
     - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
     - sudo pip3 install 'idna<2.7'
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - make doc-linkcheck
+    - make doc-html-and-linkcheck
   allow_failure: true
 
 test:validation:

@@ -30,8 +30,8 @@ let bake_block
     (cctxt : #Proto_alpha.full)
     ?(chain = `Main)
     ?minimal_fees
-    ?minimal_picotez_per_gas_unit
-    ?minimal_picotez_per_byte
+    ?minimal_nanotez_per_gas_unit
+    ?minimal_nanotez_per_byte
     ?(await_endorsements = false)
     ?force
     ?max_priority
@@ -68,8 +68,8 @@ let bake_block
   Client_baking_forge.forge_block cctxt
     ?force
     ?minimal_fees
-    ?minimal_picotez_per_gas_unit
-    ?minimal_picotez_per_byte
+    ?minimal_nanotez_per_gas_unit
+    ?minimal_nanotez_per_byte
     ~await_endorsements
     ?timestamp:(if minimal_timestamp then None else Some (Time.now ()))
     ?seed_nonce_hash

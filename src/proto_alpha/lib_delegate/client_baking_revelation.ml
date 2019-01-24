@@ -34,7 +34,16 @@ let inject_seed_nonce_revelation rpc_config ?(chain = `Main) block ?async nonces
        Alpha_services.Forge.seed_nonce_revelation rpc_config
          (chain, block) ~branch ~level ~nonce () >>=? fun bytes ->
        let bytes = Signature.concat bytes Signature.zero in
-       Shell_services.Injection.operation rpc_config ?async ~chain bytes)
+       Shell_services.Injection.operation rpc_config ?async ~chain bytes >>=? fun oph ->
+       lwt_debug Tag.DSL.(fun f ->
+           f "Revealing nonce %a from level %a at chain %a, block %a with operation %a"
+           -% t event "reveal_nonce"
+           -% a Logging.nonce_tag nonce
+           -% a Logging.level_tag level
+           -% a Logging.chain_tag chain
+           -% a Logging.block_tag block
+           -% a Operation_hash.Logging.tag oph) >>= fun () ->
+       return oph)
     nonces >>=? fun ophs ->
   return ophs
 

@@ -111,7 +111,7 @@ module PatriciaTree(V:HashPtree.Value) = struct
     let lst = fold (fun p _ l -> p :: l) t [] in
     Format.fprintf ppf "@[<2>[%a]@]"
       Format.(pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
-                Ipaddr.V6.Prefix.pp_hum)
+                Ipaddr.V6.Prefix.pp)
       lst
 
 end

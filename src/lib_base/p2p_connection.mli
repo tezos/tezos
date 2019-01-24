@@ -98,7 +98,7 @@ module Pool_event : sig
     (** The remote peer rejected our connection. *)
 
     | Connection_established of Id.t * P2p_peer_id.t
-    (** We succesfully established a authentified connection. *)
+    (** We successfully established a authentified connection. *)
 
     | Swap_request_received of { source : P2p_peer_id.t }
     (** A swap request has been received. *)

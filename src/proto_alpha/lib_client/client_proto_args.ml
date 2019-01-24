@@ -249,8 +249,8 @@ let max_priority_arg =
 
 
 let default_minimal_fees = match Tez.of_mutez 100L with None -> assert false | Some t -> t
-let default_minimal_picotez_per_gas_unit = Z.of_int 100
-let default_minimal_picotez_per_byte = Z.of_int 1000
+let default_minimal_nanotez_per_gas_unit = Z.of_int 100
+let default_minimal_nanotez_per_byte = Z.of_int 1000
 
 let minimal_fees_arg =
   default_arg
@@ -263,21 +263,21 @@ let minimal_fees_arg =
          | Some t -> return t
          | None -> fail (Bad_minimal_fees s)))
 
-let minimal_picotez_per_gas_unit_arg =
+let minimal_nanotez_per_gas_unit_arg =
   default_arg
-    ~long:"minimal-picotez-per-gas-unit"
+    ~long:"minimal-nanotez-per-gas-unit"
     ~placeholder:"amount"
-    ~doc:"exclude operations with fees per gas lower than this threshold (in picotez)"
-    ~default:(Z.to_string default_minimal_picotez_per_gas_unit)
+    ~doc:"exclude operations with fees per gas lower than this threshold (in nanotez)"
+    ~default:(Z.to_string default_minimal_nanotez_per_gas_unit)
     (parameter (fun _ s ->
          try return (Z.of_string s)
          with _ -> fail (Bad_minimal_fees s)))
 
-let minimal_picotez_per_byte_arg =
+let minimal_nanotez_per_byte_arg =
   default_arg
-    ~long:"minimal-picotez-per-byte"
+    ~long:"minimal-nanotez-per-byte"
     ~placeholder:"amount"
-    ~default:(Z.to_string default_minimal_picotez_per_byte)
+    ~default:(Z.to_string default_minimal_nanotez_per_byte)
     ~doc:"exclude operations with fees per byte lower than this threshold (in tez)"
     (parameter (fun _ s ->
          try return (Z.of_string s)

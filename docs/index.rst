@@ -121,6 +121,7 @@ in the :ref:`introduction <howtoget>`.
    whitedoc/validation
    whitedoc/michelson
    whitedoc/proof_of_stake
+   whitedoc/voting
 
 .. toctree::
    :maxdepth: 2
@@ -149,6 +150,7 @@ in the :ref:`introduction <howtoget>`.
    api/cli-commands
    api/rpc
    api/errors
+   api/p2p
 
 Indices and tables
 ==================

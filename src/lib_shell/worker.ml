@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -106,7 +107,7 @@ module type T = sig
         It is possible to initialize the message queue.
         Of course calling {!state} will fail at that point. *)
     val on_launch :
-      self -> Name.t -> Types.parameters -> Types.state Lwt.t
+      self -> Name.t -> Types.parameters -> Types.state tzresult Lwt.t
 
     (** The main request processor, i.e. the body of the event loop. *)
     val on_request :
@@ -150,7 +151,7 @@ module type T = sig
     'kind table -> ?timeout:float ->
     Worker_types.limits -> Name.t -> Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
-    'kind t Lwt.t
+    'kind t tzresult Lwt.t
 
   (** Triggers a worker termination and waits for its completion.
       Cannot be called from within the handlers.  *)
@@ -416,7 +417,7 @@ module Make
   module type HANDLERS = sig
     type self
     val on_launch :
-      self -> Name.t -> Types.parameters -> Types.state Lwt.t
+      self -> Name.t -> Types.parameters -> Types.state tzresult Lwt.t
     val on_request :
       self -> 'a Request.t -> 'a tzresult Lwt.t
     val on_no_request :
@@ -489,8 +490,10 @@ module Make
       end >>= function
       | Ok () ->
           loop ()
-      | Error [Canceled | Exn Lwt_pipe.Closed | Exn Lwt_dropbox.Closed ] ->
-          Logger.lwt_log_notice "Worker terminated"  >>= fun () ->
+      | Error [Canceled | Exn Lwt.Canceled | Exn Lwt_pipe.Closed | Exn Lwt_dropbox.Closed ] ->
+          Logger.lwt_log_notice
+            "@[Worker terminated [%a] @]"
+            Name.pp w.name  >>= fun () ->
           do_close None
       | Error errs ->
           begin match w.current_request with
@@ -503,9 +506,15 @@ module Make
           end >>= function
           | Ok () ->
               loop ()
+          | Error ([Timeout] as errs) ->
+              Logger.lwt_log_notice
+                "@[Worker terminated with timeout [%a] @]"
+                Name.pp w.name  >>= fun () ->
+              do_close (Some errs)
           | Error errs ->
               Logger.lwt_log_error
-                "@[<v 0>Worker crashed:@,%a@]"
+                "@[<v 0>Worker crashed [%a]:@,%a@]"
+                Name.pp w.name
                 (Format.pp_print_list Error_monad.pp) errs >>= fun () ->
               do_close (Some errs) in
     loop ()
@@ -515,7 +524,7 @@ module Make
       kind table -> ?timeout:float ->
       Worker_types.limits -> Name.t -> Types.parameters ->
       (module HANDLERS with type self = kind t) ->
-      kind t Lwt.t
+      kind t tzresult Lwt.t
     = fun table ?timeout limits name parameters (module Handlers) ->
       let name_s =
         Format.asprintf "%a" Name.pp name in
@@ -556,7 +565,7 @@ module Make
           Logger.lwt_log_notice "Worker started for %s" name_s
       end >>= fun () ->
       Hashtbl.add table.instances name w ;
-      Handlers.on_launch w name parameters >>= fun state ->
+      Handlers.on_launch w name parameters >>=? fun state ->
       w.status <- Running (Time.now ()) ;
       w.state <- Some state ;
       w.worker <-
@@ -564,7 +573,7 @@ module Make
           full_name
           ~run:(fun () -> worker_loop (module Handlers) w)
           ~cancel:(fun () -> Lwt_canceler.cancel w.canceler) ;
-      Lwt.return w
+      return w
 
   let shutdown w =
     let (module Logger) = w.logger in

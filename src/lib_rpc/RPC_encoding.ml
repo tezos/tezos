@@ -28,8 +28,8 @@ type schema = Data_encoding.json_schema * Data_encoding.Binary_schema.t
 let unit = Data_encoding.empty
 let untyped = Data_encoding.(obj1 (req "untyped" string))
 let conv f g t = Data_encoding.conv ~schema:(Data_encoding.Json.schema t) f g t
-let schema t =
-  (Data_encoding.Json.schema t,
+let schema ?definitions_path t =
+  (Data_encoding.Json.schema ?definitions_path t,
    Data_encoding.Binary.describe t)
 
 let schema_encoding =

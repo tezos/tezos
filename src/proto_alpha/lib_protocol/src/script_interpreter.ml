@@ -55,8 +55,8 @@ let () =
   (* Reject *)
   register_error_kind
     `Temporary
-    ~id:"michelson_v1.script_rejected"
-    ~title: "Script failed"
+    ~id:"scriptRejectedRuntimeError"
+    ~title: "Script failed (runtime script error)"
     ~description: "A FAILWITH instruction was reached"
     (obj3
        (req "location" Script.location_encoding)
@@ -67,7 +67,7 @@ let () =
   (* Overflow *)
   register_error_kind
     `Temporary
-    ~id:"michelson_v1.script_overflow"
+    ~id:"scriptOverflowRuntimeError"
     ~title: "Script failed (overflow error)"
     ~description: "A FAIL instruction was reached due to the detection of an overflow"
     (obj2
@@ -78,12 +78,12 @@ let () =
   (* Runtime contract error *)
   register_error_kind
     `Temporary
-    ~id:"michelson_v1.runtime_error"
+    ~id:"scriptRuntimeError"
     ~title: "Script runtime error"
     ~description: "Toplevel error for all runtime script errors"
     (obj2
-       (req "contract_handle" Contract.encoding)
-       (req "contract_code" Script.expr_encoding))
+       (req "contractHandle" Contract.encoding)
+       (req "contractCode" Script.expr_encoding))
     (function
       | Runtime_contract_error (contract, expr) ->
           Some (contract, expr)
@@ -93,7 +93,7 @@ let () =
   (* Bad contract parameter *)
   register_error_kind
     `Permanent
-    ~id:"michelson_v1.bad_contract_parameter"
+    ~id:"badContractParameter"
     ~title:"Contract supplied an invalid parameter"
     ~description:"Either no parameter was supplied to a contract with \
                   a non-unit parameter type, a non-unit parameter was \
@@ -105,7 +105,7 @@ let () =
   (* Cannot serialize log *)
   register_error_kind
     `Temporary
-    ~id:"michelson_v1.cannot_serialize_log"
+    ~id:"cannotSerializeLog"
     ~title:"Not enough gas to serialize execution trace"
     ~description:"Execution trace with stacks was to big to be serialized with \
                   the provided gas"
@@ -115,7 +115,7 @@ let () =
   (* Cannot serialize failure *)
   register_error_kind
     `Temporary
-    ~id:"michelson_v1.cannot_serialize_failure"
+    ~id:"cannotSerializeFailure"
     ~title:"Not enough gas to serialize argument of FAILWITH"
     ~description:"Argument of FAILWITH was too big to be serialized with \
                   the provided gas"
@@ -125,7 +125,7 @@ let () =
   (* Cannot serialize storage *)
   register_error_kind
     `Temporary
-    ~id:"michelson_v1.cannot_serialize_storage"
+    ~id:"cannotSerializeStorage"
     ~title:"Not enough gas to serialize execution storage"
     ~description:"The returned storage was too big to be serialized with \
                   the provided gas"

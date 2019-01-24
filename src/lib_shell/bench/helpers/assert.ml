@@ -28,7 +28,7 @@ open Proto_alpha
 let error ~loc v f =
   match v with
   | Error err when List.exists f err ->
-      return ()
+      return_unit
   | Ok _ ->
       failwith "Unexpected successful result (%s)" loc
   | Error err ->
@@ -44,13 +44,13 @@ let equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b  =
   if not (cmp a b) then
     failwith "@[@[[%s]@] - @[%s : %a is not equal to %a@]@]" loc msg pp a pp b
   else
-    return ()
+    return_unit
 
 let not_equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b  =
   if cmp a b then
     failwith "@[@[[%s]@] - @[%s : %a is equal to %a@]@]" loc msg pp a pp b
   else
-    return ()
+    return_unit
 
 let equal_tez ~loc (a:Alpha_context.Tez.t) (b:Alpha_context.Tez.t) =
   let open Alpha_context in

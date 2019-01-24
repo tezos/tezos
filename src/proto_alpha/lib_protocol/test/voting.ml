@@ -197,6 +197,7 @@ let test_voting () =
     delegates >>=? fun operations ->
   Block.bake ~operations b >>=? fun b ->
 
+  (* voting twice for the same proposal is not allowed *)
   Op.ballot (B b) del1 Protocol_hash.zero Vote.Nay >>=? fun op ->
   Block.bake ~operations:[op] b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res begin function
@@ -331,7 +332,98 @@ let test_voting () =
 
   return_unit
 
+let test_period1 () =
+  Context.init 10 >>=? fun (b,delegates) ->
+
+  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
+
+  let del1 = List.nth delegates 0 in
+  let del2 = List.nth delegates 1 in
+
+  Op.proposals (B b) del1 [protos.(0)] >>=? fun ops1 ->
+  Op.proposals (B b) del2 [protos.(1)] >>=? fun ops2 ->
+  Block.bake ~operations:[ops1;ops2] b >>=? fun b ->
+  Block.bake_n ((Int32.to_int blocks_per_voting_period)-1) b >>=? fun b ->
+
+  (* we remain in the proposal when there is no winner *)
+  Context.Vote.get_current_period_kind (B b) >>=? begin function
+    | Proposal -> return_unit
+    | _ -> failwith "%s - Unexpected period kind" __LOC__
+  end >>=? fun () ->
+
+  return_unit
+
+
+let test_period2_supermajority supermajority () =
+  Context.init 100 >>=? fun (b,delegates) ->
+
+  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
+
+  let del1 = List.nth delegates 0 in
+  let proposal = protos.(0) in
+
+  Op.proposals (B b) del1 [proposal] >>=? fun ops1 ->
+  Block.bake ~operations:[ops1] b >>=? fun b ->
+  Block.bake_n ((Int32.to_int blocks_per_voting_period)-1) b >>=? fun b ->
+
+  (* we remain in the proposal when there is no winner *)
+  Context.Vote.get_current_period_kind (B b) >>=? begin function
+    | Testing_vote -> return_unit
+    | _ -> failwith "%s - Unexpected period kind" __LOC__
+  end >>=? fun () ->
+
+  (* assert our proposal won *)
+  Context.Vote.get_current_proposal (B b) >>=? begin function
+    | Some v -> if Protocol_hash.(equal proposal v) then return_unit
+        else failwith "%s - Wrong proposal" __LOC__
+    | None -> failwith "%s - Missing proposal" __LOC__
+  end >>=? fun () ->
+
+  (* majority/minority vote depending on the [ok] parameter *)
+  filter_s
+    (fun del ->
+       Context.Contract.pkh del >>=? fun pkh ->
+       Context.Delegate.info (B b) pkh >>=? fun {deactivated} -> return (not deactivated))
+    delegates >>=? fun active_delegates ->
+
+  let num_delegates = List.length active_delegates in
+  let num_nays = num_delegates / 5 in
+  let num_yays = num_nays * 4 in
+  let num_yays = if supermajority then num_yays else num_yays - 1 in
+
+  let open Alpha_context in
+
+  let nays_delegates, rest = List.split_n num_nays active_delegates in
+  let yays_delegates, _ = List.split_n num_yays rest in
+  map_s (fun del ->
+      Op.ballot (B b) del proposal Vote.Yay)
+    yays_delegates >>=? fun operations_yays ->
+  map_s (fun del ->
+      Op.ballot (B b) del proposal Vote.Nay)
+    nays_delegates >>=? fun operations_nays ->
+  let operations = operations_yays @ operations_nays in
+
+  Block.bake ~operations b >>=? fun b ->
+  Block.bake_n ((Int32.to_int blocks_per_voting_period)-1) b >>=? fun b ->
+
+  Context.Vote.get_current_period_kind (B b) >>=? begin function
+    | Testing ->
+        if supermajority then return_unit
+        else failwith "%s - Expected period kind Proposal, obtained Testing" __LOC__
+    | Proposal ->
+        if not supermajority then return_unit
+        else failwith "%s - Expected period kind Proposal, obtained Testing_vote" __LOC__
+    | _ -> failwith "%s - Unexpected period kind" __LOC__
+  end >>=? fun () ->
+
+  return_unit
+
 
 let tests = [
   Test.tztest "voting" `Quick (test_voting) ;
+  Test.tztest "voting: test period 1" `Quick (test_period1) ;
+  Test.tztest "voting: test period 2, with supermajority" `Quick (test_period2_supermajority true) ;
+  Test.tztest "voting: test period 2, without supermajority" `Quick (test_period2_supermajority false) ;
 ]

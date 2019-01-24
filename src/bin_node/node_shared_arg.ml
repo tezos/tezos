@@ -71,7 +71,7 @@ let wrap
       ~f:(fun (cert, key) -> { Node_config_file.cert ; key })
       rpc_tls in
 
-  (* when `--expected-connections` is used,
+  (* when `--connections` is used,
      override all the bounds defined in the configuration file. *)
   let bootstrap_threshold,
       min_connections, expected_connections, max_connections,
@@ -166,7 +166,11 @@ module Term = struct
 
   let connections =
     let doc =
-      "The number of running connections that we aim for." in
+      "Sets min_connections, expected_connections, max_connections to NUM / 2, \
+       NUM, (3 * NUM) / 2, respectively. Sets peer_table_size to 8 * NUM \
+       unless it is already defined in the configuration file. Sets \
+       bootstrap_threshold to min(NUM / 4, 2) unless it is already defined in \
+       the configuration file." in
     Arg.(value & opt (some int) None &
          info ~docs ~doc ~docv:"NUM" ["connections"])
 

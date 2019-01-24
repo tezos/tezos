@@ -117,6 +117,7 @@ exec_docker() {
     else
         local interactive_flags="-t"
     fi
+    local node_container="$(container_name "$docker_node_container")"
     declare -a container_args=();
     tmpdir="/tmp"
     for arg in "$@"; do
@@ -127,13 +128,14 @@ exec_docker() {
             fi
             file_name=$(basename "${local_path}")
             docker_path="$tmpdir/$file_name"
-            docker cp "${local_path}" "$docker_node_container:${docker_path}"
-            container_args+=("$docker_path");
+            docker cp "${local_path}" "$node_container:${docker_path}"
+            docker exec "$interactive_flags" "$node_container" sudo chown tezos "${docker_path}"
+            container_args+=("file:$docker_path");
         else
             container_args+=("${arg}");
         fi
     done
-    docker exec "$interactive_flags" "$(container_name "$docker_node_container")" "${container_args[@]}"
+    docker exec "$interactive_flags" -e 'TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER' "$node_container" "${container_args[@]}"
 }
 
 ## Container ###############################################################

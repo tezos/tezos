@@ -41,8 +41,8 @@ val delegatable_switch: (bool, Proto_alpha.full) Clic.arg
 val spendable_switch: (bool, Proto_alpha.full) Clic.arg
 val max_priority_arg: (int option, Proto_alpha.full) Clic.arg
 val minimal_fees_arg: (Tez.tez, Proto_alpha.full) Clic.arg
-val minimal_picotez_per_gas_unit_arg: (Z.t, Proto_alpha.full) Clic.arg
-val minimal_picotez_per_byte_arg: (Z.t, Proto_alpha.full) Clic.arg
+val minimal_nanotez_per_gas_unit_arg: (Z.t, Proto_alpha.full) Clic.arg
+val minimal_nanotez_per_byte_arg: (Z.t, Proto_alpha.full) Clic.arg
 val force_low_fee_arg: (bool, Proto_alpha.full) Clic.arg
 val fee_cap_arg: (Tez.t, Proto_alpha.full) Clic.arg
 val burn_cap_arg: (Tez.t, Proto_alpha.full) Clic.arg

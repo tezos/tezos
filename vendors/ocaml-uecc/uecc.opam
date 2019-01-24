@@ -1,4 +1,4 @@
-opam-version: "1.2"
+opam-version: "2.0"
 name: "uecc"
 version: "1.0"
 authors: "Vincent Bernardoff <vb@luminar.eu.org>"
@@ -7,17 +7,12 @@ license: "ISC"
 homepage: "https://github.com/vbmithr/ocaml-uecc"
 bug-reports: "https://github.com/vbmithr/ocaml-uecc/issues"
 dev-repo: "git://github.com/vbmithr/ocaml-uecc"
-
-available: [
-  ocaml-version >= "4.02.0"
-]
-
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
-build-test: [ "dune" "runtest" "-p" name "-j" jobs ]
+run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
 depends: [
   "dune" {build & >= "1.0.1"}
   "bigstring" {>= "0.1.1"}
-  "alcotest" {test & >= "0.8.1"}
-  "cstruct" {test & >= "3.2.1"}
-  "hex" {test}
+  "alcotest" {with-test & >= "0.8.1"}
+  "cstruct" {with-test & >= "3.2.1"}
+  "hex" {with-test}
 ]

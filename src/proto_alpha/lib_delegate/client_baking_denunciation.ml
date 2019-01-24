@@ -113,6 +113,7 @@ let process_endorsements (cctxt : #Proto_alpha.full) state ~chain
                 lwt_log_notice Tag.DSL.(fun f ->
                     f "Double endorsement evidence injected %a"
                     -% t event "double_endorsement_denounced"
+                    -% t signed_operation_tag bytes
                     -% a Operation_hash.Logging.tag op_hash) >>= fun () ->
                 return @@ HLevel.replace state.endorsements_table level
                   (Delegate_Map.add delegate new_endorsement map)
@@ -166,6 +167,7 @@ let process_block (cctxt : #Proto_alpha.full) state ~chain (header : Alpha_block
         lwt_log_notice Tag.DSL.(fun f ->
             f "Double baking evidence injected %a"
             -% t event "double_baking_denounced"
+            -% t signed_operation_tag bytes
             -% a Operation_hash.Logging.tag op_hash) >>= fun () ->
         return @@ HLevel.replace state.blocks_table level
           (Delegate_Map.add baker hash map)

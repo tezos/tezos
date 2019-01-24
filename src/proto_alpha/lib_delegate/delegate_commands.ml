@@ -58,8 +58,8 @@ let delegate_commands () =
       (args9
          max_priority_arg
          minimal_fees_arg
-         minimal_picotez_per_gas_unit_arg
-         minimal_picotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         minimal_nanotez_per_byte_arg
          await_endorsements_arg
          force_switch
          minimal_timestamp_switch
@@ -70,14 +70,14 @@ let delegate_commands () =
          ~name:"baker" ~desc: "name of the delegate owning the baking right"
        @@ stop)
       (fun (max_priority, minimal_fees,
-            minimal_picotez_per_gas_unit, minimal_picotez_per_byte,
+            minimal_nanotez_per_gas_unit, minimal_nanotez_per_byte,
             await_endorsements, force,
             minimal_timestamp, mempool, context_path)
         delegate cctxt ->
         bake_block cctxt cctxt#block
           ~minimal_fees
-          ~minimal_picotez_per_gas_unit
-          ~minimal_picotez_per_byte
+          ~minimal_nanotez_per_gas_unit
+          ~minimal_nanotez_per_byte
           ~await_endorsements
           ~force ?max_priority ~minimal_timestamp
           ?mempool ?context_path delegate) ;
@@ -113,8 +113,8 @@ let baker_commands () =
       (args5
          max_priority_arg
          minimal_fees_arg
-         minimal_picotez_per_gas_unit_arg
-         minimal_picotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         minimal_nanotez_per_byte_arg
          no_waiting_for_endorsements_arg)
       (prefixes [ "run" ; "with" ; "local" ; "node" ]
        @@ param
@@ -122,15 +122,15 @@ let baker_commands () =
          ~desc:"Path to the node data directory (e.g. $HOME/.tezos-node)"
          directory_parameter
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun (max_priority, minimal_fees, minimal_picotez_per_gas_unit,
-            minimal_picotez_per_byte, no_waiting_for_endorsements)
+      (fun (max_priority, minimal_fees, minimal_nanotez_per_gas_unit,
+            minimal_nanotez_per_byte, no_waiting_for_endorsements)
         node_path delegates cctxt ->
         Tezos_signer_backends.Encrypted.decrypt_list
           cctxt (List.map fst delegates) >>=? fun () ->
         Client_daemon.Baker.run cctxt
           ~minimal_fees
-          ~minimal_picotez_per_gas_unit
-          ~minimal_picotez_per_byte
+          ~minimal_nanotez_per_gas_unit
+          ~minimal_nanotez_per_byte
           ?max_priority
           ~await_endorsements:(not no_waiting_for_endorsements)
           ~context_path:(Filename.concat node_path "context")

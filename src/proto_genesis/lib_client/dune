@@ -6,8 +6,7 @@
             tezos-client-base
             tezos-client-commands
             tezos-protocol-environment
-            tezos-protocol-genesis
-            tezos-protocol-alpha)
+            tezos-protocol-genesis)
  (library_flags (:standard -linkall))
  (flags (:standard -w -9+27-30-32-40@8
                    -safe-string

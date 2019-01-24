@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -45,6 +46,7 @@ class type io = object
 end
 
 class type wallet = object
+  method password_filename : string option
   method with_lock : (unit -> 'a Lwt.t) -> 'a  Lwt.t
   method load : string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
   method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t

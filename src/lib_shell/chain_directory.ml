@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -162,9 +163,10 @@ let build_rpc_directory validator =
   merge
     (RPC_directory.map
        (fun chain ->
-          Validator.get_exn validator
-            (State.Chain.id chain) >>= fun chain_validator ->
-          Lwt.return (Chain_validator.prevalidator chain_validator))
+          match Validator.get validator (State.Chain.id chain) with
+          | Error _ -> Lwt.fail Not_found
+          | Ok chain_validator ->
+              Lwt.return (Chain_validator.prevalidator chain_validator))
        Prevalidator.rpc_directory) ;
 
   RPC_directory.prefix Chain_services.path @@

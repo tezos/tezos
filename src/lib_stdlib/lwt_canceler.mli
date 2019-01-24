@@ -23,9 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A [Canceler.t] is a three-states synchronization object with transitions
+    "waiting -> canceling -> canceled", starting in waiting state. A chain
+    of hooks can be attached to the canceler. Hooks are triggered when
+    switching to the canceling state. The canceler switches to canceled state
+    when the hooks have completed. *)
+
 type t
+
+(** [create t] returns a canceler in waiting state. *)
 val create : unit -> t
+
+(** If [t] is in wait state, [cancel t] triggers the cancelation process:
+    1. it switches to canceling state,
+    2. executes the hooks sequentially in separate Lwt threads,
+    3. waits for hooks execution to complete,
+    4. switches to cancel state.
+    If [t] is in canceled state, [cancel t] is determined immediately.
+    If [t] is in canceling state, [cancel t] is determined at the end of the
+    cancelation process. *)
 val cancel : t -> unit Lwt.t
+
+(** [cancelation t] is determined when [t] is in canceling or canceled state. *)
 val cancelation : t -> unit Lwt.t
+
+(** [on_cancel t hook] adds [hook] to the end of the current chain. *)
 val on_cancel : t -> (unit -> unit Lwt.t) -> unit
+
+(** [canceled t] is [true] iff [t] is canceled or canceling. *)
 val canceled : t -> bool

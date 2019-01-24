@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -36,7 +37,7 @@ type t = {
   prevalidator_limits: Prevalidator.limits ;
 
   valid_block_input: State.Block.t Lwt_watcher.input ;
-  active_chains: Chain_validator.t Lwt.t Chain_id.Table.t ;
+  active_chains: Chain_validator.t Chain_id.Table.t ;
 
 }
 
@@ -47,9 +48,9 @@ let create state db
     prevalidator_limits
     chain_validator_limits
   =
-  Block_validator.create block_validator_limits db block_validator_kind >>= fun block_validator ->
+  Block_validator.create block_validator_limits db block_validator_kind >>=? fun block_validator ->
   let valid_block_input = Lwt_watcher.create_input () in
-  Lwt.return
+  return
     { state ; db ;
       block_validator ;
       block_validator_limits ; prevalidator_limits ;
@@ -63,25 +64,26 @@ let activate v ?max_child_ttl ~start_prevalidator chain_state =
       f "activate chain %a"
       -% t event "active_chain"
       -% a State_logging.chain_id chain_id) >>= fun () ->
-  try Chain_id.Table.find v.active_chains chain_id
-  with Not_found ->
-    let nv =
+  match Chain_id.Table.find_opt v.active_chains chain_id with
+  |Some nv -> return nv
+  |None ->
       Chain_validator.create
         ?max_child_ttl
         ~start_prevalidator
         v.peer_validator_limits v.prevalidator_limits
         v.block_validator
         v.valid_block_input v.db chain_state
-        v.chain_validator_limits in
-    Chain_id.Table.add v.active_chains chain_id nv ;
-    nv
+        v.chain_validator_limits >>=? fun nv ->
+      Chain_id.Table.add v.active_chains chain_id nv ;
+      return nv
 
 let get_exn { active_chains } chain_id =
   Chain_id.Table.find active_chains chain_id
 
-let get v chain_id =
-  try get_exn v chain_id >>= fun nv -> return nv
-  with Not_found -> fail (Validation_errors.Inactive_chain chain_id)
+let get { active_chains } chain_id =
+  match Chain_id.Table.find_opt active_chains chain_id with
+  |Some nv -> Ok nv
+  |None -> error (Validation_errors.Inactive_chain chain_id)
 
 let validate_block v ?(force = false) ?chain_id bytes operations =
   let hash = Block_hash.hash_bytes [bytes] in
@@ -96,10 +98,10 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
             | None ->
                 failwith "Unknown predecessor (%a), cannot inject the block."
                   Block_hash.pp_short block.shell.predecessor
-            | Some (chain_id, _bh) -> get v chain_id
+            | Some (chain_id, _bh) -> Lwt.return (get v chain_id)
           end
         | Some chain_id ->
-            get v chain_id >>=? fun nv ->
+            Lwt.return (get v chain_id) >>=? fun nv ->
             if force then
               return nv
             else
@@ -120,7 +122,7 @@ let shutdown { active_chains ; block_validator } =
   let jobs =
     Block_validator.shutdown block_validator ::
     Chain_id.Table.fold
-      (fun _ nv acc -> (nv >>= Chain_validator.shutdown) :: acc)
+      (fun _ nv acc -> Chain_validator.shutdown nv :: acc)
       active_chains [] in
   Lwt.join jobs >>= fun () ->
   Lwt.return_unit
@@ -137,10 +139,10 @@ let inject_operation v ?chain_id op =
         | None ->
             failwith "Unknown branch (%a), cannot inject the operation."
               Block_hash.pp_short op.shell.branch
-        | Some (chain_id, _bh) -> get v chain_id
+        | Some (chain_id, _bh) -> Lwt.return (get v chain_id)
       end
     | Some chain_id ->
-        get v chain_id >>=? fun nv ->
+        Lwt.return (get v chain_id) >>=? fun nv ->
         Distributed_db.Block_header.known
           (Chain_validator.chain_db nv)
           op.shell.branch >>= function

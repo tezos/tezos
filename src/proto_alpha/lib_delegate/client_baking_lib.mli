@@ -31,8 +31,8 @@ val bake_block:
   #Proto_alpha.full ->
   ?chain:Chain_services.chain ->
   ?minimal_fees: Tez.t ->
-  ?minimal_picotez_per_gas_unit: Z.t ->
-  ?minimal_picotez_per_byte: Z.t ->
+  ?minimal_nanotez_per_gas_unit: Z.t ->
+  ?minimal_nanotez_per_byte: Z.t ->
   ?await_endorsements: bool ->
   ?force:bool ->
   ?max_priority: int ->

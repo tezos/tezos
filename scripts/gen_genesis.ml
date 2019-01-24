@@ -20,7 +20,7 @@ let prefix = "BLockGenesisGenesisGenesisGenesisGenesis"
 let rec genesis () =
   let date =
     Lwt_main.run
-      (Lwt_process.pread_line (Lwt_process.shell "date +%FT%TZ --utc")) in
+      (Lwt_process.pread_line (Lwt_process.shell "TZ='AAA+1' date +%FT%TZ")) in
   let suffix = String.sub Digest.(to_hex (string date)) 0 5 in
   match Base58.raw_decode (prefix ^ suffix ^ "crcCRC") with
   | None -> genesis ()
@@ -43,22 +43,24 @@ let () =
 
 let sed =
   Format.sprintf
-    "sed -i \
+    "sed -i.old \
      -e 's/Time.of_notation_exn \"[^\\\"]*\"/Time.of_notation_exn \"%s\"/' \
      -e 's/BLockGenesisGenesisGenesisGenesisGenesis.........../%s/' \
      ../src/bin_node/node_run_command.ml"
     date
     genesis
 
-let _ =
-  Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed))
+let () =
+  Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed) >>= fun _ ->
+                Lwt_unix.unlink "../src/bin_node/node_run_command.ml.old")
 
 let sed =
   Format.sprintf
-    "sed -E -i \
+    "sed -E -i.old \
      -e 's/name = \"(TEZOS[_A-Z]+)[^\"]*\" ;/name = \"\\1%s\" ;/' \
      ../src/lib_shell/distributed_db_message.ml"
     date
 
-let _ =
-  Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed))
+let () =
+  Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed) >>= fun _ ->
+                Lwt_unix.unlink "../src/lib_shell/distributed_db_message.ml.old")

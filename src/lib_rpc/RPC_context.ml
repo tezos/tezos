@@ -180,8 +180,8 @@ let () =
     (obj2
        (req "method" RPC_service.meth_encoding)
        (req "uri" uri_encoding))
-    ~pp:(fun ppf (_meth, _uri) ->
-        Format.fprintf ppf "Did not find service")
+    ~pp:(fun ppf (meth, uri) ->
+        Format.fprintf ppf "Did not find service: %s %a" (RPC_service.string_of_meth meth) Uri.pp_hum uri)
     (function Not_found { meth ; uri } -> Some (meth, uri)
             | _ -> None)
     (fun (meth, uri) -> Not_found { meth ; uri })

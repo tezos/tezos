@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -69,8 +70,8 @@ let get_manager_operation_gas_and_fee contents =
 
 type fee_parameter = {
   minimal_fees: Tez.t ;
-  minimal_picotez_per_byte: Z.t ;
-  minimal_picotez_per_gas_unit: Z.t ;
+  minimal_nanotez_per_byte: Z.t ;
+  minimal_nanotez_per_gas_unit: Z.t ;
   force_low_fee: bool ;
   fee_cap: Tez.t ;
   burn_cap: Tez.t ;
@@ -78,8 +79,8 @@ type fee_parameter = {
 
 let dummy_fee_parameter = {
   minimal_fees = Tez.zero ;
-  minimal_picotez_per_byte = Z.zero ;
-  minimal_picotez_per_gas_unit = Z.zero ;
+  minimal_nanotez_per_byte = Z.zero ;
+  minimal_nanotez_per_gas_unit = Z.zero ;
   force_low_fee = false ;
   fee_cap = Tez.one ;
   burn_cap = Tez.zero ;
@@ -99,24 +100,24 @@ let check_fees
             Tez.pp fee >>= fun () ->
           exit 1
         else begin (* *)
-          let fees_in_picotez =
+          let fees_in_nanotez =
             Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000) in
-          let minimal_fees_in_picotez =
+          let minimal_fees_in_nanotez =
             Z.mul (Z.of_int64 (Tez.to_mutez config.minimal_fees)) (Z.of_int 1000) in
-          let minimal_fees_for_gas_in_picotez =
-            Z.mul config.minimal_picotez_per_gas_unit gas in
-          let minimal_fees_for_size_in_picotez =
-            Z.mul config.minimal_picotez_per_byte (Z.of_int size) in
-          let estimated_fees_in_picotez =
+          let minimal_fees_for_gas_in_nanotez =
+            Z.mul config.minimal_nanotez_per_gas_unit gas in
+          let minimal_fees_for_size_in_nanotez =
+            Z.mul config.minimal_nanotez_per_byte (Z.of_int size) in
+          let estimated_fees_in_nanotez =
             Z.add
-              minimal_fees_in_picotez
-              (Z.add minimal_fees_for_gas_in_picotez minimal_fees_for_size_in_picotez) in
+              minimal_fees_in_nanotez
+              (Z.add minimal_fees_for_gas_in_nanotez minimal_fees_for_size_in_nanotez) in
           let estimated_fees =
-            match Tez.of_mutez (Z.to_int64 (Z.div (Z.add (Z.of_int 999) estimated_fees_in_picotez) (Z.of_int 1000))) with
+            match Tez.of_mutez (Z.to_int64 (Z.div (Z.add (Z.of_int 999) estimated_fees_in_nanotez) (Z.of_int 1000))) with
             | None -> assert false
             | Some fee -> fee in
           if not config.force_low_fee &&
-             Z.compare fees_in_picotez estimated_fees_in_picotez < 0 then begin
+             Z.compare fees_in_nanotez estimated_fees_in_nanotez < 0 then begin
             cctxt#error "The proposed fee (%s%a) are lower than the fee that baker \
                          expect by default (%s%a).@\n\
                         \ Use `--force-low-fee` to emit this operation anyway."
@@ -384,9 +385,45 @@ let may_patch_limits
         | Some c, Some rest -> Some (Cons (c, rest))
       end in
 
+  let rec patch_fee :
+    type kind. bool -> kind contents -> kind contents = fun first -> function
+    | Manager_operation c as op ->
+        let gas_limit = c.gas_limit in
+        let size =
+          if first then
+            Data_encoding.Binary.fixed_length_exn
+              Tezos_base.Operation.shell_header_encoding +
+            Data_encoding.Binary.length
+              Operation.contents_encoding
+              (Contents op) +
+            Signature.size
+          else
+            Data_encoding.Binary.length
+              Operation.contents_encoding
+              (Contents op)
+        in
+        let minimal_fees_in_nanotez =
+          Z.mul (Z.of_int64 (Tez.to_mutez fee_parameter.minimal_fees)) (Z.of_int 1000) in
+        let minimal_fees_for_gas_in_nanotez =
+          Z.mul fee_parameter.minimal_nanotez_per_gas_unit gas_limit in
+        let minimal_fees_for_size_in_nanotez =
+          Z.mul fee_parameter.minimal_nanotez_per_byte (Z.of_int size) in
+        let fees_in_nanotez =
+          Z.add minimal_fees_in_nanotez @@
+          Z.add minimal_fees_for_gas_in_nanotez minimal_fees_for_size_in_nanotez in
+        begin match Tez.of_mutez (Z.to_int64 (Z.div (Z.add (Z.of_int 999) fees_in_nanotez) (Z.of_int 1000))) with
+          | None -> assert false
+          | Some fee ->
+              if fee <= c.fee then
+                op
+              else
+                patch_fee first (Manager_operation { c with fee })
+        end
+    | c -> c in
+
   let patch :
     type kind. bool -> kind contents * kind contents_result -> kind contents tzresult Lwt.t = fun first -> function
-    | Manager_operation c as op, (Manager_operation_result _ as result) ->
+    | Manager_operation c, (Manager_operation_result _ as result) ->
         begin
           if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
             Lwt.return (estimated_gas_single result) >>=? fun gas ->
@@ -417,37 +454,11 @@ let may_patch_limits
             end
           else return c.storage_limit
         end >>=? fun storage_limit ->
-        begin
-          if compute_fee then
-            let size =
-              if first then
-                Data_encoding.Binary.fixed_length_exn
-                  Tezos_base.Operation.shell_header_encoding +
-                Data_encoding.Binary.length
-                  Operation.contents_encoding
-                  (Contents op) +
-                Signature.size
-              else
-                Data_encoding.Binary.length
-                  Operation.contents_encoding
-                  (Contents op)
-            in
-            let minimal_fees_in_picotez =
-              Z.mul (Z.of_int64 (Tez.to_mutez fee_parameter.minimal_fees)) (Z.of_int 1000) in
-            let minimal_fees_for_gas_in_picotez =
-              Z.mul fee_parameter.minimal_picotez_per_gas_unit gas_limit in
-            let minimal_fees_for_size_in_picotez =
-              Z.mul fee_parameter.minimal_picotez_per_byte (Z.of_int size) in
-            let fees_in_picotez =
-              Z.add minimal_fees_in_picotez @@
-              Z.add minimal_fees_for_gas_in_picotez minimal_fees_for_size_in_picotez in
-            match Tez.of_mutez (Z.to_int64 (Z.div (Z.add (Z.of_int 999) fees_in_picotez) (Z.of_int 1000))) with
-            | None -> assert false
-            | Some fee -> return fee
-          else
-            return c.fee
-        end >>=? fun fee ->
-        return (Manager_operation { c with gas_limit ; storage_limit ; fee })
+        let c = Manager_operation { c with gas_limit ; storage_limit } in
+        if compute_fee then
+          return (patch_fee first c)
+        else
+          return c
     | (c, _) -> return c in
   let rec patch_list :
     type kind. bool -> kind contents_and_result_list -> kind contents_list tzresult Lwt.t =
@@ -523,7 +534,7 @@ let inject_operation
     let oph = Operation_hash.hash_bytes [bytes] in
     cctxt#message
       "@[<v 0>Operation: 0x%a@,\
-       Operation hash: %a@]"
+       Operation hash is '%a'@]"
       MBytes.pp_hex bytes
       Operation_hash.pp oph >>= fun () ->
     cctxt#message
@@ -534,7 +545,7 @@ let inject_operation
   else
     Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
     cctxt#message "Operation successfully injected in the node." >>= fun () ->
-    cctxt#message "Operation hash: %a" Operation_hash.pp oph >>= fun () ->
+    cctxt#message "Operation hash is '%a'" Operation_hash.pp oph >>= fun () ->
     begin
       match confirmations with
       | None ->

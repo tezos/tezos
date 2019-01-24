@@ -50,8 +50,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Tezos'
-copyright = '2017, Dynamic Ledger Solutions, Inc. <contact@tezos.com>'
-author = 'Dynamic Ledger Solutions, Inc. <contact@tezos.com>'
+copyright = '2018, Nomadic Labs <contact@nomadic-labs.com>'
+author = 'Nomadic Labs <contact@nomadic-labs.com>'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -151,7 +151,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'Tezos.tex', 'Tezos Documentation',
-     'Dynamic Ledger Solutions, Inc. \\textless{}contact@tezos.com\\textgreater{}', 'manual'),
+     'Nomadic Labs \\textless{}contact@nomadic-labs.com\\textgreater{}', 'manual'),
 ]
 
 

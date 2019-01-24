@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -84,7 +85,8 @@ module type T = sig
   val validation_result: types_state -> error Preapply_result.t
 
   val fitness: unit -> Fitness.t Lwt.t
-  val worker: worker Lwt.t
+  val initialization_errors: unit tzresult Lwt.t
+  val worker: worker Lazy.t
 
 end
 
@@ -470,7 +472,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
                  (fun (hash, op) -> (hash, map_op op))
                  (List.rev pv.applied) ;
              refused =
-               Operation_hash.Map.map map_op_error pv.branch_refusals ;
+               Operation_hash.Map.map map_op_error pv.refusals ;
              branch_refused =
                Operation_hash.Map.map map_op_error pv.branch_refusals ;
              branch_delayed =
@@ -510,11 +512,11 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
           let current_mempool = ref (Some current_mempool) in
           let filter_result = function
             | `Applied -> params#applied
-            | `Refused -> params#branch_refused
-            | `Branch_refused -> params#refused
+            | `Refused -> params#refused
+            | `Branch_refused -> params#branch_refused
             | `Branch_delayed -> params#branch_delayed
           in
-          let next () =
+          let rec next () =
             match !current_mempool with
             | Some mempool -> begin
                 current_mempool := None ;
@@ -532,7 +534,8 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
                         Proto.operation_data_encoding
                         bytes in
                     Lwt.return_some [ { Proto.shell ; protocol_data } ]
-                | _ -> Lwt.return_none
+                | Some _ -> next ()
+                | None -> Lwt.return_none
               end
           in
           let shutdown () = Lwt_watcher.shutdown stopper in
@@ -690,7 +693,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       List.iter
         (fun oph -> Lwt.ignore_result (fetch_operation w pv oph))
         mempool.known_valid ;
-      Lwt.return pv
+      return pv
 
     let on_error w r st errs =
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
@@ -712,14 +715,23 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
    * functor (and thus a single worker for the single instantiaion of Worker).
    * Whislt this is somewhat abusing the intended purpose of worker, it is part
    * of a transition plan to a one-worker-per-peer architecture. *)
-  let worker =
+  let worker_promise =
     Worker.launch table Arg.limits.worker_limits
       name
       (Arg.limits, Arg.chain_db)
       (module Handlers)
 
+  let initialization_errors =
+    worker_promise >>=? fun _ -> return_unit
+
+  let worker = lazy begin
+    match Lwt.state worker_promise with
+    | Lwt.Return (Ok worker) -> worker
+    | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> assert false
+  end
+
   let fitness () =
-    worker >>= fun w ->
+    let w = Lazy.force worker in
     let pv = Worker.state w in
     begin
       Lwt.return pv.validation_state >>=? fun state ->
@@ -756,43 +768,40 @@ let create limits (module Proto: Registered_protocol.T) chain_db =
           let chain_db = chain_db
           let chain_id = chain_id
         end) in
-      Prevalidator.worker >>= fun _ ->
+      (* Checking initialization errors before giving a reference to dnagerous
+       * `worker` value to caller. *)
+      Prevalidator.initialization_errors >>=? fun () ->
       ChainProto_registry.register Prevalidator.name (module Prevalidator: T);
-      Lwt.return (module Prevalidator: T)
+      return (module Prevalidator: T)
   | Some p ->
-      Lwt.return p
+      return p
 
 let shutdown (t:t) =
   let module Prevalidator: T = (val t) in
-  Prevalidator.worker >>= fun w ->
+  let w = Lazy.force Prevalidator.worker in
   ChainProto_registry.remove Prevalidator.name;
   Prevalidator.Worker.shutdown w
 
 let flush (t:t) head =
   let module Prevalidator: T = (val t) in
-  Prevalidator.worker >>= fun w ->
+  let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.push_request_and_wait w (Request.Flush head)
 
 let notify_operations (t:t) peer mempool =
   let module Prevalidator: T = (val t) in
-  Prevalidator.worker >>= fun w ->
+  let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.push_request w (Request.Notify (peer, mempool))
 
 let operations (t:t) =
   let module Prevalidator: T = (val t) in
-  match Lwt.state Prevalidator.worker with
-  | Lwt.Fail _ | Lwt.Sleep ->
-      (* FIXME: this shouldn't happen at all, here we return a safe value *)
-      (Preapply_result.empty, Operation_hash.Map.empty)
-  | Lwt.Return w ->
-      let pv = Prevalidator.Worker.state w in
-      ({ (Prevalidator.validation_result pv) with
-         applied = List.rev pv.applied },
-       pv.pending)
+  let w = Lazy.force Prevalidator.worker in
+  let pv = Prevalidator.Worker.state w in
+  ({ (Prevalidator.validation_result pv) with applied = List.rev pv.applied },
+   pv.pending)
 
 let pending ?block (t:t) =
   let module Prevalidator: T = (val t) in
-  Prevalidator.worker >>= fun w ->
+  let w = Lazy.force Prevalidator.worker in
   let pv = Prevalidator.Worker.state w in
   let ops = Preapply_result.operations (Prevalidator.validation_result pv) in
   match block with
@@ -804,9 +813,9 @@ let pending ?block (t:t) =
 
 let timestamp (t:t) =
   let module Prevalidator: T = (val t) in
-  Prevalidator.worker >>= fun w ->
+  let w = Lazy.force Prevalidator.worker in
   let pv = Prevalidator.Worker.state w in
-  Lwt.return pv.timestamp
+  pv.timestamp
 
 let fitness (t:t) =
   let module Prevalidator: T = (val t) in
@@ -814,13 +823,13 @@ let fitness (t:t) =
 
 let inject_operation (t:t) op =
   let module Prevalidator: T = (val t) in
-  Prevalidator.worker >>= fun w ->
+  let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.push_request_and_wait w (Inject op)
 
 let status (t:t) =
   let module Prevalidator: T = (val t) in
-  Prevalidator.worker >>= fun w ->
-  Lwt.return (Prevalidator.Worker.status w)
+  let w = Lazy.force Prevalidator.worker in
+  Prevalidator.Worker.status w
 
 let running_workers () =
   ChainProto_registry.fold
@@ -829,27 +838,18 @@ let running_workers () =
 
 let pending_requests (t:t) =
   let module Prevalidator: T = (val t) in
-  match Lwt.state Prevalidator.worker with
-  | Lwt.Fail _ | Lwt.Sleep ->
-      (* FIXME: this shouldn't happen at all, here we return a safe value *)
-      []
-  | Lwt.Return w -> Prevalidator.Worker.pending_requests w
+  let w = Lazy.force Prevalidator.worker in
+  Prevalidator.Worker.pending_requests w
 
 let current_request (t:t) =
   let module Prevalidator: T = (val t) in
-  match Lwt.state Prevalidator.worker with
-  | Lwt.Fail _ | Lwt.Sleep ->
-      (* FIXME: this shouldn't happen at all, here we return a safe value *)
-      None
-  | Lwt.Return w -> Prevalidator.Worker.current_request w
+  let w = Lazy.force Prevalidator.worker in
+  Prevalidator.Worker.current_request w
 
 let last_events (t:t) =
   let module Prevalidator: T = (val t) in
-  match Lwt.state Prevalidator.worker with
-  | Lwt.Fail _ | Lwt.Sleep ->
-      (* FIXME: this shouldn't happen at all, here we return a safe value *)
-      []
-  | Lwt.Return w -> Prevalidator.Worker.last_events w
+  let w = Lazy.force Prevalidator.worker in
+  Prevalidator.Worker.last_events w
 
 let protocol_hash (t:t) =
   let module Prevalidator: T = (val t) in
@@ -882,7 +882,11 @@ let rpc_directory  : t option RPC_directory.t =
           Lwt.return (RPC_directory.map (fun _ -> Lwt.return_unit) empty_rpc_directory)
       | Some t ->
           let module Prevalidator: T = (val t: T) in
-          Prevalidator.worker >>= fun w ->
-          let pv = Prevalidator.Worker.state w in
-          let pv_rpc_dir = Lazy.force pv.rpc_directory in
-          Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))
+          Prevalidator.initialization_errors >>= function
+          | Error _ ->
+              Lwt.return (RPC_directory.map (fun _ -> Lwt.return_unit) empty_rpc_directory)
+          | Ok () ->
+              let w = Lazy.force Prevalidator.worker in
+              let pv = Prevalidator.Worker.state w in
+              let pv_rpc_dir = Lazy.force pv.rpc_directory in
+              Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))

@@ -57,15 +57,15 @@ module High_watermark = struct
         let chain_id = Chain_id.of_bytes_exn (MBytes.sub bytes 1 4) in
         let level = get_level () in
         begin match List.assoc_opt chain_id all with
-          | None -> return None
+          | None -> return_none
           | Some marks ->
               match List.assoc_opt pkh marks with
-              | None -> return None
+              | None -> return_none
               | Some (previous_level, _, None) ->
                   if previous_level >= level then
                     failwith "%s level %ld not above high watermark %ld" name level previous_level
                   else
-                    return None
+                    return_none
               | Some (previous_level, previous_hash, Some signature) ->
                   if previous_level > level then
                     failwith "%s level %ld below high watermark %ld" name level previous_level
@@ -73,7 +73,7 @@ module High_watermark = struct
                     if previous_hash <> hash then
                       failwith "%s level %ld already signed with different data" name level
                     else
-                      return (Some signature)
+                      return_some signature
                   else return_none
         end >>=? function
         | Some signature -> return signature
