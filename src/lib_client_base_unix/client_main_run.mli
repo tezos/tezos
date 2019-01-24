@@ -24,6 +24,10 @@
 (*****************************************************************************)
 
 module type M =
+(* This module type lists the parameters you can give to the function [run]
+   defined below; most calls use and will use the default value for this module
+   type, which is module [Client_config] (client_config.ml).
+   Another instance of this module type is in main_signer.ml *)
 sig
   type t
   val global_options :
