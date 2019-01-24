@@ -533,9 +533,8 @@ let other_registrations : (_ -> (module Remote_params) -> _) option  =
                end))
         ))
 
-
-type 'a c = Tezos_client_base.Client_context.full Clic.command
-
 let clic_commands ~base_dir:_ ~config_commands ~builtin_commands
     ~other_commands ~require_auth:_ =
   config_commands @ builtin_commands @ other_commands
+
+let logger = None

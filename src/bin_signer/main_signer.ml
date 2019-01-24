@@ -331,16 +331,14 @@ struct
   let default_base_dir = default_base_dir
   let other_registrations = None
 
-  type 'a c = Tezos_client_base.Client_context.full Clic.command
-
   let clic_commands ~base_dir ~config_commands:_ ~builtin_commands:_
       ~other_commands ~require_auth =
     commands base_dir require_auth @ other_commands
+
+  let logger = Some (RPC_client.full_logger Format.err_formatter)
 end
 
 let () =
   Client_main_run.run
     (module C)
     ~select_commands:(fun _ _ -> return [])
-    ~logger:(RPC_client.full_logger Format.err_formatter)
-    ()

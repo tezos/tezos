@@ -37,15 +37,14 @@ sig
   val other_registrations :
     (Client_config.Cfg_file.t -> (module Client_config.Remote_params) -> unit)
       option
-  type 'a c = Tezos_client_base.Client_context.full Clic.command
   val clic_commands :
     base_dir:string ->
-    config_commands:'a c list ->
-    builtin_commands:'a c list ->
-    other_commands:'a c list ->
+    config_commands:Tezos_client_base.Client_context.full Clic.command list ->
+    builtin_commands:Tezos_client_base.Client_context.full Clic.command list ->
+    other_commands:Tezos_client_base.Client_context.full Clic.command list ->
     require_auth:bool ->
-    'a c list
-
+    Tezos_client_base.Client_context.full Clic.command list
+  val logger : RPC_client.logger option
 end
 
 val run :
@@ -54,6 +53,4 @@ val run :
     (RPC_client.http_ctxt ->
      Client_config.cli_args ->
      Client_context.full Clic.command list tzresult Lwt.t) ->
-  ?logger:RPC_client.logger ->
-  unit ->
   unit

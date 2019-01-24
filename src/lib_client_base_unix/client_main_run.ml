@@ -57,14 +57,14 @@ sig
   val other_registrations :
     (Client_config.Cfg_file.t -> (module Client_config.Remote_params) -> unit)
       option
-  type 'a c = Tezos_client_base.Client_context.full Clic.command
   val clic_commands :
     base_dir:string ->
-    config_commands:'a c list ->
-    builtin_commands:'a c list ->
-    other_commands:'a c list ->
+    config_commands:Tezos_client_base.Client_context.full Clic.command list ->
+    builtin_commands:Tezos_client_base.Client_context.full Clic.command list ->
+    other_commands:Tezos_client_base.Client_context.full Clic.command list ->
     require_auth:bool ->
-    'a c list
+    Tezos_client_base.Client_context.full Clic.command list
+  val logger : RPC_client.logger option
 end
 
 
@@ -72,9 +72,6 @@ end
 let main
     (module C: M)
     ~select_commands
-    ?logger
-    ?(other_registrations = fun _ (module Remote_params: Client_config.Remote_params) -> ())
-    ()
   =
   let global_options = C.global_options () in
   let executable_name = Filename.basename Sys.executable_name in
@@ -166,9 +163,9 @@ let main
                     "remote signer expects authentication signature, \
                      but no authorized key was found in the wallet"
         let logger =
-          (* overriding the logger we might already have with the one given
-             as argument *)
-          match logger with Some logger -> logger | None -> rpc_config.logger
+          (* overriding the logger we might already have with the one from
+             module C *)
+          match C.logger with Some logger -> logger | None -> rpc_config.logger
       end in
       let module Http = Tezos_signer_backends.Http.Make(Remote_params) in
       let module Https = Tezos_signer_backends.Https.Make(Remote_params) in
@@ -185,9 +182,12 @@ let main
       Client_keys.register_signer (module Https) ;
       begin
         match parsed_config_file with
-        | Some parsed_config_file ->
-            other_registrations parsed_config_file (module Remote_params)
         | None -> ()
+        | Some parsed_config_file ->
+            match C.other_registrations with
+            | Some r ->
+                r parsed_config_file (module Remote_params)
+            | None -> ()
       end ;
       begin
         (match parsed_args with
@@ -266,16 +266,11 @@ let run
         (RPC_client.http_ctxt ->
          Client_config.cli_args ->
          Client_context.full Clic.command list tzresult Lwt.t))
-    ?logger
-    ()
   =
   Pervasives.exit
     (Lwt_main.run
        (main
           (module M)
           ~select_commands
-          ?logger
-          ?other_registrations:M.other_registrations
-          ()
        )
     )

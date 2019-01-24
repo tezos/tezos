@@ -32,4 +32,4 @@ let select_commands _ _ =
          Client_protocols_commands.commands () ;
          Client_rpc_commands.commands ])
 
-let () = Client_main_run.run (module Client_config) ~select_commands ()
+let () = Client_main_run.run (module Client_config) ~select_commands
