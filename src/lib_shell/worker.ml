@@ -491,7 +491,9 @@ module Make
       | Ok () ->
           loop ()
       | Error [Canceled | Exn Lwt_pipe.Closed | Exn Lwt_dropbox.Closed ] ->
-          Logger.lwt_log_notice "@[Worker terminated [%a] @]" Name.pp w.name  >>= fun () ->
+          Logger.lwt_log_notice
+            "@[Worker terminated [%a] @]"
+            Name.pp w.name  >>= fun () ->
           do_close None
       | Error errs ->
           begin match w.current_request with
@@ -505,11 +507,14 @@ module Make
           | Ok () ->
               loop ()
           | Error ([Timeout] as errs) ->
-              Logger.lwt_log_notice "Worker terminated with timeout" >>= fun () ->
+              Logger.lwt_log_notice
+                "@[Worker terminated with timeout [%a] @]"
+                Name.pp w.name  >>= fun () ->
               do_close (Some errs)
           | Error errs ->
               Logger.lwt_log_error
-                "@[<v 0>Worker crashed:@,%a@]"
+                "@[<v 0>Worker crashed [%a]:@,%a@]"
+                Name.pp w.name
                 (Format.pp_print_list Error_monad.pp) errs >>= fun () ->
               do_close (Some errs) in
     loop ()
