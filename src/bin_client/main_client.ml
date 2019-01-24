@@ -128,10 +128,7 @@ let select_commands ctxt { block ; protocol } =
   get_commands_for_version ctxt network block protocol >>|? fun (_, commands_for_version)  ->
   Client_rpc_commands.commands @
   Tezos_signer_backends.Ledger.commands () @
-  List.map
-    (Clic.map_command
-       (fun (o : Client_context.full) -> o))
-    (Client_keys_commands.commands network) @
+  Client_keys_commands.commands network @
   Client_helpers_commands.commands () @
   commands_for_version
 
