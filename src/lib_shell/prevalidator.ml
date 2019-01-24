@@ -591,6 +591,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         ~from_block:pv.predecessor ~to_block:predecessor
         ~live_blocks:new_live_blocks
         (Preapply_result.operations (validation_result pv)) >>= fun pending ->
+
       let timestamp = Time.now () in
       Prevalidation.create ~predecessor ~timestamp () >>= fun validation_state ->
       debug w "%d operations were not washed by the flush"

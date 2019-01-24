@@ -1479,14 +1479,37 @@ let check_and_save_partial_mode
     ~previous
     ~now
     global_store
+    state
   =
   let open Partial_mode in
   match (previous, now) with
+  | (Light, Light) | (Full, Full) | (Zero, Zero) ->
+      return_unit
   | (Light, Full) | (Zero, Full) | (Zero, Light) ->
       fail Wrong_coercion_partial_mode
-  | (_, partial_mode) ->
+  | (Full, Light) ->
       Store.Configuration.Partial_mode.store
-        global_store partial_mode >>= fun () ->
+        global_store Light >>= fun () ->
+      Chain.all state >>= fun chains ->
+      iter_s (fun chain_state ->
+          Chain.checkpoint chain_state >>= fun checkpoint ->
+          let lvl = checkpoint.shell.level in
+          let hash = Block_header.hash checkpoint in
+          Chain.purge_light chain_state (lvl, hash) >>= fun () ->
+          return_unit
+        ) chains >>=? fun () ->
+      return_unit
+  | (Light, Zero) | (Full, Zero) ->
+      Store.Configuration.Partial_mode.store
+        global_store Zero >>= fun () ->
+      Chain.all state >>= fun chains ->
+      iter_s (fun chain_state ->
+          Chain.checkpoint chain_state >>= fun checkpoint ->
+          let lvl = checkpoint.shell.level in
+          let hash = Block_header.hash checkpoint in
+          Chain.purge_zero chain_state (lvl, hash) >>= fun () ->
+          return_unit
+        ) chains >>=? fun () ->
       return_unit
 
 let init
@@ -1508,7 +1531,7 @@ let init
     | None -> Lwt.return Partial_mode.Full
     | Some p_mode -> Lwt.return p_mode end >>= fun previous_partial_mode ->
   check_and_save_partial_mode ~previous:previous_partial_mode ~now:partial_mode
-    global_store >>=? fun () ->
+    global_store state >>=? fun () ->
   return (state, main_chain_state, context_index)
 
 let close { global_data } =
