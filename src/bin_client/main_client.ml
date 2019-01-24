@@ -132,4 +132,4 @@ let select_commands ctxt { block ; protocol } =
   Client_helpers_commands.commands () @
   commands_for_version
 
-let () = Client_main_run.run (module Client_config) ~select_commands ()
+let () = Client_main_run.run (module Client_config) ~select_commands
