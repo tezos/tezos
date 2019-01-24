@@ -52,6 +52,7 @@ type t = {
   rpc_tls: Node_config_file.tls option ;
   log_output: Logging_unix.Output.t option ;
   bootstrap_threshold: int option ;
+  partial_mode: Node.partial_mode option ;
 }
 
 let wrap
@@ -61,7 +62,7 @@ let wrap
     listen_addr discovery_addr peers no_bootstrap_peers
     bootstrap_threshold private_mode disable_mempool
     expected_pow rpc_listen_addr rpc_tls
-    cors_origins cors_headers log_output =
+    cors_origins cors_headers log_output partial_mode =
 
   let actual_data_dir =
     Option.unopt ~default:Node_config_file.default_data_dir data_dir in
@@ -113,6 +114,7 @@ let wrap
     log_output ;
     peer_table_size ;
     bootstrap_threshold ;
+    partial_mode ;
   }
 
 module Manpage = struct
@@ -287,6 +289,29 @@ module Term = struct
     Arg.(value & opt_all string [] &
          info ~docs ~doc ~docv:"HEADER" ["cors-header"])
 
+  (* Partial mode. *)
+
+  let partial_mode_converter =
+    let open Partial_mode in
+    let conv s = match s with
+      | "full" -> `Ok Full
+      | "light" -> `Ok Light
+      | "zero" -> `Ok Zero
+      | s -> `Error s in
+    let to_string = function
+      | Full -> "full"
+      | Light -> "light"
+      | Zero -> "zero" in
+    let pp fmt mode = Format.fprintf fmt "%s" (to_string mode) in
+    (conv, pp)
+
+  let partial_mode =
+    let doc = "Partial mode." in
+    Arg.(value & opt (some partial_mode_converter) None &
+         info ~docs ~doc ~docv:"Partial mode" ["partial-mode"])
+
+  (* Args. *)
+
   let args =
     let open Term in
     const wrap $ data_dir $ config_file
@@ -299,6 +324,7 @@ module Term = struct
     $ expected_pow $ rpc_listen_addr $ rpc_tls
     $ cors_origins $ cors_headers
     $ log_output
+    $ partial_mode
 
 end
 
@@ -322,6 +348,7 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         cors_origins ; cors_headers ;
         log_output ;
         bootstrap_threshold ;
+        partial_mode ;
       } = args in
   let bootstrap_peers =
     if no_bootstrap_peers || ignore_bootstrap_peers
@@ -336,4 +363,4 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
     ?peer_table_size ?expected_pow
     ~bootstrap_peers ?listen_addr ?discovery_addr ?rpc_listen_addr ~private_mode
     ~disable_mempool ~cors_origins ~cors_headers ?rpc_tls ?log_output
-    ?bootstrap_threshold cfg
+    ?bootstrap_threshold ?partial_mode cfg

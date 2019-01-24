@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019 Nomadic Labs. <contact@tezcore.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,43 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  data_dir: string option ;
-  config_file: string ;
-  min_connections: int option ;
-  expected_connections: int option ;
-  max_connections: int option ;
-  max_download_speed: int option ;
-  max_upload_speed: int option ;
-  binary_chunks_size: int option ;
-  peer_table_size: int option ;
-  expected_pow: float option ;
-  peers: string list ;
-  no_bootstrap_peers: bool ;
-  listen_addr: string option ;
-  discovery_addr: string option ;
-  rpc_listen_addr: string option ;
-  private_mode: bool ;
-  disable_mempool: bool ;
-  cors_origins: string list ;
-  cors_headers: string list ;
-  rpc_tls: Node_config_file.tls option ;
-  log_output: Logging_unix.Output.t option ;
-  bootstrap_threshold: int option ;
-  partial_mode: Partial_mode.t option ;
-}
+type t =
+  | Full
+  | Light
+  | Zero
 
-module Term : sig
-  val args: t Cmdliner.Term.t
-  val data_dir: string option Cmdliner.Term.t
-  val config_file: string option Cmdliner.Term.t
-end
+let encoding = Data_encoding.string_enum
+    [ ("full", Full) ;
+      ("light", Light) ;
+      ("zero", Zero) ;
+    ]
 
-val read_and_patch_config_file: ?ignore_bootstrap_peers:bool -> t -> Node_config_file.t tzresult Lwt.t
+let equal = function
+  | (Full, Full)
+  | (Light, Light)
+  | (Zero, Zero) -> true
+  | _ -> false
 
-module Manpage : sig
-  val misc_section: string
-  val args: Cmdliner.Manpage.block list
-  val bugs: Cmdliner.Manpage.block list
-end
-
+let pp ppf = function
+  | Full -> Format.fprintf ppf "full"
+  | Light -> Format.fprintf ppf "light"
+  | Zero -> Format.fprintf ppf "zero"

@@ -49,12 +49,16 @@ val estimated_length: seed -> t -> int
     represented by [locator] using [seed]. *)
 
 val compute:
-  predecessor: (Block_hash.t -> int -> Block_hash.t option Lwt.t) ->
-  genesis:Block_hash.t ->
-  Block_hash.t -> Block_header.t -> seed -> size:int -> t Lwt.t
-(** [compute block seed max_length] compute the sparse block locator using
-    [seed] to compute random jumps for the [block]. The locator contains at
-    most [max_length] elements. *)
+  get_predecessor: (Block_hash.t -> int -> Block_hash.t option Lwt.t) ->
+  rock_bottom:Block_hash.t -> size:int -> Block_hash.t -> Block_header.t ->
+  seed -> t Lwt.t
+(** [compute ~get_predecessor ~genesis ~save_point ~rock_bottom
+    ~size block_hash header seed] returns the sparse block locator
+    using [seed] to compute random jumps for the [block_hash] together
+    with the [header], adding the [rock_bottom] at the end of the sparse block
+    if the chain has already been pruned.
+    The locator contains at most [size + 1] elements, including the
+    rock_bottom. *)
 
 type step = {
   block: Block_hash.t ;
@@ -74,6 +78,9 @@ val to_steps: seed -> t -> step list
     first step will be `genesis`).
     All steps contains [strict_step = true], except the oldest one. *)
 
+val to_steps_truncate: limit:int -> last_pred:Block_hash.t ->
+  seed -> t -> step list
+
 type validity =
   | Unknown
   | Known_valid
@@ -81,7 +88,7 @@ type validity =
 
 val unknown_prefix:
   is_known:(Block_hash.t -> validity Lwt.t) ->
-  t -> (Block_hash.t * t) option Lwt.t
+  t -> [> `Ok of Block_hash.t * t | `Invalid | `Unknown ] Lwt.t
 (** [unknown_prefix validity locator] keeps only the unknown part of
     the locator up to the first valid block. If there is no known valid
     block or there is a known invalid one, None is returned. *)

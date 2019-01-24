@@ -126,7 +126,7 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
     Chain_traversal.live_blocks
       predecessor
       (State.Block.max_operations_ttl predecessor)
-    >>= fun (live_blocks, live_operations) ->
+    >>=? fun (live_blocks, live_operations) ->
     Context.reset_test_chain
       predecessor_context predecessor_hash
       timestamp >>= fun predecessor_context ->

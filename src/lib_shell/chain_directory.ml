@@ -41,6 +41,11 @@ let get_chain state chain =
   get_chain_id state chain >>= fun chain_id ->
   State.Chain.get_exn state chain_id
 
+let get_checkpoint state (chain : Chain_services.chain) =
+  get_chain state chain >>= fun chain ->
+  State.Chain.checkpoint chain >>= fun header ->
+  Lwt.return (Block_header.hash header)
+
 let predecessors ignored length head =
   let rec loop acc length block =
     if length <= 0 then

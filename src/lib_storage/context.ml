@@ -440,7 +440,6 @@ let init ?patch_context ?mapsize ?readonly root =
 
 let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
-
 let commit_genesis index ~chain_id ~time ~protocol =
   let tree = GitStore.Tree.empty in
   let ctxt = { index ; tree ; parents = [] } in

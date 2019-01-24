@@ -29,8 +29,8 @@
 
     - the index of validation contexts; and
     - the persistent state of the node:
-      - the blockchain and its alternate heads ;
-      - the pool of pending operations of a chain. *)
+    - the blockchain and its alternate heads ;
+    - the pool of pending operations of a chain. *)
 
 type t
 type global_state = t
@@ -70,6 +70,18 @@ module Chain : sig
   (** Returns all the known chains. *)
   val all: global_state -> chain_state list Lwt.t
 
+  (* (\** [purge_zero chain hash] first prunes all block information, starting
+   *     from the block [b] referenced by the [hash] down to the one indexed by
+   *     level [level(b) - min(max_op_ttl(b), level(b))].
+   *     Then it deletes all block information from the predecessor of this one
+   *     down to the chain's save_point. *\)
+   * val purge_zero: t -> Int32.t * Block_hash.t -> unit Lwt.t
+   *
+   * (\** [purge_light chain hash] prunes all block information, starting
+   *      from the block [b] referenced by the [hash] down to the one indexed by
+   *      chain's save point. *\)
+   * val purge_light: t -> Int32.t * Block_hash.t -> unit Lwt.t *)
+
   (** Destroy a chain: this completly removes from the local storage all
       the data associated to the chain (this includes blocks and
       operations). *)
@@ -89,14 +101,25 @@ module Chain : sig
 
   val checkpoint: chain_state -> Block_header.t Lwt.t
 
+  val save_point: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+  val rock_bottom: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+
+
   (** Update the current checkpoint. The current head should be
       consistent (i.e. it should either have a lower level or pass
       through the checkpoint). In the process all the blocks from
       invalid alternate heads are removed from the disk, either
       completely (when `level <= checkpoint`) or still tagged as
       invalid (when `level > checkpoint`). *)
-  val set_checkpoint:
-    chain_state -> Block_header.t -> unit Lwt.t
+  val set_checkpoint: chain_state -> Block_header.t -> unit Lwt.t
+
+  (** Apply [set_checkpoint] then [purge_light]. *)
+  val set_checkpoint_then_purge_light: chain_state -> Block_header.t ->
+    unit Lwt.t
+
+  (** Apply [set_checkpoint] then [purge_zero]. *)
+  val set_checkpoint_then_purge_zero: chain_state -> Block_header.t ->
+    unit Lwt.t
 
   (** Check that a block is compatible with the current checkpoint.
       This function assumes that the predecessor is known valid. *)
@@ -104,8 +127,7 @@ module Chain : sig
 
 end
 
-(** {2 Block header manipulation} ******************************************)
-
+type error += Missing_block of Block_hash.t
 
 (** {2 Block database} *****************************************************)
 
@@ -128,9 +150,10 @@ module Block : sig
   val list_invalid: Chain.t -> (Block_hash.t * int32 * error list) list Lwt.t
   val unmark_invalid: Chain.t -> Block_hash.t -> unit tzresult Lwt.t
 
-  val read: Chain.t -> ?pred:int -> Block_hash.t -> block tzresult Lwt.t
-  val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block option Lwt.t
-  val read_exn: Chain.t -> ?pred:int -> Block_hash.t -> block Lwt.t
+  val read: Chain.t -> Block_hash.t -> block tzresult Lwt.t
+  val read_opt: Chain.t -> Block_hash.t -> block option Lwt.t
+  val read_exn: Chain.t -> Block_hash.t -> block Lwt.t
+  val read_predecessor: Chain.t -> pred:int -> Block_hash.t -> block option Lwt.t
 
   val store:
     ?dont_enforce_context_hash:bool ->
@@ -156,9 +179,10 @@ module Block : sig
 
     val known: Chain.t -> Block_hash.t -> bool Lwt.t
 
-    val read: Chain.t -> ?pred:int -> Block_hash.t -> block_header tzresult Lwt.t
-    val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block_header option Lwt.t
-    val read_exn: Chain.t -> ?pred:int -> Block_hash.t -> block_header Lwt.t
+    val read: Chain.t -> Block_hash.t -> block_header tzresult Lwt.t
+    val read_opt: Chain.t -> Block_hash.t -> block_header option Lwt.t
+    val read_exn: Chain.t -> Block_hash.t -> block_header Lwt.t
+
     val of_block: block -> block_header
     val to_block: block_header -> block option Lwt.t
 
@@ -224,7 +248,8 @@ module Block : sig
   val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
   val known_ancestor:
-    Chain.t -> Block_locator.t -> (block * Block_locator.t) option Lwt.t
+    Chain.t -> Partial_mode.t -> Block_locator.t ->
+    Block_locator.t option Lwt.t
   (** [known_ancestor chain_state locator] computes the first block of
       [locator] that is known to be a valid block. It also computes the
       'prefix' of [locator] with end at the first valid block.  The
@@ -237,10 +262,10 @@ module Block : sig
 end
 
 val read_block:
-  global_state -> ?pred:int -> Block_hash.t -> Block.t option Lwt.t
+  global_state -> Block_hash.t -> Block.t option Lwt.t
 
 val read_block_exn:
-  global_state -> ?pred:int -> Block_hash.t -> Block.t Lwt.t
+  global_state -> Block_hash.t -> Block.t Lwt.t
 
 val watcher: t -> Block.t Lwt_stream.t * Lwt_watcher.stopper
 
@@ -260,6 +285,8 @@ type chain_data = {
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
   test_chain: Chain_id.t option ;
+  save_point: Int32.t * Block_hash.t ;
+  rock_bottom: Int32.t * Block_hash.t ;
 }
 
 val read_chain_data:
@@ -326,6 +353,7 @@ val init:
   ?context_mapsize:int64 ->
   store_root:string ->
   context_root:string ->
+  partial_mode:Partial_mode.t ->
   Chain.genesis ->
   (global_state * Chain.t * Context.index) tzresult Lwt.t
 

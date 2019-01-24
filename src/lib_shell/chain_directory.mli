@@ -26,6 +26,9 @@
 val get_chain_id: State.t -> Chain_services.chain -> Chain_id.t Lwt.t
 val get_chain: State.t -> Chain_services.chain -> State.Chain.t Lwt.t
 
+val get_checkpoint: State.t -> Chain_services.chain ->
+  Block_hash.t Lwt.t
+
 val rpc_directory: State.Chain.t RPC_directory.t
 
 val build_rpc_directory: Validator.t -> unit RPC_directory.t

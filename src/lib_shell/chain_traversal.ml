@@ -139,11 +139,17 @@ let live_blocks block n =
            (fun oacc op -> Operation_hash.Set.add op oacc))
         oacc hashes  in
     let bacc = Block_hash.Set.add (Block.Header.hash block_head) bacc in
-    if n = 0 then Lwt.return (bacc, oacc)
+    if n = 0 then return (bacc, oacc)
     else
-      Block.Header.predecessor block_head >>= function
-      | None -> Lwt.return (bacc, oacc)
-      | Some predecessor -> loop bacc oacc chain_state predecessor (pred n) in
+      State.Block.Header.predecessor block_head >>= function
+      | None ->
+          let genesis_hash = (State.Chain.genesis chain_state).block in
+          let block_hash = Block.Header.hash block_head in
+          if Block_hash.equal genesis_hash block_hash
+          then return (bacc, oacc)
+          else fail (State.Missing_block block_hash)
+      | Some predecessor ->
+          loop bacc oacc chain_state predecessor (pred n) in
   loop
     Block_hash.Set.empty Operation_hash.Set.empty
     (Block.chain_state block) (Block.Header.of_block block)

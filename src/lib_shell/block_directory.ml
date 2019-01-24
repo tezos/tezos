@@ -74,7 +74,7 @@ let build_raw_rpc_directory
     Chain_traversal.live_blocks
       block
       (State.Block.max_operations_ttl block)
-    >>= fun (live_blocks, _) ->
+    >>=? fun (live_blocks, _) ->
     return live_blocks
   end ;
 
@@ -336,15 +336,16 @@ let get_directory block =
 
 let get_block chain_state = function
   | `Genesis ->
-      Chain.genesis chain_state
-  |  `Head n ->
+      Chain.genesis chain_state >>= fun b ->
+      Lwt.return b
+  | `Head n ->
       Chain.head chain_state >>= fun head ->
       if n < 0 then
         Lwt.fail Not_found
       else if n = 0 then
-        Lwt.return head
+        Lwt.return_some head
       else
-        State.Block.read_exn chain_state ~pred:n (State.Block.hash head)
+        State.Block.read_predecessor chain_state ~pred:n (State.Block.hash head)
   | `Hash (hash, n) ->
       if n < 0 then
         State.Block.read_exn chain_state hash >>= fun block ->
@@ -356,19 +357,24 @@ let get_block chain_state = function
         if target < 0 then
           Lwt.fail Not_found
         else
-          State.Block.read_exn chain_state ~pred:target (State.Block.hash head)
+          State.Block.read_predecessor
+            chain_state ~pred:target
+            (State.Block.hash head)
       else
-        State.Block.read_exn chain_state ~pred:n hash
+        State.Block.read_predecessor chain_state ~pred:n hash
   | `Level i ->
       Chain.head chain_state >>= fun head ->
       let target = Int32.(to_int (sub (State.Block.level head) i)) in
       if target < 0 then
         Lwt.fail Not_found
       else
-        State.Block.read_exn chain_state ~pred:target (State.Block.hash head)
+        State.Block.read_predecessor chain_state ~pred:target
+          (State.Block.hash head)
 
 let build_rpc_directory chain_state block =
-  get_block chain_state block >>= fun block ->
-  get_directory block >>= fun dir ->
-  Lwt.return (RPC_directory.map (fun _ -> Lwt.return block) dir)
-
+  get_block chain_state block >>= function
+  | None ->
+      Lwt.fail Not_found
+  | Some block ->
+      get_directory block >>= fun dir ->
+      Lwt.return (RPC_directory.map (fun _ -> Lwt.return block) dir)

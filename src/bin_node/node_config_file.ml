@@ -70,6 +70,7 @@ and shell = {
   prevalidator_limits : Node.prevalidator_limits ;
   peer_validator_limits : Node.peer_validator_limits ;
   chain_validator_limits : Node.chain_validator_limits ;
+  partial_mode : Node.partial_mode ;
 }
 
 let default_p2p_limits : P2p.limits = {
@@ -119,6 +120,7 @@ let default_shell = {
   prevalidator_limits = Node.default_prevalidator_limits ;
   peer_validator_limits = Node.default_peer_validator_limits ;
   chain_validator_limits = Node.default_chain_validator_limits ;
+  partial_mode = Node.default_partial_mode ;
 }
 
 let default_config = {
@@ -436,18 +438,19 @@ let shell =
   let open Data_encoding in
   conv
     (fun { peer_validator_limits ; block_validator_limits ;
-           prevalidator_limits ; chain_validator_limits } ->
+           prevalidator_limits ; chain_validator_limits ; partial_mode } ->
       (peer_validator_limits, block_validator_limits,
-       prevalidator_limits, chain_validator_limits))
+       prevalidator_limits, chain_validator_limits, partial_mode))
     (fun (peer_validator_limits, block_validator_limits,
-          prevalidator_limits, chain_validator_limits) ->
+          prevalidator_limits, chain_validator_limits, partial_mode) ->
       { peer_validator_limits ; block_validator_limits ;
-        prevalidator_limits ; chain_validator_limits })
-    (obj4
+        prevalidator_limits ; chain_validator_limits ; partial_mode })
+    (obj5
        (dft "peer_validator" peer_validator_limits_encoding default_shell.peer_validator_limits)
        (dft "block_validator" block_validator_limits_encoding default_shell.block_validator_limits)
        (dft "prevalidator" prevalidator_limits_encoding default_shell.prevalidator_limits)
        (dft "chain_validator" chain_validator_limits_encoding default_shell.chain_validator_limits)
+       (dft "partial-mode" Partial_mode.encoding default_shell.partial_mode)
     )
 
 let encoding =
@@ -511,6 +514,7 @@ let update
     ?rpc_tls
     ?log_output
     ?bootstrap_threshold
+    ?partial_mode
     cfg = let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size =
@@ -584,7 +588,8 @@ let update
         ~f:(fun bootstrap_threshold ->
             { cfg.shell.chain_validator_limits
               with bootstrap_threshold })
-        bootstrap_threshold
+        bootstrap_threshold ;
+    partial_mode = Option.unopt partial_mode ~default:cfg.shell.partial_mode;
   }
   in
   return { data_dir ; p2p ; rpc ; log ; shell }

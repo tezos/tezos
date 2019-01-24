@@ -55,11 +55,13 @@ and chain_validator_limits = {
   bootstrap_threshold: int ;
   worker_limits : Worker_types.limits ;
 }
+and partial_mode = Partial_mode.t
 
 val default_peer_validator_limits: peer_validator_limits
 val default_prevalidator_limits: prevalidator_limits
 val default_block_validator_limits: block_validator_limits
 val default_chain_validator_limits: chain_validator_limits
+val default_partial_mode: partial_mode
 
 val create:
   ?sandboxed:bool ->
@@ -68,6 +70,7 @@ val create:
   block_validator_limits ->
   prevalidator_limits ->
   chain_validator_limits ->
+  partial_mode ->
   t tzresult Lwt.t
 
 val shutdown: t -> unit Lwt.t

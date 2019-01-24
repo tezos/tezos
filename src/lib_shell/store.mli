@@ -43,6 +43,15 @@ val with_atomic_rw:
   (unit -> 'a Error_monad.tzresult Lwt.t) ->
   'a tzresult Lwt.t
 
+(** {2 Configuration} **********************************************************)
+
+module Configuration : sig
+
+  module Partial_mode : SINGLE_STORE
+    with type t := global_store
+     and type value := Partial_mode.t
+end
+
 (** {2 Chain store} **********************************************************)
 
 module Chain : sig
@@ -105,6 +114,14 @@ module Chain_data : sig
      and type value := Block_header.t
 
   module Checkpoint_0_0_1 : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
+
+  module Save_point : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
+
+  module Rock_bottom : SINGLE_STORE
     with type t := store
      and type value := Int32.t * Block_hash.t
 

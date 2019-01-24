@@ -27,6 +27,19 @@ type t = Raw_store.t
 type global_store = t
 
 (**************************************************************************
+ * Configuration setup we need to save in order to avoid wrong changes.
+ **************************************************************************)
+
+module Configuration = struct
+
+  module Partial_mode = Store_helpers.Make_single_store
+      (Raw_store)
+      (struct let name = ["partial_mode"] end)
+      (Store_helpers.Make_value(Partial_mode))
+
+end
+
+(**************************************************************************
  * Net store under "chain/"
  **************************************************************************)
 
@@ -296,6 +309,29 @@ module Chain_data = struct
            let open Data_encoding in
            tup2 int32 Block_hash.encoding
        end))
+
+  module Save_point =
+    Store_helpers.Make_single_store
+      (Chain.Indexed_store.Store)
+      (struct let name = ["save_point"] end)
+      (Store_helpers.Make_value(struct
+         type t = Int32.t * Block_hash.t
+         let encoding =
+           let open Data_encoding in
+           tup2 int32 Block_hash.encoding
+       end))
+
+  module Rock_bottom =
+    Store_helpers.Make_single_store
+      (Chain.Indexed_store.Store)
+      (struct let name = ["rock_bottom"] end)
+      (Store_helpers.Make_value(struct
+         type t = Int32.t * Block_hash.t
+         let encoding =
+           let open Data_encoding in
+           tup2 int32 Block_hash.encoding
+       end))
+
 
 end
 
