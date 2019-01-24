@@ -116,7 +116,7 @@ test:p2p:pool:
 test:proto_alpha:
   <<: *test_definition
   script:
-    - dune build @src/proto_002_PsYLVpVv/lib_protocol/runtest
+    - dune build @src/proto_003_PsddFKi3/lib_protocol/runtest
 
 test:p2p:peerset:
   <<: *test_definition
@@ -136,7 +136,7 @@ test:p2p:banned_peers:
 test:client_alpha:vote:
   <<: *test_definition
   script:
-    - dune build @src/proto_002_PsYLVpVv/lib_delegate/runtest_vote
+    - dune build @src/proto_003_PsddFKi3/lib_delegate/runtest_vote
 
 test:basic.sh:
   <<: *test_definition

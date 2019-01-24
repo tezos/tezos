@@ -5,7 +5,7 @@
             tezos-stdlib-unix
             tezos-shell
             tezos-protocol-updater
-            tezos-embedded-protocol-002-PsYLVpVv
+            tezos-embedded-protocol-003-PsddFKi3
             re)
  (flags (:standard -w -9+27-30-32-40@8
                    -safe-string
