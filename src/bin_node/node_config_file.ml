@@ -70,7 +70,7 @@ and shell = {
   prevalidator_limits : Node.prevalidator_limits ;
   peer_validator_limits : Node.peer_validator_limits ;
   chain_validator_limits : Node.chain_validator_limits ;
-  history_mode : History_mode.t ;
+  history_mode : History_mode.t option ;
 }
 
 let default_p2p_limits : P2p.limits = {
@@ -120,7 +120,7 @@ let default_shell = {
   prevalidator_limits = Node.default_prevalidator_limits ;
   peer_validator_limits = Node.default_peer_validator_limits ;
   chain_validator_limits = Node.default_chain_validator_limits ;
-  history_mode = Node.default_history_mode ;
+  history_mode = None ;
 }
 
 let default_config = {
@@ -450,7 +450,7 @@ let shell =
        (dft "block_validator" block_validator_limits_encoding default_shell.block_validator_limits)
        (dft "prevalidator" prevalidator_limits_encoding default_shell.prevalidator_limits)
        (dft "chain_validator" chain_validator_limits_encoding default_shell.chain_validator_limits)
-       (dft "history_mode" History_mode.encoding default_shell.history_mode)
+       (opt "history_mode" History_mode.encoding)
     )
 
 let encoding =
@@ -589,7 +589,7 @@ let update
             { cfg.shell.chain_validator_limits
               with bootstrap_threshold })
         bootstrap_threshold ;
-    history_mode = Option.unopt history_mode ~default:cfg.shell.history_mode;
+    history_mode = Option.first_some history_mode cfg.shell.history_mode;
   }
   in
   return { data_dir ; p2p ; rpc ; log ; shell }

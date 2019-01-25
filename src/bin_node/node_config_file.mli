@@ -59,7 +59,7 @@ and shell = {
   prevalidator_limits : Node.prevalidator_limits ;
   peer_validator_limits : Node.peer_validator_limits ;
   chain_validator_limits : Node.chain_validator_limits ;
-  history_mode : History_mode.t ;
+  history_mode : History_mode.t option ;
 }
 
 val default_data_dir: string

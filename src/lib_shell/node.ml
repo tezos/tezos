@@ -201,8 +201,8 @@ let create
     | None -> true in
   init_p2p ~sandboxed p2p_params >>=? fun p2p ->
   State.init
-    ~store_root ~context_root ~history_mode ?patch_context
-    genesis >>=? fun (state, mainchain_state, context_index) ->
+    ~store_root ~context_root ?history_mode ?patch_context
+    genesis >>=? fun (state, mainchain_state, context_index, history_mode) ->
   may_update_checkpoint mainchain_state checkpoint history_mode >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
   Validator.create state distributed_db

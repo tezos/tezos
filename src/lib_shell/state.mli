@@ -343,9 +343,9 @@ val init:
   ?context_mapsize:int64 ->
   store_root:string ->
   context_root:string ->
-  history_mode:History_mode.t ->
+  ?history_mode:History_mode.t ->
   Chain.genesis ->
-  (global_state * Chain.t * Context.index) tzresult Lwt.t
+  (global_state * Chain.t * Context.index * History_mode.t) tzresult Lwt.t
 
 val close:
   global_state -> unit Lwt.t
