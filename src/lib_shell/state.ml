@@ -627,40 +627,52 @@ module Chain = struct
       Lwt.return state.data.rock_bottom
     end
 
-  let purge_loop_light store block_hash =
-    let rec loop block_hash =
+  let purge_loop_light global_store store block_hash bottom =
+    let do_prune blocks =
+      Store.with_atomic_rw global_store @@ fun () ->
+      Lwt_list.iter_s (prune_block store) blocks in
+    let rec loop block_hash (n_blocks, blocks) =
+      begin if n_blocks >= 4000 then
+          do_prune blocks >>= fun () ->
+          Lwt.return (0, [])
+        else Lwt.return (n_blocks, blocks)
+      end >>= fun (n_blocks, blocks) ->
       Store.Block.Header.read_opt (store, block_hash) >>= function
-      | None -> Lwt.return_unit
+      | None -> assert false (* Should not happen *)
       | Some header ->
-          begin Store.Block.Contents.read_opt (store, block_hash) >>= function
-            | None -> Lwt.return_unit
-            | Some _ ->
-                prune_block store header.shell.predecessor >>= fun () ->
-                loop header.shell.predecessor
-          end
-    in loop block_hash
+          if header.shell.level = bottom then
+            do_prune (block_hash :: blocks)
+          else
+            loop header.shell.predecessor (n_blocks + 1, block_hash :: blocks) in
+    Store.Block.Header.read_exn (store, block_hash) >>= fun header ->
+    loop header.shell.predecessor (0, [])
 
   let purge_light chain_state (lvl, hash) =
-    Shared.use chain_state.block_store begin fun store ->
-      purge_loop_light store hash >>= fun () ->
-      update_chain_data chain_state begin fun _ data ->
-        let new_data = { data with save_point = (lvl, hash) ; } in
-        Lwt.return (Some new_data, ())
-      end >>= fun () ->
-      Shared.use chain_state.chain_data begin fun data ->
-        Store.Chain_data.Save_point.store data.chain_data_store (lvl, hash)
+    Shared.use chain_state.global_state.global_data begin fun global_data ->
+      Shared.use chain_state.block_store begin fun store ->
+        update_chain_data chain_state begin fun _ data ->
+          purge_loop_light global_data.global_store store hash (fst data.save_point) >>= fun () ->
+          let new_data = { data with save_point = (lvl, hash) ; } in
+          Lwt.return (Some new_data, ())
+        end >>= fun () ->
+        Shared.use chain_state.chain_data begin fun data ->
+          Store.Chain_data.Save_point.store data.chain_data_store (lvl, hash)
+        end
       end
     end
 
-  let purge_loop_zero store ~genesis_hash block_hash limit =
+  let purge_loop_zero global_store store ~genesis_hash block_hash limit =
     assert (limit > 0);
+    let do_delete blocks =
+      Store.with_atomic_rw global_store @@ fun () ->
+      Lwt_list.iter_s (delete_block store) blocks in
     let rec prune_loop block_hash limit =
       if limit = 1 then
         Store.Block.Header.read_opt (store, block_hash) >>= function
         | None -> assert false (* Should not happen. *)
         | Some header ->
             prune_block store block_hash >>= fun () ->
-            delete_loop header.shell.predecessor >>= fun () ->
+            delete_loop header.shell.predecessor (0, []) >>= fun () ->
             Lwt.return block_hash
       else
         Store.Block.Header.read_opt (store, block_hash) >>= function
@@ -668,39 +680,44 @@ module Chain = struct
         | Some header ->
             prune_block store block_hash >>= fun () ->
             prune_loop header.shell.predecessor (pred limit)
-    and delete_loop block_hash =
+    and delete_loop block_hash (n_blocks, blocks) =
+      begin if n_blocks >= 4000 then
+          do_delete blocks >>= fun () ->
+          Lwt.return (0, [])
+        else Lwt.return (n_blocks, blocks)
+      end >>= fun (n_blocks, blocks) ->
       Store.Block.Header.read_opt (store, block_hash) >>= function
-      | None ->
-          Lwt.return_unit
+      | None -> do_delete blocks
       | Some header ->
           if Block_hash.equal genesis_hash block_hash
-          then Lwt.return_unit
+          then do_delete blocks
           else begin
-            delete_block store block_hash >>= fun () ->
-            delete_loop header.shell.predecessor
+            delete_loop header.shell.predecessor (n_blocks + 1, block_hash :: blocks)
           end
     in
     Store.Block.Header.read_exn (store, block_hash) >>= fun header ->
     prune_loop header.shell.predecessor limit
 
   let purge_zero chain_state ((lvl, hash) as checkpoint) =
-    Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Contents.read_exn (store, hash) >>= fun contents ->
-      Store.Block.Header.read_exn (store, hash) >>= fun header ->
-      let max_op_ttl = contents.max_operations_ttl in
-      assert (max_op_ttl > 0);
-      let limit = min max_op_ttl (Int32.to_int header.shell.level) in
-      purge_loop_zero ~genesis_hash:chain_state.genesis.block store hash limit >>= fun rock_bottom_hash ->
-      let rock_bottom_level = Int32.sub lvl (Int32.of_int max_op_ttl) in
-      let rock_bottom = (rock_bottom_level, rock_bottom_hash) in
-      update_chain_data chain_state begin fun _ data ->
-        let new_data = { data with save_point = checkpoint ; rock_bottom ; } in
-        Lwt.return (Some new_data, ())
-      end >>= fun () ->
-      Shared.use chain_state.chain_data begin fun data ->
-        Store.Chain_data.Save_point.store data.chain_data_store checkpoint >>= fun () ->
-        Store.Chain_data.Rock_bottom.store data.chain_data_store rock_bottom >>= fun () ->
-        Lwt.return_unit
+    Shared.use chain_state.global_state.global_data begin fun global_data ->
+      Shared.use chain_state.block_store begin fun store ->
+        Store.Block.Contents.read_exn (store, hash) >>= fun contents ->
+        Store.Block.Header.read_exn (store, hash) >>= fun header ->
+        let max_op_ttl = contents.max_operations_ttl in
+        assert (max_op_ttl > 0);
+        let limit = min max_op_ttl (Int32.to_int header.shell.level) in
+        purge_loop_zero ~genesis_hash:chain_state.genesis.block global_data.global_store store hash limit >>= fun rock_bottom_hash ->
+        let rock_bottom_level = Int32.sub lvl (Int32.of_int max_op_ttl) in
+        let rock_bottom = (rock_bottom_level, rock_bottom_hash) in
+        update_chain_data chain_state begin fun _ data ->
+          let new_data = { data with save_point = checkpoint ; rock_bottom ; } in
+          Lwt.return (Some new_data, ())
+        end >>= fun () ->
+        Shared.use chain_state.chain_data begin fun data ->
+          Store.Chain_data.Save_point.store data.chain_data_store checkpoint >>= fun () ->
+          Store.Chain_data.Rock_bottom.store data.chain_data_store rock_bottom >>= fun () ->
+          Lwt.return_unit
+        end
       end
     end
 
@@ -1475,6 +1492,9 @@ let () = register_error_kind `Permanent
             | _ -> None)
     (fun () -> Wrong_coercion_partial_mode)
 
+let history_mode_tag =
+  Tag.def "history_mode" Partial_mode.pp
+
 let check_and_save_partial_mode
     ~previous
     ~now
@@ -1488,6 +1508,10 @@ let check_and_save_partial_mode
   | (Light, Full) | (Zero, Full) | (Zero, Light) ->
       fail Wrong_coercion_partial_mode
   | (Full, Light) ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "Cleaning up the state to switch to %a mode..."
+          -% t event "cleanup_state"
+          -% a history_mode_tag Light) >>= fun () ->
       Store.Configuration.Partial_mode.store
         global_store Light >>= fun () ->
       Chain.all state >>= fun chains ->
@@ -1500,6 +1524,10 @@ let check_and_save_partial_mode
         ) chains >>=? fun () ->
       return_unit
   | (Light, Zero) | (Full, Zero) ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "Cleaning up the state to switch to %a mode..."
+          -% t event "cleanup_state"
+          -% a history_mode_tag Zero) >>= fun () ->
       Store.Configuration.Partial_mode.store
         global_store Zero >>= fun () ->
       Chain.all state >>= fun chains ->

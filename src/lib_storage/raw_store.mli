@@ -32,8 +32,8 @@ val close: t -> unit
 
 val with_atomic_rw:
   t ->
-  (unit -> 'a Error_monad.tzresult Lwt.t) ->
-  'a tzresult Lwt.t
+  (unit -> 'a Lwt.t) ->
+  'a Lwt.t
 
 val open_with_atomic_rw:
   ?mapsize:int64 -> string ->
