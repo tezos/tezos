@@ -136,15 +136,15 @@ let fetch_step pipeline (step : Block_locator.step)  =
     headers >>=? fun () ->
   return_unit
 
-let headers_fetch_worker_loop pipeline partial_mode =
+let headers_fetch_worker_loop pipeline history_mode =
   begin
     let sender_id = Distributed_db.my_peer_id pipeline.chain_db in
     (* sender and receiver are inverted here because they are from
        the point of view of the node sending the locator *)
     let seed = {Block_locator.sender_id=pipeline.peer_id; receiver_id=sender_id } in
-    begin match partial_mode with
-      | Partial_mode.Full -> Lwt.return_none
-      | Light | Zero ->
+    begin match history_mode with
+      | History_mode.Archive -> Lwt.return_none
+      | Full | Rolling ->
           let chain_state = Distributed_db.chain_state pipeline.chain_db in
           State.Chain.save_point chain_state >>= Lwt.return_some
     end >>= begin fun save_point ->
@@ -302,7 +302,7 @@ let rec validation_worker_loop pipeline =
 let create
     ?(notify_new_block = fun _ -> ())
     ~block_header_timeout ~block_operations_timeout
-    block_validator peer_id chain_db locator partial_mode =
+    block_validator peer_id chain_db locator history_mode =
   let canceler = Lwt_canceler.create () in
   let fetched_headers =
     Lwt_pipe.create ~size:(1024, fun _ -> 1) () in
@@ -332,7 +332,7 @@ let create
     Lwt_utils.worker
       (Format.asprintf "bootstrap_pipeline-headers_fetch.%a.%a"
          P2p_peer.Id.pp_short peer_id Block_hash.pp_short hash)
-      ~run:(fun () -> headers_fetch_worker_loop pipeline partial_mode)
+      ~run:(fun () -> headers_fetch_worker_loop pipeline history_mode)
       ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
   pipeline.operations_fetch_worker <-
     Lwt_utils.worker

@@ -32,10 +32,10 @@ type global_store = t
 
 module Configuration = struct
 
-  module Partial_mode = Store_helpers.Make_single_store
+  module History_mode = Store_helpers.Make_single_store
       (Raw_store)
-      (struct let name = ["partial_mode"] end)
-      (Store_helpers.Make_value(Partial_mode))
+      (struct let name = ["history_mode"] end)
+      (Store_helpers.Make_value(History_mode))
 
 end
 

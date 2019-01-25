@@ -42,7 +42,7 @@ val create:
   ?notify_new_block: (State.Block.t -> unit) ->
   ?notify_bootstrapped: (unit -> unit) ->
   ?notify_termination: (unit -> unit) ->
-  Partial_mode.t ->
+  History_mode.t ->
   limits ->
   Block_validator.t ->
   Distributed_db.chain_db -> P2p_peer.Id.t -> t tzresult Lwt.t

@@ -58,7 +58,7 @@ let create state db
       valid_block_input ;
       active_chains = Chain_id.Table.create 7 }
 
-let activate v ?max_child_ttl ~start_prevalidator chain_state partial_mode =
+let activate v ?max_child_ttl ~start_prevalidator chain_state history_mode =
   let chain_id = State.Chain.id chain_state in
   lwt_log_notice Tag.DSL.(fun f ->
       f "activate chain %a"
@@ -74,7 +74,7 @@ let activate v ?max_child_ttl ~start_prevalidator chain_state partial_mode =
         v.block_validator
         v.valid_block_input v.db chain_state
         v.chain_validator_limits
-        partial_mode
+        history_mode
       >>=? fun nv ->
       Chain_id.Table.add v.active_chains chain_id nv;
       return nv

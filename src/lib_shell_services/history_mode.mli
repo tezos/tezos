@@ -23,24 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t =
-  | Full
-  | Light
-  | Zero
+(** The way a node stores its history. [Archive] keeps everything,
+    including receipts and the full context at each block. [Full] is
+    the default mode, keeping all the chain history, but losing old
+    receipts and contexts for blocks before the current checkpoint.
+    [Rolling] forgets the past before the current checkpoint to save
+    disk space. *)
+type t = Archive | Full | Rolling
 
-let encoding = Data_encoding.string_enum
-    [ ("full", Full) ;
-      ("light", Light) ;
-      ("zero", Zero) ;
-    ]
+val encoding : t RPC_encoding.t
 
-let equal = function
-  | (Full, Full)
-  | (Light, Light)
-  | (Zero, Zero) -> true
-  | _ -> false
+val equal : t * t -> bool
 
-let pp ppf = function
-  | Full -> Format.fprintf ppf "full"
-  | Light -> Format.fprintf ppf "light"
-  | Zero -> Format.fprintf ppf "zero"
+val pp : Format.formatter -> t -> unit

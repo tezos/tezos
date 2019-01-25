@@ -23,10 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Full | Light | Zero
+type t = Archive | Full | Rolling
 
-val encoding : t RPC_encoding.t
+let encoding = Data_encoding.string_enum
+    [ ("archive", Archive) ;
+      ("full", Full) ;
+      ("rolling", Rolling) ;
+    ]
 
-val equal : t * t -> bool
+let equal = function
+  | (Archive, Archive)
+  | (Full, Full)
+  | (Rolling, Rolling) -> true
+  | _ -> false
 
-val pp : Format.formatter -> t -> unit
+let pp ppf = function
+  | Archive -> Format.fprintf ppf "archive"
+  | Full -> Format.fprintf ppf "full"
+  | Rolling -> Format.fprintf ppf "rolling"

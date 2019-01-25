@@ -106,7 +106,7 @@ let set_bootstrapped pv =
     pv.parameters.notify_bootstrapped () ;
   end
 
-let bootstrap_new_branch w partial_mode _head unknown_prefix =
+let bootstrap_new_branch w history_mode _head unknown_prefix =
   let pv = Worker.state w in
   let sender_id = Distributed_db.my_peer_id pv.parameters.chain_db in
   (* sender and receiver are inverted here because they are from
@@ -123,7 +123,7 @@ let bootstrap_new_branch w partial_mode _head unknown_prefix =
       ~block_operations_timeout:pv.parameters.limits.block_operations_timeout
       pv.parameters.block_validator
       pv.peer_id pv.parameters.chain_db unknown_prefix
-      partial_mode
+      history_mode
   in
   Worker.protect w
     ~on_error:begin fun error ->
@@ -242,14 +242,14 @@ let may_validate_new_head w hash (header : Block_header.t) =
     validate_new_head w hash header
   end
 
-let may_validate_new_branch w partial_mode distant_hash locator =
+let may_validate_new_branch w history_mode distant_hash locator =
   let pv = Worker.state w in
   let distant_header, _ = (locator : Block_locator.t :> Block_header.t * _) in
   only_if_fitness_increases w distant_header @@ fun () ->
   assert_acceptable_head w
     (Block_header.hash distant_header) distant_header >>=? fun () ->
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Block.known_ancestor chain_state partial_mode locator >>= function
+  State.Block.known_ancestor chain_state history_mode locator >>= function
   | None ->
       debug w
         "ignoring branch %a without common ancestor from peer: %a."
@@ -257,7 +257,7 @@ let may_validate_new_branch w partial_mode distant_hash locator =
         P2p_peer.Id.pp_short pv.peer_id ;
       fail Validation_errors.Unknown_ancestor
   | Some unknown_prefix ->
-      bootstrap_new_branch w partial_mode distant_header unknown_prefix
+      bootstrap_new_branch w history_mode distant_header unknown_prefix
 
 
 let on_no_request w =
@@ -268,7 +268,7 @@ let on_no_request w =
   Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
   return_unit
 
-let on_request (type a) partial_mode w (req : a Request.t) : a tzresult Lwt.t =
+let on_request (type a) history_mode w (req : a Request.t) : a tzresult Lwt.t =
   let pv = Worker.state w in
   match req with
   | Request.New_head (hash, header) ->
@@ -282,7 +282,7 @@ let on_request (type a) partial_mode w (req : a Request.t) : a tzresult Lwt.t =
       debug w "processing new branch %a from peer %a."
         Block_hash.pp_short hash
         P2p_peer.Id.pp_short pv.peer_id ;
-      may_validate_new_branch w partial_mode hash locator
+      may_validate_new_branch w history_mode hash locator
 
 let on_completion w r _ st =
   Worker.record_event w (Event.Request (Request.view r, st, None )) ;
@@ -374,7 +374,7 @@ let create
     ?(notify_new_block = fun _ -> ())
     ?(notify_bootstrapped = fun () -> ())
     ?(notify_termination = fun _ -> ())
-    partial_mode
+    history_mode
     limits block_validator chain_db peer_id =
   let name = (State.Chain.id (Distributed_db.chain_state chain_db), peer_id) in
   let parameters = {
@@ -388,7 +388,7 @@ let create
   let module Handlers = struct
     type self = t
     let on_launch = on_launch
-    let on_request = (fun x y -> on_request partial_mode x y)
+    let on_request = (fun x y -> on_request history_mode x y)
     let on_close = on_close
     let on_error = on_error
     let on_completion = on_completion

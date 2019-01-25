@@ -380,8 +380,6 @@ let delete_block store block_hash =
   Store.Block.Predecessors.remove_all st
 
 
-(* 3 modes, full - pruned - zero - (super archive) | work on RPC so the content is correct for pruned blocks. *)
-
 (* Remove all blocks that are not in the chain. *)
 let cut_alternate_heads block_store chain_store heads =
   let rec cut_alternate_head hash header =
@@ -627,7 +625,7 @@ module Chain = struct
       Lwt.return state.data.rock_bottom
     end
 
-  let purge_loop_light global_store store block_hash bottom =
+  let purge_loop_full global_store store block_hash bottom =
     let do_prune blocks =
       Store.with_atomic_rw global_store @@ fun () ->
       Lwt_list.iter_s (prune_block store) blocks in
@@ -647,11 +645,11 @@ module Chain = struct
     Store.Block.Header.read_exn (store, block_hash) >>= fun header ->
     loop header.shell.predecessor (0, [])
 
-  let purge_light chain_state (lvl, hash) =
+  let purge_full chain_state (lvl, hash) =
     Shared.use chain_state.global_state.global_data begin fun global_data ->
       Shared.use chain_state.block_store begin fun store ->
         update_chain_data chain_state begin fun _ data ->
-          purge_loop_light global_data.global_store store hash (fst data.save_point) >>= fun () ->
+          purge_loop_full global_data.global_store store hash (fst data.save_point) >>= fun () ->
           let new_data = { data with save_point = (lvl, hash) ; } in
           Lwt.return (Some new_data, ())
         end >>= fun () ->
@@ -661,7 +659,7 @@ module Chain = struct
       end
     end
 
-  let purge_loop_zero global_store store ~genesis_hash block_hash limit =
+  let purge_loop_rolling global_store store ~genesis_hash block_hash limit =
     assert (limit > 0);
     let do_delete blocks =
       Store.with_atomic_rw global_store @@ fun () ->
@@ -698,7 +696,7 @@ module Chain = struct
     Store.Block.Header.read_exn (store, block_hash) >>= fun header ->
     prune_loop header.shell.predecessor limit
 
-  let purge_zero chain_state ((lvl, hash) as checkpoint) =
+  let purge_rolling chain_state ((lvl, hash) as checkpoint) =
     Shared.use chain_state.global_state.global_data begin fun global_data ->
       Shared.use chain_state.block_store begin fun store ->
         Store.Block.Contents.read_exn (store, hash) >>= fun contents ->
@@ -706,7 +704,7 @@ module Chain = struct
         let max_op_ttl = contents.max_operations_ttl in
         assert (max_op_ttl > 0);
         let limit = min max_op_ttl (Int32.to_int header.shell.level) in
-        purge_loop_zero ~genesis_hash:chain_state.genesis.block global_data.global_store store hash limit >>= fun rock_bottom_hash ->
+        purge_loop_rolling ~genesis_hash:chain_state.genesis.block global_data.global_store store hash limit >>= fun rock_bottom_hash ->
         let rock_bottom_level = Int32.sub lvl (Int32.of_int max_op_ttl) in
         let rock_bottom = (rock_bottom_level, rock_bottom_hash) in
         update_chain_data chain_state begin fun _ data ->
@@ -766,18 +764,18 @@ module Chain = struct
       end
     end
 
-  let set_checkpoint_then_purge_light chain_state checkpoint =
+  let set_checkpoint_then_purge_full chain_state checkpoint =
     set_checkpoint chain_state checkpoint >>= fun () ->
     let lvl = checkpoint.shell.level in
     let hash = Block_header.hash checkpoint in
-    purge_light chain_state (lvl, hash) >>= fun () ->
+    purge_full chain_state (lvl, hash) >>= fun () ->
     Lwt.return_unit
 
-  let set_checkpoint_then_purge_zero chain_state checkpoint =
+  let set_checkpoint_then_purge_rolling chain_state checkpoint =
     set_checkpoint chain_state checkpoint >>= fun () ->
     let lvl = checkpoint.shell.level in
     let hash = Block_header.hash checkpoint in
-    purge_zero chain_state (lvl, hash) >>= fun () ->
+    purge_rolling chain_state (lvl, hash) >>= fun () ->
     Lwt.return_unit
 
   let acceptable_block chain_state (header : Block_header.t) =
@@ -1226,13 +1224,13 @@ module Block = struct
         Store.Block.Invalid_block.known store hash
     end
 
-  let known_ancestor chain_state partial_mode locator =
+  let known_ancestor chain_state history_mode locator =
     Block_locator.unknown_prefix
       ~is_known:(block_validity chain_state) locator >>= function
     | `Ok (_tail, locator) -> Lwt.return_some locator
     | `Invalid -> Lwt.return_none
-    | `Unknown -> begin match partial_mode with
-        | Partial_mode.Full -> Lwt.return_none
+    | `Unknown -> begin match history_mode with
+        | History_mode.Archive -> Lwt.return_none
         | _ ->
             (* We restrict this locator history later when calling to_steps. *)
             Lwt.return_some locator
@@ -1478,64 +1476,64 @@ let read
   Chain.read_all state >>=? fun () ->
   return state
 
-type error += Wrong_coercion_partial_mode
+type error += Wrong_coercion_history_mode
 
 let () = register_error_kind `Permanent
-    ~id:"node_config_file.wrong_coercion_partial_mode"
-    ~title:"Wrong coercion between partial modes"
-    ~description:"Wrong coercion between partial modes."
+    ~id:"node_config_file.wrong_coercion_history_mode"
+    ~title:"Wrong coercion between history modes"
+    ~description:"Wrong coercion between history modes."
     ~pp:(fun ppf () ->
         Format.fprintf ppf
-          "@[Cannot update node partial mode.@]")
+          "@[Cannot update node history mode.@]")
     Data_encoding.unit
-    (function Wrong_coercion_partial_mode -> Some ()
+    (function Wrong_coercion_history_mode -> Some ()
             | _ -> None)
-    (fun () -> Wrong_coercion_partial_mode)
+    (fun () -> Wrong_coercion_history_mode)
 
 let history_mode_tag =
-  Tag.def "history_mode" Partial_mode.pp
+  Tag.def "history_mode" History_mode.pp
 
-let check_and_save_partial_mode
+let check_and_save_history_mode
     ~previous
     ~now
     global_store
     state
   =
-  let open Partial_mode in
+  let open History_mode in
   match (previous, now) with
-  | (Light, Light) | (Full, Full) | (Zero, Zero) ->
+  | (Archive, Archive) | (Full, Full) | (Rolling, Rolling) ->
       return_unit
-  | (Light, Full) | (Zero, Full) | (Zero, Light) ->
-      fail Wrong_coercion_partial_mode
-  | (Full, Light) ->
+  | (Full, Archive) | (Rolling, Archive) | (Rolling, Full) ->
+      fail Wrong_coercion_history_mode
+  | (Archive, Full) ->
       lwt_log_notice Tag.DSL.(fun f ->
           f "Cleaning up the state to switch to %a mode..."
           -% t event "cleanup_state"
-          -% a history_mode_tag Light) >>= fun () ->
-      Store.Configuration.Partial_mode.store
-        global_store Light >>= fun () ->
+          -% a history_mode_tag Full) >>= fun () ->
+      Store.Configuration.History_mode.store
+        global_store Full >>= fun () ->
       Chain.all state >>= fun chains ->
       iter_s (fun chain_state ->
           Chain.checkpoint chain_state >>= fun checkpoint ->
           let lvl = checkpoint.shell.level in
           let hash = Block_header.hash checkpoint in
-          Chain.purge_light chain_state (lvl, hash) >>= fun () ->
+          Chain.purge_full chain_state (lvl, hash) >>= fun () ->
           return_unit
         ) chains >>=? fun () ->
       return_unit
-  | (Light, Zero) | (Full, Zero) ->
+  | (Archive, Rolling) | (Full, Rolling) ->
       lwt_log_notice Tag.DSL.(fun f ->
           f "Cleaning up the state to switch to %a mode..."
           -% t event "cleanup_state"
-          -% a history_mode_tag Zero) >>= fun () ->
-      Store.Configuration.Partial_mode.store
-        global_store Zero >>= fun () ->
+          -% a history_mode_tag Rolling) >>= fun () ->
+      Store.Configuration.History_mode.store
+        global_store Rolling >>= fun () ->
       Chain.all state >>= fun chains ->
       iter_s (fun chain_state ->
           Chain.checkpoint chain_state >>= fun checkpoint ->
           let lvl = checkpoint.shell.level in
           let hash = Block_header.hash checkpoint in
-          Chain.purge_zero chain_state (lvl, hash) >>= fun () ->
+          Chain.purge_rolling chain_state (lvl, hash) >>= fun () ->
           return_unit
         ) chains >>=? fun () ->
       return_unit
@@ -1546,7 +1544,7 @@ let init
     ?(context_mapsize=409_600_000_000L)
     ~store_root
     ~context_root
-    ~partial_mode
+    ~history_mode
     genesis =
   Store.init ~mapsize:store_mapsize store_root >>=? fun global_store ->
   Context.init
@@ -1555,10 +1553,10 @@ let init
   let main_chain = Chain_id.of_block_hash genesis.Chain.block in
   read global_store context_index main_chain >>=? fun state ->
   may_create_chain state main_chain genesis >>= fun main_chain_state ->
-  Store.Configuration.Partial_mode.read_opt global_store >>= begin function
-    | None -> Lwt.return Partial_mode.Full
-    | Some p_mode -> Lwt.return p_mode end >>= fun previous_partial_mode ->
-  check_and_save_partial_mode ~previous:previous_partial_mode ~now:partial_mode
+  Store.Configuration.History_mode.read_opt global_store >>= begin function
+    | None -> Lwt.return History_mode.Full
+    | Some p_mode -> Lwt.return p_mode end >>= fun previous_history_mode ->
+  check_and_save_history_mode ~previous:previous_history_mode ~now:history_mode
     global_store state >>=? fun () ->
   return (state, main_chain_state, context_index)
 
@@ -1652,8 +1650,8 @@ let upgrade_0_0_1
       return_unit
     end
     chains >>=? fun () ->
-  Format.eprintf "Initializing partial mode to: %a@." Partial_mode.pp Partial_mode.Full ;
-  Store.Configuration.Partial_mode.store global_store Partial_mode.Full >>= fun () ->
+  Format.eprintf "Initializing history mode to: %a node@." History_mode.pp History_mode.Archive ;
+  Store.Configuration.History_mode.store global_store History_mode.Archive >>= fun () ->
   Store.close global_store ;
   return_unit
 

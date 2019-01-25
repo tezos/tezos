@@ -47,7 +47,7 @@ type t = {
   rpc_tls: Node_config_file.tls option ;
   log_output: Logging_unix.Output.t option ;
   bootstrap_threshold: int option ;
-  partial_mode: Partial_mode.t option ;
+  history_mode: History_mode.t option ;
 }
 
 module Term : sig

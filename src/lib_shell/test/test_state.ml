@@ -180,7 +180,7 @@ let wrap_state_init f base_dir =
       ~context_mapsize:4_096_000_000L
       ~store_root
       ~context_root
-      ~partial_mode:None
+      ~history_mode:None
       genesis >>=? fun (state, chain, _index) ->
     build_example_tree chain >>= fun vblock ->
     f { state ; chain ; vblock } >>=? fun () ->

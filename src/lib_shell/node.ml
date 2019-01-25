@@ -122,7 +122,6 @@ and chain_validator_limits = Chain_validator.limits = {
   bootstrap_threshold: int ;
   worker_limits : Worker_types.limits ;
 }
-and partial_mode = Partial_mode.t
 
 let default_block_validator_limits = {
   protocol_timeout = 120. ;
@@ -165,9 +164,9 @@ let default_chain_validator_limits = {
   }
 }
 
-let default_partial_mode = Partial_mode.Full
+let default_history_mode = History_mode.Full
 
-let may_update_checkpoint chain_state checkpoint partial_mode =
+let may_update_checkpoint chain_state checkpoint history_mode =
   match checkpoint with
   | None ->
       Lwt.return_unit
@@ -175,13 +174,13 @@ let may_update_checkpoint chain_state checkpoint partial_mode =
       State.best_known_head_for_checkpoint
         chain_state checkpoint >>= fun new_head ->
       Chain.set_head chain_state new_head >>= fun _old_head ->
-      begin match partial_mode with
-        | Partial_mode.Full ->
+      begin match history_mode with
+        | History_mode.Archive ->
             State.Chain.set_checkpoint chain_state checkpoint
-        | Light ->
-            State.Chain.set_checkpoint_then_purge_light chain_state checkpoint
-        | Zero ->
-            State.Chain.set_checkpoint_then_purge_zero chain_state checkpoint
+        | Full ->
+            State.Chain.set_checkpoint_then_purge_full chain_state checkpoint
+        | Rolling ->
+            State.Chain.set_checkpoint_then_purge_rolling chain_state checkpoint
       end
 
 let create
@@ -194,7 +193,7 @@ let create
     block_validator_limits
     prevalidator_limits
     chain_validator_limits
-    partial_mode
+    history_mode
   =
   let start_prevalidator =
     match p2p_params with
@@ -202,9 +201,9 @@ let create
     | None -> true in
   init_p2p ~sandboxed p2p_params >>=? fun p2p ->
   State.init
-    ~store_root ~context_root ~partial_mode ?patch_context
+    ~store_root ~context_root ~history_mode ?patch_context
     genesis >>=? fun (state, mainchain_state, context_index) ->
-  may_update_checkpoint mainchain_state checkpoint partial_mode >>= fun () ->
+  may_update_checkpoint mainchain_state checkpoint history_mode >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
   Validator.create state distributed_db
     peer_validator_limits
@@ -214,7 +213,7 @@ let create
     chain_validator_limits
   >>=? fun validator ->
   Validator.activate validator
-    ?max_child_ttl ~start_prevalidator mainchain_state partial_mode >>=? fun mainchain_validator ->
+    ?max_child_ttl ~start_prevalidator mainchain_state history_mode >>=? fun mainchain_validator ->
   let shutdown () =
     P2p.shutdown p2p >>= fun () ->
     Validator.shutdown validator >>= fun () ->

@@ -71,7 +71,7 @@ let init_chain base_dir : State.Chain.t Lwt.t =
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in
   State.init
-    ~store_root ~context_root ~partial_mode:None
+    ~store_root ~context_root ~history_mode:None
     state_genesis_block >>= function
   | Error _ -> Pervasives.failwith "read err"
   | Ok (_state, chain, _index) ->

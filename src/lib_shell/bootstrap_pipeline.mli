@@ -32,7 +32,7 @@ val create:
   Block_validator.t ->
   P2p_peer.Id.t -> Distributed_db.chain_db ->
   Block_locator.t ->
-  Partial_mode.t ->
+  History_mode.t ->
   t
 
 val wait: t -> unit tzresult Lwt.t

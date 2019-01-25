@@ -47,9 +47,9 @@ val with_atomic_rw:
 
 module Configuration : sig
 
-  module Partial_mode : SINGLE_STORE
+  module History_mode : SINGLE_STORE
     with type t := global_store
-     and type value := Partial_mode.t
+     and type value := History_mode.t
 end
 
 (** {2 Chain store} **********************************************************)
