@@ -268,8 +268,9 @@ let genesis_block store id =
   Store.Block.Header.read_exn (Store.Block.get store, genesis) >|= fun h ->
   h.shell.context
 
-let run_gc (config : Node_config_file.t) checkpoint =
-  Store.init ~mapsize:4_000_000_000_000L (store_dir config.data_dir)
+let run_gc (config : Node_config_file.t) =
+  lwt_log_notice "Collecting live contexts before to run the GC..." >>= fun () ->
+  Store.init ~mapsize:4_000_000_000_000L (Node_data_version.store_dir config.data_dir)
   >>= function
   | Error _e -> Lwt.fail_with "Store.init" (* XXX: use the error monad *)
   | Ok store ->
@@ -279,10 +280,7 @@ let run_gc (config : Node_config_file.t) checkpoint =
         let chain_t = Store.Chain.get store id in
         let block_t = Store.Block.get chain_t in
         let chain_data_t = Store.Chain_data.get chain_t in
-        (match checkpoint with
-         | Some (n, _) -> Lwt.return n
-         | None -> Store.Chain_data.Checkpoint.read_exn chain_data_t >|= fst)
-        >>= fun max_level ->
+        Store.Chain_data.Save_point.read_exn chain_data_t >>= fun (max_level, _) ->
         Lwt_list.fold_left_s (fun acc head ->
             predecessors block_t max_level head >|= fun hashes ->
             Context_hash.Set.union acc hashes
@@ -295,8 +293,9 @@ let run_gc (config : Node_config_file.t) checkpoint =
       Lwt_list.fold_left_s alive_in_chain Context_hash.Set.empty ids
       >>= fun roots ->
       Tezos_storage.Context.init
-        ~mapsize:4_000_000_000_000L (context_dir config.data_dir)
+        ~mapsize:4_000_000_000_000L (Node_data_version.context_dir config.data_dir)
       >>= fun context ->
+      lwt_log_notice "Running the context GC..." >>= fun () ->
       Tezos_storage.Context.gc context ~roots
 
 let run ?verbosity ?sandbox ?checkpoint ~gc (config : Node_config_file.t) =
@@ -309,7 +308,7 @@ let run ?verbosity ?sandbox ?checkpoint ~gc (config : Node_config_file.t) =
     | None -> config.log
     | Some default_level -> { config.log with default_level } in
   Logging_unix.init ~cfg:log_cfg () >>= fun () ->
-  (if not gc then Lwt.return () else run_gc config checkpoint) >>= fun () ->
+  (if not gc then Lwt.return () else run_gc config) >>= fun () ->
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
   init_node ?sandbox ?checkpoint config >>=? fun node ->
@@ -412,12 +411,11 @@ module Term = struct
   let gc =
     let open Cmdliner in
     let doc =
-      "Run the GC and exit. Use 0 to use the last-fork point, \
-       otherwise keep the latest $(b, N) contexts."
+      "Run the context GC on startup."
     in
     Arg.(value
          & flag
-         & info ~doc ~docv:"N" ~docs:Node_shared_arg.Manpage.misc_section
+         & info ~doc ~docs:Node_shared_arg.Manpage.misc_section
            ["gc"])
 
   let term =
