@@ -328,6 +328,8 @@ module Current_mempool : sig
 
 end
 
+val history_mode: global_state -> History_mode.t tzresult Lwt.t
+
 val upgrade_0_0_1:
   ?store_mapsize:Int64.t ->
   store_root:string ->

@@ -53,7 +53,7 @@ val chain_id:
 val checkpoint:
   #simple ->
   ?chain:chain ->
-  unit -> Block_header.t tzresult Lwt.t
+  unit -> (Block_header.t * int32 * int32 * History_mode.t) tzresult Lwt.t
 
 module Mempool = Block_services.Empty.Mempool
 
@@ -109,7 +109,7 @@ module S : sig
   val checkpoint:
     ([ `GET ], prefix,
      prefix, unit, unit,
-     Block_header.t) RPC_service.t
+     Block_header.t * int32 * int32 * History_mode.t) RPC_service.t
 
   module Blocks : sig
 

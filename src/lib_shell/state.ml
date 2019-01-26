@@ -1570,6 +1570,11 @@ let init
     global_store state >>=? fun () ->
   return (state, main_chain_state, context_index)
 
+let history_mode { global_data } =
+  Shared.use global_data begin fun { global_store } ->
+    Store.Configuration.History_mode.read global_store
+  end
+
 let close { global_data } =
   Shared.use global_data begin fun { global_store } ->
     Store.close global_store ;
