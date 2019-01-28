@@ -195,18 +195,22 @@ let wrap_ledger_cmd f =
   | Ok v ->
       return v
 
-let get_public_key
-    ?(authorize_baking=false)
+let public_key_returning_instruction which
     ?(prompt=false)
     ledger curve path =
   let path = tezos_root @ path in
-  begin match authorize_baking with
-    | false -> wrap_ledger_cmd begin fun pp ->
+  begin match which with
+    | `Get_public_key -> wrap_ledger_cmd begin fun pp ->
         Ledgerwallet_tezos.get_public_key ~prompt ~pp ledger curve path
       end
-    | true ->
+    | `Authorize_baking ->
         wrap_ledger_cmd begin fun pp ->
           Ledgerwallet_tezos.authorize_baking ~pp ledger curve path
+        end
+    | `Setup (main_chain_id, main_hwm, test_hwm) ->
+        wrap_ledger_cmd begin fun pp ->
+          Ledgerwallet_tezos.setup_baking ~pp ledger curve path
+            ~main_chain_id ~main_hwm ~test_hwm
         end
   end >>|? fun pk ->
   let pk = Cstruct.to_bigarray pk in
@@ -232,6 +236,8 @@ let get_public_key
           MBytes.set_int8 buf 0 2 ;
           let _nb_written = write_key ~compress:true (MBytes.sub buf 1 pklen) pk in
           Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding buf
+
+let get_public_key = public_key_returning_instruction `Get_public_key
 
 module Ledger = struct
   type t = {
@@ -511,7 +517,7 @@ let commands =
         ~desc: "List supported Ledger Nano S devices connected."
         no_options
         (fixed [ "list" ; "connected" ; "ledgers" ])
-        (fun () (cctxt : Client_context.io_wallet) ->
+        (fun () (cctxt : Client_context.full) ->
            find_ledgers () >>=? function
            | [] ->
                cctxt#message "No device found." >>= fun () ->
@@ -557,7 +563,7 @@ let commands =
         (prefixes [ "show" ; "ledger" ]
          @@ Client_keys.sk_uri_param
          @@ stop)
-        (fun test_sign sk_uri (cctxt : Client_context.io_wallet) ->
+        (fun test_sign sk_uri (cctxt : Client_context.full) ->
            neuterize sk_uri >>=? fun pk_uri ->
            id_of_pk_uri pk_uri >>=? fun id ->
            find_ledgers ~id () >>=? function
@@ -625,7 +631,7 @@ let commands =
         (prefixes [ "get" ; "ledger" ; "authorized" ; "path" ; "for" ]
          @@ Public_key.alias_param
          @@ stop)
-        (fun () (name, (pk_uri, _)) (cctxt : Client_context.io_wallet) ->
+        (fun () (name, (pk_uri, _)) (cctxt : Client_context.full) ->
            id_of_pk_uri pk_uri >>=? fun root_id ->
            with_ledger root_id begin fun h _version _of_curve _to_curve ->
              wrap_ledger_cmd begin fun pp ->
@@ -644,17 +650,19 @@ let commands =
            end) ;
 
       Clic.command ~group
-        ~desc: "Authorize a Ledger to bake for a key"
+        ~desc: "Authorize a Ledger to bake for a key (deprecated, \
+                use `setup ledger ...` with recent versions of the Baking app)"
         no_options
         (prefixes [ "authorize" ; "ledger" ; "to" ; "bake" ; "for" ]
          @@ Public_key.alias_param
          @@ stop)
-        (fun () (_, (pk_uri, _)) (cctxt : Client_context.io_wallet) ->
+        (fun () (_, (pk_uri, _)) (cctxt : Client_context.full) ->
            id_of_pk_uri pk_uri >>=? fun root_id ->
            with_ledger root_id begin fun h _version _of_curve _of_pkh ->
              let path = path_of_pk_uri pk_uri in
              curve_of_id root_id >>=? fun curve ->
-             get_public_key ~authorize_baking:true h curve path >>=? fun pk ->
+             public_key_returning_instruction `Authorize_baking h curve path
+             >>=? fun pk ->
              let pkh = Signature.Public_key.hash pk in
              cctxt#message
                "@[<v 0>Authorized baking for address: %a@,\
@@ -665,24 +673,123 @@ let commands =
            end) ;
 
       Clic.command ~group
+        ~desc: "Setup a Ledger to bake for a key"
+        (let hwm_arg kind =
+           let doc =
+             Printf.sprintf
+               "Use <HWM> as %s chain high watermark instead of asking the ledger."
+               kind in
+           let long = kind ^ "-hwm" in
+           default_arg ~doc ~long ~placeholder:"HWM"
+             ~default:"ASK-LEDGER"
+             (parameter
+                (fun _ -> function
+                   | "ASK-LEDGER" -> return None
+                   | s ->
+                       try return (Some (Int32.of_string s)) with _ ->
+                         failwith "Parameter %S should be a 32-bits integer" s))
+         in
+         args3
+           (default_arg
+              ~doc:"Use <ID> as main chain-id instead of asking the node."
+              ~long:"main-chain-id" ~placeholder:"ID"
+              ~default:"ASK-NODE"
+              (parameter
+                 (fun _ -> function
+                    | "ASK-NODE" -> return `Ask_node
+                    | s ->
+                        try return (`Int32 (Int32.of_string s))
+                        with _ ->
+                          (try return (`Chain_id (Chain_id.of_b58check_exn s))
+                           with _ ->
+                             failwith "Parameter %S should be a 32-bits integer \
+                                       or a Base58 chain-id" s))))
+           (hwm_arg "main") (hwm_arg "test"))
+        (prefixes [ "setup" ; "ledger" ; "to" ; "bake" ; "for" ]
+         @@ Public_key.alias_param
+         @@ stop)
+        (fun (chain_id_opt, main_hwm_opt, test_hwm_opt)
+          (_, (pk_uri, _)) (cctxt : Client_context.full) ->
+          let chain_id_of_int32 i32 =
+            let open Int32 in
+            let byte n =
+              logand 0xFFl (shift_right i32 (n * 8))
+              |> Int32.to_int |> char_of_int in
+            Chain_id.of_string_exn
+              (Stringext.of_array (Array.init 4 (fun i -> byte (3 - i)))) in
+          begin match chain_id_opt with
+            | `Ask_node ->
+                Chain_services.chain_id cctxt ()
+            | `Int32 s -> return (chain_id_of_int32 s)
+            | `Chain_id chid -> return chid
+          end
+          >>=? fun main_chain_id ->
+          id_of_pk_uri pk_uri >>=? fun root_id ->
+          with_ledger root_id begin fun h _version _of_curve _of_pkh ->
+            let path = path_of_pk_uri pk_uri in
+            curve_of_id root_id >>=? fun curve ->
+            wrap_ledger_cmd begin fun pp ->
+              Ledgerwallet_tezos.get_all_high_watermarks ~pp h
+            end
+            >>=? fun (`Main_hwm current_mh, `Test_hwm current_th, `Chain_id current_ci) ->
+            let main_hwm = Option.unopt main_hwm_opt ~default:current_mh in
+            let test_hwm = Option.unopt test_hwm_opt ~default:current_th in
+            cctxt#message "Setting up the ledger:@.\
+                           * Main chain ID: %a -> %a@.\
+                           * Main chain High Watermark: %ld -> %ld@.\
+                           * Test chain High Watermark: %ld -> %ld"
+              Chain_id.pp (Chain_id.of_string_exn current_ci)
+              Chain_id.pp main_chain_id
+              current_mh main_hwm
+              current_th test_hwm
+            >>= fun () ->
+            public_key_returning_instruction
+              (`Setup (Chain_id.to_string main_chain_id, main_hwm, test_hwm))
+              h curve path
+            >>=? fun pk ->
+            let pkh = Signature.Public_key.hash pk in
+            cctxt#message
+              "@[<v 0>Authorized baking for address: %a@,\
+               Corresponding full public key: %a@]"
+              Signature.Public_key_hash.pp pkh
+              Signature.Public_key.pp pk >>= fun () ->
+            return_unit
+          end) ;
+
+      Clic.command ~group
         ~desc: "Get high water mark of a Ledger"
-        no_options
+        (args1 (switch ~doc:"Use the (deprecated) Ledger instructions \
+                             (for older versions of the Baking app)"
+                  ~long:"use-legacy-instructions" ()))
         (prefixes [ "get" ; "ledger" ; "high" ; "watermark" ; "for" ]
          @@ Client_keys.sk_uri_param
          @@ stop)
-        (fun () sk_uri (cctxt : Client_context.io_wallet) ->
+        (fun legacy_apdu sk_uri (cctxt : Client_context.full) ->
            id_of_sk_uri sk_uri >>=? fun id ->
            with_ledger id begin fun h version _ _ ->
              match version.app_class with
              | Tezos ->
-                 failwith "Fatal: this operation is only valid with TezBake"
-             | TezBake ->
+                 failwith "Fatal: this operation is only valid with the \
+                           Tezos Baking application"
+             | TezBake when legacy_apdu ->
                  wrap_ledger_cmd begin fun pp ->
                    Ledgerwallet_tezos.get_high_watermark ~pp h
-                 end >>=? fun hwm ->
-                 cctxt#message
-                   "@[<v 0>%a has high water mark: %ld@]"
+                 end
+                 >>=? fun hwm ->
+                 cctxt#message "The high water mark for@ %a@ is %ld."
                    pp_id id hwm >>= fun () ->
+                 return_unit
+             | TezBake ->
+                 wrap_ledger_cmd begin fun pp ->
+                   Ledgerwallet_tezos.get_all_high_watermarks ~pp h
+                 end
+                 >>=? fun (`Main_hwm mh, `Test_hwm th, `Chain_id ci) ->
+                 cctxt#message
+                   "The high water mark values for@ %a@ are\
+                    @ %ld for the main-chain@ (%a)@ \
+                    and@ %ld for the test-chain."
+                   pp_id id mh Chain_id.pp Chain_id.(of_string_exn ci) th
+                 >>= fun () ->
                  return_unit
            end
         ) ;
@@ -700,7 +807,7 @@ let commands =
                     try return (Int32.of_string s)
                     with _ -> failwith "%s is not an int32 value" s)))
          @@ stop)
-        (fun () sk_uri hwm (cctxt : Client_context.io_wallet) ->
+        (fun () sk_uri hwm (cctxt : Client_context.full) ->
            id_of_sk_uri sk_uri >>=? fun id ->
            with_ledger id begin fun h version _ _ ->
              match version.app_class with
