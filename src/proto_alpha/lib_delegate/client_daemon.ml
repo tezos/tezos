@@ -31,10 +31,47 @@ let await_bootstrapped_node (cctxt: #Proto_alpha.full) =
   cctxt#message "Node synchronized." >>= fun () ->
   return_unit
 
+let monitor_fork_testchain (cctxt: #Proto_alpha.full) =
+  (* Waiting for the node to be synchronized *)
+  cctxt#message "Waiting for the test chain to be forked..." >>= fun () ->
+  Shell_services.Monitor.active_chains cctxt >>=? fun (stream, _) ->
+  let rec loop () =
+    Lwt_stream.next stream >>= fun l ->
+    let testchain =
+      List.find_opt (function
+          | Shell_services.Monitor.Active_test _ -> true
+          | _ -> false) l in
+    match testchain with
+    | Some (Active_test { protocol ; expiration_date })
+      when Protocol_hash.equal Proto_alpha.hash protocol -> begin
+        let abort_daemon () =
+          Format.printf "Test chain's expiration date reached \
+                         (%a)... Stopping the daemon.@."
+            Time.pp_hum expiration_date ;
+          exit 0 in
+        let delay = Int64.to_int Time.(diff expiration_date (now ())) in
+        if delay <= 0 then
+          abort_daemon ()
+        else
+          let timeout =
+            Lwt_timeout.create delay abort_daemon in
+          Lwt_timeout.start timeout ;
+          return_unit
+      end
+    | None -> loop ()
+    | Some _ -> loop () (* Got a testchain for a different protocol, skipping *) in
+  loop () >>=? fun () ->
+  cctxt#message "Test chain forked." >>= fun () ->
+  return_unit
+
 module Endorser = struct
 
   let run (cctxt : #Proto_alpha.full) ~chain ~delay delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
+    begin if chain = `Test then
+        monitor_fork_testchain cctxt
+      else
+        return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt chain >>=? fun block_stream ->
@@ -60,6 +97,10 @@ module Baker = struct
       ~context_path
       delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
+    begin if chain = `Test then
+        monitor_fork_testchain cctxt
+      else
+        return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_heads
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt chain >>=? fun block_stream ->
