@@ -278,13 +278,37 @@ module Make (I:Dump_interface)
 
   type command_type = Root | Directory | Blob | End | Meta
 
-  let set_command fd c =
-    Lwt_utils_unix.write_string fd
+  let rec read_string rbuf ~len =
+    let fd, buf, ofs, total = !rbuf in
+    if Bytes.length buf - ofs < len then
+      let blen = Bytes.length buf - ofs in
+      let neu = Bytes.create (blen + 1_000_000) in
+      Bytes.blit buf ofs neu 0 blen ;
+      Lwt_unix.read fd neu blen 1_000_000 >>= fun bread ->
+      total := !total + bread ;
+      if bread = 0 then
+        Lwt.fail End_of_file
+      else
+        let neu = if bread <> 1_000_000 then Bytes.sub neu 0 (blen + bread) else neu in
+        rbuf := (fd, neu, 0, total) ;
+        read_string rbuf ~len
+    else
+      let res = Bytes.sub_string buf ofs len in
+      rbuf := (fd, buf, ofs + len, total) ;
+      Lwt.return res
+
+  let read_mbytes rbuf b =
+    read_string rbuf ~len:(MBytes.length b) >>= fun string ->
+    MBytes.blit_of_string string 0 b 0 (MBytes.length b) ;
+    Lwt.return ()
+
+  let set_command buf c =
+    Buffer.add_string buf
       ( match c with
         | Root -> "r" | Directory -> "d" | Blob -> "b" | End -> "e" | Meta -> "m")
-  let get_command fd =
+  let get_command rbuf =
     Lwt.try_bind
-      (fun () -> Lwt_utils_unix.read_string fd ~len:1)
+      (fun () -> read_string rbuf ~len:1)
       begin function
         | "r" -> return Root
         | "d" -> return Directory
@@ -298,12 +322,12 @@ module Make (I:Dump_interface)
         | _ -> fail @@ Bad_read ("Unknown read error")
       end
 
-  let set_hash_type fd ty = set_command fd
+  let set_hash_type buf ty = set_command buf
       ( match ty with
         | `Node -> Directory
         | `Blob -> Blob )
-  let get_hash_type fd =
-    get_command fd >>=? function
+  let get_hash_type rbuf =
+    get_command rbuf >>=? function
     | Root -> fail @@ Bad_read ("can't reference commit here")
     | Directory -> return `Node
     | Blob -> return `Blob
@@ -311,129 +335,129 @@ module Make (I:Dump_interface)
     | Meta -> fail @@ Bad_read ("can't reference meta here")
 
 
-  let set_int64 fd i =
+  let set_int64 buf i =
     let b = Bytes.create 8 in
     EndianBytes.BigEndian.set_int64 b 0 i;
-    Lwt_utils_unix.write_bytes fd b
-  let get_int64 fd =
-    Lwt_utils_unix.read_string ~len:8 fd >>= fun s ->
+    Buffer.add_bytes buf b
+  let get_int64 rbuf =
+    read_string ~len:8 rbuf >>= fun s ->
     Lwt.return @@ EndianString.BigEndian.get_int64 s 0
-  let set_int fd i =
-    set_int64 fd @@ Int64.of_int i
-  let get_int fd =
-    get_int64 fd >|= Int64.to_int
+  let set_int buf i =
+    set_int64 buf @@ Int64.of_int i
+  let get_int rbuf =
+    get_int64 rbuf >|= Int64.to_int
 
-  let set_mbytes fd b =
-    set_int fd @@ MBytes.length b >>= fun () ->
-    Lwt_utils_unix.write_mbytes fd b
-  let get_mbytes fd =
-    get_int fd >>= fun l ->
+  let set_mbytes buf b =
+    set_int buf (MBytes.length b) ;
+    Buffer.add_bytes buf (MBytes.to_bytes b)
+  let get_mbytes rbuf =
+    get_int rbuf >>= fun l ->
     let b = MBytes.create l in
-    Lwt_utils_unix.read_mbytes fd b >>= fun () ->
+    read_mbytes rbuf b >>= fun () ->
     Lwt.return b
 
-  let set_hash fd h =
+  let set_hash buf h =
     let (ty,mb) = I.hash_export h in
-    set_hash_type fd ty >>= fun () ->
-    set_mbytes fd mb
-  let get_hash fd =
-    get_hash_type fd >>=? fun ty ->
-    get_mbytes fd >>= fun mb ->
+    set_hash_type buf ty ;
+    set_mbytes buf mb
+  let get_hash rbuf =
+    get_hash_type rbuf >>=? fun ty ->
+    get_mbytes rbuf >>= fun mb ->
     Lwt.return @@ I.hash_import ty mb
 
-  let set_string fd s =
-    set_int fd @@ String.length s >>= fun () ->
-    Lwt_utils_unix.write_string fd s
-  let get_string fd =
-    get_int fd >>= fun l ->
-    Lwt_utils_unix.read_string ~len:l fd
+  let set_string buf s =
+    set_int buf (String.length s) ;
+    Buffer.add_string buf s
+  let get_string rbuf =
+    get_int rbuf >>= fun l ->
+    read_string ~len:l rbuf
 
-  let set_list fd f l =
-    set_int fd (List.length l) >>= fun () ->
-    Lwt_list.iter_s (f fd) l
-  let get_rev_list fd f =
-    get_int fd >>= fun l ->
+  let set_list buf f l =
+    set_int buf (List.length l) ;
+    List.iter (f buf) l
+  let get_rev_list rbuf f =
+    get_int rbuf >>= fun l ->
     if l < 0
     then fail @@ Bad_read "negative list length"
     else
       let rec loop acc n =
         if n = 0 then return acc
-        else f fd >>=? fun x -> loop (x::acc) (pred n)
+        else f rbuf >>=? fun x -> loop (x::acc) (pred n)
       in loop [] l
 
-  let set_keys_hashs fd keys =
-    set_list fd
-      (fun fd (k,h) -> set_string fd k >>= fun () -> set_hash fd h)
+  let set_keys_hashs buf keys =
+    set_list buf
+      (fun buf (k,h) -> set_string buf k ; set_hash buf h)
       keys
-  let get_keys_hashs fd =
-    get_rev_list fd begin fun fd ->
-      get_string fd >>= fun k ->
-      get_hash fd >>=? fun h ->
+  let get_keys_hashs rbuf =
+    get_rev_list rbuf begin fun rbuf ->
+      get_string rbuf >>= fun k ->
+      get_hash rbuf >>=? fun h ->
       return (k,h)
     end
 
-  let set_rev_path fd path_rev = set_list fd set_string path_rev
-  let get_path fd =
-    get_rev_list fd (fun fd -> get_string fd >>= return)
+  let set_rev_path buf path_rev = set_list buf set_string path_rev
+  let get_path rbuf =
+    get_rev_list rbuf (fun rbuf -> get_string rbuf >>= return)
 
-  let set_blob fd hash path_rev blob =
-    set_command fd Blob >>= fun () ->
+  let set_blob buf hash path_rev blob =
+    set_command buf Blob ;
     match I.hash_export hash with
     | `Blob, mbhash ->
         begin
-          set_mbytes fd mbhash >>= fun () ->
-          set_rev_path fd path_rev >>= fun () ->
-          set_mbytes fd blob
+          set_mbytes buf mbhash ;
+          set_rev_path buf path_rev ;
+          set_mbytes buf blob
         end
     | `Node, _ -> assert false
-  let get_blob fd =
-    get_mbytes fd >>= fun mbhash ->
+  let get_blob rbuf =
+    get_mbytes rbuf >>= fun mbhash ->
     Lwt.return @@ I.hash_import `Blob mbhash >>=? fun hash ->
-    get_path fd >>=? fun path ->
-    get_mbytes fd >>= fun blob ->
+    get_path rbuf >>=? fun path ->
+    get_mbytes rbuf >>= fun blob ->
     return ( hash, path, blob )
 
-  let set_dir fd hash path_rev keys =
-    set_command fd Directory >>= fun () ->
+  let set_dir buf hash path_rev keys =
+    set_command buf Directory ;
     match I.hash_export hash with
     | `Node, mbhash ->
         begin
-          set_mbytes fd mbhash >>= fun () ->
-          set_rev_path fd path_rev >>= fun () ->
-          set_keys_hashs fd keys
+          set_mbytes buf mbhash ;
+          set_rev_path buf path_rev ;
+          set_keys_hashs buf keys
         end
     | `Blob, _ -> assert false
-  let get_dir fd =
-    get_mbytes fd >>= fun mbhash ->
+  let get_dir rbuf =
+    get_mbytes rbuf >>= fun mbhash ->
     Lwt.return @@ I.hash_import `Node mbhash >>=? fun hash ->
-    get_path fd >>=? fun path ->
-    get_keys_hashs fd >>=? fun keys ->
+    get_path rbuf >>=? fun path ->
+    get_keys_hashs rbuf >>=? fun keys ->
     return ( hash, path, keys )
 
-  let set_root fd bh info parents meta_h =
-    set_command fd Root >>= fun () ->
+  let set_root buf bh info parents meta_h =
+    set_command buf Root ;
     let mbhash = I.Block_header.to_bytes bh in
-    set_mbytes fd mbhash >>= fun () ->
+    set_mbytes buf mbhash ;
     let ( date, author, message ) = I.context_info_export info in
-    set_int64 fd date >>= fun () ->
-    set_string fd author >>= fun () ->
-    set_string fd message >>= fun () ->
-    set_list fd (fun fd ch -> set_mbytes fd @@ I.Commit_hash.to_bytes ch) parents >>= fun () ->
-    set_mbytes fd (Context_hash.to_bytes meta_h)
-  let get_root fd meta_tbl =
-    get_mbytes fd >>= fun mbhash ->
+    set_int64 buf date ;
+    set_string buf author ;
+    set_string buf message ;
+    set_list buf (fun buf ch -> set_mbytes buf @@ I.Commit_hash.to_bytes ch) parents ;
+    set_mbytes buf (Context_hash.to_bytes meta_h)
+  let get_root rbuf meta_tbl =
+    get_mbytes rbuf >>= fun mbhash ->
     match I.Block_header.of_bytes mbhash with
     | None -> fail @@ Bad_read "wrong block header"
     | Some bh ->
-        get_int64 fd >>= fun date ->
-        get_string fd >>= fun author ->
-        get_string fd >>= fun message ->
+        get_int64 rbuf >>= fun date ->
+        get_string rbuf >>= fun author ->
+        get_string rbuf >>= fun message ->
         let info = I.context_info_import ( date, author, message ) in
-        get_rev_list fd
-          (fun fd -> get_mbytes fd >>= fun mbh ->
+        get_rev_list rbuf
+          (fun rbuf -> get_mbytes rbuf >>= fun mbh ->
             Lwt.return @@ I.Commit_hash.of_bytes mbh)
         >>=? fun parents ->
-        get_mbytes fd >>= fun h ->
+        get_mbytes rbuf >>= fun h ->
         Lwt.return @@ Context_hash.of_bytes h >>=? fun h ->
         begin match Hashtbl.find_opt meta_tbl h with
           | None -> fail @@ Bad_read "unknown meta hash"
@@ -441,22 +465,22 @@ module Make (I:Dump_interface)
         end  >>=? fun meta ->
         return ( bh, info, List.rev parents, meta)
 
-  let set_meta fd tbl b =
+  let set_meta buf tbl b =
     let h = Context_hash.hash_bytes [b] in
     if Hashtbl.mem tbl h
     then Lwt.return h
     else
       begin
         Hashtbl.add tbl h ();
-        set_command fd Meta >>= fun () ->
-        set_mbytes fd (Context_hash.to_bytes h) >>= fun () ->
-        set_mbytes fd b >>= fun () ->
+        set_command buf Meta ;
+        set_mbytes buf (Context_hash.to_bytes h) ;
+        set_mbytes buf b ;
         Lwt.return h
       end
-  let get_meta fd tbl =
-    get_mbytes fd >>= fun h ->
+  let get_meta rbuf tbl =
+    get_mbytes rbuf >>= fun h ->
     Lwt.return @@ Context_hash.of_bytes h >>=? fun h ->
-    get_mbytes fd >>= fun b ->
+    get_mbytes rbuf >>= fun b ->
     let h' = Context_hash.hash_bytes [b] in
     if Context_hash.equal h h'
     then ( Hashtbl.add tbl h b; return () )
@@ -467,6 +491,15 @@ module Make (I:Dump_interface)
 
   let dump_contexts_fd idx blocks ~fd =
 
+    let buf = Buffer.create 1_000_000 in
+    let written = ref 0 in
+    let flush () =
+      let contents = Buffer.contents buf in
+      Buffer.clear buf ;
+      written := !written + String.length contents ;
+      Lwt_utils_unix.write_string fd contents in
+    let maybe_flush () =
+      if Buffer.length buf > 1_000_000 then flush () else Lwt.return_unit in
     (* Setting the magic *)
     let magic_set () =
       Lwt_utils_unix.write_string fd context_dump_magic
@@ -476,15 +509,14 @@ module Make (I:Dump_interface)
     let visited_hash = Hashtbl.create 1000 in
     let visited h = Hashtbl.mem visited_hash h in
     let set_visit h = Hashtbl.add visited_hash h () in
-
     (* Folding through a node *)
     let fold_tree_path ctxt path_rev tree =
       let cpt = ref 0 in
       let rec fold_tree_path ctxt path_rev tree =
         I.tree_list tree >>= fun keys ->
         let keys = List.sort (fun (a,_) (b,_) -> String.compare a b) keys in
-        Lwt_list.fold_left_s
-          begin fun acc (name,kind) ->
+        Lwt_list.map_s
+          begin fun (name,kind) ->
             let path_rev = name :: path_rev in
             I.sub_tree tree [name] >>= function
             | None -> assert false
@@ -495,6 +527,12 @@ module Make (I:Dump_interface)
                   then Lwt.return_unit
                   else
                     begin
+                      if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
+                        Format.eprintf "Context: %dK elements, %dMiB written%!\
+                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+                          (!cpt / 1000) (!written / 1_048_576) ;
+                      incr cpt ;
                       set_visit hash; (* There cannot be a cycle *)
                       match kind with
                       | `Contents ->
@@ -502,19 +540,18 @@ module Make (I:Dump_interface)
                             I.tree_content sub_tree >>= function
                             | None -> assert false
                             | Some data ->
-                                if !cpt mod 1000 = 0 then
-                                  Format.eprintf ".%!" ;
-                                incr cpt ;
-                                set_blob fd hash path_rev data
+                                set_blob buf hash path_rev data ;
+                                maybe_flush ()
                           end
                       | `Node -> fold_tree_path ctxt path_rev sub_tree
                     end
                 end >>= fun () ->
-                Lwt.return ( (name,hash)::acc )
+                Lwt.return ( (name,hash) )
           end
-          [] keys >>= fun sub_keys_rev ->
+          keys >>= fun sub_keys ->
         I.tree_hash ctxt tree >>= fun hash ->
-        set_dir fd hash path_rev (List.rev sub_keys_rev)
+        set_dir buf hash path_rev (sub_keys) ;
+        maybe_flush ()
       in
       fold_tree_path ctxt path_rev tree
     in
@@ -533,15 +570,18 @@ module Make (I:Dump_interface)
                let tree = I.context_tree ctxt in
                fold_tree_path ctxt [] tree >>= fun () ->
                I.context_parents ctxt >>= fun parents ->
-               set_meta fd meta_tbl (I.Block_data.to_bytes meta)
+               set_meta buf meta_tbl (I.Block_data.to_bytes meta)
                >>= fun meta_h ->
                (* Lwt_list.map_s (set_meta fd meta_tbl) metas *)
-               set_root fd bh (I.context_info ctxt) parents meta_h
-               >>= return
+               set_root buf bh (I.context_info ctxt) parents meta_h ;
+               return_unit
         )
         blocks
       >>=? fun () ->
-      set_command fd End >>= return
+      set_command buf End;
+      flush () >>= fun () ->
+      if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+      return_unit
     end
       begin function
         | Unix.Unix_error (e,_,_) -> fail @@ Writing_error (Unix.error_message e)
@@ -556,10 +596,13 @@ module Make (I:Dump_interface)
 
   let restore_contexts_fd index ~fd =
 
+    let read = ref 0 in
+    let rbuf = ref (fd, Bytes.empty, 0, read) in
+
     (* Magic check *)
     let magic_check () =
       let magic_length = String.length context_dump_magic in
-      Lwt_utils_unix.read_string ~len:magic_length fd >>= fun magic ->
+      read_string ~len:magic_length rbuf >>= fun magic ->
       if magic <> context_dump_magic
       then fail @@ Bad_read "wrong magic"
       else return ()
@@ -599,12 +642,17 @@ module Make (I:Dump_interface)
     let meta_tbl : ( Context_hash.t, MBytes.t ) Hashtbl.t = Hashtbl.create 127 in
 
     (* The big loop *)
-    let rec loop ctxt acc =
-      get_command fd >>=?
+    let rec loop ctxt acc cpt =
+      if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
+                        Format.eprintf "Context: %dK elements, %dMiB read%!\
+                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+                          (cpt / 1000) (!read / 1_048_576) ;
+      get_command rbuf >>=?
       function
       | Root ->
           begin
-            get_root fd meta_tbl >>=? fun ( bh_should, info, parents, meta) ->
+            get_root rbuf meta_tbl >>=? fun ( bh_should, info, parents, meta) ->
             I.set_context ~info ~parents ctxt bh_should >>= function
             | None -> fail @@ Bad_read "context_hash does not correspond for block"
             | Some bh ->
@@ -616,23 +664,26 @@ module Make (I:Dump_interface)
                 loop
                   (I.make_context index)
                   (( bh, meta ) :: acc)
+                  (succ cpt)
           end
       | Directory ->
-          get_dir fd >>=?
+          get_dir rbuf >>=?
           fun ( hash, path, keys ) -> add_dir ctxt hash path keys >>=?
-          fun tree -> loop (I.update_context ctxt tree) acc
+          fun tree -> loop (I.update_context ctxt tree) acc (succ cpt)
       | Blob ->
-          get_blob fd >>=?
+          get_blob rbuf >>=?
           fun ( hash, path, blob ) -> add_blob ctxt path hash blob >>=?
-          fun tree -> loop (I.update_context ctxt tree) acc
-      | End -> return acc
-      | Meta -> get_meta fd meta_tbl >>=? fun () -> loop ctxt acc
+          fun tree -> loop (I.update_context ctxt tree) acc (succ cpt)
+      | End ->
+          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          return acc
+      | Meta -> get_meta rbuf meta_tbl >>=? fun () -> loop ctxt acc (succ cpt)
     in
 
     (* Execution *)
     Lwt.catch (fun () ->
         magic_check () >>=? fun () ->
-        loop (I.make_context index) []
+        loop (I.make_context index) [] 0
       )
       (function
         | Unix.Unix_error (e,_,_) -> fail @@ Bad_read (Unix.error_message e)
