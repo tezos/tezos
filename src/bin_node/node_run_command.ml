@@ -251,22 +251,30 @@ let known_heads store chain_id =
   let chain = Store.Chain.get store chain_id in
   Store.Chain_data.(Known_heads.read_all @@ get chain)
 
-let predecessors store max_level head =
+module Contexts_to_gc = Set.Make (struct
+    type t = Chain_id.t * Block_header.t
+    let compare
+        (id_a, { Block_header.shell = { level = level_a } })
+        (id_b, { Block_header.shell = { level = level_b } }) =
+      compare (id_a, level_a) (id_b, level_b)
+  end)
+
+let predecessors store max_level head chain_id acc =
   let rec aux acc hash =
     Store.Block.Header.read_exn (store, hash) >>= fun h ->
-    if h.shell.level < max_level then Lwt.return acc
+    let acc = Contexts_to_gc.add (chain_id, h) acc in
+    if h.shell.level <= max_level then Lwt.return acc
     else
       Store.Block.Predecessors.read_exn (store, hash) 0 >>= fun pred ->
-      let acc = Context_hash.Set.add h.shell.context acc in
       aux acc pred
   in
-  aux Context_hash.Set.empty head
+  aux acc head
 
 let genesis_block store id =
   let store = Store.Chain.get store id in
   Store.Chain.Genesis_hash.read_exn store >>= fun genesis ->
   Store.Block.Header.read_exn (Store.Block.get store, genesis) >|= fun h ->
-  h.shell.context
+  h
 
 let run_gc (config : Node_config_file.t) =
   lwt_log_notice "Collecting live contexts before to run the GC..." >>= fun () ->
@@ -275,26 +283,33 @@ let run_gc (config : Node_config_file.t) =
   | Error _e -> Lwt.fail_with "Store.init" (* XXX: use the error monad *)
   | Ok store ->
       let alive_in_chain acc id =
-        genesis_block store id >>= fun genesis ->
+        genesis_block store id >>= fun genesis_header ->
         known_heads store id >>= fun heads ->
         let chain_t = Store.Chain.get store id in
         let block_t = Store.Block.get chain_t in
         let chain_data_t = Store.Chain_data.get chain_t in
-        Store.Chain_data.Save_point.read_exn chain_data_t >>= fun (max_level, _) ->
-        Lwt_list.fold_left_s (fun acc head ->
-            predecessors block_t max_level head >|= fun hashes ->
-            Context_hash.Set.union acc hashes
-          ) acc (Block_hash.Set.elements heads)
-        >|= fun hashes ->
+        Store.Chain_data.Save_point.read_exn chain_data_t >>= fun (save_level, _) ->
+        Lwt_list.fold_left_s (fun (acc, max_head_level) head ->
+            Store.Block.Header.read_exn (block_t, head) >>= fun { shell = { level = head_level } } ->
+            predecessors block_t save_level head id acc >|= fun acc ->
+            acc, max max_head_level head_level)
+          (acc, save_level) (Block_hash.Set.elements heads)
+        >>= fun (acc, max_head_level) ->
+        lwt_log_notice
+          "Keeping contexts of chain %a from level %ld to %ld"
+          Chain_id.pp id save_level max_head_level >>= fun () ->
         (* Always promote the genesis block *)
-        Context_hash.Set.add genesis hashes
+        Lwt.return (Contexts_to_gc.add (id, genesis_header) acc)
       in
       Store.Chain.list store >>= fun ids ->
-      Lwt_list.fold_left_s alive_in_chain Context_hash.Set.empty ids
+      Lwt_list.fold_left_s alive_in_chain Contexts_to_gc.empty ids
       >>= fun roots ->
       Tezos_storage.Context.init
         ~mapsize:4_000_000_000_000L (Node_data_version.context_dir config.data_dir)
       >>= fun context ->
+      lwt_log_notice "Sorting contexts, most recent first..." >>= fun () ->
+      let roots = Contexts_to_gc.elements roots in
+      let roots = List.rev_map (fun (_, { Block_header.shell = { context } }) -> context) roots in
       lwt_log_notice "Running the context GC..." >>= fun () ->
       Tezos_storage.Context.gc context ~roots
 

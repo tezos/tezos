@@ -42,7 +42,7 @@ val init:
 
 val close: unit -> unit Lwt.t
 
-val gc: index -> roots:Context_hash.Set.t -> unit Lwt.t
+val gc: index -> roots:Context_hash.t list -> unit Lwt.t
 
 val commit_genesis:
   index ->

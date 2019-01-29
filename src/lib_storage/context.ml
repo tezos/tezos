@@ -346,7 +346,6 @@ let commit ~time ?message context =
 let gc_in_progress = ref None
 
 let gc index ~roots =
-  let roots = Context_hash.Set.elements roots in
   let switch = Lwt_switch.create () in
   gc_in_progress := Some switch;
   GitStore.gc ~repo:index.repo ~switch roots >|= fun stats ->
