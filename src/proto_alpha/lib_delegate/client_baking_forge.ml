@@ -725,9 +725,17 @@ let forge_block
       -% a timestamp_tag timestamp
       -% a fitness_tag shell_header.fitness) >>= fun () ->
 
-  let level = Raw_level.of_int32 shell_header.level |> function
-    | Ok level -> level
-    | _ -> assert false (* TODO *) in
+  begin match Alpha_environment.wrap_error (Raw_level.of_int32 shell_header.level) with
+    | Ok level -> return level
+    | (Error errs) as err ->
+        lwt_log_error Tag.DSL.(fun f ->
+            f "@[Error on raw_level conversion : %a@]"
+            -% t event "block_injection_failed"
+            -% a errs_tag errs
+          ) >>= fun () ->
+        Lwt.return err
+  end >>=? fun level ->
+
   inject_block cctxt
     ?force ~chain ~shell_header ~priority ?seed_nonce_hash
     ~delegate_pkh
