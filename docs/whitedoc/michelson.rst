@@ -886,7 +886,7 @@ Operations on sets
     > MEM / x : {} : S  =>  false : S
     > MEM / x : { hd ; <tl> } : S  =>  r : S
         iff COMPARE / x : hd : []  =>  1 : []
-        where MEM / x : v : { <tl> } : S  =>  r : S
+        where MEM / x : { <tl> } : S  =>  r : S
     > MEM / x : { hd ; <tl> } : S  =>  true : S
         iff COMPARE / x : hd : []  =>  0 : []
     > MEM / x : { hd ; <tl> } : S  =>  false : S
@@ -1773,7 +1773,7 @@ A typing rule can be inferred:
 
     > SET_CAR  =>  CDR ; SWAP ; PAIR
 
--  ``SET_CDR``: Set the first value of a pair.
+-  ``SET_CDR``: Set the second value of a pair.
 
 ::
 
@@ -2393,7 +2393,7 @@ variable annotation corresponding to the field annotation alone.
 ::
 
    CDAR
-   :: (pair ('a %foo) (pair %bar ('b %x) ('c %y))) : 'S ->  @p.bar.x 'b : 'S
+   :: (pair ('a %foo) (pair %bar ('b %x) ('c %y))) : 'S ->  @bar.x 'b : 'S
 
 A similar mechanism is used for context dependent instructions:
 
