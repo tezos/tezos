@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,52 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  if Filename.basename Sys.argv.(0) = Updater.compiler_name then begin
-    try
-      Tezos_protocol_compiler.Compiler.main
-        Tezos_protocol_compiler_native.Native.driver ;
-      Pervasives.exit 0
-    with exn ->
-      Format.eprintf "%a\n%!" Opterrors.report_error exn;
-      Pervasives.exit 1
-  end
+let raw_commit_hash = "$Format:%H$"
 
-let term =
-  let open Cmdliner.Term in
-  ret (const (`Help (`Pager, None)))
+let commit_hash =
+  if String.equal raw_commit_hash ("$Format:"^"%H$"(*trick to avoid git-subst*))
+  then Generated_git_info.commit_hash
+  else raw_commit_hash
 
-let description = [
-  `S "DESCRIPTION" ;
-  `P "Entry point for initializing, configuring and running a Tezos node." ;
-  `P Node_identity_command.Manpage.command_description ;
-  `P Node_run_command.Manpage.command_description ;
-  `P Node_config_command.Manpage.command_description ;
-]
+let raw_abbreviated_commit_hash = "$Format:%h$"
 
-let man =
-  description @
-  Node_run_command.Manpage.examples
+let abbreviated_commit_hash =
+  if String.equal raw_abbreviated_commit_hash ("$Format:"^"%h$")
+  then Generated_git_info.abbreviated_commit_hash
+  else raw_abbreviated_commit_hash
 
-let info =
-  let version =
-    Tezos_base.Current_git_info.abbreviated_commit_hash ^
-    " ("^Tezos_base.Current_git_info.committer_date^")" in
-  Cmdliner.Term.info
-    ~doc:"The Tezos node"
-    ~man
-    ~version
-    "tezos-node"
+let raw_committer_date = "$Format:%ci$"
 
-let commands = [
-  Node_run_command.cmd ;
-  Node_config_command.cmd ;
-  Node_identity_command.cmd ;
-]
-
-let () =
-  match Cmdliner.Term.eval_choice (term, info) commands with
-  | `Error _ -> exit 1
-  | `Help -> exit 0
-  | `Version -> exit 1
-  | `Ok () -> exit 0
+let committer_date =
+  if String.equal raw_committer_date ("$Format:"^"%ci$")
+  then Generated_git_info.committer_date
+  else raw_committer_date
