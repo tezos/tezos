@@ -102,6 +102,7 @@ and hashed_header = {
   header: Block_header.t ;
 }
 
+
 let read_chain_data { chain_data } f =
   Shared.use chain_data begin fun state ->
     f state.chain_data_store state.data
@@ -891,9 +892,9 @@ module Block = struct
       else
         read_opt chain_state header.Block_header.shell.predecessor
 
-    let predecessor_n ?(below_save_point = false) chain_state hash n =
+    let predecessor_n chain_state hash n =
       Shared.use chain_state.block_store begin fun block_store ->
-        predecessor_n ~below_save_point block_store hash n
+        predecessor_n block_store hash n
       end
   end
 
@@ -961,10 +962,20 @@ module Block = struct
         Store.Block.Invalid_block.known store hash
     end
 
-  let read_predecessor chain_state ~pred hash =
+  type partial =
+    | Full of block
+    | Header of {
+        chain_id: Chain_id.t ;
+        hash: Block_hash.t ;
+        header: Block_header.t
+      }
+    | Pruned
+
+  let read_predecessor chain_state ~pred ?(below_save_point = false) hash =
     Shared.use chain_state.block_store begin fun store ->
-      predecessor_n store hash pred >>= fun hash_opt ->
-      let new_hash_opt = match hash_opt with
+      predecessor_n ~below_save_point store hash pred >>= fun hash_opt ->
+      let new_hash_opt =
+        match hash_opt with
         | Some _ as hash_opt -> hash_opt
         | None ->
             if Block_hash.equal hash chain_state.genesis.block then
@@ -973,15 +984,18 @@ module Block = struct
               None
       in
       match new_hash_opt with
-      | None -> Lwt.return None
+      | None -> Lwt.fail Not_found
       | Some hash ->
           Store.Block.Contents.read_opt (store, hash) >>= fun contents ->
           Store.Block.Header.read_opt (store, hash) >>= fun header ->
           begin match (contents, header) with
             | (Some contents, Some header) ->
-                Lwt.return_some { chain_state ; hash ; contents ; header }
-            | _ ->
-                Lwt.return_none
+                Lwt.return (Full { chain_state ; hash ; contents ; header })
+            | (None, Some header) ->
+                let chain_id = chain_state.chain_id in
+                Lwt.return (Header { chain_id ; hash ; header })
+            | (_, None) ->
+                Lwt.return Pruned
           end
 
     end
@@ -1013,9 +1027,9 @@ module Block = struct
     else
       read_opt chain_state header.shell.predecessor
 
-  let predecessor_n ?(below_save_point = false) b n =
+  let predecessor_n b n =
     Shared.use b.chain_state.block_store begin fun block_store ->
-      predecessor_n ~below_save_point block_store b.hash n
+      predecessor_n block_store b.hash n
     end
 
   let store

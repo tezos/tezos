@@ -141,7 +141,23 @@ module Block : sig
   val read: Chain.t -> Block_hash.t -> block tzresult Lwt.t
   val read_opt: Chain.t -> Block_hash.t -> block option Lwt.t
   val read_exn: Chain.t -> Block_hash.t -> block Lwt.t
-  val read_predecessor: Chain.t -> pred:int -> Block_hash.t -> block option Lwt.t
+
+  type partial =
+    | Full of block
+    | Header of {
+        chain_id: Chain_id.t ;
+        hash: Block_hash.t ;
+        header: Block_header.t
+      }
+    | Pruned
+
+  (** Will return the full block if the block has never been cleaned
+     (all blocks for nodes whose history-mode is set to archive), only
+     the header for nodes below the save point (nodes in full or
+     rolling history-mode) or even `Pruned` for blocks below the rock
+     bottom, only for nodes in rolling history-mode. Will fail with
+     `Not_found` if the given hash is unknown. *)
+  val read_predecessor: Chain.t -> pred:int -> ?below_save_point:bool -> Block_hash.t -> partial Lwt.t
 
   val store:
     ?dont_enforce_context_hash:bool ->
@@ -188,7 +204,7 @@ module Block : sig
     val all_operation_hashes: block_header -> Operation_hash.t list list Lwt.t
 
     val predecessor : block_header -> block_header option Lwt.t
-    val predecessor_n : ?below_save_point:bool -> Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
+    val predecessor_n : Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
 
   end
 
@@ -212,7 +228,7 @@ module Block : sig
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t
-  val predecessor_n: ?below_save_point:bool -> t -> int -> Block_hash.t option Lwt.t
+  val predecessor_n: t -> int -> Block_hash.t option Lwt.t
 
   val is_valid_for_checkpoint: t -> Block_header.t -> bool Lwt.t
 
