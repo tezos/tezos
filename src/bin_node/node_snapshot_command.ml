@@ -70,7 +70,7 @@ let export ?(export_full=false) data_dir filename blocks =
           (block_store, pred_block_hash) >>=? fun pred_block_header ->
 
         (* Get operation list*)
-        let validations_passes = pred_block_header.shell.validation_passes in
+        let validations_passes = block_header.shell.validation_passes in
         Error_monad.map_s
           (fun i -> Store.Block.Operations.read (block_store, block_hash) i)
           (0 -- (validations_passes - 1)) >>=? fun operations ->
@@ -177,8 +177,6 @@ let import data_dir filename =
           context_index
           pred_context_hash >>= fun predecessor_context ->
 
-        let pruned_block_pred, pruned_blocks = List.hd old_blocks, List.tl old_blocks in
-
         (* … we can now call apply … *)
         Tezos_validation.Block_validation.apply
           chain_id
@@ -209,13 +207,13 @@ let import data_dir filename =
               else
                 begin
                   let expected = hd1.block_header.shell.predecessor in
-                  let found = Block_header.hash hd2.block_header in
-                  if Block_hash.equal expected found then
+                  let computed = Block_header.hash hd2.block_header in
+                  if Block_hash.equal expected computed then
                     chain_check (hd2::tl) limit
                   else
                     (*FIXME : raise nice exception*)
                     failwith "Error in chain found %a, expected %a"
-                      Block_hash.pp found Block_hash.pp expected
+                      Block_hash.pp computed Block_hash.pp expected
                 end
           | hd :: [] ->
               if hd.block_header.shell.level = limit then
@@ -226,7 +224,68 @@ let import data_dir filename =
                   "Error not enough blocks found to ensure valid imported block"
           | [] -> assert false
         in
-        chain_check (pruned_block_pred :: pruned_blocks) check_limit >>=? fun () ->
+        chain_check old_blocks check_limit >>=? fun () ->
+
+        let operation_checks ops ops_h bh_op_h =
+          (* Compute operations hashes and compare*)
+          List.iter2
+            (fun (_,op) (_,oph) ->
+               let expeced_op_hash = List.map Operation.hash op in
+               List.iter2 (fun excpected found ->
+                   (* FIXME: raise nice expection *)
+                   assert (Operation_hash.equal excpected found)
+                 ) expeced_op_hash oph;
+            )
+            ops ops_h;
+          (* Check header hashes based on merkel tree*)
+          Lwt_list.map_p (fun (_,opl) ->
+              Lwt_list.map_p (fun op ->
+                  let op_hash = Operation.hash op in
+                  Lwt.return op_hash) opl)
+            (List.rev ops) >>= fun hashes ->
+          let computed_hash =
+            Operation_list_list_hash.compute
+              (List.map Operation_list_hash.compute hashes) in
+          (* FIXME: raise nice expection *)
+          assert
+            (Operation_list_list_hash.equal computed_hash bh_op_h);
+          Lwt.return_unit
+        in
+
+        (* … we check prunde blocks validity …*)
+        let check_limit =
+          Int32.(sub
+                   block_header.shell.level
+                   (of_int block_validation_result.validation_result.max_operations_ttl)) in
+        let rec chain_check (l:Tezos_storage.Context.Pruned_block.t list) limit =
+          match l with
+          | hd1 :: _ when hd1.block_header.shell.level = limit ->
+              return_unit
+          | hd1 :: hd2 :: tl ->
+              (* Checking operations consistency *)
+              let ({block_header; operations ; operation_hashes ; _} :
+                     Tezos_storage.Context.Pruned_block.t) = hd1 in
+              operation_checks
+                operations
+                operation_hashes
+                block_header.shell.operations_hash
+              >>= fun () ->
+              begin
+                let expected = hd1.block_header.shell.predecessor in
+                let computed = Block_header.hash hd2.block_header in
+                if Block_hash.equal expected computed then
+                  chain_check (hd2::tl) limit
+                else
+                  (*FIXME : raise nice exception*)
+                  failwith "Error in chain found %a, expected %a"
+                    Block_hash.pp computed Block_hash.pp expected
+              end
+          | _ ->
+              (*FIXME : raise nice exception*)
+              failwith
+                "Failed to validate imported block"
+        in
+        chain_check old_blocks check_limit >>=? fun () ->
 
         (* … and we write data in store.*)
         let nb_blocks = List.length old_blocks in
@@ -262,7 +321,7 @@ let import data_dir filename =
           end >>= fun () ->
           if rest = [] then Lwt.return ()
           else loop_on_chunks rest in
-        loop_on_chunks (pruned_block_pred :: pruned_blocks) >>= fun () ->
+        loop_on_chunks old_blocks >>= fun () ->
         if Unix.isatty Unix.stderr then Format.eprintf "@." ;
 
         let chain_data = Store.Chain_data.get chain_store in
