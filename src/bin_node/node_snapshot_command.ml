@@ -235,31 +235,38 @@ let import data_dir filename =
         (* … and we write data in store.*)
         let nb_blocks = List.length old_blocks in
         let cpt = ref 1 in
-        Lwt_list.iter_s begin fun pruned_block ->
-          if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
-            Format.eprintf "Storing blocks: %iK/%iK%!\
-                            \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                            \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-              (!cpt / 1000)
-              (nb_blocks / 1000);
-          incr cpt;
-          let ({block_header; operations ; operation_hashes ; predecessors } :
-                 Tezos_storage.Context.Pruned_block.t) = pruned_block in
-          let pruned_block_hash = Block_header.hash block_header in
-          Store.Block.Header.store
-            (block_store, Block_header.hash block_header) block_header >>= fun () ->
-          Lwt_list.iter_s
-            (fun (i,v) -> Store.Block.Operations.store (block_store,pruned_block_hash) i v)
-            operations >>= fun () ->
-          Lwt_list.iter_s
-            (fun (i,v) -> Store.Block.Operation_hashes.store (block_store,pruned_block_hash) i v)
-            operation_hashes >>= fun () ->
-          Lwt_list.iter_s
-            (fun (l,h) -> Store.Block.Predecessors.store (block_store,pruned_block_hash) l h)
-            predecessors >>= fun () ->
-          Lwt.return_unit
-        end
-          (pruned_block_pred :: pruned_blocks) >>=fun () ->
+        let rec loop_on_chunks blocks =
+          let blocks, rest = List.split_n 5000 blocks in
+          Store.with_atomic_rw store begin fun () ->
+            Lwt_list.iter_s begin fun pruned_block ->
+              if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
+                Format.eprintf "Storing blocks: %iK/%iK%!\
+                                \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                                \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+                  (!cpt / 1000)
+                  (nb_blocks / 1000);
+              incr cpt;
+              let ({block_header; operations ; operation_hashes ; predecessors } :
+                     Tezos_storage.Context.Pruned_block.t) = pruned_block in
+              let pruned_block_hash = Block_header.hash block_header in
+              Store.Block.Header.store
+                (block_store, Block_header.hash block_header) block_header >>= fun () ->
+              Lwt_list.iter_s
+                (fun (i,v) -> Store.Block.Operations.store (block_store,pruned_block_hash) i v)
+                operations >>= fun () ->
+              Lwt_list.iter_s
+                (fun (i,v) -> Store.Block.Operation_hashes.store (block_store,pruned_block_hash) i v)
+                operation_hashes >>= fun () ->
+              Lwt_list.iter_s
+                (fun (l,h) -> Store.Block.Predecessors.store (block_store,pruned_block_hash) l h)
+                predecessors >>= fun () ->
+              Lwt.return_unit
+            end
+              blocks
+          end >>= fun () ->
+          if rest = [] then Lwt.return ()
+          else loop_on_chunks rest in
+        loop_on_chunks (pruned_block_pred :: pruned_blocks) >>= fun () ->
         if Unix.isatty Unix.stderr then Format.eprintf "@." ;
 
         let chain_data = Store.Chain_data.get chain_store in
