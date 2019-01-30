@@ -92,7 +92,7 @@ let export ?(export_full=false) data_dir filename blocks =
             return
               (Int32.(sub block_header.shell.level (of_int max_op_ttl)))
         end >>=? fun export_limit ->
-        let rec load_pruned (bh : Block_header.t)  acc limit =
+        let rec load_pruned (bh : Block_header.t) acc limit =
           if bh.shell.level = limit then
             return acc
           else
@@ -226,7 +226,16 @@ let import data_dir filename =
         chain_check (pruned_block_pred :: pruned_blocks) check_limit >>=? fun () ->
 
         (* … and we write data in store.*)
+        let nb_blocks = List.length old_blocks in
+        let cpt = ref 1 in
         Lwt_list.iter_s begin fun pruned_block ->
+          if Unix.isatty Unix.stderr then
+            Format.eprintf "Storing blocks: %i/%i%!\
+                            \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                            \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+              !cpt
+              nb_blocks;
+          incr cpt;
           let ({block_header; operations ; operation_hashes ; predecessors } :
                  Tezos_storage.Context.Block_data.pruned_block) = pruned_block in
           let pruned_block_hash = Block_header.hash block_header in
@@ -244,6 +253,7 @@ let import data_dir filename =
           Lwt.return_unit
         end
           (pruned_block_pred :: pruned_blocks) >>=fun () ->
+        if Unix.isatty Unix.stderr then Format.eprintf "@." ;
 
         let chain_data = Store.Chain_data.get chain_store in
 
