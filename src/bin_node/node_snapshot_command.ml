@@ -80,10 +80,6 @@ let export ?(export_full=false) data_dir filename blocks =
           (block_store, block_hash) >>=? fun block_content ->
         (* Get the max_ttls previous block headers and their operation hashes*)
         let max_op_ttl = block_content.max_operations_ttl in
-        (* FIXME: Raise a nice exception ?*)
-        fail_when (max_op_ttl < 60)
-          (failure "Number of confirmations for block %a is too low (%i < 60)"
-             Block_hash.pp block_hash max_op_ttl) >>=? fun () ->
         begin
           if export_full then
             Store.Chain_data.Rock_bottom.read chain_data_store >>=? fun (rb_level,_) ->
