@@ -92,7 +92,15 @@ let export ?(export_full=false) data_dir filename blocks =
             return
               (Int32.(sub block_header.shell.level (of_int max_op_ttl)))
         end >>=? fun export_limit ->
+        let cpt = ref 0 in
         let rec load_pruned (bh : Block_header.t) acc limit =
+          if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
+            Format.eprintf "Retrieving history: %iK/%iK blocks%!\
+                            \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                            \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+              (!cpt / 1000)
+              ((!cpt + (Int32.to_int bh.shell.level - Int32.to_int limit)) / 1000);
+          incr cpt;
           if bh.shell.level = limit then
             return acc
           else
@@ -109,15 +117,14 @@ let export ?(export_full=false) data_dir filename blocks =
                 operations ;
                 operation_hashes ;
                 predecessors ;
-              } : Tezos_storage.Context.Block_data.pruned_block ) in
-            load_pruned pbhd (acc @ [pruned_block]) limit in
-        load_pruned block_header [] export_limit >>=? fun old_pruned_blocks ->
-
+              } : Tezos_storage.Context.Pruned_block.t ) in
+            load_pruned pbhd (pruned_block :: acc) limit in
+        load_pruned block_header [] export_limit >>=? fun old_pruned_blocks_rev ->
+        if Unix.isatty Unix.stderr then Format.eprintf "@." ;
         let block_data =
           ({block_header = block_header ;
-            operations ;
-            old_blocks = old_pruned_blocks } : Tezos_storage.Context.Block_data.t ) in
-        return (Some (pred_block_header, block_data))
+            operations } : Tezos_storage.Context.Block_data.t ) in
+        return (Some (pred_block_header, block_data, List.rev old_pruned_blocks_rev))
   end
     blocks >>=? fun data_to_dump ->
   Store.close store;
@@ -155,8 +162,8 @@ let import data_dir filename =
   Tezos_storage.Context.restore_contexts context_index ~filename >>=? fun restored_data ->
 
   (* Process data imported from snapshot *)
-  Error_monad.iter_s begin fun ((predecessor_block_header : Block_header.t), meta) ->
-    let ({ block_header ; operations ; old_blocks } :
+  Error_monad.iter_s begin fun ((predecessor_block_header : Block_header.t), meta, old_blocks) ->
+    let ({ block_header ; operations } :
            Tezos_storage.Context.Block_data.t) = meta in
     let block_hash = Block_header.hash block_header in
     Store.Block.Contents.known (block_store,block_hash) >>= fun known ->
@@ -198,7 +205,7 @@ let import data_dir filename =
           Int32.(sub
                    block_header.shell.level
                    (of_int block_validation_result.validation_result.max_operations_ttl)) in
-        let rec chain_check (l:Tezos_storage.Context.Block_data.pruned_block list) limit =
+        let rec chain_check (l:Tezos_storage.Context.Pruned_block.t list) limit =
           match l with
           | hd1 :: hd2 :: tl ->
               if hd1.block_header.shell.level = limit then
@@ -229,15 +236,15 @@ let import data_dir filename =
         let nb_blocks = List.length old_blocks in
         let cpt = ref 1 in
         Lwt_list.iter_s begin fun pruned_block ->
-          if Unix.isatty Unix.stderr then
-            Format.eprintf "Storing blocks: %i/%i%!\
+          if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
+            Format.eprintf "Storing blocks: %iK/%iK%!\
                             \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
                             \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-              !cpt
-              nb_blocks;
+              (!cpt / 1000)
+              (nb_blocks / 1000);
           incr cpt;
           let ({block_header; operations ; operation_hashes ; predecessors } :
-                 Tezos_storage.Context.Block_data.pruned_block) = pruned_block in
+                 Tezos_storage.Context.Pruned_block.t) = pruned_block in
           let pruned_block_hash = Block_header.hash block_header in
           Store.Block.Header.store
             (block_store, Block_header.hash block_header) block_header >>= fun () ->

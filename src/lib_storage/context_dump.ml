@@ -40,6 +40,12 @@ module type Dump_interface = sig
     val equal : t -> t -> bool
   end
 
+  module Pruned_block : sig
+    type t
+    val to_bytes : t -> MBytes.t
+    val of_bytes : MBytes.t -> t option
+  end
+
   module Block_data : sig
     type t
     val to_bytes : t -> MBytes.t
@@ -93,10 +99,11 @@ module type S = sig
   type context
   type block_header
   type block_data
+  type pruned_block
 
-  val dump_contexts_fd : index -> (block_header * block_data) list -> fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
+  val dump_contexts_fd : index -> (block_header * block_data * pruned_block list) list -> fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
   val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
-    (block_header * block_data) list tzresult Lwt.t
+    (block_header * block_data * pruned_block list) list tzresult Lwt.t
 end
 
 type error += Writing_error of string
@@ -228,7 +235,7 @@ let () = register_error_kind `Permanent
    path_rev must be given reversed.
    keys should be ordered by String.compare on its first element.
 
- * Root: 'r' (block_header : mbytes, date : int, author : string, message : string, parents : mbytes list)
+ * Root: 'r' (block_data : mbytes, date : int, author : string, message : string, parents : mbytes list)
    Root marks a context as complete, everything happening after the ROOT
    instruction will be in a different context, and no other modification will be
    performed on that context.
@@ -236,6 +243,11 @@ let () = register_error_kind `Permanent
    date, author and message must be the ones used by Tezos.
    parents must be the list of ancestors of the context (which would have a single element).
    parents should be ordered by hash decreasing (though if there are several parents, something really odd happened).
+
+ * Proot: 'p' (pruned_block_data: mbytes)
+   Adds a history block (only the chain data without context).
+   For a snapshot to be valid, there should be Proot entries for at least a number of blocks
+   preceding each Root according to the Root's operation ttl.
 
  * End: 'e'
    This must be the end of the file.
@@ -263,7 +275,10 @@ let () = register_error_kind `Permanent
    Blob root/b/ba
    Blob root/b
    Dir root
+   Proot data
+   Proot data
    Root
+   ...
    End
 
    In case several trees are given, they should be exported in the order given as input.
@@ -276,7 +291,7 @@ module Make (I:Dump_interface)
 
   let context_dump_magic = "V1Tezos-Context-dump"
 
-  type command_type = Root | Directory | Blob | End | Meta
+  type command_type = Root | Proot | Directory | Blob | End | Meta
 
   let rec read_string rbuf ~len =
     let fd, buf, ofs, total = !rbuf in
@@ -305,7 +320,7 @@ module Make (I:Dump_interface)
   let set_command buf c =
     Buffer.add_string buf
       ( match c with
-        | Root -> "r" | Directory -> "d" | Blob -> "b" | End -> "e" | Meta -> "m")
+        | Root -> "r" | Directory -> "d" | Blob -> "b" | End -> "e" | Meta -> "m" | Proot -> "p")
   let get_command rbuf =
     Lwt.try_bind
       (fun () -> read_string rbuf ~len:1)
@@ -315,6 +330,7 @@ module Make (I:Dump_interface)
         | "b" -> return Blob
         | "e" -> return End
         | "m" -> return Meta
+        | "p" -> return Proot
         | opcode -> fail @@ Bad_read ("wrong opcode: " ^ opcode)
       end
       begin function
@@ -328,6 +344,7 @@ module Make (I:Dump_interface)
         | `Blob -> Blob )
   let get_hash_type rbuf =
     get_command rbuf >>=? function
+    | Proot -> fail @@ Bad_read ("can't have a pruned block here")
     | Root -> fail @@ Bad_read ("can't reference commit here")
     | Directory -> return `Node
     | Blob -> return `Blob
@@ -563,16 +580,25 @@ module Make (I:Dump_interface)
     Lwt.catch begin fun () ->
       magic_set () >>= fun () ->
       Error_monad.iter_s
-        (fun (bh,meta) ->
+        (fun (bh,meta,pruned) ->
            I.get_context idx bh >>= function
            | None -> fail @@ Context_not_found (I.Block_header.to_bytes bh)
            | Some ctxt ->
                let tree = I.context_tree ctxt in
                fold_tree_path ctxt [] tree >>= fun () ->
                I.context_parents ctxt >>= fun parents ->
-               set_meta buf meta_tbl (I.Block_data.to_bytes meta)
-               >>= fun meta_h ->
-               (* Lwt_list.map_s (set_meta fd meta_tbl) metas *)
+               set_meta buf meta_tbl (I.Block_data.to_bytes meta) >>= fun meta_h ->
+               Lwt_list.fold_left_s (fun cpt pruned ->
+                      if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
+                        Format.eprintf "History: %dK block, %dMiB written%!\
+                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+                          (cpt / 1000) (!written / 1_048_576) ;
+                      set_command buf Proot ;
+                      let mbhash = I.Pruned_block.to_bytes pruned in
+                      set_mbytes buf mbhash ;
+                      maybe_flush () >>= fun () ->
+                      Lwt.return (cpt + 1)) 0 pruned >>= fun _ ->
                set_root buf bh (I.context_info ctxt) parents meta_h ;
                return_unit
         )
@@ -642,30 +668,28 @@ module Make (I:Dump_interface)
     let meta_tbl : ( Context_hash.t, MBytes.t ) Hashtbl.t = Hashtbl.create 127 in
 
     (* The big loop *)
+    let finalize_root ctxt =
+      get_root rbuf meta_tbl >>=? fun ( bh_should, info, parents, meta) ->
+      I.set_context ~info ~parents ctxt bh_should >>= function
+      | None -> fail @@ Bad_read "context_hash does not correspond for block"
+      | Some bh ->
+          begin
+            match I.Block_data.of_bytes meta with
+            | Some md -> return md
+            | None -> fail @@ Bad_read "wrong meta data"
+          end >>=? fun meta ->
+          return (bh, meta) in
     let rec loop ctxt acc cpt =
       if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
-                        Format.eprintf "Context: %dK elements, %dMiB read%!\
-                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-                          (cpt / 1000) (!read / 1_048_576) ;
+        Format.eprintf "Context: %dK elements, %dMiB read%!\
+                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+          (cpt / 1000) (!read / 1_048_576) ;
       get_command rbuf >>=?
       function
       | Root ->
-          begin
-            get_root rbuf meta_tbl >>=? fun ( bh_should, info, parents, meta) ->
-            I.set_context ~info ~parents ctxt bh_should >>= function
-            | None -> fail @@ Bad_read "context_hash does not correspond for block"
-            | Some bh ->
-                begin
-                  match I.Block_data.of_bytes meta with
-                  | Some md -> return md
-                  | None -> fail @@ Bad_read "wrong meta data"
-                end >>=? fun meta ->
-                loop
-                  (I.make_context index)
-                  (( bh, meta ) :: acc)
-                  (succ cpt)
-          end
+          finalize_root ctxt >>=? fun (bh, meta) ->
+          loop (I.make_context index) ((bh, meta, []) :: acc) (succ cpt)
       | Directory ->
           get_dir rbuf >>=?
           fun ( hash, path, keys ) -> add_dir ctxt hash path keys >>=?
@@ -678,6 +702,27 @@ module Make (I:Dump_interface)
           if Unix.isatty Unix.stderr then Format.eprintf "@." ;
           return acc
       | Meta -> get_meta rbuf meta_tbl >>=? fun () -> loop ctxt acc (succ cpt)
+      | Proot ->
+          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          loop_pruned [] 0 >>=? fun pruned ->
+          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          finalize_root ctxt >>=? fun (bh, meta) ->
+          loop (I.make_context index) ((bh, meta, pruned) :: acc) (succ cpt)
+    and loop_pruned acc cpt =
+      if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
+        Format.eprintf "History: %dK blocks, %dMiB read%!\
+                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+          (cpt / 1000) (!read / 1_048_576) ;
+      get_mbytes rbuf >>= fun bytes ->
+      match I.Pruned_block.of_bytes bytes with
+      | None -> fail @@ Bad_read "wrong pruned block"
+      | Some block ->
+          get_command rbuf >>=? function
+          | Proot -> loop_pruned (block :: acc) (succ cpt)
+          | Root -> return (List.rev acc)
+          | _ ->
+              fail @@ Bad_read "invalid command in the middle of block history"
     in
 
     (* Execution *)

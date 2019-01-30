@@ -109,37 +109,41 @@ val clear_test_chain: index -> Chain_id.t -> unit Lwt.t
 
 (** {2 Context dumping} ******************************************************)
 
-module Block_data : sig
+module Pruned_block : sig
 
-  (* To fit pruned blocks *)
-  type pruned_block = {
+  type t = {
     block_header : Block_header.t ;
     operations : ( int * Operation.t list ) list ;
     operation_hashes : (int * Operation_hash.t list) list ;
     predecessors : (int * Block_hash.t) list ;
   }
 
-  val pruned_block_encoding : pruned_block Data_encoding.t
+  val encoding : t Data_encoding.t
+
+  val to_bytes : t -> MBytes.t
+  val of_bytes : MBytes.t -> t option
+end
+
+module Block_data : sig
 
   type t = {
     block_header : Block_header.t ;
     operations : Operation.t list list ;
-    old_blocks : pruned_block list ;
   }
 
   val to_bytes : t -> MBytes.t
   val of_bytes : MBytes.t -> t option
   val empty : t
-  val block_data_encoding : t Data_encoding.t
+  val encoding : t Data_encoding.t
 end
 
-val dump_contexts : index -> (Block_header.t * Block_data.t) list -> filename:string ->
+val dump_contexts : index -> (Block_header.t * Block_data.t * Pruned_block.t list) list -> filename:string ->
   unit tzresult Lwt.t
 val restore_contexts : index -> filename:string ->
-  (Block_header.t * Block_data.t) list tzresult Lwt.t
+  (Block_header.t * Block_data.t * Pruned_block.t list) list tzresult Lwt.t
 
 
-val dump_contexts_fd : index -> (Block_header.t * Block_data.t) list -> fd:Lwt_unix.file_descr ->
+val dump_contexts_fd : index -> (Block_header.t * Block_data.t * Pruned_block.t list) list -> fd:Lwt_unix.file_descr ->
   unit tzresult Lwt.t
 val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
-  (Block_header.t * Block_data.t) list tzresult Lwt.t
+  (Block_header.t * Block_data.t * Pruned_block.t list) list tzresult Lwt.t
