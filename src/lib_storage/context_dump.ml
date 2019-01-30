@@ -545,7 +545,7 @@ module Make (I:Dump_interface)
                   else
                     begin
                       if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
-                        Format.eprintf "Context: %dK elements, %dMiB written%!\
+                        Format.eprintf "Context: %dK elements, %dMiB written%!\b\b\b\b\
                                         \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
                                         \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
                           (!cpt / 1000) (!written / 1_048_576) ;
@@ -586,11 +586,12 @@ module Make (I:Dump_interface)
            | Some ctxt ->
                let tree = I.context_tree ctxt in
                fold_tree_path ctxt [] tree >>= fun () ->
+               if Unix.isatty Unix.stderr then Format.eprintf "@." ;
                I.context_parents ctxt >>= fun parents ->
                set_meta buf meta_tbl (I.Block_data.to_bytes meta) >>= fun meta_h ->
                Lwt_list.fold_left_s (fun cpt pruned ->
                       if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
-                        Format.eprintf "History: %dK block, %dMiB written%!\
+                        Format.eprintf "History: %dK block, %dMiB written%!\b\b\b\b\b\
                                         \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
                                         \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
                           (cpt / 1000) (!written / 1_048_576) ;
@@ -681,7 +682,7 @@ module Make (I:Dump_interface)
           return (bh, meta) in
     let rec loop ctxt acc cpt =
       if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
-        Format.eprintf "Context: %dK elements, %dMiB read%!\
+        Format.eprintf "Context: %dK elements, %dMiB read%!\b\b\b\b\b\
                         \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
                         \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
           (cpt / 1000) (!read / 1_048_576) ;
@@ -710,7 +711,7 @@ module Make (I:Dump_interface)
           loop (I.make_context index) ((bh, meta, pruned) :: acc) (succ cpt)
     and loop_pruned acc cpt =
       if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
-        Format.eprintf "History: %dK blocks, %dMiB read%!\
+        Format.eprintf "History: %dK blocks, %dMiB read%!\b\b\b\b\b\b\
                         \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
                         \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
           (cpt / 1000) (!read / 1_048_576) ;
