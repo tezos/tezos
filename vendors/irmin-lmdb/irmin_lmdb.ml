@@ -347,7 +347,7 @@ module Irmin_value_store
         |+ field "kind" (option metadata_v2_t) (function
             | { kind = `Node ; _ } -> None
             | { kind = `Contents m ; _ } -> Some m)
-        |+ field "name" (string_of `Int8) (fun { name ; _ } -> name)
+        |+ field "name" string (fun { name ; _ } -> name)
         |+ field "node" hash_v2_t (fun { node ; _ } -> node)
         |> sealr
 
@@ -549,7 +549,7 @@ module Irmin_value_store
       let open Irmin_v2_type in
       record "entries" (fun v entries -> { version = Char.code v; entries })
       |+ field "version" char (fun t -> Char.chr t.version)
-      |+ field "entries" (list ~len:`Int16 Val.entry_v2_t) (fun t -> t.entries)
+      |+ field "entries" (list Val.entry_v2_t) (fun t -> t.entries)
       |> sealr
 
     let version v = match Cstruct.get_uint8 v 0 with
