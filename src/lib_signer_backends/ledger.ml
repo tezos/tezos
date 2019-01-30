@@ -658,7 +658,28 @@ let commands =
          @@ stop)
         (fun () (_, (pk_uri, _)) (cctxt : Client_context.full) ->
            id_of_pk_uri pk_uri >>=? fun root_id ->
-           with_ledger root_id begin fun h _version _of_curve _of_pkh ->
+           with_ledger root_id begin fun h version _of_curve _of_pkh ->
+             begin match version with
+               | { Ledgerwallet_tezos.Version.app_class = Tezos ; _ } ->
+                   failwith "This command (`authorize ledger ...`) only \
+                             works with the Tezos Baking app"
+               | { Ledgerwallet_tezos.Version.app_class = TezBake ;
+                   major ; _ } when major >= 2 ->
+                   failwith
+                     "This command (`authorize ledger ...`) is@ \
+                      not compatible with@ this version of the Ledger@ \
+                      Baking app (%a >= 2.0.0),@ please use the command@ \
+                      `setup ledger to bake for ...`@ from now on."
+                     Ledgerwallet_tezos.Version.pp version
+               | _ ->
+                   cctxt#message
+                     "This Ledger Baking app is outdated (%a)@ running@ \
+                      in backwards@ compatibility mode."
+                     Ledgerwallet_tezos.Version.pp version
+                   >>= fun () ->
+                   return_unit
+             end
+             >>=? fun () ->
              let path = path_of_pk_uri pk_uri in
              curve_of_id root_id >>=? fun curve ->
              public_key_returning_instruction `Authorize_baking h curve path
@@ -710,22 +731,39 @@ let commands =
          @@ stop)
         (fun (chain_id_opt, main_hwm_opt, test_hwm_opt)
           (_, (pk_uri, _)) (cctxt : Client_context.full) ->
-          let chain_id_of_int32 i32 =
-            let open Int32 in
-            let byte n =
-              logand 0xFFl (shift_right i32 (n * 8))
-              |> Int32.to_int |> char_of_int in
-            Chain_id.of_string_exn
-              (Stringext.of_array (Array.init 4 (fun i -> byte (3 - i)))) in
-          begin match chain_id_opt with
-            | `Ask_node ->
-                Chain_services.chain_id cctxt ()
-            | `Int32 s -> return (chain_id_of_int32 s)
-            | `Chain_id chid -> return chid
-          end
-          >>=? fun main_chain_id ->
           id_of_pk_uri pk_uri >>=? fun root_id ->
-          with_ledger root_id begin fun h _version _of_curve _of_pkh ->
+          with_ledger root_id begin fun h version _of_curve _of_pkh ->
+            begin
+              let open Ledgerwallet_tezos.Version in
+              match version with
+              | { app_class = Tezos ; _ } ->
+                  failwith "This command (`setup ledger ...`) only \
+                            works with the Tezos Baking app"
+              | { app_class = TezBake ;
+                  major ; _ } when major < 2 ->
+                  failwith
+                    "This command (`setup ledger ...`)@ is not@ compatible@ with \
+                     this version@ of the Ledger Baking app@ (%a < 2.0.0),@ \
+                     please upgrade@ your ledger@ or use the command@ \
+                     `authorize ledger to bake for ...`"
+                    pp version
+              | _ -> return_unit
+            end
+            >>=? fun () ->
+            let chain_id_of_int32 i32 =
+              let open Int32 in
+              let byte n =
+                logand 0xFFl (shift_right i32 (n * 8))
+                |> Int32.to_int |> char_of_int in
+              Chain_id.of_string_exn
+                (Stringext.of_array (Array.init 4 (fun i -> byte (3 - i)))) in
+            begin match chain_id_opt with
+              | `Ask_node ->
+                  Chain_services.chain_id cctxt ()
+              | `Int32 s -> return (chain_id_of_int32 s)
+              | `Chain_id chid -> return chid
+            end
+            >>=? fun main_chain_id ->
             let path = path_of_pk_uri pk_uri in
             curve_of_id root_id >>=? fun curve ->
             wrap_ledger_cmd begin fun pp ->
@@ -758,20 +796,20 @@ let commands =
 
       Clic.command ~group
         ~desc: "Get high water mark of a Ledger"
-        (args1 (switch ~doc:"Use the (deprecated) Ledger instructions \
-                             (for older versions of the Baking app)"
-                  ~long:"use-legacy-instructions" ()))
+        (args1 (switch ~doc:"Prevent the fallback to the (deprecated) Ledger \
+                             instructions (for 1.x.y versions of the Baking app)"
+                  ~long:"no-legacy-instructions" ()))
         (prefixes [ "get" ; "ledger" ; "high" ; "watermark" ; "for" ]
          @@ Client_keys.sk_uri_param
          @@ stop)
-        (fun legacy_apdu sk_uri (cctxt : Client_context.full) ->
+        (fun no_legacy_apdu sk_uri (cctxt : Client_context.full) ->
            id_of_sk_uri sk_uri >>=? fun id ->
            with_ledger id begin fun h version _ _ ->
              match version.app_class with
              | Tezos ->
                  failwith "Fatal: this operation is only valid with the \
                            Tezos Baking application"
-             | TezBake when legacy_apdu ->
+             | TezBake when not no_legacy_apdu && version.major < 2 ->
                  wrap_ledger_cmd begin fun pp ->
                    Ledgerwallet_tezos.get_high_watermark ~pp h
                  end
@@ -779,6 +817,11 @@ let commands =
                  cctxt#message "The high water mark for@ %a@ is %ld."
                    pp_id id hwm >>= fun () ->
                  return_unit
+             | TezBake when no_legacy_apdu && version.major < 2 ->
+                 failwith
+                   "Cannot get the high water mark with@ \
+                    `--no-legacy-instructions` and version %a"
+                   Ledgerwallet_tezos.Version.pp version
              | TezBake ->
                  wrap_ledger_cmd begin fun pp ->
                    Ledgerwallet_tezos.get_all_high_watermarks ~pp h
