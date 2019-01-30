@@ -223,13 +223,19 @@ let predecessor_n_raw store block_hash distance =
     in
     loop block_hash distance
 
-let predecessor_n block_store block_hash distance =
+let predecessor_n ?(below_save_point = false) block_store block_hash distance =
   predecessor_n_raw block_store block_hash distance >>= function
   | None ->
       Lwt.return_none
   | Some predecessor ->
       (* check if this block was pruned by the gc *)
-      Store.Block.Contents.known (block_store, predecessor) >>= function
+      begin
+        if below_save_point then
+          Store.Block.Header.known (block_store, predecessor)
+        else (* Force read of pruned block *)
+          Store.Block.Contents.known (block_store, predecessor)
+      end
+      >>= function
       | false ->
           Lwt.return_none
       | true ->
@@ -871,9 +877,9 @@ module Block = struct
       else
         read_opt chain_state header.Block_header.shell.predecessor
 
-    let predecessor_n chain_state hash n =
+    let predecessor_n ?(below_save_point = false) chain_state hash n =
       Shared.use chain_state.block_store begin fun block_store ->
-        predecessor_n block_store hash n
+        predecessor_n ~below_save_point block_store hash n
       end
   end
 
@@ -993,9 +999,9 @@ module Block = struct
     else
       read_opt chain_state header.shell.predecessor
 
-  let predecessor_n b n =
+  let predecessor_n ?(below_save_point = false) b n =
     Shared.use b.chain_state.block_store begin fun block_store ->
-      predecessor_n block_store b.hash n
+      predecessor_n ~below_save_point block_store b.hash n
     end
 
   let store

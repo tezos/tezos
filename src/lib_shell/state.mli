@@ -200,7 +200,7 @@ module Block : sig
     val all_operation_hashes: block_header -> Operation_hash.t list list Lwt.t
 
     val predecessor : block_header -> block_header option Lwt.t
-    val predecessor_n : Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
+    val predecessor_n : ?below_save_point:bool -> Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
 
   end
 
@@ -224,7 +224,7 @@ module Block : sig
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t
-  val predecessor_n: t -> int -> Block_hash.t option Lwt.t
+  val predecessor_n: ?below_save_point:bool -> t -> int -> Block_hash.t option Lwt.t
 
   val is_valid_for_checkpoint: t -> Block_header.t -> bool Lwt.t
 
