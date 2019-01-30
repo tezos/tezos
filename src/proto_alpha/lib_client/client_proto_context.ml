@@ -541,8 +541,7 @@ let display_receipt_for_operation
   get_operation_from_block cctxt ~chain predecessors operation_hash
   >>=? function
   | None ->
-      cctxt#message "Couldn't find operation" >>= fun () ->
-      return_unit
+      failwith "Couldn't find operation"
   | Some op ->
       cctxt#message "%a" pp_operation op >>= fun () ->
       return_unit
