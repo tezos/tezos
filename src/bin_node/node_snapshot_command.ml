@@ -31,7 +31,7 @@ let (//) = Filename.concat
 let context_dir data_dir = data_dir // "context"
 let store_dir data_dir = data_dir // "store"
 
-let export data_dir filename commits =
+let export ?(export_full=false) data_dir filename blocks =
   let data_dir =
     match data_dir with
     | None -> Node_config_file.default_data_dir
@@ -44,79 +44,82 @@ let export data_dir filename commits =
   let chain_store = Store.Chain.get store chain_id in
   let chain_data_store = Store.Chain_data.get chain_store in
   let block_store = Store.Block.get chain_store in
-  begin if commits <> [] then
-      Lwt.return (List.map Block_hash.of_b58check_exn commits)
+  begin if blocks <> [] then
+      Lwt.return (List.map Block_hash.of_b58check_exn blocks)
     else
       Store.Chain_data.Current_head.read_exn chain_data_store >>= fun head ->
       Store.Block.Predecessors.read_exn (block_store, head) 6 >>= fun sixteenth_pred ->
       lwt_log_notice "No block hash specified with the `--block` option. Using %a by default (64th predecessor from the current head)"
         Block_hash.pp sixteenth_pred >>= fun () ->
       Lwt.return [ sixteenth_pred ]
-  end >>= fun commits ->
-  Error_monad.filter_map_p begin fun commit_block_hash ->
-    Store.Block.Header.read_opt (block_store, commit_block_hash) >>= function
+  end >>= fun blocks ->
+  Error_monad.filter_map_p begin fun block_hash ->
+    Store.Block.Header.read_opt (block_store, block_hash) >>= function
     | None ->
         lwt_log_notice "Skipping unknown block %a"
-          Block_hash.pp commit_block_hash >>= fun () ->
+          Block_hash.pp block_hash >>= fun () ->
         return_none
-    | Some commit_block_header ->
+    | Some block_header ->
         lwt_log_notice "Dumping: %a"
-          Block_hash.pp commit_block_hash >>= fun () ->
+          Block_hash.pp block_hash >>= fun () ->
 
-        (* Get branch precessor's block header*)
+        (* Get block precessor's block header*)
         Store.Block.Predecessors.read
-          (block_store, commit_block_hash) 0 >>=? fun pred_block_hash ->
+          (block_store, block_hash) 0 >>=? fun pred_block_hash ->
         Store.Block.Header.read
           (block_store, pred_block_hash) >>=? fun pred_block_header ->
 
-        (* Get branch predecessor's operation list*)
+        (* Get operation list*)
         let validations_passes = pred_block_header.shell.validation_passes in
         Error_monad.map_s
-          (fun i -> Store.Block.Operations.read (block_store, commit_block_hash) i)
+          (fun i -> Store.Block.Operations.read (block_store, block_hash) i)
           (0 -- (validations_passes - 1)) >>=? fun operations ->
 
-        (* Get branch predecessor's content *)
+        (* Get block predecessor's content *)
         Store.Block.Contents.read
-          (block_store, pred_block_hash) >>=? fun pred_block_content ->
+          (block_store, block_hash) >>=? fun block_content ->
         (* Get the max_ttls previous block headers and their operation hashes*)
-        let max_op_ttl = pred_block_content.max_operations_ttl in
-        (*TODO: Raise a nice exception ?*)
-        if (max_op_ttl < 60) then
-          failwith "Number of confirmations for block %a is too low (%i < 60)"
-            Block_hash.pp commit_block_hash max_op_ttl
-        else return_unit >>=? fun () ->
+        let max_op_ttl = block_content.max_operations_ttl in
+        (* FIXME: Raise a nice exception ?*)
+        fail_when (max_op_ttl < 60)
+          (failure "Number of confirmations for block %a is too low (%i < 60)"
+             Block_hash.pp block_hash max_op_ttl) >>=? fun () ->
+        begin
+          if export_full then
+            Store.Chain_data.Rock_bottom.read chain_data_store >>=? fun (rb_level,_) ->
+            return rb_level
+          else
+            return
+              (Int32.(sub block_header.shell.level (of_int max_op_ttl)))
+        end >>=? fun export_limit ->
+        let rec load_pruned (bh : Block_header.t)  acc limit =
+          if bh.shell.level = limit then
+            return acc
+          else
+            let pbh = bh.shell.predecessor in
+            Store.Block.Header.read (block_store, pbh) >>=? fun pbhd ->
+            (* Get operations *)
+            Store.Block.Operations.bindings (block_store, pbh) >>= fun operations ->
+            (* Get operation hashes *)
+            Store.Block.Operation_hashes.bindings (block_store, pbh) >>= fun operation_hashes ->
+            (* Get predecessors*)
+            Store.Block.Predecessors.bindings (block_store, pbh) >>= fun predecessors ->
+            let pruned_block = ({
+                block_header = pbhd ;
+                operations ;
+                operation_hashes ;
+                predecessors ;
+              } : Tezos_storage.Context.Block_data.pruned_block ) in
+            load_pruned pbhd (acc @ [pruned_block]) limit in
+        load_pruned block_header [] export_limit >>=? fun old_pruned_blocks ->
 
-          (* Load all data needed for previous blocks *)
-          (* that is to say [pred :: max_ttl_blocks] *)
-          let rec load_pruned bh n acc =
-            if n = max_op_ttl + 1 then return acc
-            else
-              Store.Block.Predecessors.read (block_store, bh) 0 >>=? fun pbh ->
-              (* Get header *)
-              Store.Block.Header.read (block_store, pbh) >>=? fun pbhd ->
-              (* Get operations *)
-              Store.Block.Operations.bindings (block_store, pbh) >>= fun operations ->
-              (* Get operation hashes *)
-              Store.Block.Operation_hashes.bindings (block_store, pbh) >>= fun operation_hashes ->
-              (* Get predecessors*)
-              Store.Block.Predecessors.bindings (block_store, pbh) >>= fun predecessors ->
-              let pruned_block = ({
-                  block_header = pbhd ;
-                  operations ;
-                  operation_hashes ;
-                  predecessors ;
-                } : Tezos_storage.Context.Block_data.pruned_block ) in
-              load_pruned pbh (n + 1) (acc @ [pruned_block])
-          in
-          load_pruned commit_block_hash 0 [] >>=? fun old_pruned_blocks ->
-
-          let block_data =
-            ({block_header = commit_block_header ;
-              operations ;
-              old_blocks = old_pruned_blocks } : Tezos_storage.Context.Block_data.t ) in
-          return (Some (pred_block_header, block_data))
+        let block_data =
+          ({block_header = block_header ;
+            operations ;
+            old_blocks = old_pruned_blocks } : Tezos_storage.Context.Block_data.t ) in
+        return (Some (pred_block_header, block_data))
   end
-    commits >>=? fun data_to_dump ->
+    blocks >>=? fun data_to_dump ->
   Store.close store;
   Tezos_storage.Context.init ~readonly:true context_root
   >>= fun context_index ->
@@ -126,30 +129,6 @@ let export data_dir filename commits =
     ~filename >>=? fun () ->
   lwt_log_notice "Sucessful export (in file %s)" filename >>= fun () ->
   return_unit
-
-let patch_context json ctxt =
-  begin
-    match json with
-    | None -> Lwt.return ctxt
-    | Some json ->
-        Tezos_storage.Context.set ctxt
-          ["sandbox_parameter"]
-          (Data_encoding.Binary.to_bytes_exn Data_encoding.json json)
-  end >>= fun ctxt ->
-  let module Proto = (val Registered_protocol.get_exn genesis.protocol) in
-  Proto.init ctxt {
-    level = 0l ;
-    proto_level = 0 ;
-    predecessor = genesis.block ;
-    timestamp = genesis.time ;
-    validation_passes = 0 ;
-    operations_hash = Operation_list_list_hash.empty ;
-    fitness = [] ;
-    context = Context_hash.zero ;
-  } >>= function
-  | Error _ -> assert false (* FIXME error *)
-  | Ok { context = ctxt ; _ } ->
-      Lwt.return ctxt
 
 let import data_dir filename =
   let data_dir =
@@ -163,16 +142,14 @@ let import data_dir filename =
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   Lwt_lock_file.create
     ~unlink_on_exit:true (Node_data_version.lock_file data_dir) >>=? fun () ->
-  Store.init store_root >>=? fun store ->
+  (* FIXME: use config value ?*)
+  Store.init ~mapsize:4_096_000_000_000L store_root >>=? fun store ->
   let chain_store = Store.Chain.get store chain_id in
   let block_store = Store.Block.get chain_store in
 
-  (* TODO : Check if really needed *)
-  let patch_context = Some (patch_context None) in
-
-  State.init ~context_root ~store_root ~history_mode:Rolling ?patch_context genesis
+  State.init
+    ~context_root ~store_root ~history_mode:Rolling genesis
   >>=? fun (_state, chain_state, context_index, _history_mode) ->
-  Printf.printf "State.init OK\n%!";
 
   (* Restore context *)
   Tezos_storage.Context.restore_contexts context_index ~filename >>=? fun restored_data ->
@@ -197,75 +174,76 @@ let import data_dir filename =
           context_index
           pred_context_hash >>= fun predecessor_context ->
 
-        let pruned_block_pred, pruned_max_ttl_blocks = List.hd old_blocks, List.tl old_blocks in
-
-        (* … to check that the max_operations_ttl blocks are chained …*)
-        (* FIXME*)
-        let max_operations_ttl = 60 in
-        (*TODO: Raise a nice exception*)
-        assert (List.length pruned_max_ttl_blocks >= max_operations_ttl);
-        let rec chain_check n (l:Tezos_storage.Context.Block_data.pruned_block list) =
-          match l with
-          | hd1 :: hd2 :: tl ->
-              let expected = hd1.block_header.shell.predecessor in
-              let found = Block_header.hash hd2.block_header in
-              if Block_hash.equal expected found then
-                chain_check (n+1) (hd2::tl)
-              else
-                failwith "Error in chain found %a, expected %a"
-                  Block_hash.pp found Block_hash.pp expected
-          | _ :: [] ->
-              return_unit
-          | [] -> assert false
-        in
-        chain_check 0 (pruned_block_pred :: pruned_max_ttl_blocks) >>=? fun () ->
-
-        Format.printf "Chained_check : Ok\n%!";
+        let pruned_block_pred, pruned_blocks = List.hd old_blocks, List.tl old_blocks in
 
         (* … we can now call apply … *)
         Tezos_validation.Block_validation.apply
           chain_id
-          ~max_operations_ttl
+          ~max_operations_ttl:(max_int-1)
           ~predecessor_block_header:predecessor_block_header
           ~predecessor_context
           ~block_header
           operations >>=? fun block_validation_result ->
 
         (* … and we expect to match the context_hash …*)
-        (* TODO: Raise a nice exception *)
+        (* FIXME : Raise a nice exception *)
         fail_when
           (not (Context_hash.equal
                   block_validation_result.context_hash
                   block_header.shell.context))
           (failure "Resulting context hash does not match") >>=? fun () ->
 
-        Format.printf "Apply: Ok\n%!";
+        (* … we check that the max_operations_ttl blocks are chained …*)
+        let check_limit =
+          Int32.(sub
+                   block_header.shell.level
+                   (of_int block_validation_result.validation_result.max_operations_ttl)) in
+        let rec chain_check (l:Tezos_storage.Context.Block_data.pruned_block list) limit =
+          match l with
+          | hd1 :: hd2 :: tl ->
+              if hd1.block_header.shell.level = limit then
+                return_unit
+              else
+                begin
+                  let expected = hd1.block_header.shell.predecessor in
+                  let found = Block_header.hash hd2.block_header in
+                  if Block_hash.equal expected found then
+                    chain_check (hd2::tl) limit
+                  else
+                    (*FIXME : raise nice exception*)
+                    failwith "Error in chain found %a, expected %a"
+                      Block_hash.pp found Block_hash.pp expected
+                end
+          | hd :: [] ->
+              if hd.block_header.shell.level = limit then
+                return_unit
+              else
+                (*FIXME : raise nice exception*)
+                failwith
+                  "Error not enough blocks found to ensure valid imported block"
+          | [] -> assert false
+        in
+        chain_check (pruned_block_pred :: pruned_blocks) check_limit >>=? fun () ->
 
         (* … and we write data in store.*)
         Lwt_list.iter_s begin fun pruned_block ->
           let ({block_header; operations ; operation_hashes ; predecessors } :
                  Tezos_storage.Context.Block_data.pruned_block) = pruned_block in
           let pruned_block_hash = Block_header.hash block_header in
-          (* Headers …*)
           Store.Block.Header.store
             (block_store, Block_header.hash block_header) block_header >>= fun () ->
-          (* Operations …*)
           Lwt_list.iter_s
             (fun (i,v) -> Store.Block.Operations.store (block_store,pruned_block_hash) i v)
             operations >>= fun () ->
-          (* Operation_hashes …*)
           Lwt_list.iter_s
             (fun (i,v) -> Store.Block.Operation_hashes.store (block_store,pruned_block_hash) i v)
             operation_hashes >>= fun () ->
-          (* and predecessors *)
           Lwt_list.iter_s
             (fun (l,h) -> Store.Block.Predecessors.store (block_store,pruned_block_hash) l h)
             predecessors >>= fun () ->
           Lwt.return_unit
         end
-          (pruned_block_pred :: pruned_max_ttl_blocks) >>=fun () ->
-
-        Format.printf "Storing all imported data: Ok\n%!";
+          (pruned_block_pred :: pruned_blocks) >>=fun () ->
 
         let chain_data = Store.Chain_data.get chain_store in
 
@@ -288,7 +266,9 @@ let import data_dir filename =
           validation_store >>=? fun new_head ->
 
         begin match new_head with
-          | None -> Lwt.fail_with "Failed to store block (already known)"
+          | None ->
+              (*FIXME : raise nice exception*)
+              Lwt.fail_with "Failed to store block (already known)"
           | Some new_head ->
               (* New head is set*)
               Store.Chain_data.Known_heads.store chain_data (State.Block.hash new_head) >>= fun () ->
@@ -302,12 +282,25 @@ let import data_dir filename =
           let new_data = { data with save_point = new_checkpoint ; } in
           Lwt.return (Some new_data, ())
         end >>= fun () ->
+
         Store.Chain_data.Save_point.store chain_data new_checkpoint >>= fun () ->
-        let rock_bottom_level = Int32.sub block_header.shell.level (Int32.of_int validation_result.max_operations_ttl) in
-        State.Block.read_exn chain_state block_hash >>= fun block ->
-        State.Block.predecessor_n block (validation_result.max_operations_ttl - 1) >>= fun rock_bottom ->
-        let rock_bottom_hash = Option.unopt_exn (Failure "rock bottom not in snapshot") rock_bottom in
-        Store.Chain_data.Rock_bottom.store chain_data (rock_bottom_level, rock_bottom_hash) >>= fun () ->
+        let rock_bottom_level =
+          Int32.(sub
+                   block_header.shell.level
+                   (of_int validation_result.max_operations_ttl)) in
+        State.Block.read_exn chain_state block_hash >>= fun rock_bottom_block ->
+        State.Block.predecessor_n
+          ~below_save_point:true
+          rock_bottom_block
+          validation_result.max_operations_ttl >>= fun rock_bottom ->
+        (* FIXME: raise a nice exception *)
+        let rock_bottom_hash =
+          Option.unopt_exn
+            (Failure "Failed to read rock bottom block")
+            rock_bottom in
+        Store.Chain_data.Rock_bottom.store
+          chain_data
+          (rock_bottom_level, rock_bottom_hash) >>= fun () ->
         return_unit
       end
   end
@@ -322,10 +315,10 @@ module Term = struct
 
   type subcommand = Export | Import
 
-  let process subcommand config_file file commits =
+  let process subcommand config_file file blocks export_full =
     let res =
       match subcommand with
-      | Export -> export config_file file commits
+      | Export -> export ~export_full config_file file blocks
       | Import -> import config_file file
     in
     match Lwt_main.run res with
@@ -351,17 +344,25 @@ module Term = struct
     let open Cmdliner.Arg in
     required & pos 1 (some string) None & info [] ~docv:"FILE"
 
-  let commit =
+  let blocks =
     let open Cmdliner.Arg in
-    let doc ="Commit to export" in
-    value & opt_all string [] & info ~docv:"OPTION" ~doc ["commit"]
+    let doc ="Block hash of the block to export." in
+    value & opt_all string [] & info ~docv:"OPTION" ~doc ["block"]
+
+  let export_full =
+    let open Cmdliner in
+    let doc =
+      "Force export command to dump all blocks known until rock bottom." in
+    Arg.(value & flag &
+         info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["full"])
 
   let term =
     let open Cmdliner.Term in
     ret (const process $ subcommand_arg
          $ Node_shared_arg.Term.data_dir
          $ file_arg
-         $ commit)
+         $ blocks
+         $ export_full)
 
 end
 
