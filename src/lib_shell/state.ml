@@ -351,6 +351,7 @@ let tag_invalid_heads block_store chain_store heads level =
       Store.Block.Contents.remove (block_store, hash) >>= fun () ->
       Store.Block.Operation_hashes.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Operation_path.remove_all (block_store, hash) >>= fun () ->
+      Store.Block.Operations_metadata.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Operations.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Predecessors.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Header.read_opt
@@ -1654,6 +1655,14 @@ let upgrade_0_0_1
                 Store.Block.Contents.read_opt (block_store, h) >>= fun contents ->
                 match header, contents with
                 | Some _, Some _ -> (* already converted *) return (erroneous, skipped + 1, processed)
+                | None, None ->
+                    Store.Block.Operations_metadata.keys (block_store, h) >>= fun stale_metadata ->
+                    if stale_metadata <> [] then
+                      Store.Block.Predecessors.remove_all (block_store, h) >>= fun () ->
+                      Store.Block.Operations_metadata.remove_all (block_store, h) >>= fun () ->
+                      return (erroneous, skipped + 1, processed)
+                    else
+                      return (h :: erroneous, skipped, processed)
                 | _ -> return (h :: erroneous, skipped, processed)
           end (erroneous, skipped, processed) blocks
         end >>=? fun (erroneous, skipped, processed) ->
