@@ -247,10 +247,6 @@ let init_signal () =
   ignore (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
   ignore (Lwt_unix.on_signal Sys.sigterm (handler "TERM") : Lwt_unix.signal_handler_id)
 
-let known_heads store chain_id =
-  let chain = Store.Chain.get store chain_id in
-  Store.Chain_data.(Known_heads.read_all @@ get chain)
-
 module Contexts_to_gc = Set.Make (struct
     type t = Chain_id.t * Block_header.t
     let compare
@@ -259,35 +255,36 @@ module Contexts_to_gc = Set.Make (struct
       compare (id_a, level_a) (id_b, level_b)
   end)
 
-let predecessors store max_level head chain_id acc =
-  let rec aux acc hash =
-    Store.Block.Header.read_exn (store, hash) >>= fun h ->
-    let acc = Contexts_to_gc.add (chain_id, h) acc in
-    if h.shell.level <= max_level then Lwt.return acc
-    else
-      Store.Block.Predecessors.read_exn (store, hash) 0 >>= fun pred ->
-      aux acc pred
-  in
-  aux acc head
-
-let genesis_block store id =
-  let store = Store.Chain.get store id in
-  Store.Chain.Genesis_hash.read_exn store >>= fun genesis ->
-  Store.Block.Header.read_exn (Store.Block.get store, genesis) >|= fun h ->
-  h
-
 let run_gc (config : Node_config_file.t) =
+  let cpt = ref 0 in
   lwt_log_notice "Collecting live contexts before to run the GC..." >>= fun () ->
   Store.init ~mapsize:4_000_000_000_000L (Node_data_version.store_dir config.data_dir)
   >>= function
   | Error _e -> Lwt.fail_with "Store.init" (* XXX: use the error monad *)
   | Ok store ->
+      let predecessors store max_level head chain_id acc =
+        let rec aux acc hash =
+          Store.Block.Header.read_exn (store, hash) >>= fun h ->
+          if Contexts_to_gc.mem (chain_id, h) acc then Lwt.return acc else
+            let acc = Contexts_to_gc.add (chain_id, h) acc in
+            if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
+              Format.eprintf "%dK contexts examined%!\
+                              \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+                (!cpt / 1000) ;
+            incr cpt ;
+            if h.shell.level <= max_level then Lwt.return acc
+            else
+              Store.Block.Predecessors.read_exn (store, hash) 0 >>= fun pred ->
+              aux acc pred
+        in
+        aux acc head in
       let alive_in_chain acc id =
-        genesis_block store id >>= fun genesis_header ->
-        known_heads store id >>= fun heads ->
         let chain_t = Store.Chain.get store id in
         let block_t = Store.Block.get chain_t in
         let chain_data_t = Store.Chain_data.get chain_t in
+        Store.Chain.Genesis_hash.read_exn chain_t >>= fun genesis ->
+        Store.Block.Header.read_exn (Store.Block.get chain_t, genesis) >>= fun genesis_header ->
+        Store.Chain_data.(Known_heads.read_all @@ get chain_t) >>= fun heads ->
         Store.Chain_data.Save_point.read_exn chain_data_t >>= fun (save_level, _) ->
         Lwt_list.fold_left_s (fun (acc, max_head_level) head ->
             Store.Block.Header.read_exn (block_t, head) >>= fun { shell = { level = head_level } } ->
@@ -295,6 +292,7 @@ let run_gc (config : Node_config_file.t) =
             acc, max max_head_level head_level)
           (acc, save_level) (Block_hash.Set.elements heads)
         >>= fun (acc, max_head_level) ->
+        if Unix.isatty Unix.stderr then Format.eprintf "@." ;
         lwt_log_notice
           "Keeping contexts of chain %a from level %ld to %ld"
           Chain_id.pp id save_level max_head_level >>= fun () ->
