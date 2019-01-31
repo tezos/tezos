@@ -89,7 +89,7 @@ Zeronet
 Zeronet is the most cutting-edge development network of Tezos. It is
 restarted without notice, possibly several times a day.
 This network is mostly used internally by the Tezos developers and may
-have *different constants* that Alphanet or Mainnet, for example it
+have *different constants* from Alphanet or Mainnet, for example it
 has shorter cycles and a shorter interval between blocks.
 We offer no support for the Zeronet.
 
