@@ -262,7 +262,7 @@ tezos node launched with \`launch-sandboxed-node $1\`. For instance:
 Note: if the current protocol version, as reported by the previous
 command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you
 may have to activate in your "sandboxed network" the same economic
-protocol than used by the alphanet by running:
+protocol as used by the alphanet by running:
 
   tezos-activate-alpha
 
