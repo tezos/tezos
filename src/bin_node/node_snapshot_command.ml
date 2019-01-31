@@ -31,7 +31,7 @@ let (//) = Filename.concat
 let context_dir data_dir = data_dir // "context"
 let store_dir data_dir = data_dir // "store"
 
-let export ?(export_full=false) data_dir filename blocks =
+let export ?(export_rolling=false) data_dir filename blocks =
   let data_dir =
     match data_dir with
     | None -> Node_config_file.default_data_dir
@@ -81,7 +81,7 @@ let export ?(export_full=false) data_dir filename blocks =
         (* Get the max_ttls previous block headers and their operation hashes*)
         let max_op_ttl = block_content.max_operations_ttl in
         begin
-          if export_full then
+          if not export_rolling then
             Store.Chain_data.Rock_bottom.read chain_data_store >>=? fun (rb_level,_) ->
             return rb_level
           else
@@ -354,10 +354,10 @@ module Term = struct
 
   type subcommand = Export | Import
 
-  let process subcommand config_file file blocks export_full =
+  let process subcommand config_file file blocks export_rolling =
     let res =
       match subcommand with
-      | Export -> export ~export_full config_file file blocks
+      | Export -> export ~export_rolling config_file file blocks
       | Import -> import config_file file
     in
     match Lwt_main.run res with
@@ -388,12 +388,12 @@ module Term = struct
     let doc ="Block hash of the block to export." in
     value & opt_all string [] & info ~docv:"OPTION" ~doc ["block"]
 
-  let export_full =
+  let export_rolling =
     let open Cmdliner in
     let doc =
-      "Force export command to dump all blocks known until rock bottom." in
+      "Force export command to dump a minimal snapshot based on the rolling mode." in
     Arg.(value & flag &
-         info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["full"])
+         info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["rolling"])
 
   let term =
     let open Cmdliner.Term in
@@ -401,7 +401,7 @@ module Term = struct
          $ Node_shared_arg.Term.data_dir
          $ file_arg
          $ blocks
-         $ export_full)
+         $ export_rolling)
 
 end
 
