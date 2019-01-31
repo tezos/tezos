@@ -253,8 +253,10 @@ let raw_protocol_encoding =
 
 module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
-  let protocol_hash = Protocol_hash.to_b58check Proto.hash
-  let next_protocol_hash = Protocol_hash.to_b58check Next_proto.hash
+  let protocol_hash =
+    Protocol_hash.to_b58check Proto.hash
+  let next_protocol_hash =
+    Protocol_hash.to_b58check Next_proto.hash
 
   type raw_block_header = {
     shell: Block_header.shell_header ;
@@ -990,23 +992,25 @@ end
 
 module Fake_protocol = struct
   let hash = Protocol_hash.zero
-  type block_header_data = unit
-  let block_header_data_encoding = Data_encoding.empty
+  type block_header_data = MBytes.t
+  let block_header_data_encoding =
+    (obj1 (req "raw_protocol_data" Data_encoding.Variable.bytes))
   type block_header_metadata = unit
   let block_header_metadata_encoding = Data_encoding.empty
-  type operation_data = unit
+  type operation_data = MBytes.t
   type operation_receipt = unit
   type operation = {
     shell: Operation.shell_header ;
     protocol_data: operation_data ;
   }
-  let operation_data_encoding = Data_encoding.empty
+  let operation_data_encoding =
+    (obj1 (req "raw_protocol_data" Data_encoding.Variable.bytes))
   let operation_receipt_encoding = Data_encoding.empty
   let operation_data_and_receipt_encoding =
     Data_encoding.conv
-      (fun ((), ()) -> ())
-      (fun () -> ((), ()))
-      Data_encoding.empty
+      (fun (b, ()) -> b)
+      (fun b -> (b, ()))
+      operation_data_encoding
 end
 
 module Empty = Make(Fake_protocol)(Fake_protocol)
