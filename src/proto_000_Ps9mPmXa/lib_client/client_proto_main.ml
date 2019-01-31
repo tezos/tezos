@@ -56,6 +56,18 @@ let file_parameter =
       else
         return p)
 
+let fitness_from_int64 fitness =
+  (* definition taken from src/proto_003_PsddFKi3/lib_protocol/src/constants_repr.ml *)
+  let version_number = "\000" in
+  (* definitions taken from src/proto_003_PsddFKi3/lib_protocol/src/fitness_repr.ml *)
+  let int64_to_bytes i =
+    let b = MBytes.create 8 in
+    MBytes.set_int64 b 0 i;
+    b
+  in
+  [ MBytes.of_string version_number ;
+    int64_to_bytes fitness ]
+
 let commands () =
   let open Clic in
   let args =
@@ -87,7 +99,7 @@ let commands () =
          file_parameter
        @@ stop)
       begin fun timestamp hash fitness sk param_json_file (cctxt : Client_context.full) ->
-        let fitness = Proto_alpha.Fitness_repr.from_int64 fitness in
+        let fitness = fitness_from_int64 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file >>=? fun json ->
         let protocol_parameters = Data_encoding.Binary.to_bytes_exn Data_encoding.json json in
         bake cctxt ?timestamp cctxt#block

@@ -4,12 +4,12 @@
  (libraries tezos-base
             tezos-rpc-http
             tezos-shell-services
+            tezos-stdlib-unix
+            tezos-client-base-unix
             tezos-client-base
             tezos-client-commands
             tezos-client-000-Ps9mPmXa
             tezos-client-003-PsddFKi3
-            tezos-stdlib-unix
-            tezos-client-base-unix
             tezos-client-003-PsddFKi3-commands.registration
             tezos-baking-003-PsddFKi3-commands.registration
             tezos-signer-backends)

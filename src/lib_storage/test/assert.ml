@@ -33,6 +33,9 @@ let default_printer _ = ""
 let equal ?(eq=(=)) ?(prn=default_printer) ?(msg="") x y =
   if not (eq x y) then fail (prn x) (prn y) msg
 
+let equal_string ?msg s1 s2 =
+  equal ?msg ~prn:(fun s -> s) s1 s2
+
 let equal_string_option ?msg o1 o2 =
   let prn = function
     | None -> "None"
@@ -58,9 +61,19 @@ let make_equal_list eq prn ?(msg="") x y =
         () in
   iter 0 x y
 
+let equal_string_list ?msg l1 l2 =
+  make_equal_list ?msg (=) (fun x -> x) l1 l2
+
 let equal_string_list_list ?msg l1 l2 =
   let pr_persist l =
     let res =
       String.concat ";" (List.map (fun s -> Printf.sprintf "%S" s) l) in
     Printf.sprintf "[%s]" res in
   make_equal_list ?msg (=) pr_persist l1 l2
+
+let equal_key_dir_list ?msg l1 l2 =
+  make_equal_list ?msg (=)
+    (function
+      | `Key k -> "Key " ^ String.concat "/" k
+      | `Dir k -> "Dir " ^ String.concat "/" k)
+    l1 l2

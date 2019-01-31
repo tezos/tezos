@@ -6,8 +6,7 @@
             tezos-client-base
             tezos-client-commands
             tezos-protocol-environment
-            tezos-protocol-000-Ps9mPmXa
-            tezos-protocol-003-PsddFKi3)
+            tezos-protocol-000-Ps9mPmXa)
  (library_flags (:standard -linkall))
  (flags (:standard -w -9+27-30-32-40@8
                    -safe-string

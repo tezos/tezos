@@ -110,12 +110,12 @@ let test_fold _ =
 
 let print_pset ppf pset =
   PSet.iter (fun p ->
-      Format.fprintf ppf "%a " Ipaddr.V6.Prefix.pp_hum p
+      Format.fprintf ppf "%a " Ipaddr.V6.Prefix.pp p
     ) pset
 
 let print_list ppf l =
   List.iter (fun p ->
-      Format.fprintf ppf "%a " Ipaddr.V6.Prefix.pp_hum p
+      Format.fprintf ppf "%a " Ipaddr.V6.Prefix.pp p
     ) l
 
 let test_to_list _ =

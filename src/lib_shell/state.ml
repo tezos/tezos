@@ -1154,8 +1154,8 @@ let may_create_chain state chain genesis =
 
 let read
     ?patch_context
-    ?(store_mapsize=4_096_000_000_000L)
-    ?(context_mapsize=40_960_000_000L)
+    ?(store_mapsize=40_960_000_000L)
+    ?(context_mapsize=409_600_000_000L)
     ~store_root
     ~context_root
     genesis =

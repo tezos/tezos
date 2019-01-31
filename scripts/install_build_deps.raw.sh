@@ -7,4 +7,4 @@ src_dir="$(dirname "$script_dir")"
 
 opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
 
-opam install $opams --deps-only --with-test
+opam install $opams --deps-only --with-test -y --criteria="-notuptodate,-changed,-removed"

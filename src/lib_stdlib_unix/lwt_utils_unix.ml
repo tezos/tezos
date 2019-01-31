@@ -285,8 +285,8 @@ module Socket = struct
   let handle_litteral_ipv6 host =
     (* To strip '[' and ']' when a litteral IPv6 is provided *)
     match Ipaddr.of_string host with
-    | None -> host
-    | Some ipaddr -> Ipaddr.to_string ipaddr
+    | Error (`Msg _) -> host
+    | Ok ipaddr -> Ipaddr.to_string ipaddr
 
   let connect = function
     | Unix path ->

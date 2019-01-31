@@ -1,22 +1,16 @@
-opam-version: "1.2"
+opam-version: "2.0"
 name: "blake2"
-version: "dev"
 authors: "Vincent Bernardoff <vb@luminar.eu.org>"
 maintainer: "Vincent Bernardoff <vb@luminar.eu.org>"
 license: "ISC"
 homepage: "https://github.com/vbmithr/ocaml-blake2"
 bug-reports: "https://github.com/vbmithr/ocaml-blake2/issues"
 dev-repo: "git://github.com/vbmithr/ocaml-blake2"
-
-available: [
-  ocaml-version >= "4.02.0"
-]
-
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
-build-test: [ "dune" "runtest" "-p" name "-j" jobs ]
+run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
 depends: [
   "dune" {build & >= "1.0.1"}
   "bigstring" {>= "0.1.1"}
-  "alcotest" { test }
-  "hex" {test & >= "1.2.0"}
+  "alcotest" { with-test }
+  "hex" {with-test & >= "1.2.0"}
 ]

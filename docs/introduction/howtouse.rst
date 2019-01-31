@@ -48,7 +48,7 @@ The full documentation is also available online :ref:`client_manual`.
 Node
 ----
 
-The node is effectively the Tezos block-chain and it has two main
+The node is effectively the Tezos blockchain and it has two main
 functions: running the gossip network and the updating the context.
 The gossip network is where all Tezos nodes exchange blocks and
 operations with each other (see :ref:`tezos-admin-client` to monitor
@@ -58,7 +58,7 @@ hop several times through other nodes until it finds its way in a
 block baked by a baker.
 Using the blocks it receives on the gossip network the shell also
 keeps up to date the current `context`, that is the full state of
-the block-chain shared by all peers.
+the blockchain shared by all peers.
 Approximately every minute a new block is created and, when the shell
 receives it, it applies each operation in the block to its current
 context and computes a new context.
@@ -91,13 +91,13 @@ keys that nodes use to encrypt messages sent to each other, and an
 antispam-PoW stamp proving that enough computing power has been
 dedicated to creating this identity.
 Note that this is merely a network identity and it is not related in
-any way to a Tezos address on the block-chain.
+any way to a Tezos address on the blockchain.
 
 
 Storage
 ~~~~~~~
 
-All block-chain data is stored under ``$HOME/.tezos-node/``.
+All blockchain data is stored under ``$HOME/.tezos-node/``.
 If for some reason your node is misbehaving or there has been an
 upgrade of the network, it is safe to remove this directory, it just
 means that your node will take some time to resync the chain.
@@ -233,7 +233,7 @@ transaction, including its hash, and then waits for the operation to
 be included in one block.
 If you want to simulate a transaction without actually sending it to
 the network you can use the ``--dry-run`` option.
-As in any block-chain it is advisable to wait several blocks to
+As in any blockchain it is advisable to wait several blocks to
 consider the transaction as final, for an important operation we
 advice to wait 60 blocks.
 We can do that with:
@@ -255,7 +255,7 @@ Receipts for operations and blocks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 After an operation the client prints a `receipt` that recapitulates
-the effects of the operation on the block-chain.
+the effects of the operation on the blockchain.
 It is possible to review the receipt of a transaction with:
 
 ::
@@ -350,7 +350,7 @@ that is burnt.
 This cost comes from the *storage* and is shown in the line
 ``Paid storage size diff: 46 bytes``, 41 for the contract and 5 for
 the string ``"hello"``.
-Given that a contract saves its data on the public block-chain that
+Given that a contract saves its data on the public blockchain that
 every node stores, it is necessary to charge a fee per byte to avoid
 abuse and encourage lean programs.
 

@@ -62,8 +62,8 @@ doc-html: all
 	@cp -r $$(pwd)/_build/default/_doc/* $$(pwd)/docs/_build/api/odoc/
 	@${MAKE} -C docs html
 
-doc-linkcheck:
-	@${MAKE} -C docs linkcheck
+doc-html-and-linkcheck: doc-html
+	@${MAKE} -C docs all
 
 build-test:
 	@dune build @buildtest

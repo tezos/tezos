@@ -1,21 +1,20 @@
-opam-version: "1.2"
-version: "dev"
+opam-version: "2.0"
 maintainer: "contact@tezos.com"
 authors: [ "Tezos devteam" ]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
-dev-repo: "https://gitlab.com/tezos/tezos.git"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
-  "dune" { build & = "1.0.1" }
+  "dune" { build & >= "1.0.1" }
   "tezos-base"
   "tezos-protocol-compiler"
-  "alcotest-lwt" { test }
-  "tezos-stdlib-unix" { test }
-  "tezos-protocol-environment" { test }
-  "tezos-shell-services" { test }
-  "bip39" { test }
+  "alcotest-lwt" { with-test }
+  "tezos-stdlib-unix" { with-test }
+  "tezos-protocol-environment" { with-test }
+  "tezos-shell-services" { with-test }
+  "bip39" { with-test }
 ]
 build: [
   [ "rm" "dune" "src/dune" ]
@@ -23,6 +22,6 @@ build: [
   [ "sed" "-i.old" "s/let predefined_version = None/let predefined_version = Some \"003_PsddFKi3\"/" "dune" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
-build-test: [
+run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]

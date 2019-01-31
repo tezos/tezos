@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Name = struct let name = "genesis-alpha" end
-module Alpha_environment = Tezos_protocol_environment_faked.MakeV1(Name)()
-include Tezos_protocol_003_PsddFKi3.Functor.Make(Alpha_environment)
+let raw_commit_hash = "$Format:%H$"
+
+let commit_hash =
+  if String.equal raw_commit_hash ("$Format:"^"%H$"(*trick to avoid git-subst*))
+  then Generated_git_info.commit_hash
+  else raw_commit_hash
+
+let raw_abbreviated_commit_hash = "$Format:%h$"
+
+let abbreviated_commit_hash =
+  if String.equal raw_abbreviated_commit_hash ("$Format:"^"%h$")
+  then Generated_git_info.abbreviated_commit_hash
+  else raw_abbreviated_commit_hash
+
+let raw_committer_date = "$Format:%ci$"
+
+let committer_date =
+  if String.equal raw_committer_date ("$Format:"^"%ci$")
+  then Generated_git_info.committer_date
+  else raw_committer_date

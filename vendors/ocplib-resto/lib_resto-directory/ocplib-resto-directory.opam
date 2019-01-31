@@ -1,5 +1,5 @@
 version: "dev"
-opam-version: "1.2"
+opam-version: "2.0"
 maintainer: "Grégoire Henry <gregoire.henry@tezos.com>"
 authors: "Grégoire Henry <gregoire.henry@tezos.com>"
 license: "LGPL-2.1-with-OCaml-exception"
@@ -10,7 +10,7 @@ dev-repo: "git+https://github.com/OCamlPro/ocplib-resto"
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
-build-test: [
+run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
 
@@ -18,6 +18,6 @@ depends: [
   "ocamlfind" {build}
   "dune" {build}
   "ocplib-resto" {= "dev" }
-  "ocplib-resto-json" {= "dev" & test }
+  "ocplib-resto-json" {= "dev" & with-test }
   "lwt" { >= "3.0.0" }
 ]

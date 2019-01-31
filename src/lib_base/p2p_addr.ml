@@ -46,15 +46,15 @@ type port = int
 let pp ppf addr =
   match Ipaddr.v4_of_v6 addr with
   | Some addr ->
-      Format.fprintf ppf "%a" Ipaddr.V4.pp_hum addr
+      Format.fprintf ppf "%a" Ipaddr.V4.pp addr
   | None ->
-      Format.fprintf ppf "[%a]" Ipaddr.V6.pp_hum addr
+      Format.fprintf ppf "[%a]" Ipaddr.V6.pp addr
 
 let of_string_opt str =
-  Option.map (Ipaddr.of_string str) ~f:begin function
-    | Ipaddr.V4 addr -> Ipaddr.v6_of_v4 addr
-    | V6 addr -> addr
-  end
+  match Ipaddr.of_string str with
+  | Ok (Ipaddr.V4 addr) -> Some (Ipaddr.v6_of_v4 addr)
+  | Ok (V6 addr) -> Some addr
+  | Error (`Msg _) -> None
 
 let of_string_exn str =
   match of_string_opt str with
