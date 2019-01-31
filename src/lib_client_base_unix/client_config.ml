@@ -268,9 +268,9 @@ let timings_switch () =
 let chain_arg () =
   default_arg
     ~long:"chain"
-    ~short:'b'
     ~placeholder:"hash|tag"
-    ~doc:"chain on which to apply contextual commands"
+    ~doc:"chain on which to apply contextual commands (possible tags \
+          are 'main' and 'test')"
     ~default:(Chain_services.to_string default_cli_args.chain)
     (chain_parameter ())
 let block_arg () =
@@ -278,7 +278,8 @@ let block_arg () =
     ~long:"block"
     ~short:'b'
     ~placeholder:"hash|tag"
-    ~doc:"block on which to apply contextual commands"
+    ~doc:"block on which to apply contextual commands (possible tags \
+          are 'head' and 'genesis')"
     ~default:(Block_services.to_string default_cli_args.block)
     (block_parameter ())
 let wait_arg () =
