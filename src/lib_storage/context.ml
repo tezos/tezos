@@ -503,21 +503,19 @@ module Pruned_block = struct
     block_header : Block_header.t ;
     operations : (int * Operation.t list ) list ;
     operation_hashes : (int * Operation_hash.t list) list ;
-    predecessors : (int * Block_hash.t) list ;
   }
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun { block_header ; operations ; operation_hashes ; predecessors} ->
-         (block_header, operations, operation_hashes, predecessors))
-      (fun (block_header, operations, operation_hashes, predecessors) ->
-         { block_header ; operations ; operation_hashes ; predecessors})
-      (obj4
+      (fun { block_header ; operations ; operation_hashes} ->
+         (block_header, operations, operation_hashes))
+      (fun (block_header, operations, operation_hashes) ->
+         { block_header ; operations ; operation_hashes})
+      (obj3
          (req "block_header" (dynamic_size Block_header.encoding))
          (req "operations" (list (tup2 int31 (list (dynamic_size Operation.encoding)))))
          (req "operation_hashes" (list (tup2 int31 (list Operation_hash.encoding))))
-         (req "predecessors" (list (tup2 int31 Block_hash.encoding)))
       )
 
   let to_bytes x =

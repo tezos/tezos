@@ -85,9 +85,9 @@ let export ?(export_full=false) data_dir filename blocks =
             Store.Chain_data.Rock_bottom.read chain_data_store >>=? fun (rb_level,_) ->
             return rb_level
           else
-            return
-              (Int32.(sub block_header.shell.level (of_int max_op_ttl)))
+            return (Int32.(sub block_header.shell.level (of_int max_op_ttl)))
         end >>=? fun export_limit ->
+        let export_limit = max 1l export_limit (* never include genesis *) in
         let cpt = ref 0 in
         let rec load_pruned (bh : Block_header.t) acc limit =
           if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
@@ -97,7 +97,7 @@ let export ?(export_full=false) data_dir filename blocks =
               (!cpt / 1000)
               ((!cpt + (Int32.to_int bh.shell.level - Int32.to_int limit)) / 1000);
           incr cpt;
-          if bh.shell.level = limit then
+          if bh.shell.level < limit then
             return acc
           else
             let pbh = bh.shell.predecessor in
@@ -106,13 +106,10 @@ let export ?(export_full=false) data_dir filename blocks =
             Store.Block.Operations.bindings (block_store, pbh) >>= fun operations ->
             (* Get operation hashes *)
             Store.Block.Operation_hashes.bindings (block_store, pbh) >>= fun operation_hashes ->
-            (* Get predecessors*)
-            Store.Block.Predecessors.bindings (block_store, pbh) >>= fun predecessors ->
             let pruned_block = ({
                 block_header = pbhd ;
                 operations ;
                 operation_hashes ;
-                predecessors ;
               } : Tezos_storage.Context.Pruned_block.t ) in
             load_pruned pbhd (pruned_block :: acc) limit in
         load_pruned block_header [] export_limit >>=? fun old_pruned_blocks_rev ->
@@ -154,13 +151,15 @@ let import data_dir filename =
     ~context_root ~store_root ~history_mode:Rolling genesis
   >>=? fun (_state, chain_state, context_index, _history_mode) ->
 
+  let open Tezos_storage.Context in
+
   (* Restore context *)
-  Tezos_storage.Context.restore_contexts context_index ~filename >>=? fun restored_data ->
+  restore_contexts context_index ~filename >>=? fun restored_data ->
 
   (* Process data imported from snapshot *)
   Error_monad.iter_s begin fun ((predecessor_block_header : Block_header.t), meta, old_blocks) ->
     let ({ block_header ; operations } :
-           Tezos_storage.Context.Block_data.t) = meta in
+           Block_data.t) = meta in
     let block_hash = Block_header.hash block_header in
     Store.Block.Contents.known (block_store,block_hash) >>= fun known ->
     if known then
@@ -173,7 +172,7 @@ let import data_dir filename =
         (* To validate block_header we need … *)
         (* … its predecessor context … *)
         let pred_context_hash = predecessor_block_header.shell.context in
-        Tezos_storage.Context.checkout_exn
+        checkout_exn
           context_index
           pred_context_hash >>= fun predecessor_context ->
 
@@ -187,141 +186,107 @@ let import data_dir filename =
           operations >>=? fun block_validation_result ->
 
         (* … and we expect to match the context_hash …*)
-        (* FIXME : Raise a nice exception *)
         fail_when
           (not (Context_hash.equal
                   block_validation_result.context_hash
                   block_header.shell.context))
           (failure "Resulting context hash does not match") >>=? fun () ->
 
-        (* … we check that the max_operations_ttl blocks are chained …*)
-        let check_limit =
-          Int32.(sub
-                   block_header.shell.level
-                   (of_int block_validation_result.validation_result.max_operations_ttl)) in
-        let rec chain_check (l:Tezos_storage.Context.Pruned_block.t list) limit =
-          match l with
-          | hd1 :: hd2 :: tl ->
-              if hd1.block_header.shell.level = limit then
-                return_unit
-              else
-                begin
-                  let expected = hd1.block_header.shell.predecessor in
-                  let computed = Block_header.hash hd2.block_header in
-                  if Block_hash.equal expected computed then
-                    chain_check (hd2::tl) limit
-                  else
-                    (*FIXME : raise nice exception*)
-                    failwith "Error in chain found %a, expected %a"
-                      Block_hash.pp computed Block_hash.pp expected
-                end
-          | hd :: [] ->
-              if hd.block_header.shell.level = limit then
-                return_unit
-              else
-                (*FIXME : raise nice exception*)
-                failwith
-                  "Error not enough blocks found to ensure valid imported block"
-          | [] -> assert false
-        in
-        chain_check old_blocks check_limit >>=? fun () ->
-
-        let operation_checks ops ops_h bh_op_h =
+        (* … we check the history and compute the predecessor tables …*)
+        let operation_checks ({block_header = bh; operations = ops ; operation_hashes = ops_h ; _} : Pruned_block.t) =
           (* Compute operations hashes and compare*)
           List.iter2
             (fun (_,op) (_,oph) ->
                let expeced_op_hash = List.map Operation.hash op in
                List.iter2 (fun excpected found ->
-                   (* FIXME: raise nice expection *)
                    assert (Operation_hash.equal excpected found)
                  ) expeced_op_hash oph;
             )
             ops ops_h;
           (* Check header hashes based on merkel tree*)
-          Lwt_list.map_p (fun (_,opl) ->
-              Lwt_list.map_p (fun op ->
-                  let op_hash = Operation.hash op in
-                  Lwt.return op_hash) opl)
-            (List.rev ops) >>= fun hashes ->
+          let hashes = List.map (fun (_,opl) ->
+              List.map Operation.hash opl)
+              (List.rev ops) in
           let computed_hash =
             Operation_list_list_hash.compute
               (List.map Operation_list_hash.compute hashes) in
-          (* FIXME: raise nice expection *)
-          assert
-            (Operation_list_list_hash.equal computed_hash bh_op_h);
-          Lwt.return_unit
+          assert (Operation_list_list_hash.equal computed_hash bh.Block_header.shell.operations_hash) ;
         in
 
-        (* … we check prunde blocks validity …*)
-        let check_limit =
-          Int32.(sub
-                   block_header.shell.level
-                   (of_int block_validation_result.validation_result.max_operations_ttl)) in
-        let rec chain_check (l:Tezos_storage.Context.Pruned_block.t list) limit =
-          match l with
-          | hd1 :: _ when hd1.block_header.shell.level = limit ->
-              return_unit
-          | hd1 :: hd2 :: tl ->
-              (* Checking operations consistency *)
-              let ({block_header; operations ; operation_hashes ; _} :
-                     Tezos_storage.Context.Pruned_block.t) = hd1 in
-              operation_checks
-                operations
-                operation_hashes
-                block_header.shell.operations_hash
-              >>= fun () ->
-              begin
-                let expected = hd1.block_header.shell.predecessor in
-                let computed = Block_header.hash hd2.block_header in
-                if Block_hash.equal expected computed then
-                  chain_check (hd2::tl) limit
-                else
-                  (*FIXME : raise nice exception*)
-                  failwith "Error in chain found %a, expected %a"
-                    Block_hash.pp computed Block_hash.pp expected
-              end
-          | _ ->
-              (*FIXME : raise nice exception*)
-              failwith
-                "Failed to validate imported block"
-        in
-        chain_check old_blocks check_limit >>=? fun () ->
+        lwt_log_notice "Checking history consistency" >>= fun () ->
+
+        let old_blocks = List.rev_map (fun pruned_block ->
+            let hash = Block_header.hash pruned_block.Pruned_block.block_header in
+            (hash, pruned_block))
+            old_blocks in
+        let history = Array.of_list old_blocks in
+        let nb_blocks = Array.length history in
+        assert (Block_hash.equal block_header.shell.predecessor (fst history.(nb_blocks - 1))) ;
+        let oldest_header = (snd history.(0)).block_header in
+        let oldest_level = oldest_header.shell.level in
+        assert (oldest_level >= 1l) ;
+        if Compare.Int32.(oldest_level = 1l) then
+          assert (Block_hash.equal oldest_header.shell.predecessor genesis.block) ;
+        operation_checks (snd history.(0)) ;
+        for i = nb_blocks - 1 downto 1 do
+          operation_checks (snd history.(i)) ;
+          let ({block_header; _} : Pruned_block.t) = snd history.(i) in
+          assert (block_header.shell.level >= 2l) ;
+          assert (Block_hash.equal block_header.shell.predecessor (fst history.(i - 1))) ;
+        done ;
+
+        lwt_log_notice "Computing predecessor tables" >>= fun () ->
+
+        let predecessors =
+          Array.init nb_blocks @@ fun i ->
+          let rec step s d acc =
+            if oldest_level = 1l && i - d = -1 then
+              List.rev ((s, genesis.block) :: acc)
+            else if i - d < 0 then
+              List.rev acc
+            else
+              step (succ s) (d * 2) ((s, fst history.(i - d)) :: acc) in
+          step 0 1 [] in
+
+        (* … we set the history mode to full if it looks like a full snapshot … *)
+        begin if (snd history.(0)).Pruned_block.block_header.shell.level = 1l then
+            lwt_log_notice "Setting history-mode to %a" History_mode.pp Full >>= fun () ->
+            Store.Configuration.History_mode.store store Full
+          else
+            lwt_log_notice "Setting history-mode to %a" History_mode.pp Rolling >>= fun () ->
+            Lwt.return ()
+        end >>= fun () ->
 
         (* … and we write data in store.*)
-        let nb_blocks = List.length old_blocks in
-        let cpt = ref 1 in
-        let rec loop_on_chunks blocks =
-          let blocks, rest = List.split_n 5000 blocks in
+        let rec loop_on_chunks cpt =
           Store.with_atomic_rw store begin fun () ->
-            Lwt_list.iter_s begin fun pruned_block ->
-              if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
-                Format.eprintf "Storing blocks: %iK/%iK%!\
-                                \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                                \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-                  (!cpt / 1000)
-                  (nb_blocks / 1000);
-              incr cpt;
-              let ({block_header; operations ; operation_hashes ; predecessors } :
-                     Tezos_storage.Context.Pruned_block.t) = pruned_block in
-              let pruned_block_hash = Block_header.hash block_header in
-              Store.Block.Header.store
-                (block_store, Block_header.hash block_header) block_header >>= fun () ->
-              Lwt_list.iter_s
-                (fun (i,v) -> Store.Block.Operations.store (block_store,pruned_block_hash) i v)
-                operations >>= fun () ->
-              Lwt_list.iter_s
-                (fun (i,v) -> Store.Block.Operation_hashes.store (block_store,pruned_block_hash) i v)
-                operation_hashes >>= fun () ->
-              Lwt_list.iter_s
-                (fun (l,h) -> Store.Block.Predecessors.store (block_store,pruned_block_hash) l h)
-                predecessors >>= fun () ->
-              Lwt.return_unit
-            end
-              blocks
-          end >>= fun () ->
-          if rest = [] then Lwt.return ()
-          else loop_on_chunks rest in
-        loop_on_chunks old_blocks >>= fun () ->
+            let rec loop_on_chunk cpt =
+              if cpt = nb_blocks then Lwt.return cpt else begin
+                if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
+                  Format.eprintf "Storing blocks: %iK/%iK%!\
+                                  \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                                  \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+                    (cpt / 1000)
+                    (nb_blocks / 1000);
+                let pruned_block_hash, {Pruned_block.block_header ; operations ; operation_hashes } = history.(cpt) in
+                Store.Block.Header.store
+                  (block_store, Block_header.hash block_header) block_header >>= fun () ->
+                Lwt_list.iter_s
+                  (fun (i,v) -> Store.Block.Operations.store (block_store,pruned_block_hash) i v)
+                  operations >>= fun () ->
+                Lwt_list.iter_s
+                  (fun (i,v) -> Store.Block.Operation_hashes.store (block_store,pruned_block_hash) i v)
+                  operation_hashes >>= fun () ->
+                Lwt_list.iter_s
+                  (fun (l,h) -> Store.Block.Predecessors.store (block_store,pruned_block_hash) l h)
+                  predecessors.(cpt) >>= fun () ->
+                loop_on_chunk (succ cpt)
+              end in
+            if (succ cpt) mod 5000 = 0 then Lwt.return cpt else
+              loop_on_chunk cpt end >>= fun cpt ->
+          if cpt = nb_blocks then Lwt.return () else
+            loop_on_chunks cpt in
+        loop_on_chunks 0 >>= fun () ->
         if Unix.isatty Unix.stderr then Format.eprintf "@." ;
 
         let chain_data = Store.Chain_data.get chain_store in
@@ -364,19 +329,14 @@ let import data_dir filename =
 
         Store.Chain_data.Save_point.store chain_data new_checkpoint >>= fun () ->
         let rock_bottom_level =
+          if oldest_level = 1l then 0l else oldest_level in
+        let rock_bottom_hash =
+          if oldest_level = 1l then genesis.block else Block_header.hash oldest_header in
+        let minimal_rock_bottom_level =
           Int32.(sub
                    block_header.shell.level
                    (of_int validation_result.max_operations_ttl)) in
-        State.Block.read_exn chain_state block_hash >>= fun rock_bottom_block ->
-        State.Block.predecessor_n
-          ~below_save_point:true
-          rock_bottom_block
-          validation_result.max_operations_ttl >>= fun rock_bottom ->
-        (* FIXME: raise a nice exception *)
-        let rock_bottom_hash =
-          Option.unopt_exn
-            (Failure "Failed to read rock bottom block")
-            rock_bottom in
+        assert Compare.Int32.(rock_bottom_level <= minimal_rock_bottom_level) ;
         Store.Chain_data.Rock_bottom.store
           chain_data
           (rock_bottom_level, rock_bottom_hash) >>= fun () ->

@@ -115,7 +115,6 @@ module Pruned_block : sig
     block_header : Block_header.t ;
     operations : ( int * Operation.t list ) list ;
     operation_hashes : (int * Operation_hash.t list) list ;
-    predecessors : (int * Block_hash.t) list ;
   }
 
   val encoding : t Data_encoding.t
