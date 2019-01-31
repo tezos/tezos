@@ -42,7 +42,7 @@ services:
 
   accuser:
     image: tezos/tezos:latest
-    hostname: accuser-PsYLVpVv
+    hostname: accuser
     environment:
       - PROTOCOL=003-PsddFKi3
     command: tezos-accuser
