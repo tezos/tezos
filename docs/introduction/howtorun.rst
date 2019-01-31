@@ -125,8 +125,8 @@ Moreover we could extend ``n`` to cover ``preserved_cycles = 5``.
 Once we have ``p`` and ``n``, the expected number of times that we
 might get selected is ``p * n`` (the mean of the distribution).
 Over many cycles our chances will fall around the mean, in some cycles
-we will unlucky get less rights, but in some cycles we might get lucky
-and be assigned more rights!
+we might get unlucky and be assigned fewer rights, but in some cycles we might
+get lucky and be assigned more rights!
 Clearly we would like to plan ahead and have enough deposits to cover
 also the "lucky" cycles so we need to compute a sort of "maximum"
 number of rights that is safe for `most cases`.
