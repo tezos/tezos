@@ -112,7 +112,7 @@ The number of active rolls can be computed with two RPCs, first we
 list all the active delegates with ``delegates?active``, then we sum
 all their ``stacking_balance`` and we simply divide by the size of a
 roll, 10kꜩ.
-At the time of writing, on Betanet the number of active rolls is ~30k
+At the time of writing, on Mainnet the number of active rolls is ~30k
 so for each block we know that the chance that we get selected for
 baking is ``1/30k`` while for endorsing is 32 times that.
 Given that every draw is with replacement, the distribution that
