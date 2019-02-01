@@ -601,9 +601,14 @@ module Dumpable_context = struct
   let context_parents ctxt =
     match ctxt with
     | { parents = [commit]; _ } ->
-        GitStore.Commit.parents commit >>= fun parents ->
-        let parents = List.map GitStore.Commit.hash parents in
-        Lwt.return @@ List.sort Context_hash.compare parents
+        (* XXX(samoht): fixed in irmin v2 *)
+        let key = GitStore.Commit.hash commit in
+        GitStore.Private.Commit.find
+          (GitStore.Private.Repo.commit_t ctxt.index.repo) key
+        >|= fun v ->
+        let commit = match v with None -> assert false | Some v -> v in
+        let parents = GitStore.Private.Commit.Val.parents commit in
+        List.sort Context_hash.compare parents
     | _ -> assert false
 
   let context_info = function
