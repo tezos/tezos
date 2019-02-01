@@ -44,6 +44,14 @@ let export ?(export_rolling=false) data_dir filename blocks =
   let chain_store = Store.Chain.get store chain_id in
   let chain_data_store = Store.Chain_data.get chain_store in
   let block_store = Store.Block.get chain_store in
+  Store.Configuration.History_mode.read_exn store >>= fun history_mode ->
+  begin match history_mode with
+    | Archive | Full -> return_unit
+    | Rolling ->
+        if export_rolling then return_unit else
+          failwith "cannot export a full snapshot from a %a node"
+            History_mode.pp history_mode
+  end >>=? fun () ->
   begin if blocks <> [] then
       Lwt.return (List.map Block_hash.of_b58check_exn blocks)
     else
