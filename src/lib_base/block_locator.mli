@@ -50,15 +50,15 @@ val estimated_length: seed -> t -> int
 
 val compute:
   get_predecessor: (Block_hash.t -> int -> Block_hash.t option Lwt.t) ->
-  rock_bottom:Block_hash.t -> size:int -> Block_hash.t -> Block_header.t ->
+  caboose:Block_hash.t -> size:int -> Block_hash.t -> Block_header.t ->
   seed -> t Lwt.t
-(** [compute ~get_predecessor ~genesis ~save_point ~rock_bottom
+(** [compute ~get_predecessor ~genesis ~save_point ~caboose
     ~size block_hash header seed] returns the sparse block locator
     using [seed] to compute random jumps for the [block_hash] together
-    with the [header], adding the [rock_bottom] at the end of the sparse block
+    with the [header], adding the [caboose] at the end of the sparse block
     if the chain has already been pruned.
     The locator contains at most [size + 1] elements, including the
-    rock_bottom. *)
+    caboose. *)
 
 type step = {
   block: Block_hash.t ;

@@ -121,7 +121,7 @@ module Chain_data : sig
     with type t := store
      and type value := Int32.t * Block_hash.t
 
-  module Rock_bottom : SINGLE_STORE
+  module Caboose : SINGLE_STORE
     with type t := store
      and type value := Int32.t * Block_hash.t
 

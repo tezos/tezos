@@ -90,7 +90,7 @@ module Chain : sig
   val checkpoint: chain_state -> Block_header.t Lwt.t
 
   val save_point: chain_state -> (Int32.t * Block_hash.t) Lwt.t
-  val rock_bottom: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+  val caboose: chain_state -> (Int32.t * Block_hash.t) Lwt.t
 
 
   (** Update the current checkpoint. The current head should be
@@ -290,7 +290,7 @@ type chain_data = {
   live_operations: Operation_hash.Set.t ;
   test_chain: Chain_id.t option ;
   save_point: Int32.t * Block_hash.t ;
-  rock_bottom: Int32.t * Block_hash.t ;
+  caboose: Int32.t * Block_hash.t ;
 }
 
 val read_chain_data:

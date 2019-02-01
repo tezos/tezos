@@ -309,8 +309,8 @@ let test_locator base_dir =
 
   let check_locator size : unit tzresult Lwt.t =
     State.read_chain_data chain begin fun _ data ->
-      Lwt.return (data.rock_bottom, data.save_point)
-    end >>= fun (rock_bottom, save_point) ->
+      Lwt.return (data.caboose, data.save_point)
+    end >>= fun (caboose, save_point) ->
     State.Block.read chain head >>=? begin fun block ->
       Chain.genesis chain >>= fun genesis ->
       time ~runs:runs (fun () ->
@@ -320,7 +320,7 @@ let test_locator base_dir =
           compute_linear_locator chain
             ~genesis:(State.Block.hash genesis)
             ~save_point
-            ~rock_bottom ~size block)
+            ~caboose ~size block)
       |> fun (l_lin,t_lin) ->
       l_exp >>= fun l_exp ->
       l_lin >>= fun l_lin ->

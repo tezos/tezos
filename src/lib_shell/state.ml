@@ -86,7 +86,7 @@ and chain_data = {
   live_operations: Operation_hash.Set.t ;
   test_chain: Chain_id.t option ;
   save_point: Int32.t * Block_hash.t  ;
-  rock_bottom: Int32.t * Block_hash.t  ;
+  caboose: Int32.t * Block_hash.t  ;
 }
 
 and block = {
@@ -244,13 +244,13 @@ let predecessor_n ?(below_save_point = false) block_store block_hash distance =
 
 let compute_locator_from_hash chain_state ?(size = 200) head_hash seed =
   Shared.use chain_state.chain_data begin fun state ->
-    Lwt.return state.data.rock_bottom
-  end >>= fun (_lvl, rock_bottom) ->
+    Lwt.return state.data.caboose
+  end >>= fun (_lvl, caboose) ->
   Shared.use chain_state.block_store begin fun block_store ->
     Store.Block.Header.read_exn (block_store, head_hash) >>= fun header ->
     Block_locator.compute
       ~get_predecessor:(predecessor_n ~below_save_point:true block_store)
-      ~rock_bottom
+      ~caboose
       ~size
       head_hash header seed
   end
@@ -433,7 +433,7 @@ module Chain = struct
       ~genesis
       ~faked_genesis_hash
       ~save_point
-      ~rock_bottom
+      ~caboose
       ~expiration
       ~allow_forked_chain
       ~current_head
@@ -446,7 +446,7 @@ module Chain = struct
     let rec chain_data = {
       data = {
         save_point ;
-        rock_bottom ;
+        caboose ;
         current_head = {
           chain_state ;
           hash = current_head ;
@@ -482,14 +482,14 @@ module Chain = struct
     let block_store = Store.Block.get chain_store
     and chain_data_store = Store.Chain_data.get chain_store in
     let save_point = 0l, genesis.block in
-    let rock_bottom = 0l, genesis.block in
+    let caboose = 0l, genesis.block in
     Store.Chain.Genesis_hash.store chain_store genesis.block >>= fun () ->
     Store.Chain.Genesis_time.store chain_store genesis.time >>= fun () ->
     Store.Chain.Genesis_protocol.store chain_store genesis.protocol >>= fun () ->
     Store.Chain_data.Current_head.store chain_data_store genesis.block >>= fun () ->
     Store.Chain_data.Known_heads.store chain_data_store genesis.block >>= fun () ->
     Store.Chain_data.Save_point.store chain_data_store save_point >>= fun () ->
-    Store.Chain_data.Rock_bottom.store chain_data_store rock_bottom >>= fun () ->
+    Store.Chain_data.Caboose.store chain_data_store caboose >>= fun () ->
     begin
       match expiration with
       | None -> Lwt.return_unit
@@ -512,7 +512,7 @@ module Chain = struct
       ~allow_forked_chain
       ~checkpoint:genesis_header
       ~save_point
-      ~rock_bottom
+      ~caboose
       global_state
       data.context_index
       chain_data_store
@@ -550,7 +550,7 @@ module Chain = struct
     Store.Chain_data.Current_head.read chain_data_store >>=? fun current_head ->
     Store.Chain_data.Checkpoint.read chain_data_store >>=? fun checkpoint ->
     Store.Chain_data.Save_point.read chain_data_store >>=? fun save_point ->
-    Store.Chain_data.Rock_bottom.read chain_data_store >>=? fun rock_bottom ->
+    Store.Chain_data.Caboose.read chain_data_store >>=? fun caboose ->
     begin
       match expiration with
       | None -> Lwt.return_unit
@@ -566,7 +566,7 @@ module Chain = struct
         ~allow_forked_chain
         ~checkpoint
         ~save_point
-        ~rock_bottom
+        ~caboose
         global_state
         data.context_index
         chain_data_store
@@ -620,9 +620,9 @@ module Chain = struct
     Shared.use chain_state.chain_data begin fun state ->
       Lwt.return state.data.save_point
     end
-  let rock_bottom chain_state =
+  let caboose chain_state =
     Shared.use chain_state.chain_data begin fun state ->
-      Lwt.return state.data.rock_bottom
+      Lwt.return state.data.caboose
     end
 
   let purge_loop_full global_store store block_hash bottom =
@@ -704,16 +704,16 @@ module Chain = struct
         let max_op_ttl = contents.max_operations_ttl in
         assert (max_op_ttl > 0);
         let limit = min max_op_ttl (Int32.to_int header.shell.level) in
-        purge_loop_rolling ~genesis_hash:chain_state.genesis.block global_data.global_store store hash limit >>= fun rock_bottom_hash ->
-        let rock_bottom_level = Int32.sub lvl (Int32.of_int max_op_ttl) in
-        let rock_bottom = (rock_bottom_level, rock_bottom_hash) in
+        purge_loop_rolling ~genesis_hash:chain_state.genesis.block global_data.global_store store hash limit >>= fun caboose_hash ->
+        let caboose_level = Int32.sub lvl (Int32.of_int max_op_ttl) in
+        let caboose = (caboose_level, caboose_hash) in
         update_chain_data chain_state begin fun _ data ->
-          let new_data = { data with save_point = checkpoint ; rock_bottom ; } in
+          let new_data = { data with save_point = checkpoint ; caboose ; } in
           Lwt.return (Some new_data, ())
         end >>= fun () ->
         Shared.use chain_state.chain_data begin fun data ->
           Store.Chain_data.Save_point.store data.chain_data_store checkpoint >>= fun () ->
-          Store.Chain_data.Rock_bottom.store data.chain_data_store rock_bottom >>= fun () ->
+          Store.Chain_data.Caboose.store data.chain_data_store caboose >>= fun () ->
           Lwt.return_unit
         end
 
@@ -1692,7 +1692,7 @@ let upgrade_0_0_1
       end >>=? fun () ->
       Store.Chain.Genesis_hash.read chain_store >>=? fun genesis_hash ->
       Store.Chain_data.Save_point.store chain_data_store (0l, genesis_hash) >>= fun () ->
-      Store.Chain_data.Rock_bottom.store chain_data_store (0l, genesis_hash) >>= fun () ->
+      Store.Chain_data.Caboose.store chain_data_store (0l, genesis_hash) >>= fun () ->
       return_unit
     end
     chains >>=? fun () ->

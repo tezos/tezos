@@ -321,10 +321,10 @@ module Chain_data = struct
            tup2 int32 Block_hash.encoding
        end))
 
-  module Rock_bottom =
+  module Caboose =
     Store_helpers.Make_single_store
       (Chain.Indexed_store.Store)
-      (struct let name = ["rock_bottom"] end)
+      (struct let name = ["caboose"] end)
       (Store_helpers.Make_value(struct
          type t = Int32.t * Block_hash.t
          let encoding =

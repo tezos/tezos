@@ -128,9 +128,9 @@ let rpc_directory =
   register0 S.checkpoint begin fun chain () () ->
     State.Chain.checkpoint chain >>= fun checkpoint ->
     State.Chain.save_point chain >>= fun (save_point, _) ->
-    State.Chain.rock_bottom chain >>= fun (rock_bottom, _) ->
+    State.Chain.caboose chain >>= fun (caboose, _) ->
     State.history_mode (State.Chain.global_state chain) >>=? fun history_mode ->
-    return (checkpoint, save_point, rock_bottom, history_mode)
+    return (checkpoint, save_point, caboose, history_mode)
   end ;
 
   (* blocks *)

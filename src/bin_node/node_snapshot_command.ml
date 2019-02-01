@@ -91,7 +91,7 @@ let export ?(export_rolling=false) data_dir filename block =
         let max_op_ttl = block_content.max_operations_ttl in
         begin
           if not export_rolling then
-            Store.Chain_data.Rock_bottom.read chain_data_store >>=? fun (rb_level,_) ->
+            Store.Chain_data.Caboose.read chain_data_store >>=? fun (rb_level,_) ->
             return rb_level
           else
             return (Int32.(sub block_header.shell.level (of_int max_op_ttl)))
@@ -344,18 +344,18 @@ let import data_dir filename =
         end >>= fun () ->
 
         Store.Chain_data.Save_point.store chain_data new_checkpoint >>= fun () ->
-        let rock_bottom_level =
+        let caboose_level =
           if oldest_level = 1l then 0l else oldest_level in
-        let rock_bottom_hash =
+        let caboose_hash =
           if oldest_level = 1l then genesis.block else Block_header.hash oldest_header in
-        let minimal_rock_bottom_level =
+        let minimal_caboose_level =
           Int32.(sub
                    block_header.shell.level
                    (of_int validation_result.max_operations_ttl)) in
-        assert Compare.Int32.(rock_bottom_level <= minimal_rock_bottom_level) ;
-        Store.Chain_data.Rock_bottom.store
+        assert Compare.Int32.(caboose_level <= minimal_caboose_level) ;
+        Store.Chain_data.Caboose.store
           chain_data
-          (rock_bottom_level, rock_bottom_hash) >>= fun () ->
+          (caboose_level, caboose_hash) >>= fun () ->
         return_unit
       end
   end

@@ -184,7 +184,7 @@ let to_steps_truncate ~limit ~last_pred seed locator =
 
 let compute
     ~get_predecessor
-    ~rock_bottom
+    ~caboose
     ~size
     block_hash
     header
@@ -196,10 +196,10 @@ let compute
       let (step, state) = Step.next state in
       get_predecessor current_block_hash step >>= function
       | None ->
-          if Block_hash.equal rock_bottom current_block_hash then
+          if Block_hash.equal caboose current_block_hash then
             Lwt.return acc
           else
-            Lwt.return (rock_bottom :: acc)
+            Lwt.return (caboose :: acc)
       | Some predecessor ->
           loop (predecessor :: acc) (pred size) state predecessor in
   if size <= 0 then

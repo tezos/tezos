@@ -59,7 +59,7 @@ type data = State.chain_data = {
   live_operations: Operation_hash.Set.t ;
   test_chain: Chain_id.t option ;
   save_point: Int32.t * Block_hash.t ;
-  rock_bottom: Int32.t * Block_hash.t ;
+  caboose: Int32.t * Block_hash.t ;
 }
 
 let data chain_state =
@@ -114,7 +114,7 @@ let locked_set_head chain_store data block live_blocks live_operations =
     live_operations ;
     test_chain = None ;
     save_point = data.save_point ;
-    rock_bottom = data.rock_bottom ;
+    caboose = data.caboose ;
   }
 
 let set_head chain_state block =

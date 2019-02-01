@@ -236,11 +236,11 @@ let test_purge_light (s: state) =
      block hash at the beginning. *)
   State.read_chain_data s.chain begin fun _ data ->
     assert (Block_hash.equal data.save_point genesis_block) ;
-    assert (Block_hash.equal data.rock_bottom genesis_block) ;
-    return data.rock_bottom
+    assert (Block_hash.equal data.caboose genesis_block) ;
+    return data.caboose
   end
   (* We purge here. *)
-  >>=? fun rock_bottom ->
+  >>=? fun caboose ->
   State.Chain.purge_light s.chain hb2
   >>= fun () -> (* Assert the oldest block is correctly updated. *)
   State.read_chain_data s.chain begin fun _ data ->
@@ -249,7 +249,7 @@ let test_purge_light (s: state) =
   end
   >>=? fun () -> (* Assert the rock bottom is still the same. *)
   State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal data.rock_bottom rock_bottom) ;
+    assert (Block_hash.equal data.caboose caboose) ;
     return_unit
   end
   >>=? fun () -> (* Assert b2 does still exist. *)
@@ -288,7 +288,7 @@ let test_purge_zero (s: state) =
      block hash at the beginning. *)
   State.read_chain_data s.chain begin fun _ data ->
     assert (Block_hash.equal data.save_point genesis_block) ;
-    assert (Block_hash.equal data.rock_bottom genesis_block) ;
+    assert (Block_hash.equal data.caboose genesis_block) ;
     return_unit
   end
   (* We purge here. *)
@@ -302,7 +302,7 @@ let test_purge_zero (s: state) =
   State.read_chain_data s.chain begin fun _ data ->
     let dist = min max_op_ttl lb2 in
     assert (dist = lb2 - lb1) ;
-    assert (Block_hash.equal data.rock_bottom hb1) ;
+    assert (Block_hash.equal data.caboose hb1) ;
     return_unit
   end
   >>=? fun () -> (* Assert b2 does still exist. *)

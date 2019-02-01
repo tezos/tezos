@@ -48,7 +48,7 @@ let checkpoint_encoding =
   (obj4
      (req "block" Block_header.encoding)
      (dft "save_point" int32 0l)
-     (dft "rock_bottom" int32 0l)
+     (dft "caboose" int32 0l)
      (req "history_mode" History_mode.encoding))
 
 let invalid_block_encoding =
