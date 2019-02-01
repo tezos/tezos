@@ -51,9 +51,13 @@ let man =
   Node_run_command.Manpage.examples
 
 let info =
+  let version =
+    Tezos_base.Current_git_info.abbreviated_commit_hash ^
+    " ("^Tezos_base.Current_git_info.committer_date^")" in
   Cmdliner.Term.info
     ~doc:"The Tezos node"
     ~man
+    ~version
     "tezos-node"
 
 let commands = [

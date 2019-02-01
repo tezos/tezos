@@ -7,7 +7,7 @@ ocaml_version=4.06.1
 opam_version=2.0
 
 ## Please update `.gitlab-ci.yml` accordingly
-opam_repository_tag=bb57cca4069add53f85f26794971581be8e77e3d
-full_opam_repository_tag=a1ce1244a86abf897cacd4692a3ae8c369a18938
+opam_repository_tag=9f0956e21f4dcd2803d83072903872eba196bef8
+full_opam_repository_tag=3ed20d6cfd8a35fd8b459bec3a30e149b6dc03d4
 opam_repository_url=https://gitlab.com/tezos/opam-repository.git
 opam_repository=$opam_repository_url\#$opam_repository_tag

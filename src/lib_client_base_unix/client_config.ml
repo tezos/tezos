@@ -310,7 +310,7 @@ let password_filename_arg () =
     ~long:"password-filename"
     ~short:'f'
     ~placeholder:"filename"
-    ~doc:"path to the passowrd filename"
+    ~doc:"path to the password filename"
     (string_parameter ())
 
 let read_config_file config_file =

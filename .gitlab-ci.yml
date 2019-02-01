@@ -1,6 +1,6 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: bb57cca4069add53f85f26794971581be8e77e3d
+  build_deps_image_version: 9f0956e21f4dcd2803d83072903872eba196bef8
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
 
@@ -574,12 +574,16 @@ publish:docker:
     - zeronet-staging
     - mainnet-staging
   before_script:
+    - apk add git
     - mkdir ~/.docker || true
     - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json
   script:
+    - LAST_COMMIT_DATE_TIME=$(git log --pretty=format:"%cd" -1 --date="format:%Y%m%d%H%M%S" 2>&1)
     - ./scripts/create_docker_image.sh
         "${public_docker_image_name}" "${CI_COMMIT_REF_NAME}"
     - docker push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
+    - docker tag "${public_docker_image_name}:${CI_COMMIT_REF_NAME}" "${public_docker_image_name}:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
   tags:
     - safe_docker
 

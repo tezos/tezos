@@ -216,7 +216,7 @@ Please preserve the JSON file, after each reset of Zeronet or
 Alphanet, you will have to reactivate the wallet.
 
 Please drink carefully and don't abuse the faucet: it only contains
-30.000 wallets for a total amount of ꜩ760.000.000.
+30,000 wallets for a total amount of ꜩ760,000,000.
 
 
 Transactions

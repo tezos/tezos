@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,8 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Alcotest.run "tezos-storage" [
-    "context", Test_context.tests ;
-    "raw_store", Test_raw_store.tests ;
-  ]
+let raw_commit_hash = "$Format:%H$"
+
+let commit_hash =
+  if String.equal raw_commit_hash ("$Format:"^"%H$"(*trick to avoid git-subst*))
+  then Generated_git_info.commit_hash
+  else raw_commit_hash
+
+let raw_abbreviated_commit_hash = "$Format:%h$"
+
+let abbreviated_commit_hash =
+  if String.equal raw_abbreviated_commit_hash ("$Format:"^"%h$")
+  then Generated_git_info.abbreviated_commit_hash
+  else raw_abbreviated_commit_hash
+
+let raw_committer_date = "$Format:%ci$"
+
+let committer_date =
+  if String.equal raw_committer_date ("$Format:"^"%ci$")
+  then Generated_git_info.committer_date
+  else raw_committer_date
