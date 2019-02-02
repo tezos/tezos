@@ -56,6 +56,7 @@ let chain_arg =
 type block = [
   | `Genesis
   | `Head of int
+  | `Alias of [ `Caboose | `Checkpoint | `Save_point ] * int
   | `Hash of Block_hash.t * int
   | `Level of Int32.t
 ]
@@ -82,6 +83,21 @@ let parse_block s =
     | (["head"], _) -> Ok (`Head 0)
     | (["head"; n], '~') | (["head"; n], '-') ->
         Ok (`Head (int_of_string n))
+    | (["checkpoint"], _) ->
+        Ok (`Alias (`Checkpoint, 0))
+    | (["checkpoint" ; n], '~') | (["checkpoint" ; n], '-') ->
+        Ok (`Alias (`Checkpoint, int_of_string n))
+    | (["checkpoint" ; n], '+') -> Ok (`Alias (`Checkpoint, - int_of_string n))
+    | (["save_point"], _) ->
+        Ok (`Alias (`Save_point, 0))
+    | (["save_point" ; n], '~') | (["save_point" ; n], '-') ->
+        Ok (`Alias (`Save_point, int_of_string n))
+    | (["save_point" ; n], '+') -> Ok (`Alias (`Save_point, - int_of_string n))
+    | (["caboose"], _) ->
+        Ok (`Alias (`Caboose, 0))
+    | (["caboose" ; n], '~') | (["caboose" ; n], '-') ->
+        Ok (`Alias (`Caboose, int_of_string n))
+    | (["caboose" ; n], '+') -> Ok (`Alias (`Caboose, - int_of_string n))
     | ([hol], _) ->
         begin
           match Block_hash.of_b58check_opt hol with
@@ -97,8 +113,15 @@ let parse_block s =
     | _ -> raise Exit
   with _ -> Error "Cannot parse block identifier."
 
+let alias_to_string = function
+  | `Checkpoint -> "checkpoint"
+  | `Save_point -> "save_point"
+  | `Caboose -> "caboose"
 let to_string = function
   | `Genesis -> "genesis"
+  | `Alias (a, 0) -> alias_to_string a
+  | `Alias (a, n) when n < 0 -> Printf.sprintf "%s+%d" (alias_to_string a) (-n)
+  | `Alias (a, n) -> Printf.sprintf "%s~%d" (alias_to_string a) n
   | `Head 0 -> "head"
   | `Head n when n < 0 -> Printf.sprintf "head+%d" (-n)
   | `Head n -> Printf.sprintf "head~%d" n
