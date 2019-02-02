@@ -373,7 +373,19 @@ let get_block chain_state = function
         State.Block.read_predecessor
           chain_state ~pred:n ~below_save_point:true
           (State.Block.hash head)
-  | `Hash (hash, n) ->
+  | `Alias (_, n) | `Hash (_, n) as b ->
+      begin match b with
+        | `Alias (`Checkpoint, _) ->
+            State.Chain.checkpoint chain_state >>= fun checkpoint ->
+            Lwt.return (Block_header.hash checkpoint)
+        | `Alias (`Save_point, _) ->
+            State.Chain.save_point chain_state >>= fun (_, save_point) ->
+            Lwt.return save_point
+        | `Alias (`Caboose, _) ->
+            State.Chain.caboose chain_state >>= fun (_, caboose) ->
+            Lwt.return caboose
+        | `Hash (h, _) -> Lwt.return h
+      end >>= fun hash ->
       if n < 0 then
         State.Block.read_exn chain_state hash >>= fun block ->
         Chain.head chain_state >>= fun head ->
