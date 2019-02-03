@@ -289,16 +289,14 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
     def "block_header" @@
     conv
       (fun { chain_id ; hash ; shell ; protocol_data } ->
-         let raw = b58_header shell protocol_data in
-         (((), chain_id, hash, raw), { shell ; protocol_data }))
-      (fun (((), chain_id, hash, _), { shell ; protocol_data }) ->
+         (((), chain_id, hash), { shell ; protocol_data }))
+      (fun (((), chain_id, hash), { shell ; protocol_data }) ->
          { chain_id ; hash ; shell ; protocol_data } )
       (merge_objs
-         (obj4
+         (obj3
             (req "protocol" (constant protocol_hash))
             (req "chain_id" Chain_id.encoding)
-            (req "hash" Block_hash.encoding)
-            (opt "encoded_header" string))
+            (req "hash" Block_hash.encoding))
          raw_block_header_encoding)
 
   type block_metadata = {
