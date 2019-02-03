@@ -101,15 +101,14 @@ let raw_encode ?(alphabet=Alphabet.default) s =
   let res_len = (len * 8 + 4) / 5 in
   let res = Bytes.make res_len '\000' in
   let s = Z.of_bits s in
-  let rec loop s =
-    if s = Z.zero then 0 else
+  let rec loop s i =
+    if s = Z.zero then i else
       let s, r = Z.div_rem s zbase in
-      let i = loop s in
       Bytes.set res i (to_char ~alphabet (Z.to_int r)) ;
-      i + 1 in
-  let i = loop s in
-  let res = Bytes.sub_string res 0 i in
-  String.make zeros zero ^ res
+      loop s (i - 1) in
+  let i = loop s (res_len - 1) in
+  let ress = Bytes.sub_string res (i + 1) (res_len - i - 1) in
+  String.make zeros zero ^ ress
 
 let raw_decode ?(alphabet=Alphabet.default) s =
   TzString.fold_left begin fun a c ->
