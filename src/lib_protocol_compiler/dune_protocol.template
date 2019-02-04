@@ -1,0 +1,70 @@
+
+(rule
+ (targets environment.ml)
+ (action
+  (write-file %{targets}
+              "include Tezos_protocol_environment_shell.MakeV1(struct let name = \"%%VERSION%%\" end)()
+      module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
+")))
+
+(rule
+ (targets registerer.ml)
+ (deps tezos_embedded_protocol_environment_%%LIB_VERSION%%.cmxa
+       (:src_dir TEZOS_PROTOCOL))
+ (action
+  (with-stdout-to %{targets}
+                  (chdir %{workspace_root} (run %{bin:tezos-embedded-protocol-packer} "%{src_dir}" "%%LIB_VERSION%%")))))
+
+
+(rule
+ (targets functor.ml)
+ (deps %%SOURCES%%
+       (:src_dir TEZOS_PROTOCOL))
+ (action (with-stdout-to %{targets}
+                         (chdir %{workspace_root}
+                                (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
+
+(library
+ (name tezos_protocol_%%LIB_VERSION%%)
+ (public_name tezos-protocol-%%VERSION%%)
+ (libraries tezos-protocol-environment-sigs)
+ (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
+        -warn-error "-a+8"
+        -safe-string -nopervasives)
+ (modules Functor))
+
+(library
+ (name tezos_embedded_protocol_environment_%%LIB_VERSION%%)
+ (public_name tezos-embedded-protocol-%%VERSION%%.environment)
+ (library_flags (:standard -linkall))
+ (libraries tezos-protocol-environment-shell)
+ (modules Environment))
+
+(library
+ (name tezos_embedded_raw_protocol_%%LIB_VERSION%%)
+ (public_name tezos-embedded-protocol-%%VERSION%%.raw)
+ (libraries tezos_embedded_protocol_environment_%%LIB_VERSION%%)
+ (library_flags (:standard -linkall))
+ (flags (:standard -nopervasives -nostdlib -safe-string
+                   -w +a-4-6-7-9-29-32-40..42-44-45-48
+                   -warn-error -a+8
+                   -open Tezos_embedded_protocol_environment_%%LIB_VERSION%%__Environment
+                   -open Pervasives
+                   -open Error_monad))
+ (modules %%MODULES%%))
+
+(library
+ (name tezos_embedded_protocol_%%LIB_VERSION%%)
+ (public_name tezos-embedded-protocol-%%VERSION%%)
+ (library_flags (:standard -linkall))
+ (libraries tezos_embedded_raw_protocol_%%LIB_VERSION%%
+            tezos-protocol-updater
+            tezos-protocol-environment-shell)
+ (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48
+                   -warn-error -a+8))
+ (modules Registerer))
+
+(alias
+ (name runtest_sandbox)
+ (deps .tezos_protocol_%%LIB_VERSION%%.objs/tezos_protocol_%%LIB_VERSION%%.cmx))
+

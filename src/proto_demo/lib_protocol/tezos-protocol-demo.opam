@@ -11,9 +11,9 @@ depends: [
   "tezos-protocol-compiler"
 ]
 build: [
-  [ "rm" "dune" "src/dune" ]
-  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_protocol_template" "dune" ]
-  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"demo\"/" "dune" ]
+  [ "%{tezos-protocol-compiler:lib}%/replace"
+      "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
+      "src/dune" "demo" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 run-test: [
