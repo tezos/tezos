@@ -348,6 +348,14 @@ let process sandbox verbosity checkpoint gc args =
           | Some _ -> true
           | None -> false)
       args >>=? fun config ->
+    (*Do not allow gc AND history mode*)
+    begin match config.shell.history_mode with
+      | None -> return_unit
+      | Some _ ->
+          fail_when gc
+            (failure "Cannot run GC and set history mode at the same time. \
+                      Please upgrade history mode first.")
+    end >>=? fun () ->
     begin match sandbox with
       | Some _ ->
           if config.data_dir = Node_config_file.default_data_dir
