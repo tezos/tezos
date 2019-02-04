@@ -38,12 +38,12 @@ endif
 	 done
 
 PROTOCOLS := genesis alpha demo
-DUNE_INCS=$(patsubst %,src/proto_%/lib_protocol/src/dune.inc, ${PROTOCOLS})
+DUNE_INCS=$(patsubst %,src/proto_%/lib_protocol/dune.inc, ${PROTOCOLS})
 
 generate_dune: ${DUNE_INCS}
 
-${DUNE_INCS}:: src/proto_%/lib_protocol/src/dune.inc: \
-  src/proto_%/lib_protocol/src/TEZOS_PROTOCOL
+${DUNE_INCS}:: src/proto_%/lib_protocol/dune.inc: \
+  src/proto_%/lib_protocol/TEZOS_PROTOCOL
 	dune build @$(dir $@)/runtest_dune_template --auto-promote
 	touch $@
 
