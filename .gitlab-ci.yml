@@ -2,7 +2,7 @@ variables:
   ## Please update `scripts/version.sh` accordingly
   build_deps_image_version: 9f0956e21f4dcd2803d83072903872eba196bef8
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
-  public_docker_image_name: docker.io/${CI_PROJECT_PATH}
+  public_docker_image_name: ${CI_REGISTRY_IMAGE}/${CI_PROJECT_PATH}
 
 stages:
   - doc
@@ -27,6 +27,7 @@ stages:
     - alphanet-staging
     - zeronet-staging
     - mainnet-staging
+    - mainnet-snapshots
   before_script:
     - opam list
     - . ./scripts/version.sh
@@ -586,6 +587,7 @@ publish:docker:
     - alphanet-staging
     - zeronet-staging
     - mainnet-staging
+    - mainnet-snapshots
   before_script:
     - apk add git
     - mkdir ~/.docker || true
