@@ -1516,11 +1516,12 @@ let check_and_save_history_mode
       Chain.all state >>= fun chains ->
       iter_s (fun chain_state ->
           Chain.checkpoint chain_state >>= fun checkpoint ->
-          let lvl = checkpoint.shell.level in
-          if Int32.equal lvl Int32.zero then
+          let hash = Block_header.hash checkpoint in
+          let faked_genesis_hash = Chain.faked_genesis_hash chain_state in
+          if Block_hash.equal hash faked_genesis_hash then
             return_unit
           else
-            let hash = Block_header.hash checkpoint in
+            let lvl = checkpoint.shell.level in
             Chain.purge_full chain_state (lvl, hash) >>= fun () ->
             return_unit
         ) chains >>=? fun () ->
@@ -1535,12 +1536,14 @@ let check_and_save_history_mode
       Chain.all state >>= fun chains ->
       iter_s (fun chain_state ->
           Chain.checkpoint chain_state >>= fun checkpoint ->
-          let lvl = checkpoint.shell.level in
-          if Int32.equal lvl Int32.zero then
+          let hash = Block_header.hash checkpoint in
+          let faked_genesis_hash = Chain.faked_genesis_hash chain_state in
+          if Block_hash.equal hash faked_genesis_hash then
             return_unit
           else
-            let hash = Block_header.hash checkpoint in
-            Chain.purge_rolling chain_state (lvl, hash) >>= fun () ->
+            let lvl = checkpoint.shell.level in
+            Chain.purge_rolling chain_state (lvl, hash)
+            >>= fun () ->
             return_unit
         ) chains >>=? fun () ->
       return_unit
