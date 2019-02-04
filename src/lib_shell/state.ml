@@ -1490,35 +1490,39 @@ let read
   Chain.read_all state >>=? fun () ->
   return state
 
-type error += Wrong_coercion_history_mode
+type error += Wrong_coercion_history_mode of { previous_mode: History_mode.t; next_mode: History_mode.t }
 
 let () = register_error_kind `Permanent
     ~id:"node_config_file.wrong_coercion_history_mode"
     ~title:"Wrong coercion between history modes"
     ~description:"Wrong coercion between history modes."
-    ~pp:(fun ppf () ->
+    ~pp:(fun ppf (hm1, hm2) ->
         Format.fprintf ppf
-          "@[Cannot update node history mode.@]")
-    Data_encoding.unit
-    (function Wrong_coercion_history_mode -> Some ()
+          "@[Cannot update node history mode from %a mode to %a mode.@]"
+          History_mode.pp hm1 History_mode.pp hm2
+      )
+    (Data_encoding.obj2
+       (Data_encoding.req "previous_mode" History_mode.encoding)
+       (Data_encoding.req "next_mode" History_mode.encoding))
+    (function Wrong_coercion_history_mode x -> Some (x.previous_mode, x.next_mode)
             | _ -> None)
-    (fun () -> Wrong_coercion_history_mode)
+    (fun (previous_mode, next_mode) -> Wrong_coercion_history_mode { previous_mode; next_mode })
 
 let history_mode_tag =
   Tag.def "history_mode" History_mode.pp
 
 let check_and_save_history_mode
-    ~previous
-    ~now
+    ~previous_mode
+    ~next_mode
     global_store
     state
   =
   let open History_mode in
-  match (previous, now) with
+  match (previous_mode, next_mode) with
   | (Archive, Archive) | (Full, Full) | (Rolling, Rolling) ->
       return_unit
   | (Full, Archive) | (Rolling, Archive) | (Rolling, Full) ->
-      fail Wrong_coercion_history_mode
+      fail (Wrong_coercion_history_mode { previous_mode ; next_mode })
   | (Archive, Full) ->
       lwt_log_notice Tag.DSL.(fun f ->
           f "Cleaning up the state to switch to %a mode..."
@@ -1586,8 +1590,8 @@ let init
         | None -> return previous_history_mode
         | Some history_mode ->
             check_and_save_history_mode
-              ~previous:previous_history_mode
-              ~now:history_mode global_store state >>=? fun () ->
+              ~previous_mode:previous_history_mode
+              ~next_mode:history_mode global_store state >>=? fun () ->
             return history_mode
   end >>=? fun history_mode ->
   return (state, main_chain_state, context_index, history_mode)
