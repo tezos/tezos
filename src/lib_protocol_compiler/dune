@@ -99,10 +99,23 @@
                    -open Tezos_stdlib_unix))
  (modules Main_embedded_packer))
 
+(executable
+ (name replace)
+ (libraries tezos-base tezos-stdlib-unix str)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix))
+ (modules Replace))
+
 (install
  (section share)
  (files jbuild_protocol_template
         jbuild_embedded_protocol_template))
+
+(install
+ (section libexec)
+ (files (replace.exe as replace)
+        dune_protocol
+        dune_protocol.template))
 
 (alias
  (name runtest_indent)

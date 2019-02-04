@@ -17,9 +17,9 @@ depends: [
   "bip39" { with-test }
 ]
 build: [
-  [ "rm" "dune" "src/dune" ]
-  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_protocol_template" "dune" ]
-  [ "sed" "-i.old" "s/let predefined_version = None/let predefined_version = Some \"001_PtCJ7pwo\"/" "dune" ]
+  [ "%{tezos-protocol-compiler:lib}%/replace"
+      "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
+      "src/dune" "001_PtCJ7pwo" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 run-test: [

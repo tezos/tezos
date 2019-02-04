@@ -13,7 +13,7 @@ endif
 
 current_ocaml_version := $(shell opam exec -- ocamlc -version)
 
-all:
+all: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
@@ -37,7 +37,17 @@ endif
 	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
 	 done
 
-all.pkg:
+PROTOCOLS := 000_Ps9mPmXa 001_PtCJ7pwo 002_PsYLVpVv 003_PsddFKi3 demo
+DUNE_INCS=$(patsubst %,src/proto_%/lib_protocol/src/dune.inc, ${PROTOCOLS})
+
+generate_dune: ${DUNE_INCS}
+
+${DUNE_INCS}:: src/proto_%/lib_protocol/src/dune.inc: \
+  src/proto_%/lib_protocol/src/TEZOS_PROTOCOL
+	dune build @$(dir $@)/runtest_dune_template --auto-promote
+	touch $@
+
+all.pkg: generate_dune
 	@dune build \
 	    $(patsubst %.opam,%.install, $(shell find src vendors -name \*.opam -print))
 
