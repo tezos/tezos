@@ -153,6 +153,7 @@ let import data_dir filename =
   (* FIXME: use config value ?*)
   Store.init ~mapsize:4_096_000_000_000L store_root >>=? fun store ->
   let chain_store = Store.Chain.get store chain_id in
+  let chain_data = Store.Chain_data.get chain_store in
   let block_store = Store.Block.get chain_store in
 
   State.init
@@ -288,6 +289,12 @@ let import data_dir filename =
                 Lwt_list.iter_s
                   (fun (l,h) -> Store.Block.Predecessors.store (block_store,pruned_block_hash) l h)
                   predecessors.(cpt) >>= fun () ->
+                begin match predecessors.(cpt) with
+                  | (0, pred_hash) :: _ ->
+                      Store.Chain_data.In_main_branch.store (chain_data, pred_hash) pruned_block_hash
+                  | [] -> Lwt.return_unit
+                  | _ :: _ -> assert false
+                end >>= fun () ->
                 loop_on_chunk (succ cpt)
               end in
             if (succ cpt) mod 5000 = 0 then Lwt.return cpt else
@@ -296,8 +303,6 @@ let import data_dir filename =
             loop_on_chunks cpt in
         loop_on_chunks 0 >>= fun () ->
         if Unix.isatty Unix.stderr then Format.eprintf "@." ;
-
-        let chain_data = Store.Chain_data.get chain_store in
 
         (* Prepare the new head to be stored *)
         let block_metadata = block_validation_result.block_metadata in
@@ -323,6 +328,7 @@ let import data_dir filename =
               Lwt.fail_with "Failed to store block (already known)"
           | Some new_head ->
               (* New head is set*)
+              Store.Chain_data.Known_heads.remove chain_data genesis.block >>= fun () ->
               Store.Chain_data.Known_heads.store chain_data (State.Block.hash new_head) >>= fun () ->
               Store.Chain_data.Current_head.store chain_data (State.Block.hash new_head)
         end  >>= fun _old_head ->
