@@ -37,7 +37,9 @@ val level: incremental -> int32
 val begin_construction:
   ?priority:int ->
   ?timestamp:Time.t ->
-  Block.t -> incremental tzresult Lwt.t
+  ?policy:Block.baker_policy ->
+  Block.t ->
+  incremental tzresult Lwt.t
 
 val add_operation:
   ?expect_failure:(error list -> unit tzresult Lwt.t) ->
