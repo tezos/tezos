@@ -31,7 +31,7 @@ let (//) = Filename.concat
 let context_dir data_dir = data_dir // "context"
 let store_dir data_dir = data_dir // "store"
 
-let export ?(export_rolling=false) data_dir filename blocks =
+let export ?(export_rolling=false) data_dir filename block =
   let data_dir =
     match data_dir with
     | None -> Node_config_file.default_data_dir
@@ -52,21 +52,22 @@ let export ?(export_rolling=false) data_dir filename blocks =
           failwith "cannot export a full snapshot from a %a node"
             History_mode.pp history_mode
   end >>=? fun () ->
-  begin if blocks <> [] then
-      Lwt.return (List.map Block_hash.of_b58check_exn blocks)
-    else
-      Store.Chain_data.Current_head.read_exn chain_data_store >>= fun head ->
-      Store.Block.Predecessors.read_exn (block_store, head) 6 >>= fun sixteenth_pred ->
-      lwt_log_notice "No block hash specified with the `--block` option. Using %a by default (64th predecessor from the current head)"
-        Block_hash.pp sixteenth_pred >>= fun () ->
-      Lwt.return [ sixteenth_pred ]
-  end >>= fun blocks ->
-  Error_monad.filter_map_p begin fun block_hash ->
-    Store.Block.Header.read_opt (block_store, block_hash) >>= function
+  begin
+    match block with
+    | Some block_hash ->
+        Lwt.return (Block_hash.of_b58check_exn block_hash)
     | None ->
-        lwt_log_notice "Skipping unknown block %a"
-          Block_hash.pp block_hash >>= fun () ->
-        return_none
+        Store.Chain_data.Current_head.read_exn chain_data_store >>= fun head ->
+        Store.Block.Predecessors.read_exn (block_store, head) 6 >>= fun sixteenth_pred ->
+        lwt_log_notice "No block hash specified with the `--block` option. Using %a by default (64th predecessor from the current head)"
+          Block_hash.pp sixteenth_pred >>= fun () ->
+        Lwt.return sixteenth_pred
+  end >>= fun block_hash ->
+  Store.Block.Header.read_opt (block_store, block_hash) >>=
+  begin function
+    | None ->
+        failwith "Skipping unknown block %a"
+          Block_hash.pp block_hash
     | Some block_header ->
         lwt_log_notice "Dumping: %a"
           Block_hash.pp block_hash >>= fun () ->
@@ -125,15 +126,15 @@ let export ?(export_rolling=false) data_dir filename blocks =
         let block_data =
           ({block_header = block_header ;
             operations } : Tezos_storage.Context.Block_data.t ) in
-        return (Some (pred_block_header, block_data, List.rev old_pruned_blocks_rev))
+        return (pred_block_header, block_data, List.rev old_pruned_blocks_rev)
   end
-    blocks >>=? fun data_to_dump ->
+  >>=? fun data_to_dump ->
   Store.close store;
   Tezos_storage.Context.init ~readonly:true context_root
   >>= fun context_index ->
   Tezos_storage.Context.dump_contexts
     context_index
-    data_to_dump
+    [ data_to_dump ]
     ~filename >>=? fun () ->
   lwt_log_notice "Sucessful export (in file %s)" filename >>= fun () ->
   return_unit
@@ -400,7 +401,7 @@ module Term = struct
   let blocks =
     let open Cmdliner.Arg in
     let doc ="Block hash of the block to export." in
-    value & opt_all string [] & info ~docv:"OPTION" ~doc ["block"]
+    value & opt (some string) None & info ~docv:"OPTION" ~doc ["block"]
 
   let export_rolling =
     let open Cmdliner in
