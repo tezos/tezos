@@ -52,6 +52,7 @@ check_indentation:
 build:
   <<: *build_definition
   script:
+    - dune build @runtest_dune_template
     - make all
   artifacts:
     paths:
