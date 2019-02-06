@@ -276,4 +276,7 @@ let apply
     ~predecessor_block_header
     ~predecessor_context
     ~block_header
-    operations
+    operations >>= function
+  | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
+      fail (System_error { errno ; fn ; msg })
+  | (Ok _ | Error _) as res -> Lwt.return res

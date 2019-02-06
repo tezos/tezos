@@ -299,6 +299,9 @@ let on_error w r st errs =
       Worker.trigger_shutdown w ;
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
       Lwt.return (Error errs)
+  | [Block_validator_errors.System_error _ ] as errs ->
+      Worker.record_event w (Event.Request (r, st, Some errs)) ;
+      return_unit
   | [Block_validator_errors.Unavailable_protocol { protocol } ] -> begin
       Block_validator.fetch_and_compile_protocol
         pv.parameters.block_validator

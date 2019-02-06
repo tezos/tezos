@@ -59,5 +59,8 @@ type error +=
         expected: Operation_list_list_hash.t ;
         found: Operation_list_list_hash.t }
   | Failed_to_checkout_context of Context_hash.t
+  | System_error of { errno: Unix.error ;
+                      fn: string ;
+                      msg: string }
 
 val invalid_block : Block_hash.t -> block_error -> error

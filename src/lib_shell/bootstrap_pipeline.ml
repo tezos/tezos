@@ -268,6 +268,7 @@ let rec validation_worker_loop pipeline =
       Lwt.return_unit
   | Error ([ Block_validator_errors.Invalid_block _
            | Block_validator_errors.Unavailable_protocol _
+           | Block_validator_errors.System_error _
            | Timeout] as err ) ->
       (* Propagate the error to the peer validator. *)
       pipeline.errors <- pipeline.errors @ err ;

@@ -153,9 +153,7 @@ let on_request
                   block ;
                 notify_new_block block ;
                 return (Ok (Some block))
-            (* TODO catch other temporary error (e.g. system errors)
-               and do not 'commit' them on disk... *)
-            | Error [Canceled | Unavailable_protocol _] as err ->
+            | Error [ Canceled | Unavailable_protocol _ | System_error _ ] as err ->
                 (* FIXME: Canceled can escape. Canceled is not registered. BOOM! *)
                 return err
             | Error errors ->
