@@ -401,7 +401,7 @@ module Term = struct
   let blocks =
     let open Cmdliner.Arg in
     let doc ="Block hash of the block to export." in
-    value & opt (some string) None & info ~docv:"OPTION" ~doc ["block"]
+    value & opt (some string) None & info ~docv:"<block_hash>" ~doc ["block"]
 
   let export_rolling =
     let open Cmdliner in
@@ -423,22 +423,33 @@ end
 module Manpage = struct
 
   let command_description =
-    "The $(b,snapshot) command ... ."
+    "The $(b,snapshot) command is meant to export and import snapshots files."
 
   let description = [
     `S "DESCRIPTION" ;
     `P (command_description ^ " Several operations are possible: ");
-    `P "$(b,export) ... " ;
-    `P "$(b,import) ... " ;
+    `P "$(b,export) allows to export a snapshot of the current node state into a file." ;
+
+    `P "$(b,import) allows to import a snapshot from a given file." ;
   ]
 
   let options = [
     `S "OPTIONS" ;
   ]
 
+  let examples =
+    [
+      `S "EXAMPLES" ;
+      `I ("$(b,Export a snapshot using the rolling mode)",
+          "$(mname) snapshot export latest.rolling --rolling") ;
+      `I ("$(b,Import a snapshot located in file.full)",
+          "$(mname) snapshot import file.full")
+    ]
+
   let man =
     description @
     options @
+    examples @
     Node_shared_arg.Manpage.bugs
 
   let info =
