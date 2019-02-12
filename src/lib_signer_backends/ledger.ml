@@ -456,6 +456,12 @@ let curve_of_id = function
   | Pkh pkh -> return (curve_of_pkh pkh)
   | Animals (a,  curve_opt) -> unopt_curve a curve_opt
 
+(* The Ledger uses a special value 0x00000000 for the “any” chain-id: *)
+let pp_ledger_chain_id fmt s =
+  match s with
+  | "\x00\x00\x00\x00" -> Format.fprintf fmt "'Unspecified'"
+  | other -> Format.fprintf fmt "%a" Chain_id.pp (Chain_id.of_string_exn other)
+
 let sign ?watermark sk_uri msg =
   id_of_sk_uri sk_uri >>=? fun id ->
   with_ledger id begin fun ledger { major; minor; patch; _ } _of_curve _of_pkh ->
@@ -776,7 +782,7 @@ let commands =
                            * Main chain ID: %a -> %a@.\
                            * Main chain High Watermark: %ld -> %ld@.\
                            * Test chain High Watermark: %ld -> %ld"
-              Chain_id.pp (Chain_id.of_string_exn current_ci)
+              pp_ledger_chain_id current_ci
               Chain_id.pp main_chain_id
               current_mh main_hwm
               current_th test_hwm
@@ -831,7 +837,7 @@ let commands =
                    "The high water mark values for@ %a@ are\
                     @ %ld for the main-chain@ (%a)@ \
                     and@ %ld for the test-chain."
-                   pp_id id mh Chain_id.pp Chain_id.(of_string_exn ci) th
+                   pp_id id mh pp_ledger_chain_id ci th
                  >>= fun () ->
                  return_unit
            end
