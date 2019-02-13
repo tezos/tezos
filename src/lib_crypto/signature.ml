@@ -162,8 +162,10 @@ module Public_key_hash = struct
 
   let path_length =
     let l1 = Ed25519.Public_key_hash.path_length
-    and l2 = Secp256k1.Public_key_hash.path_length in
+    and l2 = Secp256k1.Public_key_hash.path_length
+    and l3 = P256.Public_key_hash.path_length in
     assert Compare.Int.(l1 = l2) ;
+    assert Compare.Int.(l1 = l3) ;
     1 + l1
 
   let prefix_path _ = assert false (* unused *)
