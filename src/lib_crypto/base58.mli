@@ -89,6 +89,7 @@ val register_encoding:
   wrap: ('a -> data) ->
   'a encoding
 
+(** Checks that an encoding has a certain prefix and length. *)
 val check_encoded_prefix: 'a encoding -> string -> int -> unit
 
 module Alphabet : sig

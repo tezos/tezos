@@ -117,6 +117,10 @@ module Make_minimal (K : Name) = struct
     Blake2b.final state
 
   let path_length = 6
+
+  (** Converts [key] to hex thus doubling its size then splits it into a list of
+      length [path_length] where each element is one byte, or two characters,
+      except the last one which contains the rest. *)
   let to_path key l =
     let `Hex key = to_hex key in
     String.sub key 0 2 :: String.sub key 2 2 ::
