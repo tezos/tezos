@@ -68,7 +68,6 @@ end
 
 module MakeB58(H : sig
     type t
-    val title: string
     val name: string
     val b58check_encoding: t Base58.encoding
   end) = struct

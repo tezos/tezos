@@ -74,5 +74,5 @@
 
 (alias
  (name runtest_sandbox)
- (deps .tezos_protocol_alpha.objs/tezos_protocol_alpha.cmx))
+ (deps .tezos_protocol_alpha.objs/native/tezos_protocol_alpha.cmx))
 
