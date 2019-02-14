@@ -1,41 +1,28 @@
 (executables
- (names test_michelson_parser)
- (libraries tezos-base
-            tezos-rpc-http
-            tezos-shell-services
-            tezos-client-base
-            tezos-client-genesis
-            tezos-client-alpha
-            tezos-baking-alpha
-            tezos-client-base-unix
-            tezos-signer-backends
-            tezos-micheline
+ (names test_parser)
+ (libraries tezos-stdlib-unix
+	    tezos-micheline
             alcotest-lwt)
  (flags (:standard -w -9-32 -safe-string
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_micheline
-                    -open Tezos_rpc_http
-                    -open Tezos_shell_services
-                    -open Tezos_client_base
-                    -open Tezos_client_genesis
-                    -open Tezos_client_alpha
-                    -open Tezos_baking_alpha
-                    -open Tezos_client_base_unix)))
-
+                   -open Tezos_base__TzPervasives
+		   -open Tezos_micheline
+		   -open Tezos_stdlib_unix)))
 
 (alias
-(name buildtest)
-(deps test_michelson_parser.exe))
+  (name buildtest)
+  (deps test_parser.exe))
 
 (alias
-(name runtest_michelson_parser)
-(action (run %{exe:test_michelson_parser.exe})))
+  (name runtest_micheline_parser)
+  (action (run %{exe:test_parser.exe})))
 
 (alias
-(name runtest)
-(deps (alias runtest_michelson_parser)))
+  (name runtest)
+  (deps (alias runtest_micheline_parser)))
 
 (alias
-(name runtest_indent)
-(deps (glob_files *.ml{,i}))
-(action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+  (name runtest_indent)
+  (deps (glob_files *.ml{,i}))
+  (action
+    (run bash
+      %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
