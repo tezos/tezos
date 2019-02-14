@@ -74,5 +74,5 @@
 
 (alias
  (name runtest_sandbox)
- (deps .tezos_protocol_001_PtCJ7pwo.objs/tezos_protocol_001_PtCJ7pwo.cmx))
+ (deps .tezos_protocol_001_PtCJ7pwo.objs/native/tezos_protocol_001_PtCJ7pwo.cmx))
 

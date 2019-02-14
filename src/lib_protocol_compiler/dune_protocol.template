@@ -66,5 +66,5 @@
 
 (alias
  (name runtest_sandbox)
- (deps .tezos_protocol_%%LIB_VERSION%%.objs/tezos_protocol_%%LIB_VERSION%%.cmx))
+ (deps .tezos_protocol_%%LIB_VERSION%%.objs/native/tezos_protocol_%%LIB_VERSION%%.cmx))
 

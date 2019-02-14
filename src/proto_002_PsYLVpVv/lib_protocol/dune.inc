@@ -74,5 +74,5 @@
 
 (alias
  (name runtest_sandbox)
- (deps .tezos_protocol_002_PsYLVpVv.objs/tezos_protocol_002_PsYLVpVv.cmx))
+ (deps .tezos_protocol_002_PsYLVpVv.objs/native/tezos_protocol_002_PsYLVpVv.cmx))
 

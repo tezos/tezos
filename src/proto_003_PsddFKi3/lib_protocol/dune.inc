@@ -74,5 +74,4 @@
 
 (alias
  (name runtest_sandbox)
- (deps .tezos_protocol_003_PsddFKi3.objs/tezos_protocol_003_PsddFKi3.cmx))
-
+ (deps .tezos_protocol_003_PsddFKi3.objs/native/tezos_protocol_003_PsddFKi3.cmx))

@@ -74,5 +74,5 @@
 
 (alias
  (name runtest_sandbox)
- (deps .tezos_protocol_000_Ps9mPmXa.objs/tezos_protocol_000_Ps9mPmXa.cmx))
+ (deps .tezos_protocol_000_Ps9mPmXa.objs/native/tezos_protocol_000_Ps9mPmXa.cmx))
 
