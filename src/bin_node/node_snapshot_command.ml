@@ -106,7 +106,7 @@ let export ?(export_rolling=false) data_dir filename block =
               (!cpt / 1000)
               ((!cpt + (Int32.to_int bh.shell.level - Int32.to_int limit)) / 1000);
           incr cpt;
-          if bh.shell.level < limit then
+          if bh.shell.level <= limit then
             return acc
           else
             let pbh = bh.shell.predecessor in
@@ -152,14 +152,15 @@ let import data_dir filename =
   Lwt_lock_file.create
     ~unlink_on_exit:true (Node_data_version.lock_file data_dir) >>=? fun () ->
   (* FIXME: use config value ?*)
-  Store.init ~mapsize:4_096_000_000_000L store_root >>=? fun store ->
-  let chain_store = Store.Chain.get store chain_id in
-  let chain_data = Store.Chain_data.get chain_store in
-  let block_store = Store.Block.get chain_store in
 
   State.init
     ~context_root ~store_root ~history_mode:Rolling genesis
   >>=? fun (_state, chain_state, context_index, _history_mode) ->
+
+  Store.init ~mapsize:40_960_000_000L store_root >>=? fun store ->
+  let chain_store = Store.Chain.get store chain_id in
+  let chain_data = Store.Chain_data.get chain_store in
+  let block_store = Store.Block.get chain_store in
 
   let open Tezos_storage.Context in
 

@@ -721,7 +721,7 @@ module Make (I:Dump_interface)
       | Some block ->
           get_command rbuf >>=? function
           | Proot -> loop_pruned (block :: acc) (succ cpt)
-          | Root -> return (List.rev acc)
+          | Root -> return (List.rev (block :: acc))
           | _ ->
               fail @@ Bad_read "invalid command in the middle of block history"
     in
