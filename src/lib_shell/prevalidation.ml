@@ -122,11 +122,14 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
               level = predecessor_level } } =
       State.Block.header predecessor in
     State.Block.context predecessor >>= fun predecessor_context ->
+    let predecessor_header = State.Block.header predecessor in
     let predecessor_hash = State.Block.hash predecessor in
     Chain_traversal.live_blocks
       predecessor
       (State.Block.max_operations_ttl predecessor)
     >>=? fun (live_blocks, live_operations) ->
+    Block_validation.reset_test_chain predecessor_context predecessor_header.shell
+    >>=? fun (predecessor_context, _forked_genesis_header) ->
     begin
       match protocol_data with
       | None -> return_none
@@ -299,6 +302,5 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
           NewProto.init context shell_header >>=? fun { context ; message ; _ } ->
           return (context, message)
   end >>=? fun (context, message) ->
-  Block_validation.reset_test_chain context shell_header >>=? fun context ->
   Context.hash ?message ~time:timestamp context >>= fun context ->
   return ({ shell_header with context }, validation_result_list)

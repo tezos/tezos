@@ -148,7 +148,7 @@ let on_request
                           header operations
                     | Error _ as x -> Lwt.return x
                   end >>=? fun { validation_result ; block_metadata ;
-                                 ops_metadata ; context_hash } ->
+                                 ops_metadata ; context_hash ; forked_genesis_header } ->
                   let validation_store =
                     ({ context_hash ;
                        message = validation_result.message ;
@@ -158,7 +158,8 @@ let on_request
                   Distributed_db.commit_block
                     chain_db hash
                     header block_metadata operations ops_metadata
-                    validation_store >>=? function
+                    validation_store
+                    ~forked_genesis_header >>=? function
                   | None -> assert false (* should not happen *)
                   | Some block -> return block
                 end

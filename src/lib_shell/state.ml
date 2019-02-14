@@ -1040,7 +1040,8 @@ module Block = struct
       ?(dont_enforce_context_hash = false)
       chain_state block_header block_header_metadata
       operations operations_metadata
-      { context_hash ; message ; max_operations_ttl ; last_allowed_fork_level } =
+      { context_hash ; message ; max_operations_ttl ; last_allowed_fork_level }
+      ~forked_genesis_header =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     fail_unless
@@ -1130,6 +1131,14 @@ module Block = struct
           Store.Chain_data.Known_heads.remove store predecessor >>= fun () ->
           Store.Chain_data.Known_heads.store store hash
         end >>= fun () ->
+        begin match forked_genesis_header with
+          | None -> Lwt.return_unit
+          | Some forked_genesis_header ->
+              let genesis = forked_genesis_header.Block_header.shell.predecessor in
+              Shared.use chain_state.global_state.global_data begin fun global_data ->
+                Store.Forked_genesis_header.store global_data.global_store genesis forked_genesis_header
+              end
+        end >>= fun () ->
         let block = { chain_state ; hash ; contents ; header } in
         Lwt_watcher.notify chain_state.block_watcher block ;
         Lwt_watcher.notify chain_state.global_state.block_watcher block ;
@@ -1216,7 +1225,15 @@ module Block = struct
 
   let test_chain block =
     context block >>= fun context ->
-    Context.get_test_chain context
+    Context.get_test_chain context >>= fun status ->
+    match status with
+    | Running { genesis } ->
+        Shared.use block.chain_state.global_state.global_data begin fun global_data ->
+          Store.Forked_genesis_header.read_opt global_data.global_store genesis
+        end >>= fun forked_genesis_header ->
+        Lwt.return (status, forked_genesis_header)
+    | Forking _ -> Lwt.return (status, None)
+    | Not_running -> Lwt.return (status, None)
 
   let block_validity chain_state block : Block_locator.validity Lwt.t =
     known chain_state block >>= function

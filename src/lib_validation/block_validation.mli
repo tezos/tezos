@@ -32,7 +32,7 @@ val may_patch_protocol:
 val reset_test_chain:
   Context.t ->
   Block_header.shell_header ->
-  Context.t tzresult Lwt.t
+  (Context.t * Block_header.t option) tzresult Lwt.t
 
 val check_liveness:
   live_blocks:Block_hash.Set.t ->
@@ -46,6 +46,7 @@ type result = {
   block_metadata: MBytes.t ;
   ops_metadata: MBytes.t list list ;
   context_hash: Context_hash.t ;
+  forked_genesis_header : Block_header.t option ;
 }
 
 val apply:

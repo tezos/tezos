@@ -322,7 +322,8 @@ let import data_dir filename =
           block_metadata
           operations
           ops_metadata
-          validation_store >>=? fun new_head ->
+          validation_store
+          ~forked_genesis_header:None >>=? fun new_head ->
 
         begin match new_head with
           | None ->

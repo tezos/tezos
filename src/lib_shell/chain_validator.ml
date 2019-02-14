@@ -188,9 +188,10 @@ let may_switch_test_chain w active_chains spawn_child block =
   begin
     let block_header = State.Block.header block in
     State.Block.test_chain block >>= function
-    | Not_running -> shutdown_child nv active_chains >>= return
-    | Forking _ -> assert false (* should not happen *)
-    | Running { genesis ; genesis_header ; protocol ; expiration } ->
+    | Not_running, _ -> shutdown_child nv active_chains >>= return
+    | Forking _, _ -> return () (* will be spawned at next block *)
+    | Running _, None -> assert false (* should not happen *)
+    | Running { genesis ; protocol ; expiration }, Some genesis_header ->
         let activated =
           match nv.child with
           | None -> false

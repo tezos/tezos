@@ -94,6 +94,18 @@ module Chain = struct
 end
 
 (**************************************************************************
+ * Temporary test chain genesis header store under "forked_genesis_header/"
+ **************************************************************************)
+
+module Forked_genesis_header =
+  Store_helpers.Make_map
+    (Store_helpers.Make_substore
+       (Raw_store)
+       (struct let name = ["forked_genesis_header"] end))
+    (Block_hash)
+    (Store_helpers.Make_value(Block_header))
+
+(**************************************************************************
  * Block_header store under "chain/<id>/blocks/"
  **************************************************************************)
 
