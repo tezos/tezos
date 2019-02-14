@@ -219,7 +219,7 @@ module Make (Encoding : Resto.ENCODING) = struct
           else
             Lwt.return (`Error (ansbody, media_name, media))
       | `Bad_request ->
-          Cohttp_lwt.Body.to_string body >>= fun body ->
+          Cohttp_lwt.Body.to_string ansbody >>= fun body ->
           Lwt.return (`Bad_request body)
       | `Method_not_allowed ->
           let allowed = Cohttp.Header.get_multi headers "accept" in
@@ -227,7 +227,7 @@ module Make (Encoding : Resto.ENCODING) = struct
       | `Unsupported_media_type ->
           Lwt.return  `Unsupported_media_type
       | `Not_acceptable ->
-          Cohttp_lwt.Body.to_string body >>= fun body ->
+          Cohttp_lwt.Body.to_string ansbody >>= fun body ->
           Lwt.return (`Not_acceptable body)
       | code ->
           Lwt.return
