@@ -31,18 +31,19 @@ type result = {
   block_metadata: MBytes.t ;
   ops_metadata: MBytes.t list list ;
   context_hash: Context_hash.t ;
+  forked_genesis_header : Block_header.t option ;
 }
 
 let reset_test_chain
     ctxt (forked_header : Block_header.shell_header) =
   Context.get_test_chain ctxt >>= function
-  | Not_running -> return ctxt
+  | Not_running -> return (ctxt, None)
   | Running { expiration } ->
       if Time.(expiration <= forked_header.timestamp) then
         Context.set_test_chain ctxt Not_running >>= fun ctxt ->
-        return ctxt
+        return (ctxt, None)
       else
-        return ctxt
+        return (ctxt, None)
   | Forking { protocol ; expiration } ->
       begin match Registered_protocol.get protocol with
         | Some proto -> return proto
@@ -54,9 +55,9 @@ let reset_test_chain
       Context.set_protocol test_ctxt protocol >>= fun test_ctxt ->
       Context.commit_test_chain_genesis forked_header test_ctxt >>= fun (chain_id, genesis, genesis_header) ->
       Context.set_test_chain ctxt
-        (Running { chain_id ; genesis ; genesis_header ;
+        (Running { chain_id ; genesis ;
                    protocol ; expiration }) >>= fun ctxt ->
-      return ctxt
+      return (ctxt, Some genesis_header)
 
 let may_patch_protocol
     ~level
@@ -167,11 +168,12 @@ module Make(Proto : Registered_protocol.T) = struct
       block_hash block_header >>=? fun () ->
     parse_block_header block_hash block_header >>=? fun block_header ->
     check_operation_quota block_hash operations >>=? fun () ->
+    reset_test_chain predecessor_context predecessor_block_header.shell >>=? fun (context, forked_genesis_header) ->
     parse_operations block_hash operations >>=? fun operations ->
     (* TODO wrap 'proto_error' into 'block_error' *)
     Proto.begin_application
       ~chain_id
-      ~predecessor_context
+      ~predecessor_context:context
       ~predecessor_timestamp:predecessor_block_header.shell.timestamp
       ~predecessor_fitness:predecessor_block_header.shell.fitness
       block_header >>=? fun state ->
@@ -234,13 +236,12 @@ module Make(Proto : Registered_protocol.T) = struct
            (Data_encoding.Binary.to_bytes_exn
               Proto.operation_receipt_encoding))
         ops_metadata in
-    reset_test_chain validation_result.context block_header.shell >>=? fun context ->
     Context.commit
       ~time:block_header.shell.timestamp
       ?message:validation_result.message
-      context >>= fun context_hash ->
+      validation_result.context >>= fun context_hash ->
     return ({ validation_result ; block_metadata ;
-              ops_metadata ; context_hash })
+              ops_metadata ; context_hash ; forked_genesis_header })
 
 end
 

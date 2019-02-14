@@ -117,7 +117,7 @@ let build_raw_rpc_directory
       Data_encoding.Binary.of_bytes_exn
         Proto.block_header_metadata_encoding
         (State.Block.metadata block) in
-    State.Block.test_chain block >>= fun test_chain_status ->
+    State.Block.test_chain block >>= fun (test_chain_status, _) ->
     return {
       Block_services.protocol_data ;
       test_chain_status ;

@@ -129,7 +129,8 @@ let build_valid_chain state vtbl pred names =
                message = ctxt.message;
                max_operations_ttl = ctxt.max_operations_ttl;
                last_allowed_fork_level = ctxt.last_allowed_fork_level} :
-                State.Block.validation_store) >>=? fun _vblock ->
+                State.Block.validation_store)
+             ~forked_genesis_header:None >>=? fun _vblock ->
            State.Block.read state hash >>=? fun vblock ->
            Hashtbl.add vtbl name vblock ;
            return vblock

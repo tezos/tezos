@@ -149,6 +149,7 @@ val commit_block:
   Block_header.t -> MBytes.t ->
   Operation.t list list -> MBytes.t list list ->
   State.Block.validation_store ->
+  forked_genesis_header: (Block_header.t option) ->
   State.Block.t option tzresult Lwt.t
 
 (** Store on disk all the data associated to an invalid block. *)
