@@ -126,7 +126,7 @@ let make_empty_chain (chain:State.Chain.t) n : Block_hash.t Lwt.t =
         { header with
           shell = { header.shell with predecessor = pred ;
                                       level = Int32.of_int lvl } } in
-      State.Block.store chain header zero [] [] empty_result >>=? fun _ ->
+      State.Block.store chain header zero [] [] empty_result ~forked_genesis_header:None >>=? fun _ ->
       loop (lvl+1) (Block_header.hash header)
   in
   loop 1 genesis_hash >>= function
