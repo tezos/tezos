@@ -594,6 +594,7 @@ publish:docker:
          mkdir ~/.docker || true ;
          echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json ;
       fi
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
   script:
     - LAST_COMMIT_DATE_TIME=$(git log --pretty=format:"%cd" -1 --date="format:%Y%m%d%H%M%S" 2>&1)
     - ./scripts/create_docker_image.sh
