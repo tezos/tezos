@@ -590,16 +590,16 @@ module Make (I:Dump_interface)
                I.context_parents ctxt >>= fun parents ->
                set_meta buf meta_tbl (I.Block_data.to_bytes meta) >>= fun meta_h ->
                Lwt_list.fold_left_s (fun cpt pruned ->
-                      if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
-                        Format.eprintf "History: %dK block, %dMiB written%!\b\b\b\b\b\
-                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-                          (cpt / 1000) (!written / 1_048_576) ;
-                      set_command buf Proot ;
-                      let mbhash = I.Pruned_block.to_bytes pruned in
-                      set_mbytes buf mbhash ;
-                      maybe_flush () >>= fun () ->
-                      Lwt.return (cpt + 1)) 0 pruned >>= fun _ ->
+                   if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
+                     Format.eprintf "History: %dK block, %dMiB written%!\b\b\b\b\b\
+                                     \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                                     \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+                       (cpt / 1000) (!written / 1_048_576) ;
+                   set_command buf Proot ;
+                   let mbhash = I.Pruned_block.to_bytes pruned in
+                   set_mbytes buf mbhash ;
+                   maybe_flush () >>= fun () ->
+                   Lwt.return (cpt + 1)) 0 pruned >>= fun _ ->
                set_root buf bh (I.context_info ctxt) parents meta_h ;
                return_unit
         )

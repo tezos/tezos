@@ -152,11 +152,11 @@ module Block : sig
     | Pruned
 
   (** Will return the full block if the block has never been cleaned
-     (all blocks for nodes whose history-mode is set to archive), only
-     the header for nodes below the save point (nodes in full or
-     rolling history-mode) or even `Pruned` for blocks below the rock
-     bottom, only for nodes in rolling history-mode. Will fail with
-     `Not_found` if the given hash is unknown. *)
+      (all blocks for nodes whose history-mode is set to archive), only
+      the header for nodes below the save point (nodes in full or
+      rolling history-mode) or even `Pruned` for blocks below the rock
+      bottom, only for nodes in rolling history-mode. Will fail with
+      `Not_found` if the given hash is unknown. *)
   val read_predecessor: Chain.t -> pred:int -> ?below_save_point:bool -> Block_hash.t -> partial Lwt.t
 
   val store:
