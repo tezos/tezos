@@ -249,11 +249,11 @@ let test_dump { idx; genesis; block2; block3b; _ } =
            Context.Block_data.empty )
         ctxt_hashes
     in
-    Context.dump_contexts idx bhs ~filename:dumpfile >>=? fun () ->
+    Context.dump_contexts idx (List.map (fun (a, b) -> (a, b, [])) bhs) ~filename:dumpfile >>=? fun () ->
     let root = base_dir2 // "context" in
     Context.init ?patch_context:None root >>= fun idx2 ->
     Context.restore_contexts idx2 ~filename:dumpfile >>=? fun l ->
-    let l = List.map (fun (bh,_) -> bh.Block_header.shell.context) l in
+    let l = List.map (fun (bh,_, _) -> bh.Block_header.shell.context) l in
     Assert.equal_context_hash_list ~msg:__LOC__ ctxt_hashes l ;
     return ()
   end

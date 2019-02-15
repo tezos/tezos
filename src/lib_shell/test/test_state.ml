@@ -148,14 +148,16 @@ let build_valid_chain state vtbl pred names =
 
 let build_example_tree chain =
   let vtbl = Hashtbl.create 23 in
-  Chain.genesis chain >>= fun genesis ->
-  Hashtbl.add vtbl "Genesis" genesis ;
-  let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ; "A6" ; "A7" ; "A8" ] in
-  build_valid_chain chain vtbl genesis c >>= fun () ->
-  let a3 = Hashtbl.find vtbl "A3" in
-  let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ; "B6" ; "B7" ; "B8" ] in
-  build_valid_chain chain vtbl a3 c >>= fun () ->
-  Lwt.return vtbl
+  Chain.genesis chain >>= function
+  | None -> assert false
+  | Some genesis ->
+      Hashtbl.add vtbl "Genesis" genesis ;
+      let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ; "A6" ; "A7" ; "A8" ] in
+      build_valid_chain chain vtbl genesis c >>= fun () ->
+      let a3 = Hashtbl.find vtbl "A3" in
+      let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ; "B6" ; "B7" ; "B8" ] in
+      build_valid_chain chain vtbl a3 c >>= fun () ->
+      Lwt.return vtbl
 
 type state = {
   vblock: (string, State.Block.t) Hashtbl.t ;
@@ -180,8 +182,7 @@ let wrap_state_init f base_dir =
       ~context_mapsize:4_096_000_000L
       ~store_root
       ~context_root
-      ~history_mode:None
-      genesis >>=? fun (state, chain, _index) ->
+      genesis >>=? fun (state, chain, _index, _history_mode) ->
     build_example_tree chain >>= fun vblock ->
     f { state ; chain ; vblock } >>=? fun () ->
     return_unit
@@ -235,21 +236,21 @@ let test_purge_light (s: state) =
   (* Assert the rock bottom and the oldest block are equal to the genesis
      block hash at the beginning. *)
   State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal data.save_point genesis_block) ;
-    assert (Block_hash.equal data.caboose genesis_block) ;
+    assert (Block_hash.equal (snd data.save_point) genesis_block) ;
+    assert (Block_hash.equal (snd data.caboose) genesis_block) ;
     return data.caboose
   end
   (* We purge here. *)
   >>=? fun caboose ->
-  State.Chain.purge_light s.chain hb2
-  >>= fun () -> (* Assert the oldest block is correctly updated. *)
+  (* State.Chain.purge_light s.chain hb2 *)
+  (* >>= fun () -> (\* Assert the oldest block is correctly updated. *\) *)
   State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal data.save_point hb2) ;
+    assert (Block_hash.equal (snd data.save_point) hb2) ;
     return_unit
   end
   >>=? fun () -> (* Assert the rock bottom is still the same. *)
   State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal data.caboose caboose) ;
+    assert (Block_hash.equal (snd data.caboose) (snd caboose)) ;
     return_unit
   end
   >>=? fun () -> (* Assert b2 does still exist. *)
@@ -287,22 +288,23 @@ let test_purge_zero (s: state) =
   (* Assert the rock bottom and the oldest block are equal to the genesis
      block hash at the beginning. *)
   State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal data.save_point genesis_block) ;
-    assert (Block_hash.equal data.caboose genesis_block) ;
+    assert (Block_hash.equal (snd data.save_point) genesis_block) ;
+    assert (Block_hash.equal (snd data.caboose) genesis_block) ;
     return_unit
   end
   (* We purge here. *)
-  >>=? fun () -> State.Chain.purge_zero s.chain hb2
-  >>= fun () -> (* Assert the oldest block is correctly updated. *)
+  >>=? fun () ->
+  (* State.Chain.purge_zero s.chain hb2 *)
+  (* >>= fun () -> (\* Assert the oldest block is correctly updated. *\) *)
   State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal data.save_point hb2) ;
+    assert (Block_hash.equal (snd data.save_point) hb2) ;
     return_unit
   end
   >>=? fun () -> (* Assert the rock bottom is correctly updated. *)
   State.read_chain_data s.chain begin fun _ data ->
     let dist = min max_op_ttl lb2 in
     assert (dist = lb2 - lb1) ;
-    assert (Block_hash.equal data.caboose hb1) ;
+    assert (Block_hash.equal (snd data.caboose) hb1) ;
     return_unit
   end
   >>=? fun () -> (* Assert b2 does still exist. *)
@@ -323,7 +325,9 @@ let test_purge_zero (s: state) =
 (** Chain.set_checkpoint_then_purge_light *)
 
 let test_set_checkpoint_then_purge_light (s : state) =
-  State.Chain.checkpoint s.chain >>= fun (checkpoint_lvl, checkpoint_hash) ->
+  State.Chain.checkpoint s.chain >>= fun checkpoint ->
+  let checkpoint_lvl = checkpoint.shell.level in
+  let checkpoint_hash = Block_header.hash checkpoint in
   (* At the beginning the checkpoint is the genesis. *)
   assert (Block_hash.equal checkpoint_hash genesis_block) ;
   assert (checkpoint_lvl = Int32.zero) ;
@@ -340,13 +344,13 @@ let test_set_checkpoint_then_purge_light (s : state) =
   assert (Int32.compare checkpoint_lvl lb1 = -1) ;
   assert (Int32.compare checkpoint_lvl lb2 = -1) ;
   (* Let us set a new checkpoint "B1" whose level is greater than the genesis. *)
-  State.Chain.set_checkpoint_then_purge_light s.chain (lb2, hb2)
+  State.Chain.set_checkpoint_then_purge_rolling s.chain (State.Block.header b2)
   >>= fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
   begin State.Block.known s.chain hb2 >|= fun b -> assert b end
   >>= fun () ->
-  begin State.Chain.checkpoint s.chain >|= begin fun (lvl, c) ->
-      assert (Block_hash.equal c hb2);
-      assert (Int32.equal lvl lb2);
+  begin State.Chain.checkpoint s.chain >|= begin fun b ->
+      assert (Block_hash.equal (Block_header.hash b) hb2);
+      assert (Int32.equal b.shell.level lb2);
     end
   end
   >>= fun () -> (* Assert b1 has been pruned.. *)
@@ -362,7 +366,9 @@ let test_set_checkpoint_then_purge_light (s : state) =
 (** Chain.set_checkpoint_then_purge_zero *)
 
 let test_set_checkpoint_then_purge_zero (s : state) =
-  State.Chain.checkpoint s.chain >>= fun (checkpoint_lvl, checkpoint_hash) ->
+  State.Chain.checkpoint s.chain >>= fun checkpoint ->
+  let checkpoint_lvl = checkpoint.shell.level in
+  let checkpoint_hash = Block_header.hash checkpoint in
   (* At the beginning the checkpoint is the genesis. *)
   assert (Block_hash.equal checkpoint_hash genesis_block) ;
   assert (checkpoint_lvl = Int32.zero) ;
@@ -388,13 +394,13 @@ let test_set_checkpoint_then_purge_zero (s : state) =
   let ila1 = Int32.to_int la1 in
   assert (ilb2 - ila1 > min max_op_ttl ilb2);
   (* Let us set a new checkpoint "B1" whose level is greater than the genesis. *)
-  State.Chain.set_checkpoint_then_purge_zero s.chain (lb2, hb2)
+  State.Chain.set_checkpoint_then_purge_full s.chain (State.Block.header b2)
   >>= fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
   begin State.Block.known s.chain hb2 >|= fun b -> assert b end
   >>= fun () ->
-  begin State.Chain.checkpoint s.chain >|= begin fun (lvl, c) ->
-      assert (Block_hash.equal c hb2);
-      assert (Int32.equal lvl lb2);
+  begin State.Chain.checkpoint s.chain >|= begin fun b ->
+      assert (Block_hash.equal (Block_header.hash b) hb2);
+      assert (Int32.equal b.shell.level lb2);
     end
   end
   >>= fun () -> (* Assert b1 has been pruned.. *)

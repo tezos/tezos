@@ -71,10 +71,10 @@ let init_chain base_dir : State.Chain.t Lwt.t =
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in
   State.init
-    ~store_root ~context_root ~history_mode:None
+    ~store_root ~context_root ~history_mode:Archive
     state_genesis_block >>= function
   | Error _ -> Pervasives.failwith "read err"
-  | Ok (_state, chain, _index) ->
+  | Ok (_state, chain, _index, _history_mode) ->
       Lwt.return chain
 
 
@@ -310,16 +310,13 @@ let test_locator base_dir =
   let check_locator size : unit tzresult Lwt.t =
     State.read_chain_data chain begin fun _ data ->
       Lwt.return (data.caboose, data.save_point)
-    end >>= fun (caboose, save_point) ->
+    end >>= fun ((_, caboose), _save_point) ->
     State.Block.read chain head >>=? begin fun block ->
-      Chain.genesis chain >>= fun genesis ->
       time ~runs:runs (fun () ->
           State.compute_locator chain ~size block seed) |>
       fun (l_exp,t_exp) ->
       time ~runs:runs (fun () ->
           compute_linear_locator chain
-            ~genesis:(State.Block.hash genesis)
-            ~save_point
             ~caboose ~size block)
       |> fun (l_lin,t_lin) ->
       l_exp >>= fun l_exp ->

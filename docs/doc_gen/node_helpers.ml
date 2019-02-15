@@ -52,7 +52,7 @@ let with_node f =
       Node.default_block_validator_limits
       Node.default_prevalidator_limits
       Node.default_chain_validator_limits
-      Node.default_partial_mode
+      None
     >>=? fun node ->
     f node >>=? fun () ->
     return () in
