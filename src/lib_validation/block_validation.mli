@@ -31,7 +31,7 @@ val may_patch_protocol:
 
 val reset_test_chain:
   Context.t ->
-  Block_header.shell_header ->
+  Block_header.t ->
   (Context.t * Block_header.t option) tzresult Lwt.t
 
 val check_liveness:

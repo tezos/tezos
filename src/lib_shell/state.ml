@@ -482,6 +482,9 @@ module Chain = struct
         locked_create
           state data ?allow_forked_chain
           chain_id genesis genesis_header >>= fun chain ->
+        (* in case this is a forked chain creation,
+           delete its header from the temporary table*)
+        Store.Forked_genesis_header.remove data.global_store genesis.block >>= fun () ->
         Lwt.return chain
     end
 
@@ -1031,13 +1034,23 @@ module Block = struct
   let test_chain block =
     context block >>= fun context ->
     Context.get_test_chain context >>= fun status ->
+    let of_genesis genesis =
+      (* if the chain already exists, use its genesis *)
+      begin Chain.get block.chain_state.global_state (Chain_id.of_block_hash genesis) >>= function
+        | Ok forked_chain_state ->
+            Shared.use forked_chain_state.block_store begin fun forked_block_store ->
+              Store.Block.Header.read_opt (forked_block_store, genesis)
+            end
+        | Error _ ->
+            (* otherwise, look in the temporary table *)
+            Shared.use block.chain_state.global_state.global_data begin fun global_data ->
+              Store.Forked_genesis_header.read_opt global_data.global_store genesis
+            end
+      end >>= fun forked_genesis_header ->
+      Lwt.return (status, forked_genesis_header) in
     match status with
-    | Running { genesis } ->
-        Shared.use block.chain_state.global_state.global_data begin fun global_data ->
-          Store.Forked_genesis_header.read_opt global_data.global_store genesis
-        end >>= fun forked_genesis_header ->
-        Lwt.return (status, forked_genesis_header)
-    | Forking _ -> Lwt.return (status, None)
+    | Running { genesis } -> of_genesis genesis
+    | Forking _ -> of_genesis (snd (Context.compute_testchain_genesis (hash block)))
     | Not_running -> Lwt.return (status, None)
 
   let block_validity chain_state block : Block_locator.validity Lwt.t =

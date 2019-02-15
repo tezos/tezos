@@ -40,6 +40,9 @@ val init:
   string ->
   index Lwt.t
 
+val compute_testchain_genesis:
+  Block_hash.t -> Chain_id.t * Block_hash.t
+
 val commit_genesis:
   index ->
   chain_id:Chain_id.t ->
@@ -48,7 +51,7 @@ val commit_genesis:
   Context_hash.t Lwt.t
 
 val commit_test_chain_genesis:
-  Block_header.shell_header ->
+  Block_header.t ->
   context ->
   (Chain_id.t * Block_hash.t * Block_header.t) Lwt.t
 
