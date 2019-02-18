@@ -36,6 +36,7 @@ val create:
   Block_validator.validator_kind ->
   Prevalidator.limits ->
   Chain_validator.limits ->
+  start_testchain:bool ->
   t tzresult Lwt.t
 val shutdown: t -> unit Lwt.t
 

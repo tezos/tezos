@@ -194,11 +194,10 @@ let create
     prevalidator_limits
     chain_validator_limits
     history_mode
-  =
-  let start_prevalidator =
+  let (start_prevalidator, start_testchain) =
     match p2p_params with
-    | Some (config, _limits) -> not config.P2p.disable_mempool
-    | None -> true in
+    | Some (config, _limits) -> not config.P2p.disable_mempool, not config.P2p.disable_testchain
+    | None -> true, true in
   init_p2p ~sandboxed p2p_params >>=? fun p2p ->
   State.init
     ~store_root ~context_root ?history_mode ?patch_context
@@ -211,10 +210,12 @@ let create
     (Block_validator.Internal context_index)
     prevalidator_limits
     chain_validator_limits
+    ~start_testchain
   >>=? fun validator ->
   (* TODO : Check that the testchain is correctly activated after a node restart *)
   Validator.activate validator
-    ?max_child_ttl ~start_prevalidator mainchain_state history_mode >>=? fun mainchain_validator ->
+    ?max_child_ttl ~start_prevalidator
+    mainchain_state history_mode >>=? fun mainchain_validator ->
   let shutdown () =
     P2p.shutdown p2p >>= fun () ->
     Distributed_db.shutdown distributed_db >>= fun () ->
