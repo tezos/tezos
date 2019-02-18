@@ -35,6 +35,7 @@ type t = {
   peer_validator_limits: Peer_validator.limits ;
   block_validator_limits: Block_validator.limits ;
   prevalidator_limits: Prevalidator.limits ;
+  start_testchain: bool ;
 
   valid_block_input: State.Block.t Lwt_watcher.input ;
 
@@ -49,12 +50,14 @@ let create state db
     block_validator_kind
     prevalidator_limits
     chain_validator_limits
+    ~start_testchain
   =
-  Block_validator.create block_validator_limits db block_validator_kind >>=? fun block_validator ->
+  Block_validator.create block_validator_limits db block_validator_kind ~start_testchain >>=? fun block_validator ->
   let valid_block_input = Lwt_watcher.create_input () in
   let chains_input = Lwt_watcher.create_input () in
   return
     { state ; db ;
+      start_testchain ;
       block_validator ;
       block_validator_limits ; prevalidator_limits ;
       peer_validator_limits ; chain_validator_limits ;
@@ -62,7 +65,9 @@ let create state db
       chains_input ;
       active_chains = Chain_id.Table.create 7 }
 
-let activate v ?max_child_ttl ~start_prevalidator chain_state =
+let activate v ?max_child_ttl
+    ~start_prevalidator
+    chain_state =
   let chain_id = State.Chain.id chain_state in
   lwt_log_notice Tag.DSL.(fun f ->
       f "activate chain %a"
@@ -74,6 +79,7 @@ let activate v ?max_child_ttl ~start_prevalidator chain_state =
       Chain_validator.create
         ?max_child_ttl
         ~start_prevalidator
+        ~start_testchain:v.start_testchain
         ~active_chains:v.active_chains
         v.peer_validator_limits v.prevalidator_limits
         v.block_validator

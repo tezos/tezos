@@ -40,6 +40,7 @@ and p2p = {
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
+  disable_testchain : bool ;
 }
 
 and rpc = {
@@ -83,6 +84,7 @@ val update:
   ?rpc_listen_addr:string ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
+  ?disable_testchain:bool ->
   ?cors_origins:string list ->
   ?cors_headers:string list ->
   ?rpc_tls:tls ->

@@ -48,8 +48,9 @@ module Types = struct
     protocol_validator: Protocol_validator.t ;
     validation_process: Block_validator_process.t ;
     limits : limits ;
+    start_testchain : bool ;
   }
-  type parameters = limits * Distributed_db.t * Block_validator_process.validator_kind
+  type parameters = limits * bool * Distributed_db.t * Block_validator_process.validator_kind
   let view _state _parameters = ()
 end
 
@@ -130,6 +131,7 @@ let on_request
                 begin Block_validator_process.apply_block
                     bv.validation_process
                     ~predecessor:pred
+                    ~start_testchain:bv.start_testchain
                     header operations >>= function
                   | Ok x -> return x
                   | Error [ Missing_test_protocol protocol ] ->
@@ -140,6 +142,7 @@ let on_request
                       Block_validator_process.apply_block
                         bv.validation_process
                         ~predecessor:pred
+                        ~start_testchain:bv.start_testchain
                         header operations
                   | Error _ as x -> Lwt.return x
                 end >>=? fun { validation_result ; block_metadata ;
@@ -177,10 +180,10 @@ let on_request
                 assert commited ;
                 return (Error errors)
 
-let on_launch _ _ (limits, db, validation_kind) =
+let on_launch _ _ (limits, start_testchain, db, validation_kind) =
   let protocol_validator = Protocol_validator.create db in
   Block_validator_process.init validation_kind >>= fun validation_process ->
-  return { Types.protocol_validator ; validation_process ; limits }
+  return { Types.protocol_validator ; validation_process ; limits ; start_testchain }
 
 let on_error w r st errs =
   Worker.record_event w (Validation_failure (r, st, errs)) ;
@@ -207,7 +210,7 @@ let on_close w =
 
 let table = Worker.create_table Queue
 
-let create limits db validation_process_kind =
+let create limits db validation_process_kind ~start_testchain =
   let module Handlers = struct
     type self = t
     let on_launch = on_launch
@@ -221,7 +224,7 @@ let create limits db validation_process_kind =
     table
     limits.worker_limits
     ()
-    (limits, db, validation_process_kind)
+    (limits, start_testchain, db, validation_process_kind)
     (module Handlers)
 
 let shutdown = Worker.shutdown
