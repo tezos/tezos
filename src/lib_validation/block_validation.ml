@@ -35,7 +35,7 @@ type result = {
 }
 
 let reset_test_chain
-    ctxt (forked_header : Block_header.t) =
+    ctxt ~start_testchain (forked_header : Block_header.t) =
   Context.get_test_chain ctxt >>= function
   | Not_running -> return (ctxt, None)
   | Running { expiration } ->
@@ -45,19 +45,25 @@ let reset_test_chain
       else
         return (ctxt, None)
   | Forking { protocol ; expiration } ->
-      begin match Registered_protocol.get protocol with
-        | Some proto -> return proto
-        | None ->
-            fail (Missing_test_protocol protocol)
-      end >>=? fun (module Proto_test) ->
-      Proto_test.init ctxt forked_header.shell >>=? fun { context = test_ctxt } ->
-      Context.set_test_chain test_ctxt Not_running >>= fun test_ctxt ->
-      Context.set_protocol test_ctxt protocol >>= fun test_ctxt ->
-      Context.commit_test_chain_genesis forked_header test_ctxt >>= fun (chain_id, genesis, genesis_header) ->
+      begin if start_testchain then
+          begin match Registered_protocol.get protocol with
+            | Some proto -> return proto
+            | None ->
+                fail (Missing_test_protocol protocol)
+          end >>=? fun (module Proto_test) ->
+          Proto_test.init ctxt forked_header.shell >>=? fun { context = test_ctxt } ->
+          Context.set_test_chain test_ctxt Not_running >>= fun test_ctxt ->
+          Context.set_protocol test_ctxt protocol >>= fun test_ctxt ->
+          Context.commit_test_chain_genesis forked_header test_ctxt >>= fun (chain_id, genesis, genesis_header) ->
+          return (chain_id, genesis, Some  genesis_header)
+        else
+          let chain_id, genesis = Context.compute_testchain_genesis (Block_header.hash forked_header) in
+          return (chain_id, genesis, None)
+      end >>=? fun (chain_id, genesis, genesis_header) ->
       Context.set_test_chain ctxt
         (Running { chain_id ; genesis ;
                    protocol ; expiration }) >>= fun ctxt ->
-      return (ctxt, Some genesis_header)
+      return (ctxt, genesis_header)
 
 let may_patch_protocol
     ~level
@@ -159,6 +165,7 @@ module Make(Proto : Registered_protocol.T) = struct
       ~max_operations_ttl
       ~(predecessor_block_header : Block_header.t)
       ~predecessor_context
+      ~start_testchain
       ~(block_header : Block_header.t)
       operations =
     let block_hash = Block_header.hash block_header in
@@ -168,7 +175,7 @@ module Make(Proto : Registered_protocol.T) = struct
       block_hash block_header >>=? fun () ->
     parse_block_header block_hash block_header >>=? fun block_header ->
     check_operation_quota block_hash operations >>=? fun () ->
-    reset_test_chain predecessor_context predecessor_block_header >>=? fun (context, forked_genesis_header) ->
+    reset_test_chain predecessor_context predecessor_block_header ~start_testchain >>=? fun (context, forked_genesis_header) ->
     parse_operations block_hash operations >>=? fun operations ->
     (* TODO wrap 'proto_error' into 'block_error' *)
     Proto.begin_application
@@ -282,6 +289,7 @@ let apply
     ~max_operations_ttl
     ~(predecessor_block_header : Block_header.t)
     ~predecessor_context
+    ~start_testchain
     ~(block_header : Block_header.t)
     operations =
   let block_hash = Block_header.hash block_header in
@@ -299,6 +307,7 @@ let apply
     ~max_operations_ttl
     ~predecessor_block_header
     ~predecessor_context
+    ~start_testchain
     ~block_header
     operations >>= function
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->

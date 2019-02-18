@@ -102,6 +102,8 @@ type config = {
   trust_discovered_peers : bool ;
   (** If [true], peers discovered on the local network will be trusted. *)
 
+  disable_testchain : bool ;
+  (** If [true], testchain related messages will be ignored. *)
 }
 
 (** Network capacities *)

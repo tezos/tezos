@@ -31,6 +31,7 @@ val may_patch_protocol:
 
 val reset_test_chain:
   Context.t ->
+  start_testchain:bool ->
   Block_header.t ->
   (Context.t * Block_header.t option) tzresult Lwt.t
 
@@ -54,5 +55,6 @@ val apply:
   max_operations_ttl:int ->
   predecessor_block_header:Block_header.t ->
   predecessor_context:Context.t ->
+  start_testchain:bool ->
   block_header:Block_header.t ->
   Operation.t list list -> result tzresult Lwt.t

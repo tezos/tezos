@@ -65,6 +65,7 @@ type config = {
   proof_of_work_target : Crypto_box.target ;
   disable_mempool : bool ;
   trust_discovered_peers : bool ;
+  disable_testchain : bool ;
 }
 
 type limits = {

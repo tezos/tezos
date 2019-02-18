@@ -36,6 +36,7 @@ type validator_kind =
 
 val create:
   limits ->  Distributed_db.t -> validator_kind ->
+  start_testchain:bool ->
   t tzresult Lwt.t
 
 val validate:

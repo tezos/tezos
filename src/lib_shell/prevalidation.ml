@@ -131,7 +131,7 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
       predecessor
       (State.Block.max_operations_ttl predecessor)
     >>= fun (live_blocks, live_operations) ->
-    Block_validation.reset_test_chain predecessor_context predecessor_header
+    Block_validation.reset_test_chain predecessor_context ~start_testchain:false predecessor_header
     >>=? fun (predecessor_context, _forked_genesis_header) ->
     begin
       match protocol_data with
