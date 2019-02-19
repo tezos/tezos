@@ -105,7 +105,7 @@ let run_nodes client server =
   Process.wait_all nodes
 
 let raw_accept sched main_socket =
-  Lwt_unix.accept main_socket >>= fun (fd, sockaddr) ->
+  P2p_fd.accept main_socket >>= fun (fd, sockaddr) ->
   let fd = P2p_io_scheduler.register sched fd in
   let point =
     match sockaddr with
@@ -122,10 +122,10 @@ let accept sched main_socket =
     conn_meta_config
 
 let raw_connect sched addr port =
-  let fd = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
+  let fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
   let uaddr =
     Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
-  Lwt_unix.connect fd uaddr >>= fun () ->
+  P2p_fd.connect fd uaddr >>= fun () ->
   let fd = P2p_io_scheduler.register sched fd in
   Lwt.return fd
 

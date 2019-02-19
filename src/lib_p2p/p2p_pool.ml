@@ -728,18 +728,18 @@ let rec connect ?timeout pool point =
       P2p_errors.Private_mode >>=? fun () ->
     fail_unless_disconnected_point point_info >>=? fun () ->
     P2p_point_state.set_requested point_info canceler ;
-    let fd = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
+    let fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
     let uaddr =
       Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
     lwt_debug "connect: %a" P2p_point.Id.pp point >>= fun () ->
     protect ~canceler begin fun () ->
       log pool (Outgoing_connection point) ;
-      Lwt_unix.connect fd uaddr >>= fun () ->
+      P2p_fd.connect fd uaddr >>= fun () ->
       return_unit
     end ~on_error: begin fun err ->
       lwt_debug "connect: %a -> disconnect" P2p_point.Id.pp point >>= fun () ->
       P2p_point_state.set_disconnected point_info ;
-      Lwt_utils_unix.safe_close fd >>= fun () ->
+      P2p_fd.close fd >>= fun () ->
       match err with
       | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
           fail P2p_errors.Connection_refused
@@ -1127,7 +1127,7 @@ let accept pool fd point =
   || pool.config.max_connections <= active_connections pool
   (* silently ignore banned points *)
   || (P2p_acl.banned_addr pool.acl (fst point)) then
-    Lwt.async (fun () -> Lwt_utils_unix.safe_close fd)
+    Lwt.async (fun () -> P2p_fd.close fd)
   else
     let canceler = Lwt_canceler.create () in
     P2p_point.Table.add pool.incoming point canceler ;

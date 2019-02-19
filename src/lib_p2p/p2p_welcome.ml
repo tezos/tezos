@@ -38,7 +38,7 @@ let rec worker_loop st =
   let Pool pool = st.pool in
   Lwt_unix.yield () >>= fun () ->
   protect ~canceler:st.canceler begin fun () ->
-    Lwt_unix.accept st.socket >>= return
+    P2p_fd.accept st.socket >>= return
   end >>= function
   | Ok (fd, addr) ->
       let point =

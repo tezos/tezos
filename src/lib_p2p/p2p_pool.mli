@@ -224,7 +224,7 @@ val connect:
     in [pool] in less than [timeout] seconds. *)
 
 val accept:
-  ('msg, 'peer_meta,'conn_meta) pool -> Lwt_unix.file_descr -> P2p_point.Id.t -> unit
+  ('msg, 'peer_meta,'conn_meta) pool -> P2p_fd.t -> P2p_point.Id.t -> unit
 (** [accept pool fd point] instructs [pool] to start the process of
     accepting a connection from [fd]. Used by [P2p]. *)
 
