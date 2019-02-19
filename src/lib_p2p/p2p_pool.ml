@@ -303,21 +303,24 @@ let gc_points ({ config = { max_known_points } ; known_points } as pool) =
   match max_known_points with
   | None -> ()
   | Some (_, target) ->
-      let now = Time.now () in (* TODO: maybe time of discovery? *)
-      let table = Gc_point_set.create target in
-      P2p_point.Table.iter (fun p point_info ->
-          if P2p_point_state.is_disconnected point_info then
-            let time =
-              match P2p_point_state.Info.last_miss point_info with
-              | None -> now
-              | Some t -> t in
-            Gc_point_set.insert (time, p) table
-        ) known_points ;
-      let to_remove = Gc_point_set.get table in
-      ListLabels.iter to_remove ~f:begin fun (_, p) ->
-        P2p_point.Table.remove known_points p
-      end ;
-      log pool Gc_points
+      let current_size = P2p_point.Table.length known_points in
+      if current_size > target then
+        let to_remove_target = current_size - target in
+        let now = Time.now () in (* TODO: maybe time of discovery? *)
+        let table = Gc_point_set.create to_remove_target in
+        P2p_point.Table.iter (fun p point_info ->
+            if P2p_point_state.is_disconnected point_info then
+              let time =
+                match P2p_point_state.Info.last_miss point_info with
+                | None -> now
+                | Some t -> t in
+              Gc_point_set.insert (time, p) table
+          ) known_points ;
+        let to_remove = Gc_point_set.get table in
+        ListLabels.iter to_remove ~f:begin fun (_, p) ->
+          P2p_point.Table.remove known_points p
+        end ;
+        log pool Gc_points
 
 let register_point pool ?trusted _source_peer_id (addr, port as point) =
   match P2p_point.Table.find_opt pool.known_points point with
@@ -358,18 +361,21 @@ let gc_peer_ids ({ peer_meta_config = { score } ;
   match max_known_peer_ids with
   | None -> ()
   | Some (_, target) ->
-      let table = Gc_peer_set.create target in
-      P2p_peer.Table.iter (fun peer_id peer_info ->
-          let created = P2p_peer_state.Info.created peer_info in
-          let score = score @@ P2p_peer_state.Info.peer_metadata peer_info in
-          if P2p_peer_state.is_disconnected peer_info then
-            Gc_peer_set.insert (score, created, peer_id) table)
-        known_peer_ids ;
-      let to_remove = Gc_peer_set.get table in
-      ListLabels.iter to_remove ~f:begin fun (_, _, peer_id) ->
-        P2p_peer.Table.remove known_peer_ids peer_id
-      end ;
-      log pool Gc_peer_ids
+      let current_size = P2p_peer.Table.length known_peer_ids in
+      if current_size > target then
+        let to_remove_target = current_size - target in
+        let table = Gc_peer_set.create to_remove_target in
+        P2p_peer.Table.iter (fun peer_id peer_info ->
+            let created = P2p_peer_state.Info.created peer_info in
+            let score = score @@ P2p_peer_state.Info.peer_metadata peer_info in
+            if P2p_peer_state.is_disconnected peer_info then
+              Gc_peer_set.insert (score, created, peer_id) table
+          ) known_peer_ids ;
+        let to_remove = Gc_peer_set.get table in
+        ListLabels.iter to_remove ~f:begin fun (_, _, peer_id) ->
+          P2p_peer.Table.remove known_peer_ids peer_id
+        end ;
+        log pool Gc_peer_ids
 
 let register_peer pool peer_id =
   match P2p_peer.Table.find_opt pool.known_peer_ids peer_id with
