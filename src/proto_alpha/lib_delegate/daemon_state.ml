@@ -223,3 +223,58 @@ let record_endorsement (cctxt : #Client_context.wallet) ~chain ~delegate level =
           else
             fail (Invalid_chain_id chain_id)
   end
+
+let legacy_block_filename = "block"
+let legacy_endorsement_filename = "endorsement"
+let legacy_encoding = Data_encoding.assoc Raw_level.encoding
+
+let upgrade_files (wallet : #Proto_alpha.full) () =
+  wallet#with_lock begin fun () ->
+    load_watermarks wallet >>=? fun highwatermarks ->
+    (* If the file is not empty, it means the upgrade already occured *)
+    if highwatermarks <> empty then
+      return_unit
+    else
+      begin
+        Client_keys.get_keys wallet >>=? fun keys ->
+        return (List.map (fun (_,pkh,_,_) -> pkh) keys)
+      end >>=? fun delegates ->
+      let delegates_assoc =
+        List.map (fun delegate -> Signature.Public_key_hash.to_short_b58check delegate, delegate)
+          delegates in
+      wallet#load legacy_block_filename ~default:[] legacy_encoding >>=? fun old_blocks ->
+      wallet#load legacy_endorsement_filename ~default:[] legacy_encoding >>=? fun old_endorsements ->
+      let highwatermarks =
+        List.fold_left (fun ({ main_chain = { block_highwatermark ; _ } } as acc) (delegate, level) ->
+            let delegate = List.assoc delegate delegates_assoc in
+            match Signature.Public_key_hash.Map.find_opt delegate block_highwatermark with
+            | None ->
+                let block_highwatermark = Signature.Public_key_hash.Map.add delegate level block_highwatermark in
+                { acc with main_chain = { acc.main_chain with block_highwatermark } }
+            | Some old_level ->
+                if Raw_level.(old_level < level) then
+                  let block_highwatermark = Signature.Public_key_hash.Map.add delegate level block_highwatermark in
+                  { acc with main_chain = { acc.main_chain with block_highwatermark } }
+                else
+                  acc
+          ) empty old_blocks in
+      let highwatermarks =
+        List.fold_left (fun ({ main_chain = { endorsement_highwatermark ; _ } } as acc) (delegate, level) ->
+            let delegate = List.assoc delegate delegates_assoc in
+            match Signature.Public_key_hash.Map.find_opt delegate endorsement_highwatermark with
+            | None ->
+                let endorsement_highwatermark = Signature.Public_key_hash.Map.add delegate level endorsement_highwatermark in
+                { acc with main_chain = { acc.main_chain with endorsement_highwatermark } }
+            | Some old_level ->
+                if Raw_level.(old_level < level) then
+                  let endorsement_highwatermark = Signature.Public_key_hash.Map.add delegate level endorsement_highwatermark in
+                  { acc with main_chain = { acc.main_chain with endorsement_highwatermark } }
+                else
+                  acc
+          ) highwatermarks old_endorsements in
+      save_watermarks wallet highwatermarks >>=? fun () ->
+      (* If given empty, [write] delete the files *)
+      wallet#write legacy_block_filename [] legacy_encoding >>=? fun () ->
+      wallet#write legacy_endorsement_filename [] legacy_encoding >>=? fun () ->
+      return_unit
+  end
