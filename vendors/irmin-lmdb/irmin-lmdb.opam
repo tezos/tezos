@@ -17,7 +17,6 @@ run-test: ["dune" "runtest" "-p" name]
 depends: [
   "dune" {build & >= "1.0.1"}
   "ocplib-endian" {>= "1.0"}
-  "hashset"
   "irmin"    {>= "1.4.0"}
   "lmdb"     {>= "0.1"}
 ]
