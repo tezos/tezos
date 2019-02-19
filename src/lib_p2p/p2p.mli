@@ -173,6 +173,8 @@ val create :
   'peer_meta peer_meta_config -> 'conn_meta conn_meta_config ->
   'msg message_config ->  ('msg, 'peer_meta, 'conn_meta) net tzresult Lwt.t
 
+val activate : ('msg, 'peer_meta, 'conn_meta) net -> unit
+
 (** Return one's peer_id *)
 val peer_id : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t
 

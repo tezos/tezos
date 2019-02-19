@@ -52,9 +52,12 @@ type bounds = {
 type 'meta t
 (** Type of a maintenance worker. *)
 
-val run: bounds -> ('msg, 'meta, 'meta_conn) P2p_pool.t -> 'meta t
-(** [run ~greylist_timeout bounds pool] is a maintenance worker for
-    [pool] with connection targets specified in [bounds]. *)
+val create : bounds -> ('msg, 'meta, 'meta_conn) P2p_pool.t -> 'meta t
+(** [create ~greylist_timeout bounds pool] prepares a maintenance
+    worker for [pool] with connection targets specified in [bounds]. *)
+
+val activate : 'meta t -> unit
+(** [activate t] start the worker that will maintain connections *)
 
 val maintain: 'meta t -> unit Lwt.t
 (** [maintain t] gives a hint to maintenance worker [t] that

@@ -120,6 +120,7 @@ let may_toggle_bootstrapped_chain w =
   if not nv.bootstrapped &&
      P2p_peer.Table.length nv.bootstrapped_peers >= nv.parameters.limits.bootstrap_threshold
   then begin
+    Log.log_info "bootstrapped";
     nv.bootstrapped <- true ;
     Lwt.wakeup_later nv.bootstrapped_wakener () ;
   end

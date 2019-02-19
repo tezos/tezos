@@ -206,21 +206,20 @@ let rec worker_loop st =
   | Error [ Canceled ] -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
-let run bounds pool =
-  let canceler = Lwt_canceler.create () in
-  let st = {
-    canceler ;
-    bounds ;
-    pool = Pool pool ;
-    just_maintained = Lwt_condition.create () ;
-    please_maintain = Lwt_condition.create () ;
-    maintain_worker = Lwt.return_unit ;
-  } in
+let create bounds pool = {
+  canceler = Lwt_canceler.create ();
+  bounds ;
+  pool = Pool pool ;
+  just_maintained = Lwt_condition.create () ;
+  please_maintain = Lwt_condition.create () ;
+  maintain_worker = Lwt.return_unit ;
+}
+
+let activate st =
   st.maintain_worker <-
     Lwt_utils.worker "maintenance"
       ~run:(fun () -> worker_loop st)
-      ~cancel:(fun () -> Lwt_canceler.cancel canceler) ;
-  st
+      ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
 
 let maintain { just_maintained ; please_maintain } =
   let wait = Lwt_condition.wait just_maintained in

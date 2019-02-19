@@ -158,13 +158,13 @@ let create_maintenance_worker limits pool =
       ~expected:limits.expected_connections
       ~max:limits.max_connections
   in
-  P2p_maintenance.run bounds pool
+  P2p_maintenance.create bounds pool
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
   | None -> Lwt.return_none
   | Some port ->
-      P2p_welcome.run
+      P2p_welcome.create
         ~backlog:limits.backlog pool
         ?addr:config.listening_addr
         port >>= fun w ->
@@ -201,8 +201,20 @@ module Real = struct
 
   let peer_id { config } = config.identity.peer_id
 
+
   let maintain { maintenance } () =
     P2p_maintenance.maintain maintenance
+
+  let activate t () =
+    log_info "activate";
+    begin
+      match t.welcome with
+      | None -> ()
+      | Some w -> P2p_welcome.activate w
+    end ;
+    P2p_maintenance.activate t.maintenance;
+    Lwt.async (fun () -> P2p_maintenance.maintain t.maintenance) ;
+    ()
 
   let roll _net () = Lwt.return_unit (* TODO implement *)
 
@@ -377,6 +389,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   on_new_connection :
     (P2p_peer.Id.t ->
      ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit ;
+  activate : unit -> unit ;
 }
 type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
@@ -446,7 +459,12 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
     fold_connections = (fun ~init ~f -> Real.fold_connections net ~init ~f) ;
     iter_connections = Real.iter_connections net ;
     on_new_connection = Real.on_new_connection net ;
+    activate = Real.activate net ;
   }
+
+let activate t =
+  log_info "activate P2P layer !";
+  t.activate ()
 
 let faked_network peer_cfg faked_metadata = {
   versions = [] ;
@@ -472,7 +490,8 @@ let faked_network peer_cfg faked_metadata = {
   iter_connections = (fun _f -> ()) ;
   on_new_connection = (fun _f -> ()) ;
   broadcast = ignore ;
-  pool = None
+  pool = None ;
+  activate = (fun _ -> ()) ;
 }
 
 let peer_id net = net.peer_id
