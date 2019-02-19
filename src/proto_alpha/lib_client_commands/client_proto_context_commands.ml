@@ -73,6 +73,12 @@ let non_negative_param =
       | Some i when i >= 0 -> return i
       | _ -> failwith "Parameter should be a non-negative integer literal")
 
+let block_hash_param =
+  Clic.parameter (fun _ s ->
+      try return (Block_hash.of_b58check_exn s)
+      with _ ->
+        failwith "Parameter '%s' is an invalid block hash" s)
+
 let group =
   { Clic.name = "context" ;
     title = "Block contextual commands (see option -block)" }
@@ -567,11 +573,12 @@ let commands version () =
     ]) @
   [
     command ~desc:"Wait until an operation is included in a block"
-      (args2
+      (args3
          (default_arg
             ~long:"confirmations"
             ~placeholder:"num_blocks"
-            ~doc:"do not end until after 'N' additional blocks after the operation appears"
+            ~doc:"wait until 'N' additional blocks after the operation \
+                  appears in the considered chain"
             ~default:"0"
             non_negative_param)
          (default_arg
@@ -579,7 +586,12 @@ let commands version () =
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_param))
+            non_negative_param)
+         (arg
+            ~long:"branch"
+            ~placeholder:"block_hash"
+            ~doc:"hash of the oldest block where we should look for the operation"
+            block_hash_param))
       (prefixes [ "wait" ; "for" ]
        @@ param
          ~name:"operation"
@@ -591,9 +603,9 @@ let commands version () =
                | Some hash -> return hash))
        @@ prefixes [ "to" ; "be" ; "included" ]
        @@ stop)
-      begin fun (confirmations, predecessors) operation_hash (ctxt : Proto_alpha.full) ->
+      begin fun (confirmations, predecessors, branch) operation_hash (ctxt : Proto_alpha.full) ->
         Client_confirmations.wait_for_operation_inclusion ctxt
-          ~chain:`Main ~confirmations ~predecessors operation_hash >>=? fun _ ->
+          ~chain:`Main ~confirmations ~predecessors ?branch operation_hash >>=? fun _ ->
         return_unit
       end ;
 
