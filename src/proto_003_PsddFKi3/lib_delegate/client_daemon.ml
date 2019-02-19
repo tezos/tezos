@@ -103,6 +103,7 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
 module Endorser = struct
 
   let run (cctxt : #Proto_alpha.full) ~chain ~delay delegates =
+    Daemon_state.upgrade_files cctxt () >>=? fun () ->
     await_bootstrapped_node cctxt >>=? fun _ ->
     begin if chain = `Test then
         monitor_fork_testchain cctxt ~cleanup_nonces:false
@@ -132,6 +133,7 @@ module Baker = struct
       ~chain
       ~context_path
       delegates =
+    Daemon_state.upgrade_files cctxt () >>=? fun () ->
     await_bootstrapped_node cctxt >>=? fun _ ->
     begin if chain = `Test then
         monitor_fork_testchain cctxt ~cleanup_nonces:true
