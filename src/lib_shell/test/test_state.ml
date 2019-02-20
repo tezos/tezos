@@ -212,124 +212,16 @@ let test_read_block (s: state) =
 
 (****************************************************************************)
 
-(** State.purge *)
+(** Chain.set_checkpoint_then_purge_full *)
 
-let test_purge_light (s: state) =
-  let a1 = vblock s "A1" in
-  let ha1 = State.Block.hash a1 in
-  let b1 = vblock s "B1" in
-  let hb1 = State.Block.hash b1 in
-  let b2 = vblock s "B2" in
-  let hb2 = State.Block.hash b2 in
-  (* Assert all the blocks are known. *)
-  begin State.Block.known s.chain ha1 >|= fun b -> assert b end >>= fun () ->
-  begin State.Block.known s.chain hb1 >|= fun b -> assert b end >>= fun () ->
-  begin State.Block.known s.chain hb2 >|= fun b -> assert b end >>= fun () ->
-  let max_op_ttl = State.Block.max_operations_ttl b2 in
-  assert (max_op_ttl > 0) ;
-  let lb1 = Int32.to_int (State.Block.level b1) in
-  let lb2 = Int32.to_int (State.Block.level b2) in
-  let la1 = Int32.to_int (State.Block.level a1) in
-  (* Assert b1 and a1 have a lower level than b2. *)
-  assert (lb1 < lb2) ;
-  assert (la1 < lb2) ;
-  (* Assert the rock bottom and the oldest block are equal to the genesis
-     block hash at the beginning. *)
-  State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal (snd data.save_point) genesis_block) ;
-    assert (Block_hash.equal (snd data.caboose) genesis_block) ;
-    return data.caboose
-  end
-  (* We purge here. *)
-  >>=? fun caboose ->
-  (* State.Chain.purge_light s.chain hb2 *)
-  (* >>= fun () -> (\* Assert the oldest block is correctly updated. *\) *)
-  State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal (snd data.save_point) hb2) ;
-    return_unit
-  end
-  >>=? fun () -> (* Assert the rock bottom is still the same. *)
-  State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal (snd data.caboose) (snd caboose)) ;
-    return_unit
-  end
-  >>=? fun () -> (* Assert b2 does still exist. *)
-  begin State.Block.known s.chain hb2 >|= fun b -> assert b end
-  >>= fun () -> (* Assert b1 has been pruned.. *)
-  begin State.Block.known s.chain hb1 >|= fun b -> assert (not b) end
-  >>= fun () -> (* pruned, so we can still access its header. *)
-  begin State.Block.Header.known s.chain hb1 >|= fun b -> assert b end
-  >>= fun () -> (* Assert a1 has also been pruned .. *)
-  begin State.Block.known s.chain ha1 >|= fun b -> assert (not b) end
-  >>= fun () -> (* and we can also access its header. *)
-  begin State.Block.Header.known s.chain ha1 >|= fun b -> assert b end
-  >>= fun () -> return_unit
-
-let test_purge_zero (s: state) =
-  let a1 = vblock s "A1" in
-  let ha1 = State.Block.hash a1 in
-  let b1 = vblock s "B1" in
-  let hb1 = State.Block.hash b1 in
-  let b2 = vblock s "B2" in
-  let hb2 = State.Block.hash b2 in
-  (* Assert all the blocks are known. *)
-  begin State.Block.known s.chain ha1 >|= fun b -> assert b end >>= fun () ->
-  begin State.Block.known s.chain hb1 >|= fun b -> assert b end >>= fun () ->
-  begin State.Block.known s.chain hb2 >|= fun b -> assert b end >>= fun () ->
-  let max_op_ttl = State.Block.max_operations_ttl b2 in
-  assert (max_op_ttl > 0) ;
-  let lb1 = Int32.to_int (State.Block.level b1) in
-  let lb2 = Int32.to_int (State.Block.level b2) in
-  (* Assert b1 is in the to-prune range. *)
-  assert (lb2 - lb1 <= min max_op_ttl lb2) ;
-  (* Assert a1 is in the to-delete range. *)
-  let la1 = Int32.to_int (State.Block.level a1) in
-  assert (lb2 - la1 > min max_op_ttl lb2) ;
-  (* Assert the rock bottom and the oldest block are equal to the genesis
-     block hash at the beginning. *)
-  State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal (snd data.save_point) genesis_block) ;
-    assert (Block_hash.equal (snd data.caboose) genesis_block) ;
-    return_unit
-  end
-  (* We purge here. *)
-  >>=? fun () ->
-  (* State.Chain.purge_zero s.chain hb2 *)
-  (* >>= fun () -> (\* Assert the oldest block is correctly updated. *\) *)
-  State.read_chain_data s.chain begin fun _ data ->
-    assert (Block_hash.equal (snd data.save_point) hb2) ;
-    return_unit
-  end
-  >>=? fun () -> (* Assert the rock bottom is correctly updated. *)
-  State.read_chain_data s.chain begin fun _ data ->
-    let dist = min max_op_ttl lb2 in
-    assert (dist = lb2 - lb1) ;
-    assert (Block_hash.equal (snd data.caboose) hb1) ;
-    return_unit
-  end
-  >>=? fun () -> (* Assert b2 does still exist. *)
-  begin State.Block.known s.chain hb2 >|= fun b -> assert b end
-  >>= fun () -> (* Assert b1 has been pruned.. *)
-  begin State.Block.known s.chain hb1 >|= fun b -> assert (not b) end
-  >>= fun () -> (* pruned, so we can still access its header. *)
-  begin State.Block.Header.known s.chain hb1 >|= fun b -> assert b end
-  >>= fun () -> (* Assert a1 has been deleted.. *)
-  begin State.Block.known s.chain ha1 >|= fun b -> assert (not b) end
-  >>= fun () -> (* deleted, so we can not access its header anymore. *)
-  begin State.Block.Header.known s.chain ha1 >|= fun b -> assert (not b) end
-  >>= fun () -> return_unit
-
-
-(****************************************************************************)
-
-(** Chain.set_checkpoint_then_purge_light *)
-
-let test_set_checkpoint_then_purge_light (s : state) =
+let test_set_checkpoint_then_purge_full (s : state) =
   State.Chain.checkpoint s.chain >>= fun checkpoint ->
   let checkpoint_lvl = checkpoint.shell.level in
   let checkpoint_hash = Block_header.hash checkpoint in
   (* At the beginning the checkpoint is the genesis. *)
-  assert (Block_hash.equal checkpoint_hash genesis_block) ;
+  State.Block.read (s.chain) genesis_block >>=? fun read_genesis ->
+  let read_genesis_hash = Block_header.hash (State.Block.header read_genesis) in
+  assert (Block_hash.equal checkpoint_hash read_genesis_hash) ;
   assert (checkpoint_lvl = Int32.zero) ;
   let a1 = vblock s "A1" in
   let ha1 = State.Block.hash a1 in
@@ -344,7 +236,7 @@ let test_set_checkpoint_then_purge_light (s : state) =
   assert (Int32.compare checkpoint_lvl lb1 = -1) ;
   assert (Int32.compare checkpoint_lvl lb2 = -1) ;
   (* Let us set a new checkpoint "B1" whose level is greater than the genesis. *)
-  State.Chain.set_checkpoint_then_purge_rolling s.chain (State.Block.header b2)
+  State.Chain.set_checkpoint_then_purge_full s.chain (State.Block.header b2)
   >>= fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
   begin State.Block.known s.chain hb2 >|= fun b -> assert b end
   >>= fun () ->
@@ -363,14 +255,16 @@ let test_set_checkpoint_then_purge_light (s : state) =
   begin State.Block.Header.known s.chain ha1 >|= fun b -> assert b end
   >>= fun () -> return_unit
 
-(** Chain.set_checkpoint_then_purge_zero *)
+(** Chain.set_checkpoint_then_purge_rolling *)
 
-let test_set_checkpoint_then_purge_zero (s : state) =
+let test_set_checkpoint_then_purge_rolling (s : state) =
   State.Chain.checkpoint s.chain >>= fun checkpoint ->
   let checkpoint_lvl = checkpoint.shell.level in
   let checkpoint_hash = Block_header.hash checkpoint in
   (* At the beginning the checkpoint is the genesis. *)
-  assert (Block_hash.equal checkpoint_hash genesis_block) ;
+  State.Block.read (s.chain) genesis_block >>=? fun read_genesis ->
+  let read_genesis_hash = Block_header.hash (State.Block.header read_genesis) in
+  assert (Block_hash.equal checkpoint_hash read_genesis_hash) ;
   assert (checkpoint_lvl = Int32.zero) ;
   let a1 = vblock s "A1" in
   let ha1 = State.Block.hash a1 in
@@ -394,7 +288,7 @@ let test_set_checkpoint_then_purge_zero (s : state) =
   let ila1 = Int32.to_int la1 in
   assert (ilb2 - ila1 > min max_op_ttl ilb2);
   (* Let us set a new checkpoint "B1" whose level is greater than the genesis. *)
-  State.Chain.set_checkpoint_then_purge_full s.chain (State.Block.header b2)
+  State.Chain.set_checkpoint_then_purge_rolling s.chain (State.Block.header b2)
   >>= fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
   begin State.Block.known s.chain hb2 >|= fun b -> assert b end
   >>= fun () ->
@@ -633,10 +527,8 @@ let tests : (string * (state -> unit tzresult Lwt.t)) list = [
   "head", test_head ;
   "mem", test_mem ;
   "new_blocks", test_new_blocks ;
-  "purge_light", test_purge_light ;
-  "purge_zero", test_purge_zero ;
-  "set_checkpoint_then_purge_zero", test_set_checkpoint_then_purge_zero ;
-  "set_checkpoint_then_purge_light", test_set_checkpoint_then_purge_light ;
+  "set_checkpoint_then_purge_rolling", test_set_checkpoint_then_purge_rolling ;
+  "set_checkpoint_then_purge_full", test_set_checkpoint_then_purge_full ;
 ]
 
 
