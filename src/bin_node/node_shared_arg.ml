@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -42,6 +43,7 @@ type t = {
   peers: string list ;
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
+  discovery_addr: string option ;
   rpc_listen_addr: string option ;
   private_mode: bool ;
   disable_mempool: bool ;
@@ -56,7 +58,8 @@ let wrap
     data_dir config_file
     connections max_download_speed max_upload_speed binary_chunks_size
     peer_table_size
-    listen_addr peers no_bootstrap_peers bootstrap_threshold private_mode disable_mempool
+    listen_addr discovery_addr peers no_bootstrap_peers
+    bootstrap_threshold private_mode disable_mempool
     expected_pow rpc_listen_addr rpc_tls
     cors_origins cors_headers log_output =
 
@@ -100,6 +103,7 @@ let wrap
     peers ;
     no_bootstrap_peers ;
     listen_addr ;
+    discovery_addr ;
     rpc_listen_addr ;
     private_mode ;
     disable_mempool ;
@@ -188,9 +192,7 @@ module Term = struct
 
   let binary_chunks_size =
     let doc =
-      Format.sprintf
-        "Size limit (in kB) of binary blocks that are sent to other peers."
-    in
+      "Size limit (in kB) of binary blocks that are sent to other peers." in
     Arg.(value & opt (some int) None &
          info ~docs ~doc ~docv:"NUM" ["binary-chunks-size"])
 
@@ -206,6 +208,11 @@ module Term = struct
       "The TCP address and port at which this instance can be reached." in
     Arg.(value & opt (some string) None &
          info ~docs ~doc ~docv:"ADDR:PORT" ["net-addr"])
+
+  let discovery_addr =
+    let doc = "The UDP address and port used for local peer discovery." in
+    Arg.(value & opt (some string) None &
+         info ~docs ~doc ~docv:"ADDR:PORT" ["discovery-addr"])
 
   let no_bootstrap_peers =
     let doc =
@@ -286,7 +293,8 @@ module Term = struct
     $ connections
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size
-    $ listen_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold
+    $ listen_addr $ discovery_addr $ peers $ no_bootstrap_peers
+    $ bootstrap_threshold
     $ private_mode $ disable_mempool
     $ expected_pow $ rpc_listen_addr $ rpc_tls
     $ cors_origins $ cors_headers
@@ -308,6 +316,7 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         expected_pow ;
         peers ; no_bootstrap_peers ;
         listen_addr ; private_mode ;
+        discovery_addr ;
         disable_mempool ;
         rpc_listen_addr ; rpc_tls ;
         cors_origins ; cors_headers ;
@@ -325,6 +334,6 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
     ?data_dir ?min_connections ?expected_connections ?max_connections
     ?max_download_speed ?max_upload_speed ?binary_chunks_size
     ?peer_table_size ?expected_pow
-    ~bootstrap_peers ?listen_addr ?rpc_listen_addr ~private_mode
+    ~bootstrap_peers ?listen_addr ?discovery_addr ?rpc_listen_addr ~private_mode
     ~disable_mempool ~cors_origins ~cors_headers ?rpc_tls ?log_output
     ?bootstrap_threshold cfg

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,9 +39,10 @@ type 'meta t = {
   canceler: Lwt_canceler.t ;
   bounds: bounds ;
   pool: 'meta pool ;
+  discovery: P2p_discovery.t option ;
   just_maintained: unit Lwt_condition.t ;
   please_maintain: unit Lwt_condition.t ;
-  mutable maintain_worker : unit Lwt.t ;
+  mutable maintain_worker: unit Lwt.t ;
 }
 
 (** Select [expected] points among the disconnected known points.
@@ -155,11 +157,14 @@ and too_few_connections st n_connected =
   if success then begin
     maintain st
   end else begin
-    (* not enough contacts, ask the pals of our pals, and then wait *)
+    (* not enough contacts, ask the pals of our pals,
+       discover the local network and then wait *)
     P2p_pool.broadcast_bootstrap_msg pool ;
+    Option.iter ~f:P2p_discovery.wakeup st.discovery ;
     protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
         P2p_pool.Pool_event.wait_new_peer pool ;
+        P2p_pool.Pool_event.wait_new_point pool ;
         Lwt_unix.sleep 5.0 (* TODO exponential back-off ??
                                    or wait for the existence of a
                                    non grey-listed peer ?? *)
@@ -189,7 +194,7 @@ let rec worker_loop st =
         Lwt_unix.sleep 120. ; (* every two minutes *)
         Lwt_condition.wait st.please_maintain ; (* when asked *)
         P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
-        P2p_pool.Pool_event.wait_too_many_connections pool
+        P2p_pool.Pool_event.wait_too_many_connections pool ;
       ] >>= fun () ->
       return_unit
     end >>=? fun () ->
@@ -206,9 +211,10 @@ let rec worker_loop st =
   | Error [ Canceled ] -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
-let create bounds pool = {
-  canceler = Lwt_canceler.create ();
+let create ?discovery bounds pool = {
+  canceler = Lwt_canceler.create () ;
   bounds ;
+  discovery ;
   pool = Pool pool ;
   just_maintained = Lwt_condition.create () ;
   please_maintain = Lwt_condition.create () ;
@@ -219,7 +225,8 @@ let activate st =
   st.maintain_worker <-
     Lwt_utils.worker "maintenance"
       ~run:(fun () -> worker_loop st)
-      ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
+      ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
+  Option.iter st.discovery ~f:P2p_discovery.activate
 
 let maintain { just_maintained ; please_maintain } =
   let wait = Lwt_condition.wait just_maintained in
@@ -228,10 +235,12 @@ let maintain { just_maintained ; please_maintain } =
 
 let shutdown {
     canceler ;
+    discovery ;
     maintain_worker ;
-    just_maintained } =
+    just_maintained ;
+  } =
   Lwt_canceler.cancel canceler >>= fun () ->
+  Lwt_utils.may ~f:P2p_discovery.shutdown discovery >>= fun () ->
   maintain_worker >>= fun () ->
   Lwt_condition.broadcast just_maintained () ;
   Lwt.return_unit
-

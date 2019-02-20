@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -37,6 +38,7 @@ type t = {
   peers: string list ;
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
+  discovery_addr: string option ;
   rpc_listen_addr: string option ;
   private_mode: bool ;
   disable_mempool: bool ;

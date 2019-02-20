@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -62,11 +63,19 @@ type config = {
 
   listening_port : P2p_addr.port option;
   (** Tells if incoming connections accepted, precising the TCP port
-      on which the peer can be reached *)
+      on which the peer can be reached (default: [9732])*)
 
   listening_addr : P2p_addr.t option;
-  (** When incoming connections are accepted, precising on which
+  (** When incoming connections are accepted, precise on which
       IP adddress the node listen (default: [[::]]). *)
+
+  discovery_port : P2p_addr.port option;
+  (** Tells if local peer discovery is enabled, precising the TCP port
+      on which the peer can be reached (default: [10732]) *)
+
+  discovery_addr : Ipaddr.V4.t option;
+  (** When local peer discovery is enabled, precise on which
+      IP address messages are broadcasted (default: [255.255.255.255]). *)
 
   trusted_points : P2p_point.Id.t list ;
   (** List of hard-coded known peers to bootstrap the network from. *)
@@ -296,4 +305,3 @@ module Raw : sig
     | Disconnect
   val encoding: 'msg app_message_encoding list -> 'msg t Data_encoding.t
 end
-

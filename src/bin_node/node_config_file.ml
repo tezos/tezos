@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,8 +31,9 @@ let home =
   with Not_found -> "/root"
 
 let default_data_dir = home // ".tezos-node"
-let default_p2p_port = 9732
-let default_rpc_port = 8732
+let default_rpc_port       =  8732
+let default_p2p_port       =  9732
+let default_discovery_port = 10732
 
 type t = {
   data_dir : string ;
@@ -45,6 +47,7 @@ and p2p = {
   expected_pow : float ;
   bootstrap_peers : string list ;
   listen_addr : string option ;
+  discovery_addr : string option ;
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
@@ -97,8 +100,9 @@ let default_p2p_limits : P2p.limits = {
 let default_p2p = {
   expected_pow = 26. ;
   bootstrap_peers  = [] ;
-  listen_addr  = Some ("[::]:" ^ string_of_int default_p2p_port) ;
-  private_mode  = false ;
+  listen_addr = Some ("[::]:" ^ string_of_int default_p2p_port) ;
+  discovery_addr = None ;
+  private_mode = false ;
   limits = default_p2p_limits ;
   disable_mempool = false ;
 }
@@ -241,15 +245,15 @@ let limit : P2p.limits Data_encoding.t =
 let p2p =
   let open Data_encoding in
   conv
-    (fun { expected_pow ; bootstrap_peers ;
-           listen_addr ; private_mode ; limits ; disable_mempool } ->
-      ( expected_pow, bootstrap_peers,
-        listen_addr, private_mode, limits, disable_mempool ))
-    (fun ( expected_pow, bootstrap_peers,
-           listen_addr, private_mode, limits, disable_mempool ) ->
-      { expected_pow ; bootstrap_peers ;
-        listen_addr ; private_mode ; limits ; disable_mempool })
-    (obj6
+    (fun { expected_pow ; bootstrap_peers ; listen_addr ; discovery_addr ;
+           private_mode ; limits ; disable_mempool } ->
+      ( expected_pow, bootstrap_peers, listen_addr, discovery_addr ,
+        private_mode, limits, disable_mempool ))
+    (fun ( expected_pow, bootstrap_peers, listen_addr, discovery_addr,
+           private_mode, limits, disable_mempool ) ->
+      { expected_pow ; bootstrap_peers ; listen_addr ; discovery_addr ;
+        private_mode ; limits ; disable_mempool })
+    (obj7
        (dft "expected-proof-of-work"
           ~description: "Floating point number between 0 and 256 that represents a \
                          difficulty, 24 signifies for example that at least 24 leading \
@@ -264,6 +268,11 @@ let p2p =
                          specified, the default port 8732 will be \
                          assumed."
           string)
+       (dft "discovery-addr"
+          ~description: "Host for local peer discovery. If the port is not \
+                         specified, the default port 10732 will be \
+                         assumed."
+          (option string) default_p2p.discovery_addr)
        (dft "private-mode"
           ~description: "Specify if the node is in private mode or \
                          not. A node in private mode rejects incoming \
@@ -493,6 +502,7 @@ let update
     ?expected_pow
     ?bootstrap_peers
     ?listen_addr
+    ?discovery_addr
     ?rpc_listen_addr
     ?(private_mode = false)
     ?(disable_mempool = false)
@@ -544,6 +554,8 @@ let update
       Option.unopt ~default:cfg.p2p.bootstrap_peers bootstrap_peers ;
     listen_addr =
       Option.first_some listen_addr cfg.p2p.listen_addr ;
+    discovery_addr =
+      Option.first_some discovery_addr cfg.p2p.discovery_addr ;
     private_mode = cfg.p2p.private_mode || private_mode ;
     limits ;
     disable_mempool = cfg.p2p.disable_mempool || disable_mempool ;
@@ -577,45 +589,85 @@ let update
   in
   return { data_dir ; p2p ; rpc ; log ; shell }
 
-let resolve_addr ?default_port ?(passive = false) peer =
+let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
   let addr, port = P2p_point.Id.parse_addr_port peer in
-  let node = if addr = "" || addr = "_" then "::" else addr
+  let node = if addr = "" || addr = "_" then default_addr else addr
   and service =
     match port, default_port with
-    | "", None ->
-        invalid_arg ""
+    | "", None -> invalid_arg ""
     | "", Some default_port -> string_of_int default_port
     | port, _ -> port in
   Lwt_utils_unix.getaddrinfo ~passive ~node ~service
 
-let resolve_addrs ?default_port ?passive peers =
+let resolve_addrs ~default_addr ?default_port ?passive peers =
   Lwt_list.fold_left_s begin fun a peer ->
-    resolve_addr ?default_port ?passive peer >>= fun points ->
+    resolve_addr ~default_addr ?default_port ?passive peer >>= fun points ->
     Lwt.return (List.rev_append points a)
   end [] peers
 
+let resolve_discovery_addrs discovery_addr =
+  resolve_addr
+    ~default_addr:Ipaddr.V4.(to_string broadcast)
+    ~default_port:default_discovery_port
+    ~passive:true
+    discovery_addr
+  >>= fun addrs ->
+  let rec to_ipv4 acc = function
+    | [] -> Lwt.return (List.rev acc)
+    | (ip, port) :: xs -> begin match Ipaddr.v4_of_v6 ip with
+        | Some v -> to_ipv4 ((v, port) :: acc) xs
+        | None ->
+            Format.eprintf
+              "Warning: failed to convert %S to an ipv4 address@."
+              (Ipaddr.V6.to_string ip) ;
+            to_ipv4 acc xs
+      end
+  in to_ipv4 [] addrs
+
 let resolve_listening_addrs listen_addr =
   resolve_addr
+    ~default_addr:"::"
     ~default_port:default_p2p_port
     ~passive:true
     listen_addr
 
 let resolve_rpc_listening_addrs listen_addr =
   resolve_addr
+    ~default_addr:"::"
     ~default_port:default_rpc_port
     ~passive:true
     listen_addr
 
 let resolve_bootstrap_addrs peers =
   resolve_addrs
+    ~default_addr:"::"
     ~default_port:default_p2p_port
     peers
+
 let check_listening_addr config =
   match config.p2p.listen_addr with
   | None -> Lwt.return_unit
   | Some addr ->
       Lwt.catch begin fun () ->
         resolve_listening_addrs addr >>= function
+        | [] ->
+            Format.eprintf "Warning: failed to resolve %S\n@." addr ;
+            Lwt.return_unit
+        | _ :: _ ->
+            Lwt.return_unit
+      end begin function
+        | (Invalid_argument msg) ->
+            Format.eprintf "Warning: failed to parse %S:\   %s\n@." addr msg ;
+            Lwt.return_unit
+        | exn -> Lwt.fail exn
+      end
+
+let check_discovery_addr config =
+  match config.p2p.discovery_addr with
+  | None -> Lwt.return_unit
+  | Some addr ->
+      Lwt.catch begin fun () ->
+        resolve_discovery_addrs addr >>= function
         | [] ->
             Format.eprintf "Warning: failed to resolve %S\n@." addr ;
             Lwt.return_unit
@@ -711,6 +763,7 @@ let check_connections config =
 let check config =
   check_listening_addr config >>= fun () ->
   check_rpc_listening_addr config >>= fun () ->
+  check_discovery_addr config >>= fun () ->
   check_bootstrap_peers config >>= fun () ->
   check_connections config ;
   Lwt.return_unit

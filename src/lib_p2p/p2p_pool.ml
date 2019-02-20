@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -260,6 +261,7 @@ and events = {
   too_few_connections : unit Lwt_condition.t ;
   too_many_connections : unit Lwt_condition.t ;
   new_peer : unit Lwt_condition.t ;
+  new_point : unit Lwt_condition.t ;
   new_connection : unit Lwt_condition.t ;
 }
 
@@ -285,6 +287,8 @@ module Pool_event = struct
     Lwt_condition.wait pool.events.too_many_connections
   let wait_new_peer pool =
     Lwt_condition.wait pool.events.new_peer
+  let wait_new_point pool =
+    Lwt_condition.wait pool.events.new_point
   let wait_new_connection pool =
     Lwt_condition.wait pool.events.new_connection
 end
@@ -330,6 +334,7 @@ let register_point pool ?trusted _source_peer_id (addr, port as point) =
         if P2p_point.Table.length pool.known_points >= max then gc_points pool
       end ;
       P2p_point.Table.add pool.known_points point point_info ;
+      Lwt_condition.broadcast pool.events.new_point () ;
       log pool (New_point point) ;
       point_info
   | Some point_info -> point_info
@@ -1028,9 +1033,9 @@ and register_new_points pool conn =
     List.iter (register_new_point pool source_peer_id) points ;
     Lwt.return_unit
 
-and register_new_point pool _source_peer_id point =
+and register_new_point pool source_peer_id point =
   if not (P2p_point.Table.mem pool.my_id_points point) then
-    ignore (register_point pool _source_peer_id point)
+    ignore (register_point pool source_peer_id point)
 
 and list_known_points ?(ignore_private = false) pool conn =
   if Connection.private_node conn then
@@ -1177,6 +1182,7 @@ let create config peer_meta_config conn_meta_config message_config io_sched =
     too_few_connections = Lwt_condition.create () ;
     too_many_connections = Lwt_condition.create () ;
     new_peer = Lwt_condition.create () ;
+    new_point = Lwt_condition.create () ;
     new_connection = Lwt_condition.create () ;
   } in
   let pool = {

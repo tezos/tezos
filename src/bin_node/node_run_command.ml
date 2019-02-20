@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -119,6 +120,18 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   end >>= fun sandbox_param ->
   (* TODO "WARN" when pow is below our expectation. *)
   begin
+    match config.p2p.discovery_addr with
+    | None ->
+        lwt_log_notice "No local peer discovery." >>= fun () ->
+        return (None, None)
+    | Some addr ->
+        Node_config_file.resolve_discovery_addrs addr >>= function
+        | [] ->
+            failwith "Cannot resolve P2P discovery address: %S" addr
+        | (addr, port) :: _ ->
+            return (Some addr, Some port)
+  end >>=? fun (discovery_addr, discovery_port) ->
+  begin
     match config.p2p.listen_addr with
     | None ->
         lwt_log_notice "Not listening to P2P calls." >>= fun () ->
@@ -149,6 +162,8 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
         let p2p_config : P2p.config =
           { listening_addr ;
             listening_port ;
+            discovery_addr ;
+            discovery_port ;
             trusted_points ;
             peers_file =
               (config.data_dir // "peers.json") ;

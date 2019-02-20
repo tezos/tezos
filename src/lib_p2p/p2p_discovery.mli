@@ -24,52 +24,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* min <= min_threshold <= min_target <= max_target <= max_threshold <= max *)
 
-(** P2P maintenance worker.
+(** Local peer discovery.
 
-    The P2P layer urges the maintainer to work when the number of
-    connections reaches `max` or is below `min`. Otherwise, the
-    maintener is lazy and only looks up for connections every two
-    minutes (hardcoded constant). The [maintain] function is another
-    way to signal the maintainer that a maintenance step is desired.
+    This module manages the discovery of local peers through UDP broadcasting.
+    It is composed of two workers:
+    - The sender worker whose role is to broadcast discovery messages.
+    - The answer worker whose role is to listen discovery messages and register new
+      peers in the current pool.
+    Discovery messages are composed of an arbitrary key, the listening port and
+    the peer id of the current peer.
+*)
 
-    When the maintener detects that the number of connections is over
-    `max_threshold`, it randomly kills connections to reach
-    `max_target`.
+(** Type of a discovery worker. *)
+type t
 
-    When the maintener detects that the number of connections is below
-    `min_threshold`, it creates enough connection to reach at least
-    `min_target` (and never more than `max_target`). In the process, it
-    might ask its actual peers for new peers.  *)
+(** [create ~listening_port ~discovery_port ~discovery_addr pool peer_id]
+    returns a discovery worker registering local peers to the [pool]
+    and broadcasting discovery messages with the [peer_id] and
+    the [listening_port] through the address [discovery_addr:discovery_port]. *)
+val create : listening_port:int -> discovery_port:int ->
+  discovery_addr:Ipaddr.V4.t -> ('a, 'b, 'c) P2p_pool.t -> P2p_peer.Table.key ->
+  t
 
-type bounds = {
-  min_threshold: int ;
-  min_target: int ;
-  max_target: int ;
-  max_threshold: int ;
-}
+val activate : t -> unit
 
-type 'meta t
-(** Type of a maintenance worker. *)
+(** [wakeup t] sends a signal to the sender machine of [t], asking it
+    to immediately proceed to broadcasting. *)
+val wakeup : t -> unit
 
-val create:
-  ?discovery:P2p_discovery.t ->
-  bounds ->
-  ('msg, 'meta, 'meta_conn) P2p_pool.t ->
-  'meta t
-(** [run ?discovery bounds pool] returns a maintenance worker, with
-    the [discovery] worker if present, for [pool] with connection targets
-    specified in [bounds]. *)
-
-val activate: 'meta t -> unit
-(** [activate t] start the worker that will maintain connections *)
-
-val maintain: 'meta t -> unit Lwt.t
-(** [maintain t] gives a hint to maintenance worker [t] that
-    maintenance is needed and returns whenever [t] has done a
-    maintenance cycle. *)
-
-val shutdown: 'meta t -> unit Lwt.t
-(** [shutdown t] is a thread that returns whenever [t] has
-    successfully shut down. *)
+(** [shutdown t] returns when [t] has completed shutdown. *)
+val shutdown : t -> unit Lwt.t

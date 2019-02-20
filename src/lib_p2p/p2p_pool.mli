@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -119,6 +120,7 @@ type config = {
 
   known_peer_ids_history_size : int ;
   (** Size of the known peer_ids log buffer (default: 50) *)
+
   known_points_history_size : int ;
   (** Size of the known points log buffer (default: 50) *)
 
@@ -204,6 +206,10 @@ module Pool_event : sig
   (** [wait_new_peer pool] is determined when a new peer
       (i.e. authentication successful) gets added to the pool. *)
 
+  val wait_new_point: ('msg, 'peer_meta,'conn_meta) pool -> unit Lwt.t
+  (** [wait_new_point pool] is determined when a new point gets registered
+      to the pool. *)
+
   val wait_new_connection: ('msg, 'peer_meta,'conn_meta) pool -> unit Lwt.t
   (** [wait_new_connection pool] is determined when a new connection is
       successfully established in the pool. *)
@@ -230,7 +236,12 @@ val connect:
 val accept:
   ('msg, 'peer_meta,'conn_meta) pool -> P2p_fd.t -> P2p_point.Id.t -> unit
 (** [accept pool fd point] instructs [pool] to start the process of
-    accepting a connection from [fd]. Used by [P2p]. *)
+    accepting a connection from [fd]. Used by [P2p_welcome]. *)
+
+val register_new_point:
+  ('a, 'b, 'c) pool -> P2p_peer.Table.key -> P2p_point.Id.t -> unit
+(** [register_new_point pool source_peer_id point] tries to register [point]
+    in pool's internal peer table. *)
 
 val disconnect:
   ?wait:bool -> ('msg, 'peer_meta,'conn_meta) connection -> unit Lwt.t
@@ -429,4 +440,3 @@ module Message : sig
   val encoding: 'msg encoding list -> 'msg t Data_encoding.t
 
 end
-

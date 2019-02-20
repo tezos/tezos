@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -53,8 +54,10 @@ type 'msg message_config = 'msg P2p_pool.message_config = {
 }
 
 type config = {
-  listening_port : P2p_addr.port option;
-  listening_addr : P2p_addr.t option;
+  listening_port : P2p_addr.port option ;
+  listening_addr : P2p_addr.t option ;
+  discovery_port : P2p_addr.port option ;
+  discovery_addr : Ipaddr.V4.t option ;
   trusted_points : P2p_point.Id.t list ;
   peers_file : string ;
   private_mode : bool ;
@@ -138,6 +141,16 @@ let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg io_sched
     P2p_pool.create pool_cfg meta_cfg conn_meta_cfg msg_cfg io_sched in
   pool
 
+let may_create_discovery_worker _limits config pool =
+  match (config.listening_port, config.discovery_port, config.discovery_addr) with
+  | (Some listening_port, Some discovery_port, Some discovery_addr) ->
+      Some (P2p_discovery.create pool
+              config.identity.peer_id
+              ~listening_port
+              ~discovery_port ~discovery_addr)
+  | (_, _, _) ->
+      None
+
 let bounds ~min ~expected ~max =
   assert (min <= expected) ;
   assert (expected <= max) ;
@@ -151,14 +164,16 @@ let bounds ~min ~expected ~max =
     max_threshold = max - step_max ;
   }
 
-let create_maintenance_worker limits pool =
+let create_maintenance_worker limits pool config =
   let bounds =
     bounds
       ~min:limits.min_connections
       ~expected:limits.expected_connections
       ~max:limits.max_connections
   in
-  P2p_maintenance.create bounds pool
+  let discovery =
+    may_create_discovery_worker limits config pool in
+  P2p_maintenance.create ?discovery bounds pool
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
@@ -188,7 +203,7 @@ module Real = struct
     let io_sched = create_scheduler limits in
     create_connection_pool
       config limits meta_cfg conn_meta_cfg msg_cfg io_sched >>= fun pool ->
-    let maintenance = create_maintenance_worker limits pool in
+    let maintenance = create_maintenance_worker limits pool config in
     may_create_welcome_worker config limits pool >>= fun welcome ->
     return {
       config ;
@@ -212,7 +227,7 @@ module Real = struct
       | None -> ()
       | Some w -> P2p_welcome.activate w
     end ;
-    P2p_maintenance.activate t.maintenance;
+    P2p_maintenance.activate t.maintenance ;
     Lwt.async (fun () -> P2p_maintenance.maintain t.maintenance) ;
     ()
 
