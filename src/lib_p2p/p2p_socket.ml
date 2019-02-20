@@ -56,7 +56,7 @@ module Crypto = struct
      input and output. *)
   let () = assert (Crypto_box.boxzerobytes >= header_length)
 
-  let write_chunk fd cryptobox_data msg =
+  let write_chunk ?canceler fd cryptobox_data msg =
     let msglen = MBytes.length msg in
     fail_unless
       (msglen <= max_content_length) P2p_errors.Invalid_message_size >>=? fun () ->
@@ -71,15 +71,15 @@ module Crypto = struct
     let header_pos = Crypto_box.boxzerobytes - header_length in
     MBytes.set_int16 buf header_pos encrypted_length ;
     let payload = MBytes.sub buf header_pos (buf_length - header_pos) in
-    P2p_io_scheduler.write fd payload
+    P2p_io_scheduler.write ?canceler fd payload
 
-  let read_chunk fd cryptobox_data =
+  let read_chunk ?canceler fd cryptobox_data =
     let header_buf = MBytes.create header_length in
-    P2p_io_scheduler.read_full ~len:header_length fd header_buf >>=? fun () ->
+    P2p_io_scheduler.read_full ?canceler ~len:header_length fd header_buf >>=? fun () ->
     let encrypted_length = MBytes.get_uint16 header_buf 0 in
     let buf_length = encrypted_length + Crypto_box.boxzerobytes in
     let buf = MBytes.make buf_length '\x00' in
-    P2p_io_scheduler.read_full
+    P2p_io_scheduler.read_full ?canceler
       ~pos:Crypto_box.boxzerobytes ~len:encrypted_length fd buf >>=? fun () ->
     let remote_nonce = cryptobox_data.remote_nonce in
     cryptobox_data.remote_nonce <- Crypto_box.increment_nonce remote_nonce ;
@@ -140,7 +140,7 @@ module Connection_message = struct
          (req "message_nonce" Crypto_box.nonce_encoding)
          (req "versions" (Variable.list P2p_version.encoding)))
 
-  let write fd message =
+  let write ~canceler fd message =
     let encoded_message_len =
       Data_encoding.Binary.length encoding message in
     fail_unless
@@ -155,20 +155,20 @@ module Connection_message = struct
     | Some last ->
         fail_unless (last = len) P2p_errors.Encoding_error >>=? fun () ->
         MBytes.set_int16 buf 0 encoded_message_len ;
-        P2p_io_scheduler.write fd buf >>=? fun () ->
+        P2p_io_scheduler.write ~canceler fd buf >>=? fun () ->
         (* We return the raw message as it is used later to compute
            the nonces *)
         return buf
 
-  let read fd =
+  let read ~canceler fd =
     let header_buf = MBytes.create Crypto.header_length in
-    P2p_io_scheduler.read_full
+    P2p_io_scheduler.read_full ~canceler
       ~len:Crypto.header_length fd header_buf >>=? fun () ->
     let len = MBytes.get_uint16 header_buf 0 in
     let pos = Crypto.header_length in
     let buf = MBytes.create (pos + len) in
     MBytes.set_int16 buf 0 len ;
-    P2p_io_scheduler.read_full ~len ~pos fd buf >>=? fun () ->
+    P2p_io_scheduler.read_full ~canceler ~len ~pos fd buf >>=? fun () ->
     match Data_encoding.Binary.read encoding buf pos len with
     | None ->
         fail P2p_errors.Decoding_error
@@ -188,7 +188,7 @@ type 'meta metadata_config = {
 
 module Metadata = struct
 
-  let write metadata_config cryptobox_data fd message =
+  let write ~canceler metadata_config cryptobox_data fd message =
     let encoded_message_len =
       Data_encoding.Binary.length metadata_config.conn_meta_encoding message in
     let buf = MBytes.create encoded_message_len in
@@ -201,10 +201,10 @@ module Metadata = struct
     | Some last ->
         fail_unless (last = encoded_message_len)
           P2p_errors.Encoding_error >>=? fun () ->
-        Crypto.write_chunk cryptobox_data fd buf
+        Crypto.write_chunk ~canceler cryptobox_data fd buf
 
-  let read metadata_config fd cryptobox_data =
-    Crypto.read_chunk fd cryptobox_data >>=? fun buf ->
+  let read ~canceler metadata_config fd cryptobox_data =
+    Crypto.read_chunk ~canceler fd cryptobox_data >>=? fun buf ->
     let length = MBytes.length buf in
     let encoding = metadata_config.conn_meta_encoding in
     match
@@ -248,7 +248,7 @@ module Ack = struct
       nack_case (Tag 255) ;
     ]
 
-  let write fd cryptobox_data message =
+  let write ?canceler fd cryptobox_data message =
     let encoded_message_len =
       Data_encoding.Binary.length encoding message in
     let buf = MBytes.create encoded_message_len in
@@ -258,10 +258,10 @@ module Ack = struct
     | Some last ->
         fail_unless (last = encoded_message_len)
           P2p_errors.Encoding_error >>=? fun () ->
-        Crypto.write_chunk fd cryptobox_data buf
+        Crypto.write_chunk ?canceler fd cryptobox_data buf
 
-  let read fd cryptobox_data =
-    Crypto.read_chunk fd cryptobox_data >>=? fun buf ->
+  let read ?canceler fd cryptobox_data =
+    Crypto.read_chunk ?canceler fd cryptobox_data >>=? fun buf ->
     let length = MBytes.length buf in
     match Data_encoding.Binary.read encoding buf 0 length with
     | None ->
@@ -289,18 +289,19 @@ let kick { fd ; cryptobox_data ; _ } =
    whether we're trying to connect to a peer or checking an incoming
    connection, both parties must first introduce themselves. *)
 let authenticate
+    ~canceler
     ~proof_of_work_target
     ~incoming fd (remote_addr, remote_socket_port as point)
     ?listening_port identity supported_versions metadata_config =
   let local_nonce_seed = Crypto_box.random_nonce () in
   lwt_debug "Sending authenfication to %a" P2p_point.Id.pp point >>= fun () ->
-  Connection_message.write fd
+  Connection_message.write ~canceler fd
     { public_key = identity.P2p_identity.public_key ;
       proof_of_work_stamp = identity.proof_of_work_stamp ;
       message_nonce = local_nonce_seed ;
       port = listening_port ;
       versions = supported_versions } >>=? fun sent_msg ->
-  Connection_message.read fd >>=? fun (msg, recv_msg) ->
+  Connection_message.read ~canceler fd >>=? fun (msg, recv_msg) ->
   let remote_listening_port =
     if incoming then msg.port else Some remote_socket_port in
   let id_point = remote_addr, remote_listening_port in
@@ -318,8 +319,8 @@ let authenticate
     Crypto_box.generate_nonces ~incoming ~sent_msg ~recv_msg in
   let cryptobox_data = { Crypto.channel_key ; local_nonce ; remote_nonce } in
   let local_metadata = metadata_config.conn_meta_value remote_peer_id in
-  Metadata.write metadata_config fd cryptobox_data local_metadata >>=? fun () ->
-  Metadata.read metadata_config fd cryptobox_data >>=? fun remote_metadata ->
+  Metadata.write ~canceler metadata_config fd cryptobox_data local_metadata >>=? fun () ->
+  Metadata.read ~canceler metadata_config fd cryptobox_data >>=? fun remote_metadata ->
   let info =
     { P2p_connection.Info.peer_id = remote_peer_id ;
       versions = msg.versions ; incoming ;
@@ -351,9 +352,8 @@ module Reader = struct
           lwt_debug "[read_message] incremental decoding error" >>= fun () ->
           return_none
       | Await decode_next_buf ->
-          protect ~canceler:st.canceler begin fun () ->
-            Crypto.read_chunk st.conn.fd st.conn.cryptobox_data
-          end >>=? fun buf ->
+          Crypto.read_chunk ~canceler:st.canceler
+            st.conn.fd st.conn.cryptobox_data >>=? fun buf ->
           lwt_debug
             "reading %d bytes from %a"
             (MBytes.length buf) P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
@@ -432,9 +432,8 @@ module Writer = struct
     let rec loop = function
       | [] -> return_unit
       | buf :: l ->
-          protect ~canceler:st.canceler begin fun () ->
-            Crypto.write_chunk st.conn.fd st.conn.cryptobox_data buf
-          end >>=? fun () ->
+          Crypto.write_chunk ~canceler:st.canceler
+            st.conn.fd st.conn.cryptobox_data buf >>=? fun () ->
           lwt_debug "writing %d bytes to %a"
             (MBytes.length buf) P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
           loop l in
@@ -561,11 +560,12 @@ let private_node { conn } = conn.info.private_node
 let accept
     ?incoming_message_queue_size ?outgoing_message_queue_size
     ?binary_chunks_size
+    ~canceler
     conn
     encoding =
   protect begin fun () ->
-    Ack.write conn.fd conn.cryptobox_data Ack >>=? fun () ->
-    Ack.read conn.fd conn.cryptobox_data
+    Ack.write ~canceler conn.fd conn.cryptobox_data Ack >>=? fun () ->
+    Ack.read ~canceler conn.fd conn.cryptobox_data
   end ~on_error:begin fun err ->
     P2p_io_scheduler.close conn.fd >>= fun _ ->
     match err with

@@ -62,6 +62,7 @@ val private_node: ('msg, 'meta) t -> bool
 (** {1 Low-level functions (do not use directly)} *)
 
 val authenticate:
+  canceler:Lwt_canceler.t ->
   proof_of_work_target:Crypto_box.target ->
   incoming:bool ->
   P2p_io_scheduler.connection -> P2p_point.Id.t ->
@@ -84,6 +85,7 @@ val accept:
   ?incoming_message_queue_size:int ->
   ?outgoing_message_queue_size:int ->
   ?binary_chunks_size: int ->
+  canceler:Lwt_canceler.t ->
   'meta authenticated_connection ->
   'msg Data_encoding.t -> ('msg, 'meta) t tzresult Lwt.t
 (** (Low-level) (Cancelable) Accepts a remote peer given an

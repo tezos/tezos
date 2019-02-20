@@ -390,10 +390,11 @@ let register st conn =
     conn
   end
 
-let write { write_queue } msg =
-  Lwt.catch
-    (fun () -> Lwt_pipe.push write_queue msg >>= return)
-    (fun _ -> fail P2p_errors.Connection_closed)
+let write ?canceler { write_queue } msg =
+  trace P2p_errors.Connection_closed @@
+  protect ?canceler begin fun () ->
+    Lwt_pipe.push write_queue msg >>= return
+  end
 let write_now { write_queue } msg = Lwt_pipe.push_now write_queue msg
 
 let read_from conn ?pos ?len buf msg =
@@ -426,7 +427,7 @@ let read_now conn ?pos ?len buf =
           (Lwt_pipe.pop_now conn.read_queue)
       with Lwt_pipe.Closed -> Some (Error [P2p_errors.Connection_closed])
 
-let read conn ?pos ?len buf =
+let read ?canceler conn ?pos ?len buf =
   match conn.partial_read with
   | Some msg ->
       conn.partial_read <- None ;
@@ -434,11 +435,13 @@ let read conn ?pos ?len buf =
   | None ->
       Lwt.catch
         (fun () ->
-           Lwt_pipe.pop conn.read_queue >|= fun msg ->
+           protect ?canceler begin fun () ->
+             Lwt_pipe.pop conn.read_queue
+           end >|= fun msg ->
            read_from conn ?pos ?len buf msg)
         (fun _ -> fail P2p_errors.Connection_closed)
 
-let read_full conn ?pos ?len buf =
+let read_full ?canceler conn ?pos ?len buf =
   let maxlen = MBytes.length buf in
   let pos = Option.unopt ~default:0 pos in
   let len = Option.unopt ~default:(maxlen - pos) len in
@@ -448,7 +451,7 @@ let read_full conn ?pos ?len buf =
     if len = 0 then
       return_unit
     else
-      read conn ~pos ~len buf >>=? fun read_len ->
+      read ?canceler conn ~pos ~len buf >>=? fun read_len ->
       loop (pos + read_len) (len - read_len) in
   loop pos len
 
