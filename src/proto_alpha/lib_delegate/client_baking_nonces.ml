@@ -129,5 +129,12 @@ let remove t chain hash =
           Some (Block_hash.Map.remove hash map))
     t
 
+let remove_all t chain =
+  Chain_id.Map.update chain
+    (function
+      | None -> None
+      | Some _ -> None)
+    t
+
 let find_chain_nonces_opt t chain =
   Chain_id.Map.find_opt chain t
