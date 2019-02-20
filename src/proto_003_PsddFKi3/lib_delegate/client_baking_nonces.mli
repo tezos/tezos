@@ -63,6 +63,11 @@ val remove:
   Block_hash.t ->
   t
 
+val remove_all:
+  t ->
+  Chain_id.t ->
+  t
+
 val find_chain_nonces_opt:
   t ->
   Chain_id.t ->
