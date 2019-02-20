@@ -213,6 +213,11 @@ test:validation:
   script:
     - dune build @src/lib_validation/runtest
 
+test:micheline:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_micheline/runtest
+
 ############################################################
 ## Stage: building opam packages (only master and *opam*) ##
 ############################################################
