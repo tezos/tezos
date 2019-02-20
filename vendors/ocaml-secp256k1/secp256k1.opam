@@ -6,6 +6,7 @@ maintainer: "Vincent Bernardoff <vb@luminar.eu.org>"
 homepage: "https://github.com/vbmithr/ocaml-secp256k1-internal"
 bug-reports: "https://github.com/vbmithr/ocaml-secp256k1-internal/issues"
 dev-repo: "git://github.com/vbmithr/ocaml-secp256k1-internal"
+synopsis: "Bindings to secp256k1 internal functions"
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
 depends: [
   "conf-gmp" {build}
