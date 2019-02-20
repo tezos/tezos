@@ -53,7 +53,7 @@ let await_bootstrapped_node (cctxt: #Proto_alpha.full) =
   cctxt#message "Node synchronized." >>= fun () ->
   return_unit
 
-let monitor_fork_testchain (cctxt: #Proto_alpha.full) =
+let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
   (* Waiting for the node to be synchronized *)
   cctxt#message "Waiting for the test chain to be forked..." >>= fun () ->
   Shell_services.Monitor.active_chains cctxt >>=? fun (stream, _) ->
@@ -66,17 +66,31 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) =
     match testchain with
     | Some (Active_test { protocol ; expiration_date })
       when Protocol_hash.equal Proto_alpha.hash protocol -> begin
+        Chain_services.chain_id cctxt ~chain:`Test () >>=? fun test_chain_id ->
         let abort_daemon () =
-          Format.printf "Test chain's expiration date reached \
+          cctxt#message "Test chain's expiration date reached \
                          (%a)... Stopping the daemon.@."
-            Time.pp_hum expiration_date ;
-          exit 0 in
+            Time.pp_hum expiration_date >>= fun () ->
+          if cleanup_nonces then
+            (* Clean-up existing nonces *)
+            cctxt#with_lock begin fun () ->
+              Chain_services.chain_id cctxt ~chain:`Test () >>=? fun main_chain_id ->
+              Client_baking_nonces.load ~main_chain_id cctxt >>=? fun nonces ->
+              let nonces = Client_baking_nonces.remove_all nonces test_chain_id in
+              Client_baking_nonces.save cctxt nonces
+            end
+          else
+            return_unit >>=? fun () ->
+            exit 0 in
+        let canceler = Lwt_canceler.create () in
+        Lwt_canceler.on_cancel canceler (fun () -> abort_daemon () >>= function _ -> Lwt.return_unit) ;
         let delay = Int64.to_int Time.(diff expiration_date (now ())) in
         if delay <= 0 then
-          abort_daemon ()
+          (* Testchain already expired... Retrying. *)
+          loop ()
         else
           let timeout =
-            Lwt_timeout.create delay abort_daemon in
+            Lwt_timeout.create delay (fun () -> Lwt_canceler.cancel canceler |> ignore) in
           Lwt_timeout.start timeout ;
           return_unit
       end
@@ -91,7 +105,7 @@ module Endorser = struct
   let run (cctxt : #Proto_alpha.full) ~chain ~delay delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
     begin if chain = `Test then
-        monitor_fork_testchain cctxt
+        monitor_fork_testchain cctxt ~cleanup_nonces:false
       else
         return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_heads
@@ -120,7 +134,7 @@ module Baker = struct
       delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
     begin if chain = `Test then
-        monitor_fork_testchain cctxt
+        monitor_fork_testchain cctxt ~cleanup_nonces:true
       else
         return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_heads
