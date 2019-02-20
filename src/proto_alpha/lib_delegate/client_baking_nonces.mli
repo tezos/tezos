@@ -28,11 +28,8 @@ open Alpha_context
 
 type t
 
-val encoding: t Data_encoding.t
-
-val name: string
-
 val load:
+  main_chain_id: Chain_id.t ->
   #Client_context.wallet ->
   t tzresult Lwt.t
 
@@ -43,30 +40,30 @@ val save:
 
 val mem:
   t ->
-  Chain_services.chain ->
+  Chain_id.t ->
   Block_hash.t ->
   bool
 
 val find_opt:
   t ->
-  Chain_services.chain ->
+  Chain_id.t ->
   Block_hash.t ->
   Nonce.t option
 
 val add:
   t ->
-  Chain_services.chain ->
+  Chain_id.t ->
   Block_hash.t ->
   Nonce.t ->
   t
 
 val remove:
   t ->
-  Chain_services.chain ->
+  Chain_id.t ->
   Block_hash.t ->
   t
 
 val find_chain_nonces_opt:
   t ->
-  Chain_services.chain ->
+  Chain_id.t ->
   Nonce.t Block_hash.Map.t option
