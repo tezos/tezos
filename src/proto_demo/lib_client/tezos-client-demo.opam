@@ -14,7 +14,7 @@ depends: [
   "tezos-client-base"
   "tezos-client-commands"
   "tezos-protocol-environment"
-  "tezos-protocol-genesis"
+  "tezos-protocol-demo"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
