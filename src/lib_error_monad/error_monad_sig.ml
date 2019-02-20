@@ -67,11 +67,10 @@ module type S = sig
   (** The error data type is extensible. Each module can register specialized
       error serializers
       [id] unique name of this error. Ex.: overflow_time_counter
-      [title] human readable description. Ex.: The time counter overflown while computing delta increase
-      [description] formatter use to pretty print additional arguments. Ex.: The time counter overflown while computing delta increase. Previsous value %d. Delta: %d
-      [pp] data encoding for this error. If the error has no value, specify Data_encoding.empty
-      [encoder]
-      [decoder]
+      [title] more readable name. Ex.: Overflow of time counter
+      [description] human readable description. Ex.: The time counter overflowed while computing delta increase
+      [pp] formatter used to pretty print additional arguments. Ex.: The time counter overflowed while computing delta increase. Previous value %d. Delta: %d
+      [encoder] [decoder] data encoding for this error. If the error has no value, specify Data_encoding.empty
   *)
   val register_error_kind :
     error_category ->
