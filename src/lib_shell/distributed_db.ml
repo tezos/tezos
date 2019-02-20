@@ -910,7 +910,7 @@ let disconnect { global_db = { p2p } } peer_id =
   | None -> Lwt.return_unit
   | Some conn -> P2p.disconnect p2p conn
 
-let shutdown { p2p ; p2p_readers ; active_chains } =
+let shutdown { p2p_readers ; active_chains } =
   P2p_peer.Table.fold
     (fun _peer_id reader acc ->
        P2p_reader.shutdown reader >>= fun () -> acc)
@@ -923,7 +923,6 @@ let shutdown { p2p ; p2p_readers ; active_chains } =
        acc)
     active_chains
     Lwt.return_unit >>= fun () ->
-  P2p.shutdown p2p >>= fun () ->
   Lwt.return_unit
 
 let clear_block chain_db hash n =

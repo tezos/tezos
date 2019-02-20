@@ -216,6 +216,7 @@ let create
     ?max_child_ttl ~start_prevalidator mainchain_state history_mode >>=? fun mainchain_validator ->
   let shutdown () =
     P2p.shutdown p2p >>= fun () ->
+    Distributed_db.shutdown distributed_db >>= fun () ->
     Validator.shutdown validator >>= fun () ->
     State.close state >>= fun () ->
     Lwt.return_unit
