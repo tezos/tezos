@@ -114,10 +114,15 @@ test:p2p:pool:
   script:
     - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
 
-test:proto_alpha:
+test:proto_alpha:lib_protocol:
   <<: *test_definition
   script:
     - dune build @src/proto_alpha/lib_protocol/runtest
+
+test:proto_alpha:lib_client:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_alpha/lib_client/test/runtest
 
 test:p2p:peerset:
   <<: *test_definition
