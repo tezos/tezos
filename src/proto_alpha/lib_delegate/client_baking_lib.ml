@@ -77,8 +77,10 @@ let bake_block
     | Some seed_nonce ->
         cctxt#with_lock begin fun () ->
           let open Client_baking_nonces in
-          load cctxt >>=? fun nonces ->
-          let nonces = add nonces chain block_hash seed_nonce in
+          Chain_services.chain_id cctxt ~chain:`Main () >>=? fun main_chain_id ->
+          Chain_services.chain_id cctxt () >>=? fun chain_id ->
+          load ~main_chain_id cctxt >>=? fun nonces ->
+          let nonces = add nonces chain_id block_hash seed_nonce in
           save cctxt nonces
         end
         |> trace_exn (Failure "Error while recording block")
@@ -112,8 +114,10 @@ let do_reveal cctxt ~chain ~block nonces =
   return_unit
 
 let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
+  Chain_services.chain_id cctxt ~chain:`Main () >>=? fun main_chain_id ->
+  Chain_services.chain_id cctxt () >>=? fun chain_id ->
   cctxt#with_lock begin fun () ->
-    Client_baking_nonces.load cctxt
+    Client_baking_nonces.load ~main_chain_id cctxt
   end >>=? fun nonces ->
   Lwt_list.filter_map_p
     (fun hash ->
@@ -130,7 +134,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
   filter_map_s (fun (bi : Client_baking_blocks.block_info) ->
-      match Client_baking_nonces.find_opt nonces cctxt#chain bi.hash with
+      match Client_baking_nonces.find_opt nonces chain_id bi.hash with
       | None ->
           cctxt#warning "Cannot find nonces for block %a (ignoring)@."
             Block_hash.pp_short bi.hash >>= fun () ->
