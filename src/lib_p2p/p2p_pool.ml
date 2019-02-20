@@ -337,7 +337,13 @@ let register_point pool ?trusted _source_peer_id (addr, port as point) =
       Lwt_condition.broadcast pool.events.new_point () ;
       log pool (New_point point) ;
       point_info
-  | Some point_info -> point_info
+  | Some point_info ->
+      begin
+        match trusted with
+        | Some true -> P2p_point_state.Info.set_trusted point_info ;
+        | _ -> ()
+      end ;
+      point_info
 
 let may_register_my_id_point pool = function
   | [P2p_errors.Myself (addr, Some port)] ->
@@ -1027,15 +1033,15 @@ and disconnect ?(wait = false) conn =
   conn.wait_close <- wait ;
   Answerer.shutdown (Lazy.force conn.answerer)
 
-and register_new_points pool conn =
+and register_new_points ?trusted pool conn =
   let source_peer_id = P2p_peer_state.Info.peer_id conn.peer_info in
   fun points ->
-    List.iter (register_new_point pool source_peer_id) points ;
+    List.iter (register_new_point ?trusted pool source_peer_id) points ;
     Lwt.return_unit
 
-and register_new_point pool source_peer_id point =
+and register_new_point ?trusted pool source_peer_id point =
   if not (P2p_point.Table.mem pool.my_id_points point) then
-    ignore (register_point pool source_peer_id point)
+    ignore (register_point ?trusted pool source_peer_id point)
 
 and list_known_points ?(ignore_private = false) pool conn =
   if Connection.private_node conn then

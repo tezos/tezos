@@ -43,8 +43,11 @@ type t
     returns a discovery worker registering local peers to the [pool]
     and broadcasting discovery messages with the [peer_id] and
     the [listening_port] through the address [discovery_addr:discovery_port]. *)
-val create : listening_port:int -> discovery_port:int ->
-  discovery_addr:Ipaddr.V4.t -> ('a, 'b, 'c) P2p_pool.t -> P2p_peer.Table.key ->
+val create :
+  listening_port:int ->
+  discovery_port:int -> discovery_addr:Ipaddr.V4.t ->
+  trust_discovered_peers:bool ->
+  ('a, 'b, 'c) P2p_pool.t -> P2p_peer.Table.key ->
   t
 
 val activate : t -> unit

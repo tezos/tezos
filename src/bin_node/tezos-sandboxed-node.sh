@@ -17,7 +17,7 @@ start_sandboxed_node() {
     expected_connections="${expected_connections:-3}"
     node_dir="$(mktemp -d -t tezos-node.XXXXXXXX)"
     peers=("--no-bootstrap-peers")
-#    peers+=("--private-mode") ## Should we accept discovered peers as trusted nodes ?
+    peers+=("--private-mode")
 
     node="${local_node}"
     sandbox_param="--sandbox=$sandbox_file"

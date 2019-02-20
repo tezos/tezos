@@ -49,6 +49,7 @@ module Answer = struct
     pool: pool ;
     discovery_port: int ;
     canceler: Lwt_canceler.t ;
+    trust_discovered_peers: bool ;
     mutable worker: unit Lwt.t ;
   }
 
@@ -98,7 +99,9 @@ module Answer = struct
                       let Pool pool = st.pool in
                       lwt_log_info "Registering new point %a:%d"
                         P2p_addr.pp addr remote_port >>= fun () ->
-                      P2p_pool.register_new_point pool st.my_peer_id
+                      P2p_pool.register_new_point
+                        ~trusted:st.trust_discovered_peers
+                        pool st.my_peer_id
                         (addr, remote_port) ;
                       aux ()
                 end
@@ -123,10 +126,11 @@ module Answer = struct
         Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
 
-  let create my_peer_id pool ~discovery_port = {
+  let create my_peer_id pool ~trust_discovered_peers ~discovery_port = {
     canceler = Lwt_canceler.create () ;
     my_peer_id ;
     discovery_port ;
+    trust_discovered_peers ;
     pool = Pool pool ;
     worker = Lwt.return_unit ;
   }
@@ -225,8 +229,7 @@ module Sender = struct
         Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
 
-  let create
-      my_peer_id pool ~listening_port ~discovery_port ~discovery_addr = {
+  let create my_peer_id pool ~listening_port ~discovery_port ~discovery_addr = {
     canceler = Lwt_canceler.create () ;
     my_peer_id ;
     listening_port ;
@@ -252,8 +255,8 @@ type t = {
   sender: Sender.t ;
 }
 
-let create ~listening_port ~discovery_port ~discovery_addr pool my_peer_id =
-  let answer = Answer.create my_peer_id pool ~discovery_port in
+let create ~listening_port ~discovery_port ~discovery_addr ~trust_discovered_peers pool my_peer_id =
+  let answer = Answer.create my_peer_id pool ~discovery_port ~trust_discovered_peers in
   let sender =
     Sender.create
       my_peer_id pool ~listening_port ~discovery_port ~discovery_addr in

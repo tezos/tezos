@@ -172,6 +172,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
             proof_of_work_target =
               Crypto_box.make_target config.p2p.expected_pow ;
             disable_mempool = config.p2p.disable_mempool ;
+            trust_discovered_peers = (sandbox_param <> None) ;
           }
         in
         return_some (p2p_config, config.p2p.limits)

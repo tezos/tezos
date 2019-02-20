@@ -239,6 +239,7 @@ val accept:
     accepting a connection from [fd]. Used by [P2p_welcome]. *)
 
 val register_new_point:
+  ?trusted:bool ->
   ('a, 'b, 'c) pool -> P2p_peer.Table.key -> P2p_point.Id.t -> unit
 (** [register_new_point pool source_peer_id point] tries to register [point]
     in pool's internal peer table. *)

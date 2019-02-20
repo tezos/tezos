@@ -64,6 +64,7 @@ type config = {
   identity : P2p_identity.t ;
   proof_of_work_target : Crypto_box.target ;
   disable_mempool : bool ;
+  trust_discovered_peers : bool ;
 }
 
 type limits = {
@@ -147,7 +148,8 @@ let may_create_discovery_worker _limits config pool =
       Some (P2p_discovery.create pool
               config.identity.peer_id
               ~listening_port
-              ~discovery_port ~discovery_addr)
+              ~discovery_port ~discovery_addr
+              ~trust_discovered_peers:config.trust_discovered_peers)
   | (_, _, _) ->
       None
 

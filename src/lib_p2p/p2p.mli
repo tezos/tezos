@@ -98,6 +98,10 @@ type config = {
 
   disable_mempool : bool ;
   (** If [true], all non-empty mempools will be ignored. *)
+
+  trust_discovered_peers : bool ;
+  (** If [true], peers discovered on the local network will be trusted. *)
+
 }
 
 (** Network capacities *)
