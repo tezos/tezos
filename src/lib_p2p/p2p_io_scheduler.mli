@@ -61,7 +61,9 @@ val create:
 val register: t -> P2p_fd.t -> connection
 (** [register sched fd] is a [connection] managed by [sched]. *)
 
-val write: connection -> MBytes.t -> unit tzresult Lwt.t
+val write:
+  ?canceler:Lwt_canceler.t ->
+  connection -> MBytes.t -> unit tzresult Lwt.t
 (** [write conn msg] returns [Ok ()] when [msg] has been added to
     [conn]'s write queue, or fail with an error. *)
 
@@ -76,11 +78,13 @@ val read_now:
     [buf] starting at [pos]. *)
 
 val read:
+  ?canceler:Lwt_canceler.t ->
   connection -> ?pos:int -> ?len:int -> MBytes.t -> int tzresult Lwt.t
 (** Like [read_now], but waits till [conn] read queue has at least one
     element instead of failing. *)
 
 val read_full:
+  ?canceler:Lwt_canceler.t ->
   connection -> ?pos:int -> ?len:int -> MBytes.t -> unit tzresult Lwt.t
 (** Like [read], but blits exactly [len] bytes in [buf]. *)
 
