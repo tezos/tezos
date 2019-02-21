@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -37,7 +38,12 @@ let id0 =
   (* Luckilly, this will be an insuficient proof of work! *)
   P2p_identity.generate (Crypto_box.make_target 0.)
 
-let versions = P2p_version.[{ name = "TEST" ; minor = 0 ; major = 0 }]
+let version =
+  { Network_version.
+    chain_name = Distributed_db_version.sandboxed_chain_name ;
+    distributed_db_version = Distributed_db_version.zero ;
+    p2p_version = P2p_version.zero ;
+  }
 
 type metadata = unit
 let conn_meta_config : metadata P2p_socket.metadata_config = {
@@ -121,7 +127,7 @@ let accept sched main_socket =
   P2p_socket.authenticate
     ~canceler
     ~proof_of_work_target
-    ~incoming:true fd point id1 versions
+    ~incoming:true fd point id1 version
     conn_meta_config
 
 let raw_connect sched addr port =
@@ -138,7 +144,8 @@ let connect sched addr port id =
     ~canceler
     ~proof_of_work_target
     ~incoming:false fd
-    (addr, port) id versions conn_meta_config >>=? fun (info, auth_fd) ->
+    (addr, port) id version
+    conn_meta_config >>=? fun (info, auth_fd) ->
   _assert (not info.incoming) __LOC__ "" >>=? fun () ->
   _assert (P2p_peer.Id.compare info.peer_id id1.peer_id = 0)
     __LOC__ "" >>=? fun () ->

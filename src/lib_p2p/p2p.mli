@@ -55,7 +55,8 @@ type 'msg app_message_encoding = Encoding : {
 
 type 'msg message_config = {
   encoding : 'msg app_message_encoding list ;
-  versions : P2p_version.t list;
+  chain_name : Distributed_db_version.name ;
+  distributed_db_versions : Distributed_db_version.t list ;
 }
 
 (** Network configuration *)
@@ -181,6 +182,7 @@ type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 (** A faked p2p layer, which do not initiate any connection
     nor open any listening socket *)
 val faked_network :
+  'msg message_config ->
   'peer_meta peer_meta_config ->
   'conn_meta ->
   ('msg, 'peer_meta, 'conn_meta) net

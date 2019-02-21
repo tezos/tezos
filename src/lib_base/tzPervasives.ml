@@ -61,6 +61,9 @@ module P2p_connection = P2p_connection
 module P2p_stat = P2p_stat
 module P2p_version = P2p_version
 
+module Distributed_db_version = Distributed_db_version
+module Network_version = Network_version
+
 module Lwt_exit = Lwt_exit
 
 include Utils.Infix

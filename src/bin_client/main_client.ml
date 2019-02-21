@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -74,10 +75,11 @@ let sandbox () =
 
 let check_network ctxt =
   Shell_services.P2p.versions ctxt >>= function
-  | Error _ ->
+  | Error _
+  | Ok [] ->
       Lwt.return_none
-  | Ok versions ->
-      match String.split_on_char '_' (P2p_version.best versions).name with
+  | Ok (version :: _) ->
+      match String.split_on_char '_' (version.chain_name :> string) with
       | "SANDBOXED" :: _ ->
           sandbox () ;
           Lwt.return_some `Sandbox
@@ -87,7 +89,8 @@ let check_network ctxt =
       | "TEZOS" :: "ALPHANET" :: _date :: [] ->
           alphanet () ;
           Lwt.return_some `Alphanet
-      | "TEZOS" :: "BETANET" :: _date :: [] ->
+      | "TEZOS" :: "BETANET" :: _ :: []
+      | "TEZOS" :: "MAINNET" :: [] ->
           mainnet () ;
           Lwt.return_some `Mainnet
       | _ ->

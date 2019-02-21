@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -303,15 +304,13 @@ let encoding =
 
   ]
 
-let versions =
-  let open P2p_version in
-  [ { name = "TEZOS_BETANET_2018-06-30T16:07:32Z" ;
-      major = 0 ;
-      minor = 0 ;
-    }
-  ]
-
-let cfg : _ P2p.message_config = { encoding ; versions }
+let cfg : _ P2p.message_config = {
+  encoding ;
+  chain_name = Distributed_db_version.chain_name ;
+  distributed_db_versions = [
+    Distributed_db_version.zero ;
+  ] ;
+}
 
 let raw_encoding = P2p.Raw.encoding encoding
 

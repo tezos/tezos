@@ -149,10 +149,12 @@ type 'peer_meta peer_meta_config = {
 
 type 'msg message_config = {
   encoding : 'msg encoding list ;
-  versions : P2p_version.t list;
+  chain_name : Distributed_db_version.name ;
+  distributed_db_versions : Distributed_db_version.t list ;
 }
 
 val create:
+  ?p2p_versions: P2p_version.t list ->
   config ->
   'peer_meta peer_meta_config ->
   'conn_meta P2p_socket.metadata_config ->
