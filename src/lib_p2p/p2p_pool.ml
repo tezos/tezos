@@ -24,9 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO Test cancelation of a (pending) connection *)
+(* TODO Test cancellation of a (pending) connection *)
 
-(* TODO do not recompute list_known_points at each requests...  but
+(* TODO do not recompute list_known_points at each requests... but
         only once in a while, e.g. every minutes or when a point
         or the associated peer_id is blacklisted. *)
 
@@ -223,11 +223,14 @@ type 'peer_meta peer_meta_config = {
 
 type 'msg message_config = {
   encoding : 'msg encoding list ;
-  versions : P2p_version.t list;
+  chain_name : Distributed_db_version.name ;
+  distributed_db_versions : Distributed_db_version.t list ;
 }
 
 type ('msg, 'peer_meta, 'conn_meta) t = {
   config : config ;
+  announced_version : Network_version.t ;
+  custom_p2p_versions : P2p_version.t list ;
   peer_meta_config : 'peer_meta peer_meta_config ;
   conn_meta_config : 'conn_meta P2p_socket.metadata_config ;
   message_config : 'msg message_config ;
@@ -253,7 +256,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   mutable new_connection_hook :
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) list ;
   mutable latest_accepted_swap : Time.t ;
-  mutable latest_succesfull_swap : Time.t  ;
+  mutable latest_succesfull_swap : Time.t ;
 }
 
 and events = {
@@ -272,6 +275,7 @@ and ('msg, 'peer_meta, 'conn_meta) connection = {
     (('msg, 'peer_meta, 'conn_meta) connection, 'peer_meta, 'conn_meta) P2p_peer_state.Info.t ;
   point_info :
     ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t option ;
+  negotiated_version : Network_version.t ;
   answerer : ('msg, 'conn_meta) Answerer.t Lazy.t ;
   mutable last_sent_swap_request : (Time.t * P2p_peer.Id.t) option ;
   mutable wait_close : bool ;
@@ -457,7 +461,7 @@ let broadcast_bootstrap_msg pool =
 (***************************************************************************)
 
 (* this function duplicates bit of code from the modules below to avoid
-   creating mutually recurvive modules *)
+   creating mutually recursive modules *)
 let connection_of_peer_id pool peer_id =
   Option.apply
     (P2p_peer.Table.find_opt pool.known_peer_ids peer_id) ~f:begin fun p ->
@@ -506,7 +510,7 @@ module Points = struct
   let fold_known pool ~init ~f =
     P2p_point.Table.fold f pool.known_points init
 
-  let fold_connected  pool ~init ~f =
+  let fold_connected pool ~init ~f =
     P2p_point.Table.fold f pool.connected_points init
 
   let banned pool (addr, _port) =
@@ -793,7 +797,7 @@ and raw_authenticate pool ?point_info canceler fd point =
       ~proof_of_work_target:pool.config.proof_of_work_target
       ~incoming fd point
       ?listening_port:pool.config.listening_port
-      pool.config.identity pool.message_config.versions
+      pool.config.identity pool.announced_version
       pool.conn_meta_config
   end ~on_error: begin fun err ->
     begin match err with
@@ -846,9 +850,12 @@ and raw_authenticate pool ?point_info canceler fd point =
     | None, None -> None
     | Some _ as point_info, _ | _, (Some _ as point_info) -> point_info in
   let peer_info = register_peer pool info.peer_id in
-  let acceptable_versions =
-    P2p_version.common info.versions pool.message_config.versions
-  in
+  let acceptable_version =
+    Network_version.select
+      ~chain_name:pool.message_config.chain_name
+      ~distributed_db_versions:pool.message_config.distributed_db_versions
+      ~p2p_versions:pool.custom_p2p_versions
+      info.announced_version in
   let acceptable_point =
     Option.unopt_map connection_point_info
       ~default:(not pool.config.private_mode)
@@ -873,11 +880,19 @@ and raw_authenticate pool ?point_info canceler fd point =
         (* TODO: in some circumstances cancel and accept... *)
         false
     | Running _ -> false
-    | Disconnected -> true
-  in
+    | Disconnected -> true in
+  (* To Verify : the thread must ? not be interrupted between
+     point removal from incoming and point registration into
+     active connection to prevent flooding attack.
+     incoming_connections + active_connection must reflect/dominate
+     the actual number of ongoing connections.
+     On the other hand, if we wait too long for Ack, we will reject
+     incoming connections, thus giving an entry point for dos attack
+     by giving late Nack.
+  *)
   if incoming then
     P2p_point.Table.remove pool.incoming point ;
-  match acceptable_versions with
+  match acceptable_version with
   | Some version when acceptable_peer_id && acceptable_point -> begin
       log pool (Accepting_request (point, info.id_point, info.peer_id)) ;
       Option.iter connection_point_info
@@ -913,7 +928,7 @@ and raw_authenticate pool ?point_info canceler fd point =
       let id_point =
         match info.id_point, Option.map ~f:P2p_point_state.Info.point point_info with
         | (addr, _), Some (_, port) -> addr, Some port
-        | id_point, None ->  id_point in
+        | id_point, None -> id_point in
       return
         (create_connection
            pool conn
@@ -930,10 +945,26 @@ and raw_authenticate pool ?point_info canceler fd point =
         Option.iter ~f:P2p_point_state.set_disconnected point_info ;
         (* FIXME P2p_peer_state.set_disconnected ~requested:true peer_info ; *)
       end ;
-      fail (P2p_errors.Rejected info.peer_id)
+      match acceptable_version with
+      | None -> begin
+          lwt_debug "No common protocol@.\
+                     (chains: local %a - remote %a)@.\
+                     (db_versions: local [%a] - remote %a)@.\
+                     (p2p_versions: local [%a] - remote %a)"
+            Distributed_db_version.pp_name pool.message_config.chain_name
+            Distributed_db_version.pp_name info.announced_version.chain_name
+            (Format.pp_print_list Distributed_db_version.pp) pool.message_config.distributed_db_versions
+            Distributed_db_version.pp info.announced_version.distributed_db_version
+            (Format.pp_print_list P2p_version.pp) pool.custom_p2p_versions
+            P2p_version.pp info.announced_version.p2p_version
+          >>= fun () ->
+          fail (P2p_errors.Rejected_no_common_protocol
+                  { announced = info.announced_version })
+        end
+      | Some _ -> fail (P2p_errors.Rejected info.peer_id)
     end
 
-and create_connection pool p2p_conn id_point point_info peer_info _version =
+and create_connection pool p2p_conn id_point point_info peer_info negotiated_version =
   let peer_id = P2p_peer_state.Info.peer_id peer_info in
   let canceler = Lwt_canceler.create () in
   let size =
@@ -999,7 +1030,8 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
   and conn =
     { conn = p2p_conn ; point_info ; peer_info ;
       messages ; canceler ; answerer ; wait_close = false ;
-      last_sent_swap_request = None } in
+      last_sent_swap_request = None ;
+      negotiated_version } in
   ignore (Lazy.force answerer) ;
   let conn_meta = P2p_socket.remote_metadata p2p_conn in
   Option.iter point_info ~f:begin fun point_info ->
@@ -1141,7 +1173,7 @@ and swap pool conn current_peer_id new_point =
       log pool (Swap_failure { source = source_peer_id }) ;
       match err with
       | [ Timeout ] ->
-          lwt_debug "Swap to %a was interupted: %a"
+          lwt_debug "Swap to %a was interrupted: %a"
             P2p_point.Id.pp new_point pp_print_error err
       | _ ->
           lwt_log_error "Swap to %a failed: %a"
@@ -1191,7 +1223,9 @@ let send_swap_request pool =
 
 (***************************************************************************)
 
-let create config peer_meta_config conn_meta_config message_config io_sched =
+let create
+    ?(p2p_versions = P2p_version.supported)
+    config peer_meta_config conn_meta_config message_config io_sched =
   let events = {
     too_few_connections = Lwt_condition.create () ;
     too_many_connections = Lwt_condition.create () ;
@@ -1201,6 +1235,12 @@ let create config peer_meta_config conn_meta_config message_config io_sched =
   } in
   let pool = {
     config ; peer_meta_config ; conn_meta_config ; message_config ;
+    announced_version =
+      Network_version.announced
+        ~chain_name: message_config.chain_name
+        ~distributed_db_versions: message_config.distributed_db_versions
+        ~p2p_versions ;
+    custom_p2p_versions = p2p_versions ;
     my_id_points = P2p_point.Table.create 7 ;
     known_peer_ids = P2p_peer.Table.create 53 ;
     connected_peer_ids = P2p_peer.Table.create 53 ;
@@ -1251,7 +1291,7 @@ let destroy ({ config ; peer_meta_config } as pool) =
           Lwt_canceler.cancel cancel >>= fun () -> acc
       | Running { data = conn } ->
           disconnect conn >>= fun () -> acc
-      | Disconnected ->  acc)
+      | Disconnected -> acc)
     pool.known_points @@
   P2p_peer.Table.fold (fun _peer_id peer_info acc ->
       match P2p_peer_state.get peer_info with
@@ -1259,7 +1299,7 @@ let destroy ({ config ; peer_meta_config } as pool) =
           Lwt_canceler.cancel cancel >>= fun () -> acc
       | Running { data = conn } ->
           disconnect conn >>= fun () -> acc
-      | Disconnected ->  acc)
+      | Disconnected -> acc)
     pool.known_peer_ids @@
   P2p_point.Table.fold (fun _point canceler acc ->
       Lwt_canceler.cancel canceler >>= fun () -> acc)
@@ -1267,3 +1307,4 @@ let destroy ({ config ; peer_meta_config } as pool) =
 
 let on_new_connection pool f =
   pool.new_connection_hook <- f :: pool.new_connection_hook
+

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -964,7 +965,8 @@ let watch_operation { operation_input } =
 
 module Raw = struct
   let encoding = P2p.Raw.encoding Message.cfg.encoding
-  let supported_versions = Message.cfg.versions
+  let chain_name = Message.cfg.chain_name
+  let distributed_db_versions = Message.cfg.distributed_db_versions
 end
 
 module Make

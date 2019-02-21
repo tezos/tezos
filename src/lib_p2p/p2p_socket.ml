@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -114,31 +115,31 @@ module Connection_message = struct
 
   type t = {
     port : int option ;
-    versions : P2p_version.t list ;
     public_key : Crypto_box.public_key ;
     proof_of_work_stamp : Crypto_box.nonce ;
     message_nonce : Crypto_box.nonce ;
+    version : Network_version.t ;
   }
 
   let encoding =
     let open Data_encoding in
     conv
       (fun { port ; public_key ; proof_of_work_stamp ;
-             message_nonce ; versions } ->
+             message_nonce ; version } ->
         let port = match port with None -> 0 | Some port -> port in
         (port, public_key, proof_of_work_stamp,
-         message_nonce, versions))
+         message_nonce, version))
       (fun (port, public_key, proof_of_work_stamp,
-            message_nonce, versions) ->
+            message_nonce, version) ->
         let port = if port = 0 then None else Some port in
         { port ; public_key ; proof_of_work_stamp ;
-          message_nonce ; versions })
+          message_nonce ; version })
       (obj5
          (req "port" uint16)
          (req "pubkey" Crypto_box.public_key_encoding)
          (req "proof_of_work_stamp" Crypto_box.nonce_encoding)
          (req "message_nonce" Crypto_box.nonce_encoding)
-         (req "versions" (Variable.list P2p_version.encoding)))
+         (req "version" Network_version.encoding))
 
   let write ~canceler fd message =
     let encoded_message_len =
@@ -292,7 +293,7 @@ let authenticate
     ~canceler
     ~proof_of_work_target
     ~incoming fd (remote_addr, remote_socket_port as point)
-    ?listening_port identity supported_versions metadata_config =
+    ?listening_port identity announced_version metadata_config =
   let local_nonce_seed = Crypto_box.random_nonce () in
   lwt_debug "Sending authenfication to %a" P2p_point.Id.pp point >>= fun () ->
   Connection_message.write ~canceler fd
@@ -300,7 +301,7 @@ let authenticate
       proof_of_work_stamp = identity.proof_of_work_stamp ;
       message_nonce = local_nonce_seed ;
       port = listening_port ;
-      versions = supported_versions } >>=? fun sent_msg ->
+      version = announced_version } >>=? fun sent_msg ->
   Connection_message.read ~canceler fd >>=? fun (msg, recv_msg) ->
   let remote_listening_port =
     if incoming then msg.port else Some remote_socket_port in
@@ -323,7 +324,7 @@ let authenticate
   Metadata.read ~canceler metadata_config fd cryptobox_data >>=? fun remote_metadata ->
   let info =
     { P2p_connection.Info.peer_id = remote_peer_id ;
-      versions = msg.versions ; incoming ;
+      announced_version = msg.version ; incoming ;
       id_point ; remote_socket_port ;
       private_node = metadata_config.private_node remote_metadata ;
       local_metadata ;

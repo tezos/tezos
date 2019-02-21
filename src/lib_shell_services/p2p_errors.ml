@@ -45,6 +45,7 @@ type error += Decipher_error
 type error += Invalid_message_size
 type error += Encoding_error
 type error += Rejected_socket_connection
+type error += Rejected_no_common_protocol of { announced : Network_version.t }
 type error += Decoding_error
 type error += Myself of P2p_connection.Id.t
 type error += Not_enough_proof_of_work of P2p_peer.Id.t
@@ -92,6 +93,21 @@ let () =
     Data_encoding.empty
     (function Rejected_socket_connection -> Some () | _ -> None)
     (fun () -> Rejected_socket_connection) ;
+  (* Rejected socket connection, no common network protocol *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_socket.rejected_no_common_protocol"
+    ~title:"Rejected socket connection - no common network protocol"
+    ~description:"Rejected peer connection: \
+                  rejected socket connection as we have no common \
+                  network protocol with the peer."
+    ~pp:(fun ppf _lst -> Format.fprintf ppf
+            "Rejected peer connection: no common network protocol.")
+    Data_encoding.(obj1 (req "announced_version" Network_version.encoding))
+    (function
+      | Rejected_no_common_protocol { announced } -> Some announced
+      | _ -> None)
+    (fun announced -> Rejected_no_common_protocol { announced });
   (* Decoding error *)
   register_error_kind
     `Permanent
