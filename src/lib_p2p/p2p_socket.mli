@@ -74,7 +74,7 @@ val authenticate:
     [P2P_io_scheduler.connection] into an [authenticated_connection] (auth
     correct, acceptation undecided). *)
 
-val kick: 'meta authenticated_connection -> P2p_point.Id.t list -> unit Lwt.t
+val kick: 'meta authenticated_connection -> unit Lwt.t
 (** (Low-level) (Cancelable) [kick afd] notifies the remote peer that
     we refuse this connection and then closes [afd]. Used in
     [P2p_connection_pool] to reject an [authenticated_connection] which we do
