@@ -66,7 +66,6 @@ let test_tokenize_basic () =
   assert_tokenize ~loc:__LOC__ "0xabc" [ Bytes "0xabc" ] >>=? fun () ->
   assert_tokenize ~loc:__LOC__ "0x" [ Bytes "0x" ] >>=? fun () ->
   assert_tokenize ~loc:__LOC__ "0x1" [ Bytes "0x1" ] >>=? fun () ->
-  (*FIXME why xabc is is not equal *)
   assert_tokenize_error ~loc:__LOC__ "xabc" [ Bytes "xabc" ] >>=? fun () ->
   assert_tokenize_error ~loc:__LOC__ "1xabc" [ Bytes "1xabc" ] >>=? fun () ->
   assert_tokenize_error ~loc:__LOC__ "1c" [ Bytes "1c" ] >>=? fun () ->
@@ -85,7 +84,6 @@ let test_tokenize_basic () =
   assert_tokenize ~loc:__LOC__ "-1" [ Int "-1" ] >>=? fun () ->
   assert_tokenize ~loc:__LOC__ "1" [ Int "1" ] >>=? fun () ->
   assert_tokenize ~loc:__LOC__ "-10" [ Int "-10" ] >>=? fun () ->
-  (*FIXME it is not equal*)
   assert_tokenize_error ~loc:__LOC__ ".1000" [ Int ".1000" ] >>=? fun () ->
   assert_tokenize_error ~loc:__LOC__ "10_00" [ Int "10_00" ] >>=? fun () ->
   assert_tokenize_error ~loc:__LOC__ "1,000" [ Int "1,000" ] >>=? fun () ->
@@ -123,7 +121,8 @@ let test_tokenize_basic () =
   assert_tokenize_error ~loc:__LOC__ "$$t" [ Annot "$$t" ] >>=? fun () ->
   assert_tokenize_error ~loc:__LOC__ "_from" [ Annot "_from" ] >>=? fun () ->
   assert_tokenize_error ~loc:__LOC__ ".from" [ Annot ".from" ] >>=? fun () ->
-  (*FIXME: why these cases below are not equal? and fail and not the %@?*)
+  (*NOTE: the cases below fail because ':' is used in the middle of the
+    annotation. *)
   assert_tokenize_error ~loc:__LOC__ "%:from" [ Annot "%:from" ] >>=? fun () ->
   assert_tokenize_error ~loc:__LOC__ "%:@from" [ Annot "%:@from" ] >>=? fun () ->
   assert_tokenize_error ~loc:__LOC__ "::t" [ Annot "::t" ] >>=? fun () ->
@@ -166,15 +165,15 @@ let test_one_line_contract () =
     [Ident "PUSH"; Ident "string"; String "abc"; Semi] >>=? fun () ->
   assert_tokenize ~loc:__LOC__ "DROP; SWAP"
     [Ident "DROP"; Semi; Ident "SWAP"] >>=? fun () ->
-  (*FIXME: these cases do not fail? *)
+  (* NOTE: the cases below do not fail because we only do tokenization. *)
   assert_tokenize ~loc:__LOC__ "DIP {ADD"
     [Ident "DIP"; Open_brace; Ident "ADD"] >>=? fun () ->
   assert_tokenize ~loc:__LOC__ "(option int"
     [Open_paren; Ident "option"; Ident "int"] >>=? fun () ->
   assert_tokenize ~loc:__LOC__ "parameter int}"
     [Ident "parameter"; Ident "int"; Close_brace] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "(option int"
-    [Open_paren; Ident "option"; Ident "int"]
+  assert_tokenize ~loc:__LOC__ "}{}{}{"
+    [Close_brace; Open_brace; Close_brace; Open_brace; Close_brace; Open_brace]
 
 (*********************************)
 (* Conditional contracts *)
@@ -203,7 +202,7 @@ let test_condition_contract () =
      Close_brace; Close_brace; Close_brace; Semi;
      Ident "UNIT"; Semi; Ident "SWAP"; Semi; Ident "PAIR"; Close_brace
     ] >>=? fun () ->
-  (*FIXME: this case should fail because it is missing the close_paren?*)
+  (* NOTE: the cases below do not fail because we only do tokenization. *)
   assert_tokenize ~loc:__LOC__
     "parameter (or string (option int);"
     [Ident "parameter"; Open_paren; Ident "or"; Ident "string"; Open_paren;
@@ -259,7 +258,7 @@ let test_basic_parsing () =
            [Prim ((), "int", [], []);
             Int ((), Z.of_int 100)],
            [])] >>=? fun () ->
-  (*FIXME: this case should fail *)
+  (*NOTE: this case doesn't fail because we don't type check *)
   assert_toplevel_parsing ~loc:__LOC__ "PUSH string 100"
     [Prim ((), "PUSH",
            [Prim ((), "string", [], []);
