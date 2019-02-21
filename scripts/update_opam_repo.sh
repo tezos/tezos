@@ -7,15 +7,15 @@
 # the cone of tezos dependencies.  This repository is then used to
 # create the based opam image used by the CI to compile tezos and to
 # generate the docker images.  From time to time, when it is necessary
-# to update a dependency, this repository should mannually
+# to update a dependency, this repository should manually
 # refreshed. This script takes care of generating a patch for the
 # private opam tezos repository. This patch must be applied manually
 # w.r.t. the master branch. The procedure is as follows :
 #
-# 1. Update the varialbe `full_opam_repository_tag` in `version.sh` to
+# 1. Update the variable `full_opam_repository_tag` in `version.sh` to
 #    a commit hash from the master branch of the official
 #    opam-repository. All the required packages will be extracted from
-#    this snapshot fo the repo.
+#    this snapshot to the repo.
 #
 # 2. Run this script, it will generate a file `opam_repo.patch`
 #
@@ -68,7 +68,7 @@ for opam in $opams; do
     ## HACK: For some reason, `opam admin list/filter` do not follow
     ## `--with-test/doc` for 'toplevel' package, only for their
     ## 'dependencies.  We want the exact opposite (like for `opam
-    ## install`), so we manually remove the tag the most
+    ## install`), so we manually remove the tag in the most
     ## ugliest-possible way...
 
     sed -e "s/{ *with-test *}//" \
