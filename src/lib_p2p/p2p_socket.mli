@@ -74,7 +74,7 @@ val authenticate:
     [P2P_io_scheduler.connection] into an [authenticated_connection] (auth
     correct, acceptation undecided). *)
 
-val kick: 'meta authenticated_connection -> unit Lwt.t
+val kick: 'meta authenticated_connection -> P2p_point.Id.t list -> unit Lwt.t
 (** (Low-level) (Cancelable) [kick afd] notifies the remote peer that
     we refuse this connection and then closes [afd]. Used in
     [P2p_connection_pool] to reject an [authenticated_connection] which we do
@@ -90,7 +90,7 @@ val accept:
     authenticated_connection. Used in [P2p_connection_pool], to promote an
     [authenticated_connection] to the status of an active peer. *)
 
-val check_binary_chunks_size:  int -> unit tzresult Lwt.t
+val check_binary_chunks_size: int -> unit tzresult Lwt.t
 (** Precheck for the [?binary_chunks_size] parameter of [accept]. *)
 
 (** {1 IO functions on connections} *)

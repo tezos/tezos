@@ -99,7 +99,7 @@ end
    bytes, whereas the option is set in kbytes. Also, since the default
    size is 64kB-1, it is actually impossible to set the default
    size using the option (the max is 63 kB). *)
-let check_binary_chunks_size  size =
+let check_binary_chunks_size size =
   let value = size - Crypto.extrabytes in
   fail_unless
     (value > 0 &&
@@ -347,7 +347,7 @@ module Reader = struct
       match status with
       | Success { result ; size ; stream } ->
           return_some (result, size, stream)
-      | Error _ ->
+      | Error _err ->
           lwt_debug "[read_message] incremental decoding error" >>= fun () ->
           return_none
       | Await decode_next_buf ->
