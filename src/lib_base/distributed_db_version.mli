@@ -32,6 +32,8 @@ val pp_name: Format.formatter -> name -> unit
 val name_encoding: name Data_encoding.t
 
 val chain_name: name
+val old_chain_name: name
+val incompatible_chain_name: name
 val sandboxed_chain_name: name
 
 (** An abstract version number for the high-level distributed_db messages. *)
