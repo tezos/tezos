@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,45 +24,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include (module type of (struct include Tezos_stdlib end))
-include (module type of (struct include Tezos_error_monad end))
-include (module type of (struct include Tezos_rpc end))
-include (module type of (struct include Tezos_clic end))
-include (module type of (struct include Tezos_crypto end))
+(** Distributed_db protocol version. *)
 
-module Data_encoding = Data_encoding
+type name = string
 
-module List : sig
-  include (module type of (struct include List end))
-  include (module type of (struct include Tezos_stdlib.TzList end))
-end
-module String : sig
-  include (module type of (struct include String end))
-  include (module type of (struct include Tezos_stdlib.TzString end))
-end
+let pp_name = Format.pp_print_string
+let name_encoding = Data_encoding.string
 
-module Time = Time
-module Fitness = Fitness
-module Block_header = Block_header
-module Operation = Operation
-module Protocol = Protocol
-module Test_chain_status = Test_chain_status
-module Preapply_result = Preapply_result
-module Block_locator = Block_locator
-module Mempool = Mempool
+let chain_name = "TEZOS_ZERONET_2019-04-02T14:55:17Z"
+let sandboxed_chain_name = "SANDBOXED_TEZOS"
 
-module P2p_addr = P2p_addr
-module P2p_identity = P2p_identity
-module P2p_peer = P2p_peer
-module P2p_point = P2p_point
-module P2p_connection = P2p_connection
-module P2p_stat = P2p_stat
-module P2p_version = P2p_version
+type t = int
 
-module Distributed_db_version = Distributed_db_version
-module Network_version = Network_version
+let pp = Format.pp_print_int
+let encoding = Data_encoding.uint16
 
-module Lwt_exit = Lwt_exit
+let zero = 0
 
-include (module type of (struct include Utils.Infix end))
-include (module type of (struct include Error_monad end))

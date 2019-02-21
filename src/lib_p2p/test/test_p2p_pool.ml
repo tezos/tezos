@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,7 +40,8 @@ let msg_config : message P2p_pool.message_config = {
       max_length = None ;
     } ;
   ] ;
-  versions =  P2p_version.[ { name = "TEST" ; major = 0 ; minor = 0 } ] ;
+  chain_name = Distributed_db_version.sandboxed_chain_name ;
+  distributed_db_versions = [ Distributed_db_version.zero ] ;
 }
 
 type metadata = unit

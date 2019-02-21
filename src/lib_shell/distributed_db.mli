@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -201,5 +202,6 @@ val commit_protocol:
 
 module Raw : sig
   val encoding: Message.t P2p.Raw.t Data_encoding.t
-  val supported_versions: P2p_version.t list
+  val chain_name: Distributed_db_version.name
+  val distributed_db_versions: Distributed_db_version.t list
 end

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2019 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -65,7 +65,7 @@ let init_p2p ?(sandboxed = false) p2p_params =
       let c_meta = init_connection_metadata None in
       lwt_log_notice Tag.DSL.(fun f ->
           f "P2P layer is disabled" -% t event "p2p_disabled") >>= fun () ->
-      return (P2p.faked_network peer_metadata_cfg c_meta)
+      return (P2p.faked_network Distributed_db_message.cfg peer_metadata_cfg c_meta)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
@@ -74,11 +74,7 @@ let init_p2p ?(sandboxed = false) p2p_params =
       let message_cfg =
         if sandboxed then
           { Distributed_db_message.cfg with
-            versions =
-              List.map
-                (fun v -> { v with P2p_version.name =
-                                     "SANDBOXED_" ^ v.P2p_version.name })
-                Distributed_db_message.cfg.versions }
+            chain_name = Distributed_db_version.sandboxed_chain_name }
         else
           Distributed_db_message.cfg in
       P2p.create
