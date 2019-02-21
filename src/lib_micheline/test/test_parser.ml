@@ -27,6 +27,8 @@
 (* Token value   *)
 (****************************************************************************)
 
+open Assert.Compat
+
 let assert_tokenize ~loc given expected =
   match Micheline_parser.tokenize given with
   | tokens, [] ->
@@ -454,9 +456,7 @@ let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick begin fun _ () ->
     f () >>= function
     | Ok () -> Lwt.return_unit
-    | Error err ->
-        Tezos_stdlib_unix.Logging_unix.close () >>= fun () ->
-        Lwt.fail_with (Format.asprintf "%a" pp_print_error err)
+    | Error err -> Lwt.fail_with err
   end
 
 let () =

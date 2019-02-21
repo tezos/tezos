@@ -1,12 +1,9 @@
 (executables
  (names test_parser)
- (libraries tezos-stdlib-unix
-	    tezos-micheline
+ (libraries tezos-micheline
             alcotest-lwt)
  (flags (:standard -w -9-32 -safe-string
-                   -open Tezos_base__TzPervasives
-		   -open Tezos_micheline
-		   -open Tezos_stdlib_unix)))
+                   -open Tezos_micheline)))
 
 (alias
   (name buildtest)
