@@ -1767,13 +1767,13 @@ A typing rule can be inferred:
     > IF_SOME / (Some a) : S  =>  bt / a : S
     > IF_SOME / (None) : S  =>  bf / S
 
--  ``SET_CAR``: Set the first value of a pair.
+-  ``SET_CAR``: Set the left field of a pair.
 
 ::
 
     > SET_CAR  =>  CDR ; SWAP ; PAIR
 
--  ``SET_CDR``: Set the second value of a pair.
+-  ``SET_CDR``: Set the right field of a pair.
 
 ::
 
@@ -1789,13 +1789,13 @@ A typing rule can be inferred:
     > SET_CD(\rest=[AD]+)R / S   =>
         { DUP ; DIP { CDR ; SET_C(\rest)R } ; CAR ; PAIR } / S
 
--  ``MAP_CAR`` code: Transform the first value of a pair.
+-  ``MAP_CAR`` code: Transform the left field of a pair.
 
 ::
 
     > MAP_CAR code  =>  DUP ; CDR ; DIP { CAR ; code } ; SWAP ; PAIR
 
--  ``MAP_CDR`` code: Transform the first value of a pair.
+-  ``MAP_CDR`` code: Transform the right field of a pair.
 
 ::
 
