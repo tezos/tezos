@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -52,9 +53,17 @@ type bounds = {
 type 'meta t
 (** Type of a maintenance worker. *)
 
-val run: bounds -> ('msg, 'meta, 'meta_conn) P2p_pool.t -> 'meta t
-(** [run ~greylist_timeout bounds pool] is a maintenance worker for
-    [pool] with connection targets specified in [bounds]. *)
+val create:
+  ?discovery:P2p_discovery.t ->
+  bounds ->
+  ('msg, 'meta, 'meta_conn) P2p_pool.t ->
+  'meta t
+(** [run ?discovery bounds pool] returns a maintenance worker, with
+    the [discovery] worker if present, for [pool] with connection targets
+    specified in [bounds]. *)
+
+val activate: 'meta t -> unit
+(** [activate t] start the worker that will maintain connections *)
 
 val maintain: 'meta t -> unit Lwt.t
 (** [maintain t] gives a hint to maintenance worker [t] that

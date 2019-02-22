@@ -58,7 +58,7 @@ val create:
     max upload (resp. download) speed, and specified read
     (resp. write) queue sizes (in bytes) for connections. *)
 
-val register: t -> Lwt_unix.file_descr -> connection
+val register: t -> P2p_fd.t -> connection
 (** [register sched fd] is a [connection] managed by [sched]. *)
 
 val write: connection -> MBytes.t -> unit tzresult Lwt.t
@@ -92,7 +92,7 @@ val global_stat: t -> P2p_stat.t
 (** [global_stat sched] is a snapshot of [sched]'s bandwidth usage
     (sum of [stat conn] for each [conn] in [sched]). *)
 
-val iter_connection: t -> (int -> connection -> unit) -> unit
+val iter_connection: t -> (connection -> unit) -> unit
 (** [iter_connection sched f] applies [f] on each connection managed
     by [sched]. *)
 
@@ -104,3 +104,5 @@ val shutdown: ?timeout:float -> t -> unit Lwt.t
 (** [shutdown sched] returns after all connections managed by [sched]
     have been closed and [sched]'s inner worker has successfully
     canceled. *)
+
+val id : connection -> int

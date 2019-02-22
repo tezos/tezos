@@ -11,6 +11,7 @@ depends: [
   "tezos-data-encoding"
   "tezos-error-monad"
   "uutf"
+  "alcotest-lwt" { with-test }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]

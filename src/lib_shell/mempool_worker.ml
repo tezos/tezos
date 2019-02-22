@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -45,24 +46,31 @@ module type T = sig
     | Refused of error list
     | Duplicate
     | Not_in_branch
+  val result_encoding : result Data_encoding.t
 
   (** Creates/tear-down a new mempool validator context. *)
-  val create : limits -> Distributed_db.chain_db -> t Lwt.t
+  val create : limits -> Distributed_db.chain_db -> t tzresult Lwt.t
   val shutdown : t -> unit Lwt.t
 
   (** parse a new operation and add it to the mempool context *)
-  val parse : t -> Operation.t -> operation tzresult Lwt.t
+  val parse : Operation.t -> operation tzresult
 
   (** validate a new operation and add it to the mempool context *)
   val validate : t -> operation -> result tzresult Lwt.t
 
-  val chain_db : t -> Distributed_db.chain_db tzresult
+  val chain_db : t -> Distributed_db.chain_db
 
   val rpc_directory : t RPC_directory.t
 
 end
 
-module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
+module type STATIC = sig
+  val max_size_parsed_cache: int
+end
+
+module Make(Static: STATIC)(Proto: Registered_protocol.T)
+  : T with module Proto = Proto
+= struct
 
   module Proto = Proto
 
@@ -118,6 +126,14 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
           (fun () -> Not_in_branch) ;
       ]
 
+  let pp_result ppf = function
+    | Applied _ -> Format.pp_print_string ppf "applied"
+    | Branch_delayed _ -> Format.pp_print_string ppf "branch delayed"
+    | Branch_refused _ -> Format.pp_print_string ppf "branch refused"
+    | Refused _ -> Format.pp_print_string ppf "refused"
+    | Duplicate -> Format.pp_print_string ppf "duplicate"
+    | Not_in_branch -> Format.pp_print_string ppf "not in branch"
+
   let operation_encoding =
     let open Data_encoding in
     conv
@@ -135,23 +151,20 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
     end)
 
   module Name = struct
-    type t = Chain_id.t * Protocol_hash.t
-    let encoding =
-      Data_encoding.tup2
-        Chain_id.encoding
-        Protocol_hash.encoding
-    let base = [ "validator.mempool" ]
-    let pp fmt (chain_id, proto_hash) =
-      Chain_id.pp_short fmt chain_id;
-      Format.pp_print_string fmt ".";
-      Protocol_hash.pp_short fmt proto_hash
+    type t = Chain_id.t
+    let encoding = Chain_id.encoding
+    let base =
+      let proto_hash =
+        let _: string = Format.flush_str_formatter () in
+        Format.fprintf Format.str_formatter "%a" Protocol_hash.pp Proto.hash;
+        Format.flush_str_formatter () in
+      [ "node"; "mempool"; "worker"; proto_hash ]
+    let pp = Chain_id.pp_short
   end
 
   module Request = struct
 
-    type 'a t =
-      | Parse : Operation.t -> operation t
-      | Validate : operation -> result t
+    type 'a t = Validate : operation -> result t [@@ocaml.unboxed]
 
     type view = View : _ t -> view
 
@@ -159,32 +172,13 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
 
     let encoding =
       let open Data_encoding in
-      union
-        [ case (Tag 0)
-            ~title:"Parsed_operation"
-            (* XXX:  can't I use operation_encoding defined above ? *)
-            (obj3
-               (req "hash" Operation_hash.encoding)
-               (req "raw" Operation.encoding)
-               (req "protocol_data" Proto.operation_data_encoding))
-            (function
-              | View (Validate { hash ; raw ; protocol_data }) ->
-                  Some ( hash, raw, protocol_data )
-              | _ -> None)
-            (fun ( hash, raw, protocol_data ) ->
-               View (Validate { hash ; raw ; protocol_data })) ;
-          case (Tag 1)
-            ~title:"Raw operation"
-            Operation.encoding
-            (function | View (Parse op) -> Some op | _ -> None)
-            (fun op -> View (Parse op))
-        ]
+      conv
+        (fun (View (Validate op)) -> op)
+        (fun op -> View (Validate op))
+        operation_encoding
 
-    let pp ppf = function
-      | View (Parse op) ->
-          Format.fprintf ppf "New raw operation %a" Operation.pp op
-      | View (Validate { hash }) ->
-          Format.fprintf ppf "New parsed operation hash %a" Operation_hash.pp hash
+    let pp ppf (View (Validate { hash })) =
+      Format.fprintf ppf "Validating new operation %a" Operation_hash.pp hash
   end
 
   module Event = struct
@@ -225,68 +219,85 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
       | Debug msg -> Format.fprintf ppf "%s" msg
       | Request (view, { pushed ; treated ; completed }, None)  ->
           Format.fprintf ppf
-            "@[<v 0>%a@,\
-             Pushed: %a, Treated: %a, Completed: %a@]"
+            "@[<v 0>%a@,Pushed: %a, Treated: %a, Completed: %a@]"
             Request.pp view
             Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
       | Request (view, { pushed ; treated ; completed }, Some errors)  ->
           Format.fprintf ppf
-            "@[<v 0>%a@,\
-             Pushed: %a, Treated: %a, Failed: %a@,\
-             %a@]"
+            "@[<v 0>%a@,Pushed: %a, Treated: %a, Failed: %a@,Errors: %a@]"
             Request.pp view
             Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
             (Format.pp_print_list Error_monad.pp) errors
   end
 
-  (* operations' cache. used for memoization *)
-  module Cache = struct
+  (* parsed operations' cache. used for memoization *)
+  module ParsedCache = struct
 
     type t = {
-      operations : result Operation_hash.Table.t ;
-      parsed_operations : operation tzresult Operation_hash.Table.t ;
+      table: operation tzresult Operation_hash.Table.t ;
+      ring: Operation_hash.t Ring.t ;
     }
+
+    let create () : t = {
+      table = Operation_hash.Table.create Static.max_size_parsed_cache ;
+      ring = Ring.create Static.max_size_parsed_cache ;
+    }
+
+    let add t raw_op parsed_op =
+      let hash = Operation.hash raw_op in
+      Option.iter
+        ~f:(Operation_hash.Table.remove t.table)
+        (Ring.add_and_return_erased t.ring hash);
+      Operation_hash.Table.replace t.table hash parsed_op
+
+    let find_opt t raw_op =
+      let hash = Operation.hash raw_op in
+      Operation_hash.Table.find_opt t.table hash
+
+    let find_hash_opt t hash =
+      Operation_hash.Table.find_opt t.table hash
+
+    let rem t hash =
+      (* NOTE: hashes are not removed from the ring. As a result, the cache size
+       * bound can be lowered. This is a non-issue because it's only a cache. *)
+      Operation_hash.Table.remove t.table hash
+
+  end
+
+  (* validated operations' cache. used for memoization *)
+  module ValidatedCache = struct
+
+    type t = (result * Operation.t) Operation_hash.Table.t
 
     let encoding =
       let open Data_encoding in
-      conv
-        (fun { operations ; parsed_operations } -> (operations, parsed_operations))
-        (fun (operations, parsed_operations) -> { operations ; parsed_operations })
-        (obj2
-           (req "operations" (Operation_hash.Table.encoding result_encoding))
-           (req "parsed_operations"
-              (Operation_hash.Table.encoding
-                 (Error_monad.result_encoding operation_encoding)))
+      Operation_hash.Table.encoding (
+        tup2
+          result_encoding
+          Operation.encoding
+      )
+
+    let pp break ppf table =
+      let open Format in
+      Operation_hash.Table.iter
+        (fun h (r, _) ->
+           fprintf ppf "Operation %a: %a"
+             Operation_hash.pp_short h
+             pp_result r;
+           break ppf
         )
+        table
 
-    let create () =
-      { operations = Operation_hash.Table.create 1000 ;
-        parsed_operations = Operation_hash.Table.create 1000
-      }
+    let create () = Operation_hash.Table.create 1000
 
-    let add_validated t parsed_op result =
-      Operation_hash.Table.replace t.operations parsed_op.hash result
+    let add t parsed_op result =
+      Operation_hash.Table.replace t parsed_op.hash result
 
-    let add_parsed t raw_op parsed_op =
-      let hash = Operation.hash raw_op in
-      Operation_hash.Table.replace t.parsed_operations hash parsed_op
+    let find_opt t parsed_op =
+      Operation_hash.Table.find_opt t parsed_op.hash
 
-    let mem_validated t parsed_op =
-      Operation_hash.Table.mem t.operations parsed_op.hash
-
-    let mem_parsed t raw_op =
-      let hash = Operation.hash raw_op in
-      Operation_hash.Table.mem t.parsed_operations hash
-
-    let find_validated_opt t parsed_op =
-      Operation_hash.Table.find_opt t.operations parsed_op.hash
-
-    let find_parsed_opt t raw_op =
-      let hash = Operation.hash raw_op in
-      Operation_hash.Table.find_opt t.parsed_operations hash
-
-    let iter_validated f t =
-      Operation_hash.Table.iter f t.operations
+    let iter f t =
+      Operation_hash.Table.iter f t
 
     let to_mempool t =
       let empty = {
@@ -303,48 +314,42 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
             op.Operation.proto in
         { Proto.shell = op.shell ; protocol_data } in
       Operation_hash.Table.fold
-        (fun hash result acc ->
-           match Operation_hash.Table.find_opt t.parsed_operations hash with
-           (* XXX this invariant should be better enforced *)
-           | None | Some (Error _) -> assert false
-           | Some (Ok op) -> begin
-               match result with
-               | Applied _ -> {
-                   acc with
-                   Proto_services.Mempool.applied =
-                     (hash, map_op op.raw)::acc.Proto_services.Mempool.applied
-                 }
-               | Branch_refused err -> {
-                   acc with
-                   Proto_services.Mempool.branch_refused =
-                     Operation_hash.Map.add
-                       hash
-                       (map_op op.raw,err)
-                       acc.Proto_services.Mempool.branch_refused
-                 }
-               | Branch_delayed err -> {
-                   acc with
-                   Proto_services.Mempool.branch_delayed =
-                     Operation_hash.Map.add
-                       hash
-                       (map_op op.raw,err)
-                       acc.Proto_services.Mempool.branch_delayed
-                 }
-               | Refused err -> {
-                   acc with
-                   Proto_services.Mempool.refused =
-                     Operation_hash.Map.add
-                       hash
-                       (map_op op.raw,err)
-                       acc.Proto_services.Mempool.refused
-                 }
-               | _ -> acc
-             end)
-        t.operations empty
+        (fun hash (result,raw_op) acc ->
+           let proto_op = map_op raw_op in
+           match result with
+           | Applied _ -> {
+               acc with
+               Proto_services.Mempool.applied =
+                 (hash, proto_op)::acc.Proto_services.Mempool.applied
+             }
+           | Branch_refused err -> {
+               acc with
+               Proto_services.Mempool.branch_refused =
+                 Operation_hash.Map.add
+                   hash
+                   (proto_op,err)
+                   acc.Proto_services.Mempool.branch_refused
+             }
+           | Branch_delayed err -> {
+               acc with
+               Proto_services.Mempool.branch_delayed =
+                 Operation_hash.Map.add
+                   hash
+                   (proto_op,err)
+                   acc.Proto_services.Mempool.branch_delayed
+             }
+           | Refused err -> {
+               acc with
+               Proto_services.Mempool.refused =
+                 Operation_hash.Map.add
+                   hash
+                   (proto_op,err)
+                   acc.Proto_services.Mempool.refused
+             }
+           | _ -> acc
+        ) t empty
 
-    let clear t =
-      Operation_hash.Table.clear t.operations;
-      Operation_hash.Table.clear t.parsed_operations
+    let clear t = Operation_hash.Table.clear t
 
   end
 
@@ -352,16 +357,17 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
 
     type parameters = {
       limits : limits ;
-      chain_db : Distributed_db.chain_db
+      chain_db : Distributed_db.chain_db ;
+      validation_state : Proto.validation_state ;
     }
 
     (* internal worker state *)
-    type worker_state =
+    type state =
       {
         (* state of the validator. this is updated at each apply_operation *)
         mutable validation_state : Proto.validation_state ;
 
-        cache : Cache.t ;
+        cache : ValidatedCache.t ;
 
         (* live blocks and operations, initialized at worker launch *)
         live_blocks : Block_hash.Set.t ;
@@ -375,25 +381,25 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
 
         parameters : parameters ;
       }
-    type state = worker_state tzresult
 
-    type worker_view = { cache : Cache.t }
-    type view = worker_view tzresult
+    type view = { cache : ValidatedCache.t }
 
-    let view (state : state) _ : view =
-      state >|? fun state -> { cache = state.cache }
+    let view (state : state) _ : view = { cache = state.cache }
 
     let encoding =
       let open Data_encoding in
-      Error_monad.result_encoding (
-        conv
-          (fun { cache } -> cache)
-          (fun cache -> { cache })
-          Cache.encoding
-      )
+      conv
+        (fun { cache } -> cache)
+        (fun cache -> { cache })
+        ValidatedCache.encoding
 
-    let pp ppf _view =
-      Format.fprintf ppf "lots of operations"
+    let pp ppf { cache } =
+      ValidatedCache.pp
+        (fun ppf ->
+           Format.pp_print_string ppf ";";
+           Format.pp_print_space ppf ())
+        ppf
+        cache
 
   end
 
@@ -402,6 +408,8 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
   open Types
 
   type t = Worker.infinite Worker.queue Worker.t
+
+  let parsed_cache = ParsedCache.create ()
 
   let debug w =
     Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
@@ -468,80 +476,70 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
 
   (*** end prevalidation ***)
 
-  let parse_helper (_ : t) raw_op =
+  let parse_helper raw_op =
     let hash = Operation.hash raw_op in
     let size = Data_encoding.Binary.length Operation.encoding raw_op in
     if size > Proto.max_operation_data_length then
-      fail (Oversized_operation
-              { size ; max = Proto.max_operation_data_length })
+      error (Oversized_operation
+               { size ; max = Proto.max_operation_data_length })
     else
       match Data_encoding.Binary.of_bytes
               Proto.operation_data_encoding
               raw_op.Operation.proto with
-      | None -> fail Parse_error
+      | None -> error Parse_error
       | Some protocol_data ->
-          return { hash ; raw = raw_op ; protocol_data }
+          ok { hash ; raw = raw_op ; protocol_data }
 
   (* this function update the internal state of the worker *)
   let validate_helper w parsed_op =
-    Lwt.return (Worker.state w) >>=? fun state ->
-    apply_operation state parsed_op >>= fun (validation_state,result) ->
+    let state = Worker.state w in
+    apply_operation state parsed_op >>= fun (validation_state, result) ->
     begin
       match validation_state with
       | Some validation_state -> state.validation_state <- validation_state
       | None -> ()
     end ;
-    return result
+    Lwt.return result
 
   let notify_helper w result { Operation.shell ; proto } =
-    match Worker.state w with
+    let state = Worker.state w in
     (* this function is called by on_validate where we take care of the error *)
-    | Error _err -> ()
-    | Ok state ->
-        let protocol_data =
-          Data_encoding.Binary.of_bytes_exn
-            Proto.operation_data_encoding
-            proto in
-        Lwt_watcher.notify state.operation_stream (result, shell, protocol_data)
+    let protocol_data =
+      Data_encoding.Binary.of_bytes_exn
+        Proto.operation_data_encoding
+        proto in
+    Lwt_watcher.notify state.operation_stream (result, shell, protocol_data)
 
   (* memoization is done only at on_* level *)
   let on_validate w parsed_op =
-    Lwt.return (Worker.state w) >>=? fun state ->
-    match Cache.find_validated_opt state.cache parsed_op with
-    | None | Some (Branch_delayed _) ->
-        validate_helper w parsed_op >>=? fun result ->
-        Cache.add_validated state.cache parsed_op result;
+    let state = Worker.state w in
+    match ValidatedCache.find_opt state.cache parsed_op with
+    | None | Some ((Branch_delayed _),_) ->
+        validate_helper w parsed_op >>= fun result ->
+        ValidatedCache.add state.cache parsed_op (result, parsed_op.raw);
         (* operations are notified only the first time *)
         notify_helper w result parsed_op.raw ;
-        return result
-    | Some result -> return result
-
-  let on_parse w raw_op =
-    Lwt.return (Worker.state w) >>=? fun state ->
-    match Cache.find_parsed_opt state.cache raw_op with
-    | None ->
-        parse_helper w raw_op >>= fun parsed_op ->
-        Cache.add_parsed state.cache raw_op parsed_op;
-        Lwt.return parsed_op
-    | Some parsed_op -> Lwt.return parsed_op
+        Lwt.return result
+    | Some (result,_) -> Lwt.return result
 
   (* worker's handlers *)
   let on_request :
     type r. t -> r Request.t -> r tzresult Lwt.t = fun w request ->
     match request with
-    | Request.Parse raw_op -> on_parse w raw_op
-    | Request.Validate parsed_op -> on_validate w parsed_op
+    | Request.Validate parsed_op -> on_validate w parsed_op >>= return
 
-  let on_launch (_ : t) (_ : Name.t) ( { chain_db } as parameters ) =
+  let on_launch (_ : t) (_ : Name.t) ( { chain_db ; validation_state } as parameters ) =
     let chain_state = Distributed_db.chain_state chain_db in
-    Chain.data chain_state >>= fun
-      { current_head = predecessor ; current_mempool = _mempool ;
-        live_blocks ; live_operations } ->
-    let timestamp = Time.now () in
-    create ~predecessor ~timestamp () >>=? fun validation_state ->
+    Chain.data chain_state >>= fun {
+      current_mempool = _mempool ;
+      live_blocks ; live_operations } ->
+    (* remove all operations that are already included *)
+    Operation_hash.Set.iter (fun hash ->
+        ParsedCache.rem parsed_cache hash
+      ) live_operations;
     return {
       validation_state ;
-      cache = Cache.create () ;
+      cache = ValidatedCache.create () ;
       live_blocks ;
       live_operations ;
       operation_stream = Lwt_watcher.create_input ();
@@ -549,16 +547,14 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
     }
 
   let on_close w =
-    match Worker.state w with
-    | Error _err -> Lwt.return_unit
-    | Ok state ->
-        Lwt_watcher.shutdown_input state.operation_stream;
-        Cache.iter_validated (fun hash _ ->
-            Distributed_db.Operation.clear_or_cancel
-              state.parameters.chain_db hash)
-          state.cache ;
-        Cache.clear state.cache;
-        Lwt.return_unit
+    let state = Worker.state w in
+    Lwt_watcher.shutdown_input state.operation_stream;
+    ValidatedCache.iter (fun hash _ ->
+        Distributed_db.Operation.clear_or_cancel
+          state.parameters.chain_db hash)
+      state.cache ;
+    ValidatedCache.clear state.cache;
+    Lwt.return_unit
 
   let on_error w r st errs =
     Worker.record_event w (Event.Request (r, st, Some errs)) ;
@@ -575,7 +571,6 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
     let chain_id = State.Chain.id chain_state in
     let module Handlers = struct
       type self = t
-
       let on_launch = on_launch
       let on_close = on_close
       let on_error = on_error
@@ -583,11 +578,14 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
       let on_no_request _ = return_unit
       let on_request = on_request
     end in
+    Chain.data chain_state >>= fun { current_head = predecessor } ->
+    let timestamp = Time.now () in
+    create ~predecessor ~timestamp () >>=? fun validation_state ->
     Worker.launch
       table
       limits.worker_limits
-      (chain_id, Proto.hash)
-      { limits ; chain_db }
+      chain_id
+      { limits ; chain_db ; validation_state }
       (module Handlers)
 
   (* Exporting functions *)
@@ -595,12 +593,18 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
   let validate t parsed_op =
     Worker.push_request_and_wait t (Request.Validate parsed_op)
 
-  let parse t op =
-    Worker.push_request_and_wait t (Request.Parse op)
+  (* atomic parse + memoization *)
+  let parse raw_op =
+    begin match ParsedCache.find_opt parsed_cache raw_op with
+      | None ->
+          let parsed_op = parse_helper raw_op in
+          ParsedCache.add parsed_cache raw_op parsed_op;
+          parsed_op
+      | Some parsed_op -> parsed_op
+    end
 
   let chain_db t =
     let state = Worker.state t in
-    state >|? fun state ->
     state.parameters.chain_db
 
   let pending_rpc_directory : t RPC_directory.t =
@@ -608,9 +612,8 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
       RPC_directory.empty
       (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
       (fun w () () ->
-         match Worker.state w with
-         | Error err -> RPC_answer.fail err
-         | Ok state -> RPC_answer.return (Cache.to_mempool state.cache)
+         let state = Worker.state w in
+         RPC_answer.return (ValidatedCache.to_mempool state.cache)
       )
 
   let monitor_rpc_directory : t RPC_directory.t =
@@ -618,24 +621,22 @@ module Make(Proto: Registered_protocol.T) : T with module Proto = Proto = struct
       RPC_directory.empty
       (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
       (fun w params () ->
-         match Worker.state w with
-         | Error err -> RPC_answer.fail err
-         | Ok state ->
-             let filter_result = function
-               | Applied _ -> params#applied
-               | Refused _ -> params#branch_refused
-               | Branch_refused _ -> params#refused
-               | Branch_delayed _ -> params#branch_delayed
-               | _ -> false in
+         let state = Worker.state w in
+         let filter_result = function
+           | Applied _ -> params#applied
+           | Refused _ -> params#branch_refused
+           | Branch_refused _ -> params#refused
+           | Branch_delayed _ -> params#branch_delayed
+           | _ -> false in
 
-             let op_stream, stopper = Lwt_watcher.create_stream state.operation_stream in
-             let shutdown () = Lwt_watcher.shutdown stopper in
-             let next () =
-               Lwt_stream.get op_stream >>= function
-               | Some (kind, shell, protocol_data) when filter_result kind ->
-                   Lwt.return_some [ { Proto.shell ; protocol_data } ]
-               | _ -> Lwt.return_none in
-             RPC_answer.return_stream { next ; shutdown }
+         let op_stream, stopper = Lwt_watcher.create_stream state.operation_stream in
+         let shutdown () = Lwt_watcher.shutdown stopper in
+         let next () =
+           Lwt_stream.get op_stream >>= function
+           | Some (kind, shell, protocol_data) when filter_result kind ->
+               Lwt.return_some [ { Proto.shell ; protocol_data } ]
+           | _ -> Lwt.return_none in
+         RPC_answer.return_stream { next ; shutdown }
       )
 
   (* /mempool/<chain_id>/pending

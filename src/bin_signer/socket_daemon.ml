@@ -36,6 +36,24 @@ let handle_client ?magic_bytes ~check_high_watermark ~require_auth cctxt fd =
       Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
       Lwt_unix.close fd >>= fun () ->
       return_unit
+  | Deterministic_nonce req ->
+      let encoding = result_encoding Deterministic_nonce.Response.encoding in
+      Handler.deterministic_nonce cctxt req ~require_auth >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
+      Lwt_unix.close fd >>= fun () ->
+      return_unit
+  | Deterministic_nonce_hash req ->
+      let encoding = result_encoding Deterministic_nonce_hash.Response.encoding in
+      Handler.deterministic_nonce_hash cctxt req ~require_auth >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
+      Lwt_unix.close fd >>= fun () ->
+      return_unit
+  | Supports_deterministic_nonces req ->
+      let encoding = result_encoding Supports_deterministic_nonces.Response.encoding in
+      Handler.supports_deterministic_nonces cctxt req >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
+      Lwt_unix.close fd >>= fun () ->
+      return_unit
   | Public_key pkh ->
       let encoding = result_encoding Public_key.Response.encoding in
       Handler.public_key cctxt pkh >>= fun res ->
@@ -65,11 +83,13 @@ let run (cctxt : #Client_context.wallet) path ?magic_bytes ~check_high_watermark
             -% s host_name host
             -% s service_name service)
     | Unix path ->
-        Sys.set_signal Sys.sigint (Signal_handle begin fun _ ->
-            Format.printf "Removing the local socket file and quitting.@." ;
-            Unix.unlink path ;
-            exit 0
-          end) ;
+        ListLabels.iter Sys.[sigint ; sigterm] ~f:begin fun signal ->
+          Sys.set_signal signal (Signal_handle begin fun _ ->
+              Format.printf "Removing the local socket file and quitting.@." ;
+              Unix.unlink path ;
+              exit 0
+            end)
+        end ;
         log Tag.DSL.(fun f ->
             f "Accepting UNIX requests on %s"
             -% t event "accepting_unix_requests"

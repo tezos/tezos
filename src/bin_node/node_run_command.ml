@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -77,18 +78,6 @@ let context_dir data_dir = data_dir // "context"
 let protocol_dir data_dir = data_dir // "protocol"
 let lock_file data_dir = data_dir // "lock"
 
-let find_log_rules default =
-  match Option.try_with (fun () -> Sys.getenv "TEZOS_LOG"),
-        Option.try_with (fun () -> Sys.getenv "LWT_LOG")
-  with
-  | Some rules, None -> "environment variable TEZOS_LOG", Some rules
-  | None, Some rules -> "environment variable LWT_LOG", Some rules
-  | None, None -> "configuration file", default
-  | Some rules, Some _ ->
-      warn "Both environment variables TEZOS_LOG and LWT_LOG \
-            defined, using TEZOS_LOG." ;
-      "environment varible TEZOS_LOG", Some rules
-
 let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   let patch_context json ctxt =
     begin
@@ -131,6 +120,18 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   end >>= fun sandbox_param ->
   (* TODO "WARN" when pow is below our expectation. *)
   begin
+    match config.p2p.discovery_addr with
+    | None ->
+        lwt_log_notice "No local peer discovery." >>= fun () ->
+        return (None, None)
+    | Some addr ->
+        Node_config_file.resolve_discovery_addrs addr >>= function
+        | [] ->
+            failwith "Cannot resolve P2P discovery address: %S" addr
+        | (addr, port) :: _ ->
+            return (Some addr, Some port)
+  end >>=? fun (discovery_addr, discovery_port) ->
+  begin
     match config.p2p.listen_addr with
     | None ->
         lwt_log_notice "Not listening to P2P calls." >>= fun () ->
@@ -161,6 +162,8 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
         let p2p_config : P2p.config =
           { listening_addr ;
             listening_port ;
+            discovery_addr ;
+            discovery_port ;
             trusted_points ;
             peers_file =
               (config.data_dir // "peers.json") ;
@@ -169,6 +172,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
             proof_of_work_target =
               Crypto_box.make_target config.p2p.expected_pow ;
             disable_mempool = config.p2p.disable_mempool ;
+            trust_discovered_peers = (sandbox_param <> None) ;
           }
         in
         return_some (p2p_config, config.p2p.limits)

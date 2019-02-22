@@ -33,12 +33,22 @@ module Make(P : sig
     val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
   end) = struct
 
-  let sign ?watermark path pkh msg =
-    let msg =
-      match watermark with
-      | None -> msg
-      | Some watermark ->
-          MBytes.concat "" [ Signature.bytes_of_watermark watermark ; msg ] in
+  type request_type =
+    | Sign_request
+    | Deterministic_nonce_request
+    | Deterministic_nonce_hash_request
+
+  let build_request pkh data signature = function
+    | Sign_request ->
+        Request.Sign { Sign.Request.pkh ; data ; signature }
+    | Deterministic_nonce_request ->
+        Request.Deterministic_nonce
+          { Deterministic_nonce.Request.pkh ; data ; signature }
+    | Deterministic_nonce_hash_request ->
+        Request.Deterministic_nonce_hash
+          { Deterministic_nonce_hash.Request.pkh ; data ; signature }
+
+  let signer_operation path pkh msg request_type =
     begin
       Lwt_utils_unix.Socket.connect path >>=? fun conn ->
       Lwt_utils_unix.Socket.send
@@ -55,12 +65,43 @@ module Make(P : sig
             return_some signature
       end
     end >>=? fun signature ->
-    let req = { Sign.Request.pkh ; data = msg ; signature } in
     Lwt_utils_unix.Socket.connect path >>=? fun conn ->
-    Lwt_utils_unix.Socket.send
-      conn Request.encoding (Request.Sign req) >>=? fun () ->
+    let req = build_request pkh msg signature request_type in
+    Lwt_utils_unix.Socket.send conn Request.encoding req >>=? fun () ->
+    return conn
+
+  let sign ?watermark path pkh msg =
+    let msg =
+      match watermark with
+      | None -> msg
+      | Some watermark ->
+          MBytes.concat "" [ Signature.bytes_of_watermark watermark ; msg ] in
+    signer_operation path pkh msg Sign_request >>=? fun conn ->
     Lwt_utils_unix.Socket.recv conn
       (result_encoding Sign.Response.encoding) >>=? fun res ->
+    Lwt_unix.close conn >>= fun () ->
+    Lwt.return res
+
+  let deterministic_nonce path pkh msg =
+    signer_operation path pkh msg Deterministic_nonce_request >>=? fun conn ->
+    Lwt_utils_unix.Socket.recv conn
+      (result_encoding Deterministic_nonce.Response.encoding) >>=? fun res ->
+    Lwt_unix.close conn >>= fun () ->
+    Lwt.return res
+
+  let deterministic_nonce_hash path pkh msg =
+    signer_operation path pkh msg Deterministic_nonce_hash_request >>=? fun conn ->
+    Lwt_utils_unix.Socket.recv conn
+      (result_encoding Deterministic_nonce_hash.Response.encoding) >>=? fun res ->
+    Lwt_unix.close conn >>= fun () ->
+    Lwt.return res
+
+  let supports_deterministic_nonces path pkh =
+    Lwt_utils_unix.Socket.connect path >>=? fun conn ->
+    Lwt_utils_unix.Socket.send
+      conn Request.encoding (Request.Supports_deterministic_nonces pkh) >>=? fun () ->
+    Lwt_utils_unix.Socket.recv conn
+      (result_encoding Supports_deterministic_nonces.Response.encoding) >>=? fun res ->
     Lwt_unix.close conn >>= fun () ->
     Lwt.return res
 
@@ -93,20 +134,32 @@ module Make(P : sig
           Lwt.return (Signature.Public_key_hash.of_b58check key) >>=? fun key ->
           return (Lwt_utils_unix.Socket.Unix (Uri.path uri), key)
 
-    let public_key uri =
+    let public_key ?interactive:(_) uri =
       parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) ->
       public_key path pkh
 
     let neuterize uri =
       return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
 
-    let public_key_hash uri =
+    let public_key_hash ?interactive:(_) uri =
       public_key uri >>=? fun pk ->
       return (Signature.Public_key.hash pk, Some pk)
 
     let sign ?watermark uri msg =
       parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
       sign ?watermark path pkh msg
+
+    let deterministic_nonce uri msg =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      deterministic_nonce path pkh msg
+
+    let deterministic_nonce_hash uri msg =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      deterministic_nonce_hash path pkh msg
+
+    let supports_deterministic_nonces uri =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      supports_deterministic_nonces path pkh
 
   end
 
@@ -139,20 +192,32 @@ module Make(P : sig
           return (Lwt_utils_unix.Socket.Tcp (path, string_of_int port,
                                              [Lwt_unix.AI_SOCKTYPE SOCK_STREAM]), pkh)
 
-    let public_key uri =
+    let public_key ?interactive:(_) uri =
       parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) ->
       public_key path pkh
 
     let neuterize uri =
       return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
 
-    let public_key_hash uri =
-      public_key uri >>=? fun pk ->
+    let public_key_hash ?interactive uri =
+      public_key ?interactive uri >>=? fun pk ->
       return (Signature.Public_key.hash pk, Some pk)
 
     let sign ?watermark uri msg =
       parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
       sign ?watermark path pkh msg
+
+    let deterministic_nonce uri msg =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      deterministic_nonce path pkh msg
+
+    let deterministic_nonce_hash uri msg =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      deterministic_nonce_hash path pkh msg
+
+    let supports_deterministic_nonces uri =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (path, pkh) ->
+      supports_deterministic_nonces path pkh
 
   end
 

@@ -1,0 +1,18 @@
+(library
+ (name tezos_validation)
+ (public_name tezos-validation)
+ (libraries tezos-base
+	    tezos-storage
+	    tezos-shell-services
+	    tezos-protocol-updater)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+		   -open Tezos_storage
+		   -open Tezos_shell_services
+		   -open Tezos_protocol_updater)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

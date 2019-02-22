@@ -285,3 +285,9 @@ let generate_key ?(seed=Rand.generate 32) () =
   let pk = Key.neuterize_exn context sk in
   let pkh = Public_key.hash pk in
   pkh, pk, sk
+
+let deterministic_nonce sk msg =
+  Hacl.Hash.SHA256.HMAC.digest ~key: (Secret_key.to_bytes sk) ~msg
+
+let deterministic_nonce_hash sk msg =
+  Blake2B.to_bytes (Blake2B.hash_bytes [deterministic_nonce sk msg])

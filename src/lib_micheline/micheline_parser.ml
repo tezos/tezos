@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -235,7 +236,7 @@ let tokenize source =
         begin match uchar_to_char c with
           | Some ('0'.. '9') -> integer acc start
           | Some 'x' -> bytes acc start
-          | Some ('a' | 'c'..'w' | 'y' | 'z' | 'A'..'Z') ->
+          | Some ('a'..'w' | 'y' | 'z' | 'A'..'Z') ->
               errors := Missing_break_after_number stop :: !errors ;
               back charloc ;
               skip (tok start stop (Int "0") :: acc)
@@ -680,9 +681,9 @@ and do_check ?(toplevel = false) errors = function
 
 let parse_expression ?check tokens =
   let result = match tokens with
-    | ({ token = Open_paren } as token) :: { token = Ident name } :: { token = Annot _ } :: rest ->
+    | ({ token = Open_paren } as token) :: { token = Ident name } :: { token = Annot annot } :: rest ->
         let annots, rest = annots rest in
-        let mode = Wrapped (token, name, [], annots) in
+        let mode = Wrapped (token, name, [], annot :: annots) in
         parse ?check [] rest [ mode ; Expression None ]
     | ({ token = Open_paren } as token) :: { token = Ident name } :: rest ->
         let mode = Wrapped (token, name, [], []) in

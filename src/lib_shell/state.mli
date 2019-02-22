@@ -291,7 +291,7 @@ val init:
   store_root:string ->
   context_root:string ->
   Chain.genesis ->
-  (global_state * Chain.t) tzresult Lwt.t
+  (global_state * Chain.t * Context.index) tzresult Lwt.t
 
 val close:
   global_state -> unit Lwt.t

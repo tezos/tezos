@@ -162,8 +162,10 @@ module Public_key_hash = struct
 
   let path_length =
     let l1 = Ed25519.Public_key_hash.path_length
-    and l2 = Secp256k1.Public_key_hash.path_length in
+    and l2 = Secp256k1.Public_key_hash.path_length
+    and l3 = P256.Public_key_hash.path_length in
     assert Compare.Int.(l1 = l2) ;
+    assert Compare.Int.(l1 = l3) ;
     1 + l1
 
   let prefix_path _ = assert false (* unused *)
@@ -599,3 +601,15 @@ let generate_key ?(algo = Ed25519) ?seed () =
       let pkh, pk, sk = P256.generate_key ?seed () in
       (Public_key_hash.P256 pkh,
        Public_key.P256 pk, Secret_key.P256 sk)
+
+let deterministic_nonce sk msg =
+  match sk with
+  | Secret_key.Ed25519 sk   -> Ed25519.deterministic_nonce sk msg
+  | Secret_key.Secp256k1 sk -> Secp256k1.deterministic_nonce sk msg
+  | Secret_key.P256 sk      -> P256.deterministic_nonce sk msg
+
+let deterministic_nonce_hash sk msg =
+  match sk with
+  | Secret_key.Ed25519 sk   -> Ed25519.deterministic_nonce_hash sk msg
+  | Secret_key.Secp256k1 sk -> Secp256k1.deterministic_nonce_hash sk msg
+  | Secret_key.P256 sk      -> P256.deterministic_nonce_hash sk msg

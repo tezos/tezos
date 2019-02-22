@@ -102,7 +102,7 @@ let test_random algo =
   let ctx = fake_ctx () in
   let decrypt_ctx = (ctx :> Client_context.prompter) in
   let rec inner i =
-    if i >= loops then return ()
+    if i >= loops then return_unit
     else
       let _, _, sk = Signature.generate_key ~algo () in
       encrypt ctx sk >>=? fun sk_uri ->

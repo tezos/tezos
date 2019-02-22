@@ -614,6 +614,14 @@ module Block = struct
   }
   type block = t
 
+  type validation_store = {
+    context_hash: Context_hash.t;
+    message: string option;
+    max_operations_ttl: int;
+    last_allowed_fork_level: Int32.t;
+  }
+
+
   let compare b1 b2 = Block_hash.compare b1.hash b2.hash
   let equal b1 b2 = Block_hash.equal b1.hash b2.hash
 
@@ -1176,8 +1184,8 @@ let read
 
 let init
     ?patch_context
-    ?(store_mapsize=4_096_000_000_000L)
-    ?(context_mapsize=40_960_000_000L)
+    ?(store_mapsize=40_960_000_000L)
+    ?(context_mapsize=409_600_000_000L)
     ~store_root
     ~context_root
     genesis =
@@ -1188,7 +1196,7 @@ let init
   let main_chain = Chain_id.of_block_hash genesis.Chain.block in
   read global_store context_index main_chain >>=? fun state ->
   may_create_chain state main_chain genesis >>= fun main_chain_state ->
-  return (state, main_chain_state)
+  return (state, main_chain_state, context_index)
 
 let close { global_data } =
   Shared.use global_data begin fun { global_store } ->

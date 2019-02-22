@@ -220,7 +220,7 @@ val apply_lazy :
 
 module Json : sig
 
-  val schema : 'a encoding -> json_schema
+  val schema : ?definitions_path:string -> 'a encoding -> json_schema
   val construct : 't encoding -> 't -> json
   val destruct : 't encoding -> json -> 't
 

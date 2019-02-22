@@ -1397,7 +1397,7 @@ contract, unit for an account.
 
     :: 'S   ->   mutez : 'S
 
--  ``ADDRESS``: Push the untyped version of a contract.
+-  ``ADDRESS``: Push the address of a contract.
 
 ::
 

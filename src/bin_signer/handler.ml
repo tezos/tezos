@@ -57,15 +57,15 @@ module High_watermark = struct
         let chain_id = Chain_id.of_bytes_exn (MBytes.sub bytes 1 4) in
         let level = get_level () in
         begin match List.assoc_opt chain_id all with
-          | None -> return None
+          | None -> return_none
           | Some marks ->
               match List.assoc_opt pkh marks with
-              | None -> return None
+              | None -> return_none
               | Some (previous_level, _, None) ->
                   if previous_level >= level then
                     failwith "%s level %ld not above high watermark %ld" name level previous_level
                   else
-                    return None
+                    return_none
               | Some (previous_level, previous_hash, Some signature) ->
                   if previous_level > level then
                     failwith "%s level %ld below high watermark %ld" name level previous_level
@@ -73,7 +73,7 @@ module High_watermark = struct
                     if previous_hash <> hash then
                       failwith "%s level %ld already signed with different data" name level
                     else
-                      return (Some signature)
+                      return_some signature
                   else return_none
         end >>=? function
         | Some signature -> return signature
@@ -116,6 +116,22 @@ let check_magic_byte magic_bytes data =
       else
         failwith "magic byte 0x%02X not allowed" byte
 
+
+let check_authorization cctxt pkh data require_auth signature =
+  match require_auth, signature with
+  | false, _ -> return_unit
+  | true, None -> failwith "missing authentication signature field"
+  | true, Some signature ->
+      let to_sign = Signer_messages.Sign.Request.to_sign ~pkh ~data in
+      Authorized_key.load cctxt >>=? fun keys ->
+      if List.fold_left
+          (fun acc (_, key) -> acc || Signature.check key signature to_sign)
+          false keys
+      then
+        return_unit
+      else
+        failwith "invalid authentication signature"
+
 let sign
     (cctxt : #Client_context.wallet)
     Signer_messages.Sign.Request.{ pkh ; data ; signature }
@@ -127,20 +143,7 @@ let sign
       -% a Signature.Public_key_hash.Logging.tag pkh
       -% s magic_byte (MBytes.get_uint8 data 0)) >>= fun () ->
   check_magic_byte magic_bytes data >>=? fun () ->
-  begin match require_auth, signature with
-    | false, _ -> return_unit
-    | true, None -> failwith "missing authentication signature field"
-    | true, Some signature ->
-        let to_sign = Signer_messages.Sign.Request.to_sign ~pkh ~data in
-        Authorized_key.load cctxt >>=? fun keys ->
-        if List.fold_left
-            (fun acc (_, key) -> acc || Signature.check key signature to_sign)
-            false keys
-        then
-          return_unit
-        else
-          failwith "invalid authentication signature"
-  end >>=? fun () ->
+  check_authorization cctxt pkh data require_auth signature >>=? fun () ->
   Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
   log Tag.DSL.(fun f ->
       f "Signing data for key %s"
@@ -151,6 +154,52 @@ let sign
     High_watermark.mark_if_block_or_endorsement cctxt pkh data sign
   else
     sign data
+
+let deterministic_nonce
+    (cctxt : #Client_context.wallet)
+    Signer_messages.Deterministic_nonce.Request.{ pkh ; data ; signature }
+    ~require_auth =
+  log Tag.DSL.(fun f ->
+      f "Request for creating a nonce from %d input bytes for key %a"
+      -% t event "request_for_deterministic_nonce"
+      -% s num_bytes (MBytes.length data)
+      -% a Signature.Public_key_hash.Logging.tag pkh) >>= fun () ->
+  check_authorization cctxt pkh data require_auth signature >>=? fun () ->
+  Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
+  log Tag.DSL.(fun f ->
+      f "Creating nonce for key %s"
+      -% t event "creating_nonce"
+      -% s Client_keys.Logging.tag name) >>= fun () ->
+  Client_keys.deterministic_nonce sk_uri data
+
+let deterministic_nonce_hash
+    (cctxt : #Client_context.wallet)
+    Signer_messages.Deterministic_nonce_hash.Request.{ pkh ; data ; signature }
+    ~require_auth =
+  log Tag.DSL.(fun f ->
+      f "Request for creating a nonce hash from %d input bytes for key %a"
+      -% t event "request_for_deterministic_nonce_hash"
+      -% s num_bytes (MBytes.length data)
+      -% a Signature.Public_key_hash.Logging.tag pkh) >>= fun () ->
+  check_authorization cctxt pkh data require_auth signature >>=? fun () ->
+  Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
+  log Tag.DSL.(fun f ->
+      f "Creating nonce hash for key %s"
+      -% t event "creating_nonce_hash"
+      -% s Client_keys.Logging.tag name) >>= fun () ->
+  Client_keys.deterministic_nonce_hash sk_uri data
+
+let supports_deterministic_nonces (cctxt : #Client_context.wallet) pkh =
+  log Tag.DSL.(fun f ->
+      f "Request for checking whether the signer supports deterministic nonces for key %a"
+      -% t event "request_for_supports_deterministic_nonces"
+      -% a Signature.Public_key_hash.Logging.tag pkh) >>= fun () ->
+  Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
+  log Tag.DSL.(fun f ->
+      f "Returns true if and only if signer can generate determinstic nonces for key %s"
+      -% t event "supports_deterministic_nonces"
+      -% s Client_keys.Logging.tag name) >>= fun () ->
+  Client_keys.supports_deterministic_nonces sk_uri
 
 let public_key (cctxt : #Client_context.wallet) pkh =
   log Tag.DSL.(fun f ->

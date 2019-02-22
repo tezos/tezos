@@ -35,6 +35,8 @@ let current_slots_tag = Tag.def ~doc:"Number of baking slots that can be baked a
 let future_slots_tag = Tag.def ~doc:"Number of baking slots in the foreseeable future but not yet bakeable" "future_slots" Format.pp_print_int
 let timespan_tag = Tag.def ~doc:"Time in seconds" "timespan" (fun fmt i -> Format.fprintf fmt "%Lds" i)
 
+let signed_header_tag = Tag.def ~doc:"Signed header" "signed_header" MBytes.pp_hex
+let signed_operation_tag = Tag.def ~doc:"Signed operation" "signed_operation" MBytes.pp_hex
 let operations_tag = Tag.def ~doc:"Block Operations" "operations"
     (Format.pp_print_list
        ~pp_sep:(fun ppf () -> Format.fprintf ppf "+")
@@ -56,8 +58,13 @@ let denounced_endorsements_slots_tag = Tag.def ~doc:"Endorsement Slots" "denounc
 let denouncement_source_tag = Tag.def ~doc:"Denounce Source" "source" Format.pp_print_text
 
 let level_tag = Tag.def ~doc:"Level" "level" Raw_level.pp
+let nonce_tag = Tag.def ~doc:"Nonce" "nonce" Data_encoding.Json.(fun ppf nonce -> pp ppf (construct Nonce.encoding nonce))
+let chain_tag = Tag.def ~doc:"Chain selector" "chain" Format.(fun ppf chain -> pp_print_string ppf @@ Block_services.chain_to_string chain)
+let block_tag = Tag.def ~doc:"Block selector" "block" Format.(fun ppf block -> pp_print_string ppf @@ Block_services.to_string block)
 
 let worker_tag = Tag.def ~doc:"Worker in which event occurred" "worker" Format.pp_print_text
+
+let block_header_tag = Tag.def ~doc:"Raw block header" "block_header" (fun ppf _ -> Format.fprintf ppf "[raw block header]")
 
 let conflicting_endorsements_tag = Tag.def ~doc:"Two conflicting endorsements signed by the same key" "conflicting_endorsements" Format.(
     fun ppf (a,b) -> fprintf ppf "%a / %a" Operation_hash.pp (Operation.hash a) Operation_hash.pp (Operation.hash b))

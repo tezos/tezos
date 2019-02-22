@@ -53,8 +53,9 @@ let rpc_ctxt =
   new Alpha_environment.proto_rpc_context_of_directory
     rpc_context Proto_alpha.rpc_services
 
-let begin_construction ?(priority=0) ?timestamp (predecessor : Block.t) =
-  Block.get_next_baker ~policy:(Block.By_priority priority)
+let begin_construction ?(priority=0) ?timestamp
+    ?(policy=Block.By_priority priority) (predecessor : Block.t) =
+  Block.get_next_baker ~policy
     predecessor >>=? fun (delegate, priority, real_timestamp) ->
   Account.find delegate >>=? fun delegate ->
   let timestamp = Option.unopt ~default:real_timestamp timestamp in

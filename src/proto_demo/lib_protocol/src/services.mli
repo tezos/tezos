@@ -23,24 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type kind =
-  | Internal
+val failing:
+  'a #RPC_context.simple -> 'a -> int -> unit shell_tzresult Lwt.t
 
-type t
+val echo :
+  'a #RPC_context.simple -> 'a -> string -> string shell_tzresult Lwt.t
 
-val init : context_root:string -> kind -> t Lwt.t
-val close : t -> unit Lwt.t
-
-type application_result = {
-  validation_result: Tezos_protocol_environment_shell.validation_result ;
-  block_data: Secp256k1.watermark ;
-  ops_metadata: Secp256k1.watermark list list ;
-  context_hash: Context_hash.t ;
-}
-
-val apply_block :
-  t ->
-  Block_header.t ->
-  Operation.t list list ->
-  State.Chain.t ->
-  application_result tzresult Lwt.t
+val rpc_services : Updater.rpc_context RPC_directory.t

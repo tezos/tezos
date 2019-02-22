@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -384,9 +385,45 @@ let may_patch_limits
         | Some c, Some rest -> Some (Cons (c, rest))
       end in
 
+  let rec patch_fee :
+    type kind. bool -> kind contents -> kind contents = fun first -> function
+    | Manager_operation c as op ->
+        let gas_limit = c.gas_limit in
+        let size =
+          if first then
+            Data_encoding.Binary.fixed_length_exn
+              Tezos_base.Operation.shell_header_encoding +
+            Data_encoding.Binary.length
+              Operation.contents_encoding
+              (Contents op) +
+            Signature.size
+          else
+            Data_encoding.Binary.length
+              Operation.contents_encoding
+              (Contents op)
+        in
+        let minimal_fees_in_nanotez =
+          Z.mul (Z.of_int64 (Tez.to_mutez fee_parameter.minimal_fees)) (Z.of_int 1000) in
+        let minimal_fees_for_gas_in_nanotez =
+          Z.mul fee_parameter.minimal_nanotez_per_gas_unit gas_limit in
+        let minimal_fees_for_size_in_nanotez =
+          Z.mul fee_parameter.minimal_nanotez_per_byte (Z.of_int size) in
+        let fees_in_nanotez =
+          Z.add minimal_fees_in_nanotez @@
+          Z.add minimal_fees_for_gas_in_nanotez minimal_fees_for_size_in_nanotez in
+        begin match Tez.of_mutez (Z.to_int64 (Z.div (Z.add (Z.of_int 999) fees_in_nanotez) (Z.of_int 1000))) with
+          | None -> assert false
+          | Some fee ->
+              if fee <= c.fee then
+                op
+              else
+                patch_fee first (Manager_operation { c with fee })
+        end
+    | c -> c in
+
   let patch :
     type kind. bool -> kind contents * kind contents_result -> kind contents tzresult Lwt.t = fun first -> function
-    | Manager_operation c as op, (Manager_operation_result _ as result) ->
+    | Manager_operation c, (Manager_operation_result _ as result) ->
         begin
           if c.gas_limit < Z.zero || gas_limit <= c.gas_limit then
             Lwt.return (estimated_gas_single result) >>=? fun gas ->
@@ -417,37 +454,11 @@ let may_patch_limits
             end
           else return c.storage_limit
         end >>=? fun storage_limit ->
-        begin
-          if compute_fee then
-            let size =
-              if first then
-                Data_encoding.Binary.fixed_length_exn
-                  Tezos_base.Operation.shell_header_encoding +
-                Data_encoding.Binary.length
-                  Operation.contents_encoding
-                  (Contents op) +
-                Signature.size
-              else
-                Data_encoding.Binary.length
-                  Operation.contents_encoding
-                  (Contents op)
-            in
-            let minimal_fees_in_nanotez =
-              Z.mul (Z.of_int64 (Tez.to_mutez fee_parameter.minimal_fees)) (Z.of_int 1000) in
-            let minimal_fees_for_gas_in_nanotez =
-              Z.mul fee_parameter.minimal_nanotez_per_gas_unit gas_limit in
-            let minimal_fees_for_size_in_nanotez =
-              Z.mul fee_parameter.minimal_nanotez_per_byte (Z.of_int size) in
-            let fees_in_nanotez =
-              Z.add minimal_fees_in_nanotez @@
-              Z.add minimal_fees_for_gas_in_nanotez minimal_fees_for_size_in_nanotez in
-            match Tez.of_mutez (Z.to_int64 (Z.div (Z.add (Z.of_int 999) fees_in_nanotez) (Z.of_int 1000))) with
-            | None -> assert false
-            | Some fee -> return fee
-          else
-            return c.fee
-        end >>=? fun fee ->
-        return (Manager_operation { c with gas_limit ; storage_limit ; fee })
+        let c = Manager_operation { c with gas_limit ; storage_limit } in
+        if compute_fee then
+          return (patch_fee first c)
+        else
+          return c
     | (c, _) -> return c in
   let rec patch_list :
     type kind. bool -> kind contents_and_result_list -> kind contents_list tzresult Lwt.t =
@@ -523,7 +534,7 @@ let inject_operation
     let oph = Operation_hash.hash_bytes [bytes] in
     cctxt#message
       "@[<v 0>Operation: 0x%a@,\
-       Operation hash: %a@]"
+       Operation hash is '%a'@]"
       MBytes.pp_hex bytes
       Operation_hash.pp oph >>= fun () ->
     cctxt#message
@@ -534,20 +545,20 @@ let inject_operation
   else
     Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
     cctxt#message "Operation successfully injected in the node." >>= fun () ->
-    cctxt#message "Operation hash: %a" Operation_hash.pp oph >>= fun () ->
+    cctxt#message "Operation hash is '%a'" Operation_hash.pp oph >>= fun () ->
     begin
       match confirmations with
       | None ->
           cctxt#message "@[<v 0>NOT waiting for the operation to be included.@,\
                          Use command@,\
-                        \  tezos-client wait for %a to be included --confirmations 30@,\
+                        \  tezos-client wait for %a to be included --confirmations 30 --branch %a@,\
                          and/or an external block explorer to make sure that it has been included.@]"
-            Operation_hash.pp oph >>= fun () ->
+            Operation_hash.pp oph Block_hash.pp op.shell.branch >>= fun () ->
           return result
       | Some confirmations ->
           cctxt#message "Waiting for the operation to be included..." >>= fun () ->
           Client_confirmations.wait_for_operation_inclusion
-            ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
+            ~branch:op.shell.branch ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
           Alpha_block_services.Operations.operation
             cctxt ~block:(`Hash (h, 0)) i j >>=? fun op' ->
           match op'.receipt with
@@ -583,9 +594,10 @@ let inject_operation
               "@[<v 0>The operation has only been included %d blocks ago.@,\
                We recommend to wait more.@,\
                Use command@,\
-              \  tezos-client wait for %a to be included --confirmations 30@,\
+              \  tezos-client wait for %a to be included --confirmations 30 \
+               --branch %a@,\
                and/or an external block explorer.@]"
-              number Operation_hash.pp oph
+              number Operation_hash.pp oph Block_hash.pp op.shell.branch
     end >>= fun () ->
     return (oph, op.protocol_data.contents, result.contents)
 

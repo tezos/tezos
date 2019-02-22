@@ -13,6 +13,7 @@ depends: [
   "tezos-p2p"
   "tezos-shell-services"
   "tezos-protocol-updater"
+  "tezos-validation"
   "alcotest-lwt" { with-test }
   "tezos-embedded-protocol-demo" { with-test }
 ]

@@ -169,7 +169,7 @@ usage() {
     echo "Small script to initialize a client to a local and closed test network with a maximum of 9 nodes."
     echo
     echo "Usage: eval \`$0 <id>\`"
-    echo "  where <id> should be an integer between 1 and 9."
+    echo "  where <id> should be a positive integer."
 }
 
 main () {
@@ -189,7 +189,7 @@ main () {
         local_compiler="${local_compiler:-$(which tezos-protocol-compiler)}"
     fi
 
-    if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
+    if [ $# -lt 1 ] || [ "$1" -le 0 ] ; then
         usage
         exit 1
     fi
@@ -262,7 +262,7 @@ tezos node launched with \`launch-sandboxed-node $1\`. For instance:
 Note: if the current protocol version, as reported by the previous
 command, is "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P", you
 may have to activate in your "sandboxed network" the same economic
-protocol than used by the alphanet by running:
+protocol as used by the alphanet by running:
 
   tezos-activate-alpha
 

@@ -42,7 +42,7 @@ type 'meta metadata_config = {
 }
 (** Type for the parameter negotiation mechanism. *)
 
-type 'meta authenticated_fd
+type 'meta authenticated_connection
 (** Type of a connection that successfully passed the authentication
     phase, but has not been accepted yet. Parametrized by the type
     of expected parameter in the `ack` message. *)
@@ -68,29 +68,29 @@ val authenticate:
   ?listening_port: int ->
   P2p_identity.t -> P2p_version.t list ->
   'meta metadata_config ->
-  ('meta P2p_connection.Info.t * 'meta authenticated_fd) tzresult Lwt.t
+  ('meta P2p_connection.Info.t * 'meta authenticated_connection) tzresult Lwt.t
 (** (Low-level) (Cancelable) Authentication function of a remote
     peer. Used in [P2p_connection_pool], to promote a
-    [P2P_io_scheduler.connection] into an [authenticated_fd] (auth
+    [P2P_io_scheduler.connection] into an [authenticated_connection] (auth
     correct, acceptation undecided). *)
 
-val kick: 'meta authenticated_fd -> unit Lwt.t
+val kick: 'meta authenticated_connection -> unit Lwt.t
 (** (Low-level) (Cancelable) [kick afd] notifies the remote peer that
     we refuse this connection and then closes [afd]. Used in
-    [P2p_connection_pool] to reject an [aunthenticated_fd] which we do
+    [P2p_connection_pool] to reject an [authenticated_connection] which we do
     not want to connect to for some reason. *)
 
 val accept:
   ?incoming_message_queue_size:int ->
   ?outgoing_message_queue_size:int ->
   ?binary_chunks_size: int ->
-  'meta authenticated_fd ->
+  'meta authenticated_connection ->
   'msg Data_encoding.t -> ('msg, 'meta) t tzresult Lwt.t
 (** (Low-level) (Cancelable) Accepts a remote peer given an
-    authenticated_fd. Used in [P2p_connection_pool], to promote an
-    [authenticated_fd] to the status of an active peer. *)
+    authenticated_connection. Used in [P2p_connection_pool], to promote an
+    [authenticated_connection] to the status of an active peer. *)
 
-val check_binary_chunks_size:  int -> unit tzresult Lwt.t
+val check_binary_chunks_size: int -> unit tzresult Lwt.t
 (** Precheck for the [?binary_chunks_size] parameter of [accept]. *)
 
 (** {1 IO functions on connections} *)

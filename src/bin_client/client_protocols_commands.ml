@@ -57,7 +57,7 @@ let commands () =
               Lwt_utils_unix.Protocol.read_dir dirname >>=? fun (_hash, proto) ->
               Shell_services.Injection.protocol cctxt proto >>= function
               | Ok hash ->
-                  cctxt#message "Injected protocol %a successfully" Protocol_hash.pp_short hash >>= fun () ->
+                  cctxt#message "Injected protocol %a successfully" Protocol_hash.pp hash >>= fun () ->
                   return_unit
               | Error err ->
                   cctxt#error "Error while injecting protocol from %s: %a"

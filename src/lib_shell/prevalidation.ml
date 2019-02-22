@@ -25,45 +25,6 @@
 
 open Validation_errors
 
-let rec apply_operations apply_operation state r max_ops ~sort ops =
-  let open Preapply_result in
-  Lwt_list.fold_left_s
-    (fun (state, max_ops, r) (hash, op, parsed_op) ->
-       apply_operation state max_ops op parsed_op >>= function
-       | Ok (state, _metadata) ->
-           let applied = (hash, op) :: r.applied in
-           Lwt.return (state, max_ops - 1, { r with applied })
-       | Error errors ->
-           match classify_errors errors with
-           | `Branch ->
-               let branch_refused =
-                 Operation_hash.Map.add hash (op, errors) r.branch_refused in
-               Lwt.return (state, max_ops, { r with branch_refused })
-           | `Permanent ->
-               let refused =
-                 Operation_hash.Map.add hash (op, errors) r.refused in
-               Lwt.return (state, max_ops, { r with refused })
-           | `Temporary ->
-               let branch_delayed =
-                 Operation_hash.Map.add hash (op, errors) r.branch_delayed in
-               Lwt.return (state, max_ops, { r with branch_delayed }))
-    (state, max_ops, r)
-    ops >>= fun (state, max_ops, r) ->
-  match r.applied with
-  | _ :: _ when sort ->
-      let rechecked_operations =
-        List.filter
-          (fun (hash, _, _) -> Operation_hash.Map.mem hash r.branch_delayed)
-          ops in
-      let remaining = List.length rechecked_operations in
-      if remaining = 0 || remaining = List.length ops then
-        Lwt.return (state, max_ops, r)
-      else
-        apply_operations apply_operation state r max_ops ~sort rechecked_operations
-  | _ ->
-      Lwt.return (state, max_ops, r)
-
-
 module type T = sig
 
   module Proto: Registered_protocol.T
@@ -316,7 +277,7 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
   Prevalidation.status validation_state >>=? fun { block_result ; _ } ->
   let pred_shell_header = State.Block.shell_header predecessor in
   let level = Int32.succ pred_shell_header.level in
-  Block_validator.may_patch_protocol
+  Block_validation.may_patch_protocol
     ~level block_result >>=? fun { fitness ; context ; message } ->
   State.Block.protocol_hash predecessor >>= fun pred_protocol ->
   Context.get_protocol context >>= fun protocol ->

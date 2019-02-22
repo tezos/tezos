@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -105,36 +106,38 @@ let build_rpc_directory validator mainchain_validator =
     (* TODO: when `chain = `Test`, should we reset then stream when
        the `testnet` change, or dias we currently do ?? *)
     Chain_directory.get_chain state chain >>= fun chain ->
-    Validator.get_exn validator (State.Chain.id chain) >>= fun chain_validator ->
-    let block_stream, stopper = Chain_validator.new_head_watcher chain_validator in
-    Chain.head chain >>= fun head ->
-    let shutdown () = Lwt_watcher.shutdown stopper in
-    let in_next_protocols block =
-      match q#next_protocols with
-      | [] -> Lwt.return_true
-      | protocols ->
-          State.Block.context block >>= fun context ->
-          Context.get_protocol context >>= fun next_protocol ->
-          Lwt.return (List.exists (Protocol_hash.equal next_protocol) protocols) in
-    let stream =
-      Lwt_stream.filter_map_s
-        (fun block ->
-           in_next_protocols block >>= fun in_next_protocols ->
-           if in_next_protocols then
-             Lwt.return_some (State.Block.hash block, State.Block.header block)
-           else
-             Lwt.return_none)
-        block_stream in
-    in_next_protocols head >>= fun first_block_is_among_next_protocols ->
-    let first_call =
-      (* Skip the first block if this is false *)
-      ref first_block_is_among_next_protocols in
-    let next () =
-      if !first_call then begin
-        first_call := false ; Lwt.return_some (State.Block.hash head, State.Block.header head)
-      end else
-        Lwt_stream.get stream in
-    RPC_answer.return_stream { next ; shutdown }
+    match Validator.get validator (State.Chain.id chain) with
+    | Error _ -> Lwt.fail Not_found
+    | Ok chain_validator ->
+        let block_stream, stopper = Chain_validator.new_head_watcher chain_validator in
+        Chain.head chain >>= fun head ->
+        let shutdown () = Lwt_watcher.shutdown stopper in
+        let in_next_protocols block =
+          match q#next_protocols with
+          | [] -> Lwt.return_true
+          | protocols ->
+              State.Block.context block >>= fun context ->
+              Context.get_protocol context >>= fun next_protocol ->
+              Lwt.return (List.exists (Protocol_hash.equal next_protocol) protocols) in
+        let stream =
+          Lwt_stream.filter_map_s
+            (fun block ->
+               in_next_protocols block >>= fun in_next_protocols ->
+               if in_next_protocols then
+                 Lwt.return_some (State.Block.hash block, State.Block.header block)
+               else
+                 Lwt.return_none)
+            block_stream in
+        in_next_protocols head >>= fun first_block_is_among_next_protocols ->
+        let first_call =
+          (* Skip the first block if this is false *)
+          ref first_block_is_among_next_protocols in
+        let next () =
+          if !first_call then begin
+            first_call := false ; Lwt.return_some (State.Block.hash head, State.Block.header head)
+          end else
+            Lwt_stream.get stream in
+        RPC_answer.return_stream { next ; shutdown }
   end ;
 
   gen_register0 Monitor_services.S.protocols begin fun () () ->

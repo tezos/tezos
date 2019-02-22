@@ -35,6 +35,7 @@ val wait_for_operation_inclusion:
   chain:Chain_services.chain ->
   ?predecessors:int ->
   ?confirmations:int ->
+  ?branch:Block_hash.t ->
   Operation_hash.t ->
   (Block_hash.t * int * int) tzresult Lwt.t
 

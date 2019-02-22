@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -189,19 +190,19 @@ let create
     | None -> true in
   init_p2p ~sandboxed p2p_params >>=? fun p2p ->
   State.init
-    ~store_root ~context_root ?patch_context genesis >>=? fun (state, mainchain_state) ->
+    ~store_root ~context_root ?patch_context
+    genesis >>=? fun (state, mainchain_state, context_index) ->
   may_update_checkpoint mainchain_state checkpoint >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
-  Validator_process.(init ~context_root Internal) >>= fun validation_process ->
   Validator.create state distributed_db
     peer_validator_limits
     block_validator_limits
-    validation_process
+    (Block_validator.Internal context_index)
     prevalidator_limits
     chain_validator_limits
-  >>= fun validator ->
+  >>=? fun validator ->
   Validator.activate validator
-    ?max_child_ttl ~start_prevalidator mainchain_state >>= fun mainchain_validator ->
+    ?max_child_ttl ~start_prevalidator mainchain_state >>=? fun mainchain_validator ->
   let shutdown () =
     P2p.shutdown p2p >>= fun () ->
     Validator.shutdown validator >>= fun () ->

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,6 +26,7 @@
 
 class unix_wallet :
   base_dir:string ->
+  password_filename: string option ->
   Client_context.wallet
 class unix_prompter :
   Client_context.prompter
@@ -35,5 +37,6 @@ class unix_full :
   base_dir:string ->
   block:Shell_services.block ->
   confirmations:int option ->
+  password_filename: string option ->
   rpc_config:RPC_client.config ->
   Client_context.full

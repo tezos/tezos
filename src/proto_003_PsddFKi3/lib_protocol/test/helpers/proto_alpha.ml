@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Name = struct let name = "alpha" end
+module Name = struct let name = "003_PsddFKi3" end
 module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
 
 type alpha_error = Alpha_environment.Error_monad.error

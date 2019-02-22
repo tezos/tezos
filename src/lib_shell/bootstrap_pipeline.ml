@@ -267,7 +267,9 @@ let rec validation_worker_loop pipeline =
   | Error [Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed] ->
       Lwt.return_unit
   | Error ([ Block_validator_errors.Invalid_block _
-           | Block_validator_errors.Unavailable_protocol _ ] as err ) ->
+           | Block_validator_errors.Unavailable_protocol _
+           | Block_validator_errors.System_error _
+           | Timeout] as err ) ->
       (* Propagate the error to the peer validator. *)
       pipeline.errors <- pipeline.errors @ err ;
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->

@@ -152,6 +152,14 @@ Install the OCaml compiler and the libraries which Tezos depends on:
 
    make build-deps
 
+Alternatively, if you want to be able to install extra packages
+(development packages such as `merlin`), you may use the following
+command instead:
+
+::
+
+   make build-dev-deps
+
 This command creates a local opam switch ``_opam`` where the right
 version of OCaml is compiled and installed (this takes a while but
 it's only done once).
@@ -174,11 +182,3 @@ Lastly you can also add Tezos binaries to your ``PATH`` variable,
 activate bash autocompletion and after reading the Disclaimer a few
 hundred times you are allowed to disable it with
 ``TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y``.
-
-To add the default opam repository at a lower priority (for example to
-install merlin or test other opam packages), you can use the following
-command:
-
-::
-
-   opam repo add default --rank=-1

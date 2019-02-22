@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -42,6 +43,8 @@ module Id = struct
   let pp_opt ppf = function
     | None -> Format.pp_print_string ppf "none"
     | Some point -> pp ppf point
+  let pp_list ppf point_list =
+    Format.pp_print_list  ~pp_sep:Format.pp_print_space pp ppf point_list
 
   let is_local (addr, _) = Ipaddr.V6.is_private addr
   let is_global (addr, _) = not @@ Ipaddr.V6.is_private addr

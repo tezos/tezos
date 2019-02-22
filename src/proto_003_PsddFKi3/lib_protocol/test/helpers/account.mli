@@ -42,6 +42,9 @@ val add_account : t -> unit
 val find: Signature.Public_key_hash.t -> t tzresult Lwt.t
 val find_alternate: Signature.Public_key_hash.t -> t
 
-(** [generate_accounts n] : generates [n] random accounts with
-    4.000.000.000 tz and add them to the global account state *)
-val generate_accounts : int -> (t * Tez_repr.t) list
+(** [generate_accounts ?initial_balances n] : generates [n] random
+    accounts with the initial balance of the [i]th account given by the
+    [i]th value in the list [initial_balances] or otherwise
+    4.000.000.000 tz (if the list is too short); and add them to the
+    global account state *)
+val generate_accounts : ?initial_balances:int64 list -> int -> (t * Tez_repr.t) list

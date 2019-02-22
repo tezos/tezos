@@ -271,6 +271,23 @@ let commands version : Client_context.io_wallet Clic.command list =
                gen_keys_containing ~encrypted ~force ~prefix ~containing ~name cctxt)
     end ;
 
+    command ~group ~desc: "Encrypt an unencrypted secret key."
+      no_options
+      (prefixes [ "encrypt" ; "secret" ; "key" ]
+       @@ stop)
+      (fun () (cctxt : Client_context.io_wallet) ->
+         cctxt#prompt_password "Enter unencrypted secret key: " >>=? fun sk_uri ->
+         let sk_uri = Uri.of_string (MBytes.to_string sk_uri) in
+         begin match Uri.scheme sk_uri with
+           | None | Some "unencrypted" -> return_unit
+           | _ -> failwith "This command can only be used with the \"unencrypted\" scheme"
+         end >>=? fun () ->
+         Lwt.return (Signature.Secret_key.of_b58check (Uri.path sk_uri)) >>=? fun sk ->
+         Tezos_signer_backends.Encrypted.encrypt cctxt sk >>=? fun sk_uri ->
+         cctxt#message "Encrypted secret key %a" Uri.pp_hum (sk_uri :> Uri.t) >>= fun () ->
+         return_unit
+      ) ;
+
     command ~group ~desc: "Add a secret key to the wallet."
       (args1 (Secret_key.force_switch ()))
       (prefix "import"
@@ -290,7 +307,8 @@ let commands version : Client_context.io_wallet Clic.command list =
                     "public and secret keys '%s' don't correspond, \
                      please don't use --force" name)
          end >>=? fun () ->
-         Client_keys.public_key_hash pk_uri >>=? fun (pkh, public_key) ->
+         Client_keys.public_key_hash ~interactive:cctxt pk_uri
+         >>=? fun (pkh, public_key) ->
          cctxt#message
            "Tezos address added: %a"
            Signature.Public_key_hash.pp pkh >>= fun () ->
@@ -424,5 +442,41 @@ let commands version : Client_context.io_wallet Clic.command list =
          Public_key.set cctxt [] >>=? fun () ->
          Secret_key.set cctxt [] >>=? fun () ->
          Public_key_hash.set cctxt []) ;
+
+    command ~group ~desc: "Compute deterministic nonce."
+      no_options
+      (prefixes [ "generate" ; "nonce"; "for" ]
+       @@ Public_key_hash.alias_param
+       @@ prefixes [ "from" ]
+       @@ string
+         ~name: "data"
+         ~desc: "string from which to deterministically generate the nonce"
+       @@ stop)
+      (fun () (name, _pkh) data (cctxt : Client_context.io_wallet) ->
+         let data = MBytes.of_string data in
+         Secret_key.mem cctxt name >>=? fun sk_present ->
+         fail_unless sk_present
+           (failure "secret key not present for %s" name) >>=? fun () ->
+         Secret_key.find cctxt name >>=? fun sk_uri ->
+         Client_keys.deterministic_nonce sk_uri data >>=? fun nonce ->
+         cctxt#message "%a" MBytes.pp_hex nonce >>= fun () -> return_unit) ;
+
+    command ~group ~desc: "Compute deterministic nonce hash."
+      no_options
+      (prefixes [ "generate" ; "nonce"; "hash"; "for" ]
+       @@ Public_key_hash.alias_param
+       @@ prefixes [ "from" ]
+       @@ string
+         ~name: "data"
+         ~desc: "string from which to deterministically generate the nonce hash"
+       @@ stop)
+      (fun () (name, _pkh) data (cctxt : Client_context.io_wallet) ->
+         let data = MBytes.of_string data in
+         Secret_key.mem cctxt name >>=? fun sk_present ->
+         fail_unless sk_present
+           (failure "secret key not present for %s" name) >>=? fun () ->
+         Secret_key.find cctxt name >>=? fun sk_uri ->
+         Client_keys.deterministic_nonce_hash sk_uri data >>=? fun nonce_hash ->
+         cctxt#message "%a" MBytes.pp_hex nonce_hash >>= fun () -> return_unit) ;
 
   ]
