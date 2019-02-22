@@ -54,12 +54,13 @@ let reset_test_chain
           Proto_test.init ctxt forked_header.shell >>=? fun { context = test_ctxt } ->
           Context.set_test_chain test_ctxt Not_running >>= fun test_ctxt ->
           Context.set_protocol test_ctxt protocol >>= fun test_ctxt ->
-          Context.commit_test_chain_genesis forked_header test_ctxt >>= fun (chain_id, genesis, genesis_header) ->
-          return (chain_id, genesis, Some  genesis_header)
+          Context.commit_test_chain_genesis forked_header test_ctxt >>= fun (_chain_id, genesis, genesis_header) ->
+          return (genesis, Some  genesis_header)
         else
-          let chain_id, genesis = Context.compute_testchain_genesis (Block_header.hash forked_header) in
-          return (chain_id, genesis, None)
-      end >>=? fun (chain_id, genesis, genesis_header) ->
+          let _chain_id, genesis = Context.compute_testchain_genesis (Block_header.hash forked_header) in
+          return (genesis, None)
+      end >>=? fun (genesis, genesis_header) ->
+      let chain_id = Context.compute_testchain_chain_id (Block_header.hash forked_header) in
       Context.set_test_chain ctxt
         (Running { chain_id ; genesis ;
                    protocol ; expiration }) >>= fun ctxt ->

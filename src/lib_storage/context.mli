@@ -40,6 +40,9 @@ val init:
   string ->
   index Lwt.t
 
+val compute_testchain_chain_id:
+  Block_hash.t -> Chain_id.t
+
 val compute_testchain_genesis:
   Block_hash.t -> Chain_id.t * Block_hash.t
 

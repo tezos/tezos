@@ -191,8 +191,7 @@ let may_switch_test_chain w active_chains spawn_child block =
     | (Forking _
       | Running _), None -> return () (* disable_testchain was on at forking time *)
     | (Forking { protocol ; expiration }
-      | Running { protocol ; expiration }), Some genesis_header ->
-        let genesis = genesis_header.shell.predecessor in
+      | Running { protocol ; expiration }), Some (chain_id, genesis, genesis_header) ->
         let activated =
           match nv.child with
           | None -> false
@@ -217,7 +216,6 @@ let may_switch_test_chain w active_chains spawn_child block =
           return_unit
         else begin
           begin
-            let chain_id = Chain_id.of_block_hash genesis in
             State.Chain.get
               (State.Chain.global_state nv.parameters.chain_state)
               chain_id >>= function
