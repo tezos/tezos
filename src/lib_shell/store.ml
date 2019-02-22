@@ -102,7 +102,7 @@ module Forked_genesis_header =
     (Store_helpers.Make_substore
        (Raw_store)
        (struct let name = ["forked_genesis_header"] end))
-    (Block_hash)
+    (Chain_id)
     (Store_helpers.Make_value(Block_header))
 
 (**************************************************************************

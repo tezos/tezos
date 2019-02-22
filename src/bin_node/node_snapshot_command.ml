@@ -193,6 +193,7 @@ let import data_dir filename =
           ~max_operations_ttl:(max_int-1)
           ~predecessor_block_header:predecessor_block_header
           ~predecessor_context
+          ~start_testchain:false
           ~block_header
           operations >>=? fun block_validation_result ->
 

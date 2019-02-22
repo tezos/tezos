@@ -223,5 +223,5 @@ end
 
 module Forked_genesis_header : MAP_STORE
   with type t = global_store
-   and type key := Block_hash.t
+   and type key := Chain_id.t
    and type value := Block_header.t

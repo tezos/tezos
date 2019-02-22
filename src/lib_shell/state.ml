@@ -430,14 +430,8 @@ module Chain = struct
     end
 
   let allocate
-      ~genesis
-      ~faked_genesis_hash
-      ~save_point
-      ~caboose
-      ~expiration
-      ~allow_forked_chain
-      ~current_head
-      ~checkpoint
+      ~genesis ~faked_genesis_hash ~expiration ~save_point ~caboose
+      ~allow_forked_chain ~current_head ~checkpoint ~chain_id
       global_state context_index chain_data_store block_store =
     Store.Block.Contents.read_exn
       (block_store, current_head) >>= fun current_block ->
@@ -463,7 +457,7 @@ module Chain = struct
     }
     and chain_state = {
       global_state ;
-      chain_id = Chain_id.of_block_hash genesis.block ;
+      chain_id ;
       chain_data = { Shared.data = chain_data ; lock = Lwt_mutex.create () } ;
       genesis ; faked_genesis_hash ;
       expiration ;
@@ -510,6 +504,7 @@ module Chain = struct
       ~checkpoint:genesis_header
       ~save_point
       ~caboose
+      ~chain_id
       global_state
       data.context_index
       chain_data_store
@@ -517,8 +512,7 @@ module Chain = struct
     Chain_id.Table.add data.chains chain_id chain ;
     Lwt.return chain
 
-  let create state ?allow_forked_chain genesis  =
-    let chain_id = Chain_id.of_block_hash genesis.block in
+  let create state ?allow_forked_chain genesis chain_id  =
     Shared.use state.global_data begin fun data ->
       let chain_store = Store.Chain.get data.global_store chain_id in
       let block_store = Store.Block.get chain_store in
@@ -537,12 +531,13 @@ module Chain = struct
           chain_id genesis genesis_header >>= fun chain ->
         (* in case this is a forked chain creation,
            delete its header from the temporary table*)
-        Store.Forked_genesis_header.remove data.global_store genesis.block >>= fun () ->
+        Store.Forked_genesis_header.remove data.global_store
+          (Context.compute_testchain_chain_id genesis.block) >>= fun () ->
         Lwt.return chain
     end
 
-  let locked_read global_state data id =
-    let chain_store = Store.Chain.get data.global_store id in
+  let locked_read global_state data chain_id =
+    let chain_store = Store.Chain.get data.global_store chain_id in
     let block_store = Store.Block.get chain_store
     and chain_data_store = Store.Chain_data.get chain_store in
     Store.Chain.Genesis_hash.read chain_store >>=? fun genesis_hash ->
@@ -550,7 +545,7 @@ module Chain = struct
     Store.Chain.Genesis_protocol.read chain_store >>=? fun protocol ->
     Store.Chain.Expiration.read_opt chain_store >>= fun expiration ->
     Store.Chain.Allow_forked_chain.known
-      data.global_store id >>= fun allow_forked_chain ->
+      data.global_store chain_id >>= fun allow_forked_chain ->
     Store.Block.Header.read (block_store, genesis_hash) >>=? fun genesis_header ->
     let genesis = { time ; protocol ; block = genesis_hash } in
     Store.Chain_data.Current_head.read chain_data_store >>=? fun current_head ->
@@ -573,6 +568,7 @@ module Chain = struct
         ~checkpoint
         ~save_point
         ~caboose
+        ~chain_id
         global_state
         data.context_index
         chain_data_store
@@ -1139,7 +1135,8 @@ module Block = struct
           | Some forked_genesis_header ->
               let genesis = forked_genesis_header.Block_header.shell.predecessor in
               Shared.use chain_state.global_state.global_data begin fun global_data ->
-                Store.Forked_genesis_header.store global_data.global_store genesis forked_genesis_header
+                Store.Forked_genesis_header.store global_data.global_store
+                  (Context.compute_testchain_chain_id genesis) forked_genesis_header
               end
         end >>= fun () ->
         let block = { chain_state ; hash ; contents ; header } in
@@ -1229,9 +1226,9 @@ module Block = struct
   let test_chain block =
     context block >>= fun context ->
     Context.get_test_chain context >>= fun status ->
-    let of_genesis genesis =
+    let lookup_testchain (chain_id, genesis) =
       (* if the chain already exists, use its genesis *)
-      begin Chain.get block.chain_state.global_state (Chain_id.of_block_hash genesis) >>= function
+      begin Chain.get block.chain_state.global_state chain_id >>= function
         | Ok forked_chain_state ->
             Shared.use forked_chain_state.block_store begin fun forked_block_store ->
               Store.Block.Header.read_opt (forked_block_store, genesis)
@@ -1239,13 +1236,17 @@ module Block = struct
         | Error _ ->
             (* otherwise, look in the temporary table *)
             Shared.use block.chain_state.global_state.global_data begin fun global_data ->
-              Store.Forked_genesis_header.read_opt global_data.global_store genesis
+              Store.Forked_genesis_header.read_opt global_data.global_store chain_id
             end
-      end >>= fun forked_genesis_header ->
-      Lwt.return (status, forked_genesis_header) in
+      end >>= function
+      | Some forked_genesis_header ->
+          Lwt.return (status, Some (chain_id, genesis, forked_genesis_header))
+      | None ->
+          Lwt.return (status, None)
+    in
     match status with
-    | Running { genesis } -> of_genesis genesis
-    | Forking _ -> of_genesis (snd (Context.compute_testchain_genesis (hash block)))
+    | Running { genesis } -> lookup_testchain (Context.compute_testchain_chain_id genesis, genesis)
+    | Forking _ -> lookup_testchain (Context.compute_testchain_genesis (hash block))
     | Not_running -> Lwt.return (status, None)
 
   let block_validity chain_state block : Block_locator.validity Lwt.t =
@@ -1500,13 +1501,13 @@ module Current_mempool = struct
 
 end
 
-let may_create_chain state chain genesis =
-  Chain.get state chain >>= function
+let may_create_chain state chain_id genesis =
+  Chain.get state chain_id >>= function
   | Ok chain -> Lwt.return chain
   | Error _ ->
       Chain.create
         ~allow_forked_chain:true
-        state genesis
+        state genesis chain_id
 
 let read
     global_store
@@ -1614,9 +1615,9 @@ let init
   Context.init
     ~mapsize:context_mapsize ?patch_context
     context_root >>= fun context_index ->
-  let main_chain = Chain_id.of_block_hash genesis.Chain.block in
-  read global_store context_index main_chain >>=? fun state ->
-  may_create_chain state main_chain genesis >>= fun main_chain_state ->
+  let chain_id = Chain_id.of_block_hash genesis.Chain.block in
+  read global_store context_index chain_id >>=? fun state ->
+  may_create_chain state chain_id genesis >>= fun main_chain_state ->
   Store.Configuration.History_mode.read_opt global_store >>= begin function
     | None ->
         let mode = Option.unopt ~default:History_mode.Full history_mode in

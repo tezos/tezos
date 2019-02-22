@@ -193,7 +193,7 @@ let create
     block_validator_limits
     prevalidator_limits
     chain_validator_limits
-    history_mode
+    history_mode =
   let (start_prevalidator, start_testchain) =
     match p2p_params with
     | Some (config, _limits) -> not config.P2p.disable_mempool, not config.P2p.disable_testchain
