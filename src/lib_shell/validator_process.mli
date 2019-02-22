@@ -23,45 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos Shell - Main entry point of the validation scheduler. *)
+type kind =
+  | Internal
 
 type t
 
-val create:
-  State.t ->
-  Distributed_db.t ->
-  Peer_validator.limits ->
-  Block_validator.limits ->
-  Validator_process.t ->
-  Prevalidator.limits ->
-  Chain_validator.limits ->
-  t Lwt.t
-val shutdown: t -> unit Lwt.t
+val init : context_root:string -> kind -> t Lwt.t
+val close : t -> unit Lwt.t
 
-(** Start the validation scheduler of a given chain. *)
-val activate:
+type application_result = {
+  validation_result: Tezos_protocol_environment_shell.validation_result ;
+  block_data: Secp256k1.watermark ;
+  ops_metadata: Secp256k1.watermark list list ;
+  context_hash: Context_hash.t ;
+}
+
+val apply_block :
   t ->
-  ?max_child_ttl:int ->
-  start_prevalidator:bool ->
-  State.Chain.t -> Chain_validator.t Lwt.t
-
-val get: t -> Chain_id.t -> Chain_validator.t tzresult Lwt.t
-val get_exn: t -> Chain_id.t -> Chain_validator.t Lwt.t
-
-(** Force the validation of a block. *)
-val validate_block:
-  t ->
-  ?force:bool ->
-  ?chain_id:Chain_id.t ->
-  MBytes.t -> Operation.t list list ->
-  (Block_hash.t * State.Block.t option tzresult Lwt.t) tzresult Lwt.t
-
-(** Monitor all the valid block (for all activate chains). *)
-val watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
-
-val inject_operation:
-  t ->
-  ?chain_id:Chain_id.t ->
-  Operation.t -> unit tzresult Lwt.t
-
-val distributed_db: t -> Distributed_db.t
+  Block_header.t ->
+  Operation.t list list ->
+  State.Chain.t ->
+  application_result tzresult Lwt.t
