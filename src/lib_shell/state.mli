@@ -58,7 +58,9 @@ module Chain : sig
   val create:
     global_state ->
     ?allow_forked_chain:bool ->
-    genesis -> chain_state Lwt.t
+    genesis ->
+    Chain_id.t ->
+    chain_state Lwt.t
 
   (** Look up for a chain by the hash of its genesis block. *)
   val get: global_state -> Chain_id.t -> chain_state tzresult Lwt.t
@@ -208,7 +210,9 @@ module Block : sig
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
-  val test_chain: t -> (Test_chain_status.t * Block_header.t option) Lwt.t
+  val test_chain:
+    t ->
+    (Test_chain_status.t * (Chain_id.t * Block_hash.t * Block_header.t) option) Lwt.t
 
   val operation_hashes:
     t -> int ->

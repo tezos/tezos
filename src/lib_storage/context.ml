@@ -451,9 +451,13 @@ let commit_genesis index ~chain_id ~time ~protocol =
   GitStore.Branch.set index.repo (get_branch chain_id) commit >>= fun () ->
   Lwt.return (GitStore.Commit.hash commit)
 
+let compute_testchain_chain_id genesis =
+  let genesis_hash = Block_hash.hash_bytes [Block_hash.to_bytes genesis] in
+  Chain_id.of_block_hash genesis_hash
+
 let compute_testchain_genesis forked_block =
   let genesis = Block_hash.hash_bytes [Block_hash.to_bytes forked_block] in
-  let chain_id = Chain_id.of_block_hash genesis in
+  let chain_id = compute_testchain_chain_id genesis in
   chain_id, genesis
 
 let commit_test_chain_genesis (forked_header : Block_header.t) ctxt =
