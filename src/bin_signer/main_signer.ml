@@ -121,7 +121,7 @@ let commands base_dir require_auth : Client_context.full command list =
   List.map
     (Clic.map_command
        (fun (o : Client_context.full) -> (o :> Client_context.io_wallet)))
-    (Client_keys_commands.commands None @
+    (Client_keys_commands.commands (Some `Zeronet) @
      [ command ~group
          ~desc: "Launch a signer daemon over a TCP socket."
          (args5

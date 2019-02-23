@@ -210,7 +210,7 @@ assert_fails $client run script $contract_op_dir/packunpack.tz on storage Unit a
                '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)'
 
 # Get current steps to quota
-assert_storage $contract_op_dir/steps_to_quota.tz 111 Unit 399813
+assert_storage $contract_op_dir/steps_to_quota.tz 111 Unit 3999813
 
 # Get the current balance of the contract
 assert_storage $contract_op_dir/balance.tz '111' Unit '4000000000000'
