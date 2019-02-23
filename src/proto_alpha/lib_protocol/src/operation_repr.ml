@@ -253,7 +253,7 @@ module Encoding = struct
         name = "origination" ;
         encoding =
           (obj6
-             (req "manager_pubkey" Signature.Public_key_hash.encoding)
+             (req "managerPubkey" Signature.Public_key_hash.encoding)
              (req "balance" Tez_repr.encoding)
              (dft "spendable" bool true)
              (dft "delegatable" bool true)
