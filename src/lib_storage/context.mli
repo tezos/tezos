@@ -48,7 +48,7 @@ val compute_testchain_chain_id:
   Block_hash.t -> Chain_id.t
 
 val compute_testchain_genesis:
-  Block_hash.t -> Chain_id.t * Block_hash.t
+  Block_hash.t -> Block_hash.t
 
 val commit_genesis:
   index ->
@@ -58,9 +58,9 @@ val commit_genesis:
   Context_hash.t Lwt.t
 
 val commit_test_chain_genesis:
-  Block_header.t ->
   context ->
-  (Chain_id.t * Block_hash.t * Block_header.t) Lwt.t
+  Block_header.t ->
+  Block_header.t Lwt.t
 
 
 (** {2 Generic interface} ****************************************************)

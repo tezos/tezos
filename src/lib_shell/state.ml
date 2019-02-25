@@ -1226,7 +1226,8 @@ module Block = struct
   let test_chain block =
     context block >>= fun context ->
     Context.get_test_chain context >>= fun status ->
-    let lookup_testchain (chain_id, genesis) =
+    let lookup_testchain genesis =
+      let chain_id = Context.compute_testchain_chain_id genesis in
       (* if the chain already exists, use its genesis *)
       begin Chain.get block.chain_state.global_state chain_id >>= function
         | Ok forked_chain_state ->
@@ -1245,8 +1246,10 @@ module Block = struct
           Lwt.return (status, None)
     in
     match status with
-    | Running { genesis } -> lookup_testchain (Context.compute_testchain_chain_id genesis, genesis)
-    | Forking _ -> lookup_testchain (Context.compute_testchain_genesis (hash block))
+    | Running { genesis ; _ } -> lookup_testchain genesis
+    | Forking _ ->
+        let genesis = Context.compute_testchain_genesis (hash block) in
+        lookup_testchain genesis
     | Not_running -> Lwt.return (status, None)
 
   let block_validity chain_state block : Block_locator.validity Lwt.t =

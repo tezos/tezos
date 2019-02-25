@@ -470,10 +470,9 @@ let compute_testchain_chain_id genesis =
 
 let compute_testchain_genesis forked_block =
   let genesis = Block_hash.hash_bytes [Block_hash.to_bytes forked_block] in
-  let chain_id = compute_testchain_chain_id genesis in
-  chain_id, genesis
+  genesis
 
-let commit_test_chain_genesis (forked_header : Block_header.t) ctxt =
+let commit_test_chain_genesis ctxt (forked_header : Block_header.t) =
   let message =
     Format.asprintf "Forking testchain at level %ld." forked_header.shell.level in
   raw_commit ~time:forked_header.shell.timestamp ~message ctxt >>= fun commit ->
@@ -486,13 +485,14 @@ let commit_test_chain_genesis (forked_header : Block_header.t) ctxt =
     context = GitStore.Commit.hash commit ;
   } in
   let forked_block = Block_header.hash forked_header in
-  let chain_id, genesis_hash = compute_testchain_genesis forked_block in
+  let genesis_hash = compute_testchain_genesis forked_block in
+  let chain_id = compute_testchain_chain_id genesis_hash in
   let genesis_header : Block_header.t =
     { shell = { faked_shell_header with predecessor = genesis_hash } ;
       protocol_data = MBytes.create 0 } in
   let branch = get_branch chain_id in
   GitStore.Branch.set ctxt.index.repo branch commit >>= fun () ->
-  Lwt.return (chain_id, genesis_hash, genesis_header)
+  Lwt.return genesis_header
 
 let clear_test_chain index chain_id =
   (* TODO remove commits... ??? *)
