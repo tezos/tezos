@@ -116,6 +116,9 @@ type limits = {
   greylist_timeout : int ;
   (** GC delay for the grelists tables, in seconds. *)
 
+  maintenance_idle_time: float ;
+  (** How long to wait at most, in seconds, before running a maintenance loop. *)
+
   min_connections : int ;
   (** Strict minimum number of connections (triggers an urgent maintenance) *)
 

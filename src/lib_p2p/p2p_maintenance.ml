@@ -194,10 +194,11 @@ and too_many_connections st n_connected =
 
 let rec worker_loop st =
   let Pool pool = st.pool in
+  let config = P2p_pool.config pool in
   begin
     protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
-        Lwt_unix.sleep 120. ; (* every two minutes *)
+        Lwt_unix.sleep config.P2p_pool.maintenance_idle_time ; (* default: every two minutes *)
         Lwt_condition.wait st.please_maintain ; (* when asked *)
         P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
         P2p_pool.Pool_event.wait_too_many_connections pool ;
