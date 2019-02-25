@@ -147,4 +147,8 @@ let build_rpc_directory validator mainchain_validator =
     RPC_answer.return_stream { next ; shutdown }
   end ;
 
+  gen_register0 Monitor_services.S.commit_hash begin fun () () ->
+    RPC_answer.return Tezos_base.Current_git_info.commit_hash
+  end ;
+
   !dir

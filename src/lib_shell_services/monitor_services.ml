@@ -100,6 +100,13 @@ module S = struct
       ~output: Protocol_hash.encoding
       RPC_path.(path / "protocols")
 
+  let commit_hash =
+    RPC_service.get_service
+      ~description:"Get information on the build of the node."
+      ~query: RPC_query.empty
+      ~output: string
+      RPC_path.(path / "commit_hash")
+
 end
 
 open RPC_context
@@ -122,3 +129,6 @@ let heads ctxt ?(next_protocols = []) chain =
 
 let protocols ctxt =
   make_streamed_call S.protocols ctxt () () ()
+
+let commit_hash ctxt =
+  make_call S.commit_hash ctxt () () ()
