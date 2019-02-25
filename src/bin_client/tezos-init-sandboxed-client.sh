@@ -169,7 +169,7 @@ usage() {
     echo "Small script to initialize a client to a local and closed test network with a maximum of 9 nodes."
     echo
     echo "Usage: eval \`$0 <id>\`"
-    echo "  where <id> should be a positive integer."
+    echo "  where <id> should be an integer between 1 and 9."
 }
 
 main () {
@@ -189,7 +189,7 @@ main () {
         local_compiler="${local_compiler:-$(which tezos-protocol-compiler)}"
     fi
 
-    if [ $# -lt 1 ] || [ "$1" -le 0 ] ; then
+    if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
         usage
         exit 1
     fi
