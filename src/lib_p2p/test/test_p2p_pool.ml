@@ -95,6 +95,7 @@ let detach_node f points n =
       connection_timeout = 10. ;
       authentication_timeout = 2. ;
       greylist_timeout = 2 ;
+      maintenance_idle_time = 120. ;
       incoming_app_message_queue_size = None ;
       incoming_message_queue_size = None ;
       outgoing_message_queue_size = None ;

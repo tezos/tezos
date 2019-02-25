@@ -72,6 +72,7 @@ type limits = {
   connection_timeout : float ;
   authentication_timeout : float ;
   greylist_timeout : int ;
+  maintenance_idle_time: float ;
 
   min_connections : int ;
   expected_connections : int ;
@@ -127,6 +128,7 @@ let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg io_sched
     connection_timeout = limits.connection_timeout ;
     authentication_timeout = limits.authentication_timeout ;
     greylist_timeout = limits.greylist_timeout ;
+    maintenance_idle_time = limits.maintenance_idle_time ;
     incoming_app_message_queue_size = limits.incoming_app_message_queue_size ;
     incoming_message_queue_size = limits.incoming_message_queue_size ;
     outgoing_message_queue_size = limits.outgoing_message_queue_size ;

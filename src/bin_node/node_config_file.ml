@@ -76,6 +76,7 @@ let default_p2p_limits : P2p.limits = {
   connection_timeout = 10. ;
   authentication_timeout = 5. ;
   greylist_timeout = 86400 ; (* one day *)
+  maintenance_idle_time = 120. ; (* two minutes *)
   min_connections = 10 ;
   expected_connections = 50 ;
   max_connections = 100 ;
@@ -133,6 +134,7 @@ let limit : P2p.limits Data_encoding.t =
   let open Data_encoding in
   conv
     (fun { P2p.connection_timeout ; authentication_timeout ; greylist_timeout ;
+           maintenance_idle_time ;
            min_connections ; expected_connections ; max_connections ;
            backlog ; max_incoming_connections ;
            max_download_speed ; max_upload_speed ;
@@ -152,7 +154,7 @@ let limit : P2p.limits Data_encoding.t =
            incoming_message_queue_size, outgoing_message_queue_size,
            known_points_history_size, known_peer_ids_history_size,
            max_known_points)),
-        (  max_known_peer_ids, greylist_timeout))))
+        (  max_known_peer_ids, greylist_timeout, maintenance_idle_time))))
     (fun (((( connection_timeout, authentication_timeout,
               min_connections, expected_connections,
               max_connections, backlog, max_incoming_connections,
@@ -162,8 +164,9 @@ let limit : P2p.limits Data_encoding.t =
               incoming_message_queue_size, outgoing_message_queue_size,
               known_points_history_size, known_peer_ids_history_size,
               max_known_points)),
-           (  max_known_peer_ids, greylist_timeout))) ->
+           (  max_known_peer_ids, greylist_timeout, maintenance_idle_time))) ->
       { connection_timeout ; authentication_timeout ; greylist_timeout ;
+        maintenance_idle_time ;
         min_connections ; expected_connections ;
         max_connections ; backlog ; max_incoming_connections ;
         max_download_speed ; max_upload_speed ;
@@ -234,13 +237,17 @@ let limit : P2p.limits Data_encoding.t =
                 default_p2p_limits.known_points_history_size)
              (opt "max_known_points" (tup2 uint16 uint16))
           ))
-       (obj2
+       (obj3
           (opt "max_known_peer_ids" (tup2 uint16 uint16))
           (dft "greylist-timeout"
              ~description: "GC delay for the greylists tables, in seconds."
              int31 default_p2p_limits.greylist_timeout)
-
-       ))
+          (dft "maintenance-idle-time"
+             ~description: "How long to wait at most, in seconds, \
+                            before running a maintenance loop."
+             float default_p2p_limits.maintenance_idle_time)
+       )
+    )
 
 let p2p =
   let open Data_encoding in
