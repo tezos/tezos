@@ -65,6 +65,22 @@ let may_lock_pidfile = function
       trace (failure "Failed to create the pidfile: %s" pidfile) @@
       Lwt_lock_file.create ~unlink_on_exit:true pidfile
 
+let check_upgrade_baking_files (cctxt : #Client_context.full) =
+  cctxt#with_lock begin fun () ->
+    begin
+      Daemon_state.should_upgrade_blocks_file cctxt >>=? fun should_upgrade_blocks ->
+      Daemon_state.should_upgrade_endorsements_file cctxt >>=? fun should_upgrade_endorsements ->
+      Client_baking_nonces.should_upgrade_nonce_file cctxt >>=? fun should_upgrade_nonce ->
+      return (should_upgrade_blocks || should_upgrade_endorsements || should_upgrade_nonce)
+    end >>=? fun should_upgrade ->
+    if should_upgrade then begin
+      cctxt#error "Old baking state detected. Run `tezos-client \
+                   --base-dir <dir> upgrade baking state` to \
+                   upgrade the state. By default <dir> is '$HOME/.tezos-client'"
+    end else
+      return_unit
+  end
+
 let delegate_commands () =
   let open Clic in
   [
@@ -88,6 +104,7 @@ let delegate_commands () =
             await_endorsements, force,
             minimal_timestamp, mempool, context_path)
         delegate cctxt ->
+        check_upgrade_baking_files cctxt >>=? fun () ->
         bake_block cctxt
           ~minimal_fees
           ~minimal_nanotez_per_gas_unit
@@ -102,12 +119,14 @@ let delegate_commands () =
       (prefixes [ "reveal"; "nonce"; "for" ]
        @@ seq_of_param Block_hash.param)
       (fun () block_hashes cctxt ->
+         check_upgrade_baking_files cctxt >>=? fun () ->
          reveal_block_nonces cctxt ~chain:cctxt#chain ~block:cctxt#block block_hashes) ;
     command ~group ~desc: "Forge and inject all the possible seed-nonce revelation operations."
       no_options
       (prefixes [ "reveal"; "nonces" ]
        @@ stop)
       (fun () cctxt ->
+         check_upgrade_baking_files cctxt >>=? fun () ->
          reveal_nonces ~chain:cctxt#chain ~block:cctxt#block cctxt ()) ;
     command ~group ~desc: "Forge and inject an endorsement operation."
       no_options
@@ -115,7 +134,20 @@ let delegate_commands () =
        @@ Client_keys.Public_key_hash.source_param
          ~name:"baker" ~desc: "name of the delegate owning the endorsement right"
        @@ stop)
-      (fun () delegate cctxt -> endorse_block cctxt ~chain:cctxt#chain delegate) ;
+      (fun () delegate cctxt ->
+         check_upgrade_baking_files cctxt >>=? fun () ->
+         endorse_block cctxt ~chain:cctxt#chain delegate) ;
+    command ~group ~desc: "Upgrade legacy client files to the up-to-date format."
+      no_options
+      (prefixes [ "upgrade" ; "baking" ; "state" ]
+       @@ stop)
+      (fun () (cctxt : #Client_context.full) ->
+         cctxt#with_lock begin fun () ->
+           Shell_services.Chain.chain_id cctxt ~chain:`Main () >>=? fun main_chain_id ->
+           Client_baking_nonces.upgrade_nonce_file ~main_chain_id cctxt >>=? fun () ->
+           Daemon_state.upgrade_files cctxt () >>=? fun () ->
+           return_unit
+         end) ;
   ]
 
 let init_signal () =
@@ -155,6 +187,7 @@ let baker_commands () =
         may_lock_pidfile pidfile >>=? fun () ->
         Tezos_signer_backends.Encrypted.decrypt_list
           cctxt (List.map fst delegates) >>=? fun () ->
+        check_upgrade_baking_files cctxt >>=? fun () ->
         Client_daemon.Baker.run cctxt
           ~chain:cctxt#chain
           ~minimal_fees
@@ -183,6 +216,7 @@ let endorser_commands () =
          may_lock_pidfile pidfile >>=? fun () ->
          Tezos_signer_backends.Encrypted.decrypt_list
            cctxt (List.map fst delegates) >>=? fun () ->
+         check_upgrade_baking_files cctxt >>=? fun () ->
          Client_daemon.Endorser.run cctxt
            ~chain:cctxt#chain
            ~delay:endorsement_delay
