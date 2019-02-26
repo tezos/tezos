@@ -31,7 +31,7 @@ type result = {
   block_metadata: MBytes.t ;
   ops_metadata: MBytes.t list list ;
   context_hash: Context_hash.t ;
-  forked_genesis_header : Block_header.t option ;
+  forking_testchain : bool ;
 }
 
 let update_testchain_status ctxt predecessor_header =
@@ -52,23 +52,25 @@ let update_testchain_status ctxt predecessor_header =
                    protocol ; expiration }) >>= fun ctxt ->
       return ctxt
 
-let reset_test_chain
-    ctxt ~start_testchain forked_header =
+let is_testchain_forking ctxt =
   Context.get_test_chain ctxt >>= function
-  | Not_running | Running _ -> return_none
+  | Not_running | Running _ -> Lwt.return_false
+  | Forking _ -> Lwt.return_true
+
+let init_test_chain
+    ctxt forked_header =
+  Context.get_test_chain ctxt >>= function
+  | Not_running | Running _ -> assert false
   | Forking { protocol ; _ } ->
-      if start_testchain then
-        begin match Registered_protocol.get protocol with
-          | Some proto -> return proto
-          | None -> fail (Missing_test_protocol protocol)
-        end >>=? fun (module Proto_test) ->
-        Proto_test.init ctxt forked_header.Block_header.shell >>=? fun { context = test_ctxt } ->
-        Context.set_test_chain test_ctxt Not_running >>= fun test_ctxt ->
-        Context.set_protocol test_ctxt protocol >>= fun test_ctxt ->
-        Context.commit_test_chain_genesis test_ctxt forked_header >>= fun genesis_header ->
-        return_some genesis_header
-      else
-        return_none
+      begin match Registered_protocol.get protocol with
+        | Some proto -> return proto
+        | None -> fail (Missing_test_protocol protocol)
+      end >>=? fun (module Proto_test) ->
+      Proto_test.init ctxt forked_header.Block_header.shell >>=? fun { context = test_ctxt } ->
+      Context.set_test_chain test_ctxt Not_running >>= fun test_ctxt ->
+      Context.set_protocol test_ctxt protocol >>= fun test_ctxt ->
+      Context.commit_test_chain_genesis test_ctxt forked_header >>= fun genesis_header ->
+      return genesis_header
 
 let may_patch_protocol
     ~level
@@ -170,12 +172,10 @@ module Make(Proto : Registered_protocol.T) = struct
       ~max_operations_ttl
       ~(predecessor_block_header : Block_header.t)
       ~predecessor_context
-      ~start_testchain
       ~(block_header : Block_header.t)
       operations =
     let block_hash = Block_header.hash block_header in
     let invalid_block = invalid_block block_hash in
-    let current_block_header = block_header in
     check_block_header
       ~predecessor_block_header
       block_hash block_header >>=? fun () ->
@@ -201,10 +201,11 @@ module Make(Proto : Registered_protocol.T) = struct
       (state, []) operations >>=? fun (state, ops_metadata) ->
     let ops_metadata = List.rev ops_metadata in
     Proto.finalize_block state >>=? fun (validation_result, block_data) ->
-    reset_test_chain
-      validation_result.context
-      current_block_header
-      ~start_testchain >>=? fun forked_genesis_header ->
+    (* reset_test_chain
+     *   validation_result.context
+     *   current_block_header
+     *   ~start_testchain >>=? fun forked_genesis_header -> *)
+    is_testchain_forking validation_result.context >>= fun forking_testchain ->
     may_patch_protocol
       ~level:block_header.shell.level validation_result >>=? fun validation_result ->
     Context.get_protocol validation_result.context >>= fun new_protocol ->
@@ -258,7 +259,7 @@ module Make(Proto : Registered_protocol.T) = struct
       ?message:validation_result.message
       validation_result.context >>= fun context_hash ->
     return ({ validation_result ; block_metadata ;
-              ops_metadata ; context_hash ; forked_genesis_header })
+              ops_metadata ; context_hash ; forking_testchain })
 
 end
 
@@ -299,7 +300,6 @@ let apply
     ~max_operations_ttl
     ~(predecessor_block_header : Block_header.t)
     ~predecessor_context
-    ~start_testchain
     ~(block_header : Block_header.t)
     operations =
   let block_hash = Block_header.hash block_header in
@@ -317,7 +317,6 @@ let apply
     ~max_operations_ttl
     ~predecessor_block_header
     ~predecessor_context
-    ~start_testchain
     ~block_header
     operations >>= function
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->

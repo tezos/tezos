@@ -932,12 +932,12 @@ let clear_block chain_db hash n =
 
 let commit_block chain_db hash
     header header_data operations operations_data result
-    ~forked_genesis_header =
+    ~forking_testchain =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
   assert (List.length operations = header.shell.validation_passes) ;
   State.Block.store chain_db.chain_state
     header header_data operations operations_data result
-    ~forked_genesis_header >>=? fun res ->
+    ~forking_testchain >>=? fun res ->
   clear_block chain_db hash header.shell.validation_passes ;
   return res
 
@@ -1141,4 +1141,3 @@ module Advertise = struct
           ) (P2p_peer.Table.fold (fun k v acc -> (k,v)::acc) chain_db.active_connections [])
 
 end
-

@@ -53,7 +53,6 @@ module Seq_validator = struct
       chain_id
       ~max_operations_ttl
       ~(predecessor_block_header : Block_header.t)
-      ~start_testchain
       ~block_header
       operations =
     get_context validator_process.context_index
@@ -63,7 +62,6 @@ module Seq_validator = struct
       ~max_operations_ttl
       ~predecessor_block_header
       ~predecessor_context
-      ~start_testchain
       ~block_header
       operations
 
@@ -83,7 +81,7 @@ let init = function
 let close = function
   | Sequential vp -> Seq_validator.close vp
 
-let apply_block bvp ~predecessor ~start_testchain block_header operations =
+let apply_block bvp ~predecessor block_header operations =
   let chain_state = State.Block.chain_state predecessor in
   let chain_id = State.Block.chain_id predecessor in
   let predecessor_block_header = State.Block.header predecessor in
@@ -104,6 +102,4 @@ let apply_block bvp ~predecessor ~start_testchain block_header operations =
       Seq_validator.apply_block vp
         ~max_operations_ttl
         chain_id ~predecessor_block_header
-        ~start_testchain
         ~block_header operations
-

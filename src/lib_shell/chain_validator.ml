@@ -44,7 +44,7 @@ end
 
 type limits = {
   bootstrap_threshold: int ;
-  worker_limits: Worker_types.limits
+  worker_limits: Worker_types.limits ;
 }
 
 module Types = struct
@@ -188,10 +188,11 @@ let may_switch_test_chain w active_chains spawn_child block =
     let block_header = State.Block.header block in
     State.Block.test_chain block >>= function
     | Not_running, _ -> shutdown_child nv active_chains >>= return
-    | (Forking _
-      | Running _), None -> return () (* disable_testchain was on at forking time *)
+    | (Forking _ | Running _), None -> return_unit (* only for snapshots *)
     | (Forking { protocol ; expiration }
-      | Running { protocol ; expiration }), Some (chain_id, genesis, genesis_header) ->
+      | Running { protocol ; expiration }), Some forking_block ->
+        let genesis = Context.compute_testchain_genesis (State.Block.hash forking_block) in
+        let chain_id = Context.compute_testchain_chain_id genesis in
         let activated =
           match nv.child with
           | None -> false
@@ -203,9 +204,12 @@ let may_switch_test_chain w active_chains spawn_child block =
           match nv.parameters.max_child_ttl with
           | None -> Lwt.return false
           | Some ttl ->
+              let forking_block_timestamp =
+                (State.Block.shell_header forking_block).Block_header.timestamp
+              in
               Lwt.return
                 Time.(min expiration
-                        (add genesis_header.shell.timestamp (Int64.of_int ttl))
+                        (add forking_block_timestamp (Int64.of_int ttl))
                       < block_header.shell.timestamp)
         end >>= fun locally_expired ->
         if locally_expired && activated then
@@ -221,12 +225,27 @@ let may_switch_test_chain w active_chains spawn_child block =
               chain_id >>= function
             | Ok chain_state -> return chain_state
             | Error _ -> (* TODO proper error matching (Not_found ?) or use `get_opt` ? *)
-                State.fork_testchain
-                  block chain_id genesis genesis_header protocol expiration >>=? fun chain_state ->
-                Chain.head chain_state >>= fun new_genesis_block ->
-                Lwt_watcher.notify nv.parameters.global_valid_block_input new_genesis_block ;
-                Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
-                return chain_state
+                State.Block.context forking_block >>= fun context ->
+                let try_init_test_chain cont =
+                  Block_validation.init_test_chain
+                    context (State.Block.header forking_block) >>= function
+                  | Ok genesis_header ->
+                      State.fork_testchain
+                        block chain_id genesis genesis_header protocol expiration >>=? fun chain_state ->
+                      Chain.head chain_state >>= fun new_genesis_block ->
+                      Lwt_watcher.notify nv.parameters.global_valid_block_input new_genesis_block ;
+                      Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
+                      return chain_state
+                  | Error [ Block_validator_errors.Missing_test_protocol missing_protocol ] ->
+                      Block_validator.fetch_and_compile_protocol
+                        nv.parameters.block_validator
+                        missing_protocol >>=? fun _ ->
+                      cont ()
+                  | Error _ as errs -> Lwt.return errs
+                in
+                try_init_test_chain @@ fun () ->
+                try_init_test_chain @@ fun () ->
+                failwith "Could not retrieve test protocol"
           end >>=? fun chain_state ->
           (* [spawn_child] is a callback to [create_node]. Thus, it takes care of
              global initialization boilerplate (e.g. notifying [global_chains_input],
@@ -512,7 +531,8 @@ let create
     ~start_testchain
     ~active_chains
     peer_validator_limits prevalidator_limits
-    block_validator global_valid_block_input
+    block_validator
+    global_valid_block_input
     global_chains_input
     global_db state limits =
   (* hide the optional ?parent *)
@@ -522,7 +542,8 @@ let create
     ~start_testchain
     ~active_chains
     peer_validator_limits prevalidator_limits
-    block_validator global_valid_block_input
+    block_validator
+    global_valid_block_input
     global_chains_input
     global_db state limits
 
