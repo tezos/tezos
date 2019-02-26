@@ -29,7 +29,6 @@ open Alpha_context
 type t
 
 val load:
-  main_chain_id: Chain_id.t ->
   #Client_context.wallet ->
   t tzresult Lwt.t
 
@@ -72,3 +71,12 @@ val find_chain_nonces_opt:
   t ->
   Chain_id.t ->
   Nonce.t Block_hash.Map.t option
+
+val should_upgrade_nonce_file:
+  #Client_context.full ->
+  bool tzresult Lwt.t
+
+val upgrade_nonce_file:
+  #Client_context.full ->
+  main_chain_id: Chain_id.t ->
+  unit tzresult Lwt.t
