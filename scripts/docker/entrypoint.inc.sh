@@ -58,14 +58,16 @@ launch_node() {
     fi
     if [ "$local_data_version" != "$image_version" ]; then
         echo "Removing outdated chain data..."
-        if [ -f "$node_data_dir/identities.json" ]; then \
-            mv "$node_data_dir/identities.json" /tmp
+        if [ -f "$node_data_dir/identity.json" ]; then \
+            mv "$node_data_dir/identity.json" /tmp
         fi
         rm -rf "$node_data_dir"
         rm -rf "$client_dir/nonces"
+        rm -rf "$client_dir/endorsements"
+        rm -rf "$client_dir/blocks"
         rm -rf "$client_dir/highwatermarks"
-        if [ -f "/tmp/identities.json" ]; then \
-            mv /tmp/identities.json "$node_data_dir/"
+        if [ -f "/tmp/identity.json" ]; then \
+            mv /tmp/identity.json "$node_data_dir/"
         fi
         cp "/usr/local/share/tezos/alphanet_version" \
            "$node_dir/alphanet_version"
