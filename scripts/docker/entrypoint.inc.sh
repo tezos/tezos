@@ -109,8 +109,16 @@ launch_node() {
 
 launch_baker() {
     configure_client
-    wait_for_the_node_to_be_bootstraped
-    exec "$baker" --base-dir "$client_dir" \
+    exec "$baker" --chain main \
+	 --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 run with local node "$node_data_dir"
+}
+
+launch_baker_test() {
+    configure_client
+    exec "$baker" --chain test \
+	 --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
 	 run with local node "$node_data_dir"
 }
@@ -118,7 +126,17 @@ launch_baker() {
 launch_endorser() {
     configure_client
     wait_for_the_node_to_be_bootstraped
-    exec "$endorser" --base-dir "$client_dir" \
+    exec "$endorser" --chain main \
+	 --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 run --endorsement-delay 10
+}
+
+launch_endorser_test() {
+    configure_client
+    wait_for_the_node_to_be_bootstraped
+    exec "$endorser" --chain test \
+	 --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
 	 run --endorsement-delay 10
 }
