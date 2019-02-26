@@ -34,11 +34,11 @@ val update_testchain_status:
   Block_header.t ->
   Context.t tzresult Lwt.t
 
-val reset_test_chain:
+(** [init_test_chain] must only be called on a forking block. *)
+val init_test_chain:
   Context.t ->
-  start_testchain:bool ->
   Block_header.t ->
-  Block_header.t option tzresult Lwt.t
+  Block_header.t tzresult Lwt.t
 
 val check_liveness:
   live_blocks:Block_hash.Set.t ->
@@ -52,7 +52,7 @@ type result = {
   block_metadata: MBytes.t ;
   ops_metadata: MBytes.t list list ;
   context_hash: Context_hash.t ;
-  forked_genesis_header : Block_header.t option ;
+  forking_testchain: bool ;
 }
 
 val apply:
@@ -60,6 +60,5 @@ val apply:
   max_operations_ttl:int ->
   predecessor_block_header:Block_header.t ->
   predecessor_context:Context.t ->
-  start_testchain:bool ->
   block_header:Block_header.t ->
   Operation.t list list -> result tzresult Lwt.t

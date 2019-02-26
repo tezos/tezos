@@ -35,7 +35,6 @@ val close : t -> unit Lwt.t
 val apply_block :
   t ->
   predecessor:State.Block.t ->
-  start_testchain: bool ->
   Block_header.t ->
   Operation.t list list ->
   Block_validation.result tzresult Lwt.t

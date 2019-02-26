@@ -167,7 +167,7 @@ module Block : sig
     Block_header.t -> MBytes.t ->
     Operation.t list list -> MBytes.t list list ->
     validation_store ->
-    forked_genesis_header: (Block_header.t option) ->
+    forking_testchain: bool ->
     block option tzresult Lwt.t
 
   val store_invalid:
@@ -237,9 +237,7 @@ module Block : sig
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
-  val test_chain:
-    t ->
-    (Test_chain_status.t * (Chain_id.t * Block_hash.t * Block_header.t) option) Lwt.t
+  val test_chain: t -> (Test_chain_status.t * t option) Lwt.t
 
   val operation_hashes:
     t -> int ->

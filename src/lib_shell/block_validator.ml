@@ -99,7 +99,6 @@ let get_proto pred hash =
                                    protocol = pred_protocol_hash })
   | Some p -> return p
 
-
 let on_request
   : type r. t -> r Request.t -> r tzresult Lwt.t
   = fun w
@@ -136,7 +135,6 @@ let on_request
                   begin Block_validator_process.apply_block
                       bv.validation_process
                       ~predecessor:pred
-                      ~start_testchain:bv.start_testchain
                       header operations >>= function
                     | Ok x -> return x
                     | Error [ Missing_test_protocol protocol ] ->
@@ -147,11 +145,10 @@ let on_request
                         Block_validator_process.apply_block
                           bv.validation_process
                           ~predecessor:pred
-                          ~start_testchain:bv.start_testchain
                           header operations
                     | Error _ as x -> Lwt.return x
                   end >>=? fun { validation_result ; block_metadata ;
-                                 ops_metadata ; context_hash ; forked_genesis_header } ->
+                                 ops_metadata ; context_hash ; forking_testchain } ->
                   let validation_store =
                     ({ context_hash ;
                        message = validation_result.message ;
@@ -162,7 +159,7 @@ let on_request
                     chain_db hash
                     header block_metadata operations ops_metadata
                     validation_store
-                    ~forked_genesis_header >>=? function
+                    ~forking_testchain >>=? function
                   | None -> assert false (* should not happen *)
                   | Some block -> return block
                 end

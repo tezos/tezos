@@ -932,12 +932,12 @@ let clear_block chain_db hash n =
 
 let commit_block chain_db hash
     header header_data operations operations_data result
-    ~forked_genesis_header =
+    ~forking_testchain =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
   assert (List.length operations = header.shell.validation_passes) ;
   State.Block.store chain_db.chain_state
     header header_data operations operations_data result
-    ~forked_genesis_header >>=? fun res ->
+    ~forking_testchain >>=? fun res ->
   clear_block chain_db hash header.shell.validation_passes ;
   return res
 
