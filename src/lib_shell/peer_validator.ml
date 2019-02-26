@@ -334,8 +334,8 @@ let on_close w =
 
 let on_launch _ name parameters =
   let chain_state = Distributed_db.chain_state parameters.chain_db in
-  State.Block.read_exn chain_state
-    (State.Chain.genesis chain_state).block >>= fun genesis ->
+  State.Block.read_opt chain_state
+    (State.Chain.genesis chain_state).block >|= Option.unopt_assert ~loc:__POS__ >>= fun genesis ->
   let rec pv = {
     peer_id = snd name ;
     parameters = { parameters with notify_new_block } ;

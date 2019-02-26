@@ -144,7 +144,7 @@ module Block_header_storage = struct
     State.Block.read_opt chain_state h >>= fun b ->
     Lwt.return (Option.map ~f:State.Block.header b)
   let read_exn chain_state h =
-    State.Block.read_exn chain_state h >>= fun b ->
+    State.Block.read_opt chain_state h >|= Option.unopt_assert ~loc:__POS__ >>= fun b ->
     Lwt.return (State.Block.header b)
 end
 
@@ -180,7 +180,7 @@ module Operation_hashes_storage = struct
         State.Block.operation_hashes b i >>= fun (ops, _) ->
         Lwt.return_some ops
   let read_exn chain_state (h, i) =
-    State.Block.read_exn chain_state h >>= fun b ->
+    State.Block.read_opt chain_state h >|= Option.unopt_assert ~loc:__POS__ >>= fun b ->
     State.Block.operation_hashes b i >>= fun (ops, _) ->
     Lwt.return ops
 end
@@ -262,7 +262,7 @@ module Operations_storage = struct
         State.Block.operations b i >>= fun (ops, _) ->
         Lwt.return_some ops
   let read_exn chain_state (h, i) =
-    State.Block.read_exn chain_state h >>= fun b ->
+    State.Block.read_opt chain_state h >|= Option.unopt_assert ~loc:__POS__ >>= fun b ->
     State.Block.operations b i >>= fun (ops, _) ->
     Lwt.return ops
 end
@@ -326,7 +326,7 @@ module Protocol_storage = struct
   let known = State.Protocol.known
   let read = State.Protocol.read
   let read_opt = State.Protocol.read_opt
-  let read_exn = State.Protocol.read_exn
+  let read_exn _ _ = raise Not_found
 end
 
 module Raw_protocol =

@@ -31,13 +31,14 @@ let mempool_encoding = Mempool.encoding
 
 let genesis chain_state =
   let genesis = State.Chain.genesis chain_state in
-  State.Block.read_exn chain_state genesis.block
+  State.Block.read_opt chain_state genesis.block >|= Option.unopt_assert ~loc:__POS__
 
 let known_heads chain_state =
   State.read_chain_data chain_state begin fun chain_store _data ->
     Store.Chain_data.Known_heads.elements chain_store
   end >>= fun hashes ->
-  Lwt_list.map_p (State.Block.read_exn chain_state) hashes
+  Lwt_list.map_p
+    (fun h -> State.Block.read_opt chain_state h >|= Option.unopt_assert ~loc:__POS__) hashes
 
 let head chain_state =
   State.read_chain_data chain_state begin fun _chain_store data ->
@@ -135,4 +136,3 @@ let init_head chain_state =
   head chain_state >>= fun block ->
   set_head chain_state block >>= fun _ ->
   Lwt.return_unit
-

@@ -79,7 +79,6 @@ module Make_substore (S : STORE) (N : NAME)
   let known_dir t k = S.known_dir t (to_key k)
   let read t k = S.read t (to_key k)
   let read_opt t k = S.read_opt t (to_key k)
-  let read_exn t k = S.read_exn t (to_key k)
   let store t k v = S.store t (to_key k) v
   let remove t k = S.remove t (to_key k)
   let fold t k ~init ~f =
@@ -108,7 +107,6 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let known_dir (t,i) k = S.known_dir t (to_key i k)
     let read (t,i) k = S.read t (to_key i k)
     let read_opt (t,i) k = S.read_opt t (to_key i k)
-    let read_exn (t,i) k = S.read_exn t (to_key i k)
     let store (t,i) k v = S.store t (to_key i k) v
     let remove (t,i) k = S.remove t (to_key i k)
     let fold (t,i) k ~init ~f =

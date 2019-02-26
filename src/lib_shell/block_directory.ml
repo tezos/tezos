@@ -344,31 +344,32 @@ let get_block chain_state = function
       else if n = 0 then
         Lwt.return head
       else
-        State.Block.read_exn chain_state ~pred:n (State.Block.hash head)
+        State.Block.read_opt chain_state ~pred:n (State.Block.hash head) >|= Option.unopt_assert ~loc:__POS__
   | `Hash (hash, n) ->
       if n < 0 then
-        State.Block.read_exn chain_state hash >>= fun block ->
-        Chain.head chain_state >>= fun head ->
-        let head_level = State.Block.level head in
-        let block_level = State.Block.level block in
-        let target =
-          Int32.(to_int (sub head_level (sub block_level (of_int n)))) in
-        if target < 0 then
-          Lwt.fail Not_found
-        else
-          State.Block.read_exn chain_state ~pred:target (State.Block.hash head)
+        State.Block.read_opt chain_state hash >>= function
+        | None -> assert false
+        | Some block ->
+            Chain.head chain_state >>= fun head ->
+            let head_level = State.Block.level head in
+            let block_level = State.Block.level block in
+            let target =
+              Int32.(to_int (sub head_level (sub block_level (of_int n)))) in
+            if target < 0 then
+              Lwt.fail Not_found
+            else
+              State.Block.read_opt chain_state ~pred:target (State.Block.hash head) >|= Option.unopt_assert ~loc:__POS__
       else
-        State.Block.read_exn chain_state ~pred:n hash
+        State.Block.read_opt chain_state ~pred:n hash >|= Option.unopt_assert ~loc:__POS__
   | `Level i ->
       Chain.head chain_state >>= fun head ->
       let target = Int32.(to_int (sub (State.Block.level head) i)) in
       if target < 0 then
         Lwt.fail Not_found
       else
-        State.Block.read_exn chain_state ~pred:target (State.Block.hash head)
+        State.Block.read_opt chain_state ~pred:target (State.Block.hash head) >|= Option.unopt_assert ~loc:__POS__
 
 let build_rpc_directory chain_state block =
   get_block chain_state block >>= fun block ->
   get_directory block >>= fun dir ->
   Lwt.return (RPC_directory.map (fun _ -> Lwt.return block) dir)
-

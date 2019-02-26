@@ -45,6 +45,9 @@ val unopt_map: f:('a -> 'b) -> default:'b -> 'a option -> 'b
 (** [unopt_exn exn x] is [y] if [x] is [Some y], or raises [exn] if [x] is [None] *)
 val unopt_exn : exn -> 'a option -> 'a
 
+(** [unopt_assert loc x] is [y] if [x] is [Some y], or raises Assert_failure loc if [x] is None *)
+val unopt_assert : loc:string * int * int * 'a -> 'b option -> 'b
+
 (** First input of form [Some x], or [None] if none **)
 val first_some: 'a option -> 'a option -> 'a option
 

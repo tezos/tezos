@@ -137,7 +137,6 @@ module Block : sig
 
   val read: Chain.t -> ?pred:int -> Block_hash.t -> block tzresult Lwt.t
   val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block option Lwt.t
-  val read_exn: Chain.t -> ?pred:int -> Block_hash.t -> block Lwt.t
 
   val store:
     ?dont_enforce_context_hash:bool ->
@@ -297,12 +296,10 @@ module Protocol : sig
   (** Read a value in the local database. *)
   val read: global_state -> Protocol_hash.t -> Protocol.t tzresult Lwt.t
   val read_opt: global_state -> Protocol_hash.t -> Protocol.t option Lwt.t
-  val read_exn: global_state -> Protocol_hash.t -> Protocol.t Lwt.t
 
   (** Read a value in the local database (without parsing). *)
   val read_raw: global_state -> Protocol_hash.t -> MBytes.t tzresult Lwt.t
   val read_raw_opt: global_state -> Protocol_hash.t -> MBytes.t option Lwt.t
-  val read_raw_exn: global_state -> Protocol_hash.t -> MBytes.t Lwt.t
 
   val store: global_state -> Protocol.t -> Protocol_hash.t option Lwt.t
 
