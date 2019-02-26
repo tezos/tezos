@@ -33,10 +33,17 @@ type bounds = {
   max_threshold: int ;
 }
 
+type config = {
+  maintenance_idle_time: float ;
+  greylist_timeout: int ;
+  private_mode: bool ;
+}
+
 type 'meta pool = Pool : ('msg, 'meta, 'meta_conn) P2p_pool.t -> 'meta pool
 
 type 'meta t = {
   canceler: Lwt_canceler.t ;
+  config: config ;
   bounds: bounds ;
   pool: 'meta pool ;
   discovery: P2p_discovery.t option ;
@@ -64,7 +71,6 @@ let connectable st start_time expected seen_points =
         | Some t1, Some t2 -> Time.compare t2 t1
     end) in
   let acc = Bounded_point_info.create expected in
-  let private_mode = (P2p_pool.config pool).P2p_pool.private_mode in
   let seen_points =
     P2p_pool.Points.fold_known pool ~init:seen_points
       ~f:begin fun point pi seen_points ->
@@ -75,7 +81,7 @@ let connectable st start_time expected seen_points =
         *)
         if P2p_point.Set.mem point seen_points ||
            P2p_pool.Points.banned pool point ||
-           (private_mode && not (P2p_point_state.Info.trusted pi))
+           (st.config.private_mode && not (P2p_point_state.Info.trusted pi))
         then
           seen_points
         else
@@ -131,9 +137,8 @@ let rec try_to_contact
 let rec maintain st =
   let Pool pool = st.pool in
   let n_connected = P2p_pool.active_connections pool in
-  let pool_cfg = P2p_pool.config pool in
   let older_than =
-    Time.(add (now ()) (Int64.of_int (- pool_cfg.greylist_timeout)))
+    Time.(add (now ()) (Int64.of_int (- st.config.greylist_timeout)))
   in
   P2p_pool.gc_greylist pool ~older_than ;
   if n_connected < st.bounds.min_threshold then
@@ -194,11 +199,10 @@ and too_many_connections st n_connected =
 
 let rec worker_loop st =
   let Pool pool = st.pool in
-  let config = P2p_pool.config pool in
   begin
     protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
-        Lwt_unix.sleep config.P2p_pool.maintenance_idle_time ; (* default: every two minutes *)
+        Lwt_unix.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
         Lwt_condition.wait st.please_maintain ; (* when asked *)
         P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
         P2p_pool.Pool_event.wait_too_many_connections pool ;
@@ -218,8 +222,9 @@ let rec worker_loop st =
   | Error [ Canceled ] -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
-let create ?discovery bounds pool = {
+let create ?discovery config bounds pool = {
   canceler = Lwt_canceler.create () ;
+  config ;
   bounds ;
   discovery ;
   pool = Pool pool ;

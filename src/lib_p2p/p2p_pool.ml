@@ -200,8 +200,6 @@ type config = {
   max_incoming_connections : int ;
   connection_timeout : float ;
   authentication_timeout : float ;
-  greylist_timeout : int ;
-  maintenance_idle_time: float ;
 
   incoming_app_message_queue_size : int option ;
   incoming_message_queue_size : int option ;

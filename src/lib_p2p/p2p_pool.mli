@@ -103,12 +103,6 @@ type config = {
   authentication_timeout : float ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
-  greylist_timeout : int ;
-  (** GC delay for the grelists tables, in seconds. *)
-
-  maintenance_idle_time: float ;
-  (** How long to wait at most, in seconds, before running a maintenance loop. *)
-
   incoming_app_message_queue_size : int option ;
   (** Size of the message queue for user messages (messages returned
       by this module's [read] function. *)
