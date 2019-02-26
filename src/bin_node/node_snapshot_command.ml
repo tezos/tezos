@@ -193,7 +193,6 @@ let import data_dir filename =
           ~max_operations_ttl:(max_int-1)
           ~predecessor_block_header:predecessor_block_header
           ~predecessor_context
-          ~start_testchain:false
           ~block_header
           operations >>=? fun block_validation_result ->
 
@@ -324,7 +323,7 @@ let import data_dir filename =
           operations
           ops_metadata
           validation_store
-          ~forked_genesis_header:None >>=? fun new_head ->
+          ~forking_testchain:false >>=? fun new_head ->
 
         begin match new_head with
           | None ->
