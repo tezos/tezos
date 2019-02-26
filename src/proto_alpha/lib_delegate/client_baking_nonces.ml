@@ -28,6 +28,7 @@ open Alpha_context
 
 type t = Nonce.t Block_hash.Map.t Chain_id.Map.t
 
+let empty = Chain_id.Map.empty
 
 let per_chain_encoding =
   let open Data_encoding in
@@ -56,43 +57,18 @@ let encoding =
           (req "chain" Chain_id.encoding)
           (req "nonces" per_chain_encoding)))
 
-let transition_encoding =
+let legacy_encoding =
   let open Data_encoding in
-  let legacy_case =
-    case
-      ~title:"legacy_encoding"
-      ~description:"Old version encoding"
-      (Tag 0)
-      per_chain_encoding
-      (function
-        | `Legacy _ -> assert false (* never write in the legacy format *)
-        | `Current _ -> None)
-      (fun l ->
-         `Legacy (List.fold_left (fun acc (hash, nonce) ->
-             Block_hash.Map.add hash nonce acc)
-             Block_hash.Map.empty l))
-  in
-  let current_case =
-    case
-      ~title:"current_encoding"
-      ~description:"`Current version encoding"
-      (Tag 1)
-      encoding
-      (function
-        | `Current map -> Some map
-        | `Legacy _ -> assert false (* never write in the legacy format *))
-      (fun map -> `Current map)
-  in
   def "seed_nonce" @@
-  union ~tag_size:`Uint8 [ legacy_case ; current_case ]
+  list
+    (obj2
+       (req "block" Block_hash.encoding)
+       (req "nonce" Nonce.encoding))
 
 let name = "nonce"
 
-let load ~main_chain_id (wallet : #Client_context.wallet) =
-  wallet#load name ~default:(`Current Chain_id.Map.empty) transition_encoding >>=? function
-  | `Current map -> return map
-  | `Legacy map ->
-      return (Chain_id.Map.add main_chain_id map Chain_id.Map.empty)
+let load (wallet : #Client_context.wallet) =
+  wallet#load name ~default:Chain_id.Map.empty encoding
 
 let save (wallet : #Client_context.wallet) t =
   wallet#write name t encoding
@@ -110,7 +86,6 @@ let find_opt t chain hash =
     Block_hash.Map.find_opt hash nonces
   with
   | Not_found -> None
-
 
 let add t chain hash nonce =
   Chain_id.Map.update chain
@@ -138,3 +113,23 @@ let remove_all t chain =
 
 let find_chain_nonces_opt t chain =
   Chain_id.Map.find_opt chain t
+
+let should_upgrade_nonce_file (wallet : #Client_context.full) =
+  wallet#load name ~default:[] legacy_encoding >>= function
+  | Ok nonces when nonces <> [] -> return_true
+  | Ok _ | Error _ -> return_false
+
+let upgrade_nonce_file (wallet : #Client_context.full) ~main_chain_id =
+  wallet#load name ~default:[] legacy_encoding >>= function
+  | Ok [] | Error _ -> return_unit (* upgrade not needed or already occured *)
+  | Ok l ->
+      (* Backup legacy files *)
+      wallet#write (name ^ "_old") l legacy_encoding >>=? fun () ->
+      let old_nonces =
+        List.fold_left (fun acc (hash, nonce) ->
+            Block_hash.Map.add hash nonce acc)
+          Block_hash.Map.empty l in
+      let main_map =
+        Chain_id.Map.add main_chain_id old_nonces empty in
+      save wallet main_map >>=? fun () ->
+      return_unit

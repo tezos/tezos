@@ -52,8 +52,7 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
           if cleanup_nonces then
             (* Clean-up existing nonces *)
             cctxt#with_lock begin fun () ->
-              Chain_services.chain_id cctxt ~chain:`Test () >>=? fun main_chain_id ->
-              Client_baking_nonces.load ~main_chain_id cctxt >>=? fun nonces ->
+              Client_baking_nonces.load cctxt >>=? fun nonces ->
               let nonces = Client_baking_nonces.remove_all nonces test_chain_id in
               Client_baking_nonces.save cctxt nonces
             end
