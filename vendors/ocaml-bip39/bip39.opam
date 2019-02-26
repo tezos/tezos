@@ -5,6 +5,7 @@ maintainer: "Vincent Bernardoff <vb@luminar.eu.org>"
 authors: ["Vincent Bernardoff <vb@luminar.eu.org>"]
 homepage: "https://github.com/vbmithr/ocaml-bip39"
 doc: "https://vbmithr.github.io/ocaml-bip39/doc"
+synopsis: "Bitcoin's BIP39 implementation"
 license: "ISC"
 dev-repo: "git+https://github.com/vbmithr/ocaml-bip39.git"
 bug-reports: "https://github.com/vbmithr/ocaml-bip39/issues"

@@ -6,6 +6,7 @@ homepage:     "https://gitlab.com/tezos/irmin-lmdb"
 bug-reports:  "https://gitlab.com/tezos/irmin-lmdb/issues"
 dev-repo:     "git+https://gitlab.com/tezos/irmin-lmdb.git"
 doc:          "https://tezos.gitlab.io/irmin-lmdb/"
+synopsis:     "LMDB backend for Irmin"
 
 build: [
  ["dune" "subst"] {pinned}

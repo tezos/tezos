@@ -114,7 +114,9 @@ let rec try_to_contact
     else
       List.fold_left
         (fun acc point ->
-           P2p_pool.connect pool point >>= function
+           protect ~canceler:st.canceler begin fun () ->
+             P2p_pool.connect pool point
+           end >>= function
            | Ok _ -> acc >|= succ
            | Error _ -> acc)
         (Lwt.return 0)

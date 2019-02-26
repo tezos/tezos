@@ -48,6 +48,7 @@ type rpc_error =
                             media_type: string ;
                             error: string }
   | OCaml_exception of string
+  | Unauthorized_host of string option
 
 let rpc_error_encoding =
   let open Data_encoding in
@@ -196,6 +197,11 @@ let pp_rpc_error ppf err =
       Format.fprintf ppf
         "@[<v 2>The server failed with an unexpected exception:@ %s@]"
         msg
+  | Unauthorized_host host ->
+      Format.fprintf ppf
+        "@[<v 2>The server refused connection to host \"%s\", \
+         please check the node settings for CORS allowed origins.@]"
+        (Option.unopt ~default:"" host)
 
 type error +=
   | Request_failed of { meth: RPC_service.meth ;
@@ -269,6 +275,8 @@ let generic_call ?logger ?headers ?accept ?body ?media meth uri : (content, cont
       request_failed meth uri (Connection_failed msg)
   | `OCaml_exception msg ->
       request_failed meth uri (OCaml_exception msg)
+  | `Unauthorized_host host ->
+      request_failed meth uri (Unauthorized_host host)
 
 let handle_error meth uri (body, media, _) f =
   Cohttp_lwt.Body.is_empty body >>= fun empty ->
@@ -389,6 +397,8 @@ let handle accept (meth, uri, ans) =
       request_failed meth uri (Connection_failed msg)
   | `OCaml_exception msg ->
       request_failed meth uri (OCaml_exception msg)
+  | `Unauthorized_host host ->
+      request_failed meth uri (Unauthorized_host host)
 
 let call_streamed_service
     (type p q i o )

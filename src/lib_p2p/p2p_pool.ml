@@ -783,6 +783,7 @@ and raw_authenticate pool ?point_info canceler fd point =
     (if incoming then " incoming" else "") >>= fun () ->
   protect ~canceler begin fun () ->
     P2p_socket.authenticate
+      ~canceler
       ~proof_of_work_target:pool.config.proof_of_work_target
       ~incoming fd point
       ?listening_port:pool.config.listening_port
@@ -885,6 +886,7 @@ and raw_authenticate pool ?point_info canceler fd point =
           ?incoming_message_queue_size:pool.config.incoming_message_queue_size
           ?outgoing_message_queue_size:pool.config.outgoing_message_queue_size
           ?binary_chunks_size:pool.config.binary_chunks_size
+          ~canceler
           auth_fd pool.encoding >>=? fun conn ->
         lwt_debug "authenticate: %a -> Connected %a"
           P2p_point.Id.pp point

@@ -17,8 +17,11 @@ start_sandboxed_node() {
     expected_connections="${expected_connections:-3}"
     node_dir="$(mktemp -d -t tezos-node.XXXXXXXX)"
     peers=("--no-bootstrap-peers")
+    for peer_port in $(seq 19730 $((19730 + max_peer_id))); do
+        peers+=("--peer")
+        peers+=("127.0.0.1:$peer_port")
+    done
     peers+=("--private-mode")
-
     node="${local_node}"
     sandbox_param="--sandbox=$sandbox_file"
 
@@ -38,7 +41,6 @@ EOF
               --data-dir "$node_dir" \
               --net-addr "127.0.0.1:$port" \
               --rpc-addr "127.0.0.1:$rpc" \
-              --discovery-addr "127.255.255.255" \
               --rpc-tls  "${node_dir}/tezos.crt,${node_dir}/tezos.key" \
               --expected-pow "$expected_pow" \
               --connections "$expected_connections"
@@ -167,7 +169,6 @@ EOF
               --data-dir "$node_dir" \
               --net-addr "127.0.0.1:$port" \
               --rpc-addr "127.0.0.1:$rpc" \
-              --discovery-addr "127.255.255.255" \
               --expected-pow "$expected_pow" \
               --connections "$expected_connections"
     fi
@@ -196,11 +197,11 @@ main() {
         sandbox_file="${sandbox_file:-sandbox.json}"
     fi
 
-    if [ $# -lt 1 ] || [ "$1" -le 0 ]; then
+    if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
         echo "Small script to launch local and closed test network with a maximum of 9 nodes."
         echo
         echo "Usage: $0 <id>"
-        echo "  where <id> should be a positive integer."
+        echo "  where <id> should be an integer between 1 and 9."
         exit 1
     fi
 

@@ -47,7 +47,7 @@ type t = {
 (* we use a prefix ' cnx:' that allows easy grepping in the log to lookup
    everything related to a particular connection. *)
 let log t fmt =
-  Format.kasprintf (fun s -> Log.log_info "cnx:%d:%s" t.id s) fmt
+  Format.kasprintf (fun s -> Log.debug "cnx:%d:%s" t.id s) fmt
 
 let create =
   let counter = ref 0 in

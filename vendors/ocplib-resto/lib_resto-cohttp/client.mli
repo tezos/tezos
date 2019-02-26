@@ -32,7 +32,8 @@ module Make (Encoding : Resto.ENCODING) : sig
     | `Not_acceptable of string
     | `Unexpected_status_code of Cohttp.Code.status_code * content
     | `Connection_failed of string
-    | `OCaml_exception of string ]
+    | `OCaml_exception of string
+    | `Unauthorized_host of string option ]
 
   module type LOGGER = sig
     type request

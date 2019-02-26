@@ -45,6 +45,8 @@ val protocols:
   #streamed ->
   (Protocol_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
 
+val commit_hash: #simple -> string tzresult Lwt.t
+
 module S : sig
 
   val bootstrapped:
@@ -70,5 +72,7 @@ module S : sig
      unit, unit, unit,
      Protocol_hash.t) RPC_service.t
 
+  val commit_hash:
+    ([ `GET ], unit, unit, unit, unit, string) RPC_service.t
 end
 
