@@ -67,6 +67,7 @@ launch_node() {
         rm -rf "$client_dir/blocks"
         rm -rf "$client_dir/highwatermarks"
         if [ -f "/tmp/identity.json" ]; then \
+            mkdir -p "$node_data_dir"
             mv /tmp/identity.json "$node_data_dir/"
         fi
         cp "/usr/local/share/tezos/alphanet_version" \
